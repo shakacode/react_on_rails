@@ -6886,21 +6886,23 @@ def publish_or_update_github_release(monorepo_root:, release_context:, dry_run:)
     return
   end
 
+  repo_slug = github_repo_slug(monorepo_root)
+
   Tempfile.create(["react-on-rails-release-notes-", ".md"]) do |tmp|
     tmp.write(release_context[:notes])
     tmp.flush
 
-    release_exists = system("gh", "release", "view", release_context[:tag], chdir: monorepo_root, out: File::NULL,
-                                                                            err: File::NULL)
+    release_exists = system("gh", "release", "view", release_context[:tag], "--repo", repo_slug,
+                            chdir: monorepo_root, out: File::NULL, err: File::NULL)
     abort "❌ Unable to run `gh`. Ensure GitHub CLI is installed and on PATH." if release_exists.nil?
 
     release_command = if release_exists
-                        ["gh", "release", "edit", release_context[:tag], "--title", release_context[:title],
-                         "--notes-file", tmp.path,
+                        ["gh", "release", "edit", release_context[:tag], "--repo", repo_slug,
+                         "--title", release_context[:title], "--notes-file", tmp.path,
                          "--prerelease=#{release_context[:prerelease]}"]
                       else
-                        command = ["gh", "release", "create", release_context[:tag], "--verify-tag", "--title",
-                                   release_context[:title],
+                        command = ["gh", "release", "create", release_context[:tag], "--repo", repo_slug,
+                                   "--verify-tag", "--title", release_context[:title],
                                    "--notes-file", tmp.path]
                         command << "--prerelease" if release_context[:prerelease]
                         command
