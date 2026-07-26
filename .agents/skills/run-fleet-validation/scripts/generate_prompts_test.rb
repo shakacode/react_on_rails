@@ -3276,6 +3276,19 @@ class FleetValidationGeneratorTest < Minitest::Test
     end
   end
 
+  def test_index_closeout_command_targets_the_generated_pack_directory
+    Dir.mktmpdir do |root|
+      output_dir = File.join(root, "fleet pack")
+      build_generator.write_pack(output_dir)
+      index = File.read(File.join(output_dir, "INDEX.md"))
+
+      assert_includes index, "PACK_DIR=#{Shellwords.escape(output_dir)}"
+      assert_includes index, "bundle exec ruby .agents/skills/run-fleet-validation/scripts/validate_ledger.rb"
+      assert_includes index, '--ledger "$PACK_DIR/result-ledger.json"'
+      assert_includes index, '--render-tracker "$PACK_DIR/tracker-closeout.md"'
+    end
+  end
+
   def test_core_matrix_gate_is_always_assigned_to_coordinator_one
     (4..8).each do |prompt_count|
       generator = build_generator(prompt_count:)
