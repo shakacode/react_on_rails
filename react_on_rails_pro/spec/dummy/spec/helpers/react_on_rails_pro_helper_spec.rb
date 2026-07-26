@@ -2099,6 +2099,39 @@ describe ReactOnRailsProHelper do
         expect(chunks_read.count).to eq(chunks.count)
       end
 
+      it "does not cache a buffered render when any chunk reports errors" do
+        error_chunks = [
+          { html: "<div>Chunk 1: shell ok</div>", consoleReplayScript: "",
+            hasErrors: false, isShellReady: true },
+          { html: "<div>Chunk 2: broken boundary</div>", consoleReplayScript: "",
+            hasErrors: true, isShellReady: true }
+        ]
+        user_cache_key = ["buffered-stream-cache-errors", component_name]
+        expected_cache_key = nil
+        result = nil
+
+        Sync do
+          mock_request_and_response(error_chunks)
+          expected_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(
+            component_name,
+            cache_key: ["buffered_stream_react_component", user_cache_key],
+            prerender: true
+          )
+          result = cached_buffered_stream_react_component(
+            component_name,
+            cache_key: user_cache_key,
+            id: "#{component_name}-react-component-0",
+            cache_options: { expires_in: 60 }
+          ) do
+            props
+          end
+        end
+
+        expect(result).to include("broken boundary")
+        expect(chunks_read.count).to eq(error_chunks.count)
+        expect(Rails.cache.read(expected_cache_key)).to be_nil
+      end
+
       it "respects explicit auto_load_bundle false on cache misses" do
         original_auto_load_bundle = ReactOnRails.configuration.auto_load_bundle
         ReactOnRails.configuration.auto_load_bundle = true
@@ -2329,6 +2362,39 @@ describe ReactOnRailsProHelper do
           <script>window.ReactOnRailsReveal && window.ReactOnRailsReveal("#{component_name}")</script>
           <script src="/packs/generated/PublicPageClientEffects.js"></script>
         HTML
+      end
+
+      it "does not cache static RSC HTML when any chunk reports errors" do
+        error_chunks = [
+          { html: "<div>Chunk 1: shell ok</div>", consoleReplayScript: "",
+            hasErrors: false, isShellReady: true },
+          { html: "<div>Chunk 2: broken boundary</div>", consoleReplayScript: "",
+            hasErrors: true, isShellReady: true }
+        ]
+        user_cache_key = ["static-rsc-cache-errors", component_name]
+        expected_cache_key = nil
+        result = nil
+
+        Sync do
+          mock_request_and_response(error_chunks)
+          expected_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(
+            component_name,
+            cache_key: ["static_rsc_component", user_cache_key],
+            prerender: true
+          )
+          result = cached_static_rsc_component(
+            component_name,
+            cache_key: user_cache_key,
+            id: "#{component_name}-react-component-0",
+            cache_options: { expires_in: 60 }
+          ) do
+            props
+          end
+        end
+
+        expect(result).to include("broken boundary")
+        expect(chunks_read.count).to eq(error_chunks.count)
+        expect(Rails.cache.read(expected_cache_key)).to be_nil
       end
 
       it "replaces cached static RSC attribution once per request" do
