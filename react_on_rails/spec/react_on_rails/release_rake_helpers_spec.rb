@@ -664,6 +664,37 @@ RSpec.describe "release.rake helper methods" do
   end
 
   describe "#publish_or_update_github_release" do
+    it "scopes GitHub release commands to the origin repository" do
+      release_context = {
+        notes: "#### Fixed\n\n- Release fix",
+        prerelease: false,
+        tag: "v17.0.0",
+        title: "v17.0.0"
+      }
+      allow(self).to receive(:ensure_git_tag_exists!)
+      allow(self).to receive(:github_repo_slug).with("/tmp/repo").and_return("shakacode/react_on_rails")
+      allow(self).to receive(:system).and_return(false, true, true, true)
+
+      2.times do
+        publish_or_update_github_release(monorepo_root: "/tmp/repo", release_context:, dry_run: false)
+      end
+
+      expect(self).to have_received(:system)
+        .with(
+          "gh", "release", "view", "v17.0.0", "--repo", "shakacode/react_on_rails",
+          chdir: "/tmp/repo", out: File::NULL, err: File::NULL
+        ).twice
+      expect(self).to have_received(:system).with(
+        "gh", "release", "create", "v17.0.0", "--repo", "shakacode/react_on_rails", "--verify-tag",
+        "--title", "v17.0.0", "--notes-file", a_string_ending_with(".md"), chdir: "/tmp/repo"
+      )
+      expect(self).to have_received(:system).with(
+        "gh", "release", "edit", "v17.0.0", "--repo", "shakacode/react_on_rails",
+        "--title", "v17.0.0", "--notes-file", a_string_ending_with(".md"), "--prerelease=false",
+        chdir: "/tmp/repo"
+      )
+    end
+
     it "reports the GitHub-only recovery command when publication fails" do
       release_context = {
         notes: "#### Fixed\n\n- Release fix",
@@ -672,6 +703,7 @@ RSpec.describe "release.rake helper methods" do
         title: "v17.0.0"
       }
       allow(self).to receive(:ensure_git_tag_exists!)
+      allow(self).to receive(:github_repo_slug).with("/tmp/repo").and_return("shakacode/react_on_rails")
       allow(self).to receive(:system).and_return(false, false)
 
       expect do
