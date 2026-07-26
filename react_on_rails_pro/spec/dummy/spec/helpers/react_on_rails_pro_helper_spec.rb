@@ -2073,8 +2073,7 @@ describe ReactOnRailsProHelper do
               component_name,
               cache_key: ["buffered-stream-cache-spec", component_name],
               id: "#{component_name}-react-component-0",
-              trace: true,
-              cache_options: { expires_in: 60 }
+              trace: true
             ) do
               props_calls += 1
               props
@@ -2439,8 +2438,7 @@ describe ReactOnRailsProHelper do
           result = cached_static_rsc_component(
             component_name,
             cache_key: ["static-rsc-cache-spec", component_name],
-            id: "#{component_name}-react-component-0",
-            cache_options: { expires_in: 60 }
+            id: "#{component_name}-react-component-0"
           ) do
             props_calls += 1
             props

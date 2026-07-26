@@ -493,7 +493,7 @@ module ReactOnRailsProHelper
     cache_hit = true
     cache_write_skipped = false
     uncached_result = nil
-    fetch_options = cache_write_if ? cache_write_options.merge(skip_nil: true) : cache_write_options
+    fetch_options = cache_write_if ? (cache_write_options || {}).merge(skip_nil: true) : cache_write_options
     result = Rails.cache.fetch(cache_key, fetch_options) do
       cache_hit = false
       rendered_result = yield
