@@ -492,18 +492,17 @@ module ReactOnRailsProHelper
   def fetch_cache_entry(cache_key, cache_write_options, cache_write_if:)
     cache_hit = true
     cache_write_skipped = false
-    uncached_result = nil
-    fetch_options = cache_write_if ? (cache_write_options || {}).merge(skip_nil: true) : cache_write_options
-    result = Rails.cache.fetch(cache_key, fetch_options) do
-      cache_hit = false
-      rendered_result = yield
-      next rendered_result unless cache_write_if && !cache_write_if.call
+    skip_cache_write = Object.new
+    result = catch(skip_cache_write) do
+      Rails.cache.fetch(cache_key, cache_write_options) do
+        cache_hit = false
+        rendered_result = yield
+        next rendered_result unless cache_write_if && !cache_write_if.call
 
-      cache_write_skipped = true
-      uncached_result = rendered_result
-      nil
+        cache_write_skipped = true
+        throw(skip_cache_write, rendered_result)
+      end
     end
-    result = uncached_result if cache_write_skipped
 
     [result, cache_hit, cache_write_skipped]
   end

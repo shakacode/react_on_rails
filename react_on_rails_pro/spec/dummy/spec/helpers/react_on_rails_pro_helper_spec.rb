@@ -856,6 +856,12 @@ describe ReactOnRailsProHelper do
       )
     end
 
+    def simulate_cache_store_ignoring_skip_nil
+      allow(Rails.cache).to receive(:fetch).and_wrap_original do |original, key, options = nil, &fetch_block|
+        original.call(key, options&.except(:skip_nil), &fetch_block)
+      end
+    end
+
     it "redacts parser failures from the StreamRequest helper wrapper" do
       stub_pro_bundle_hashes
       malformed_payloads = [
@@ -2042,6 +2048,111 @@ describe ReactOnRailsProHelper do
       end
     end
 
+    describe "#fetch_cache_entry", :caching do
+      around do |example|
+        Rails.cache.clear
+        example.run
+      ensure
+        Rails.cache.clear
+      end
+
+      it "returns a rejected nil result and leaves no cache entry" do
+        cache_key = "rejected-nil-#{SecureRandom.hex(4)}"
+        simulate_cache_store_ignoring_skip_nil
+
+        result = send(:fetch_cache_entry, cache_key, nil, cache_write_if: -> { false }) { nil }
+
+        expect(result).to eq([nil, false, true])
+        expect(Rails.cache.exist?(cache_key)).to be(false)
+      end
+
+      it "preserves ordinary nil cache writes without a rejection predicate" do
+        cache_key = "ordinary-nil-#{SecureRandom.hex(4)}"
+
+        result = send(:fetch_cache_entry, cache_key, nil, cache_write_if: nil) { nil }
+
+        expect(result).to eq([nil, false, false])
+        expect(Rails.cache.exist?(cache_key)).to be(true)
+      end
+
+      it "keeps nested rejected cache fetches isolated" do
+        outer_key = "rejected-outer-#{SecureRandom.hex(4)}"
+        inner_key = "rejected-inner-#{SecureRandom.hex(4)}"
+        inner_result = nil
+        simulate_cache_store_ignoring_skip_nil
+
+        outer_result = send(:fetch_cache_entry, outer_key, nil, cache_write_if: -> { false }) do
+          inner_result = send(:fetch_cache_entry, inner_key, nil, cache_write_if: -> { false }) do
+            "inner rejected"
+          end
+          "outer rejected"
+        end
+
+        expect(inner_result).to eq(["inner rejected", false, true])
+        expect(outer_result).to eq(["outer rejected", false, true])
+        expect(Rails.cache.exist?(inner_key)).to be(false)
+        expect(Rails.cache.exist?(outer_key)).to be(false)
+      end
+
+      it "emits cache generation without a cache write for rejected misses" do
+        cache_key = "rejected-notifications-#{SecureRandom.hex(4)}"
+        notifications = []
+        simulate_cache_store_ignoring_skip_nil
+        subscriber = ActiveSupport::Notifications.subscribe(
+          /cache_(?:generate|write)\.active_support/
+        ) do |event_name, _started, _finished, _event_id, payload|
+          notifications << event_name if payload[:key] == cache_key
+        end
+
+        result = send(:fetch_cache_entry, cache_key, nil, cache_write_if: -> { false }) { "rejected" }
+
+        expect(result).to eq(["rejected", false, true])
+        expect(notifications).to include("cache_generate.active_support")
+        expect(notifications).not_to include("cache_write.active_support")
+      ensure
+        ActiveSupport::Notifications.unsubscribe(subscriber) if subscriber
+      end
+
+      it "does not register cache tags for rejected misses" do
+        options = {
+          cache_key: "rejected-tags-#{SecureRandom.hex(4)}",
+          cache_tags: ["rejected-tag"],
+          prerender: false
+        }
+        expected_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(component_name, options)
+        simulate_cache_store_ignoring_skip_nil
+        allow(ReactOnRailsPro::Cache).to receive(:register_normalized_tags)
+
+        result = send(:fetch_react_component, component_name, options, cache_write_if: -> { false }) do
+          "rejected"
+        end
+
+        expect(result).to eq("rejected")
+        expect(Rails.cache.exist?(expected_cache_key)).to be(false)
+        expect(ReactOnRailsPro::Cache).not_to have_received(:register_normalized_tags)
+      end
+
+      it "preserves the stale race-condition entry while rejecting the fresh result" do
+        cache_key = "rejected-race-condition-#{SecureRandom.hex(4)}"
+        started_at = Time.now
+        Rails.cache.write(cache_key, "stale", expires_in: 1)
+        allow(Time).to receive(:now).and_return(started_at + 2)
+        simulate_cache_store_ignoring_skip_nil
+
+        result = send(
+          :fetch_cache_entry,
+          cache_key,
+          { race_condition_ttl: 5 },
+          cache_write_if: -> { false }
+        ) { "fresh error" }
+
+        expect(result).to eq(["fresh error", false, true])
+        expect(Rails.cache.read(cache_key)).to eq("stale")
+        allow(Time).to receive(:now).and_return(started_at + 8)
+        expect(Rails.cache.exist?(cache_key)).to be(false)
+      end
+    end
+
     describe "#cached_buffered_stream_react_component", :caching do
       around do |example|
         Rails.cache.clear
@@ -2109,6 +2220,8 @@ describe ReactOnRailsProHelper do
         expected_cache_key = nil
         result = nil
 
+        simulate_cache_store_ignoring_skip_nil
+
         Sync do
           mock_request_and_response(error_chunks)
           expected_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(
@@ -2119,8 +2232,7 @@ describe ReactOnRailsProHelper do
           result = cached_buffered_stream_react_component(
             component_name,
             cache_key: user_cache_key,
-            id: "#{component_name}-react-component-0",
-            cache_options: { expires_in: 60 }
+            id: "#{component_name}-react-component-0"
           ) do
             props
           end
@@ -2128,7 +2240,7 @@ describe ReactOnRailsProHelper do
 
         expect(result).to include("broken boundary")
         expect(chunks_read.count).to eq(error_chunks.count)
-        expect(Rails.cache.read(expected_cache_key)).to be_nil
+        expect(Rails.cache.exist?(expected_cache_key)).to be(false)
       end
 
       it "respects explicit auto_load_bundle false on cache misses" do
@@ -2374,6 +2486,8 @@ describe ReactOnRailsProHelper do
         expected_cache_key = nil
         result = nil
 
+        simulate_cache_store_ignoring_skip_nil
+
         Sync do
           mock_request_and_response(error_chunks)
           expected_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(
@@ -2384,8 +2498,7 @@ describe ReactOnRailsProHelper do
           result = cached_static_rsc_component(
             component_name,
             cache_key: user_cache_key,
-            id: "#{component_name}-react-component-0",
-            cache_options: { expires_in: 60 }
+            id: "#{component_name}-react-component-0"
           ) do
             props
           end
@@ -2393,7 +2506,7 @@ describe ReactOnRailsProHelper do
 
         expect(result).to include("broken boundary")
         expect(chunks_read.count).to eq(error_chunks.count)
-        expect(Rails.cache.read(expected_cache_key)).to be_nil
+        expect(Rails.cache.exist?(expected_cache_key)).to be(false)
       end
 
       it "replaces cached static RSC attribution once per request" do
