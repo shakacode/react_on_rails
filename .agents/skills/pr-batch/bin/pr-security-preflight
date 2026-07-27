@@ -248,24 +248,26 @@ def resolved_trust_config(explicit_path, repo:, github_host:)
     expanded = File.expand_path(explicit_path)
     abort "Trust config not found: #{expanded}" unless File.exist?(expanded)
 
-    return { path: expanded, global: trust_config_global?(expanded, repo, github_host:) }
+    return { path: expanded, global: trust_config_global?(expanded, repo, github_host:), source: "explicit" }
   end
 
   repo_path = repo_trust_config_path
-  return { path: repo_path, global: trust_config_global?(repo_path, repo, github_host:) } if File.exist?(repo_path)
+  if File.exist?(repo_path)
+    return { path: repo_path, global: trust_config_global?(repo_path, repo, github_host:), source: "repo-local" }
+  end
 
   env_path = ENV[USER_TRUST_CONFIG_ENV].to_s
   unless env_path.empty?
     expanded_env_path = File.expand_path(env_path)
     abort "#{USER_TRUST_CONFIG_ENV} points to a missing trust config: #{expanded_env_path}" unless File.exist?(expanded_env_path)
 
-    return { path: expanded_env_path, global: true }
+    return { path: expanded_env_path, global: true, source: "env" }
   end
 
   home_path = File.expand_path(HOME_TRUST_CONFIG)
-  return { path: home_path, global: true } if File.exist?(home_path)
+  return { path: home_path, global: true, source: "user-global" } if File.exist?(home_path)
 
-  { path: PACKAGED_TRUST_CONFIG, global: false }
+  { path: PACKAGED_TRUST_CONFIG, global: false, source: "packaged-fallback" }
 end
 
 def repo_trust_config_path
@@ -981,9 +983,19 @@ def high_risk_files(files)
 end
 
 PARTICIPANT_NODES_FRAGMENT = <<~GRAPHQL
+  id
   login
   url
   __typename
+GRAPHQL
+
+CANONICAL_BOT_QUERY = <<~GRAPHQL
+  query CanonicalBot($id:ID!) {
+    node(id:$id) {
+      __typename
+      ... on Bot { login }
+    }
+  }
 GRAPHQL
 
 PR_TIMELINE_NODES_FRAGMENT = <<~GRAPHQL
@@ -1250,11 +1262,36 @@ def participant_logins_and_unknown_count(target)
     if login.to_s.empty?
       unknown_count += 1
     else
-      participants << login
+      participants << [login, participant&.[]("id")]
     end
   end
 
   { participants:, unknown_count: }
+end
+
+def canonical_bot_login(node_id, canonical_bot_cache)
+  return if node_id.to_s.empty?
+
+  canonical_bot_cache.fetch(node_id) do
+    payload = run_gh_json("api", "graphql", "-f", "id=#{node_id}", "-f", "query=#{CANONICAL_BOT_QUERY}")
+    node = payload.dig("data", "node")
+    canonical_bot_cache[node_id] = if node.is_a?(Hash) && node["__typename"] == "Bot"
+                                     node["login"]
+                                   end
+  end
+rescue StandardError => e
+  warn "WARN: could not resolve canonical bot identity for node #{node_id}: #{e.message.lines.first&.strip}"
+  canonical_bot_cache[node_id] = nil
+end
+
+def trusted_bare_bot_participant?(login, node_id, trust_config, canonical_bot_cache)
+  trusted_bots = trust_config.fetch(:trusted_bots)
+  return false unless trusted_bots.include?(normalized_login(login))
+
+  canonical_login = canonical_bot_login(node_id, canonical_bot_cache)
+  return false if canonical_login.to_s.empty?
+
+  trusted_bots.include?(normalized_bot_login(canonical_login))
 end
 
 def unknown_participant_findings(unknown_count)
@@ -1269,15 +1306,16 @@ def unknown_participant_findings(unknown_count)
   }]
 end
 
-def participant_findings(repo:, target:, visible:, permission_cache:, trust_config:, team_cache:)
+def participant_findings(repo:, target:, visible:, permission_cache:, trust_config:, team_cache:, canonical_bot_cache:)
   participant_data = participant_logins_and_unknown_count(target)
   findings = unknown_participant_findings(participant_data.fetch(:unknown_count))
   source_logins = target_source_actor_logins(target)
 
-  participant_data.fetch(:participants).each do |login|
+  participant_data.fetch(:participants).each do |login, node_id|
     # Trusted bots cannot delete comments, so a hidden bot participant does not
     # carry the same prompt-injection risk as a hidden human.
     next if trusted_bot?(login, trust_config)
+    next if trusted_bare_bot_participant?(login, node_id, trust_config, canonical_bot_cache)
 
     hidden = !visible.include?(login)
     if trusted_metadata_bot?(login, trust_config) && !hidden && !source_logins.include?(login)
@@ -1303,7 +1341,7 @@ def participant_findings(repo:, target:, visible:, permission_cache:, trust_conf
 end
 
 def scan_target(repo:, owner:, name:, number:, pr_query:, issue_query:, include_reactions:, permission_cache:,
-                trust_config:, team_cache:)
+                trust_config:, team_cache:, canonical_bot_cache:)
   issue = issue_payload(repo, number)
   target_is_pr = issue.key?("pull_request")
   graph_field = target_is_pr ? "pullRequest" : "issue"
@@ -1349,7 +1387,15 @@ def scan_target(repo:, owner:, name:, number:, pr_query:, issue_query:, include_
     files:,
     number:,
     graph_coverage_findings: graph_coverage_findings(target, include_target_author: target_is_pr),
-    participant_findings: participant_findings(repo:, target:, visible:, permission_cache:, trust_config:, team_cache:),
+    participant_findings: participant_findings(
+      repo:,
+      target:,
+      visible:,
+      permission_cache:,
+      trust_config:,
+      team_cache:,
+      canonical_bot_cache:
+    ),
     risky_files: high_risk_files(files),
     suspicious: suspicious_findings.fetch(:suspicious),
     suspicious_warnings: suspicious_findings.fetch(:suspicious_warnings),
@@ -1611,7 +1657,14 @@ overall_blockers = []
 acknowledged_findings = []
 permission_cache = {}
 team_cache = {}
-trust_config = load_trust_config(**resolved_trust_config(options.fetch(:trust_config), repo:, github_host:))
+canonical_bot_cache = {}
+trust_config_resolution = resolved_trust_config(options.fetch(:trust_config), repo:, github_host:)
+puts "Trust config: #{trust_config_resolution.fetch(:path)}"
+puts "Trust config source: #{trust_config_resolution.fetch(:source)}"
+trust_config = load_trust_config(
+  path: trust_config_resolution.fetch(:path),
+  global: trust_config_resolution.fetch(:global)
+)
 
 ARGV.each do |arg|
   number = Integer(arg, exception: false)
@@ -1627,7 +1680,8 @@ ARGV.each do |arg|
     include_reactions: options[:include_reactions],
     permission_cache:,
     trust_config:,
-    team_cache:
+    team_cache:,
+    canonical_bot_cache:
   )
   print_scan_result(
     result,
