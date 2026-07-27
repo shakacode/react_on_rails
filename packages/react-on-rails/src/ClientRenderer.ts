@@ -519,8 +519,15 @@ export function renderComponent(domId: string): void {
   // Initialize stores first
   forEachStore(railsContext);
 
-  // Find the element with the matching data-dom-id
-  const el = document.querySelector(`[data-dom-id="${domId}"]`);
+  // Compare attribute values directly so valid DOM IDs do not need CSS-selector escaping.
+  let el: Element | null = null;
+  const componentElements = document.querySelectorAll('[data-dom-id]');
+  for (let index = 0; index < componentElements.length; index += 1) {
+    if (componentElements[index].getAttribute('data-dom-id') === domId) {
+      el = componentElements[index];
+      break;
+    }
+  }
   if (!el) return;
 
   renderElement(el, railsContext);

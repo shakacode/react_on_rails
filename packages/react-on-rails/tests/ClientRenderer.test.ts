@@ -115,6 +115,31 @@ describe('ClientRenderer', () => {
       expect(targetNode.innerHTML).toContain('Rendered:');
     });
 
+    it.each(['component"quoted', 'component\\backslash', 'component#selector.metachar[one]'])(
+      'renders a component whose DOM ID contains selector metacharacters: %s',
+      (domId) => {
+        setupRailsContext();
+
+        const TestComponent: React.FC<{ message: string }> = ({ message }) =>
+          React.createElement('div', null, `Hello, ${message}!`);
+        ComponentRegistry.register({ TestComponent });
+
+        const componentElement = document.createElement('div');
+        componentElement.className = 'js-react-on-rails-component';
+        componentElement.setAttribute('data-component-name', 'TestComponent');
+        componentElement.setAttribute('data-dom-id', domId);
+        componentElement.textContent = JSON.stringify({ message: 'World' });
+        document.body.appendChild(componentElement);
+
+        const targetNode = document.createElement('div');
+        targetNode.id = domId;
+        document.body.appendChild(targetNode);
+
+        expect(() => renderComponent(domId)).not.toThrow();
+        expect(targetNode.innerHTML).toContain('Rendered:');
+      },
+    );
+
     it('handles missing Rails context gracefully', () => {
       // Don't setup Rails context - should return early without error
       renderComponent('test-component');

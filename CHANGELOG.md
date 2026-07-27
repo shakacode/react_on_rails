@@ -75,6 +75,13 @@ pair`, returns invalid UTF-8, or silently mis-decodes the value. The parser now 
   [PR 4804](https://github.com/shakacode/react_on_rails/pull/4804) by
   [justin808](https://github.com/justin808).
 
+- **`renderComponent` now handles DOM IDs containing selector metacharacters**: Component payloads are
+  matched by their exact `data-dom-id` attribute value, so valid IDs containing quotes, backslashes,
+  hashes, periods, or brackets no longer throw selector errors or fail to render. Fixes
+  [Issue 4585](https://github.com/shakacode/react_on_rails/issues/4585).
+  [PR 4808](https://github.com/shakacode/react_on_rails/pull/4808) by
+  [justin808](https://github.com/justin808).
+
 - **Stopped Doctor from warning when a layout uses only one pack helper**: `rake react_on_rails:doctor`
   no longer emits `⚠️ <layout>: has javascript_pack_tag but missing stylesheet_pack_tag` (or its mirror)
   based purely on helper asymmetry. A JavaScript-only Shakapacker entrypoint, a CSS-only pack, and a
