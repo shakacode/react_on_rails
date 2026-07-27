@@ -70,6 +70,7 @@ module FleetValidation
     end
 
     def write_pack(output_dir)
+      output_dir = File.expand_path(output_dir)
       @lifecycle.validate_existing_ledger(File.join(output_dir, "result-ledger.json"))
       FileUtils.mkdir_p(output_dir)
       clear_generated_prompts(output_dir)
