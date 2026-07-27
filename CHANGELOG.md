@@ -68,6 +68,13 @@ pair`, returns invalid UTF-8, or silently mis-decodes the value. The parser now 
   [PR 4722](https://github.com/shakacode/react_on_rails/pull/4722) by
   [justin808](https://github.com/justin808).
 
+- **[Pro]** **Buffered and static RSC caches no longer persist error-containing renders**: Buffered
+  component HTML and static RSC HTML now skip cache writes when any streamed chunk reports
+  `hasErrors: true`; clean renders remain cacheable. Fixes
+  [Issue 4723](https://github.com/shakacode/react_on_rails/issues/4723).
+  [PR 4804](https://github.com/shakacode/react_on_rails/pull/4804) by
+  [justin808](https://github.com/justin808).
+
 - **Stopped Doctor from warning when a layout uses only one pack helper**: `rake react_on_rails:doctor`
   no longer emits `⚠️ <layout>: has javascript_pack_tag but missing stylesheet_pack_tag` (or its mirror)
   based purely on helper asymmetry. A JavaScript-only Shakapacker entrypoint, a CSS-only pack, and a
