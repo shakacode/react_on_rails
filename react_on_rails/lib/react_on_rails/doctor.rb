@@ -3341,6 +3341,9 @@ module ReactOnRails
     end
 
     def node_renderer_call_reachability_proven?(content, call)
+      delimiters = node_renderer_delimiter_stack(content)
+      return false unless delimiters && delimiters.empty?
+
       prefix = content[...call.begin(0)]
       return false unless node_renderer_call_at_top_level?(prefix)
       return false if node_renderer_call_in_unproven_initializer?(prefix)
@@ -3359,16 +3362,23 @@ module ReactOnRails
       brace_depth.zero?
     end
 
-    def node_renderer_call_in_unproven_initializer?(prefix)
+    def node_renderer_delimiter_stack(content)
       delimiters = []
 
-      prefix.each_char.with_index do |character, index|
+      content.each_char.with_index do |character, index|
         delimiters << [character, index] if NODE_RENDERER_OPENING_DELIMITERS.include?(character)
         next unless NODE_RENDERER_MATCHING_OPENING_DELIMITERS.key?(character)
 
         opening = delimiters.pop
-        return true unless opening&.first == NODE_RENDERER_MATCHING_OPENING_DELIMITERS.fetch(character)
+        return nil unless opening&.first == NODE_RENDERER_MATCHING_OPENING_DELIMITERS.fetch(character)
       end
+
+      delimiters
+    end
+
+    def node_renderer_call_in_unproven_initializer?(prefix)
+      delimiters = node_renderer_delimiter_stack(prefix)
+      return true unless delimiters
 
       delimiters.any? do |opening, index|
         next false unless NODE_RENDERER_UNPROVEN_INITIALIZER_OPENINGS.include?(opening)

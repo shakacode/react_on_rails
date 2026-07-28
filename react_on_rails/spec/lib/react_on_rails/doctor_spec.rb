@@ -3977,6 +3977,14 @@ RSpec.describe ReactOnRails::Doctor do
         "startRenderer(JSON.parse(process.env.RENDERER_CONFIG));"
       ],
       [
+        "a direct call after an unmatched opening parenthesis",
+        "(reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a direct call after an unmatched opening bracket",
+        "[reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
         "a direct call inside an uninvoked arrow function",
         "const startRenderer = () => reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
       ],
@@ -4328,6 +4336,14 @@ RSpec.describe ReactOnRails::Doctor do
         "const chooseRenderer = (value = reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 })) => value;\n" \
         "chooseRenderer(true);\n" \
         "startRenderer(JSON.parse(process.env.RENDERER_CONFIG));"
+      ],
+      [
+        "a direct call after an unmatched opening parenthesis",
+        "(reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a direct call after an unmatched opening bracket",
+        "[reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
       ],
       [
         "a direct call inside an uninvoked arrow function",
