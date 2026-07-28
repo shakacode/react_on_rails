@@ -152,6 +152,10 @@ module ReactOnRails
     /mx
     NODE_RENDERER_BARE_CALL_PATTERN =
       /(?<![.\p{ID_Continue}$#])reactOnRailsProNodeRenderer\s*\(\s*/
+    NODE_RENDERER_UNPROVEN_CALL_CONTROL_PATTERN = /
+      (?:&&|\|\||=>|\?) |
+      \b(?:if|else|for|while|do|switch|case|catch|finally|function|return|throw)\b
+    /x
     # Defense-in-depth cap on how many files a single glob may contribute.
     # Realistic repos have a handful of workflow / deploy-stage files; far more
     # than this is a sign of an unexpectedly broad pattern, not legitimate config.
@@ -3321,7 +3325,9 @@ module ReactOnRails
       masked_content = node_renderer_mask_quoted_string_contents(active_content)
       calls = masked_content.to_enum(:scan, NODE_RENDERER_BARE_CALL_PATTERN).filter_map do
         call = Regexp.last_match
-        call unless node_renderer_constructor_call?(masked_content, call)
+        next if node_renderer_constructor_call?(masked_content, call)
+
+        call if node_renderer_call_reachability_proven?(masked_content, call)
       end
       return nil unless calls.one?
 
@@ -3329,6 +3335,24 @@ module ReactOnRails
       argument = active_content[call.end(0)..]
 
       argument.match(/\A(#{NODE_RENDERER_CONFIG_OBJECT_PATTERN})\s*\)/o)&.[](1)
+    end
+
+    def node_renderer_call_reachability_proven?(content, call)
+      prefix = content[...call.begin(0)]
+      return false unless node_renderer_call_at_top_level?(prefix)
+
+      !prefix.match?(NODE_RENDERER_UNPROVEN_CALL_CONTROL_PATTERN)
+    end
+
+    def node_renderer_call_at_top_level?(prefix)
+      brace_depth = 0
+      prefix.each_char do |character|
+        brace_depth += 1 if character == "{"
+        brace_depth -= 1 if character == "}"
+        return false if brace_depth.negative?
+      end
+
+      brace_depth.zero?
     end
 
     def node_renderer_constructor_call?(content, call)

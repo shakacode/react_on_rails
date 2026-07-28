@@ -3615,28 +3615,11 @@ RSpec.describe ReactOnRails::Doctor do
         JS
       ],
       [
-        "an identifier ending in new before a parenthesized direct call",
-        "function renew(value) { return value; }\n" \
-        "renew (reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 }));"
-      ],
-      [
         "new text in strings, comments, and regular expressions",
         "const label = 'new';\n" \
         "// new\n" \
         "const matcher = /new/;\n" \
         "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
-      ],
-      [
-        "a return context",
-        "function startRenderer() {\n" \
-        "return (reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 }));\n" \
-        "}\nstartRenderer();"
-      ],
-      [
-        "an await context",
-        "async function startRenderer() {\n" \
-        "await (reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 }));\n" \
-        "}\nstartRenderer();"
       ],
       [
         "a void context",
@@ -3646,11 +3629,6 @@ RSpec.describe ReactOnRails::Doctor do
         "a direct call used as an outer constructor argument",
         "class Factory {}\n" \
         "new Factory(reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 }));"
-      ],
-      [
-        "a direct call passed to a method named new",
-        "const wrapper = { new(value) { return value; } };\n" \
-        "wrapper.new(reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 }));"
       ],
       [
         "a byte-zero call followed by a trailing new decoy",
@@ -3951,6 +3929,57 @@ RSpec.describe ReactOnRails::Doctor do
         "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4, [key]: 2 });"
       ],
       [
+        "a direct call passed through an earlier function declaration",
+        "function renew(value) { return value; }\n" \
+        "renew (reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 }));"
+      ],
+      [
+        "a direct call passed through an earlier object method",
+        "const wrapper = { new(value) { return value; } };\n" \
+        "wrapper.new(reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 }));"
+      ],
+      [
+        "an unreachable braced direct-call decoy before a dynamic aliased renderer call",
+        "const startRenderer = reactOnRailsProNodeRenderer;\n" \
+        "if (false) { reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 }); }\n" \
+        "startRenderer(JSON.parse(process.env.RENDERER_CONFIG));"
+      ],
+      [
+        "a short-circuited direct-call decoy before a dynamic aliased renderer call",
+        "const startRenderer = reactOnRailsProNodeRenderer;\n" \
+        "false && reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });\n" \
+        "startRenderer(JSON.parse(process.env.RENDERER_CONFIG));"
+      ],
+      [
+        "an unbraced conditional direct-call decoy",
+        "if (false) reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a ternary direct-call decoy",
+        "false ? reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 }) : undefined;"
+      ],
+      [
+        "a direct call after a top-level throw",
+        "throw new Error('renderer disabled');\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a direct call inside an uninvoked arrow function",
+        "const startRenderer = () => reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a direct call inside a return context",
+        "function startRenderer() {\n" \
+        "return (reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 }));\n" \
+        "}\nstartRenderer();"
+      ],
+      [
+        "a direct call inside an await context",
+        "async function startRenderer() {\n" \
+        "await (reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 }));\n" \
+        "}\nstartRenderer();"
+      ],
+      [
         "a direct member-call decoy before a dynamic aliased renderer call",
         "const startRenderer = reactOnRailsProNodeRenderer;\n" \
         "shim.reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });\n" \
@@ -4238,6 +4267,57 @@ RSpec.describe ReactOnRails::Doctor do
         "a computed object property",
         "const key = getRuntimeKey();\n" \
         "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4, [key]: 2 });"
+      ],
+      [
+        "a direct call passed through an earlier function declaration",
+        "function renew(value) { return value; }\n" \
+        "renew (reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 }));"
+      ],
+      [
+        "a direct call passed through an earlier object method",
+        "const wrapper = { new(value) { return value; } };\n" \
+        "wrapper.new(reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 }));"
+      ],
+      [
+        "an unreachable braced direct-call decoy before a dynamic aliased renderer call",
+        "const startRenderer = reactOnRailsProNodeRenderer;\n" \
+        "if (false) { reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 }); }\n" \
+        "startRenderer(JSON.parse(process.env.RENDERER_CONFIG));"
+      ],
+      [
+        "a short-circuited direct-call decoy before a dynamic aliased renderer call",
+        "const startRenderer = reactOnRailsProNodeRenderer;\n" \
+        "false && reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });\n" \
+        "startRenderer(JSON.parse(process.env.RENDERER_CONFIG));"
+      ],
+      [
+        "an unbraced conditional direct-call decoy",
+        "if (false) reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a ternary direct-call decoy",
+        "false ? reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 }) : undefined;"
+      ],
+      [
+        "a direct call after a top-level throw",
+        "throw new Error('renderer disabled');\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a direct call inside an uninvoked arrow function",
+        "const startRenderer = () => reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a direct call inside a return context",
+        "function startRenderer() {\n" \
+        "return (reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 }));\n" \
+        "}\nstartRenderer();"
+      ],
+      [
+        "a direct call inside an await context",
+        "async function startRenderer() {\n" \
+        "await (reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 }));\n" \
+        "}\nstartRenderer();"
       ],
       [
         "a computed getter",
