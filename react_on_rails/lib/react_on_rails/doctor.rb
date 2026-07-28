@@ -154,13 +154,23 @@ module ReactOnRails
     NODE_RENDERER_BARE_CALL_PATTERN =
       /(?<![.\p{ID_Continue}$#])reactOnRailsProNodeRenderer\s*\(\s*/
     NODE_RENDERER_RSC_CONDITIONAL_NODES = %i[
+      binary
+      brace_block
       case
       case3
+      class
+      def
+      defs
+      do_block
       for
       if
       if_mod
+      ifop
+      lambda
+      module
       rescue
       rescue_mod
+      sclass
       unless
       unless_mod
       until
@@ -3215,6 +3225,7 @@ module ReactOnRails
     def node_renderer_initializer_rsc_enabled
       initializer_path = doctor_app_path("config/initializers/react_on_rails_pro.rb")
       return nil unless File.exist?(initializer_path)
+      return nil if File.size(initializer_path) > NODE_RENDERER_CONFIG_MAX_BYTES
 
       content = File.read(initializer_path, NODE_RENDERER_CONFIG_MAX_BYTES)
       evidence = node_renderer_rsc_assignment_evidence(Ripper.sexp(content))

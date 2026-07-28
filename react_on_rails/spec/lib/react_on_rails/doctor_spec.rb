@@ -5003,6 +5003,210 @@ RSpec.describe ReactOnRails::Doctor do
       )
     end
 
+    it "keeps oversized initializer RSC evidence conservative after a failed Rails boot" do
+      allow(doctor).to receive(:ensure_rails_environment_loaded).and_return(false)
+      FileUtils.mkdir_p("config/initializers")
+      prefix =
+        "config.enable_rsc_support = false\n" \
+        "config.server_renderer = \"NodeRenderer\"\n" \
+        "#"
+      padding = "x" * (described_class::NODE_RENDERER_CONFIG_MAX_BYTES - prefix.bytesize)
+      File.write(
+        "config/initializers/react_on_rails_pro.rb",
+        "#{prefix}#{padding}\nconfig.enable_rsc_support = true\n"
+      )
+      File.write("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
+
+      doctor.send(:check_node_renderer_rollout_capacity)
+
+      expect(checker.messages).to include(
+        hash_including(
+          type: :info,
+          content: a_string_including(
+            "contexts_per_generation=2",
+            "required_capacity=4",
+            "RSC evidence=unverified_conservative_enabled"
+          )
+        ),
+        hash_including(
+          type: :warning,
+          content: a_string_including("insufficient", "configured=2", "required=4")
+        )
+      )
+      expect(checker.messages).not_to include(hash_including(type: :success))
+    end
+
+    it "emits conservative JSON evidence for an oversized initializer after a failed Rails boot" do
+      FileUtils.mkdir_p("config/initializers")
+      prefix =
+        "config.enable_rsc_support = false\n" \
+        "config.server_renderer = \"NodeRenderer\"\n" \
+        "#"
+      padding = "x" * (described_class::NODE_RENDERER_CONFIG_MAX_BYTES - prefix.bytesize)
+      File.write(
+        "config/initializers/react_on_rails_pro.rb",
+        "#{prefix}#{padding}\nconfig.enable_rsc_support = true\n"
+      )
+      File.write("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
+      json_doctor = described_class.new(format: :json, only: "node_renderer_rollout_capacity")
+      allow(json_doctor).to receive(:ensure_rails_environment_loaded).and_return(false)
+      allow(json_doctor).to receive(:exit)
+      output = []
+      allow(json_doctor).to receive(:puts) { |argument| output << argument.to_s }
+
+      json_doctor.run_diagnosis
+
+      check = JSON.parse(output.join("\n")).fetch("checks").first
+      expect(check).to include(
+        "id" => "node_renderer_rollout_capacity",
+        "status" => "warn"
+      )
+      expect(check.fetch("details")).to include(
+        hash_including(
+          "level" => "info",
+          "content" => a_string_including(
+            "contexts_per_generation=2",
+            "required_capacity=4",
+            "RSC evidence=unverified_conservative_enabled"
+          )
+        ),
+        hash_including(
+          "level" => "warning",
+          "content" => a_string_including("insufficient", "configured=2", "required=4")
+        )
+      )
+    end
+
+    [
+      [
+        "an uncalled instance method",
+        <<~RUBY
+          def configure_rsc(config)
+            config.enable_rsc_support = false
+          end
+        RUBY
+      ],
+      [
+        "an uncalled singleton method",
+        <<~RUBY
+          def self.configure_rsc(config)
+            config.enable_rsc_support = false
+          end
+        RUBY
+      ],
+      [
+        "a block",
+        <<~RUBY
+          configs.each do |config|
+            config.enable_rsc_support = false
+          end
+        RUBY
+      ],
+      [
+        "a lambda",
+        <<~RUBY
+          configure_rsc = ->(config) { config.enable_rsc_support = false }
+        RUBY
+      ],
+      [
+        "a ternary branch",
+        <<~RUBY
+          enabled ? (config.enable_rsc_support = false) : nil
+        RUBY
+      ],
+      [
+        "a short-circuit expression",
+        <<~RUBY
+          enabled && (config.enable_rsc_support = false)
+        RUBY
+      ],
+      [
+        "a class body",
+        <<~RUBY
+          class Setup
+            config.enable_rsc_support = false
+          end
+        RUBY
+      ],
+      [
+        "a module body",
+        <<~RUBY
+          module Setup
+            config.enable_rsc_support = false
+          end
+        RUBY
+      ]
+    ].each do |description, dynamic_source|
+      it "keeps RSC evidence in #{description} conservative after a failed Rails boot" do
+        allow(doctor).to receive(:ensure_rails_environment_loaded).and_return(false)
+        FileUtils.mkdir_p("config/initializers")
+        File.write(
+          "config/initializers/react_on_rails_pro.rb",
+          "config.server_renderer = \"NodeRenderer\"\n#{dynamic_source}"
+        )
+        File.write("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
+
+        doctor.send(:check_node_renderer_rollout_capacity)
+
+        expect(checker.messages).to include(
+          hash_including(
+            type: :info,
+            content: a_string_including(
+              "contexts_per_generation=2",
+              "required_capacity=4",
+              "RSC evidence=unverified_conservative_enabled"
+            )
+          ),
+          hash_including(
+            type: :warning,
+            content: a_string_including("insufficient", "configured=2", "required=4")
+          )
+        )
+        expect(checker.messages).not_to include(hash_including(type: :success))
+      end
+    end
+
+    it "emits conservative JSON evidence for an uncalled method assignment after a failed Rails boot" do
+      FileUtils.mkdir_p("config/initializers")
+      File.write(
+        "config/initializers/react_on_rails_pro.rb",
+        <<~RUBY
+          config.server_renderer = "NodeRenderer"
+          def configure_rsc(config)
+            config.enable_rsc_support = false
+          end
+        RUBY
+      )
+      File.write("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
+      json_doctor = described_class.new(format: :json, only: "node_renderer_rollout_capacity")
+      allow(json_doctor).to receive(:ensure_rails_environment_loaded).and_return(false)
+      allow(json_doctor).to receive(:exit)
+      output = []
+      allow(json_doctor).to receive(:puts) { |argument| output << argument.to_s }
+
+      json_doctor.run_diagnosis
+
+      check = JSON.parse(output.join("\n")).fetch("checks").first
+      expect(check).to include(
+        "id" => "node_renderer_rollout_capacity",
+        "status" => "warn"
+      )
+      expect(check.fetch("details")).to include(
+        hash_including(
+          "level" => "info",
+          "content" => a_string_including(
+            "contexts_per_generation=2",
+            "required_capacity=4",
+            "RSC evidence=unverified_conservative_enabled"
+          )
+        ),
+        hash_including(
+          "level" => "warning",
+          "content" => a_string_including("insufficient", "configured=2", "required=4")
+        )
+      )
+    end
+
     it "infers a leading top-level initializer RSC assignment after a failed Rails boot" do
       allow(doctor).to receive(:ensure_rails_environment_loaded).and_return(false)
       FileUtils.mkdir_p("config/initializers")
