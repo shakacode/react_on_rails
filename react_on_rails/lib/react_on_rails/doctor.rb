@@ -3233,7 +3233,8 @@ module ReactOnRails
         evidence << { enabled:, conditional: }
       end
 
-      node.drop(1).each do |child|
+      children = node.first.is_a?(Symbol) ? node.drop(1) : node
+      children.each do |child|
         node_renderer_rsc_assignment_evidence(child, conditional:, evidence:)
       end
       evidence
@@ -3268,14 +3269,16 @@ module ReactOnRails
 
       config_path, selection_error = node_renderer_config_path
       return { state: :unverified, reason: selection_error } unless config_path
-      return { state: :unverified, reason: "canonical_renderer_script_too_large" } if
+      return { state: :unverified, reason: "canonical_renderer_script_too_large", config_path: } if
         File.size(doctor_app_path(config_path)) > NODE_RENDERER_CONFIG_MAX_BYTES
 
       active_content = node_renderer_active_config_content(
         File.read(doctor_app_path(config_path), NODE_RENDERER_CONFIG_MAX_BYTES)
       )
-      node_renderer_static_capacity_evidence(active_content) ||
+      evidence =
+        node_renderer_static_capacity_evidence(active_content) ||
         node_renderer_env_or_default_capacity_evidence(config_path)
+      evidence.merge(config_path:)
     end
 
     def node_renderer_config_path
@@ -3390,8 +3393,9 @@ module ReactOnRails
     end
 
     def node_renderer_constructor_call?(content, call)
-      operator_end = content.rindex(/\S/, call.begin(0) - 1)
-      operator_end = content.rindex(/\S/, operator_end - 1) while operator_end && content[operator_end] == "("
+      return false if call.begin(0).zero?
+
+      operator_end = node_renderer_constructor_operator_end(content, call.begin(0))
       return false unless operator_end && operator_end >= 2
 
       operator_start = operator_end - 2
@@ -3399,6 +3403,12 @@ module ReactOnRails
 
       preceding_character = content[operator_start - 1] if operator_start.positive?
       !preceding_character&.match?(/[.\p{ID_Continue}$#]/)
+    end
+
+    def node_renderer_constructor_operator_end(content, call_start)
+      operator_end = content.rindex(/\S/, call_start - 1)
+      operator_end = content.rindex(/\S/, operator_end - 1) while operator_end && content[operator_end] == "("
+      operator_end
     end
 
     def node_renderer_mask_quoted_string_contents(content)
@@ -3493,7 +3503,7 @@ module ReactOnRails
           "(evidence=unverified, topology=#{topology_label}, reason=#{evidence.fetch(:reason)}). " \
           "Doctor does not query the live renderer process."
         )
-        add_node_renderer_capacity_guidance(required_capacity)
+        add_node_renderer_capacity_guidance(required_capacity, evidence[:config_path])
         return
       end
 
@@ -3505,14 +3515,15 @@ module ReactOnRails
         checker.add_success("✅ VM pool rollout capacity is sufficient (#{evidence_summary}).")
       else
         checker.add_warning("⚠️  VM pool rollout capacity is insufficient (#{evidence_summary}).")
-        add_node_renderer_capacity_guidance(required_capacity)
+        add_node_renderer_capacity_guidance(required_capacity, evidence[:config_path])
       end
     end
 
-    def add_node_renderer_capacity_guidance(required_capacity)
+    def add_node_renderer_capacity_guidance(required_capacity, config_path = nil)
+      config_path ||= NodeRendererProcfile::NEW_RENDERER_SCRIPT_PATH
       checker.add_info(
         "💡 Set MAX_VM_POOL_SIZE=#{required_capacity} in the NodeRenderer workload, or set " \
-        "maxVMPoolSize: #{required_capacity} in renderer/node-renderer.js. The hard cap applies per worker."
+        "maxVMPoolSize: #{required_capacity} in #{config_path}. The hard cap applies per worker."
       )
     end
 

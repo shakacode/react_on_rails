@@ -180,9 +180,12 @@ describe('configBuilder', () => {
       'rejects invalid MAX_VM_POOL_SIZE=%p from ENV',
       (maxVMPoolSize) => {
         process.env.MAX_VM_POOL_SIZE = maxVMPoolSize;
-        const { buildConfig } = loadConfigBuilderWithMockedLogger();
+        const processExit = mockProcessExit();
+        const { buildConfig, error } = loadConfigBuilderWithMockedLogger();
 
-        expect(() => buildConfig()).toThrow('maxVMPoolSize must be a positive integer');
+        expect(() => buildConfig()).toThrow('process.exit: 1');
+        expect(error).toHaveBeenCalledWith('maxVMPoolSize must be a positive integer');
+        expect(processExit).toHaveBeenCalledWith(1);
       },
     );
 
@@ -207,11 +210,25 @@ describe('configBuilder', () => {
     it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])(
       'rejects an invalid rollout drain timeout of %p',
       (vmPoolRolloutDrainTimeout) => {
-        const { buildConfig } = loadConfigBuilderWithMockedLogger();
+        const processExit = mockProcessExit();
+        const { buildConfig, error } = loadConfigBuilderWithMockedLogger();
 
-        expect(() => buildConfig({ vmPoolRolloutDrainTimeout })).toThrow(
-          'vmPoolRolloutDrainTimeout must be a positive number of seconds',
-        );
+        expect(() => buildConfig({ vmPoolRolloutDrainTimeout })).toThrow('process.exit: 1');
+        expect(error).toHaveBeenCalledWith('vmPoolRolloutDrainTimeout must be a positive number of seconds');
+        expect(processExit).toHaveBeenCalledWith(1);
+      },
+    );
+
+    it.each(['45s', 'abc', '0', '-1', 'NaN', 'Infinity'])(
+      'rejects invalid VM_POOL_ROLLOUT_DRAIN_TIMEOUT=%p from ENV',
+      (vmPoolRolloutDrainTimeout) => {
+        process.env.VM_POOL_ROLLOUT_DRAIN_TIMEOUT = vmPoolRolloutDrainTimeout;
+        const processExit = mockProcessExit();
+        const { buildConfig, error } = loadConfigBuilderWithMockedLogger();
+
+        expect(() => buildConfig()).toThrow('process.exit: 1');
+        expect(error).toHaveBeenCalledWith('vmPoolRolloutDrainTimeout must be a positive number of seconds');
+        expect(processExit).toHaveBeenCalledWith(1);
       },
     );
 

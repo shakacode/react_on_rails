@@ -243,7 +243,7 @@ function defaultMaxVMPoolSize() {
 }
 
 function defaultVmPoolRolloutDrainTimeout() {
-  return env.VM_POOL_ROLLOUT_DRAIN_TIMEOUT ? parseFloat(env.VM_POOL_ROLLOUT_DRAIN_TIMEOUT) : 60;
+  return env.VM_POOL_ROLLOUT_DRAIN_TIMEOUT ? Number(env.VM_POOL_ROLLOUT_DRAIN_TIMEOUT) : 60;
 }
 
 const defaultConfig: Config = {
@@ -496,10 +496,12 @@ export function buildConfig(providedUserConfig?: Partial<Config>): Config {
   config.enableHealthEndpoints = truthyHealthEndpointFlag(config.enableHealthEndpoints);
 
   if (config.maxVMPoolSize <= 0 || !Number.isInteger(config.maxVMPoolSize)) {
-    throw new Error('maxVMPoolSize must be a positive integer');
+    log.error('maxVMPoolSize must be a positive integer');
+    process.exit(1);
   }
   if (config.vmPoolRolloutDrainTimeout <= 0 || !Number.isFinite(config.vmPoolRolloutDrainTimeout)) {
-    throw new Error('vmPoolRolloutDrainTimeout must be a positive number of seconds');
+    log.error('vmPoolRolloutDrainTimeout must be a positive number of seconds');
+    process.exit(1);
   }
 
   let currentArg: string | undefined;

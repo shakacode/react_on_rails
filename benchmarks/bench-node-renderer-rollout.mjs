@@ -86,21 +86,24 @@ async function run() {
 
   const configModulePath = path.join(packageRoot, 'lib/shared/configBuilder.js');
   const vmModulePath = path.join(packageRoot, 'lib/worker/vm.js');
-  if (!fs.existsSync(configModulePath) || !fs.existsSync(vmModulePath)) {
+  const fixturePath = path.join(packageRoot, 'tests/fixtures/bundle.js');
+  const missingRequiredPaths = [configModulePath, vmModulePath, fixturePath].filter(
+    (requiredPath) => !fs.existsSync(requiredPath),
+  );
+  if (missingRequiredPaths.length > 0) {
     throw new Error(
-      'Compiled Node Renderer files are missing. Run ' +
-        '`pnpm --filter react-on-rails-pro-node-renderer run build` first.',
+      `Required rollout benchmark files are missing:\n${missingRequiredPaths
+        .map((missingPath) => `- ${missingPath}`)
+        .join('\n')}\n` +
+        'Run `pnpm --filter react-on-rails-pro-node-renderer run build` and ensure the benchmark fixture is present.',
     );
   }
 
-  const { buildConfig } = require('../packages/react-on-rails-pro-node-renderer/lib/shared/configBuilder');
-  const {
-    buildExecutionContext,
-    getVMContext,
-    resetVM,
-  } = require('../packages/react-on-rails-pro-node-renderer/lib/worker/vm');
+  // eslint-disable-next-line import/no-dynamic-require -- computed path was checked above
+  const { buildConfig } = require(configModulePath);
+  // eslint-disable-next-line import/no-dynamic-require -- computed path was checked above
+  const { buildExecutionContext, getVMContext, resetVM } = require(vmModulePath);
   const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ror-node-renderer-rollout-'));
-  const fixturePath = path.join(packageRoot, 'tests/fixtures/bundle.js');
   const bundleSets = {
     old: ['server', 'rsc'].map((role) => path.join(temporaryRoot, 'old', `${role}.js`)),
     new: ['server', 'rsc'].map((role) => path.join(temporaryRoot, 'new', `${role}.js`)),

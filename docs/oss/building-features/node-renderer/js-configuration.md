@@ -57,7 +57,7 @@ available default ENV values if you wire them into your own launch script.
 1. **maxVMPoolSize** (default: `4`; set via `MAX_VM_POOL_SIZE` env var, parsed as integer) - Absolute maximum number of compiled VM contexts retained in the pool **per renderer worker**. The default holds the server and RSC contexts for one draining and one current bundle generation. Least-recently-used pooled contexts are evicted when the hard cap is exceeded. Must be a positive integer.
 1. **vmPoolRolloutDrainTimeout** (default: `60`; set via `VM_POOL_ROLLOUT_DRAIN_TIMEOUT`, parsed as seconds) - How long an inactive bundle set remains eligible for VM reuse during a rolling deploy. The default covers a representative 40-second overlap plus 20 seconds of drain and scheduling margin. Must be a positive finite number. Tune it to exceed the longest interval during which a draining app revision can still send a render request.
 
-### Sizing and draining the VM pool
+## Sizing and draining the VM pool
 
 Use this per-worker sizing formula:
 

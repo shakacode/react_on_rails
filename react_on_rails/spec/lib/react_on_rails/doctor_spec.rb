@@ -14,6 +14,12 @@ RSpec.describe ReactOnRails::Doctor do
     File.write("node_modules/#{name}/package.json", JSON.generate(package_json))
   end
 
+  def require_node_runtime!
+    return if ReactOnRails::Utils.command_available?("node")
+
+    skip "Node.js is required for this JavaScript runtime proof"
+  end
+
   describe "#initialize" do
     it "initializes with default options" do
       expect(doctor).to be_instance_of(described_class)
@@ -3645,6 +3651,10 @@ RSpec.describe ReactOnRails::Doctor do
         "a direct call passed to a method named new",
         "const wrapper = { new(value) { return value; } };\n" \
         "wrapper.new(reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 }));"
+      ],
+      [
+        "a byte-zero call followed by a trailing new decoy",
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });\nnew"
       ]
     ].each do |description, source|
       it "observes a direct inline literal with #{description}" do
@@ -3705,6 +3715,7 @@ RSpec.describe ReactOnRails::Doctor do
     end
 
     it "proves Node rejects a constructor invocation of an arrow-function renderer" do
+      require_node_runtime!
       source = <<~JS
         const reactOnRailsProNodeRenderer = () => undefined;
         new reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });
@@ -3727,6 +3738,7 @@ RSpec.describe ReactOnRails::Doctor do
       ]
     ].each do |description, invocation|
       it "proves Node rejects #{description}" do
+        require_node_runtime!
         source = <<~JS
           const reactOnRailsProNodeRenderer = () => undefined;
           #{invocation}
@@ -3740,6 +3752,7 @@ RSpec.describe ReactOnRails::Doctor do
     end
 
     it "proves JavaScript config spread invokes a leading getter before reading capacity" do
+      require_node_runtime!
       source = <<~JS
         let getterCalls = 0;
         const userConfig = {
@@ -3873,6 +3886,31 @@ RSpec.describe ReactOnRails::Doctor do
       expect(checker.messages).not_to include(
         hash_including(type: :success, content: a_string_including("configured=8"))
       )
+    end
+
+    it "emits JSON guidance for the renderer script selected by an active direct Procfile launcher" do
+      FileUtils.mkdir_p("client")
+      File.write("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });")
+      File.write("client/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
+      File.write("Procfile.production", "node-renderer: node client/node-renderer.js\n")
+      json_doctor = described_class.new(format: :json, only: "node_renderer_rollout_capacity")
+      allow(json_doctor).to receive(:ensure_rails_environment_loaded).and_return(true)
+      allow(json_doctor).to receive(:exit)
+      output = []
+      allow(json_doctor).to receive(:puts) { |argument| output << argument.to_s }
+
+      json_doctor.run_diagnosis
+
+      check = JSON.parse(output.join("\n")).fetch("checks").first
+      expect(check).to include(
+        "id" => "node_renderer_rollout_capacity",
+        "status" => "warn"
+      )
+      guidance = check.fetch("details").find do |detail|
+        detail["level"] == "info" && detail["content"].include?("Set MAX_VM_POOL_SIZE")
+      end
+      expect(guidance.fetch("content")).to include("client/node-renderer.js")
+      expect(guidance.fetch("content")).not_to include("renderer/node-renderer.js")
     end
 
     it "fails closed for a top-level literal on a named object passed to the renderer" do
@@ -4443,6 +4481,11 @@ RSpec.describe ReactOnRails::Doctor do
       expect(checker.messages).not_to include(
         hash_including(type: :success, content: a_string_including("configured=8"))
       )
+      guidance = checker.messages.find do |message|
+        message[:type] == :info && message[:content].include?("Set MAX_VM_POOL_SIZE")
+      end
+      expect(guidance.fetch(:content)).to include("client/node-renderer.js")
+      expect(guidance.fetch(:content)).not_to include("renderer/node-renderer.js")
     end
 
     [
@@ -4957,6 +5000,67 @@ RSpec.describe ReactOnRails::Doctor do
       )
       expect(checker.messages).not_to include(
         hash_including(type: :info, content: a_string_including("contexts_per_generation=1"))
+      )
+    end
+
+    it "infers a leading top-level initializer RSC assignment after a failed Rails boot" do
+      allow(doctor).to receive(:ensure_rails_environment_loaded).and_return(false)
+      FileUtils.mkdir_p("config/initializers")
+      File.write(
+        "config/initializers/react_on_rails_pro.rb",
+        <<~RUBY
+          config.enable_rsc_support = false
+          config.server_renderer = "NodeRenderer"
+        RUBY
+      )
+      File.write("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
+      allow(pro_config).to receive(:enable_rsc_support).and_return(true)
+
+      doctor.send(:check_node_renderer_rollout_capacity)
+
+      expect(checker.messages).to include(
+        hash_including(
+          type: :info,
+          content: a_string_including(
+            "contexts_per_generation=1",
+            "required_capacity=2",
+            "RSC evidence=inferred_disabled"
+          )
+        ),
+        hash_including(
+          type: :success,
+          content: a_string_including("configured=2", "required=2")
+        )
+      )
+    end
+
+    it "keeps conflicting top-level initializer RSC evidence conservative after a failed Rails boot" do
+      allow(doctor).to receive(:ensure_rails_environment_loaded).and_return(false)
+      FileUtils.mkdir_p("config/initializers")
+      File.write(
+        "config/initializers/react_on_rails_pro.rb",
+        <<~RUBY
+          config.enable_rsc_support = false
+          config.server_renderer = "NodeRenderer"
+          config.enable_rsc_support = true
+        RUBY
+      )
+      File.write("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
+
+      doctor.send(:check_node_renderer_rollout_capacity)
+
+      expect(checker.messages).to include(
+        hash_including(
+          type: :info,
+          content: a_string_including(
+            "contexts_per_generation=2",
+            "required_capacity=4",
+            "RSC evidence=unverified_conservative_enabled"
+          )
+        )
+      )
+      expect(checker.messages).not_to include(
+        hash_including(type: :info, content: a_string_including("RSC evidence=inferred_enabled"))
       )
     end
 

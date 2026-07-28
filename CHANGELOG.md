@@ -37,6 +37,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   replicas, so operators should re-check deployment memory requests and limits. Invalid `MAX_VM_POOL_SIZE` values
   that previously fell back to the default now fail fast during renderer startup. Fixes
   [Issue 4810](https://github.com/shakacode/react_on_rails/issues/4810).
+  [PR 4811](https://github.com/shakacode/react_on_rails/pull/4811) by
+  [justin808](https://github.com/justin808).
 
 - **RailsContext now stays current across Turbo and Turbolinks navigation**: Parsed context is cached
   only while its source element and JSON text remain unchanged. Replacing the context element or
