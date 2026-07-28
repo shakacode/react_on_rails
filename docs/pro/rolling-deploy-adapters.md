@@ -238,7 +238,7 @@ This ordering is also what makes the [boot seed](#promotion-deploys-need-a-relea
 - ℹ️ The resolved renderer cache dir and how many bundle-hash subdirectories are present.
 - ℹ️ Whether `PREVIOUS_BUNDLE_HASHES` env override is set.
 - ✅/⚠️ The conservative old/new VM-cap formula per worker, including RSC context count.
-- ℹ️ Whether the capacity is `observed`, `inferred`, or `unverified`; separate workloads and ambiguous loopback sidecars stay unverified rather than producing a false pass.
+- ℹ️ Whether the capacity is `observed` or `unverified`; separate workloads and ambiguous loopback sidecars stay unverified rather than producing a false pass.
 
 Doctor never calls `fetch` or `upload` and does not query the live Node Renderer process — those have side effects or would require a new privileged diagnostics channel.
 

@@ -155,7 +155,7 @@ Optional React on Rails Pro package and configuration consistency.
 
 Conservative per-worker VM capacity for overlapping Node Renderer bundle
 generations. Details include the old/new × SSR/RSC formula and classify
-configuration evidence as `observed`, `inferred`, or `unverified`. A loopback
+configuration evidence as `observed` or `unverified`. A loopback
 endpoint does not prove a shared process environment, and separate renderer
 workloads remain unverified because Doctor does not query the live renderer.
 

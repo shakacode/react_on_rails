@@ -126,7 +126,7 @@ Topology changes the first factor:
 - **Sidecar containers:** `localhost` proves only a shared pod network namespace. Treat the topology as one generation per renderer only when both containers are in the same pod template and roll as one unit with aligned images and startup gates. It does not prove that Rails and Node inherited the same environment variables.
 - **Separate workloads:** A shared renderer service receives requests from draining and current Rails revisions. Use at least `4` for RSC, deploy and warm the renderer first, and increase the cap if more than two Rails revisions can overlap.
 
-`react_on_rails:doctor` uses the conservative old/new formula and reports whether capacity evidence is `observed`, `inferred`, or `unverified`. It never treats a loopback `renderer_url` or a Rails-process environment variable as proof of live sidecar configuration. For a separate renderer workload, confirm `MAX_VM_POOL_SIZE` or `maxVMPoolSize` in that workload directly.
+`react_on_rails:doctor` uses the conservative old/new formula and reports whether capacity evidence is `observed` or `unverified`. It never treats a loopback `renderer_url` or a Rails-process environment variable as proof of live sidecar configuration. For a separate renderer workload, confirm `MAX_VM_POOL_SIZE` or `maxVMPoolSize` in that workload directly.
 
 Pre-seeding controls the on-disk bundle cache; it does not precompile per-worker VM contexts. Use a rolling-deploy adapter and boot seed to avoid uploads, then use the VM-cap formula to avoid context rebuild thrash after the first render. Inactive bundle sets drain after `vmPoolRolloutDrainTimeout` (60 seconds by default); see [Node Renderer JavaScript Configuration](./js-configuration.md#sizing-and-draining-the-vm-pool).
 

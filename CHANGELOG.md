@@ -30,7 +30,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   The default per-worker VM hard cap now retains four contexts, enough for the server and RSC bundles from one
   draining and one current revision. Successful bundle sets remain reusable through a configurable, timer-driven
   drain window, while inactive contexts, generation metadata, and pressure logs stay bounded. Doctor now reports the
-  rollout-capacity formula with observed, inferred, or unverified evidence instead of treating a loopback endpoint or
+  rollout-capacity formula with observed or unverified evidence instead of treating a loopback endpoint or
   Rails-process environment as live renderer proof. The deployment guides distinguish disk pre-seeding from VM
   compilation and document topology, memory, and last-observed-generation tradeoffs. **Upgrade memory impact:** the
   default `maxVMPoolSize` doubles from 2 to 4 per worker, and total VM retention scales with renderer workers and
