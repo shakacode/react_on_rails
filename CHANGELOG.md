@@ -26,6 +26,18 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **Bounded Node Renderer VM retention now avoids old/new RSC rebuild thrash during rolling deploys**:
+  The default per-worker VM hard cap now retains four contexts, enough for the server and RSC bundles from one
+  draining and one current revision. Successful bundle sets remain reusable through a configurable, timer-driven
+  drain window, while inactive contexts, generation metadata, and pressure logs stay bounded. Doctor now reports the
+  rollout-capacity formula with observed, inferred, or unverified evidence instead of treating a loopback endpoint or
+  Rails-process environment as live renderer proof. The deployment guides distinguish disk pre-seeding from VM
+  compilation and document topology, memory, and last-observed-generation tradeoffs. **Upgrade memory impact:** the
+  default `maxVMPoolSize` doubles from 2 to 4 per worker, and total VM retention scales with renderer workers and
+  replicas, so operators should re-check deployment memory requests and limits. Invalid `MAX_VM_POOL_SIZE` values
+  that previously fell back to the default now fail fast during renderer startup. Fixes
+  [Issue 4810](https://github.com/shakacode/react_on_rails/issues/4810).
+
 - **RailsContext now stays current across Turbo and Turbolinks navigation**: Parsed context is cached
   only while its source element and JSON text remain unchanged. Replacing the context element or
   morphing its payload in place now makes the next core render or immediate Pro hydration receive the

@@ -25,6 +25,7 @@ import m from 'module';
 import cluster from 'cluster';
 import type { Readable } from 'stream';
 import { ReadableStream } from 'stream/web';
+import { performance as monotonicPerformance } from 'node:perf_hooks';
 import { promisify, TextEncoder, types as utilTypes } from 'util';
 import type { ReactOnRails as ROR } from 'react-on-rails' with { 'resolution-mode': 'import' };
 import type { Context } from 'vm';
@@ -78,6 +79,44 @@ const vmContexts = new Map<string, VMContext>();
 // Track VM creation promises to handle concurrent buildVM requests
 const vmCreationPromises = new Map<string, Promise<VMContext>>();
 
+interface BundleGeneration {
+  bundlePaths: Set<string>;
+  lastObservedAt: number;
+  observationSequence: number;
+}
+
+interface VMPoolActivity {
+  contextsBuilt: number;
+  cacheHits: number;
+  hardLimitEvictions: number;
+  drainedContextRetirements: number;
+}
+
+const bundleGenerations = new Map<string, BundleGeneration>();
+const vmPoolActivity: VMPoolActivity = {
+  contextsBuilt: 0,
+  cacheHits: 0,
+  hardLimitEvictions: 0,
+  drainedContextRetirements: 0,
+};
+let generationObservationSequence = 0;
+type VMPoolTimer = ReturnType<typeof setTimeout>;
+export interface VMPoolClock {
+  now: () => number;
+  schedule: (callback: () => void, delay: number) => VMPoolTimer;
+  cancel: (timer: VMPoolTimer) => void;
+}
+const defaultVMPoolClock: VMPoolClock = {
+  now: () => monotonicPerformance.now(),
+  schedule: (callback, delay) => setTimeout(callback, delay),
+  cancel: (timer) => clearTimeout(timer),
+};
+let vmPoolClock = defaultVMPoolClock;
+let generationRetirementTimer: VMPoolTimer | undefined;
+let lastPressureWarningAt: number | undefined;
+const VM_POOL_PRESSURE_WARNING_INTERVAL_MS = 30_000;
+const VM_POOL_MAX_TIMER_DELAY_MS = 2_147_483_647;
+
 // Execution contexts can outlive VM pool entries while a request is still
 // running. Keep source maps for those evicted contexts until the request
 // releases them, then drop both the registration and parsed-map cache.
@@ -122,6 +161,176 @@ function retireSourceMapRegistrationAfterEviction(sourceMapRegistration: BundleS
   } else {
     unregisterBundleForSourceMaps(sourceMapRegistration);
   }
+}
+
+type VMRemovalReason = 'hard_limit' | 'drained_generation';
+
+function removeVMContextFromPool(bundlePath: string, reason: VMRemovalReason) {
+  const vmContext = vmContexts.get(bundlePath);
+  if (!vmContext) {
+    return false;
+  }
+
+  vmContexts.delete(bundlePath);
+  retireSourceMapRegistrationAfterEviction(vmContext.sourceMapRegistration);
+  if (reason === 'hard_limit') {
+    vmPoolActivity.hardLimitEvictions += 1;
+  } else {
+    vmPoolActivity.drainedContextRetirements += 1;
+  }
+  return true;
+}
+
+function bundleGenerationKey(bundlePaths: string[]) {
+  return JSON.stringify(Array.from(new Set(bundlePaths)).sort());
+}
+
+function latestBundleGenerationKey() {
+  let latestKey: string | undefined;
+  let latestSequence = -1;
+  bundleGenerations.forEach((generation, key) => {
+    if (generation.observationSequence > latestSequence) {
+      latestKey = key;
+      latestSequence = generation.observationSequence;
+    }
+  });
+  return latestKey;
+}
+
+function retainedBundlePaths() {
+  const retainedPaths = new Set<string>();
+  bundleGenerations.forEach(({ bundlePaths }) => {
+    bundlePaths.forEach((bundlePath) => retainedPaths.add(bundlePath));
+  });
+  return retainedPaths;
+}
+
+function retireDrainedBundleGenerations() {
+  generationRetirementTimer = undefined;
+  const { vmPoolRolloutDrainTimeout, maxVMPoolSize } = getConfig();
+  const drainTimeoutMilliseconds = vmPoolRolloutDrainTimeout * 1000;
+  const currentTime = vmPoolClock.now();
+  const latestKey = latestBundleGenerationKey();
+  let retiredGenerations = 0;
+
+  bundleGenerations.forEach((generation, key) => {
+    if (key !== latestKey && currentTime - generation.lastObservedAt >= drainTimeoutMilliseconds) {
+      bundleGenerations.delete(key);
+      retiredGenerations += 1;
+    }
+  });
+
+  if (retiredGenerations > 0) {
+    const retainedPaths = retainedBundlePaths();
+    let retiredContexts = 0;
+    Array.from(vmContexts.keys()).forEach((bundlePath) => {
+      if (!retainedPaths.has(bundlePath) && removeVMContextFromPool(bundlePath, 'drained_generation')) {
+        retiredContexts += 1;
+      }
+    });
+    log.info(
+      {
+        event: 'vm_pool_rollout_generation_retired',
+        retiredGenerations,
+        retiredContexts,
+        retainedContexts: vmContexts.size,
+        trackedGenerations: bundleGenerations.size,
+        maxVMPoolSize,
+        drainedContextRetirements: vmPoolActivity.drainedContextRetirements,
+      },
+      'Retired inactive rolling-deploy VM contexts',
+    );
+  }
+
+  // These timer functions intentionally call each other as the rollout set ages.
+  // eslint-disable-next-line no-use-before-define
+  scheduleGenerationRetirement();
+}
+
+function scheduleGenerationRetirement() {
+  if (generationRetirementTimer) {
+    // Keep the existing wake-up instead of replacing a timer on every render.
+    // An early wake-up is harmless: the callback re-evaluates generation ages
+    // and schedules the next exact expiration.
+    return;
+  }
+  if (bundleGenerations.size <= 1) {
+    return;
+  }
+
+  const { vmPoolRolloutDrainTimeout } = getConfig();
+  const drainTimeoutMilliseconds = vmPoolRolloutDrainTimeout * 1000;
+  const currentTime = vmPoolClock.now();
+  const latestKey = latestBundleGenerationKey();
+  let oldestObservedAt = Number.POSITIVE_INFINITY;
+  bundleGenerations.forEach((generation, key) => {
+    if (key !== latestKey) {
+      oldestObservedAt = Math.min(oldestObservedAt, generation.lastObservedAt);
+    }
+  });
+  if (!Number.isFinite(oldestObservedAt)) {
+    return;
+  }
+  const nextExpiration = oldestObservedAt + drainTimeoutMilliseconds;
+
+  generationRetirementTimer = vmPoolClock.schedule(
+    retireDrainedBundleGenerations,
+    Math.min(VM_POOL_MAX_TIMER_DELAY_MS, Math.max(1, nextExpiration - currentTime)),
+  );
+  generationRetirementTimer.unref?.();
+}
+
+function observeBundleGeneration(bundlePaths: string[]) {
+  if (bundlePaths.length === 0) {
+    return;
+  }
+
+  const { maxVMPoolSize } = getConfig();
+  const normalizedBundlePaths = new Set(bundlePaths);
+  const key = bundleGenerationKey(bundlePaths);
+  generationObservationSequence += 1;
+  bundleGenerations.set(key, {
+    bundlePaths: normalizedBundlePaths,
+    lastObservedAt: vmPoolClock.now(),
+    observationSequence: generationObservationSequence,
+  });
+
+  // maxVMPoolSize is intentionally a loose upper bound for generation metadata. Retained VM contexts
+  // remain the hard memory-bound resource; supported old/new RSC overlap needs only two generations.
+  while (bundleGenerations.size > maxVMPoolSize) {
+    let oldestKey: string | undefined;
+    let oldestSequence = Number.POSITIVE_INFINITY;
+    bundleGenerations.forEach((generation, candidateKey) => {
+      if (candidateKey !== key && generation.observationSequence < oldestSequence) {
+        oldestSequence = generation.observationSequence;
+        oldestKey = candidateKey;
+      }
+    });
+    if (!oldestKey) {
+      break;
+    }
+    bundleGenerations.delete(oldestKey);
+  }
+
+  scheduleGenerationRetirement();
+}
+
+/** @internal Used in tests and diagnostic instrumentation. */
+export function getVMPoolDiagnostics() {
+  return {
+    retainedContexts: vmContexts.size,
+    trackedGenerations: bundleGenerations.size,
+    ...vmPoolActivity,
+  };
+}
+
+/** @internal Replaces the monotonic clock and scheduler for deterministic tests. */
+export function setVMPoolClockForTest(clock: VMPoolClock | undefined) {
+  if (generationRetirementTimer) {
+    vmPoolClock.cancel(generationRetirementTimer);
+    generationRetirementTimer = undefined;
+  }
+  vmPoolClock = clock ?? defaultVMPoolClock;
 }
 
 /**
@@ -198,15 +407,35 @@ function manageVMPoolSize() {
     return;
   }
 
-  const sortedEntries = Array.from(vmContexts.entries()).sort(([, a], [, b]) => a.lastUsed - b.lastUsed);
+  const sortedEntries = Array.from(vmContexts.entries()).sort(
+    ([pathA, contextA], [pathB, contextB]) =>
+      contextA.lastUsed - contextB.lastUsed || pathA.localeCompare(pathB),
+  );
 
   while (sortedEntries.length > maxVMPoolSize) {
     const oldestEntry = sortedEntries.shift();
     if (oldestEntry) {
-      const [oldestPath, oldestContext] = oldestEntry;
-      vmContexts.delete(oldestPath);
-      retireSourceMapRegistrationAfterEviction(oldestContext.sourceMapRegistration);
-      log.debug(`Removed VM for bundle ${oldestPath} due to pool size limit (max: ${maxVMPoolSize})`);
+      const [oldestPath] = oldestEntry;
+      removeVMContextFromPool(oldestPath, 'hard_limit');
+      const currentTime = vmPoolClock.now();
+      if (
+        lastPressureWarningAt === undefined ||
+        currentTime - lastPressureWarningAt >= VM_POOL_PRESSURE_WARNING_INTERVAL_MS
+      ) {
+        lastPressureWarningAt = currentTime;
+        log.warn(
+          {
+            event: 'vm_pool_hard_limit_eviction',
+            retainedContexts: vmContexts.size,
+            trackedGenerations: bundleGenerations.size,
+            maxVMPoolSize,
+            hardLimitEvictions: vmPoolActivity.hardLimitEvictions,
+            contextsBuilt: vmPoolActivity.contextsBuilt,
+            warningIntervalMilliseconds: VM_POOL_PRESSURE_WARNING_INTERVAL_MS,
+          },
+          'VM pool pressure is evicting least-recently-used contexts at the configured hard limit',
+        );
+      }
     }
   }
 }
@@ -406,13 +635,25 @@ async function buildVM(filePath: string): Promise<VMContext> {
         lastUsed: Date.now(),
       };
       vmContexts.set(filePath, newVmContext);
+      vmPoolActivity.contextsBuilt += 1;
 
       // Manage pool size after adding new VM
       manageVMPoolSize();
+      log.debug(
+        {
+          event: 'vm_pool_context_built',
+          retainedContexts: vmContexts.size,
+          trackedGenerations: bundleGenerations.size,
+          maxVMPoolSize: getConfig().maxVMPoolSize,
+          contextsBuilt: vmPoolActivity.contextsBuilt,
+          hardLimitEvictions: vmPoolActivity.hardLimitEvictions,
+        },
+        'Built VM context',
+      );
 
       // isWorker check is required for JS unit testing:
       if (cluster.isWorker && cluster.worker !== undefined) {
-        log.debug(`Built VM for worker #${cluster.worker.id} with bundle ${filePath}`);
+        log.debug({ workerId: cluster.worker.id }, 'Built VM context for worker');
       }
 
       if (log.level === 'debug') {
@@ -473,6 +714,7 @@ async function buildVM(filePath: string): Promise<VMContext> {
 async function getOrBuildVMContext(bundleFilePath: string, buildVmsIfNeeded: boolean): Promise<VMContext> {
   const vmContext = getVMContext(bundleFilePath);
   if (vmContext) {
+    vmPoolActivity.cacheHits += 1;
     return vmContext;
   }
 
@@ -551,6 +793,11 @@ export async function buildExecutionContext(
     retainedSourceMapRegistrations.forEach(releaseSourceMapRegistration);
     throw firstBuildRejection;
   }
+
+  // Only a fully usable request bundle set may affect rollout retirement.
+  // Recording before every bundle succeeds could make a failed upload appear
+  // current and later retire the last known-good generation.
+  observeBundleGeneration(bundlePaths);
 
   // This Map persists for the lifetime of this ExecutionContext (one HTTP request).
   // It allows data to be shared between the initial render and subsequent update chunks.
@@ -695,8 +942,20 @@ export async function buildExecutionContext(
 
 /** @internal Used in tests */
 export function resetVM() {
+  if (generationRetirementTimer) {
+    vmPoolClock.cancel(generationRetirementTimer);
+    generationRetirementTimer = undefined;
+  }
   vmContexts.clear();
   vmCreationPromises.clear();
+  bundleGenerations.clear();
+  generationObservationSequence = 0;
+  vmPoolActivity.contextsBuilt = 0;
+  vmPoolActivity.cacheHits = 0;
+  vmPoolActivity.hardLimitEvictions = 0;
+  vmPoolActivity.drainedContextRetirements = 0;
+  lastPressureWarningAt = undefined;
+  vmPoolClock = defaultVMPoolClock;
   activeSourceMapRequestCounts.clear();
   evictedSourceMapRegistrations.clear();
   resetSourceMapSupport();

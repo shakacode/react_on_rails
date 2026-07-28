@@ -2,9 +2,11 @@
 
 require "json"
 require "erb"
+require "ripper"
 require "stringio"
 require "tempfile"
 require "timeout"
+require "uri"
 require "yaml"
 require_relative "utils"
 require_relative "version"
@@ -117,6 +119,55 @@ module ReactOnRails
     ].freeze
     # Per-file safety gate to bound IO during the scan, not a meaningful size limit.
     RENDERER_CACHE_DEPLOY_SCRIPT_MAX_BYTES = 1_048_576
+    NODE_RENDERER_CONFIG_MAX_BYTES = 1_048_576
+    NODE_RENDERER_ROLLOUT_GENERATIONS = 2
+    NODE_RENDERER_LAUNCHER_PATHS = %w[
+      Procfile
+      Procfile.dev
+      Procfile.dev-static-assets
+      Procfile.dev-prod-assets
+      Procfile.production
+    ].freeze
+    NODE_RENDERER_SCRIPT_REFERENCE_PATTERN =
+      %r{\bnode\s+\.?/?((?:renderer|client)/node-renderer\.js)(?=\s|\z)}
+    NODE_RENDERER_DIRECT_LAUNCHER_PATTERN = %r{
+      \A[ \t]*[A-Za-z0-9_-]+:[ \t]*
+      (?:MAX_VM_POOL_SIZE=(?<assignment>[^\s]+)[ \t]+)?
+      node[ \t]+\.?/?(?<path>(?:renderer|client)/node-renderer\.js)
+      [ \t]*(?:\r?\n)?\z
+    }x
+    NODE_RENDERER_JS_STRING_PATTERN = /
+      "(?:\\.|[^"\\])*" |
+      '(?:\\.|[^'\\])*' |
+      `(?:\\.|[^`\\])*`
+    /mx
+    NODE_RENDERER_NESTED_OBJECT_PATTERN = /
+      \{
+        (?:#{NODE_RENDERER_JS_STRING_PATTERN}|[^{}"'`])*
+      \}
+    /mx
+    NODE_RENDERER_CONFIG_OBJECT_PATTERN = /
+      \{
+        (?:#{NODE_RENDERER_JS_STRING_PATTERN}|#{NODE_RENDERER_NESTED_OBJECT_PATTERN}|[^{}"'`])*
+      \}
+    /mx
+    NODE_RENDERER_BARE_CALL_PATTERN =
+      /(?<![.\p{ID_Continue}$#])reactOnRailsProNodeRenderer\s*\(\s*/
+    NODE_RENDERER_RSC_CONDITIONAL_NODES = %i[
+      case
+      case3
+      for
+      if
+      if_mod
+      rescue
+      rescue_mod
+      unless
+      unless_mod
+      until
+      until_mod
+      while
+      while_mod
+    ].freeze
     # Defense-in-depth cap on how many files a single glob may contribute.
     # Realistic repos have a handful of workflow / deploy-stage files; far more
     # than this is a sign of an unexpectedly broad pattern, not legitimate config.
@@ -149,6 +200,8 @@ module ReactOnRails
       { id: "testing_setup", title: "Testing Setup", method: :check_testing_setup },
       { id: "development_environment", title: "Development Environment", method: :check_development },
       { id: "react_on_rails_pro_setup", title: "React on Rails Pro Setup", method: :check_pro_setup },
+      { id: "node_renderer_rollout_capacity", title: "Node Renderer Rollout Capacity",
+        method: :check_node_renderer_rollout_capacity },
       { id: "react_server_components", title: "React Server Components", method: :check_rsc_setup }
     ].freeze
     CHECK_SECTIONS_BY_ID = CHECK_SECTIONS.to_h { |section| [section[:id], section] }.freeze
@@ -2024,7 +2077,7 @@ module ReactOnRails
     end
 
     def pro_initializer_has_node_renderer?
-      config_path = "config/initializers/react_on_rails_pro.rb"
+      config_path = doctor_app_path("config/initializers/react_on_rails_pro.rb")
       return false unless File.exist?(config_path)
 
       File.read(config_path).match?(/server_renderer\s*=\s*["']NodeRenderer["']/)
@@ -2961,10 +3014,10 @@ module ReactOnRails
 
       @rails_environment_attempted = true
 
-      env_file = "config/environment.rb"
+      env_file = doctor_app_path("config/environment.rb")
       return false unless File.exist?(env_file)
 
-      require File.expand_path(env_file)
+      require env_file
       @rails_environment_loaded = true
     rescue StandardError, LoadError => e
       checker.add_warning(<<~MSG.strip)
@@ -3094,6 +3147,373 @@ module ReactOnRails
       end
     rescue StandardError => e
       checker.add_warning("⚠️  Could not detect Pro renderer mode: #{e.message}")
+    end
+
+    def check_node_renderer_rollout_capacity
+      unless ReactOnRails::Utils.react_on_rails_pro?
+        checker.add_info("ℹ️  NodeRenderer rollout capacity check not applicable — React on Rails Pro is not installed")
+        return
+      end
+
+      rails_environment_loaded = ensure_rails_environment_loaded
+      unless resolved_pro_server_renderer == "NodeRenderer"
+        checker.add_info("ℹ️  NodeRenderer rollout capacity check not applicable — NodeRenderer is not configured")
+        return
+      end
+
+      contexts_per_generation, rsc_evidence = node_renderer_contexts_per_generation(rails_environment_loaded)
+      required_capacity = NODE_RENDERER_ROLLOUT_GENERATIONS * contexts_per_generation
+      topology = node_renderer_endpoint_topology
+      evidence = node_renderer_vm_pool_capacity_evidence(topology)
+
+      checker.add_info(
+        "ℹ️  VM pool formula: generations=#{NODE_RENDERER_ROLLOUT_GENERATIONS} × " \
+        "contexts_per_generation=#{contexts_per_generation} = required_capacity=#{required_capacity} per worker " \
+        "(RSC evidence=#{rsc_evidence})."
+      )
+      if topology == :loopback_endpoint
+        checker.add_info(
+          "ℹ️  topology=loopback_endpoint does not prove whether NodeRenderer shares a container, pod, " \
+          "process environment, or deploy lifecycle with Rails."
+        )
+      end
+      report_node_renderer_capacity_evidence(evidence, required_capacity, topology)
+    rescue StandardError, LoadError
+      checker.add_warning(
+        "⚠️  VM pool rollout capacity is unverified " \
+        "(evidence=unverified, topology=unknown, reason=inspection_error)."
+      )
+      add_node_renderer_capacity_guidance(NODE_RENDERER_ROLLOUT_GENERATIONS * 2)
+    end
+
+    def node_renderer_contexts_per_generation(rails_environment_loaded)
+      if rails_environment_loaded
+        runtime_enabled = node_renderer_runtime_rsc_enabled
+        unless runtime_enabled.nil?
+          enabled = runtime_enabled
+          return [enabled ? 2 : 1, "observed_#{enabled ? 'enabled' : 'disabled'}"]
+        end
+      end
+
+      initializer_enabled = node_renderer_initializer_rsc_enabled
+      unless initializer_enabled.nil?
+        return [
+          initializer_enabled ? 2 : 1,
+          "inferred_#{initializer_enabled ? 'enabled' : 'disabled'}"
+        ]
+      end
+
+      [2, "unverified_conservative_enabled"]
+    end
+
+    def node_renderer_runtime_rsc_enabled
+      return nil unless defined?(ReactOnRailsPro) && ReactOnRailsPro.respond_to?(:configuration)
+
+      ReactOnRailsPro.configuration.enable_rsc_support
+    end
+
+    def node_renderer_initializer_rsc_enabled
+      initializer_path = doctor_app_path("config/initializers/react_on_rails_pro.rb")
+      return nil unless File.exist?(initializer_path)
+
+      content = File.read(initializer_path, NODE_RENDERER_CONFIG_MAX_BYTES)
+      evidence = node_renderer_rsc_assignment_evidence(Ripper.sexp(content))
+      return nil unless evidence.one? && !evidence.first.fetch(:conditional)
+
+      evidence.first.fetch(:enabled)
+    end
+
+    def node_renderer_rsc_assignment_evidence(node, conditional: false, evidence: [])
+      return evidence unless node.is_a?(Array)
+
+      conditional ||= NODE_RENDERER_RSC_CONDITIONAL_NODES.include?(node.first)
+      if node_renderer_rsc_assignment?(node)
+        literal = node.dig(2, 1, 1)
+        enabled = { "false" => false, "true" => true }.fetch(literal, nil)
+        evidence << { enabled:, conditional: }
+      end
+
+      node.drop(1).each do |child|
+        node_renderer_rsc_assignment_evidence(child, conditional:, evidence:)
+      end
+      evidence
+    end
+
+    def node_renderer_rsc_assignment?(node)
+      return false unless node.first == :assign
+
+      target = node[1]
+      target&.first == :field &&
+        target.dig(1, 1, 1) == "config" &&
+        target.dig(3, 1) == "enable_rsc_support"
+    end
+
+    def node_renderer_endpoint_topology
+      return :unknown unless defined?(ReactOnRailsPro) && ReactOnRailsPro.respond_to?(:configuration)
+
+      host = URI.parse(ReactOnRailsPro.configuration.renderer_url.to_s).host&.downcase
+      return :unknown unless host
+
+      host = host.delete_prefix("[").delete_suffix("]")
+      return :loopback_endpoint if %w[localhost 127.0.0.1 ::1].include?(host)
+
+      :separate
+    rescue URI::InvalidURIError
+      :unknown
+    end
+
+    def node_renderer_vm_pool_capacity_evidence(topology)
+      return { state: :unverified, reason: "separate_renderer_workload" } if topology == :separate
+      return { state: :unverified, reason: "endpoint_topology_unknown" } unless topology == :loopback_endpoint
+
+      config_path, selection_error = node_renderer_config_path
+      return { state: :unverified, reason: selection_error } unless config_path
+      return { state: :unverified, reason: "canonical_renderer_script_too_large" } if
+        File.size(doctor_app_path(config_path)) > NODE_RENDERER_CONFIG_MAX_BYTES
+
+      active_content = node_renderer_active_config_content(
+        File.read(doctor_app_path(config_path), NODE_RENDERER_CONFIG_MAX_BYTES)
+      )
+      node_renderer_static_capacity_evidence(active_content) ||
+        node_renderer_env_or_default_capacity_evidence(config_path)
+    end
+
+    def node_renderer_config_path
+      existing_paths = [
+        NodeRendererProcfile::NEW_RENDERER_SCRIPT_PATH,
+        NodeRendererProcfile::LEGACY_RENDERER_SCRIPT_PATH
+      ].select { |path| File.file?(doctor_app_path(path)) }
+      return [nil, "canonical_renderer_script_missing"] if existing_paths.empty?
+      return [existing_paths.first, nil] if existing_paths.one?
+
+      launched_paths = node_renderer_direct_launcher_script_paths & existing_paths
+      return [launched_paths.first, nil] if launched_paths.one?
+
+      [nil, "renderer_script_selection_not_proven"]
+    end
+
+    def node_renderer_direct_launcher_script_paths
+      node_renderer_launcher_classifications.filter_map do |classification|
+        classification[:path] if classification[:state] == :proven
+      end.uniq
+    end
+
+    def node_renderer_launcher_classifications
+      NODE_RENDERER_LAUNCHER_PATHS.flat_map do |path|
+        launcher_path = doctor_app_path(path)
+        next [] unless File.file?(launcher_path)
+        next [] if File.size(launcher_path) > NODE_RENDERER_CONFIG_MAX_BYTES
+
+        File.read(launcher_path, NODE_RENDERER_CONFIG_MAX_BYTES).each_line.filter_map do |line|
+          node_renderer_launcher_line_classification(line)
+        end
+      rescue StandardError
+        []
+      end
+    end
+
+    def node_renderer_launcher_line_classification(line)
+      return if line.match?(/^\s*#/)
+
+      active_line = line.sub(/[ \t]+#.*$/, "")
+      direct_match = active_line.match(NODE_RENDERER_DIRECT_LAUNCHER_PATTERN)
+      if direct_match
+        return {
+          state: :proven,
+          path: direct_match[:path],
+          assignment: direct_match[:assignment]
+        }
+      end
+
+      referenced_paths = active_line.scan(NODE_RENDERER_SCRIPT_REFERENCE_PATTERN).flatten.uniq
+      return if referenced_paths.empty?
+
+      { state: :unproven, paths: referenced_paths }
+    end
+
+    def node_renderer_static_capacity_evidence(active_content)
+      return { state: :unverified, reason: "ambiguous_javascript_configuration" } if active_content.include?("`")
+      if node_renderer_regexp_call_lookalike?(active_content)
+        return { state: :unverified, reason: "ambiguous_javascript_configuration" }
+      end
+
+      mentions = active_content.scan(/\bmaxVMPoolSize\b/)
+      return nil if mentions.empty?
+
+      config_object = node_renderer_call_config_object(active_content)
+      return { state: :unverified, reason: "renderer_configuration_binding_not_proven" } unless config_object
+
+      node_renderer_config_object_capacity_evidence(config_object, mentions.length)
+    end
+
+    def node_renderer_config_object_capacity_evidence(config_object, total_mentions)
+      top_level_content = node_renderer_top_level_config_content(config_object)
+      return { state: :unverified, reason: "renderer_configuration_binding_not_proven" } unless top_level_content
+
+      top_level_syntax = top_level_content.gsub(NODE_RENDERER_JS_STRING_PATTERN, " string ")
+      top_level_mentions = top_level_content.scan(/\bmaxVMPoolSize\b/)
+      return { state: :unverified, reason: "renderer_configuration_binding_not_proven" } if top_level_mentions.empty?
+      return { state: :unverified, reason: "ambiguous_javascript_configuration" } unless
+        top_level_mentions.one? && top_level_mentions.length == total_mentions
+      return { state: :unverified, reason: "ambiguous_javascript_configuration" } if
+        node_renderer_config_object_ambiguous?(config_object, top_level_syntax)
+      return { state: :unverified, reason: "dynamic_javascript_configuration" } if top_level_syntax.include?("...")
+
+      literal_match = top_level_content.match(
+        /(?:\A|,)\s*(?:maxVMPoolSize|["']maxVMPoolSize["'])\s*:\s*(0|[1-9]\d*)\s*(?=,|\z)/
+      )
+      return { state: :observed, value: literal_match[1].to_i, source: "canonical_renderer_script" } if literal_match
+
+      { state: :unverified, reason: "dynamic_javascript_configuration" }
+    end
+
+    def node_renderer_config_object_ambiguous?(config_object, top_level_syntax)
+      accessor_syntax = top_level_syntax.gsub(%r{/\*.*?\*/|//[^\n]*}m, " ")
+
+      top_level_syntax.include?("[") ||
+        config_object.include?("\\") ||
+        accessor_syntax.match?(/(?:\A|,)\s*(?:get|set)\s+[^\s,():]+\s*\(/)
+    end
+
+    def node_renderer_call_config_object(active_content)
+      masked_content = node_renderer_mask_quoted_string_contents(active_content)
+      calls = masked_content.to_enum(:scan, NODE_RENDERER_BARE_CALL_PATTERN).filter_map do
+        call = Regexp.last_match
+        call unless node_renderer_constructor_call?(masked_content, call)
+      end
+      return nil unless calls.one?
+
+      call = calls.first
+      argument = active_content[call.end(0)..]
+
+      argument.match(/\A(#{NODE_RENDERER_CONFIG_OBJECT_PATTERN})\s*\)/o)&.[](1)
+    end
+
+    def node_renderer_constructor_call?(content, call)
+      operator_end = content.rindex(/\S/, call.begin(0) - 1)
+      operator_end = content.rindex(/\S/, operator_end - 1) while operator_end && content[operator_end] == "("
+      return false unless operator_end && operator_end >= 2
+
+      operator_start = operator_end - 2
+      return false unless content[operator_start, 3] == "new"
+
+      preceding_character = content[operator_start - 1] if operator_start.positive?
+      !preceding_character&.match?(/[.\p{ID_Continue}$#]/)
+    end
+
+    def node_renderer_mask_quoted_string_contents(content)
+      content.gsub(/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/m) do |string|
+        "#{string[0]}#{' ' * (string.length - 2)}#{string[-1]}"
+      end
+    end
+
+    def node_renderer_regexp_call_lookalike?(content)
+      masked_content = node_renderer_mask_quoted_string_contents(content)
+
+      masked_content.each_line.any? do |line|
+        first_call = line.index("reactOnRailsProNodeRenderer")
+        next false unless first_call
+
+        first_slash = line.index("/")
+        last_slash = line.rindex("/")
+        last_call = line.rindex("reactOnRailsProNodeRenderer")
+
+        first_slash && last_slash && first_slash < last_call && last_slash > first_call
+      end
+    end
+
+    def node_renderer_top_level_config_content(config_object)
+      content = config_object[1...-1].gsub(NODE_RENDERER_NESTED_OBJECT_PATTERN, "")
+      return nil if content.match?(/[{}]/)
+
+      content
+    end
+
+    def node_renderer_env_or_default_capacity_evidence(config_path)
+      launcher_evidence = node_renderer_launcher_vm_pool_assignment_evidence(config_path)
+      return launcher_evidence if launcher_evidence
+
+      env_value = ENV.fetch("MAX_VM_POOL_SIZE", nil)
+      if env_value
+        unless env_value.match?(/\A[1-9]\d*\z/)
+          return { state: :unverified, reason: "invalid_doctor_process_environment_value" }
+        end
+
+        return { state: :unverified, reason: "renderer_process_environment_not_proven" }
+      end
+
+      { state: :unverified, reason: "package_default_not_proven" }
+    end
+
+    def node_renderer_launcher_vm_pool_assignment_evidence(config_path)
+      classifications = node_renderer_launcher_classifications
+      if classifications.any? do |classification|
+           classification[:state] == :unproven && classification[:paths].include?(config_path)
+         end
+        return { state: :unverified, reason: "dynamic_or_ambiguous_launcher_vm_pool_assignment" }
+      end
+
+      selected_launchers = classifications.select do |classification|
+        classification[:state] == :proven && classification[:path] == config_path
+      end
+      assignment_matches = selected_launchers.map { |classification| classification[:assignment] }
+      node_renderer_launcher_assignment_values_evidence(assignment_matches)
+    end
+
+    def node_renderer_launcher_assignment_values_evidence(assignment_matches)
+      assignments = assignment_matches.compact
+      return nil if assignments.empty?
+      return { state: :unverified, reason: "dynamic_or_ambiguous_launcher_vm_pool_assignment" } unless
+        assignments.length == assignment_matches.length &&
+        assignments.all? { |assignment| assignment.match?(/\A[1-9]\d*\z/) } &&
+        assignments.uniq.one?
+
+      {
+        state: :observed,
+        value: assignments.first.to_i,
+        source: "selected_launcher_static_assignment"
+      }
+    end
+
+    def node_renderer_active_config_content(content)
+      return content if content.include?("`")
+
+      content.gsub(
+        %r{(#{NODE_RENDERER_JS_STRING_PATTERN})|/\*.*?\*/|//[^\n]*}mxo
+      ) { Regexp.last_match(1) || " " }
+    end
+
+    def report_node_renderer_capacity_evidence(evidence, required_capacity, topology)
+      evidence_state = evidence.fetch(:state)
+      topology_label = topology.to_s
+
+      if evidence_state == :unverified
+        checker.add_warning(
+          "⚠️  VM pool rollout capacity is unverified " \
+          "(evidence=unverified, topology=#{topology_label}, reason=#{evidence.fetch(:reason)}). " \
+          "Doctor does not query the live renderer process."
+        )
+        add_node_renderer_capacity_guidance(required_capacity)
+        return
+      end
+
+      configured_capacity = evidence.fetch(:value)
+      evidence_summary =
+        "evidence=#{evidence_state}, configured=#{configured_capacity}, required=#{required_capacity}, " \
+        "topology=#{topology_label}, source=#{evidence.fetch(:source)}, scope=configuration_not_live_process"
+      if configured_capacity >= required_capacity
+        checker.add_success("✅ VM pool rollout capacity is sufficient (#{evidence_summary}).")
+      else
+        checker.add_warning("⚠️  VM pool rollout capacity is insufficient (#{evidence_summary}).")
+        add_node_renderer_capacity_guidance(required_capacity)
+      end
+    end
+
+    def add_node_renderer_capacity_guidance(required_capacity)
+      checker.add_info(
+        "💡 Set MAX_VM_POOL_SIZE=#{required_capacity} in the NodeRenderer workload, or set " \
+        "maxVMPoolSize: #{required_capacity} in renderer/node-renderer.js. The hard cap applies per worker."
+      )
     end
 
     def check_deprecated_renderer_cache_task
@@ -4867,11 +5287,31 @@ module ReactOnRails
     end
 
     def doctor_app_root
+      return @doctor_app_root if defined?(@doctor_app_root)
+
       rails_root = Rails.root if defined?(Rails) && Rails.respond_to?(:root)
       rails_root = rails_root.to_s
-      rails_root.empty? ? Dir.pwd : rails_root
+      @doctor_app_root = rails_root.empty? ? doctor_app_root_from_cwd : rails_root
     rescue StandardError
-      Dir.pwd
+      @doctor_app_root = doctor_app_root_from_cwd
+    end
+
+    def doctor_app_root_from_cwd
+      start_path = File.expand_path(Dir.pwd)
+      candidate = start_path
+      loop do
+        return candidate if File.file?(File.join(candidate, "config/environment.rb"))
+
+        parent = File.dirname(candidate)
+        break if parent == candidate
+
+        candidate = parent
+      end
+      start_path
+    end
+
+    def doctor_app_path(relative_path)
+      File.expand_path(relative_path, doctor_app_root)
     end
 
     def report_missing_rsc_artifact(label, artifact_path)

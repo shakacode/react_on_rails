@@ -171,6 +171,34 @@ Keep build-time seeding too; the layers are complementary:
 > [!IMPORTANT]
 > Gate renderer start and readiness on the boot seed **completing, not succeeding**. A failed seed must degrade to the 410 fallback rather than wedge the deploy; the task already warns and continues on fetch failures.
 
+## Disk warmup and VM warmup are separate
+
+The adapter and `pre_seed_renderer_cache` warm the renderer's **disk cache**. They make old and new bundle files plus companion manifests available before traffic, so a request avoids `410 Gone`, upload, and retry. They do not precompile the JavaScript into every renderer worker's VM pool.
+
+Each worker compiles a disk-cached bundle on its first render. Keep those contexts resident during the overlap with:
+
+```text
+maxVMPoolSize >= simultaneous bundle generations × contexts per generation
+```
+
+SSR-only has one context per generation. RSC has two: server plus RSC. The common old/new RSC rollout therefore needs `2 × 2 = 4` contexts per worker, which is the default. `maxVMPoolSize` is always a hard cap on pooled contexts; setting it to `2` during that four-context overlap causes least-recently-used eviction and can recreate the old/new rebuild loop even when every file was pre-seeded successfully.
+
+Inactive bundle sets drain after `vmPoolRolloutDrainTimeout` (60 seconds by default). Set that timeout longer than the maximum period in which your deploy platform can still route a draining revision to the renderer. The cleanup timer runs without waiting for another request, and shared paths stay pooled while referenced. The hard cap bounds pooled contexts, but an in-flight request can keep an evicted execution context and source-map registration alive until release, so transient memory also requires concurrency headroom.
+
+The renderer sees exact bundle paths, not a trusted deployment-generation sequence. It retains the most recently observed **successful** bundle set. If the final overlap request is from the old revision and traffic goes idle past the drain timeout, the new set can be retired; its next request performs one bounded rebuild, is reused afterward, and makes the expired old set eligible for retirement. This is a memory-bound tradeoff, not a guarantee that the renderer can identify chronological "old" and "new" revisions.
+
+The fleet-wide pooled-context upper bound is:
+
+```text
+overlapping renderer replicas × effective workers per replica × maxVMPoolSize
+```
+
+Include old replicas and rollout surge in the replica count. Use one effective worker for `workersCount: 0`. Size each renderer replica's memory request and limit from its worker/pooled-context count plus measured process, V8 heap, bundle-buffer, and safety overhead, including source maps and evicted execution contexts held by concurrent in-flight requests; multiply the per-replica request by overlapping replicas for total cluster capacity.
+
+There is no supported eager VM-prewarm API. The built-in `/ready` signal becomes ready after at least one context compiles and is not proof that every old/new server and RSC context is warm. After disk seeding and renderer liveness, use application-owned, authenticated Rails smoke requests to exercise the required SSR and RSC paths before public readiness when your platform supports that gate. Smoke verifies only the workers reached because there is no supported worker-targeting API. Otherwise, expect one first-render compilation per bundle and worker; the correctly sized pool prevents the repeated alternating rebuilds.
+
+For configuration details, pressure log events, and topology-specific minimums, see [Sizing and draining the VM pool](../oss/building-features/node-renderer/js-configuration.md#sizing-and-draining-the-vm-pool) and [Rollout VM capacity and memory tradeoff](../oss/building-features/node-renderer/container-deployment.md#rollout-vm-capacity-and-memory-tradeoff).
+
 ## Deploy the renderer before Rails
 
 **This ordering requirement applies only when the renderer is a _separate workload_ from Rails** — Option 3 in [Container deployment](../oss/building-features/node-renderer/container-deployment.md#architecture-options). If Rails and the renderer share one workload — a single container or sidecar containers (Options 1–2) — they deploy on one atomic lifecycle. A Ruby-capable startup step can run the [boot seed](#promotion-deploys-need-a-release-time-boot-seed) before Node serves traffic.
@@ -192,8 +220,9 @@ Rails and the Node Renderer are **separate workloads** with independent deploy l
 Make the ordering explicit in your pipeline rather than relying on timing:
 
 1. Deploy/promote the **Node Renderer** workload (new image, cache pre-seeded during its build).
-2. Wait until its new revision is **live and healthy** — readiness passing and all new renderer instances up.
-3. Only then deploy/promote the **Rails** workload.
+2. Keep it on private service networking with renderer password authentication.
+3. Wait until its new revision is **live and healthy** — readiness passing and all new renderer instances up.
+4. Only then deploy/promote the **Rails** workload; use a non-public candidate smoke gate for SSR/RSC when available.
 
 The invariant to enforce is **renderer-ready-before-Rails-live**: gate the Rails workload's release on the renderer workload's release completing (sequence them as separate steps in your deploy pipeline), and/or tune the renderer's readiness probe and Rails' startup so Rails does not accept traffic until the renderer reports ready. Prefer a readiness gate over a fixed sleep — it tracks actual state. The exact wiring depends on your deploy tooling.
 
@@ -208,8 +237,10 @@ This ordering is also what makes the [boot seed](#promotion-deploys-need-a-relea
 - ⚠️ Empty-list returns (often indicates the upload side has never run on a prior deploy).
 - ℹ️ The resolved renderer cache dir and how many bundle-hash subdirectories are present.
 - ℹ️ Whether `PREVIOUS_BUNDLE_HASHES` env override is set.
+- ✅/⚠️ The conservative old/new VM-cap formula per worker, including RSC context count.
+- ℹ️ Whether the capacity is `observed`, `inferred`, or `unverified`; separate workloads and ambiguous loopback sidecars stay unverified rather than producing a false pass.
 
-Doctor never calls `fetch` or `upload` — those have side effects.
+Doctor never calls `fetch` or `upload` and does not query the live Node Renderer process — those have side effects or would require a new privileged diagnostics channel.
 
 ## Need your own artifact store?
 

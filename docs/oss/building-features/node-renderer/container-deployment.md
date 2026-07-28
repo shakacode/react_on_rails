@@ -16,14 +16,16 @@ This guide covers deploying the Node Renderer in containerized environments (Doc
 
 When running Rails and the Node Renderer in containers, you have three options, listed from simplest to most complex:
 
-|                            | Single Container       | Sidecar Containers          | Separate Workloads                              |
-| -------------------------- | ---------------------- | --------------------------- | ----------------------------------------------- |
-| **Complexity**             | Lowest                 | Medium                      | Highest                                         |
-| **Scaling**                | Together               | Together                    | Independent                                     |
-| **Version alignment**      | Guaranteed             | Guaranteed                  | Risk of drift                                   |
-| **Networking**             | `localhost`            | `localhost`                 | Service DNS                                     |
-| **Per-process visibility** | No                     | Yes                         | Yes                                             |
-| **When to use**            | Default starting point | Need to diagnose OOM source | Need independent scaling at high replica counts |
+|                                             | Single Container           | Sidecar Containers             | Separate Workloads                              |
+| ------------------------------------------- | -------------------------- | ------------------------------ | ----------------------------------------------- |
+| **Complexity**                              | Lowest                     | Medium                         | Highest                                         |
+| **Scaling**                                 | Together                   | Together                       | Independent                                     |
+| **Version alignment**                       | Guaranteed                 | Guaranteed                     | Risk of drift                                   |
+| **Networking**                              | `localhost`                | `localhost`                    | Service DNS                                     |
+| **Per-process visibility**                  | No                         | Yes                            | Yes                                             |
+| **Generations per renderer during rollout** | 1 when lifecycle is atomic | 1 when pod lifecycle is atomic | 2+ while app revisions overlap                  |
+| **RSC VM contexts per worker**              | 2 minimum; 4 default       | 2 minimum; 4 default           | 4 for old + new; increase for wider overlap     |
+| **When to use**                             | Default starting point     | Need to diagnose OOM source    | Need independent scaling at high replica counts |
 
 <p align="center">
   <img src="images/deployment-topologies.svg" alt="Three container topologies for running Rails with the Pro Node Renderer. Single container: both processes run in one container sharing OS resources and talking over localhost — lowest complexity, scaled together, versions always aligned. Sidecar containers: Rails and the Node Renderer run as two containers in the same pod with their own resource limits but still talking over localhost — scaled together, versions aligned, with per-process visibility. Separate workloads: Rails and the renderer run as independent workloads communicating over service DNS — scaled independently but with a risk of version drift on rolling deploys." width="840" />
@@ -107,6 +109,61 @@ end
 ```
 
 > **Recommendation:** Start with a single container. Move to sidecar containers if you need per-process memory/CPU visibility (e.g., to diagnose OOM restarts). Separate workloads are rarely justified unless you have a specific need for independent scaling at high replica counts.
+
+### Rollout VM capacity and memory tradeoff
+
+The Node Renderer retains compiled VM contexts per worker. Size its hard cap with:
+
+```text
+maxVMPoolSize >= simultaneous bundle generations reaching one renderer × contexts per generation
+```
+
+Contexts per generation are `1` for SSR-only and `2` when RSC is enabled. The package default is `4`, which covers the common separate-workload overlap of old and new RSC-enabled Rails revisions (`2 × 2`). Pooled VM memory grows approximately with `workersCount × pooled contexts per worker`, plus each worker's base V8 heap and source-map overhead. In-flight requests can temporarily retain evicted execution contexts and source maps outside the pool, so measure concurrent workload headroom with your own bundles before reducing container limits.
+
+Topology changes the first factor:
+
+- **Single container:** An atomic app revision normally sends Rails requests only to the renderer in the same container, so one generation reaches each renderer. The default leaves rollout headroom; `2` is the RSC minimum only if that lifecycle guarantee is durable.
+- **Sidecar containers:** `localhost` proves only a shared pod network namespace. Treat the topology as one generation per renderer only when both containers are in the same pod template and roll as one unit with aligned images and startup gates. It does not prove that Rails and Node inherited the same environment variables.
+- **Separate workloads:** A shared renderer service receives requests from draining and current Rails revisions. Use at least `4` for RSC, deploy and warm the renderer first, and increase the cap if more than two Rails revisions can overlap.
+
+`react_on_rails:doctor` uses the conservative old/new formula and reports whether capacity evidence is `observed`, `inferred`, or `unverified`. It never treats a loopback `renderer_url` or a Rails-process environment variable as proof of live sidecar configuration. For a separate renderer workload, confirm `MAX_VM_POOL_SIZE` or `maxVMPoolSize` in that workload directly.
+
+Pre-seeding controls the on-disk bundle cache; it does not precompile per-worker VM contexts. Use a rolling-deploy adapter and boot seed to avoid uploads, then use the VM-cap formula to avoid context rebuild thrash after the first render. Inactive bundle sets drain after `vmPoolRolloutDrainTimeout` (60 seconds by default); see [Node Renderer JavaScript Configuration](./js-configuration.md#sizing-and-draining-the-vm-pool).
+
+The exact pooled-context upper bound across the live fleet is:
+
+```text
+maximum pooled contexts = overlapping renderer replicas × effective workers per replica × maxVMPoolSize
+```
+
+Count old replicas plus the new rollout surge. `workersCount: 0` is one effective worker. For each replica, budget its memory request and limit from the worker/pooled-context term plus measured master-process, base-heap, bundle-buffer, and safety overhead for source maps and evicted execution contexts held by concurrent in-flight requests. Multiply the per-replica request by the maximum overlapping replica count to plan the cluster reservation. A higher VM cap can stop rebuild churn while still causing OOMs if rollout surge or in-flight concurrency was omitted from capacity planning.
+
+There is no supported eager VM-prewarm API. Disk seeding avoids bundle upload but leaves VM compilation to the first render in each worker. The built-in `/ready` check proves that at least one VM context exists, not that all old/new server and RSC contexts are compiled. When possible, keep a Rails candidate out of public readiness, wait for renderer liveness, and send authenticated application smoke requests that exercise the required SSR and RSC paths. Those requests verify only the workers they reach because no supported API targets every worker. If pre-cutover smoke is unavailable, plan for one first-render compilation per bundle and worker.
+
+### Recommended rollout sequence by topology
+
+**Single container**
+
+1. Build one aligned Ruby+Node image and keep the build-time seed as a fallback.
+2. Before accepting traffic, run the release-time seed against the draining deployment.
+3. Start NodeRenderer, start Rails, wait for renderer liveness, and run an internal authenticated Rails smoke render if the process supervisor supports a pre-readiness gate.
+4. Mark the combined container ready, then drain the old combined revision.
+
+**Sidecar containers in one pod**
+
+1. Use a Ruby-capable init step to complete the release-time seed into the writable cache volume shared with the Node sidecar.
+2. Start the aligned Rails and Node sidecars from the same pod revision. Keep Rails public readiness false until Node liveness passes.
+3. Run internal authenticated Rails smoke requests for SSR and RSC when supported, then mark the pod ready.
+4. Roll and drain the pod as one lifecycle. A loopback URL alone is not evidence that the images, environment, cache volume, or lifecycle are aligned.
+
+**Separate workloads**
+
+1. Complete the release-time seed for the new renderer revision and make the cache available to that workload.
+2. Deploy the renderer first on private networking with `RENDERER_PASSWORD` authentication. Wait until the seeded revision is live and ready.
+3. Deploy a new Rails candidate configured for that renderer. Keep it out of public traffic while authenticated SSR/RSC smoke requests run when the platform supports this gate.
+4. Make new Rails live, drain old Rails, keep old/new VM capacity for the full drain window, and only then remove obsolete renderer capacity.
+
+Never expose a separately deployed renderer directly to the public network. The Node `vm` module is not a security boundary; use private service discovery, firewall policy, and renderer password authentication.
 
 ## Control Plane Deployment Shapes
 

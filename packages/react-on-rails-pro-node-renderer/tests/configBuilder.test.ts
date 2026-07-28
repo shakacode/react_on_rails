@@ -25,6 +25,8 @@ describe('configBuilder', () => {
     'RENDERER_ENABLE_HEALTH_ENDPOINTS',
     'RENDERER_SUPPORT_MODULES',
     'RENDERER_WORKERS_COUNT',
+    'MAX_VM_POOL_SIZE',
+    'VM_POOL_ROLLOUT_DRAIN_TIMEOUT',
   ] as const;
   const savedEnvValues = Object.fromEntries(envVarsToRestore.map((key) => [key, process.env[key]]));
 
@@ -131,6 +133,104 @@ describe('configBuilder', () => {
     const envValues = envValuesUsedForRenderedConfig({ licenseToken: 'configured-license-token' });
 
     expect(envValues.REACT_ON_RAILS_PRO_LICENSE).toBe(false);
+  });
+
+  describe('rolling-deploy VM pool configuration', () => {
+    it('defaults to capacity for one draining and one current RSC generation', () => {
+      delete process.env.MAX_VM_POOL_SIZE;
+      delete process.env.VM_POOL_ROLLOUT_DRAIN_TIMEOUT;
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      expect(buildConfig()).toMatchObject({
+        maxVMPoolSize: 4,
+        vmPoolRolloutDrainTimeout: 60,
+      });
+    });
+
+    it('reads the hard cap and drain timeout from ENV', () => {
+      process.env.MAX_VM_POOL_SIZE = '6';
+      process.env.VM_POOL_ROLLOUT_DRAIN_TIMEOUT = '45.5';
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      expect(buildConfig()).toMatchObject({
+        maxVMPoolSize: 6,
+        vmPoolRolloutDrainTimeout: 45.5,
+      });
+    });
+
+    it('reads a drain timeout set after the config module is imported', () => {
+      delete process.env.VM_POOL_ROLLOUT_DRAIN_TIMEOUT;
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      process.env.VM_POOL_ROLLOUT_DRAIN_TIMEOUT = '37.5';
+
+      expect(buildConfig().vmPoolRolloutDrainTimeout).toBe(37.5);
+    });
+
+    it('reads a VM pool cap set after the config module is imported', () => {
+      delete process.env.MAX_VM_POOL_SIZE;
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      process.env.MAX_VM_POOL_SIZE = '6';
+
+      expect(buildConfig().maxVMPoolSize).toBe(6);
+    });
+
+    it.each(['', 'abc', '0', '-1', '2.5'])(
+      'rejects invalid MAX_VM_POOL_SIZE=%p from ENV',
+      (maxVMPoolSize) => {
+        process.env.MAX_VM_POOL_SIZE = maxVMPoolSize;
+        const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+        expect(() => buildConfig()).toThrow('maxVMPoolSize must be a positive integer');
+      },
+    );
+
+    it('preserves explicit VM pool configuration precedence over invalid ENV', () => {
+      process.env.MAX_VM_POOL_SIZE = 'abc';
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      expect(buildConfig({ maxVMPoolSize: 8 }).maxVMPoolSize).toBe(8);
+    });
+
+    it('prefers explicit configuration over ENV', () => {
+      process.env.MAX_VM_POOL_SIZE = '6';
+      process.env.VM_POOL_ROLLOUT_DRAIN_TIMEOUT = '45';
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      expect(buildConfig({ maxVMPoolSize: 8, vmPoolRolloutDrainTimeout: 90 })).toMatchObject({
+        maxVMPoolSize: 8,
+        vmPoolRolloutDrainTimeout: 90,
+      });
+    });
+
+    it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])(
+      'rejects an invalid rollout drain timeout of %p',
+      (vmPoolRolloutDrainTimeout) => {
+        const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+        expect(() => buildConfig({ vmPoolRolloutDrainTimeout })).toThrow(
+          'vmPoolRolloutDrainTimeout must be a positive number of seconds',
+        );
+      },
+    );
+
+    it('reports only effective rollout ENV settings in sanitized config metadata', () => {
+      process.env.MAX_VM_POOL_SIZE = '6';
+      process.env.VM_POOL_ROLLOUT_DRAIN_TIMEOUT = '45';
+
+      const envValues = envValuesUsedForRenderedConfig(
+        {} as {
+          host?: string;
+          licenseToken?: string;
+        },
+      );
+
+      expect(envValues).toMatchObject({
+        MAX_VM_POOL_SIZE: '6',
+        VM_POOL_ROLLOUT_DRAIN_TIMEOUT: '45',
+      });
+    });
   });
 
   it('reports the effective license ENV as masked', () => {

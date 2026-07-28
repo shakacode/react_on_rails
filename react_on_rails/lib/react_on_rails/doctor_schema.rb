@@ -65,6 +65,11 @@ module ReactOnRails
         files: ["Gemfile", "package.json", "config/initializers/react_on_rails.rb"],
         expected_end_state: "React on Rails Pro packages and configuration are mutually compatible."
       },
+      "node_renderer_rollout_capacity" => {
+        files: ["renderer/node-renderer.js", "client/node-renderer.js", "deployment environment"],
+        expected_end_state:
+          "The NodeRenderer VM hard cap can hold every server and RSC context needed by overlapping deploy generations."
+      },
       "react_server_components" => {
         files: ["config/initializers/react_on_rails.rb", "config/shakapacker.yml", "app/javascript"],
         expected_end_state: "RSC packages, generated artifacts, and renderer configuration are consistent."

@@ -54,7 +54,52 @@ available default ENV values if you wire them into your own launch script.
    See also `supportModules`.
 1. **enableHealthEndpoints** - (default: `false`; set `RENDERER_ENABLE_HEALTH_ENDPOINTS` to `true`, `TRUE`, `yes`, `YES`, or `1` to enable) - If set to `true`, the renderer registers built-in, unauthenticated `GET /health` (liveness) and `GET /ready` (readiness) probe endpoints with status-only response bodies. See [Health and Readiness Endpoints](./health-checks.md) for semantics and working Kubernetes/ECS probe examples (the renderer's h2c listener cannot be probed with HTTP/1.1 `httpGet` probes).
 1. **replayServerAsyncOperationLogs** (default: `process.env.REPLAY_SERVER_ASYNC_OPERATION_LOGS` if set, otherwise `true` when `NODE_ENV=development`, `false` in other environments) - If set to `true`, enables replay of console logs from asynchronous server operations. If `false`, only logs that occur before any awaited asynchronous operations are replayed. Note: unlike `password`, this option only checks `NODE_ENV`, not `RAILS_ENV` — async log replay is a JS debugging concern, so it keys off the JS runtime environment alone.
-1. **maxVMPoolSize** (default: `2`; set via `MAX_VM_POOL_SIZE` env var, parsed as integer) - Maximum number of VM contexts to keep in memory. Typically only two contexts are needed — one for the server bundle and one for React Server Components (RSC) if enabled. Older contexts are removed when this limit is reached. Must be a positive integer.
+1. **maxVMPoolSize** (default: `4`; set via `MAX_VM_POOL_SIZE` env var, parsed as integer) - Absolute maximum number of compiled VM contexts retained in the pool **per renderer worker**. The default holds the server and RSC contexts for one draining and one current bundle generation. Least-recently-used pooled contexts are evicted when the hard cap is exceeded. Must be a positive integer.
+1. **vmPoolRolloutDrainTimeout** (default: `60`; set via `VM_POOL_ROLLOUT_DRAIN_TIMEOUT`, parsed as seconds) - How long an inactive bundle set remains eligible for VM reuse during a rolling deploy. The default covers a representative 40-second overlap plus 20 seconds of drain and scheduling margin. Must be a positive finite number. Tune it to exceed the longest interval during which a draining app revision can still send a render request.
+
+### Sizing and draining the VM pool
+
+Use this per-worker sizing formula:
+
+```text
+maxVMPoolSize >= simultaneous bundle generations × contexts per generation
+```
+
+- SSR-only uses one context per generation.
+- RSC uses two contexts per generation: one server context and one RSC context.
+- A renderer shared by old and new RSC-enabled Rails revisions therefore needs `2 × 2 = 4` contexts per worker. This is the default.
+- If your topology guarantees that each renderer receives requests from only one app revision, the minimum is `1` for SSR-only or `2` for RSC. Keep the default `4` unless the memory savings justify relying on that topology guarantee.
+
+`maxVMPoolSize` remains an absolute cap on contexts retained in the VM pool. Setting it below the formula does not create temporary rollout headroom: the renderer evicts least-recently-used pooled contexts and may rebuild them as old and new requests alternate. Hard-limit pressure logs are rate-limited and include cumulative build and eviction counters.
+
+The drain timeout bounds how long inactive generation metadata and unshared contexts remain in the pool. Cleanup runs from one unreferenced timer, so it does not require another render request. Shared bundle paths remain pooled while any live bundle set references them. An already-running request can keep an evicted execution context and source-map registration alive outside the pool until it releases them.
+
+The request protocol identifies bundle paths but does not declare which deployment generation is chronologically newer. The pool therefore protects the **most recently observed successful bundle set**, not a claimed "new" revision. If the last overlap request comes from the old revision and traffic then goes idle, the timer can retire the new set. The next new-revision request rebuilds that set once, subsequent requests reuse it, and the already-expired old set becomes eligible for retirement. Pooled context retention remains bounded throughout; total transient memory also depends on concurrent in-flight work that has not released evicted contexts and source maps.
+
+Disk-cache seeding and VM retention solve different cold paths:
+
+- `pre_seed_renderer_cache` places bundle files and companion artifacts on disk, avoiding a `410 Gone`, upload, and retry.
+- The first render for a disk-cached bundle still compiles its VM context.
+- A correctly sized VM pool avoids repeating that compilation while rollout requests alternate.
+
+At `debug`, `vm_pool_context_built` reports cumulative builds and hard-cap evictions. `vm_pool_hard_limit_eviction` is a rate-limited warning that indicates the configured cap is causing pressure. `vm_pool_rollout_generation_retired` reports bounded drain cleanup without logging bundle paths.
+
+The exact fleet-wide upper bound on pooled contexts is:
+
+```text
+renderer replicas × effective workers per replica × maxVMPoolSize
+```
+
+`workersCount: 0` means one effective in-process worker; otherwise use the configured worker count. During a rollout, use the maximum simultaneously live renderer replicas, including old replicas and `maxSurge`, not only steady-state replicas. Estimate each replica's memory request and limit from `effective workers × maxVMPoolSize × measured memory per pooled context`, then add the master process, base V8 heaps, bundle buffers, and headroom for source maps and evicted execution contexts held by concurrent in-flight requests. The total cluster reservation multiplies that per-replica budget by the overlapping replica count.
+
+There is currently no supported eager VM-prewarm API. `/ready` becomes ready after at least one context is compiled; it does not prove that every rollout bundle and role is compiled. A safe controlled rollout is:
+
+1. Complete disk seeding before renderer startup.
+2. Start the renderer on private networking with the normal render password configured.
+3. Wait for liveness, then send application-owned, authenticated smoke requests through Rails that exercise each required SSR and RSC render path.
+4. Mark the Rails candidate ready for public traffic only after those renders succeed.
+
+The smoke verifies the workers that receive those requests; there is no supported worker-targeting API that proves every worker is precompiled. If your platform cannot run that smoke before cutover, the first request for each disk-cached bundle performs one compilation in the selected worker. The correctly sized pool prevents repeated old/new compilation within that worker after the first render; it does not eliminate the initial compilation.
 
 Deprecated options:
 
