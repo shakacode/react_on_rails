@@ -5121,6 +5121,12 @@ RSpec.describe ReactOnRails::Doctor do
         RUBY
       ],
       [
+        "a defined? query",
+        <<~RUBY
+          defined?(config.enable_rsc_support = false)
+        RUBY
+      ],
+      [
         "a class body",
         <<~RUBY
           class Setup
@@ -5166,15 +5172,13 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
-    it "emits conservative JSON evidence for an uncalled method assignment after a failed Rails boot" do
+    it "emits conservative JSON evidence for an assignment inside defined? after a failed Rails boot" do
       FileUtils.mkdir_p("config/initializers")
       File.write(
         "config/initializers/react_on_rails_pro.rb",
         <<~RUBY
           config.server_renderer = "NodeRenderer"
-          def configure_rsc(config)
-            config.enable_rsc_support = false
-          end
+          defined?(config.enable_rsc_support = false)
         RUBY
       )
       File.write("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")

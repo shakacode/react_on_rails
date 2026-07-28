@@ -153,31 +153,6 @@ module ReactOnRails
     /mx
     NODE_RENDERER_BARE_CALL_PATTERN =
       /(?<![.\p{ID_Continue}$#])reactOnRailsProNodeRenderer\s*\(\s*/
-    NODE_RENDERER_RSC_CONDITIONAL_NODES = %i[
-      binary
-      brace_block
-      case
-      case3
-      class
-      def
-      defs
-      do_block
-      for
-      if
-      if_mod
-      ifop
-      lambda
-      module
-      rescue
-      rescue_mod
-      sclass
-      unless
-      unless_mod
-      until
-      until_mod
-      while
-      while_mod
-    ].freeze
     # Defense-in-depth cap on how many files a single glob may contribute.
     # Realistic repos have a handful of workflow / deploy-stage files; far more
     # than this is a sign of an unexpectedly broad pattern, not legitimate config.
@@ -3234,21 +3209,19 @@ module ReactOnRails
       evidence.first.fetch(:enabled)
     end
 
-    def node_renderer_rsc_assignment_evidence(node, conditional: false, evidence: [])
-      return evidence unless node.is_a?(Array)
+    def node_renderer_rsc_assignment_evidence(node)
+      return [] unless node.is_a?(Array) && node.first == :program
 
-      conditional ||= NODE_RENDERER_RSC_CONDITIONAL_NODES.include?(node.first)
-      if node_renderer_rsc_assignment?(node)
-        literal = node.dig(2, 1, 1)
-        enabled = { "false" => false, "true" => true }.fetch(literal, nil)
-        evidence << { enabled:, conditional: }
-      end
+      Array(node[1]).filter_map do |statement|
+        next unless node_renderer_rsc_assignment?(statement)
 
-      children = node.first.is_a?(Symbol) ? node.drop(1) : node
-      children.each do |child|
-        node_renderer_rsc_assignment_evidence(child, conditional:, evidence:)
+        enabled =
+          case statement.dig(2, 1, 1)
+          when "false" then false
+          when "true" then true
+          end
+        { enabled:, conditional: false }
       end
-      evidence
     end
 
     def node_renderer_rsc_assignment?(node)
