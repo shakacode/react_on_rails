@@ -5127,6 +5127,20 @@ RSpec.describe ReactOnRails::Doctor do
         RUBY
       ],
       [
+        "a safe-navigation assignment",
+        <<~RUBY
+          config = nil
+          config&.enable_rsc_support = false
+        RUBY
+      ],
+      [
+        "an unbound top-level receiver",
+        <<~RUBY
+          config = Object.new
+          config.enable_rsc_support = false
+        RUBY
+      ],
+      [
         "a class body",
         <<~RUBY
           class Setup
@@ -5211,7 +5225,7 @@ RSpec.describe ReactOnRails::Doctor do
       )
     end
 
-    it "infers a leading top-level initializer RSC assignment after a failed Rails boot" do
+    it "keeps a leading top-level initializer RSC assignment conservative after a failed Rails boot" do
       allow(doctor).to receive(:ensure_rails_environment_loaded).and_return(false)
       FileUtils.mkdir_p("config/initializers")
       File.write(
@@ -5230,16 +5244,17 @@ RSpec.describe ReactOnRails::Doctor do
         hash_including(
           type: :info,
           content: a_string_including(
-            "contexts_per_generation=1",
-            "required_capacity=2",
-            "RSC evidence=inferred_disabled"
+            "contexts_per_generation=2",
+            "required_capacity=4",
+            "RSC evidence=unverified_conservative_enabled"
           )
         ),
         hash_including(
-          type: :success,
-          content: a_string_including("configured=2", "required=2")
+          type: :warning,
+          content: a_string_including("insufficient", "configured=2", "required=4")
         )
       )
+      expect(checker.messages).not_to include(hash_including(type: :success))
     end
 
     it "keeps conflicting top-level initializer RSC evidence conservative after a failed Rails boot" do
@@ -5336,7 +5351,7 @@ RSpec.describe ReactOnRails::Doctor do
           content: a_string_including(
             "contexts_per_generation=2",
             "required_capacity=4",
-            "RSC evidence=inferred_enabled"
+            "RSC evidence=unverified_conservative_enabled"
           )
         ),
         hash_including(

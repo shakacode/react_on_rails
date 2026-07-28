@@ -2,7 +2,6 @@
 
 require "json"
 require "erb"
-require "ripper"
 require "stringio"
 require "tempfile"
 require "timeout"
@@ -3180,14 +3179,6 @@ module ReactOnRails
         end
       end
 
-      initializer_enabled = node_renderer_initializer_rsc_enabled
-      unless initializer_enabled.nil?
-        return [
-          initializer_enabled ? 2 : 1,
-          "inferred_#{initializer_enabled ? 'enabled' : 'disabled'}"
-        ]
-      end
-
       [2, "unverified_conservative_enabled"]
     end
 
@@ -3195,42 +3186,6 @@ module ReactOnRails
       return nil unless defined?(ReactOnRailsPro) && ReactOnRailsPro.respond_to?(:configuration)
 
       ReactOnRailsPro.configuration.enable_rsc_support
-    end
-
-    def node_renderer_initializer_rsc_enabled
-      initializer_path = doctor_app_path("config/initializers/react_on_rails_pro.rb")
-      return nil unless File.exist?(initializer_path)
-      return nil if File.size(initializer_path) > NODE_RENDERER_CONFIG_MAX_BYTES
-
-      content = File.read(initializer_path, NODE_RENDERER_CONFIG_MAX_BYTES)
-      evidence = node_renderer_rsc_assignment_evidence(Ripper.sexp(content))
-      return nil unless evidence.one? && !evidence.first.fetch(:conditional)
-
-      evidence.first.fetch(:enabled)
-    end
-
-    def node_renderer_rsc_assignment_evidence(node)
-      return [] unless node.is_a?(Array) && node.first == :program
-
-      Array(node[1]).filter_map do |statement|
-        next unless node_renderer_rsc_assignment?(statement)
-
-        enabled =
-          case statement.dig(2, 1, 1)
-          when "false" then false
-          when "true" then true
-          end
-        { enabled:, conditional: false }
-      end
-    end
-
-    def node_renderer_rsc_assignment?(node)
-      return false unless node.first == :assign
-
-      target = node[1]
-      target&.first == :field &&
-        target.dig(1, 1, 1) == "config" &&
-        target.dig(3, 1) == "enable_rsc_support"
     end
 
     def node_renderer_endpoint_topology
