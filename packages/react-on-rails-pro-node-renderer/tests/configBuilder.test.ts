@@ -219,7 +219,7 @@ describe('configBuilder', () => {
       },
     );
 
-    it.each(['45s', 'abc', '0', '-1', 'NaN', 'Infinity'])(
+    it.each(['', '45s', 'abc', '0', '-1', 'NaN', 'Infinity'])(
       'rejects invalid VM_POOL_ROLLOUT_DRAIN_TIMEOUT=%p from ENV',
       (vmPoolRolloutDrainTimeout) => {
         process.env.VM_POOL_ROLLOUT_DRAIN_TIMEOUT = vmPoolRolloutDrainTimeout;

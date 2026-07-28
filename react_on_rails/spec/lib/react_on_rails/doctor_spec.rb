@@ -3655,6 +3655,10 @@ RSpec.describe ReactOnRails::Doctor do
       [
         "a byte-zero call followed by a trailing new decoy",
         "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });\nnew"
+      ],
+      [
+        "a byte-zero parenthesized call followed by a trailing new decoy",
+        "(reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 }));\nnew"
       ]
     ].each do |description, source|
       it "observes a direct inline literal with #{description}" do

@@ -3346,7 +3346,11 @@ module ReactOnRails
 
     def node_renderer_constructor_operator_end(content, call_start)
       operator_end = content.rindex(/\S/, call_start - 1)
-      operator_end = content.rindex(/\S/, operator_end - 1) while operator_end && content[operator_end] == "("
+      while operator_end&.positive? && content[operator_end] == "("
+        operator_end = content.rindex(/\S/, operator_end - 1)
+      end
+      return nil if operator_end&.zero? && content[operator_end] == "("
+
       operator_end
     end
 

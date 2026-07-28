@@ -243,7 +243,7 @@ function defaultMaxVMPoolSize() {
 }
 
 function defaultVmPoolRolloutDrainTimeout() {
-  return env.VM_POOL_ROLLOUT_DRAIN_TIMEOUT ? Number(env.VM_POOL_ROLLOUT_DRAIN_TIMEOUT) : 60;
+  return env.VM_POOL_ROLLOUT_DRAIN_TIMEOUT != null ? Number(env.VM_POOL_ROLLOUT_DRAIN_TIMEOUT) : 60;
 }
 
 const defaultConfig: Config = {
