@@ -156,6 +156,9 @@ module ReactOnRails
       (?:&&|\|\||=>|\?) |
       \b(?:if|else|for|while|do|switch|case|catch|finally|function|return|throw)\b
     /x
+    NODE_RENDERER_OPENING_DELIMITERS = ["(", "[", "{"].freeze
+    NODE_RENDERER_MATCHING_OPENING_DELIMITERS = { ")" => "(", "]" => "[", "}" => "{" }.freeze
+    NODE_RENDERER_UNPROVEN_INITIALIZER_OPENINGS = ["(", "["].freeze
     # Defense-in-depth cap on how many files a single glob may contribute.
     # Realistic repos have a handful of workflow / deploy-stage files; far more
     # than this is a sign of an unexpectedly broad pattern, not legitimate config.
@@ -3340,6 +3343,7 @@ module ReactOnRails
     def node_renderer_call_reachability_proven?(content, call)
       prefix = content[...call.begin(0)]
       return false unless node_renderer_call_at_top_level?(prefix)
+      return false if node_renderer_call_in_unproven_initializer?(prefix)
 
       !prefix.match?(NODE_RENDERER_UNPROVEN_CALL_CONTROL_PATTERN)
     end
@@ -3353,6 +3357,24 @@ module ReactOnRails
       end
 
       brace_depth.zero?
+    end
+
+    def node_renderer_call_in_unproven_initializer?(prefix)
+      delimiters = []
+
+      prefix.each_char.with_index do |character, index|
+        delimiters << [character, index] if NODE_RENDERER_OPENING_DELIMITERS.include?(character)
+        next unless NODE_RENDERER_MATCHING_OPENING_DELIMITERS.key?(character)
+
+        opening = delimiters.pop
+        return true unless opening&.first == NODE_RENDERER_MATCHING_OPENING_DELIMITERS.fetch(character)
+      end
+
+      delimiters.any? do |opening, index|
+        next false unless NODE_RENDERER_UNPROVEN_INITIALIZER_OPENINGS.include?(opening)
+
+        prefix[(index + 1)..].match?(/(?<![=!<>])=(?!=|>)/)
+      end
     end
 
     def node_renderer_constructor_call?(content, call)

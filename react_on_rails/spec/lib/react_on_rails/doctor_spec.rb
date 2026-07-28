@@ -3964,6 +3964,19 @@ RSpec.describe ReactOnRails::Doctor do
         "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
       ],
       [
+        "a direct call in an unused array-destructuring default",
+        "const startRenderer = reactOnRailsProNodeRenderer;\n" \
+        "const [unused = reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 })] = [true];\n" \
+        "startRenderer(JSON.parse(process.env.RENDERER_CONFIG));"
+      ],
+      [
+        "a direct call in an unused arrow-parameter default",
+        "const startRenderer = reactOnRailsProNodeRenderer;\n" \
+        "const chooseRenderer = (value = reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 })) => value;\n" \
+        "chooseRenderer(true);\n" \
+        "startRenderer(JSON.parse(process.env.RENDERER_CONFIG));"
+      ],
+      [
         "a direct call inside an uninvoked arrow function",
         "const startRenderer = () => reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
       ],
@@ -4302,6 +4315,19 @@ RSpec.describe ReactOnRails::Doctor do
         "a direct call after a top-level throw",
         "throw new Error('renderer disabled');\n" \
         "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a direct call in an unused array-destructuring default",
+        "const startRenderer = reactOnRailsProNodeRenderer;\n" \
+        "const [unused = reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 })] = [true];\n" \
+        "startRenderer(JSON.parse(process.env.RENDERER_CONFIG));"
+      ],
+      [
+        "a direct call in an unused arrow-parameter default",
+        "const startRenderer = reactOnRailsProNodeRenderer;\n" \
+        "const chooseRenderer = (value = reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 })) => value;\n" \
+        "chooseRenderer(true);\n" \
+        "startRenderer(JSON.parse(process.env.RENDERER_CONFIG));"
       ],
       [
         "a direct call inside an uninvoked arrow function",
