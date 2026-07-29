@@ -135,6 +135,16 @@ git -C "$REPO" -c user.name=ci-test -c user.email=ci-test@example.com \
   merge -q --no-ff -m "Merge docs into main" "$PR_HEAD"
 MERGE_REF="$(git -C "$REPO" rev-parse HEAD)"
 
+# A newer PR head that landed after the merge ref was computed. Nothing merges it,
+# so MERGE_REF's tree cannot contain its file. This is the stale-merge-ref race:
+# the event reports this head while the checkout still holds the older merge.
+git -C "$REPO" checkout -q docs
+echo "added later" > "$REPO/added-after-merge-ref.txt"
+git -C "$REPO" add added-after-merge-ref.txt
+git_commit -m "Change present only in the newer PR head"
+NEW_PR_HEAD="$(git -C "$REPO" rev-parse HEAD)"
+git -C "$REPO" checkout -q main
+
 # A second merge ref carrying a large changed-file list, for the truncation case.
 # The names are long on purpose: the whole list has to exceed the 64KB pipe buffer
 # for an early-closing reader to be able to break the step.
@@ -188,17 +198,30 @@ assert_contains "$LAST_OUTPUT" "docs.md" "current merge ref"
 # The whole point of the fix: main's own drift must not enter the diff.
 assert_not_contains "$LAST_OUTPUT" "newer.txt" "current merge ref"
 
-# Regression guard for the under-selection hazard. A stale merge ref describes an
-# older head, so its first parent can OMIT changes that exist in the current head
-# and let this gate pass without the hosted run they need. Falling back to the
-# event base can only widen, which is the safe direction.
-run_case "stale merge ref falls back to the event base" \
-  "$MERGE_REF" pull_request "" "0000000000000000000000000000000000000000" "$OLD_MAIN"
-assert_rc 0 "stale merge ref"
-assert_contains "$LAST_OUTPUT" "Diff base: $OLD_MAIN (source: event payload (merge ref stale))" "stale merge ref"
-assert_contains "$LAST_OUTPUT" "DETECTOR_BASE=$OLD_MAIN" "stale merge ref"
-assert_contains "$LAST_OUTPUT" "merge ref is stale" "stale merge ref"
-assert_not_contains "$LAST_OUTPUT" "source: PR merge commit first parent" "stale merge ref"
+# Regression guard for the under-selection hazard, which is the sharpest edge in
+# this step. When the merge ref is stale, HEAD's tree does not contain the current
+# head's changes, so NO choice of base can classify them: every base is diffed
+# against a tree that is already missing them. Widening the base does not help.
+# The step must refuse to classify rather than emit a confident, incomplete answer
+# that could let a generator change through this required gate.
+#
+# NEW_PR_HEAD below is deliberately not reachable from MERGE_REF, which is exactly
+# the shape of the race this guards against.
+run_case "stale merge ref fails closed" \
+  "$MERGE_REF" pull_request "" "$NEW_PR_HEAD" "$OLD_MAIN"
+assert_rc 1 "stale merge ref"
+assert_contains "$LAST_OUTPUT" "::error::" "stale merge ref"
+assert_contains "$LAST_OUTPUT" "GitHub's merge ref is stale" "stale merge ref"
+assert_contains "$LAST_OUTPUT" "Re-run this job" "stale merge ref"
+# It must not hand any base to the detector once it knows the tree is wrong.
+assert_not_contains "$LAST_OUTPUT" "DETECTOR_BASE=" "stale merge ref"
+
+# Demonstrates WHY widening the base is not a fix: the file added in the current
+# head simply is not in HEAD's tree, so it cannot appear in any diff taken here.
+missing_from_stale_head="$(git -C "$REPO" diff --name-only "$OLD_MAIN" "$MERGE_REF" | grep -c 'added-after-merge-ref.txt')"
+if [ "$missing_from_stale_head" -ne 0 ]; then
+  fail "stale merge ref: expected the newer head's file to be absent from the widest diff against the stale HEAD"
+fi
 
 # A single-parent HEAD must never take HEAD^1: there it is the PR's own previous
 # commit rather than the base branch. Unlike the stale-merge-ref case there is no

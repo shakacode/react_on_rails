@@ -160,22 +160,33 @@ jobs:
             # parents[0] = HEAD, [1] = first parent (base side), [2] = second parent (PR head)
             if [ "${#parents[@]}" -eq 3 ]; then
               if [ -n "${PULL_REQUEST_HEAD_SHA}" ] && [ "${parents[2]}" != "${PULL_REQUEST_HEAD_SHA}" ]; then
-                # The merge ref describes an OLDER PR head. Mind the direction of
-                # the error here: a stale event base can only ADD base-branch
-                # commits to the diff, which over-selects suites and merely wastes
-                # runner minutes. Classifying from a stale merge ref's first parent
-                # instead OMITS changes that exist in the current head, which can
-                # flip run_generators to false and let this required gate pass
-                # without the hosted run those changes needed. Narrowing is the
-                # unsafe direction, so once staleness is detected, fall back to the
-                # event base rather than trusting a base proven to describe the
-                # wrong head.
-                echo "::warning::Checked-out merge commit's second parent (${parents[2]}) is not the current PR head (${PULL_REQUEST_HEAD_SHA}); GitHub's merge ref is stale. Falling back to ${base_ref} so the classification cannot omit changes present in the current head."
-                base_source="event payload (merge ref stale)"
-              else
-                base_ref="${parents[1]}"
-                base_source="PR merge commit first parent"
+                # Fail closed: this is the one state where no base can save us.
+                #
+                # Mind the direction of the error. A stale base only ADDS
+                # base-branch commits to the diff, over-selecting suites and
+                # wasting runner minutes, which is survivable. Missing changes is
+                # not: run_generators can come back false and this required gate
+                # can pass without the hosted run those changes needed.
+                #
+                # When the merge ref is stale, HEAD's TREE does not contain the
+                # current head's changes at all, so every base is diffed against a
+                # tree that is already missing them. Choosing a wider base cannot
+                # recover a file that is not in HEAD. The only honest outcomes are
+                # to classify the reported head instead (a network fetch plus a
+                # tree that no longer matches the rest of this job) or to refuse to
+                # classify. A required gate should refuse.
+                #
+                # This is a genuinely different situation from the single-parent
+                # branch below, which continues with a warning. There, HEAD is the
+                # real PR head, so a wide base still yields a complete diff. Here it
+                # does not. The condition is a race against GitHub recomputing
+                # refs/pull/<n>/merge, so a re-run clears it.
+                echo "::error::Checked-out merge commit's second parent (${parents[2]}) is not the PR head reported by this event (${PULL_REQUEST_HEAD_SHA}). GitHub's merge ref is stale, so HEAD's tree cannot contain the current head's changes and no diff base can produce a trustworthy classification. Re-run this job so GitHub recomputes refs/pull/<n>/merge, or push to the branch again."
+                exit 1
               fi
+
+              base_ref="${parents[1]}"
+              base_source="PR merge commit first parent"
             else
               # bundle-size.yml hard-fails on an unexpected merge structure. This gate
               # runs on every PR, so it warns instead: a new hard-fail path here would
