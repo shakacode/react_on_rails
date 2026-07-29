@@ -90,7 +90,7 @@ pinning it; checking only the base package is insufficient.
 - **OSS (`--standard-only`)**: pin and verify `react-on-rails@${NPM_TARGET_VERSION}`.
 
   ```bash
-  npm view "react-on-rails@${NPM_TARGET_VERSION}" version
+  pnpm view "react-on-rails@${NPM_TARGET_VERSION}" version
   ```
 
 - **Pro (all renderers)**: pin and verify `react-on-rails-pro@${NPM_TARGET_VERSION}`. Also pin and verify
@@ -98,9 +98,9 @@ pinning it; checking only the base package is insufficient.
   Do not add a direct `react-on-rails` dependency to Pro or RSC apps.
 
   ```bash
-  npm view "react-on-rails-pro@${NPM_TARGET_VERSION}" version
+  pnpm view "react-on-rails-pro@${NPM_TARGET_VERSION}" version
   # Run only when the app uses the standalone NodeRenderer:
-  npm view "react-on-rails-pro-node-renderer@${NPM_TARGET_VERSION}" version
+  pnpm view "react-on-rails-pro-node-renderer@${NPM_TARGET_VERSION}" version
   ```
 
 - **RSC (`--rsc`)**: follow the Pro rule, including its conditional standalone NodeRenderer package
@@ -113,7 +113,7 @@ pinning it; checking only the base package is insufficient.
 
   ```bash
   RSC_TARGET_VERSION="<exact RSC pin from target guidance>"
-  npm view "react-on-rails-rsc@${RSC_TARGET_VERSION}" version
+  pnpm view "react-on-rails-rsc@${RSC_TARGET_VERSION}" version
   ```
 
 4. Pin Ruby gems with `GEM_TARGET_VERSION` and regenerate the Bundler lockfile.

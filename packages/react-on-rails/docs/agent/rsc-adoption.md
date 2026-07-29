@@ -20,7 +20,7 @@ do not reconstruct the RSC build or renderer protocol from memory.
 
 ```bash
 bundle exec rake react_on_rails:install_rsc_agent_guardrails
-bin/rails react_on_rails:doctor FORMAT=json
+bundle exec rails react_on_rails:doctor FORMAT=json
 ```
 
 Before completion, protect any RSC payload route, keep the Node renderer private, avoid sensitive

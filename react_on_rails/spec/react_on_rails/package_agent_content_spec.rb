@@ -119,6 +119,13 @@ RSpec.describe "packaged agent content" do
     expect(guide).to include("stream_view_containing_react_components")
   end
 
+  it "runs the RSC adoption doctor through Bundler" do
+    guide = gem_root.join("docs/agent/rsc-adoption.md").read
+
+    expect(guide).to include("bundle exec rails react_on_rails:doctor FORMAT=json")
+    expect(guide).not_to include("bin/rails react_on_rails:doctor")
+  end
+
   it "separates progressive and buffered streaming requirements" do
     streaming_paths = %w[skills/streaming-debug/SKILL.md docs/agent/streaming-debug.md]
 
@@ -164,7 +171,7 @@ RSpec.describe "packaged agent content" do
     end
   end
 
-  it "scopes the buffered RSC-support prerequisite to the static RSC helper" do
+  it "does not invent an RSC-support prerequisite for buffered helpers" do
     streaming_paths = %w[skills/streaming-debug/SKILL.md docs/agent/streaming-debug.md]
 
     aggregate_failures do
@@ -175,13 +182,10 @@ RSpec.describe "packaged agent content" do
         expect(buffered).not_to be_nil, "expected #{relative_path} to describe buffered helpers"
         next unless buffered
 
-        expect(buffered[:body]).to include(
-          "`cached_static_rsc_component` requires `config.enable_rsc_support = true`"
+        expect(buffered[:body]).to include("do not gate entry on `config.enable_rsc_support`")
+        expect(buffered[:body]).not_to match(
+          /`cached_static_rsc_component` requires `config\.enable_rsc_support = true`/
         )
-        expect(buffered[:body]).to include(
-          "`buffered_stream_react_component` and `cached_buffered_stream_react_component` do not require"
-        )
-        expect(buffered[:body]).not_to match(/direct helper-entry/i)
       end
     end
   end
@@ -241,9 +245,10 @@ RSpec.describe "packaged agent content" do
     expect(guide).to include("`ReactOnRails::Generators::JsDependencyManager::RSC_PACKAGE_VERSION_PIN`")
     expect(guide).to include("`react-on-rails-rsc@${RSC_TARGET_VERSION}`")
     expect(guide).to include("Never derive `RSC_TARGET_VERSION` from `NPM_TARGET_VERSION`")
-    expect(guide).to include('npm view "react-on-rails-pro@${NPM_TARGET_VERSION}" version')
-    expect(guide).to include('npm view "react-on-rails-pro-node-renderer@${NPM_TARGET_VERSION}" version')
-    expect(guide).to include('npm view "react-on-rails-rsc@${RSC_TARGET_VERSION}" version')
+    expect(guide).to include('pnpm view "react-on-rails-pro@${NPM_TARGET_VERSION}" version')
+    expect(guide).to include('pnpm view "react-on-rails-pro-node-renderer@${NPM_TARGET_VERSION}" version')
+    expect(guide).to include('pnpm view "react-on-rails-rsc@${RSC_TARGET_VERSION}" version')
+    expect(guide).not_to match(/^\s*npm view /)
     expect(guide).not_to include("Pin npm packages with `NPM_TARGET_VERSION`")
   end
 

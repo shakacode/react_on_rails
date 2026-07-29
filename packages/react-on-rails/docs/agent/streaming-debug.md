@@ -32,8 +32,8 @@ For `buffered_stream_react_component`, `cached_buffered_stream_react_component`,
 1. Confirm the Node renderer is reachable and inspect the complete buffered result.
 2. These helpers do not require the streaming controller wrapper: they do not require
    `ReactOnRailsPro::Stream`, `stream_view_containing_react_components`, or a suspending boundary.
-3. Only `cached_static_rsc_component` requires `config.enable_rsc_support = true`.
-   `buffered_stream_react_component` and `cached_buffered_stream_react_component` do not require this setting.
+3. These buffered helpers do not gate entry on `config.enable_rsc_support`; verify the component's
+   actual RSC bundle and renderer requirements independently.
 4. Expect the browser to receive the page only after the renderer has produced the complete result;
    early shell flush and progressive Suspense reveal are not buffered-helper behavior.
 
