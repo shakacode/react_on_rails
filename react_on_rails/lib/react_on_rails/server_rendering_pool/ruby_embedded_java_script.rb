@@ -159,7 +159,7 @@ module ReactOnRails
           # (a supported config convenience, e.g. https://:password@host:3800). This is the
           # public entry point that file_url_to_string is called from, so without this the
           # sanitization inside file_url_to_string's own raise/rescue is moot for any real
-          # caller — the credential would still leak here regardless. See PR #4817.
+          # caller — the credential would still leak here regardless.
           msg = "You specified server rendering JS file: #{sanitized_renderer_url(server_js_file)}, but it cannot " \
                 "be read. You may set the server_bundle_js_file in your configuration to be \"\" to " \
                 "avoid this warning.\nError is: #{e}\n\n#{Utils.default_troubleshooting_section}"
@@ -416,11 +416,21 @@ module ReactOnRails
                   "#{response.code} #{response.message}"
           end
 
-          response.body.dup.force_encoding(charset_from_content_type(response["content-type"]))
+          # Label the bytes with the declared charset, then transcode to UTF-8: ExecJS's
+          # underlying JS runtime parses source as UTF-8, so a body merely *tagged* with its
+          # declared encoding (e.g. ISO-8859-1) rather than actually converted would have its
+          # non-ASCII bytes silently corrupted once the runtime re-interprets them as UTF-8.
+          # An undecodable byte sequence (a charset that doesn't actually match the bytes) is
+          # deliberately allowed to raise here rather than silently replaced with U+FFFD: this is
+          # source code, and replacing corrupt bytes would produce a bundle that parses but
+          # behaves wrongly, which is harder to diagnose than a clear load failure naming the URL.
+          response.body.dup
+                  .force_encoding(charset_from_content_type(response["content-type"]))
+                  .encode(Encoding::UTF_8)
         rescue StandardError => e
           # Sanitized here too: a non-2xx response (e.g. 401/403 from a bad-credentials config) is
           # exactly the failure mode that would otherwise put a URL's embedded password into this
-          # message, which Rails.logger and error trackers can persist. See PR #4817 review discussion.
+          # message, which Rails.logger and error trackers can persist.
           msg = "file_url_to_string #{sanitized_renderer_url(url)} failed\nError is: #{e}\n\n" \
                 "#{Utils.default_troubleshooting_section}"
           raise ReactOnRails::ServerBundleLoadError, msg
