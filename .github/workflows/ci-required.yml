@@ -213,7 +213,16 @@ jobs:
             # case this output exists to expose. sed is used rather than head
             # because sed reads its input to the end, so nothing can close the
             # pipe early.
-            changed_files="$(git diff --name-only "$diff_base" HEAD)"
+            # The explicit || guard is required: bash `set -e` does NOT fire on a
+            # failed command substitution in an assignment, so without it a failing
+            # git diff would silently yield an empty list that reads as "nothing
+            # changed" -- the same under-selection direction this step guards
+            # against elsewhere. script/ci-changes-detector guards its own diff the
+            # same way for the same reason; do not "simplify" this away.
+            changed_files="$(git diff --name-only "$diff_base" HEAD)" || {
+              echo "::error::git diff failed for ${diff_base}..HEAD while listing changed files."
+              exit 1
+            }
 
             if [ -z "$changed_files" ]; then
               echo "Changed files the classification was computed from: none"

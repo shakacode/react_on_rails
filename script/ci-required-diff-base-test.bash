@@ -258,6 +258,15 @@ if [ "$printed_files" -ne 50 ]; then
   fail "large changed-file list: expected 50 printed paths, got $printed_files"
 fi
 
+# NOT COVERED HERE: the `|| { echo ::error::; exit 1; }` guard on the
+# changed_files assignment. Exercising it needs a git that fails only on
+# `diff --name-only`, and injecting one via PATH does not survive into the child
+# shell in every developer environment, so a case for it would pass or fail for
+# reasons unrelated to the guard. The guard mirrors the one in
+# script/ci-changes-detector, which is likewise enforced by comment rather than
+# by test. Tracked with the extraction work in #4824, where the logic moves into
+# script/ and the guard becomes directly callable.
+
 echo
 if [ "$TESTS_FAILED" -ne 0 ]; then
   echo "$TESTS_FAILED of $TESTS_RUN diff-base tests failed" >&2
