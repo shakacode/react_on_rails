@@ -432,13 +432,29 @@ module ReactOnRails
           # underlying JS runtime parses source as UTF-8, so a body merely *tagged* with its
           # declared encoding (e.g. ISO-8859-1) rather than actually converted would have its
           # non-ASCII bytes silently corrupted once the runtime re-interprets them as UTF-8.
+          #
+          # String#encode is a no-op — it does NOT validate — when the source encoding already
+          # equals the destination (UTF-8). charset_from_content_type returns UTF-8 for three of
+          # the four cases this method exists to handle (no Content-Type header, no charset
+          # parameter, and an explicit charset=utf-8), so `.encode(Encoding::UTF_8)` alone would
+          # silently let invalid bytes through unchanged on those three paths — only a genuine
+          # cross-encoding transcode (e.g. a declared ISO-8859-1 body) actually validates via
+          # `encode`. valid_encoding? is therefore checked explicitly afterward so every path
+          # fails fast, not just the cross-encoding one.
+          #
           # An undecodable byte sequence (a charset that doesn't actually match the bytes) is
-          # deliberately allowed to raise here rather than silently replaced with U+FFFD: this is
-          # source code, and replacing corrupt bytes would produce a bundle that parses but
-          # behaves wrongly, which is harder to diagnose than a clear load failure naming the URL.
-          response.body.dup
-                  .force_encoding(charset_from_content_type(response["content-type"]))
-                  .encode(Encoding::UTF_8)
+          # deliberately raised here rather than silently replaced with U+FFFD: this is source
+          # code, and replacing corrupt bytes would produce a bundle that parses but behaves
+          # wrongly, which is harder to diagnose than a clear load failure naming the URL.
+          decoded = response.body.dup
+                            .force_encoding(charset_from_content_type(response["content-type"]))
+                            .encode(Encoding::UTF_8)
+          unless decoded.valid_encoding?
+            raise "response body is not valid UTF-8 after decoding from the declared charset " \
+                  "(GET #{sanitized_renderer_url(url)})"
+          end
+
+          decoded
         rescue StandardError => e
           # Sanitized here too: a non-2xx response (e.g. 401/403 from a bad-credentials config) is
           # exactly the failure mode that would otherwise put a URL's embedded password into this
