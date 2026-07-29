@@ -40,6 +40,22 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4821](https://github.com/shakacode/react_on_rails/pull/4821) by
   [justin808](https://github.com/justin808).
 
+- **HTTP-served SSR bundle loading now honors the response charset, rejects non-2xx responses,
+  and no longer leaks URL credentials into error messages**:
+  When `server_bundle_js_file` resolves to an HTTP(S) URL, `RubyEmbeddedJavaScript.file_url_to_string`
+  no longer assumes the `Content-Type` header always ends in an exact `; charset=...` form. A response
+  with no charset, a `Content-Type` with no charset parameter, a missing `Content-Type` header, or a
+  quoted charset value (`charset="ISO-8859-1"`) now transcodes to UTF-8 successfully instead of
+  raising or silently mislabeling the bytes, falling back to UTF-8 when no usable charset is declared.
+  A non-2xx response (for example a 404 page or a proxy error) is now rejected with a clear
+  bundle-load error naming the URL and status, instead of being returned as if it were JavaScript
+  bundle source. Additionally, a `server_bundle_js_file` URL with embedded HTTP basic-auth
+  credentials (e.g. `https://:password@host:3800/bundle.js`) no longer leaks that password into
+  raised errors or logs on a load failure. Fixes
+  [Issue 4584](https://github.com/shakacode/react_on_rails/issues/4584).
+  [PR 4817](https://github.com/shakacode/react_on_rails/pull/4817) by
+  [justin808](https://github.com/justin808).
+
 - **RailsContext now stays current across Turbo and Turbolinks navigation**: Parsed context is cached
   only while its source element and JSON text remain unchanged. Replacing the context element or
   morphing its payload in place now makes the next core render or immediate Pro hydration receive the
