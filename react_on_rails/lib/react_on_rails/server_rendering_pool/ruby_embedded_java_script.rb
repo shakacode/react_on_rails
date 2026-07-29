@@ -407,12 +407,17 @@ module ReactOnRails
         def file_url_to_string(url)
           response = Net::HTTP.get_response(URI.parse(url))
           unless response.is_a?(Net::HTTPSuccess)
-            raise "GET #{url} returned a non-success HTTP status: #{response.code} #{response.message}"
+            raise "GET #{sanitized_renderer_url(url)} returned a non-success HTTP status: " \
+                  "#{response.code} #{response.message}"
           end
 
           response.body.dup.force_encoding(charset_from_content_type(response["content-type"]))
         rescue StandardError => e
-          msg = "file_url_to_string #{url} failed\nError is: #{e}\n\n#{Utils.default_troubleshooting_section}"
+          # Sanitized here too: a non-2xx response (e.g. 401/403 from a bad-credentials config) is
+          # exactly the failure mode that would otherwise put a URL's embedded password into this
+          # message, which Rails.logger and error trackers can persist. See PR #4817 review discussion.
+          msg = "file_url_to_string #{sanitized_renderer_url(url)} failed\nError is: #{e}\n\n" \
+                "#{Utils.default_troubleshooting_section}"
           raise ReactOnRails::ServerBundleLoadError, msg
         end
 

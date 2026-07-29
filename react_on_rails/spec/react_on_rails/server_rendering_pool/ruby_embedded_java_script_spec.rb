@@ -350,6 +350,59 @@ module ReactOnRails
           end
         end
 
+        # PR #4817 review: a non-2xx response is exactly the failure mode a bad-credentials
+        # config produces (401/403 against a URL with embedded basic-auth credentials), so the
+        # status-check path must not put the password in the raised message.
+        #
+        # These two specs call the private `file_url_to_string` directly (rather than through
+        # `read_bundle_js_code`) to isolate the two interpolations that PR #4817 authorized
+        # fixing. `read_bundle_js_code`'s own rescue (line ~158) interpolates the raw URL
+        # independently and has the same leak, but that is a separate method/location outside
+        # this PR's explicitly bounded fix; it is tracked as a follow-up rather than expanded
+        # into here.
+        context "when the HTTP-served bundle URL embeds credentials and the response is non-2xx" do
+          it "does not leak the credential into the raised error message" do
+            server_bundle_url = "http://user:s3cr3t@localhost:3035/webpack/development/server-bundle.js"
+
+            not_found_response = Net::HTTPNotFound.new("1.1", "404", "Not Found")
+            not_found_response["content-type"] = "text/html; charset=utf-8"
+            not_found_response.instance_variable_set(:@read, true)
+            not_found_response.instance_variable_set(:@body, "<html><body>Not Found</body></html>")
+
+            allow(Net::HTTP).to receive(:get_response).and_return(not_found_response)
+
+            expect do
+              described_class.send(:file_url_to_string, server_bundle_url)
+            end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
+              expect(error.message).not_to include("s3cr3t")
+              # The status and a usable (sanitized) URL must still be present for diagnosis.
+              expect(error.message).to include("404")
+              expect(error.message).to include("localhost:3035")
+            }
+          end
+        end
+
+        # PR #4817 review: the outer rescue's message (pre-existing, not introduced by this PR's
+        # non-2xx/charset fix) has the same interpolation gap on any other failure of
+        # Net::HTTP.get_response (e.g. a connection error), so it must be sanitized too.
+        context "when the HTTP-served bundle URL embeds credentials and the connection fails" do
+          it "does not leak the credential into the raised error message" do
+            server_bundle_url = "http://user:s3cr3t@localhost:3035/webpack/development/server-bundle.js"
+
+            allow(Net::HTTP).to receive(:get_response).and_raise(
+              Errno::ECONNREFUSED.new("connect(2) for localhost:3035")
+            )
+
+            expect do
+              described_class.send(:file_url_to_string, server_bundle_url)
+            end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
+              expect(error.message).not_to include("s3cr3t")
+              expect(error.message).to include("localhost:3035")
+              expect(error.message).to include("failed")
+            }
+          end
+        end
+
         # See issue #4584: the charset was assumed to always be present in the exact form
         # "; charset=..." rather than honored from whatever the response actually declares.
         context "when the HTTP-served bundle declares a non-UTF-8 charset" do
