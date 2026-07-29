@@ -125,13 +125,12 @@ jobs:
         env:
           PULL_REQUEST_BASE_SHA: ${{ github.event.inputs.pull_request_base_sha || '' }}
           PULL_REQUEST_HEAD_SHA: ${{ github.event.pull_request.head.sha || '' }}
-          EVENT_BASE_REF: >-
-            ${{
-              github.event.pull_request.base.sha ||
-              github.event.merge_group.base_sha ||
-              github.event.before ||
-              'origin/main'
-            }}
+          # Keep this expression on one line. It is the merge-queue base-ref
+          # contract asserted by react_on_rails/spec/react_on_rails/ruby_version_support_spec.rb,
+          # which matches the raw file text, and a folded scalar would preserve
+          # the newlines rather than fold them (the continuation lines are more
+          # indented than the first).
+          EVENT_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before || 'origin/main' }}
         run: |
           # For pull_request events actions/checkout resolves refs/pull/<n>/merge,
           # so HEAD is the PR head merged into the CURRENT base tip. By contrast
