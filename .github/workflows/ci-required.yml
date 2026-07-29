@@ -124,12 +124,66 @@ jobs:
         id: changes
         env:
           PULL_REQUEST_BASE_SHA: ${{ github.event.inputs.pull_request_base_sha || '' }}
+          PULL_REQUEST_HEAD_SHA: ${{ github.event.pull_request.head.sha || '' }}
+          EVENT_BASE_REF: >-
+            ${{
+              github.event.pull_request.base.sha ||
+              github.event.merge_group.base_sha ||
+              github.event.before ||
+              'origin/main'
+            }}
         run: |
-          base_ref="${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before || 'origin/main' }}"
+          # For pull_request events actions/checkout resolves refs/pull/<n>/merge,
+          # so HEAD is the PR head merged into the CURRENT base tip. By contrast
+          # github.event.pull_request.base.sha is only refreshed when the PR is
+          # opened or synchronized, so on a branch that has not been pushed for a
+          # while it lags HEAD's own base parent. Diffing from that stale SHA folds
+          # every base-branch commit in between into the changed-file set, which is
+          # how a docs-only PR gets classified as a generator change and is then
+          # told to spend a hosted CI run it does not need (#4756).
+          #
+          # The merge commit's FIRST PARENT is the base commit the merge was
+          # actually computed against, so it is the only base that yields this PR's
+          # own diff. It is also always present locally (it is a parent of HEAD), so
+          # it cannot fall outside the shallow fetch window. bundle-size.yml derives
+          # its size baseline from the same first parent for the same reason.
+          base_ref="${EVENT_BASE_REF}"
+          base_source="event payload"
+
           if [ -n "${PULL_REQUEST_BASE_SHA}" ]; then
             base_ref="${PULL_REQUEST_BASE_SHA}"
+            base_source="workflow_dispatch input"
+          elif [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+            parent_line="$(git rev-list --parents -n 1 HEAD 2>/dev/null || true)"
+            read -ra parents <<< "$parent_line"
+            # parents[0] = HEAD, [1] = first parent (base side), [2] = second parent (PR head)
+            if [ "${#parents[@]}" -eq 3 ]; then
+              base_ref="${parents[1]}"
+              base_source="PR merge commit first parent"
+
+              if [ -n "${PULL_REQUEST_HEAD_SHA}" ] && [ "${parents[2]}" != "${PULL_REQUEST_HEAD_SHA}" ]; then
+                echo "::warning::Checked-out merge commit's second parent (${parents[2]}) is not the current PR head (${PULL_REQUEST_HEAD_SHA}); GitHub's merge ref is stale, so this classification describes an older head."
+              fi
+            else
+              # bundle-size.yml hard-fails on an unexpected merge structure. This gate
+              # runs on every PR, so it warns instead: a new hard-fail path here would
+              # block more PRs than the misclassification it guards against. The
+              # changed-file list printed below makes a widened diff obvious anyway.
+              echo "::warning::HEAD is not the expected two-parent PR merge commit, so the changed-file classification is computed from ${base_ref} and may include base-branch drift. If this PR is routed to suites it does not touch, rebase it on its base branch."
+            fi
           fi
+
+          echo "Diff base: ${base_ref} (source: ${base_source})"
+
           script/ci-changes-detector "$base_ref"
+
+          # Show the exact file set behind the classification above so a widened
+          # diff is visible at a glance. The detector has already fetched and
+          # deepened as needed, so these calls add no network work.
+          if diff_base="$(git merge-base "$base_ref" HEAD 2>/dev/null)"; then
+            echo "Changed files the classification was computed from (first 50):"
+            git diff --name-only "$diff_base" HEAD | head -50
+          fi
 
       - name: Enforce hosted CI for generator changes
         env:
