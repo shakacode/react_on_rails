@@ -258,6 +258,16 @@ pair`, returns invalid UTF-8, or silently mis-decodes the value. The parser now 
   [PR 4579](https://github.com/shakacode/react_on_rails/pull/4579) by
   [alexeyr-ci2](https://github.com/alexeyr-ci2).
 
+### [17.0.1] - 2026-07-26
+
+#### Fixed
+
+- **Corrected the OSS npm package license metadata and packed license**: `react-on-rails` now declares
+  `MIT`, includes a package-local MIT license in the published tarball, and verifies the packed
+  artifact cannot inherit React on Rails Pro commercial terms.
+  [PR 4792](https://github.com/shakacode/react_on_rails/pull/4792) by
+  [justin808](https://github.com/justin808).
+
 ### [17.0.0] - 2026-07-16
 
 #### Breaking Changes
@@ -3005,7 +3015,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.0.0...main
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.0.1...main
+[17.0.1]: https://github.com/shakacode/react_on_rails/compare/v17.0.0...v17.0.1
 [17.0.0]: https://github.com/shakacode/react_on_rails/compare/v16.6.0...v17.0.0
 [16.6.0]: https://github.com/shakacode/react_on_rails/compare/v16.5.1...v16.6.0
 [16.5.1]: https://github.com/shakacode/react_on_rails/compare/v16.5.0...v16.5.1
