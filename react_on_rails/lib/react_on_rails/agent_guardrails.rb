@@ -21,8 +21,11 @@ module ReactOnRails
       "rsc_app_safety_check.rb" => ".claude/hooks/rsc-app-safety-check.rb"
     }.freeze
 
-    HOOK_COMMAND = "ruby"
-    HOOK_ARGS = ["${CLAUDE_PROJECT_DIR}/.claude/hooks/rsc-app-safety-check.rb"].freeze
+    # Claude Code's PostToolUse hook entries take a single "command" string (see this repo's own
+    # working .claude/settings.json for a live reference). There is no "args" array in that schema;
+    # the template is executable (chmod 0o755) and starts with `#!/usr/bin/env ruby`, so it can be
+    # invoked directly without a separate interpreter argument.
+    HOOK_COMMAND = "${CLAUDE_PROJECT_DIR}/.claude/hooks/rsc-app-safety-check.rb"
     LEGACY_HOOK_COMMAND = "${CLAUDE_PROJECT_DIR}/.claude/hooks/rsc-app-safety-check.sh"
     LEGACY_HOOK_REL = ".claude/hooks/rsc-app-safety-check.sh"
     HOOK_REL = ".claude/hooks/rsc-app-safety-check.rb"
@@ -208,11 +211,11 @@ module ReactOnRails
           entry = { "matcher" => HOOK_MATCHER, "hooks" => [] }
           post_tool_use << entry
         end
-        (entry["hooks"] ||= []) << { "type" => "command", "command" => HOOK_COMMAND, "args" => HOOK_ARGS }
+        (entry["hooks"] ||= []) << { "type" => "command", "command" => HOOK_COMMAND }
       end
 
       def registered_hook?(hook)
-        hook["type"] == "command" && hook["command"] == HOOK_COMMAND && hook["args"] == HOOK_ARGS
+        hook["type"] == "command" && hook["command"] == HOOK_COMMAND
       end
 
       def managed_hook?(hook)

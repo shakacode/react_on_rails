@@ -26,7 +26,7 @@ module ReactOnRails
     def rsc_hooks
       settings.dig("hooks", "PostToolUse").flat_map { |entry| entry["hooks"] }
               .select do |hook|
-        hook["args"] == described_class::HOOK_ARGS || hook["command"] == described_class::LEGACY_HOOK_COMMAND
+        hook["command"] == described_class::HOOK_COMMAND || hook["command"] == described_class::LEGACY_HOOK_COMMAND
       end
     end
 
@@ -657,15 +657,17 @@ module ReactOnRails
       expect(skill).not_to include("Props passed to SSR can reach your error tracker")
     end
 
-    it "registers the project hook in exec form so paths with spaces are not shell-split" do
+    it "registers the project hook as a single command string, matching Claude Code's supported " \
+       "PostToolUse schema (no unsupported \"args\" array)" do
       described_class.install(@app_root)
 
       hook = settings.dig("hooks", "PostToolUse").flat_map { |entry| entry.fetch("hooks") }
-                     .find { |entry| entry["command"] == described_class::HOOK_COMMAND }
+                     .find { |entry| entry["type"] == "command" && entry["command"] == described_class::HOOK_COMMAND }
 
-      expect(hook).to include(
-        "type" => "command", "command" => described_class::HOOK_COMMAND, "args" => described_class::HOOK_ARGS
-      )
+      # Claude Code's PostToolUse hook entries take a single "command" string (see this repo's own
+      # working .claude/settings.json). An "args" array is not part of that schema and is silently
+      # ignored by the hook runner, so a hook shaped that way never actually invokes the script.
+      expect(hook).to eq("type" => "command", "command" => described_class::HOOK_COMMAND)
     end
 
     it "removes the legacy shell hook file and upgrades its settings registration" do
@@ -697,7 +699,7 @@ module ReactOnRails
         "removed    .claude/hooks/rsc-app-safety-check.sh (replaced by .claude/hooks/rsc-app-safety-check.rb)"
       )
       expect(project_hooks).to contain_exactly(
-        "type" => "command", "command" => described_class::HOOK_COMMAND, "args" => described_class::HOOK_ARGS
+        "type" => "command", "command" => described_class::HOOK_COMMAND
       )
     end
 
@@ -712,11 +714,7 @@ module ReactOnRails
               {
                 "matcher" => "Edit|Write",
                 "hooks" => [
-                  {
-                    "type" => "command",
-                    "command" => described_class::HOOK_COMMAND,
-                    "args" => described_class::HOOK_ARGS
-                  },
+                  { "type" => "command", "command" => described_class::HOOK_COMMAND },
                   { "type" => "command", "command" => described_class::LEGACY_HOOK_COMMAND }
                 ]
               }
@@ -728,7 +726,7 @@ module ReactOnRails
       described_class.install(@app_root)
 
       expect(rsc_hooks).to contain_exactly(
-        "type" => "command", "command" => described_class::HOOK_COMMAND, "args" => described_class::HOOK_ARGS
+        "type" => "command", "command" => described_class::HOOK_COMMAND
       )
     end
 
