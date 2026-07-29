@@ -413,6 +413,32 @@ module ReactOnRails
           end
         end
 
+        # A URL malformed enough that URI.parse itself raises (e.g. a space in the host) fails
+        # before sanitized_renderer_url is ever applied to the `url` variable at the raise site —
+        # URI::InvalidURIError's own message embeds the original credential-bearing string
+        # verbatim, so that message must be scrubbed independently of the url variable.
+        context "when the HTTP-served bundle URL embeds credentials and is malformed enough to fail URI parsing" do
+          it "does not leak the credential into the raised error message" do
+            server_bundle_url = "http://bundle-user:s3cr3t@bad host/webpack/development/server-bundle.js"
+
+            allow(ReactOnRails::Utils).to receive_messages(
+              server_bundle_js_file_path: server_bundle_url,
+              server_bundle_path_is_http?: true
+            )
+
+            expect do
+              described_class.read_bundle_js_code
+            end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
+              expect(error.message).not_to include("s3cr3t")
+              expect(error.message).not_to include("bundle-user")
+              # The error must still say the URL was malformed and show enough of it (host/path
+              # minus credentials) for an operator to identify which configured URL failed.
+              expect(error.message).to include("bad URI")
+              expect(error.message).to include("bad host")
+            }
+          end
+        end
+
         # read_bundle_js_code also serves the local (non-HTTP) bundle path, where
         # server_bundle_js_file is a plain filesystem path rather than a URL.
         # sanitized_renderer_url must pass such paths through unchanged (no embedded userinfo to

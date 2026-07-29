@@ -159,10 +159,13 @@ module ReactOnRails
           # (a supported config convenience, e.g. https://:password@host:3800). This is the
           # public entry point that file_url_to_string is called from, so without this the
           # sanitization inside file_url_to_string's own raise/rescue is moot for any real
-          # caller — the credential would still leak here regardless.
+          # caller — the credential would still leak here regardless. e.message is scrubbed too:
+          # a URL malformed enough that URI.parse raises embeds the raw, unsanitized URL verbatim
+          # in URI::InvalidURIError's own message.
           msg = "You specified server rendering JS file: #{sanitized_renderer_url(server_js_file)}, but it cannot " \
                 "be read. You may set the server_bundle_js_file in your configuration to be \"\" to " \
-                "avoid this warning.\nError is: #{e}\n\n#{Utils.default_troubleshooting_section}"
+                "avoid this warning.\nError is: #{strip_userinfo(e.message)}\n\n" \
+                "#{Utils.default_troubleshooting_section}"
           raise ReactOnRails::ServerBundleLoadError, msg
         end
 
@@ -404,9 +407,18 @@ module ReactOnRails
           uri.user = nil
           uri.to_s
         rescue URI::InvalidURIError
-          # Best-effort strip of the common user:pass@ form so a URL that URI rejects as
-          # malformed still doesn't leak a password into the message or logs.
-          url.to_s.gsub(%r{//[^/@]*@}, "//")
+          # A URL malformed enough that URI rejects it still shouldn't leak credentials.
+          strip_userinfo(url)
+        end
+
+        # Best-effort strip of the common user:pass@ form from arbitrary text — not just a URL
+        # value, but also free-form text that may quote one, such as the message of a
+        # URI::InvalidURIError raised from an unparseable credential-bearing URL (that message
+        # embeds the raw original string verbatim). Shared by sanitized_renderer_url's malformed-
+        # URL fallback and by the rescue blocks below, so there is exactly one definition of
+        # "strip userinfo" rather than two regexes that can drift apart.
+        def strip_userinfo(text)
+          text.to_s.gsub(%r{//[^/@]*@}, "//")
         end
 
         def file_url_to_string(url)
@@ -430,9 +442,11 @@ module ReactOnRails
         rescue StandardError => e
           # Sanitized here too: a non-2xx response (e.g. 401/403 from a bad-credentials config) is
           # exactly the failure mode that would otherwise put a URL's embedded password into this
-          # message, which Rails.logger and error trackers can persist.
-          msg = "file_url_to_string #{sanitized_renderer_url(url)} failed\nError is: #{e}\n\n" \
-                "#{Utils.default_troubleshooting_section}"
+          # message, which Rails.logger and error trackers can persist. e.message is scrubbed as
+          # well as url itself: a URL malformed enough that URI.parse raises embeds the raw,
+          # unsanitized URL verbatim in URI::InvalidURIError's own message.
+          msg = "file_url_to_string #{sanitized_renderer_url(url)} failed\nError is: " \
+                "#{strip_userinfo(e.message)}\n\n#{Utils.default_troubleshooting_section}"
           raise ReactOnRails::ServerBundleLoadError, msg
         end
 
