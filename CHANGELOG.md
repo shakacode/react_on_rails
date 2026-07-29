@@ -26,6 +26,20 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **RSC render-error details are no longer sent to the browser on the fetched payload path**:
+  The RSC payload fetched during client-side navigation (via `rsc_payload_generation_url_path`) included
+  the server's rendering-error message and source-mapped stack — which contains server file paths — in its
+  metadata, in every environment. The inline (first-paint) payload path was already redacted, so error
+  detail that was hidden on first paint could still reach the browser on a client navigation. The fetched
+  path now applies the same fail-closed gate: full detail only in `development` and `test`, while
+  `production`, `staging`, and any unrecognized environment receive a generic `hasErrors: true` signal so
+  client error boundaries still fire. Server-side error handling is unaffected — `raise_prerender_error`
+  still receives the full message and stack, because redaction happens at the browser-facing boundary
+  after the server's own error transform runs. Fixes
+  [Issue 4736](https://github.com/shakacode/react_on_rails/issues/4736).
+  [PR 4821](https://github.com/shakacode/react_on_rails/pull/4821) by
+  [justin808](https://github.com/justin808).
+
 - **RailsContext now stays current across Turbo and Turbolinks navigation**: Parsed context is cached
   only while its source element and JSON text remain unchanged. Replacing the context element or
   morphing its payload in place now makes the next core render or immediate Pro hydration receive the
