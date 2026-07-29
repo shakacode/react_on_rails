@@ -1,0 +1,247 @@
+#!/usr/bin/env bash
+# Test harness for the diff-base selection in the "Run changed-files detector"
+# step of .github/workflows/ci-required.yml.
+#
+# Run: bash script/ci-required-diff-base-test.bash
+# CI invokes it from the "Run CI gate tests" step of the same workflow.
+#
+# The step body is extracted from the committed workflow with a YAML parser and
+# executed against a synthetic repository, so the logic under test is exactly the
+# logic that ships. That matters because this branching decides which suites run
+# for every PR, and it lives inline in YAML rather than in script/.
+#
+# script/ci-changes-detector is stubbed here. Its own behavior is covered by
+# script/ci-changes-detector-test.bash; what this harness pins down is which base
+# ref the step hands it, and that the step survives a large changed-file list.
+#
+# Cases are run under `bash --noprofile --norc -eo pipefail`, the exact shell
+# GitHub Actions uses for run: steps. The pipefail part is load-bearing: it is
+# what turned a truncating pipe into a hard failure of this required gate.
+
+set -uo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+WORKFLOW="$REPO_ROOT/.github/workflows/ci-required.yml"
+
+TESTS_RUN=0
+TESTS_FAILED=0
+FAILURES=()
+
+LAST_OUTPUT=""
+LAST_RC=0
+
+fail() {
+  local message="$1"
+  TESTS_FAILED=$((TESTS_FAILED + 1))
+  FAILURES+=("$message")
+  echo "  FAIL: $message" >&2
+}
+
+assert_contains() {
+  local haystack="$1"
+  local needle="$2"
+  local label="$3"
+
+  case "$haystack" in
+    *"$needle"*) ;;
+    *) fail "$label: expected '$needle' in: $haystack" ;;
+  esac
+}
+
+assert_not_contains() {
+  local haystack="$1"
+  local needle="$2"
+  local label="$3"
+
+  case "$haystack" in
+    *"$needle"*) fail "$label: did not expect '$needle' in: $haystack" ;;
+    *) ;;
+  esac
+}
+
+assert_rc() {
+  local expected="$1"
+  local label="$2"
+
+  if [ "$LAST_RC" -ne "$expected" ]; then
+    fail "$label: expected exit $expected, got $LAST_RC. Output: $LAST_OUTPUT"
+  fi
+}
+
+WORKDIR="$(mktemp -d)"
+cleanup() {
+  rm -rf "$WORKDIR"
+}
+trap cleanup EXIT
+
+STEP="$WORKDIR/step.sh"
+REPO="$WORKDIR/repo"
+
+# Extract the step body. A rename of the step name is a real breakage of this
+# harness, so fail loudly rather than silently testing nothing.
+if ! ruby -ryaml -e '
+  workflow = YAML.safe_load_file(ARGV[0], permitted_classes: [], aliases: false)
+  steps = workflow.fetch("jobs").fetch("required-pr-gate").fetch("steps")
+  step = steps.find { |candidate| candidate["name"] == "Run changed-files detector" }
+  abort "step \"Run changed-files detector\" not found in #{ARGV[0]}" if step.nil?
+  File.write(ARGV[1], step.fetch("run"))
+' "$WORKFLOW" "$STEP"; then
+  echo "FAIL: could not extract the step body from $WORKFLOW" >&2
+  exit 1
+fi
+
+git init -q "$REPO"
+mkdir -p "$REPO/script"
+
+cat > "$REPO/script/ci-changes-detector" <<'STUB'
+#!/usr/bin/env bash
+# Stub standing in for the real detector: record the base ref it was handed.
+echo "DETECTOR_BASE=$1"
+STUB
+chmod +x "$REPO/script/ci-changes-detector"
+
+git_commit() {
+  git -C "$REPO" -c user.name=ci-test -c user.email=ci-test@example.com \
+    commit -q --no-verify "$@"
+}
+
+git -C "$REPO" checkout -q -b main
+git -C "$REPO" add script/ci-changes-detector
+git_commit -m "Add detector stub"
+
+echo "old" > "$REPO/older.txt"
+git -C "$REPO" add older.txt
+git_commit -m "Older main commit"
+OLD_MAIN="$(git -C "$REPO" rev-parse HEAD)"
+
+echo "new" > "$REPO/newer.txt"
+git -C "$REPO" add newer.txt
+git_commit -m "Newer main commit"
+MAIN_TIP="$(git -C "$REPO" rev-parse HEAD)"
+
+# A docs-only PR branch, cut from the OLDER main commit. OLD_MAIN stands in for a
+# pull_request.base.sha that has gone stale while main moved on.
+git -C "$REPO" checkout -q -b docs "$OLD_MAIN"
+echo "docs" > "$REPO/docs.md"
+git -C "$REPO" add docs.md
+git_commit -m "Docs-only change"
+PR_HEAD="$(git -C "$REPO" rev-parse HEAD)"
+
+# Stand-in for refs/pull/<n>/merge: first parent is the base side, second is the
+# PR head. This is the shape actions/checkout puts in HEAD for pull_request.
+git -C "$REPO" checkout -q main
+git -C "$REPO" -c user.name=ci-test -c user.email=ci-test@example.com \
+  merge -q --no-ff -m "Merge docs into main" "$PR_HEAD"
+MERGE_REF="$(git -C "$REPO" rev-parse HEAD)"
+
+# A second merge ref carrying a large changed-file list, for the truncation case.
+# The names are long on purpose: the whole list has to exceed the 64KB pipe buffer
+# for an early-closing reader to be able to break the step.
+git -C "$REPO" checkout -q -b big "$MERGE_REF"
+mkdir -p "$REPO/bigdir"
+long_name="a-deliberately-long-path-segment-to-exceed-the-pipe-buffer-quickly"
+seq 1 3000 | while read -r index; do
+  printf '%s/bigdir/%s-%05d.txt\n' "$REPO" "$long_name" "$index"
+done | xargs touch
+git -C "$REPO" add -A
+git_commit -m "Large changed-file list"
+BIG_HEAD="$(git -C "$REPO" rev-parse HEAD)"
+
+git -C "$REPO" checkout -q main
+git -C "$REPO" -c user.name=ci-test -c user.email=ci-test@example.com \
+  merge -q --no-ff -m "Merge big into main" "$BIG_HEAD"
+BIG_MERGE_REF="$(git -C "$REPO" rev-parse HEAD)"
+
+run_case() {
+  local name="$1"
+  local head="$2"
+  local event_name="$3"
+  local dispatch_base_sha="$4"
+  local pr_head_sha="$5"
+  local event_base_ref="$6"
+
+  TESTS_RUN=$((TESTS_RUN + 1))
+  echo "-> $name"
+
+  git -C "$REPO" checkout -q --detach "$head"
+
+  LAST_OUTPUT="$(
+    cd "$REPO" || exit 1
+    CI=1 \
+      GITHUB_EVENT_NAME="$event_name" \
+      GITHUB_OUTPUT="$WORKDIR/github-output.txt" \
+      PULL_REQUEST_BASE_SHA="$dispatch_base_sha" \
+      PULL_REQUEST_HEAD_SHA="$pr_head_sha" \
+      EVENT_BASE_REF="$event_base_ref" \
+      bash --noprofile --norc -eo pipefail "$STEP" 2>&1
+  )"
+  LAST_RC=$?
+}
+
+run_case "current merge ref uses the first parent" \
+  "$MERGE_REF" pull_request "" "$PR_HEAD" "$OLD_MAIN"
+assert_rc 0 "current merge ref"
+assert_contains "$LAST_OUTPUT" "Diff base: $MAIN_TIP (source: PR merge commit first parent)" "current merge ref"
+assert_contains "$LAST_OUTPUT" "DETECTOR_BASE=$MAIN_TIP" "current merge ref"
+assert_contains "$LAST_OUTPUT" "docs.md" "current merge ref"
+# The whole point of the fix: main's own drift must not enter the diff.
+assert_not_contains "$LAST_OUTPUT" "newer.txt" "current merge ref"
+
+# Regression guard for the under-selection hazard. A stale merge ref describes an
+# older head, so its first parent can OMIT changes that exist in the current head
+# and let this gate pass without the hosted run they need. Falling back to the
+# event base can only widen, which is the safe direction.
+run_case "stale merge ref falls back to the event base" \
+  "$MERGE_REF" pull_request "" "0000000000000000000000000000000000000000" "$OLD_MAIN"
+assert_rc 0 "stale merge ref"
+assert_contains "$LAST_OUTPUT" "Diff base: $OLD_MAIN (source: event payload (merge ref stale))" "stale merge ref"
+assert_contains "$LAST_OUTPUT" "DETECTOR_BASE=$OLD_MAIN" "stale merge ref"
+assert_contains "$LAST_OUTPUT" "merge ref is stale" "stale merge ref"
+assert_not_contains "$LAST_OUTPUT" "source: PR merge commit first parent" "stale merge ref"
+
+# A single-parent HEAD must never take HEAD^1: there it is the PR's own previous
+# commit rather than the base branch. Unlike the stale-merge-ref case there is no
+# better base available, so warn and continue.
+run_case "single-parent HEAD keeps the event base" \
+  "$PR_HEAD" pull_request "" "$PR_HEAD" "$OLD_MAIN"
+assert_rc 0 "single-parent HEAD"
+assert_contains "$LAST_OUTPUT" "Diff base: $OLD_MAIN (source: event payload)" "single-parent HEAD"
+assert_contains "$LAST_OUTPUT" "not the expected two-parent PR merge commit" "single-parent HEAD"
+
+run_case "workflow_dispatch input wins" \
+  "$MERGE_REF" workflow_dispatch "$OLD_MAIN" "$PR_HEAD" "$MAIN_TIP"
+assert_rc 0 "workflow_dispatch input"
+assert_contains "$LAST_OUTPUT" "Diff base: $OLD_MAIN (source: workflow_dispatch input)" "workflow_dispatch input"
+
+# merge_group must keep diffing from the merge queue base SHA it is handed. This
+# mirrors the contract asserted in
+# react_on_rails/spec/react_on_rails/ruby_version_support_spec.rb.
+run_case "merge_group keeps the event base" \
+  "$MERGE_REF" merge_group "" "" "$OLD_MAIN"
+assert_rc 0 "merge_group"
+assert_contains "$LAST_OUTPUT" "Diff base: $OLD_MAIN (source: event payload)" "merge_group"
+assert_not_contains "$LAST_OUTPUT" "source: PR merge commit first parent" "merge_group"
+
+# Regression guard for the truncation pipe. Under pipefail an early-closing reader
+# makes git exit 141 and takes the whole required gate down with it.
+run_case "large changed-file list does not abort the step" \
+  "$BIG_MERGE_REF" pull_request "" "$BIG_HEAD" "$OLD_MAIN"
+assert_rc 0 "large changed-file list"
+assert_contains "$LAST_OUTPUT" "3000 total, showing up to 50" "large changed-file list"
+
+printed_files="$(printf '%s\n' "$LAST_OUTPUT" | grep -c "bigdir/${long_name}-")"
+if [ "$printed_files" -ne 50 ]; then
+  fail "large changed-file list: expected 50 printed paths, got $printed_files"
+fi
+
+echo
+if [ "$TESTS_FAILED" -ne 0 ]; then
+  echo "$TESTS_FAILED of $TESTS_RUN diff-base tests failed" >&2
+  for failure in "${FAILURES[@]}"; do
+    echo "  - $failure" >&2
+  done
+  exit 1
+fi
+
+echo "$TESTS_RUN diff-base tests passed"

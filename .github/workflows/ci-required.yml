@@ -87,6 +87,7 @@ jobs:
             bin/ci-rerun-failures \
             bin/request-hosted-ci \
             script/ci-changes-detector \
+            script/ci-required-diff-base-test.bash \
             script/ci-required-hosted-gate
           do
             bash -n "$script"
@@ -96,6 +97,7 @@ jobs:
       - name: Run CI gate tests
         run: |
           bash script/ci-required-hosted-gate-test.bash
+          bash script/ci-required-diff-base-test.bash
           bash script/lint-mirrored-blocks-test.bash
           ruby script/ci_required_merge_group_gate_test.rb
           node --test .github/workflows/ci-commands.test.cjs
@@ -157,11 +159,22 @@ jobs:
             read -ra parents <<< "$parent_line"
             # parents[0] = HEAD, [1] = first parent (base side), [2] = second parent (PR head)
             if [ "${#parents[@]}" -eq 3 ]; then
-              base_ref="${parents[1]}"
-              base_source="PR merge commit first parent"
-
               if [ -n "${PULL_REQUEST_HEAD_SHA}" ] && [ "${parents[2]}" != "${PULL_REQUEST_HEAD_SHA}" ]; then
-                echo "::warning::Checked-out merge commit's second parent (${parents[2]}) is not the current PR head (${PULL_REQUEST_HEAD_SHA}); GitHub's merge ref is stale, so this classification describes an older head."
+                # The merge ref describes an OLDER PR head. Mind the direction of
+                # the error here: a stale event base can only ADD base-branch
+                # commits to the diff, which over-selects suites and merely wastes
+                # runner minutes. Classifying from a stale merge ref's first parent
+                # instead OMITS changes that exist in the current head, which can
+                # flip run_generators to false and let this required gate pass
+                # without the hosted run those changes needed. Narrowing is the
+                # unsafe direction, so once staleness is detected, fall back to the
+                # event base rather than trusting a base proven to describe the
+                # wrong head.
+                echo "::warning::Checked-out merge commit's second parent (${parents[2]}) is not the current PR head (${PULL_REQUEST_HEAD_SHA}); GitHub's merge ref is stale. Falling back to ${base_ref} so the classification cannot omit changes present in the current head."
+                base_source="event payload (merge ref stale)"
+              else
+                base_ref="${parents[1]}"
+                base_source="PR merge commit first parent"
               fi
             else
               # bundle-size.yml hard-fails on an unexpected merge structure. This gate
@@ -180,8 +193,24 @@ jobs:
           # diff is visible at a glance. The detector has already fetched and
           # deepened as needed, so these calls add no network work.
           if diff_base="$(git merge-base "$base_ref" HEAD 2>/dev/null)"; then
-            echo "Changed files the classification was computed from (first 50):"
-            git diff --name-only "$diff_base" HEAD | head -50
+            # Capture the whole stream before truncating. Piping git diff straight
+            # into `head -50` lets head close the read end once it has its 50
+            # lines; git then takes SIGPIPE and exits 141, and because Actions runs
+            # run: steps under `bash --noprofile --norc -eo pipefail`, pipefail
+            # promotes that 141 to the pipeline's status and set -e fails this
+            # required gate. It would fire on large diffs, meaning the widened-diff
+            # case this output exists to expose. sed is used rather than head
+            # because sed reads its input to the end, so nothing can close the
+            # pipe early.
+            changed_files="$(git diff --name-only "$diff_base" HEAD)"
+
+            if [ -z "$changed_files" ]; then
+              echo "Changed files the classification was computed from: none"
+            else
+              changed_total="$(printf '%s\n' "$changed_files" | wc -l | tr -d ' ')"
+              echo "Changed files the classification was computed from (${changed_total} total, showing up to 50):"
+              printf '%s\n' "$changed_files" | sed -n '1,50p'
+            fi
           fi
 
       - name: Enforce hosted CI for generator changes
