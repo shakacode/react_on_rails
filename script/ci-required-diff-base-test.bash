@@ -262,10 +262,13 @@ fi
 # changed_files assignment. Exercising it needs a git that fails only on
 # `diff --name-only`, and injecting one via PATH does not survive into the child
 # shell in every developer environment, so a case for it would pass or fail for
-# reasons unrelated to the guard. The guard mirrors the one in
-# script/ci-changes-detector, which is likewise enforced by comment rather than
-# by test. Tracked with the extraction work in #4824, where the logic moves into
-# script/ and the guard becomes directly callable.
+# reasons unrelated to the guard.
+#
+# The stakes are lower than they look: `set -e` aborts on a failed command
+# substitution in a plain assignment on its own, so the guard supplies a better
+# message rather than the only failure. Tracked with the extraction work in
+# #4824, where the logic moves into script/ and the guard becomes directly
+# callable.
 
 echo
 if [ "$TESTS_FAILED" -ne 0 ]; then

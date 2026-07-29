@@ -213,12 +213,14 @@ jobs:
             # case this output exists to expose. sed is used rather than head
             # because sed reads its input to the end, so nothing can close the
             # pipe early.
-            # The explicit || guard is required: bash `set -e` does NOT fire on a
-            # failed command substitution in an assignment, so without it a failing
-            # git diff would silently yield an empty list that reads as "nothing
-            # changed" -- the same under-selection direction this step guards
-            # against elsewhere. script/ci-changes-detector guards its own diff the
-            # same way for the same reason; do not "simplify" this away.
+            # The || guard is for the diagnostic, not for control flow. `set -e`
+            # DOES abort on a failed command substitution in a plain assignment
+            # (the masking people remember applies to declaration assignments such
+            # as `local x=$(false)`, not to this one), so the step would fail here
+            # either way. Without the guard it fails with a bare non-zero exit and
+            # git's own stderr; with it, the log names which refs the diff was
+            # between. Keep it for that message, not because the failure would
+            # otherwise pass unnoticed.
             changed_files="$(git diff --name-only "$diff_base" HEAD)" || {
               echo "::error::git diff failed for ${diff_base}..HEAD while listing changed files."
               exit 1
