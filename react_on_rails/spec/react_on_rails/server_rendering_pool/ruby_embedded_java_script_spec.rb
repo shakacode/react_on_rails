@@ -321,6 +321,115 @@ module ReactOnRails
             expect(error.message).to include("connect(2) for localhost:3035")
           }
         end
+
+        # See issue #4584: a non-2xx HTTP response (e.g. a 404 page from a proxy) was
+        # returned as if it were bundle source, silently, instead of raising.
+        context "when the HTTP-served bundle responds with a non-2xx status" do
+          it "raises a bundle-load error naming the status and URL instead of returning the error body as source" do
+            server_bundle_url = "http://localhost:3035/webpack/development/server-bundle.js"
+
+            allow(ReactOnRails::Utils).to receive_messages(
+              server_bundle_js_file_path: server_bundle_url,
+              server_bundle_path_is_http?: true
+            )
+
+            not_found_response = Net::HTTPNotFound.new("1.1", "404", "Not Found")
+            not_found_response["content-type"] = "text/html; charset=utf-8"
+            not_found_response.instance_variable_set(:@read, true)
+            not_found_response.instance_variable_set(:@body, "<html><body>Not Found</body></html>")
+
+            allow(Net::HTTP).to receive(:get_response).and_return(not_found_response)
+
+            expect do
+              described_class.read_bundle_js_code
+            end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
+              expect(error.message).to include(server_bundle_url)
+              expect(error.message).to include("404")
+              expect(error.message).not_to include("<html>")
+            }
+          end
+        end
+
+        # See issue #4584: the charset was assumed to always be present in the exact form
+        # "; charset=..." rather than honored from whatever the response actually declares.
+        context "when the HTTP-served bundle declares a non-UTF-8 charset" do
+          it "decodes the body using the declared charset instead of assuming UTF-8" do
+            server_bundle_url = "http://localhost:3035/webpack/development/server-bundle.js"
+
+            allow(ReactOnRails::Utils).to receive_messages(
+              server_bundle_js_file_path: server_bundle_url,
+              server_bundle_path_is_http?: true
+            )
+
+            # "// café" encoded as ISO-8859-1 (0xE9 is not a valid standalone UTF-8 byte).
+            latin1_body = "// caf\xE9\nvar x = 1;".dup.force_encoding(Encoding::ASCII_8BIT)
+
+            ok_response = Net::HTTPOK.new("1.1", "200", "OK")
+            # A quoted charset value is valid per RFC 7231's quoted-string parameter syntax.
+            # The pre-fix regex captured the literal value including the quote characters and
+            # passed it straight to String#force_encoding, raising
+            # `ArgumentError: unknown encoding name - "ISO-8859-1"` instead of decoding.
+            ok_response["content-type"] = 'application/javascript; charset="ISO-8859-1"'
+            ok_response.instance_variable_set(:@read, true)
+            ok_response.instance_variable_set(:@body, latin1_body)
+
+            allow(Net::HTTP).to receive(:get_response).and_return(ok_response)
+
+            result = described_class.read_bundle_js_code
+
+            expect(result.encoding).to eq(Encoding::ISO_8859_1)
+            expect(result.valid_encoding?).to be(true)
+            expect(result.encode(Encoding::UTF_8)).to eq("// café\nvar x = 1;")
+          end
+        end
+
+        # Acceptance criteria (#4584): a successful response with a missing/blank charset,
+        # or a missing Content-Type header entirely, must not raise — it should fall back to
+        # a safe default encoding rather than blowing up on a nil charset match.
+        context "when the HTTP-served bundle response has no Content-Type header" do
+          it "falls back to UTF-8 instead of raising" do
+            server_bundle_url = "http://localhost:3035/webpack/development/server-bundle.js"
+
+            allow(ReactOnRails::Utils).to receive_messages(
+              server_bundle_js_file_path: server_bundle_url,
+              server_bundle_path_is_http?: true
+            )
+
+            ok_response = Net::HTTPOK.new("1.1", "200", "OK")
+            ok_response.instance_variable_set(:@read, true)
+            ok_response.instance_variable_set(:@body, "var x = 1;")
+
+            allow(Net::HTTP).to receive(:get_response).and_return(ok_response)
+
+            result = described_class.read_bundle_js_code
+
+            expect(result).to eq("var x = 1;")
+            expect(result.encoding).to eq(Encoding::UTF_8)
+          end
+        end
+
+        context "when the HTTP-served bundle response has a Content-Type with no charset parameter" do
+          it "falls back to UTF-8 instead of raising" do
+            server_bundle_url = "http://localhost:3035/webpack/development/server-bundle.js"
+
+            allow(ReactOnRails::Utils).to receive_messages(
+              server_bundle_js_file_path: server_bundle_url,
+              server_bundle_path_is_http?: true
+            )
+
+            ok_response = Net::HTTPOK.new("1.1", "200", "OK")
+            ok_response["content-type"] = "application/javascript"
+            ok_response.instance_variable_set(:@read, true)
+            ok_response.instance_variable_set(:@body, "var x = 1;")
+
+            allow(Net::HTTP).to receive(:get_response).and_return(ok_response)
+
+            result = described_class.read_bundle_js_code
+
+            expect(result).to eq("var x = 1;")
+            expect(result.encoding).to eq(Encoding::UTF_8)
+          end
+        end
       end
     end
   end

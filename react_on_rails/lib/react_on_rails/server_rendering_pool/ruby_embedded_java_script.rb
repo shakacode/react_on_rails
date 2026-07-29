@@ -406,13 +406,31 @@ module ReactOnRails
 
         def file_url_to_string(url)
           response = Net::HTTP.get_response(URI.parse(url))
-          content_type_header = response["content-type"]
-          match = content_type_header.match(/\A.*; charset=(?<encoding>.*)\z/)
-          encoding_type = match[:encoding]
-          response.body.force_encoding(encoding_type)
+          unless response.is_a?(Net::HTTPSuccess)
+            raise "GET #{url} returned a non-success HTTP status: #{response.code} #{response.message}"
+          end
+
+          response.body.dup.force_encoding(charset_from_content_type(response["content-type"]))
         rescue StandardError => e
           msg = "file_url_to_string #{url} failed\nError is: #{e}\n\n#{Utils.default_troubleshooting_section}"
           raise ReactOnRails::ServerBundleLoadError, msg
+        end
+
+        # Extracts the charset from a Content-Type header value (e.g. "application/javascript;
+        # charset=utf-8"), tolerating a quoted charset value (`charset="UTF-8"`, valid per RFC
+        # 7231's quoted-string parameter syntax) and additional parameters after it (e.g.
+        # `charset=utf-8; boundary=...`). Falls back to UTF-8 — the standard default for
+        # JavaScript/JSON source — when the header is missing, has no charset parameter, or
+        # names an encoding Ruby does not recognize, rather than raising on an absent or
+        # malformed charset. See issue #4584.
+        def charset_from_content_type(content_type_header)
+          match = content_type_header.to_s.match(/;\s*charset=(?<encoding>[^;]+)/i)
+          return Encoding::UTF_8 unless match
+
+          charset = match[:encoding].strip.delete_prefix('"').delete_suffix('"')
+          Encoding.find(charset)
+        rescue ArgumentError
+          Encoding::UTF_8
         end
 
         def parse_render_result(result_string, render_options)
