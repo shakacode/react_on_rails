@@ -155,8 +155,13 @@ module ReactOnRails
             File.read(server_js_file)
           end
         rescue StandardError => e
-          msg = "You specified server rendering JS file: #{server_js_file}, but it cannot be " \
-                "read. You may set the server_bundle_js_file in your configuration to be \"\" to " \
+          # Sanitized: server_js_file may be an HTTP(S) URL with embedded basic-auth credentials
+          # (a supported config convenience, e.g. https://:password@host:3800). This is the
+          # public entry point that file_url_to_string is called from, so without this the
+          # sanitization inside file_url_to_string's own raise/rescue is moot for any real
+          # caller — the credential would still leak here regardless. See PR #4817.
+          msg = "You specified server rendering JS file: #{sanitized_renderer_url(server_js_file)}, but it cannot " \
+                "be read. You may set the server_bundle_js_file in your configuration to be \"\" to " \
                 "avoid this warning.\nError is: #{e}\n\n#{Utils.default_troubleshooting_section}"
           raise ReactOnRails::ServerBundleLoadError, msg
         end
