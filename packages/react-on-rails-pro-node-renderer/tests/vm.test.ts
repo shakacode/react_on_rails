@@ -29,7 +29,7 @@ import {
   BUNDLE_TIMESTAMP,
   vmBundlePath,
 } from './helper';
-import { buildExecutionContext, hasVMContextForBundle, resetVM } from '../src/worker/vm';
+import { buildExecutionContext, getVMContext, hasVMContextForBundle, resetVM } from '../src/worker/vm';
 import { getConfig } from '../src/shared/configBuilder';
 import { isErrorRenderResult } from '../src/shared/utils';
 import * as errorReporter from '../src/shared/errorReporter';
@@ -119,6 +119,50 @@ describe('buildVM and runInVM', () => {
 
       const result = await runInVM('typeof testString !== "undefined"', uploadedBundlePathForTest());
       expect(result).toBe('true');
+    });
+  });
+
+  // The context is built with `vm.constants.DONT_CONTEXTIFY` when the Node version has it, and
+  // with a contextified sandbox otherwise. The two must be observationally identical here.
+  describe.each([
+    ['vanilla global (DONT_CONTEXTIFY)', true],
+    ['contextified sandbox (older-Node fallback)', false],
+  ])('VM context flavor: %s', (_label, preferVanilla) => {
+    const runtimeHasDontContextify = vm.constants?.DONT_CONTEXTIFY !== undefined;
+
+    beforeEach(() => {
+      // `vm.constants` is frozen, but `vm`'s own `constants` property is writable, so swapping
+      // the whole object forces the module down the older-Node fallback path.
+      if (!preferVanilla) {
+        jest.replaceProperty(vm, 'constants', undefined as unknown as typeof vm.constants);
+      }
+      resetVM();
+    });
+
+    test('creates the expected flavor without changing VM semantics', async () => {
+      getConfig().supportModules = true;
+      await createUploadedBundleForTest();
+      const bundlePath = uploadedBundlePathForTest();
+      const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+
+      const vmContext = getVMContext(bundlePath);
+      if (!vmContext) throw new Error(`no VM context built for ${bundlePath}`);
+      const { context } = vmContext;
+
+      // A vanilla context's handle IS its `globalThis`; a contextified sandbox is a separate object.
+      expect(vm.runInContext('globalThis', context) === context).toBe(
+        preferVanilla && runtimeHasDontContextify,
+      );
+
+      // Injected globals reach the bundle, and `global = this` still aliases.
+      expect(await runInVM('typeof Buffer !== "undefined"', bundlePath)).toBe('true');
+      expect(await runInVM('global === globalThis', bundlePath)).toBe('true');
+      // Per-request state is visible during execution, and cleared afterwards so it cannot leak
+      // into a later request sharing this pooled context.
+      expect(await runInVM('typeof renderingRequest', bundlePath)).toBe('string');
+      expect(vm.runInContext('typeof renderingRequest', context)).toBe('undefined');
+      // Nothing escaped into the worker's own realm.
+      expect(global.ReactOnRails).toBeUndefined();
     });
   });
 

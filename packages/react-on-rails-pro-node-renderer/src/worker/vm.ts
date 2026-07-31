@@ -314,7 +314,20 @@ async function buildVM(filePath: string): Promise<VMContext> {
       if (additionalContextIsObject) {
         extendContext(contextObject, additionalContext);
       }
-      const context = vm.createContext(contextObject);
+      // `vm.constants.DONT_CONTEXTIFY` (Node 20.18+ / 22.8+) creates a context whose global object
+      // is an ordinary one rather than being wrapped in V8 property interceptors, so global lookups
+      // inside the bundle (`React`, `process`, `Buffer`, ...) hit V8's normal fast paths. It is
+      // passed *instead of* the sandbox object and returns the new context's global, hence the
+      // assign afterwards; that object is reference-equal to `globalThis` inside the context, so
+      // the per-request injection/cleanup in `runInVM` is unaffected.
+      //
+      // `?.` because `vm.constants` itself only exists from Node 20.12/21.7; both it and the
+      // branch can go once 20.18/22.8 are the floor.
+      const dontContextify: typeof vm.constants.DONT_CONTEXTIFY | undefined = vm.constants?.DONT_CONTEXTIFY;
+      const context =
+        dontContextify === undefined
+          ? vm.createContext(contextObject)
+          : Object.assign(vm.createContext(dontContextify), contextObject);
 
       // Create explicit reference to global context, just in case (some libs can use it):
       vm.runInContext('global = this', context);
