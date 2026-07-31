@@ -140,11 +140,15 @@ is available merely because another package manager is installed.
    bare, non-TTY generator rerun.
 
 7. Only for a stack with a preserving mapping, and only after reviewing and accepting the preview,
-   apply the same choices without `--pretend`:
+   apply the same choices without `--pretend` in a clean branch or worktree:
 
    ```bash
    bundle exec rails generate react_on_rails:install <STACK_FLAG> <OTHER_CURRENT_CHOICES>
    ```
+
+   Before accepting any generated change, audit `package.json` and the JavaScript lockfile against
+   their pre-run state. The apply step installs the generator's current dependency defaults even
+   though `--pretend` skipped them; preserve intentional app pins and reject unintended upgrades.
 
 8. Run the doctor loop, compile assets, and run focused application tests.
 

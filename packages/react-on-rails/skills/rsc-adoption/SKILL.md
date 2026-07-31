@@ -12,8 +12,9 @@ React Server Components are a React on Rails Pro workflow. Read the
 
 1. Confirm the app uses the Pro gem and matching Pro npm packages, the Node renderer,
    and compatible React, React DOM, and RSC package releases.
-2. Use `bundle exec rails generate react_on_rails:rsc` for the supported setup path and
-   review every generated change.
+2. Preserve the app's language on the supported setup path: use
+   `bundle exec rails generate react_on_rails:rsc --typescript` for TypeScript apps and
+   `bundle exec rails generate react_on_rails:rsc` for JavaScript apps. Review every generated change.
 3. Treat the `'use client'` directive as the RSC boundary. Do not confuse it with
    `.client.` and `.server.` filename suffixes, which control bundle placement.
 4. Keep Rails-owned data, authentication, authorization, and caching on the Rails side;

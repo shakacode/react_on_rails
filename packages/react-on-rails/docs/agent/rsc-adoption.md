@@ -6,8 +6,10 @@ do not reconstruct the RSC build or renderer protocol from memory.
 ## Adoption sequence
 
 1. Confirm the Pro gem/npm packages, Node renderer, React, React DOM, and RSC package are compatible.
-2. Run `bundle exec rails generate react_on_rails:rsc` and review the generated client, server, and
-   RSC bundle configuration.
+2. Preserve the app's language when running the generator: use
+   `bundle exec rails generate react_on_rails:rsc --typescript` for a TypeScript app and
+   `bundle exec rails generate react_on_rails:rsc` for a JavaScript app. Review the generated client,
+   server, and RSC bundle configuration.
 3. Move one leaf at a time. The `'use client'` directive marks the server-to-client boundary, not
    every module that will execute on the client. Modules imported below that boundary remain client code
    even when they lack the directive; place it only where a subtree needs browser APIs, state, effects,

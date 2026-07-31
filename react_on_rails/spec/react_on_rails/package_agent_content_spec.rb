@@ -126,6 +126,20 @@ RSpec.describe "packaged agent content" do
     expect(guide).not_to include("bundle exec rails react_on_rails:doctor")
   end
 
+  it "preserves the app language when adopting RSC" do
+    rsc_paths = %w[skills/rsc-adoption/SKILL.md docs/agent/rsc-adoption.md]
+
+    aggregate_failures do
+      rsc_paths.each do |relative_path|
+        content = gem_root.join(relative_path).read
+
+        expect(content).to include("`bundle exec rails generate react_on_rails:rsc --typescript`")
+        expect(content).to include("`bundle exec rails generate react_on_rails:rsc`")
+        expect(content).to match(/--typescript` for (?:a )?TypeScript app/)
+      end
+    end
+  end
+
   it "separates progressive and buffered streaming requirements" do
     streaming_paths = %w[skills/streaming-debug/SKILL.md docs/agent/streaming-debug.md]
 
@@ -351,6 +365,8 @@ RSpec.describe "packaged agent content" do
     expect(guide).to include("upgrade dependencies and configuration manually")
     expect(guide).to include("`--pretend` omits dependency installation and script effects")
     expect(guide).to include("not a complete mutation audit")
+    expect(guide).to include("audit `package.json` and the JavaScript lockfile")
+    expect(guide).to include("installs the generator's current dependency defaults")
     expect(guide).not_to include("`--pro` for Pro without RSC")
   end
 end
