@@ -71,6 +71,16 @@ RSpec.describe "script/release-forward-port" do
     snippet.lines.map { |line| line.delete_prefix(indent) }.join
   end
 
+  def documented_bash_snippet_containing(fragment)
+    runbook = File.read(File.join(repo_root, "internal/contributor-info/release-train-runbook.md"))
+    snippets = runbook.to_enum(:scan, /```bash\n(.*?)\n[ \t]*```/m).map { Regexp.last_match(1) }
+    snippet = snippets.find { |candidate| candidate.include?(fragment) }
+    raise "documented bash snippet containing #{fragment.inspect} is missing" unless snippet
+
+    indent = snippet[/\A[ \t]*/]
+    snippet.lines.map { |line| line.delete_prefix(indent) }.join
+  end
+
   def documented_closeout_merge_snippet
     documented_bash_snippet('CLOSEOUT_PR="${CLOSEOUT_PR:?set the closeout PR number or URL}"')
   end
@@ -89,6 +99,18 @@ RSpec.describe "script/release-forward-port" do
 
   def documented_manual_closeout_snippet
     documented_bash_snippet("# After v17.0.0 is published and the GitHub release exists:")
+  end
+
+  def documented_release_start_preview_snippet
+    documented_bash_snippet_containing("release:start[")
+  end
+
+  def documented_release_finish_promote_preview_snippet
+    documented_bash_snippet_containing("script/release-finish promote")
+  end
+
+  def documented_release_finish_closeout_preview_snippet
+    documented_bash_snippet_containing("script/release-finish close-out")
   end
 
   def write_release_lifecycle_stubs(tmpdir)
@@ -130,6 +152,21 @@ RSpec.describe "script/release-forward-port" do
       BASH
     )
     FileUtils.chmod(0o755, forward_port_path)
+
+    write_release_finish_lifecycle_stub(script_dir)
+  end
+
+  def write_release_finish_lifecycle_stub(script_dir)
+    release_finish_path = File.join(script_dir, "release-finish")
+    File.write(
+      release_finish_path,
+      <<~BASH
+        #!/bin/bash
+        printf 'release-finish\\0' >>"${LIFECYCLE_TEST_CALLS}"
+        printf '%s\\0' "$@" >>"${LIFECYCLE_TEST_CALLS}"
+      BASH
+    )
+    FileUtils.chmod(0o755, release_finish_path)
   end
 
   def release_lifecycle_command_stubs
@@ -141,6 +178,10 @@ RSpec.describe "script/release-forward-port" do
       }
 
       agent-coord() { return 0; }
+
+      bundle() {
+        record_call bundle "$@"
+      }
 
       gh() {
         record_call gh "$@"
@@ -592,10 +633,29 @@ RSpec.describe "script/release-forward-port" do
       runbook = File.read(File.join(repo_root, "internal/contributor-info/release-train-runbook.md"))
       snippets = runbook.to_enum(:scan, /```bash\n(.*?)\n[ \t]*```/m).map { Regexp.last_match(1) }
       executable_lines = snippets.flat_map(&:lines).map(&:strip).reject do |line|
-        line.empty? || line.start_with?("#") || line.include?("--dry-run") || line.include?("release:start[")
+        line.empty? || line.start_with?("#")
       end
 
       expect(executable_lines.grep(/17\.0\.0/)).to be_empty
+    end
+
+    it "passes the canonical version to every executable release helper preview" do
+      previews = {
+        documented_release_start_preview_snippet => ["bundle", "exec", "rake", "release:start[17.0.1,true]"],
+        documented_release_finish_promote_preview_snippet => ["release-finish", "promote", "17.0.1", "--dry-run"],
+        documented_release_finish_closeout_preview_snippet => ["release-finish", "close-out", "17.0.1", "--dry-run"]
+      }
+
+      previews.each do |snippet, expected_call|
+        _stdout, stderr, status, _mutations, calls = run_documented_release_lifecycle(
+          snippet,
+          { "RELEASE_VERSION_INPUT" => "17.0.1" }
+        )
+
+        expect(status).to be_success, stderr
+        expect(calls.each_cons(expected_call.length).to_a).to include(expected_call)
+        expect(calls).not_to include(a_string_including("17.0.0"))
+      end
     end
 
     it "runs exact branch creation and manual closeout snippets through the acquired canonical lifecycle" do
@@ -711,6 +771,8 @@ RSpec.describe "script/release-forward-port" do
     end
 
     it "binds a rebase closeout to the exact fetched release source and real PICK plan" do
+      source_release_sha = "d" * 40
+
       _stdout, stderr, status, arguments = run_documented_closeout_merge(
         method: "REBASE",
         source_release_sha: "D" * 40
@@ -737,6 +799,37 @@ RSpec.describe "script/release-forward-port" do
       expect(status).not_to be_success
       expect(stderr).to include("source release commit is not exactly one PICK in the current forward-port plan")
       expect(arguments).to be_empty
+
+      _stdout, stderr, status, arguments = run_documented_closeout_merge(
+        method: "REBASE",
+        source_release_sha:,
+        forward_port_plan: <<~PLAN
+          PICK #{source_release_sha[0, 12]} Forward-port release fix (#123)
+          PICK #{'e' * 12} Unexpected extra release fix (#124)
+        PLAN
+      )
+
+      expect(status).not_to be_success
+      expect(stderr).to include("source release commit is not exactly one PICK in the current forward-port plan")
+      expect(arguments).to be_empty
+
+      _stdout, stderr, status, _arguments, calls = run_documented_closeout_merge(
+        method: "REBASE",
+        source_release_sha:
+      )
+
+      expect(status).to be_success, stderr
+      expected_call = [
+        "release-forward-port",
+        "--source",
+        "origin/release/17.0.0",
+        "--target",
+        "origin/main",
+        "--only",
+        source_release_sha,
+        "--dry-run"
+      ]
+      expect(calls.each_cons(expected_call.length).to_a).to include(expected_call)
     end
 
     it "requires one validated rebase commit with one exact direct source footer" do

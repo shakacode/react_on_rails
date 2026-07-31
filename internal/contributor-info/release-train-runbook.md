@@ -362,7 +362,7 @@ guarded commands below:
 
 ```bash
 git checkout main && git pull --rebase
-bundle exec rake "release:start[17.0.0,true]"   # dry-run only; no branch or remote write
+bundle exec rake "release:start[${RELEASE_VERSION},true]"   # dry-run only; no branch or remote write
 ```
 
 Live `release:start` is an unfenced compound helper: it fetches, creates, and
@@ -908,6 +908,7 @@ if [ "${CLOSEOUT_MERGE_METHOD}" = "REBASE" ]; then
     script/release-forward-port \
       --source "origin/release/${RELEASE_VERSION}" \
       --target origin/main \
+      --only "${CLOSEOUT_SOURCE_RELEASE_SHA}" \
       --dry-run
   )" || {
     echo "could not derive the current release-forward-port plan; stop closeout" >&2
@@ -916,8 +917,8 @@ if [ "${CLOSEOUT_MERGE_METHOD}" = "REBASE" ]; then
   ruby -e '
     source_sha, plan = ARGV
     expected_prefix = source_sha[0, 12]
-    picks = plan.lines(chomp: true).grep(/\APICK #{expected_prefix} /)
-    abort unless picks.one?
+    picks = plan.lines(chomp: true).grep(/\APICK /)
+    abort unless picks.one? && picks.first.start_with?("PICK #{expected_prefix} ")
   ' "${CLOSEOUT_SOURCE_RELEASE_SHA}" "${closeout_forward_port_plan}" || {
     echo "source release commit is not exactly one PICK in the current forward-port plan; stop closeout" >&2
     return 1 2>/dev/null || exit 1
@@ -1179,7 +1180,7 @@ replace — the rake promotion guards (`stable_release_branch_allowed?`,
 only `--dry-run` until the wrapper contract above is implemented:
 
 ```bash
-script/release-finish promote 17.0.0 --dry-run   # checks current remote state; performs no release writes
+script/release-finish promote "${RELEASE_VERSION}" --dry-run   # checks current remote state; performs no release writes
 # BLOCKED: do not run normal mode without the repository-owned lifetime/fencing wrapper.
 ```
 
@@ -1286,7 +1287,7 @@ until the repository-owned lifetime/per-write wrapper exists. Preview with `--dr
 git fetch origin
 git checkout main
 git pull --rebase
-script/release-finish close-out 17.0.0 --dry-run   # prints commands + the real forward-port plan
+script/release-finish close-out "${RELEASE_VERSION}" --dry-run   # prints commands + the real forward-port plan
 # BLOCKED: do not run normal mode without the repository-owned lifetime/per-write lease wrapper.
 # If either check is incomplete, land the PRs from step 3 and rerun the preview.
 ```
