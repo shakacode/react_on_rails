@@ -569,6 +569,7 @@ above; when there are multiple selections, serialize the sequence:
 
    ```bash
    BACKPORT_PR="${BACKPORT_PR:?set the backport PR number or URL}"
+   RELEASE_VERSION="${RELEASE_VERSION:?set the exact X.Y.Z release version}"
    BACKPORT_RELEASE_BRANCH="${BACKPORT_RELEASE_BRANCH:?set the exact release/X.Y.Z branch}"
    BACKPORT_VALIDATED_HEAD_OID="${BACKPORT_VALIDATED_HEAD_OID:?set the validated 40-character head OID}"
    BACKPORT_VALIDATED_BASE_OID="${BACKPORT_VALIDATED_BASE_OID:?set the validated 40-character release-base OID}"
@@ -578,9 +579,17 @@ above; when there are multiple selections, serialize the sequence:
    BACKPORT_COMMIT_HEADLINE="${BACKPORT_COMMIT_HEADLINE:?set the final squash headline}"
    BACKPORT_COMMIT_BODY="${BACKPORT_COMMIT_BODY:?set the final squash body}"
 
+   if [[ ! "${RELEASE_VERSION}" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+     echo "release version must be X.Y.Z; stop backport" >&2
+     return 1 2>/dev/null || exit 1
+   fi
    jq -en --arg branch "${BACKPORT_RELEASE_BRANCH}" \
      '$branch | test("^release/[0-9]+\\.[0-9]+\\.[0-9]+$")' >/dev/null || {
      echo "backport target is not an exact release/X.Y.Z branch; stop backport" >&2
+     return 1 2>/dev/null || exit 1
+   }
+   test "${BACKPORT_RELEASE_BRANCH}" = "release/${RELEASE_VERSION}" || {
+     echo "backport target must equal release/${RELEASE_VERSION}; stop backport" >&2
      return 1 2>/dev/null || exit 1
    }
    ruby -e '

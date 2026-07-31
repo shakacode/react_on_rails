@@ -61,13 +61,22 @@ RSpec.describe "script/release-forward-port" do
     Open3.capture3(git_env, RbConfig.ruby, script_path, *args, chdir: repo_root)
   end
 
-  def documented_closeout_merge_snippet
-    marker = 'CLOSEOUT_PR="${CLOSEOUT_PR:?set the closeout PR number or URL}"'
+  def documented_bash_snippet(marker)
     runbook = File.read(File.join(repo_root, "internal/contributor-info/release-train-runbook.md"))
-    match = runbook.match(/```bash\n(?<snippet>#{Regexp.escape(marker)}.*?)\n```/m)
-    raise "documented closeout merge snippet is missing" unless match
+    snippets = runbook.to_enum(:scan, /```bash\n(.*?)\n[ \t]*```/m).map { Regexp.last_match(1) }
+    snippet = snippets.find { |candidate| candidate.lstrip.start_with?(marker) }
+    raise "documented bash snippet starting with #{marker.inspect} is missing" unless snippet
 
-    match[:snippet]
+    indent = snippet[/\A[ \t]*/]
+    snippet.lines.map { |line| line.delete_prefix(indent) }.join
+  end
+
+  def documented_closeout_merge_snippet
+    documented_bash_snippet('CLOSEOUT_PR="${CLOSEOUT_PR:?set the closeout PR number or URL}"')
+  end
+
+  def documented_backport_merge_snippet
+    documented_bash_snippet('BACKPORT_PR="${BACKPORT_PR:?set the backport PR number or URL}"')
   end
 
   def closeout_merge_harness
@@ -132,6 +141,176 @@ RSpec.describe "script/release-forward-port" do
       arguments = File.exist?(arguments_path) ? File.binread(arguments_path).split("\0") : []
 
       [stdout, stderr, status, arguments]
+    end
+  end
+
+  def backport_merge_harness
+    <<~BASH
+      set -u
+
+      gh() {
+        case "$1 $2" in
+          "pr view") printf '%s\n' "${BACKPORT_TEST_PR_JSON}" ;;
+          "api graphql")
+            printf '%s\\0' "$@" >"${BACKPORT_TEST_GH_ARGS}"
+            printf '%s\n' '{"data":{"mergePullRequest":{"pullRequest":{"merged":true}}}}'
+            ;;
+          *) printf 'unexpected gh invocation: %s\n' "$*" >&2; return 64 ;;
+        esac
+      }
+
+      git() {
+        case "$1 $2" in
+          "fetch --prune") return 0 ;;
+          "rev-parse refs/remotes/origin/main^{commit}") printf '%s\n' "${BACKPORT_TEST_MAIN_OID}" ;;
+          "rev-parse refs/remotes/origin/release/"*) printf '%s\n' "${BACKPORT_TEST_BASE_OID}" ;;
+          "merge-base --is-ancestor") return 0 ;;
+          *) printf 'unexpected git invocation: %s\n' "$*" >&2; return 64 ;;
+        esac
+      }
+
+      require_live_release_line_lease() { return 0; }
+
+      run_backport_merge() {
+      #{documented_backport_merge_snippet}
+      }
+
+      run_backport_merge
+    BASH
+  end
+
+  def run_documented_backport_merge(release_version:, release_branch:)
+    Dir.mktmpdir("release-backport-runbook") do |tmpdir|
+      arguments_path = File.join(tmpdir, "graphql-arguments")
+      head_oid = "a" * 40
+      base_oid = "b" * 40
+      main_oid = "c" * 40
+      source_sha = "d" * 40
+      environment = {
+        "RELEASE_VERSION" => release_version,
+        "BACKPORT_PR" => "999",
+        "BACKPORT_RELEASE_BRANCH" => release_branch,
+        "BACKPORT_VALIDATED_HEAD_OID" => head_oid,
+        "BACKPORT_VALIDATED_BASE_OID" => base_oid,
+        "BACKPORT_VALIDATED_MAIN_OID" => main_oid,
+        "BACKPORT_SOURCE_SHA" => source_sha,
+        "BACKPORT_SOURCE_AUDIT_RESULT" => "live-not-reverted-not-superseded:#{main_oid}",
+        "BACKPORT_COMMIT_HEADLINE" => "Backport release fix (#999)",
+        "BACKPORT_COMMIT_BODY" => "(cherry picked from commit #{source_sha})",
+        "BACKPORT_TEST_MAIN_OID" => main_oid,
+        "BACKPORT_TEST_BASE_OID" => base_oid,
+        "BACKPORT_TEST_GH_ARGS" => arguments_path,
+        "BACKPORT_TEST_PR_JSON" => JSON.generate(
+          number: 999,
+          id: "PR_node_id",
+          baseRefName: release_branch,
+          baseRefOid: base_oid,
+          headRefOid: head_oid
+        )
+      }
+      stdout, stderr, status = Open3.capture3(
+        environment,
+        "/bin/bash",
+        stdin_data: backport_merge_harness,
+        chdir: repo_root
+      )
+      arguments = File.exist?(arguments_path) ? File.binread(arguments_path).split("\0") : []
+
+      [stdout, stderr, status, arguments]
+    end
+  end
+
+  def documented_selective_closeout_validator
+    runbook = File.read(File.join(repo_root, "internal/contributor-info/release-train-runbook.md"))
+    match = runbook.match(/ruby -rjson -ropen3 -e '\n(?<program>.*?)\n\s+' "\$\{FINAL_PLAN_FILE\}"/m)
+    raise "documented selective closeout validator is missing" unless match
+
+    match[:program]
+  end
+
+  def write_selective_closeout_inputs(repo, fixture)
+    write_file(repo, fixture.fetch(:plan_path), fixture.fetch(:plan))
+    write_file(repo, fixture.fetch(:manifest_path), "#{JSON.pretty_generate(fixture.fetch(:manifest))}\n")
+    write_file(repo, fixture.fetch(:manual_acks_path), fixture.fetch(:manual_acks))
+  end
+
+  def run_documented_selective_closeout_validator(repo, fixture)
+    Open3.capture3(
+      git_env,
+      RbConfig.ruby,
+      "-rjson",
+      "-ropen3",
+      "-e",
+      documented_selective_closeout_validator,
+      File.join(repo, fixture.fetch(:plan_path)),
+      File.join(repo, fixture.fetch(:manifest_path)),
+      fixture.fetch(:release_tip),
+      fixture.fetch(:main_tip),
+      File.join(repo, fixture.fetch(:manual_acks_path)),
+      chdir: repo
+    )
+  end
+
+  def selective_closeout_manifest(origin_sha:, replacement_sha:, release_sha:)
+    {
+      "version" => 1,
+      "omitted_picks" => [
+        {
+          "release_sha" => release_sha,
+          "origin_sha" => origin_sha,
+          "replacement_sha" => replacement_sha,
+          "replacement_disposition" => {
+            "replacement_sha" => replacement_sha,
+            "audited_main_sha" => replacement_sha,
+            "approved_by" => "maintainer",
+            "approval_record" => "https://github.com/shakacode/react_on_rails/issues/123#issuecomment-456"
+          },
+          "proof" => "original source was reverted on main",
+          "approval" => "maintainer approved the exact omission"
+        }
+      ]
+    }
+  end
+
+  def with_selective_closeout_validator_fixture
+    Dir.mktmpdir("selective-closeout-validator") do |repo|
+      git(repo, "init")
+      git(repo, "checkout", "-b", "main")
+      git(repo, "config", "user.email", "test@example.com")
+      git(repo, "config", "user.name", "Release Test")
+      git(repo, "config", "commit.gpgsign", "false")
+
+      write_file(repo, "origin.txt", "source behavior\n")
+      origin_sha = commit_all(repo, "Original main change")
+      write_file(repo, "replacement.txt", "replacement behavior\n")
+      replacement_sha = commit_all(repo, "Replacement main change")
+      git(repo, "checkout", "-b", "release/1.0.0", origin_sha)
+      write_file(repo, "version.txt", "1.0.0\n")
+      manual_sha = commit_all(repo, "Set stable release version")
+      write_file(repo, "release-fix.txt", "release fix\n")
+      release_sha = commit_all(repo, "Release fix\n\n(cherry picked from commit #{origin_sha})")
+
+      fixture = {
+        plan_path: "final-plan.txt",
+        manifest_path: "omitted-picks.json",
+        manual_acks_path: "manual-acks.txt",
+        release_tip: release_sha,
+        main_tip: replacement_sha,
+        origin_sha:,
+        replacement_sha:,
+        manual_sha:,
+        release_sha:,
+        plan: <<~PLAN,
+          ACK-MANUAL #{manual_sha[0, 12]} Set stable release version
+               stable version change inspected
+               acknowledged by --ack-manual; skipping after operator inspection
+          PICK #{release_sha[0, 12]} Release fix
+        PLAN
+        manual_acks: "#{manual_sha}\n",
+        manifest: selective_closeout_manifest(origin_sha:, replacement_sha:, release_sha:)
+      }
+      write_selective_closeout_inputs(repo, fixture)
+      yield repo, fixture
     end
   end
 
@@ -267,6 +446,100 @@ RSpec.describe "script/release-forward-port" do
       query = arguments.find { |argument| argument.start_with?("query=") }
       expect(query).not_to include("commitHeadline")
       expect(query).not_to include("commitBody")
+    end
+  end
+
+  describe "documented one-source backport merge" do
+    it "merges only when the target matches the validated release version" do
+      _stdout, stderr, status, arguments = run_documented_backport_merge(
+        release_version: "17.0.0",
+        release_branch: "release/17.0.0"
+      )
+
+      expect(status).to be_success, stderr
+      expect(arguments).to include("commitHeadline=Backport release fix (#999)")
+    end
+
+    it "refuses a release branch that does not match the held release version before mutation" do
+      _stdout, stderr, status, arguments = run_documented_backport_merge(
+        release_version: "17.0.0",
+        release_branch: "release/17.0.1"
+      )
+
+      expect(status).not_to be_success
+      expect(stderr).to include("backport target must equal release/17.0.0; stop backport")
+      expect(arguments).to be_empty
+    end
+
+    it "refuses a non-stable release version before mutation" do
+      _stdout, stderr, status, arguments = run_documented_backport_merge(
+        release_version: "17.0.0.rc.1",
+        release_branch: "release/17.0.0.rc.1"
+      )
+
+      expect(status).not_to be_success
+      expect(stderr).to include("release version must be X.Y.Z; stop backport")
+      expect(arguments).to be_empty
+    end
+  end
+
+  describe "documented selective manual closeout validator" do
+    it "accepts a bound final plan, manifest, replacement, provenance footer, and manual acknowledgement" do
+      with_selective_closeout_validator_fixture do |repo, fixture|
+        _stdout, stderr, status = run_documented_selective_closeout_validator(repo, fixture)
+
+        expect(status).to be_success, stderr
+      end
+    end
+
+    it "rejects an unknown plan action and manifest schema drift" do
+      with_selective_closeout_validator_fixture do |repo, fixture|
+        fixture[:plan] = fixture.fetch(:plan).sub("PICK ", "DROP ")
+        write_selective_closeout_inputs(repo, fixture)
+        _stdout, stderr, status = run_documented_selective_closeout_validator(repo, fixture)
+
+        expect(status).not_to be_success
+        expect(stderr).to include("malformed or unrecognized plan action row")
+
+        fixture[:plan] = fixture.fetch(:plan).sub("DROP ", "PICK ")
+        fixture[:manifest]["unexpected"] = true
+        write_selective_closeout_inputs(repo, fixture)
+        _stdout, stderr, status = run_documented_selective_closeout_validator(repo, fixture)
+
+        expect(status).not_to be_success
+        expect(stderr).to include("top-level object or keys are invalid")
+      end
+    end
+
+    it "rejects direct-source provenance and replacement-disposition drift" do
+      with_selective_closeout_validator_fixture do |repo, fixture|
+        row = fixture.fetch(:manifest).fetch("omitted_picks").fetch(0)
+        row["origin_sha"] = fixture.fetch(:manual_sha)
+        write_selective_closeout_inputs(repo, fixture)
+        _stdout, stderr, status = run_documented_selective_closeout_validator(repo, fixture)
+
+        expect(status).not_to be_success
+        expect(stderr).to include("origin does not match one direct -x footer")
+
+        row["origin_sha"] = fixture.fetch(:origin_sha)
+        row.fetch("replacement_disposition")["audited_main_sha"] = fixture.fetch(:origin_sha)
+        write_selective_closeout_inputs(repo, fixture)
+        _stdout, stderr, status = run_documented_selective_closeout_validator(repo, fixture)
+
+        expect(status).not_to be_success
+        expect(stderr).to include("replacement disposition is stale or main-tip-mismatched")
+      end
+    end
+
+    it "rejects manual acknowledgement drift from ACK-MANUAL plan rows" do
+      with_selective_closeout_validator_fixture do |repo, fixture|
+        fixture[:manual_acks] = ""
+        write_selective_closeout_inputs(repo, fixture)
+        _stdout, stderr, status = run_documented_selective_closeout_validator(repo, fixture)
+
+        expect(status).not_to be_success
+        expect(stderr).to include("manual acknowledgement file does not exactly match ACK-MANUAL rows")
+      end
     end
   end
 
