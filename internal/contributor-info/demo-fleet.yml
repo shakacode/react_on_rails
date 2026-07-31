@@ -151,7 +151,6 @@ repos:
       review_app: not_required
     packages:
       - { ecosystem: gem, name: react_on_rails }
-      - { ecosystem: npm, name: react-on-rails }
       - { ecosystem: gem, name: react_on_rails_pro }
       - { ecosystem: npm, name: react-on-rails-pro }
       - { ecosystem: npm, name: react-on-rails-pro-node-renderer }
@@ -181,7 +180,6 @@ repos:
       review_app_workflow: .github/workflows/cpflow-deploy-review-app.yml
     packages:
       - { ecosystem: gem, name: react_on_rails }
-      - { ecosystem: npm, name: react-on-rails }
       - { ecosystem: gem, name: react_on_rails_pro }
       - { ecosystem: npm, name: react-on-rails-pro }
       - { ecosystem: npm, name: react-on-rails-pro-node-renderer }
@@ -204,7 +202,6 @@ repos:
       review_app_workflow: .github/workflows/cpflow-deploy-review-app.yml
     packages:
       - { ecosystem: gem, name: react_on_rails }
-      - { ecosystem: npm, name: react-on-rails }
       - { ecosystem: gem, name: react_on_rails_pro }
       - { ecosystem: npm, name: react-on-rails-pro }
       - { ecosystem: npm, name: react-on-rails-pro-node-renderer }
@@ -226,7 +223,6 @@ repos:
       review_app_workflow: .github/workflows/cpflow-deploy-review-app.yml
     packages:
       - { ecosystem: gem, name: react_on_rails }
-      - { ecosystem: npm, name: react-on-rails }
       - { ecosystem: gem, name: react_on_rails_pro }
       - { ecosystem: npm, name: react-on-rails-pro }
       - { ecosystem: npm, name: react-on-rails-pro-node-renderer }
@@ -247,7 +243,6 @@ repos:
       review_app_workflow: .github/workflows/cpflow-deploy-review-app.yml
     packages:
       - { ecosystem: gem, name: react_on_rails }
-      - { ecosystem: npm, name: react-on-rails }
       - { ecosystem: gem, name: react_on_rails_pro }
       - { ecosystem: npm, name: react-on-rails-pro }
       - { ecosystem: npm, name: react-on-rails-pro-node-renderer }
@@ -271,7 +266,6 @@ repos:
       review_app_workflow: .github/workflows/cpflow-deploy-review-app.yml
     packages:
       - { ecosystem: gem, name: react_on_rails }
-      - { ecosystem: npm, name: react-on-rails }
       - { ecosystem: gem, name: react_on_rails_pro }
       - { ecosystem: npm, name: react-on-rails-pro }
       - { ecosystem: npm, name: react-on-rails-pro-node-renderer }

@@ -115,6 +115,24 @@ RSpec.describe BmfCollector do
         expect(collector.display_rows.map { |row| row["name"] }).to eq(["/broken"])
         expect(collector.to_bmf).to be_empty
       end
+
+      it "carries per-sample values in the row (and never in the BMF payload)" do
+        samples = { "rps" => [99.0, 100.0, 101.0], "p50_latency" => [4.9, 5.0, 5.2] }
+        collector = described_class.new
+        collector.add(name: "/foo", rps: 100.0, p50: 5.0, p90: 6.0, status: "200=100", samples:)
+
+        expect(collector.display_rows.first["samples"]).to eq(samples)
+        expect(collector.to_bmf.dig("/foo", "rps")).to eq("value" => 100.0)
+        expect(collector.to_bmf["/foo"].keys).not_to include("samples")
+      end
+
+      it "omits the samples key for single-sample rows (nil or empty samples)" do
+        collector = described_class.new
+        collector.add(name: "/single", rps: 100.0, p50: 5.0, p90: 6.0, status: "200=100", samples: nil)
+        collector.add(name: "/empty", rps: 100.0, p50: 5.0, p90: 6.0, status: "200=100", samples: {})
+
+        expect(collector.display_rows).to(be_none { |row| row.key?("samples") })
+      end
     end
 
     describe "#write_display_json" do

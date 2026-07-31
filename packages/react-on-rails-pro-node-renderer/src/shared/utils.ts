@@ -63,7 +63,9 @@ export function smartTrim(value: unknown, maxLength = getConfig().maxDebugSnippe
 export interface ResponseResult {
   headers: {
     'Cache-Control'?: string;
-    'Content-Type'?: string;
+    // Content-Type is not caller-settable: setResponse forces text/plain on every string
+    // payload (reflected-XSS hardening) and otherwise lets Fastify infer it.
+    'Content-Type'?: never;
     'X-Content-Type-Options'?: string;
     [key: string]: string | undefined;
   };

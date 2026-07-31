@@ -580,29 +580,174 @@ dependency. For `17.0.0` and `react-on-rails-rsc@19.2.1`, use this order:
 Every fix that lands on `release/X.Y.Z` must also reach `main`, or `main` regresses the moment the
 release branch is deleted. Use `script/release-forward-port` first so the operation is dry-run-able,
 idempotent, and skips RC version-bump commits. The helper uses **`git cherry-pick -x`** for commits it
-applies; do not use a branch merge:
+applies; do not use a branch merge or combine the remaining source fixes into one catch-all PR.
 
 ```bash
 git fetch origin
-git checkout main
-git pull --rebase
 
-# Inspect the plan first. Expect fix/CHANGELOG commits to be PICK and
-# Bump version commits to be SKIP.
+# Inspect the complete plan from current main. Expect missing fix commits to be PICK and pure CHANGELOG/version-bump
+# commits to be SKIP; changelog content is handled by the reconciliation pass below.
 script/release-forward-port --source origin/release/17.0.0 --target main --dry-run
 
-# Apply the same plan. The helper checks out the local target branch and cherry-picks with -x.
-script/release-forward-port --source origin/release/17.0.0 --target main
-git push   # or open a PR if main is protected / the fix needs review on main
+# For EACH remaining PICK, start again from the latest origin/main and create one source-change PR.
+# Replace <source-sha>, <source-pr>, and <slug>; merge this PR before starting the next one.
+git switch -c forward-port/<source-pr>-<slug> origin/main
+script/release-forward-port \
+  --source origin/release/17.0.0 \
+  --target forward-port/<source-pr>-<slug> \
+  --only <source-sha> \
+  --dry-run
+script/release-forward-port \
+  --source origin/release/17.0.0 \
+  --target forward-port/<source-pr>-<slug> \
+  --only <source-sha>
+# Validate, push, open the PR to main, and merge it before repeating from a freshly fetched origin/main.
+
+# After every source-change PR has merged, use a separate release/changelog branch and PR.
+git fetch --prune origin main
+git switch -c release/reconcile-17.0.0-changelog origin/main
+script/release-forward-port \
+  --source origin/release/17.0.0 \
+  --target release/reconcile-17.0.0-changelog \
+  --changelog \
+  --dry-run
+script/release-forward-port \
+  --source origin/release/17.0.0 \
+  --target release/reconcile-17.0.0-changelog \
+  --changelog
+git diff --check
+git add CHANGELOG.md
+git commit -m "Reconcile 17.0.0 release changelog on main"
+# Validate, push, and open the dedicated release/changelog PR to main. Squash it with:
+# Record the final React on Rails X.Y.Z changelog (#<pr-number>)
+# Include this exact sentence in the PR body, using the newest release-branch commit that changed CHANGELOG.md:
+# The final changelog records source CHANGELOG.md commit `<40-character-sha>`.
 ```
 
+Merge every source-change PR and the dedicated changelog PR synchronously from
+the release coordinator's shell after its exact-head gates pass. Set
+`CLOSEOUT_MERGE_METHOD=REBASE` for a source-change PR and `SQUASH` for the
+dedicated changelog PR. Do not use auto-merge or a merge queue here: neither
+rechecks the release-line lease immediately before the write, and a queued
+merge can land a different head. This mutation binds the merge to the reviewed
+head and fails unless GitHub reports the PR merged in the same response:
+
+```bash
+CLOSEOUT_PR="${CLOSEOUT_PR:?set the closeout PR number or URL}"
+CLOSEOUT_MERGE_METHOD="${CLOSEOUT_MERGE_METHOD:?set REBASE or SQUASH}"
+case "${CLOSEOUT_MERGE_METHOD}" in
+  REBASE|SQUASH) ;;
+  *) echo "unsupported closeout merge method" >&2; return 1 2>/dev/null || exit 1 ;;
+esac
+closeout_pr_json="$(gh pr view "${CLOSEOUT_PR}" --json id,headRefOid)" || {
+  echo "could not resolve the closeout PR identity; stop closeout" >&2
+  return 1 2>/dev/null || exit 1
+}
+CLOSEOUT_PR_ID="$(
+  jq -er '.id | select(type == "string" and length > 0)' <<<"${closeout_pr_json}"
+)" || {
+  echo "closeout PR node id is missing or invalid; stop closeout" >&2
+  return 1 2>/dev/null || exit 1
+}
+CLOSEOUT_HEAD_OID="$(
+  jq -er '.headRefOid | select(type == "string" and test("^[0-9a-f]{40}$"))' \
+    <<<"${closeout_pr_json}"
+)" || {
+  echo "closeout PR head OID is missing or invalid; stop closeout" >&2
+  return 1 2>/dev/null || exit 1
+}
+require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
+closeout_merge_result="$(
+  gh api graphql \
+    -f query='mutation(
+      $pullRequestId: ID!,
+      $expectedHeadOid: GitObjectID!,
+      $mergeMethod: PullRequestMergeMethod!
+    ) {
+      mergePullRequest(input: {
+        pullRequestId: $pullRequestId
+        expectedHeadOid: $expectedHeadOid
+        mergeMethod: $mergeMethod
+      }) {
+        pullRequest { merged }
+      }
+    }' \
+    -f pullRequestId="${CLOSEOUT_PR_ID}" \
+    -f expectedHeadOid="${CLOSEOUT_HEAD_OID}" \
+    -f mergeMethod="${CLOSEOUT_MERGE_METHOD}"
+)" || {
+  echo "synchronous closeout PR merge failed; stop closeout" >&2
+  return 1 2>/dev/null || exit 1
+}
+jq -e '.data.mergePullRequest.pullRequest.merged == true' \
+  >/dev/null <<<"${closeout_merge_result}" || {
+  echo "closeout PR was not merged synchronously; stop closeout" >&2
+  return 1 2>/dev/null || exit 1
+}
+```
+
+Fetch the new `origin/main` immediately after each successful merge before
+planning the next source-change PR or the final changelog PR.
+
+- Treat the dry-run plan as a queue, not one combined forward-port branch. Land one missing source
+  change per PR, wait for it to merge, fetch the new `origin/main`, and then plan the next PR. Prefer
+  a history-preserving rebase merge for source-change PRs. If the repository merge queue enforces a
+  squash, the one-change-per-PR boundary is mandatory and the PR title/body must identify the release
+  source commit and source PR. Use this exact positive provenance sentence in the PR body so the
+  squash commit remains machine-checkable even when Markdown wraps it:
+  `The commit retains \`cherry-pick -x\` provenance from source squash commit \`<40-character-sha>\`.`
+  That exact sentence is authoritative regardless of the squash title; free-form or negated prose
+  is not a substitute.
+- Squash the dedicated changelog/release reconciliation PR with
+  `Record the final React on Rails X.Y.Z changelog (#<pr-number>)`. Do not mix source changes into it.
+  Include the exact source-CHANGELOG sentence shown above in the PR body. That changelog-only commit is
+  authoritative only while the named source commit remains the newest release-branch `CHANGELOG.md` change
+  and its `X.Y.Z` section remains byte-for-byte unchanged on `main`. The current target must also have no
+  matching RC section and no release entry reintroduced under `[Unreleased]`; the helper removes that residue
+  in a new changelog reconciliation rather than letting the authority check hide it. This permits reviewed
+  consolidation of superseded RC-only entries without allowing a later release-branch or target correction
+  to be hidden. The close-out check also fails if `release/X.Y.Z` no longer contains a matching stable or
+  prerelease `X.Y.Z` section, because a non-destructive no-op is not proof of release completion. For a legacy
+  dedicated changelog PR that predates the sentence, inspect the current source changelog commit and pass
+  `--ack-final-changelog-source <sha>` to the changelog check and `release-finish close-out`.
+- Do not create empty marker or provenance-only commits for `SKIP` entries. A commit marked already
+  present, patch-equivalent, changelog-only, version-only, generated-only, or empty is evidence that
+  no source PR is needed. The helper's empty-commit guard specifically prevents no-op forward-port
+  markers from reaching `main`.
+- Normal mode refuses to apply more than one actionable commit unless `--all` is explicit. `--all`
+  exists for exceptional local recovery and is not the main-branch release close-out workflow.
+- `--check` and `release-finish close-out` refuse to run while a cherry-pick is in progress, including
+  an empty cherry-pick whose porcelain status appears clean. Finish, skip, or abort it first.
 - The helper skips commits already present on `main` using `(cherry picked from commit <sha>)`
   evidence when available, unless the footer-bearing target commit has a later standard `git revert` commit
   on the target branch. For already-applied patches without the footer, it uses `git cherry` as the
   candidate signal before matching the source patch-id to target history and checking for a later standard
-  `git revert` of the matching target commit.
+  `git revert` of the matching target commit. Combined squash commits can make the whole-commit patch ID
+  differ, so an exact source-subject or source-PR mention in target history is also a candidate signal; the
+  helper still requires a path-scoped patch-ID match before skipping the source commit. When a release
+  backport body explicitly names its upstream PR, the helper can use a zero-context path-scoped match so
+  harmless neighboring context drift does not hide an otherwise identical patch.
+- Adapted backports can record their upstream PR relationship, but source-commit narration is not content
+  proof. Statements such as `Backports #123 to the release train`,
+  `This is equivalent to main PR #123 with release-specific behavior preserved.`, and reviewed
+  replacement/composite forms therefore report `MANUAL` for operator inspection when every required target
+  commit remains live. They never produce an automatic skip from PR numbers or shared path names alone.
+  Automatic skips still require patch equivalence, `cherry-pick -x`, or exact source-bound provenance recorded
+  by the target forward-port commit. Incidental, contrastive, or negated prose such as
+  `not a backport from main PR #123` is never authoritative. A later standard revert makes the source eligible
+  again instead of leaving it as an acknowledged relationship.
+- Generated-only `llms-full.txt` / `llms-full-pro.txt` commits are skipped because release artifacts can be
+  stale relative to current target documentation. Regenerate both files from the resolved target sources.
+- An interim prerelease package pin is skipped only when a later stable source commit names the same stable
+  version, covers every non-changelog/non-generated path of the interim pin, and is independently proven live
+  on the target. The cumulative contents and modes of the interim pin's paths at that stable source commit
+  must also match the target. If they differ, the helper marks the interim commit `MANUAL` so an unrelated
+  setting cannot be silently omitted while the stable pin is skipped.
 - `-x` appends `(cherry picked from commit <sha>)` so the forward-port is auditable and future
   helper runs can see the relationship.
+- Pure `CHANGELOG.md` stamp commits are skipped in code mode. After the code picks finish, run the
+  separate `--changelog` dry-run and apply commands shown above; that pass de-duplicates release entries
+  into `main`'s `[Unreleased]` section and removes RC-header residue from mixed code/changelog picks.
 - Known limitation: the "already forward-ported" skip still starts from history evidence. If a later
   target commit quotes the exact `(cherry picked from commit <sha>)` footer in its message body, that can
   look like `-x` evidence. Standard `git revert` commits of the footer-bearing target commit prevent the
@@ -719,94 +864,104 @@ evidence and maintainer sign-off; it must not become a global skip of CI, ShakaP
 ### 5. Close out the release line
 
 Acquire or renew the release-line writer lease before closeout and hold it
-through guarded branch deletion. Rerun `require_live_release_line_lease`
-immediately before deleting the release ref; release the lease only after the
-closeout and phase clear are durable.
+through guarded branch deletion. Refresh its heartbeat during the read-only
+checks, and rerun `require_live_release_line_lease` immediately before every
+remote ref transaction. Release the lease only after closeout and phase clear
+are durable.
 
 Before running the closeout helper, fetch `origin/main` and repeat the
 retained-source audit. If a retained backport's main origin was reverted,
-superseded, or is `UNKNOWN`, stop for explicit manual disposition. Do not let
-`script/release-forward-port` automatically reapply that origin merely because
-its current plan classifies the commit as `PICK`; record whether to omit it,
-replace it, or reapply it before proceeding. The ordinary helper path is valid
-only when every `PICK` should be applied.
+superseded, or is `UNKNOWN`, stop for explicit manual disposition; do not let a
+missing-source plan silently reapply it.
 
 **Scripted preview path.** `script/release-finish close-out X.Y.Z` describes this step: it runs
-`git fetch`, asserts you are on `main` with a clean tree, shows the real `script/release-forward-port`
-dry-run plan, then asks for explicit confirmation before applying the forward-port and, separately,
-before deleting the release branch on the remote. It shells out to the existing
-`script/release-forward-port` interface (it does not re-implement forward-porting), so the same plan,
-skips, and `MANUAL` handling described in step 3 apply. Normal mode is an unfenced compound writer; use
-only `--dry-run` until the wrapper contract above is implemented:
+`git fetch`, asserts you are on a clean and current `main`, and runs the real
+`script/release-forward-port --check` code and changelog plans. It does not apply release commits to
+`main`; step 3's separate PRs must already be merged. In normal mode, only after both checks pass does it ask for
+confirmation before deleting the release branch on the remote. A final fetch would still need to find local
+`main` exactly equal to `origin/main` and both checked remote tips unchanged; any intervening commit
+requires rerunning both checks. Git omits an unchanged `main` refspec from a push, so a no-op main lease
+cannot close the last network race. Instead, the deletion atomically moves the checked source tip to a
+temporary `release-finish-recovery/*` branch while deleting the release branch with a real source lease.
+It then re-fetches `main`: if `main` raced, it atomically restores the release branch before aborting;
+if another actor recreated the release branch, it aborts and retains recovery for inspection; otherwise
+it atomically proves the source remains absent while removing the temporary recovery branch. A concurrent
+source recreation rejects that cleanup transaction and leaves recovery available for inspection. Pass
+`--ack-manual <sha>` for each
+stable version-bump, merge, or rollback item that was inspected and intentionally required no source
+PR. For a legacy authoritative changelog PR without embedded source-SHA provenance, also pass
+`--ack-final-changelog-source <current-source-changelog-sha>`. Because the helper cannot refresh the
+canonical coordination lease immediately before each remote transaction, normal mode remains blocked
+until the repository-owned lifetime/per-write wrapper exists. Preview with `--dry-run`:
 
 ```bash
 git fetch origin
 git checkout main
 git pull --rebase
 script/release-finish close-out 17.0.0 --dry-run   # prints commands + the real forward-port plan
-# BLOCKED: do not run normal mode without the repository-owned lifetime/fencing wrapper.
+# BLOCKED: do not run normal mode without the repository-owned lifetime/per-write lease wrapper.
+# If either check is incomplete, land the PRs from step 3 and rerun the preview.
 ```
 
 The manual equivalent the script wraps is below.
 
 ```bash
 # After v17.0.0 is published and the GitHub release exists:
-# 1. Forward-port any remaining release-branch commits to main:
+# 1. Forward-port any remaining release-branch commits through the separate PRs in step 3.
 git fetch origin
 git checkout main
 git pull --rebase
+checked_main_sha="$(git rev-parse origin/main)"
+checked_source_sha="$(git rev-parse origin/release/17.0.0)"
 
-# The helper skips rc version bumps and already-forward-ported fixes.
-# It reports stable final version bumps as MANUAL so CHANGELOG extraction is explicit.
-script/release-forward-port --source origin/release/17.0.0 --target main --dry-run
-script/release-forward-port --source origin/release/17.0.0 --target main
+# The read-only completion checks must pass after every source PR and the separate
+# changelog/release squash PR have merged. Acknowledge only inspected MANUAL items.
+script/release-forward-port --source origin/release/17.0.0 --target main --check \
+  --ack-manual <inspected-sha>
+script/release-forward-port --source origin/release/17.0.0 --target main --changelog --check \
+  --ack-final-changelog-source <current-source-changelog-sha>
+
+# 2. Prefer release-finish for deletion. If reproducing it manually, fetch and compare both refs,
+# then preserve the source tip on a temporary remote branch throughout the destructive window:
+git fetch origin
+test "$(git rev-parse origin/main)" = "${checked_main_sha}"
+test "$(git rev-parse origin/release/17.0.0)" = "${checked_source_sha}"
+release_ref="refs/heads/release/17.0.0"
+recovery_ref="refs/heads/release-finish-recovery/17.0.0-${checked_source_sha:0:12}"
 require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
-git push   # push main directly or push the exact forward-port PR branch
-# If a PR is required, complete its exact-head gates, then in the merger's shell:
-FORWARD_PORT_PR="${FORWARD_PORT_PR:?set the forward-port PR number or URL}"
-forward_port_pr_json="$(gh pr view "${FORWARD_PORT_PR}" --json id,headRefOid)" || {
-  echo "could not resolve the forward-port PR identity; stop closeout" >&2
-  return 1 2>/dev/null || exit 1
-}
-FORWARD_PORT_PR_ID="$(
-  jq -er '.id | select(type == "string" and length > 0)' <<<"${forward_port_pr_json}"
-)" || {
-  echo "forward-port PR node id is missing or invalid; stop closeout" >&2
-  return 1 2>/dev/null || exit 1
-}
-FORWARD_PORT_HEAD_OID="$(
-  jq -er '.headRefOid | select(type == "string" and test("^[0-9a-f]{40}$"))' \
-    <<<"${forward_port_pr_json}"
-)" || {
-  echo "forward-port PR head OID is missing or invalid; stop closeout" >&2
-  return 1 2>/dev/null || exit 1
-}
+git push --atomic \
+  --force-with-lease="${release_ref}:${checked_source_sha}" \
+  --force-with-lease="${recovery_ref}:" \
+  origin \
+  "${checked_source_sha}:${recovery_ref}" \
+  ":${release_ref}"
+
+# Re-fetch immediately. Restore the release branch if main changed during deletion;
+# abort with recovery intact if the release branch reappeared; otherwise atomically prove it remains
+# absent while removing recovery with its own lease.
+git fetch origin
+if git ls-remote --exit-code --heads -- origin release/17.0.0 >/dev/null 2>&1; then
+  echo "release branch reappeared; retain recovery and rerun all completion checks" >&2
+  exit 1
+fi
+if test "$(git rev-parse origin/main)" != "${checked_main_sha}"; then
+  require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
+  git push --atomic \
+    --force-with-lease="${release_ref}:" \
+    --force-with-lease="${recovery_ref}:${checked_source_sha}" \
+    origin \
+    "${checked_source_sha}:${release_ref}" \
+    ":${recovery_ref}"
+  echo "main changed; release branch restored — rerun close-out" >&2
+  exit 1
+fi
 require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
-forward_port_merge_result="$(
-  gh api graphql \
-    -f query='mutation($pullRequestId: ID!, $expectedHeadOid: GitObjectID!) {
-      mergePullRequest(input: {
-        pullRequestId: $pullRequestId
-        expectedHeadOid: $expectedHeadOid
-        mergeMethod: REBASE
-      }) {
-        pullRequest { merged }
-      }
-    }' \
-    -f pullRequestId="${FORWARD_PORT_PR_ID}" \
-    -f expectedHeadOid="${FORWARD_PORT_HEAD_OID}"
-)" || {
-  echo "synchronous forward-port PR merge failed; stop closeout" >&2
-  return 1 2>/dev/null || exit 1
-}
-jq -e '.data.mergePullRequest.pullRequest.merged == true' \
-  >/dev/null <<<"${forward_port_merge_result}" || {
-  echo "forward-port PR was not merged synchronously; stop closeout" >&2
-  return 1 2>/dev/null || exit 1
-}
-# 2. Delete the ephemeral branch — the tags are the durable record.
-require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
-git push origin --delete release/17.0.0
+git push --atomic \
+  --force-with-lease="${release_ref}:" \
+  --force-with-lease="${recovery_ref}:${checked_source_sha}" \
+  origin \
+  ":${release_ref}" \
+  ":${recovery_ref}"
 ```
 
 #### Selective manual closeout for intentionally omitted `PICK` entries
@@ -1060,9 +1215,9 @@ steps; do not mix a partial helper run with an unrecorded selective omission.
 > `main`'s current version to the commit subject and skips with an explicit version-drift message when
 > `main` has already advanced past the release version (e.g. to `17.1.0.dev`) or already has that version.
 > If the skipped final version-bump commit also contains the only CHANGELOG collapse you need on `main`,
-> use the manual fallback: cherry-pick that one commit, resolve version artifacts to keep `main`'s newer
-> version, keep only the intended CHANGELOG changes, and preserve a `(cherry picked from commit <sha>)`
-> footer in the final commit message. Then bump `main` to the next dev version per
+> use the dedicated `--changelog` reconciliation branch and squash PR; do not cherry-pick the release
+> version commit. After that PR merges and the changelog check passes, give its inspected source SHA to
+> `release-finish close-out --ack-manual <sha>`. Then bump `main` to the next dev version per
 > [`releasing.md`](releasing.md) if it is not already.
 
 See [`releasing.md`](releasing.md) for the next-dev version bump details.

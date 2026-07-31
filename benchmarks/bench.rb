@@ -16,6 +16,16 @@ SUMMARY_TXT = "#{OUTDIR}/summary.txt".freeze
 BMF_SUFFIX = PRO ? ": Pro" : ": Core"
 BENCHMARK_SHARD_INDEX = Integer(env_or_default("BENCHMARK_SHARD_INDEX", 0))
 BENCHMARK_TOTAL_SHARDS = Integer(env_or_default("BENCHMARK_TOTAL_SHARDS", 1))
+# Repeated k6 samples per route. Each sample is an independent k6 run; the median
+# per metric is what ships to Bencher, and the per-sample values ride along in the
+# display sidecar so the relative comparison can require a flagged change to
+# reproduce across samples (#4580). Default 1 keeps the single-run behavior for
+# local trend runs; CI sets 3.
+BENCHMARK_SAMPLES = Integer(env_or_default("BENCHMARK_SAMPLES", 1))
+# Per-sample k6 duration. Multi-sample runs default shorter so total sampling time
+# stays comparable (3x12s vs the single 30s); an explicit DURATION always wins and
+# is per sample.
+K6_DURATION = env_or_default("DURATION", BENCHMARK_SAMPLES > 1 ? "12s" : "30s")
 
 def add_to_summary(*parts)
   add_summary_line(SUMMARY_TXT, *parts)
@@ -31,15 +41,19 @@ end
 
 # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
-# Benchmark a single route with k6. Returns [rps, p50, p90, status] on success
-# and RAISES on any k6/parse failure so the suite can record the failure and
-# exit non-zero instead of shipping fabricated metrics to Bencher.
-def run_k6_benchmark(target, route_name)
-  puts "\n===> k6: #{route_name}"
+# Benchmark a single route with one k6 run (one sample). Returns
+# [rps, p50, p90, status] on success and RAISES on any k6/parse failure so the
+# suite can record the failure and exit non-zero instead of shipping fabricated
+# metrics to Bencher.
+def run_k6_benchmark(target, route_name, sample: 1)
+  sample_label = BENCHMARK_SAMPLES > 1 ? " (sample #{sample}/#{BENCHMARK_SAMPLES})" : ""
+  puts "\n===> k6: #{route_name}#{sample_label}"
 
   k6_script = File.expand_path("k6.ts", __dir__)
-  k6_summary_json = "#{OUTDIR}/#{route_name}_k6_summary.json"
-  k6_txt = "#{OUTDIR}/#{route_name}_k6.txt"
+  # Single-sample runs keep the unsuffixed artifact names local tooling knows.
+  file_suffix = BENCHMARK_SAMPLES > 1 ? "_s#{sample}" : ""
+  k6_summary_json = "#{OUTDIR}/#{route_name}_k6_summary#{file_suffix}.json"
+  k6_txt = "#{OUTDIR}/#{route_name}_k6#{file_suffix}.txt"
 
   # Drop any summary file left by a previous run for this route. k6 only writes
   # the export on a clean finish, so without this a crashed/killed k6 could
@@ -51,7 +65,7 @@ def run_k6_benchmark(target, route_name)
   k6_env_vars = [
     "-e TARGET_URL=#{Shellwords.escape(target)}",
     "-e RATE=#{RATE}",
-    "-e DURATION=#{DURATION}",
+    "-e DURATION=#{K6_DURATION}",
     "-e CONNECTIONS=#{CONNECTIONS}",
     "-e MAX_CONNECTIONS=#{MAX_CONNECTIONS}",
     "-e REQUEST_TIMEOUT=#{REQUEST_TIMEOUT}"
@@ -94,9 +108,68 @@ end
 
 # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
-# Benchmark a single route end-to-end (warm-up + k6). Returns
-# [rps, p50, p90, status] on success and RAISES on failure (delegated to
-# run_k6_benchmark) so the suite can record it.
+# Median of a numeric array (mean of the middle two for even sizes).
+def median(values)
+  sorted = values.sort
+  mid = sorted.length / 2
+  sorted.length.odd? ? sorted[mid] : ((sorted[mid - 1] + sorted[mid]) / 2.0)
+end
+
+# Median across samples for one metric position, or "MISSING" if any sample
+# failed to produce a number (mirrors the single-sample MISSING token).
+def median_metric(sample_tuples, index)
+  values = sample_tuples.map { |tuple| tuple[index] }
+  return "MISSING" unless values.all?(Numeric)
+
+  median(values).round(2)
+end
+
+# Status tokens that carry no per-code counts to merge.
+COUNTLESS_STATUSES = %w[MISSING FAILED].freeze
+
+# Sum per-code status counts across samples, e.g. ["200=100,3xx=2", "200=98"] ->
+# "200=198,3xx=2" (first-appearance code order). Samples without parseable
+# counts ("MISSING") are skipped; all-missing stays "MISSING".
+def merge_statuses(statuses)
+  counts = Hash.new(0)
+  statuses.each do |status|
+    next if status.nil? || COUNTLESS_STATUSES.include?(status)
+
+    status.split(",").each do |part|
+      code, count = part.split("=")
+      counts[code] += count.to_i
+    end
+  end
+  return "MISSING" if counts.empty?
+
+  counts.map { |code, count| "#{code}=#{count}" }.join(",")
+end
+
+# Aggregate per-sample [rps, p50, p90, status] tuples into the route's reported
+# result: medians per metric (robust to a one-off noisy sample), summed status
+# counts, plus the raw per-sample values keyed by Bencher measure so the
+# relative comparison can require a flagged change to reproduce across samples.
+def aggregate_samples(sample_tuples)
+  samples = nil
+  if sample_tuples.length > 1
+    samples = { "rps" => 0, "p50_latency" => 1, "p90_latency" => 2 }.filter_map do |measure, index|
+      values = sample_tuples.map { |tuple| tuple[index] }
+      [measure, values] if values.all?(Numeric)
+    end.to_h
+  end
+
+  {
+    rps: median_metric(sample_tuples, 0),
+    p50: median_metric(sample_tuples, 1),
+    p90: median_metric(sample_tuples, 2),
+    status: merge_statuses(sample_tuples.map { |tuple| tuple[3] }),
+    samples:
+  }
+end
+
+# Benchmark a single route end-to-end (warm-up + BENCHMARK_SAMPLES k6 runs).
+# Returns {rps:, p50:, p90:, status:, samples:} on success and RAISES on failure
+# (delegated to run_k6_benchmark) so the suite can record it.
 def benchmark_route(route)
   separator = "=" * 80
   puts "\n#{separator}"
@@ -109,8 +182,10 @@ def benchmark_route(route)
   # Warm up this route before measuring: a few priming requests trigger
   # first-request compilation/cache population so they don't skew the run. Kept
   # small on purpose — at ~37 routes/shard the old 10×0.5s (5s/route) warm-up
-  # dominated CI time (#4012); the 30s k6 run below is what actually loads the
-  # server, and it self-warms the remaining workers in its first fraction of a second.
+  # dominated CI time (#4012); the k6 runs below are what actually load the
+  # server, and they self-warm the remaining workers in their first fraction of
+  # a second (with medians, any residual cold-start lands in sample 1 and is
+  # discounted by the aggregation).
   puts "Warming up server for #{route} with 3 requests..."
   3.times do
     server_responding?(target)
@@ -118,7 +193,9 @@ def benchmark_route(route)
   end
   puts "Warm-up complete for #{route}"
 
-  run_k6_benchmark(target, sanitize_route_name(route))
+  route_name = sanitize_route_name(route)
+  tuples = (1..BENCHMARK_SAMPLES).map { |sample| run_k6_benchmark(target, route_name, sample:) }
+  aggregate_samples(tuples)
 end
 
 # Run every route, collecting per-route failures instead of aborting the whole
@@ -131,12 +208,13 @@ def run_benchmark_suite(routes, bmf_collector, runner: method(:benchmark_route))
   failed_routes = []
 
   routes.each do |route|
-    rps, p50, p90, status = runner.call(route)
-    add_to_summary(route, rps, p50, p90, status)
+    result = runner.call(route)
+    add_to_summary(route, result[:rps], result[:p50], result[:p90], result[:status])
     # Add to BMF collector for Bencher output. p90 is sent to Bencher boundary-less
     # (recorded for a summary-table baseline but never thresholded) and also kept in the
-    # display sidecar so the summary table can show it; see BmfCollector.
-    bmf_collector.add(name: route, rps:, p50:, p90:, status:)
+    # display sidecar so the summary table can show it; see BmfCollector. samples: is
+    # the per-sample raw values (multi-sample runs only), display-sidecar-bound.
+    bmf_collector.add(name: route, **result.slice(:rps, :p50, :p90, :status, :samples))
   rescue StandardError => e
     # ::error:: must go to stdout — GitHub Actions only parses workflow commands
     # from stdout, not stderr, so writing here is what renders the UI annotation.
@@ -166,6 +244,8 @@ if __FILE__ == $PROGRAM_NAME
   raise "No routes assigned to shard #{BENCHMARK_SHARD_INDEX + 1}/#{BENCHMARK_TOTAL_SHARDS}" if routes.empty?
 
   validate_benchmark_config!
+  validate_positive_integer(BENCHMARK_SAMPLES, "BENCHMARK_SAMPLES")
+  validate_duration(K6_DURATION, "DURATION")
 
   # Check required tools are installed
   check_required_tools(%w[k6 column tee bash])
@@ -179,7 +259,8 @@ if __FILE__ == $PROGRAM_NAME
       - BENCHMARK_TOTAL_SHARDS: #{BENCHMARK_TOTAL_SHARDS}
       - ROUTES_IN_SHARD: #{routes.length}/#{all_routes.length}
       - RATE: #{RATE}
-      - DURATION: #{DURATION}
+      - BENCHMARK_SAMPLES: #{BENCHMARK_SAMPLES}
+      - DURATION (per sample): #{K6_DURATION}
       - REQUEST_TIMEOUT: #{REQUEST_TIMEOUT}
       - CONNECTIONS: #{CONNECTIONS}
       - MAX_CONNECTIONS: #{MAX_CONNECTIONS}

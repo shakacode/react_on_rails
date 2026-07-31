@@ -5,6 +5,7 @@ require_relative "lib/track_benchmarks"
 require_relative "lib/bencher_token"
 
 BENCHMARK_JSON = TrackBenchmarks::Config::BENCHMARK_JSON
+BASELINE_BENCHMARK_JSON = TrackBenchmarks::Config::BASELINE_BENCHMARK_JSON
 REPORT_JSON = TrackBenchmarks::Config::REPORT_JSON
 DISPLAY_JSON = TrackBenchmarks::Config::DISPLAY_JSON
 CANDIDATE_REPORT_JSON = TrackBenchmarks::Config::CANDIDATE_REPORT_JSON
@@ -27,12 +28,8 @@ def confirmation_branch(run_id, suite_name)
   TrackBenchmarks::BranchArgs.confirmation_branch(run_id, suite_name)
 end
 
-def confirmation_start_point_args
-  TrackBenchmarks::BranchArgs.confirmation_start_point_args
-end
-
-def branch_and_start_point_args
-  TrackBenchmarks::BranchArgs.branch_and_start_point_args
+def run_plan
+  TrackBenchmarks::BranchArgs.run_plan
 end
 
 def run_bencher!(branch, start_point_args)
@@ -103,10 +100,6 @@ def describe_alert(alert)
   TrackBenchmarks::Confirmation.describe_alert(alert)
 end
 
-def retry_without_start_point_hash?(stderr, exit_code, report)
-  TrackBenchmarks::BencherRun.retry_without_start_point_hash?(stderr, exit_code, report)
-end
-
 def main_push?
   TrackBenchmarks::RegressionPayloads.main_push?
 end
@@ -143,11 +136,18 @@ end
 # Only run the benchmark tracking when invoked as a script; `require`-ing the file
 # (e.g. from specs) just loads the compatibility helpers above.
 if __FILE__ == $PROGRAM_NAME
-  # Check the input file before validating env vars — a missing benchmark.json is the more
-  # actionable failure (almost always upstream `bench.rb` didn't produce results).
-  unless File.exist?(BENCHMARK_JSON)
-    warn "Benchmark JSON file not found: #{BENCHMARK_JSON}"
-    exit 1
+  # Check the input files before validating env vars — a missing benchmark.json is the
+  # more actionable failure (almost always an upstream bench phase didn't produce
+  # results). Relative continuous benchmarking needs BOTH this runner's runs: the base
+  # phase's baseline and the head phase's results.
+  {
+    "head benchmark JSON" => BENCHMARK_JSON,
+    "baseline (base-phase) benchmark JSON" => BASELINE_BENCHMARK_JSON
+  }.each do |label, path|
+    unless File.exist?(path)
+      warn "#{label} file not found: #{path}"
+      exit 1
+    end
   end
 
   SUITE_NAME = env!("BENCHMARK_SUITE_NAME")

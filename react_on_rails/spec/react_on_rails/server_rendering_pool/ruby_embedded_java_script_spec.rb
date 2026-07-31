@@ -321,6 +321,351 @@ module ReactOnRails
             expect(error.message).to include("connect(2) for localhost:3035")
           }
         end
+
+        # See issue #4584: a non-2xx HTTP response (e.g. a 404 page from a proxy) was
+        # returned as if it were bundle source, silently, instead of raising.
+        context "when the HTTP-served bundle responds with a non-2xx status" do
+          it "raises a bundle-load error naming the status and URL instead of returning the error body as source" do
+            server_bundle_url = "http://localhost:3035/webpack/development/server-bundle.js"
+
+            allow(ReactOnRails::Utils).to receive_messages(
+              server_bundle_js_file_path: server_bundle_url,
+              server_bundle_path_is_http?: true
+            )
+
+            not_found_response = Net::HTTPNotFound.new("1.1", "404", "Not Found")
+            not_found_response["content-type"] = "text/html; charset=utf-8"
+            not_found_response.instance_variable_set(:@read, true)
+            not_found_response.instance_variable_set(:@body, "<html><body>Not Found</body></html>")
+
+            allow(Net::HTTP).to receive(:get_response).and_return(not_found_response)
+
+            expect do
+              described_class.read_bundle_js_code
+            end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
+              expect(error.message).to include(server_bundle_url)
+              expect(error.message).to include("404")
+              expect(error.message).not_to include("<html>")
+            }
+          end
+        end
+
+        # No error message in this file's HTTP-bundle-loading path may leak a URL's embedded
+        # basic-auth credentials. A non-2xx response is exactly the failure mode a bad-credentials
+        # config produces (401/403), so the status-check path must not put the username or
+        # password in the raised message. These specs call the public `read_bundle_js_code` entry
+        # point (not the private `file_url_to_string`) because that is the real path every caller
+        # goes through — `read_bundle_js_code`'s own rescue re-interpolates the raw URL
+        # independently of whatever `file_url_to_string` does internally, so sanitizing only the
+        # inner method would leave the credential leaking right back out through here.
+        context "when the HTTP-served bundle URL embeds credentials and the response is non-2xx" do
+          it "does not leak the credential into the raised error message" do
+            server_bundle_url = "http://bundle-user:s3cr3t@localhost:3035/webpack/development/server-bundle.js"
+
+            allow(ReactOnRails::Utils).to receive_messages(
+              server_bundle_js_file_path: server_bundle_url,
+              server_bundle_path_is_http?: true
+            )
+
+            not_found_response = Net::HTTPNotFound.new("1.1", "404", "Not Found")
+            not_found_response["content-type"] = "text/html; charset=utf-8"
+            not_found_response.instance_variable_set(:@read, true)
+            not_found_response.instance_variable_set(:@body, "<html><body>Not Found</body></html>")
+
+            allow(Net::HTTP).to receive(:get_response).and_return(not_found_response)
+
+            expect do
+              described_class.read_bundle_js_code
+            end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
+              expect(error.message).not_to include("s3cr3t")
+              expect(error.message).not_to include("bundle-user")
+              # The status and a usable (sanitized) URL must still be present for diagnosis.
+              expect(error.message).to include("404")
+              expect(error.message).to include("localhost:3035")
+            }
+          end
+        end
+
+        # read_bundle_js_code's own rescue (the outer wrapper around file_url_to_string) has the
+        # identical interpolation gap on any other failure of Net::HTTP.get_response (e.g. a
+        # connection error), so it must be sanitized too — this is the path a credentialed URL
+        # actually takes when the connection itself fails.
+        context "when the HTTP-served bundle URL embeds credentials and the connection fails" do
+          it "does not leak the credential into the raised error message" do
+            server_bundle_url = "http://bundle-user:s3cr3t@localhost:3035/webpack/development/server-bundle.js"
+
+            allow(ReactOnRails::Utils).to receive_messages(
+              server_bundle_js_file_path: server_bundle_url,
+              server_bundle_path_is_http?: true
+            )
+            allow(Net::HTTP).to receive(:get_response).and_raise(
+              Errno::ECONNREFUSED.new("connect(2) for localhost:3035")
+            )
+
+            expect do
+              described_class.read_bundle_js_code
+            end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
+              expect(error.message).not_to include("s3cr3t")
+              expect(error.message).not_to include("bundle-user")
+              expect(error.message).to include("localhost:3035")
+              expect(error.message).to include("cannot be read")
+            }
+          end
+        end
+
+        # A URL malformed enough that URI.parse itself raises (e.g. a space in the host) fails
+        # before sanitized_renderer_url is ever applied to the `url` variable at the raise site —
+        # URI::InvalidURIError's own message embeds the original credential-bearing string
+        # verbatim, so that message must be scrubbed independently of the url variable.
+        context "when the HTTP-served bundle URL embeds credentials and is malformed enough to fail URI parsing" do
+          it "does not leak the credential into the raised error message" do
+            server_bundle_url = "http://bundle-user:s3cr3t@bad host/webpack/development/server-bundle.js"
+
+            allow(ReactOnRails::Utils).to receive_messages(
+              server_bundle_js_file_path: server_bundle_url,
+              server_bundle_path_is_http?: true
+            )
+
+            expect do
+              described_class.read_bundle_js_code
+            end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
+              expect(error.message).not_to include("s3cr3t")
+              expect(error.message).not_to include("bundle-user")
+              # The error must still say the URL was malformed and show enough of it (host/path
+              # minus credentials) for an operator to identify which configured URL failed.
+              expect(error.message).to include("bad URI")
+              expect(error.message).to include("bad host")
+            }
+          end
+        end
+
+        # read_bundle_js_code also serves the local (non-HTTP) bundle path, where
+        # server_bundle_js_file is a plain filesystem path rather than a URL.
+        # sanitized_renderer_url must pass such paths through unchanged (no embedded userinfo to
+        # strip) so this fix doesn't regress the diagnostic message for the far more common
+        # local-file configuration.
+        context "when the local (non-HTTP) bundle file cannot be read" do
+          it "still names the configured file path in the raised error message" do
+            server_bundle_path = "/app/public/webpack/development/server-bundle.js"
+
+            allow(ReactOnRails::Utils).to receive_messages(
+              server_bundle_js_file_path: server_bundle_path,
+              server_bundle_path_is_http?: false
+            )
+            allow(File).to receive(:read).with(server_bundle_path).and_raise(
+              Errno::ENOENT, server_bundle_path
+            )
+
+            expect do
+              described_class.read_bundle_js_code
+            end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
+              expect(error.message).to include(server_bundle_path)
+              expect(error.message).to include("cannot be read")
+            }
+          end
+        end
+
+        # See issue #4584: the charset was assumed to always be present in the exact form
+        # "; charset=..." rather than honored from whatever the response actually declares.
+        #
+        # This must actually transcode the bytes to UTF-8, not merely relabel them: ExecJS's
+        # underlying JS runtime parses source as UTF-8, so a body only tagged with its declared
+        # encoding (rather than converted) would have its non-ASCII bytes silently corrupted the
+        # moment the runtime re-interprets them as UTF-8. Asserting only the string's `#encoding`
+        # after a relabel-only fix would pass while still shipping corrupted bytes to the JS
+        # engine, so this asserts the actual returned bytes decode correctly.
+        context "when the HTTP-served bundle declares a non-UTF-8 charset" do
+          it "transcodes the body from the declared charset to UTF-8, preserving non-ASCII content" do
+            server_bundle_url = "http://localhost:3035/webpack/development/server-bundle.js"
+
+            allow(ReactOnRails::Utils).to receive_messages(
+              server_bundle_js_file_path: server_bundle_url,
+              server_bundle_path_is_http?: true
+            )
+
+            # "// café" encoded as ISO-8859-1 (0xE9 is not a valid standalone UTF-8 byte).
+            latin1_body = "// caf\xE9\nvar x = 1;".dup.force_encoding(Encoding::ASCII_8BIT)
+
+            ok_response = Net::HTTPOK.new("1.1", "200", "OK")
+            # A quoted charset value is valid per RFC 7231's quoted-string parameter syntax.
+            # The pre-fix regex captured the literal value including the quote characters and
+            # passed it straight to String#force_encoding, raising
+            # `ArgumentError: unknown encoding name - "ISO-8859-1"` instead of decoding.
+            ok_response["content-type"] = 'application/javascript; charset="ISO-8859-1"'
+            ok_response.instance_variable_set(:@read, true)
+            ok_response.instance_variable_set(:@body, latin1_body)
+
+            allow(Net::HTTP).to receive(:get_response).and_return(ok_response)
+
+            result = described_class.read_bundle_js_code
+
+            # The SUT's own return value must already be valid, transcoded UTF-8 — not ISO-8859-1
+            # bytes that happen to be convertible if a caller separately re-encodes them.
+            expect(result.encoding).to eq(Encoding::UTF_8)
+            expect(result.valid_encoding?).to be(true)
+            expect(result).to eq("// café\nvar x = 1;")
+          end
+        end
+
+        # String#encode is a no-op — it does not validate — when the source encoding already
+        # equals the destination (UTF-8). charset_from_content_type returns UTF-8 for the three
+        # "same-encoding" cases below (no Content-Type header, no charset parameter, and an
+        # explicit charset=utf-8), so `.encode(Encoding::UTF_8)` alone would silently let an
+        # invalid byte through unchanged on each of them — only a genuine cross-encoding
+        # transcode (the ISO-8859-1 case above) actually validates via `encode`. Each of these
+        # three specs uses a body containing an invalid standalone byte (0xE9) to prove the
+        # explicit valid_encoding? check (not `encode` alone) is what catches it.
+        context "when the HTTP-served bundle response has no Content-Type header and the body is not valid UTF-8" do
+          it "raises instead of silently passing corrupt bytes through" do
+            server_bundle_url = "http://localhost:3035/webpack/development/server-bundle.js"
+
+            allow(ReactOnRails::Utils).to receive_messages(
+              server_bundle_js_file_path: server_bundle_url,
+              server_bundle_path_is_http?: true
+            )
+
+            invalid_utf8_body = "// caf\xE9\nvar x = 1;".dup.force_encoding(Encoding::ASCII_8BIT)
+
+            ok_response = Net::HTTPOK.new("1.1", "200", "OK")
+            ok_response.instance_variable_set(:@read, true)
+            ok_response.instance_variable_set(:@body, invalid_utf8_body)
+
+            allow(Net::HTTP).to receive(:get_response).and_return(ok_response)
+
+            expect do
+              described_class.read_bundle_js_code
+            end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
+              expect(error.message).to include(server_bundle_url)
+              expect(error.message).to include("not valid UTF-8")
+            }
+          end
+        end
+
+        context "when the HTTP-served bundle response has a Content-Type with no charset parameter " \
+                "and the body is not valid UTF-8" do
+          it "raises instead of silently passing corrupt bytes through" do
+            server_bundle_url = "http://localhost:3035/webpack/development/server-bundle.js"
+
+            allow(ReactOnRails::Utils).to receive_messages(
+              server_bundle_js_file_path: server_bundle_url,
+              server_bundle_path_is_http?: true
+            )
+
+            invalid_utf8_body = "// caf\xE9\nvar x = 1;".dup.force_encoding(Encoding::ASCII_8BIT)
+
+            ok_response = Net::HTTPOK.new("1.1", "200", "OK")
+            ok_response["content-type"] = "application/javascript"
+            ok_response.instance_variable_set(:@read, true)
+            ok_response.instance_variable_set(:@body, invalid_utf8_body)
+
+            allow(Net::HTTP).to receive(:get_response).and_return(ok_response)
+
+            expect do
+              described_class.read_bundle_js_code
+            end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
+              expect(error.message).to include(server_bundle_url)
+              expect(error.message).to include("not valid UTF-8")
+            }
+          end
+        end
+
+        context "when the HTTP-served bundle declares charset=utf-8 explicitly and the body is not valid UTF-8" do
+          it "raises instead of silently passing corrupt bytes through" do
+            server_bundle_url = "http://localhost:3035/webpack/development/server-bundle.js"
+
+            allow(ReactOnRails::Utils).to receive_messages(
+              server_bundle_js_file_path: server_bundle_url,
+              server_bundle_path_is_http?: true
+            )
+
+            invalid_utf8_body = "// caf\xE9\nvar x = 1;".dup.force_encoding(Encoding::ASCII_8BIT)
+
+            ok_response = Net::HTTPOK.new("1.1", "200", "OK")
+            ok_response["content-type"] = "application/javascript; charset=utf-8"
+            ok_response.instance_variable_set(:@read, true)
+            ok_response.instance_variable_set(:@body, invalid_utf8_body)
+
+            allow(Net::HTTP).to receive(:get_response).and_return(ok_response)
+
+            expect do
+              described_class.read_bundle_js_code
+            end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
+              expect(error.message).to include(server_bundle_url)
+              expect(error.message).to include("not valid UTF-8")
+            }
+          end
+        end
+
+        context "when the HTTP-served bundle declares a charset Ruby does not recognize" do
+          it "falls back to UTF-8 instead of raising" do
+            server_bundle_url = "http://localhost:3035/webpack/development/server-bundle.js"
+
+            allow(ReactOnRails::Utils).to receive_messages(
+              server_bundle_js_file_path: server_bundle_url,
+              server_bundle_path_is_http?: true
+            )
+
+            ok_response = Net::HTTPOK.new("1.1", "200", "OK")
+            ok_response["content-type"] = "application/javascript; charset=unknown-charset"
+            ok_response.instance_variable_set(:@read, true)
+            ok_response.instance_variable_set(:@body, "var x = 1;")
+
+            allow(Net::HTTP).to receive(:get_response).and_return(ok_response)
+
+            result = described_class.read_bundle_js_code
+
+            expect(result).to eq("var x = 1;")
+            expect(result.encoding).to eq(Encoding::UTF_8)
+          end
+        end
+
+        # Acceptance criteria (#4584): a successful response with a missing/blank charset,
+        # or a missing Content-Type header entirely, must not raise — it should fall back to
+        # a safe default encoding rather than blowing up on a nil charset match.
+        context "when the HTTP-served bundle response has no Content-Type header" do
+          it "falls back to UTF-8 instead of raising" do
+            server_bundle_url = "http://localhost:3035/webpack/development/server-bundle.js"
+
+            allow(ReactOnRails::Utils).to receive_messages(
+              server_bundle_js_file_path: server_bundle_url,
+              server_bundle_path_is_http?: true
+            )
+
+            ok_response = Net::HTTPOK.new("1.1", "200", "OK")
+            ok_response.instance_variable_set(:@read, true)
+            ok_response.instance_variable_set(:@body, "var x = 1;")
+
+            allow(Net::HTTP).to receive(:get_response).and_return(ok_response)
+
+            result = described_class.read_bundle_js_code
+
+            expect(result).to eq("var x = 1;")
+            expect(result.encoding).to eq(Encoding::UTF_8)
+          end
+        end
+
+        context "when the HTTP-served bundle response has a Content-Type with no charset parameter" do
+          it "falls back to UTF-8 instead of raising" do
+            server_bundle_url = "http://localhost:3035/webpack/development/server-bundle.js"
+
+            allow(ReactOnRails::Utils).to receive_messages(
+              server_bundle_js_file_path: server_bundle_url,
+              server_bundle_path_is_http?: true
+            )
+
+            ok_response = Net::HTTPOK.new("1.1", "200", "OK")
+            ok_response["content-type"] = "application/javascript"
+            ok_response.instance_variable_set(:@read, true)
+            ok_response.instance_variable_set(:@body, "var x = 1;")
+
+            allow(Net::HTTP).to receive(:get_response).and_return(ok_response)
+
+            result = described_class.read_bundle_js_code
+
+            expect(result).to eq("var x = 1;")
+            expect(result.encoding).to eq(Encoding::UTF_8)
+          end
+        end
       end
     end
   end

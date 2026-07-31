@@ -133,6 +133,8 @@ Rails.application.routes.draw do
   get "context_function_return_jsx" => "pages#context_function_return_jsx"
   get "pure_component_wrapped_in_function" => "pages#pure_component_wrapped_in_function"
   get "posts_page" => "pages#posts_page"
+  get "selective_hydration_demo" => "pages#selective_hydration_demo", as: :selective_hydration_demo
+  get "selective_hydration_cached" => "pages#selective_hydration_cached", as: :selective_hydration_cached
 
   # API Routes
   namespace :api do

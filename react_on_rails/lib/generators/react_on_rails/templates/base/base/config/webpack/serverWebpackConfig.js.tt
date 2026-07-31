@@ -17,18 +17,18 @@ const rscClientReferences = {
 };
 <% end -%>
 
+// Normalizes an entry of a webpack/rspack `rule.use` array to its loader path.
+// Entries may be a bare string, a `{ loader, options }` object, or null.
+function getLoaderPath(item) {
+  if (typeof item === 'string') return item;
+  if (item && typeof item.loader === 'string') return item.loader;
+  return '';
+}
+
 <% if use_pro? -%>
 function extractLoader(rule, loaderName) {
   if (!Array.isArray(rule.use)) return null;
-  return rule.use.find((item) => {
-    let testValue = '';
-    if (typeof item === 'string') {
-      testValue = item;
-    } else if (item && typeof item.loader === 'string') {
-      testValue = item.loader;
-    }
-    return testValue.includes(loaderName);
-  });
+  return rule.use.find((item) => getLoaderPath(item).includes(loaderName));
 }
 
 <% end -%>
@@ -63,15 +63,10 @@ const configureServer = () => {
   serverWebpackConfig.module.rules.forEach((loader) => {
     if (loader.use && loader.use.filter) {
       loader.use = loader.use.filter((item) => {
-        let testValue = '';
-        if (typeof item === 'string') {
-          testValue = item;
-        } else if (item && typeof item.loader === 'string') {
-          testValue = item.loader;
-        }
+        const loaderPath = getLoaderPath(item);
         return !(
-          testValue.includes('mini-css-extract-plugin') ||
-          testValue.includes('cssExtractLoader') // Rspack uses this path
+          loaderPath.includes('mini-css-extract-plugin') ||
+          loaderPath.includes('cssExtractLoader') // Rspack uses this path
         );
       });
     }
@@ -162,29 +157,14 @@ const configureServer = () => {
     if (Array.isArray(rule.use)) {
       // remove the mini-css-extract-plugin and style-loader
       rule.use = rule.use.filter((item) => {
-        let testValue = '';
-        if (typeof item === 'string') {
-          testValue = item;
-        } else if (item && typeof item.loader === 'string') {
-          testValue = item.loader;
-        }
+        const loaderPath = getLoaderPath(item);
         return !(
-          testValue.includes('mini-css-extract-plugin') ||
-          testValue.includes('cssExtractLoader') || // Rspack uses this path
-          testValue === 'style-loader'
+          loaderPath.includes('mini-css-extract-plugin') ||
+          loaderPath.includes('cssExtractLoader') || // Rspack uses this path
+          loaderPath === 'style-loader'
         );
       });
-      const cssLoader = rule.use.find((item) => {
-        let testValue = '';
-
-        if (typeof item === 'string') {
-          testValue = item;
-        } else if (item && typeof item.loader === 'string') {
-          testValue = item.loader;
-        }
-
-        return testValue.includes('css-loader');
-      });
+      const cssLoader = rule.use.find((item) => getLoaderPath(item).includes('css-loader'));
       if (cssLoader && cssLoader.options && cssLoader.options.modules) {
         cssLoader.options.modules = {
           ...(typeof cssLoader.options.modules === 'object' ? cssLoader.options.modules : {}),

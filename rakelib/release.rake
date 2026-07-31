@@ -5871,13 +5871,44 @@ def gh_included_response_parts(output)
   output = normalized_utf8_output(output)
   return [nil, nil, nil] unless output
 
-  newline = gh_included_response_newline(output)
-  return [nil, nil, nil] unless newline && valid_gh_included_response_bytes?(output)
+  status_line_parts = gh_included_response_status_line_parts(output)
+  return [nil, nil, nil] unless status_line_parts && valid_gh_included_response_bytes?(output)
 
-  header_block, body, *trailing_sections = output.split("#{newline}#{newline}", -1)
-  return [nil, nil, nil] unless trailing_sections.empty? && header_block && body
+  status_line, status_newline, remainder = status_line_parts
+  newline = gh_included_response_newline(remainder)
+  # gh writes the status line with the platform newline, then writes HTTP
+  # headers with CRLF. Accept that CLI byte shape while continuing
+  # to reject the inverse or arbitrarily mixed framing.
+  return [nil, nil, nil] unless compatible_gh_included_response_newlines?(status_newline, newline)
 
+  headers, body = gh_included_response_headers_and_body(remainder, newline:)
+  return [nil, nil, nil] unless headers && body
+
+  header_block = headers.empty? ? status_line : [status_line, headers].join(newline)
   [header_block, body, newline]
+end
+
+def gh_included_response_headers_and_body(remainder, newline:)
+  separator = "#{newline}#{newline}"
+  if remainder.start_with?(newline)
+    body = remainder.delete_prefix(newline)
+    return if body.include?(separator)
+
+    return ["", body]
+  end
+
+  headers, body, *trailing_sections = remainder.split(separator, -1)
+  [headers, body] if trailing_sections.empty? && headers && body
+end
+
+def gh_included_response_status_line_parts(output)
+  output.match(/\A([^\r\n]+)(\r?\n)(.*)\z/m)&.captures
+end
+
+def compatible_gh_included_response_newlines?(status_newline, header_newline)
+  return false unless header_newline
+
+  status_newline == header_newline || (status_newline == "\n" && header_newline == "\r\n")
 end
 
 def gh_included_response_newline(output)
@@ -6855,21 +6886,23 @@ def publish_or_update_github_release(monorepo_root:, release_context:, dry_run:)
     return
   end
 
+  repo_slug = github_repo_slug(monorepo_root)
+
   Tempfile.create(["react-on-rails-release-notes-", ".md"]) do |tmp|
     tmp.write(release_context[:notes])
     tmp.flush
 
-    release_exists = system("gh", "release", "view", release_context[:tag], chdir: monorepo_root, out: File::NULL,
-                                                                            err: File::NULL)
+    release_exists = system("gh", "release", "view", release_context[:tag], "--repo", repo_slug,
+                            chdir: monorepo_root, out: File::NULL, err: File::NULL)
     abort "❌ Unable to run `gh`. Ensure GitHub CLI is installed and on PATH." if release_exists.nil?
 
     release_command = if release_exists
-                        ["gh", "release", "edit", release_context[:tag], "--title", release_context[:title],
-                         "--notes-file", tmp.path,
+                        ["gh", "release", "edit", release_context[:tag], "--repo", repo_slug,
+                         "--title", release_context[:title], "--notes-file", tmp.path,
                          "--prerelease=#{release_context[:prerelease]}"]
                       else
-                        command = ["gh", "release", "create", release_context[:tag], "--verify-tag", "--title",
-                                   release_context[:title],
+                        command = ["gh", "release", "create", release_context[:tag], "--repo", repo_slug,
+                                   "--verify-tag", "--title", release_context[:title],
                                    "--notes-file", tmp.path]
                         command << "--prerelease" if release_context[:prerelease]
                         command

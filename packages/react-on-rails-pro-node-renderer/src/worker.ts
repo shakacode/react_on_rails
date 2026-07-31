@@ -155,45 +155,27 @@ function setHeaders(headers: ResponseResult['headers'], res: FastifyReply) {
   Object.entries(headers).forEach(([key, header]) => res.header(key, header));
 }
 
-function hasHeader(headers: ResponseResult['headers'], headerName: string) {
-  const lowerHeaderName = headerName.toLowerCase();
-  return Object.keys(headers).some((key) => key.toLowerCase() === lowerHeaderName);
-}
-
-function setStringResponseHeaders(headers: ResponseResult['headers'], res: FastifyReply) {
-  if (!hasHeader(headers, 'Content-Type')) {
-    res.type('text/plain; charset=utf-8');
-  }
-  if (!hasHeader(headers, 'X-Content-Type-Options')) {
-    res.header('X-Content-Type-Options', 'nosniff');
-  }
-}
-
 const setResponse = async (result: ResponseResult, res: FastifyReply) => {
   const { status, data, headers, stream } = result;
   if (status !== 200 && status !== 410) {
     log.info({ msg: 'Sending non-200, non-410 data back', data });
-  }
-  if (!stream && typeof data === 'string' && status >= 400) {
-    setHeaders(headers, res);
-    res.header('Content-Type', 'text/plain; charset=utf-8');
-    res.header('X-Content-Type-Options', 'nosniff');
-    res.status(status);
-    res.send(data);
-    return;
-  }
-
-  if (!stream && typeof data === 'string') {
-    setStringResponseHeaders(headers, res);
   }
   setHeaders(headers, res);
   res.status(status);
 
   if (stream) {
     await res.send(stream);
-  } else {
-    res.send(data);
+    return;
   }
+
+  if (typeof data === 'string') {
+    // String payloads (rendered output and error text) may embed request-derived
+    // content; the Rails client reads them as raw text, so an explicit non-HTML
+    // content type keeps reflected markup inert if a browser hits this endpoint.
+    res.header('Content-Type', 'text/plain; charset=utf-8');
+    res.header('X-Content-Type-Options', 'nosniff');
+  }
+  res.send(data);
 };
 
 function runWhenStreamFinishes(
@@ -446,6 +428,8 @@ export const disableHttp2 = () => {
 type WithBodyArrayField<T, K extends string> = T & { [P in K | `${K}[]`]?: string | string[] };
 
 const INVALID_CONTENT_LENGTH_ERROR_CODE = 'FST_ERR_CTP_INVALID_CONTENT_LENGTH';
+const RAW_RENDER_CONTENT_TYPE = 'application/vnd.react-on-rails.render-request+javascript';
+const RAW_RENDER_HEADER_PREFIX = 'x-react-on-rails-pro-';
 
 const errorCode = (error: unknown): string | undefined => {
   const code = (error as { code?: unknown })?.code;
@@ -504,6 +488,89 @@ const extractBodyArrayField = <Key extends string>(
     return [value];
   }
   return undefined;
+};
+
+type RawRenderHeaders = Record<string, unknown>;
+
+const scalarHeader = (headers: RawRenderHeaders, name: string) => {
+  const value = headers[name];
+  return typeof value === 'string' ? value : undefined;
+};
+
+const normalizeRawRenderRequest = (
+  renderingRequest: unknown,
+  headers: RawRenderHeaders,
+): { body?: Record<string, unknown>; error?: string } => {
+  if (typeof renderingRequest !== 'string') {
+    return { error: 'Invalid raw render request body: expected a JavaScript string.' };
+  }
+
+  const authorization = scalarHeader(headers, 'authorization');
+  if (authorization && !authorization.startsWith('Bearer ')) {
+    return { error: 'Invalid Authorization header for raw render request.' };
+  }
+
+  const dependencyHeader = scalarHeader(headers, `${RAW_RENDER_HEADER_PREFIX}dependency-bundle-timestamps`);
+  let dependencyBundleTimestamps: unknown = [];
+  if (dependencyHeader !== undefined) {
+    try {
+      dependencyBundleTimestamps = JSON.parse(dependencyHeader);
+    } catch {
+      return { error: 'Invalid dependency bundle timestamps header: expected a JSON array.' };
+    }
+    if (
+      !Array.isArray(dependencyBundleTimestamps) ||
+      !dependencyBundleTimestamps.every((timestamp) => typeof timestamp === 'string')
+    ) {
+      return { error: 'Invalid dependency bundle timestamps header: expected an array of strings.' };
+    }
+  }
+
+  const observabilityHeader = scalarHeader(headers, `${RAW_RENDER_HEADER_PREFIX}rsc-stream-observability`);
+  if (
+    observabilityHeader !== undefined &&
+    observabilityHeader !== 'true' &&
+    observabilityHeader !== 'false'
+  ) {
+    return { error: 'Invalid RSC stream observability header: expected true or false.' };
+  }
+
+  return {
+    body: {
+      renderingRequest,
+      protocolVersion: scalarHeader(headers, `${RAW_RENDER_HEADER_PREFIX}protocol-version`),
+      gemVersion: scalarHeader(headers, `${RAW_RENDER_HEADER_PREFIX}gem-version`),
+      railsEnv: scalarHeader(headers, `${RAW_RENDER_HEADER_PREFIX}rails-env`),
+      password: authorization?.slice('Bearer '.length),
+      dependencyBundleTimestamps,
+      ...(observabilityHeader === undefined ? {} : { rscStreamObservability: observabilityHeader }),
+    },
+  };
+};
+
+// Extracts only the precheck fields, without shape validation, so protocol, version, and
+// password checks run before normalizeRawRenderRequest's 400s; a malformed but
+// unauthenticated raw request must fail auth first, matching the parsed-body path and
+// /asset-exists. Must include every field checkProtocolVersion reads (gemVersion and
+// railsEnv drive the non-production version-mismatch 412), since prechecks run only once
+// on this path. Absent headers must not produce keys at all, so the protocol-version
+// diagnostic's "received fields" list only names fields the client actually sent.
+const rawRenderPrecheckBody = (headers: RawRenderHeaders) => {
+  const authorization = scalarHeader(headers, 'authorization');
+  const body: Record<string, string> = {};
+  const assign = (key: string, value: string | undefined) => {
+    if (value !== undefined) {
+      body[key] = value;
+    }
+  };
+  assign('protocolVersion', scalarHeader(headers, `${RAW_RENDER_HEADER_PREFIX}protocol-version`));
+  assign('gemVersion', scalarHeader(headers, `${RAW_RENDER_HEADER_PREFIX}gem-version`));
+  assign('railsEnv', scalarHeader(headers, `${RAW_RENDER_HEADER_PREFIX}rails-env`));
+  assign(
+    'password',
+    authorization?.startsWith('Bearer ') ? authorization.slice('Bearer '.length) : authorization,
+  );
+  return body;
 };
 
 function discardMultipartFile(part: MultipartFile) {
@@ -599,7 +666,10 @@ export default function run(config: Partial<Config>) {
     }
   });
 
-  // Supports application/x-www-form-urlencoded
+  // Supports application/x-www-form-urlencoded. The gem no longer sends it (render
+  // requests use RAW_RENDER_CONTENT_TYPE), but keep parsing it so a not-yet-upgraded
+  // gem in a rolling deploy still reaches the protocol/render path instead of failing
+  // with an unactionable 415 at the content-type layer.
   void app.register(fastifyFormbody);
   app.addHook('preParsing', (req, _res, payload, done) => {
     const contentLength = Number(req.headers['content-length']);
@@ -681,6 +751,10 @@ export default function run(config: Partial<Config>) {
     },
   });
 
+  app.addContentTypeParser(RAW_RENDER_CONTENT_TYPE, { parseAs: 'string' }, (_req, body, done) => {
+    done(null, body);
+  });
+
   // Ensure NDJSON bodies are not buffered and are available as a stream immediately
   app.addContentTypeParser('application/x-ndjson', (req, payload, done) => {
     // Pass through the raw stream; the route will consume req.raw
@@ -700,9 +774,31 @@ export default function run(config: Partial<Config>) {
       return;
     }
 
-    const precheckResult = performRequestPrechecks(req.body);
-    if (precheckResult) {
-      await setResponse(precheckResult, res);
+    let body: Record<string, unknown>;
+    if (req.headers['content-type']?.split(';', 1)[0] === RAW_RENDER_CONTENT_TYPE) {
+      const precheckResult = performRequestPrechecks(rawRenderPrecheckBody(req.headers));
+      if (precheckResult) {
+        await setResponse(precheckResult, res);
+        return;
+      }
+      const normalizedRequest = normalizeRawRenderRequest(req.body, req.headers);
+      if (normalizedRequest.error || !normalizedRequest.body) {
+        await setResponse(
+          badRequestResponseResult(normalizedRequest.error ?? 'Invalid raw render request.'),
+          res,
+        );
+        return;
+      }
+      body = normalizedRequest.body;
+    } else if (req.body && typeof req.body === 'object') {
+      body = req.body;
+      const precheckResult = performRequestPrechecks(body);
+      if (precheckResult) {
+        await setResponse(precheckResult, res);
+        return;
+      }
+    } else {
+      await setResponse(badRequestResponseResult('Invalid or missing request body.'), res);
       return;
     }
 
@@ -717,11 +813,6 @@ export default function run(config: Partial<Config>) {
     //   await delay(100000);
     // }
 
-    const { body } = req;
-    if (!body || typeof body !== 'object') {
-      await setResponse(badRequestResponseResult('Invalid or missing request body.'), res);
-      return;
-    }
     const { renderingRequest } = body;
     if (!isValidRenderingRequest(renderingRequest)) {
       await setResponse(badRequestResponseResult(invalidRenderingRequestMessage(body)), res);
