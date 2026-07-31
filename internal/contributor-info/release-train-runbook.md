@@ -151,7 +151,11 @@ mutation. The bounded status and claim operations fail closed on timeout,
 `UNKNOWN`, or `CLAIM_REFUSED`:
 
 ```bash
-RELEASE_VERSION=17.0.0
+if [ "${RELEASE_VERSION+x}" = x ] || [ "${RELEASE_LINE_TARGET+x}" = x ]; then
+  echo "canonical release variables are already set; start a fresh shell before acquiring a release-line lease" >&2
+  return 1 2>/dev/null || exit 1
+fi
+RELEASE_VERSION="${RELEASE_VERSION_INPUT:?set the exact stable X.Y.Z release version}"
 if [[ ! "${RELEASE_VERSION}" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
   echo "release version must be a stable X.Y.Z version; stop" >&2
   return 1 2>/dev/null || exit 1
@@ -233,10 +237,13 @@ if [ "${lease_status}" -ne 0 ]; then
 fi
 ```
 
+Set `RELEASE_VERSION_INPUT` only in a fresh shell. The bootstrap refuses to run
+when `RELEASE_VERSION` or `RELEASE_LINE_TARGET` already exists, including when
+it is pasted again into a stale interactive shell. After validation,
 `RELEASE_VERSION` and `RELEASE_LINE_TARGET` are the canonical, readonly lease
 identity for this shell lifecycle. Do not reassign either variable. Later
-backport, selective-closeout, and changelog-closeout inputs use their own names
-and must equal `RELEASE_VERSION` before any GitHub or Git mutation.
+backport, synchronous-closeout, and selective-closeout inputs use their own
+names and must equal `RELEASE_VERSION` before any GitHub or Git mutation.
 
 The explicit claim TTL is four hours and the heartbeat TTL is 15 minutes. Renew
 the claim at least hourly with the bounded `claim` command from
@@ -371,11 +378,11 @@ After the dry-run succeeds, create the branch from an explicitly refreshed
 ```bash
 git fetch --prune origin "+refs/heads/main:refs/remotes/origin/main"
 # Cut from the exact main commit you intend to stabilize.
-git switch -c release/17.0.0 origin/main
+git switch -c "release/${RELEASE_VERSION}" origin/main
 require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
 git push \
-  --force-with-lease="refs/heads/release/17.0.0:" \
-  -u origin "release/17.0.0:refs/heads/release/17.0.0"
+  --force-with-lease="refs/heads/release/${RELEASE_VERSION}:" \
+  -u origin "release/${RELEASE_VERSION}:refs/heads/release/${RELEASE_VERSION}"
 ```
 
 **Step 1b — cut rc.0 from the branch.** After at least one CI run finishes on the `release/17.0.0` tip,
@@ -466,11 +473,13 @@ merge into `release/X.Y.Z`.
 Author each stabilizing fix as a PR **targeting `release/X.Y.Z`** (not `main`):
 
 ```bash
+STABILIZER_BRANCH="fix/${RELEASE_VERSION}-ssr-regression"
+readonly STABILIZER_BRANCH
 git fetch origin
-git checkout -b fix/17.0.0-ssr-regression origin/release/17.0.0
+git checkout -b "${STABILIZER_BRANCH}" "origin/release/${RELEASE_VERSION}"
 # ...fix, test...
-git push -u origin fix/17.0.0-ssr-regression
-gh pr create --base release/17.0.0 --title "Fix SSR regression" --body "..."
+git push -u origin "${STABILIZER_BRANCH}"
+gh pr create --base "release/${RELEASE_VERSION}" --title "Fix SSR regression" --body "..."
 ```
 
 Merge stabilizing PRs into `release/X.Y.Z`, then cut the next RC tag (`v17.0.0.rc.1`, …) from the
@@ -789,37 +798,39 @@ git fetch origin
 
 # Inspect the complete plan from current main. Expect missing fix commits to be PICK and pure CHANGELOG/version-bump
 # commits to be SKIP; changelog content is handled by the reconciliation pass below.
-script/release-forward-port --source origin/release/17.0.0 --target main --dry-run
+script/release-forward-port --source "origin/release/${RELEASE_VERSION}" --target main --dry-run
 
 # For EACH remaining PICK, start again from the latest origin/main and create one source-change PR.
 # Replace <source-sha>, <source-pr>, and <slug>; merge this PR before starting the next one.
 git switch -c forward-port/<source-pr>-<slug> origin/main
 script/release-forward-port \
-  --source origin/release/17.0.0 \
+  --source "origin/release/${RELEASE_VERSION}" \
   --target forward-port/<source-pr>-<slug> \
   --only <source-sha> \
   --dry-run
 script/release-forward-port \
-  --source origin/release/17.0.0 \
+  --source "origin/release/${RELEASE_VERSION}" \
   --target forward-port/<source-pr>-<slug> \
   --only <source-sha>
 # Validate, push, open the PR to main, and merge it before repeating from a freshly fetched origin/main.
 
 # After every source-change PR has merged, use a separate release/changelog branch and PR.
+CHANGELOG_CLOSEOUT_BRANCH="release/reconcile-${RELEASE_VERSION}-changelog"
+readonly CHANGELOG_CLOSEOUT_BRANCH
 git fetch --prune origin main
-git switch -c release/reconcile-17.0.0-changelog origin/main
+git switch -c "${CHANGELOG_CLOSEOUT_BRANCH}" origin/main
 script/release-forward-port \
-  --source origin/release/17.0.0 \
-  --target release/reconcile-17.0.0-changelog \
+  --source "origin/release/${RELEASE_VERSION}" \
+  --target "${CHANGELOG_CLOSEOUT_BRANCH}" \
   --changelog \
   --dry-run
 script/release-forward-port \
-  --source origin/release/17.0.0 \
-  --target release/reconcile-17.0.0-changelog \
+  --source "origin/release/${RELEASE_VERSION}" \
+  --target "${CHANGELOG_CLOSEOUT_BRANCH}" \
   --changelog
 git diff --check
 git add CHANGELOG.md
-git commit -m "Reconcile 17.0.0 release changelog on main"
+git commit -m "Reconcile ${RELEASE_VERSION} release changelog on main"
 # Validate, push, and open the dedicated release/changelog PR to main. Squash it with:
 # Record the final React on Rails X.Y.Z changelog (#<pr-number>)
 # Include this exact sentence in the PR body, using the newest release-branch commit that changed CHANGELOG.md:
@@ -836,32 +847,94 @@ by validation and review. The mutation binds the head with `expectedHeadOid`;
 the base comparisons below are fail-closed preflight checks because GitHub's
 merge mutation has no expected-base argument:
 
+Both merge methods require `CLOSEOUT_RELEASE_VERSION` to match the canonical
+lease version. A `REBASE` additionally binds one full source release SHA to the
+fetched canonical release ref, the current `origin/main` forward-port plan, and
+the PR's single commit plus direct provenance footer. A `SQUASH` binds its
+source changelog OID to the latest `CHANGELOG.md` commit on that same fetched
+release ref.
+
 ```bash
 CLOSEOUT_PR="${CLOSEOUT_PR:?set the closeout PR number or URL}"
 CLOSEOUT_MERGE_METHOD="${CLOSEOUT_MERGE_METHOD:?set REBASE or SQUASH}"
+CLOSEOUT_RELEASE_VERSION="${CLOSEOUT_RELEASE_VERSION:?set the X.Y.Z release version}"
 CLOSEOUT_VALIDATED_HEAD_OID="${CLOSEOUT_VALIDATED_HEAD_OID:?set the validated 40-character head OID}"
 CLOSEOUT_VALIDATED_BASE_OID="${CLOSEOUT_VALIDATED_BASE_OID:?set the validated 40-character base OID}"
 case "${CLOSEOUT_MERGE_METHOD}" in
   REBASE|SQUASH) ;;
   *) echo "unsupported closeout merge method" >&2; return 1 2>/dev/null || exit 1 ;;
 esac
-if [ "${CLOSEOUT_MERGE_METHOD}" = "SQUASH" ]; then
-  CLOSEOUT_RELEASE_VERSION="${CLOSEOUT_RELEASE_VERSION:?set the X.Y.Z release version}"
-  CLOSEOUT_SOURCE_CHANGELOG_OID="${CLOSEOUT_SOURCE_CHANGELOG_OID:?set the source CHANGELOG.md 40-character commit OID}"
-  if [[ ! "${CLOSEOUT_RELEASE_VERSION}" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
-    echo "closeout release version must be X.Y.Z; stop closeout" >&2
+if [[ ! "${CLOSEOUT_RELEASE_VERSION}" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+  echo "closeout release version must be X.Y.Z; stop closeout" >&2
+  return 1 2>/dev/null || exit 1
+fi
+test "${CLOSEOUT_RELEASE_VERSION}" = "${RELEASE_VERSION}" || {
+  echo "closeout release version must equal held release-line lease version ${RELEASE_VERSION}; stop closeout" >&2
+  return 1 2>/dev/null || exit 1
+}
+if [[ ! "${CLOSEOUT_VALIDATED_HEAD_OID}" =~ ^[0-9a-f]{40}$ ]] ||
+   [[ ! "${CLOSEOUT_VALIDATED_BASE_OID}" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "validated closeout head and base must be lowercase 40-character SHAs; stop closeout" >&2
+  return 1 2>/dev/null || exit 1
+fi
+if [ "${CLOSEOUT_MERGE_METHOD}" = "REBASE" ]; then
+  CLOSEOUT_SOURCE_RELEASE_SHA="${CLOSEOUT_SOURCE_RELEASE_SHA:?set the source release commit 40-character SHA}"
+  if [[ ! "${CLOSEOUT_SOURCE_RELEASE_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "source release SHA must be a lowercase 40-character SHA; stop closeout" >&2
     return 1 2>/dev/null || exit 1
   fi
-  test "${CLOSEOUT_RELEASE_VERSION}" = "${RELEASE_VERSION}" || {
-    echo "closeout release version must equal held release-line lease version ${RELEASE_VERSION}; stop closeout" >&2
-    return 1 2>/dev/null || exit 1
-  }
+else
+  CLOSEOUT_SOURCE_CHANGELOG_OID="${CLOSEOUT_SOURCE_CHANGELOG_OID:?set the source CHANGELOG.md 40-character commit OID}"
   if [[ ! "${CLOSEOUT_SOURCE_CHANGELOG_OID}" =~ ^[0-9a-f]{40}$ ]]; then
     echo "source CHANGELOG.md OID must be a lowercase 40-character SHA; stop closeout" >&2
     return 1 2>/dev/null || exit 1
   fi
 fi
-closeout_pr_json="$(gh pr view "${CLOSEOUT_PR}" --json id,number,baseRefName,baseRefOid,headRefOid)" || {
+closeout_main_ref="refs/remotes/origin/main"
+closeout_release_ref="refs/remotes/origin/release/${RELEASE_VERSION}"
+git fetch --prune origin \
+  "+refs/heads/main:${closeout_main_ref}" \
+  "+refs/heads/release/${RELEASE_VERSION}:${closeout_release_ref}" || {
+  echo "could not refresh origin/main and the canonical release ref; stop closeout" >&2
+  return 1 2>/dev/null || exit 1
+}
+if [ "${CLOSEOUT_MERGE_METHOD}" = "REBASE" ]; then
+  git cat-file -e "${CLOSEOUT_SOURCE_RELEASE_SHA}^{commit}" &&
+    git merge-base --is-ancestor "${CLOSEOUT_SOURCE_RELEASE_SHA}" "${closeout_release_ref}" || {
+    echo "source release commit is not on the fetched canonical release ref; stop closeout" >&2
+    return 1 2>/dev/null || exit 1
+  }
+  closeout_forward_port_plan="$(
+    script/release-forward-port \
+      --source "origin/release/${RELEASE_VERSION}" \
+      --target origin/main \
+      --dry-run
+  )" || {
+    echo "could not derive the current release-forward-port plan; stop closeout" >&2
+    return 1 2>/dev/null || exit 1
+  }
+  ruby -e '
+    source_sha, plan = ARGV
+    expected_prefix = source_sha[0, 12]
+    picks = plan.lines(chomp: true).grep(/\APICK #{expected_prefix} /)
+    abort unless picks.one?
+  ' "${CLOSEOUT_SOURCE_RELEASE_SHA}" "${closeout_forward_port_plan}" || {
+    echo "source release commit is not exactly one PICK in the current forward-port plan; stop closeout" >&2
+    return 1 2>/dev/null || exit 1
+  }
+else
+  latest_release_changelog_oid="$(
+    git log -1 --format=%H "${closeout_release_ref}" -- CHANGELOG.md
+  )" || {
+    echo "could not find the latest CHANGELOG.md commit on the canonical release ref; stop closeout" >&2
+    return 1 2>/dev/null || exit 1
+  }
+  test "${latest_release_changelog_oid}" = "${CLOSEOUT_SOURCE_CHANGELOG_OID}" || {
+    echo "source CHANGELOG.md OID is not the latest commit on the fetched canonical release ref; stop closeout" >&2
+    return 1 2>/dev/null || exit 1
+  }
+fi
+closeout_pr_json="$(gh pr view "${CLOSEOUT_PR}" --json id,number,baseRefName,baseRefOid,headRefOid,commits)" || {
   echo "could not resolve the closeout PR identity; stop closeout" >&2
   return 1 2>/dev/null || exit 1
 }
@@ -893,6 +966,20 @@ test "${CLOSEOUT_HEAD_OID}" = "${CLOSEOUT_VALIDATED_HEAD_OID}" || {
   echo "closeout PR head differs from the validated head; stop closeout" >&2
   return 1 2>/dev/null || exit 1
 }
+if [ "${CLOSEOUT_MERGE_METHOD}" = "REBASE" ]; then
+  expected_source_footer="(cherry picked from commit ${CLOSEOUT_SOURCE_RELEASE_SHA})"
+  jq -e \
+    --arg head "${CLOSEOUT_VALIDATED_HEAD_OID}" \
+    --arg footer "${expected_source_footer}" \
+    '(.commits | type == "array" and length == 1) and
+     (.commits[0].oid == $head) and
+     ([.commits[0].messageBody | split("\n")[] |
+       select(startswith("(cherry picked from commit ") and endswith(")"))] == [$footer])' \
+    >/dev/null <<<"${closeout_pr_json}" || {
+    echo "rebase closeout PR must contain exactly the validated head with one direct source footer; stop closeout" >&2
+    return 1 2>/dev/null || exit 1
+  }
+fi
 CLOSEOUT_BASE_OID="$(
   jq -er '.baseRefOid | select(type == "string" and test("^[0-9a-f]{40}$"))' \
     <<<"${closeout_pr_json}"
@@ -908,11 +995,7 @@ test "${CLOSEOUT_BASE_OID}" = "${CLOSEOUT_VALIDATED_BASE_OID}" || {
   echo "closeout PR base differs from the validated base; stop closeout" >&2
   return 1 2>/dev/null || exit 1
 }
-git fetch --prune origin +refs/heads/main:refs/remotes/origin/main || {
-  echo "could not refresh origin/main; stop closeout" >&2
-  return 1 2>/dev/null || exit 1
-}
-test "$(git rev-parse origin/main)" = "${CLOSEOUT_VALIDATED_BASE_OID}" || {
+test "$(git rev-parse "${closeout_main_ref}^{commit}")" = "${CLOSEOUT_VALIDATED_BASE_OID}" || {
   echo "origin/main differs from the validated base; stop closeout" >&2
   return 1 2>/dev/null || exit 1
 }
@@ -1104,11 +1187,20 @@ By default it resolves the highest `v17.0.0.rc.N` tag as the accepted RC; pass `
 to pin a specific one. The manual equivalent the script runs is below.
 
 ```bash
+ACCEPTED_RC_TAG="${ACCEPTED_RC_TAG:?set the exact accepted vX.Y.Z.rc.N tag}"
+accepted_rc_prefix="v${RELEASE_VERSION}.rc."
+accepted_rc_index="${ACCEPTED_RC_TAG#"${accepted_rc_prefix}"}"
+if [[ "${ACCEPTED_RC_TAG}" != "${accepted_rc_prefix}"* ]] ||
+   [[ ! "${accepted_rc_index}" =~ ^(0|[1-9][0-9]*)$ ]]; then
+  echo "accepted RC tag must belong to v${RELEASE_VERSION}.rc.N; stop promotion" >&2
+  return 1 2>/dev/null || exit 1
+fi
+readonly ACCEPTED_RC_TAG
 git fetch origin
-git checkout release/17.0.0
+git checkout "release/${RELEASE_VERSION}"
 # The branch tip MUST be the last good RC commit (e.g. the v17.0.0.rc.3 commit).
 git rev-parse HEAD            # confirm it equals the tag of the good RC
-git diff --stat v17.0.0.rc.3  # expect: empty (no drift since the good RC)
+git diff --stat "${ACCEPTED_RC_TAG}"  # expect: empty (no drift since the good RC)
 ```
 
 Collapse the RC CHANGELOG sections into the final section, then stop at the fenced-publication gap.
@@ -1142,7 +1234,7 @@ commits that landed on `main` after the cut are **not** in the final.
 ```bash
 # Expect only version/changelog metadata — version.rb, the Pro version file, package.json files,
 # lockfiles, and CHANGELOG.md — and no runtime source (.rb/.ts/.tsx/.js under lib or src) changes:
-git diff --name-only v17.0.0.rc.3 v17.0.0
+git diff --name-only "${ACCEPTED_RC_TAG}" "v${RELEASE_VERSION}"
 ```
 
 `final` is the strictest phase: no new features, only cherry-picked fully-verified fixes if an RC must
@@ -1204,26 +1296,44 @@ The manual equivalent the script wraps is below.
 ```bash
 # After v17.0.0 is published and the GitHub release exists:
 # 1. Forward-port any remaining release-branch commits through the separate PRs in step 3.
+MANUAL_CLOSEOUT_ACK_SHA="${MANUAL_CLOSEOUT_ACK_SHA:-}"
+MANUAL_CLOSEOUT_CHANGELOG_SOURCE_SHA="${MANUAL_CLOSEOUT_CHANGELOG_SOURCE_SHA:-}"
+manual_ack_args=()
+changelog_source_ack_args=()
+if [ -n "${MANUAL_CLOSEOUT_ACK_SHA}" ]; then
+  [[ "${MANUAL_CLOSEOUT_ACK_SHA}" =~ ^[0-9a-f]{40}$ ]] || {
+    echo "manual closeout acknowledgement must be a lowercase 40-character SHA; stop closeout" >&2
+    return 1 2>/dev/null || exit 1
+  }
+  manual_ack_args=(--ack-manual "${MANUAL_CLOSEOUT_ACK_SHA}")
+fi
+if [ -n "${MANUAL_CLOSEOUT_CHANGELOG_SOURCE_SHA}" ]; then
+  [[ "${MANUAL_CLOSEOUT_CHANGELOG_SOURCE_SHA}" =~ ^[0-9a-f]{40}$ ]] || {
+    echo "changelog source acknowledgement must be a lowercase 40-character SHA; stop closeout" >&2
+    return 1 2>/dev/null || exit 1
+  }
+  changelog_source_ack_args=(--ack-final-changelog-source "${MANUAL_CLOSEOUT_CHANGELOG_SOURCE_SHA}")
+fi
 git fetch origin
 git checkout main
 git pull --rebase
 checked_main_sha="$(git rev-parse origin/main)"
-checked_source_sha="$(git rev-parse origin/release/17.0.0)"
+checked_source_sha="$(git rev-parse "origin/release/${RELEASE_VERSION}")"
 
 # The read-only completion checks must pass after every source PR and the separate
 # changelog/release squash PR have merged. Acknowledge only inspected MANUAL items.
-script/release-forward-port --source origin/release/17.0.0 --target main --check \
-  --ack-manual <inspected-sha>
-script/release-forward-port --source origin/release/17.0.0 --target main --changelog --check \
-  --ack-final-changelog-source <current-source-changelog-sha>
+script/release-forward-port --source "origin/release/${RELEASE_VERSION}" --target main --check \
+  ${manual_ack_args[@]+"${manual_ack_args[@]}"}
+script/release-forward-port --source "origin/release/${RELEASE_VERSION}" --target main --changelog --check \
+  ${changelog_source_ack_args[@]+"${changelog_source_ack_args[@]}"}
 
 # 2. Prefer release-finish for deletion. If reproducing it manually, fetch and compare both refs,
 # then preserve the source tip on a temporary remote branch throughout the destructive window:
 git fetch origin
 test "$(git rev-parse origin/main)" = "${checked_main_sha}"
-test "$(git rev-parse origin/release/17.0.0)" = "${checked_source_sha}"
-release_ref="refs/heads/release/17.0.0"
-recovery_ref="refs/heads/release-finish-recovery/17.0.0-${checked_source_sha:0:12}"
+test "$(git rev-parse "origin/release/${RELEASE_VERSION}")" = "${checked_source_sha}"
+release_ref="refs/heads/release/${RELEASE_VERSION}"
+recovery_ref="refs/heads/release-finish-recovery/${RELEASE_VERSION}-${checked_source_sha:0:12}"
 require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
 git push --atomic \
   --force-with-lease="${release_ref}:${checked_source_sha}" \
@@ -1239,7 +1349,7 @@ git fetch origin || {
   echo "post-deletion fetch failed; retain recovery and rerun all completion checks" >&2
   return 1 2>/dev/null || exit 1
 }
-if git ls-remote --exit-code --heads -- origin release/17.0.0 >/dev/null 2>&1; then
+if git ls-remote --exit-code --heads -- origin "release/${RELEASE_VERSION}" >/dev/null 2>&1; then
   echo "release branch reappeared; retain recovery and rerun all completion checks" >&2
   exit 1
 fi
