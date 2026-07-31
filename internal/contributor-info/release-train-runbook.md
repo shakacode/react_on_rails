@@ -143,11 +143,12 @@ gates and is not an alternative.
 
 Use one non-reusable identity for the lifetime of the coordinator process and
 its supervised child processes. Generate a fresh UUID-backed agent id on every
-restart or handoff; never copy an old process's id into its replacement. This
-makes a resumed stale process a different claim holder that is refused after the
-replacement takes over. Carry the same instance id in the claim and heartbeat
-as defense in depth. The bounded status and claim operations fail closed on
-timeout, `UNKNOWN`, or `CLAIM_REFUSED`:
+restart or handoff; never copy an old process's id into its replacement. Carry
+the same instance id in the claim and heartbeat as defense in depth. These
+identities make stale ownership visible, but they do not fence a GitHub or Git
+write: neither remote accepts the coordination claim generation as part of its
+mutation. The bounded status and claim operations fail closed on timeout,
+`UNKNOWN`, or `CLAIM_REFUSED`:
 
 ```bash
 RELEASE_VERSION=17.0.0
@@ -237,33 +238,44 @@ assertion passes again.
 
 Treat a helper that performs several outward operations, such as
 `script/release-finish` or `bundle exec rake release`, as one compound writer.
-Those helpers do not embed the coordination client and cannot fence an outward
-operation against a lease refresh failure. A separate supervisor is
-insufficient: it can be killed while its helper remains alive, after which a
-replacement could take the lease and race the orphan. Until a repository-owned
-wrapper both binds the whole helper process group to the supervisor's lifetime
-and checks the live lease immediately before each outward operation, use these
-helpers only in dry-run mode. For a live release, stop and use the runbook's
-individual commands, with `require_live_release_line_lease` immediately before
-each outward write. If an individual command cannot expose that boundary, stop
-rather than run it as an unfenced compound writer. The coordinator must not
-release or transfer the claim while any release subprocess remains alive.
+Those helpers do not embed the coordination client and cannot check ownership
+at each outward-operation boundary. A separate supervisor is insufficient: it
+can be killed while its helper remains alive, after which a replacement could
+take the lease and race the orphan. Until a repository-owned wrapper binds the
+whole helper process group to the supervisor's lifetime and checks ownership at
+each outward operation, use these helpers only in dry-run mode. For a live
+release, stop and use the runbook's individual commands, with
+`require_live_release_line_lease` immediately before each outward write. If an
+individual command cannot expose that boundary, stop rather than run it as an
+uncontrolled compound writer.
 
 Immediately before each write or merge, rerun `require_live_release_line_lease`
-in the shell where the functions above are defined. It must prove that the
-canonical claim is active, unexpired, and owned by the process-unique
-`RELEASE_COORDINATOR_ID`, and that both the claim and its matching live heartbeat
-carry `RELEASE_COORDINATOR_INSTANCE_ID` and bind to the canonical target. Agent
-identity alone is insufficient because released and expired records retain their
-last holder. In a batch, chain each later release-targeted lane with `depends_on`
-and do not launch it until the preceding merge is terminal. A merge queue that
-reruns only the repository's current merge-group CI is not an alternative. If
-the lease guard is unavailable, or its state is `UNKNOWN`, stop rather than let
-two release writers race from the same release tip.
+in the shell where the functions above are defined. It is a fail-closed
+**preflight read**: it proves that the canonical claim is active, unexpired, and
+owned by the process-unique `RELEASE_COORDINATOR_ID` at the instant of the read,
+with a matching live heartbeat and instance id. It does not atomically bind
+that ownership to the subsequent GitHub mutation or Git remote transaction.
+GitHub's `expectedHeadOid` and Git's `--force-with-lease`/compare-and-swap bind
+resource identity and reduce stale-write risk, but neither carries the
+coordination generation. Individual commands therefore remain a best-effort
+single-controller protocol with a narrow preflight-to-write race.
+
+Operational exclusivity is mandatory: do not release, transfer, or take over the
+claim until the prior coordinator process group and every child are positively
+known terminated. Claim expiry, heartbeat staleness, or backend permission to
+take over is not proof of termination and is insufficient by itself. If that
+positive termination evidence or another durable ownership guarantee cannot be
+established, stop pending resource-bound fencing instead of taking over. In a
+batch, chain each later release-targeted lane with `depends_on` and do not launch
+it until the preceding merge is terminal. A merge queue that reruns only the
+repository's current merge-group CI is not an alternative. If the preflight is
+unavailable or `UNKNOWN`, stop rather than let two release writers race from the
+same release tip.
 
 Keep the lease across the whole release train when practical. Release it only
 after branch deletion and release-line closeout are complete, or after a
-cancellation/handoff is durably recorded:
+cancellation/handoff is durably recorded **and** the coordinator process group
+and every child are positively known terminated:
 
 ```bash
 agent-coord release \
@@ -274,10 +286,13 @@ agent-coord release \
 ```
 
 On handoff, the replacement must generate a fresh process identity and acquire
-this same canonical target after the old release is visible; it must not reuse
-the old id, invent another target, or bypass a refusal. If the old process
-crashed, wait until the backend permits takeover. Once the fresh holder is
-active, any resumed old process is refused because its agent id differs.
+this same canonical target after the old release and positive process-group
+termination evidence are visible; it must not reuse the old id, invent another
+target, or bypass a refusal. If the old process crashed but its termination and
+children cannot be established, remain stopped even after TTL expiry or backend
+takeover becomes available. A fresh identity helps reject later preflights from
+a resumed old process; it cannot revoke a write already between preflight and
+mutation.
 
 #### Partial-publication recovery
 
@@ -629,17 +644,21 @@ the release coordinator's shell after its exact-head gates pass. Set
 `CLOSEOUT_MERGE_METHOD=REBASE` for a source-change PR and `SQUASH` for the
 dedicated changelog PR. Do not use auto-merge or a merge queue here: neither
 rechecks the release-line lease immediately before the write, and a queued
-merge can land a different head. This mutation binds the merge to the reviewed
-head and fails unless GitHub reports the PR merged in the same response:
+merge can land a different head. Record both the head OID and base OID covered
+by validation and review. The mutation binds the head with `expectedHeadOid`;
+the base comparisons below are fail-closed preflight checks because GitHub's
+merge mutation has no expected-base argument:
 
 ```bash
 CLOSEOUT_PR="${CLOSEOUT_PR:?set the closeout PR number or URL}"
 CLOSEOUT_MERGE_METHOD="${CLOSEOUT_MERGE_METHOD:?set REBASE or SQUASH}"
+CLOSEOUT_VALIDATED_HEAD_OID="${CLOSEOUT_VALIDATED_HEAD_OID:?set the validated 40-character head OID}"
+CLOSEOUT_VALIDATED_BASE_OID="${CLOSEOUT_VALIDATED_BASE_OID:?set the validated 40-character base OID}"
 case "${CLOSEOUT_MERGE_METHOD}" in
   REBASE|SQUASH) ;;
   *) echo "unsupported closeout merge method" >&2; return 1 2>/dev/null || exit 1 ;;
 esac
-closeout_pr_json="$(gh pr view "${CLOSEOUT_PR}" --json id,headRefOid)" || {
+closeout_pr_json="$(gh pr view "${CLOSEOUT_PR}" --json id,baseRefName,baseRefOid,headRefOid)" || {
   echo "could not resolve the closeout PR identity; stop closeout" >&2
   return 1 2>/dev/null || exit 1
 }
@@ -654,6 +673,33 @@ CLOSEOUT_HEAD_OID="$(
     <<<"${closeout_pr_json}"
 )" || {
   echo "closeout PR head OID is missing or invalid; stop closeout" >&2
+  return 1 2>/dev/null || exit 1
+}
+test "${CLOSEOUT_HEAD_OID}" = "${CLOSEOUT_VALIDATED_HEAD_OID}" || {
+  echo "closeout PR head differs from the validated head; stop closeout" >&2
+  return 1 2>/dev/null || exit 1
+}
+CLOSEOUT_BASE_OID="$(
+  jq -er '.baseRefOid | select(type == "string" and test("^[0-9a-f]{40}$"))' \
+    <<<"${closeout_pr_json}"
+)" || {
+  echo "closeout PR base OID is missing or invalid; stop closeout" >&2
+  return 1 2>/dev/null || exit 1
+}
+jq -e '.baseRefName == "main"' >/dev/null <<<"${closeout_pr_json}" || {
+  echo "closeout PR no longer targets main; stop closeout" >&2
+  return 1 2>/dev/null || exit 1
+}
+test "${CLOSEOUT_BASE_OID}" = "${CLOSEOUT_VALIDATED_BASE_OID}" || {
+  echo "closeout PR base differs from the validated base; stop closeout" >&2
+  return 1 2>/dev/null || exit 1
+}
+git fetch --prune origin +refs/heads/main:refs/remotes/origin/main || {
+  echo "could not refresh origin/main; stop closeout" >&2
+  return 1 2>/dev/null || exit 1
+}
+test "$(git rev-parse origin/main)" = "${CLOSEOUT_VALIDATED_BASE_OID}" || {
+  echo "origin/main differs from the validated base; stop closeout" >&2
   return 1 2>/dev/null || exit 1
 }
 require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
@@ -685,6 +731,11 @@ jq -e '.data.mergePullRequest.pullRequest.merged == true' \
   return 1 2>/dev/null || exit 1
 }
 ```
+
+These base and ownership checks reduce stale-write risk but do not eliminate a
+change after the last preflight and before the mutation. Run them only under the
+single-controller/positive-termination rule above; if that operational
+ownership is not durable, stop pending resource-bound fencing.
 
 Fetch the new `origin/main` immediately after each successful merge before
 planning the next source-change PR or the final changelog PR.
@@ -986,141 +1037,121 @@ audited manual path instead:
    main_refspec="+refs/heads/main:refs/remotes/origin/main"
    release_refspec="+refs/heads/release/${RELEASE_VERSION}:refs/remotes/origin/release/${RELEASE_VERSION}"
    git fetch --prune origin "${main_refspec}" "${release_refspec}" || {
-   echo "could not refresh main and the release ref; stop selective closeout" >&2
-   return 1 2>/dev/null || exit 1
+     echo "could not refresh main and the release ref; stop selective closeout" >&2
+     return 1 2>/dev/null || exit 1
    }
    git switch main || { return 1 2>/dev/null || exit 1; }
-   worktree_state="$(git status --porcelain)" || {
-   echo "could not inspect the worktree; stop selective closeout" >&2
-   return 1 2>/dev/null || exit 1
-   }
-   test -z "${worktree_state}" || {
-   echo "main is dirty; stop selective closeout" >&2
-   return 1 2>/dev/null || exit 1
-   }
-   local_main="$(git rev-parse HEAD)" || {
-   echo "could not resolve local main; stop selective closeout" >&2
-   return 1 2>/dev/null || exit 1
+   test -z "$(git status --porcelain)" || {
+     echo "main is dirty; stop selective closeout" >&2
+     return 1 2>/dev/null || exit 1
    }
    AUDITED_MAIN_TIP="$(git rev-parse origin/main)" || {
-   echo "could not resolve origin/main; stop selective closeout" >&2
-   return 1 2>/dev/null || exit 1
+     echo "could not resolve origin/main; stop selective closeout" >&2
+     return 1 2>/dev/null || exit 1
    }
-   test "${local_main}" = "${AUDITED_MAIN_TIP}" || {
-   echo "local main differs from origin/main; stop selective closeout" >&2
-   return 1 2>/dev/null || exit 1
+   test "$(git rev-parse HEAD)" = "${AUDITED_MAIN_TIP}" || {
+     echo "local main differs from origin/main; stop selective closeout" >&2
+     return 1 2>/dev/null || exit 1
    }
    AUDITED_RELEASE_TIP="$(git rev-parse "origin/release/${RELEASE_VERSION}")" || {
-   echo "could not resolve the release tip; stop selective closeout" >&2
-   return 1 2>/dev/null || exit 1
+     echo "could not resolve the release tip; stop selective closeout" >&2
+     return 1 2>/dev/null || exit 1
    }
    script/release-forward-port \
-   --source "origin/release/${RELEASE_VERSION}" --target main --dry-run \
-   >"${PLAN_FILE}" 2>&1 || { return 1 2>/dev/null || exit 1; }
+     --source "origin/release/${RELEASE_VERSION}" --target main --dry-run \
+     >"${PLAN_FILE}" 2>&1 || { return 1 2>/dev/null || exit 1; }
    cat "${PLAN_FILE}" || { return 1 2>/dev/null || exit 1; }
    ```
 
-2. Create `OMITTED_PICKS_FILE` as the complete, non-empty omitted-pick manifest,
-   with one row per approved omission. For every row, record the omitted release
-   commit SHA, its direct main-origin SHA, the proof that the origin is reverted
-   or superseded, the replacement SHA or explicit `NONE`, and the exact
-   maintainer approval for that disposition. Reject duplicate release or origin
-   SHAs. Cross-check the manifest against the saved plan: every listed release
-   SHA must be a `PICK`, and every approved omitted `PICK` must appear exactly
-   once. Any malformed, incomplete, extra, or `UNKNOWN` row stops closeout.
-3. In dry-run order, manually `git cherry-pick -x <release-commit-sha>` every
-   `PICK` not listed in `OMITTED_PICKS_FILE`. Preserve the plan's `SKIP` entries
-   and resolve each `MANUAL` entry with the existing manual fallback. Do not
-   cherry-pick any release commit in the omitted-pick manifest.
-4. Push the resulting `main` branch or merge its PR. When a PR is required, use
-   a merge method that preserves every manually cherry-picked commit and its
-   direct `-x` footer; do not squash a multi-commit selective closeout. For the
-   single-pick case, a squash merge is supported only when its final body copies
-   that pick's exact direct footer. Guard the PR-branch or direct-main push and,
-   after the exact-head PR gates finish, guard the merge separately in the
-   merger's shell. Do not put validation, review, or another long-running action
-   between either guard and its outward operation. The merge command must merge
-   immediately; stop if branch protection would queue or defer it:
+2. Record the maintainer-approved omission dispositions against the exact
+   initial plan and `AUDITED_RELEASE_TIP`. This is a provisional selection, not
+   the final manifest. Each disposition must name the full release commit, its
+   direct main-origin commit, reverted/superseded proof, a replacement commit or
+   `NONE`, and the exact approval. Any `UNKNOWN` disposition stops closeout.
+3. Process every `PICK` not selected for omission **serially in its own
+   source-change PR**. For each one, refetch `origin/main`, require the release
+   tip still equals `AUDITED_RELEASE_TIP`, branch from that fresh main tip, and
+   run `script/release-forward-port --only <full-release-sha>` for exactly one
+   commit. Verify the resulting commit contains exactly one direct `-x` footer.
+   Validate, review, and push that branch; then use the synchronous merge block
+   in Step 3 with `CLOSEOUT_MERGE_METHOD=REBASE`, setting its validated head and
+   base OIDs from that PR's exact-head gates. Fetch the new `origin/main` and
+   prove that source is no longer a `PICK` before starting the next PR. Never
+   combine two non-omitted picks, and never begin final manifest or changelog
+   reconciliation while one is non-terminal:
 
    ```bash
-   require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
-   git push   # push main directly or push the exact selective-closeout PR branch
-   # If a PR is required, complete its exact-head gates, then:
-   SELECTIVE_CLOSEOUT_PR="${SELECTIVE_CLOSEOUT_PR:?set the selective-closeout PR number or URL}"
-   selective_closeout_pr_json="$(gh pr view "${SELECTIVE_CLOSEOUT_PR}" --json id,headRefOid)" || {
-     echo "could not resolve the selective-closeout PR identity; stop closeout" >&2
+   FORWARD_PORT_SHA="${FORWARD_PORT_SHA:?set one non-omitted full release commit SHA}"
+   FORWARD_PORT_BRANCH="${FORWARD_PORT_BRANCH:?set one unique source-change branch}"
+   git fetch --prune origin "${main_refspec}" "${release_refspec}" || {
+     echo "could not refresh refs; stop selective closeout" >&2
      return 1 2>/dev/null || exit 1
    }
-   SELECTIVE_CLOSEOUT_PR_ID="$(
-     jq -er '.id | select(type == "string" and length > 0)' <<<"${selective_closeout_pr_json}"
-   )" || {
-     echo "selective-closeout PR node id is missing or invalid; stop closeout" >&2
+   test "$(git rev-parse "origin/release/${RELEASE_VERSION}")" = "${AUDITED_RELEASE_TIP}" || {
+     echo "release tip changed; restart the selective audit" >&2
      return 1 2>/dev/null || exit 1
    }
-   SELECTIVE_CLOSEOUT_HEAD_OID="$(
-     jq -er '.headRefOid | select(type == "string" and test("^[0-9a-f]{40}$"))' \
-       <<<"${selective_closeout_pr_json}"
-   )" || {
-     echo "selective-closeout PR head OID is missing or invalid; stop closeout" >&2
+   FORWARD_PORT_BASE_OID="$(git rev-parse origin/main)" || {
+     echo "could not resolve the forward-port base; stop selective closeout" >&2
      return 1 2>/dev/null || exit 1
    }
-   require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
-   selective_closeout_merge_result="$(
-     gh api graphql \
-       -f query='mutation($pullRequestId: ID!, $expectedHeadOid: GitObjectID!) {
-         mergePullRequest(input: {
-           pullRequestId: $pullRequestId
-           expectedHeadOid: $expectedHeadOid
-           mergeMethod: REBASE
-         }) {
-           pullRequest { merged }
-         }
-       }' \
-       -f pullRequestId="${SELECTIVE_CLOSEOUT_PR_ID}" \
-       -f expectedHeadOid="${SELECTIVE_CLOSEOUT_HEAD_OID}"
-   )" || {
-     echo "synchronous selective-closeout PR merge failed; stop closeout" >&2
+   git switch -c "${FORWARD_PORT_BRANCH}" "${FORWARD_PORT_BASE_OID}" || {
      return 1 2>/dev/null || exit 1
    }
-   jq -e '.data.mergePullRequest.pullRequest.merged == true' \
-     >/dev/null <<<"${selective_closeout_merge_result}" || {
-     echo "selective-closeout PR was not merged synchronously; stop closeout" >&2
+   script/release-forward-port \
+     --source "origin/release/${RELEASE_VERSION}" \
+     --target "${FORWARD_PORT_BRANCH}" \
+     --only "${FORWARD_PORT_SHA}" \
+     --dry-run || { return 1 2>/dev/null || exit 1; }
+   script/release-forward-port \
+     --source "origin/release/${RELEASE_VERSION}" \
+     --target "${FORWARD_PORT_BRANCH}" \
+     --only "${FORWARD_PORT_SHA}" || { return 1 2>/dev/null || exit 1; }
+   test "$(git log -1 --format=%B | grep -Fxc "(cherry picked from commit ${FORWARD_PORT_SHA})")" -eq 1 || {
+     echo "forward-port commit lacks exactly one direct -x footer; stop" >&2
      return 1 2>/dev/null || exit 1
+   }
+   # Validate, review, push, and synchronously merge this one-source PR using
+   # CLOSEOUT_VALIDATED_BASE_OID=${FORWARD_PORT_BASE_OID}; then fetch/replan.
+   ```
+
+4. Only after every non-omitted `PICK` is terminal, refetch and rerun the full
+   plan. Resolve every `MANUAL` row with the existing manual fallback, explain
+   every `SKIP`, and run the separate changelog reconciliation PR from fresh
+   `origin/main` if needed. Then create `OMITTED_PICKS_FILE` as strict JSON with
+   exactly these top-level keys and exactly these keys per row:
+
+   ```json
+   {
+     "version": 1,
+     "omitted_picks": [
+       {
+         "release_sha": "<40 lowercase hex characters>",
+         "origin_sha": "<40 lowercase hex characters>",
+         "replacement_sha": "<40 lowercase hex characters or NONE>",
+         "proof": "<nonempty reverted-or-superseded evidence>",
+         "approval": "<nonempty exact maintainer approval>"
+       }
+     ]
    }
    ```
 
-   Refetch `origin/main` and the exact release ref with the explicit tracking
-   refspecs above. Require the release ref to
-   still equal `AUDITED_RELEASE_TIP`; if it advanced, restart the entire audit
-   against the new tip. Then verify every non-omitted `PICK` is live with
-   auditable `-x` provenance, every `SKIP`/`MANUAL` entry has its recorded
-   disposition, every manifest replacement other than `NONE` is live, and every
-   omitted origin remains reverted or superseded. Any missing, changed, or
-   `UNKNOWN` evidence stops closeout. After that audit passes, reset
-   `AUDITED_MAIN_TIP` to the exact audited `origin/main` SHA and preserve it with
-   `AUDITED_RELEASE_TIP`:
+   The manifest must be nonempty. Refetch `origin/main` after the final
+   reconciliation, repeat the live replacement and omitted-origin audit, and
+   record that exact tip in `AUDITED_MAIN_TIP`. Missing, changed, duplicate, or
+   `UNKNOWN` evidence stops closeout.
 
-   ```bash
-   AUDITED_MAIN_TIP="$(git rev-parse origin/main)" || {
-     echo "could not record the audited main tip; stop selective closeout" >&2
-     return 1 2>/dev/null || exit 1
-   }
-   ```
-
-5. Immediately before final reconciliation and deletion, refetch the exact main
-   and release refs and require them to equal `AUDITED_MAIN_TIP` and
-   `AUDITED_RELEASE_TIP`. Re-run the dry-run against that audited
-   `origin/main`, not a possibly stale local `main`. Reconcile every row to the
-   recorded evidence and the complete omitted-pick manifest. The final plan may
-   contain only `PICK` entries listed exactly once in `OMITTED_PICKS_FILE`,
-   already-dispositioned `MANUAL` entries, and expected `SKIP` rows such as RC
-   version bumps or commits already proven live on `origin/main`; no other
-   `PICK`, unresolved `MANUAL`, or unexplained `SKIP` may remain. Only then, with
-   the repository's required destructive-operation confirmation, atomically
-   publish an annotated closeout tag and delete the release branch. The tag
-   binds the deletion to the exact audited main and release OIDs plus the final
-   plan and omitted-pick manifest digests, establishing a durable cutoff without
-   freezing later `main` development:
+5. Immediately before tag publication and deletion, refetch the exact main and
+   release refs and require them to equal `AUDITED_MAIN_TIP` and
+   `AUDITED_RELEASE_TIP`. Re-run the dry-run against audited `origin/main`.
+   Machine-validate that the manifest release commits are **exactly** the final
+   plan's remaining `PICK` set, that each row's origin matches the release
+   commit's sole direct `-x` footer, and that every replacement SHA is live on
+   audited main. No other `PICK`, unresolved `MANUAL`, or unexplained `SKIP` may
+   remain. Compute the plan and manifest digests only after this validator
+   passes. Then, with the required destructive-operation confirmation, publish
+   the annotated evidence tag and delete the release branch in one Git ref
+   transaction:
 
    ```bash
    main_refspec="+refs/heads/main:refs/remotes/origin/main"
@@ -1150,6 +1181,84 @@ audited manual path instead:
      --source "origin/release/${RELEASE_VERSION}" --target origin/main --dry-run \
      >"${FINAL_PLAN_FILE}" 2>&1 || { return 1 2>/dev/null || exit 1; }
    cat "${FINAL_PLAN_FILE}" || { return 1 2>/dev/null || exit 1; }
+   ruby -rjson -ropen3 -e '
+     fail_validation = lambda do |message|
+       warn "manifest validation failed: #{message}"
+       exit 1
+     end
+     capture_command = lambda do |*command|
+       output, status = Open3.capture2e(*command)
+       fail_validation.call("#{command.join(" ")} failed: #{output.strip}") unless status.success?
+       output.strip
+     end
+     plan_path, manifest_path, release_tip, main_tip = ARGV
+     full_sha = /\A[0-9a-f]{40}\z/
+     expected_row_keys = %w[approval origin_sha proof release_sha replacement_sha]
+     manifest = JSON.parse(File.read(manifest_path, encoding: "UTF-8"))
+     fail_validation.call("top-level object or keys are invalid") unless
+       manifest.is_a?(Hash) && manifest.keys.sort == %w[omitted_picks version]
+     fail_validation.call("version must equal 1") unless manifest["version"] == 1
+     rows = manifest["omitted_picks"]
+     fail_validation.call("omitted_picks must be a nonempty array") unless rows.is_a?(Array) && !rows.empty?
+     rows.each_with_index do |row, index|
+       fail_validation.call("row #{index} shape is invalid") unless
+         row.is_a?(Hash) && row.keys.sort == expected_row_keys
+       %w[proof approval].each do |field|
+         value = row[field]
+         fail_validation.call("row #{index} #{field} is empty or UNKNOWN") unless
+           value.is_a?(String) && !value.strip.empty? && !value.match?(/\bUNKNOWN\b/i)
+       end
+       %w[release_sha origin_sha].each do |field|
+         value = row[field]
+         fail_validation.call("row #{index} #{field} is not a full lowercase SHA") unless
+           value.is_a?(String) && value.match?(full_sha)
+       end
+       replacement = row["replacement_sha"]
+       fail_validation.call("row #{index} replacement_sha must be a full SHA or NONE") unless
+         replacement == "NONE" || (replacement.is_a?(String) && replacement.match?(full_sha))
+     end
+     release_shas = rows.map { |row| row.fetch("release_sha") }
+     origin_shas = rows.map { |row| row.fetch("origin_sha") }
+     fail_validation.call("release_sha values are duplicated") unless release_shas.uniq.length == release_shas.length
+     fail_validation.call("origin_sha values are duplicated") unless origin_shas.uniq.length == origin_shas.length
+     pick_prefixes = File.foreach(plan_path).filter_map do |line|
+       match = /\APICK ([0-9a-f]{12})\b/.match(line)
+       match && match[1]
+     end
+     fail_validation.call("final plan has no remaining PICK set") if pick_prefixes.empty?
+     fail_validation.call("final plan PICK prefixes are duplicated") unless pick_prefixes.uniq.length == pick_prefixes.length
+     planned_release_shas = pick_prefixes.map do |prefix|
+       sha = capture_command.call("git", "rev-parse", "--verify", "#{prefix}^{commit}")
+       fail_validation.call("plan PICK #{prefix} is outside audited release") unless
+         system("git", "merge-base", "--is-ancestor", sha, release_tip,
+                out: File::NULL, err: File::NULL)
+       sha
+     end
+     fail_validation.call("manifest is not exactly the final PICK set") unless
+       release_shas.sort == planned_release_shas.sort
+     rows.each_with_index do |row, index|
+       body = capture_command.call("git", "show", "-s", "--format=%B", row.fetch("release_sha"))
+       origins = body.lines.filter_map do |line|
+         match = /\A\(cherry picked from commit ([0-9a-f]{40})\)\s*\z/.match(line)
+         match && match[1]
+       end
+       fail_validation.call("row #{index} origin does not match one direct -x footer") unless
+         origins == [row.fetch("origin_sha")]
+       fail_validation.call("row #{index} origin object is unavailable") unless
+         system("git", "cat-file", "-e", "#{row.fetch("origin_sha")}^{commit}",
+                out: File::NULL, err: File::NULL)
+       replacement = row.fetch("replacement_sha")
+       next if replacement == "NONE"
+
+       fail_validation.call("row #{index} replacement is not live on audited main") unless
+         system("git", "merge-base", "--is-ancestor", replacement, main_tip,
+                out: File::NULL, err: File::NULL)
+     end
+   ' "${FINAL_PLAN_FILE}" "${OMITTED_PICKS_FILE}" \
+     "${AUDITED_RELEASE_TIP}" "${AUDITED_MAIN_TIP}" || {
+     echo "final omitted-pick manifest validation failed; stop selective closeout" >&2
+     return 1 2>/dev/null || exit 1
+   }
    FINAL_PLAN_SHA256="$(
      ruby -rdigest -e 'puts Digest::SHA256.file(ARGV.fetch(0)).hexdigest' "${FINAL_PLAN_FILE}"
    )" || {
@@ -1196,14 +1305,16 @@ audited manual path instead:
      ":refs/heads/release/${RELEASE_VERSION}"
    ```
 
-   If the atomic push rejects either lease, no remote ref changes: preserve the
-   branch, inspect or remove the unpushed local closeout tag, and restart the
-   audit. The annotated tag makes the exact audited `main` cutoff and release tip
-   and binds the complete omitted-pick manifest in the same remote ref
-   transaction that deletes the branch. Commits merged to `main` after that
-   cutoff belong to later development and do not silently rewrite this closeout
-   evidence. After guarded deletion, clear the release-line phase. The release
-   and closeout tags remain the durable record.
+   If the atomic push rejects either Git ref lease, no remote ref changes:
+   preserve the branch, inspect or remove the unpushed local closeout tag, and
+   restart the audit. The tag records the audited `main` cutoff, release tip, and
+   validated evidence digests in the same Git ref transaction that deletes the
+   branch. The Git CAS protects those resource identities; it does not bind the
+   coordination claim generation and retains the narrow preflight-to-push race.
+   Apply the positive-termination single-controller rule above or remain stopped
+   pending resource-bound fencing. Commits merged to `main` after the recorded
+   cutoff belong to later development. After guarded deletion, clear the
+   release-line phase; the release and closeout tags remain the durable record.
 
 This path is the complete alternative to the helper's apply and branch-delete
 steps; do not mix a partial helper run with an unrecorded selective omission.
