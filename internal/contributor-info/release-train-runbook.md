@@ -821,7 +821,19 @@ case "${CLOSEOUT_MERGE_METHOD}" in
   REBASE|SQUASH) ;;
   *) echo "unsupported closeout merge method" >&2; return 1 2>/dev/null || exit 1 ;;
 esac
-closeout_pr_json="$(gh pr view "${CLOSEOUT_PR}" --json id,baseRefName,baseRefOid,headRefOid)" || {
+if [ "${CLOSEOUT_MERGE_METHOD}" = "SQUASH" ]; then
+  CLOSEOUT_RELEASE_VERSION="${CLOSEOUT_RELEASE_VERSION:?set the X.Y.Z release version}"
+  CLOSEOUT_SOURCE_CHANGELOG_OID="${CLOSEOUT_SOURCE_CHANGELOG_OID:?set the source CHANGELOG.md 40-character commit OID}"
+  if [[ ! "${CLOSEOUT_RELEASE_VERSION}" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+    echo "closeout release version must be X.Y.Z; stop closeout" >&2
+    return 1 2>/dev/null || exit 1
+  fi
+  if [[ ! "${CLOSEOUT_SOURCE_CHANGELOG_OID}" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "source CHANGELOG.md OID must be a lowercase 40-character SHA; stop closeout" >&2
+    return 1 2>/dev/null || exit 1
+  fi
+fi
+closeout_pr_json="$(gh pr view "${CLOSEOUT_PR}" --json id,number,baseRefName,baseRefOid,headRefOid)" || {
   echo "could not resolve the closeout PR identity; stop closeout" >&2
   return 1 2>/dev/null || exit 1
 }
@@ -831,6 +843,17 @@ CLOSEOUT_PR_ID="$(
   echo "closeout PR node id is missing or invalid; stop closeout" >&2
   return 1 2>/dev/null || exit 1
 }
+if [ "${CLOSEOUT_MERGE_METHOD}" = "SQUASH" ]; then
+  CLOSEOUT_PR_NUMBER="$(
+    jq -er '.number | select(type == "number" and . > 0 and floor == .) | tostring' \
+      <<<"${closeout_pr_json}"
+  )" || {
+    echo "closeout PR number is missing or invalid; stop closeout" >&2
+    return 1 2>/dev/null || exit 1
+  }
+  CLOSEOUT_COMMIT_HEADLINE="Record the final React on Rails ${CLOSEOUT_RELEASE_VERSION} changelog (#${CLOSEOUT_PR_NUMBER})"
+  CLOSEOUT_COMMIT_BODY="The final changelog records source CHANGELOG.md commit \`${CLOSEOUT_SOURCE_CHANGELOG_OID}\`."
+fi
 CLOSEOUT_HEAD_OID="$(
   jq -er '.headRefOid | select(type == "string" and test("^[0-9a-f]{40}$"))' \
     <<<"${closeout_pr_json}"
@@ -866,28 +889,59 @@ test "$(git rev-parse origin/main)" = "${CLOSEOUT_VALIDATED_BASE_OID}" || {
   return 1 2>/dev/null || exit 1
 }
 require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
-closeout_merge_result="$(
-  gh api graphql \
-    -f query='mutation(
-      $pullRequestId: ID!,
-      $expectedHeadOid: GitObjectID!,
-      $mergeMethod: PullRequestMergeMethod!
-    ) {
-      mergePullRequest(input: {
-        pullRequestId: $pullRequestId
-        expectedHeadOid: $expectedHeadOid
-        mergeMethod: $mergeMethod
-      }) {
-        pullRequest { merged }
-      }
-    }' \
-    -f pullRequestId="${CLOSEOUT_PR_ID}" \
-    -f expectedHeadOid="${CLOSEOUT_HEAD_OID}" \
-    -f mergeMethod="${CLOSEOUT_MERGE_METHOD}"
-)" || {
-  echo "synchronous closeout PR merge failed; stop closeout" >&2
-  return 1 2>/dev/null || exit 1
-}
+if [ "${CLOSEOUT_MERGE_METHOD}" = "SQUASH" ]; then
+  closeout_merge_result="$(
+    gh api graphql \
+      -f query='mutation(
+        $pullRequestId: ID!,
+        $expectedHeadOid: GitObjectID!,
+        $mergeMethod: PullRequestMergeMethod!,
+        $commitHeadline: String!,
+        $commitBody: String!
+      ) {
+        mergePullRequest(input: {
+          pullRequestId: $pullRequestId
+          expectedHeadOid: $expectedHeadOid
+          mergeMethod: $mergeMethod
+          commitHeadline: $commitHeadline
+          commitBody: $commitBody
+        }) {
+          pullRequest { merged }
+        }
+      }' \
+      -f pullRequestId="${CLOSEOUT_PR_ID}" \
+      -f expectedHeadOid="${CLOSEOUT_HEAD_OID}" \
+      -f mergeMethod="${CLOSEOUT_MERGE_METHOD}" \
+      -f commitHeadline="${CLOSEOUT_COMMIT_HEADLINE}" \
+      -f commitBody="${CLOSEOUT_COMMIT_BODY}"
+  )" || {
+    echo "synchronous closeout PR merge failed; stop closeout" >&2
+    return 1 2>/dev/null || exit 1
+  }
+else
+  closeout_merge_result="$(
+    gh api graphql \
+      -f query='mutation(
+        $pullRequestId: ID!,
+        $expectedHeadOid: GitObjectID!,
+        $mergeMethod: PullRequestMergeMethod!
+      ) {
+        mergePullRequest(input: {
+          pullRequestId: $pullRequestId
+          expectedHeadOid: $expectedHeadOid
+          mergeMethod: $mergeMethod
+        }) {
+          pullRequest { merged }
+        }
+      }' \
+      -f pullRequestId="${CLOSEOUT_PR_ID}" \
+      -f expectedHeadOid="${CLOSEOUT_HEAD_OID}" \
+      -f mergeMethod="${CLOSEOUT_MERGE_METHOD}"
+  )" || {
+    echo "synchronous closeout PR merge failed; stop closeout" >&2
+    return 1 2>/dev/null || exit 1
+  }
+fi
 jq -e '.data.mergePullRequest.pullRequest.merged == true' \
   >/dev/null <<<"${closeout_merge_result}" || {
   echo "closeout PR was not merged synchronously; stop closeout" >&2

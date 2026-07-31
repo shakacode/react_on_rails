@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "fileutils"
+require "json"
 require "open3"
 require "rbconfig"
 require "tmpdir"
@@ -58,6 +59,80 @@ RSpec.describe "script/release-forward-port" do
 
   def run_script_from_repo_root(*args)
     Open3.capture3(git_env, RbConfig.ruby, script_path, *args, chdir: repo_root)
+  end
+
+  def documented_closeout_merge_snippet
+    marker = 'CLOSEOUT_PR="${CLOSEOUT_PR:?set the closeout PR number or URL}"'
+    runbook = File.read(File.join(repo_root, "internal/contributor-info/release-train-runbook.md"))
+    match = runbook.match(/```bash\n(?<snippet>#{Regexp.escape(marker)}.*?)\n```/m)
+    raise "documented closeout merge snippet is missing" unless match
+
+    match[:snippet]
+  end
+
+  def closeout_merge_harness
+    <<~BASH
+      set -u
+
+      gh() {
+        case "$1 $2" in
+          "pr view") printf '%s\n' "${CLOSEOUT_TEST_PR_JSON}" ;;
+          "api graphql")
+            printf '%s\\0' "$@" >"${CLOSEOUT_TEST_GH_ARGS}"
+            printf '%s\n' '{"data":{"mergePullRequest":{"pullRequest":{"merged":true}}}}'
+            ;;
+          *) printf 'unexpected gh invocation: %s\n' "$*" >&2; return 64 ;;
+        esac
+      }
+
+      git() {
+        case "$1 $2" in
+          "fetch --prune") return 0 ;;
+          "rev-parse origin/main") printf '%s\n' "${CLOSEOUT_TEST_BASE_OID}" ;;
+          *) printf 'unexpected git invocation: %s\n' "$*" >&2; return 64 ;;
+        esac
+      }
+
+      require_live_release_line_lease() { return 0; }
+
+      run_closeout_merge() {
+      #{documented_closeout_merge_snippet}
+      }
+
+      run_closeout_merge
+    BASH
+  end
+
+  def run_documented_closeout_merge(method:, release_version: nil, source_changelog_oid: nil, pr_number: 999)
+    Dir.mktmpdir("release-closeout-runbook") do |tmpdir|
+      arguments_path = File.join(tmpdir, "graphql-arguments")
+      environment = {
+        "CLOSEOUT_PR" => "https://github.com/shakacode/react_on_rails/pull/#{pr_number}",
+        "CLOSEOUT_MERGE_METHOD" => method,
+        "CLOSEOUT_VALIDATED_HEAD_OID" => "a" * 40,
+        "CLOSEOUT_VALIDATED_BASE_OID" => "b" * 40,
+        "CLOSEOUT_TEST_BASE_OID" => "b" * 40,
+        "CLOSEOUT_TEST_GH_ARGS" => arguments_path,
+        "CLOSEOUT_TEST_PR_JSON" => JSON.generate(
+          id: "PR_node_id",
+          number: pr_number,
+          baseRefName: "main",
+          baseRefOid: "b" * 40,
+          headRefOid: "a" * 40
+        )
+      }
+      environment["CLOSEOUT_RELEASE_VERSION"] = release_version if release_version
+      environment["CLOSEOUT_SOURCE_CHANGELOG_OID"] = source_changelog_oid if source_changelog_oid
+      stdout, stderr, status = Open3.capture3(
+        environment,
+        "/bin/bash",
+        stdin_data: closeout_merge_harness,
+        chdir: repo_root
+      )
+      arguments = File.exist?(arguments_path) ? File.binread(arguments_path).split("\0") : []
+
+      [stdout, stderr, status, arguments]
+    end
   end
 
   def version_file(version)
@@ -123,6 +198,76 @@ RSpec.describe "script/release-forward-port" do
     git(repo, "add", "external-diff.sh")
     git(repo, "commit", "--no-gpg-sign", "-m", "Configure external diff helper")
     git(repo, "config", "diff.external", external_diff_path)
+  end
+
+  describe "documented synchronous closeout merge" do
+    it "passes authoritative final-changelog metadata for a squash merge" do
+      source_changelog_oid = "c" * 40
+      _stdout, stderr, status, arguments = run_documented_closeout_merge(
+        method: "SQUASH",
+        release_version: "17.0.0",
+        source_changelog_oid:
+      )
+
+      expect(status).to be_success, stderr
+      expect(arguments).to include(
+        "commitHeadline=Record the final React on Rails 17.0.0 changelog (#999)",
+        "commitBody=The final changelog records source CHANGELOG.md commit `#{source_changelog_oid}`."
+      )
+      query = arguments.find { |argument| argument.start_with?("query=") }
+      expect(query).to include(
+        "$commitHeadline: String!",
+        "$commitBody: String!",
+        "commitHeadline: $commitHeadline",
+        "commitBody: $commitBody"
+      )
+    end
+
+    it "refuses malformed squash metadata before attempting the merge" do
+      source_changelog_oid = "c" * 40
+      _stdout, stderr, status, arguments = run_documented_closeout_merge(
+        method: "SQUASH",
+        release_version: "17.0.0.rc.1",
+        source_changelog_oid:
+      )
+
+      expect(status).not_to be_success
+      expect(stderr).to include("closeout release version must be X.Y.Z")
+      expect(arguments).to be_empty
+
+      _stdout, stderr, status, arguments = run_documented_closeout_merge(
+        method: "SQUASH",
+        release_version: "17.0.0",
+        source_changelog_oid: "C" * 40
+      )
+
+      expect(status).not_to be_success
+      expect(stderr).to include("source CHANGELOG.md OID must be a lowercase 40-character SHA")
+      expect(arguments).to be_empty
+
+      _stdout, stderr, status, arguments = run_documented_closeout_merge(
+        method: "SQUASH",
+        release_version: "17.0.0",
+        source_changelog_oid:,
+        pr_number: 0
+      )
+
+      expect(status).not_to be_success
+      expect(stderr).to include("closeout PR number is missing or invalid")
+      expect(arguments).to be_empty
+    end
+
+    it "preserves the rebase merge path without squash-only metadata" do
+      _stdout, stderr, status, arguments = run_documented_closeout_merge(method: "REBASE")
+
+      expect(status).to be_success, stderr
+      expect(arguments).to include("mergeMethod=REBASE")
+      expect(arguments).not_to include(a_string_starting_with("commitHeadline="))
+      expect(arguments).not_to include(a_string_starting_with("commitBody="))
+      query = arguments.find { |argument| argument.start_with?("query=") }
+      expect(query).not_to include("commitHeadline")
+      expect(query).not_to include("commitBody")
+    end
   end
 
   it "dry-runs the forward-port plan without changing the target branch" do
