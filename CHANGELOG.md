@@ -29,10 +29,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 - **Release retries now durably reuse maintainer-verified ShakaPerf evidence**: `rake release` can bind an
   existing successful run to the canonical release tracker with `RELEASE_SHAKAPERF_RUN`, then re-fetch and
   re-verify the exact SHA or machine-proven runtime-equivalent evidence on later invocations instead of
-  dispatching duplicate performance runs. Stable releases also distinguish ShakaPerf observation/API
-  failures from known gate failures and support an append-only, tracker-bound observation waiver that does
-  not claim the run succeeded or bypass any other release gate; the tracker, waiver, and exact run are
-  revalidated before remote tag push and package publication. Fixes
+  dispatching duplicate performance runs. Tracker trust is bound to the exact
+  `Release gate: react_on_rails X.Y.Z` stable-base title, explicit selectors take precedence over automatic
+  accepted-RC reuse, and persisted accelerated retries cannot silently consume a selector. Automatic reuse
+  falls back to normal discovery only for authoritative natural invalidation such as stale or missing evidence,
+  a failed/cancelled live run, or changed runtime ancestry; indeterminate API failures and record mutations
+  remain blocking. Stable releases also support an append-only, tracker-bound observation waiver that does not
+  claim the run succeeded or bypass any other release gate; the tracker, waiver, and exact run are revalidated
+  before remote tag push and package publication. Fixes
   [Issue 4812](https://github.com/shakacode/react_on_rails/issues/4812).
 
 - **[Pro]** **RSC render-error details are no longer sent to the browser on the fetched payload path**:

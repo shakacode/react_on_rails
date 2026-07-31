@@ -161,6 +161,7 @@ class ShakaperfGateObservationError < StandardError
 end
 
 class ShakaperfGateMissingRunError < ShakaperfGateObservationError; end
+class ShakaperfGateMissingArtifactError < ShakaperfGateObservationError; end
 # Keep in sync with every package.json, Gemfile.lock, and version file that the
 # release task rewrites while promoting an RC to a final release.
 # CHANGELOG.md is intentionally excluded. main_ci_walkback_commit? classifies
@@ -607,6 +608,7 @@ def shakaperf_release_gate_evidence_runtime_rejection(monorepo_root:, head_sha:,
   return nil if candidate_sha == head_sha
 
   commits = shakaperf_candidate_commit_shas(monorepo_root:, candidate_sha:, head_sha:)
+  return "tested candidate is not an ancestor of the release head" if commits == :not_ancestor
   return "tested candidate ancestry or intervening commits cannot be verified" unless commits
   return "release commits after the tested candidate are not metadata-only" unless commits.all? do |sha|
     shakaperf_prerun_metadata_commit?(monorepo_root:, sha:)
@@ -628,7 +630,11 @@ def shakaperf_candidate_commit_shas(monorepo_root:, candidate_sha:, head_sha:)
   _ancestor_output, ancestor_status = Open3.capture2e(
     "git", "-C", monorepo_root, "merge-base", "--is-ancestor", candidate_sha, head_sha
   )
-  return nil unless ancestor_status.success?
+  unless ancestor_status.success?
+    return :not_ancestor if ancestor_status.exitstatus == 1
+
+    return nil
+  end
 
   output, status = Open3.capture2e(
     "git", "-C", monorepo_root, "rev-list", "--reverse", "#{candidate_sha}..#{head_sha}"
@@ -926,7 +932,7 @@ def normalized_optional_release_value(value)
   value
 end
 
-def validated_shakaperf_release_tracker!(monorepo_root:, tracker_input:, required:)
+def validated_shakaperf_release_tracker!(monorepo_root:, tracker_input:, required:, target_version:)
   if tracker_input.to_s.empty?
     if required
       abort "❌ RELEASE_SHAKAPERF_RUN or RELEASE_FINAL_SHAKAPERF_WAIVER_REASON requires " \
@@ -940,7 +946,7 @@ def validated_shakaperf_release_tracker!(monorepo_root:, tracker_input:, require
   end
 
   tracker = tracker_input.to_i
-  fetch_release_tracker_issue!(repo_slug: github_repo_slug(monorepo_root), tracker:)
+  fetch_release_tracker_issue!(repo_slug: github_repo_slug(monorepo_root), tracker:, target_version:)
   tracker
 end
 
@@ -1044,6 +1050,87 @@ def shakaperf_release_tracker_record_rejection(record:, run:, repo_slug:, ref:, 
   shakaperf_release_tracker_freshness_rejection(record:, validation_time:)
 end
 
+def naturally_invalidated_shakaperf_association_rejection?(rejection)
+  [
+    "evidence is stale",
+    "saved workflow run is authoritatively missing",
+    "saved evidence artifact is authoritatively missing",
+    "release runtime tree differs from the tested candidate",
+    "release commits after the tested candidate are not metadata-only",
+    "tested candidate is not an ancestor of the release head"
+  ].include?(rejection) ||
+    rejection.to_s.match?(/\Aworkflow run completed with (?:failure|cancelled)\z/)
+end
+
+def continue_after_naturally_invalidated_shakaperf_association(rejection:, run_url:)
+  puts "Saved ShakaPerf association is no longer reusable (#{rejection}); " \
+       "continuing with normal discovery: #{run_url}"
+  nil
+end
+
+def automatic_shakaperf_association_reuse?(entry:, run_id:)
+  entry[:kind] == :association && run_id.nil?
+end
+
+def reusable_saved_shakaperf_evidence?(entry:, run_id:, rejection:, run_url:)
+  return true unless rejection
+
+  if automatic_shakaperf_association_reuse?(entry:, run_id:) &&
+     naturally_invalidated_shakaperf_association_rejection?(rejection)
+    continue_after_naturally_invalidated_shakaperf_association(rejection:, run_url:)
+    return false
+  end
+
+  abort "❌ Saved ShakaPerf release tracker evidence is invalid: #{rejection}."
+end
+
+def saved_shakaperf_observation_error_run(record:, entry:, ref:, target_version:)
+  candidate_sha = entry[:kind] == :association ? record.fetch("candidate_sha") : record.fetch("head_sha")
+  {
+    "databaseId" => record.fetch("run_id").to_i,
+    "attempt" => record.fetch("run_attempt").to_i,
+    "displayTitle" => shakaperf_release_gate_display_title(ref:, head_sha: candidate_sha, target_version:),
+    "headSha" => candidate_sha,
+    "status" => "unknown",
+    "conclusion" => nil,
+    "url" => record.fetch("run_url")
+  }
+end
+
+def fetch_saved_shakaperf_release_gate_run(repo_slug:, record:, entry:, ref:, target_version:, run_id:)
+  normalized_selected_shakaperf_release_gate_run(
+    fetch_selected_shakaperf_release_gate_run!(repo_slug:, run_id: record.fetch("run_id").to_i)
+  )
+rescue ShakaperfGateMissingRunError
+  reusable_saved_shakaperf_evidence?(
+    entry:,
+    run_id:,
+    rejection: "saved workflow run is authoritatively missing",
+    run_url: record.fetch("run_url")
+  )
+  nil
+rescue ShakaperfGateObservationError => e
+  tracked_run = saved_shakaperf_observation_error_run(record:, entry:, ref:, target_version:)
+  raise ShakaperfGateObservationError.new(e.message, run: tracked_run, tracker_entry: entry)
+end
+
+def saved_shakaperf_release_tracker_rejection(entry:, record:, run:, repo_slug:, monorepo_root:, ref:,
+                                              head_sha:, target_version:, release_started_at:)
+  if entry[:kind] == :association
+    verified_shakaperf_release_tracker_association_rejection(
+      record:, run:, repo_slug:, monorepo_root:, ref:, head_sha:, target_version:, release_started_at:
+    )
+  else
+    shakaperf_release_tracker_record_rejection(
+      record:, run:, repo_slug:, ref:, head_sha:, target_version:, validation_time: release_started_at
+    )
+  end
+rescue ShakaperfGateMissingArtifactError
+  "saved evidence artifact is authoritatively missing"
+rescue ShakaperfGateObservationError => e
+  abort "❌ Saved ShakaPerf release tracker evidence could not be re-observed; refusing dispatch.\n\n#{e.message}"
+end
+
 def reuse_shakaperf_release_tracker_evidence(repo_slug:, monorepo_root:, tracker:, ref:, head_sha:, target_version:,
                                              release_started_at:, run_id: nil)
   entry = selected_shakaperf_release_tracker_record!(
@@ -1052,34 +1139,13 @@ def reuse_shakaperf_release_tracker_evidence(repo_slug:, monorepo_root:, tracker
   return nil unless entry
 
   record = entry.fetch(:record)
-  begin
-    run = normalized_selected_shakaperf_release_gate_run(
-      fetch_selected_shakaperf_release_gate_run!(repo_slug:, run_id: record.fetch("run_id").to_i)
-    )
-  rescue ShakaperfGateObservationError => e
-    candidate_sha = entry[:kind] == :association ? record.fetch("candidate_sha") : record.fetch("head_sha")
-    tracked_run = {
-      "databaseId" => record.fetch("run_id").to_i,
-      "attempt" => record.fetch("run_attempt").to_i,
-      "displayTitle" => shakaperf_release_gate_display_title(ref:, head_sha: candidate_sha, target_version:),
-      "headSha" => candidate_sha,
-      "status" => "unknown",
-      "conclusion" => nil,
-      "url" => record.fetch("run_url")
-    }
-    raise ShakaperfGateObservationError.new(e.message, run: tracked_run, tracker_entry: entry)
-  end
-  rejection = if entry[:kind] == :association
-                verified_shakaperf_release_tracker_association_rejection(
-                  record:, run:, repo_slug:, monorepo_root:, ref:, head_sha:, target_version:,
-                  release_started_at:
-                )
-              else
-                shakaperf_release_tracker_record_rejection(
-                  record:, run:, repo_slug:, ref:, head_sha:, target_version:, validation_time: release_started_at
-                )
-              end
-  abort "❌ Saved ShakaPerf release tracker evidence is invalid: #{rejection}." if rejection
+  run = fetch_saved_shakaperf_release_gate_run(repo_slug:, record:, entry:, ref:, target_version:, run_id:)
+  return nil unless run
+
+  rejection = saved_shakaperf_release_tracker_rejection(
+    entry:, record:, run:, repo_slug:, monorepo_root:, ref:, head_sha:, target_version:, release_started_at:
+  )
+  return nil unless reusable_saved_shakaperf_evidence?(entry:, run_id:, rejection:, run_url: run.fetch("url"))
 
   tracker_url = "https://github.com/#{repo_slug}/issues/#{tracker}"
   puts "✓ Reusing verified ShakaPerf release tracker evidence from #{tracker_url}: #{run.fetch('url')}"
@@ -1121,7 +1187,11 @@ def verified_shakaperf_release_tracker_association_rejection(record:, run:, repo
   )
   return rejection if rejection
 
-  evidence = fetch_shakaperf_release_gate_evidence(repo_slug:, run:)
+  if run["status"] == "completed" && %w[failure cancelled].include?(run["conclusion"])
+    return "workflow run completed with #{run.fetch('conclusion')}"
+  end
+
+  evidence = fetch_shakaperf_release_gate_evidence_for_association!(repo_slug:, run:)
   rejection = verified_shakaperf_release_tracker_artifact_rejection(record:, evidence:)
   return rejection if rejection
 
@@ -1529,6 +1599,60 @@ rescue StandardError => e
   warn "⚠️ Unable to inspect ShakaPerf pre-run evidence: #{e.class}: #{e.message}; " \
        "dispatching an exact-head gate."
   nil
+end
+
+def authoritative_shakaperf_artifact_absence?(output)
+  output.to_s.match?(%r{\bHTTP(?:/\d(?:\.\d)?)?\s+404\b|\b404\s+Not Found\b|\bno artifacts? found\b}i)
+end
+
+def download_saved_shakaperf_release_gate_evidence!(repo_slug:, run:, dir:)
+  output, status = capture_gh_output(
+    "run", "download", run.fetch("databaseId").to_s,
+    "--repo", repo_slug,
+    "--name", SHAKAPERF_RELEASE_GATE_EVIDENCE_ARTIFACT,
+    "--dir", dir
+  )
+  return if status.success?
+
+  error_class = if authoritative_shakaperf_artifact_absence?(output)
+                  ShakaperfGateMissingArtifactError
+                else
+                  ShakaperfGateObservationError
+                end
+  raise error_class.new("Unable to download saved ShakaPerf evidence artifact.\n\n#{output}", run:)
+end
+
+def saved_shakaperf_release_gate_evidence_path!(dir:, run:)
+  evidence_paths = Dir.glob(File.join(dir, "**", SHAKAPERF_RELEASE_GATE_EVIDENCE_FILE))
+  if evidence_paths.empty?
+    raise ShakaperfGateMissingArtifactError.new(
+      "Saved ShakaPerf evidence artifact no longer contains #{SHAKAPERF_RELEASE_GATE_EVIDENCE_FILE}.", run:
+    )
+  end
+  unless evidence_paths.one?
+    raise ShakaperfGateObservationError.new(
+      "Saved ShakaPerf evidence artifact contains multiple evidence files.", run:
+    )
+  end
+
+  evidence_paths.first
+end
+
+def fetch_shakaperf_release_gate_evidence_for_association!(repo_slug:, run:)
+  Dir.mktmpdir("shakaperf-release-evidence") do |dir|
+    download_saved_shakaperf_release_gate_evidence!(repo_slug:, run:, dir:)
+    JSON.parse(File.read(saved_shakaperf_release_gate_evidence_path!(dir:, run:)))
+  end
+rescue ShakaperfGateObservationError
+  raise
+rescue JSON::ParserError => e
+  raise ShakaperfGateObservationError.new(
+    "Saved ShakaPerf evidence artifact returned invalid JSON: #{e.message}", run:
+  )
+rescue StandardError => e
+  raise ShakaperfGateObservationError.new(
+    "Unable to inspect saved ShakaPerf evidence artifact: #{e.class}: #{e.message}", run:
+  )
 end
 
 def refresh_shakaperf_release_gate_run!(repo_slug:, run:)
@@ -3887,7 +4011,14 @@ def trusted_accelerated_rc_records_from_repository_comment!(
   unless records.all? { |record| record["release_tracker"] == tracker }
     abort "❌ Accelerated RC retry history is bound to a different release tracker."
   end
-  tracker_issues[tracker] = fetch_release_tracker_issue!(repo_slug:, tracker:) unless tracker_issues.key?(tracker)
+  records.each do |record|
+    target_version = record.fetch("target_version")
+    if tracker_issues.key?(tracker)
+      validate_release_tracker_issue!(tracker_issues.fetch(tracker), tracker:, target_version:)
+    else
+      tracker_issues[tracker] = fetch_release_tracker_issue!(repo_slug:, tracker:, target_version:)
+    end
+  end
 
   records
 end
@@ -3948,22 +4079,23 @@ def accelerated_rc_records_from_trusted_comment!(comment:, login:)
   records
 end
 
-def validate_release_tracker_issue!(issue, tracker:)
-  labels = Array(issue["labels"]).map { |label| label.is_a?(Hash) ? label["name"] : label }
-  release_tracker = issue["title"].to_s.start_with?("Release gate:") ||
-                    (%w[release TRACKING] - labels).empty?
-  unless issue["number"] == tracker && issue["state"] == "open" && issue["pull_request"].nil? && release_tracker
-    abort "❌ Accelerated RC publication requires an active open release tracker; ##{tracker} is not eligible."
+def validate_release_tracker_issue!(issue, tracker:, target_version:)
+  expected_title = "Release gate: react_on_rails #{release_base_version(target_version)}"
+  eligible = issue["number"] == tracker && issue["state"] == "open" && issue["pull_request"].nil? &&
+             issue["title"] == expected_title
+  unless eligible
+    abort "❌ Accelerated RC publication requires an active open release tracker with the exact title " \
+          "#{expected_title.inspect}; ##{tracker} is not eligible."
   end
 
   issue
 end
 
-def fetch_release_tracker_issue!(repo_slug:, tracker:)
+def fetch_release_tracker_issue!(repo_slug:, tracker:, target_version:)
   output, status = capture_gh_output("api", "repos/#{repo_slug}/issues/#{tracker}")
   abort "❌ Unable to read release tracker ##{tracker}.\n\n#{output}" unless status.success?
 
-  validate_release_tracker_issue!(JSON.parse(output), tracker:)
+  validate_release_tracker_issue!(JSON.parse(output), tracker:, target_version:)
 rescue JSON::ParserError => e
   abort "❌ Release tracker ##{tracker} returned invalid JSON: #{e.message}"
 end
@@ -4805,7 +4937,7 @@ def accelerated_rc_authorization_for_same_candidate_retry!(
   end
 
   tracker = history.fetch(:tracker)
-  fetch_release_tracker_issue!(repo_slug:, tracker:)
+  fetch_release_tracker_issue!(repo_slug:, tracker:, target_version:)
   chain = history.fetch(:chain)
   terminal = chain.fetch(:terminal)
   if terminal && terminal["status"] == "candidate-rejected"
@@ -5155,7 +5287,7 @@ def authorize_accelerated_rc_publication!(repo_slug:, monorepo_root:, release_br
     options:, candidate_sha:, runtime_tree_fingerprint:, release_branch:, ci_snapshot: ci, shakaperf:,
     approved_by: approver, recorded_at: Time.now.utc
   )
-  fetch_release_tracker_issue!(repo_slug:, tracker:)
+  fetch_release_tracker_issue!(repo_slug:, tracker:, target_version: options.fetch(:target_gem_version))
   append_accelerated_rc_tracker_record!(repo_slug:, tracker:, record:)
 end
 
@@ -5181,7 +5313,7 @@ def validated_repository_accelerated_rc_publication_completion_history!(repo_slu
 end
 
 def record_accelerated_rc_publication_complete!(repo_slug:, tracker:, authorized_record:, approved_by:, recorded_at:)
-  fetch_release_tracker_issue!(repo_slug:, tracker:)
+  fetch_release_tracker_issue!(repo_slug:, tracker:, target_version: authorized_record.fetch("target_version"))
   history = validated_repository_accelerated_rc_publication_completion_history!(
     repo_slug:, tracker:, authorization: authorized_record
   )
@@ -5696,7 +5828,7 @@ def append_accelerated_rc_reconciliation_record!(repo_slug:, tracker:, record:, 
 end
 
 def run_accelerated_rc_reconciliation!(repo_slug:, monorepo_root:, tracker:, target_version:, reason:, evidence:)
-  fetch_release_tracker_issue!(repo_slug:, tracker:)
+  fetch_release_tracker_issue!(repo_slug:, tracker:, target_version:)
   approved_by = current_release_approver!(repo_slug:)
   records = fetch_accelerated_rc_tracker_records!(repo_slug:, tracker:)
   records = recover_accelerated_rc_publication_for_reconciliation!(
@@ -5769,14 +5901,14 @@ end
 
 def ordinary_rc_record_for_release_branch_promotion!(monorepo_root:, rc_tag:, tracker_input:, candidate_sha:)
   repo_slug = github_repo_slug(monorepo_root)
+  rc_version = parse_release_tag_to_gem_version(rc_tag)
   if tracker_input
     unless tracker_input.to_s.match?(/\A[1-9]\d*\z/)
       abort "❌ Final promotion is blocked: RELEASE_TRACKER must be a positive issue number."
     end
-    fetch_release_tracker_issue!(repo_slug:, tracker: tracker_input.to_i)
+    fetch_release_tracker_issue!(repo_slug:, tracker: tracker_input.to_i, target_version: rc_version)
   end
 
-  rc_version = parse_release_tag_to_gem_version(rc_tag)
   history = fetch_repository_accelerated_rc_records_for_candidate!(
     repo_slug:, target_version: rc_version, candidate_sha:
   )
@@ -5810,8 +5942,8 @@ def accepted_accelerated_rc_record_for_release_branch_promotion!(monorepo_root:,
   end
 
   repo_slug = github_repo_slug(monorepo_root)
-  fetch_release_tracker_issue!(repo_slug:, tracker:)
   rc_version = tag_provenance.fetch("target_version")
+  fetch_release_tracker_issue!(repo_slug:, tracker:, target_version: rc_version)
   rc_sha = tag_identity.fetch(:candidate_sha)
   history = validated_repository_accelerated_rc_candidate_history!(
     repo_slug:, target_version: rc_version, candidate_sha: rc_sha, expected_tracker: tracker
@@ -6058,7 +6190,8 @@ def validate_ordinary_stable_shakaperf_waiver_boundary!(monorepo_root:, context:
 
   repo_slug = github_repo_slug(monorepo_root)
   tracker = context.dig(:expected_snapshot, "release_tracker")
-  fetch_release_tracker_issue!(repo_slug:, tracker:)
+  target_version = context.dig(:expected_snapshot, "target_version")
+  fetch_release_tracker_issue!(repo_slug:, tracker:, target_version:)
   validate_final_shakaperf_observation_waiver_publication_boundary!(
     monorepo_root:,
     carried_record: context.fetch(:carried_record),
@@ -6284,9 +6417,13 @@ end
 def final_promotion_shakaperf_snapshot!(repo_slug:, monorepo_root:, current_branch:, final_head_sha:, record:,
                                         target_version:, release_started_at:, allow_ci_override:, dry_run:,
                                         tracker: nil, run_selector: nil, waiver_reason: nil)
-  reused = reuse_accepted_rc_shakaperf_evidence!(
-    repo_slug:, monorepo_root:, ref: current_branch, head_sha: final_head_sha, record:
-  )
+  reused = if run_selector
+             false
+           else
+             reuse_accepted_rc_shakaperf_evidence!(
+               repo_slug:, monorepo_root:, ref: current_branch, head_sha: final_head_sha, record:
+             )
+           end
   if reused
     return {
       mode: FINAL_PROMOTION_SHAKAPERF_ACCEPTED_RC_MODE,
@@ -8808,7 +8945,8 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
                           validated_shakaperf_release_tracker!(
                             monorepo_root: release_root,
                             tracker_input: release_tracker_input,
-                            required: explicit_shakaperf_control
+                            required: explicit_shakaperf_control,
+                            target_version: resolved_target_gem_version
                           )
                         end
     prerelease_tag_retry_state = :none
@@ -8841,6 +8979,9 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
       current_checkout_version:,
       candidate_sha: accelerated_rc_same_candidate_retry ? current_git_sha!(release_root) : nil
     )
+    if accelerated_rc_options && shakaperf_run_selector
+      abort "❌ Persisted accelerated RC retry cannot be combined with RELEASE_SHAKAPERF_RUN."
+    end
     if accelerated_rc_options
       ensure_accelerated_rc_release_branch!(
         current_branch:,
@@ -8857,7 +8998,11 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
     accelerated_approver = nil
     if accelerated_rc_options
       repo_slug ||= github_repo_slug(release_root)
-      fetch_release_tracker_issue!(repo_slug:, tracker: accelerated_rc_options.fetch(:tracker))
+      fetch_release_tracker_issue!(
+        repo_slug:,
+        tracker: accelerated_rc_options.fetch(:tracker),
+        target_version: accelerated_rc_options.fetch(:target_gem_version)
+      )
       accelerated_approver = current_release_approver!(repo_slug:)
     end
 

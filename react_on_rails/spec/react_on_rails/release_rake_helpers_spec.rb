@@ -1368,6 +1368,33 @@ RSpec.describe "release.rake helper methods" do
 
       expect(evidence_rejection).to eq("tested candidate ancestry or intervening commits cannot be verified")
     end
+
+    it "distinguishes authoritative non-ancestry from an indeterminate ancestry check" do
+      allow(self).to receive(:shakaperf_candidate_commit_shas)
+        .with(monorepo_root:, candidate_sha:, head_sha:).and_return(:not_ancestor)
+
+      expect(evidence_rejection).to eq("tested candidate is not an ancestor of the release head")
+    end
+  end
+
+  describe "#shakaperf_candidate_commit_shas" do
+    let(:monorepo_root) { "/tmp/repo" }
+    let(:candidate_sha) { "a" * 40 }
+    let(:head_sha) { "b" * 40 }
+
+    it "returns an authoritative marker when git proves the candidate is not an ancestor" do
+      not_ancestor = instance_double(Process::Status, success?: false, exitstatus: 1)
+      allow(Open3).to receive(:capture2e).and_return(["", not_ancestor])
+
+      expect(shakaperf_candidate_commit_shas(monorepo_root:, candidate_sha:, head_sha:)).to eq(:not_ancestor)
+    end
+
+    it "returns unknown when the ancestry command itself fails" do
+      git_error = instance_double(Process::Status, success?: false, exitstatus: 128)
+      allow(Open3).to receive(:capture2e).and_return(["fatal: repository unavailable", git_error])
+
+      expect(shakaperf_candidate_commit_shas(monorepo_root:, candidate_sha:, head_sha:)).to be_nil
+    end
   end
 
   describe "#find_latest_shakaperf_prerun" do
@@ -1503,6 +1530,61 @@ RSpec.describe "release.rake helper methods" do
       refreshed_run = terminal_run.merge("conclusion" => "future_conclusion")
 
       expect(trustworthy_terminal_shakaperf_release_gate_run?(original_run:, refreshed_run:)).to be false
+    end
+  end
+
+  describe "#fetch_shakaperf_release_gate_evidence_for_association!" do
+    let(:repo_slug) { "shakacode/react_on_rails" }
+    let(:run) { { "databaseId" => 123_456 } }
+
+    it "keeps an indeterminate artifact permission failure hard instead of treating it as absence" do
+      status = instance_double(Process::Status, success?: false)
+      allow(self).to receive(:capture_gh_output).and_return(["HTTP 403: Resource not accessible", status])
+
+      expect do
+        fetch_shakaperf_release_gate_evidence_for_association!(repo_slug:, run:)
+      end.to raise_error(ShakaperfGateObservationError, /403.*not accessible/i)
+    end
+
+    it "classifies an authoritative missing artifact separately from an indeterminate failure" do
+      status = instance_double(Process::Status, success?: false)
+      allow(self).to receive(:capture_gh_output).and_return(["HTTP 404: artifact not found", status])
+
+      expect do
+        fetch_shakaperf_release_gate_evidence_for_association!(repo_slug:, run:)
+      end.to raise_error(ShakaperfGateMissingArtifactError, /404.*not found/i)
+    end
+  end
+
+  describe "#fetch_selected_shakaperf_release_gate_run!" do
+    let(:repo_slug) { "shakacode/react_on_rails" }
+    let(:run_id) { 123_456 }
+    let(:failure_status) { instance_double(Process::Status, success?: false) }
+
+    it "classifies an authoritative 404 as a missing run" do
+      allow(self).to receive(:capture_gh_output).and_return(["HTTP 404: Not Found", failure_status])
+
+      expect do
+        fetch_selected_shakaperf_release_gate_run!(repo_slug:, run_id:)
+      end.to raise_error(ShakaperfGateMissingRunError, /404.*Not Found/i)
+    end
+
+    it "keeps permission failures indeterminate" do
+      allow(self).to receive(:capture_gh_output)
+        .and_return(["HTTP 403: Resource not accessible", failure_status])
+
+      expect do
+        fetch_selected_shakaperf_release_gate_run!(repo_slug:, run_id:)
+      end.to raise_error(ShakaperfGateObservationError, /403.*not accessible/i)
+    end
+
+    it "keeps malformed API responses indeterminate" do
+      success_status = instance_double(Process::Status, success?: true)
+      allow(self).to receive(:capture_gh_output).and_return(["not json", success_status])
+
+      expect do
+        fetch_selected_shakaperf_release_gate_run!(repo_slug:, run_id:)
+      end.to raise_error(ShakaperfGateObservationError, /invalid JSON/i)
     end
   end
 
@@ -1706,6 +1788,8 @@ RSpec.describe "release.rake helper methods" do
       allow(self).to receive(:fetch_selected_shakaperf_release_gate_run!)
         .with(repo_slug:, run_id: 123_456).and_return(selected_run)
       allow(self).to receive(:fetch_shakaperf_release_gate_evidence)
+        .with(repo_slug:, run: selected_run).and_return(schema_v2_evidence)
+      allow(self).to receive(:fetch_shakaperf_release_gate_evidence_for_association!)
         .with(repo_slug:, run: selected_run).and_return(schema_v2_evidence)
       allow(self).to receive(:shakaperf_release_gate_evidence_rejection)
         .with(hash_including(head_sha: release_sha, run: selected_run, evidence: schema_v2_evidence))
@@ -2093,7 +2177,7 @@ RSpec.describe "release.rake helper methods" do
         .with(repo_slug:, tracker: 4806).and_return([{ kind: :association, record: }])
       allow(self).to receive(:fetch_selected_shakaperf_release_gate_run!)
         .with(repo_slug:, run_id: 123_456).and_return(selected_run)
-      allow(self).to receive(:fetch_shakaperf_release_gate_evidence)
+      allow(self).to receive(:fetch_shakaperf_release_gate_evidence_for_association!)
         .with(repo_slug:, run: selected_run).and_return(schema_v2_evidence)
       allow(self).to receive(:shakaperf_release_gate_evidence_rejection)
         .with(hash_including(run: selected_run, evidence: schema_v2_evidence, require_prerun: false)).and_return(nil)
@@ -2153,7 +2237,7 @@ RSpec.describe "release.rake helper methods" do
       }
       allow(self).to receive(:trusted_shakaperf_release_tracker_records!)
         .with(repo_slug:, tracker: 4806).and_return([{ kind: :association, record: }])
-      expect(self).not_to receive(:fetch_shakaperf_release_gate_evidence)
+      expect(self).not_to receive(:fetch_shakaperf_release_gate_evidence_for_association!)
 
       aggregate_failures do
         mismatches.each do |field, value|
@@ -2211,7 +2295,7 @@ RSpec.describe "release.rake helper methods" do
         .with(repo_slug:, tracker: 4806).and_return([{ kind: :association, record: }])
       allow(self).to receive(:fetch_selected_shakaperf_release_gate_run!)
         .with(repo_slug:, run_id: 123_456).and_return(selected_run)
-      allow(self).to receive(:fetch_shakaperf_release_gate_evidence)
+      allow(self).to receive(:fetch_shakaperf_release_gate_evidence_for_association!)
         .with(repo_slug:, run: selected_run).and_return(schema_v2_evidence)
       allow(self).to receive(:shakaperf_release_gate_evidence_rejection).with(
         hash_including(head_sha: release_sha, run: selected_run, evidence: schema_v2_evidence, require_prerun: false)
@@ -2269,7 +2353,7 @@ RSpec.describe "release.rake helper methods" do
         .with(repo_slug:, tracker: 4806).and_return([{ kind: :association, record: }])
       allow(self).to receive(:fetch_selected_shakaperf_release_gate_run!)
         .with(repo_slug:, run_id: 123_456).and_return(selected_run)
-      allow(self).to receive(:fetch_shakaperf_release_gate_evidence)
+      allow(self).to receive(:fetch_shakaperf_release_gate_evidence_for_association!)
         .with(repo_slug:, run: selected_run).and_return(schema_v2_evidence)
       allow(self).to receive(:shakaperf_release_gate_evidence_rejection)
         .and_return("runtime tree fingerprint does not match the release candidate")
@@ -2288,6 +2372,310 @@ RSpec.describe "release.rake helper methods" do
           tracker: 4806
         )
       end.to raise_error(SystemExit, /runtime tree fingerprint does not match/)
+    end
+
+    context "when automatic durable association evidence is naturally invalidated" do
+      let(:release_sha) { "a" * 40 }
+      let(:association_run) do
+        run.merge(
+          "headSha" => association_candidate_sha,
+          "status" => "completed",
+          "conclusion" => "success",
+          "updatedAt" => "2026-07-14T12:30:00Z"
+        )
+      end
+      let(:association_evidence) do
+        {
+          "schema_version" => 2,
+          "run_attempt" => 1,
+          "run_id" => 123_456,
+          "run_url" => association_run.fetch("url"),
+          "branch" => "release-branch",
+          "candidate_sha" => association_candidate_sha,
+          "target_version" => target_version,
+          "conclusion" => "success",
+          "runtime_tree_fingerprint" => "a" * 64,
+          "completed_at" => "2026-07-14T12:29:59Z"
+        }
+      end
+      let(:association_record) do
+        build_verified_shakaperf_release_tracker_record(
+          repo_slug:,
+          tracker: 4806,
+          ref: "release-branch",
+          head_sha: association_candidate_sha,
+          target_version:,
+          run: association_run,
+          evidence: association_evidence,
+          approved_by: "justin808",
+          recorded_at: Time.iso8601("2026-07-14T12:31:00Z")
+        )
+      end
+
+      def association_candidate_sha
+        "b" * 40
+      end
+
+      before do
+        allow(self).to receive(:trusted_shakaperf_release_tracker_records!)
+          .with(repo_slug:, tracker: 4806).and_return([{ kind: :association, record: association_record }])
+        allow(self).to receive(:fetch_selected_shakaperf_release_gate_run!)
+          .with(repo_slug:, run_id: 123_456).and_return(association_run)
+        allow(self).to receive(:fetch_shakaperf_release_gate_evidence_for_association!)
+          .with(repo_slug:, run: association_run).and_return(association_evidence)
+      end
+
+      it "falls through to normal discovery when the saved evidence is stale" do
+        allow(self).to receive_messages(
+          shakaperf_release_gate_evidence_rejection: "evidence is stale",
+          discover_and_run_shakaperf_release_gate!: :fresh_discovery
+        )
+
+        expect(
+          observe_shakaperf_release_gate!(
+            repo_slug:,
+            monorepo_root:,
+            tracker: 4806,
+            run_selector: nil,
+            ref: "release-branch",
+            head_sha: release_sha,
+            target_version:,
+            release_started_at:
+          )
+        ).to eq(:fresh_discovery)
+        expect(self).to have_received(:discover_and_run_shakaperf_release_gate!)
+      end
+
+      [
+        "release runtime tree differs from the tested candidate",
+        "release commits after the tested candidate are not metadata-only",
+        "tested candidate is not an ancestor of the release head"
+      ].each do |rejection|
+        it "falls through to normal discovery when #{rejection}" do
+          allow(self).to receive_messages(
+            shakaperf_release_gate_evidence_rejection: rejection,
+            discover_and_run_shakaperf_release_gate!: :fresh_discovery
+          )
+
+          expect(
+            observe_shakaperf_release_gate!(
+              repo_slug:,
+              monorepo_root:,
+              tracker: 4806,
+              run_selector: nil,
+              ref: "release-branch",
+              head_sha: release_sha,
+              target_version:,
+              release_started_at:
+            )
+          ).to eq(:fresh_discovery)
+          expect(self).to have_received(:discover_and_run_shakaperf_release_gate!)
+        end
+      end
+
+      %w[failure cancelled].each do |conclusion|
+        it "naturally invalidates the association when the live run is now #{conclusion}" do
+          live_run = association_run.merge("conclusion" => conclusion)
+          allow(self).to receive(:fetch_selected_shakaperf_release_gate_run!)
+            .with(repo_slug:, run_id: 123_456).and_return(live_run)
+          expect(self).not_to receive(:fetch_shakaperf_release_gate_evidence_for_association!)
+
+          expect do
+            expect(
+              reuse_shakaperf_release_tracker_evidence(
+                repo_slug:,
+                monorepo_root:,
+                tracker: 4806,
+                ref: "release-branch",
+                head_sha: release_sha,
+                target_version:,
+                release_started_at:
+              )
+            ).to be_nil
+          end.to output(/no longer reusable.*workflow.*#{conclusion}/i).to_stdout
+        end
+      end
+
+      it "falls through to normal discovery when the saved run is authoritatively missing" do
+        allow(self).to receive(:fetch_selected_shakaperf_release_gate_run!)
+          .with(repo_slug:, run_id: 123_456)
+          .and_raise(ShakaperfGateMissingRunError, "HTTP 404 Not Found")
+        allow(self).to receive(:discover_and_run_shakaperf_release_gate!).and_return(:fresh_discovery)
+
+        expect(
+          observe_shakaperf_release_gate!(
+            repo_slug:,
+            monorepo_root:,
+            tracker: 4806,
+            run_selector: nil,
+            ref: "release-branch",
+            head_sha: release_sha,
+            target_version:,
+            release_started_at:
+          )
+        ).to eq(:fresh_discovery)
+        expect(self).to have_received(:discover_and_run_shakaperf_release_gate!)
+      end
+
+      it "falls through to normal discovery when the saved artifact is authoritatively missing" do
+        allow(self).to receive(:fetch_shakaperf_release_gate_evidence_for_association!)
+          .with(repo_slug:, run: association_run)
+          .and_raise(ShakaperfGateMissingArtifactError, "HTTP 404: artifact not found")
+        allow(self).to receive(:discover_and_run_shakaperf_release_gate!).and_return(:fresh_discovery)
+
+        expect(
+          observe_shakaperf_release_gate!(
+            repo_slug:,
+            monorepo_root:,
+            tracker: 4806,
+            run_selector: nil,
+            ref: "release-branch",
+            head_sha: release_sha,
+            target_version:,
+            release_started_at:
+          )
+        ).to eq(:fresh_discovery)
+        expect(self).to have_received(:discover_and_run_shakaperf_release_gate!)
+      end
+
+      it "keeps an indeterminate artifact observation failure hard" do
+        allow(self).to receive(:fetch_shakaperf_release_gate_evidence_for_association!)
+          .with(repo_slug:, run: association_run)
+          .and_raise(ShakaperfGateObservationError, "HTTP 403: Resource not accessible")
+        expect(self).not_to receive(:discover_and_run_shakaperf_release_gate!)
+
+        expect do
+          observe_shakaperf_release_gate!(
+            repo_slug:,
+            monorepo_root:,
+            tracker: 4806,
+            run_selector: nil,
+            ref: "release-branch",
+            head_sha: release_sha,
+            target_version:,
+            release_started_at:
+          )
+        end.to raise_error(SystemExit, /could not be re-observed.*refusing dispatch.*403/im)
+      end
+
+      it "keeps trusted-record digest and fingerprint mutations hard" do
+        mutated_evidence = association_evidence.merge("completed_at" => "2026-07-14T12:29:58Z")
+        fingerprint_evidence = association_evidence.merge("runtime_tree_fingerprint" => "b" * 64)
+        fingerprint_record = association_record.merge(
+          "evidence_digest" => Digest::SHA256.hexdigest(canonical_accelerated_rc_json(fingerprint_evidence))
+        )
+        mutations = [
+          [association_record, mutated_evidence, "schema-v2 evidence digest changed"],
+          [fingerprint_record, fingerprint_evidence, "runtime tree fingerprint changed"]
+        ]
+
+        aggregate_failures do
+          mutations.each do |record, evidence, rejection|
+            allow(self).to receive(:trusted_shakaperf_release_tracker_records!)
+              .with(repo_slug:, tracker: 4806).and_return([{ kind: :association, record: }])
+            allow(self).to receive(:fetch_shakaperf_release_gate_evidence_for_association!)
+              .with(repo_slug:, run: association_run).and_return(evidence)
+            expect do
+              reuse_shakaperf_release_tracker_evidence(
+                repo_slug:,
+                monorepo_root:,
+                tracker: 4806,
+                ref: "release-branch",
+                head_sha: release_sha,
+                target_version:,
+                release_started_at:
+              )
+            end.to raise_error(SystemExit, /#{Regexp.escape(rejection)}/)
+          end
+        end
+      end
+
+      context "with an explicit run selector" do
+        it "rejects stale and runtime-divergent associations instead of falling through" do
+          rejections = [
+            "evidence is stale",
+            "release runtime tree differs from the tested candidate",
+            "release commits after the tested candidate are not metadata-only",
+            "tested candidate is not an ancestor of the release head"
+          ]
+
+          aggregate_failures do
+            rejections.each do |rejection|
+              allow(self).to receive(:shakaperf_release_gate_evidence_rejection).and_return(rejection)
+              expect do
+                reuse_shakaperf_release_tracker_evidence(
+                  repo_slug:,
+                  monorepo_root:,
+                  tracker: 4806,
+                  ref: "release-branch",
+                  head_sha: release_sha,
+                  target_version:,
+                  release_started_at:,
+                  run_id: 123_456
+                )
+              end.to raise_error(SystemExit, /#{Regexp.escape(rejection)}/)
+            end
+          end
+        end
+
+        %w[failure cancelled].each do |conclusion|
+          it "rejects a saved live run that is now #{conclusion}" do
+            allow(self).to receive(:fetch_selected_shakaperf_release_gate_run!)
+              .with(repo_slug:, run_id: 123_456).and_return(association_run.merge("conclusion" => conclusion))
+
+            expect do
+              reuse_shakaperf_release_tracker_evidence(
+                repo_slug:,
+                monorepo_root:,
+                tracker: 4806,
+                ref: "release-branch",
+                head_sha: release_sha,
+                target_version:,
+                release_started_at:,
+                run_id: 123_456
+              )
+            end.to raise_error(SystemExit, /workflow run completed with #{conclusion}/)
+          end
+        end
+
+        it "rejects an authoritatively missing saved run" do
+          allow(self).to receive(:fetch_selected_shakaperf_release_gate_run!)
+            .with(repo_slug:, run_id: 123_456)
+            .and_raise(ShakaperfGateMissingRunError, "HTTP 404 Not Found")
+
+          expect do
+            reuse_shakaperf_release_tracker_evidence(
+              repo_slug:,
+              monorepo_root:,
+              tracker: 4806,
+              ref: "release-branch",
+              head_sha: release_sha,
+              target_version:,
+              release_started_at:,
+              run_id: 123_456
+            )
+          end.to raise_error(SystemExit, /saved workflow run is authoritatively missing/)
+        end
+
+        it "rejects an authoritatively missing saved artifact" do
+          allow(self).to receive(:fetch_shakaperf_release_gate_evidence_for_association!)
+            .with(repo_slug:, run: association_run)
+            .and_raise(ShakaperfGateMissingArtifactError, "HTTP 404: artifact not found")
+
+          expect do
+            reuse_shakaperf_release_tracker_evidence(
+              repo_slug:,
+              monorepo_root:,
+              tracker: 4806,
+              ref: "release-branch",
+              head_sha: release_sha,
+              target_version:,
+              release_started_at:,
+              run_id: 123_456
+            )
+          end.to raise_error(SystemExit, /saved evidence artifact is authoritatively missing/)
+        end
+      end
     end
 
     it "rejects failed, cancelled, stale, or mismatched selected-run evidence before saving" do
@@ -7517,12 +7905,57 @@ RSpec.describe "release.rake helper methods" do
           {
             "number" => 3823,
             "state" => "closed",
-            "title" => "Release gate: React on Rails 17.0.0",
+            "title" => "Release gate: react_on_rails 17.0.0",
             "labels" => [{ "name" => "release" }, { "name" => "TRACKING" }]
           },
-          tracker: 3823
+          tracker: 3823,
+          target_version: "17.0.0"
         )
       end.to raise_error(SystemExit, /active open release tracker/)
+    end
+
+    it "rejects a wrong-version tracker even when generic release labels are present" do
+      expect do
+        validate_release_tracker_issue!(
+          {
+            "number" => 3823,
+            "state" => "open",
+            "title" => "Release gate: react_on_rails 16.9.0",
+            "labels" => [{ "name" => "release" }, { "name" => "TRACKING" }],
+            "pull_request" => nil
+          },
+          tracker: 3823,
+          target_version: "17.0.0"
+        )
+      end.to raise_error(SystemExit, /exact title.*Release gate: react_on_rails 17\.0\.0/i)
+    end
+
+    it "maps an RC target to its stable-base tracker title" do
+      issue = {
+        "number" => 3823,
+        "state" => "open",
+        "title" => "Release gate: react_on_rails 17.0.0",
+        "labels" => [],
+        "pull_request" => nil
+      }
+
+      expect(
+        validate_release_tracker_issue!(issue, tracker: 3823, target_version: "17.0.0.rc.10")
+      ).to eq(issue)
+    end
+
+    it "preserves the historical issue 4806 title binding for the 17.0.1 release" do
+      issue = {
+        "number" => 4806,
+        "state" => "open",
+        "title" => "Release gate: react_on_rails 17.0.1",
+        "labels" => [],
+        "pull_request" => nil
+      }
+
+      expect(
+        validate_release_tracker_issue!(issue, tracker: 4806, target_version: "17.0.1")
+      ).to eq(issue)
     end
 
     it "rejects a pull request even when its issue fields otherwise look like a release tracker" do
@@ -7531,11 +7964,12 @@ RSpec.describe "release.rake helper methods" do
           {
             "number" => 3823,
             "state" => "open",
-            "title" => "Release gate: React on Rails 17.0.0",
+            "title" => "Release gate: react_on_rails 17.0.0",
             "labels" => [{ "name" => "release" }, { "name" => "TRACKING" }],
             "pull_request" => { "url" => "https://api.github.com/repos/shakacode/react_on_rails/pulls/3823" }
           },
-          tracker: 3823
+          tracker: 3823,
+          target_version: "17.0.0"
         )
       end.to raise_error(SystemExit, /active open release tracker/)
     end
@@ -7855,7 +8289,7 @@ RSpec.describe "release.rake helper methods" do
       tracker_issue = {
         "number" => 3823,
         "state" => "open",
-        "title" => "Release gate: React on Rails 17.0.0",
+        "title" => "Release gate: react_on_rails 17.0.0",
         "labels" => [],
         "pull_request" => nil
       }
@@ -8129,8 +8563,16 @@ RSpec.describe "release.rake helper methods" do
         accelerated_rc_repository_comment_permission!: "maintain"
       )
       expect(self).to receive(:fetch_release_tracker_issue!)
-        .once.with(repo_slug: "shakacode/react_on_rails", tracker: 3823)
-        .and_return({})
+        .once.with(
+          repo_slug: "shakacode/react_on_rails", tracker: 3823, target_version: "17.0.0.rc.10"
+        ).and_return(
+          {
+            "number" => 3823,
+            "state" => "open",
+            "title" => "Release gate: react_on_rails 17.0.0",
+            "pull_request" => nil
+          }
+        )
 
       expect(
         fetch_repository_accelerated_rc_records_for_candidate!(
@@ -8152,7 +8594,7 @@ RSpec.describe "release.rake helper methods" do
       pull_request_issue = {
         "number" => 3823,
         "state" => "open",
-        "title" => "Release gate: React on Rails 17.0.0",
+        "title" => "Release gate: react_on_rails 17.0.0",
         "labels" => [{ "name" => "release" }, { "name" => "TRACKING" }],
         "pull_request" => { "url" => "https://api.github.com/repos/shakacode/react_on_rails/pulls/3823" }
       }
@@ -8693,6 +9135,42 @@ RSpec.describe "release.rake helper methods" do
           comment:, repo_slug: "shakacode/react_on_rails", permissions: {}
         )
       ).to eq([authorization])
+    end
+
+    it "rejects repository-wide durable history stored on a tracker for another stable target" do
+      authorization = build_accelerated_rc_publication_record(
+        options: accelerated_rc_options,
+        candidate_sha: "f" * 40,
+        runtime_tree_fingerprint: "a" * 64,
+        release_branch: "release/17.0.0",
+        ci_snapshot: accelerated_rc_ci_snapshot,
+        shakaperf: accelerated_rc_shakaperf_snapshot,
+        approved_by: "justin808",
+        recorded_at: Time.utc(2026, 7, 14, 13, 30)
+      )
+      comment = {
+        "body" => accelerated_rc_tracker_comment(authorization),
+        "issue_url" => "https://api.github.com/repos/shakacode/react_on_rails/issues/3823",
+        "user" => { "login" => "justin808" }
+      }
+      issue = {
+        "number" => 3823,
+        "state" => "open",
+        "title" => "Release gate: react_on_rails 16.9.0",
+        "pull_request" => nil,
+        "labels" => [{ "name" => "release" }, { "name" => "TRACKING" }]
+      }
+      status = instance_double(Process::Status, success?: true)
+      allow(self).to receive(:accelerated_rc_repository_comment_permission!).and_return("maintain")
+      allow(self).to receive(:capture_gh_output)
+        .with("api", "repos/shakacode/react_on_rails/issues/3823")
+        .and_return([JSON.generate(issue), status])
+
+      expect do
+        trusted_accelerated_rc_records_from_repository_comment!(
+          comment:, repo_slug: "shakacode/react_on_rails", permissions: {}
+        )
+      end.to raise_error(SystemExit, /exact title.*Release gate: react_on_rails 17\.0\.0/i)
     end
 
     it "rejects an auditable record that names a different approver than its comment author" do
@@ -11869,7 +12347,7 @@ RSpec.describe "release.rake helper methods" do
         .and_return(["commit\n", status])
       allow(self).to receive(:github_repo_slug).with("/tmp/repo").and_return("shakacode/react_on_rails")
       allow(self).to receive(:fetch_release_tracker_issue!).with(
-        repo_slug: "shakacode/react_on_rails", tracker: 3823
+        repo_slug: "shakacode/react_on_rails", tracker: 3823, target_version: "17.0.0.rc.10"
       )
       allow(self).to receive(:fetch_repository_accelerated_rc_records_for_candidate!).with(
         repo_slug: "shakacode/react_on_rails",
@@ -11886,7 +12364,7 @@ RSpec.describe "release.rake helper methods" do
 
       expect(result).to be_nil
       expect(self).to have_received(:fetch_release_tracker_issue!).with(
-        repo_slug: "shakacode/react_on_rails", tracker: 3823
+        repo_slug: "shakacode/react_on_rails", tracker: 3823, target_version: "17.0.0.rc.10"
       )
     end
 
@@ -12852,6 +13330,60 @@ RSpec.describe "release.rake helper methods" do
       end.to raise_error(SystemExit, /inconsistent accelerated final-promotion boundary evidence/i)
     end
 
+    it "lets an explicit final run selector bypass reusable accepted-RC ShakaPerf evidence" do
+      selector = "654321"
+      expect(self).not_to receive(:reuse_accepted_rc_shakaperf_evidence!)
+      allow(self).to receive(:strict_final_promotion_shakaperf_snapshot!).with(
+        hash_including(run_selector: selector)
+      ).and_return(strict_final_shakaperf_snapshot)
+
+      evidence = final_promotion_shakaperf_snapshot!(
+        repo_slug: "shakacode/react_on_rails",
+        monorepo_root: "/tmp/repo",
+        current_branch: "release/17.0.0",
+        final_head_sha: "e" * 40,
+        record: accepted_record,
+        target_version: "17.0.0",
+        release_started_at: Time.utc(2026, 7, 14, 14),
+        allow_ci_override: false,
+        dry_run: false,
+        tracker: 3823,
+        run_selector: selector
+      )
+
+      expect(evidence).to include(mode: FINAL_PROMOTION_SHAKAPERF_STRICT_FINAL_MODE)
+      expect(self).to have_received(:strict_final_promotion_shakaperf_snapshot!).with(
+        hash_including(run_selector: selector)
+      )
+    end
+
+    it "does not let an accepted-RC refresh API error preempt an explicit final run selector" do
+      selector = "654321"
+      expect(self).not_to receive(:reuse_accepted_rc_shakaperf_evidence!)
+      allow(self).to receive(:strict_final_promotion_shakaperf_snapshot!).with(
+        hash_including(run_selector: selector)
+      ).and_return(strict_final_shakaperf_snapshot)
+
+      expect do
+        final_promotion_shakaperf_snapshot!(
+          repo_slug: "shakacode/react_on_rails",
+          monorepo_root: "/tmp/repo",
+          current_branch: "release/17.0.0",
+          final_head_sha: "e" * 40,
+          record: accepted_record,
+          target_version: "17.0.0",
+          release_started_at: Time.utc(2026, 7, 14, 14),
+          allow_ci_override: false,
+          dry_run: false,
+          tracker: 3823,
+          run_selector: selector
+        )
+      end.not_to raise_error
+      expect(self).to have_received(:strict_final_promotion_shakaperf_snapshot!).with(
+        hash_including(run_selector: selector)
+      )
+    end
+
     it "aborts post-bump runtime drift instead of falling back to a fresh ShakaPerf gate" do
       allow(self).to receive(:accelerated_rc_runtime_equivalent?).and_return(false)
       expect(self).not_to receive(:refresh_accepted_rc_ci_evidence_for_promotion!)
@@ -13609,7 +14141,7 @@ RSpec.describe "release.rake helper methods" do
       {
         "number" => 4806,
         "state" => "open",
-        "title" => "Release gate: React on Rails 17.0.0",
+        "title" => "Release gate: react_on_rails 17.0.1",
         "pull_request" => nil,
         "labels" => []
       }
@@ -13625,8 +14157,8 @@ RSpec.describe "release.rake helper methods" do
         current_monorepo_root: "/tmp/repo",
         verbose: nil,
         release_paths: { monorepo_root: "/tmp/repo", gem_root: "/tmp/repo/react_on_rails" },
-        resolve_release_version_before_auth!: "17.0.0",
-        current_gem_version: "16.9.0",
+        resolve_release_version_before_auth!: "17.0.1",
+        current_gem_version: "17.0.0",
         ci_status_override_allowed_for_release!: false,
         github_repo_slug: "shakacode/react_on_rails"
       )
@@ -13650,7 +14182,7 @@ RSpec.describe "release.rake helper methods" do
 
     def invoke_automatic_tracker_release
       release_task.reenable
-      release_task.invoke("17.0.0", true, true, false)
+      release_task.invoke("17.0.1", true, true, false)
       nil
     rescue SystemExit => error
       error
@@ -13751,6 +14283,49 @@ RSpec.describe "release.rake helper methods" do
         expect(task_receiver).not_to have_received(:publish_npm_with_retry)
         expect(task_receiver).not_to have_received(:publish_gem_with_retry)
       end
+    end
+
+    it "rejects a ShakaPerf selector after durable same-candidate retry discovery and before side effects" do
+      release_task = Rake::Task["release"]
+      task_receiver = release_task.actions.first.binding.receiver
+      success_status = instance_double(Process::Status, success?: true)
+
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", "/tmp/repo", "rev-parse", "--abbrev-ref", "HEAD")
+        .and_return(["release/17.0.0\n", success_status])
+      allow(ReactOnRails::GitUtils).to receive(:uncommitted_changes?)
+      allow(task_receiver).to receive(:with_release_checkout) { |**_, &block| block.call("/tmp/repo") }
+      allow(task_receiver).to receive_messages(
+        current_monorepo_root: "/tmp/repo",
+        verbose: nil,
+        release_paths: { monorepo_root: "/tmp/repo", gem_root: "/tmp/repo/react_on_rails" },
+        resolve_release_version_before_auth!: "17.0.0.rc.10",
+        current_gem_version: "17.0.0.rc.10",
+        validated_shakaperf_release_tracker!: 3823,
+        release_tag_retry_state_for_current_head: :none,
+        ci_status_override_allowed_for_release!: false,
+        github_repo_slug: "shakacode/react_on_rails",
+        current_git_sha!: "e" * 40,
+        resolve_accelerated_rc_options_for_release!: {
+          target_gem_version: "17.0.0.rc.10",
+          tracker: 3823,
+          reason: "Persisted same-candidate retry"
+        }
+      )
+      allow(ENV).to receive(:fetch).and_call_original
+      allow(ENV).to receive(:fetch).with("RELEASE_SHAKAPERF_RUN", nil).and_return("654321")
+      allow(ENV).to receive(:fetch).with("RELEASE_FINAL_SHAKAPERF_WAIVER_REASON", nil).and_return(nil)
+      allow(ENV).to receive(:fetch).with("RELEASE_TRACKER", nil).and_return("3823")
+      allow(ENV).to receive(:fetch).with("RELEASE_ACCELERATED_RC", nil).and_return(nil)
+      expect(task_receiver).not_to receive(:fetch_release_tracker_issue!)
+      expect(task_receiver).not_to receive(:current_release_approver!)
+      expect(task_receiver).not_to receive(:validate_main_ci_status!)
+      expect(task_receiver).not_to receive(:sh_in_dir_for_release)
+      expect(task_receiver).not_to receive(:run_shakaperf_release_gate!)
+
+      failure = invoke_release_task_and_capture_exit(release_task)
+
+      expect(failure&.message).to match(/accelerated RC retry.*cannot be combined.*RELEASE_SHAKAPERF_RUN/i)
     end
 
     it "blocks accelerated RCs from feature branches before release side effects" do
@@ -14026,7 +14601,8 @@ RSpec.describe "release.rake helper methods" do
         )
         expect(task_receiver).to have_received(:fetch_release_tracker_issue!).with(
           repo_slug: "shakacode/react_on_rails",
-          tracker: 3823
+          tracker: 3823,
+          target_version: "17.0.0.rc.10"
         )
         expect(task_receiver).to have_received(:current_release_approver!).with(
           repo_slug: "shakacode/react_on_rails"
@@ -14370,7 +14946,7 @@ RSpec.describe "release.rake helper methods" do
 
     before do
       allow(self).to receive(:github_repo_slug).with("/tmp/repo").and_return(repo_slug)
-      allow(self).to receive(:fetch_release_tracker_issue!).with(repo_slug:, tracker: 3823)
+      allow(self).to receive(:fetch_release_tracker_issue!).with(repo_slug:, tracker: 3823, target_version:)
     end
 
     it "fails closed on a terminal run at both irreversible boundaries" do
@@ -14408,7 +14984,8 @@ RSpec.describe "release.rake helper methods" do
 
     it "fails closed when the release tracker is no longer canonical and active at either boundary" do
       allow(self).to receive(:fetch_release_tracker_issue!)
-        .with(repo_slug:, tracker: 3823).and_raise(SystemExit, "release tracker is no longer active")
+        .with(repo_slug:, tracker: 3823, target_version:)
+        .and_raise(SystemExit, "release tracker is no longer active")
 
       ["git tag push", "package publication"].each do |phase|
         expect do

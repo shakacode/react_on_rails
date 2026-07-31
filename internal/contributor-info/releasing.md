@@ -172,8 +172,11 @@ GEM_RELEASE_MAX_RETRIES=<n>  # Positive base-10 integer max retry attempts (defa
 
 #### Saving and reusing ShakaPerf release evidence
 
-Use the canonical `Release gate: react_on_rails X.Y.Z` issue as the durable store. To associate a run
-that was started manually or missed by automatic discovery, provide the same active tracker used by the
+Use the open issue whose exact title is `Release gate: react_on_rails X.Y.Z` as the durable store. `X.Y.Z`
+is always the stable base, so an RC such as `17.0.1.rc.3` is bound to `Release gate: react_on_rails 17.0.1`.
+Release-related labels are advisory and cannot substitute for the exact title. The selected tracker and every
+tracker reached by repository-wide durable-history discovery must satisfy this same target binding. To associate
+a run that was started manually or missed by automatic discovery, provide the same active tracker used by the
 release train and either the numeric run ID or its canonical GitHub URL:
 
 ```bash
@@ -188,6 +191,12 @@ terminal success, completion time, candidate SHA, evidence digest, and runtime f
 comment is append-only, attributed to a repository maintainer, and re-fetched before the task continues.
 Saving the same association again is idempotent.
 
+An explicit `RELEASE_SHAKAPERF_RUN` is authoritative for selection, not a hint. During stable promotion it
+bypasses automatic accepted-RC ShakaPerf reuse and goes directly through strict-final selector verification and
+persistence. It cannot be combined with `RELEASE_ACCELERATED_RC=true`. It also cannot be supplied on an unflagged
+same-candidate retry once durable discovery proves that the retry is accelerated; this aborts before approver,
+CI, mutation, or evidence-refresh work.
+
 The trusted canonical tracker comment is the durable source of truth. A local
 `shakaperf-release-evidence.json` is only a downloaded artifact/cache used during verification; it is never
 the durable source of truth and cannot authorize reuse by itself.
@@ -197,6 +206,16 @@ unedited machine comments, re-fetches the saved run and artifact, and re-runs th
 evidence is preferred. Existing machine-verified runtime-equivalence remains supported because the stored
 candidate is bound to the live run while the schema-v2 runtime fingerprint is compared with the current
 release commit. Output names both the tracker URL and reused run URL.
+
+Only automatic association reuse may discard naturally invalid evidence and continue through normal discovery.
+That recovery is limited to authoritative staleness, a 404-proven missing run or artifact, a live run now completed
+with `failure` or `cancelled`, or proof that the current runtime tree/ancestry is no longer equivalent. A Git
+`merge-base --is-ancestor` exit 1 is authoritative non-ancestry; a Git execution error is unknown and blocks.
+Explicit selectors reject every one of those conditions. Edited, malformed, unsupported, or noncanonical trusted
+comments; author/tracker/title mismatch; conflicting latest records; record/live identity conflict; digest or
+fingerprint mutation; artifact parse or shape errors; and authentication, permission, pagination, parse, or other
+indeterminate API failures all remain hard failures. Absence must therefore be proved, never inferred from an
+unknown observation.
 
 Inspect the durable state with `gh issue view 4806 --repo shakacode/react_on_rails --comments`. To replace
 an association, run the explicit selector again with a newer verified run; the newest trusted association
@@ -285,7 +304,8 @@ non-release feature branches.
 
 The task rejects the accelerated path when the version is implicit, the target is not a canonical
 lowercase `.rc.` version, the tracker is closed or ineligible, the reason is missing, or
-`RELEASE_CI_STATUS_OVERRIDE` is also set. Case-varied spellings such as `.RC.` are rejected before
+`RELEASE_CI_STATUS_OVERRIDE` or `RELEASE_SHAKAPERF_RUN` is also set. The selector incompatibility also applies
+after an unflagged same-candidate retry discovers persisted accelerated options. Case-varied spellings such as `.RC.` are rejected before
 tracker records or tag provenance can be created. Every numeric core component and the numeric `rc`
 identifier must also use canonical npm-semver spelling: zero itself is valid, but leading zeroes are not.
 It still fails closed on failed, missing, malformed,
@@ -406,9 +426,10 @@ malformed boundaries, duplicated markers, and
 spoofed summaries cannot prove irrelevance and therefore reach strict parsing and block. Discovery comments
 must name the canonical API issue URL in the exact requested repository; wrong hosts, repositories, paths,
 queries, and fragments are rejected before their issue number is used. Every tracker referenced by a plausible
-exact-candidate marker is fetched once and must pass the same open release-tracker eligibility check used by
-selected-tracker publication. Pull requests cannot serve as release trackers even though GitHub exposes their
-comments through the issues APIs.
+exact-candidate marker is fetched once and must be an open issue with the exact stable-base title derived from that
+record's target version; labels do not substitute. This is the same eligibility check used by selected-tracker
+publication. Pull requests cannot serve as release trackers even though GitHub exposes their comments through the
+issues APIs.
 
 ShakaPerf evidence is bound to the requested version, workflow run, run attempt, and candidate SHA
 through reconciliation and every publication boundary. Reused accepted-RC evidence remains bound to
@@ -488,8 +509,10 @@ docs/comment-only delta. Every intervening commit is inspected:
 package manifests, version files, and `Gemfile.lock` files may differ only by their normalized product-version
 metadata, while dependency, lockfile, or any other runtime-bearing content change requires a new accepted RC
 and cannot fall back to a fresh final ShakaPerf run. Accepted ShakaPerf evidence is
-refreshed and re-verified against the final tip; otherwise the normal strict final ShakaPerf gate runs
-only for a still-runtime-equivalent finalization. After that gate completes, the task re-fetches the live
+refreshed and re-verified against the final tip when automatic reuse applies. An explicit
+`RELEASE_SHAKAPERF_RUN` instead bypasses that reuse and must pass and persist through the strict final selector
+path; otherwise the normal strict final ShakaPerf gate runs only for a still-runtime-equivalent finalization.
+After that gate completes, the task re-fetches the live
 remote RC tag, repository-wide canonical tracker chain, and exact accepted-RC CI immediately before stable
 tagging and publication. The re-fetched accepted record must differ from the originally gated record only by its
 permitted retry timestamp. Local `HEAD` must still equal the validated final candidate, and the stable tag
