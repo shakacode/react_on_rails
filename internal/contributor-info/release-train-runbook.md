@@ -544,16 +544,23 @@ above; when there are multiple selections, serialize the sequence:
    provenance was lost.
 
    Merge a one-source backport synchronously from the release coordinator's
-   shell; do not enable auto-merge or use a merge queue. Record the exact head
-   and release-base OIDs covered by validation and review, then use this
-   expected-head squash path with the final headline and body:
+   shell; do not enable auto-merge or use a merge queue. Record the exact head,
+   release-base, and `main` OIDs covered by validation and review, then use this
+   expected-head squash path with the final headline and body. After the
+   exact-head gates, rerun the existing source-liveness, presence, and
+   supersession audit against `BACKPORT_VALIDATED_MAIN_OID`; only when it proves
+   the source patch is still live and neither reverted nor superseded may the
+   operator set `BACKPORT_SOURCE_AUDIT_RESULT` to the exact bound value shown
+   below:
 
    ```bash
    BACKPORT_PR="${BACKPORT_PR:?set the backport PR number or URL}"
    BACKPORT_RELEASE_BRANCH="${BACKPORT_RELEASE_BRANCH:?set the exact release/X.Y.Z branch}"
    BACKPORT_VALIDATED_HEAD_OID="${BACKPORT_VALIDATED_HEAD_OID:?set the validated 40-character head OID}"
    BACKPORT_VALIDATED_BASE_OID="${BACKPORT_VALIDATED_BASE_OID:?set the validated 40-character release-base OID}"
+   BACKPORT_VALIDATED_MAIN_OID="${BACKPORT_VALIDATED_MAIN_OID:?set the audited 40-character main OID}"
    BACKPORT_SOURCE_SHA="${BACKPORT_SOURCE_SHA:?set the direct 40-character main source SHA}"
+   BACKPORT_SOURCE_AUDIT_RESULT="${BACKPORT_SOURCE_AUDIT_RESULT:?set the main-OID-bound source-audit result}"
    BACKPORT_COMMIT_HEADLINE="${BACKPORT_COMMIT_HEADLINE:?set the final squash headline}"
    BACKPORT_COMMIT_BODY="${BACKPORT_COMMIT_BODY:?set the final squash body}"
 
@@ -564,13 +571,14 @@ above; when there are multiple selections, serialize the sequence:
    }
    ruby -e '
      full_sha = /\A[0-9a-f]{40}\z/
-     head, base, source, body = ARGV
-     abort "invalid backport OID" unless [head, base, source].all? { |oid| full_sha.match?(oid) }
+     head, base, main, source, body = ARGV
+     abort "invalid backport OID" unless [head, base, main, source].all? { |oid| full_sha.match?(oid) }
      footers = body.lines(chomp: true).grep(/\A\(cherry picked from commit [0-9a-f]{40}\)\z/)
      expected = "(cherry picked from commit #{source})"
      abort "squash body must contain exactly one direct source footer" unless footers == [expected]
    ' "${BACKPORT_VALIDATED_HEAD_OID}" "${BACKPORT_VALIDATED_BASE_OID}" \
-     "${BACKPORT_SOURCE_SHA}" "${BACKPORT_COMMIT_BODY}" || {
+     "${BACKPORT_VALIDATED_MAIN_OID}" "${BACKPORT_SOURCE_SHA}" \
+     "${BACKPORT_COMMIT_BODY}" || {
      return 1 2>/dev/null || exit 1
    }
 
@@ -618,13 +626,29 @@ above; when there are multiple selections, serialize the sequence:
      return 1 2>/dev/null || exit 1
    }
    git fetch --prune origin \
+     "+refs/heads/main:refs/remotes/origin/main" \
      "+refs/heads/${BACKPORT_RELEASE_BRANCH}:refs/remotes/origin/${BACKPORT_RELEASE_BRANCH}" || {
-     echo "could not refresh the release branch; stop backport" >&2
+     echo "could not refresh main and the release branch; stop backport" >&2
+     return 1 2>/dev/null || exit 1
+   }
+   test "$(git rev-parse refs/remotes/origin/main^{commit})" = \
+     "${BACKPORT_VALIDATED_MAIN_OID}" || {
+     echo "origin/main differs from the audited main OID; stop backport" >&2
      return 1 2>/dev/null || exit 1
    }
    test "$(git rev-parse "refs/remotes/origin/${BACKPORT_RELEASE_BRANCH}^{commit}")" = \
      "${BACKPORT_VALIDATED_BASE_OID}" || {
      echo "release branch differs from the validated base; stop backport" >&2
+     return 1 2>/dev/null || exit 1
+   }
+   git merge-base --is-ancestor \
+     "${BACKPORT_SOURCE_SHA}" refs/remotes/origin/main || {
+     echo "backport source is not an ancestor of the exact fetched main; stop backport" >&2
+     return 1 2>/dev/null || exit 1
+   }
+   test "${BACKPORT_SOURCE_AUDIT_RESULT}" = \
+     "live-not-reverted-not-superseded:${BACKPORT_VALIDATED_MAIN_OID}" || {
+     echo "source audit is missing, UNKNOWN, stale, or not clean; stop backport" >&2
      return 1 2>/dev/null || exit 1
    }
    require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
@@ -661,10 +685,11 @@ above; when there are multiple selections, serialize the sequence:
    }
    ```
 
-   The head, base, branch, and release-line ownership checks are preflight
-   checks. They retain the narrow preflight-to-mutation race, so use this path
-   only under the positive-termination/single-controller rule above; otherwise
-   stop pending resource-bound fencing.
+   The head, base, branch, freshly fetched `main`, source-audit, and release-line
+   ownership checks are preflight checks. They retain the narrow
+   preflight-to-mutation race, so use this path only under the
+   positive-termination/single-controller rule above; otherwise stop pending
+   resource-bound fencing.
 
 8. Fetch the new release tip before updating or branching the next selected
    source PR.
