@@ -37,12 +37,15 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   and record mutations remain blocking. Raw REST-selected runs now preserve their creation timestamp through
   strict-final verification. Before either a live release or dry run can reach registry checks, confirmation,
   mutation, tagging, or publication, the task also verifies the frozen pnpm install state, the repository-pinned
-  pnpm version, and lifecycle-enabled builds of all four npm release packages. npm publication now retries only
-  explicit OTP challenges and bounded transient failures, while authentication, lifecycle, registry, and unknown
-  failures stop immediately with OTP values redacted. Stable releases also support an append-only, tracker-bound
-  observation waiver that does not
+  pnpm version, and lifecycle-enabled builds of all four npm release packages before creating a release checkout,
+  pulling, authenticating, or reading any remote release state. npm publication now retries only explicit OTP
+  challenges and context-qualified transient network/HTTP failures; authentication, lifecycle, registry, incidental
+  numeric diagnostics, and unknown failures stop immediately with OTP values redacted. Stable releases also support
+  an append-only, tracker-bound schema-v2 observation waiver bound to the exact run attempt and canonical
+  repository/workflow/event/branch identity. Legacy schema-v1 waiver markers remain readable audit history but cannot
+  authorize publication. The waiver does not
   claim the run succeeded or bypass any other release gate; the tracker, waiver, and exact run are revalidated
-  before remote tag push and package publication. Fixes
+  before remote tag push and package publication, and a rerun attempt blocks both boundaries. Fixes
   [Issue 4812](https://github.com/shakacode/react_on_rails/issues/4812).
 
 - **[Pro]** **RSC render-error details are no longer sent to the browser on the fetched payload path**:

@@ -112,10 +112,12 @@ When called with no arguments, `rake release`:
 
 Dry runs use a temporary git worktree so version bumps and installs do not modify your current checkout.
 
-Both live releases and dry runs first verify npm publication readiness in the original checkout. The root
+Both live releases and dry runs first verify npm publication readiness in the original checkout, immediately after
+the clean-worktree check and verbosity setup. The root
 `packageManager` must pin an exact pnpm version, the installed pnpm must match it, `node_modules/.pnpm/lock.yaml`
 must byte-match the committed `pnpm-lock.yaml`, and every npm release package must pass its normal `build` script
-with lifecycle scripts enabled. This happens before registry probes, confirmation, version mutation, ShakaPerf
+with lifecycle scripts enabled. This happens before release-checkout creation, `git pull`, npm or GitHub
+authentication, CI/tag/version-policy remote reads, registry probes, confirmation, version mutation, ShakaPerf
 dispatch, tagging, publication, or OTP prompting. Every readiness failure prints the single repair command:
 
 ```bash
@@ -245,15 +247,19 @@ RELEASE_FINAL_SHAKAPERF_WAIVER_REASON="GitHub REST observer exhausted its quota"
 bundle exec rake "release[17.0.1]"
 ```
 
-The task writes and re-fetches an append-only `gate_observation_failed` waiver bound to the exact tracker,
-repository, branch, stable version, candidate SHA, run ID/URL, reason, and authenticated maintainer. It
+The task writes and re-fetches an append-only schema-v2 `gate_observation_failed` waiver bound to the exact tracker,
+repository, canonical workflow, `workflow_dispatch` event, branch, stable version, candidate SHA, run ID, positive
+run attempt, URL, reason, and authenticated maintainer. Canonical schema-v1 waiver markers remain readable,
+approver/tracker-bound audit history, but they are deliberately non-authorizing; a new schema-v2 record must be
+appended for the candidate. Malformed, edited, or noncanonical legacy markers still fail closed. The waiver
 preserves the last observed run status and conclusion and never reports the run as successful. The waiver
 cannot apply to prereleases, a failed/cancelled or otherwise terminal run, malformed/mismatched/stale
-evidence, or a different current run/reason. It waives only inability to observe ShakaPerf; CI, version
+evidence, a rerun attempt, or a different current run/reason. It waives only inability to observe ShakaPerf; CI, version
 policy, tag, registry, accepted-RC, and publication-boundary checks remain unchanged and blocking.
 Immediately before the remote tag push and again before package publication, the task revalidates that the
-tracker is still canonical and active, the append-only waiver is unchanged, and the exact run is still
-active. Continued API unavailability remains covered by the recorded observation waiver, but a terminal or
+tracker is still canonical and active, the append-only waiver and its exact attempt are unchanged, and the exact run
+identity and attempt are still active. Continued API unavailability remains covered by the recorded observation
+waiver, but a terminal, rerun, wrong-identity, or
 unknown run state, a closed/noncanonical tracker, or a changed/disappeared waiver blocks publication.
 
 #### Release CI evidence and strict HEAD evaluation
@@ -833,7 +839,15 @@ pnpm install --frozen-lockfile
 ```
 
 Then fix any remaining build error and rerun the same explicit release version. The release will not have reached
-confirmation, version mutation, ShakaPerf dispatch, tagging, publication, or OTP prompting.
+release-checkout creation, pull/authentication, remote CI/tag/version reads, confirmation, version mutation,
+ShakaPerf dispatch, tagging, publication, or OTP prompting.
+
+During npm publication, only explicit transient diagnostics are retried with bounded backoff and the same OTP:
+network codes such as `ECONNRESET`, npm/pnpm codes such as `E429`, `E503`, or `ERR_PNPM_FETCH_503`, and HTTP or
+response/status-code contexts such as `HTTP 429` or `status code 503`. Bare numbers such as `429` or `500`, package
+sizes, TypeScript source locations, lifecycle failures, registry rejections, authentication failures, and unknown
+output fail immediately. Only an explicit OTP challenge (`EOTP` or an equivalent one-time-password prompt) requests
+a fresh code; all printed OTP values remain redacted.
 
 ### If Release Fails
 

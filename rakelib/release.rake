@@ -39,13 +39,15 @@ NPM_PUBLISH_HARD_FAILURE_CATEGORIES = %i[
   registry_rejection
   unknown
 ].freeze
-NPM_PUBLISH_TRANSIENT_PATTERN = /
+NPM_PUBLISH_TRANSIENT_PATTERN = %r{
   \b(?:
     EAI_AGAIN | ECONNRESET | ETIMEDOUT | ENETUNREACH | ECONNREFUSED |
-    ERR_SOCKET_TIMEOUT | E5\d\d | ERR_PNPM_FETCH_(?:429|5\d\d)
+    ERR_SOCKET_TIMEOUT | E429 | E5\d\d | ERR_PNPM_FETCH_(?:429|5\d\d)
   )\b |
-  socket\ hang\ up | network\ (?:timeout|error) | \b429\b | too\ many\ requests | \b(?:HTTP\s*)?5\d\d\b
-/ix
+  socket\ hang\ up | network\ (?:timeout|error) | too\ many\ requests |
+  \bHTTP(?:/1\.\d)?\s+(?:429|5\d\d)\b |
+  \b(?:response(?:\s+status)?|status(?:\s+code)?)\s*(?::|=)?\s*(?:429|5\d\d)\b
+}ix
 NPM_PUBLISH_LOCAL_LIFECYCLE_PATTERN = /
   \b(?:ELIFECYCLE|ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL|ERR_PNPM_NO_SCRIPT)\b |
   prepublishOnly | lifecycle\ script | \btsc\b | TypeScript | Cannot\ find\ module
@@ -120,7 +122,7 @@ FINAL_PROMOTION_SHAKAPERF_ACCEPTED_RC_MODE = "accepted-rc-reuse"
 FINAL_PROMOTION_SHAKAPERF_STRICT_FINAL_MODE = "strict-final"
 FINAL_PROMOTION_SHAKAPERF_OBSERVATION_WAIVER_MODE = "strict-final-observation-waiver"
 FINAL_PROMOTION_SHAKAPERF_OBSERVATION_WAIVER_FIELDS = %w[
-  status run_id run_url candidate_sha target_version release_started_at observed_status observed_conclusion
+  status run_id attempt run_url candidate_sha target_version release_started_at observed_status observed_conclusion
   release_tracker waiver_digest
 ].freeze
 SHAKAPERF_RELEASE_GATE_TERMINAL_CONCLUSIONS = %w[
@@ -160,18 +162,22 @@ SHAKAPERF_RELEASE_TRACKER_ASSOCIATION_IDENTITY_FIELDS = %w[
   repository release_tracker branch candidate_sha target_version workflow run_id run_attempt run_url
   runtime_tree_fingerprint evidence_digest
 ].freeze
-SHAKAPERF_APPROVER_BOUND_ENTRY_KINDS = %i[association waiver].freeze
-SHAKAPERF_FINAL_OBSERVATION_WAIVER_SCHEMA_VERSION = 1
+SHAKAPERF_APPROVER_BOUND_ENTRY_KINDS = %i[association waiver legacy_waiver].freeze
+SHAKAPERF_FINAL_OBSERVATION_WAIVER_SCHEMA_VERSION = 2
 SHAKAPERF_FINAL_OBSERVATION_WAIVER_MARKER = "react-on-rails-final-shakaperf-waiver"
 SHAKAPERF_FINAL_OBSERVATION_WAIVER_MARKER_OPENER =
   "<!-- #{SHAKAPERF_FINAL_OBSERVATION_WAIVER_MARKER} ".freeze
 SHAKAPERF_FINAL_OBSERVATION_WAIVER_FIELDS = %w[
-  schema_version repository release_tracker branch candidate_sha target_version workflow run_id run_url failure_kind
-  reason observation_digest approved_by recorded_at
+  schema_version repository release_tracker branch candidate_sha target_version workflow run_id run_attempt run_url
+  failure_kind reason observation_digest approved_by recorded_at
 ].freeze
 SHAKAPERF_FINAL_OBSERVATION_WAIVER_IDENTITY_FIELDS = %w[
-  repository release_tracker branch candidate_sha target_version workflow run_id run_url failure_kind reason
-  observation_digest approved_by
+  repository release_tracker branch candidate_sha target_version workflow run_id run_attempt run_url failure_kind
+  reason observation_digest approved_by
+].freeze
+SHAKAPERF_FINAL_OBSERVATION_WAIVER_LEGACY_V1_FIELDS = %w[
+  schema_version repository release_tracker branch candidate_sha target_version workflow run_id run_url failure_kind
+  reason observation_digest approved_by recorded_at
 ].freeze
 
 class ShakaperfGateObservationError < StandardError
@@ -1078,7 +1084,10 @@ end
 def shakaperf_release_tracker_entry_from_comment!(comment)
   body = comment.fetch("body")
   if body.include?(SHAKAPERF_FINAL_OBSERVATION_WAIVER_MARKER_OPENER)
-    { kind: :waiver, record: final_shakaperf_observation_waiver_record_from_comment!(comment) }
+    record = final_shakaperf_observation_waiver_record_from_comment!(comment)
+    current_schema = record.fetch("schema_version") == SHAKAPERF_FINAL_OBSERVATION_WAIVER_SCHEMA_VERSION
+    kind = current_schema ? :waiver : :legacy_waiver
+    { kind:, record: }
   elsif body.include?(SHAKAPERF_RELEASE_TRACKER_ASSOCIATION_MARKER_OPENER)
     { kind: :association, record: verified_shakaperf_release_tracker_record_from_comment!(comment) }
   else
@@ -1096,12 +1105,16 @@ def final_shakaperf_observation_waiver_record_from_comment!(comment)
   end
 
   schema_version, encoded_payload = matches.first
-  unless schema_version.to_i == SHAKAPERF_FINAL_OBSERVATION_WAIVER_SCHEMA_VERSION && encoded_payload.length.even?
+  unless %w[1 2].include?(schema_version) && encoded_payload.length.even?
     abort "❌ Release tracker contains an unsupported final ShakaPerf observation waiver."
   end
 
   record = JSON.parse([encoded_payload].pack("H*"))
-  validate_final_shakaperf_observation_waiver_record!(record)
+  if schema_version == SHAKAPERF_FINAL_OBSERVATION_WAIVER_SCHEMA_VERSION.to_s
+    validate_final_shakaperf_observation_waiver_record!(record)
+  else
+    validate_legacy_final_shakaperf_observation_waiver_record!(record)
+  end
   canonical_encoded = canonical_accelerated_rc_json(record).unpack1("H*")
   unless encoded_payload == canonical_encoded
     abort "❌ Release tracker contains a non-canonical final ShakaPerf observation waiver."
@@ -1396,6 +1409,10 @@ def saved_shakaperf_observation_error_run(record:, entry:, ref:, target_version:
     "attempt" => record.fetch("run_attempt").to_i,
     "displayTitle" => shakaperf_release_gate_display_title(ref:, head_sha: candidate_sha, target_version:),
     "headSha" => candidate_sha,
+    "headBranch" => ref,
+    "workflowPath" => ".github/workflows/#{SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE}",
+    "event" => "workflow_dispatch",
+    "repository" => record.fetch("repository"),
     "status" => "unknown",
     "conclusion" => nil,
     "url" => record.fetch("run_url")
@@ -1667,12 +1684,48 @@ end
 def valid_final_shakaperf_observation_waiver_evidence?(record)
   [
     positive_github_id?(record["run_id"]),
+    positive_github_id?(record["run_attempt"]),
     valid_accelerated_rc_https_url?(record["run_url"]),
     record["failure_kind"] == "gate_observation_failed",
     record["observation_digest"].to_s.match?(/\A[0-9a-f]{64}\z/),
     valid_accelerated_rc_nonempty_string?(record["approved_by"]),
     !shakaperf_release_gate_time(record["recorded_at"]).nil?
   ].all?
+end
+
+def valid_legacy_final_shakaperf_observation_waiver_identity?(record)
+  return false unless accelerated_rc_exact_keys?(record, SHAKAPERF_FINAL_OBSERVATION_WAIVER_LEGACY_V1_FIELDS)
+
+  [
+    record["schema_version"] == 1,
+    valid_accelerated_rc_nonempty_string?(record["repository"]),
+    valid_accelerated_rc_tracker_number?(record["release_tracker"]),
+    valid_accelerated_rc_nonempty_string?(record["branch"]),
+    record["candidate_sha"].to_s.match?(/\A[0-9a-f]{40}\z/),
+    record["target_version"].to_s.match?(SHAKAPERF_RELEASE_GATE_CANONICAL_VERSION_PATTERN),
+    !release_prerelease_version?(record["target_version"]),
+    record["workflow"] == SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE
+  ].all?
+end
+
+def valid_legacy_final_shakaperf_observation_waiver_evidence?(record)
+  [
+    positive_github_id?(record["run_id"]),
+    valid_accelerated_rc_https_url?(record["run_url"]),
+    record["failure_kind"] == "gate_observation_failed",
+    record["observation_digest"].to_s.match?(/\A[0-9a-f]{64}\z/),
+    valid_accelerated_rc_nonempty_string?(record["approved_by"]),
+    !shakaperf_release_gate_time(record["recorded_at"]).nil?
+  ].all?
+end
+
+def validate_legacy_final_shakaperf_observation_waiver_record!(record)
+  valid = valid_legacy_final_shakaperf_observation_waiver_identity?(record) &&
+          valid_legacy_final_shakaperf_observation_waiver_evidence?(record)
+  validate_final_shakaperf_observation_waiver_reason!(record["reason"]) if valid
+  abort "❌ Release tracker contains a malformed final ShakaPerf observation waiver." unless valid
+
+  record
 end
 
 def validate_final_shakaperf_observation_waiver_record!(record)
@@ -1693,7 +1746,7 @@ def final_shakaperf_observation_waiver_comment(record)
     ### Final ShakaPerf observation waiver
 
     - Release: `#{record.fetch('target_version')}` at `#{record.fetch('candidate_sha')}`
-    - Run: #{record.fetch('run_url')}
+    - Run: #{record.fetch('run_url')} (attempt #{record.fetch('run_attempt')})
     - Failure kind: `gate_observation_failed`
     - Maintainer: `#{record.fetch('approved_by')}` at `#{record.fetch('recorded_at')}`
     - Reason: #{record.fetch('reason')}
@@ -1705,7 +1758,11 @@ def exact_final_shakaperf_waiver_run!(repo_slug:, ref:, head_sha:, target_versio
   run_id = normalized["databaseId"]
   expected_url = "https://github.com/#{repo_slug}/actions/runs/#{run_id}"
   expected_title = shakaperf_release_gate_display_title(ref:, head_sha:, target_version:)
-  valid = positive_github_id?(run_id) && normalized["headSha"] == head_sha &&
+  identity_rejection = selected_shakaperf_release_gate_run_identity_rejection(
+    run: normalized, repo_slug:, ref:
+  )
+  valid = identity_rejection.nil? && positive_github_id?(run_id) && positive_github_id?(normalized["attempt"]) &&
+          normalized["headSha"] == head_sha &&
           normalized["displayTitle"] == expected_title && normalized["url"] == expected_url
   unless valid
     abort "❌ Final ShakaPerf observation waiver requires an exact repository/branch/version/SHA run identity."
@@ -1746,6 +1803,7 @@ def build_final_shakaperf_observation_waiver_record(repo_slug:, tracker:, ref:, 
     "target_version" => target_version,
     "workflow" => SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE,
     "run_id" => normalized_run.fetch("databaseId"),
+    "run_attempt" => normalized_run.fetch("attempt"),
     "run_url" => normalized_run.fetch("url"),
     "failure_kind" => "gate_observation_failed",
     "reason" => validate_final_shakaperf_observation_waiver_reason!(reason),
@@ -1785,9 +1843,12 @@ end
 
 def waived_final_shakaperf_run(record, observed_run: nil)
   normalized_run = normalized_selected_shakaperf_release_gate_run(observed_run || {})
+  if observed_run && normalized_run["attempt"] != record.fetch("run_attempt")
+    abort "❌ Observed run attempt does not match the final ShakaPerf observation waiver."
+  end
   {
     "databaseId" => record.fetch("run_id"),
-    "attempt" => normalized_run["attempt"],
+    "attempt" => record.fetch("run_attempt"),
     "displayTitle" => shakaperf_release_gate_display_title(
       ref: record.fetch("branch"),
       head_sha: record.fetch("candidate_sha"),
@@ -1819,8 +1880,8 @@ def apply_final_shakaperf_observation_waiver!(error:, repo_slug:, tracker:, ref:
   existing = selected_final_shakaperf_observation_waiver(
     entries:, repo_slug:, tracker:, ref:, head_sha:, target_version:
   )
-  if existing && (existing.values_at("run_id", "run_url", "reason") !=
-                  [observed_run["databaseId"], observed_run["url"], reason])
+  if existing && (existing.values_at("run_id", "run_attempt", "run_url", "reason") !=
+                  [observed_run["databaseId"], observed_run["attempt"], observed_run["url"], reason])
     abort "❌ Existing final ShakaPerf observation waiver does not match the current exact run and reason."
   end
   record = existing || persist_final_shakaperf_observation_waiver!(
@@ -1879,7 +1940,14 @@ def fetch_shakaperf_release_gate_runs(repo_slug:, ref:)
     raise ShakaperfGateObservationError, "Unable to list ShakaPerf release gate workflow runs.\n\n#{output}"
   end
 
-  JSON.parse(output)
+  JSON.parse(output).map do |run|
+    run.merge(
+      "repository" => repo_slug,
+      "workflowPath" => ".github/workflows/#{SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE}",
+      "event" => "workflow_dispatch",
+      "headBranch" => ref
+    )
+  end
 rescue JSON::ParserError => e
   raise ShakaperfGateObservationError,
         "Failed to parse ShakaPerf release gate workflow runs: #{e.message}\n\nOutput:\n#{output}"
@@ -1982,7 +2050,12 @@ def refresh_shakaperf_release_gate_run!(repo_slug:, run:)
     )
   end
 
-  JSON.parse(output)
+  JSON.parse(output).merge(
+    "repository" => run["repository"],
+    "workflowPath" => run["workflowPath"],
+    "event" => run["event"],
+    "headBranch" => run["headBranch"]
+  )
 rescue JSON::ParserError => e
   raise ShakaperfGateObservationError.new(
     "Failed to parse refreshed ShakaPerf release gate workflow evidence: #{e.message}", run:
@@ -5000,6 +5073,7 @@ def valid_final_shakaperf_observation_waiver_snapshot_identity?(snapshot)
   [
     snapshot["status"] == "observation_waived",
     positive_github_id?(snapshot["run_id"]),
+    positive_github_id?(snapshot["attempt"]),
     valid_accelerated_rc_https_url?(snapshot["run_url"]),
     snapshot["candidate_sha"].to_s.match?(/\A[0-9a-f]{40}\z/),
     snapshot["target_version"].to_s.match?(SHAKAPERF_RELEASE_GATE_CANONICAL_VERSION_PATTERN),
@@ -6447,10 +6521,7 @@ def validate_final_shakaperf_observation_waiver_publication_boundary!(monorepo_r
     head_sha: carried_record.fetch("candidate_sha"),
     target_version: carried_record.fetch("target_version")
   )
-  digest = Digest::SHA256.hexdigest(canonical_accelerated_rc_json(waiver)) if waiver
-  unless waiver && digest == expected_snapshot.fetch("waiver_digest") &&
-         waiver["run_id"] == expected_snapshot.fetch("run_id") &&
-         waiver["run_url"] == expected_snapshot.fetch("run_url")
+  unless exact_final_shakaperf_observation_waiver_snapshot_match?(waiver:, expected_snapshot:)
     abort "❌ #{boundary_label} #{phase} ShakaPerf observation waiver changed, disappeared, or is conflicting."
   end
 
@@ -6465,6 +6536,15 @@ def validate_final_shakaperf_observation_waiver_publication_boundary!(monorepo_r
 rescue ShakaperfGateMissingRunError
   abort "❌ Selected ShakaPerf run is missing or deleted at #{boundary_label.downcase} #{phase}; " \
         "the observation waiver cannot continue."
+end
+
+def exact_final_shakaperf_observation_waiver_snapshot_match?(waiver:, expected_snapshot:)
+  return false unless waiver
+
+  digest = Digest::SHA256.hexdigest(canonical_accelerated_rc_json(waiver))
+  digest == expected_snapshot.fetch("waiver_digest") &&
+    waiver.values_at("run_id", "run_attempt", "run_url") ==
+      expected_snapshot.values_at("run_id", "attempt", "run_url")
 end
 
 def ordinary_stable_shakaperf_waiver_context_identity(context)
@@ -6521,6 +6601,9 @@ def validate_current_final_shakaperf_observation_waiver_run!(repo_slug:, waiver:
   observed_run = exact_final_shakaperf_waiver_run!(
     repo_slug:, ref:, head_sha:, target_version:, run: normalized_selected_shakaperf_release_gate_run(run)
   )
+  unless observed_run["attempt"] == waiver.fetch("run_attempt")
+    abort "❌ Current ShakaPerf run attempt does not match the final observation waiver."
+  end
   if observed_run["status"] == "completed" || !observed_run["conclusion"].to_s.empty?
     abort "❌ A terminal ShakaPerf result cannot remain covered by a final observation waiver."
   end
@@ -6583,7 +6666,7 @@ def exact_final_shakaperf_observation_waiver_snapshot?(run:, record:, ref:, head
   [
     run["observationWaived"] == true,
     record.values_at("branch", "candidate_sha", "target_version") == [ref, head_sha, target_version],
-    record.values_at("run_id", "run_url") == run.values_at("databaseId", "url"),
+    record.values_at("run_id", "run_attempt", "run_url") == run.values_at("databaseId", "attempt", "url"),
     run["status"] != "completed",
     run["conclusion"].to_s.empty?
   ].all?
@@ -6593,6 +6676,7 @@ def build_final_shakaperf_observation_waiver_snapshot(run:, record:, head_sha:, 
   {
     status: "observation_waived",
     run_id: record.fetch("run_id"),
+    attempt: record.fetch("run_attempt"),
     run_url: record.fetch("run_url"),
     candidate_sha: head_sha,
     target_version:,
@@ -9110,9 +9194,9 @@ def npm_publish_failure_category(output)
     /\bEOTP\b|one[- ]time (?:password|passcode)|\botp(?: code)?\b.*\b(?:required|invalid|expired)\b/i
   )
   return :authentication_failure if text.match?(/\b(?:ENEEDAUTH|E401)\b|authentication (?:is )?required/i)
-  return :transient if text.match?(NPM_PUBLISH_TRANSIENT_PATTERN)
   return :local_lifecycle if text.match?(NPM_PUBLISH_LOCAL_LIFECYCLE_PATTERN)
   return :registry_rejection if text.match?(NPM_PUBLISH_REGISTRY_REJECTION_PATTERN)
+  return :transient if text.match?(NPM_PUBLISH_TRANSIENT_PATTERN)
 
   :unknown
 end
@@ -9315,6 +9399,8 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
 
   # Configure output verbosity
   verbose(is_verbose)
+
+  validate_npm_release_readiness!(monorepo_root:)
 
   released_gem_version = nil
   released_npm_version = nil
@@ -9522,8 +9608,6 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
       release_branch_final_promotion:,
       release_branch_tag_scope:
     )
-
-    validate_npm_release_readiness!(monorepo_root:)
 
     unless is_dry_run
       preflight_registry_publish_conflicts!(
