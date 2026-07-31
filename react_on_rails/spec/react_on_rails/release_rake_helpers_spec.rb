@@ -695,7 +695,7 @@ RSpec.describe "release.rake helper methods" do
       )
     end
 
-    it "reports the GitHub-only recovery command when publication fails" do
+    it "reports only preview-safe GitHub recovery guidance when publication fails" do
       release_context = {
         notes: "#### Fixed\n\n- Release fix",
         prerelease: false,
@@ -712,7 +712,131 @@ RSpec.describe "release.rake helper methods" do
           release_context:,
           dry_run: false
         )
-      end.to raise_error(SystemExit, /bundle exec rake "sync_github_release\[17\.0\.0\]"/)
+      end.to raise_error(SystemExit) { |error|
+        expect(error.message).to include(
+          "Live GitHub release recovery is BLOCKED",
+          'bundle exec rake "sync_github_release[17.0.0,true]"',
+          "internal/contributor-info/release-train-runbook.md"
+        )
+        expect(error.message).not_to include('bundle exec rake "sync_github_release[17.0.0]"')
+      }
+    end
+  end
+
+  describe "#sync_github_release_after_publish" do
+    it "reports only preview-safe guidance when the changelog section is missing" do
+      allow(self).to receive(:extract_changelog_section)
+        .with(changelog_path: "/tmp/repo/CHANGELOG.md", version: "17.0.0")
+        .and_return(nil)
+      expect(self).not_to receive(:verify_gh_auth)
+
+      output = capture_stdout do
+        sync_github_release_after_publish(monorepo_root: "/tmp/repo", gem_version: "17.0.0", dry_run: false)
+      end
+
+      expect(output).to match(
+        /Skipping GitHub release.*Live GitHub release recovery is BLOCKED.*sync_github_release\[17\.0\.0,true\]/m
+      )
+      expect(output).not_to match(/sync_github_release\[17\.0\.0\]"/)
+    end
+  end
+
+  describe "#report_release_dry_run_follow_up" do
+    it "points only to another preview instead of an unfenced live release" do
+      output = capture_stdout do
+        report_release_dry_run_follow_up(version: "17.0.0")
+      end
+
+      expect(output).to include(
+        "Live compound release remains BLOCKED",
+        'bundle exec rake "release[17.0.0,true]"',
+        "release-train-runbook.md"
+      )
+      expect(output).not_to match(/To actually release|bundle exec rake "release\[17\.0\.0\]"/)
+    end
+  end
+
+  describe "preview-only compound release guidance" do
+    let(:release_runbook) { "internal/contributor-info/release-train-runbook.md" }
+
+    it "keeps release retry guidance in preview mode" do
+      allow(self).to receive(:extract_changelog_section)
+        .with(changelog_path: "/tmp/repo/CHANGELOG.md", version: "17.0.0")
+        .and_return(nil)
+
+      expect do
+        confirm_release!(version: "17.0.0", monorepo_root: "/tmp/repo")
+      end.to raise_error(SystemExit) { |error|
+        expect(error.message).to include(
+          "Live compound release remains BLOCKED",
+          'bundle exec rake "release[17.0.0,true]"',
+          release_runbook
+        )
+        expect(error.message).not_to include('bundle exec rake "release[17.0.0]"')
+      }
+
+      retry_message = argumentless_prerelease_release_message(
+        changelog_version: "17.0.0.rc.10",
+        current_version: "17.0.0.rc.10"
+      )
+      expect(retry_message).to include(
+        "Live compound release remains BLOCKED",
+        'bundle exec rake "release[17.0.0.rc.10,true]"',
+        'bundle exec rake "release[17.0.0,true]"',
+        release_runbook
+      )
+      expect(retry_message).not_to include(
+        'bundle exec rake "release[17.0.0.rc.10]"',
+        'bundle exec rake "release[17.0.0]"'
+      )
+    end
+
+    it "keeps CI retry and override guidance in preview mode" do
+      expect do
+        handle_shakaperf_release_gate_violation!(message: "gate failed")
+      end.to raise_error(SystemExit) { |error|
+        expect(error.message).to include(
+          'RELEASE_CI_STATUS_OVERRIDE=true bundle exec rake "release[VERSION,true]"',
+          'bundle exec rake "release[VERSION,true,false,true]"',
+          "Live compound release remains BLOCKED",
+          release_runbook
+        )
+        expect(error.message).to include("Preserve the failure evidence", "do not rerun or revert")
+        expect(error.message).not_to include("retry the release", "push a revert")
+      }
+
+      notice = capture_stdout { print_shakaperf_release_gate_notice(ref: "release/17.0.0", head_sha: "a" * 40) }
+      override_guidance = main_ci_status_override_guidance
+      [notice, override_guidance].each do |guidance|
+        expect(guidance).to include(
+          'RELEASE_CI_STATUS_OVERRIDE=true bundle exec rake "release[VERSION,true]"',
+          'bundle exec rake "release[VERSION,true,false,true]"',
+          "Live compound release remains BLOCKED",
+          release_runbook
+        )
+        expect(guidance).not_to include(
+          "RELEASE_CI_STATUS_OVERRIDE=true bundle exec rake release[...]",
+          'bundle exec rake "release[VERSION,false,false,true]"'
+        )
+      end
+    end
+
+    it "keeps release-line follow-up guidance in preview mode" do
+      existing_branch = release_branch_already_exists_message(release_branch: "release/17.0.0")
+      started_branch = release_line_started_next_steps(release_branch: "release/17.0.0")
+      non_interactive = release_branch_cut_offer_non_interactive_message(release_branch: "release/17.0.0")
+
+      [existing_branch, started_branch, non_interactive].each do |guidance|
+        expect(guidance).to include(
+          'bundle exec rake "release[VERSION,true]"',
+          "Live compound release remains BLOCKED",
+          release_runbook
+        )
+        expect(guidance).not_to include('bundle exec rake "release[17.0.0.rc.0,true]"')
+        expect(guidance).not_to match(/bundle exec rake release(?:\s|$)/)
+      end
+      expect(existing_branch).not_to include("git checkout")
+      expect(non_interactive).not_to include("git checkout -b", "git push -u")
     end
   end
 
@@ -803,7 +927,7 @@ RSpec.describe "release.rake helper methods" do
 
       expect do
         resolve_release_version_before_auth!(version_input: "", monorepo_root: "/tmp/repo", dry_run: false)
-      end.to raise_error(SystemExit, /bundle exec rake "release\[17\.0\.0\.rc\.10\]"/)
+      end.to raise_error(SystemExit, /bundle exec rake "release\[17\.0\.0\.rc\.10,true\]"/)
     end
 
     it "reports the post-pull stable version when a pull advances the checkout to stable" do
@@ -822,7 +946,7 @@ RSpec.describe "release.rake helper methods" do
         )
       end.to raise_error(
         SystemExit,
-        /Current version: 17\.0\.0\n.*bundle exec rake "release\[17\.0\.0\]"/m
+        /Current version: 17\.0\.0\n.*bundle exec rake "release\[17\.0\.0,true\]"/m
       )
     end
 
@@ -842,7 +966,7 @@ RSpec.describe "release.rake helper methods" do
         )
       end.to raise_error(
         SystemExit,
-        /Current version: 17\.0\.0\.rc\.12\n.*bundle exec rake "release\[17\.0\.0\.rc\.12\]"/m
+        /Current version: 17\.0\.0\.rc\.12\n.*bundle exec rake "release\[17\.0\.0\.rc\.12,true\]"/m
       )
     end
 
@@ -862,7 +986,7 @@ RSpec.describe "release.rake helper methods" do
         )
       end.to raise_error(
         SystemExit,
-        /Current version: 17\.0\.0\.rc\.11\n.*bundle exec rake "release\[17\.0\.0\.rc\.11\]"/m
+        /Current version: 17\.0\.0\.rc\.11\n.*bundle exec rake "release\[17\.0\.0\.rc\.11,true\]"/m
       )
     end
 
@@ -916,7 +1040,7 @@ RSpec.describe "release.rake helper methods" do
         )
       end.to raise_error(
         SystemExit,
-        /Current version: 18\.0\.0\.beta\.1\n.*bundle exec rake "release\[18\.0\.0\.beta\.1\]"/m
+        /Current version: 18\.0\.0\.beta\.1\n.*bundle exec rake "release\[18\.0\.0\.beta\.1,true\]"/m
       )
     end
   end
@@ -948,7 +1072,7 @@ RSpec.describe "release.rake helper methods" do
         resolve_version_input("", "/tmp/repo")
       end.to raise_error(
         SystemExit,
-        /Refusing to infer stable 17\.0\.0.*bundle exec rake "release\[17\.0\.0\.rc\.10\]"/m
+        /Refusing to infer stable 17\.0\.0.*bundle exec rake "release\[17\.0\.0\.rc\.10,true\]"/m
       )
     end
 
@@ -963,7 +1087,7 @@ RSpec.describe "release.rake helper methods" do
         resolve_version_input("", "/tmp/repo")
       end.to raise_error(
         SystemExit,
-        /Refusing to infer stable 17\.0\.0.*bundle exec rake "release\[17\.0\.0\]"/m
+        /Refusing to infer stable 17\.0\.0.*bundle exec rake "release\[17\.0\.0,true\]"/m
       )
     end
 
@@ -976,7 +1100,7 @@ RSpec.describe "release.rake helper methods" do
         resolve_version_input("", "/tmp/repo")
       end.to raise_error(
         SystemExit,
-        /bundle exec rake "release\[17\.0\.0\.rc\.10\]".*non-empty CHANGELOG\.md section for 17\.0\.0/m
+        /bundle exec rake "release\[17\.0\.0\.rc\.10,true\]".*non-empty CHANGELOG\.md section for 17\.0\.0/m
       )
     end
 
@@ -989,7 +1113,7 @@ RSpec.describe "release.rake helper methods" do
 
       expect do
         resolve_version_input("", "/tmp/repo")
-      end.to raise_error(SystemExit, /bundle exec rake "release\[17\.0\.0\.rc\.10\]"/)
+      end.to raise_error(SystemExit, /bundle exec rake "release\[17\.0\.0\.rc\.10,true\]"/)
     end
 
     it "derives stable-promotion guidance from the current prerelease when the changelog is stale" do
@@ -1000,7 +1124,7 @@ RSpec.describe "release.rake helper methods" do
 
       expect do
         resolve_version_input("", "/tmp/repo")
-      end.to raise_error(SystemExit, /stable 17\.0\.0.*bundle exec rake "release\[17\.0\.0\]"/m)
+      end.to raise_error(SystemExit, /stable 17\.0\.0.*bundle exec rake "release\[17\.0\.0,true\]"/m)
     end
 
     it "allows an argument-less advance to a newer prerelease from the changelog" do
@@ -12209,6 +12333,34 @@ RSpec.describe "release.rake helper methods" do
   end
 
   describe "release task help" do
+    it "advertises only preview commands while live compound release is blocked" do
+      rakefile = File.read(File.expand_path("../../../rakelib/release.rake", __dir__))
+      release_help = rakefile.match(/desc\("(.*?)"\)\ntask :release/m)[1]
+      sync_help = rakefile.match(/desc\("Creates or updates a GitHub release(.*?)"\)\ntask :sync_github_release/m)[1]
+      start_help = rakefile.match(/desc\("Start a release line(.*?)"\)\n  task :start/m)[1]
+
+      expect([release_help, start_help]).to all(
+        include("Live compound release remains BLOCKED", "internal/contributor-info/release-train-runbook.md")
+      )
+      expect(sync_help).to include(
+        "Live GitHub release recovery is BLOCKED",
+        "internal/contributor-info/release-train-runbook.md"
+      )
+
+      release_commands = release_help.lines.grep(/rake (?:\\?"?)release(?:\[|\\?"?$)/)
+      sync_commands = sync_help.lines.grep(/rake \\"sync_github_release\[/)
+      start_commands = start_help.lines.grep(/rake (?:\\?")?release:start/)
+
+      expect(release_commands).not_to be_empty
+      expect(sync_commands).not_to be_empty
+      expect(start_commands).not_to be_empty
+      expect(release_commands).to all(include("true"))
+      expect(sync_commands).to all(include(",true]"))
+      expect(start_commands).to all(include("true"))
+      expect(release_help).to include("Preserve the failure evidence", "do not rerun or revert")
+      expect(release_help).not_to include("retry from that commit", "push a revert")
+    end
+
     it "does not advertise strict HEAD retry before the CI gate establishes healthy evidence" do
       rakefile = File.read(File.expand_path("../../../rakelib/release.rake", __dir__))
       help = rakefile.match(/desc\("(.*?)"\)\ntask :release/m)[1]
@@ -12229,6 +12381,8 @@ RSpec.describe "release.rake helper methods" do
         "from matching release/X.Y.Z",
         "GEM_RELEASE_MAX_RETRIES=<n>  # Positive base-10 integer"
       )
+      expect(help).to include('rake \\"release[16.2.0.rc.1,true]\\"')
+      expect(help).not_to include("release[16.2.0.rc.1,true,false,true]")
       expect(Rake::Task.task_defined?("release:reconcile_accelerated_rc")).to be(true)
     end
 
@@ -14876,7 +15030,7 @@ RSpec.describe "release.rake helper methods" do
       it "offers strict exact-HEAD evaluation only after exact HEAD is healthy" do
         strict_head_guidance = [
           "strict evaluation, not a waiver",
-          'RELEASE_CI_EVALUATE_HEAD=true bundle exec rake "release\\[17\\.0\\.0\\.rc\\.10\\]"',
+          'RELEASE_CI_EVALUATE_HEAD=true bundle exec rake "release\\[17\\.0\\.0\\.rc\\.10,true\\]"',
           "DANGEROUS",
           "RELEASE_CI_STATUS_OVERRIDE=true"
         ].join(".*")
@@ -14925,7 +15079,10 @@ RSpec.describe "release.rake helper methods" do
             dry_run: false,
             target_gem_version: "17.0.0.rc.10"
           )
-        end.to raise_error(SystemExit, /RELEASE_CI_EVALUATE_HEAD=true bundle exec rake "release\[17\.0\.0\.rc\.10\]"/)
+        end.to raise_error(
+          SystemExit,
+          /RELEASE_CI_EVALUATE_HEAD=true bundle exec rake "release\[17\.0\.0\.rc\.10,true\]"/
+        )
       end
 
       it "offers strict guidance when a successful exact-HEAD legacy status supersedes an earlier failure" do
@@ -14954,7 +15111,10 @@ RSpec.describe "release.rake helper methods" do
             dry_run: false,
             target_gem_version: "17.0.0.rc.10"
           )
-        end.to raise_error(SystemExit, /RELEASE_CI_EVALUATE_HEAD=true bundle exec rake "release\[17\.0\.0\.rc\.10\]"/)
+        end.to raise_error(
+          SystemExit,
+          /RELEASE_CI_EVALUATE_HEAD=true bundle exec rake "release\[17\.0\.0\.rc\.10,true\]"/
+        )
       end
 
       it "withholds strict exact-HEAD guidance when walked-back unrelated evidence is pending" do
@@ -15491,7 +15651,7 @@ RSpec.describe "release.rake helper methods" do
 
         expected_output = [
           "⚠️ DRY RUN: CI evidence below would block a real release:",
-          '^  RELEASE_CI_EVALUATE_HEAD=true bundle exec rake "release\\[17\\.0\\.0\\.rc\\.10\\]"$',
+          '^  RELEASE_CI_EVALUATE_HEAD=true bundle exec rake "release\\[17\\.0\\.0\\.rc\\.10,true\\]"$',
           "⚠️ DRY RUN: Real release remains blocked.",
           "⚠️ DRY RUN: DANGEROUS PRERELEASE-ONLY LAST RESORT",
           "RELEASE_CI_STATUS_OVERRIDE=true"
@@ -15571,7 +15731,10 @@ RSpec.describe "release.rake helper methods" do
             dry_run: false,
             target_gem_version: "17.0.0.rc.10"
           )
-        end.to raise_error(SystemExit, /RELEASE_CI_EVALUATE_HEAD=true bundle exec rake "release\[17\.0\.0\.rc\.10\]"/)
+        end.to raise_error(
+          SystemExit,
+          /RELEASE_CI_EVALUATE_HEAD=true bundle exec rake "release\[17\.0\.0\.rc\.10,true\]"/
+        )
       end
 
       it "tells the operator to wait for pending exact-HEAD checks without recommending strict HEAD" do
@@ -15805,7 +15968,10 @@ RSpec.describe "release.rake helper methods" do
             dry_run: false,
             target_gem_version: "17.0.0.rc.10"
           )
-        end.to raise_error(SystemExit, /RELEASE_CI_EVALUATE_HEAD=true bundle exec rake "release\[17\.0\.0\.rc\.10\]"/)
+        end.to raise_error(
+          SystemExit,
+          /RELEASE_CI_EVALUATE_HEAD=true bundle exec rake "release\[17\.0\.0\.rc\.10,true\]"/
+        )
       end
     end
 
@@ -18931,7 +19097,10 @@ RSpec.describe "release.rake helper methods" do
           target_gem_version: "17.0.0.rc.0",
           dry_run: false
         )
-      end.to raise_error(SystemExit, %r{release/17.0.0 already exists.*git checkout release/17.0.0}m)
+      end.to raise_error(
+        SystemExit,
+        %r{release/17.0.0 already exists.*release\[VERSION,true\].*release-train-runbook}m
+      )
     end
 
     it "aborts with the manual recipe when stdin is not a TTY" do
@@ -18948,7 +19117,10 @@ RSpec.describe "release.rake helper methods" do
           target_gem_version: "17.0.0.rc.0",
           dry_run: false
         )
-      end.to raise_error(SystemExit, %r{without a terminal.*git checkout -b release/17.0.0 origin/main}m)
+      end.to raise_error(
+        SystemExit,
+        /without a terminal.*release\[VERSION,true\].*release-train-runbook/m
+      )
     end
 
     it "is a no-op for a non-rc target on main" do
@@ -19034,7 +19206,9 @@ RSpec.describe "release.rake helper methods" do
 
       expect do
         start_release_line!(monorepo_root: "/tmp/repo", release_branch: "release/17.0.0", dry_run: false)
-      end.to output(%r{Started release/17.0.0.*update-changelog rc.*bundle exec rake release}m).to_stdout
+      end.to output(
+        %r{Started release/17.0.0.*update-changelog rc.*release\[VERSION,true\].*release-train-runbook}m
+      ).to_stdout
 
       expect(self).to have_received(:sh_in_dir_for_release).with("/tmp/repo", "git fetch origin")
       expect(self).to have_received(:sh_in_dir_for_release)
