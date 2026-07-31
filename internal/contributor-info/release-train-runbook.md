@@ -1139,7 +1139,13 @@ audited manual path instead:
    The manifest must be nonempty. Refetch `origin/main` after the final
    reconciliation, repeat the live replacement and omitted-origin audit, and
    record that exact tip in `AUDITED_MAIN_TIP`. Missing, changed, duplicate, or
-   `UNKNOWN` evidence stops closeout.
+   `UNKNOWN` evidence stops closeout. Also create `MANUAL_ACKS_FILE` as a
+   durable newline-delimited list containing the full lowercase SHA of every
+   manually resolved plan row. It may be empty only when the plan has no manual
+   rows; blank lines, duplicates, abbreviated SHAs, and `UNKNOWN` are invalid.
+   The final helper invocation passes each row as repeatable `--ack-manual`;
+   the helper itself rejects any acknowledgement that is not currently
+   classified `MANUAL`.
 
 5. Immediately before tag publication and deletion, refetch the exact main and
    release refs and require them to equal `AUDITED_MAIN_TIP` and
@@ -1176,9 +1182,28 @@ audited manual path instead:
      echo "release tip changed; restart the closeout audit" >&2
      return 1 2>/dev/null || exit 1
    }
+   MANUAL_ACKS_FILE="${MANUAL_ACKS_FILE:?set the durable manual-acknowledgement SHA file}"
+   ruby -e '
+     path = ARGV.fetch(0)
+     content = File.binread(path)
+     abort "manual acknowledgement file must end with a newline" if
+       !content.empty? && !content.end_with?("\n")
+     shas = content.lines(chomp: true)
+     abort "manual acknowledgement rows must be full lowercase SHAs" unless
+       shas.all? { |sha| sha.match?(/\A[0-9a-f]{40}\z/) }
+     abort "manual acknowledgement SHAs must be unique" unless shas.uniq.length == shas.length
+   ' "${MANUAL_ACKS_FILE}" || {
+     echo "manual acknowledgement file is invalid; stop selective closeout" >&2
+     return 1 2>/dev/null || exit 1
+   }
+   manual_ack_args=()
+   while IFS= read -r manual_ack_sha; do
+     manual_ack_args+=(--ack-manual "${manual_ack_sha}")
+   done <"${MANUAL_ACKS_FILE}"
    FINAL_PLAN_FILE="${PLAN_FILE}.final"
    script/release-forward-port \
-     --source "origin/release/${RELEASE_VERSION}" --target origin/main --dry-run \
+     --source "origin/release/${RELEASE_VERSION}" --target origin/main \
+     "${manual_ack_args[@]}" --dry-run \
      >"${FINAL_PLAN_FILE}" 2>&1 || { return 1 2>/dev/null || exit 1; }
    cat "${FINAL_PLAN_FILE}" || { return 1 2>/dev/null || exit 1; }
    ruby -rjson -ropen3 -e '
@@ -1191,7 +1216,7 @@ audited manual path instead:
        fail_validation.call("#{command.join(" ")} failed: #{output.strip}") unless status.success?
        output.strip
      end
-     plan_path, manifest_path, release_tip, main_tip = ARGV
+     plan_path, manifest_path, release_tip, main_tip, manual_acks_path = ARGV
      full_sha = /\A[0-9a-f]{40}\z/
      expected_row_keys = %w[approval origin_sha proof release_sha replacement_sha]
      manifest = JSON.parse(File.read(manifest_path, encoding: "UTF-8"))
@@ -1221,21 +1246,60 @@ audited manual path instead:
      origin_shas = rows.map { |row| row.fetch("origin_sha") }
      fail_validation.call("release_sha values are duplicated") unless release_shas.uniq.length == release_shas.length
      fail_validation.call("origin_sha values are duplicated") unless origin_shas.uniq.length == origin_shas.length
-     pick_prefixes = File.foreach(plan_path).filter_map do |line|
-       match = /\APICK ([0-9a-f]{12})\b/.match(line)
-       match && match[1]
+     lines = File.readlines(plan_path, chomp: true)
+     entries = []
+     index = 0
+     while index < lines.length
+       line = lines.fetch(index)
+       known_action = line.match?(/\A(?:PICK|SKIP|MANUAL|ACK-MANUAL)\b/)
+       entry_shaped = line.match?(/\A[A-Z][A-Z-]*\s+[0-9a-f]{12}\b/)
+       unless known_action || entry_shaped
+         index += 1
+         next
+       end
+       match = /\A(?<action>PICK|SKIP|MANUAL|ACK-MANUAL) (?<prefix>[0-9a-f]{12}) (?<subject>\S(?:.*\S)?)\z/.match(line)
+       fail_validation.call("malformed or unrecognized plan action row: #{line.inspect}") unless match
+       entry = { action: match[:action], prefix: match[:prefix] }
+       unless entry.fetch(:action) == "PICK"
+         index += 1
+         reason_match = /\A     (?<reason>\S(?:.*\S)?)\z/.match(lines[index].to_s)
+         fail_validation.call("#{entry.fetch(:action)} #{entry.fetch(:prefix)} lacks an explanation") unless
+           reason_match && !reason_match[:reason].match?(/\bUNKNOWN\b/i)
+         if entry.fetch(:action) == "MANUAL"
+           fail_validation.call("unresolved MANUAL #{entry.fetch(:prefix)} remains in final plan")
+         elsif entry.fetch(:action) == "ACK-MANUAL"
+           index += 1
+           expected_marker = "     acknowledged by --ack-manual; skipping after operator inspection"
+           fail_validation.call("ACK-MANUAL #{entry.fetch(:prefix)} lacks its acknowledgement marker") unless
+             lines[index] == expected_marker
+         end
+       end
+       entries << entry
+       index += 1
      end
-     fail_validation.call("final plan has no remaining PICK set") if pick_prefixes.empty?
-     fail_validation.call("final plan PICK prefixes are duplicated") unless pick_prefixes.uniq.length == pick_prefixes.length
-     planned_release_shas = pick_prefixes.map do |prefix|
-       sha = capture_command.call("git", "rev-parse", "--verify", "#{prefix}^{commit}")
-       fail_validation.call("plan PICK #{prefix} is outside audited release") unless
+     prefixes = entries.map { |entry| entry.fetch(:prefix) }
+     fail_validation.call("final plan action SHAs are duplicated") unless prefixes.uniq.length == prefixes.length
+     entries.each do |entry|
+       sha = capture_command.call("git", "rev-parse", "--verify", "#{entry.fetch(:prefix)}^{commit}")
+       fail_validation.call("plan entry #{entry.fetch(:prefix)} is outside audited release") unless
          system("git", "merge-base", "--is-ancestor", sha, release_tip,
                 out: File::NULL, err: File::NULL)
-       sha
+       entry[:sha] = sha
      end
+     planned_release_shas = entries.filter_map { |entry| entry[:sha] if entry.fetch(:action) == "PICK" }
+     fail_validation.call("final plan has no remaining PICK set") if planned_release_shas.empty?
      fail_validation.call("manifest is not exactly the final PICK set") unless
        release_shas.sort == planned_release_shas.sort
+     manual_ack_shas = File.readlines(manual_acks_path, chomp: true)
+     fail_validation.call("manual acknowledgement rows are malformed") unless
+       manual_ack_shas.all? { |sha| sha.match?(full_sha) }
+     fail_validation.call("manual acknowledgement SHAs are duplicated") unless
+       manual_ack_shas.uniq.length == manual_ack_shas.length
+     acknowledged_plan_shas = entries.filter_map do |entry|
+       entry[:sha] if entry.fetch(:action) == "ACK-MANUAL"
+     end
+     fail_validation.call("manual acknowledgement file does not exactly match ACK-MANUAL rows") unless
+       manual_ack_shas.sort == acknowledged_plan_shas.sort
      rows.each_with_index do |row, index|
        body = capture_command.call("git", "show", "-s", "--format=%B", row.fetch("release_sha"))
        origins = body.lines.filter_map do |line|
@@ -1255,7 +1319,7 @@ audited manual path instead:
                 out: File::NULL, err: File::NULL)
      end
    ' "${FINAL_PLAN_FILE}" "${OMITTED_PICKS_FILE}" \
-     "${AUDITED_RELEASE_TIP}" "${AUDITED_MAIN_TIP}" || {
+     "${AUDITED_RELEASE_TIP}" "${AUDITED_MAIN_TIP}" "${MANUAL_ACKS_FILE}" || {
      echo "final omitted-pick manifest validation failed; stop selective closeout" >&2
      return 1 2>/dev/null || exit 1
    }
