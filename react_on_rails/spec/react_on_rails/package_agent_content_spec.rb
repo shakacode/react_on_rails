@@ -119,11 +119,11 @@ RSpec.describe "packaged agent content" do
     expect(guide).to include("stream_view_containing_react_components")
   end
 
-  it "runs the RSC adoption doctor through Bundler" do
+  it "runs the RSC adoption doctor through the consumer app binstub" do
     guide = gem_root.join("docs/agent/rsc-adoption.md").read
 
-    expect(guide).to include("bundle exec rails react_on_rails:doctor FORMAT=json")
-    expect(guide).not_to include("bin/rails react_on_rails:doctor")
+    expect(guide).to include("bin/rails react_on_rails:doctor FORMAT=json")
+    expect(guide).not_to include("bundle exec rails react_on_rails:doctor")
   end
 
   it "separates progressive and buffered streaming requirements" do
