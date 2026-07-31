@@ -220,6 +220,10 @@ preserves the last observed run status and conclusion and never reports the run 
 cannot apply to prereleases, a failed/cancelled or otherwise terminal run, malformed/mismatched/stale
 evidence, or a different current run/reason. It waives only inability to observe ShakaPerf; CI, version
 policy, tag, registry, accepted-RC, and publication-boundary checks remain unchanged and blocking.
+Immediately before the remote tag push and again before package publication, the task revalidates that the
+tracker is still canonical and active, the append-only waiver is unchanged, and the exact run is still
+active. Continued API unavailability remains covered by the recorded observation waiver, but a terminal or
+unknown run state, a closed/noncanonical tracker, or a changed/disappeared waiver blocks publication.
 
 #### Release CI evidence and strict HEAD evaluation
 

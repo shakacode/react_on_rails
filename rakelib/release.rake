@@ -843,7 +843,7 @@ end
 
 def resolve_shakaperf_release_tracker_candidate_conflict!(candidates)
   run_ids = shakaperf_release_tracker_candidate_run_ids(candidates)
-  return candidates unless run_ids.many?
+  return candidates unless run_ids.length > 1
 
   unless candidates.all? { |entry| entry[:kind] == :association }
     abort "❌ Release tracker contains conflicting ShakaPerf evidence for this candidate; select one exact run."
@@ -905,6 +905,12 @@ def selected_shakaperf_release_gate_run_id!(selector:, repo_slug:)
   abort "❌ RELEASE_SHAKAPERF_RUN must be a positive run ID or canonical run URL for #{repo_slug}."
 end
 
+def normalized_optional_release_value(value)
+  return nil if value.nil? || value.strip.empty?
+
+  value
+end
+
 def validated_shakaperf_release_tracker!(monorepo_root:, tracker_input:, required:)
   if tracker_input.to_s.empty?
     if required
@@ -921,16 +927,6 @@ def validated_shakaperf_release_tracker!(monorepo_root:, tracker_input:, require
   tracker = tracker_input.to_i
   fetch_release_tracker_issue!(repo_slug: github_repo_slug(monorepo_root), tracker:)
   tracker
-end
-
-def shakaperf_release_tracker_number!(tracker_input)
-  return nil if tracker_input.to_s.empty?
-
-  unless tracker_input.to_s.match?(/\A[1-9]\d*\z/)
-    abort "❌ RELEASE_TRACKER must be a positive issue number when used for ShakaPerf evidence."
-  end
-
-  tracker_input.to_i
 end
 
 def normalized_selected_shakaperf_release_gate_run(run)
@@ -1443,7 +1439,7 @@ def select_and_verify_shakaperf_release_gate_run!(repo_slug:, monorepo_root:, tr
   abort "❌ Selected ShakaPerf run is not reusable: #{rejection}." if rejection
 
   persist_verified_shakaperf_release_tracker_evidence!(
-    repo_slug:, tracker:, ref:, head_sha:, target_version:, run:, evidence:
+    repo_slug:, tracker:, ref:, head_sha: evidence.fetch("candidate_sha"), target_version:, run:, evidence:
   )
   puts "✓ Selected ShakaPerf run passed schema-v2 verification: #{run.fetch('url')}"
   run
@@ -4682,7 +4678,8 @@ def ensure_release_tag_for_candidate!(monorepo_root:, tag:, candidate_sha:, tag_
 end
 
 def push_release_tag_for_candidate!(monorepo_root:, tag:, candidate_sha:, accelerated_publication_record: nil,
-                                    accelerated_boundary_record: nil, accelerated_final_promotion_context: nil)
+                                    accelerated_boundary_record: nil, accelerated_final_promotion_context: nil,
+                                    ordinary_stable_shakaperf_waiver_context: nil)
   boundary_context = accelerated_repository_boundary_context!(
     accelerated_publication_record:, accelerated_boundary_record:
   )
@@ -4706,6 +4703,9 @@ def push_release_tag_for_candidate!(monorepo_root:, tag:, candidate_sha:, accele
   validate_release_candidate_publication_boundary!(
     monorepo_root:, tag:, candidate_sha:, phase: "git tag push"
   )
+  validate_ordinary_stable_shakaperf_waiver_boundary!(
+    monorepo_root:, context: ordinary_stable_shakaperf_waiver_context, phase: "git tag push"
+  )
   sh_in_dir_for_release(monorepo_root, "LEFTHOOK=0 git push --tags")
   validate_accelerated_tag_publication_phase!(
     monorepo_root:, record: boundary_record, final_promotion_context: accelerated_final_promotion_context,
@@ -4716,6 +4716,9 @@ def push_release_tag_for_candidate!(monorepo_root:, tag:, candidate_sha:, accele
   )
   validate_remote_release_tag_candidate_sha!(
     monorepo_root:, tag:, candidate_sha:, phase: "package publication"
+  )
+  validate_ordinary_stable_shakaperf_waiver_boundary!(
+    monorepo_root:, context: ordinary_stable_shakaperf_waiver_context, phase: "package publication"
   )
 end
 
@@ -5939,9 +5942,10 @@ def validate_final_promotion_shakaperf_publication_boundary!(monorepo_root:, con
 end
 
 def validate_final_shakaperf_observation_waiver_publication_boundary!(monorepo_root:, carried_record:,
-                                                                      expected_snapshot:, phase:)
+                                                                      expected_snapshot:, phase:,
+                                                                      boundary_label: "Final promotion")
   unless valid_final_shakaperf_observation_waiver_snapshot?(expected_snapshot)
-    abort "❌ Final promotion #{phase} ShakaPerf observation waiver snapshot is malformed."
+    abort "❌ #{boundary_label} #{phase} ShakaPerf observation waiver snapshot is malformed."
   end
 
   repo_slug = github_repo_slug(monorepo_root)
@@ -5959,7 +5963,7 @@ def validate_final_shakaperf_observation_waiver_publication_boundary!(monorepo_r
   unless waiver && digest == expected_snapshot.fetch("waiver_digest") &&
          waiver["run_id"] == expected_snapshot.fetch("run_id") &&
          waiver["run_url"] == expected_snapshot.fetch("run_url")
-    abort "❌ Final promotion #{phase} ShakaPerf observation waiver changed, disappeared, or is conflicting."
+    abort "❌ #{boundary_label} #{phase} ShakaPerf observation waiver changed, disappeared, or is conflicting."
   end
 
   validate_current_final_shakaperf_observation_waiver_run!(
@@ -5970,6 +5974,54 @@ def validate_final_shakaperf_observation_waiver_publication_boundary!(monorepo_r
     target_version: carried_record.fetch("target_version")
   )
   expected_snapshot
+end
+
+def ordinary_stable_shakaperf_waiver_context_identity(context)
+  canonical_accelerated_rc_json(
+    "carried_record" => context.fetch(:carried_record),
+    "expected_snapshot" => context.fetch(:expected_snapshot)
+  )
+end
+
+def valid_ordinary_stable_shakaperf_waiver_context?(context)
+  required_keys = %i[carried_record expected_snapshot identity_anchor]
+  return false unless context.is_a?(Hash) && context.keys.sort == required_keys.sort
+
+  carried_record = context.fetch(:carried_record)
+  expected_snapshot = context.fetch(:expected_snapshot)
+  identity_anchor = context.fetch(:identity_anchor)
+  return false unless carried_record.is_a?(Hash)
+
+  [
+    accelerated_rc_exact_keys?(carried_record, %w[release_branch candidate_sha target_version]),
+    valid_final_shakaperf_observation_waiver_snapshot?(expected_snapshot),
+    carried_record.values_at("candidate_sha", "target_version") ==
+      expected_snapshot.values_at("candidate_sha", "target_version"),
+    identity_anchor.is_a?(String),
+    identity_anchor.frozen?,
+    identity_anchor == ordinary_stable_shakaperf_waiver_context_identity(context)
+  ].all?
+rescue KeyError
+  false
+end
+
+def validate_ordinary_stable_shakaperf_waiver_boundary!(monorepo_root:, context:, phase:)
+  return unless context
+
+  unless valid_ordinary_stable_shakaperf_waiver_context?(context)
+    abort "❌ Ordinary stable #{phase} ShakaPerf observation waiver context is malformed or changed."
+  end
+
+  repo_slug = github_repo_slug(monorepo_root)
+  tracker = context.dig(:expected_snapshot, "release_tracker")
+  fetch_release_tracker_issue!(repo_slug:, tracker:)
+  validate_final_shakaperf_observation_waiver_publication_boundary!(
+    monorepo_root:,
+    carried_record: context.fetch(:carried_record),
+    expected_snapshot: context.fetch(:expected_snapshot),
+    phase:,
+    boundary_label: "Ordinary stable release"
+  )
 end
 
 def validate_current_final_shakaperf_observation_waiver_run!(repo_slug:, waiver:, ref:, head_sha:, target_version:)
@@ -6068,6 +6120,27 @@ def final_shakaperf_observation_waiver_snapshot!(run:, ref:, head_sha:, target_v
   abort "❌ Final promotion ShakaPerf observation waiver has an invalid release start time." unless started_at
 
   build_final_shakaperf_observation_waiver_snapshot(run:, record:, head_sha:, target_version:, started_at:)
+end
+
+def ordinary_stable_shakaperf_waiver_context!(run:, ref:, head_sha:, target_version:, release_started_at:)
+  return nil unless run.is_a?(Hash) && run["observationWaived"] == true
+
+  abort "❌ Ordinary ShakaPerf observation waiver context is allowed for stable releases only." if
+    release_prerelease_version?(target_version)
+
+  expected_snapshot = json_compatible_release_value(
+    final_shakaperf_observation_waiver_snapshot!(
+      run:, ref:, head_sha:, target_version:, release_started_at:
+    )
+  )
+  carried_record = {
+    "release_branch" => ref,
+    "candidate_sha" => head_sha,
+    "target_version" => target_version
+  }
+  context = { carried_record:, expected_snapshot: }
+  context[:identity_anchor] = ordinary_stable_shakaperf_waiver_context_identity(context).freeze
+  context.freeze
 end
 
 def strict_final_promotion_shakaperf_snapshot!(monorepo_root:, current_branch:, final_head_sha:, target_version:,
@@ -8644,6 +8717,7 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
   released_npm_version = nil
   accelerated_publication_record = nil
   final_promotion_context = nil
+  ordinary_stable_shakaperf_waiver_context = nil
   argumentless_starting_prerelease_version = if args_hash.fetch(:version, "").to_s.strip.empty?
                                                starting_version = current_gem_version(monorepo_root)
                                                starting_version if release_prerelease_version?(starting_version)
@@ -8668,20 +8742,25 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
     version_converter = ReactOnRails::VersionSyntaxConverter.new
     resolved_target_npm_version = version_converter.rubygem_to_npm(resolved_target_gem_version)
     is_prerelease = release_prerelease_version?(resolved_target_gem_version)
-    shakaperf_run_selector = ENV.fetch("RELEASE_SHAKAPERF_RUN", nil)
-    shakaperf_waiver_reason = ENV.fetch("RELEASE_FINAL_SHAKAPERF_WAIVER_REASON", nil)
+    shakaperf_run_selector = normalized_optional_release_value(ENV.fetch("RELEASE_SHAKAPERF_RUN", nil))
+    shakaperf_waiver_reason = normalized_optional_release_value(
+      ENV.fetch("RELEASE_FINAL_SHAKAPERF_WAIVER_REASON", nil)
+    )
     if shakaperf_waiver_reason
       abort "❌ RELEASE_FINAL_SHAKAPERF_WAIVER_REASON is allowed for stable releases only." if is_prerelease
       validate_final_shakaperf_observation_waiver_reason!(shakaperf_waiver_reason)
     end
     release_tracker_input = ENV.fetch("RELEASE_TRACKER", nil)
     explicit_shakaperf_control = !shakaperf_run_selector.to_s.empty? || !shakaperf_waiver_reason.to_s.empty?
-    shakaperf_tracker = if explicit_shakaperf_control
-                          validated_shakaperf_release_tracker!(
-                            monorepo_root: release_root, tracker_input: release_tracker_input, required: true
-                          )
+    accelerated_rc_requested = release_truthy?(ENV.fetch("RELEASE_ACCELERATED_RC", nil))
+    shakaperf_tracker = if accelerated_rc_requested && !explicit_shakaperf_control
+                          nil
                         else
-                          shakaperf_release_tracker_number!(release_tracker_input)
+                          validated_shakaperf_release_tracker!(
+                            monorepo_root: release_root,
+                            tracker_input: release_tracker_input,
+                            required: explicit_shakaperf_control
+                          )
                         end
     prerelease_tag_retry_state = :none
     if is_prerelease
@@ -8697,7 +8776,6 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
       override_flag: args_hash[:override_ci_status],
       is_prerelease:
     )
-    accelerated_rc_requested = release_truthy?(ENV.fetch("RELEASE_ACCELERATED_RC", nil))
     accelerated_rc_same_candidate_retry = rc_prerelease_version?(resolved_target_gem_version) &&
                                           current_checkout_version == resolved_target_gem_version
     accelerated_rc_retry_probe = !accelerated_rc_requested && accelerated_rc_same_candidate_retry
@@ -8957,7 +9035,7 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
         validated_release_candidate_sha = final_promotion_context.fetch(:candidate_sha)
         accepted_rc_record = final_promotion_context.fetch(:record)
       else
-        run_shakaperf_release_gate!(
+        shakaperf_result = run_shakaperf_release_gate!(
           monorepo_root: release_root,
           ref: current_branch,
           head_sha: release_candidate_sha,
@@ -8969,6 +9047,13 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
           run_selector: shakaperf_run_selector,
           waiver_reason: shakaperf_waiver_reason
         )
+        ordinary_stable_shakaperf_waiver_context = ordinary_stable_shakaperf_waiver_context!(
+          run: shakaperf_result,
+          ref: current_branch,
+          head_sha: release_candidate_sha,
+          target_version: actual_gem_version,
+          release_started_at:
+        )
       end
 
       push_release_tag_for_candidate!(
@@ -8976,7 +9061,8 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
         tag: tag_name,
         candidate_sha: validated_release_candidate_sha,
         accelerated_boundary_record: accelerated_publication_record || accepted_rc_record,
-        accelerated_final_promotion_context: final_promotion_context
+        accelerated_final_promotion_context: final_promotion_context,
+        ordinary_stable_shakaperf_waiver_context:
       )
 
       puts "\n#{'=' * 80}"

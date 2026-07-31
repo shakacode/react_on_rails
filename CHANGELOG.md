@@ -31,7 +31,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   re-verify the exact SHA or machine-proven runtime-equivalent evidence on later invocations instead of
   dispatching duplicate performance runs. Stable releases also distinguish ShakaPerf observation/API
   failures from known gate failures and support an append-only, tracker-bound observation waiver that does
-  not claim the run succeeded or bypass any other release gate. Fixes
+  not claim the run succeeded or bypass any other release gate; the tracker, waiver, and exact run are
+  revalidated before remote tag push and package publication. Fixes
   [Issue 4812](https://github.com/shakacode/react_on_rails/issues/4812).
 
 - **[Pro]** **RSC render-error details are no longer sent to the browser on the fetched payload path**:
