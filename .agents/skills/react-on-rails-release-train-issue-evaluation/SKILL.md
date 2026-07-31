@@ -13,6 +13,11 @@ Use this with `$evaluate-issue`. That skill answers "is this worth doing?"; this
 
 ## Backport Shape
 
+The runbook's **BLOCKED** compound-release boundary is an operational and agent
+policy stop, not runtime enforcement. The tasks remain technically callable in
+live mode; direct live invocation outside the individually guarded procedure
+violates release policy.
+
 When one or more merged `main` PRs qualify for `release/X.Y.Z`, default to one
 source PR per release backport PR:
 
@@ -53,6 +58,13 @@ source PR per release backport PR:
   stop for explicit manual dispositions and use the runbook's selective manual
   closeout path plus its complete omitted-pick manifest when the disposition is
   to omit or replace one or more picks.
+- Treat `BACKPORT_SOURCE_AUDIT_RESULT` and selective-closeout manifest proof,
+  approval, and replacement-disposition fields as structured attestations. They
+  do not prove the underlying semantic facts. Before accepting them, the maker
+  and independent checker must each re-derive the audit against the exact
+  fetched tips and separately verify approval authorship, repository permission,
+  and trust from the live authenticated record. Stale, inaccessible, untrusted,
+  or `UNKNOWN` evidence remains fail-closed.
 - Give each source PR its own `git cherry-pick -x` provenance, conflict record,
   validation, QA evidence, review cycle, and rollback boundary. Every commit
   created by a `main`-to-release backport and landed on the release branch must

@@ -18,6 +18,10 @@ and [Release Verification Runbook](release-verification-runbook.md).
 > on this page are therefore previews. For a live cut or reconciliation, follow
 > the individually guarded commands in the
 > [Release-Train Runbook](release-train-runbook.md#serialize-every-release-line-write).
+> **BLOCKED** is an operational and agent policy stop, not runtime enforcement:
+> these tasks remain technically callable in live mode, but direct live
+> invocation outside that individually guarded procedure violates release
+> policy.
 > Interrupted or partial-publication recovery is currently blocked; preserve
 > the evidence and follow the dispositions in
 > [Partial-publication recovery](release-train-runbook.md#partial-publication-recovery).

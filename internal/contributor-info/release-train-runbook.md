@@ -249,6 +249,11 @@ release, stop and use the runbook's individual commands, with
 individual command cannot expose that boundary, stop rather than run it as an
 uncontrolled compound writer.
 
+Here and elsewhere in this runbook, **BLOCKED** is an operational and agent
+policy stop, not runtime enforcement. The compound tasks remain technically
+callable in live mode; direct live invocation outside the individually guarded
+procedure violates release policy.
+
 Immediately before each write or merge, rerun `require_live_release_line_lease`
 in the shell where the functions above are defined. It is a fail-closed
 **preflight read**: it proves that the canonical claim is active, unexpired, and
@@ -552,6 +557,15 @@ above; when there are multiple selections, serialize the sequence:
    the source patch is still live and neither reverted nor superseded may the
    operator set `BACKPORT_SOURCE_AUDIT_RESULT` to the exact bound value shown
    below:
+
+   `BACKPORT_SOURCE_AUDIT_RESULT` is a structured exact-main-bound attestation;
+   its string comparison below does not prove the underlying semantic facts.
+   Before setting or accepting it, the maker and independent checker must each
+   re-derive source liveness, reversion, supersession, and presence against the
+   exact fetched `BACKPORT_VALIDATED_MAIN_OID`. When renewed maintainer approval
+   is required, they must also verify approval authorship, repository permission,
+   and trust from the live authenticated approval record rather than from the
+   attestation text.
 
    ```bash
    BACKPORT_PR="${BACKPORT_PR:?set the backport PR number or URL}"
@@ -1219,7 +1233,10 @@ audited manual path instead:
    initial plan and `AUDITED_RELEASE_TIP`. This is a provisional selection, not
    the final manifest. Each disposition must name the full release commit, its
    direct main-origin commit, reverted/superseded proof, a replacement commit or
-   `NONE`, and the exact approval. Any `UNKNOWN` disposition stops closeout.
+   `NONE`, and the exact approval. A replacement also requires a renewed
+   verified-maintainer disposition whose identifiable approval record names the
+   exact replacement SHA and the exact audited `main` tip. Any `UNKNOWN`
+   disposition stops closeout.
 3. Process every `PICK` not selected for omission **serially in its own
    source-change PR**. For each one, refetch `origin/main`, require the release
    tip still equals `AUDITED_RELEASE_TIP`, branch from that fresh main tip, and
@@ -1280,7 +1297,13 @@ audited manual path instead:
        {
          "release_sha": "<40 lowercase hex characters>",
          "origin_sha": "<40 lowercase hex characters>",
-         "replacement_sha": "<40 lowercase hex characters or NONE>",
+         "replacement_sha": "<40 lowercase hex characters>",
+         "replacement_disposition": {
+           "replacement_sha": "<the same 40 lowercase hex characters>",
+           "audited_main_sha": "<the exact AUDITED_MAIN_TIP>",
+           "approved_by": "<verified maintainer GitHub login>",
+           "approval_record": "https://github.com/shakacode/react_on_rails/issues/123#issuecomment-456"
+         },
          "proof": "<nonempty reverted-or-superseded evidence>",
          "approval": "<nonempty exact maintainer approval>"
        }
@@ -1288,10 +1311,16 @@ audited manual path instead:
    }
    ```
 
-   The manifest must be nonempty. Refetch `origin/main` after the final
-   reconciliation, repeat the live replacement and omitted-origin audit, and
-   record that exact tip in `AUDITED_MAIN_TIP`. Missing, changed, duplicate, or
-   `UNKNOWN` evidence stops closeout. Also create `MANUAL_ACKS_FILE` as a
+   When `replacement_sha` is `NONE`, `replacement_disposition` must be the exact
+   string `NONE`. Otherwise the disposition object must have exactly the four
+   keys shown above, repeat the same replacement SHA, bind the approval to the
+   exact `AUDITED_MAIN_TIP`, name the verified maintainer, and point to an
+   identifiable approval comment, review, or discussion record in this
+   repository. The manifest must be nonempty. Refetch `origin/main` after the
+   final reconciliation, repeat the replacement and omitted-origin semantic
+   audit, obtain a renewed disposition for any replacement against that exact
+   tip, and record it in `AUDITED_MAIN_TIP`. Missing, changed, duplicate, stale,
+   or `UNKNOWN` evidence stops closeout. Also create `MANUAL_ACKS_FILE` as a
    durable newline-delimited list containing the full lowercase SHA of every
    manually resolved plan row. It may be empty only when the plan has no manual
    rows; blank lines, duplicates, abbreviated SHAs, and `UNKNOWN` are invalid.
@@ -1299,17 +1328,28 @@ audited manual path instead:
    the helper itself rejects any acknowledgement that is not currently
    classified `MANUAL`.
 
+   The row's `proof`, `approval`, and `replacement_disposition` fields are
+   structured attestations bound to exact objects; they do not prove the
+   underlying semantic facts or the approver's authority. Before accepting the
+   manifest, the maker and independent checker must each re-derive the omitted
+   origin and replacement audit against the exact fetched tips, and separately
+   verify approval authorship, repository permission, and trust from every live
+   authenticated approval record. Any stale, inaccessible, untrusted, or
+   `UNKNOWN` audit or approval remains fail-closed.
+
 5. Immediately before tag publication and deletion, refetch the exact main and
    release refs and require them to equal `AUDITED_MAIN_TIP` and
    `AUDITED_RELEASE_TIP`. Re-run the dry-run against audited `origin/main`.
    Machine-validate that the manifest release commits are **exactly** the final
    plan's remaining `PICK` set, that each row's origin matches the release
-   commit's sole direct `-x` footer, and that every replacement SHA is live on
-   audited main. No other `PICK`, unresolved `MANUAL`, or unexplained `SKIP` may
-   remain. Compute the plan and manifest digests only after this validator
-   passes. Then, with the required destructive-operation confirmation, publish
-   the annotated evidence tag and delete the release branch in one Git ref
-   transaction:
+   commit's sole direct `-x` footer, and that every replacement is both an
+   ancestor of audited main and covered by a renewed exact-main-tip-bound
+   disposition. Separately re-derive replacement semantic liveness; ancestry is
+   not proof that a replacement was not later reverted. No other `PICK`,
+   unresolved `MANUAL`, or unexplained `SKIP` may remain. Compute the plan and
+   manifest digests only after this validator passes. Then, with the required
+   destructive-operation confirmation, publish the annotated evidence tag and
+   delete the release branch in one Git ref transaction:
 
    ```bash
    main_refspec="+refs/heads/main:refs/remotes/origin/main"
@@ -1370,7 +1410,19 @@ audited manual path instead:
      end
      plan_path, manifest_path, release_tip, main_tip, manual_acks_path = ARGV
      full_sha = /\A[0-9a-f]{40}\z/
-     expected_row_keys = %w[approval origin_sha proof release_sha replacement_sha]
+     expected_row_keys = %w[
+       approval origin_sha proof release_sha replacement_disposition replacement_sha
+     ]
+     expected_replacement_disposition_keys = %w[
+       approval_record approved_by audited_main_sha replacement_sha
+     ]
+     github_login = /\A[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?\z/
+     approval_record = %r{
+       \Ahttps://github\.com/shakacode/react_on_rails/
+       (?:issues/[1-9][0-9]*\#issuecomment-[1-9][0-9]*|
+          pull/[1-9][0-9]*\#(?:issuecomment-|pullrequestreview-|discussion_r)[1-9][0-9]*)
+       \z
+     }x
      manifest = JSON.parse(File.read(manifest_path, encoding: "UTF-8"))
      fail_validation.call("top-level object or keys are invalid") unless
        manifest.is_a?(Hash) && manifest.keys.sort == %w[omitted_picks version]
@@ -1393,6 +1445,25 @@ audited manual path instead:
        replacement = row["replacement_sha"]
        fail_validation.call("row #{index} replacement_sha must be a full SHA or NONE") unless
          replacement == "NONE" || (replacement.is_a?(String) && replacement.match?(full_sha))
+       disposition = row["replacement_disposition"]
+       if replacement == "NONE"
+         fail_validation.call("row #{index} NONE replacement requires disposition NONE") unless
+           disposition == "NONE"
+         next
+       end
+
+       fail_validation.call("row #{index} replacement disposition shape is invalid") unless
+         disposition.is_a?(Hash) && disposition.keys.sort == expected_replacement_disposition_keys
+       fail_validation.call("row #{index} replacement disposition SHA does not match") unless
+         disposition["replacement_sha"] == replacement
+       fail_validation.call("row #{index} replacement disposition is stale or main-tip-mismatched") unless
+         disposition["audited_main_sha"] == main_tip
+       approved_by = disposition["approved_by"]
+       fail_validation.call("row #{index} replacement approver is invalid or UNKNOWN") unless
+         approved_by.is_a?(String) && approved_by.match?(github_login) && !approved_by.casecmp?("UNKNOWN")
+       record = disposition["approval_record"]
+       fail_validation.call("row #{index} replacement approval record is invalid or UNKNOWN") unless
+         record.is_a?(String) && record.match?(approval_record) && !record.match?(/\bUNKNOWN\b/i)
      end
      release_shas = rows.map { |row| row.fetch("release_sha") }
      origin_shas = rows.map { |row| row.fetch("origin_sha") }
@@ -1466,7 +1537,7 @@ audited manual path instead:
        replacement = row.fetch("replacement_sha")
        next if replacement == "NONE"
 
-       fail_validation.call("row #{index} replacement is not live on audited main") unless
+       fail_validation.call("row #{index} replacement is not an ancestor of audited main") unless
          system("git", "merge-base", "--is-ancestor", replacement, main_tip,
                 out: File::NULL, err: File::NULL)
      end
@@ -1475,6 +1546,7 @@ audited manual path instead:
      echo "final omitted-pick manifest validation failed; stop selective closeout" >&2
      return 1 2>/dev/null || exit 1
    }
+
    FINAL_PLAN_SHA256="$(
      ruby -rdigest -e 'puts Digest::SHA256.file(ARGV.fetch(0)).hexdigest' "${FINAL_PLAN_FILE}"
    )" || {
@@ -1520,6 +1592,11 @@ audited manual path instead:
      "refs/tags/${CLOSEOUT_TAG}:refs/tags/${CLOSEOUT_TAG}" \
      ":refs/heads/release/${RELEASE_VERSION}"
    ```
+
+   The embedded validator enforces schema, exact-object binding, ancestry, and
+   manifest/plan consistency only. Its success is not independent semantic
+   proof and does not replace the maker/checker re-derivation or live approval
+   trust verification above.
 
    If the atomic push rejects either Git ref lease, no remote ref changes:
    preserve the branch, inspect or remove the unpushed local closeout tag, and

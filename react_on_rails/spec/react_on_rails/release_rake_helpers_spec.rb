@@ -714,7 +714,7 @@ RSpec.describe "release.rake helper methods" do
         )
       end.to raise_error(SystemExit) { |error|
         expect(error.message).to include(
-          "Live GitHub release recovery is BLOCKED",
+          "Live GitHub release recovery remains BLOCKED",
           'bundle exec rake "sync_github_release[17.0.0,true]"',
           "internal/contributor-info/release-train-runbook.md"
         )
@@ -735,7 +735,7 @@ RSpec.describe "release.rake helper methods" do
       end
 
       expect(output).to match(
-        /Skipping GitHub release.*Live GitHub release recovery is BLOCKED.*sync_github_release\[17\.0\.0,true\]/m
+        /Skipping GitHub release.*Live GitHub release recovery remains BLOCKED.*sync_github_release\[17\.0\.0,true\]/m
       )
       expect(output).not_to match(/sync_github_release\[17\.0\.0\]"/)
     end
@@ -758,6 +758,24 @@ RSpec.describe "release.rake helper methods" do
 
   describe "preview-only compound release guidance" do
     let(:release_runbook) { "internal/contributor-info/release-train-runbook.md" }
+
+    it "states exactly that the live boundary is policy, not runtime enforcement" do
+      expect(release_compound_live_boundary_guidance).to eq(<<~GUIDANCE.chomp)
+        Live compound release remains BLOCKED by operational and agent policy until the repository-owned
+        lifetime/per-write lease wrapper exists. This is not runtime enforcement: the release tasks remain
+        technically callable in live mode. Direct live invocation outside the individually guarded procedure in
+        internal/contributor-info/release-train-runbook.md violates repository policy.
+      GUIDANCE
+
+      expect(github_release_sync_preview_guidance(version: "17.0.0")).to eq(<<~GUIDANCE.chomp)
+        Live GitHub release recovery remains BLOCKED by operational and agent policy until the repository-owned
+        lifetime/per-write lease wrapper exists. This is not runtime enforcement: sync_github_release remains
+        technically callable in live mode. Direct live invocation outside the individually guarded procedure in
+        internal/contributor-info/release-train-runbook.md violates repository policy.
+        Preview the idempotent GitHub-only sync step with:
+          bundle exec rake "sync_github_release[17.0.0,true]"
+      GUIDANCE
+    end
 
     it "keeps release retry guidance in preview mode" do
       allow(self).to receive(:extract_changelog_section)
@@ -12343,7 +12361,7 @@ RSpec.describe "release.rake helper methods" do
         include("Live compound release remains BLOCKED", "internal/contributor-info/release-train-runbook.md")
       )
       expect(sync_help).to include(
-        "Live GitHub release recovery is BLOCKED",
+        "Live GitHub release recovery remains BLOCKED",
         "internal/contributor-info/release-train-runbook.md"
       )
 
