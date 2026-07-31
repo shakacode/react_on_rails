@@ -152,6 +152,13 @@ mutation. The bounded status and claim operations fail closed on timeout,
 
 ```bash
 RELEASE_VERSION=17.0.0
+if [[ ! "${RELEASE_VERSION}" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+  echo "release version must be a stable X.Y.Z version; stop" >&2
+  return 1 2>/dev/null || exit 1
+fi
+RELEASE_LINE_TARGET="release-line:${RELEASE_VERSION}"
+readonly RELEASE_VERSION RELEASE_LINE_TARGET
+export RELEASE_VERSION RELEASE_LINE_TARGET
 RELEASE_COORDINATOR_INSTANCE_ID="$(
   ruby -rsecurerandom -e 'print SecureRandom.uuid'
 )" || {
@@ -165,7 +172,6 @@ test -n "${RELEASE_COORDINATOR_INSTANCE_ID}" || {
 RELEASE_COORDINATOR_ID="release-${RELEASE_VERSION}-${RELEASE_COORDINATOR_INSTANCE_ID}"
 readonly RELEASE_COORDINATOR_INSTANCE_ID RELEASE_COORDINATOR_ID
 export RELEASE_COORDINATOR_INSTANCE_ID RELEASE_COORDINATOR_ID
-RELEASE_LINE_TARGET="release-line:${RELEASE_VERSION}"
 PR_BATCH_SKILL_DIR="${PR_BATCH_SKILL_DIR:-$(.agents/bin/shared-skill-dir pr-batch)}"
 
 heartbeat_release_line_lease() {
@@ -226,6 +232,11 @@ if [ "${lease_status}" -ne 0 ]; then
   return "${lease_status}" 2>/dev/null || exit "${lease_status}"
 fi
 ```
+
+`RELEASE_VERSION` and `RELEASE_LINE_TARGET` are the canonical, readonly lease
+identity for this shell lifecycle. Do not reassign either variable. Later
+backport, selective-closeout, and changelog-closeout inputs use their own names
+and must equal `RELEASE_VERSION` before any GitHub or Git mutation.
 
 The explicit claim TTL is four hours and the heartbeat TTL is 15 minutes. Renew
 the claim at least hourly with the bounded `claim` command from
@@ -569,7 +580,7 @@ above; when there are multiple selections, serialize the sequence:
 
    ```bash
    BACKPORT_PR="${BACKPORT_PR:?set the backport PR number or URL}"
-   RELEASE_VERSION="${RELEASE_VERSION:?set the exact X.Y.Z release version}"
+   BACKPORT_RELEASE_VERSION="${BACKPORT_RELEASE_VERSION:?set the exact X.Y.Z release version}"
    BACKPORT_RELEASE_BRANCH="${BACKPORT_RELEASE_BRANCH:?set the exact release/X.Y.Z branch}"
    BACKPORT_VALIDATED_HEAD_OID="${BACKPORT_VALIDATED_HEAD_OID:?set the validated 40-character head OID}"
    BACKPORT_VALIDATED_BASE_OID="${BACKPORT_VALIDATED_BASE_OID:?set the validated 40-character release-base OID}"
@@ -579,10 +590,14 @@ above; when there are multiple selections, serialize the sequence:
    BACKPORT_COMMIT_HEADLINE="${BACKPORT_COMMIT_HEADLINE:?set the final squash headline}"
    BACKPORT_COMMIT_BODY="${BACKPORT_COMMIT_BODY:?set the final squash body}"
 
-   if [[ ! "${RELEASE_VERSION}" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+   if [[ ! "${BACKPORT_RELEASE_VERSION}" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
      echo "release version must be X.Y.Z; stop backport" >&2
      return 1 2>/dev/null || exit 1
    fi
+   test "${BACKPORT_RELEASE_VERSION}" = "${RELEASE_VERSION}" || {
+     echo "backport release version must equal held release-line lease version ${RELEASE_VERSION}; stop backport" >&2
+     return 1 2>/dev/null || exit 1
+   }
    jq -en --arg branch "${BACKPORT_RELEASE_BRANCH}" \
      '$branch | test("^release/[0-9]+\\.[0-9]+\\.[0-9]+$")' >/dev/null || {
      echo "backport target is not an exact release/X.Y.Z branch; stop backport" >&2
@@ -837,6 +852,10 @@ if [ "${CLOSEOUT_MERGE_METHOD}" = "SQUASH" ]; then
     echo "closeout release version must be X.Y.Z; stop closeout" >&2
     return 1 2>/dev/null || exit 1
   fi
+  test "${CLOSEOUT_RELEASE_VERSION}" = "${RELEASE_VERSION}" || {
+    echo "closeout release version must equal held release-line lease version ${RELEASE_VERSION}; stop closeout" >&2
+    return 1 2>/dev/null || exit 1
+  }
   if [[ ! "${CLOSEOUT_SOURCE_CHANGELOG_OID}" =~ ^[0-9a-f]{40}$ ]]; then
     echo "source CHANGELOG.md OID must be a lowercase 40-character SHA; stop closeout" >&2
     return 1 2>/dev/null || exit 1
@@ -1253,14 +1272,23 @@ changes or use replacements already live on `main`, do not run normal-mode
 `script/release-forward-port` or `script/release-finish close-out`. Use this
 audited manual path instead:
 
-1. Set `RELEASE_VERSION`, `PLAN_FILE`, and `OMITTED_PICKS_FILE`; fetch both
+1. Set `SELECTIVE_CLOSEOUT_RELEASE_VERSION`, `PLAN_FILE`, and
+   `OMITTED_PICKS_FILE`; fetch both
    `origin/main` and the exact release ref, require a clean local `main` exactly
    equal to `origin/main`, save the complete dry-run plan as release-tracker
    evidence, and record the audited release tip. Every stated precondition is
    executable and fails closed:
 
    ```bash
-   RELEASE_VERSION=17.0.0
+   SELECTIVE_CLOSEOUT_RELEASE_VERSION="${SELECTIVE_CLOSEOUT_RELEASE_VERSION:?set the exact X.Y.Z release version}"
+   if [[ ! "${SELECTIVE_CLOSEOUT_RELEASE_VERSION}" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+     echo "selective closeout release version must be X.Y.Z; stop selective closeout" >&2
+     return 1 2>/dev/null || exit 1
+   fi
+   test "${SELECTIVE_CLOSEOUT_RELEASE_VERSION}" = "${RELEASE_VERSION}" || {
+     echo "selective closeout version must equal held release-line lease version ${RELEASE_VERSION}; stop selective closeout" >&2
+     return 1 2>/dev/null || exit 1
+   }
    PLAN_FILE="${PLAN_FILE:?set a durable path for release-tracker plan evidence}"
    OMITTED_PICKS_FILE="${OMITTED_PICKS_FILE:?set a durable path for omitted-pick evidence}"
    main_refspec="+refs/heads/main:refs/remotes/origin/main"

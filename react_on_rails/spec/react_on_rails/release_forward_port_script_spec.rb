@@ -75,8 +75,60 @@ RSpec.describe "script/release-forward-port" do
     documented_bash_snippet('CLOSEOUT_PR="${CLOSEOUT_PR:?set the closeout PR number or URL}"')
   end
 
+  def documented_release_line_lease_snippet
+    documented_bash_snippet("RELEASE_VERSION=17.0.0")
+  end
+
   def documented_backport_merge_snippet
     documented_bash_snippet('BACKPORT_PR="${BACKPORT_PR:?set the backport PR number or URL}"')
+  end
+
+  def run_documented_release_line_lease(extra_script, release_version: "17.0.0")
+    Dir.mktmpdir("release-line-lease-runbook") do |tmpdir|
+      helper_dir = File.join(tmpdir, "bin")
+      FileUtils.mkdir_p(helper_dir)
+      helper_path = File.join(helper_dir, "agent-coord-bounded")
+      File.write(
+        helper_path,
+        <<~BASH
+          #!/bin/bash
+          target=""
+          command=""
+          while [ "$#" -gt 0 ]; do
+            case "$1" in
+              status|claim) command="$1" ;;
+              --target) shift; target="$1" ;;
+            esac
+            shift
+          done
+          if [ "${command}" = "status" ]; then
+            printf '{"claims":[{"status":"active","agent_id":"%s","instance_id":"%s","expires_at":"2099-01-01T00:00:00Z"}],"heartbeats":[{"agent_id":"%s","instance_id":"%s","target":"shakacode/react_on_rails#%s","liveness":"live"}]}\\n' \
+              "${RELEASE_COORDINATOR_ID}" "${RELEASE_COORDINATOR_INSTANCE_ID}" \
+              "${RELEASE_COORDINATOR_ID}" "${RELEASE_COORDINATOR_INSTANCE_ID}" "${target}"
+          fi
+        BASH
+      )
+      FileUtils.chmod(0o755, helper_path)
+      lease_snippet = documented_release_line_lease_snippet.sub(
+        "RELEASE_VERSION=17.0.0",
+        "RELEASE_VERSION=#{release_version}"
+      )
+      harness = <<~BASH
+        set -u
+        agent-coord() { return 0; }
+
+        #{lease_snippet}
+
+        #{extra_script}
+      BASH
+
+      Open3.capture3(
+        { "PR_BATCH_SKILL_DIR" => tmpdir },
+        "/bin/bash",
+        stdin_data: harness,
+        chdir: repo_root
+      )
+    end
   end
 
   def closeout_merge_harness
@@ -104,6 +156,8 @@ RSpec.describe "script/release-forward-port" do
 
       require_live_release_line_lease() { return 0; }
 
+      readonly RELEASE_VERSION RELEASE_LINE_TARGET
+
       run_closeout_merge() {
       #{documented_closeout_merge_snippet}
       }
@@ -112,12 +166,20 @@ RSpec.describe "script/release-forward-port" do
     BASH
   end
 
-  def run_documented_closeout_merge(method:, release_version: nil, source_changelog_oid: nil, pr_number: 999)
+  def run_documented_closeout_merge(
+    method:,
+    release_version: nil,
+    source_changelog_oid: nil,
+    pr_number: 999,
+    lease_version: "17.0.0"
+  )
     Dir.mktmpdir("release-closeout-runbook") do |tmpdir|
       arguments_path = File.join(tmpdir, "graphql-arguments")
       environment = {
         "CLOSEOUT_PR" => "https://github.com/shakacode/react_on_rails/pull/#{pr_number}",
         "CLOSEOUT_MERGE_METHOD" => method,
+        "RELEASE_VERSION" => lease_version,
+        "RELEASE_LINE_TARGET" => "release-line:#{lease_version}",
         "CLOSEOUT_VALIDATED_HEAD_OID" => "a" * 40,
         "CLOSEOUT_VALIDATED_BASE_OID" => "b" * 40,
         "CLOSEOUT_TEST_BASE_OID" => "b" * 40,
@@ -171,6 +233,8 @@ RSpec.describe "script/release-forward-port" do
 
       require_live_release_line_lease() { return 0; }
 
+      readonly RELEASE_VERSION RELEASE_LINE_TARGET
+
       run_backport_merge() {
       #{documented_backport_merge_snippet}
       }
@@ -179,7 +243,12 @@ RSpec.describe "script/release-forward-port" do
     BASH
   end
 
-  def run_documented_backport_merge(release_version:, release_branch:)
+  def run_documented_backport_merge(
+    release_version:,
+    release_branch:,
+    lease_version: release_version,
+    release_line_target: "release-line:#{lease_version}"
+  )
     Dir.mktmpdir("release-backport-runbook") do |tmpdir|
       arguments_path = File.join(tmpdir, "graphql-arguments")
       head_oid = "a" * 40
@@ -187,7 +256,9 @@ RSpec.describe "script/release-forward-port" do
       main_oid = "c" * 40
       source_sha = "d" * 40
       environment = {
-        "RELEASE_VERSION" => release_version,
+        "RELEASE_VERSION" => lease_version,
+        "RELEASE_LINE_TARGET" => release_line_target,
+        "BACKPORT_RELEASE_VERSION" => release_version,
         "BACKPORT_PR" => "999",
         "BACKPORT_RELEASE_BRANCH" => release_branch,
         "BACKPORT_VALIDATED_HEAD_OID" => head_oid,
@@ -226,6 +297,57 @@ RSpec.describe "script/release-forward-port" do
     raise "documented selective closeout validator is missing" unless match
 
     match[:program]
+  end
+
+  def documented_selective_closeout_setup_snippet
+    runbook = File.read(File.join(repo_root, "internal/contributor-info/release-train-runbook.md"))
+    snippets = runbook.to_enum(:scan, /```bash\n(.*?)\n[ \t]*```/m).map { Regexp.last_match(1) }
+    snippet = snippets.find do |candidate|
+      candidate.include?('PLAN_FILE="${PLAN_FILE:?set a durable path for release-tracker plan evidence}"')
+    end
+    raise "documented selective closeout setup snippet is missing" unless snippet
+
+    indent = snippet[/\A[ \t]*/]
+    snippet.lines.map { |line| line.delete_prefix(indent) }.join
+  end
+
+  def run_documented_selective_closeout_setup(lease_version:, closeout_version:)
+    Dir.mktmpdir("selective-closeout-runbook") do |tmpdir|
+      FileUtils.mkdir_p(File.join(tmpdir, "script"))
+      forward_port_path = File.join(tmpdir, "script", "release-forward-port")
+      File.write(forward_port_path, "#!/bin/bash\nprintf 'PICK plan\\n'\n")
+      FileUtils.chmod(0o755, forward_port_path)
+      arguments_path = File.join(tmpdir, "git-arguments")
+      plan_path = File.join(tmpdir, "plan.txt")
+      harness = <<~BASH
+        set -u
+        git() {
+          printf '%s\\0' "$@" >>"${SELECTIVE_TEST_GIT_ARGS}"
+          case "$1 $2" in
+            "fetch --prune"|"switch main") return 0 ;;
+            "status --porcelain") return 0 ;;
+            "rev-parse origin/main"|"rev-parse HEAD") printf '%040d\\n' 0 ;;
+            "rev-parse origin/release/"*) printf '%040d\\n' 1 ;;
+            *) printf 'unexpected git invocation: %s\\n' "$*" >&2; return 64 ;;
+          esac
+        }
+        readonly RELEASE_VERSION RELEASE_LINE_TARGET
+
+        #{documented_selective_closeout_setup_snippet}
+      BASH
+      environment = {
+        "RELEASE_VERSION" => lease_version,
+        "RELEASE_LINE_TARGET" => "release-line:#{lease_version}",
+        "SELECTIVE_CLOSEOUT_RELEASE_VERSION" => closeout_version,
+        "PLAN_FILE" => plan_path,
+        "OMITTED_PICKS_FILE" => File.join(tmpdir, "omitted-picks.json"),
+        "SELECTIVE_TEST_GIT_ARGS" => arguments_path
+      }
+      stdout, stderr, status = Open3.capture3(environment, "/bin/bash", stdin_data: harness, chdir: tmpdir)
+      arguments = File.exist?(arguments_path) ? File.binread(arguments_path).split("\0") : []
+
+      [stdout, stderr, status, arguments]
+    end
   end
 
   def write_selective_closeout_inputs(repo, fixture)
@@ -379,6 +501,37 @@ RSpec.describe "script/release-forward-port" do
     git(repo, "config", "diff.external", external_diff_path)
   end
 
+  describe "documented release-line lease bootstrap" do
+    it "rejects a non-stable canonical version before acquiring the lease" do
+      _stdout, stderr, status = run_documented_release_line_lease("exit 72", release_version: "17.0.0.rc.1")
+
+      expect(status).not_to be_success
+      expect(stderr).to include("release version must be a stable X.Y.Z version; stop")
+    end
+
+    it "keeps the canonical release version and target immutable for the shell lifecycle" do
+      stdout, stderr, status = run_documented_release_line_lease(<<~BASH)
+        ( RELEASE_VERSION=17.0.1 ) >/dev/null 2>&1 && exit 70
+        ( RELEASE_LINE_TARGET=release-line:17.0.1 ) >/dev/null 2>&1 && exit 71
+        printf '%s %s\n' "${RELEASE_VERSION}" "${RELEASE_LINE_TARGET}"
+      BASH
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("17.0.0 release-line:17.0.0")
+    end
+
+    it "assigns the canonical release version and target only in the lease bootstrap" do
+      runbook = File.read(File.join(repo_root, "internal/contributor-info/release-train-runbook.md"))
+      snippets = runbook.to_enum(:scan, /```bash\n(.*?)\n[ \t]*```/m).map { Regexp.last_match(1) }
+      executable_lines = snippets.flat_map(&:lines).map(&:strip)
+
+      expect(executable_lines.grep(/\ARELEASE_VERSION=/)).to eq(["RELEASE_VERSION=17.0.0"])
+      expect(executable_lines.grep(/\ARELEASE_LINE_TARGET=/)).to eq(
+        ['RELEASE_LINE_TARGET="release-line:${RELEASE_VERSION}"']
+      )
+    end
+  end
+
   describe "documented synchronous closeout merge" do
     it "passes authoritative final-changelog metadata for a squash merge" do
       source_changelog_oid = "c" * 40
@@ -436,6 +589,20 @@ RSpec.describe "script/release-forward-port" do
       expect(arguments).to be_empty
     end
 
+    it "refuses a squash version that differs from the held lease before attempting the merge" do
+      source_changelog_oid = "c" * 40
+      _stdout, stderr, status, arguments = run_documented_closeout_merge(
+        method: "SQUASH",
+        lease_version: "17.0.0",
+        release_version: "17.0.1",
+        source_changelog_oid:
+      )
+
+      expect(status).not_to be_success
+      expect(stderr).to include("closeout release version must equal held release-line lease version 17.0.0")
+      expect(arguments).to be_empty
+    end
+
     it "preserves the rebase merge path without squash-only metadata" do
       _stdout, stderr, status, arguments = run_documented_closeout_merge(method: "REBASE")
 
@@ -460,6 +627,17 @@ RSpec.describe "script/release-forward-port" do
       expect(arguments).to include("commitHeadline=Backport release fix (#999)")
     end
 
+    it "accepts a matching backport input without retargeting the canonical lease variables" do
+      _stdout, stderr, status, arguments = run_documented_backport_merge(
+        lease_version: "17.0.0",
+        release_version: "17.0.0",
+        release_branch: "release/17.0.0"
+      )
+
+      expect(status).to be_success, stderr
+      expect(arguments).to include("commitHeadline=Backport release fix (#999)")
+    end
+
     it "refuses a release branch that does not match the held release version before mutation" do
       _stdout, stderr, status, arguments = run_documented_backport_merge(
         release_version: "17.0.0",
@@ -468,6 +646,18 @@ RSpec.describe "script/release-forward-port" do
 
       expect(status).not_to be_success
       expect(stderr).to include("backport target must equal release/17.0.0; stop backport")
+      expect(arguments).to be_empty
+    end
+
+    it "refuses a backport version that retargets the held release-line lease before mutation" do
+      _stdout, stderr, status, arguments = run_documented_backport_merge(
+        lease_version: "17.0.0",
+        release_version: "17.0.1",
+        release_branch: "release/17.0.1"
+      )
+
+      expect(status).not_to be_success
+      expect(stderr).to include("backport release version must equal held release-line lease version 17.0.0")
       expect(arguments).to be_empty
     end
 
@@ -484,6 +674,28 @@ RSpec.describe "script/release-forward-port" do
   end
 
   describe "documented selective manual closeout validator" do
+    it "accepts a selective-closeout version that matches the held lease" do
+      stdout, stderr, status, arguments = run_documented_selective_closeout_setup(
+        lease_version: "17.0.0",
+        closeout_version: "17.0.0"
+      )
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("PICK plan")
+      expect(arguments).to include("fetch", "--prune", "switch", "main")
+    end
+
+    it "refuses a later selective-closeout version that differs from the held lease before mutation" do
+      _stdout, stderr, status, arguments = run_documented_selective_closeout_setup(
+        lease_version: "17.0.0",
+        closeout_version: "17.0.1"
+      )
+
+      expect(status).not_to be_success
+      expect(stderr).to include("selective closeout version must equal held release-line lease version 17.0.0")
+      expect(arguments).to be_empty
+    end
+
     it "accepts a bound final plan, manifest, replacement, provenance footer, and manual acknowledgement" do
       with_selective_closeout_validator_fixture do |repo, fixture|
         _stdout, stderr, status = run_documented_selective_closeout_validator(repo, fixture)
