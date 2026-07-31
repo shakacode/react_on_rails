@@ -721,6 +721,17 @@ def shakaperf_release_tracker_v1_record_from_comment!(comment)
   fields
 end
 
+def validate_approver_bound_shakaperf_tracker_entry!(entry:, tracker:, login:)
+  return unless SHAKAPERF_APPROVER_BOUND_ENTRY_KINDS.include?(entry[:kind])
+
+  if entry.dig(:record, "release_tracker") != tracker
+    abort "❌ ShakaPerf record's embedded release tracker does not match its containing issue."
+  end
+  return if entry.dig(:record, "approved_by") == login
+
+  abort "❌ ShakaPerf tracker record approver does not match its trusted comment author."
+end
+
 def trusted_shakaperf_release_tracker_records!(repo_slug:, tracker:)
   permissions = {}
   fetch_shakaperf_release_tracker_comments!(repo_slug:, tracker:).filter_map do |comment|
@@ -740,9 +751,7 @@ def trusted_shakaperf_release_tracker_records!(repo_slug:, tracker:)
     abort "❌ ShakaPerf evidence is bound to a different release tracker." unless issue_tracker == tracker
 
     entry = shakaperf_release_tracker_entry_from_comment!(comment)
-    if SHAKAPERF_APPROVER_BOUND_ENTRY_KINDS.include?(entry[:kind]) && entry.dig(:record, "approved_by") != login
-      abort "❌ ShakaPerf tracker record approver does not match its trusted comment author."
-    end
+    validate_approver_bound_shakaperf_tracker_entry!(entry:, tracker:, login:)
 
     entry.merge(author: login, comment:)
   end
@@ -955,6 +964,18 @@ def normalized_selected_shakaperf_release_gate_run(run)
   }
 end
 
+def selected_shakaperf_release_gate_run_identity_rejection(run:, repo_slug:, ref:)
+  expected_workflow_path = ".github/workflows/#{SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE}"
+  return "repository does not match" unless run["repository"] == repo_slug
+  unless run["workflowPath"].to_s.split("@", 2).first == expected_workflow_path
+    return "workflowPath does not match the canonical ShakaPerf workflow"
+  end
+  return "event is not workflow_dispatch" unless run["event"] == "workflow_dispatch"
+  return "headBranch does not match the release branch" unless run["headBranch"] == ref
+
+  nil
+end
+
 def shakaperf_release_tracker_identity_rejection(record:, run:, repo_slug:, ref:, head_sha:, target_version:)
   return "repository does not match" unless record["repository"] == repo_slug && run["repository"] == repo_slug
   return "release does not match" unless record["release"] == target_version
@@ -1092,6 +1113,9 @@ end
 
 def verified_shakaperf_release_tracker_association_rejection(record:, run:, repo_slug:, monorepo_root:, ref:,
                                                              head_sha:, target_version:, release_started_at:)
+  rejection = selected_shakaperf_release_gate_run_identity_rejection(run:, repo_slug:, ref:)
+  return rejection if rejection
+
   rejection = verified_shakaperf_release_tracker_association_identity_rejection(
     record:, run:, repo_slug:, ref:, target_version:
   )
@@ -1231,9 +1255,10 @@ end
 
 def validate_final_shakaperf_observation_waiver_reason!(reason)
   valid = reason.is_a?(String) && reason == reason.strip && reason.length.between?(1, 500) &&
-          !reason.match?(/[\r\n[:cntrl:]]/)
+          !reason.match?(/[\r\n[:cntrl:]]/) && !reason.include?("<!--") && !reason.include?("-->")
   unless valid
-    abort "❌ RELEASE_FINAL_SHAKAPERF_WAIVER_REASON must be a non-empty single-line reason (maximum 500 characters)."
+    abort "❌ RELEASE_FINAL_SHAKAPERF_WAIVER_REASON must be non-empty single-line plain text " \
+          "(maximum 500 characters)."
   end
 
   reason
@@ -1435,6 +1460,9 @@ def select_and_verify_shakaperf_release_gate_run!(repo_slug:, monorepo_root:, tr
   run = normalized_selected_shakaperf_release_gate_run(
     fetch_selected_shakaperf_release_gate_run!(repo_slug:, run_id:)
   )
+  identity_rejection = selected_shakaperf_release_gate_run_identity_rejection(run:, repo_slug:, ref:)
+  abort "❌ Selected ShakaPerf run is not reusable: #{identity_rejection}." if identity_rejection
+
   evidence = fetch_shakaperf_release_gate_evidence(repo_slug:, run:)
   abort "❌ Selected ShakaPerf run has no readable schema-v2 evidence artifact." unless evidence
 

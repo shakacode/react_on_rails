@@ -1522,6 +1522,10 @@ RSpec.describe "release.rake helper methods" do
           ref: "release-branch", head_sha:, target_version:
         ),
         "headSha" => head_sha,
+        "headBranch" => "release-branch",
+        "workflowPath" => ".github/workflows/#{SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE}@refs/heads/release-branch",
+        "event" => "workflow_dispatch",
+        "repository" => repo_slug,
         "createdAt" => "2026-07-14T12:00:00Z",
         "startedAt" => "2026-07-14T12:00:05Z",
         "url" => "https://github.com/shakacode/react_on_rails/actions/runs/123456"
@@ -1635,6 +1639,44 @@ RSpec.describe "release.rake helper methods" do
       )
 
       expect(result).to eq(selected_run)
+    end
+
+    it "rejects a mismatched live selected-run identity before persisting an explicit selector" do
+      selected_run = run.merge(
+        "status" => "completed",
+        "conclusion" => "success",
+        "updatedAt" => "2026-07-14T12:30:00Z"
+      )
+      mismatches = {
+        "repository" => "other/repository",
+        "workflowPath" => ".github/workflows/unrelated.yml@refs/heads/release-branch",
+        "event" => "push",
+        "headBranch" => "release/other"
+      }
+      allow(self).to receive(:trusted_shakaperf_release_tracker_records!)
+        .with(repo_slug:, tracker: 4806).and_return([])
+      expect(self).not_to receive(:fetch_shakaperf_release_gate_evidence)
+      expect(self).not_to receive(:persist_verified_shakaperf_release_tracker_evidence!)
+
+      aggregate_failures do
+        mismatches.each do |field, value|
+          allow(self).to receive(:fetch_selected_shakaperf_release_gate_run!)
+            .with(repo_slug:, run_id: 123_456).and_return(selected_run.merge(field => value))
+
+          expect do
+            select_and_verify_shakaperf_release_gate_run!(
+              repo_slug:,
+              monorepo_root:,
+              tracker: 4806,
+              selector: "123456",
+              ref: "release-branch",
+              head_sha:,
+              target_version:,
+              release_started_at:
+            )
+          end.to raise_error(SystemExit, /Selected ShakaPerf run.*#{Regexp.escape(field)}/i)
+        end
+      end
     end
 
     it "persists the tested SHA for a runtime-equivalent selector and reuses it after restart" do
@@ -1871,6 +1913,81 @@ RSpec.describe "release.rake helper methods" do
       )
     end
 
+    it "rejects copied approver-bound records whose embedded tracker differs from the containing issue" do
+      candidate_sha = "a" * 40
+      selected_run = run.merge(
+        "headSha" => candidate_sha,
+        "status" => "completed",
+        "conclusion" => "success",
+        "updatedAt" => "2026-07-14T12:30:00Z"
+      )
+      evidence = {
+        "schema_version" => 2,
+        "run_attempt" => 1,
+        "run_id" => 123_456,
+        "run_url" => selected_run.fetch("url"),
+        "branch" => "release-branch",
+        "candidate_sha" => candidate_sha,
+        "target_version" => target_version,
+        "conclusion" => "success",
+        "runtime_tree_fingerprint" => "a" * 64,
+        "completed_at" => "2026-07-14T12:29:59Z"
+      }
+      association = build_verified_shakaperf_release_tracker_record(
+        repo_slug:,
+        tracker: 7777,
+        ref: "release-branch",
+        head_sha: candidate_sha,
+        target_version:,
+        run: selected_run,
+        evidence:,
+        approved_by: "justin808",
+        recorded_at: Time.iso8601("2026-07-14T12:31:00Z")
+      )
+      waiver_run = selected_run.merge(
+        "displayTitle" => shakaperf_release_gate_display_title(
+          ref: "release-branch", head_sha: candidate_sha, target_version: "17.0.0"
+        ),
+        "status" => "in_progress",
+        "conclusion" => nil
+      )
+      waiver = build_final_shakaperf_observation_waiver_record(
+        repo_slug:,
+        tracker: 7777,
+        ref: "release-branch",
+        head_sha: candidate_sha,
+        target_version: "17.0.0",
+        run: waiver_run,
+        reason: "GitHub REST observer exhausted its quota",
+        observation: "quota exhausted",
+        approved_by: "justin808",
+        recorded_at: Time.iso8601("2026-07-14T12:31:00Z")
+      )
+      bodies = [
+        verified_shakaperf_release_tracker_comment(association),
+        final_shakaperf_observation_waiver_comment(waiver)
+      ]
+      allow(self).to receive(:accelerated_rc_repository_comment_permission!)
+        .with(repo_slug:, login: "justin808", permissions: {}).and_return("maintain")
+
+      aggregate_failures do
+        bodies.each_with_index do |body, index|
+          comment = accelerated_rc_test_issue_comment(
+            id: 96 + index,
+            tracker: 4806,
+            body:,
+            user: { "login" => "justin808" }
+          )
+          allow(self).to receive(:fetch_shakaperf_release_tracker_comments!)
+            .with(repo_slug:, tracker: 4806).and_return([comment])
+
+          expect do
+            trusted_shakaperf_release_tracker_records!(repo_slug:, tracker: 4806)
+          end.to raise_error(SystemExit, /embedded release tracker.*containing issue/i)
+        end
+      end
+    end
+
     it "ignores a malformed marker from a non-maintainer before parsing its payload" do
       comment = accelerated_rc_test_issue_comment(
         id: 92,
@@ -1995,6 +2112,67 @@ RSpec.describe "release.rake helper methods" do
       )
 
       expect(result).to eq(selected_run)
+    end
+
+    it "rejects a mismatched live selected-run identity before reusing a durable association" do
+      candidate_sha = "a" * 40
+      selected_run = run.merge(
+        "headSha" => candidate_sha,
+        "status" => "completed",
+        "conclusion" => "success",
+        "updatedAt" => "2026-07-14T12:30:00Z"
+      )
+      schema_v2_evidence = {
+        "schema_version" => 2,
+        "run_attempt" => 1,
+        "run_id" => 123_456,
+        "run_url" => selected_run.fetch("url"),
+        "branch" => "release-branch",
+        "candidate_sha" => candidate_sha,
+        "target_version" => target_version,
+        "conclusion" => "success",
+        "runtime_tree_fingerprint" => "a" * 64,
+        "completed_at" => "2026-07-14T12:29:59Z"
+      }
+      record = build_verified_shakaperf_release_tracker_record(
+        repo_slug:,
+        tracker: 4806,
+        ref: "release-branch",
+        head_sha: candidate_sha,
+        target_version:,
+        run: selected_run,
+        evidence: schema_v2_evidence,
+        approved_by: "justin808",
+        recorded_at: Time.iso8601("2026-07-14T12:31:00Z")
+      )
+      mismatches = {
+        "repository" => "other/repository",
+        "workflowPath" => ".github/workflows/unrelated.yml@refs/heads/release-branch",
+        "event" => "push",
+        "headBranch" => "release/other"
+      }
+      allow(self).to receive(:trusted_shakaperf_release_tracker_records!)
+        .with(repo_slug:, tracker: 4806).and_return([{ kind: :association, record: }])
+      expect(self).not_to receive(:fetch_shakaperf_release_gate_evidence)
+
+      aggregate_failures do
+        mismatches.each do |field, value|
+          allow(self).to receive(:fetch_selected_shakaperf_release_gate_run!)
+            .with(repo_slug:, run_id: 123_456).and_return(selected_run.merge(field => value))
+
+          expect do
+            reuse_shakaperf_release_tracker_evidence(
+              repo_slug:,
+              monorepo_root:,
+              tracker: 4806,
+              ref: "release-branch",
+              head_sha: candidate_sha,
+              target_version:,
+              release_started_at:
+            )
+          end.to raise_error(SystemExit, /Saved ShakaPerf.*#{Regexp.escape(field)}/i)
+        end
+      end
     end
 
     it "reuses a saved association for a runtime-equivalent release commit" do
@@ -2220,6 +2398,48 @@ RSpec.describe "release.rake helper methods" do
         "reason" => "GitHub REST observer exhausted its quota",
         "approved_by" => "justin808"
       )
+    end
+
+    it "rejects HTML comment syntax in a waiver reason before posting or returning a record" do
+      candidate_sha = "a" * 40
+      observed_run = run.merge(
+        "headSha" => candidate_sha,
+        "displayTitle" => shakaperf_release_gate_display_title(
+          ref: "release-branch", head_sha: candidate_sha, target_version: "17.0.0"
+        ),
+        "status" => "in_progress",
+        "conclusion" => nil
+      )
+      invalid_reasons = [
+        "observer failed <!--",
+        "observer failed -->",
+        "observer failed #{SHAKAPERF_FINAL_OBSERVATION_WAIVER_MARKER_OPENER}v1 deadbeef -->"
+      ]
+      posted_bodies = []
+      allow(self).to receive(:current_release_approver!).with(repo_slug:).and_return("justin808")
+      allow(self).to receive(:trusted_shakaperf_release_tracker_records!)
+        .with(repo_slug:, tracker: 4806).and_return([])
+      allow(self).to receive(:post_release_tracker_comment!) { |body:, **| posted_bodies << body }
+
+      aggregate_failures do
+        invalid_reasons.each do |reason|
+          record = nil
+          expect do
+            record = persist_final_shakaperf_observation_waiver!(
+              repo_slug:,
+              tracker: 4806,
+              ref: "release-branch",
+              head_sha: candidate_sha,
+              target_version: "17.0.0",
+              run: observed_run,
+              reason:,
+              observation: "quota exhausted"
+            )
+          end.to raise_error(SystemExit, /single-line plain text/i)
+          expect(record).to be_nil
+        end
+        expect(posted_bodies).to be_empty
+      end
     end
 
     it "never applies the observation waiver to a failed selected run" do
