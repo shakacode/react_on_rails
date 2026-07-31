@@ -32,6 +32,28 @@ RUBYGEMS_VERSIONS_READ_TIMEOUT_SECONDS = 15
 GITHUB_RELEASE_BODY_MAX_LENGTH = 125_000
 NPM_PUBLISH_VERIFY_ATTEMPTS = 6
 NPM_PUBLISH_VERIFY_RETRY_DELAY_SECONDS = 5
+NPM_PUBLISH_MAX_BACKOFF_SECONDS = 30
+NPM_PUBLISH_HARD_FAILURE_CATEGORIES = %i[
+  authentication_failure
+  local_lifecycle
+  registry_rejection
+  unknown
+].freeze
+NPM_PUBLISH_TRANSIENT_PATTERN = /
+  \b(?:
+    EAI_AGAIN | ECONNRESET | ETIMEDOUT | ENETUNREACH | ECONNREFUSED |
+    ERR_SOCKET_TIMEOUT | E5\d\d | ERR_PNPM_FETCH_(?:429|5\d\d)
+  )\b |
+  socket\ hang\ up | network\ (?:timeout|error) | \b429\b | too\ many\ requests | \b(?:HTTP\s*)?5\d\d\b
+/ix
+NPM_PUBLISH_LOCAL_LIFECYCLE_PATTERN = /
+  \b(?:ELIFECYCLE|ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL|ERR_PNPM_NO_SCRIPT)\b |
+  prepublishOnly | lifecycle\ script | \btsc\b | TypeScript | Cannot\ find\ module
+/ix
+NPM_PUBLISH_REGISTRY_REJECTION_PATTERN = /
+  \b(?:EPUBLISHCONFLICT|E403|E400)\b | cannot\ publish\ over | previously\ published | forbidden |
+  invalid\ package | invalid\ semver | access\ denied
+/ix
 NPM_INSTALL_DEPENDENCY_FIELDS = %w[dependencies optionalDependencies peerDependencies].freeze
 NPM_RELEASE_PACKAGE_NAMES = %w[
   react-on-rails
@@ -54,6 +76,8 @@ SHAKAPERF_RELEASE_GATE_EVIDENCE_ARTIFACT = "shakaperf-release-evidence"
 SHAKAPERF_RELEASE_GATE_EVIDENCE_FILE = "shakaperf-release-evidence.json"
 SHAKAPERF_RELEASE_GATE_EVIDENCE_MAX_AGE_SECONDS = 7 * 24 * 60 * 60
 SHAKAPERF_RELEASE_GATE_EVIDENCE_SCHEMA_VERSION = 2
+SHAKAPERF_GIT_TREE_METADATA_PATTERN = /\A\d{6} (?:blob|commit) [0-9a-f]{40}(?:[0-9a-f]{24})?\z/
+SHAKAPERF_GIT_NAME_STATUS_PATTERN = /\A(?:[ADMTUXB]|[CR]\d{1,3})\z/
 ACCELERATED_RC_RECORD_SCHEMA_VERSION = 1
 ACCELERATED_RC_RECORD_MARKER = "react-on-rails-accelerated-rc"
 ACCELERATED_RC_RECORD_MARKER_OPENER = "<!-- #{ACCELERATED_RC_RECORD_MARKER} ".freeze
@@ -162,6 +186,69 @@ end
 
 class ShakaperfGateMissingRunError < ShakaperfGateObservationError; end
 class ShakaperfGateMissingArtifactError < ShakaperfGateObservationError; end
+
+class ShakaperfVerificationResult
+  attr_reader :status, :value, :details
+
+  def self.verified(value)
+    new(status: :verified, value:)
+  end
+
+  def self.not_ancestor
+    new(status: :not_ancestor)
+  end
+
+  def self.unknown(details)
+    new(status: :unknown, details:)
+  end
+
+  def initialize(status:, value: nil, details: nil)
+    @status = status
+    @value = value
+    @details = details
+  end
+
+  def verified?
+    status == :verified
+  end
+end
+
+class ShakaperfEvidenceRejection
+  NATURAL_INVALIDATION_KINDS = %i[
+    missing_artifact
+    missing_run
+    not_ancestor
+    runtime_bearing_commits
+    runtime_diverged
+    stale
+    workflow_cancelled
+    workflow_failed
+  ].freeze
+
+  attr_reader :kind, :message
+
+  def initialize(kind:, message:)
+    @kind = kind
+    @message = message
+  end
+
+  def natural_invalidation?
+    NATURAL_INVALIDATION_KINDS.include?(kind)
+  end
+
+  def to_s
+    message
+  end
+end
+
+class NpmPublishAttemptError < StandardError
+  attr_reader :category
+
+  def initialize(category:, details:)
+    @category = category
+    super("npm publish #{category.to_s.tr('_', ' ')}: #{details}")
+  end
+end
 # Keep in sync with every package.json, Gemfile.lock, and version file that the
 # release task rewrites while promoting an RC to a final release.
 # CHANGELOG.md is intentionally excluded. main_ci_walkback_commit? classifies
@@ -422,24 +509,47 @@ def current_git_sha!(monorepo_root, context: nil)
   output.strip
 end
 
-def shakaperf_runtime_tree_fingerprint(monorepo_root:, sha:)
+def shakaperf_runtime_tree_entry(entry)
+  metadata, path = entry.split("\t", 2)
+  return nil unless metadata&.match?(SHAKAPERF_GIT_TREE_METADATA_PATTERN) && !path.to_s.empty?
+
+  [metadata, path]
+end
+
+def shakaperf_runtime_tree_entries_verdict(output)
+  entries = output.split("\0")
+  return ShakaperfVerificationResult.unknown("git ls-tree returned no entries") if entries.empty?
+
+  parsed_entries = entries.map { |entry| shakaperf_runtime_tree_entry(entry) }
+  return ShakaperfVerificationResult.unknown("git ls-tree returned malformed entry data") if parsed_entries.any?(&:nil?)
+
+  runtime_pairs = parsed_entries.reject do |_metadata, path|
+    SHAKAPERF_RUNTIME_TREE_IGNORED_PATHS.include?(path)
+  end
+  runtime_entries = runtime_pairs.map { |metadata, path| "#{metadata}\t#{path}" }
+  return ShakaperfVerificationResult.unknown("git ls-tree returned no runtime entries") if runtime_entries.empty?
+
+  ShakaperfVerificationResult.verified(Digest::SHA256.hexdigest(runtime_entries.sort.join("\0")))
+end
+
+def shakaperf_runtime_tree_fingerprint_verdict(monorepo_root:, sha:)
   output, status = Open3.capture2e(
     "git", "-C", monorepo_root, "ls-tree", "-r", "-z", "--full-tree", sha
   )
-  return nil unless status.success?
-
-  runtime_entries = output.split("\0").filter_map do |entry|
-    metadata, path = entry.split("\t", 2)
-    next if metadata.nil? || path.nil?
-    next if SHAKAPERF_RUNTIME_TREE_IGNORED_PATHS.include?(path)
-
-    "#{metadata}\t#{path}"
+  unless status.success?
+    return ShakaperfVerificationResult.unknown(
+      "git ls-tree exited #{status.exitstatus}: #{output.to_s.strip}"
+    )
   end
-  return nil if runtime_entries.empty?
 
-  Digest::SHA256.hexdigest(runtime_entries.sort.join("\0"))
-rescue StandardError
-  nil
+  shakaperf_runtime_tree_entries_verdict(output)
+rescue StandardError => e
+  ShakaperfVerificationResult.unknown("git ls-tree raised #{e.class}: #{e.message}")
+end
+
+def shakaperf_runtime_tree_fingerprint(monorepo_root:, sha:)
+  verdict = shakaperf_runtime_tree_fingerprint_verdict(monorepo_root:, sha:)
+  verdict.value if verdict.verified?
 end
 
 def shakaperf_prerun_candidate(monorepo_root:, ref:, head_sha:)
@@ -561,7 +671,9 @@ def shakaperf_release_gate_evidence_time_rejection(run:, evidence:, release_star
   completed_at, updated_at = times
   return "evidence completion time is after the workflow update" if completed_at > updated_at
   return "evidence completion time is in the future" if completed_at > validation_time
-  return "evidence is stale" if validation_time - completed_at > SHAKAPERF_RELEASE_GATE_EVIDENCE_MAX_AGE_SECONDS
+  if validation_time - completed_at > SHAKAPERF_RELEASE_GATE_EVIDENCE_MAX_AGE_SECONDS
+    return ShakaperfEvidenceRejection.new(kind: :stale, message: "evidence is stale")
+  end
   return nil unless require_prerun
 
   shakaperf_prerun_release_order_rejection(
@@ -597,24 +709,82 @@ def shakaperf_release_gate_evidence_times(run:, evidence:)
   [[completed_at, updated_at], nil]
 end
 
-def shakaperf_release_gate_evidence_runtime_rejection(monorepo_root:, head_sha:, evidence:)
-  candidate_sha = evidence["candidate_sha"]
-  fingerprint = evidence["runtime_tree_fingerprint"]
-  candidate_fingerprint = shakaperf_runtime_tree_fingerprint(monorepo_root:, sha: candidate_sha)
-  return "candidate runtime tree cannot be verified" unless candidate_fingerprint == fingerprint
+def shakaperf_runtime_fingerprint_rejection(verdict:, fingerprint:, unknown_message:, mismatch_kind:,
+                                            mismatch_message:)
+  unless verdict.verified?
+    return ShakaperfEvidenceRejection.new(
+      kind: :git_unknown,
+      message: "#{unknown_message} (#{verdict.details})"
+    )
+  end
+  return nil if verdict.value == fingerprint
 
-  head_fingerprint = shakaperf_runtime_tree_fingerprint(monorepo_root:, sha: head_sha)
-  return "release runtime tree differs from the tested candidate" unless head_fingerprint == fingerprint
-  return nil if candidate_sha == head_sha
+  ShakaperfEvidenceRejection.new(kind: mismatch_kind, message: mismatch_message)
+end
 
-  commits = shakaperf_candidate_commit_shas(monorepo_root:, candidate_sha:, head_sha:)
-  return "tested candidate is not an ancestor of the release head" if commits == :not_ancestor
-  return "tested candidate ancestry or intervening commits cannot be verified" unless commits
-  return "release commits after the tested candidate are not metadata-only" unless commits.all? do |sha|
-    shakaperf_prerun_metadata_commit?(monorepo_root:, sha:)
+def shakaperf_intervening_commits_rejection(monorepo_root:, commits:)
+  commits.each do |sha|
+    verdict = shakaperf_prerun_metadata_commit_verdict(monorepo_root:, sha:)
+    unless verdict.verified?
+      return ShakaperfEvidenceRejection.new(
+        kind: :git_unknown,
+        message: "intervening commit classification cannot be verified for #{sha} (#{verdict.details})"
+      )
+    end
+    next if verdict.value == :metadata_only
+
+    return ShakaperfEvidenceRejection.new(
+      kind: :runtime_bearing_commits,
+      message: "release commits after the tested candidate are not metadata-only"
+    )
   end
 
   nil
+end
+
+def shakaperf_candidate_commits_rejection(monorepo_root:, candidate_sha:, head_sha:)
+  verdict = shakaperf_candidate_commit_shas(monorepo_root:, candidate_sha:, head_sha:)
+  if verdict.status == :not_ancestor
+    return ShakaperfEvidenceRejection.new(
+      kind: :not_ancestor,
+      message: "tested candidate is not an ancestor of the release head"
+    )
+  end
+  unless verdict.verified?
+    return ShakaperfEvidenceRejection.new(
+      kind: :git_unknown,
+      message: "tested candidate ancestry or intervening commits cannot be verified"
+    )
+  end
+
+  shakaperf_intervening_commits_rejection(monorepo_root:, commits: verdict.value)
+end
+
+def shakaperf_release_gate_evidence_runtime_rejection(monorepo_root:, head_sha:, evidence:)
+  candidate_sha = evidence["candidate_sha"]
+  fingerprint = evidence["runtime_tree_fingerprint"]
+  candidate_verdict = shakaperf_runtime_tree_fingerprint_verdict(monorepo_root:, sha: candidate_sha)
+  rejection = shakaperf_runtime_fingerprint_rejection(
+    verdict: candidate_verdict,
+    fingerprint:,
+    unknown_message: "candidate runtime tree cannot be verified",
+    mismatch_kind: :candidate_runtime_mismatch,
+    mismatch_message: "candidate runtime tree does not match the recorded evidence"
+  )
+  return rejection if rejection
+
+  head_verdict = shakaperf_runtime_tree_fingerprint_verdict(monorepo_root:, sha: head_sha)
+  rejection = shakaperf_runtime_fingerprint_rejection(
+    verdict: head_verdict,
+    fingerprint:,
+    unknown_message: "release-head runtime tree cannot be verified",
+    mismatch_kind: :runtime_diverged,
+    mismatch_message: "release runtime tree differs from the tested candidate"
+  )
+  return rejection if rejection
+  return nil if candidate_sha == head_sha
+
+  shakaperf_candidate_commits_rejection(monorepo_root:, candidate_sha:, head_sha:)
 end
 
 def shakaperf_release_gate_time(value)
@@ -626,44 +796,186 @@ rescue ArgumentError
   nil
 end
 
-def shakaperf_candidate_commit_shas(monorepo_root:, candidate_sha:, head_sha:)
-  _ancestor_output, ancestor_status = Open3.capture2e(
+def shakaperf_candidate_ancestry_verdict(monorepo_root:, candidate_sha:, head_sha:)
+  output, status = Open3.capture2e(
     "git", "-C", monorepo_root, "merge-base", "--is-ancestor", candidate_sha, head_sha
   )
-  unless ancestor_status.success?
-    return :not_ancestor if ancestor_status.exitstatus == 1
+  return ShakaperfVerificationResult.verified(true) if status.success?
+  return ShakaperfVerificationResult.not_ancestor if status.exitstatus == 1
 
-    return nil
-  end
+  ShakaperfVerificationResult.unknown("git merge-base exited #{status.exitstatus}: #{output.to_s.strip}")
+rescue StandardError => e
+  ShakaperfVerificationResult.unknown("git merge-base raised #{e.class}: #{e.message}")
+end
 
+def shakaperf_candidate_rev_list_verdict(monorepo_root:, candidate_sha:, head_sha:)
   output, status = Open3.capture2e(
     "git", "-C", monorepo_root, "rev-list", "--reverse", "#{candidate_sha}..#{head_sha}"
   )
-  return nil unless status.success?
+  unless status.success?
+    return ShakaperfVerificationResult.unknown(
+      "git rev-list exited #{status.exitstatus}: #{output.to_s.strip}"
+    )
+  end
 
   commits = output.lines.map(&:strip).reject(&:empty?)
-  commits.empty? ? nil : commits
-rescue StandardError
-  nil
+  unless commits.any? && commits.all? { |sha| sha.match?(/\A[0-9a-f]{40}\z/) }
+    return ShakaperfVerificationResult.unknown("git rev-list returned malformed or empty commit data")
+  end
+
+  ShakaperfVerificationResult.verified(commits)
+rescue StandardError => e
+  ShakaperfVerificationResult.unknown("git rev-list raised #{e.class}: #{e.message}")
 end
 
-def shakaperf_prerun_metadata_commit?(monorepo_root:, sha:)
-  return true if release_finalization_metadata_commit?(monorepo_root:, sha:)
-  return false unless commit_non_runtime_only?(monorepo_root:, sha:)
+def shakaperf_candidate_commit_shas(monorepo_root:, candidate_sha:, head_sha:)
+  ancestry = shakaperf_candidate_ancestry_verdict(monorepo_root:, candidate_sha:, head_sha:)
+  return ancestry unless ancestry.verified?
 
-  shakaperf_changelog_only_commit?(monorepo_root:, sha:)
+  shakaperf_candidate_rev_list_verdict(monorepo_root:, candidate_sha:, head_sha:)
 end
 
-def shakaperf_changelog_only_commit?(monorepo_root:, sha:)
+def shakaperf_detector_flag_verdict(output_file)
+  flag = File.read(output_file).lines.reverse.find { |line| line.start_with?("non_runtime_only=") }
+  return ShakaperfVerificationResult.unknown("ci-changes-detector omitted non_runtime_only") if flag.nil?
+
+  value = flag.split("=", 2).last.strip
+  unless %w[true false].include?(value)
+    return ShakaperfVerificationResult.unknown("ci-changes-detector returned an invalid non_runtime_only value")
+  end
+
+  ShakaperfVerificationResult.verified(value == "true")
+end
+
+def shakaperf_run_detector_verdict(detector:, output_file:, monorepo_root:, sha:)
+  output, status = Open3.capture2e(
+    { "GITHUB_OUTPUT" => output_file }, detector, "#{sha}^", sha, chdir: monorepo_root
+  )
+  unless status.success?
+    return ShakaperfVerificationResult.unknown(
+      "ci-changes-detector exited #{status.exitstatus}: #{output.to_s.strip}"
+    )
+  end
+
+  shakaperf_detector_flag_verdict(output_file)
+rescue StandardError => e
+  ShakaperfVerificationResult.unknown("ci-changes-detector raised #{e.class}: #{e.message}")
+end
+
+def shakaperf_commit_non_runtime_only_verdict(monorepo_root:, sha:)
+  detector = File.join(monorepo_root, "script", "ci-changes-detector")
+  return ShakaperfVerificationResult.unknown("ci-changes-detector is not executable") unless File.executable?(detector)
+
+  Dir.mktmpdir("ror-ci-detector") do |dir|
+    output_file = File.join(dir, "github_output")
+    File.write(output_file, "")
+    shakaperf_run_detector_verdict(detector:, output_file:, monorepo_root:, sha:)
+  end
+rescue StandardError => e
+  ShakaperfVerificationResult.unknown("ci-changes-detector setup raised #{e.class}: #{e.message}")
+end
+
+def shakaperf_git_file_at_commit_verdict(monorepo_root:, ref:, path:)
+  output, status = Open3.capture2e("git", "-C", monorepo_root, "show", "#{ref}:#{path}")
+  unless status.success?
+    return ShakaperfVerificationResult.unknown(
+      "git show exited #{status.exitstatus} for #{path}: #{output.to_s.strip}"
+    )
+  end
+
+  ShakaperfVerificationResult.verified(output)
+rescue StandardError => e
+  ShakaperfVerificationResult.unknown("git show raised #{e.class} for #{path}: #{e.message}")
+end
+
+def shakaperf_name_status_change(line)
+  fields = line.split("\t", -1)
+  status_code = fields.shift
+  path_count = status_code&.match?(/\A[CR]\d{1,3}\z/) ? 2 : 1
+  return nil unless status_code&.match?(SHAKAPERF_GIT_NAME_STATUS_PATTERN)
+  return nil unless fields.length == path_count && fields.none?(&:empty?)
+
+  { status: status_code, paths: fields }
+end
+
+def shakaperf_commit_name_status_verdict(monorepo_root:, sha:)
   output, status = Open3.capture2e(
     "git", "-C", monorepo_root, "diff-tree", "--no-commit-id", "--name-status", "-r", "#{sha}^", sha
   )
-  return false unless status.success?
+  unless status.success?
+    return ShakaperfVerificationResult.unknown(
+      "git diff-tree exited #{status.exitstatus}: #{output.to_s.strip}"
+    )
+  end
 
-  changes = output.lines.map(&:chomp)
-  changes.any? && changes.all?("M\tCHANGELOG.md")
-rescue StandardError
-  false
+  changes = output.lines.map { |line| shakaperf_name_status_change(line.chomp) }
+  return ShakaperfVerificationResult.unknown("git diff-tree returned malformed name-status data") if
+    changes.any?(&:nil?)
+
+  ShakaperfVerificationResult.verified(changes)
+rescue StandardError => e
+  ShakaperfVerificationResult.unknown("git diff-tree raised #{e.class}: #{e.message}")
+end
+
+def shakaperf_release_metadata_path_verdict(monorepo_root:, sha:, path:)
+  before = shakaperf_git_file_at_commit_verdict(monorepo_root:, ref: "#{sha}^", path:)
+  return before unless before.verified?
+
+  after = shakaperf_git_file_at_commit_verdict(monorepo_root:, ref: sha, path:)
+  return after unless after.verified?
+
+  metadata_only = release_finalization_metadata_contents_only?(before: before.value, after: after.value, path:)
+  ShakaperfVerificationResult.verified(metadata_only)
+end
+
+def shakaperf_release_metadata_paths_verdict(monorepo_root:, sha:, paths:)
+  paths.each do |path|
+    verdict = shakaperf_release_metadata_path_verdict(monorepo_root:, sha:, path:)
+    return verdict unless verdict.verified? && verdict.value
+  end
+
+  ShakaperfVerificationResult.verified(true)
+end
+
+def shakaperf_release_finalization_metadata_commit_verdict(monorepo_root:, sha:)
+  changes = shakaperf_commit_name_status_verdict(monorepo_root:, sha:)
+  return changes unless changes.verified?
+  return ShakaperfVerificationResult.verified(false) if changes.value.empty?
+
+  paths = changes.value.filter_map do |change|
+    path = change[:paths].first
+    path if change[:status] == "M" && RELEASE_FINALIZATION_METADATA_PATHS.include?(path)
+  end
+  return ShakaperfVerificationResult.verified(false) unless paths.length == changes.value.length
+
+  shakaperf_release_metadata_paths_verdict(monorepo_root:, sha:, paths:)
+rescue StandardError => e
+  ShakaperfVerificationResult.unknown("release metadata inspection raised #{e.class}: #{e.message}")
+end
+
+def shakaperf_prerun_metadata_commit_verdict(monorepo_root:, sha:)
+  finalization_verdict = shakaperf_release_finalization_metadata_commit_verdict(monorepo_root:, sha:)
+  return finalization_verdict unless finalization_verdict.verified?
+  return ShakaperfVerificationResult.verified(:metadata_only) if finalization_verdict.value
+
+  detector_verdict = shakaperf_commit_non_runtime_only_verdict(monorepo_root:, sha:)
+  return detector_verdict unless detector_verdict.verified?
+  return ShakaperfVerificationResult.verified(:runtime_bearing) unless detector_verdict.value
+
+  changelog_verdict = shakaperf_changelog_only_commit_verdict(monorepo_root:, sha:)
+  return changelog_verdict unless changelog_verdict.verified?
+
+  classification = changelog_verdict.value ? :metadata_only : :runtime_bearing
+  ShakaperfVerificationResult.verified(classification)
+end
+
+def shakaperf_changelog_only_commit_verdict(monorepo_root:, sha:)
+  changes_verdict = shakaperf_commit_name_status_verdict(monorepo_root:, sha:)
+  return changes_verdict unless changes_verdict.verified?
+
+  changes = changes_verdict.value
+  changelog_only = changes.any? && changes.all?({ status: "M", paths: ["CHANGELOG.md"] })
+  ShakaperfVerificationResult.verified(changelog_only)
 end
 
 def handle_shakaperf_release_gate_violation!(message:)
@@ -963,6 +1275,7 @@ def normalized_selected_shakaperf_release_gate_run(run)
     "event" => run["event"],
     "status" => run["status"],
     "conclusion" => run["conclusion"],
+    "createdAt" => run["created_at"],
     "startedAt" => run["run_started_at"],
     "updatedAt" => run["updated_at"],
     "url" => run["html_url"],
@@ -1051,15 +1364,7 @@ def shakaperf_release_tracker_record_rejection(record:, run:, repo_slug:, ref:, 
 end
 
 def naturally_invalidated_shakaperf_association_rejection?(rejection)
-  [
-    "evidence is stale",
-    "saved workflow run is authoritatively missing",
-    "saved evidence artifact is authoritatively missing",
-    "release runtime tree differs from the tested candidate",
-    "release commits after the tested candidate are not metadata-only",
-    "tested candidate is not an ancestor of the release head"
-  ].include?(rejection) ||
-    rejection.to_s.match?(/\Aworkflow run completed with (?:failure|cancelled)\z/)
+  rejection.is_a?(ShakaperfEvidenceRejection) && rejection.natural_invalidation?
 end
 
 def continue_after_naturally_invalidated_shakaperf_association(rejection:, run_url:)
@@ -1105,7 +1410,10 @@ rescue ShakaperfGateMissingRunError
   reusable_saved_shakaperf_evidence?(
     entry:,
     run_id:,
-    rejection: "saved workflow run is authoritatively missing",
+    rejection: ShakaperfEvidenceRejection.new(
+      kind: :missing_run,
+      message: "saved workflow run is authoritatively missing"
+    ),
     run_url: record.fetch("run_url")
   )
   nil
@@ -1126,7 +1434,10 @@ def saved_shakaperf_release_tracker_rejection(entry:, record:, run:, repo_slug:,
     )
   end
 rescue ShakaperfGateMissingArtifactError
-  "saved evidence artifact is authoritatively missing"
+  ShakaperfEvidenceRejection.new(
+    kind: :missing_artifact,
+    message: "saved evidence artifact is authoritatively missing"
+  )
 rescue ShakaperfGateObservationError => e
   abort "❌ Saved ShakaPerf release tracker evidence could not be re-observed; refusing dispatch.\n\n#{e.message}"
 end
@@ -1188,7 +1499,11 @@ def verified_shakaperf_release_tracker_association_rejection(record:, run:, repo
   return rejection if rejection
 
   if run["status"] == "completed" && %w[failure cancelled].include?(run["conclusion"])
-    return "workflow run completed with #{run.fetch('conclusion')}"
+    conclusion = run.fetch("conclusion")
+    return ShakaperfEvidenceRejection.new(
+      kind: conclusion == "failure" ? :workflow_failed : :workflow_cancelled,
+      message: "workflow run completed with #{conclusion}"
+    )
   end
 
   evidence = fetch_shakaperf_release_gate_evidence_for_association!(repo_slug:, run:)
@@ -7006,6 +7321,10 @@ def release_finalization_metadata_content_only?(monorepo_root:, sha:, path:)
   after = git_file_at_commit(monorepo_root:, ref: sha, path:)
   return false if before.nil? || after.nil?
 
+  release_finalization_metadata_contents_only?(before:, after:, path:)
+end
+
+def release_finalization_metadata_contents_only?(before:, after:, path:)
   if path.end_with?("package.json")
     package_json_version_only_change?(before, after)
   elsif path.end_with?("version.rb")
@@ -8339,6 +8658,60 @@ def fetch_rubygems_versions(gem_name, api_url: RUBYGEMS_VERSIONS_API_URL)
   [response.body, response]
 end
 
+def abort_npm_release_readiness!(reason)
+  abort <<~ERROR
+    ❌ npm release readiness failed: #{reason}.
+
+    pnpm install --frozen-lockfile
+  ERROR
+end
+
+def declared_pnpm_release_version!(monorepo_root:)
+  package_json = JSON.parse(File.read(File.join(monorepo_root, "package.json")))
+  package_manager = package_json["packageManager"]
+  match = package_manager.to_s.match(/\Apnpm@(?<version>\d+\.\d+\.\d+)(?:\+sha512\.[0-9a-f]+)?\z/i)
+  return match[:version] if match
+
+  abort_npm_release_readiness!("root packageManager must declare an exact pnpm version")
+rescue Errno::ENOENT, JSON::ParserError => e
+  abort_npm_release_readiness!("root packageManager cannot be verified (#{e.class}: #{e.message})")
+end
+
+def capture_npm_release_readiness_command(monorepo_root, *command)
+  Open3.capture2e(*command, chdir: monorepo_root)
+rescue StandardError => e
+  abort_npm_release_readiness!("npm toolchain command failed to start (#{e.class}: #{e.message})")
+end
+
+def validate_npm_release_readiness!(monorepo_root:)
+  declared_pnpm_version = declared_pnpm_release_version!(monorepo_root:)
+  workspace_lock = File.join(monorepo_root, "pnpm-lock.yaml")
+  installed_lock = File.join(monorepo_root, "node_modules", ".pnpm", "lock.yaml")
+  dependency_state_ready = File.file?(workspace_lock) && File.file?(installed_lock) &&
+                           File.binread(workspace_lock) == File.binread(installed_lock)
+  abort_npm_release_readiness!("installed dependency state is missing or stale") unless dependency_state_ready
+
+  version_output, version_status = capture_npm_release_readiness_command(monorepo_root, "pnpm", "--version")
+  installed_pnpm_version = version_output.to_s.strip
+  unless version_status.success? && installed_pnpm_version == declared_pnpm_version
+    abort_npm_release_readiness!(
+      "installed pnpm version #{installed_pnpm_version.inspect} does not match packageManager " \
+      "#{declared_pnpm_version.inspect}"
+    )
+  end
+
+  NPM_RELEASE_PACKAGE_NAMES.each do |package_name|
+    output, status = capture_npm_release_readiness_command(
+      monorepo_root, "pnpm", "--filter", package_name, "run", "build"
+    )
+    next if status.success?
+
+    abort_npm_release_readiness!("#{package_name} build failed\n\n#{output.to_s.strip}")
+  end
+
+  puts "✓ npm release packages are ready to publish"
+end
+
 def rubygem_version_published?(gem_name, version, api_url: RUBYGEMS_VERSIONS_API_URL)
   output, response = fetch_rubygems_versions(gem_name, api_url:)
   return false unless response.is_a?(Net::HTTPSuccess)
@@ -8723,6 +9096,69 @@ rescue JSON::ParserError => e
   false
 end
 
+def sanitized_npm_publish_output(output, otp:)
+  sanitized = output.to_s.dup
+  sanitized.gsub!(otp.to_s, "[REDACTED]") unless otp.to_s.empty?
+  sanitized.gsub!(/(--otp(?:=|\s+))\d+/i, '\\1[REDACTED]')
+  sanitized.gsub!(/\b(otp(?:\s+code)?\s*[:=]\s*)\d+/i, '\\1[REDACTED]')
+  sanitized.strip
+end
+
+def npm_publish_failure_category(output)
+  text = output.to_s
+  return :otp_challenge if text.match?(
+    /\bEOTP\b|one[- ]time (?:password|passcode)|\botp(?: code)?\b.*\b(?:required|invalid|expired)\b/i
+  )
+  return :authentication_failure if text.match?(/\b(?:ENEEDAUTH|E401)\b|authentication (?:is )?required/i)
+  return :transient if text.match?(NPM_PUBLISH_TRANSIENT_PATTERN)
+  return :local_lifecycle if text.match?(NPM_PUBLISH_LOCAL_LIFECYCLE_PATTERN)
+  return :registry_rejection if text.match?(NPM_PUBLISH_REGISTRY_REJECTION_PATTERN)
+
+  :unknown
+end
+
+def run_npm_publish_attempt!(dir:, publish_args:, otp:)
+  command_args = ["pnpm", "publish", *publish_args]
+  command_args += ["--otp", otp] if otp
+  output, status = Open3.capture2e(*command_args, chdir: dir)
+  return if status.success?
+
+  sanitized_output = sanitized_npm_publish_output(output, otp:)
+  raise NpmPublishAttemptError.new(
+    category: npm_publish_failure_category(output),
+    details: sanitized_output.empty? ? "command failed without diagnostic output" : sanitized_output
+  )
+rescue NpmPublishAttemptError
+  raise
+rescue StandardError => e
+  raise NpmPublishAttemptError.new(
+    category: :unknown,
+    details: "command could not be executed (#{e.class}: #{sanitized_npm_publish_output(e.message, otp:)})"
+  )
+end
+
+def retry_npm_publish_after_error(error:, package_name:, attempt:, max_retries:, current_otp:)
+  raise error if NPM_PUBLISH_HARD_FAILURE_CATEGORIES.include?(error.category)
+
+  if attempt >= max_retries
+    warn "\n❌ Failed to publish #{package_name} after #{max_retries} classified attempts"
+    raise error
+  end
+
+  warn "\n⚠️  #{package_name} publish #{error.category.to_s.tr('_', ' ')} " \
+       "(attempt #{attempt}/#{max_retries})"
+  warn error.message
+  if error.category == :otp_challenge
+    warn "Prompting for a fresh NPM OTP before retrying."
+    return prompt_for_otp("NPM")
+  end
+
+  delay = [2**(attempt - 1), NPM_PUBLISH_MAX_BACKOFF_SECONDS].min
+  warn "Retrying the transient npm failure in #{delay} seconds with the same OTP."
+  sleep delay
+  current_otp
+end
+
 def publish_npm_with_retry(dir, package_name, base_args: [], otp: nil, idempotent_retry: false, max_retries: 3)
   puts "\nPublishing #{package_name}..."
   current_otp = normalize_otp_code(otp, service_name: "NPM")
@@ -8738,37 +9174,21 @@ def publish_npm_with_retry(dir, package_name, base_args: [], otp: nil, idempoten
     return current_otp
   end
 
-  retry_count = 0
-  success = false
-
-  while retry_count < max_retries && !success
+  attempt = 0
+  loop do
+    attempt += 1
     begin
-      command_args = ["pnpm", "publish", *publish_args]
-      command_args += ["--otp", current_otp] if current_otp
       with_publishable_package_json(dir, npm_package_version) do
-        sh_args_in_dir_for_release(dir, *command_args)
+        run_npm_publish_attempt!(dir:, publish_args:, otp: current_otp)
       end
       verify_npm_package_published!(npm_package_name, npm_package_version)
-      success = true
-    rescue RuntimeError => e
-      retry_count += 1
-      if retry_count < max_retries
-        puts "\n⚠️  #{package_name} publish failed (attempt #{retry_count}/#{max_retries})"
-        puts "Error: #{e.message}"
-        puts "Common causes:"
-        puts "  - OTP code expired or incorrect"
-        puts "  - Network timeout"
-        puts "\nPlease enter a FRESH OTP code to retry..."
-        current_otp = prompt_for_otp("NPM")
-      else
-        puts "\n❌ Failed to publish #{package_name} after #{max_retries} attempts"
-        raise e
-      end
+      return current_otp
+    rescue NpmPublishAttemptError => e
+      current_otp = retry_npm_publish_after_error(
+        error: e, package_name:, attempt:, max_retries:, current_otp:
+      )
     end
   end
-
-  # Return the last successful OTP so it can be reused for subsequent packages
-  current_otp
 end
 
 # rubocop:disable Metrics/BlockLength
@@ -9102,6 +9522,8 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
       release_branch_final_promotion:,
       release_branch_tag_scope:
     )
+
+    validate_npm_release_readiness!(monorepo_root:)
 
     unless is_dry_run
       preflight_registry_publish_conflicts!(

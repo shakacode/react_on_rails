@@ -33,8 +33,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   `Release gate: react_on_rails X.Y.Z` stable-base title, explicit selectors take precedence over automatic
   accepted-RC reuse, and persisted accelerated retries cannot silently consume a selector. Automatic reuse
   falls back to normal discovery only for authoritative natural invalidation such as stale or missing evidence,
-  a failed/cancelled live run, or changed runtime ancestry; indeterminate API failures and record mutations
-  remain blocking. Stable releases also support an append-only, tracker-bound observation waiver that does not
+  a failed/cancelled live run, or proven runtime divergence; indeterminate API or Git failures, detector errors,
+  and record mutations remain blocking. Raw REST-selected runs now preserve their creation timestamp through
+  strict-final verification. Before either a live release or dry run can reach registry checks, confirmation,
+  mutation, tagging, or publication, the task also verifies the frozen pnpm install state, the repository-pinned
+  pnpm version, and lifecycle-enabled builds of all four npm release packages. npm publication now retries only
+  explicit OTP challenges and bounded transient failures, while authentication, lifecycle, registry, and unknown
+  failures stop immediately with OTP values redacted. Stable releases also support an append-only, tracker-bound
+  observation waiver that does not
   claim the run succeeded or bypass any other release gate; the tracker, waiver, and exact run are revalidated
   before remote tag push and package publication. Fixes
   [Issue 4812](https://github.com/shakacode/react_on_rails/issues/4812).

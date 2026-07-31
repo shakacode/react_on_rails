@@ -112,6 +112,16 @@ When called with no arguments, `rake release`:
 
 Dry runs use a temporary git worktree so version bumps and installs do not modify your current checkout.
 
+Both live releases and dry runs first verify npm publication readiness in the original checkout. The root
+`packageManager` must pin an exact pnpm version, the installed pnpm must match it, `node_modules/.pnpm/lock.yaml`
+must byte-match the committed `pnpm-lock.yaml`, and every npm release package must pass its normal `build` script
+with lifecycle scripts enabled. This happens before registry probes, confirmation, version mutation, ShakaPerf
+dispatch, tagging, publication, or OTP prompting. Every readiness failure prints the single repair command:
+
+```bash
+pnpm install --frozen-lockfile
+```
+
 `rake release` validates release-version policy before publishing:
 
 - Target version must be greater than the latest tagged release.
@@ -209,9 +219,11 @@ release commit. Output names both the tracker URL and reused run URL.
 
 Only automatic association reuse may discard naturally invalid evidence and continue through normal discovery.
 That recovery is limited to authoritative staleness, a 404-proven missing run or artifact, a live run now completed
-with `failure` or `cancelled`, or proof that the current runtime tree/ancestry is no longer equivalent. A Git
-`merge-base --is-ancestor` exit 1 is authoritative non-ancestry; a Git execution error is unknown and blocks.
-Explicit selectors reject every one of those conditions. Edited, malformed, unsupported, or noncanonical trusted
+with `failure` or `cancelled`, or proof that the current runtime tree, intervening commits, or ancestry is no longer
+equivalent. A Git `merge-base --is-ancestor` exit 1 is authoritative non-ancestry. Failures or malformed results from
+`git ls-tree`, `merge-base`, `rev-list`, `diff-tree`, or `script/ci-changes-detector` are unknown and block without
+dispatching a replacement run. Explicit selectors reject both authoritative invalidation and unknown verification.
+Edited, malformed, unsupported, or noncanonical trusted
 comments; author/tracker/title mismatch; conflicting latest records; record/live identity conflict; digest or
 fingerprint mutation; artifact parse or shape errors; and authentication, permission, pagination, parse, or other
 indeterminate API failures all remain hard failures. Absence must therefore be proved, never inferred from an
@@ -575,6 +587,8 @@ The `rake release` task automatically:
 1. **Validates release prerequisites**:
    - Checks for uncommitted changes (will abort if found)
    - Verifies NPM authentication (will run `npm login` if needed)
+   - Verifies the exact pinned pnpm version, frozen installed lock state, and lifecycle-enabled builds for all npm
+     release packages before registry checks or any release mutation
    - Requires a non-empty matching CHANGELOG.md section for stable targets; prereleases without one emit a warning,
      including during dry runs
    - Validates version policy (monotonic + changelog/bump consistency)
@@ -742,6 +756,11 @@ You'll need to enter OTP tokens when prompted:
 - Once for publishing `react-on-rails` to NPM (reused for subsequent NPM packages if valid)
 - Once for publishing `react_on_rails` to RubyGems (reused for `react_on_rails_pro` if valid)
 
+npm retries are classified from captured, sanitized output. Only an explicit npm OTP challenge prompts for a fresh
+OTP. A transient network or registry-service failure retries with the same OTP and bounded exponential backoff.
+Authentication failures such as `E401`/`ENEEDAUTH`, local lifecycle/build failures, registry rejections, and unknown
+failures stop immediately without an OTP prompt. OTP values are redacted from raised diagnostics.
+
 ## Requirements
 
 ### NPM Publishing
@@ -803,6 +822,18 @@ If you see errors like "Access token expired" or "E404 Not Found" during NPM pub
 3. Retry the release
 
 The release script now checks NPM authentication at the start and will automatically run `npm login` if needed, so this issue will be caught and handled before any changes are made.
+
+### NPM Release Readiness Issues
+
+If the release reports a missing/stale installed dependency state, a pnpm version mismatch, or a release-package
+build failure, run the exact repair command it prints from the repository root:
+
+```bash
+pnpm install --frozen-lockfile
+```
+
+Then fix any remaining build error and rerun the same explicit release version. The release will not have reached
+confirmation, version mutation, ShakaPerf dispatch, tagging, publication, or OTP prompting.
 
 ### If Release Fails
 
