@@ -286,15 +286,22 @@ RSpec.describe "packaged agent content" do
       %(ROR_GEM_VERSION="$(bundle exec ruby -rreact_on_rails/version -e 'print ReactOnRails::VERSION')")
     pro_gem = %(bundle add react_on_rails_pro --version="${ROR_GEM_VERSION}" --strict)
     generator = "bundle exec rails generate react_on_rails:install <LANGUAGE_CHOICE> <STACK_FLAG>"
+    license_notice =
+      /React on Rails Pro is free for evaluation and non-production use;\s+production use requires a subscription\./
+    license_notice_start = "React on Rails Pro is free for evaluation"
+    license_link = "https://reactonrails.com/docs/pro/upgrading-to-pro/"
 
     expect(install).to include("For `--pro` or `--rsc` only")
     expect(install).to include("Skip this Pro-gem preparation for `--standard-only`")
     expect(install).to include(shakapacker, base_gem, version, pro_gem, generator)
+    expect(install).to match(license_notice)
+    expect(install).to include(license_link)
     expect(install).to include("unpublished prerelease")
     expect(install).to include("matching local/path `react_on_rails_pro` gem")
     expect(install).to include("Never fall back silently to a stable Pro gem")
     expect(install.index(shakapacker)).to be < install.index(base_gem)
     expect(install.index(base_gem)).to be < install.index(version)
+    expect(install.index(license_notice_start)).to be < install.index(version)
     expect(install.index(version)).to be < install.index(pro_gem)
     expect(install.index(pro_gem)).to be < install.index(generator)
     expect(install).not_to match(/license entitlement/i)

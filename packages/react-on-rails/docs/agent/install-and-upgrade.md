@@ -23,6 +23,10 @@ bundle add shakapacker --strict
 bundle add react_on_rails --strict
 ```
 
+For `--pro` or `--rsc`, React on Rails Pro is free for evaluation and non-production use;
+production use requires a subscription. Review [Pro licensing and setup](https://reactonrails.com/docs/pro/upgrading-to-pro/)
+before proceeding.
+
 Skip this Pro-gem preparation for `--standard-only`.
 For `--pro` or `--rsc` only, derive the exact installed base-gem version before adding the Pro gem:
 
