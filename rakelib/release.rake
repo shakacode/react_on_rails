@@ -625,6 +625,7 @@ def handle_shakaperf_release_gate_violation!(message:)
       RELEASE_CI_STATUS_OVERRIDE=true bundle exec rake "release[VERSION,true]"
       # or pass override_ci_status as the 4th positional argument:
       bundle exec rake "release[VERSION,true,false,true]"
+    #{release_version_placeholder_guidance}
 
     #{release_compound_live_boundary_guidance}
   ERROR
@@ -1059,6 +1060,7 @@ def print_shakaperf_release_gate_notice(ref:, head_sha:)
       RELEASE_CI_STATUS_OVERRIDE=true bundle exec rake "release[VERSION,true]"
       # or pass override_ci_status as the 4th positional argument:
       bundle exec rake "release[VERSION,true,false,true]"
+    #{release_version_placeholder_guidance}
 
     #{release_compound_live_boundary_guidance}
   NOTICE
@@ -1702,6 +1704,7 @@ def release_branch_already_exists_message(release_branch:)
 
     Preview the existing release line after selecting #{release_branch} through the guarded runbook procedure:
       bundle exec rake "release[VERSION,true]"
+    #{release_version_placeholder_guidance}
 
     #{release_compound_live_boundary_guidance}
   MESSAGE
@@ -1717,13 +1720,15 @@ def release_line_started_next_steps(release_branch:)
          (the release gate evaluates the branch tip; a just-pushed branch has no checks yet).
       2. Ensure the rc changelog header is present on the branch: /update-changelog rc
       3. Preview the exact CHANGELOG.md version from the branch: bundle exec rake "release[VERSION,true]"
+    #{release_version_placeholder_guidance}
 
     #{release_compound_live_boundary_guidance}
   MESSAGE
 end
 
-# Manual recipe printed when the offer cannot run interactively (non-TTY) — the
-# operator runs these two commands themselves, then re-runs `rake release`.
+# Pointer-only guidance printed when the offer cannot run interactively
+# (non-TTY). It names what the guarded runbook procedure would do without
+# emitting live branch-creation or push commands.
 def release_branch_manual_cut_recipe(release_branch:)
   <<~MESSAGE.chomp
     The guarded runbook procedure would create #{release_branch} from origin/main and push it.
@@ -1779,13 +1784,25 @@ def release_branch_cut_offer_non_interactive_message(release_branch:)
     Use the guarded runbook procedure to start the release line, then preview the release:
     #{release_branch_manual_cut_recipe(release_branch:)}
     bundle exec rake "release[VERSION,true]"
+    #{release_version_placeholder_guidance}
 
     #{release_compound_live_boundary_guidance}
   MESSAGE
 end
 
+def release_line_legacy_live_prompt_warning(release_branch:)
+  <<~WARNING.chomp
+    ⚠️ LEGACY LIVE RELEASE-LINE PATH
+    Answering yes will create and push #{release_branch} without the release-line lease.
+    This remains technically possible only for backward compatibility and violates current repository release policy.
+    Operators and agents must answer no and follow the individually guarded procedure in
+    internal/contributor-info/release-train-runbook.md.
+  WARNING
+end
+
 def prompt_and_start_release_line!(monorepo_root:, release_branch:)
   base_version = release_branch.delete_prefix("release/")
+  puts release_line_legacy_live_prompt_warning(release_branch:)
   print "Start the #{base_version} release line now? [y/N]: "
   $stdout.flush
   answer = $stdin.gets&.strip&.downcase
@@ -6143,6 +6160,7 @@ def main_ci_status_override_guidance(prefix: "")
     #{prefix}  RELEASE_CI_STATUS_OVERRIDE=true bundle exec rake "release[VERSION,true]"
     #{prefix}  # or pass override_ci_status as the 4th positional argument:
     #{prefix}  bundle exec rake "release[VERSION,true,false,true]"
+    #{release_version_placeholder_guidance(prefix:)}
     #{release_compound_live_boundary_guidance.lines.map { |line| "#{prefix}#{line}" }.join}
   GUIDANCE
 end
@@ -6713,6 +6731,11 @@ def release_compound_live_boundary_guidance
     technically callable in live mode. Direct live invocation outside the individually guarded procedure in
     internal/contributor-info/release-train-runbook.md violates repository policy.
   GUIDANCE
+end
+
+def release_version_placeholder_guidance(prefix: "")
+  "#{prefix}Replace VERSION with the exact requested version or the exact CHANGELOG.md version " \
+    "before running this preview."
 end
 
 def report_release_dry_run_follow_up(version:)

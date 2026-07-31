@@ -810,17 +810,23 @@ RSpec.describe "release.rake helper methods" do
     end
 
     it "keeps CI retry and override guidance in preview mode" do
+      placeholder_instruction =
+        "Replace VERSION with the exact requested version or the exact CHANGELOG.md version " \
+        "before running this preview."
+
       expect do
         handle_shakaperf_release_gate_violation!(message: "gate failed")
       end.to raise_error(SystemExit) { |error|
         expect(error.message).to include(
           'RELEASE_CI_STATUS_OVERRIDE=true bundle exec rake "release[VERSION,true]"',
           'bundle exec rake "release[VERSION,true,false,true]"',
+          placeholder_instruction,
           "Live compound release remains BLOCKED",
           release_runbook
         )
         expect(error.message).to include("Preserve the failure evidence", "do not rerun or revert")
         expect(error.message).not_to include("retry the release", "push a revert")
+        expect(error.message).not_to match(/bundle exec rake "[^"\n]*VERSION[^"\n]*"\n\nLive compound release/)
       }
 
       notice = capture_stdout { print_shakaperf_release_gate_notice(ref: "release/17.0.0", head_sha: "a" * 40) }
@@ -829,6 +835,7 @@ RSpec.describe "release.rake helper methods" do
         expect(guidance).to include(
           'RELEASE_CI_STATUS_OVERRIDE=true bundle exec rake "release[VERSION,true]"',
           'bundle exec rake "release[VERSION,true,false,true]"',
+          placeholder_instruction,
           "Live compound release remains BLOCKED",
           release_runbook
         )
@@ -836,10 +843,20 @@ RSpec.describe "release.rake helper methods" do
           "RELEASE_CI_STATUS_OVERRIDE=true bundle exec rake release[...]",
           'bundle exec rake "release[VERSION,false,false,true]"'
         )
+        expect(guidance).not_to match(
+          /bundle exec rake "[^"\n]*VERSION[^"\n]*"\n(?:\n)?Live compound release/
+        )
       end
+
+      expect(main_ci_status_override_guidance(prefix: "⚠️ DRY RUN: ")).to include(
+        "⚠️ DRY RUN: #{placeholder_instruction}"
+      )
     end
 
     it "keeps release-line follow-up guidance in preview mode" do
+      placeholder_instruction =
+        "Replace VERSION with the exact requested version or the exact CHANGELOG.md version " \
+        "before running this preview."
       existing_branch = release_branch_already_exists_message(release_branch: "release/17.0.0")
       started_branch = release_line_started_next_steps(release_branch: "release/17.0.0")
       non_interactive = release_branch_cut_offer_non_interactive_message(release_branch: "release/17.0.0")
@@ -847,11 +864,13 @@ RSpec.describe "release.rake helper methods" do
       [existing_branch, started_branch, non_interactive].each do |guidance|
         expect(guidance).to include(
           'bundle exec rake "release[VERSION,true]"',
+          placeholder_instruction,
           "Live compound release remains BLOCKED",
           release_runbook
         )
         expect(guidance).not_to include('bundle exec rake "release[17.0.0.rc.0,true]"')
         expect(guidance).not_to match(/bundle exec rake release(?:\s|$)/)
+        expect(guidance).not_to match(/bundle exec rake "[^"\n]*VERSION[^"\n]*"\n\nLive compound release/)
       end
       expect(existing_branch).not_to include("git checkout")
       expect(non_interactive).not_to include("git checkout -b", "git push -u")
@@ -19067,6 +19086,14 @@ RSpec.describe "release.rake helper methods" do
         .and_return(false)
       allow($stdin).to receive_messages(tty?: true, gets: "y\n")
       allow(self).to receive(:start_release_line!)
+      expected_output = <<~OUTPUT.chomp
+        ⚠️ LEGACY LIVE RELEASE-LINE PATH
+        Answering yes will create and push release/17.0.0 without the release-line lease.
+        This remains technically possible only for backward compatibility and violates current repository release policy.
+        Operators and agents must answer no and follow the individually guarded procedure in
+        internal/contributor-info/release-train-runbook.md.
+        Start the 17.0.0 release line now? [y/N]:
+      OUTPUT
 
       # On acceptance the offer runs the shared start helper and then `exit 0`
       # before any tagging; `exit 0` raises a catchable SystemExit.
@@ -19079,7 +19106,7 @@ RSpec.describe "release.rake helper methods" do
             dry_run: false
           )
         end.to raise_error(SystemExit) { |error| expect(error.status).to eq(0) }
-      end.to output(%r{Start the 17.0.0 release line now\? \[y/N\]}).to_stdout
+      end.to output("#{expected_output} ").to_stdout
 
       expect(self).to have_received(:start_release_line!)
         .with(monorepo_root: "/tmp/repo", release_branch: "release/17.0.0", dry_run: false)
