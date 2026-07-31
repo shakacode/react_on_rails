@@ -1,7 +1,7 @@
 // The source code including full typescript support is available at:
 // https://github.com/shakacode/react-on-rails-demo-ssr-hmr/blob/master/config/webpack/serverWebpackConfig.js
 
-const { config } = require('shakapacker');
+const { merge, config } = require('shakapacker');
 const commonWebpackConfig = require('./commonWebpackConfig');
 
 const bundler = config.assets_bundler === 'rspack'
@@ -16,12 +16,11 @@ function getLoaderPath(item) {
   return '';
 }
 
-function extractLoader(rule, loaderName) {
-  if (!Array.isArray(rule.use)) return null;
-  return rule.use.find((item) => getLoaderPath(item).includes(loaderName));
-}
-
 const configureServer = () => {
+  // We need to use "merge" because the clientConfigObject, EVEN after running
+  // toWebpackConfig() is a mutable GLOBAL. Thus any changes, like modifying the
+  // entry value will result in changing the client config!
+  // Using webpack-merge into an empty object avoids this issue.
   const serverWebpackConfig = commonWebpackConfig();
 
   // We just want the single server bundle entry
@@ -68,8 +67,8 @@ const configureServer = () => {
   serverWebpackConfig.output = {
     filename: 'server-bundle.js',
     globalObject: 'this',
-    // Required for React on Rails Pro Node Renderer
-    libraryTarget: 'commonjs2',
+    // If using the React on Rails Pro node server renderer, uncomment the next line
+    // libraryTarget: 'commonjs2',
     path: serverBundleOutputPath,
     // No publicPath needed since server bundles are not served via web
     // https://webpack.js.org/configuration/output/#outputglobalobject
@@ -118,12 +117,6 @@ const configureServer = () => {
         };
       }
 
-      // Set SSR caller for Babel (if using Babel instead of SWC)
-      const babelLoader = extractLoader(rule, 'babel-loader');
-      if (babelLoader && babelLoader.options) {
-        babelLoader.options.caller = { ssr: true };
-      }
-
       // Skip writing image files during SSR by setting emitFile to false
     } else if (rule.use && (rule.use.loader === 'url-loader' || rule.use.loader === 'file-loader')) {
       rule.use.options.emitFile = false;
@@ -136,33 +129,12 @@ const configureServer = () => {
   // In production, devtool is disabled to avoid generating .map files.
   serverWebpackConfig.devtool = process.env.NODE_ENV === 'production' ? false : 'cheap-module-source-map';
 
-  // React on Rails Pro uses Node renderer, so target must be 'node'
-  // This fixes issues with libraries like Emotion and loadable-components
-  serverWebpackConfig.target = 'node';
-
-  // Disable Node.js polyfills - not needed when targeting Node
-  serverWebpackConfig.node = false;
-
-  // Source-mapped SSR stack traces in production:
-  // The Pro Node renderer can remap bundled stack frames back to your original
-  // source files (see docs/oss/building-features/node-renderer/debugging.md). This
-  // needs source maps in the *production* server bundle, which the default above
-  // disables (`devtool: false`). To opt in, replace only the `serverWebpackConfig.devtool`
-  // assignment above (keep the eval-devtool note) with a production-aware variant so
-  // development is unaffected. Both examples below use non-`eval` devtools, satisfying
-  // that constraint. E.g.:
-  //   serverWebpackConfig.devtool = process.env.NODE_ENV === 'production' ? 'source-map' : 'cheap-module-source-map';
-  //     // 'source-map' — external .map (smaller bundle; stage the .map next to the uploaded bundle)
-  //   serverWebpackConfig.devtool = process.env.NODE_ENV === 'production' ? 'inline-source-map' : 'cheap-module-source-map';
-  //     // 'inline-source-map' — simplest; map travels inside the bundle (larger file)
-  // The server bundle is never served to browsers; still, never expose
-  // server-bundle source maps publicly.
-
+  // If using the default 'web', then libraries like Emotion and loadable-components
+  // break with SSR. The fix is to use a node renderer and change the target.
+  // If using the React on Rails Pro node server renderer, uncomment the next line
+  // serverWebpackConfig.target = 'node'
 
   return serverWebpackConfig;
 };
 
-module.exports = {
-  default: configureServer,
-  extractLoader,
-};
+module.exports = configureServer;

@@ -3,8 +3,9 @@
 require "tmpdir"
 require "stringio"
 require_relative "../support/generator_spec_helper"
+require_relative "../support/generated_tree_approval"
 
-# Golden-output coverage for the generator's serverWebpackConfig.js template (issue #4787).
+# Golden-output coverage for the generator's complete bundler configuration tree (issue #4787).
 #
 # Why this exists
 # ---------------
@@ -15,9 +16,9 @@ require_relative "../support/generator_spec_helper"
 # would stay green while real upgrades silently stopped matching (see PR #2489, which
 # updated the template and one fixture and left a second fixture on the old implementation).
 #
-# This spec pins the real rendered output for every meaningful variant, and separately pins
-# the structural anchors the upgrade transforms match on so those anchors cannot disappear
-# from either the template or the simulation fixtures without a red build.
+# This spec pins every file in the final generated config tree for each meaningful variant.
+# It separately pins the structural anchors the upgrade transforms match on so those anchors
+# cannot disappear from either the template or the simulation fixtures without a red build.
 #
 # ---------------------------------------------------------------------------------------
 # REGENERATING THE GOLDEN FILES
@@ -35,21 +36,22 @@ module GeneratorGoldenOutput
   REGENERATE_ENV_VAR = "REGENERATE_GENERATOR_GOLDEN"
   REGENERATE_COMMAND = "cd react_on_rails && #{REGENERATE_ENV_VAR}=1 " \
                        "bundle exec rspec spec/react_on_rails/generators/generator_golden_output_spec.rb".freeze
-  GENERATED_FILE = "config/webpack/serverWebpackConfig.js"
+  GENERATED_CONFIG_ROOT = "config"
+  SERVER_CONFIG = "serverWebpackConfig.js"
 
-  # One entry per template branch combination that changes the emitted file.
+  # One entry per template branch combination that changes the emitted tree.
   #
   # `shakapacker9` is stubbed rather than read from the installed gem: the template branches
   # on it, and reading the real version would make the golden files depend on whichever
   # Shakapacker the developer happens to have installed. Both branches are covered here.
   #
-  # webpack and rspack produce byte-identical output unless RSC is on (only the RSC plugin
-  # class name and import path differ). The rspack variants are still pinned because the
-  # destination directory mapping (config/webpack -> config/rspack) is part of the contract.
+  # Tailwind changes only commonWebpackConfig.js, so one variant covers that independent branch
+  # without multiplying it across every product and bundler combination.
   VARIANTS = [
     { name: "webpack_base", options: { rspack: false }, shakapacker9: true },
     { name: "webpack_pro", options: { rspack: false, pro: true }, shakapacker9: true },
     { name: "webpack_rsc", options: { rspack: false, rsc: true }, shakapacker9: true },
+    { name: "webpack_tailwind", options: { rspack: false, tailwind: true }, shakapacker9: true },
     { name: "rspack_base", options: { rspack: true }, shakapacker9: true },
     { name: "rspack_pro", options: { rspack: true, pro: true }, shakapacker9: true },
     { name: "rspack_rsc", options: { rspack: true, rsc: true }, shakapacker9: true },
@@ -69,46 +71,71 @@ module GeneratorGoldenOutput
       raise(ArgumentError, "unknown golden variant #{name.inspect}")
   end
 
-  # Relative path the generator writes to, which differs by bundler.
-  def relative_path(variant)
-    variant[:options][:rspack] ? GENERATED_FILE.sub("config/webpack/", "config/rspack/") : GENERATED_FILE
+  def approved_root(variant)
+    File.join(GOLDEN_ROOT, variant[:name], GENERATED_CONFIG_ROOT)
   end
 
-  def golden_path(variant)
-    File.join(GOLDEN_ROOT, variant[:name], relative_path(variant))
+  def bundler_config_dir(variant)
+    variant[:options][:rspack] ? "rspack" : "webpack"
+  end
+
+  def server_config_path(variant)
+    File.join(approved_root(variant), bundler_config_dir(variant), SERVER_CONFIG)
   end
 
   def golden(name)
-    File.read(golden_path(variant(name)))
+    File.read(server_config_path(variant(name)))
   end
 
   def display_path(path)
     path.sub("#{File.expand_path('../../..', __dir__)}/", "")
   end
 
-  # Runs the real generator action (BaseGenerator#copy_webpack_config) into a throwaway
-  # destination and returns the file it wrote. Deliberately not a bare ERB render: this
-  # exercises the same code path a user's install takes, including the documentation-comment
-  # config and the bundler-specific destination directory.
+  # Runs the real config generation lifecycle into a throwaway destination and yields its
+  # config root. Pro and RSC use their production transformation methods so the approved tree
+  # represents the final installation state, not only the initial template render.
   def generate(variant)
     Dir.mktmpdir("ror-generator-golden") do |destination|
-      generator = ReactOnRails::Generators::BaseGenerator.new([], variant[:options],
-                                                              { destination_root: destination })
+      generator = generator_for(ReactOnRails::Generators::BaseGenerator, variant, destination)
       shakapacker9 = variant[:shakapacker9]
       generator.define_singleton_method(:shakapacker_version_9_or_higher?) { shakapacker9 }
 
-      silence_output { generator.copy_webpack_config }
+      silence_output do
+        generator.copy_webpack_config
+        apply_pro_config(variant, destination) if variant[:options][:pro] || variant[:options][:rsc]
+        apply_rsc_config(variant, destination) if variant[:options][:rsc]
+      end
 
-      File.read(File.join(destination, relative_path(variant)))
+      yield File.join(destination, GENERATED_CONFIG_ROOT)
     end
+  ensure
+    GeneratorMessages.clear
   end
 
   def regenerate!
     VARIANTS.each do |variant|
-      path = golden_path(variant)
-      FileUtils.mkdir_p(File.dirname(path))
-      File.write(path, generate(variant))
+      generate(variant) do |actual_root|
+        GeneratedTreeApproval.regenerate(actual_root, approved_root(variant))
+      end
     end
+  end
+
+  def generator_for(generator_class, variant, destination)
+    generator_class.new([], variant[:options], { destination_root: destination }).tap do |generator|
+      rspack = variant[:options][:rspack]
+      generator.define_singleton_method(:using_rspack?) { rspack }
+    end
+  end
+
+  def apply_pro_config(variant, destination)
+    generator = generator_for(ReactOnRails::Generators::ProGenerator, variant, destination)
+    generator.__send__(:update_webpack_config_for_pro)
+  end
+
+  def apply_rsc_config(variant, destination)
+    generator = generator_for(ReactOnRails::Generators::RscGenerator, variant, destination)
+    generator.__send__(:create_rsc_webpack_config)
+    generator.__send__(:update_webpack_configs_for_rsc)
   end
 
   def silence_output
@@ -119,32 +146,15 @@ module GeneratorGoldenOutput
     $stdout = original
   end
 
-  def differ
-    @differ ||= RSpec::Support::Differ.new(color: false)
-  end
-
-  def missing_golden_message(variant)
+  def mismatch_message(variant, comparison)
     <<~MSG
-      No golden file for variant "#{variant[:name]}" at:
+      Generated config tree does not match the approved tree for variant "#{variant[:name]}":
 
-        #{display_path(golden_path(variant))}
+        #{display_path(approved_root(variant))}
 
-      Create it by regenerating, then review the result before committing:
+      #{comparison.failure_message(differ: RSpec::Support::Differ.new(color: false))}
 
-        #{REGENERATE_COMMAND}
-    MSG
-  end
-
-  def mismatch_message(variant, actual, expected)
-    <<~MSG
-      Generated #{relative_path(variant)} does not match the golden file for variant "#{variant[:name]}":
-
-        #{display_path(golden_path(variant))}
-
-      Diff (-golden +generated):
-      #{differ.diff_as_string(actual, expected)}
-
-      If the template change is intentional, regenerate the golden files and review the diff:
+      If the generated-output change is intentional, regenerate the approved trees and review the diff:
 
         #{REGENERATE_COMMAND}
         git diff react_on_rails/spec/react_on_rails/fixtures/generated/
@@ -392,37 +402,32 @@ if GeneratorGoldenOutput.regenerating?
 end
 
 RSpec.describe "generator golden output", type: :generator do
-  describe "rendered serverWebpackConfig.js" do
+  describe "generated configuration trees" do
     GeneratorGoldenOutput::VARIANTS.each do |variant|
-      it "matches the checked-in golden file for the #{variant[:name]} variant" do
-        golden_path = GeneratorGoldenOutput.golden_path(variant)
-        expect(File.exist?(golden_path)).to be(true),
-                                            -> { GeneratorGoldenOutput.missing_golden_message(variant) }
+      it "matches the approved tree for the #{variant[:name]} variant" do
+        GeneratorGoldenOutput.generate(variant) do |actual_root|
+          comparison = GeneratedTreeApproval.compare(
+            actual_root,
+            GeneratorGoldenOutput.approved_root(variant)
+          )
 
-        actual = GeneratorGoldenOutput.generate(variant)
-        expected = File.read(golden_path)
-
-        expect(actual).to eq(expected),
-                          -> { GeneratorGoldenOutput.mismatch_message(variant, actual, expected) }
+          expect(comparison.match?).to be(true),
+                                       -> { GeneratorGoldenOutput.mismatch_message(variant, comparison) }
+        end
       end
     end
 
-    it "has exactly one golden file per variant and no orphans on disk" do
-      # regenerate! overwrites the current matrix but deliberately does not delete anything, so
-      # a variant that was removed or renamed in VARIANTS would leave a stale directory behind
-      # that reads as authoritative while no example covers it. Failing loudly here is better
-      # than silently deleting a file someone added on purpose. This also catches a changed
-      # bundler destination mapping, since the expected paths are derived from it.
-      on_disk = Dir.glob("#{GeneratorGoldenOutput::GOLDEN_ROOT}/**/*.js")
-                   .map { |path| path.sub("#{GeneratorGoldenOutput::GOLDEN_ROOT}/", "") }
+    it "has exactly one approved directory per variant and no orphan variants" do
+      # Regeneration replaces known variants but leaves removed or renamed directories intact.
+      # This example requires explicit review before deleting an orphaned approval.
+      on_disk = Dir.children(GeneratorGoldenOutput::GOLDEN_ROOT)
+                   .select { |entry| File.directory?(File.join(GeneratorGoldenOutput::GOLDEN_ROOT, entry)) }
                    .sort
-      expected = GeneratorGoldenOutput::VARIANTS
-                 .map { |variant| File.join(variant[:name], GeneratorGoldenOutput.relative_path(variant)) }
-                 .sort
+      expected = GeneratorGoldenOutput::VARIANTS.map { |variant| variant[:name] }.sort
 
       expect(on_disk).to eq(expected),
-                         "golden files on disk do not match VARIANTS. Orphans are stale variants that were " \
-                         "removed or renamed; delete them by hand after confirming they are unused."
+                         "approved directories do not match VARIANTS. Remove stale variant directories " \
+                         "after confirming they are no longer part of the generator contract."
     end
 
     it "emits identical output for webpack and rspack when RSC is off" do
