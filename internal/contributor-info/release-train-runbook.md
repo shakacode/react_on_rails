@@ -1139,7 +1139,10 @@ git push --atomic \
 # Re-fetch immediately. Restore the release branch if main changed during deletion;
 # abort with recovery intact if the release branch reappeared; otherwise atomically prove it remains
 # absent while removing recovery with its own lease.
-git fetch origin
+git fetch origin || {
+  echo "post-deletion fetch failed; retain recovery and rerun all completion checks" >&2
+  return 1 2>/dev/null || exit 1
+}
 if git ls-remote --exit-code --heads -- origin release/17.0.0 >/dev/null 2>&1; then
   echo "release branch reappeared; retain recovery and rerun all completion checks" >&2
   exit 1
