@@ -15,6 +15,8 @@ Add Shakapacker and React on Rails through Bundler.
 Choose exactly one stack flag before running the install generator.
 Use `--standard-only` for OSS, `--pro` for Pro, or `--rsc` for Pro with RSC.
 Do not rely on an interactive TTY prompt; replace `<STACK_FLAG>` explicitly in every command.
+Choose the language explicitly too: replace `<LANGUAGE_CHOICE>` with `--typescript` for TypeScript,
+or remove that placeholder for JavaScript. TypeScript is optional; omitting its flag preserves JavaScript.
 
 ```bash
 bundle add shakapacker --strict
@@ -49,7 +51,7 @@ transitively. Do not run this cleanup for `--standard-only`.
 After the conditional Pro preparation, run the generator with the explicit stack flag:
 
 ```bash
-bundle exec rails generate react_on_rails:install --typescript <STACK_FLAG>
+bundle exec rails generate react_on_rails:install <LANGUAGE_CHOICE> <STACK_FLAG>
 ```
 
 Use the app's declared JavaScript package manager if the generator prints a manual install command.
@@ -85,23 +87,15 @@ Review the generated initializer, Shakapacker configuration, scripts, routes, an
 ## JavaScript target matrix
 
 Use exactly the row matching the detected stack. Verify every relevant package version before
-pinning it; checking only the base package is insufficient.
+pinning it; checking only the base package is insufficient. Use the app's declared package manager's
+registry-inspection command for every exact package spec below. Do not assume pnpm, npm, Yarn, or Bun
+is available merely because another package manager is installed.
 
 - **OSS (`--standard-only`)**: pin and verify `react-on-rails@${NPM_TARGET_VERSION}`.
-
-  ```bash
-  pnpm view "react-on-rails@${NPM_TARGET_VERSION}" version
-  ```
 
 - **Pro (all renderers)**: pin and verify `react-on-rails-pro@${NPM_TARGET_VERSION}`. Also pin and verify
   `react-on-rails-pro-node-renderer@${NPM_TARGET_VERSION}` only when the app uses the standalone NodeRenderer.
   Do not add a direct `react-on-rails` dependency to Pro or RSC apps.
-
-  ```bash
-  pnpm view "react-on-rails-pro@${NPM_TARGET_VERSION}" version
-  # Run only when the app uses the standalone NodeRenderer:
-  pnpm view "react-on-rails-pro-node-renderer@${NPM_TARGET_VERSION}" version
-  ```
 
 - **RSC (`--rsc`)**: follow the Pro rule, including its conditional standalone NodeRenderer package
   and prohibition on a direct base dependency. Select `RSC_TARGET_VERSION` independently from the
@@ -113,7 +107,6 @@ pinning it; checking only the base package is insufficient.
 
   ```bash
   RSC_TARGET_VERSION="<exact RSC pin from target guidance>"
-  pnpm view "react-on-rails-rsc@${RSC_TARGET_VERSION}" version
   ```
 
 4. Pin Ruby gems with `GEM_TARGET_VERSION` and regenerate the Bundler lockfile.

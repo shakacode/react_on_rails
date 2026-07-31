@@ -171,7 +171,7 @@ RSpec.describe "packaged agent content" do
     end
   end
 
-  it "does not invent an RSC-support prerequisite for buffered helpers" do
+  it "requires RSC support only for cached static RSC among buffered helpers" do
     streaming_paths = %w[skills/streaming-debug/SKILL.md docs/agent/streaming-debug.md]
 
     aggregate_failures do
@@ -182,9 +182,11 @@ RSpec.describe "packaged agent content" do
         expect(buffered).not_to be_nil, "expected #{relative_path} to describe buffered helpers"
         next unless buffered
 
-        expect(buffered[:body]).to include("do not gate entry on `config.enable_rsc_support`")
-        expect(buffered[:body]).not_to match(
-          /`cached_static_rsc_component` requires `config\.enable_rsc_support = true`/
+        expect(buffered[:body]).to match(
+          /For `cached_static_rsc_component`, set `config\.enable_rsc_support = true`/
+        )
+        expect(buffered[:body]).to match(
+          /not a prerequisite for `buffered_stream_react_component` or\s+`cached_buffered_stream_react_component`/
         )
       end
     end
@@ -227,7 +229,8 @@ RSpec.describe "packaged agent content" do
     expect(guide).to include("Ruby prereleases use dot notation")
     expect(guide).to include("npm prereleases use hyphen notation")
     expect(guide).to include('"refs/tags/v${GEM_TARGET_VERSION}"')
-    expect(guide).to include('npm view "react-on-rails@${NPM_TARGET_VERSION}" version')
+    expect(guide).to include("Use the app's declared package manager's")
+    expect(guide).to include("registry-inspection command for every exact package spec")
     expect(guide).to include("`v<GEM_TARGET_VERSION>`")
     expect(guide).to include("`CURRENT_VERSION..GEM_TARGET_VERSION`")
     expect(target_selection).to be < pin_update
@@ -245,10 +248,7 @@ RSpec.describe "packaged agent content" do
     expect(guide).to include("`ReactOnRails::Generators::JsDependencyManager::RSC_PACKAGE_VERSION_PIN`")
     expect(guide).to include("`react-on-rails-rsc@${RSC_TARGET_VERSION}`")
     expect(guide).to include("Never derive `RSC_TARGET_VERSION` from `NPM_TARGET_VERSION`")
-    expect(guide).to include('pnpm view "react-on-rails-pro@${NPM_TARGET_VERSION}" version')
-    expect(guide).to include('pnpm view "react-on-rails-pro-node-renderer@${NPM_TARGET_VERSION}" version')
-    expect(guide).to include('pnpm view "react-on-rails-rsc@${RSC_TARGET_VERSION}" version')
-    expect(guide).not_to match(/^\s*npm view /)
+    expect(guide).not_to match(/^\s*(?:npm|pnpm|yarn|bun)\s+(?:view|info|pm view)\s+/)
     expect(guide).not_to include("Pin npm packages with `NPM_TARGET_VERSION`")
   end
 
@@ -266,6 +266,17 @@ RSpec.describe "packaged agent content" do
     expect(install.index(choice)).to be < install.index(commands.first)
   end
 
+  it "preserves JavaScript installs unless TypeScript is explicitly selected" do
+    guide = gem_root.join("docs/agent/install-and-upgrade.md").read
+    install = guide.match(/^## Install\n(?<body>.*?)(?=^## Upgrade$)/m)[:body]
+    generator = "bundle exec rails generate react_on_rails:install <LANGUAGE_CHOICE> <STACK_FLAG>"
+
+    expect(install).to include(generator)
+    expect(install).to include("replace `<LANGUAGE_CHOICE>` with `--typescript` for TypeScript")
+    expect(install).to include("omitting its flag preserves JavaScript")
+    expect(install).not_to include("react_on_rails:install --typescript <STACK_FLAG>")
+  end
+
   it "prepares an exact matching Pro gem before a Pro or RSC install" do
     guide = gem_root.join("docs/agent/install-and-upgrade.md").read
     install = guide.match(/^## Install\n(?<body>.*?)(?=^## Upgrade$)/m)[:body]
@@ -274,7 +285,7 @@ RSpec.describe "packaged agent content" do
     version =
       %(ROR_GEM_VERSION="$(bundle exec ruby -rreact_on_rails/version -e 'print ReactOnRails::VERSION')")
     pro_gem = %(bundle add react_on_rails_pro --version="${ROR_GEM_VERSION}" --strict)
-    generator = "bundle exec rails generate react_on_rails:install --typescript <STACK_FLAG>"
+    generator = "bundle exec rails generate react_on_rails:install <LANGUAGE_CHOICE> <STACK_FLAG>"
 
     expect(install).to include("For `--pro` or `--rsc` only")
     expect(install).to include("Skip this Pro-gem preparation for `--standard-only`")
@@ -297,7 +308,7 @@ RSpec.describe "packaged agent content" do
       %(bundle add react_on_rails_pro --path="<path-to-matching-react_on_rails_pro>" ) +
       %(--version="${ROR_GEM_VERSION}" --strict)
     cleanup = "bundle remove react_on_rails"
-    generator = "bundle exec rails generate react_on_rails:install --typescript <STACK_FLAG>"
+    generator = "bundle exec rails generate react_on_rails:install <LANGUAGE_CHOICE> <STACK_FLAG>"
 
     expect(install).to include(registry_pro_gem, local_pro_gem, cleanup, generator)
     expect(install).to include("For `--pro` or `--rsc` only, after either Pro source command succeeds")
