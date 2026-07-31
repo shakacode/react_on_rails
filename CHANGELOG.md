@@ -233,6 +233,15 @@ pair`, returns invalid UTF-8, or silently mis-decodes the value. The parser now 
 
 #### Added
 
+- **Version-matched agent skills and bundled docs**: The `react_on_rails` gem and
+  `react-on-rails` npm package now ship install/upgrade, React Server Components adoption,
+  streaming debugging, and doctor fix-loop skills with concise package-local references.
+  Newly scaffolded `AGENTS.md` files point agents to the installed package content before
+  the hosted docs, avoiding guidance drift across releases. Fixes
+  [Issue 4605](https://github.com/shakacode/react_on_rails/issues/4605).
+  [PR 4809](https://github.com/shakacode/react_on_rails/pull/4809) by
+  [justin808](https://github.com/justin808).
+
 - **[Pro]** **RSC agent guardrails installer**: New
   `rake react_on_rails:install_rsc_agent_guardrails` task (also run automatically by the RSC
   generator) installs a Claude Code `rsc-app-safety` skill and an advisory hook into a host app's

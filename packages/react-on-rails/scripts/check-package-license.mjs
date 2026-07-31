@@ -29,6 +29,16 @@ SOFTWARE.
 const readPackedFile = (tarballPath, packedPath) =>
   execFileSync('tar', ['-xOzf', tarballPath, packedPath], { encoding: 'utf8' });
 
+const listPackedFiles = (tarballPath) =>
+  execFileSync('tar', ['-tzf', tarballPath], { encoding: 'utf8' }).split('\n').filter(Boolean);
+
+const skillNames = ['doctor-fix-loop', 'install-and-upgrade', 'rsc-adoption', 'streaming-debug'];
+const expectedAgentFiles = [
+  ...skillNames.map((skillName) => `package/skills/${skillName}/SKILL.md`),
+  'package/docs/agent/README.md',
+  ...skillNames.map((skillName) => `package/docs/agent/${skillName}.md`),
+].sort();
+
 const temporaryDirectory = mkdtempSync(join(tmpdir(), 'react-on-rails-license-'));
 
 try {
@@ -40,10 +50,26 @@ try {
   const tarballPath = join(temporaryDirectory, tarball);
   const packedPackage = JSON.parse(readPackedFile(tarballPath, 'package/package.json'));
   const packedLicense = readPackedFile(tarballPath, 'package/LICENSE.md');
+  const packedFiles = listPackedFiles(tarballPath);
+  const packedAgentFiles = packedFiles
+    .filter((path) => path.startsWith('package/skills/') || path.startsWith('package/docs/agent/'))
+    .sort();
 
   assert.equal(packedPackage.license, 'MIT');
   assert.equal(packedLicense, expectedOssMitLicense);
   assert.doesNotMatch(packedLicense, /React on Rails Pro|subscription|commercial/i);
+
+  assert.deepEqual(
+    packedAgentFiles,
+    expectedAgentFiles,
+    'npm package should contain exactly the agent files',
+  );
+
+  for (const skillName of skillNames) {
+    const skill = readPackedFile(tarballPath, `package/skills/${skillName}/SKILL.md`);
+    assert.match(skill, new RegExp(`name: ${skillName}`));
+    assert.match(skill, new RegExp(`\\.\\./\\.\\./docs/agent/${skillName}\\.md`));
+  }
 } finally {
   rmSync(temporaryDirectory, { force: true, recursive: true });
 }
