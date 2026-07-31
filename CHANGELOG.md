@@ -26,6 +26,36 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **RSC render-error details are no longer sent to the browser on the fetched payload path**:
+  The RSC payload fetched during client-side navigation (via `rsc_payload_generation_url_path`) included
+  the server's rendering-error message and source-mapped stack — which contains server file paths — in its
+  metadata, in every environment. The inline (first-paint) payload path was already redacted, so error
+  detail that was hidden on first paint could still reach the browser on a client navigation. The fetched
+  path now applies the same fail-closed gate: full detail only in `development` and `test`, while
+  `production`, `staging`, and any unrecognized environment receive a generic `hasErrors: true` signal so
+  client error boundaries still fire. Server-side error handling is unaffected — `raise_prerender_error`
+  still receives the full message and stack, because redaction happens at the browser-facing boundary
+  after the server's own error transform runs. Fixes
+  [Issue 4736](https://github.com/shakacode/react_on_rails/issues/4736).
+  [PR 4821](https://github.com/shakacode/react_on_rails/pull/4821) by
+  [justin808](https://github.com/justin808).
+
+- **HTTP-served SSR bundle loading now honors the response charset, rejects non-2xx responses,
+  and no longer leaks URL credentials into error messages**:
+  When `server_bundle_js_file` resolves to an HTTP(S) URL, `RubyEmbeddedJavaScript.file_url_to_string`
+  no longer assumes the `Content-Type` header always ends in an exact `; charset=...` form. A response
+  with no charset, a `Content-Type` with no charset parameter, a missing `Content-Type` header, or a
+  quoted charset value (`charset="ISO-8859-1"`) now transcodes to UTF-8 successfully instead of
+  raising or silently mislabeling the bytes, falling back to UTF-8 when no usable charset is declared.
+  A non-2xx response (for example a 404 page or a proxy error) is now rejected with a clear
+  bundle-load error naming the URL and status, instead of being returned as if it were JavaScript
+  bundle source. Additionally, a `server_bundle_js_file` URL with embedded HTTP basic-auth
+  credentials (e.g. `https://:password@host:3800/bundle.js`) no longer leaks that password into
+  raised errors or logs on a load failure. Fixes
+  [Issue 4584](https://github.com/shakacode/react_on_rails/issues/4584).
+  [PR 4817](https://github.com/shakacode/react_on_rails/pull/4817) by
+  [justin808](https://github.com/justin808).
+
 - **RailsContext now stays current across Turbo and Turbolinks navigation**: Parsed context is cached
   only while its source element and JSON text remain unchanged. Replacing the context element or
   morphing its payload in place now makes the next core render or immediate Pro hydration receive the
@@ -266,6 +296,16 @@ pair`, returns invalid UTF-8, or silently mis-decodes the value. The parser now 
   [Issue 3584](https://github.com/shakacode/react_on_rails/issues/3584).
   [PR 4579](https://github.com/shakacode/react_on_rails/pull/4579) by
   [alexeyr-ci2](https://github.com/alexeyr-ci2).
+
+### [17.0.1] - 2026-07-26
+
+#### Fixed
+
+- **Corrected the OSS npm package license metadata and packed license**: `react-on-rails` now declares
+  `MIT`, includes a package-local MIT license in the published tarball, and verifies the packed
+  artifact cannot inherit React on Rails Pro commercial terms.
+  [PR 4792](https://github.com/shakacode/react_on_rails/pull/4792) by
+  [justin808](https://github.com/justin808).
 
 ### [17.0.0] - 2026-07-16
 
@@ -3014,7 +3054,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.0.0...main
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.0.1...main
+[17.0.1]: https://github.com/shakacode/react_on_rails/compare/v17.0.0...v17.0.1
 [17.0.0]: https://github.com/shakacode/react_on_rails/compare/v16.6.0...v17.0.0
 [16.6.0]: https://github.com/shakacode/react_on_rails/compare/v16.5.1...v16.6.0
 [16.5.1]: https://github.com/shakacode/react_on_rails/compare/v16.5.0...v16.5.1
