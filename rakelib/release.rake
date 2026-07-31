@@ -48,9 +48,13 @@ NPM_PUBLISH_TRANSIENT_PATTERN = %r{
   \bHTTP(?:/1\.\d)?\s+(?:429|5\d\d)\b |
   \b(?:response(?:\s+status)?|status(?:\s+code)?)\s*(?::|=)?\s*(?:429|5\d\d)\b
 }ix
-NPM_PUBLISH_LOCAL_LIFECYCLE_PATTERN = /
-  \b(?:ELIFECYCLE|ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL|ERR_PNPM_NO_SCRIPT)\b |
-  prepublishOnly | lifecycle\ script | \btsc\b | TypeScript | Cannot\ find\ module
+NPM_PUBLISH_LOCAL_LIFECYCLE_HARD_PATTERN = /
+  \b(?:ELIFECYCLE|ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL|ERR_PNPM_EXEC_FIRST_FAIL|ERR_PNPM_NO_SCRIPT)\b |
+  Cannot\ find\ module
+/ix
+NPM_PUBLISH_LOCAL_LIFECYCLE_BANNER_PATTERN = /\b(?:prepublishOnly|lifecycle(?:\s+script)?|tsc|TypeScript)\b/i
+NPM_PUBLISH_LOCAL_LIFECYCLE_FAILURE_CONTEXT_PATTERN = /
+  \b(?:failed|failure|not\ found|not\ recognized)\b | \berror\s+TS\d+\b
 /ix
 NPM_PUBLISH_REGISTRY_REJECTION_PATTERN = /
   \b(?:EPUBLISHCONFLICT|E403|E400)\b | cannot\ publish\ over | previously\ published | forbidden |
@@ -1985,7 +1989,12 @@ rescue StandardError => e
 end
 
 def authoritative_shakaperf_artifact_absence?(output)
-  output.to_s.match?(%r{\bHTTP(?:/\d(?:\.\d)?)?\s+404\b|\b404\s+Not Found\b|\bno artifacts? found\b}i)
+  output.to_s.match?(%r{
+    \bHTTP(?:/\d(?:\.\d)?)?\s+404\b |
+    \b404\s+Not\ Found\b |
+    \bno\ artifacts?\ found\b |
+    \bno\ valid\ artifacts\ found\ to\ download\b
+  }ix)
 end
 
 def download_saved_shakaperf_release_gate_evidence!(repo_slug:, run:, dir:)
@@ -8796,6 +8805,32 @@ def validate_npm_release_readiness!(monorepo_root:)
   puts "✓ npm release packages are ready to publish"
 end
 
+def current_npm_release_readiness_sha!(monorepo_root:, context:)
+  sha = current_git_sha!(monorepo_root, context:)
+  return sha if sha.match?(/\A[0-9a-f]{40}\z/i)
+
+  abort "❌ Unable to bind npm release readiness to an exact git SHA before #{context}."
+end
+
+def refresh_npm_release_readiness_after_pull!(monorepo_root:, readiness_sha:)
+  post_pull_sha = current_npm_release_readiness_sha!(
+    monorepo_root:,
+    context: "post-pull npm release readiness verification"
+  )
+  return readiness_sha if post_pull_sha == readiness_sha
+
+  validate_npm_release_readiness!(monorepo_root:)
+  validated_sha = current_npm_release_readiness_sha!(
+    monorepo_root:,
+    context: "post-pull npm release readiness binding"
+  )
+  if validated_sha != post_pull_sha
+    abort "❌ HEAD changed while npm release readiness was running; retry from a stable checkout."
+  end
+
+  validated_sha
+end
+
 def rubygem_version_published?(gem_name, version, api_url: RUBYGEMS_VERSIONS_API_URL)
   output, response = fetch_rubygems_versions(gem_name, api_url:)
   return false unless response.is_a?(Net::HTTPSuccess)
@@ -9194,11 +9229,20 @@ def npm_publish_failure_category(output)
     /\bEOTP\b|one[- ]time (?:password|passcode)|\botp(?: code)?\b.*\b(?:required|invalid|expired)\b/i
   )
   return :authentication_failure if text.match?(/\b(?:ENEEDAUTH|E401)\b|authentication (?:is )?required/i)
-  return :local_lifecycle if text.match?(NPM_PUBLISH_LOCAL_LIFECYCLE_PATTERN)
+  return :local_lifecycle if npm_publish_local_lifecycle_failure?(text)
   return :registry_rejection if text.match?(NPM_PUBLISH_REGISTRY_REJECTION_PATTERN)
   return :transient if text.match?(NPM_PUBLISH_TRANSIENT_PATTERN)
 
   :unknown
+end
+
+def npm_publish_local_lifecycle_failure?(text)
+  return true if text.match?(NPM_PUBLISH_LOCAL_LIFECYCLE_HARD_PATTERN)
+
+  text.each_line.any? do |line|
+    line.match?(NPM_PUBLISH_LOCAL_LIFECYCLE_BANNER_PATTERN) &&
+      line.match?(NPM_PUBLISH_LOCAL_LIFECYCLE_FAILURE_CONTEXT_PATTERN)
+  end || text.each_line.any? { |line| line.match?(/\berror\s+TS\d+\b/i) }
 end
 
 def run_npm_publish_attempt!(dir:, publish_args:, otp:)
@@ -9401,6 +9445,10 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
   verbose(is_verbose)
 
   validate_npm_release_readiness!(monorepo_root:)
+  npm_readiness_sha = current_npm_release_readiness_sha!(
+    monorepo_root:,
+    context: "initial npm release readiness verification"
+  )
 
   released_gem_version = nil
   released_npm_version = nil
@@ -9414,7 +9462,13 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
 
   with_release_checkout(monorepo_root:, dry_run: is_dry_run) do |release_root|
     release_paths_hash = release_paths(release_root)
-    sh_in_dir_for_release(release_root, "git pull --rebase") unless is_dry_run
+    unless is_dry_run
+      sh_in_dir_for_release(release_root, "git pull --rebase")
+      npm_readiness_sha = refresh_npm_release_readiness_after_pull!(
+        monorepo_root: release_root,
+        readiness_sha: npm_readiness_sha
+      )
+    end
 
     version_input = resolve_release_version_before_auth!(
       version_input: args_hash.fetch(:version, ""),

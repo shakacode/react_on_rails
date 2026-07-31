@@ -38,9 +38,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   strict-final verification. Before either a live release or dry run can reach registry checks, confirmation,
   mutation, tagging, or publication, the task also verifies the frozen pnpm install state, the repository-pinned
   pnpm version, and lifecycle-enabled builds of all four npm release packages before creating a release checkout,
-  pulling, authenticating, or reading any remote release state. npm publication now retries only explicit OTP
-  challenges and context-qualified transient network/HTTP failures; authentication, lifecycle, registry, incidental
-  numeric diagnostics, and unknown failures stop immediately with OTP values redacted. Stable releases also support
+  pulling, authenticating, or reading any remote release state. The successful check is bound to the exact commit;
+  when a live `git pull --rebase` advances `HEAD`, the task rebuilds and rebinds readiness before resolving the release
+  version or continuing. npm publication now retries only explicit OTP challenges and context-qualified transient
+  network/HTTP failures; successful lifecycle/tool banners no longer mask those diagnostics, while authentication,
+  actual lifecycle failures, registry rejection, incidental numeric diagnostics, and unknown failures stop immediately
+  with OTP values redacted. Saved ShakaPerf evidence also recognizes GitHub CLI's exact
+  `no valid artifacts found to download` diagnostic as authoritative absence while preserving observation failures as
+  blocking. Stable releases also support
   an append-only, tracker-bound schema-v2 observation waiver bound to the exact run attempt and canonical
   repository/workflow/event/branch identity. Legacy schema-v1 waiver markers remain readable audit history but cannot
   authorize publication. The waiver does not

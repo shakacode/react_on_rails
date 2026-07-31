@@ -1697,6 +1697,24 @@ RSpec.describe "release.rake helper methods" do
       end.to raise_error(ShakaperfGateObservationError, /403.*not accessible/i)
     end
 
+    it "keeps auth, rate-limit, server, DNS, and timeout diagnostics indeterminate" do
+      diagnostics = [
+        "HTTP 401: Requires authentication",
+        "HTTP 403: Resource not accessible",
+        "HTTP 429: Too Many Requests",
+        "HTTP 503: Service Unavailable",
+        "dial tcp: lookup api.github.com: no such host",
+        "request timed out",
+        "authentication required"
+      ]
+
+      aggregate_failures do
+        diagnostics.each do |diagnostic|
+          expect(authoritative_shakaperf_artifact_absence?(diagnostic)).to be(false), diagnostic
+        end
+      end
+    end
+
     it "classifies an authoritative missing artifact separately from an indeterminate failure" do
       status = instance_double(Process::Status, success?: false)
       allow(self).to receive(:capture_gh_output).and_return(["HTTP 404: artifact not found", status])
@@ -1704,6 +1722,16 @@ RSpec.describe "release.rake helper methods" do
       expect do
         fetch_shakaperf_release_gate_evidence_for_association!(repo_slug:, run:)
       end.to raise_error(ShakaperfGateMissingArtifactError, /404.*not found/i)
+    end
+
+    it "recognizes the exact gh 2.96 no-valid-artifacts diagnostic as authoritative absence" do
+      status = instance_double(Process::Status, success?: false)
+      allow(self).to receive(:capture_gh_output)
+        .and_return(["no valid artifacts found to download", status])
+
+      expect do
+        fetch_shakaperf_release_gate_evidence_for_association!(repo_slug:, run:)
+      end.to raise_error(ShakaperfGateMissingArtifactError, /no valid artifacts found to download/i)
     end
   end
 
@@ -2714,10 +2742,13 @@ RSpec.describe "release.rake helper methods" do
       end
 
       it "falls through to normal discovery when the saved artifact is authoritatively missing" do
+        missing_status = instance_double(Process::Status, success?: false)
         allow(self).to receive(:fetch_shakaperf_release_gate_evidence_for_association!)
-          .with(repo_slug:, run: association_run)
-          .and_raise(ShakaperfGateMissingArtifactError, "HTTP 404: artifact not found")
-        allow(self).to receive(:discover_and_run_shakaperf_release_gate!).and_return(:fresh_discovery)
+          .with(repo_slug:, run: association_run).and_call_original
+        allow(self).to receive_messages(
+          capture_gh_output: ["No Valid Artifacts Found To Download", missing_status],
+          discover_and_run_shakaperf_release_gate!: :fresh_discovery
+        )
 
         expect(
           observe_shakaperf_release_gate!(
@@ -2731,6 +2762,12 @@ RSpec.describe "release.rake helper methods" do
             release_started_at:
           )
         ).to eq(:fresh_discovery)
+        expect(self).to have_received(:capture_gh_output).with(
+          "run", "download", "123456",
+          "--repo", repo_slug,
+          "--name", SHAKAPERF_RELEASE_GATE_EVIDENCE_ARTIFACT,
+          "--dir", kind_of(String)
+        )
         expect(self).to have_received(:discover_and_run_shakaperf_release_gate!)
       end
 
@@ -6752,7 +6789,7 @@ RSpec.describe "release.rake helper methods" do
   end
 
   describe "#publish_npm_with_retry" do
-    it "classifies only context-qualified HTTP and npm error codes as transient" do
+    it "classifies mixed lifecycle banners and context-qualified transient diagnostics without false hard failures" do
       transient_diagnostics = [
         "npm ERR! code E429",
         "npm ERR! code E503",
@@ -6763,12 +6800,30 @@ RSpec.describe "release.rake helper methods" do
         "HTTP/1.1 503 Service Unavailable",
         "response status: 503",
         "status code 429",
-        "read ECONNRESET"
+        "read ECONNRESET",
+        "prepublishOnly completed successfully\nnpm ERR! code E503",
+        "tsc 5.9.3\nHTTP 503 Service Unavailable",
+        "TypeScript 5.9.3\nresponse status 503"
       ]
       hard_diagnostics = {
-        local_lifecycle: ["TypeScript error TS2345 (503,1)", "prepublishOnly package size 503"],
+        local_lifecycle: [
+          "TypeScript error TS2345 (503,1)",
+          "prepublishOnly failed\nnpm ERR! code E503",
+          "tsc failure\nHTTP 503 Service Unavailable",
+          "lifecycle script not found\nresponse status 503",
+          "ERR_PNPM_EXEC_FIRST_FAIL\nHTTP 503 Service Unavailable"
+        ],
         registry_rejection: ["npm ERR! code E403 registry response status 503"],
-        unknown: ["package size 503", "item 500", "429", "500"]
+        unknown: [
+          "prepublishOnly completed successfully",
+          "tsc 5.9.3",
+          "TypeScript 5.9.3",
+          "prepublishOnly package size 503",
+          "package size 503",
+          "item 500",
+          "429",
+          "500"
+        ]
       }
 
       aggregate_failures do
@@ -14830,10 +14885,15 @@ RSpec.describe "release.rake helper methods" do
       rakefile = File.read(File.expand_path("../../../rakelib/release.rake", __dir__))
       release_task = rakefile.match(/task :release,.*?(?=\ndesc\("Creates or updates a GitHub release)/m)[0]
       tag_push_helper = rakefile.match(/def push_release_tag_for_candidate!.*?^end$/m)[0]
+      readiness_refresh_helper = rakefile.match(/def refresh_npm_release_readiness_after_pull!.*?^end$/m)[0]
       clean_worktree_index = release_task.index("ReactOnRails::GitUtils.uncommitted_changes?")
       verbosity_index = release_task.index("verbose(is_verbose)")
       npm_readiness_index = release_task.index("validate_npm_release_readiness!")
+      npm_readiness_sha_index = release_task.index("current_npm_release_readiness_sha!")
       checkout_index = release_task.index("with_release_checkout")
+      pull_index = release_task.index('sh_in_dir_for_release(release_root, "git pull --rebase")')
+      readiness_refresh_index = release_task.index("refresh_npm_release_readiness_after_pull!")
+      version_resolution_index = release_task.index("resolve_release_version_before_auth!")
       tag_retry_index = release_task.index("release_tag_retry_state_for_current_head")
       retry_mode_index = release_task.index("resolve_accelerated_rc_options_for_release!")
       accelerated_branch_guard_index = release_task.index("ensure_accelerated_rc_release_branch!")
@@ -14849,11 +14909,22 @@ RSpec.describe "release.rake helper methods" do
       pre_push_boundary_index = tag_push_helper.index('phase: "git tag push"')
       git_push_index = tag_push_helper.index('sh_in_dir_for_release(monorepo_root, "LEFTHOOK=0 git push --tags")')
       package_boundary_index = tag_push_helper.index('phase: "package publication"')
+      post_pull_sha_index = readiness_refresh_helper.index("post_pull_sha = current_npm_release_readiness_sha!")
+      unchanged_sha_return_index = readiness_refresh_helper.index("return readiness_sha")
+      changed_sha_readiness_index = readiness_refresh_helper.index("validate_npm_release_readiness!")
+      changed_sha_binding_index = readiness_refresh_helper.index("validated_sha = current_npm_release_readiness_sha!")
 
       expect(clean_worktree_index).to be < verbosity_index
       expect(verbosity_index).to be < npm_readiness_index
-      expect(npm_readiness_index).to be < checkout_index
+      expect(npm_readiness_index).to be < npm_readiness_sha_index
+      expect(npm_readiness_sha_index).to be < checkout_index
       expect(release_task.scan("validate_npm_release_readiness!").length).to eq(1)
+      expect(checkout_index).to be < pull_index
+      expect(pull_index).to be < readiness_refresh_index
+      expect(readiness_refresh_index).to be < version_resolution_index
+      expect(post_pull_sha_index).to be < unchanged_sha_return_index
+      expect(unchanged_sha_return_index).to be < changed_sha_readiness_index
+      expect(changed_sha_readiness_index).to be < changed_sha_binding_index
       expect(tag_retry_index).to be < retry_mode_index
       expect(retry_mode_index).to be < accelerated_branch_guard_index
       expect(accelerated_branch_guard_index).to be < accelerated_tag_preflight_index
@@ -14900,6 +14971,7 @@ RSpec.describe "release.rake helper methods" do
       allow(task_receiver).to receive_messages(
         current_monorepo_root: "/tmp/repo",
         validate_npm_release_readiness!: nil,
+        current_npm_release_readiness_sha!: "d" * 40,
         verbose: nil,
         release_paths: { monorepo_root: "/tmp/repo", gem_root: "/tmp/repo/react_on_rails" },
         resolve_release_version_before_auth!: "17.0.0",
@@ -15026,6 +15098,194 @@ RSpec.describe "release.rake helper methods" do
         end
       end
     end
+
+    it "reruns readiness after a live pull changes HEAD and blocks every later action when it fails" do
+      initial_sha = "a" * 40
+      pulled_sha = "b" * 40
+      readiness_roots = []
+      allow(task_receiver).to receive(:current_git_sha!).and_return(initial_sha, pulled_sha)
+      allow(task_receiver).to receive(:validate_npm_release_readiness!) do |monorepo_root:|
+        readiness_roots << monorepo_root
+        abort "post-pull npm readiness stopped the release" if readiness_roots.length == 2
+      end
+      allow(task_receiver).to receive(:resolve_release_version_before_auth!) do
+        abort "version resolution reached before refreshed readiness"
+      end
+
+      failure = begin
+        release_task.reenable
+        release_task.invoke("17.0.0.rc.10", false, true, false)
+        nil
+      rescue SystemExit => error
+        error
+      end
+
+      aggregate_failures do
+        expect(failure&.message).to eq("post-pull npm readiness stopped the release")
+        expect(readiness_roots).to eq([monorepo_root, release_root])
+        expect(task_receiver).not_to have_received(:verify_npm_auth)
+        expect(task_receiver).not_to have_received(:verify_gh_auth)
+        expect(task_receiver).not_to have_received(:validate_main_ci_status!)
+        expect(task_receiver).not_to have_received(:validate_release_version_policy!)
+        expect(task_receiver).not_to have_received(:preflight_registry_publish_conflicts!)
+        expect(task_receiver).not_to have_received(:confirm_release!)
+        expect(task_receiver).not_to have_received(:run_shakaperf_release_gate!)
+        expect(task_receiver).not_to have_received(:push_release_tag_for_candidate!)
+        expect(task_receiver).not_to have_received(:publish_npm_with_retry)
+        expect(task_receiver).not_to have_received(:prompt_for_otp)
+      end
+    end
+
+    it "hard-fails when HEAD changes while the refreshed readiness check is running" do
+      initial_sha = "a" * 40
+      pulled_sha = "b" * 40
+      moved_sha = "c" * 40
+      readiness_roots = []
+      allow(task_receiver).to receive(:current_git_sha!).and_return(initial_sha, pulled_sha, moved_sha)
+      allow(task_receiver).to receive(:validate_npm_release_readiness!) do |monorepo_root:|
+        readiness_roots << monorepo_root
+      end
+      allow(task_receiver).to receive(:resolve_release_version_before_auth!) do
+        abort "version resolution reached with stale readiness"
+      end
+
+      failure = begin
+        release_task.reenable
+        release_task.invoke("17.0.0.rc.10", false, true, false)
+        nil
+      rescue SystemExit => error
+        error
+      end
+
+      aggregate_failures do
+        expect(failure&.message).to match(/HEAD changed while npm release readiness was running/i)
+        expect(readiness_roots).to eq([monorepo_root, release_root])
+        expect(task_receiver).not_to have_received(:verify_npm_auth)
+        expect(task_receiver).not_to have_received(:verify_gh_auth)
+        expect(task_receiver).not_to have_received(:validate_main_ci_status!)
+        expect(task_receiver).not_to have_received(:preflight_registry_publish_conflicts!)
+        expect(task_receiver).not_to have_received(:confirm_release!)
+        expect(task_receiver).not_to have_received(:push_release_tag_for_candidate!)
+        expect(task_receiver).not_to have_received(:publish_npm_with_retry)
+      end
+    end
+
+    it "keeps one readiness check when a live pull leaves HEAD unchanged" do
+      head_sha = "a" * 40
+      events = []
+      allow(task_receiver).to receive(:validate_npm_release_readiness!) do |monorepo_root:|
+        events << [:readiness, monorepo_root]
+      end
+      allow(task_receiver).to receive(:current_git_sha!) do |root, context:|
+        events << [:sha, root, context]
+        head_sha
+      end
+      allow(task_receiver).to receive(:sh_in_dir_for_release) do |root, command|
+        events << [:command, root, command]
+      end
+      allow(task_receiver).to receive(:resolve_release_version_before_auth!) do
+        events << [:version_resolution]
+        abort "unchanged HEAD reached version resolution"
+      end
+
+      failure = begin
+        release_task.reenable
+        release_task.invoke("17.0.0.rc.10", false, true, false)
+        nil
+      rescue SystemExit => error
+        error
+      end
+
+      aggregate_failures do
+        expect(failure&.message).to eq("unchanged HEAD reached version resolution")
+        expect(events).to eq(
+          [
+            [:readiness, monorepo_root],
+            [:sha, monorepo_root, "initial npm release readiness verification"],
+            [:command, release_root, "git pull --rebase"],
+            [:sha, release_root, "post-pull npm release readiness verification"],
+            [:version_resolution]
+          ]
+        )
+      end
+    end
+
+    it "binds a successful second readiness check to the changed live HEAD before proceeding" do
+      initial_sha = "a" * 40
+      pulled_sha = "b" * 40
+      readiness_roots = []
+      allow(task_receiver).to receive(:current_git_sha!).and_return(initial_sha, pulled_sha, pulled_sha)
+      allow(task_receiver).to receive(:validate_npm_release_readiness!) do |monorepo_root:|
+        readiness_roots << monorepo_root
+      end
+      allow(task_receiver).to receive(:resolve_release_version_before_auth!) do
+        abort "refreshed readiness reached version resolution"
+      end
+
+      failure = begin
+        release_task.reenable
+        release_task.invoke("17.0.0.rc.10", false, true, false)
+        nil
+      rescue SystemExit => error
+        error
+      end
+
+      aggregate_failures do
+        expect(failure&.message).to eq("refreshed readiness reached version resolution")
+        expect(readiness_roots).to eq([monorepo_root, release_root])
+        expect(task_receiver).to have_received(:current_git_sha!).exactly(3).times
+      end
+    end
+
+    it "keeps a dry run bound to one original-workspace readiness check without pulling" do
+      head_sha = "a" * 40
+      readiness_roots = []
+      allow(task_receiver).to receive(:current_git_sha!).and_return(head_sha)
+      allow(task_receiver).to receive(:validate_npm_release_readiness!) do |monorepo_root:|
+        readiness_roots << monorepo_root
+      end
+      allow(task_receiver).to receive(:resolve_release_version_before_auth!) do
+        abort "dry readiness reached version resolution"
+      end
+
+      failure = begin
+        release_task.reenable
+        release_task.invoke("17.0.0.rc.10", true, true, false)
+        nil
+      rescue SystemExit => error
+        error
+      end
+
+      aggregate_failures do
+        expect(failure&.message).to eq("dry readiness reached version resolution")
+        expect(readiness_roots).to eq([monorepo_root])
+        expect(task_receiver).to have_received(:current_git_sha!)
+          .with(monorepo_root, context: "initial npm release readiness verification").once
+        expect(task_receiver).not_to have_received(:sh_in_dir_for_release).with(release_root, "git pull --rebase")
+      end
+    end
+
+    it "hard-fails an unknown initial readiness SHA before creating a release checkout" do
+      allow(task_receiver).to receive(:current_git_sha!).and_return("unknown")
+
+      failure = begin
+        release_task.reenable
+        release_task.invoke("17.0.0.rc.10", false, true, false)
+        nil
+      rescue SystemExit => error
+        error
+      end
+
+      aggregate_failures do
+        expect(failure&.message).to match(/bind npm release readiness to an exact git SHA/i)
+        expect(task_receiver).not_to have_received(:with_release_checkout)
+        expect(task_receiver).not_to have_received(:resolve_release_version_before_auth!)
+        expect(task_receiver).not_to have_received(:verify_npm_auth)
+        expect(task_receiver).not_to have_received(:verify_gh_auth)
+        expect(task_receiver).not_to have_received(:validate_main_ci_status!)
+        expect(task_receiver).not_to have_received(:preflight_registry_publish_conflicts!)
+      end
+    end
   end
 
   describe "release task automatic ShakaPerf tracker validation" do
@@ -15051,6 +15311,7 @@ RSpec.describe "release.rake helper methods" do
       allow(task_receiver).to receive_messages(
         current_monorepo_root: "/tmp/repo",
         validate_npm_release_readiness!: nil,
+        current_npm_release_readiness_sha!: "d" * 40,
         verbose: nil,
         release_paths: { monorepo_root: "/tmp/repo", gem_root: "/tmp/repo/react_on_rails" },
         resolve_release_version_before_auth!: "17.0.1",
@@ -15128,6 +15389,8 @@ RSpec.describe "release.rake helper methods" do
 
   describe "release task accelerated RC preflight" do
     def invoke_release_task_and_capture_exit(release_task, version: "17.0.0.rc.10", dry_run: true)
+      task_receiver = release_task.actions.first.binding.receiver
+      allow(task_receiver).to receive(:current_npm_release_readiness_sha!).and_return("d" * 40)
       release_task.reenable
       release_task.invoke(version, dry_run, true, false)
       nil
@@ -15150,6 +15413,7 @@ RSpec.describe "release.rake helper methods" do
       allow(task_receiver).to receive_messages(
         current_monorepo_root: "/tmp/repo",
         validate_npm_release_readiness!: nil,
+        current_npm_release_readiness_sha!: "d" * 40,
         verbose: nil,
         release_paths: { monorepo_root: "/tmp/repo", gem_root: "/tmp/repo/react_on_rails" },
         resolve_release_version_before_auth!: "17.0.0.rc.10",
@@ -15195,6 +15459,7 @@ RSpec.describe "release.rake helper methods" do
       allow(task_receiver).to receive_messages(
         current_monorepo_root: "/tmp/repo",
         validate_npm_release_readiness!: nil,
+        current_npm_release_readiness_sha!: "d" * 40,
         verbose: nil,
         release_paths: { monorepo_root: "/tmp/repo", gem_root: "/tmp/repo/react_on_rails" },
         resolve_release_version_before_auth!: "17.0.0.rc.10",
@@ -15240,6 +15505,7 @@ RSpec.describe "release.rake helper methods" do
       allow(task_receiver).to receive_messages(
         current_monorepo_root: "/tmp/repo",
         validate_npm_release_readiness!: nil,
+        current_npm_release_readiness_sha!: "d" * 40,
         verbose: nil,
         release_paths: { monorepo_root: "/tmp/repo", gem_root: "/tmp/repo/react_on_rails" },
         resolve_release_version_before_auth!: "17.0.0.rc.10",
@@ -15528,6 +15794,7 @@ RSpec.describe "release.rake helper methods" do
       allow(task_receiver).to receive_messages(
         current_monorepo_root: "/tmp/repo",
         validate_npm_release_readiness!: nil,
+        current_npm_release_readiness_sha!: "d" * 40,
         verbose: nil,
         resolve_release_version_before_auth!: "17.0.0.rc.10",
         current_gem_version: "16.9.0",

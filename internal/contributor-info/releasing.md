@@ -124,6 +124,14 @@ dispatch, tagging, publication, or OTP prompting. Every readiness failure prints
 pnpm install --frozen-lockfile
 ```
 
+After the initial check succeeds, the task binds it to the exact current commit. A live release then runs
+`git pull --rebase` and immediately resolves `HEAD` again. If the pull advanced the checkout, all four release-package
+builds and the rest of npm readiness run again in the live release root; `HEAD` is resolved once more after that check
+so a concurrent commit change fails closed. Version resolution, authentication, CI, registry probes, confirmation,
+and mutation remain unreachable until readiness is bound to the current release SHA. An unchanged live checkout runs
+one readiness check, and a dry run neither pulls nor repeats the original-workspace check. Any missing or malformed SHA
+resolution is a hard failure.
+
 `rake release` validates release-version policy before publishing:
 
 - Target version must be greater than the latest tagged release.
@@ -220,9 +228,12 @@ candidate is bound to the live run while the schema-v2 runtime fingerprint is co
 release commit. Output names both the tracker URL and reused run URL.
 
 Only automatic association reuse may discard naturally invalid evidence and continue through normal discovery.
-That recovery is limited to authoritative staleness, a 404-proven missing run or artifact, a live run now completed
-with `failure` or `cancelled`, or proof that the current runtime tree, intervening commits, or ancestry is no longer
-equivalent. A Git `merge-base --is-ancestor` exit 1 is authoritative non-ancestry. Failures or malformed results from
+That recovery is limited to authoritative staleness, a 404-proven missing run or artifact, GitHub CLI's exact
+`no valid artifacts found to download` diagnostic, a live run now completed with `failure` or `cancelled`, or proof
+that the current runtime tree, intervening commits, or ancestry is no longer equivalent. The artifact diagnostic is
+matched case-insensitively; authentication, permission, rate-limit, server, DNS, and timeout errors remain unknown
+observation failures rather than absence. A Git `merge-base --is-ancestor` exit 1 is authoritative non-ancestry.
+Failures or malformed results from
 `git ls-tree`, `merge-base`, `rev-list`, `diff-tree`, or `script/ci-changes-detector` are unknown and block without
 dispatching a replacement run. Explicit selectors reject both authoritative invalidation and unknown verification.
 Edited, malformed, unsupported, or noncanonical trusted
@@ -844,8 +855,11 @@ ShakaPerf dispatch, tagging, publication, or OTP prompting.
 
 During npm publication, only explicit transient diagnostics are retried with bounded backoff and the same OTP:
 network codes such as `ECONNRESET`, npm/pnpm codes such as `E429`, `E503`, or `ERR_PNPM_FETCH_503`, and HTTP or
-response/status-code contexts such as `HTTP 429` or `status code 503`. Bare numbers such as `429` or `500`, package
-sizes, TypeScript source locations, lifecycle failures, registry rejections, authentication failures, and unknown
+response/status-code contexts such as `HTTP 429` or `status code 503`. Successful `prepublishOnly`, `tsc`, or TypeScript
+banner lines do not override a real transient diagnostic elsewhere in the output. Deterministic lifecycle codes and
+tool/lifecycle lines containing `failed`, `failure`, `not found`, `not recognized`, or `error TS...` remain local hard
+failures even when the same output also mentions a transient code. Bare numbers such as `429` or `500`, package sizes,
+successful tool banners without a transient diagnostic, registry rejections, authentication failures, and unknown
 output fail immediately. Only an explicit OTP challenge (`EOTP` or an equivalent one-time-password prompt) requests
 a fresh code; all printed OTP values remain redacted.
 
