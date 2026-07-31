@@ -542,6 +542,130 @@ above; when there are multiple selections, serialize the sequence:
    supported merge method, verify each backport-created release commit has
    exactly one direct source footer; do not proceed to the next backport if
    provenance was lost.
+
+   Merge a one-source backport synchronously from the release coordinator's
+   shell; do not enable auto-merge or use a merge queue. Record the exact head
+   and release-base OIDs covered by validation and review, then use this
+   expected-head squash path with the final headline and body:
+
+   ```bash
+   BACKPORT_PR="${BACKPORT_PR:?set the backport PR number or URL}"
+   BACKPORT_RELEASE_BRANCH="${BACKPORT_RELEASE_BRANCH:?set the exact release/X.Y.Z branch}"
+   BACKPORT_VALIDATED_HEAD_OID="${BACKPORT_VALIDATED_HEAD_OID:?set the validated 40-character head OID}"
+   BACKPORT_VALIDATED_BASE_OID="${BACKPORT_VALIDATED_BASE_OID:?set the validated 40-character release-base OID}"
+   BACKPORT_SOURCE_SHA="${BACKPORT_SOURCE_SHA:?set the direct 40-character main source SHA}"
+   BACKPORT_COMMIT_HEADLINE="${BACKPORT_COMMIT_HEADLINE:?set the final squash headline}"
+   BACKPORT_COMMIT_BODY="${BACKPORT_COMMIT_BODY:?set the final squash body}"
+
+   jq -en --arg branch "${BACKPORT_RELEASE_BRANCH}" \
+     '$branch | test("^release/[0-9]+\\.[0-9]+\\.[0-9]+$")' >/dev/null || {
+     echo "backport target is not an exact release/X.Y.Z branch; stop backport" >&2
+     return 1 2>/dev/null || exit 1
+   }
+   ruby -e '
+     full_sha = /\A[0-9a-f]{40}\z/
+     head, base, source, body = ARGV
+     abort "invalid backport OID" unless [head, base, source].all? { |oid| full_sha.match?(oid) }
+     footers = body.lines(chomp: true).grep(/\A\(cherry picked from commit [0-9a-f]{40}\)\z/)
+     expected = "(cherry picked from commit #{source})"
+     abort "squash body must contain exactly one direct source footer" unless footers == [expected]
+   ' "${BACKPORT_VALIDATED_HEAD_OID}" "${BACKPORT_VALIDATED_BASE_OID}" \
+     "${BACKPORT_SOURCE_SHA}" "${BACKPORT_COMMIT_BODY}" || {
+     return 1 2>/dev/null || exit 1
+   }
+
+   backport_pr_json="$(
+     gh pr view "${BACKPORT_PR}" --json number,id,baseRefName,baseRefOid,headRefOid
+   )" || {
+     echo "could not resolve the backport PR identity; stop backport" >&2
+     return 1 2>/dev/null || exit 1
+   }
+   BACKPORT_PR_NUMBER="$(jq -er '.number | select(type == "number" and . > 0) | tostring' \
+     <<<"${backport_pr_json}")" || {
+     echo "backport PR number is missing or invalid; stop backport" >&2
+     return 1 2>/dev/null || exit 1
+   }
+   BACKPORT_PR_ID="$(jq -er '.id | select(type == "string" and length > 0)' \
+     <<<"${backport_pr_json}")" || {
+     echo "backport PR node id is missing or invalid; stop backport" >&2
+     return 1 2>/dev/null || exit 1
+   }
+   BACKPORT_HEAD_OID="$(jq -er '.headRefOid | select(test("^[0-9a-f]{40}$"))' \
+     <<<"${backport_pr_json}")" || {
+     echo "backport PR head OID is missing or invalid; stop backport" >&2
+     return 1 2>/dev/null || exit 1
+   }
+   BACKPORT_BASE_OID="$(jq -er '.baseRefOid | select(test("^[0-9a-f]{40}$"))' \
+     <<<"${backport_pr_json}")" || {
+     echo "backport PR base OID is missing or invalid; stop backport" >&2
+     return 1 2>/dev/null || exit 1
+   }
+   jq -e --arg branch "${BACKPORT_RELEASE_BRANCH}" '.baseRefName == $branch' \
+     >/dev/null <<<"${backport_pr_json}" || {
+     echo "backport PR no longer targets the exact release branch; stop backport" >&2
+     return 1 2>/dev/null || exit 1
+   }
+   test "${BACKPORT_HEAD_OID}" = "${BACKPORT_VALIDATED_HEAD_OID}" &&
+     test "${BACKPORT_BASE_OID}" = "${BACKPORT_VALIDATED_BASE_OID}" || {
+     echo "backport PR head or base differs from validated evidence; stop backport" >&2
+     return 1 2>/dev/null || exit 1
+   }
+   jq -en --arg headline "${BACKPORT_COMMIT_HEADLINE}" \
+     --arg suffix "(#${BACKPORT_PR_NUMBER})" \
+     '($headline | length > 0) and ($headline | contains("\n") | not) and
+      ($headline | endswith($suffix))' >/dev/null || {
+     echo "final squash headline must end in (#${BACKPORT_PR_NUMBER}); stop backport" >&2
+     return 1 2>/dev/null || exit 1
+   }
+   git fetch --prune origin \
+     "+refs/heads/${BACKPORT_RELEASE_BRANCH}:refs/remotes/origin/${BACKPORT_RELEASE_BRANCH}" || {
+     echo "could not refresh the release branch; stop backport" >&2
+     return 1 2>/dev/null || exit 1
+   }
+   test "$(git rev-parse "refs/remotes/origin/${BACKPORT_RELEASE_BRANCH}^{commit}")" = \
+     "${BACKPORT_VALIDATED_BASE_OID}" || {
+     echo "release branch differs from the validated base; stop backport" >&2
+     return 1 2>/dev/null || exit 1
+   }
+   require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
+   backport_merge_result="$(
+     gh api graphql \
+       -f query='mutation(
+         $pullRequestId: ID!,
+         $expectedHeadOid: GitObjectID!,
+         $commitHeadline: String!,
+         $commitBody: String!
+       ) {
+         mergePullRequest(input: {
+           pullRequestId: $pullRequestId
+           expectedHeadOid: $expectedHeadOid
+           mergeMethod: SQUASH
+           commitHeadline: $commitHeadline
+           commitBody: $commitBody
+         }) {
+           pullRequest { merged }
+         }
+       }' \
+       -f pullRequestId="${BACKPORT_PR_ID}" \
+       -f expectedHeadOid="${BACKPORT_HEAD_OID}" \
+       -f commitHeadline="${BACKPORT_COMMIT_HEADLINE}" \
+       -f commitBody="${BACKPORT_COMMIT_BODY}"
+   )" || {
+     echo "synchronous backport squash merge failed; stop backport" >&2
+     return 1 2>/dev/null || exit 1
+   }
+   jq -e '.data.mergePullRequest.pullRequest.merged == true' \
+     >/dev/null <<<"${backport_merge_result}" || {
+     echo "backport PR was not merged synchronously; stop backport" >&2
+     return 1 2>/dev/null || exit 1
+   }
+   ```
+
+   The head, base, branch, and release-line ownership checks are preflight
+   checks. They retain the narrow preflight-to-mutation race, so use this path
+   only under the positive-termination/single-controller rule above; otherwise
+   stop pending resource-bound fencing.
+
 8. Fetch the new release tip before updating or branching the next selected
    source PR.
 9. After every backport retained in the final release set lands, reconcile the
