@@ -3290,6 +3290,66 @@ RSpec.describe "release.rake helper methods" do
       end.to raise_error(SystemExit, %r{ShakaPerf release gate failed.*actions/runs/123456.*Tests failed}m)
     end
 
+    it "never waives a nonzero fresh watcher when the terminal refresh is unavailable" do
+      candidate_sha = "a" * 40
+      stable_target = "17.0.0"
+      active_run = run.merge(
+        "displayTitle" => shakaperf_release_gate_display_title(
+          ref: "release-branch", head_sha: candidate_sha, target_version: stable_target
+        ),
+        "headSha" => candidate_sha,
+        "status" => "in_progress",
+        "conclusion" => nil
+      )
+      entries = []
+      allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+        .with(repo_slug:, ref: "release-branch").and_return([])
+      allow(self).to receive(:dispatch_shakaperf_release_gate_workflow!)
+      allow(self).to receive(:wait_for_shakaperf_release_gate_run!).and_return(active_run)
+      allow(self).to receive(:capture_gh_output_with_timeout)
+        .with(
+          "run", "watch", "123456", "--repo", repo_slug, "--exit-status",
+          timeout_seconds: SHAKAPERF_RELEASE_GATE_WATCH_TIMEOUT_SECONDS
+        )
+        .and_return(["Tests failed before refresh became unavailable", failure_status, false])
+      allow(self).to receive(:refresh_shakaperf_release_gate_run!)
+        .with(repo_slug:, run: active_run)
+        .and_raise(ShakaperfGateObservationError.new("refresh API unavailable", run: active_run))
+      allow(self).to receive(:current_release_approver!).with(repo_slug:).and_return("justin808")
+      allow(self).to receive(:trusted_shakaperf_release_tracker_records!)
+        .with(repo_slug:, tracker: 4806) { entries }
+      allow(self).to receive(:post_release_tracker_comment!) do |body:, **|
+        record = final_shakaperf_observation_waiver_record_from_comment!({ "body" => body })
+        entries << { kind: :waiver, record: }
+      end
+      publication_started = false
+      failure_pattern = Regexp.new(
+        [
+          "nonzero", "non-waivable", "actions/runs/123456",
+          "Tests failed before refresh became unavailable", "refresh API unavailable"
+        ].join(".*"),
+        Regexp::IGNORECASE | Regexp::MULTILINE
+      )
+
+      expect do
+        run_shakaperf_release_gate!(
+          monorepo_root:,
+          ref: "release-branch",
+          head_sha: candidate_sha,
+          target_version: stable_target,
+          release_started_at:,
+          allow_override: false,
+          dry_run: false,
+          tracker: 4806,
+          waiver_reason: "GitHub REST observer exhausted its quota"
+        )
+        publication_started = true
+      end.to raise_error(SystemExit, failure_pattern)
+
+      expect(entries).to be_empty
+      expect(publication_started).to be(false)
+    end
+
     it "aborts after a successful fresh gate when its evidence is invalid" do
       refreshed_run = run.merge(
         "status" => "completed",
@@ -13429,6 +13489,50 @@ RSpec.describe "release.rake helper methods" do
       release_task.reenable
     end
 
+    it "rejects an explicit ShakaPerf run selector before accelerated RC discovery or side effects" do
+      release_task = Rake::Task["release"]
+      task_receiver = release_task.actions.first.binding.receiver
+      success_status = instance_double(Process::Status, success?: true)
+
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", "/tmp/repo", "rev-parse", "--abbrev-ref", "HEAD")
+        .and_return(["release/17.0.0\n", success_status])
+      allow(ReactOnRails::GitUtils).to receive(:uncommitted_changes?)
+      allow(task_receiver).to receive(:with_release_checkout) { |**_, &block| block.call("/tmp/repo") }
+      allow(task_receiver).to receive_messages(
+        current_monorepo_root: "/tmp/repo",
+        verbose: nil,
+        release_paths: { monorepo_root: "/tmp/repo", gem_root: "/tmp/repo/react_on_rails" },
+        resolve_release_version_before_auth!: "17.0.0.rc.10",
+        current_gem_version: "16.9.0"
+      )
+      allow(task_receiver).to receive(:validated_shakaperf_release_tracker!) do
+        abort "selector combination reached tracker discovery"
+      end
+      allow(task_receiver).to receive_messages(
+        run_shakaperf_release_gate!: nil,
+        dispatch_shakaperf_release_gate_workflow!: nil,
+        publish_npm_with_retry: nil,
+        publish_gem_with_retry: nil
+      )
+      allow(ENV).to receive(:fetch).and_call_original
+      allow(ENV).to receive(:fetch).with("RELEASE_SHAKAPERF_RUN", nil).and_return("654321")
+      allow(ENV).to receive(:fetch).with("RELEASE_FINAL_SHAKAPERF_WAIVER_REASON", nil).and_return(nil)
+      allow(ENV).to receive(:fetch).with("RELEASE_TRACKER", nil).and_return("3823")
+      allow(ENV).to receive(:fetch).with("RELEASE_ACCELERATED_RC", nil).and_return("true")
+
+      failure = invoke_release_task_and_capture_exit(release_task)
+
+      aggregate_failures do
+        expect(failure&.message).to match(/RELEASE_ACCELERATED_RC.*cannot be combined.*RELEASE_SHAKAPERF_RUN/i)
+        expect(task_receiver).not_to have_received(:validated_shakaperf_release_tracker!)
+        expect(task_receiver).not_to have_received(:run_shakaperf_release_gate!)
+        expect(task_receiver).not_to have_received(:dispatch_shakaperf_release_gate_workflow!)
+        expect(task_receiver).not_to have_received(:publish_npm_with_retry)
+        expect(task_receiver).not_to have_received(:publish_gem_with_retry)
+      end
+    end
+
     it "blocks accelerated RCs from feature branches before release side effects" do
       release_task = Rake::Task["release"]
       task_receiver = release_task.actions.first.binding.receiver
@@ -14005,6 +14109,7 @@ RSpec.describe "release.rake helper methods" do
     let(:ref) { "release/17.0.0" }
     let(:candidate_sha) { "e" * 40 }
     let(:target_version) { "17.0.0" }
+    let(:failure_status) { instance_double(Process::Status, success?: false) }
     let(:observed_run) do
       {
         "databaseId" => 654_321,
@@ -14094,7 +14199,23 @@ RSpec.describe "release.rake helper methods" do
       end
     end
 
-    it "allows an exact active run or a still-unobservable API at both boundaries" do
+    it "fails closed when the selected run API definitively reports deletion at either boundary" do
+      allow(self).to receive(:trusted_shakaperf_release_tracker_records!)
+        .with(repo_slug:, tracker: 3823).and_return([{ kind: :waiver, record: waiver }])
+      allow(self).to receive(:capture_gh_output)
+        .with("api", "repos/#{repo_slug}/actions/runs/654321")
+        .and_return(["HTTP 404: Not Found", failure_status])
+
+      ["git tag push", "package publication"].each do |phase|
+        expect do
+          validate_ordinary_stable_shakaperf_waiver_boundary!(
+            monorepo_root: "/tmp/repo", context:, phase:
+          )
+        end.to raise_error(SystemExit, /selected ShakaPerf run.*missing or deleted.*#{phase}/i)
+      end
+    end
+
+    it "allows an exact active run at both boundaries" do
       allow(self).to receive(:trusted_shakaperf_release_tracker_records!)
         .with(repo_slug:, tracker: 3823).and_return([{ kind: :waiver, record: waiver }])
       allow(self).to receive(:fetch_selected_shakaperf_release_gate_run!)
@@ -14107,10 +14228,15 @@ RSpec.describe "release.rake helper methods" do
           )
         end.not_to raise_error
       end
+    end
 
-      allow(self).to receive(:fetch_selected_shakaperf_release_gate_run!)
-        .with(repo_slug:, run_id: 654_321)
-        .and_raise(ShakaperfGateObservationError, "GitHub API remains unavailable")
+    it "allows a transient selected-run API outage at both boundaries" do
+      allow(self).to receive(:trusted_shakaperf_release_tracker_records!)
+        .with(repo_slug:, tracker: 3823).and_return([{ kind: :waiver, record: waiver }])
+      allow(self).to receive(:capture_gh_output)
+        .with("api", "repos/#{repo_slug}/actions/runs/654321")
+        .and_return(["HTTP 503: Service Unavailable", failure_status])
+
       ["git tag push", "package publication"].each do |phase|
         expect do
           validate_ordinary_stable_shakaperf_waiver_boundary!(

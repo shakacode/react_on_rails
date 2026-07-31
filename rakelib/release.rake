@@ -159,6 +159,8 @@ class ShakaperfGateObservationError < StandardError
     @tracker_entry = tracker_entry
   end
 end
+
+class ShakaperfGateMissingRunError < ShakaperfGateObservationError; end
 # Keep in sync with every package.json, Gemfile.lock, and version file that the
 # release task rewrites while promoting an RC to a final release.
 # CHANGELOG.md is intentionally excluded. main_ci_walkback_commit? classifies
@@ -871,8 +873,12 @@ end
 def fetch_selected_shakaperf_release_gate_run!(repo_slug:, run_id:)
   output, status = capture_gh_output("api", "repos/#{repo_slug}/actions/runs/#{run_id}")
   unless status.success?
-    raise ShakaperfGateObservationError,
-          "Unable to inspect selected ShakaPerf release gate run #{run_id}.\n\n#{output}"
+    error_class = if output.match?(%r{\bHTTP(?:/\d(?:\.\d)?)?\s+404\b|\b404\s+Not Found\b}i)
+                    ShakaperfGateMissingRunError
+                  else
+                    ShakaperfGateObservationError
+                  end
+    raise error_class, "Unable to inspect selected ShakaPerf release gate run #{run_id}.\n\n#{output}"
   end
 
   JSON.parse(output)
@@ -1907,7 +1913,14 @@ def watch_shakaperf_release_gate_run!(repo_slug:, run:)
 
   return if status.success?
 
-  refreshed_run = refresh_shakaperf_release_gate_run!(repo_slug:, run:)
+  begin
+    refreshed_run = refresh_shakaperf_release_gate_run!(repo_slug:, run:)
+  rescue ShakaperfGateObservationError => e
+    handle_shakaperf_release_gate_violation!(
+      message: "❌ ShakaPerf release gate watcher returned nonzero and its terminal result could not be " \
+               "refreshed; this failure is non-waivable.\n\nRun: #{run_url}\n\n#{output}\n\n#{e.message}"
+    )
+  end
   if refreshed_run["status"] == "completed" && refreshed_run["conclusion"] != "success"
     handle_shakaperf_release_gate_violation!(
       message: "❌ ShakaPerf release gate failed.\n\nRun: #{run_url}\n\n#{output}"
@@ -5974,6 +5987,9 @@ def validate_final_shakaperf_observation_waiver_publication_boundary!(monorepo_r
     target_version: carried_record.fetch("target_version")
   )
   expected_snapshot
+rescue ShakaperfGateMissingRunError
+  abort "❌ Selected ShakaPerf run is missing or deleted at #{boundary_label.downcase} #{phase}; " \
+        "the observation waiver cannot continue."
 end
 
 def ordinary_stable_shakaperf_waiver_context_identity(context)
@@ -6037,6 +6053,8 @@ def validate_current_final_shakaperf_observation_waiver_run!(repo_slug:, waiver:
   end
 
   observed_run
+rescue ShakaperfGateMissingRunError
+  raise
 rescue ShakaperfGateObservationError
   nil
 end
@@ -8753,6 +8771,9 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
     release_tracker_input = ENV.fetch("RELEASE_TRACKER", nil)
     explicit_shakaperf_control = !shakaperf_run_selector.to_s.empty? || !shakaperf_waiver_reason.to_s.empty?
     accelerated_rc_requested = release_truthy?(ENV.fetch("RELEASE_ACCELERATED_RC", nil))
+    if accelerated_rc_requested && shakaperf_run_selector
+      abort "❌ RELEASE_ACCELERATED_RC=true cannot be combined with RELEASE_SHAKAPERF_RUN."
+    end
     shakaperf_tracker = if accelerated_rc_requested && !explicit_shakaperf_control
                           nil
                         else
