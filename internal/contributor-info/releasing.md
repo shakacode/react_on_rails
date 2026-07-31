@@ -163,10 +163,63 @@ RELEASE_VERSION_POLICY_OVERRIDE=true # Override release version policy checks
 RELEASE_CI_EVALUATE_HEAD=true # Strictly evaluate the fetched exact release-source HEAD; not a waiver
 RELEASE_CI_STATUS_OVERRIDE=true # DANGEROUS last-resort waiver for the release CI-status gate
 RELEASE_ACCELERATED_RC=true # Explicit RC only: publish while named pending gates finish
-RELEASE_TRACKER=<issue> # Active release tracker for accelerated RC records and final promotion
+RELEASE_TRACKER=<issue> # Active release tracker for ShakaPerf evidence, accelerated RCs, and final promotion
+RELEASE_SHAKAPERF_RUN=<id-or-canonical-url> # Verify and durably associate one existing ShakaPerf run
+RELEASE_FINAL_SHAKAPERF_WAIVER_REASON=<single-line-reason> # Stable-only observation-failure waiver
 RELEASE_ACCELERATED_RC_REASON=<reason> # Single-line maintainer reason for accelerated publication
 GEM_RELEASE_MAX_RETRIES=<n>  # Positive base-10 integer max retry attempts (default: 3)
 ```
+
+#### Saving and reusing ShakaPerf release evidence
+
+Use the canonical `Release gate: react_on_rails X.Y.Z` issue as the durable store. To associate a run
+that was started manually or missed by automatic discovery, provide the same active tracker used by the
+release train and either the numeric run ID or its canonical GitHub URL:
+
+```bash
+RELEASE_TRACKER=4806 \
+RELEASE_SHAKAPERF_RUN=https://github.com/shakacode/react_on_rails/actions/runs/30417447319 \
+bundle exec rake "release[17.0.1]"
+```
+
+This selector is not a waiver. Before appending anything, the task fetches the run and its schema-v2
+artifact from GitHub and verifies repository, workflow, branch, target version, run ID and attempt,
+terminal success, completion time, candidate SHA, evidence digest, and runtime fingerprint. The tracker
+comment is append-only, attributed to a repository maintainer, and re-fetched before the task continues.
+Saving the same association again is idempotent.
+
+The trusted canonical tracker comment is the durable source of truth. A local
+`shakaperf-release-evidence.json` is only a downloaded artifact/cache used during verification; it is never
+the durable source of truth and cannot authorize reuse by itself.
+
+On a later invocation, set `RELEASE_TRACKER` without `RELEASE_SHAKAPERF_RUN`. The task reads trusted,
+unedited machine comments, re-fetches the saved run and artifact, and re-runs the same checks. Exact-SHA
+evidence is preferred. Existing machine-verified runtime-equivalence remains supported because the stored
+candidate is bound to the live run while the schema-v2 runtime fingerprint is compared with the current
+release commit. Output names both the tracker URL and reused run URL.
+
+Inspect the durable state with `gh issue view 4806 --repo shakacode/react_on_rails --comments`. To replace
+an association, run the explicit selector again with a newer verified run; the newest trusted association
+for that exact candidate becomes the default. Use `RELEASE_SHAKAPERF_RUN` to choose between equally timed
+conflicting records. Machine comments must not be edited or deleted: an edited trusted record fails closed.
+To stop using saved evidence without mutating the audit trail, omit `RELEASE_TRACKER`; normal discovery then
+applies and dispatches a fresh exact-head run when no reusable evidence exists.
+
+If GitHub observation fails after an exact run has been identified, a maintainer may use the narrowly scoped
+stable-only escape hatch:
+
+```bash
+RELEASE_TRACKER=4806 \
+RELEASE_FINAL_SHAKAPERF_WAIVER_REASON="GitHub REST observer exhausted its quota" \
+bundle exec rake "release[17.0.1]"
+```
+
+The task writes and re-fetches an append-only `gate_observation_failed` waiver bound to the exact tracker,
+repository, branch, stable version, candidate SHA, run ID/URL, reason, and authenticated maintainer. It
+preserves the last observed run status and conclusion and never reports the run as successful. The waiver
+cannot apply to prereleases, a failed/cancelled or otherwise terminal run, malformed/mismatched/stale
+evidence, or a different current run/reason. It waives only inability to observe ShakaPerf; CI, version
+policy, tag, registry, accepted-RC, and publication-boundary checks remain unchanged and blocking.
 
 #### Release CI evidence and strict HEAD evaluation
 
