@@ -130,13 +130,29 @@ describe('buildVM and runInVM', () => {
   ])('VM context flavor: %s', (_label, preferVanilla) => {
     const runtimeHasDontContextify = vm.constants?.DONT_CONTEXTIFY !== undefined;
 
+    // `vm.constants` is a process-wide singleton, and this package's jest config sets
+    // `clearMocks`/`resetMocks` but not `restoreMocks` -- neither of which undoes a
+    // `replaceProperty`. Without the explicit restore below, the fallback case would leave
+    // `vm.constants` undefined for every later test in this file, silently forcing them all
+    // onto the older-Node path.
+    let constantsOverride: ReturnType<typeof jest.replaceProperty> | undefined;
+
     beforeEach(() => {
       // `vm.constants` is frozen, but `vm`'s own `constants` property is writable, so swapping
       // the whole object forces the module down the older-Node fallback path.
       if (!preferVanilla) {
-        jest.replaceProperty(vm, 'constants', undefined as unknown as typeof vm.constants);
+        constantsOverride = jest.replaceProperty(
+          vm,
+          'constants',
+          undefined as unknown as typeof vm.constants,
+        );
       }
       resetVM();
+    });
+
+    afterEach(() => {
+      constantsOverride?.restore();
+      constantsOverride = undefined;
     });
 
     test('creates the expected flavor without changing VM semantics', async () => {
