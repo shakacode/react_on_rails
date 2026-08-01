@@ -15074,8 +15074,11 @@ RSpec.describe "release.rake helper methods" do
       readiness_refresh_helper = rakefile.match(/def refresh_npm_release_readiness_after_pull!.*?^end$/m)[0]
       clean_worktree_index = release_task.index("ReactOnRails::GitUtils.uncommitted_changes?")
       verbosity_index = release_task.index("verbose(is_verbose)")
+      initial_readiness_sha_index = release_task.index("initial_readiness_sha = current_npm_release_readiness_sha!")
       npm_readiness_index = release_task.index("validate_npm_release_readiness!")
-      npm_readiness_sha_index = release_task.index("current_npm_release_readiness_sha!")
+      initial_readiness_binding_index = release_task.index(
+        "validated_readiness_sha = current_npm_release_readiness_sha!"
+      )
       checkout_index = release_task.index("with_release_checkout")
       pull_index = release_task.index('sh_in_dir_for_release(release_root, "git pull --rebase")')
       readiness_refresh_index = release_task.index("refresh_npm_release_readiness_after_pull!")
@@ -15101,9 +15104,10 @@ RSpec.describe "release.rake helper methods" do
       changed_sha_binding_index = readiness_refresh_helper.index("validated_sha = current_npm_release_readiness_sha!")
 
       expect(clean_worktree_index).to be < verbosity_index
-      expect(verbosity_index).to be < npm_readiness_index
-      expect(npm_readiness_index).to be < npm_readiness_sha_index
-      expect(npm_readiness_sha_index).to be < checkout_index
+      expect(verbosity_index).to be < initial_readiness_sha_index
+      expect(initial_readiness_sha_index).to be < npm_readiness_index
+      expect(npm_readiness_index).to be < initial_readiness_binding_index
+      expect(initial_readiness_binding_index).to be < checkout_index
       expect(release_task.scan("validate_npm_release_readiness!").length).to eq(1)
       expect(checkout_index).to be < pull_index
       expect(pull_index).to be < readiness_refresh_index
@@ -15246,6 +15250,7 @@ RSpec.describe "release.rake helper methods" do
       mode = dry_run ? "dry run" : "live run"
 
       it "blocks a #{mode} from the original workspace before any release side effect" do
+        allow(task_receiver).to receive(:current_git_sha!).and_return("a" * 40)
         allow(task_receiver).to receive(:validate_npm_release_readiness!) do |monorepo_root:|
           expect(monorepo_root).to eq(self.monorepo_root)
           abort "npm readiness stopped the release"
@@ -15285,11 +15290,48 @@ RSpec.describe "release.rake helper methods" do
       end
     end
 
+    it "hard-fails when HEAD changes during the initial readiness check before any later release action" do
+      initial_sha = "a" * 40
+      moved_sha = "b" * 40
+      allow(task_receiver).to receive(:current_git_sha!).and_return(initial_sha, moved_sha)
+      allow(task_receiver).to receive(:resolve_release_version_before_auth!) do
+        abort "version resolution reached with stale initial readiness"
+      end
+
+      failure = begin
+        release_task.reenable
+        release_task.invoke("17.0.0.rc.10", true, true, false)
+        nil
+      rescue SystemExit => error
+        error
+      end
+
+      aggregate_failures do
+        expect(failure&.message).to match(/HEAD changed while npm release readiness was running/i)
+        expect(task_receiver).to have_received(:validate_npm_release_readiness!).with(monorepo_root:).once
+        expect(task_receiver).not_to have_received(:with_release_checkout)
+        expect(task_receiver).not_to have_received(:resolve_release_version_before_auth!)
+        expect(task_receiver).not_to have_received(:verify_npm_auth)
+        expect(task_receiver).not_to have_received(:verify_gh_auth)
+        expect(task_receiver).not_to have_received(:validate_main_ci_status!)
+        expect(task_receiver).not_to have_received(:validate_release_version_policy!)
+        expect(task_receiver).not_to have_received(:preflight_registry_publish_conflicts!)
+        expect(task_receiver).not_to have_received(:confirm_release!)
+        expect(task_receiver).not_to have_received(:run_shakaperf_release_gate!)
+        expect(task_receiver).not_to have_received(:dispatch_shakaperf_release_gate_workflow!)
+        expect(task_receiver).not_to have_received(:wait_for_shakaperf_release_gate_run!)
+        expect(task_receiver).not_to have_received(:push_release_tag_for_candidate!)
+        expect(task_receiver).not_to have_received(:publish_npm_with_retry)
+        expect(task_receiver).not_to have_received(:prompt_for_otp)
+        expect(task_receiver).not_to have_received(:sh_in_dir_for_release)
+      end
+    end
+
     it "reruns readiness after a live pull changes HEAD and blocks every later action when it fails" do
       initial_sha = "a" * 40
       pulled_sha = "b" * 40
       readiness_roots = []
-      allow(task_receiver).to receive(:current_git_sha!).and_return(initial_sha, pulled_sha)
+      allow(task_receiver).to receive(:current_git_sha!).and_return(initial_sha, initial_sha, pulled_sha)
       allow(task_receiver).to receive(:validate_npm_release_readiness!) do |monorepo_root:|
         readiness_roots << monorepo_root
         abort "post-pull npm readiness stopped the release" if readiness_roots.length == 2
@@ -15327,7 +15369,7 @@ RSpec.describe "release.rake helper methods" do
       pulled_sha = "b" * 40
       moved_sha = "c" * 40
       readiness_roots = []
-      allow(task_receiver).to receive(:current_git_sha!).and_return(initial_sha, pulled_sha, moved_sha)
+      allow(task_receiver).to receive(:current_git_sha!).and_return(initial_sha, initial_sha, pulled_sha, moved_sha)
       allow(task_receiver).to receive(:validate_npm_release_readiness!) do |monorepo_root:|
         readiness_roots << monorepo_root
       end
@@ -15386,8 +15428,9 @@ RSpec.describe "release.rake helper methods" do
         expect(failure&.message).to eq("unchanged HEAD reached version resolution")
         expect(events).to eq(
           [
-            [:readiness, monorepo_root],
             [:sha, monorepo_root, "initial npm release readiness verification"],
+            [:readiness, monorepo_root],
+            [:sha, monorepo_root, "initial npm release readiness binding"],
             [:command, release_root, "git pull --rebase"],
             [:sha, release_root, "post-pull npm release readiness verification"],
             [:version_resolution]
@@ -15400,7 +15443,7 @@ RSpec.describe "release.rake helper methods" do
       initial_sha = "a" * 40
       pulled_sha = "b" * 40
       readiness_roots = []
-      allow(task_receiver).to receive(:current_git_sha!).and_return(initial_sha, pulled_sha, pulled_sha)
+      allow(task_receiver).to receive(:current_git_sha!).and_return(initial_sha, initial_sha, pulled_sha, pulled_sha)
       allow(task_receiver).to receive(:validate_npm_release_readiness!) do |monorepo_root:|
         readiness_roots << monorepo_root
       end
@@ -15419,14 +15462,14 @@ RSpec.describe "release.rake helper methods" do
       aggregate_failures do
         expect(failure&.message).to eq("refreshed readiness reached version resolution")
         expect(readiness_roots).to eq([monorepo_root, release_root])
-        expect(task_receiver).to have_received(:current_git_sha!).exactly(3).times
+        expect(task_receiver).to have_received(:current_git_sha!).exactly(4).times
       end
     end
 
     it "keeps a dry run bound to one original-workspace readiness check without pulling" do
       head_sha = "a" * 40
       readiness_roots = []
-      allow(task_receiver).to receive(:current_git_sha!).and_return(head_sha)
+      allow(task_receiver).to receive(:current_git_sha!).and_return(head_sha, head_sha)
       allow(task_receiver).to receive(:validate_npm_release_readiness!) do |monorepo_root:|
         readiness_roots << monorepo_root
       end
@@ -15447,6 +15490,8 @@ RSpec.describe "release.rake helper methods" do
         expect(readiness_roots).to eq([monorepo_root])
         expect(task_receiver).to have_received(:current_git_sha!)
           .with(monorepo_root, context: "initial npm release readiness verification").once
+        expect(task_receiver).to have_received(:current_git_sha!)
+          .with(monorepo_root, context: "initial npm release readiness binding").once
         expect(task_receiver).not_to have_received(:sh_in_dir_for_release).with(release_root, "git pull --rebase")
       end
     end

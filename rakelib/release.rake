@@ -9463,11 +9463,19 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
   # Configure output verbosity
   verbose(is_verbose)
 
-  validate_npm_release_readiness!(monorepo_root:)
-  npm_readiness_sha = current_npm_release_readiness_sha!(
+  initial_readiness_sha = current_npm_release_readiness_sha!(
     monorepo_root:,
     context: "initial npm release readiness verification"
   )
+  validate_npm_release_readiness!(monorepo_root:)
+  validated_readiness_sha = current_npm_release_readiness_sha!(
+    monorepo_root:,
+    context: "initial npm release readiness binding"
+  )
+  if validated_readiness_sha != initial_readiness_sha
+    abort "❌ HEAD changed while npm release readiness was running; retry from a stable checkout."
+  end
+  npm_readiness_sha = validated_readiness_sha
 
   released_gem_version = nil
   released_npm_version = nil
