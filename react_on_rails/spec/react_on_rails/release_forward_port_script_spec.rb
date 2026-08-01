@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "fileutils"
+require "json"
 require "open3"
 require "rbconfig"
 require "tmpdir"
@@ -58,6 +59,449 @@ RSpec.describe "script/release-forward-port" do
 
   def run_script_from_repo_root(*args)
     Open3.capture3(git_env, RbConfig.ruby, script_path, *args, chdir: repo_root)
+  end
+
+  def documented_bash_snippet(marker)
+    runbook = File.read(File.join(repo_root, "internal/contributor-info/release-train-runbook.md"))
+    snippets = runbook.to_enum(:scan, /```bash\n(.*?)\n[ \t]*```/m).map { Regexp.last_match(1) }
+    snippet = snippets.find { |candidate| candidate.lstrip.start_with?(marker) }
+    raise "documented bash snippet starting with #{marker.inspect} is missing" unless snippet
+
+    indent = snippet[/\A[ \t]*/]
+    snippet.lines.map { |line| line.delete_prefix(indent) }.join
+  end
+
+  def documented_bash_snippet_containing(fragment)
+    runbook = File.read(File.join(repo_root, "internal/contributor-info/release-train-runbook.md"))
+    snippets = runbook.to_enum(:scan, /```bash\n(.*?)\n[ \t]*```/m).map { Regexp.last_match(1) }
+    snippet = snippets.find { |candidate| candidate.include?(fragment) }
+    raise "documented bash snippet containing #{fragment.inspect} is missing" unless snippet
+
+    indent = snippet[/\A[ \t]*/]
+    snippet.lines.map { |line| line.delete_prefix(indent) }.join
+  end
+
+  def documented_closeout_merge_snippet
+    documented_bash_snippet('CLOSEOUT_PR="${CLOSEOUT_PR:?set the closeout PR number or URL}"')
+  end
+
+  def documented_release_line_lease_snippet
+    documented_bash_snippet('if [ "${RELEASE_VERSION+x}" = x ] || [ "${RELEASE_LINE_TARGET+x}" = x ]; then')
+  end
+
+  def documented_backport_merge_snippet
+    documented_bash_snippet('BACKPORT_PR="${BACKPORT_PR:?set the backport PR number or URL}"')
+  end
+
+  def documented_release_branch_creation_snippet
+    documented_bash_snippet('git fetch --prune origin "+refs/heads/main:refs/remotes/origin/main"')
+  end
+
+  def documented_manual_closeout_snippet
+    documented_bash_snippet("# After v17.0.0 is published and the GitHub release exists:")
+  end
+
+  def documented_release_start_preview_snippet
+    documented_bash_snippet_containing("release:start[")
+  end
+
+  def documented_release_finish_promote_preview_snippet
+    documented_bash_snippet_containing("script/release-finish promote")
+  end
+
+  def documented_release_finish_closeout_preview_snippet
+    documented_bash_snippet_containing("script/release-finish close-out")
+  end
+
+  def write_release_lifecycle_stubs(tmpdir)
+    helper_dir = File.join(tmpdir, "bin")
+    FileUtils.mkdir_p(helper_dir)
+    helper_path = File.join(helper_dir, "agent-coord-bounded")
+    File.write(
+      helper_path,
+      <<~BASH
+        #!/bin/bash
+        target=""
+        command=""
+        while [ "$#" -gt 0 ]; do
+          case "$1" in
+            status|claim) command="$1" ;;
+            --target) shift; target="$1" ;;
+          esac
+          shift
+        done
+        if [ "${command}" = "status" ]; then
+          printf '{"claims":[{"status":"active","agent_id":"%s","instance_id":"%s","expires_at":"2099-01-01T00:00:00Z"}],"heartbeats":[{"agent_id":"%s","instance_id":"%s","target":"shakacode/react_on_rails#%s","liveness":"live"}]}\\n' \
+            "${RELEASE_COORDINATOR_ID}" "${RELEASE_COORDINATOR_INSTANCE_ID}" \
+            "${RELEASE_COORDINATOR_ID}" "${RELEASE_COORDINATOR_INSTANCE_ID}" "${target}"
+        fi
+      BASH
+    )
+    FileUtils.chmod(0o755, helper_path)
+
+    script_dir = File.join(tmpdir, "script")
+    FileUtils.mkdir_p(script_dir)
+    forward_port_path = File.join(script_dir, "release-forward-port")
+    File.write(
+      forward_port_path,
+      <<~BASH
+        #!/bin/bash
+        printf 'release-forward-port\\0' >>"${LIFECYCLE_TEST_CALLS}"
+        printf '%s\\0' "$@" >>"${LIFECYCLE_TEST_CALLS}"
+        printf '%s\n' "${LIFECYCLE_TEST_FORWARD_PORT_PLAN}"
+      BASH
+    )
+    FileUtils.chmod(0o755, forward_port_path)
+
+    write_release_finish_lifecycle_stub(script_dir)
+  end
+
+  def write_release_finish_lifecycle_stub(script_dir)
+    release_finish_path = File.join(script_dir, "release-finish")
+    File.write(
+      release_finish_path,
+      <<~BASH
+        #!/bin/bash
+        printf 'release-finish\\0' >>"${LIFECYCLE_TEST_CALLS}"
+        printf '%s\\0' "$@" >>"${LIFECYCLE_TEST_CALLS}"
+      BASH
+    )
+    FileUtils.chmod(0o755, release_finish_path)
+  end
+
+  def release_lifecycle_command_stubs
+    <<~BASH
+      record_call() {
+        printf '%s\\0' "$1" >>"${LIFECYCLE_TEST_CALLS}"
+        shift
+        printf '%s\\0' "$@" >>"${LIFECYCLE_TEST_CALLS}"
+      }
+
+      agent-coord() { return 0; }
+
+      bundle() {
+        record_call bundle "$@"
+      }
+
+      gh() {
+        record_call gh "$@"
+        case "$1 $2" in
+          "pr view") printf '%s\n' "${LIFECYCLE_TEST_PR_JSON}" ;;
+          "api graphql")
+            printf '%s\\0' "$@" >"${LIFECYCLE_TEST_MUTATION_ARGS}"
+            printf '%s\n' '{"data":{"mergePullRequest":{"pullRequest":{"merged":true}}}}'
+            ;;
+          *) printf 'unexpected gh invocation: %s\n' "$*" >&2; return 64 ;;
+        esac
+      }
+    BASH
+  end
+
+  def release_lifecycle_git_stub
+    <<~BASH
+      git() {
+        record_call git "$@"
+        case "$1 $2" in
+          "fetch --prune"|"fetch origin"|"switch main"|"switch -c"|"checkout main"|"checkout -b"|\
+          "pull --rebase"|"push --atomic"|"push --force-with-lease="*|"push -u"|"diff --check"|\
+          "add CHANGELOG.md"|"commit -m") return 0 ;;
+          "status --porcelain") return 0 ;;
+          "rev-parse origin/main"|"rev-parse refs/remotes/origin/main^{commit}"|"rev-parse HEAD")
+            printf '%s\n' "${LIFECYCLE_TEST_BASE_OID}" ;;
+          "rev-parse origin/release/"*|"rev-parse refs/remotes/origin/release/"*)
+            printf '%s\n' "${LIFECYCLE_TEST_RELEASE_OID}" ;;
+          "cat-file -e") test "${LIFECYCLE_TEST_SOURCE_EXISTS}" = true ;;
+          "merge-base --is-ancestor") test "${LIFECYCLE_TEST_SOURCE_ANCESTOR}" = true ;;
+          "log -1") printf '%s\n' "${LIFECYCLE_TEST_CHANGELOG_OID}" ;;
+          "ls-remote --exit-code") return 2 ;;
+          *) printf 'unexpected git invocation: %s\n' "$*" >&2; return 64 ;;
+        esac
+      }
+    BASH
+  end
+
+  def release_lifecycle_harness(operation_snippet, bootstrap_calls: 1)
+    indented_bootstrap = documented_release_line_lease_snippet.lines.map { |line| "  #{line}" }.join
+    indented_operation = operation_snippet.lines.map { |line| "  #{line}" }.join
+    <<~BASH
+      set -u
+
+      #{release_lifecycle_command_stubs}
+      #{release_lifecycle_git_stub}
+
+      bootstrap_release_line() {
+      #{indented_bootstrap}
+      }
+
+      run_operation() {
+      #{indented_operation}
+      }
+
+      bootstrap_release_line
+      bootstrap_status=$?
+      test "${bootstrap_status}" -eq 0 || exit "${bootstrap_status}"
+      #{bootstrap_calls == 2 ? 'bootstrap_release_line || exit $?' : ':'}
+      run_operation
+    BASH
+  end
+
+  def run_documented_release_lifecycle(operation_snippet, environment = {}, bootstrap_calls: 1)
+    Dir.mktmpdir("release-lifecycle-runbook") do |tmpdir|
+      write_release_lifecycle_stubs(tmpdir)
+      calls_path = File.join(tmpdir, "calls")
+      mutation_arguments_path = File.join(tmpdir, "mutation-arguments")
+      defaults = {
+        "BUNDLE_GEMFILE" => nil,
+        "PR_BATCH_SKILL_DIR" => tmpdir,
+        "RELEASE_VERSION_INPUT" => "17.0.0",
+        "RUBYLIB" => nil,
+        "RUBYOPT" => nil,
+        "LIFECYCLE_TEST_BASE_OID" => "b" * 40,
+        "LIFECYCLE_TEST_RELEASE_OID" => "e" * 40,
+        "LIFECYCLE_TEST_CHANGELOG_OID" => "c" * 40,
+        "LIFECYCLE_TEST_SOURCE_EXISTS" => "true",
+        "LIFECYCLE_TEST_SOURCE_ANCESTOR" => "true",
+        "LIFECYCLE_TEST_FORWARD_PORT_PLAN" => "PICK #{'d' * 12} Forward-port release fix (#123)",
+        "LIFECYCLE_TEST_PR_JSON" => "{}",
+        "MANUAL_CLOSEOUT_ACK_SHA" => "d" * 40,
+        "MANUAL_CLOSEOUT_CHANGELOG_SOURCE_SHA" => "c" * 40,
+        "LIFECYCLE_TEST_CALLS" => calls_path,
+        "LIFECYCLE_TEST_MUTATION_ARGS" => mutation_arguments_path
+      }
+      stdout, stderr, status = Open3.capture3(
+        defaults.merge(environment),
+        "/bin/bash",
+        stdin_data: release_lifecycle_harness(operation_snippet, bootstrap_calls:),
+        chdir: tmpdir
+      )
+      mutation_arguments =
+        File.exist?(mutation_arguments_path) ? File.binread(mutation_arguments_path).split("\0") : []
+      calls = File.exist?(calls_path) ? File.binread(calls_path).split("\0") : []
+
+      [stdout, stderr, status, mutation_arguments, calls]
+    end
+  end
+
+  def run_documented_release_line_lease(extra_script, release_version: "17.0.0", environment: {}, bootstrap_calls: 1)
+    run_documented_release_lifecycle(
+      extra_script,
+      { "RELEASE_VERSION_INPUT" => release_version }.merge(environment),
+      bootstrap_calls:
+    ).first(3)
+  end
+
+  def run_documented_closeout_merge(
+    method:,
+    release_version: "17.0.0",
+    source_changelog_oid: nil,
+    source_release_sha: "d" * 40,
+    pr_number: 999,
+    lease_version: "17.0.0",
+    latest_changelog_oid: source_changelog_oid || ("c" * 40),
+    forward_port_plan: "PICK #{source_release_sha[0, 12]} Forward-port release fix (#123)",
+    source_exists: true,
+    source_ancestor: true,
+    pr_commits: nil
+  )
+    head_oid = "a" * 40
+    base_oid = "b" * 40
+    pr_json = JSON.generate(
+      id: "PR_node_id",
+      number: pr_number,
+      baseRefName: "main",
+      baseRefOid: base_oid,
+      headRefOid: head_oid,
+      commits: pr_commits || [
+        {
+          oid: head_oid,
+          messageBody: "(cherry picked from commit #{source_release_sha})"
+        }
+      ]
+    )
+    run_documented_release_lifecycle(
+      documented_closeout_merge_snippet,
+      {
+        "CLOSEOUT_PR" => "https://github.com/shakacode/react_on_rails/pull/#{pr_number}",
+        "CLOSEOUT_MERGE_METHOD" => method,
+        "RELEASE_VERSION_INPUT" => lease_version,
+        "CLOSEOUT_SOURCE_RELEASE_SHA" => source_release_sha,
+        "CLOSEOUT_VALIDATED_HEAD_OID" => head_oid,
+        "CLOSEOUT_VALIDATED_BASE_OID" => base_oid,
+        "LIFECYCLE_TEST_BASE_OID" => base_oid,
+        "LIFECYCLE_TEST_RELEASE_OID" => "e" * 40,
+        "LIFECYCLE_TEST_CHANGELOG_OID" => latest_changelog_oid,
+        "LIFECYCLE_TEST_FORWARD_PORT_PLAN" => forward_port_plan,
+        "LIFECYCLE_TEST_SOURCE_EXISTS" => source_exists.to_s,
+        "LIFECYCLE_TEST_SOURCE_ANCESTOR" => source_ancestor.to_s,
+        "LIFECYCLE_TEST_PR_JSON" => pr_json
+      }.tap do |environment|
+        environment["CLOSEOUT_RELEASE_VERSION"] = release_version if release_version
+        environment["CLOSEOUT_SOURCE_CHANGELOG_OID"] = source_changelog_oid if source_changelog_oid
+      end
+    )
+  end
+
+  def run_documented_backport_merge(
+    release_version:,
+    release_branch:,
+    lease_version: release_version
+  )
+    head_oid = "a" * 40
+    base_oid = "b" * 40
+    main_oid = "c" * 40
+    source_sha = "d" * 40
+    run_documented_release_lifecycle(
+      documented_backport_merge_snippet,
+      {
+        "RELEASE_VERSION_INPUT" => lease_version,
+        "BACKPORT_RELEASE_VERSION" => release_version,
+        "BACKPORT_PR" => "999",
+        "BACKPORT_RELEASE_BRANCH" => release_branch,
+        "BACKPORT_VALIDATED_HEAD_OID" => head_oid,
+        "BACKPORT_VALIDATED_BASE_OID" => base_oid,
+        "BACKPORT_VALIDATED_MAIN_OID" => main_oid,
+        "BACKPORT_SOURCE_SHA" => source_sha,
+        "BACKPORT_SOURCE_AUDIT_RESULT" => "live-not-reverted-not-superseded:#{main_oid}",
+        "BACKPORT_COMMIT_HEADLINE" => "Backport release fix (#999)",
+        "BACKPORT_COMMIT_BODY" => "(cherry picked from commit #{source_sha})",
+        "LIFECYCLE_TEST_BASE_OID" => main_oid,
+        "LIFECYCLE_TEST_RELEASE_OID" => base_oid,
+        "LIFECYCLE_TEST_PR_JSON" => JSON.generate(
+          number: 999,
+          id: "PR_node_id",
+          baseRefName: release_branch,
+          baseRefOid: base_oid,
+          headRefOid: head_oid
+        )
+      }
+    )
+  end
+
+  def documented_selective_closeout_validator
+    runbook = File.read(File.join(repo_root, "internal/contributor-info/release-train-runbook.md"))
+    match = runbook.match(/ruby -rjson -ropen3 -e '\n(?<program>.*?)\n\s+' "\$\{FINAL_PLAN_FILE\}"/m)
+    raise "documented selective closeout validator is missing" unless match
+
+    match[:program]
+  end
+
+  def documented_selective_closeout_setup_snippet
+    runbook = File.read(File.join(repo_root, "internal/contributor-info/release-train-runbook.md"))
+    snippets = runbook.to_enum(:scan, /```bash\n(.*?)\n[ \t]*```/m).map { Regexp.last_match(1) }
+    snippet = snippets.find do |candidate|
+      candidate.include?('PLAN_FILE="${PLAN_FILE:?set a durable path for release-tracker plan evidence}"')
+    end
+    raise "documented selective closeout setup snippet is missing" unless snippet
+
+    indent = snippet[/\A[ \t]*/]
+    snippet.lines.map { |line| line.delete_prefix(indent) }.join
+  end
+
+  def run_documented_selective_closeout_setup(lease_version:, closeout_version:)
+    Dir.mktmpdir("selective-closeout-evidence") do |evidence_dir|
+      plan_path = File.join(evidence_dir, "plan.txt")
+      result = run_documented_release_lifecycle(
+        documented_selective_closeout_setup_snippet,
+        {
+          "RELEASE_VERSION_INPUT" => lease_version,
+          "SELECTIVE_CLOSEOUT_RELEASE_VERSION" => closeout_version,
+          "PLAN_FILE" => plan_path,
+          "OMITTED_PICKS_FILE" => File.join(evidence_dir, "omitted-picks.json"),
+          "LIFECYCLE_TEST_BASE_OID" => "0" * 40,
+          "LIFECYCLE_TEST_RELEASE_OID" => "1" * 40,
+          "LIFECYCLE_TEST_FORWARD_PORT_PLAN" => "PICK plan"
+        }
+      )
+      stdout, stderr, status, mutation_arguments, calls = result
+      git_arguments = calls.drop_while { |argument| argument != "git" }.drop(1)
+      [stdout, stderr, status, mutation_arguments.empty? ? git_arguments : mutation_arguments, calls]
+    end
+  end
+
+  def write_selective_closeout_inputs(repo, fixture)
+    write_file(repo, fixture.fetch(:plan_path), fixture.fetch(:plan))
+    write_file(repo, fixture.fetch(:manifest_path), "#{JSON.pretty_generate(fixture.fetch(:manifest))}\n")
+    write_file(repo, fixture.fetch(:manual_acks_path), fixture.fetch(:manual_acks))
+  end
+
+  def run_documented_selective_closeout_validator(repo, fixture)
+    Open3.capture3(
+      git_env,
+      RbConfig.ruby,
+      "-rjson",
+      "-ropen3",
+      "-e",
+      documented_selective_closeout_validator,
+      File.join(repo, fixture.fetch(:plan_path)),
+      File.join(repo, fixture.fetch(:manifest_path)),
+      fixture.fetch(:release_tip),
+      fixture.fetch(:main_tip),
+      File.join(repo, fixture.fetch(:manual_acks_path)),
+      chdir: repo
+    )
+  end
+
+  def selective_closeout_manifest(origin_sha:, replacement_sha:, release_sha:)
+    {
+      "version" => 1,
+      "omitted_picks" => [
+        {
+          "release_sha" => release_sha,
+          "origin_sha" => origin_sha,
+          "replacement_sha" => replacement_sha,
+          "replacement_disposition" => {
+            "replacement_sha" => replacement_sha,
+            "audited_main_sha" => replacement_sha,
+            "approved_by" => "maintainer",
+            "approval_record" => "https://github.com/shakacode/react_on_rails/issues/123#issuecomment-456"
+          },
+          "proof" => "original source was reverted on main",
+          "approval" => "maintainer approved the exact omission"
+        }
+      ]
+    }
+  end
+
+  def with_selective_closeout_validator_fixture
+    Dir.mktmpdir("selective-closeout-validator") do |repo|
+      git(repo, "init")
+      git(repo, "checkout", "-b", "main")
+      git(repo, "config", "user.email", "test@example.com")
+      git(repo, "config", "user.name", "Release Test")
+      git(repo, "config", "commit.gpgsign", "false")
+
+      write_file(repo, "origin.txt", "source behavior\n")
+      origin_sha = commit_all(repo, "Original main change")
+      write_file(repo, "replacement.txt", "replacement behavior\n")
+      replacement_sha = commit_all(repo, "Replacement main change")
+      git(repo, "checkout", "-b", "release/1.0.0", origin_sha)
+      write_file(repo, "version.txt", "1.0.0\n")
+      manual_sha = commit_all(repo, "Set stable release version")
+      write_file(repo, "release-fix.txt", "release fix\n")
+      release_sha = commit_all(repo, "Release fix\n\n(cherry picked from commit #{origin_sha})")
+
+      fixture = {
+        plan_path: "final-plan.txt",
+        manifest_path: "omitted-picks.json",
+        manual_acks_path: "manual-acks.txt",
+        release_tip: release_sha,
+        main_tip: replacement_sha,
+        origin_sha:,
+        replacement_sha:,
+        manual_sha:,
+        release_sha:,
+        plan: <<~PLAN,
+          ACK-MANUAL #{manual_sha[0, 12]} Set stable release version
+               stable version change inspected
+               acknowledged by --ack-manual; skipping after operator inspection
+          PICK #{release_sha[0, 12]} Release fix
+        PLAN
+        manual_acks: "#{manual_sha}\n",
+        manifest: selective_closeout_manifest(origin_sha:, replacement_sha:, release_sha:)
+      }
+      write_selective_closeout_inputs(repo, fixture)
+      yield repo, fixture
+    end
   end
 
   def version_file(version)
@@ -123,6 +567,461 @@ RSpec.describe "script/release-forward-port" do
     git(repo, "add", "external-diff.sh")
     git(repo, "commit", "--no-gpg-sign", "-m", "Configure external diff helper")
     git(repo, "config", "diff.external", external_diff_path)
+  end
+
+  describe "documented release-line lease bootstrap" do
+    it "rejects a non-stable canonical version before acquiring the lease" do
+      _stdout, stderr, status = run_documented_release_line_lease("exit 72", release_version: "17.0.0.rc.1")
+
+      expect(status).not_to be_success
+      expect(stderr).to include("release version must be a stable X.Y.Z version; stop")
+    end
+
+    it "keeps the canonical release version and target immutable for the shell lifecycle" do
+      stdout, stderr, status = run_documented_release_line_lease(<<~BASH)
+        ( RELEASE_VERSION=17.0.1 ) >/dev/null 2>&1 && exit 70
+        ( RELEASE_LINE_TARGET=release-line:17.0.1 ) >/dev/null 2>&1 && exit 71
+        printf '%s %s\n' "${RELEASE_VERSION}" "${RELEASE_LINE_TARGET}"
+      BASH
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("17.0.0 release-line:17.0.0")
+    end
+
+    it "refuses either pre-existing canonical variable before assignment or coordination" do
+      [
+        { "RELEASE_VERSION" => "17.0.0" },
+        { "RELEASE_LINE_TARGET" => "release-line:17.0.0" }
+      ].each do |preexisting|
+        _stdout, stderr, status, _mutations, calls = run_documented_release_lifecycle(
+          "exit 72",
+          preexisting
+        )
+
+        expect(status).not_to be_success
+        expect(stderr).to include("canonical release variables are already set; start a fresh shell")
+        expect(calls).to be_empty
+      end
+    end
+
+    it "refuses re-pasting the exact bootstrap in the same interactive shell" do
+      _stdout, stderr, status, _mutations, calls = run_documented_release_lifecycle(
+        "exit 72",
+        {},
+        bootstrap_calls: 2
+      )
+
+      expect(status).not_to be_success
+      expect(stderr).to include("canonical release variables are already set; start a fresh shell")
+      expect(calls).to be_empty
+    end
+
+    it "assigns the canonical release version and target only in the lease bootstrap" do
+      runbook = File.read(File.join(repo_root, "internal/contributor-info/release-train-runbook.md"))
+      snippets = runbook.to_enum(:scan, /```bash\n(.*?)\n[ \t]*```/m).map { Regexp.last_match(1) }
+      executable_lines = snippets.flat_map(&:lines).map(&:strip)
+
+      expect(executable_lines.grep(/\ARELEASE_VERSION=/)).to eq(
+        ['RELEASE_VERSION="${RELEASE_VERSION_INPUT:?set the exact stable X.Y.Z release version}"']
+      )
+      expect(executable_lines.grep(/\ARELEASE_LINE_TARGET=/)).to eq(
+        ['RELEASE_LINE_TARGET="release-line:${RELEASE_VERSION}"']
+      )
+    end
+
+    it "uses the canonical version in every executable release-ref command" do
+      runbook = File.read(File.join(repo_root, "internal/contributor-info/release-train-runbook.md"))
+      snippets = runbook.to_enum(:scan, /```bash\n(.*?)\n[ \t]*```/m).map { Regexp.last_match(1) }
+      executable_lines = snippets.flat_map(&:lines).map(&:strip).reject do |line|
+        line.empty? || line.start_with?("#")
+      end
+
+      expect(executable_lines.grep(/17\.0\.0/)).to be_empty
+    end
+
+    it "passes the canonical version to every executable release helper preview" do
+      previews = {
+        documented_release_start_preview_snippet => ["bundle", "exec", "rake", "release:start[17.0.1,true]"],
+        documented_release_finish_promote_preview_snippet => ["release-finish", "promote", "17.0.1", "--dry-run"],
+        documented_release_finish_closeout_preview_snippet => ["release-finish", "close-out", "17.0.1", "--dry-run"]
+      }
+
+      previews.each do |snippet, expected_call|
+        _stdout, stderr, status, _mutations, calls = run_documented_release_lifecycle(
+          snippet,
+          { "RELEASE_VERSION_INPUT" => "17.0.1" }
+        )
+
+        expect(status).to be_success, stderr
+        expect(calls.each_cons(expected_call.length).to_a).to include(expected_call)
+        expect(calls).not_to include(a_string_including("17.0.0"))
+      end
+    end
+
+    it "runs exact branch creation and manual closeout snippets through the acquired canonical lifecycle" do
+      [documented_release_branch_creation_snippet, documented_manual_closeout_snippet].each do |snippet|
+        environment = { "RELEASE_VERSION_INPUT" => "17.0.1" }
+        if snippet == documented_manual_closeout_snippet
+          environment["MANUAL_CLOSEOUT_ACK_SHA"] = nil
+          environment["MANUAL_CLOSEOUT_CHANGELOG_SOURCE_SHA"] = nil
+        end
+        _stdout, stderr, status, _mutations, calls = run_documented_release_lifecycle(
+          snippet,
+          environment
+        )
+
+        expect(status).to be_success, stderr
+        expect(calls).to include("release/17.0.1")
+        expect(calls).not_to include(a_string_including("release/17.0.0"))
+      end
+    end
+  end
+
+  describe "documented synchronous closeout merge" do
+    it "passes authoritative final-changelog metadata for a squash merge" do
+      source_changelog_oid = "c" * 40
+      _stdout, stderr, status, arguments = run_documented_closeout_merge(
+        method: "SQUASH",
+        release_version: "17.0.0",
+        source_changelog_oid:
+      )
+
+      expect(status).to be_success, stderr
+      expect(arguments).to include(
+        "commitHeadline=Record the final React on Rails 17.0.0 changelog (#999)",
+        "commitBody=The final changelog records source CHANGELOG.md commit `#{source_changelog_oid}`."
+      )
+      query = arguments.find { |argument| argument.start_with?("query=") }
+      expect(query).to include(
+        "$commitHeadline: String!",
+        "$commitBody: String!",
+        "commitHeadline: $commitHeadline",
+        "commitBody: $commitBody"
+      )
+    end
+
+    it "refuses malformed squash metadata before attempting the merge" do
+      source_changelog_oid = "c" * 40
+      _stdout, stderr, status, arguments = run_documented_closeout_merge(
+        method: "SQUASH",
+        release_version: "17.0.0.rc.1",
+        source_changelog_oid:
+      )
+
+      expect(status).not_to be_success
+      expect(stderr).to include("closeout release version must be X.Y.Z")
+      expect(arguments).to be_empty
+
+      _stdout, stderr, status, arguments = run_documented_closeout_merge(
+        method: "SQUASH",
+        release_version: "17.0.0",
+        source_changelog_oid: "C" * 40
+      )
+
+      expect(status).not_to be_success
+      expect(stderr).to include("source CHANGELOG.md OID must be a lowercase 40-character SHA")
+      expect(arguments).to be_empty
+
+      _stdout, stderr, status, arguments = run_documented_closeout_merge(
+        method: "SQUASH",
+        release_version: "17.0.0",
+        source_changelog_oid:,
+        pr_number: 0
+      )
+
+      expect(status).not_to be_success
+      expect(stderr).to include("closeout PR number is missing or invalid")
+      expect(arguments).to be_empty
+    end
+
+    it "refuses a squash version that differs from the held lease before attempting the merge" do
+      source_changelog_oid = "c" * 40
+      _stdout, stderr, status, arguments = run_documented_closeout_merge(
+        method: "SQUASH",
+        lease_version: "17.0.0",
+        release_version: "17.0.1",
+        source_changelog_oid:
+      )
+
+      expect(status).not_to be_success
+      expect(stderr).to include("closeout release version must equal held release-line lease version 17.0.0")
+      expect(arguments).to be_empty
+    end
+
+    it "requires and validates the canonical closeout version for rebase before any gh or git call" do
+      _stdout, stderr, status, arguments, calls = run_documented_closeout_merge(
+        method: "REBASE",
+        release_version: nil
+      )
+
+      expect(status).not_to be_success
+      expect(stderr).to include("CLOSEOUT_RELEASE_VERSION")
+      expect(arguments).to be_empty
+      expect(calls).to be_empty
+
+      _stdout, stderr, status, arguments, calls = run_documented_closeout_merge(
+        method: "REBASE",
+        release_version: "17.0.0.rc.1"
+      )
+
+      expect(status).not_to be_success
+      expect(stderr).to include("closeout release version must be X.Y.Z")
+      expect(arguments).to be_empty
+      expect(calls).to be_empty
+    end
+
+    it "binds a rebase closeout to the exact fetched release source and real PICK plan" do
+      source_release_sha = "d" * 40
+
+      _stdout, stderr, status, arguments = run_documented_closeout_merge(
+        method: "REBASE",
+        source_release_sha: "D" * 40
+      )
+
+      expect(status).not_to be_success
+      expect(stderr).to include("source release SHA must be a lowercase 40-character SHA")
+      expect(arguments).to be_empty
+
+      _stdout, stderr, status, arguments = run_documented_closeout_merge(
+        method: "REBASE",
+        source_ancestor: false
+      )
+
+      expect(status).not_to be_success
+      expect(stderr).to include("source release commit is not on the fetched canonical release ref")
+      expect(arguments).to be_empty
+
+      _stdout, stderr, status, arguments = run_documented_closeout_merge(
+        method: "REBASE",
+        forward_port_plan: "SKIP #{'d' * 12} already present"
+      )
+
+      expect(status).not_to be_success
+      expect(stderr).to include("source release commit is not exactly one PICK in the current forward-port plan")
+      expect(arguments).to be_empty
+
+      _stdout, stderr, status, arguments = run_documented_closeout_merge(
+        method: "REBASE",
+        source_release_sha:,
+        forward_port_plan: <<~PLAN
+          PICK #{source_release_sha[0, 12]} Forward-port release fix (#123)
+          PICK #{'e' * 12} Unexpected extra release fix (#124)
+        PLAN
+      )
+
+      expect(status).not_to be_success
+      expect(stderr).to include("source release commit is not exactly one PICK in the current forward-port plan")
+      expect(arguments).to be_empty
+
+      _stdout, stderr, status, _arguments, calls = run_documented_closeout_merge(
+        method: "REBASE",
+        source_release_sha:
+      )
+
+      expect(status).to be_success, stderr
+      expected_call = [
+        "release-forward-port",
+        "--source",
+        "origin/release/17.0.0",
+        "--target",
+        "origin/main",
+        "--only",
+        source_release_sha,
+        "--dry-run"
+      ]
+      expect(calls.each_cons(expected_call.length).to_a).to include(expected_call)
+    end
+
+    it "requires one validated rebase commit with one exact direct source footer" do
+      head_oid = "a" * 40
+      source_sha = "d" * 40
+      invalid_commits = [
+        [],
+        [
+          {
+            oid: head_oid,
+            messageBody: "(cherry picked from commit #{source_sha})\n(cherry picked from commit #{source_sha})"
+          }
+        ],
+        [{ oid: "f" * 40, messageBody: "(cherry picked from commit #{source_sha})" }]
+      ]
+
+      invalid_commits.each do |commits|
+        _stdout, stderr, status, arguments = run_documented_closeout_merge(
+          method: "REBASE",
+          pr_commits: commits
+        )
+
+        expect(status).not_to be_success
+        expect(stderr).to include(
+          "rebase closeout PR must contain exactly the validated head with one direct source footer"
+        )
+        expect(arguments).to be_empty
+      end
+    end
+
+    it "binds squash metadata to the latest changelog commit on the canonical release ref" do
+      _stdout, stderr, status, arguments = run_documented_closeout_merge(
+        method: "SQUASH",
+        source_changelog_oid: "c" * 40,
+        latest_changelog_oid: "e" * 40
+      )
+
+      expect(status).not_to be_success
+      expect(stderr).to include("source CHANGELOG.md OID is not the latest commit on the fetched canonical release ref")
+      expect(arguments).to be_empty
+    end
+
+    it "preserves the rebase merge path without squash-only metadata" do
+      _stdout, stderr, status, arguments = run_documented_closeout_merge(method: "REBASE")
+
+      expect(status).to be_success, stderr
+      expect(arguments).to include("mergeMethod=REBASE")
+      expect(arguments).not_to include(a_string_starting_with("commitHeadline="))
+      expect(arguments).not_to include(a_string_starting_with("commitBody="))
+      query = arguments.find { |argument| argument.start_with?("query=") }
+      expect(query).not_to include("commitHeadline")
+      expect(query).not_to include("commitBody")
+    end
+  end
+
+  describe "documented one-source backport merge" do
+    it "merges only when the target matches the validated release version" do
+      _stdout, stderr, status, arguments = run_documented_backport_merge(
+        release_version: "17.0.0",
+        release_branch: "release/17.0.0"
+      )
+
+      expect(status).to be_success, stderr
+      expect(arguments).to include("commitHeadline=Backport release fix (#999)")
+    end
+
+    it "accepts a matching backport input without retargeting the canonical lease variables" do
+      _stdout, stderr, status, arguments = run_documented_backport_merge(
+        lease_version: "17.0.0",
+        release_version: "17.0.0",
+        release_branch: "release/17.0.0"
+      )
+
+      expect(status).to be_success, stderr
+      expect(arguments).to include("commitHeadline=Backport release fix (#999)")
+    end
+
+    it "refuses a release branch that does not match the held release version before mutation" do
+      _stdout, stderr, status, arguments = run_documented_backport_merge(
+        release_version: "17.0.0",
+        release_branch: "release/17.0.1"
+      )
+
+      expect(status).not_to be_success
+      expect(stderr).to include("backport target must equal release/17.0.0; stop backport")
+      expect(arguments).to be_empty
+    end
+
+    it "refuses a backport version that retargets the held release-line lease before mutation" do
+      _stdout, stderr, status, arguments = run_documented_backport_merge(
+        lease_version: "17.0.0",
+        release_version: "17.0.1",
+        release_branch: "release/17.0.1"
+      )
+
+      expect(status).not_to be_success
+      expect(stderr).to include("backport release version must equal held release-line lease version 17.0.0")
+      expect(arguments).to be_empty
+    end
+
+    it "refuses a non-stable release version before mutation" do
+      _stdout, stderr, status, arguments = run_documented_backport_merge(
+        release_version: "17.0.0.rc.1",
+        release_branch: "release/17.0.0.rc.1"
+      )
+
+      expect(status).not_to be_success
+      expect(stderr).to include("release version must be a stable X.Y.Z version; stop")
+      expect(arguments).to be_empty
+    end
+  end
+
+  describe "documented selective manual closeout validator" do
+    it "accepts a selective-closeout version that matches the held lease" do
+      stdout, stderr, status, arguments = run_documented_selective_closeout_setup(
+        lease_version: "17.0.0",
+        closeout_version: "17.0.0"
+      )
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("PICK plan")
+      expect(arguments).to include("fetch", "--prune", "switch", "main")
+    end
+
+    it "refuses a later selective-closeout version that differs from the held lease before mutation" do
+      _stdout, stderr, status, arguments = run_documented_selective_closeout_setup(
+        lease_version: "17.0.0",
+        closeout_version: "17.0.1"
+      )
+
+      expect(status).not_to be_success
+      expect(stderr).to include("selective closeout version must equal held release-line lease version 17.0.0")
+      expect(arguments).to be_empty
+    end
+
+    it "accepts a bound final plan, manifest, replacement, provenance footer, and manual acknowledgement" do
+      with_selective_closeout_validator_fixture do |repo, fixture|
+        _stdout, stderr, status = run_documented_selective_closeout_validator(repo, fixture)
+
+        expect(status).to be_success, stderr
+      end
+    end
+
+    it "rejects an unknown plan action and manifest schema drift" do
+      with_selective_closeout_validator_fixture do |repo, fixture|
+        fixture[:plan] = fixture.fetch(:plan).sub("PICK ", "DROP ")
+        write_selective_closeout_inputs(repo, fixture)
+        _stdout, stderr, status = run_documented_selective_closeout_validator(repo, fixture)
+
+        expect(status).not_to be_success
+        expect(stderr).to include("malformed or unrecognized plan action row")
+
+        fixture[:plan] = fixture.fetch(:plan).sub("DROP ", "PICK ")
+        fixture[:manifest]["unexpected"] = true
+        write_selective_closeout_inputs(repo, fixture)
+        _stdout, stderr, status = run_documented_selective_closeout_validator(repo, fixture)
+
+        expect(status).not_to be_success
+        expect(stderr).to include("top-level object or keys are invalid")
+      end
+    end
+
+    it "rejects direct-source provenance and replacement-disposition drift" do
+      with_selective_closeout_validator_fixture do |repo, fixture|
+        row = fixture.fetch(:manifest).fetch("omitted_picks").fetch(0)
+        row["origin_sha"] = fixture.fetch(:manual_sha)
+        write_selective_closeout_inputs(repo, fixture)
+        _stdout, stderr, status = run_documented_selective_closeout_validator(repo, fixture)
+
+        expect(status).not_to be_success
+        expect(stderr).to include("origin does not match one direct -x footer")
+
+        row["origin_sha"] = fixture.fetch(:origin_sha)
+        row.fetch("replacement_disposition")["audited_main_sha"] = fixture.fetch(:origin_sha)
+        write_selective_closeout_inputs(repo, fixture)
+        _stdout, stderr, status = run_documented_selective_closeout_validator(repo, fixture)
+
+        expect(status).not_to be_success
+        expect(stderr).to include("replacement disposition is stale or main-tip-mismatched")
+      end
+    end
+
+    it "rejects manual acknowledgement drift from ACK-MANUAL plan rows" do
+      with_selective_closeout_validator_fixture do |repo, fixture|
+        fixture[:manual_acks] = ""
+        write_selective_closeout_inputs(repo, fixture)
+        _stdout, stderr, status = run_documented_selective_closeout_validator(repo, fixture)
+
+        expect(status).not_to be_success
+        expect(stderr).to include("manual acknowledgement file does not exactly match ACK-MANUAL rows")
+      end
+    end
   end
 
   it "dry-runs the forward-port plan without changing the target branch" do
