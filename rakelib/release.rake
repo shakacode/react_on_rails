@@ -39,6 +39,7 @@ NPM_PUBLISH_HARD_FAILURE_CATEGORIES = %i[
   registry_rejection
   unknown
 ].freeze
+NPM_PUBLISH_UNCERTAIN_RECOVERY_CATEGORIES = %i[transient registry_rejection].freeze
 NPM_PUBLISH_TRANSIENT_PATTERN = %r{
   \b(?:
     EAI_AGAIN | ECONNRESET | ETIMEDOUT | ENETUNREACH | ECONNREFUSED |
@@ -9233,12 +9234,13 @@ end
 
 def npm_publish_failure_category(output)
   text = output.to_s
-  return :otp_challenge if text.match?(
-    /\bEOTP\b|one[- ]time (?:password|passcode)|\botp(?: code)?\b.*\b(?:required|invalid|expired)\b/i
-  )
+  return :otp_challenge if text.match?(/\bEOTP\b/i)
   return :authentication_failure if text.match?(/\b(?:ENEEDAUTH|E401)\b|authentication (?:is )?required/i)
   return :local_lifecycle if npm_publish_local_lifecycle_failure?(text)
   return :registry_rejection if text.match?(NPM_PUBLISH_REGISTRY_REJECTION_PATTERN)
+  return :otp_challenge if text.match?(
+    /one[- ]time (?:password|passcode)|\botp(?: code)?\b.*\b(?:required|invalid|expired)\b/i
+  )
   return :transient if text.match?(NPM_PUBLISH_TRANSIENT_PATTERN)
 
   :unknown
@@ -9311,6 +9313,7 @@ def publish_npm_with_retry(dir, package_name, base_args: [], otp: nil, idempoten
   end
 
   attempt = 0
+  uncertain_publish_attempt = false
   loop do
     attempt += 1
     begin
@@ -9320,6 +9323,14 @@ def publish_npm_with_retry(dir, package_name, base_args: [], otp: nil, idempoten
       verify_npm_package_published!(npm_package_name, npm_package_version)
       return current_otp
     rescue NpmPublishAttemptError => e
+      uncertain_publish_attempt ||= e.category == :transient
+      recoverable_after_uncertainty =
+        uncertain_publish_attempt && NPM_PUBLISH_UNCERTAIN_RECOVERY_CATEGORIES.include?(e.category)
+      if recoverable_after_uncertainty && npm_package_already_published?(npm_package_name, npm_package_version)
+        puts "✓ npm package #{package_name} is visible after an uncertain publish attempt; treating it as successful."
+        return current_otp
+      end
+
       current_otp = retry_npm_publish_after_error(
         error: e, package_name:, attempt:, max_retries:, current_otp:
       )

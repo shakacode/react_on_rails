@@ -118,7 +118,9 @@ the clean-worktree check and verbosity setup. The root
 must byte-match the committed `pnpm-lock.yaml`, and every npm release package must pass its normal `build` script
 with lifecycle scripts enabled. This happens before release-checkout creation, `git pull`, npm or GitHub
 authentication, CI/tag/version-policy remote reads, registry probes, confirmation, version mutation, ShakaPerf
-dispatch, tagging, publication, or OTP prompting. Every readiness failure prints the single repair command:
+dispatch, tagging, publication, or OTP prompting. A pnpm version mismatch must first be repaired by activating the
+exact pnpm version declared by the root `packageManager`. The release prints this frozen-install command for the
+installed-dependency repair:
 
 ```bash
 pnpm install --frozen-lockfile
@@ -842,8 +844,9 @@ The release script now checks NPM authentication at the start and will automatic
 
 ### NPM Release Readiness Issues
 
-If the release reports a missing/stale installed dependency state, a pnpm version mismatch, or a release-package
-build failure, run the exact repair command it prints from the repository root:
+If the release reports a pnpm version mismatch, first activate the exact pnpm version declared by the root
+`packageManager`. Then run the exact frozen-install repair command it prints from the repository root for the
+installed dependency check:
 
 ```bash
 pnpm install --frozen-lockfile

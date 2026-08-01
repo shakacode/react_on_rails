@@ -6900,6 +6900,39 @@ RSpec.describe "release.rake helper methods" do
       end
     end
 
+    {
+      authentication_failure: "npm ERR! code E401\nOTP code required to authenticate\n",
+      local_lifecycle: "npm ERR! code ELIFECYCLE\nOTP code required after lifecycle failure\n",
+      registry_rejection: "npm ERR! code E403\nOTP code required by registry policy\n"
+    }.each do |expected_category, diagnostic|
+      it "keeps mixed #{expected_category} diagnostics hard without an OTP prompt or retry" do
+        Dir.mktmpdir do |dir|
+          File.write(
+            File.join(dir, "package.json"),
+            JSON.generate("name" => "react-on-rails", "version" => "17.0.0")
+          )
+          failure_status = instance_double(Process::Status, success?: false)
+          expect(self).to receive(:npm_package_already_published?)
+            .with("react-on-rails", "17.0.0").once.and_return(false)
+          expect(Open3).to receive(:capture2e)
+            .with("pnpm", "publish", "--otp", "987654", chdir: dir)
+            .once.and_return([diagnostic, failure_status])
+          expect(self).not_to receive(:prompt_for_otp)
+          expect(self).not_to receive(:sleep)
+
+          error = begin
+            publish_npm_with_retry(dir, "react-on-rails@17.0.0", otp: "987654", max_retries: 3)
+            nil
+          rescue StandardError => caught
+            caught
+          end
+
+          expect(error).to be_a(NpmPublishAttemptError)
+          expect(error&.category).to eq(expected_category)
+        end
+      end
+    end
+
     it "retries each supported transient context with the same OTP" do
       diagnostics = [
         "npm ERR! code E429",
@@ -6981,6 +7014,92 @@ RSpec.describe "release.rake helper methods" do
       end
     end
 
+    it "recovers when a transient response loss is followed by an already-published rejection" do
+      Dir.mktmpdir do |dir|
+        File.write(
+          File.join(dir, "package.json"),
+          JSON.generate("name" => "react-on-rails", "version" => "17.0.0")
+        )
+        failure_status = instance_double(Process::Status, success?: false)
+        expect(self).to receive(:npm_package_already_published?)
+          .with("react-on-rails", "17.0.0")
+          .exactly(3).times.and_return(false, false, true)
+        expect(Open3).to receive(:capture2e)
+          .with("pnpm", "publish", "--otp", "987654", chdir: dir)
+          .twice.and_return(
+            ["npm ERR! code ECONNRESET\nresponse lost after upload\n", failure_status],
+            ["npm ERR! code EPUBLISHCONFLICT\nversion previously published\n", failure_status]
+          )
+        expect(self).to receive(:sleep).with(1).once
+        expect(self).not_to receive(:prompt_for_otp)
+        expect(self).not_to receive(:verify_npm_package_published!)
+
+        expect(
+          publish_npm_with_retry(dir, "react-on-rails@17.0.0", otp: "987654", max_retries: 3)
+        ).to eq("987654")
+      end
+    end
+
+    it "keeps a post-transient registry rejection hard when the exact version is not visible" do
+      Dir.mktmpdir do |dir|
+        File.write(
+          File.join(dir, "package.json"),
+          JSON.generate("name" => "react-on-rails", "version" => "17.0.0")
+        )
+        failure_status = instance_double(Process::Status, success?: false)
+        expect(self).to receive(:npm_package_already_published?)
+          .with("react-on-rails", "17.0.0")
+          .exactly(3).times.and_return(false, false, false)
+        expect(Open3).to receive(:capture2e)
+          .with("pnpm", "publish", "--otp", "987654", chdir: dir)
+          .twice.and_return(
+            ["npm ERR! code ECONNRESET\nresponse lost after upload\n", failure_status],
+            ["npm ERR! code EPUBLISHCONFLICT\nversion previously published\n", failure_status]
+          )
+        expect(self).to receive(:sleep).with(1).once
+        expect(self).not_to receive(:prompt_for_otp)
+
+        expect do
+          publish_npm_with_retry(dir, "react-on-rails@17.0.0", otp: "987654", max_retries: 3)
+        end.to raise_error(
+          NpmPublishAttemptError, /registry rejection.*version previously published/m
+        )
+      end
+    end
+
+    {
+      "explicit EOTP mixed with a registry diagnostic" =>
+        "npm ERR! code EOTP\nnpm ERR! code E403\nOTP code required by registry policy\n",
+      "the exact npm one-time-password prompt" =>
+        "npm notice This operation requires a one-time password from your authenticator.\n"
+    }.each do |description, diagnostic|
+      it "prompts and retries for #{description}" do
+        Dir.mktmpdir do |dir|
+          File.write(
+            File.join(dir, "package.json"),
+            JSON.generate("name" => "react-on-rails", "version" => "17.0.0")
+          )
+          failure_status = instance_double(Process::Status, success?: false)
+          success_status = instance_double(Process::Status, success?: true)
+          expect(self).to receive(:npm_package_already_published?)
+            .with("react-on-rails", "17.0.0").once.and_return(false)
+          expect(Open3).to receive(:capture2e)
+            .with("pnpm", "publish", "--otp", "987654", chdir: dir)
+            .ordered.and_return([diagnostic, failure_status])
+          expect(Open3).to receive(:capture2e)
+            .with("pnpm", "publish", "--otp", "123456", chdir: dir)
+            .ordered.and_return(["published\n", success_status])
+          expect(self).to receive(:prompt_for_otp).with("NPM").once.and_return("123456")
+          expect(self).not_to receive(:sleep)
+          expect(self).to receive(:verify_npm_package_published!).with("react-on-rails", "17.0.0")
+
+          expect(
+            publish_npm_with_retry(dir, "react-on-rails@17.0.0", otp: "987654", max_retries: 3)
+          ).to eq("123456")
+        end
+      end
+    end
+
     it "redacts the rejected OTP and prompts once for a fresh code after an auth challenge" do
       Dir.mktmpdir do |dir|
         File.write(
@@ -7052,7 +7171,8 @@ RSpec.describe "release.rake helper methods" do
             JSON.generate("name" => "react-on-rails", "version" => "17.0.0")
           )
           failure_status = instance_double(Process::Status, success?: false)
-          allow(self).to receive(:npm_package_already_published?).and_return(false)
+          expect(self).to receive(:npm_package_already_published?)
+            .with("react-on-rails", "17.0.0").once.and_return(false)
           expect(Open3).to receive(:capture2e)
             .with("pnpm", "publish", "--otp", "987654", chdir: dir)
             .once.and_return([diagnostic, failure_status])
