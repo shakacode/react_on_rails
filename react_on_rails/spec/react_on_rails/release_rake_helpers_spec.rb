@@ -3003,6 +3003,30 @@ RSpec.describe "release.rake helper methods" do
       end
     end
 
+    it "rejects a stable waiver when run-list authorization fails before identifying an exact run" do
+      candidate_sha = "a" * 40
+      stable_target = "17.0.0"
+      allow(self).to receive(:fetch_shakaperf_release_gate_runs).and_raise(
+        ShakaperfGateObservationError, "GitHub API denied permission to list workflow runs"
+      )
+      expect(self).not_to receive(:dispatch_shakaperf_release_gate_workflow!)
+      expect(self).not_to receive(:post_release_tracker_comment!)
+
+      expect do
+        run_shakaperf_release_gate!(
+          monorepo_root:,
+          ref: "release-branch",
+          head_sha: candidate_sha,
+          target_version: stable_target,
+          release_started_at:,
+          allow_override: false,
+          dry_run: false,
+          tracker: 4806,
+          waiver_reason: "GitHub REST observer exhausted its quota"
+        )
+      end.to raise_error(SystemExit, /cannot waive.*before an exact ShakaPerf run is identified/i)
+    end
+
     it "records a stable-only waiver after an exact-run observation failure" do
       candidate_sha = "a" * 40
       stable_target = "17.0.0"

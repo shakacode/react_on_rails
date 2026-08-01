@@ -1867,12 +1867,20 @@ def waived_final_shakaperf_run(record, observed_run: nil)
   }
 end
 
+def ensure_final_shakaperf_observation_waiver_run!(error)
+  return if error.run.is_a?(Hash)
+
+  abort "❌ Final ShakaPerf observation waiver cannot waive a gate observation failure before an exact " \
+        "ShakaPerf run is identified.\n\n#{error.message}"
+end
+
 def apply_final_shakaperf_observation_waiver!(error:, repo_slug:, tracker:, ref:, head_sha:, target_version:, reason:)
   abort "❌ Final ShakaPerf observation waiver requires RELEASE_TRACKER=<issue>." unless tracker
   if release_prerelease_version?(target_version)
     abort "❌ RELEASE_FINAL_SHAKAPERF_WAIVER_REASON is allowed for stable releases only."
   end
   validate_final_shakaperf_observation_waiver_reason!(reason)
+  ensure_final_shakaperf_observation_waiver_run!(error)
   observed_run = exact_final_shakaperf_waiver_run!(
     repo_slug:, ref:, head_sha:, target_version:, run: error.run
   )
