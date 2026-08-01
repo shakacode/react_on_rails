@@ -52,6 +52,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   claim the run succeeded or bypass any other release gate; the tracker, waiver, and exact run are revalidated
   before remote tag push and package publication, and a rerun attempt blocks both boundaries. Fixes
   [Issue 4812](https://github.com/shakacode/react_on_rails/issues/4812).
+  [PR 4833](https://github.com/shakacode/react_on_rails/pull/4833) by
+  [justin808](https://github.com/justin808).
 
 - **[Pro]** **RSC render-error details are no longer sent to the browser on the fetched payload path**:
   The RSC payload fetched during client-side navigation (via `rsc_payload_generation_url_path`) included
