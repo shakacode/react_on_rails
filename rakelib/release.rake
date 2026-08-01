@@ -1139,7 +1139,7 @@ def verified_shakaperf_release_tracker_record_from_comment!(comment)
   end
 
   schema_version, encoded_payload = matches.first
-  unless schema_version.to_i == SHAKAPERF_RELEASE_TRACKER_ASSOCIATION_SCHEMA_VERSION && encoded_payload.length.even?
+  unless schema_version == SHAKAPERF_RELEASE_TRACKER_ASSOCIATION_SCHEMA_VERSION.to_s && encoded_payload.length.even?
     abort "❌ Release tracker contains an unsupported verified ShakaPerf association."
   end
 

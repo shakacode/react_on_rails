@@ -1767,6 +1767,44 @@ RSpec.describe "release.rake helper methods" do
     end
   end
 
+  describe "#verified_shakaperf_release_tracker_record_from_comment!" do
+    let(:record) do
+      {
+        "schema_version" => 1,
+        "repository" => "shakacode/react_on_rails",
+        "release_tracker" => 4806,
+        "branch" => "release/17.0.0",
+        "candidate_sha" => "a" * 40,
+        "target_version" => "17.0.0",
+        "workflow" => SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE,
+        "run_id" => 123_456,
+        "run_attempt" => 1,
+        "run_url" => "https://github.com/shakacode/react_on_rails/actions/runs/123456",
+        "runtime_tree_fingerprint" => "b" * 64,
+        "evidence_digest" => "c" * 64,
+        "approved_by" => "justin808",
+        "recorded_at" => "2026-07-14T12:31:00Z"
+      }
+    end
+    let(:encoded_payload) { canonical_accelerated_rc_json(record).unpack1("H*") }
+
+    it "accepts the canonical association marker schema version" do
+      body = "<!-- #{SHAKAPERF_RELEASE_TRACKER_ASSOCIATION_MARKER} v1 #{encoded_payload} -->"
+
+      expect(
+        verified_shakaperf_release_tracker_record_from_comment!({ "body" => body })
+      ).to eq(record)
+    end
+
+    it "rejects a leading-zero association marker schema version" do
+      body = "<!-- #{SHAKAPERF_RELEASE_TRACKER_ASSOCIATION_MARKER} v01 #{encoded_payload} -->"
+
+      expect do
+        verified_shakaperf_release_tracker_record_from_comment!({ "body" => body })
+      end.to raise_error(SystemExit, /unsupported verified ShakaPerf association/)
+    end
+  end
+
   describe "#fetch_shakaperf_release_gate_runs" do
     it "attaches authoritative identity metadata from the filtered GitHub query" do
       repo_slug = "shakacode/react_on_rails"
