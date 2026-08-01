@@ -3006,6 +3006,8 @@ RSpec.describe "release.rake helper methods" do
     it "rejects a stable waiver when run-list authorization fails before identifying an exact run" do
       candidate_sha = "a" * 40
       stable_target = "17.0.0"
+      allow(self).to receive(:trusted_shakaperf_release_tracker_records!)
+        .with(repo_slug:, tracker: 4806).and_return([])
       allow(self).to receive(:fetch_shakaperf_release_gate_runs).and_raise(
         ShakaperfGateObservationError, "GitHub API denied permission to list workflow runs"
       )
@@ -3423,6 +3425,8 @@ RSpec.describe "release.rake helper methods" do
         "status" => "completed",
         "conclusion" => "failure"
       )
+      allow(self).to receive(:trusted_shakaperf_release_tracker_records!)
+        .with(repo_slug:, tracker: 4806).and_return([])
       allow(self).to receive(:fetch_shakaperf_release_gate_runs).and_raise(
         ShakaperfGateObservationError.new("Observer failed after terminal refresh", run: failed_run)
       )
