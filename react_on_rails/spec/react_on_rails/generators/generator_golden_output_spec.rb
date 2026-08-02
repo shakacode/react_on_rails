@@ -52,9 +52,11 @@ module GeneratorGoldenOutput
     { name: "webpack_pro", options: { rspack: false, pro: true }, shakapacker9: true },
     { name: "webpack_rsc", options: { rspack: false, rsc: true }, shakapacker9: true },
     { name: "webpack_tailwind", options: { rspack: false, tailwind: true }, shakapacker9: true },
+    { name: "webpack_typescript", options: { rspack: false, typescript: true }, shakapacker9: true },
     { name: "rspack_base", options: { rspack: true }, shakapacker9: true },
     { name: "rspack_pro", options: { rspack: true, pro: true }, shakapacker9: true },
     { name: "rspack_rsc", options: { rspack: true, rsc: true }, shakapacker9: true },
+    { name: "rspack_typescript", options: { rspack: true, typescript: true }, shakapacker9: true },
     # Shakapacker < 9 swaps the privateOutputPath block for the hardcoded-path block. That
     # block is independent of --pro/--rsc, so one variant pins it.
     { name: "webpack_base_shakapacker8", options: { rspack: false }, shakapacker9: false }
@@ -96,12 +98,15 @@ module GeneratorGoldenOutput
   # represents the final installation state, not only the initial template render.
   def generate(variant)
     Dir.mktmpdir("ror-generator-golden") do |destination|
+      seed_typescript_main_config(variant, destination) if variant[:options][:typescript]
       generator = generator_for(ReactOnRails::Generators::BaseGenerator, variant, destination)
       shakapacker9 = variant[:shakapacker9]
       generator.define_singleton_method(:shakapacker_version_9_or_higher?) { shakapacker9 }
 
       silence_output do
-        generator.copy_webpack_config
+        # Run main-config discovery from the generated application root so files in the
+        # repository checkout cannot affect File.exist?.
+        Dir.chdir(destination) { generator.copy_webpack_config }
         apply_pro_config(variant, destination) if variant[:options][:pro] || variant[:options][:rsc]
         apply_rsc_config(variant, destination) if variant[:options][:rsc]
       end
@@ -125,6 +130,22 @@ module GeneratorGoldenOutput
       rspack = variant[:options][:rspack]
       generator.define_singleton_method(:using_rspack?) { rspack }
     end
+  end
+
+  def seed_typescript_main_config(variant, destination)
+    # Shakapacker creates this file before React on Rails runs. Its presence, rather than the
+    # --typescript option alone, tells the base generator to preserve the .ts main entry.
+    bundler = bundler_config_dir(variant)
+    path = File.join(destination, GENERATED_CONFIG_ROOT, bundler, "#{bundler}.config.ts")
+    generator_name = variant[:options][:rspack] ? "Rspack" : "Webpack"
+    package = variant[:options][:rspack] ? "shakapacker/rspack" : "shakapacker"
+
+    FileUtils.mkdir_p(File.dirname(path))
+    File.write(path, <<~TYPESCRIPT)
+      import { generate#{generator_name}Config } from '#{package}'
+      const #{bundler}Config = generate#{generator_name}Config()
+      export default #{bundler}Config
+    TYPESCRIPT
   end
 
   def apply_pro_config(variant, destination)

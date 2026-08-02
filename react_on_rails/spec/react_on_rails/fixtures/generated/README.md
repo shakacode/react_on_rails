@@ -28,16 +28,18 @@ Each variant has one directory containing every generated file under `config/web
 `config/rspack`. The approval detects added, removed, renamed, and changed files, including
 the bundler directory mapping:
 
-| Variant                     | Flags                 | Pins                                      |
-| --------------------------- | --------------------- | ----------------------------------------- |
-| `webpack_base`              | `--no-rspack`         | Complete base OSS config tree             |
-| `webpack_pro`               | `--pro`               | Final Pro config tree                     |
-| `webpack_rsc`               | `--rsc`               | Final RSC tree + `rscWebpackConfig.js`    |
-| `webpack_tailwind`          | `--tailwind`          | Tailwind `commonWebpackConfig.js` branch  |
-| `rspack_base`               | `--rspack`            | Complete `config/rspack/` base tree       |
-| `rspack_pro`                | `--rspack --pro`      | Final Pro Rspack tree                     |
-| `rspack_rsc`                | `--rspack --rsc`      | Final RSC tree + native `RSCRspackPlugin` |
-| `webpack_base_shakapacker8` | `--no-rspack`         | Shakapacker < 9 output-path branch        |
+| Variant                     | Flags                       | Pins                                      |
+| --------------------------- | --------------------------- | ----------------------------------------- |
+| `webpack_base`              | `--no-rspack`               | Complete base OSS config tree             |
+| `webpack_pro`               | `--no-rspack --pro`         | Final Pro config tree                     |
+| `webpack_rsc`               | `--no-rspack --rsc`         | Final RSC tree + `rscWebpackConfig.js`    |
+| `webpack_tailwind`          | `--no-rspack --tailwind`    | Tailwind `commonWebpackConfig.js` branch  |
+| `webpack_typescript`        | `--no-rspack --typescript`  | TypeScript `webpack.config.ts` entry      |
+| `rspack_base`               | `--rspack`                  | Complete `config/rspack/` base tree       |
+| `rspack_pro`                | `--rspack --pro`            | Final Pro Rspack tree                     |
+| `rspack_rsc`                | `--rspack --rsc`            | Final RSC tree + native `RSCRspackPlugin` |
+| `rspack_typescript`         | `--rspack --typescript`     | TypeScript `rspack.config.ts` entry       |
+| `webpack_base_shakapacker8` | `--no-rspack`               | Shakapacker < 9 output-path branch        |
 
 Shakapacker version detection is stubbed per variant so these files do not depend on
 whichever Shakapacker version happens to be installed locally.
