@@ -2215,6 +2215,42 @@ RSpec.describe "release.rake helper methods" do
       end
     end
 
+    it "rejects contradictory same-run associations before requested identity filtering in both record orders" do
+      candidate_sha = "a" * 40
+      selected_run = run.merge(
+        "headSha" => candidate_sha,
+        "status" => "completed",
+        "conclusion" => "success"
+      )
+      canonical_record = build_verified_shakaperf_release_tracker_record(
+        repo_slug:, tracker: 4806, ref: "release-branch", head_sha: candidate_sha,
+        target_version:, run: selected_run, evidence: { "runtime_tree_fingerprint" => "a" * 64 },
+        approved_by: "justin808", recorded_at: Time.iso8601("2026-07-14T12:31:00Z")
+      )
+      canonical_entry = { kind: :association, record: canonical_record }
+      contradictions = {
+        "repository" => "other/repository",
+        "branch" => "release/other",
+        "target_version" => "17.0.0.rc.9"
+      }
+
+      aggregate_failures do
+        contradictions.each do |field, value|
+          contradictory_entry = { kind: :association, record: canonical_record.merge(field => value) }
+          [[canonical_entry, contradictory_entry], [contradictory_entry, canonical_entry]].each do |entries|
+            allow(self).to receive(:trusted_shakaperf_release_tracker_records!)
+              .with(repo_slug:, tracker: 4806).and_return(entries)
+
+            expect do
+              selected_shakaperf_release_tracker_record!(
+                repo_slug:, tracker: 4806, ref: "release-branch", head_sha: candidate_sha, target_version:
+              )
+            end.to raise_error(SystemExit, /conflicting ShakaPerf associations for the same run/i)
+          end
+        end
+      end
+    end
+
     it "rejects a mismatched live selected-run identity before persisting an explicit selector" do
       selected_run = run.merge(
         "status" => "completed",

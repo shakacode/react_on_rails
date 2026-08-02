@@ -1257,12 +1257,13 @@ def resolve_shakaperf_release_tracker_candidate_conflict!(candidates)
 end
 
 def selected_shakaperf_release_tracker_record!(repo_slug:, tracker:, ref:, head_sha:, target_version:, run_id: nil)
-  matches = trusted_shakaperf_release_tracker_records!(repo_slug:, tracker:).select do |entry|
+  entries = trusted_shakaperf_release_tracker_records!(repo_slug:, tracker:)
+  reject_conflicting_same_run_shakaperf_associations!(entries)
+  matches = entries.select do |entry|
     shakaperf_release_tracker_entry_matches?(entry:, repo_slug:, ref:, head_sha:, target_version:, run_id:)
   end
   return nil if matches.empty?
 
-  reject_conflicting_same_run_shakaperf_associations!(matches)
   candidates = preferred_shakaperf_release_tracker_candidates(matches, head_sha:)
   candidates = resolve_shakaperf_release_tracker_candidate_conflict!(candidates)
   candidates.find { |entry| entry[:kind] == :association } || candidates.first
