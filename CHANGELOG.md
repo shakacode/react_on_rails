@@ -30,6 +30,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   `commonWebpackConfig` already clones the shared client configuration, so the generated server configuration
   stays lint-clean without changing its runtime behavior. Fixes
   [Issue 4791](https://github.com/shakacode/react_on_rails/issues/4791).
+  [PR 4840](https://github.com/shakacode/react_on_rails/pull/4840) by
+  [ihabadham](https://github.com/ihabadham).
 
 - **[Pro]** **RSC render-error details are no longer sent to the browser on the fetched payload path**:
   The RSC payload fetched during client-side navigation (via `rsc_payload_generation_url_path`) included
