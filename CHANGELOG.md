@@ -24,6 +24,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Changed
+
+- **Minimum Rails version raised from 5.2 to 7.1**: The gemspec now requires `rails >= 7.1` (previously `>= 5.2`). Since React on Rails v17 already requires Ruby 3.3+, and Ruby 3.3 is not compatible with Rails versions before 7.1, the old `>= 5.2` floor allowed an impossible combination that would fail at runtime. CI has only tested against Rails 7.1 since the monorepo migration. If you are on Rails 7.0 or earlier, upgrade Rails before upgrading React on Rails. [PR 4836](https://github.com/shakacode/react_on_rails/pull/4836).
+
 #### Fixed
 
 - **[Pro]** **RSC render-error details are no longer sent to the browser on the fetched payload path**:
