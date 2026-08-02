@@ -198,6 +198,29 @@ end
 class ShakaperfGateMissingRunError < ShakaperfGateObservationError; end
 class ShakaperfGateMissingArtifactError < ShakaperfGateObservationError; end
 
+class ShakaperfAssociationBackedRun < Hash
+  attr_reader :association_identity
+
+  def self.from_verified_association(run:, association:)
+    identity = SHAKAPERF_RELEASE_TRACKER_ASSOCIATION_IDENTITY_FIELDS.to_h do |field|
+      value = association.fetch(field)
+      [field, value.is_a?(String) ? value.dup.freeze : value]
+    end.freeze
+    new(run:, association_identity: identity)
+  end
+
+  def initialize(run:, association_identity:)
+    super()
+    run.each do |key, value|
+      self[key] = value.is_a?(String) ? value.dup.freeze : value
+    end
+    @association_identity = association_identity
+    freeze
+  end
+
+  private_class_method :new
+end
+
 class ShakaperfVerificationResult
   attr_reader :status, :value, :details
 
@@ -1239,6 +1262,7 @@ def selected_shakaperf_release_tracker_record!(repo_slug:, tracker:, ref:, head_
   end
   return nil if matches.empty?
 
+  reject_conflicting_same_run_shakaperf_associations!(matches)
   candidates = preferred_shakaperf_release_tracker_candidates(matches, head_sha:)
   candidates = resolve_shakaperf_release_tracker_candidate_conflict!(candidates)
   candidates.find { |entry| entry[:kind] == :association } || candidates.first
@@ -1493,6 +1517,12 @@ rescue ShakaperfGateObservationError => e
   abort "❌ Saved ShakaPerf release tracker evidence could not be re-observed; refusing dispatch.\n\n#{e.message}"
 end
 
+def shakaperf_association_backed_run(run:, entry:, record:)
+  return run unless entry[:kind] == :association
+
+  ShakaperfAssociationBackedRun.from_verified_association(run:, association: record)
+end
+
 def reuse_shakaperf_release_tracker_evidence(repo_slug:, monorepo_root:, tracker:, ref:, head_sha:, target_version:,
                                              release_started_at:, run_id: nil, expected_association_identity: nil)
   entry = selected_shakaperf_release_tracker_record!(
@@ -1517,6 +1547,7 @@ def reuse_shakaperf_release_tracker_evidence(repo_slug:, monorepo_root:, tracker
   )
   return nil unless reusable_saved_shakaperf_evidence?(entry:, run_id:, rejection:, run_url: run.fetch("url"))
 
+  run = shakaperf_association_backed_run(run:, entry:, record:)
   tracker_url = "https://github.com/#{repo_slug}/issues/#{tracker}"
   puts "✓ Reusing verified ShakaPerf release tracker evidence from #{tracker_url}: #{run.fetch('url')}"
   run
@@ -1968,11 +1999,11 @@ def select_and_verify_shakaperf_release_gate_run!(repo_slug:, monorepo_root:, tr
   )
   abort "❌ Selected ShakaPerf run is not reusable: #{rejection}." if rejection
 
-  persist_verified_shakaperf_release_tracker_evidence!(
+  association = persist_verified_shakaperf_release_tracker_evidence!(
     repo_slug:, tracker:, ref:, head_sha: evidence.fetch("candidate_sha"), target_version:, run:, evidence:
   )
   puts "✓ Selected ShakaPerf run passed schema-v2 verification: #{run.fetch('url')}"
-  run
+  ShakaperfAssociationBackedRun.from_verified_association(run:, association:)
 end
 
 def fetch_shakaperf_release_gate_runs(repo_slug:, ref:)
@@ -6813,7 +6844,7 @@ rescue KeyError
 end
 
 def ordinary_stable_shakaperf_association_context_applicable?(tracker:, run:, target_version:)
-  tracker && !release_prerelease_version?(target_version) && run.is_a?(Hash) &&
+  tracker && !release_prerelease_version?(target_version) && run.is_a?(ShakaperfAssociationBackedRun) &&
     run.values_at("status", "conclusion") == %w[completed success]
 end
 
@@ -6862,6 +6893,12 @@ def ordinary_stable_shakaperf_association_context!(repo_slug:, tracker:, run:, r
   end
 
   association = entry.fetch(:record)
+  current_identity = SHAKAPERF_RELEASE_TRACKER_ASSOCIATION_IDENTITY_FIELDS.to_h do |field|
+    [field, association[field]]
+  end
+  unless current_identity == run.association_identity
+    abort "❌ ShakaPerf association provenance changed before context creation."
+  end
   unless association.values_at("run_id", "run_attempt", "run_url") ==
          expected_run.values_at("run_id", "attempt", "run_url")
     abort "❌ Ordinary stable ShakaPerf association context does not match the successful selected run."

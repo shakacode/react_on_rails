@@ -2064,7 +2064,12 @@ RSpec.describe "release.rake helper methods" do
     end
 
     it "uses an explicit run selector only after schema-v2 verification and saves the association" do
+      candidate_sha = "a" * 40
       selected_run = run.merge(
+        "headSha" => candidate_sha,
+        "displayTitle" => shakaperf_release_gate_display_title(
+          ref: "release-branch", head_sha: candidate_sha, target_version:
+        ),
         "status" => "completed",
         "conclusion" => "success",
         "updatedAt" => "2026-07-14T12:30:00Z"
@@ -2075,7 +2080,7 @@ RSpec.describe "release.rake helper methods" do
         "run_id" => 123_456,
         "run_url" => selected_run.fetch("url"),
         "branch" => "release-branch",
-        "candidate_sha" => head_sha,
+        "candidate_sha" => candidate_sha,
         "target_version" => target_version,
         "conclusion" => "success",
         "runtime_tree_fingerprint" => "a" * 64,
@@ -2089,17 +2094,22 @@ RSpec.describe "release.rake helper methods" do
         .with(repo_slug:, run: selected_run).and_return(schema_v2_evidence)
       allow(self).to receive(:shakaperf_release_gate_evidence_rejection)
         .with(hash_including(run: selected_run, evidence: schema_v2_evidence, require_prerun: false)).and_return(nil)
-      expect(self).to receive(:persist_verified_shakaperf_release_tracker_evidence!).with(
+      association = build_verified_shakaperf_release_tracker_record(
+        repo_slug:, tracker: 4806, ref: "release-branch", head_sha: candidate_sha,
+        target_version:, run: selected_run, evidence: schema_v2_evidence,
+        approved_by: "justin808", recorded_at: Time.iso8601("2026-07-14T12:31:00Z")
+      )
+      allow(self).to receive(:persist_verified_shakaperf_release_tracker_evidence!).with(
         hash_including(
           repo_slug:,
           tracker: 4806,
           ref: "release-branch",
-          head_sha:,
+          head_sha: candidate_sha,
           target_version:,
           run: selected_run,
           evidence: schema_v2_evidence
         )
-      )
+      ).and_return(association)
       expect(self).not_to receive(:fetch_shakaperf_release_gate_runs)
       expect(self).not_to receive(:dispatch_shakaperf_release_gate_workflow!)
       expect(self).not_to receive(:watch_shakaperf_release_gate_run!)
@@ -2107,7 +2117,7 @@ RSpec.describe "release.rake helper methods" do
       result = run_shakaperf_release_gate!(
         monorepo_root:,
         ref: "release-branch",
-        head_sha:,
+        head_sha: candidate_sha,
         target_version:,
         release_started_at:,
         allow_override: false,
@@ -2117,6 +2127,12 @@ RSpec.describe "release.rake helper methods" do
       )
 
       expect(result).to eq(selected_run)
+      expect(result).to be_a(ShakaperfAssociationBackedRun)
+      expect(result).to be_frozen
+      expect(result.association_identity).to include("run_id" => 123_456, "candidate_sha" => candidate_sha)
+      expect(self).to have_received(:persist_verified_shakaperf_release_tracker_evidence!).with(
+        hash_including(head_sha: candidate_sha, run: selected_run, evidence: schema_v2_evidence)
+      )
     end
 
     it "rejects contradictory same-run association identities independent of tracker order" do
@@ -2162,6 +2178,39 @@ RSpec.describe "release.rake helper methods" do
               resolve_shakaperf_release_tracker_candidate_conflict!(entries)
             end.to raise_error(SystemExit, /conflicting ShakaPerf associations for the same run/i)
           end
+        end
+      end
+    end
+
+    it "rejects contradictory same-run associations before exact-head preference in both record orders" do
+      exact_sha = "a" * 40
+      other_sha = "b" * 40
+      selected_run = run.merge(
+        "headSha" => exact_sha,
+        "status" => "completed",
+        "conclusion" => "success"
+      )
+      evidence = { "runtime_tree_fingerprint" => "a" * 64 }
+      build_record = lambda do |candidate_sha|
+        build_verified_shakaperf_release_tracker_record(
+          repo_slug:, tracker: 4806, ref: "release-branch", head_sha: candidate_sha,
+          target_version:, run: selected_run, evidence:,
+          approved_by: "justin808", recorded_at: Time.iso8601("2026-07-14T12:31:00Z")
+        )
+      end
+      exact_entry = { kind: :association, record: build_record.call(exact_sha) }
+      contradictory_entry = { kind: :association, record: build_record.call(other_sha) }
+
+      aggregate_failures do
+        [[exact_entry, contradictory_entry], [contradictory_entry, exact_entry]].each do |entries|
+          allow(self).to receive(:trusted_shakaperf_release_tracker_records!)
+            .with(repo_slug:, tracker: 4806).and_return(entries)
+
+          expect do
+            selected_shakaperf_release_tracker_record!(
+              repo_slug:, tracker: 4806, ref: "release-branch", head_sha: exact_sha, target_version:
+            )
+          end.to raise_error(SystemExit, /conflicting ShakaPerf associations for the same run/i)
         end
       end
     end
@@ -2649,8 +2698,12 @@ RSpec.describe "release.rake helper methods" do
 
     it "re-verifies a saved schema-v2 association after restart without dispatching" do
       candidate_sha = "a" * 40
+      stable_target = "17.0.0"
       selected_run = run.merge(
         "headSha" => candidate_sha,
+        "displayTitle" => shakaperf_release_gate_display_title(
+          ref: "release-branch", head_sha: candidate_sha, target_version: stable_target
+        ),
         "status" => "completed",
         "conclusion" => "success",
         "updatedAt" => "2026-07-14T12:30:00Z"
@@ -2662,7 +2715,7 @@ RSpec.describe "release.rake helper methods" do
         "run_url" => selected_run.fetch("url"),
         "branch" => "release-branch",
         "candidate_sha" => candidate_sha,
-        "target_version" => target_version,
+        "target_version" => stable_target,
         "conclusion" => "success",
         "runtime_tree_fingerprint" => "a" * 64,
         "completed_at" => "2026-07-14T12:29:59Z"
@@ -2672,7 +2725,7 @@ RSpec.describe "release.rake helper methods" do
         tracker: 4806,
         ref: "release-branch",
         head_sha: candidate_sha,
-        target_version:,
+        target_version: stable_target,
         run: selected_run,
         evidence: schema_v2_evidence,
         approved_by: "justin808",
@@ -2693,7 +2746,7 @@ RSpec.describe "release.rake helper methods" do
         monorepo_root:,
         ref: "release-branch",
         head_sha: candidate_sha,
-        target_version:,
+        target_version: stable_target,
         release_started_at:,
         allow_override: false,
         dry_run: false,
@@ -2701,6 +2754,13 @@ RSpec.describe "release.rake helper methods" do
       )
 
       expect(result).to eq(selected_run)
+      expect(result).to be_a(ShakaperfAssociationBackedRun)
+      expect(
+        ordinary_stable_shakaperf_association_context!(
+          repo_slug:, tracker: 4806, run: result, ref: "release-branch", head_sha: candidate_sha,
+          target_version: stable_target, release_started_at:
+        )
+      ).to include(release_tracker: 4806, expected_run: hash_including("run_id" => 123_456))
     end
 
     it "rejects a mismatched live selected-run identity before reusing a durable association" do
@@ -14450,6 +14510,11 @@ RSpec.describe "release.rake helper methods" do
         "runtime_tree_fingerprint" => "a" * 64,
         "completed_at" => "2026-07-14T14:29:59Z"
       }
+      association = build_verified_shakaperf_release_tracker_record(
+        repo_slug:, tracker: 3823, ref: "release/17.0.0", head_sha: final_head_sha,
+        target_version: "17.0.0", run: raw_rest_run, evidence: schema_v2_evidence,
+        approved_by: "justin808", recorded_at: Time.iso8601("2026-07-14T14:31:00Z")
+      )
       success_status = instance_double(Process::Status, success?: true)
       allow(self).to receive(:github_repo_slug).with("/tmp/repo").and_return(repo_slug)
       allow(self).to receive(:fetch_shakaperf_release_tracker_comments!)
@@ -14457,12 +14522,13 @@ RSpec.describe "release.rake helper methods" do
       allow(self).to receive(:capture_gh_output)
         .with("api", "repos/#{repo_slug}/actions/runs/654321")
         .and_return([JSON.generate(raw_rest_run), success_status])
-      allow(self).to receive(:fetch_shakaperf_release_gate_evidence)
-        .and_return(schema_v2_evidence)
+      allow(self).to receive_messages(
+        fetch_shakaperf_release_gate_evidence: schema_v2_evidence,
+        persist_verified_shakaperf_release_tracker_evidence!: association
+      )
       allow(self).to receive(:shakaperf_runtime_tree_fingerprint_verdict)
         .with(monorepo_root: "/tmp/repo", sha: final_head_sha)
         .and_return(ShakaperfVerificationResult.verified("a" * 64))
-      allow(self).to receive(:persist_verified_shakaperf_release_tracker_evidence!)
       allow(self).to receive(:accelerated_shakaperf_snapshot).and_call_original
       allow(Time).to receive(:now).and_return(Time.iso8601("2026-07-14T14:31:00Z"))
 
@@ -16656,11 +16722,14 @@ RSpec.describe "release.rake helper methods" do
         recorded_at: Time.utc(2026, 7, 14, 12, 31)
       )
     end
+    let(:association_backed_run) do
+      ShakaperfAssociationBackedRun.from_verified_association(run:, association:)
+    end
     let(:context) do
       ordinary_stable_shakaperf_association_context!(
         repo_slug:,
         tracker: 3823,
-        run:,
+        run: association_backed_run,
         ref:,
         head_sha: release_candidate_sha,
         target_version:,
@@ -16694,16 +16763,50 @@ RSpec.describe "release.rake helper methods" do
       expect(valid_ordinary_stable_shakaperf_association_context?(context)).to be(false)
     end
 
-    it "fails closed when a stable successful tracker-backed run has no canonical association" do
+    it "fails closed when a provenance-marked run loses its canonical association before context creation" do
+      provenance_run = ShakaperfAssociationBackedRun.from_verified_association(run:, association:)
       allow(self).to receive(:trusted_shakaperf_release_tracker_records!)
         .with(repo_slug:, tracker: 3823).and_return([])
 
       expect do
         ordinary_stable_shakaperf_association_context!(
-          repo_slug:, tracker: 3823, run:, ref:, head_sha: release_candidate_sha,
+          repo_slug:, tracker: 3823, run: provenance_run, ref:, head_sha: release_candidate_sha,
           target_version:, release_started_at: Time.utc(2026, 7, 14, 14)
         )
       end.to raise_error(SystemExit, /successful tracker-backed ShakaPerf run.*canonical association/i)
+    end
+
+    it "fails closed when a provenance-marked association mutates before context creation" do
+      provenance_run = ShakaperfAssociationBackedRun.from_verified_association(run:, association:)
+      mutated_association = association.merge("evidence_digest" => "d" * 64)
+      allow(self).to receive(:trusted_shakaperf_release_tracker_records!)
+        .with(repo_slug:, tracker: 3823).and_return([{ kind: :association, record: mutated_association }])
+
+      expect do
+        ordinary_stable_shakaperf_association_context!(
+          repo_slug:, tracker: 3823, run: provenance_run, ref:, head_sha: release_candidate_sha,
+          target_version:, release_started_at: Time.utc(2026, 7, 14, 14)
+        )
+      end.to raise_error(SystemExit, /association provenance changed before context creation/i)
+    end
+
+    it "leaves a successful fresh-discovery fallback unassociated even when a tracker was consulted" do
+      allow(self).to receive(:trusted_shakaperf_release_tracker_records!)
+        .with(repo_slug:, tracker: 3823).and_return([])
+      externally_spoofed_run = run.merge(
+        "shakaperfAssociationIdentity" => SHAKAPERF_RELEASE_TRACKER_ASSOCIATION_IDENTITY_FIELDS.to_h do |field|
+          [field, association[field]]
+        end
+      )
+
+      result = nil
+      expect do
+        result = ordinary_stable_shakaperf_association_context!(
+          repo_slug:, tracker: 3823, run: externally_spoofed_run, ref:, head_sha: release_candidate_sha,
+          target_version:, release_started_at: Time.utc(2026, 7, 14, 14)
+        )
+      end.not_to raise_error
+      expect(result).to be_nil
     end
 
     it "leaves waiver, prerelease, skipped, and trackerless direct-run paths non-applicable" do
