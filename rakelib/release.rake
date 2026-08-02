@@ -1191,7 +1191,26 @@ def latest_shakaperf_release_tracker_candidates(candidates)
   candidates.select { |entry| entry.dig(:record, "recorded_at") == latest_recorded_at }
 end
 
+def reject_conflicting_same_run_shakaperf_associations!(candidates)
+  association_identities_by_run_id = {}
+  candidates.each do |entry|
+    next unless entry[:kind] == :association
+
+    record = entry.fetch(:record)
+    run_id = record.fetch("run_id").to_i
+    identity = SHAKAPERF_RELEASE_TRACKER_ASSOCIATION_IDENTITY_FIELDS.map { |field| record[field] }
+    existing_identity = association_identities_by_run_id[run_id]
+    if existing_identity && existing_identity != identity
+      abort "❌ Release tracker contains conflicting ShakaPerf associations for the same run."
+    end
+
+    association_identities_by_run_id[run_id] = identity
+  end
+end
+
 def resolve_shakaperf_release_tracker_candidate_conflict!(candidates)
+  reject_conflicting_same_run_shakaperf_associations!(candidates)
+
   run_ids = shakaperf_release_tracker_candidate_run_ids(candidates)
   return candidates unless run_ids.length > 1
 

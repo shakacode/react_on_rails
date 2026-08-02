@@ -2119,6 +2119,53 @@ RSpec.describe "release.rake helper methods" do
       expect(result).to eq(selected_run)
     end
 
+    it "rejects contradictory same-run association identities independent of tracker order" do
+      candidate_sha = "a" * 40
+      selected_run = run.merge(
+        "headSha" => candidate_sha,
+        "status" => "completed",
+        "conclusion" => "success",
+        "updatedAt" => "2026-07-14T12:30:00Z"
+      )
+      evidence = {
+        "runtime_tree_fingerprint" => "a" * 64,
+        "completed_at" => "2026-07-14T12:29:59Z"
+      }
+      build_record = lambda do |record_evidence|
+        build_verified_shakaperf_release_tracker_record(
+          repo_slug:,
+          tracker: 4806,
+          ref: "release-branch",
+          head_sha: candidate_sha,
+          target_version:,
+          run: selected_run,
+          evidence: record_evidence,
+          approved_by: "justin808",
+          recorded_at: Time.iso8601("2026-07-14T12:31:00Z")
+        )
+      end
+      canonical_entry = { kind: :association, record: build_record.call(evidence) }
+      contradictions = [
+        build_record.call(evidence.merge("completed_at" => "2026-07-14T12:30:00Z")),
+        build_record.call(evidence.merge("runtime_tree_fingerprint" => "b" * 64))
+      ]
+
+      expect(
+        resolve_shakaperf_release_tracker_candidate_conflict!([canonical_entry, canonical_entry.dup])
+      ).to eq([canonical_entry, canonical_entry.dup])
+
+      aggregate_failures do
+        contradictions.each do |record|
+          contradictory_entry = { kind: :association, record: }
+          [[canonical_entry, contradictory_entry], [contradictory_entry, canonical_entry]].each do |entries|
+            expect do
+              resolve_shakaperf_release_tracker_candidate_conflict!(entries)
+            end.to raise_error(SystemExit, /conflicting ShakaPerf associations for the same run/i)
+          end
+        end
+      end
+    end
+
     it "rejects a mismatched live selected-run identity before persisting an explicit selector" do
       selected_run = run.merge(
         "status" => "completed",
