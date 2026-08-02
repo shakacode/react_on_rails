@@ -994,13 +994,16 @@ def handle_shakaperf_release_gate_violation!(message:)
     #{message}
 
     The version-bump commit may already be pushed to the remote without a tag or published packages.
-    For a transient gate failure, retry the release from that same commit; the version bump is already present.
-    If the gate should not be retried, push a revert commit before retrying the release.
+    Preserve the failure evidence; do not rerun or revert this partial release.
+    Follow the partial-publication recovery procedure in the release-train runbook.
 
-    For an explicitly approved prerelease override only (when ShakaPerf is known-unrelated):
-      RELEASE_CI_STATUS_OVERRIDE=true bundle exec rake release[...]
+    Preview an explicitly approved prerelease override only (when ShakaPerf is known-unrelated):
+      RELEASE_CI_STATUS_OVERRIDE=true bundle exec rake "release[VERSION,true]"
       # or pass override_ci_status as the 4th positional argument:
-      bundle exec rake "release[VERSION,false,false,true]"
+      bundle exec rake "release[VERSION,true,false,true]"
+    #{release_version_placeholder_guidance}
+
+    #{release_compound_live_boundary_guidance}
   ERROR
 end
 
@@ -2431,10 +2434,13 @@ def print_shakaperf_release_gate_notice(ref:, head_sha:)
     Fresh dispatches can take up to #{start_timeout_minutes} minutes to appear before watching starts.
     Once a run is found, this release task will watch it for up to #{watch_timeout_minutes} minutes.
     A fresh dispatch can therefore block for up to about #{fresh_dispatch_timeout_minutes} minutes total.
-    To skip only for an explicitly approved prerelease where ShakaPerf is known-unrelated:
-      RELEASE_CI_STATUS_OVERRIDE=true bundle exec rake release[...]
+    To preview the skip only for an explicitly approved prerelease where ShakaPerf is known-unrelated:
+      RELEASE_CI_STATUS_OVERRIDE=true bundle exec rake "release[VERSION,true]"
       # or pass override_ci_status as the 4th positional argument:
-      bundle exec rake "release[VERSION,false,false,true]"
+      bundle exec rake "release[VERSION,true,false,true]"
+    #{release_version_placeholder_guidance}
+
+    #{release_compound_live_boundary_guidance}
   NOTICE
 end
 
@@ -3142,8 +3148,11 @@ def release_branch_already_exists_message(release_branch:)
   <<~MESSAGE.chomp
     ❌ #{release_branch} already exists.
 
-    Continue the existing release line instead of starting a new one:
-      git checkout #{release_branch} && bundle exec rake release
+    Preview the existing release line after selecting #{release_branch} through the guarded runbook procedure:
+      bundle exec rake "release[VERSION,true]"
+    #{release_version_placeholder_guidance}
+
+    #{release_compound_live_boundary_guidance}
   MESSAGE
 end
 
@@ -3156,17 +3165,19 @@ def release_line_started_next_steps(release_branch:)
       1. Wait for at least one CI run to finish on the #{release_branch} tip
          (the release gate evaluates the branch tip; a just-pushed branch has no checks yet).
       2. Ensure the rc changelog header is present on the branch: /update-changelog rc
-      3. Cut rc.0 from the branch: bundle exec rake release
-         (the version is read from CHANGELOG.md).
+      3. Preview the exact CHANGELOG.md version from the branch: bundle exec rake "release[VERSION,true]"
+    #{release_version_placeholder_guidance}
+
+    #{release_compound_live_boundary_guidance}
   MESSAGE
 end
 
-# Manual recipe printed when the offer cannot run interactively (non-TTY) — the
-# operator runs these two commands themselves, then re-runs `rake release`.
+# Pointer-only guidance printed when the offer cannot run interactively
+# (non-TTY). It names what the guarded runbook procedure would do without
+# emitting live branch-creation or push commands.
 def release_branch_manual_cut_recipe(release_branch:)
   <<~MESSAGE.chomp
-    git checkout -b #{release_branch} origin/main
-    git push -u origin #{release_branch}
+    The guarded runbook procedure would create #{release_branch} from origin/main and push it.
   MESSAGE
 end
 
@@ -3216,13 +3227,28 @@ def release_branch_cut_offer_non_interactive_message(release_branch:)
   <<~MESSAGE.chomp
     ❌ Refusing to auto-create #{release_branch} without a terminal (non-interactive shell).
 
-    Start the release line manually, then re-run the release:
+    Use the guarded runbook procedure to start the release line, then preview the release:
     #{release_branch_manual_cut_recipe(release_branch:)}
+    bundle exec rake "release[VERSION,true]"
+    #{release_version_placeholder_guidance}
+
+    #{release_compound_live_boundary_guidance}
   MESSAGE
+end
+
+def release_line_legacy_live_prompt_warning(release_branch:)
+  <<~WARNING.chomp
+    ⚠️ LEGACY LIVE RELEASE-LINE PATH
+    Answering yes will create and push #{release_branch} without the release-line lease.
+    This remains technically possible only for backward compatibility and violates current repository release policy.
+    Operators and agents must answer no and follow the individually guarded procedure in
+    internal/contributor-info/release-train-runbook.md.
+  WARNING
 end
 
 def prompt_and_start_release_line!(monorepo_root:, release_branch:)
   base_version = release_branch.delete_prefix("release/")
+  puts release_line_legacy_live_prompt_warning(release_branch:)
   print "Start the #{base_version} release line now? [y/N]: "
   $stdout.flush
   answer = $stdin.gets&.strip&.downcase
@@ -7842,11 +7868,13 @@ end
 
 def main_ci_status_override_guidance(prefix: "")
   <<~GUIDANCE.strip
-    #{prefix}DANGEROUS PRERELEASE-ONLY LAST RESORT — override only if the failures are known-unrelated to this release:
+    #{prefix}DANGEROUS PRERELEASE-ONLY LAST RESORT — preview an override only if the failures are known-unrelated:
     #{prefix}this waives the release CI-status gate and does not establish healthy CI evidence.
-    #{prefix}  RELEASE_CI_STATUS_OVERRIDE=true bundle exec rake release[...]
+    #{prefix}  RELEASE_CI_STATUS_OVERRIDE=true bundle exec rake "release[VERSION,true]"
     #{prefix}  # or pass override_ci_status as the 4th positional argument:
-    #{prefix}  bundle exec rake "release[VERSION,false,false,true]"
+    #{prefix}  bundle exec rake "release[VERSION,true,false,true]"
+    #{release_version_placeholder_guidance(prefix:)}
+    #{release_compound_live_boundary_guidance.lines.map { |line| "#{prefix}#{line}" }.join}
   GUIDANCE
 end
 
@@ -8112,8 +8140,10 @@ def exact_head_recovery_guidance(repo_slug:, head_sha:, evaluated_sha:, required
 
     <<~GUIDANCE.strip
       ✓ Exact HEAD #{head_sha[0, 8]} has complete healthy CI evidence.
-      To re-evaluate and enforce that exact HEAD (strict evaluation, not a waiver):
-        RELEASE_CI_EVALUATE_HEAD=true bundle exec rake "release[#{target_gem_version}]"
+      Preview a re-evaluation of that exact HEAD (strict evaluation, not a waiver):
+        RELEASE_CI_EVALUATE_HEAD=true bundle exec rake "release[#{target_gem_version},true]"
+
+      #{release_compound_live_boundary_guidance}
     GUIDANCE
   when :in_progress
     "⏳ Exact HEAD #{head_sha[0, 8]} still has pending CI evidence. " \
@@ -8407,6 +8437,29 @@ def report_release_dry_run_changelog(version:, has_changelog:)
        "no GitHub release would be created."
 end
 
+def release_compound_live_boundary_guidance
+  <<~GUIDANCE.chomp
+    Live compound release remains BLOCKED by operational and agent policy until the repository-owned
+    lifetime/per-write lease wrapper exists. This is not runtime enforcement: the release tasks remain
+    technically callable in live mode. Direct live invocation outside the individually guarded procedure in
+    internal/contributor-info/release-train-runbook.md violates repository policy.
+  GUIDANCE
+end
+
+def release_version_placeholder_guidance(prefix: "")
+  "#{prefix}Replace VERSION with the exact requested version or the exact CHANGELOG.md version " \
+    "before running this preview."
+end
+
+def report_release_dry_run_follow_up(version:)
+  puts <<~GUIDANCE
+
+    #{release_compound_live_boundary_guidance}
+    Preview this exact version again with:
+      bundle exec rake "release[#{version},true]"
+  GUIDANCE
+end
+
 def report_github_release_notes_preflight!(version:, changelog_notes:)
   return unless changelog_notes
 
@@ -8424,8 +8477,10 @@ def confirm_release!(version:, monorepo_root:, dry_run: false)
       ❌ Stable release #{version} requires a non-empty CHANGELOG.md section.
 
       Refusing to continue before confirmation, tagging, or publication.
-      Stamp the changelog for #{version}, complete the final-release gates, and retry explicitly:
-        bundle exec rake "release[#{version}]"
+      Stamp the changelog for #{version}, complete the final-release gates, and preview explicitly:
+        bundle exec rake "release[#{version},true]"
+
+      #{release_compound_live_boundary_guidance}
     ERROR
   end
 
@@ -8584,9 +8639,20 @@ def abort_github_release_publish_failure!(tag)
   abort <<~ERROR
     ❌ Failed to publish GitHub release #{tag}.
 
-    The git tag and registry packages may already be published. Retry only the idempotent GitHub step:
-      bundle exec rake "sync_github_release[#{version}]"
+    The git tag and registry packages may already be published.
+    #{github_release_sync_preview_guidance(version:)}
   ERROR
+end
+
+def github_release_sync_preview_guidance(version:)
+  <<~GUIDANCE.chomp
+    Live GitHub release recovery remains BLOCKED by operational and agent policy until the repository-owned
+    lifetime/per-write lease wrapper exists. This is not runtime enforcement: sync_github_release remains
+    technically callable in live mode. Direct live invocation outside the individually guarded procedure in
+    internal/contributor-info/release-train-runbook.md violates repository policy.
+    Preview the idempotent GitHub-only sync step with:
+      bundle exec rake "sync_github_release[#{version},true]"
+  GUIDANCE
 end
 
 # rubocop:disable Metrics/AbcSize
@@ -8634,8 +8700,8 @@ def sync_github_release_after_publish(monorepo_root:, gem_version:, dry_run:)
   unless section
     puts "################################################################################"
     puts "Skipping GitHub release: no CHANGELOG.md section for #{gem_version}."
-    puts "After adding the changelog section, run:"
-    puts "bundle exec rake \"sync_github_release[#{gem_version}]\""
+    puts "After adding the changelog section:"
+    puts github_release_sync_preview_guidance(version: gem_version)
     puts "################################################################################"
     return
   end
@@ -8698,12 +8764,14 @@ def argumentless_prerelease_release_message(changelog_version:, current_version:
 
     Refusing to infer stable #{stable_version} from an argument-less prerelease retry.
 
-    To resume #{current_version} publication, run:
-      bundle exec rake "release[#{current_version}]"
+    To preview resuming #{current_version} publication, run:
+      bundle exec rake "release[#{current_version},true]"
 
     To prepare the final #{stable_version} release, add a non-empty CHANGELOG.md section for #{stable_version},
-    complete the final-release gates, then run:
-      bundle exec rake "release[#{stable_version}]"
+    complete the final-release gates, then preview:
+      bundle exec rake "release[#{stable_version},true]"
+
+    #{release_compound_live_boundary_guidance}
   ERROR
 end
 
@@ -9355,9 +9423,14 @@ skip git branch checks, allowing releases from non-main branches. A stable relea
 `main` (standard) or from a matching `release/X.Y.Z` branch (release-train RC -> final promotion,
 see internal/contributor-info/release-train-runbook.md).
 
-Retry safety: Never drop the version argument when resuming an interrupted release. Always retry
-the exact version, for example `bundle exec rake \"release[16.2.0.rc.1]\"`. An argument-less command
-from a prerelease checkout fails closed instead of inferring promotion to the stable version.
+Retry safety: Never drop the version argument when previewing recovery from an interrupted release.
+Preview the exact version, for example `bundle exec rake \"release[16.2.0.rc.1,true]\"`. An argument-less
+command from a prerelease checkout fails closed instead of inferring promotion to the stable version.
+
+Live compound release remains BLOCKED by operational and agent policy until the repository-owned
+lifetime/per-write lease wrapper exists. This is not runtime enforcement: the release tasks remain
+technically callable in live mode. Direct live invocation outside the individually guarded procedure in
+internal/contributor-info/release-train-runbook.md violates repository policy.
 
 This will update and release:
   PUBLIC (npmjs.org + rubygems.org):
@@ -9401,7 +9474,8 @@ Release CI policy:
   RELEASE_SHAKAPERF_RUN can bind an already successful exact run to RELEASE_TRACKER after full
   GitHub/schema-v2 verification. Later invocations re-fetch and re-verify that durable association.
   If that gate fails, the remote branch has the version-bump commit but no release
-  tag or published packages; retry from that commit or push a revert commit first.
+  tag or published packages. Preserve the failure evidence; do not rerun or revert
+  this partial release. Follow the partial-publication recovery procedure in the runbook.
   In-progress checks and failing gates block the release until they pass. An explicitly approved
   prerelease-only waiver may use the 4th argument or RELEASE_CI_STATUS_OVERRIDE=true.
   An explicit RC may instead use the audited accelerated path to publish while only pending
@@ -9423,19 +9497,17 @@ Environment variables:
   GEM_RELEASE_MAX_RETRIES=<n>  # Positive base-10 integer max retry attempts (default: 3)
 
 Examples:
-  rake release                                  # Auto-detect version; stable targets require changelog
-  rake release[patch]                           # Bump patch version (16.1.1 → 16.1.2)
-  rake release[minor]                           # Bump minor version (16.1.1 → 16.2.0)
-  rake release[major]                           # Bump major version (16.1.1 → 17.0.0)
-  rake release[16.2.0]                          # Set explicit version
-  rake release[16.2.0.beta.1]                   # Set pre-release version (→ 16.2.0-beta.1 for NPM)
+  rake \"release[,true]\"                       # Preview auto-detected version
+  rake \"release[patch,true]\"                  # Preview patch bump (16.1.1 → 16.1.2)
+  rake \"release[minor,true]\"                  # Preview minor bump (16.1.1 → 16.2.0)
+  rake \"release[major,true]\"                  # Preview major bump (16.1.1 → 17.0.0)
+  rake \"release[16.2.0,true]\"                 # Preview explicit version
+  rake \"release[16.2.0.beta.1,true]\"          # Preview prerelease (→ 16.2.0-beta.1 for NPM)
   RELEASE_ACCELERATED_RC=true RELEASE_TRACKER=<issue> RELEASE_ACCELERATED_RC_REASON=<reason> \
-    rake release[16.2.0.rc.1]                   # Publish an RC while named pending gates finish
+    rake \"release[16.2.0.rc.1,true]\"          # Preview an accelerated RC
   RELEASE_TRACKER=<issue> RELEASE_SHAKAPERF_RUN=<run-id-or-url> \
-    rake release[16.2.0]                        # Verify and durably bind an existing exact run
-  rake release[patch,true]                      # Dry run
-  VERBOSE=1 rake release[patch]                 # Release with verbose logging
-  NPM_OTP=123456 RUBYGEMS_OTP=789012 rake release[patch]  # Skip OTP prompts")
+    rake \"release[16.2.0,true]\"               # Preview the selector's target and tracker inputs
+  VERBOSE=1 rake \"release[patch,true]\"        # Preview with verbose logging")
 task :release, %i[version dry_run override_version_policy override_ci_status] do |_t, args|
   monorepo_root = current_monorepo_root
   release_started_at = Time.now.utc
@@ -9624,8 +9696,10 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
           - release/#{resolved_target_gem_version} (RC → final promotion, per the release-train runbook):
               promote the last good RC in place; do not re-cut from main
 
-        For pre-release versions (beta, alpha, rc, etc.), you can release from any branch:
-          rake release[#{resolved_target_gem_version.sub(/(\d+\.\d+\.\d+)/, '\\1.beta.1')}]
+        For pre-release versions (beta, alpha, rc, etc.), preview from any branch with:
+          rake "release[#{resolved_target_gem_version.sub(/(\d+\.\d+\.\d+)/, '\\1.beta.1')},true]"
+
+        #{release_compound_live_boundary_guidance}
       ERROR
     end
 
@@ -9965,7 +10039,7 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
     puts "  - Gemfile.lock files (root, dummy apps, pro)"
     puts "\nAuto-synced (no write needed):"
     puts "  - react_on_rails_pro/react_on_rails_pro.gemspec (uses ReactOnRails::VERSION)"
-    puts "\nTo actually release, run: rake release[#{released_gem_version}]"
+    report_release_dry_run_follow_up(version: released_gem_version)
   else
     sync_github_release_after_publish(monorepo_root:, gem_version: released_gem_version, dry_run: false)
 
@@ -10004,13 +10078,17 @@ end
 
 desc("Creates or updates a GitHub release from CHANGELOG.md for an already-published version.
 
+Live GitHub release recovery remains BLOCKED by operational and agent policy until the repository-owned
+lifetime/per-write lease wrapper exists. This is not runtime enforcement: sync_github_release remains
+technically callable in live mode. Direct live invocation outside the individually guarded procedure in
+internal/contributor-info/release-train-runbook.md violates repository policy. Preview only.
+
 Arguments:
 1st argument: Gem version in RubyGems format (required), e.g. 16.4.0 or 16.4.0.rc.1
 2nd argument: Dry run (true/false, default: false)
 
 Examples:
-  rake \"sync_github_release[16.4.0]\"
-  rake \"sync_github_release[16.4.0.rc.1]\"
+  rake \"sync_github_release[16.4.0,true]\"
   rake \"sync_github_release[16.4.0.rc.1,true]\"
 ")
 task :sync_github_release, %i[gem_version dry_run] do |_t, args|
@@ -10021,7 +10099,7 @@ task :sync_github_release, %i[gem_version dry_run] do |_t, args|
   requested_gem_version = args_hash[:gem_version].to_s.strip
   if requested_gem_version.empty?
     abort "❌ gem_version is required. Usage: " \
-          "rake \"sync_github_release[16.4.0]\" or rake \"sync_github_release[16.4.0.rc.1]\""
+          "rake \"sync_github_release[16.4.0,true]\" or rake \"sync_github_release[16.4.0.rc.1,true]\""
   end
   validate_requested_version_input!(requested_gem_version)
 
@@ -10073,7 +10151,9 @@ def resolve_release_start_base_version(version_arg, monorepo_root:)
     ❌ Could not determine which release line to start.
 
     The top CHANGELOG.md header is not an rc (found: #{changelog_version || 'none'}).
-    Pass the release line explicitly: bundle exec rake "release:start[17.0.0]"
+    Preview the release line explicitly: bundle exec rake "release:start[17.0.0,true]"
+
+    #{release_compound_live_boundary_guidance}
   ERROR
 end
 
@@ -10113,7 +10193,12 @@ namespace :release do
 Cuts the ephemeral release branch the release train stabilizes on. It does NOT tag rc.0 — the
 release CI gate evaluates the branch tip and a just-pushed branch has no checks yet, so creating
 the branch and cutting rc.0 must be two steps with a CI run between them. After CI runs on the new
-branch tip, run `bundle exec rake release` to cut rc.0 (version read from CHANGELOG.md).
+branch tip, preview rc.0 with `bundle exec rake \"release[17.0.0.rc.0,true]\"`.
+
+Live compound release remains BLOCKED by operational and agent policy until the repository-owned
+lifetime/per-write lease wrapper exists. This is not runtime enforcement: release:start remains technically
+callable in live mode. Direct live invocation outside the individually guarded procedure in
+internal/contributor-info/release-train-runbook.md violates repository policy.
 
 Arguments:
 1st argument: Release line base version X.Y.Z (optional). When omitted, derived from the top
@@ -10121,9 +10206,8 @@ Arguments:
 2nd argument: Dry run (true/false, default: false)
 
 Examples:
-  rake \"release:start[17.0.0]\"        # create + push release/17.0.0 from origin/main
-  rake release:start                   # derive the release line from CHANGELOG.md
-  rake \"release:start[17.0.0,true]\"   # dry run (create nothing)")
+  rake \"release:start[17.0.0,true]\"   # preview creating release/17.0.0 from origin/main
+  rake \"release:start[,true]\"         # preview a line derived from CHANGELOG.md")
   task :start, %i[version dry_run] do |_t, args|
     monorepo_root = current_monorepo_root
     args_hash = args.to_hash
