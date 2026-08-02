@@ -167,8 +167,9 @@ ReactOnRails.configure do |config|
   #   Served by: Never served to browsers
   #   Access: ReactOnRails::Utils.server_bundle_js_file_path
   #
-  # Example directory structure with recommended configuration:
-  #   app/
+  # Example directory structure with recommended configuration (paths relative to Rails root):
+  #   my-rails-app/
+  #   ├── app/
   #   ├── ssr-generated/           # Private server bundles
   #   │   ├── server-bundle.js
   #   │   └── rsc-bundle.js
@@ -181,7 +182,7 @@ ReactOnRails.configure do |config|
   ################################################################################
 
   # `prerender` means server-side rendering
-  # default is false. This is an option for view helpers `render_component` and `render_component_hash`.
+  # default is false. This is an option for view helpers `react_component` and `react_component_hash`.
   # Set to true to change the default value to true.
   config.prerender = false
 
@@ -220,7 +221,7 @@ ReactOnRails.configure do |config|
   # This configuration allows logic to be applied to client rendered props, such as stripping props that are only used during server rendering.
   # Add a module with an adjust_props_for_client_side_hydration method that expects the component's name & props hash
   # See below for an example definition of RenderingPropsExtension
-  config.rendering_props_extension = RenderingPropsExtension
+  # config.rendering_props_extension = RenderingPropsExtension
 
   ################################################################################
   # Server Renderer Configuration for ExecJS
@@ -242,7 +243,7 @@ ReactOnRails.configure do |config|
   ################################################################################
   ################################################################################
   # FILE SYSTEM BASED COMPONENT REGISTRY
-  # `render_component` and `render_component_hash` view helper methods can
+  # `react_component` and `react_component_hash` view helper methods can
   # auto-load the bundle for the generated component, to avoid having to specify the
   # bundle manually for each view with the component.
   #
@@ -290,10 +291,12 @@ ReactOnRails.configure do |config|
 
   # Configuration for how generated component packs are loaded.
   # Options: :sync, :async, :defer
-  # - :sync (default for Shakapacker < 8.2.0): Loads scripts synchronously
-  # - :async (default for Shakapacker ≥ 8.2.0): Loads scripts asynchronously for better performance
-  # - :defer: Defers script execution until after page load
-  config.generated_component_packs_loading_strategy = :async
+  # Defaults (auto-configured based on Shakapacker version and Pro license):
+  # - :async — Shakapacker 8.2.0+ with Pro license
+  # - :defer — Shakapacker 8.2.0+ without Pro license
+  # - :sync  — Shakapacker < 8.2.0
+  # You typically don't need to set this.
+  # config.generated_component_packs_loading_strategy = :defer
 
   # 🚫 REMOVED in v17.0.0: `defer_generated_component_packs` now raises NoMethodError at boot.
   # Use `generated_component_packs_loading_strategy` (above) instead:
@@ -330,9 +333,9 @@ ReactOnRails.configure do |config|
   #
   # Replace the following line to the location where you keep your client i18n yml files
   # that will source for automatic generation on translations.js & default.js
-  # By default(without this option) all yaml files from Rails.root.join("config", "locales")
-  # and installed gems are loaded
-  config.i18n_yml_dir = Rails.root.join("config", "locales")
+  # By default (without this option) all yaml files from Rails.root.join("config", "locales")
+  # and installed gems are loaded. Setting this explicitly scans only the specified directory.
+  # config.i18n_yml_dir = Rails.root.join("config", "locales")
 
   # Possible output formats are js and json
   # The default format is json
@@ -354,13 +357,6 @@ ReactOnRails.configure do |config|
   # 2. Remove ReactOnRails::TestHelper wiring
   ################################################################################
 
-  # If you are using this in your RSpec helper files:
-  #
-  # ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
-  #
-  # then this controls what yarn/pnpm/npm command is run
-  # to automatically refresh your Webpack assets on every test run.
-  #
 end
 ```
 
@@ -615,6 +611,8 @@ You can override the global setting per-component:
 react_component("MyComponent", prerender: false)  # Skip SSR for this component
 ```
 
+**Environment override:** Set `REACT_ON_RAILS_PRERENDER_OVERRIDE=true|false` to force prerendering on or off globally (e.g., disable SSR in development). Precedence: `REACT_ON_RAILS_PRERENDER_OVERRIDE` > component option (`prerender:`) > initializer default (`config.prerender`).
+
 ### Development and Debugging
 
 #### trace
@@ -782,10 +780,10 @@ Set to `nil` to disable i18n features.
 
 #### i18n_yml_dir
 
-**Type:** String
-**Default:** `Rails.root.join("config", "locales")`
+**Type:** String or nil
+**Default:** `nil` (uses Rails' built-in `i18n.load_path`, which includes `config/locales` and locale files from installed gems)
 
-Directory where i18n YAML source files are located:
+Directory where i18n YAML source files are located. Setting this explicitly scans **only** the specified directory, excluding gem-provided locale files:
 
 ```ruby
 config.i18n_yml_dir = Rails.root.join("config", "locales")
@@ -804,8 +802,8 @@ config.i18n_output_format = 'json'  # default
 
 #### i18n_yml_safe_load_options
 
-**Type:** Hash
-**Default:** `{}`
+**Type:** Hash or nil
+**Default:** `nil`
 
 Options passed to `YAML.safe_load` when reading locale files:
 
@@ -855,10 +853,10 @@ dev_server:
 **Type:** String
 **Default:** `Rails.root`
 
-Location of `node_modules` directory. With Shakapacker, this should typically be `""` (project root):
+Location of the `node_modules` directory. Defaults to `Rails.root`, which is correct for most setups. Only set this if `node_modules` lives in a different directory (e.g., a monorepo root):
 
 ```ruby
-config.node_modules_location = ""  # Shakapacker default
+config.node_modules_location = Rails.root.join("..")  # monorepo: node_modules is one level up
 ```
 
 The open-source gem always renders on the server with ExecJS; there is no configuration option to select a different server render method. For a standalone Node rendering process, use [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/)'s Node renderer, which is configured via `ReactOnRailsPro.configure`.
@@ -965,12 +963,13 @@ config.build_production_command = BuildProductionCommand
 Recommended directory structure with private server bundles:
 
 ```text
-app/
-├── ssr-generated/           # Private server bundles (never served to browsers)
+my-rails-app/                    # Rails root
+├── app/
+├── ssr-generated/               # Private server bundles (never served to browsers)
 │   ├── server-bundle.js
 │   └── rsc-bundle.js
 └── public/
-    └── webpack/development/ # Public client bundles (web-accessible)
+    └── webpack/development/     # Public client bundles (web-accessible)
         ├── application.js
         ├── manifest.json
         └── styles.css

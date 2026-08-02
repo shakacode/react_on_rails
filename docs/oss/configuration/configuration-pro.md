@@ -9,7 +9,7 @@ For general React on Rails configuration options, see [Configuration](README.md)
 
 1. You don't need to create an initializer if you are satisfied with the defaults as described below.
 1. Values beginning with `renderer` pertain only to using an external rendering server. You will need to ensure these values are consistent with your configuration for the external rendering server, as given in [JS configuration](../building-features/node-renderer/js-configuration.md)
-1. `config.prerender_caching` works for standard mini_racer server rendering and using an external rendering server.
+1. `config.prerender_caching` works for standard ExecJS server rendering and using an external rendering server.
 
 ## Example of Configuration
 
@@ -58,7 +58,7 @@ ReactOnRailsPro.configure do |config|
 
   # NodeRenderer is for a renderer that is stateless. It does not need restarting when the JS bundles
   # are updated. It is the only custom renderer currently supported. Leave blank to use the standard
-  # mini_racer rendering. Other option is NodeRenderer
+  # ExecJS rendering. Other option is NodeRenderer
   # Default for `server_renderer` is "ExecJS"
   config.server_renderer = "NodeRenderer"
 

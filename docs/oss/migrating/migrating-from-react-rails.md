@@ -41,7 +41,7 @@ Before swapping gems, check these first:
 
 1. **Webpacker vs Shakapacker**: if the app still uses `webpacker`, see [Preferred path for Webpacker-era apps](#preferred-path-for-webpacker-era-apps) above.
 2. **Bundler age**: some older `react-rails` apps still carry Bundler 1.x lockfiles. Those can fail on modern Ruby before you even reach the migration work.
-3. **Rails age**: current `react_on_rails` requires Rails 5.2+. Rails 5.1 / Webpacker 3 apps are usually a staged migration, not a one-command migration.
+3. **Rails age**: current `react_on_rails` requires Rails 7.1+ (due to the Ruby 3.3+ requirement). Older Rails apps need a Rails upgrade first.
 4. **Package manager metadata**: if you have `yarn.lock`, `pnpm-lock.yaml`, or `bun.lock*`, ensure `package.json` has a matching `packageManager` field (for example `npm@10.9.2`, `yarn@1.22.22`, `pnpm@10.12.1`, or `bun@1.2.13`).
 5. **Browserslist source**: use one source only. If `.browserslistrc` exists, remove `browserslist` from `package.json`.
 6. **JSX-in-.js projects**: current install generator auto-switches to Babel when JSX is detected in `.js` files. If your project has custom transpiler setup, review `config/shakapacker.yml` after generation.
@@ -275,7 +275,7 @@ If your app looks like this:
 then treat the migration as:
 
 1. Move from `webpacker` to `shakapacker` in its own PR.
-2. If the app is still on Rails 5.1, upgrade Rails to 5.2+ before adding current `react_on_rails`.
+2. If the app is on Rails < 7.1, upgrade Rails to 7.1+ before adding current `react_on_rails` (Ruby 3.3+ requires Rails 7.1+).
 3. Remove `react_ujs`.
 4. Run the React on Rails install generator.
 5. Replace helper syntax and component registration.

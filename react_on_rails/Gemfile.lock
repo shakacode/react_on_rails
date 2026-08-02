@@ -5,7 +5,7 @@ PATH
       addressable
       connection_pool
       execjs (~> 2.5)
-      rails (>= 5.2)
+      rails (>= 7.1)
       rainbow (~> 3.0)
       shakapacker (>= 6.0)
 

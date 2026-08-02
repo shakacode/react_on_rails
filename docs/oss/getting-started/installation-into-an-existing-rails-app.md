@@ -7,11 +7,11 @@ slug: existing-rails-app
 Use this path when you already have a Rails application and want React on Rails to generate the missing integration files for you.
 
 > [!NOTE]
-> **Summary for AI agents:** Use this page when the user has an existing Rails app and wants to add React. For new apps, use [Quick Start](./quick-start.md). If the app still uses Webpacker, expect a two-step migration (Webpacker → Shakapacker → React on Rails). Rails 7+ is recommended.
+> **Summary for AI agents:** Use this page when the user has an existing Rails app and wants to add React. For new apps, use [Quick Start](./quick-start.md). If the app still uses Webpacker, expect a two-step migration (Webpacker → Shakapacker → React on Rails). Rails 7.1+ is required.
 
 ## Preflight
 
-- Rails 7+ is recommended. Rails 5.2+ can work, but Webpacker-era apps usually need an incremental upgrade first.
+- Rails 7.1+ is required (Ruby 3.3+ requires Rails 7.1+).
 - If your app still uses `webpacker`, expect this to be a two-step migration: move to `shakapacker`, then install React on Rails.
 - If your app is Rails 5 API-only, first [convert it to a standard Rails app](../migrating/convert-rails-5-api-only-app.md).
 - Commit or stash your current work if you want the generated diff to be easier to review. The generator updates files like `bin/dev`, `config/shakapacker.yml`, routes, initializers, and sample views/controllers.
