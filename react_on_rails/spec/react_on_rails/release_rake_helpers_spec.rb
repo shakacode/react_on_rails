@@ -2585,6 +2585,68 @@ RSpec.describe "release.rake helper methods" do
       end.to raise_error(SystemExit, /malformed verified ShakaPerf association/)
     end
 
+    it "rejects every trusted comment containing more than one ShakaPerf marker family before dispatch" do
+      candidate_sha = "a" * 40
+      stable_target = "17.0.0"
+      observed_run = run.merge(
+        "headSha" => candidate_sha,
+        "displayTitle" => shakaperf_release_gate_display_title(
+          ref: "release-branch", head_sha: candidate_sha, target_version: stable_target
+        ),
+        "status" => "in_progress",
+        "conclusion" => nil
+      )
+      waiver = build_final_shakaperf_observation_waiver_record(
+        repo_slug:, tracker: 4806, ref: "release-branch", head_sha: candidate_sha,
+        target_version: stable_target, run: observed_run,
+        reason: "GitHub REST observer exhausted its quota", observation: "quota exhausted",
+        approved_by: "justin808", recorded_at: Time.iso8601("2026-07-14T12:31:00Z")
+      )
+      association = {
+        "schema_version" => SHAKAPERF_RELEASE_TRACKER_ASSOCIATION_SCHEMA_VERSION,
+        "repository" => repo_slug,
+        "release_tracker" => 4806,
+        "branch" => "release-branch",
+        "candidate_sha" => candidate_sha,
+        "target_version" => stable_target,
+        "workflow" => SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE,
+        "run_id" => 123_456,
+        "run_attempt" => 1,
+        "run_url" => "https://github.com/#{repo_slug}/actions/runs/123456",
+        "runtime_tree_fingerprint" => "b" * 64,
+        "evidence_digest" => "c" * 64,
+        "approved_by" => "justin808",
+        "recorded_at" => "2026-07-14T12:31:00Z"
+      }
+      mixed_bodies = [
+        final_shakaperf_observation_waiver_comment(waiver) +
+          "\n#{SHAKAPERF_RELEASE_TRACKER_ASSOCIATION_MARKER_OPENER}malformed -->",
+        final_shakaperf_observation_waiver_comment(waiver) +
+          "\n#{SHAKAPERF_RELEASE_TRACKER_EVIDENCE_MARKER}malformed\n-->",
+        verified_shakaperf_release_tracker_comment(association) +
+          "\n#{SHAKAPERF_RELEASE_TRACKER_EVIDENCE_MARKER}malformed\n-->"
+      ]
+      allow(self).to receive(:accelerated_rc_repository_comment_permission!)
+        .with(repo_slug:, login: "justin808", permissions: {}).and_return("maintain")
+
+      aggregate_failures do
+        mixed_bodies.each_with_index do |body, index|
+          comment = accelerated_rc_test_issue_comment(
+            id: 100 + index,
+            tracker: 4806,
+            body:,
+            user: { "login" => "justin808" }
+          )
+          allow(self).to receive(:fetch_shakaperf_release_tracker_comments!)
+            .with(repo_slug:, tracker: 4806).and_return([comment])
+
+          expect do
+            trusted_shakaperf_release_tracker_records!(repo_slug:, tracker: 4806)
+          end.to raise_error(SystemExit, /more than one ShakaPerf marker family/i)
+        end
+      end
+    end
+
     it "re-verifies a saved schema-v2 association after restart without dispatching" do
       candidate_sha = "a" * 40
       selected_run = run.merge(
@@ -15328,6 +15390,7 @@ RSpec.describe "release.rake helper methods" do
       ci_gate_index = release_task.index("validate_main_ci_status!")
       final_refresh_index = release_task.index("run_accepted_rc_final_promotion_gates!")
       direct_shakaperf_index = release_task.index("run_shakaperf_release_gate!")
+      ordinary_association_context_index = release_task.index("ordinary_stable_shakaperf_association_context!")
       ordinary_waiver_context_index = release_task.index("ordinary_stable_shakaperf_waiver_context!")
       tag_push_index = release_task.index("push_release_tag_for_candidate!")
       package_publish_index = release_task.index("Publishing PUBLIC packages to npmjs.org")
@@ -15362,6 +15425,8 @@ RSpec.describe "release.rake helper methods" do
       expect(ci_gate_index).to be < direct_shakaperf_index
       expect(final_refresh_index).to be < tag_push_index
       expect(direct_shakaperf_index).to be < tag_push_index
+      expect(direct_shakaperf_index).to be < ordinary_association_context_index
+      expect(ordinary_association_context_index).to be < tag_push_index
       expect(direct_shakaperf_index).to be < ordinary_waiver_context_index
       expect(ordinary_waiver_context_index).to be < tag_push_index
       expect(tag_push_index).to be < package_publish_index
@@ -15375,6 +15440,7 @@ RSpec.describe "release.rake helper methods" do
         "candidate_sha: validated_release_candidate_sha",
         "accelerated_boundary_record: accelerated_publication_record || accepted_rc_record",
         "accelerated_final_promotion_context: final_promotion_context",
+        "ordinary_stable_shakaperf_association_context:",
         "ordinary_stable_shakaperf_waiver_context:",
         "accelerated_rc_same_candidate_retry =",
         "shakaperf_waiver_reason = normalized_optional_release_value(",
@@ -16540,6 +16606,204 @@ RSpec.describe "release.rake helper methods" do
     end
   end
 
+  describe "#ordinary_stable_shakaperf_association_context!" do
+    let(:repo_slug) { "shakacode/react_on_rails" }
+    let(:ref) { "release/17.0.0" }
+    let(:tested_sha) { "b" * 40 }
+    let(:release_candidate_sha) { "e" * 40 }
+    let(:target_version) { "17.0.0" }
+    let(:run) do
+      {
+        "databaseId" => 654_321,
+        "attempt" => 1,
+        "displayTitle" => shakaperf_release_gate_display_title(
+          ref:, head_sha: tested_sha, target_version:
+        ),
+        "headSha" => tested_sha,
+        "headBranch" => ref,
+        "workflowPath" => ".github/workflows/#{SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE}@refs/heads/#{ref}",
+        "event" => "workflow_dispatch",
+        "repository" => repo_slug,
+        "status" => "completed",
+        "conclusion" => "success",
+        "url" => "https://github.com/shakacode/react_on_rails/actions/runs/654321"
+      }
+    end
+    let(:evidence) do
+      {
+        "schema_version" => 2,
+        "run_attempt" => 1,
+        "run_id" => 654_321,
+        "run_url" => run.fetch("url"),
+        "branch" => ref,
+        "candidate_sha" => tested_sha,
+        "target_version" => target_version,
+        "conclusion" => "success",
+        "runtime_tree_fingerprint" => "a" * 64,
+        "completed_at" => "2026-07-14T12:29:59Z"
+      }
+    end
+    let(:association) do
+      build_verified_shakaperf_release_tracker_record(
+        repo_slug:,
+        tracker: 3823,
+        ref:,
+        head_sha: tested_sha,
+        target_version:,
+        run:,
+        evidence:,
+        approved_by: "justin808",
+        recorded_at: Time.utc(2026, 7, 14, 12, 31)
+      )
+    end
+    let(:context) do
+      ordinary_stable_shakaperf_association_context!(
+        repo_slug:,
+        tracker: 3823,
+        run:,
+        ref:,
+        head_sha: release_candidate_sha,
+        target_version:,
+        release_started_at: Time.utc(2026, 7, 14, 14)
+      )
+    end
+
+    before do
+      allow(self).to receive(:trusted_shakaperf_release_tracker_records!)
+        .with(repo_slug:, tracker: 3823).and_return([{ kind: :association, record: association }])
+    end
+
+    it "carries a mutation-evident identity for the successful canonical association" do
+      expect(context).to include(
+        release_tracker: 3823,
+        release_branch: ref,
+        release_candidate_sha:,
+        target_version:,
+        expected_run: {
+          "run_id" => 654_321,
+          "attempt" => 1,
+          "run_url" => run.fetch("url"),
+          "status" => "completed",
+          "conclusion" => "success"
+        }
+      )
+      expect(context.fetch(:identity_anchor)).to be_frozen
+      expect(valid_ordinary_stable_shakaperf_association_context?(context)).to be(true)
+
+      context.fetch(:expected_run)["attempt"] = 2
+      expect(valid_ordinary_stable_shakaperf_association_context?(context)).to be(false)
+    end
+
+    it "fails closed when a stable successful tracker-backed run has no canonical association" do
+      allow(self).to receive(:trusted_shakaperf_release_tracker_records!)
+        .with(repo_slug:, tracker: 3823).and_return([])
+
+      expect do
+        ordinary_stable_shakaperf_association_context!(
+          repo_slug:, tracker: 3823, run:, ref:, head_sha: release_candidate_sha,
+          target_version:, release_started_at: Time.utc(2026, 7, 14, 14)
+        )
+      end.to raise_error(SystemExit, /successful tracker-backed ShakaPerf run.*canonical association/i)
+    end
+
+    it "leaves waiver, prerelease, skipped, and trackerless direct-run paths non-applicable" do
+      waived_run = run.merge("status" => "in_progress", "conclusion" => nil, "observationWaived" => true)
+      common = {
+        repo_slug:, ref:, head_sha: release_candidate_sha, release_started_at: Time.utc(2026, 7, 14, 14)
+      }
+
+      aggregate_failures do
+        expect(
+          ordinary_stable_shakaperf_association_context!(
+            **common, tracker: 3823, run: waived_run, target_version:
+          )
+        ).to be_nil
+        expect(
+          ordinary_stable_shakaperf_association_context!(
+            **common, tracker: 3823, run:, target_version: "17.0.0.rc.1"
+          )
+        ).to be_nil
+        expect(
+          ordinary_stable_shakaperf_association_context!(
+            **common, tracker: nil, run:, target_version:
+          )
+        ).to be_nil
+        expect(
+          ordinary_stable_shakaperf_association_context!(
+            **common, tracker: 3823, run: nil, target_version:
+          )
+        ).to be_nil
+      end
+    end
+
+    it "revalidates the exact successful run at both irreversible boundaries" do
+      allow(self).to receive(:github_repo_slug).with("/tmp/repo").and_return(repo_slug)
+      allow(self).to receive(:fetch_release_tracker_issue!).with(repo_slug:, tracker: 3823, target_version:)
+      allow(self).to receive(:fetch_shakaperf_release_gate_evidence_for_association!)
+        .with(repo_slug:, run: hash_including("databaseId" => 654_321)).and_return(evidence)
+      allow(self).to receive(:shakaperf_release_gate_evidence_rejection).and_return(nil)
+
+      phases = ["git tag push", "package publication"]
+      allow(self).to receive(:fetch_selected_shakaperf_release_gate_run!)
+        .with(repo_slug:, run_id: 654_321).and_return(run)
+      phases.each do |phase|
+        expect do
+          validate_ordinary_stable_shakaperf_association_boundary!(
+            monorepo_root: "/tmp/repo", context:, phase:
+          )
+        end.not_to raise_error
+      end
+
+      changed_runs = {
+        "rerun attempt" => run.merge("attempt" => 2),
+        "changed result" => run.merge("conclusion" => "failure"),
+        "changed identity" => run.merge("repository" => "other/repository")
+      }
+      aggregate_failures do
+        phases.product(changed_runs.to_a).each do |phase, (label, changed_run)|
+          allow(self).to receive(:fetch_selected_shakaperf_release_gate_run!)
+            .with(repo_slug:, run_id: 654_321).and_return(changed_run)
+          expect do
+            validate_ordinary_stable_shakaperf_association_boundary!(
+              monorepo_root: "/tmp/repo", context:, phase:
+            )
+          end.to raise_error(SystemExit, /ShakaPerf.*(?:attempt|failure|identity|repository|invalid)/i),
+                 "#{phase}: #{label}"
+        end
+
+        phases.each do |phase|
+          allow(self).to receive(:fetch_selected_shakaperf_release_gate_run!)
+            .with(repo_slug:, run_id: 654_321)
+            .and_raise(ShakaperfGateObservationError, "HTTP 503: Service Unavailable")
+          expect do
+            validate_ordinary_stable_shakaperf_association_boundary!(
+              monorepo_root: "/tmp/repo", context:, phase:
+            )
+          end.to raise_error(SystemExit, /could not be re-observed.*#{phase}/i)
+        end
+      end
+    end
+
+    it "rejects tracker association identity mutation at both irreversible boundaries" do
+      carried_context = context
+      mutated_association = association.merge("evidence_digest" => "d" * 64)
+      allow(self).to receive(:github_repo_slug).with("/tmp/repo").and_return(repo_slug)
+      allow(self).to receive(:fetch_release_tracker_issue!).with(repo_slug:, tracker: 3823, target_version:)
+      allow(self).to receive(:trusted_shakaperf_release_tracker_records!)
+        .with(repo_slug:, tracker: 3823).and_return([{ kind: :association, record: mutated_association }])
+
+      aggregate_failures do
+        ["git tag push", "package publication"].each do |phase|
+          expect do
+            validate_ordinary_stable_shakaperf_association_boundary!(
+              monorepo_root: "/tmp/repo", context: carried_context, phase:
+            )
+          end.to raise_error(SystemExit, /association changed before publication/i)
+        end
+      end
+    end
+  end
+
   describe "#validate_ordinary_stable_shakaperf_waiver_boundary!" do
     let(:repo_slug) { "shakacode/react_on_rails" }
     let(:ref) { "release/17.0.0" }
@@ -16728,6 +16992,45 @@ RSpec.describe "release.rake helper methods" do
   end
 
   describe "#push_release_tag_for_candidate!" do
+    it "checks an ordinary stable association immediately before tag push and package publication" do
+      candidate_sha = "e" * 40
+      association_context = { bounded: "ordinary-stable-association" }
+      events = []
+      boundary_contexts = []
+      allow(self).to receive_messages(
+        system: true,
+        validate_release_tag_candidate_sha!: candidate_sha,
+        validate_release_candidate_publication_boundary!: candidate_sha,
+        validate_accelerated_tag_publication_boundary!: nil
+      )
+      allow(self).to receive(:validate_remote_release_tag_candidate_sha!) { events << :remote_tag }
+      allow(self).to receive(:validate_ordinary_stable_shakaperf_association_boundary!) do |phase:, context:, **|
+        boundary_contexts << [:association, phase, context]
+        events << phase
+      end
+      allow(self).to receive(:validate_ordinary_stable_shakaperf_waiver_boundary!) do |phase:, context:, **|
+        boundary_contexts << [:waiver, phase, context]
+      end
+      allow(self).to receive(:sh_in_dir_for_release) { events << :tag_push }
+
+      push_release_tag_for_candidate!(
+        monorepo_root: "/tmp/repo",
+        tag: "v17.0.0",
+        candidate_sha:,
+        ordinary_stable_shakaperf_association_context: association_context
+      )
+
+      expect(events).to eq(["git tag push", :tag_push, :remote_tag, "package publication"])
+      expect(boundary_contexts).to eq(
+        [
+          [:association, "git tag push", association_context],
+          [:waiver, "git tag push", nil],
+          [:association, "package publication", association_context],
+          [:waiver, "package publication", nil]
+        ]
+      )
+    end
+
     it "checks an ordinary stable waiver immediately before tag push and package publication" do
       candidate_sha = "e" * 40
       context = { bounded: "ordinary-stable-waiver" }

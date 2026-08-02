@@ -1091,6 +1091,13 @@ end
 
 def shakaperf_release_tracker_entry_from_comment!(comment)
   body = comment.fetch("body")
+  marker_family_count = [
+    SHAKAPERF_FINAL_OBSERVATION_WAIVER_MARKER_OPENER,
+    SHAKAPERF_RELEASE_TRACKER_ASSOCIATION_MARKER_OPENER,
+    SHAKAPERF_RELEASE_TRACKER_EVIDENCE_MARKER
+  ].count { |marker| body.include?(marker) }
+  abort "❌ Release tracker comment contains more than one ShakaPerf marker family." if marker_family_count > 1
+
   if body.include?(SHAKAPERF_FINAL_OBSERVATION_WAIVER_MARKER_OPENER)
     record = final_shakaperf_observation_waiver_record_from_comment!(comment)
     current_schema = record.fetch("schema_version") == SHAKAPERF_FINAL_OBSERVATION_WAIVER_SCHEMA_VERSION
@@ -1487,13 +1494,21 @@ rescue ShakaperfGateObservationError => e
 end
 
 def reuse_shakaperf_release_tracker_evidence(repo_slug:, monorepo_root:, tracker:, ref:, head_sha:, target_version:,
-                                             release_started_at:, run_id: nil)
+                                             release_started_at:, run_id: nil, expected_association_identity: nil)
   entry = selected_shakaperf_release_tracker_record!(
     repo_slug:, tracker:, ref:, head_sha:, target_version:, run_id:
   )
   return nil unless entry
 
   record = entry.fetch(:record)
+  if expected_association_identity
+    current_identity = SHAKAPERF_RELEASE_TRACKER_ASSOCIATION_IDENTITY_FIELDS.to_h do |field|
+      [field, record[field]]
+    end
+    unless entry[:kind] == :association && current_identity == expected_association_identity
+      abort "❌ Saved ShakaPerf release tracker association changed before publication."
+    end
+  end
   run = fetch_saved_shakaperf_release_gate_run(repo_slug:, record:, entry:, ref:, target_version:, run_id:)
   return nil unless run
 
@@ -5302,9 +5317,23 @@ def ensure_release_tag_for_candidate!(monorepo_root:, tag:, candidate_sha:, tag_
   end
 end
 
+def validate_ordinary_shakaperf_boundary!(monorepo_root:, contexts:, phase:)
+  validate_ordinary_stable_shakaperf_association_boundary!(
+    monorepo_root:, context: contexts.fetch(:association), phase:
+  )
+  validate_ordinary_stable_shakaperf_waiver_boundary!(
+    monorepo_root:, context: contexts.fetch(:waiver), phase:
+  )
+end
+
 def push_release_tag_for_candidate!(monorepo_root:, tag:, candidate_sha:, accelerated_publication_record: nil,
                                     accelerated_boundary_record: nil, accelerated_final_promotion_context: nil,
+                                    ordinary_stable_shakaperf_association_context: nil,
                                     ordinary_stable_shakaperf_waiver_context: nil)
+  shakaperf_contexts = {
+    association: ordinary_stable_shakaperf_association_context,
+    waiver: ordinary_stable_shakaperf_waiver_context
+  }
   boundary_context = accelerated_repository_boundary_context!(
     accelerated_publication_record:, accelerated_boundary_record:
   )
@@ -5328,9 +5357,7 @@ def push_release_tag_for_candidate!(monorepo_root:, tag:, candidate_sha:, accele
   validate_release_candidate_publication_boundary!(
     monorepo_root:, tag:, candidate_sha:, phase: "git tag push"
   )
-  validate_ordinary_stable_shakaperf_waiver_boundary!(
-    monorepo_root:, context: ordinary_stable_shakaperf_waiver_context, phase: "git tag push"
-  )
+  validate_ordinary_shakaperf_boundary!(monorepo_root:, contexts: shakaperf_contexts, phase: "git tag push")
   sh_in_dir_for_release(monorepo_root, "LEFTHOOK=0 git push --tags")
   validate_accelerated_tag_publication_phase!(
     monorepo_root:, record: boundary_record, final_promotion_context: accelerated_final_promotion_context,
@@ -5342,9 +5369,7 @@ def push_release_tag_for_candidate!(monorepo_root:, tag:, candidate_sha:, accele
   validate_remote_release_tag_candidate_sha!(
     monorepo_root:, tag:, candidate_sha:, phase: "package publication"
   )
-  validate_ordinary_stable_shakaperf_waiver_boundary!(
-    monorepo_root:, context: ordinary_stable_shakaperf_waiver_context, phase: "package publication"
-  )
+  validate_ordinary_shakaperf_boundary!(monorepo_root:, contexts: shakaperf_contexts, phase: "package publication")
 end
 
 def validate_existing_accelerated_rc_tag!(monorepo_root:, tag:, record:)
@@ -6733,6 +6758,157 @@ def exact_final_shakaperf_observation_waiver_snapshot?(run:, record:, ref:, head
     run["status"] != "completed",
     run["conclusion"].to_s.empty?
   ].all?
+end
+
+def ordinary_stable_shakaperf_association_context_identity(context)
+  canonical_accelerated_rc_json(
+    "association_identity" => context.fetch(:association_identity),
+    "expected_run" => context.fetch(:expected_run),
+    "release_branch" => context.fetch(:release_branch),
+    "release_candidate_sha" => context.fetch(:release_candidate_sha),
+    "release_started_at" => context.fetch(:release_started_at),
+    "release_tracker" => context.fetch(:release_tracker),
+    "target_version" => context.fetch(:target_version)
+  )
+end
+
+def ordinary_stable_shakaperf_association_context_shape?(context)
+  required_keys = %i[
+    association_identity expected_run identity_anchor release_branch release_candidate_sha release_started_at
+    release_tracker target_version
+  ]
+  return false unless context.is_a?(Hash) && context.keys.sort == required_keys.sort
+
+  accelerated_rc_exact_keys?(
+    context.fetch(:association_identity), SHAKAPERF_RELEASE_TRACKER_ASSOCIATION_IDENTITY_FIELDS
+  ) && accelerated_rc_exact_keys?(
+    context.fetch(:expected_run), %w[run_id attempt run_url status conclusion]
+  )
+end
+
+def valid_ordinary_stable_shakaperf_association_context?(context)
+  return false unless ordinary_stable_shakaperf_association_context_shape?(context)
+
+  association = context.fetch(:association_identity)
+  expected_run = context.fetch(:expected_run)
+  anchor = context.fetch(:identity_anchor)
+
+  [
+    valid_accelerated_rc_tracker_number?(context.fetch(:release_tracker)),
+    valid_accelerated_rc_nonempty_string?(context.fetch(:release_branch)),
+    context.fetch(:release_candidate_sha).to_s.match?(/\A[0-9a-f]{40}\z/),
+    !release_prerelease_version?(context.fetch(:target_version)),
+    !shakaperf_release_gate_time(context.fetch(:release_started_at)).nil?,
+    association.values_at("release_tracker", "branch", "target_version") ==
+      context.values_at(:release_tracker, :release_branch, :target_version),
+    association.values_at("run_id", "run_attempt", "run_url") ==
+      expected_run.values_at("run_id", "attempt", "run_url"),
+    expected_run.values_at("status", "conclusion") == %w[completed success],
+    anchor.is_a?(String),
+    anchor.frozen?,
+    anchor == ordinary_stable_shakaperf_association_context_identity(context)
+  ].all?
+rescue KeyError
+  false
+end
+
+def ordinary_stable_shakaperf_association_context_applicable?(tracker:, run:, target_version:)
+  tracker && !release_prerelease_version?(target_version) && run.is_a?(Hash) &&
+    run.values_at("status", "conclusion") == %w[completed success]
+end
+
+def ordinary_stable_shakaperf_expected_run(run)
+  normalized_run = normalized_selected_shakaperf_release_gate_run(run)
+  {
+    "run_id" => normalized_run.fetch("databaseId"),
+    "attempt" => normalized_run.fetch("attempt"),
+    "run_url" => normalized_run.fetch("url"),
+    "status" => normalized_run.fetch("status"),
+    "conclusion" => normalized_run.fetch("conclusion")
+  }
+end
+
+def build_ordinary_stable_shakaperf_association_context(association:, expected_run:, tracker:, ref:, head_sha:,
+                                                        target_version:, release_started_at:)
+  started_at = shakaperf_release_gate_time(release_started_at)
+  abort "❌ Ordinary stable ShakaPerf association context has an invalid release start time." unless started_at
+
+  association_identity = SHAKAPERF_RELEASE_TRACKER_ASSOCIATION_IDENTITY_FIELDS.to_h do |field|
+    [field, association.fetch(field)]
+  end
+  context = {
+    association_identity:,
+    expected_run:,
+    release_branch: ref,
+    release_candidate_sha: head_sha,
+    release_started_at: started_at.iso8601,
+    release_tracker: tracker,
+    target_version:
+  }
+  context[:identity_anchor] = ordinary_stable_shakaperf_association_context_identity(context).freeze
+  context.freeze
+end
+
+def ordinary_stable_shakaperf_association_context!(repo_slug:, tracker:, run:, ref:, head_sha:, target_version:,
+                                                   release_started_at:)
+  return nil unless ordinary_stable_shakaperf_association_context_applicable?(tracker:, run:, target_version:)
+
+  expected_run = ordinary_stable_shakaperf_expected_run(run)
+  entry = selected_shakaperf_release_tracker_record!(
+    repo_slug:, tracker:, ref:, head_sha:, target_version:, run_id: expected_run.fetch("run_id")
+  )
+  unless entry && entry[:kind] == :association
+    abort "❌ Successful tracker-backed ShakaPerf run is missing its canonical association."
+  end
+
+  association = entry.fetch(:record)
+  unless association.values_at("run_id", "run_attempt", "run_url") ==
+         expected_run.values_at("run_id", "attempt", "run_url")
+    abort "❌ Ordinary stable ShakaPerf association context does not match the successful selected run."
+  end
+
+  build_ordinary_stable_shakaperf_association_context(
+    association:, expected_run:, tracker:, ref:, head_sha:, target_version:, release_started_at:
+  )
+end
+
+def validate_ordinary_stable_shakaperf_association_boundary!(monorepo_root:, context:, phase:)
+  return unless context
+
+  unless valid_ordinary_stable_shakaperf_association_context?(context)
+    abort "❌ Ordinary stable #{phase} ShakaPerf association context is malformed or changed."
+  end
+
+  repo_slug = github_repo_slug(monorepo_root)
+  tracker = context.fetch(:release_tracker)
+  target_version = context.fetch(:target_version)
+  fetch_release_tracker_issue!(repo_slug:, tracker:, target_version:)
+  expected_run = context.fetch(:expected_run)
+  observed_run = reuse_shakaperf_release_tracker_evidence(
+    repo_slug:,
+    monorepo_root:,
+    tracker:,
+    ref: context.fetch(:release_branch),
+    head_sha: context.fetch(:release_candidate_sha),
+    target_version:,
+    release_started_at: shakaperf_release_gate_time(context.fetch(:release_started_at)),
+    run_id: expected_run.fetch("run_id"),
+    expected_association_identity: context.fetch(:association_identity)
+  )
+  abort "❌ Ordinary stable release #{phase} ShakaPerf association disappeared or is not reusable." unless observed_run
+
+  observed_identity = {
+    "run_id" => observed_run["databaseId"],
+    "attempt" => observed_run["attempt"],
+    "run_url" => observed_run["url"],
+    "status" => observed_run["status"],
+    "conclusion" => observed_run["conclusion"]
+  }
+  return observed_run if observed_identity == expected_run
+
+  abort "❌ Ordinary stable release #{phase} ShakaPerf run identity or result changed."
+rescue ShakaperfGateObservationError => e
+  abort "❌ Ordinary stable release ShakaPerf association could not be re-observed before #{phase}.\n\n#{e.message}"
 end
 
 def build_final_shakaperf_observation_waiver_snapshot(run:, record:, head_sha:, target_version:, started_at:)
@@ -9572,6 +9748,7 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
   released_npm_version = nil
   accelerated_publication_record = nil
   final_promotion_context = nil
+  ordinary_stable_shakaperf_association_context = nil
   ordinary_stable_shakaperf_waiver_context = nil
   argumentless_starting_prerelease_version = if args_hash.fetch(:version, "").to_s.strip.empty?
                                                starting_version = current_gem_version(monorepo_root)
@@ -9921,13 +10098,25 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
           run_selector: shakaperf_run_selector,
           waiver_reason: shakaperf_waiver_reason
         )
-        ordinary_stable_shakaperf_waiver_context = ordinary_stable_shakaperf_waiver_context!(
-          run: shakaperf_result,
-          ref: current_branch,
-          head_sha: release_candidate_sha,
-          target_version: actual_gem_version,
-          release_started_at:
-        )
+        if shakaperf_result.is_a?(Hash) && shakaperf_result["observationWaived"] == true
+          ordinary_stable_shakaperf_waiver_context = ordinary_stable_shakaperf_waiver_context!(
+            run: shakaperf_result,
+            ref: current_branch,
+            head_sha: release_candidate_sha,
+            target_version: actual_gem_version,
+            release_started_at:
+          )
+        else
+          ordinary_stable_shakaperf_association_context = ordinary_stable_shakaperf_association_context!(
+            repo_slug: github_repo_slug(release_root),
+            tracker: shakaperf_tracker,
+            run: shakaperf_result,
+            ref: current_branch,
+            head_sha: release_candidate_sha,
+            target_version: actual_gem_version,
+            release_started_at:
+          )
+        end
       end
 
       push_release_tag_for_candidate!(
@@ -9936,6 +10125,7 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
         candidate_sha: validated_release_candidate_sha,
         accelerated_boundary_record: accelerated_publication_record || accepted_rc_record,
         accelerated_final_promotion_context: final_promotion_context,
+        ordinary_stable_shakaperf_association_context:,
         ordinary_stable_shakaperf_waiver_context:
       )
 
