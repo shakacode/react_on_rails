@@ -357,6 +357,14 @@ ReactOnRails.configure do |config|
   # 2. Remove ReactOnRails::TestHelper wiring
   ################################################################################
 
+  # If you are using this in your RSpec helper files:
+  #
+  # ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
+  #
+  # then this controls what yarn/pnpm/npm command is run
+  # to automatically refresh your Webpack assets on every test run.
+  # config.build_test_command = "RAILS_ENV=test bin/shakapacker"
+
 end
 ```
 
