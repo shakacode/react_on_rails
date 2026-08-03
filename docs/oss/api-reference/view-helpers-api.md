@@ -84,19 +84,18 @@ With Shakapacker versions before 8.4 that do not expose `config.integrity`, prel
 ### react_on_rails_font_face
 
 ```ruby
-react_on_rails_font_face(family_name, src:, weight: nil, style: nil,
-                          display: "swap", fallback: nil,
-                          fallback_size_adjust: nil,
-                          fallback_ascent_override: nil,
-                          fallback_descent_override: nil,
-                          fallback_line_gap_override: nil)
+react_on_rails_font_face(family:, src:, weight: 400, style: "normal",
+                          display: "swap", unicode_range: nil,
+                          preload: true, fallback: nil)
 ```
 
 Generates `<head>` markup for a committed, self-hosted `.woff2` font:
 
-1. A `<link rel="preload" as="font" type="font/woff2" crossorigin>` for early fetch
+1. A `<link rel="preload" as="font" type="font/woff2" crossorigin>` for early fetch (disable with `preload: false`)
 2. An `@font-face` declaration with `font-display: swap`
-3. An optional metric-matched fallback `@font-face` using `size-adjust`, `ascent-override`, `descent-override`, and `line-gap-override` — so the system fallback font occupies the same space as the web font, eliminating layout shift (CLS) during the swap
+3. An optional metric-matched fallback `@font-face` — pass a `fallback:` hash with `:family` (required), `:name` (optional), and metric keys `:size_adjust`, `:ascent_override`, `:descent_override`, `:line_gap_override` so the system fallback font occupies the same space as the web font, eliminating layout shift (CLS) during the swap
+
+All parameters are keyword arguments. `family:` is the CSS font-family name, `src:` is the URL or asset path to the `.woff2` file. Pass `unicode_range:` for subsetting.
 
 This is React on Rails' equivalent of Next.js `next/font/local` for the committed-file path. Self-hosting through the asset pipeline avoids any third-party font-host request.
 

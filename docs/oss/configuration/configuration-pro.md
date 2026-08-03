@@ -249,6 +249,9 @@ ReactOnRailsPro.configure do |config|
   # Enable server-side rendering JavaScript code profiling. When true, the Pro
   # gem generates V8 CPU profiles during server rendering that can be analyzed
   # with `rake react_on_rails_pro:process_v8_logs`.
+  # **ExecJS only** — this setting has no effect when using the Pro Node
+  # Renderer (`server_renderer = "NodeRenderer"`). It reconfigures the ExecJS
+  # runtime to use `node --prof` or `d8 --prof`.
   # See: https://reactonrails.com/docs/pro/profiling-server-side-rendering-code
   # Default: false
   # config.profile_server_rendering_js_code = false

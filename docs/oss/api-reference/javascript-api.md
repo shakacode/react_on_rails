@@ -68,19 +68,22 @@ registerStoreGenerators(storesGenerators);
 getStore(name, (throwIfMissing = true));
 
 /**
- * Get a store by name, or wait for it to be registered and hydrated.
- * Returns a Promise that resolves with the store instance once available.
- * Use when a non-React piece of code (e.g., a TanStack Router loader or
- * middleware) needs to read the store but cannot guarantee registration order.
+ * **Pro only.** Get a store by name, or wait for it to be registered and
+ * hydrated. Returns a Promise that resolves with the store instance once
+ * available. Use when a non-React piece of code (e.g., a TanStack Router
+ * loader or middleware) needs to read the store but cannot guarantee
+ * registration order. Throws in the open-source package — requires
+ * `react-on-rails-pro`.
  * @param name - The registered store name
  * @returns Promise<Store>
  */
 getOrWaitForStore(name);
 
 /**
- * Get a store generator by name, or wait for it to be registered.
- * Returns a Promise that resolves with the store generator function
- * rather than a hydrated store instance.
+ * **Pro only.** Get a store generator by name, or wait for it to be
+ * registered. Returns a Promise that resolves with the store generator
+ * function rather than a hydrated store instance. Throws in the
+ * open-source package — requires `react-on-rails-pro`.
  * @param name - The registered store generator name
  * @returns Promise<StoreGenerator>
  */
@@ -131,18 +134,21 @@ setOptions(options);
 reactOnRailsPageLoaded();
 
 /**
- * Returns a Promise that resolves when the component mounted in the given
- * DOM node has finished loading (registration + initial render). Use for
- * imperative coordination — for example, when one component needs another's
- * presence before it can initialize.
+ * Triggers rendering for the component in the given DOM node and returns
+ * a Promise. In the open-source package, the Promise resolves immediately
+ * after initiating the render (it does not wait for deferred hydration
+ * modes like `hydrate_on: :visible` to complete). React on Rails Pro
+ * provides a richer implementation where the Promise reflects actual
+ * component load completion.
  * @param domId - The DOM element ID of the React on Rails component mount
  */
 reactOnRailsComponentLoaded(domId);
 
 /**
- * Returns a Promise that resolves when the named Redux store has been
- * registered and hydrated. Use when non-component code (analytics, router
- * loaders, etc.) needs to wait for store availability.
+ * **Pro only.** Returns a Promise that resolves when the named Redux store
+ * has been registered and hydrated. Use when non-component code (analytics,
+ * router loaders, etc.) needs to wait for store availability. Throws in the
+ * open-source package — requires `react-on-rails-pro`.
  * @param storeName - The registered store name
  */
 reactOnRailsStoreLoaded(storeName);
