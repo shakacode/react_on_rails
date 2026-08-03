@@ -162,9 +162,11 @@ module ReactOnRails
           # caller — the credential would still leak here regardless. e.message is scrubbed too:
           # a URL malformed enough that URI.parse raises embeds the raw, unsanitized URL verbatim
           # in URI::InvalidURIError's own message.
-          msg = "You specified server rendering JS file: #{sanitized_renderer_url(server_js_file)}, but it cannot " \
+          sanitized_url = sanitized_renderer_url(server_js_file)
+          sanitized_error = sanitized_renderer_error_message(e.message, server_js_file, sanitized_url)
+          msg = "You specified server rendering JS file: #{sanitized_url}, but it cannot " \
                 "be read. You may set the server_bundle_js_file in your configuration to be \"\" to " \
-                "avoid this warning.\nError is: #{strip_userinfo(e.message)}\n\n" \
+                "avoid this warning.\nError is: #{sanitized_error}\n\n" \
                 "#{Utils.default_troubleshooting_section}"
           raise ReactOnRails::ServerBundleLoadError, msg
         end
@@ -395,18 +397,33 @@ module ReactOnRails
         # Strips any embedded credentials from a configured renderer URL before it is
         # interpolated into an error message, so a password in the URL (a supported config
         # convenience, e.g. https://:password@host:3800) cannot leak into logs or error
-        # trackers. The span scanner also handles malformed text containing multiple schemes.
+        # trackers. One configured value is not free-form prose: multiple schemes or line breaks
+        # make it structurally ambiguous, so those values fail closed through their final @.
         def sanitized_renderer_url(url)
           return url if url.nil? || url.empty?
+          return url unless url.match?(%r{\Ahttps?://}i)
 
-          strip_userinfo(url)
+          return strip_malformed_url_userinfo(url) if url.match?(/[\r\n]/) || url.scan(%r{https?://}i).length > 1
+
+          sanitized_valid_http_url(url) || strip_malformed_url_userinfo(url)
+        end
+
+        def sanitized_renderer_error_message(message, raw_url, sanitized_url = sanitized_renderer_url(raw_url))
+          message = message.to_s
+          return strip_userinfo(message) if raw_url.nil? || raw_url.empty?
+
+          # URI::InvalidURIError embeds String#inspect, while other errors may embed the raw value.
+          message = message.gsub(raw_url.inspect, sanitized_url.inspect)
+                           .gsub(raw_url, sanitized_url)
+          strip_userinfo(message)
         end
 
         # Protects successfully parsed bare HTTP(S) tokens by assembling the result from spans,
         # without collision-prone placeholder text. A candidate remains unprotected when any @
         # follows it before the next scheme or newline: punctuation and prose are not structural
-        # proof that the @ is unrelated to malformed userinfo. The same-line fallback may therefore
-        # over-redact ambiguous diagnostic text, preferring credential safety over fidelity.
+        # proof that the @ is unrelated to malformed userinfo. A credential-bearing candidate also
+        # remains unprotected when an unresolved scheme precedes it on the same line, allowing the
+        # fallback to redact the combined span. Ambiguous text may be over-redacted for safety.
         def strip_userinfo(text)
           text = text.to_s
           sanitized = text.dup.clear
@@ -417,6 +434,9 @@ module ReactOnRails
             protected_url = sanitized_valid_http_url(match[0])
             next unless protected_url
             next if userinfo_delimiter_before_structural_boundary?(text, match)
+            next if protected_url != match[0] && unresolved_scheme_on_current_line?(
+              text[unprotected_start...match.begin(0)]
+            )
 
             sanitized << strip_unprotected_userinfo(text[unprotected_start...match.begin(0)])
             sanitized << protected_url
@@ -431,6 +451,10 @@ module ReactOnRails
           boundary = continuation.match(%r{https?://|[\r\n]}i)
           continuation = continuation[...boundary.begin(0)] if boundary
           continuation.include?("@")
+        end
+
+        def unresolved_scheme_on_current_line?(text)
+          text.match?(%r{https?://[^\r\n]*\z}i)
         end
 
         # URI handles valid URLs structurally, so an @ in the path is never mistaken for userinfo.
@@ -501,8 +525,10 @@ module ReactOnRails
           # message, which Rails.logger and error trackers can persist. e.message is scrubbed as
           # well as url itself: a URL malformed enough that URI.parse raises embeds the raw,
           # unsanitized URL verbatim in URI::InvalidURIError's own message.
-          msg = "file_url_to_string #{sanitized_renderer_url(url)} failed\nError is: " \
-                "#{strip_userinfo(e.message)}\n\n#{Utils.default_troubleshooting_section}"
+          sanitized_url = sanitized_renderer_url(url)
+          sanitized_error = sanitized_renderer_error_message(e.message, url, sanitized_url)
+          msg = "file_url_to_string #{sanitized_url} failed\nError is: " \
+                "#{sanitized_error}\n\n#{Utils.default_troubleshooting_section}"
           raise ReactOnRails::ServerBundleLoadError, msg
         end
 
