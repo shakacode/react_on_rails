@@ -503,6 +503,26 @@ module ReactOnRails
           end
         end
 
+        context "when whitespace makes malformed userinfo look like a valid host prefix" do
+          it "does not protect the prefix quoted by the configured URL's URI error" do
+            server_bundle_url = "http://synthetic-user secret-final@host/path"
+
+            allow(ReactOnRails::Utils).to receive_messages(
+              server_bundle_js_file_path: server_bundle_url,
+              server_bundle_path_is_http?: true
+            )
+
+            expect do
+              described_class.read_bundle_js_code
+            end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
+              expect(error.message).not_to include("synthetic-user")
+              expect(error.message).not_to include("secret-final")
+              expect(error.message).to include("bad URI")
+              expect(error.message).to include("host/path")
+            }
+          end
+        end
+
         context "when malformed URL userinfo contains a literal double quote" do
           it "redacts the escaped URL from the URI error" do
             server_bundle_url = "http://synthetic-user:sec\"ret@host/path"
@@ -546,10 +566,94 @@ module ReactOnRails
           end
         end
 
+        context "when malformed userinfo looks like a valid host prefix in an ordinary error" do
+          it "does not protect the prefix before the whitespace-delimited credential suffix" do
+            server_bundle_url = "http://localhost:3035/webpack/development/server-bundle.js"
+            failure_message = "Failure loading http://synthetic-user:123 secret-final@host/path"
+
+            allow(ReactOnRails::Utils).to receive_messages(
+              server_bundle_js_file_path: server_bundle_url,
+              server_bundle_path_is_http?: true
+            )
+            allow(Net::HTTP).to receive(:get_response).and_raise(failure_message)
+
+            expect do
+              described_class.read_bundle_js_code
+            end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
+              expect(error.message).not_to include("synthetic-user")
+              expect(error.message).not_to include("123")
+              expect(error.message).not_to include("secret-final")
+              expect(error.message).to include("Failure loading http://host/path")
+            }
+          end
+        end
+
+        context "when an invalid credential URL is followed by a valid URL" do
+          it "redacts the credential and preserves the later URL" do
+            server_bundle_url = "http://localhost:3035/webpack/development/server-bundle.js"
+            failure_message = "Failure loading http://synthetic-user secret-final@host/path " \
+                              "http://healthy-host/path"
+
+            allow(ReactOnRails::Utils).to receive_messages(
+              server_bundle_js_file_path: server_bundle_url,
+              server_bundle_path_is_http?: true
+            )
+            allow(Net::HTTP).to receive(:get_response).and_raise(failure_message)
+
+            expect do
+              described_class.read_bundle_js_code
+            end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
+              expect(error.message).not_to include("synthetic-user")
+              expect(error.message).not_to include("secret-final")
+              expect(error.message).to include("Failure loading http://host/path http://healthy-host/path")
+            }
+          end
+        end
+
+        context "when an ordinary error quotes malformed userinfo across whitespace" do
+          it "redacts the quoted credential while retaining the host and path" do
+            server_bundle_url = "http://localhost:3035/webpack/development/server-bundle.js"
+            failure_message = 'Failure loading "http://synthetic-user secret-final@host/path"'
+
+            allow(ReactOnRails::Utils).to receive_messages(
+              server_bundle_js_file_path: server_bundle_url,
+              server_bundle_path_is_http?: true
+            )
+            allow(Net::HTTP).to receive(:get_response).and_raise(failure_message)
+
+            expect do
+              described_class.read_bundle_js_code
+            end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
+              expect(error.message).not_to include("synthetic-user")
+              expect(error.message).not_to include("secret-final")
+              expect(error.message).to include('Failure loading "http://host/path"')
+            }
+          end
+        end
+
         context "when a bundle-load failure embeds a valid URL with an at sign in its path" do
           it "preserves the URL because it has no userinfo" do
             server_bundle_url = "http://localhost:3035/webpack/development/server-bundle.js"
             failure_message = "Failure loading http://host/path@example"
+
+            allow(ReactOnRails::Utils).to receive_messages(
+              server_bundle_js_file_path: server_bundle_url,
+              server_bundle_path_is_http?: true
+            )
+            allow(Net::HTTP).to receive(:get_response).and_raise(failure_message)
+
+            expect do
+              described_class.read_bundle_js_code
+            end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
+              expect(error.message).to include(failure_message)
+            }
+          end
+        end
+
+        context "when a bundle-load failure contains two valid URLs" do
+          it "preserves both URLs, including an at sign in the second URL's path" do
+            server_bundle_url = "http://localhost:3035/webpack/development/server-bundle.js"
+            failure_message = "Failure loading http://first-host/path http://second-host/path@example"
 
             allow(ReactOnRails::Utils).to receive_messages(
               server_bundle_js_file_path: server_bundle_url,

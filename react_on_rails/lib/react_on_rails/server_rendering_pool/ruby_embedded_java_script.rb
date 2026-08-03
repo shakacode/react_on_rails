@@ -415,6 +415,7 @@ module ReactOnRails
             match = Regexp.last_match
             protected_url = sanitized_valid_http_url(match[0])
             next unless protected_url
+            next if malformed_userinfo_continuation?(text, match)
 
             sanitized << strip_unprotected_userinfo(text[unprotected_start...match.begin(0)])
             sanitized << protected_url
@@ -422,6 +423,16 @@ module ReactOnRails
           end
 
           sanitized << strip_unprotected_userinfo(text[unprotected_start..])
+        end
+
+        def malformed_userinfo_continuation?(text, match)
+          continuation = text[match.end(0)..].match(/\A[[:blank:]]+(?<token>\S+)/)
+          return false unless continuation
+
+          token = continuation[:token]
+          return false if token.match?(%r{\Ahttps?://}i)
+
+          token.include?("@")
         end
 
         def strip_url_userinfo(url)
