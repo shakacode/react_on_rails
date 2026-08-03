@@ -793,6 +793,34 @@ module ReactOnRails
           end
         end
 
+        context "when malformed userinfo in an ordinary error spans line breaks" do
+          [
+            ["LF", "http://synthetic-user\nsynthetic-secret@host/path"],
+            ["CR", "http://synthetic-user\rsynthetic-secret@host/path"],
+            ["CRLF", "http://synthetic-user\r\nsynthetic-secret@host/path"],
+            ["a quote and LF", "http://synthetic-user\"\nsynthetic-secret@host/path"]
+          ].each do |description, malformed_url|
+            it "fails closed across #{description}" do
+              server_bundle_path = "/tmp/server-bundle.js"
+              failure_message = "Failure loading #{malformed_url}"
+
+              allow(ReactOnRails::Utils).to receive_messages(
+                server_bundle_js_file_path: server_bundle_path,
+                server_bundle_path_is_http?: false
+              )
+              allow(File).to receive(:read).with(server_bundle_path).and_raise(failure_message)
+
+              expect do
+                described_class.read_bundle_js_code
+              end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
+                expect(error.message).not_to include("synthetic-user")
+                expect(error.message).not_to include("synthetic-secret")
+                expect(error.message).to include("Failure loading http://host/path")
+              }
+            end
+          end
+        end
+
         context "when an ordinary error contains another scheme without whitespace" do
           nested_scheme_cases.each do |description, nested_urls|
             it "sanitizes credentials after #{description}" do
@@ -960,9 +988,9 @@ module ReactOnRails
           end
         end
 
-        context "when a line boundary separates a valid URL from an email address" do
+        context "when a line boundary precedes an ambiguous email at sign" do
           [["LF", "\n"], ["CR", "\r"], ["CRLF", "\r\n"]].each do |description, boundary|
-            it "preserves both across #{description}" do
+            it "fails closed across #{description}" do
               server_bundle_url = "http://localhost:3035/webpack/development/server-bundle.js"
               failure_message = "Failure loading http://host/path#{boundary}contact dev@example.com"
 
@@ -975,9 +1003,75 @@ module ReactOnRails
               expect do
                 described_class.read_bundle_js_code
               end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
-                expect(error.message).to include(failure_message)
+                expect(error.message).not_to include("host/path")
+                expect(error.message).not_to include("contact dev")
+                expect(error.message).to include("Failure loading http://example.com")
               }
             end
+          end
+        end
+
+        context "when multiline error text contains a later URL scheme" do
+          it "redacts malformed multiline userinfo without consuming the later URL" do
+            server_bundle_path = "/tmp/server-bundle.js"
+            failure_message = "Failure loading http://synthetic-user\nsynthetic-secret@host/path\n" \
+                              "hTtPs://healthy-host/path@example"
+
+            allow(ReactOnRails::Utils).to receive_messages(
+              server_bundle_js_file_path: server_bundle_path,
+              server_bundle_path_is_http?: false
+            )
+            allow(File).to receive(:read).with(server_bundle_path).and_raise(failure_message)
+
+            expect do
+              described_class.read_bundle_js_code
+            end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
+              expect(error.message).not_to include("synthetic-user")
+              expect(error.message).not_to include("synthetic-secret")
+              expect(error.message).to include("Failure loading http://host/path\nhTtPs://healthy-host/path@example")
+            }
+          end
+
+          it "fails closed before the later scheme while preserving that separate URL" do
+            server_bundle_path = "/tmp/server-bundle.js"
+            failure_message = "Failure loading http://first-host/path\ncontact dev@example.com\n" \
+                              "HTTP://second-host/path"
+
+            allow(ReactOnRails::Utils).to receive_messages(
+              server_bundle_js_file_path: server_bundle_path,
+              server_bundle_path_is_http?: false
+            )
+            allow(File).to receive(:read).with(server_bundle_path).and_raise(failure_message)
+
+            expect do
+              described_class.read_bundle_js_code
+            end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
+              expect(error.message).not_to include("first-host/path")
+              expect(error.message).not_to include("contact dev")
+              expect(error.message).to include("Failure loading http://example.com\nHTTP://second-host/path")
+            }
+          end
+
+          it "discards an unresolved multiline region before sanitizing the next credential URL" do
+            server_bundle_path = "/tmp/server-bundle.js"
+            failure_message = "Failure loading http://synthetic-user:nonnumeric-prefix\nsynthetic-tail " \
+                              "HtTpS://synthetic-secret@host/path"
+
+            allow(ReactOnRails::Utils).to receive_messages(
+              server_bundle_js_file_path: server_bundle_path,
+              server_bundle_path_is_http?: false
+            )
+            allow(File).to receive(:read).with(server_bundle_path).and_raise(failure_message)
+
+            expect do
+              described_class.read_bundle_js_code
+            end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
+              expect(error.message).not_to include("synthetic-user")
+              expect(error.message).not_to include("nonnumeric-prefix")
+              expect(error.message).not_to include("synthetic-tail")
+              expect(error.message).not_to include("synthetic-secret")
+              expect(error.message).to include("Failure loading https://host/path")
+            }
           end
         end
 
