@@ -659,6 +659,45 @@ module ReactOnRails
           end
         end
 
+        context "when non-URL text precedes a configured credential URL" do
+          classifications = [["HTTP", true], ["local-path", false]]
+
+          [
+            ["a space", " ", "http"],
+            ["a tab", "\t", "http"],
+            ["a newline", "\n", "http"],
+            ["a quote", '"', "http"],
+            ["a label and mixed-case scheme", "URL=", "hTtPs"]
+          ].each do |description, prefix, scheme|
+            classifications.each do |classification, http_path|
+              it "sanitizes #{description} through the #{classification} branch" do
+                server_bundle_url = "#{prefix}#{scheme}://synthetic-user:synthetic-secret@host/path"
+                sanitized_url = "#{prefix}#{scheme.downcase}://host/path"
+                failure_message = "raw=#{server_bundle_url} inspected=#{server_bundle_url.inspect} " \
+                                  "repeated=#{server_bundle_url}"
+
+                allow(ReactOnRails::Utils).to receive_messages(
+                  server_bundle_js_file_path: server_bundle_url,
+                  server_bundle_path_is_http?: http_path
+                )
+                if http_path
+                  allow(Net::HTTP).to receive(:get_response).and_raise(failure_message)
+                else
+                  allow(File).to receive(:read).with(server_bundle_url).and_raise(failure_message)
+                end
+
+                expect do
+                  described_class.read_bundle_js_code
+                end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
+                  expect(error.message).not_to include("synthetic-user")
+                  expect(error.message).not_to include("synthetic-secret")
+                  expect(error.message).to include(sanitized_url)
+                }
+              end
+            end
+          end
+        end
+
         context "when malformed URL userinfo contains a literal double quote" do
           it "redacts the escaped URL from the URI error" do
             server_bundle_url = "http://synthetic-user:sec\"ret@host/path"

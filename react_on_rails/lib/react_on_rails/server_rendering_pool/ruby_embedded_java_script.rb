@@ -398,14 +398,23 @@ module ReactOnRails
         # interpolated into an error message, so a password in the URL (a supported config
         # convenience, e.g. https://:password@host:3800) cannot leak into logs or error
         # trackers. One configured value is not free-form prose: multiple schemes or line breaks
-        # make it structurally ambiguous, so those values fail closed through their final @.
+        # after its first scheme make it structurally ambiguous, so that URL suffix fails closed
+        # through its final @. Any non-URL prefix is preserved for useful error context.
         def sanitized_renderer_url(url)
           return url if url.nil? || url.empty?
-          return url unless url.match?(%r{\Ahttps?://}i)
 
-          return strip_malformed_url_userinfo(url) if url.match?(/[\r\n]/) || url.scan(%r{https?://}i).length > 1
+          scheme = url.match(%r{https?://}i)
+          return url unless scheme
 
-          sanitized_valid_http_url(url) || strip_malformed_url_userinfo(url)
+          prefix = url[...scheme.begin(0)]
+          configured_url = url[scheme.begin(0)..]
+          sanitized_url = if configured_url.match?(/[\r\n]/) || configured_url.scan(%r{https?://}i).length > 1
+                            strip_malformed_url_userinfo(configured_url)
+                          else
+                            sanitized_valid_http_url(configured_url) || strip_malformed_url_userinfo(configured_url)
+                          end
+
+          "#{prefix}#{sanitized_url}"
         end
 
         def sanitized_renderer_error_message(message, raw_url, sanitized_url = sanitized_renderer_url(raw_url))
