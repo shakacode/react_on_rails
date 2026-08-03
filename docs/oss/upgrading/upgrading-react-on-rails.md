@@ -48,7 +48,7 @@ Before changing versions, check these first:
 
 1. **Ruby and Node requirements**: React on Rails v17 requires Ruby 3.3+ and Node 18+. React on Rails v16 remains the upgrade path for apps that need older Ruby versions.
 2. **Bundler age**: legacy apps may have lockfiles created by Bundler 1.x. Those lockfiles can fail on modern Ruby before the React on Rails upgrade even starts.
-3. **Rails version**: current `react_on_rails` requires Rails 7.1+ (due to the Ruby 3.3+ requirement). Older Rails apps need a Rails upgrade first.
+3. **Rails version**: current `react_on_rails` requires Ruby 3.3+, which is incompatible with Rails < 7.0. Older Rails apps need a Rails upgrade first.
 4. **Asset stack**: if the app still uses `webpacker`, upgrade to `shakapacker` first.
 5. **Version pinning**: use exact gem and npm package versions for React on Rails-related packages. Avoid `^`, `~`, or `*`.
 

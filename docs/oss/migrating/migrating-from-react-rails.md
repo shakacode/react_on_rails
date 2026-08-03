@@ -10,7 +10,7 @@ mechanics.
 
 Not every `react-rails` app is a good candidate for a low-friction first migration. Before you start, classify what you have:
 
-- **Rails-owned island mounts on Shakapacker 6+ and Rails 7.1+.** This is the smoothest path. The generator + the steps below usually get you there with small, localized edits. (Note: `server_bundle_output_path` auto-detection requires Shakapacker 9.0+; on 6–8, set it explicitly in the initializer.)
+- **Rails-owned island mounts on Shakapacker 6+ and Rails 7.0+.** This is the smoothest path. The generator + the steps below usually get you there with small, localized edits. (Note: `server_bundle_output_path` auto-detection requires Shakapacker 9.0+; on 6–8, set it explicitly in the initializer.)
 - **Webpacker-era apps (`gem "webpacker"`, Webpack 4).** Current React on Rails targets Shakapacker, not Webpacker, as the recommended baseline — `react_on_rails doctor` flags Webpacker as a removed breaking-change issue, and the gem requires `shakapacker >= 6.0`. Migrate off Webpacker before installing current React on Rails when you can. If you need a temporary Webpacker 5 / Webpack 4 bridge, see the [Legacy Webpacker / Webpack 4 migration shims](../building-features/rails-webpacker-react-integration-options.md#legacy-webpacker--webpack-4-migration-shims) and verify the full app locally.
 - **Client-routed SPA shells (Rails is mostly a shell around a React Router / TanStack Router app).** Render the top-level SPA component from one ERB view using `react_component` (or `react_component_hash` when SSR needs to return multiple regions such as `componentHtml`, `title`, and other head tags).
   - One `react_component` call mounts the whole app.
@@ -41,7 +41,7 @@ Before swapping gems, check these first:
 
 1. **Webpacker vs Shakapacker**: if the app still uses `webpacker`, see [Preferred path for Webpacker-era apps](#preferred-path-for-webpacker-era-apps) above.
 2. **Bundler age**: some older `react-rails` apps still carry Bundler 1.x lockfiles. Those can fail on modern Ruby before you even reach the migration work.
-3. **Rails age**: current `react_on_rails` requires Rails 7.1+ (due to the Ruby 3.3+ requirement). Older Rails apps need a Rails upgrade first.
+3. **Rails age**: current `react_on_rails` requires Ruby 3.3+, which is incompatible with Rails < 7.0. Older Rails apps need a Rails upgrade first.
 4. **Package manager metadata**: if you have `yarn.lock`, `pnpm-lock.yaml`, or `bun.lock*`, ensure `package.json` has a matching `packageManager` field (for example `npm@10.9.2`, `yarn@1.22.22`, `pnpm@10.12.1`, or `bun@1.2.13`).
 5. **Browserslist source**: use one source only. If `.browserslistrc` exists, remove `browserslist` from `package.json`.
 6. **JSX-in-.js projects**: current install generator auto-switches to Babel when JSX is detected in `.js` files. If your project has custom transpiler setup, review `config/shakapacker.yml` after generation.
@@ -275,7 +275,7 @@ If your app looks like this:
 then treat the migration as:
 
 1. Move from `webpacker` to `shakapacker` in its own PR.
-2. If the app is on Rails < 7.1, upgrade Rails to 7.1+ before adding current `react_on_rails` (Ruby 3.3+ requires Rails 7.1+).
+2. If the app is on Rails < 7.0, upgrade Rails to 7.0+ before adding current `react_on_rails` (Ruby 3.3+ is incompatible with Rails < 7.0).
 3. Remove `react_ujs`.
 4. Run the React on Rails install generator.
 5. Replace helper syntax and component registration.
