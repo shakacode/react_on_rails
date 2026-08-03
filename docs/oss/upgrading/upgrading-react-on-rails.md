@@ -117,6 +117,12 @@ In CI, run precompile preparation explicitly once before webpack compilation or 
     - `config.defer_generated_component_packs = false` → **delete the line.** The old option was truthy-gated — only `= true` did anything (it set `:defer`); `= false` was a no-op that fell through to the default strategy. Deleting the line preserves that behavior. Set `config.generated_component_packs_loading_strategy = :sync` explicitly only if you specifically relied on synchronous (blocking) pack loading.
     - The default strategy (when you don't set one) is `:async` for Pro or `:defer` for non-Pro on Shakapacker 8.2.0+, and `:sync` on older Shakapacker.
   - `config.server_render_method` — delete the line. The open-source gem always renders with ExecJS, so this option never selected a server render method — its validator only raised at boot for any non-blank, non-`"ExecJS"` value. Leaving it in place now raises `NoMethodError` at boot (`bin/rake react_on_rails:doctor` also flags the stale line). For a standalone Node rendering process, use React on Rails Pro's Node renderer, configured via `ReactOnRailsPro.configure`.
+- **[Pro] Removed the undocumented `ReactOnRailsPro::Cache.fetch_react_component` class API.** Pro apps should use the supported cached helper APIs (`cached_react_component`, `cached_react_component_hash`, and related helpers) instead of calling the low-level cache class directly.
+- **[Pro] React Server Components now require the stable React 19.2.x RSC line.** Pro RSC apps on v17 require `react-on-rails-rsc >= 19.2.1 < 19.3`, React >= 19.2.7, and matching React DOM. Non-RSC Pro apps retain React 18 support. Set `REACT_ON_RAILS_PRO_DISABLE_VERSION_CHECK=1` only as an emergency escape hatch.
+- **Removed the never-wired `RenderRequest` / `JsCodeBuilder` / `RenderingStrategy` rendering layer.** These internal classes were built for a strategy-pattern refactor that was never connected. Remove any application references to `ReactOnRails::RenderRequest`, `ReactOnRails::JsCodeBuilder`, `ReactOnRails::RenderingStrategy`, or Pro equivalents.
+- **Removed undocumented `ReactOnRails::Utils` helpers.** `ReactOnRails::Utils.server_rendering_is_enabled?` and `ReactOnRails::Utils.rails_version_less_than` are gone. Remove any application calls.
+- **[Pro] Node Renderer now requires Ruby 3.3+ for the async-http transport.** The `react-on-rails-pro` gem now requires Ruby >= 3.3 (raised from >= 3.0) because `async-http` depends on Ruby 3.3 features. Upgrade Ruby before moving to this release.
+- **[Pro] `config.renderer_http_pool_size` semantics changed.** Existing numeric values now cap concurrent async-http connections for each renderer client instead of sizing a persistent process-wide connection pool. HTTP/2 may multiplex request streams over those pooled connections. Setting `nil` keeps the default connection limit and does not make the async-http client unlimited. See the [Renderer Performance Tuning](../configuration/configuration-pro.md#renderer-performance-tuning-for-streamed-rsc) section.
 
 ### Migration Steps
 
@@ -150,6 +156,33 @@ In CI, run precompile preparation explicitly once before webpack compilation or 
    ```bash
    bundle exec rubocop
    ```
+
+## Upgrading to v16.6.0 (from v16.5.x)
+
+### Breaking Changes
+
+- **Removed `immediate_hydration` completely.** The `immediate_hydration` config option, helper parameter, `data-immediate-hydration` HTML attribute, and `redux_store` `immediate_hydration:` keyword argument have been removed. Immediate hydration is now always enabled for Pro users and disabled for non-Pro users, with no per-component override.
+
+### Migration Steps
+
+1. Remove `config.immediate_hydration` from `config/initializers/react_on_rails.rb` (or `react_on_rails_pro.rb`)
+2. Remove any `immediate_hydration:` keyword arguments from `react_component`, `react_component_hash`, `stream_react_component`, and `redux_store` calls in your views
+3. Update gem and npm package versions to 16.6.0, then run `bundle install` and your package manager's install command
+
+See the [v16.6.0 Release Notes](release-notes/16.6.0.md) for all changes.
+
+## Upgrading to v16.5.0 (from v16.4.0)
+
+### Breaking Changes
+
+- **[Pro] `RENDERER_PASSWORD` now required in production-like environments.** Existing staging/production deployments using NodeRenderer without a password will fail to start after upgrading. Set `RENDERER_PASSWORD` in the environment and configure `config.renderer_password = ENV.fetch("RENDERER_PASSWORD")` in your Rails initializer before upgrading.
+- **[Pro] Minimum `async` gem version bumped to 2.29.** The streaming helper now requires `async >= 2.29` (previously `>= 2.6`) due to the migration from `Async::Variable` to `Async::Promise`. Run `bundle update async` if your Gemfile pins below 2.29.
+
+### Changes
+
+- **[Pro] Canonical env var for worker count is now `RENDERER_WORKERS_COUNT`.** The previous `NODE_RENDERER_CONCURRENCY` is still supported as a fallback. Update deployment configs and documentation to use the new name.
+
+See the [v16.5.0 Release Notes](release-notes/16.5.0.md) for all changes.
 
 ## Upgrading to v16.4.0 (from v16.3.x)
 
@@ -207,14 +240,14 @@ This is a minor release - update your gem and npm package versions, then run `bu
 
    ```ruby
    # Gemfile
-   gem "react_on_rails", "16.4.0"
+   gem "react_on_rails", "16.6.0"
    ```
 
    ```json
    // package.json — use the npm equivalent of the same release
    {
      "dependencies": {
-       "react-on-rails": "16.4.0"
+       "react-on-rails": "16.6.0"
      }
    }
    ```

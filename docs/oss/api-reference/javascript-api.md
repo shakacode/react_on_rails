@@ -18,7 +18,7 @@ If you are using [jquery-ujs](https://github.com/rails/jquery-ujs) for AJAX call
 
 ## API
 
-The best source of docs is the `interface ReactOnRails` in [types/index.ts](https://github.com/shakacode/react_on_rails/blob/main/packages/react-on-rails/src/types/index.ts). Here's a quick summary. No guarantees that this won't be outdated!
+The best source of docs is the `interface ReactOnRails` in [types/index.ts](https://github.com/shakacode/react_on_rails/blob/main/packages/react-on-rails/src/types/index.ts). Here's a quick summary, last updated for React on Rails 17.0.
 
 ```js
 /**
@@ -68,6 +68,25 @@ registerStoreGenerators(storesGenerators);
 getStore(name, (throwIfMissing = true));
 
 /**
+ * Get a store by name, or wait for it to be registered and hydrated.
+ * Returns a Promise that resolves with the store instance once available.
+ * Use when a non-React piece of code (e.g., a TanStack Router loader or
+ * middleware) needs to read the store but cannot guarantee registration order.
+ * @param name - The registered store name
+ * @returns Promise<Store>
+ */
+getOrWaitForStore(name);
+
+/**
+ * Get a store generator by name, or wait for it to be registered.
+ * Returns a Promise that resolves with the store generator function
+ * rather than a hydrated store instance.
+ * @param name - The registered store generator name
+ * @returns Promise<StoreGenerator>
+ */
+getOrWaitForStoreGenerator(name);
+
+/**
  * Renders or hydrates the React element passed. In case React version is >=18 will use the root API.
  * @param domNode
  * @param reactElement
@@ -80,6 +99,15 @@ reactHydrateOrRender(domNode, reactElement, hydrate);
  * Set options for ReactOnRails, typically before you call ReactOnRails.register
  * Available Options:
  * `traceTurbolinks: true|false` Gives you debugging messages on Turbolinks events
+ * `turbo: true|false` Register Turbo event listeners for page transitions.
+ *   Set to true for apps using Hotwire Turbo (the Turbolinks successor).
+ *   Default: false
+ * `debugMode: true|false` Enable debug mode for detailed logging of React on
+ *   Rails operations (registration, rendering, Turbo lifecycle events).
+ *   Default: false
+ * `logComponentRegistration: true|false` Log component registration details
+ *   including timing and bundle size information to the browser console.
+ *   Default: false
  * `rootErrorHandlers: { onRecoverableError, onCaughtError, onUncaughtError }` React root error
  *   callbacks applied to every React root created by React on Rails. Each callback receives
  *   React's (error, errorInfo) plus a context object whose componentName and domNodeId fields
@@ -101,6 +129,23 @@ setOptions(options);
  * https://reactonrails.com/docs/building-features/turbolinks
  */
 reactOnRailsPageLoaded();
+
+/**
+ * Returns a Promise that resolves when the component mounted in the given
+ * DOM node has finished loading (registration + initial render). Use for
+ * imperative coordination — for example, when one component needs another's
+ * presence before it can initialize.
+ * @param domId - The DOM element ID of the React on Rails component mount
+ */
+reactOnRailsComponentLoaded(domId);
+
+/**
+ * Returns a Promise that resolves when the named Redux store has been
+ * registered and hydrated. Use when non-component code (analytics, router
+ * loaders, etc.) needs to wait for store availability.
+ * @param storeName - The registered store name
+ */
+reactOnRailsStoreLoaded(storeName);
 
 /**
  * Returns CSRF authenticity token inserted by Rails csrf_meta_tags
