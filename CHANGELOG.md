@@ -26,6 +26,13 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **Generated server webpack configs no longer include an unused `merge` import or stale comments**:
+  `commonWebpackConfig` already clones the shared client configuration, so the generated server configuration
+  stays lint-clean without changing its runtime behavior. Fixes
+  [Issue 4791](https://github.com/shakacode/react_on_rails/issues/4791).
+  [PR 4840](https://github.com/shakacode/react_on_rails/pull/4840) by
+  [ihabadham](https://github.com/ihabadham).
+
 - **Release retries now durably reuse maintainer-verified ShakaPerf evidence**: `rake release` can bind an
   existing successful run to the canonical release tracker with `RELEASE_SHAKAPERF_RUN`, then re-fetch and
   re-verify the exact SHA or machine-proven runtime-equivalent evidence on later invocations instead of

@@ -1,7 +1,7 @@
 // The source code including full typescript support is available at: 
 // https://github.com/shakacode/react-on-rails-demo-ssr-hmr/blob/master/config/webpack/serverWebpackConfig.js
 
-const { merge, config } = require('shakapacker');
+const { config } = require('shakapacker');
 const commonWebpackConfig = require('./commonWebpackConfig');
 
 const bundler = config.assets_bundler === 'rspack'
@@ -31,10 +31,6 @@ function extractLoader(rule, loaderName) {
 
 // rscBundle parameter: when true, skips RSCRspackPlugin (RSC bundle doesn't need it)
 const configureServer = (rscBundle = false) => {
-  // We need to use "merge" because the clientConfigObject, EVEN after running
-  // toWebpackConfig() is a mutable GLOBAL. Thus any changes, like modifying the
-  // entry value will result in changing the client config!
-  // Using webpack-merge into an empty object avoids this issue.
   const serverWebpackConfig = commonWebpackConfig();
 
   // We just want the single server bundle entry

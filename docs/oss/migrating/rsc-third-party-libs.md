@@ -196,7 +196,7 @@ export default function UserForm() {
 <% end %>
 ```
 
-> **Note:** `local: true` is required for Rails 5.1–6.0, where `form_with` defaults to `remote: true` (Ajax). Rails 6.1+ defaults to `local: true`, so it can be omitted on newer versions.
+> **Note:** `local: true` is the default since Rails 6.1. It is included here for clarity but can be omitted.
 
 Both patterns leverage Rails' full controller/model layer -- authentication, authorization, CSRF protection, and validations all work as expected.
 
