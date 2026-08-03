@@ -550,6 +550,38 @@ module ReactOnRails
           end
         end
 
+        nested_scheme_cases = [
+          ["a comma", "http://outer.test/first,http://synthetic-user:synthetic-secret@host/path"],
+          ["a semicolon", "http://outer.test/first;http://synthetic-user:synthetic-secret@host/path"],
+          ["a parenthesis", "http://outer.test/first(http://synthetic-user:synthetic-secret@host/path)"],
+          ["no delimiter", "http://outer.test/firsthttp://synthetic-user:synthetic-secret@host/path"],
+          ["mixed-case HTTP then HTTPS",
+           "hTtP://outer.test/first;HtTpS://synthetic-user:synthetic-secret@host/path"],
+          ["mixed-case HTTPS then HTTP",
+           "HtTpS://outer.test/first;hTtP://synthetic-user:synthetic-secret@host/path"]
+        ]
+
+        context "when the configured URL contains another scheme without whitespace" do
+          nested_scheme_cases.each do |description, server_bundle_url|
+            it "sanitizes credentials after #{description}" do
+              allow(ReactOnRails::Utils).to receive_messages(
+                server_bundle_js_file_path: server_bundle_url,
+                server_bundle_path_is_http?: true
+              )
+              allow(Net::HTTP).to receive(:get_response).and_raise("connection failed")
+
+              expect do
+                described_class.read_bundle_js_code
+              end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
+                expect(error.message).not_to include("synthetic-user")
+                expect(error.message).not_to include("synthetic-secret")
+                expect(error.message).to include("outer.test/first")
+                expect(error.message).to include("host/path")
+              }
+            end
+          end
+        end
+
         context "when malformed URL userinfo contains a literal double quote" do
           it "redacts the escaped URL from the URI error" do
             server_bundle_url = "http://synthetic-user:sec\"ret@host/path"
@@ -640,6 +672,30 @@ module ReactOnRails
               end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
                 credential_fragments.each { |fragment| expect(error.message).not_to include(fragment) }
                 expect(error.message).to include("Failure loading http://host/path")
+              }
+            end
+          end
+        end
+
+        context "when an ordinary error contains another scheme without whitespace" do
+          nested_scheme_cases.each do |description, nested_urls|
+            it "sanitizes credentials after #{description}" do
+              server_bundle_url = "http://localhost:3035/webpack/development/server-bundle.js"
+              failure_message = "Failure loading #{nested_urls}"
+
+              allow(ReactOnRails::Utils).to receive_messages(
+                server_bundle_js_file_path: server_bundle_url,
+                server_bundle_path_is_http?: true
+              )
+              allow(Net::HTTP).to receive(:get_response).and_raise(failure_message)
+
+              expect do
+                described_class.read_bundle_js_code
+              end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
+                expect(error.message).not_to include("synthetic-user")
+                expect(error.message).not_to include("synthetic-secret")
+                expect(error.message).to include("outer.test/first")
+                expect(error.message).to include("host/path")
               }
             end
           end

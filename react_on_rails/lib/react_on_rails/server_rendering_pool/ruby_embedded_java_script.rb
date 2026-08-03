@@ -395,11 +395,11 @@ module ReactOnRails
         # Strips any embedded credentials from a configured renderer URL before it is
         # interpolated into an error message, so a password in the URL (a supported config
         # convenience, e.g. https://:password@host:3800) cannot leak into logs or error
-        # trackers. All valid and malformed URL paths converge on strip_url_userinfo below.
+        # trackers. The span scanner also handles malformed text containing multiple schemes.
         def sanitized_renderer_url(url)
           return url if url.nil? || url.empty?
 
-          strip_url_userinfo(url)
+          strip_userinfo(url)
         end
 
         # Protects successfully parsed bare HTTP(S) tokens by assembling the result from spans,
@@ -412,7 +412,7 @@ module ReactOnRails
           sanitized = text.dup.clear
           unprotected_start = 0
 
-          text.to_enum(:scan, %r{https?://[^\s"']+}i).each do
+          text.to_enum(:scan, %r{https?://(?:(?!https?://)[^\s"'])+}i).each do
             match = Regexp.last_match
             protected_url = sanitized_valid_http_url(match[0])
             next unless protected_url
@@ -431,12 +431,6 @@ module ReactOnRails
           boundary = continuation.match(%r{https?://|[\r\n]}i)
           continuation = continuation[...boundary.begin(0)] if boundary
           continuation.include?("@")
-        end
-
-        def strip_url_userinfo(url)
-          return url unless url.match?(%r{\Ahttps?://}i)
-
-          sanitized_valid_http_url(url) || strip_malformed_url_userinfo(url)
         end
 
         # URI handles valid URLs structurally, so an @ in the path is never mistaken for userinfo.
