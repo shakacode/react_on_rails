@@ -111,7 +111,7 @@ Read the full **[React on Rails Doctrine](./misc/doctrine.md)** for our design p
 
 ## System Requirements
 
-- **Rails 5.2+** (new apps require Rails 7+)
+- **Rails 7.0+** (Ruby 3.3+ is incompatible with Rails < 7.0; CI tests against Rails 7.1)
 - **Ruby 3.3+**
 - **Node.js 18+**
 - **Shakapacker 6+** (7+ recommended for React on Rails v17)
