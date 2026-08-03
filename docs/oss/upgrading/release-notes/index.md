@@ -9,6 +9,11 @@ This archive keeps the major React on Rails OSS release notes easy to browse wit
 
 ## Recent OSS Release Notes
 
+- [17.0.1](./17.0.1.md)
+- [17.0.0](./17.0.0.md)
+- [16.6.0](./16.6.0.md)
+- [16.5.1](./16.5.1.md)
+- [16.5.0](./16.5.0.md)
 - [16.4.0](./16.4.0.md)
 - [16.3.0](./16.3.0.md)
 - [16.2.0](./16.2.0.md)

@@ -81,6 +81,28 @@ With Shakapacker versions before 8.4 that do not expose `config.integrity`, prel
 
 ---
 
+### react_on_rails_font_face
+
+```ruby
+react_on_rails_font_face(family:, src:, weight: 400, style: "normal",
+                          display: "swap", unicode_range: nil,
+                          preload: true, fallback: nil)
+```
+
+Generates `<head>` markup for a committed, self-hosted `.woff2` font:
+
+1. A `<link rel="preload" as="font" type="font/woff2" crossorigin>` for early fetch (disable with `preload: false`)
+2. An `@font-face` declaration with `font-display: swap`
+3. An optional metric-matched fallback `@font-face` — pass a `fallback:` hash with `:family` (required), `:name` (optional), and metric keys `:size_adjust`, `:ascent_override`, `:descent_override`, `:line_gap_override` so the system fallback font occupies the same space as the web font, eliminating layout shift (CLS) during the swap
+
+All parameters are keyword arguments. `family:` is the CSS font-family name, `src:` is the URL or asset path to the `.woff2` file. Pass `unicode_range:` for subsetting.
+
+This is React on Rails' equivalent of Next.js `next/font/local` for the committed-file path. Self-hosting through the asset pipeline avoids any third-party font-host request.
+
+For full usage including metric derivation, subsetting guidance, and the `react_component_hash` head-injection pattern, see [Font Optimization](../building-features/fonts.md).
+
+---
+
 ### react_component_hash
 
 > **React 19 Alternative:** For metadata use cases (page titles, meta tags, canonical URLs), consider using [React 19 Native Metadata](../building-features/react-19-native-metadata.md) with `react_component` or `stream_react_component` instead. React 19 natively hoists `<title>`, `<meta>`, and `<link>` tags to `<head>`, eliminating the need for a render-function and `react_component_hash`. See the [migration guide](../building-features/react-19-native-metadata.md#migration-guide) for step-by-step instructions.
@@ -313,6 +335,42 @@ end %>
 > `rsc_payload_react_component_with_async_props` requires `config.enable_rsc_support = true` and always forces `prerender: true` — passing `prerender: false` has no effect. Use this helper only for custom RSC payload rendering; standard streamed ERB views should use `stream_react_component_with_async_props`.
 >
 > The emitter block runs normal Ruby code sequentially, so `emit.call` does **not** parallelize slow queries by itself. For independent slow data sources, start the work concurrently before emitting values; see [Avoiding Server-Side Waterfalls](../migrating/rsc-data-fetching.md#avoiding-server-side-waterfalls).
+
+### buffered_stream_react_component
+
+Renders through the Pro streaming/RSC renderer but **buffers the complete HTML** and returns it to Rails, instead of progressively streaming. Use for static or cacheable pages where you want Pro renderer quality (RSC support, source-mapped errors) without committing the response via `ActionController::Live`. Accepts the same options as `stream_react_component`.
+
+See [Ruby API Pro Reference](ruby-api-pro.md) for full signature and options.
+
+### cached_stream_react_component
+
+Fragment-cached version of `stream_react_component`. Caches the streamed HTML output using the standard Rails cache, with the same `cache_key:` and block pattern as `cached_react_component`. Supports optional `cache_tags:` for tag-based revalidation.
+
+See [Ruby API Pro Reference](ruby-api-pro.md) and [Fragment Caching](../building-features/caching.md) for full details.
+
+### cached_buffered_stream_react_component
+
+Fragment-cached version of `buffered_stream_react_component`. Combines buffered rendering with Rails fragment caching. Use when you want cacheable static pages rendered through the Pro renderer without progressive streaming.
+
+See [Ruby API Pro Reference](ruby-api-pro.md) for full details.
+
+### cached_static_rsc_component
+
+Caches stripped static RSC HTML for **public pages** that intentionally skip the generated page pack. Respects `auto_load_bundle: false` and preserves explicit sidecar assets. Use for fully static RSC pages where the output does not vary per request and the page pack is not needed.
+
+See [Ruby API Pro Reference](ruby-api-pro.md) for full details.
+
+### async_react_component
+
+Renders a React component asynchronously through the Pro renderer and returns a result object for deferred insertion into the page. Use when you need to start multiple renders concurrently and insert results later — for example, rendering several independent components in parallel before composing them into a layout.
+
+See [Ruby API Pro Reference](ruby-api-pro.md) for full details.
+
+### cached_async_react_component
+
+Fragment-cached version of `async_react_component`. Combines async rendering with Rails fragment caching. Supports optional `cache_tags:` for tag-based revalidation.
+
+See [Ruby API Pro Reference](ruby-api-pro.md) for full details.
 
 ---
 
