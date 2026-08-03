@@ -395,9 +395,30 @@ module ReactOnRails
         # Strips any embedded credentials from a configured renderer URL before it is
         # interpolated into an error message, so a password in the URL (a supported config
         # convenience, e.g. https://:password@host:3800) cannot leak into logs or error
-        # trackers. Mirrors ReactOnRailsPro::Configuration#strip_renderer_url_userinfo.
+        # trackers. All valid and malformed URL paths converge on strip_url_userinfo below.
         def sanitized_renderer_url(url)
           return url if url.nil? || url.empty?
+
+          strip_url_userinfo(url)
+        end
+
+        # Scrubs only HTTP(S) URL occurrences so unrelated message text remains intact. Handle
+        # quoted URLs first because URI::InvalidURIError may quote malformed userinfo containing
+        # whitespace; the bare-token pass then handles URLs embedded in ordinary error messages.
+        def strip_userinfo(text)
+          sanitized = text.to_s.gsub(%r{(?<quote>["'])(?<url>https?://.*?)\k<quote>}i) do
+            match = Regexp.last_match
+            "#{match[:quote]}#{strip_url_userinfo(match[:url])}#{match[:quote]}"
+          end
+          sanitized.gsub(%r{https?://[^\s"']+}i) { |url| strip_url_userinfo(url) }
+        end
+
+        # URI handles valid URLs without confusing an @ in the path for userinfo. When a raw
+        # configured URL is malformed (including an unescaped slash in its password), fall back
+        # to the last @ so every credential fragment is removed while preserving the host/path.
+        def strip_url_userinfo(url)
+          scheme = url.match(%r{\Ahttps?://}i)
+          return url unless scheme
 
           uri = URI.parse(url)
           return url if uri.userinfo.nil?
@@ -407,18 +428,10 @@ module ReactOnRails
           uri.user = nil
           uri.to_s
         rescue URI::InvalidURIError
-          # A URL malformed enough that URI rejects it still shouldn't leak credentials.
-          strip_userinfo(url)
-        end
+          userinfo_delimiter = url.rindex("@")
+          return url unless userinfo_delimiter
 
-        # Best-effort strip of the common user:pass@ form from arbitrary text — not just a URL
-        # value, but also free-form text that may quote one, such as the message of a
-        # URI::InvalidURIError raised from an unparseable credential-bearing URL (that message
-        # embeds the raw original string verbatim). Shared by sanitized_renderer_url's malformed-
-        # URL fallback and by the rescue blocks below, so there is exactly one definition of
-        # "strip userinfo" rather than two regexes that can drift apart.
-        def strip_userinfo(text)
-          text.to_s.gsub(%r{//[^/]*@}, "//")
+          "#{url[...scheme.end(0)]}#{url[(userinfo_delimiter + 1)..]}"
         end
 
         def file_url_to_string(url)

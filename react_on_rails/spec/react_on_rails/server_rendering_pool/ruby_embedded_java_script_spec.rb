@@ -461,6 +461,67 @@ module ReactOnRails
           end
         end
 
+        context "when malformed URL userinfo contains an unescaped slash" do
+          it "redacts every credential fragment while retaining the host and path" do
+            server_bundle_url = "http://user:prefix/secret@host/path"
+
+            allow(ReactOnRails::Utils).to receive_messages(
+              server_bundle_js_file_path: server_bundle_url,
+              server_bundle_path_is_http?: true
+            )
+
+            expect do
+              described_class.read_bundle_js_code
+            end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
+              expect(error.message).not_to include("user")
+              expect(error.message).not_to include("prefix")
+              expect(error.message).not_to include("secret")
+              expect(error.message).to include("bad URI")
+              expect(error.message).to include("host/path")
+            }
+          end
+        end
+
+        context "when malformed URL userinfo contains whitespace" do
+          it "redacts the quoted URL from the URI error while retaining the host and path" do
+            server_bundle_url = "http://user:prefix secret@host/path"
+
+            allow(ReactOnRails::Utils).to receive_messages(
+              server_bundle_js_file_path: server_bundle_url,
+              server_bundle_path_is_http?: true
+            )
+
+            expect do
+              described_class.read_bundle_js_code
+            end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
+              expect(error.message).not_to include("user")
+              expect(error.message).not_to include("prefix")
+              expect(error.message).not_to include("secret")
+              expect(error.message).to include("bad URI")
+              expect(error.message).to include("host/path")
+            }
+          end
+        end
+
+        context "when a bundle-load failure contains non-URL double-slash text" do
+          it "preserves the arbitrary message text" do
+            server_bundle_url = "http://localhost:3035/webpack/development/server-bundle.js"
+            failure_message = "// contact dev@example"
+
+            allow(ReactOnRails::Utils).to receive_messages(
+              server_bundle_js_file_path: server_bundle_url,
+              server_bundle_path_is_http?: true
+            )
+            allow(Net::HTTP).to receive(:get_response).and_raise(failure_message)
+
+            expect do
+              described_class.read_bundle_js_code
+            end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
+              expect(error.message).to include(failure_message)
+            }
+          end
+        end
+
         # read_bundle_js_code also serves the local (non-HTTP) bundle path, where
         # server_bundle_js_file is a plain filesystem path rather than a URL.
         # sanitized_renderer_url must pass such paths through unchanged (no embedded userinfo to
