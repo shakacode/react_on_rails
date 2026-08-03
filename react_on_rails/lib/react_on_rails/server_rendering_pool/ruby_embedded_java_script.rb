@@ -403,9 +403,10 @@ module ReactOnRails
         end
 
         # Protects successfully parsed bare HTTP(S) tokens by assembling the result from spans,
-        # without collision-prone placeholder text. Invalid tokens remain in the intervening spans,
-        # where a same-line fallback fails closed through the last @. That fallback may over-redact
-        # truly malformed diagnostic text, preferring credential safety over fidelity.
+        # without collision-prone placeholder text. A candidate remains unprotected when any @
+        # follows it before the next scheme or newline: punctuation and prose are not structural
+        # proof that the @ is unrelated to malformed userinfo. The same-line fallback may therefore
+        # over-redact ambiguous diagnostic text, preferring credential safety over fidelity.
         def strip_userinfo(text)
           text = text.to_s
           sanitized = text.dup.clear
@@ -415,7 +416,7 @@ module ReactOnRails
             match = Regexp.last_match
             protected_url = sanitized_valid_http_url(match[0])
             next unless protected_url
-            next if malformed_userinfo_continuation?(text, match)
+            next if userinfo_delimiter_before_structural_boundary?(text, match)
 
             sanitized << strip_unprotected_userinfo(text[unprotected_start...match.begin(0)])
             sanitized << protected_url
@@ -425,14 +426,11 @@ module ReactOnRails
           sanitized << strip_unprotected_userinfo(text[unprotected_start..])
         end
 
-        def malformed_userinfo_continuation?(text, match)
-          continuation = text[match.end(0)..].match(/\A(?:[[:blank:]]+|["'])(?<token>\S+)/)
-          return false unless continuation
-
-          token = continuation[:token]
-          return false if token.match?(%r{\Ahttps?://}i)
-
-          token.include?("@")
+        def userinfo_delimiter_before_structural_boundary?(text, match)
+          continuation = text[match.end(0)..]
+          boundary = continuation.match(%r{https?://|[\r\n]}i)
+          continuation = continuation[...boundary.begin(0)] if boundary
+          continuation.include?("@")
         end
 
         def strip_url_userinfo(url)

@@ -523,6 +523,33 @@ module ReactOnRails
           end
         end
 
+        context "when configured malformed userinfo has a delayed at sign" do
+          [
+            ["multiple intervening words", "http://synthetic-user secret-middle secret-final@host/path",
+             %w[synthetic-user secret-middle secret-final]],
+            ["a quote and whitespace", 'http://synthetic-user" secret-final@host/path',
+             %w[synthetic-user secret-final]],
+            ["a quote and multiple intervening words",
+             'http://synthetic-user" secret-middle secret-final@host/path',
+             %w[synthetic-user secret-middle secret-final]]
+          ].each do |description, server_bundle_url, credential_fragments|
+            it "redacts credentials after #{description}" do
+              allow(ReactOnRails::Utils).to receive_messages(
+                server_bundle_js_file_path: server_bundle_url,
+                server_bundle_path_is_http?: true
+              )
+
+              expect do
+                described_class.read_bundle_js_code
+              end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
+                credential_fragments.each { |fragment| expect(error.message).not_to include(fragment) }
+                expect(error.message).to include("bad URI")
+                expect(error.message).to include("host/path")
+              }
+            end
+          end
+        end
+
         context "when malformed URL userinfo contains a literal double quote" do
           it "redacts the escaped URL from the URI error" do
             server_bundle_url = "http://synthetic-user:sec\"ret@host/path"
@@ -585,6 +612,36 @@ module ReactOnRails
               expect(error.message).not_to include("secret-final")
               expect(error.message).to include("Failure loading http://host/path")
             }
+          end
+        end
+
+        context "when an ordinary error has a delayed credential at sign" do
+          [
+            ["multiple intervening words", "http://synthetic-user secret-middle secret-final@host/path",
+             %w[synthetic-user secret-middle secret-final]],
+            ["a quote and whitespace", 'http://synthetic-user" secret-final@host/path',
+             %w[synthetic-user secret-final]],
+            ["a quote and multiple intervening words",
+             'http://synthetic-user" secret-middle secret-final@host/path',
+             %w[synthetic-user secret-middle secret-final]]
+          ].each do |description, malformed_url, credential_fragments|
+            it "redacts credentials after #{description}" do
+              server_bundle_url = "http://localhost:3035/webpack/development/server-bundle.js"
+              failure_message = "Failure loading #{malformed_url}"
+
+              allow(ReactOnRails::Utils).to receive_messages(
+                server_bundle_js_file_path: server_bundle_url,
+                server_bundle_path_is_http?: true
+              )
+              allow(Net::HTTP).to receive(:get_response).and_raise(failure_message)
+
+              expect do
+                described_class.read_bundle_js_code
+              end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
+                credential_fragments.each { |fragment| expect(error.message).not_to include(fragment) }
+                expect(error.message).to include("Failure loading http://host/path")
+              }
+            end
           end
         end
 
@@ -709,8 +766,27 @@ module ReactOnRails
           end
         end
 
-        context "when a valid URL is followed by prose containing an email address" do
-          it "preserves both the URL and the later prose" do
+        context "when an email address follows a valid URL on the next line" do
+          it "preserves both because the newline is a structural boundary" do
+            server_bundle_url = "http://localhost:3035/webpack/development/server-bundle.js"
+            failure_message = "Failure loading http://host/path\ncontact dev@example.com"
+
+            allow(ReactOnRails::Utils).to receive_messages(
+              server_bundle_js_file_path: server_bundle_url,
+              server_bundle_path_is_http?: true
+            )
+            allow(Net::HTTP).to receive(:get_response).and_raise(failure_message)
+
+            expect do
+              described_class.read_bundle_js_code
+            end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
+              expect(error.message).to include(failure_message)
+            }
+          end
+        end
+
+        context "when a valid-looking URL is followed by prose containing an email address" do
+          it "fails closed because no structural boundary separates the later at sign" do
             server_bundle_url = "http://localhost:3035/webpack/development/server-bundle.js"
             failure_message = "Failure loading http://host/path; contact dev@example.com"
 
@@ -723,7 +799,9 @@ module ReactOnRails
             expect do
               described_class.read_bundle_js_code
             end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
-              expect(error.message).to include(failure_message)
+              expect(error.message).not_to include("host/path")
+              expect(error.message).not_to include("contact dev")
+              expect(error.message).to include("Failure loading http://example.com")
             }
           end
         end
