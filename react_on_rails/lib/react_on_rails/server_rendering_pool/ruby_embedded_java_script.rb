@@ -428,8 +428,8 @@ module ReactOnRails
           return strip_userinfo(message) if raw_url.nil? || raw_url.empty?
 
           # URI::InvalidURIError embeds String#inspect, while other errors may embed the raw value.
-          message = message.gsub(raw_url.inspect, sanitized_url.inspect)
-                           .gsub(raw_url, sanitized_url)
+          message = message.gsub(raw_url.inspect) { sanitized_url.inspect }
+                           .gsub(raw_url) { sanitized_url }
           strip_userinfo(message)
         end
 
@@ -484,7 +484,7 @@ module ReactOnRails
           uri.password = nil
           uri.user = nil
           uri.to_s
-        rescue URI::InvalidURIError
+        rescue URI::Error
           nil
         end
 

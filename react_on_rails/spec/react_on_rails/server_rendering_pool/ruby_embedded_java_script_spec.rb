@@ -651,6 +651,37 @@ module ReactOnRails
           end
         end
 
+        context "when URI parsing raises another URI::Error subtype" do
+          it "redacts configured credentials through the public entrypoint" do
+            server_bundle_url = "http://synthetic-user:synthetic-secret@host/path"
+            allow(URI).to receive(:parse).and_call_original
+            allow(URI).to receive(:parse).with(server_bundle_url)
+                                         .and_raise(URI::BadURIError, "bad URI for #{server_bundle_url}")
+            stub_http_bundle_failure("connection failed", bundle_url: server_bundle_url)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("bad URI for http://host/path")
+          end
+        end
+
+        context "when a local bundle path contains replacement metacharacters" do
+          it "preserves them literally while redacting credentials from the load error" do
+            server_bundle_path = %q(/tmp/\k<foo>-\1-\&-\0-literal\backslash/server-bundle.js)
+            failure_message = "raw=#{server_bundle_path} inspected=#{server_bundle_path.inspect} " \
+                              "credential=http://synthetic-user:synthetic-secret@host/path"
+            stub_local_bundle_failure(failure_message, bundle_path: server_bundle_path)
+
+            message = bundle_load_error_message
+            expect(message).to include(server_bundle_path)
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("http://host/path")
+            expect(message).to include("react_on_rails@shakacode.com")
+          end
+        end
+
         context "when a bundle-load failure embeds an unquoted malformed credential URL" do
           it "fails closed across whitespace in the credential" do
             failure_message = "Failure loading http://synthetic-user:prefix secret-final@host/path"
