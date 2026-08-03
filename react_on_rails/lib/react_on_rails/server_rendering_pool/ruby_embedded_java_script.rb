@@ -426,7 +426,7 @@ module ReactOnRails
         end
 
         def malformed_userinfo_continuation?(text, match)
-          continuation = text[match.end(0)..].match(/\A[[:blank:]]+(?<token>\S+)/)
+          continuation = text[match.end(0)..].match(/\A(?:[[:blank:]]+|["'])(?<token>\S+)/)
           return false unless continuation
 
           token = continuation[:token]

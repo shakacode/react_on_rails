@@ -631,6 +631,46 @@ module ReactOnRails
           end
         end
 
+        context "when a quote truncates a malformed credential URL token" do
+          it "does not protect the valid-looking prefix before the double quote" do
+            server_bundle_url = "http://localhost:3035/webpack/development/server-bundle.js"
+            failure_message = 'Failure loading http://synthetic-user"secret-final@host/path'
+
+            allow(ReactOnRails::Utils).to receive_messages(
+              server_bundle_js_file_path: server_bundle_url,
+              server_bundle_path_is_http?: true
+            )
+            allow(Net::HTTP).to receive(:get_response).and_raise(failure_message)
+
+            expect do
+              described_class.read_bundle_js_code
+            end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
+              expect(error.message).not_to include("synthetic-user")
+              expect(error.message).not_to include("secret-final")
+              expect(error.message).to include("Failure loading http://host/path")
+            }
+          end
+
+          it "does not protect the valid-looking prefix before the single quote" do
+            server_bundle_url = "http://localhost:3035/webpack/development/server-bundle.js"
+            failure_message = "Failure loading http://synthetic-user'secret-final@host/path"
+
+            allow(ReactOnRails::Utils).to receive_messages(
+              server_bundle_js_file_path: server_bundle_url,
+              server_bundle_path_is_http?: true
+            )
+            allow(Net::HTTP).to receive(:get_response).and_raise(failure_message)
+
+            expect do
+              described_class.read_bundle_js_code
+            end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
+              expect(error.message).not_to include("synthetic-user")
+              expect(error.message).not_to include("secret-final")
+              expect(error.message).to include("Failure loading http://host/path")
+            }
+          end
+        end
+
         context "when a bundle-load failure embeds a valid URL with an at sign in its path" do
           it "preserves the URL because it has no userinfo" do
             server_bundle_url = "http://localhost:3035/webpack/development/server-bundle.js"
