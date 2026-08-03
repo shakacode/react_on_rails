@@ -503,6 +503,27 @@ module ReactOnRails
           end
         end
 
+        context "when malformed URL userinfo contains a literal double quote" do
+          it "redacts the escaped URL from the URI error" do
+            server_bundle_url = "http://synthetic-user:sec\"ret@host/path"
+
+            allow(ReactOnRails::Utils).to receive_messages(
+              server_bundle_js_file_path: server_bundle_url,
+              server_bundle_path_is_http?: true
+            )
+
+            expect do
+              described_class.read_bundle_js_code
+            end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
+              expect(error.message).not_to include("synthetic-user")
+              expect(error.message).not_to include("sec")
+              expect(error.message).not_to include("ret")
+              expect(error.message).to include("bad URI")
+              expect(error.message).to include("host/path")
+            }
+          end
+        end
+
         context "when a bundle-load failure embeds an unquoted malformed credential URL" do
           it "fails closed across whitespace in the credential" do
             server_bundle_url = "http://localhost:3035/webpack/development/server-bundle.js"
@@ -529,6 +550,25 @@ module ReactOnRails
           it "preserves the URL because it has no userinfo" do
             server_bundle_url = "http://localhost:3035/webpack/development/server-bundle.js"
             failure_message = "Failure loading http://host/path@example"
+
+            allow(ReactOnRails::Utils).to receive_messages(
+              server_bundle_js_file_path: server_bundle_url,
+              server_bundle_path_is_http?: true
+            )
+            allow(Net::HTTP).to receive(:get_response).and_raise(failure_message)
+
+            expect do
+              described_class.read_bundle_js_code
+            end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
+              expect(error.message).to include(failure_message)
+            }
+          end
+        end
+
+        context "when a valid URL is followed by prose containing an email address" do
+          it "preserves both the URL and the later prose" do
+            server_bundle_url = "http://localhost:3035/webpack/development/server-bundle.js"
+            failure_message = "Failure loading http://host/path; contact dev@example.com"
 
             allow(ReactOnRails::Utils).to receive_messages(
               server_bundle_js_file_path: server_bundle_url,

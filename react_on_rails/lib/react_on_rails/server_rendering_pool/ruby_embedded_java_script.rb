@@ -402,29 +402,37 @@ module ReactOnRails
           strip_url_userinfo(url)
         end
 
-        # Scrubs only HTTP(S)-anchored text so unrelated messages remain intact. Quoted URLs and
-        # bare tokens use the structured helper first. The final same-line fallback activates only
-        # when horizontal whitespace precedes the final @. It may still over-redact ambiguous
-        # malformed diagnostic text, preferring credential safety over fidelity.
+        # Protects successfully parsed bare HTTP(S) tokens by assembling the result from spans,
+        # without collision-prone placeholder text. Invalid tokens remain in the intervening spans,
+        # where a same-line fallback fails closed through the last @. That fallback may over-redact
+        # truly malformed diagnostic text, preferring credential safety over fidelity.
         def strip_userinfo(text)
-          sanitized = text.to_s.gsub(%r{(?<quote>["'])(?<url>https?://.*?)\k<quote>}i) do
+          text = text.to_s
+          sanitized = text.dup.clear
+          unprotected_start = 0
+
+          text.to_enum(:scan, %r{https?://[^\s"']+}i).each do
             match = Regexp.last_match
-            "#{match[:quote]}#{strip_url_userinfo(match[:url])}#{match[:quote]}"
+            protected_url = sanitized_valid_http_url(match[0])
+            next unless protected_url
+
+            sanitized << strip_unprotected_userinfo(text[unprotected_start...match.begin(0)])
+            sanitized << protected_url
+            unprotected_start = match.end(0)
           end
-          sanitized = sanitized.gsub(%r{https?://[^\s"']+}i) { |url| strip_url_userinfo(url) }
-          sanitized.gsub(%r{(?<scheme>https?://)(?=[^\r\n]*[[:blank:]][^\r\n]*@)[^\r\n]*@}i) do
-            Regexp.last_match[:scheme]
-          end
+
+          sanitized << strip_unprotected_userinfo(text[unprotected_start..])
         end
 
-        # URI handles valid URLs without confusing an @ in the path for userinfo. When a raw
-        # configured URL is malformed (including an unescaped slash in its password), fall back
-        # to the last @ and retain only the suffix that follows it. That suffix is best-effort
-        # diagnostic context, not a guarantee that every malformed URL keeps its original path.
         def strip_url_userinfo(url)
-          scheme = url.match(%r{\Ahttps?://}i)
-          return url unless scheme
+          return url unless url.match?(%r{\Ahttps?://}i)
 
+          sanitized_valid_http_url(url) || strip_malformed_url_userinfo(url)
+        end
+
+        # URI handles valid URLs structurally, so an @ in the path is never mistaken for userinfo.
+        # Returning nil for invalid input keeps that token unprotected for the fail-closed pass.
+        def sanitized_valid_http_url(url)
           uri = URI.parse(url)
           return url if uri.userinfo.nil?
 
@@ -433,8 +441,19 @@ module ReactOnRails
           uri.user = nil
           uri.to_s
         rescue URI::InvalidURIError
+          nil
+        end
+
+        def strip_unprotected_userinfo(text)
+          text.gsub(%r{https?://[^\r\n]*@}i) { |span| strip_malformed_url_userinfo(span) }
+        end
+
+        # For malformed URLs or unprotected same-line spans, remove through the last @. The
+        # retained suffix is best-effort context; ambiguous malformed diagnostics may lose text.
+        def strip_malformed_url_userinfo(url)
+          scheme = url.match(%r{\Ahttps?://}i)
           userinfo_delimiter = url.rindex("@")
-          return url unless userinfo_delimiter
+          return url unless scheme && userinfo_delimiter
 
           "#{url[...scheme.end(0)]}#{url[(userinfo_delimiter + 1)..]}"
         end
