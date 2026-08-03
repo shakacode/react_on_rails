@@ -439,6 +439,28 @@ module ReactOnRails
           end
         end
 
+        context "when malformed URL userinfo contains multiple at signs" do
+          it "redacts the entire userinfo while retaining the host and path" do
+            server_bundle_url =
+              "http://bundle-user:password-prefix@password-suffix@bad host/webpack/development/server-bundle.js"
+
+            allow(ReactOnRails::Utils).to receive_messages(
+              server_bundle_js_file_path: server_bundle_url,
+              server_bundle_path_is_http?: true
+            )
+
+            expect do
+              described_class.read_bundle_js_code
+            end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
+              expect(error.message).not_to include("bundle-user")
+              expect(error.message).not_to include("password-prefix")
+              expect(error.message).not_to include("password-suffix")
+              expect(error.message).to include("bad URI")
+              expect(error.message).to include("bad host/webpack/development/server-bundle.js")
+            }
+          end
+        end
+
         # read_bundle_js_code also serves the local (non-HTTP) bundle path, where
         # server_bundle_js_file is a plain filesystem path rather than a URL.
         # sanitized_renderer_url must pass such paths through unchanged (no embedded userinfo to

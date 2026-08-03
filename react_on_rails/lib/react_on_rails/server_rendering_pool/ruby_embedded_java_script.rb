@@ -418,7 +418,7 @@ module ReactOnRails
         # URL fallback and by the rescue blocks below, so there is exactly one definition of
         # "strip userinfo" rather than two regexes that can drift apart.
         def strip_userinfo(text)
-          text.to_s.gsub(%r{//[^/@]*@}, "//")
+          text.to_s.gsub(%r{//[^/]*@}, "//")
         end
 
         def file_url_to_string(url)
