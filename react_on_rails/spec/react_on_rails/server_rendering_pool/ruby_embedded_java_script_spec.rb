@@ -503,6 +503,28 @@ module ReactOnRails
           end
         end
 
+        context "when a bundle-load failure embeds an unquoted malformed credential URL" do
+          it "fails closed across whitespace in the credential" do
+            server_bundle_url = "http://localhost:3035/webpack/development/server-bundle.js"
+            failure_message = "Failure loading http://synthetic-user:prefix secret-final@host/path"
+
+            allow(ReactOnRails::Utils).to receive_messages(
+              server_bundle_js_file_path: server_bundle_url,
+              server_bundle_path_is_http?: true
+            )
+            allow(Net::HTTP).to receive(:get_response).and_raise(failure_message)
+
+            expect do
+              described_class.read_bundle_js_code
+            end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
+              expect(error.message).not_to include("synthetic-user")
+              expect(error.message).not_to include("prefix")
+              expect(error.message).not_to include("secret-final")
+              expect(error.message).to include("Failure loading http://host/path")
+            }
+          end
+        end
+
         context "when a bundle-load failure contains non-URL double-slash text" do
           it "preserves the arbitrary message text" do
             server_bundle_url = "http://localhost:3035/webpack/development/server-bundle.js"
