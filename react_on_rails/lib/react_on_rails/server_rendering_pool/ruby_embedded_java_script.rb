@@ -403,16 +403,18 @@ module ReactOnRails
         end
 
         # Scrubs only HTTP(S)-anchored text so unrelated messages remain intact. Quoted URLs and
-        # bare tokens use the structured helper first. The final same-line fallback fails closed
-        # when malformed unquoted userinfo contains whitespace: it may over-redact diagnostic text
-        # or an ambiguous @ in a malformed URL path, preferring credential safety over fidelity.
+        # bare tokens use the structured helper first. The final same-line fallback activates only
+        # when horizontal whitespace precedes the final @. It may still over-redact ambiguous
+        # malformed diagnostic text, preferring credential safety over fidelity.
         def strip_userinfo(text)
           sanitized = text.to_s.gsub(%r{(?<quote>["'])(?<url>https?://.*?)\k<quote>}i) do
             match = Regexp.last_match
             "#{match[:quote]}#{strip_url_userinfo(match[:url])}#{match[:quote]}"
           end
           sanitized = sanitized.gsub(%r{https?://[^\s"']+}i) { |url| strip_url_userinfo(url) }
-          sanitized.gsub(%r{(?<scheme>https?://)[^\r\n]*@}i) { Regexp.last_match[:scheme] }
+          sanitized.gsub(%r{(?<scheme>https?://)(?=[^\r\n]*[[:blank:]][^\r\n]*@)[^\r\n]*@}i) do
+            Regexp.last_match[:scheme]
+          end
         end
 
         # URI handles valid URLs without confusing an @ in the path for userinfo. When a raw
