@@ -33,6 +33,35 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4840](https://github.com/shakacode/react_on_rails/pull/4840) by
   [ihabadham](https://github.com/ihabadham).
 
+- **Release retries now durably reuse maintainer-verified ShakaPerf evidence**: `rake release` can bind an
+  existing successful run to the canonical release tracker with `RELEASE_SHAKAPERF_RUN`, then re-fetch and
+  re-verify the exact SHA or machine-proven runtime-equivalent evidence on later invocations instead of
+  dispatching duplicate performance runs. Tracker trust is bound to the exact
+  `Release gate: react_on_rails X.Y.Z` stable-base title, explicit selectors take precedence over automatic
+  accepted-RC reuse, and persisted accelerated retries cannot silently consume a selector. Automatic reuse
+  falls back to normal discovery only for authoritative natural invalidation such as stale or missing evidence,
+  a failed/cancelled live run, or proven runtime divergence; indeterminate API or Git failures, detector errors,
+  and record mutations remain blocking. Raw REST-selected runs now preserve their creation timestamp through
+  strict-final verification. Before either a live release or dry run can reach registry checks, confirmation,
+  mutation, tagging, or publication, the task also verifies the frozen pnpm install state, the repository-pinned
+  pnpm version, and lifecycle-enabled builds of all four npm release packages before creating a release checkout,
+  pulling, authenticating, or reading any remote release state. The successful check is bound to the exact commit;
+  when a live `git pull --rebase` advances `HEAD`, the task rebuilds and rebinds readiness before resolving the release
+  version or continuing. npm publication now retries only explicit OTP challenges and context-qualified transient
+  network/HTTP failures; successful lifecycle/tool banners no longer mask those diagnostics, while authentication,
+  actual lifecycle failures, registry rejection, incidental numeric diagnostics, and unknown failures stop immediately
+  with OTP values redacted. Saved ShakaPerf evidence also recognizes GitHub CLI's exact
+  `no valid artifacts found to download` diagnostic as authoritative absence while preserving observation failures as
+  blocking. Stable releases also support
+  an append-only, tracker-bound schema-v2 observation waiver bound to the exact run attempt and canonical
+  repository/workflow/event/branch identity. Legacy schema-v1 waiver markers remain readable audit history but cannot
+  authorize publication. The waiver does not
+  claim the run succeeded or bypass any other release gate; the tracker, waiver, and exact run are revalidated
+  before remote tag push and package publication, and a rerun attempt blocks both boundaries. Fixes
+  [Issue 4812](https://github.com/shakacode/react_on_rails/issues/4812).
+  [PR 4833](https://github.com/shakacode/react_on_rails/pull/4833) by
+  [justin808](https://github.com/justin808).
+
 - **[Pro]** **RSC render-error details are no longer sent to the browser on the fetched payload path**:
   The RSC payload fetched during client-side navigation (via `rsc_payload_generation_url_path`) included
   the server's rendering-error message and source-mapped stack — which contains server file paths — in its

@@ -133,6 +133,28 @@ When called with no arguments, `rake release`:
 
 Dry runs use a temporary git worktree so version bumps and installs do not modify your current checkout.
 
+Both live releases and dry runs first verify npm publication readiness in the original checkout, immediately after
+the clean-worktree check and verbosity setup. The root
+`packageManager` must pin an exact pnpm version, the installed pnpm must match it, `node_modules/.pnpm/lock.yaml`
+must byte-match the committed `pnpm-lock.yaml`, and every npm release package must pass its normal `build` script
+with lifecycle scripts enabled. This happens before release-checkout creation, `git pull`, npm or GitHub
+authentication, CI/tag/version-policy remote reads, registry probes, confirmation, version mutation, ShakaPerf
+dispatch, tagging, publication, or OTP prompting. A pnpm version mismatch must first be repaired by activating the
+exact pnpm version declared by the root `packageManager`. The release prints this frozen-install command for the
+installed-dependency repair:
+
+```bash
+pnpm install --frozen-lockfile
+```
+
+After the initial check succeeds, the task binds it to the exact current commit. A live release then runs
+`git pull --rebase` and immediately resolves `HEAD` again. If the pull advanced the checkout, all four release-package
+builds and the rest of npm readiness run again in the live release root; `HEAD` is resolved once more after that check
+so a concurrent commit change fails closed. Version resolution, authentication, CI, registry probes, confirmation,
+and mutation remain unreachable until readiness is bound to the current release SHA. An unchanged live checkout runs
+one readiness check, and a dry run neither pulls nor repeats the original-workspace check. Any missing or malformed SHA
+resolution is a hard failure.
+
 `rake release` validates release-version policy before publishing:
 
 - Target version must be greater than the latest tagged release.
@@ -184,10 +206,98 @@ RELEASE_VERSION_POLICY_OVERRIDE=true # Override release version policy checks
 RELEASE_CI_EVALUATE_HEAD=true # Strictly evaluate the fetched exact release-source HEAD; not a waiver
 RELEASE_CI_STATUS_OVERRIDE=true # DANGEROUS last-resort waiver for the release CI-status gate
 RELEASE_ACCELERATED_RC=true # Explicit RC only: publish while named pending gates finish
-RELEASE_TRACKER=<issue> # Active release tracker for accelerated RC records and final promotion
+RELEASE_TRACKER=<issue> # Active release tracker for ShakaPerf evidence, accelerated RCs, and final promotion
+RELEASE_SHAKAPERF_RUN=<id-or-canonical-url> # Verify and durably associate one existing ShakaPerf run
+RELEASE_FINAL_SHAKAPERF_WAIVER_REASON=<single-line-reason> # Stable-only observation-failure waiver
 RELEASE_ACCELERATED_RC_REASON=<reason> # Single-line maintainer reason for accelerated publication
 GEM_RELEASE_MAX_RETRIES=<n>  # Positive base-10 integer max retry attempts (default: 3)
 ```
+
+#### Saving and reusing ShakaPerf release evidence
+
+Use the open issue whose exact title is `Release gate: react_on_rails X.Y.Z` as the durable store. `X.Y.Z`
+is always the stable base, so an RC such as `17.0.1.rc.3` is bound to `Release gate: react_on_rails 17.0.1`.
+Release-related labels are advisory and cannot substitute for the exact title. The selected tracker and every
+tracker reached by repository-wide durable-history discovery must satisfy this same target binding. To associate
+a run that was started manually or missed by automatic discovery, provide the same active tracker used by the
+release train and either the numeric run ID or its canonical GitHub URL:
+
+```bash
+RELEASE_TRACKER=4806 \
+RELEASE_SHAKAPERF_RUN=https://github.com/shakacode/react_on_rails/actions/runs/30417447319 \
+bundle exec rake "release[17.0.1,true]"
+```
+
+This preview validates the target and tracker inputs but does not fetch or persist the selected run. Live
+association remains blocked until the repository-owned release wrapper described in the execution boundary exists.
+
+This selector is not a waiver. Before appending anything, the task fetches the run and its schema-v2
+artifact from GitHub and verifies repository, workflow, branch, target version, run ID and attempt,
+terminal success, completion time, candidate SHA, evidence digest, and runtime fingerprint. The tracker
+comment is append-only, attributed to a repository maintainer, and re-fetched before the task continues.
+Saving the same association again is idempotent.
+
+An explicit `RELEASE_SHAKAPERF_RUN` is authoritative for selection, not a hint. During stable promotion it
+bypasses automatic accepted-RC ShakaPerf reuse and goes directly through strict-final selector verification and
+persistence. It cannot be combined with `RELEASE_ACCELERATED_RC=true`. It also cannot be supplied on an unflagged
+same-candidate retry once durable discovery proves that the retry is accelerated; this aborts before approver,
+CI, mutation, or evidence-refresh work.
+
+The trusted canonical tracker comment is the durable source of truth. A local
+`shakaperf-release-evidence.json` is only a downloaded artifact/cache used during verification; it is never
+the durable source of truth and cannot authorize reuse by itself.
+
+On a later invocation, set `RELEASE_TRACKER` without `RELEASE_SHAKAPERF_RUN`. The task reads trusted,
+unedited machine comments, re-fetches the saved run and artifact, and re-runs the same checks. Exact-SHA
+evidence is preferred. Existing machine-verified runtime-equivalence remains supported because the stored
+candidate is bound to the live run while the schema-v2 runtime fingerprint is compared with the current
+release commit. Output names both the tracker URL and reused run URL.
+
+Only automatic association reuse may discard naturally invalid evidence and continue through normal discovery.
+That recovery is limited to authoritative staleness, a 404-proven missing run or artifact, GitHub CLI's exact
+`no valid artifacts found to download` diagnostic, a live run now completed with `failure` or `cancelled`, or proof
+that the current runtime tree, intervening commits, or ancestry is no longer equivalent. The artifact diagnostic is
+matched case-insensitively; authentication, permission, rate-limit, server, DNS, and timeout errors remain unknown
+observation failures rather than absence. A Git `merge-base --is-ancestor` exit 1 is authoritative non-ancestry.
+Failures or malformed results from
+`git ls-tree`, `merge-base`, `rev-list`, `diff-tree`, or `script/ci-changes-detector` are unknown and block without
+dispatching a replacement run. Explicit selectors reject both authoritative invalidation and unknown verification.
+Edited, malformed, unsupported, or noncanonical trusted
+comments; author/tracker/title mismatch; conflicting latest records; record/live identity conflict; digest or
+fingerprint mutation; artifact parse or shape errors; and authentication, permission, pagination, parse, or other
+indeterminate API failures all remain hard failures. Absence must therefore be proved, never inferred from an
+unknown observation.
+
+Inspect the durable state with `gh issue view 4806 --repo shakacode/react_on_rails --comments`. To replace
+an association, run the explicit selector again with a newer verified run; the newest trusted association
+for that exact candidate becomes the default. Use `RELEASE_SHAKAPERF_RUN` to choose between equally timed
+conflicting records. Machine comments must not be edited or deleted: an edited trusted record fails closed.
+To stop using saved evidence without mutating the audit trail, omit `RELEASE_TRACKER`; normal discovery then
+applies and dispatches a fresh exact-head run when no reusable evidence exists.
+
+If GitHub observation fails after an exact run has been identified, a maintainer may use the narrowly scoped
+stable-only escape hatch:
+
+```bash
+RELEASE_TRACKER=4806 \
+RELEASE_FINAL_SHAKAPERF_WAIVER_REASON="GitHub REST observer exhausted its quota" \
+bundle exec rake "release[17.0.1]"
+```
+
+The task writes and re-fetches an append-only schema-v2 `gate_observation_failed` waiver bound to the exact tracker,
+repository, canonical workflow, `workflow_dispatch` event, branch, stable version, candidate SHA, run ID, positive
+run attempt, URL, reason, and authenticated maintainer. Canonical schema-v1 waiver markers remain readable,
+approver/tracker-bound audit history, but they are deliberately non-authorizing; a new schema-v2 record must be
+appended for the candidate. Malformed, edited, or noncanonical legacy markers still fail closed. The waiver
+preserves the last observed run status and conclusion and never reports the run as successful. The waiver
+cannot apply to prereleases, a failed/cancelled or otherwise terminal run, malformed/mismatched/stale
+evidence, a rerun attempt, or a different current run/reason. It waives only inability to observe ShakaPerf; CI, version
+policy, tag, registry, accepted-RC, and publication-boundary checks remain unchanged and blocking.
+Immediately before the remote tag push and again before package publication, the task revalidates that the
+tracker is still canonical and active, the append-only waiver and its exact attempt are unchanged, and the exact run
+identity and attempt are still active. Continued API unavailability remains covered by the recorded observation
+waiver, but a terminal, rerun, wrong-identity, or
+unknown run state, a closed/noncanonical tracker, or a changed/disappeared waiver blocks publication.
 
 #### Release CI evidence and strict HEAD evaluation
 
@@ -249,7 +359,8 @@ non-release feature branches.
 
 The task rejects the accelerated path when the version is implicit, the target is not a canonical
 lowercase `.rc.` version, the tracker is closed or ineligible, the reason is missing, or
-`RELEASE_CI_STATUS_OVERRIDE` is also set. Case-varied spellings such as `.RC.` are rejected before
+`RELEASE_CI_STATUS_OVERRIDE` or `RELEASE_SHAKAPERF_RUN` is also set. The selector incompatibility also applies
+after an unflagged same-candidate retry discovers persisted accelerated options. Case-varied spellings such as `.RC.` are rejected before
 tracker records or tag provenance can be created. Every numeric core component and the numeric `rc`
 identifier must also use canonical npm-semver spelling: zero itself is valid, but leading zeroes are not.
 It still fails closed on failed, missing, malformed,
@@ -370,9 +481,10 @@ malformed boundaries, duplicated markers, and
 spoofed summaries cannot prove irrelevance and therefore reach strict parsing and block. Discovery comments
 must name the canonical API issue URL in the exact requested repository; wrong hosts, repositories, paths,
 queries, and fragments are rejected before their issue number is used. Every tracker referenced by a plausible
-exact-candidate marker is fetched once and must pass the same open release-tracker eligibility check used by
-selected-tracker publication. Pull requests cannot serve as release trackers even though GitHub exposes their
-comments through the issues APIs.
+exact-candidate marker is fetched once and must be an open issue with the exact stable-base title derived from that
+record's target version; labels do not substitute. This is the same eligibility check used by selected-tracker
+publication. Pull requests cannot serve as release trackers even though GitHub exposes their comments through the
+issues APIs.
 
 ShakaPerf evidence is bound to the requested version, workflow run, run attempt, and candidate SHA
 through reconciliation and every publication boundary. Reused accepted-RC evidence remains bound to
@@ -445,8 +557,10 @@ docs/comment-only delta. Every intervening commit is inspected:
 package manifests, version files, and `Gemfile.lock` files may differ only by their normalized product-version
 metadata, while dependency, lockfile, or any other runtime-bearing content change requires a new accepted RC
 and cannot fall back to a fresh final ShakaPerf run. Accepted ShakaPerf evidence is
-refreshed and re-verified against the final tip; otherwise the normal strict final ShakaPerf gate runs
-only for a still-runtime-equivalent finalization. After that gate completes, the task re-fetches the live
+refreshed and re-verified against the final tip when automatic reuse applies. An explicit
+`RELEASE_SHAKAPERF_RUN` instead bypasses that reuse and must pass and persist through the strict final selector
+path; otherwise the normal strict final ShakaPerf gate runs only for a still-runtime-equivalent finalization.
+After that gate completes, the task re-fetches the live
 remote RC tag, repository-wide canonical tracker chain, and exact accepted-RC CI immediately before stable
 tagging and publication. The re-fetched accepted record must differ from the originally gated record only by its
 permitted retry timestamp. Local `HEAD` must still equal the validated final candidate, and the stable tag
@@ -507,6 +621,8 @@ The `rake release` task automatically:
 1. **Validates release prerequisites**:
    - Checks for uncommitted changes (will abort if found)
    - Verifies NPM authentication (will run `npm login` if needed)
+   - Verifies the exact pinned pnpm version, frozen installed lock state, and lifecycle-enabled builds for all npm
+     release packages before registry checks or any release mutation
    - Requires a non-empty matching CHANGELOG.md section for stable targets; prereleases without one emit a warning,
      including during dry runs
    - Validates version policy (monotonic + changelog/bump consistency)
@@ -674,6 +790,11 @@ You'll need to enter OTP tokens when prompted:
 - Once for publishing `react-on-rails` to NPM (reused for subsequent NPM packages if valid)
 - Once for publishing `react_on_rails` to RubyGems (reused for `react_on_rails_pro` if valid)
 
+npm retries are classified from captured, sanitized output. Only an explicit npm OTP challenge prompts for a fresh
+OTP. A transient network or registry-service failure retries with the same OTP and bounded exponential backoff.
+Authentication failures such as `E401`/`ENEEDAUTH`, local lifecycle/build failures, registry rejections, and unknown
+failures stop immediately without an OTP prompt. OTP values are redacted from raised diagnostics.
+
 ## Requirements
 
 ### NPM Publishing
@@ -735,6 +856,30 @@ If you see errors like "Access token expired" or "E404 Not Found" during NPM pub
 3. Retry the release
 
 The release script now checks NPM authentication at the start and will automatically run `npm login` if needed, so this issue will be caught and handled before any changes are made.
+
+### NPM Release Readiness Issues
+
+If the release reports a pnpm version mismatch, first activate the exact pnpm version declared by the root
+`packageManager`. Then run the exact frozen-install repair command it prints from the repository root for the
+installed dependency check:
+
+```bash
+pnpm install --frozen-lockfile
+```
+
+Then fix any remaining build error and rerun the same explicit release version. The release will not have reached
+release-checkout creation, pull/authentication, remote CI/tag/version reads, confirmation, version mutation,
+ShakaPerf dispatch, tagging, publication, or OTP prompting.
+
+During npm publication, only explicit transient diagnostics are retried with bounded backoff and the same OTP:
+network codes such as `ECONNRESET`, npm/pnpm codes such as `E429`, `E503`, or `ERR_PNPM_FETCH_503`, and HTTP or
+response/status-code contexts such as `HTTP 429` or `status code 503`. Successful `prepublishOnly`, `tsc`, or TypeScript
+banner lines do not override a real transient diagnostic elsewhere in the output. Deterministic lifecycle codes and
+tool/lifecycle lines containing `failed`, `failure`, `not found`, `not recognized`, or `error TS...` remain local hard
+failures even when the same output also mentions a transient code. Bare numbers such as `429` or `500`, package sizes,
+successful tool banners without a transient diagnostic, registry rejections, authentication failures, and unknown
+output fail immediately. Only an explicit OTP challenge (`EOTP` or an equivalent one-time-password prompt) requests
+a fresh code; all printed OTP values remain redacted.
 
 ### If Release Fails
 
