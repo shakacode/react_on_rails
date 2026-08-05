@@ -1,0 +1,33 @@
+// The source code including full typescript support is available at:
+// https://github.com/shakacode/react-on-rails-demo-ssr-hmr/blob/master/config/webpack/development.js
+
+const { devServer, inliningCss, config } = require('shakapacker');
+
+const serverClientOrBoth = require('./ServerClientOrBoth');
+
+const developmentEnvOnly = (clientWebpackConfig, _serverWebpackConfig, rscWebpackConfig) => {
+  // React Refresh (Fast Refresh) setup - only when dev server is running (HMR mode)
+  if (process.env.WEBPACK_SERVE) {
+    // eslint-disable-next-line global-require
+    if (config.assets_bundler === 'rspack') {
+      // Rspack uses @rspack/plugin-react-refresh for React Fast Refresh
+      const { ReactRefreshRspackPlugin } = require('@rspack/plugin-react-refresh');
+      clientWebpackConfig.plugins.push(new ReactRefreshRspackPlugin());
+
+      if (rscWebpackConfig) {
+        // RSC client references must be compiled before the server render reads the client manifest.
+        clientWebpackConfig.lazyCompilation = false;
+      }
+    } else {
+      // Webpack uses @pmmmwh/react-refresh-webpack-plugin
+      const ReactRefreshWebpackPlugin = require('@pmmmwh/react-refresh-webpack-plugin');
+      clientWebpackConfig.plugins.push(
+        new ReactRefreshWebpackPlugin({
+          // Use default overlay configuration for better compatibility
+        }),
+      );
+    }
+  }
+};
+
+module.exports = serverClientOrBoth(developmentEnvOnly);
