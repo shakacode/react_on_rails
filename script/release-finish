@@ -20,9 +20,9 @@ require "open3"
 #              the accepted RC tag, collapses the rc->stable CHANGELOG, then runs
 #              `bundle exec rake release[X.Y.Z]` (the rake guards enforce the
 #              dangerous tag/version safety; this script does not re-implement it).
-#   close-out  Step 5: forward-port remaining release-branch commits to main via
-#              `script/release-forward-port` (dry-run, then apply on confirmation),
-#              then delete the ephemeral release branch on origin.
+#   close-out  Step 5: verify the one-change forward-port PRs and the separate
+#              changelog/release PR are complete on main, then delete the
+#              ephemeral release branch on origin.
 #
 # The dangerous outward operations (`rake release`, `git push --delete`) are each
 # gated behind an explicit confirmation and are printed-only under --dry-run.
@@ -30,6 +30,9 @@ require "open3"
 class ReleaseFinish
   STABLE_VERSION = /\A\d+\.\d+\.\d+\z/
   SUBCOMMANDS = %w[promote close-out].freeze
+  FORWARD_PORT_INCOMPLETE_STATUS = 1
+  CHERRY_PICK_IN_PROGRESS_MESSAGE =
+    "a cherry-pick is already in progress; run git cherry-pick --continue, --skip, or --abort first"
   # Resolve the sibling forward-port helper relative to this script so close-out
   # works regardless of the current directory (the runbook runs from repo root,
   # but the throwaway-repo tests run from a temp checkout).
@@ -46,6 +49,8 @@ class ReleaseFinish
       assume_yes: false,
       version: nil,
       rc_tag: nil,
+      ack_manual: [],
+      ack_final_changelog_source: nil,
       remote: "origin"
     }
     @parser = build_parser
@@ -92,7 +97,16 @@ class ReleaseFinish
     raise UsageError, "too many arguments: #{argv.join(' ')}" unless argv.empty?
 
     validate_version!
+    validate_subcommand_options!(subcommand)
+
     subcommand
+  end
+
+  def validate_subcommand_options!(subcommand)
+    return unless subcommand == "promote"
+    return if @options[:ack_manual].empty? && !@options[:ack_final_changelog_source]
+
+    raise UsageError, "forward-port acknowledgements apply only to close-out verification"
   end
 
   def validate_version!
@@ -116,6 +130,7 @@ class ReleaseFinish
       parser.on("--remote NAME", "Remote for fetch and branch deletion (default: origin)") do |remote|
         @options[:remote] = remote
       end
+      add_forward_port_ack_options(parser)
       parser.on("--dry-run", "Preview the plan; still fetches remote refs needed for current-state checks") do
         @options[:dry_run] = true
       end
@@ -129,17 +144,30 @@ class ReleaseFinish
     end
   end
 
+  def add_forward_port_ack_options(parser)
+    parser.on("--ack-manual SHA", "Acknowledge one inspected MANUAL forward-port item (repeatable)") do |sha|
+      @options[:ack_manual] << sha
+    end
+    parser.on(
+      "--ack-final-changelog-source SHA",
+      "Acknowledge the current source CHANGELOG.md commit for a legacy authoritative changelog PR"
+    ) do |sha|
+      @options[:ack_final_changelog_source] = sha
+    end
+  end
+
   def usage_banner
     <<~BANNER
       Usage: script/release-finish promote   X.Y.Z [--rc-tag vX.Y.Z.rc.N] [--dry-run] [--yes]
-             script/release-finish close-out X.Y.Z [--remote origin] [--dry-run] [--yes]
+             script/release-finish close-out X.Y.Z [--remote origin] [--ack-manual SHA]
+                                                  [--ack-final-changelog-source SHA] [--dry-run] [--yes]
 
       Orchestrates the release-train runbook steps 4 (promote) and 5 (close out).
 
         promote    Verify the release/X.Y.Z tip equals the accepted RC tag, collapse the
                    rc->stable CHANGELOG, then run `bundle exec rake release[X.Y.Z]`.
-        close-out  Forward-port remaining commits to main via #{FORWARD_PORT_SCRIPT},
-                   then delete release/X.Y.Z on the remote.
+        close-out  Verify separate source and changelog forward-port PRs are complete
+                   on main, then delete release/X.Y.Z on the remote.
 
       The rake promotion guards enforce the dangerous tag/version safety; this script
       adds dry-run, confirmations, and on/at-release/clean-tree guards around them.
@@ -274,63 +302,247 @@ class ReleaseFinish
 
     fetch_remote!(remote)
     ensure_local_main_matches_remote!(remote)
+    checked_main_sha = git("rev-parse", "#{remote}/main").strip
+    checked_source_sha = git("rev-parse", source).strip
 
-    forward_port_to_main!(source)
-    delete_release_branch!(release_branch, remote)
+    complete = forward_port_complete?(source)
+    unless complete
+      if @options[:dry_run]
+        puts "\nDRY RUN: close-out is blocked until the separate forward-port PRs above merge."
+        finish_dry_run_notice
+        return 0
+      end
+
+      raise AbortError, <<~ERROR.strip
+        release close-out is not complete on #{remote}/main.
+        Land each remaining source change in its own PR, then land the separate
+        changelog/release reconciliation as a squash PR. Re-run close-out only
+        after both checks pass; the release branch was not deleted.
+      ERROR
+    end
+
+    delete_release_branch!(
+      release_branch,
+      remote,
+      checked_main_sha:,
+      checked_source_sha:
+    )
 
     finish_dry_run_notice
     0
   end
 
-  def forward_port_to_main!(source)
-    section "Forward-port remaining #{source} commits to main"
-    # Always show the REAL plan: release-forward-port --dry-run is read-only (no
-    # checkout, no cherry-pick), so running it even under our own --dry-run gives
-    # the operator the actual forward-port preview rather than a bare command.
-    puts "Dry-run plan first (delegates to #{FORWARD_PORT_SCRIPT}; it skips rc bumps and already-ported fixes):"
-    unless system(FORWARD_PORT_SCRIPT, "--source", source, "--target", "main", "--dry-run")
-      raise GitError, "#{FORWARD_PORT_SCRIPT} --dry-run failed; cannot preview the forward-port plan"
+  def forward_port_complete?(source)
+    section "Verify separate forward-port PRs from #{source}"
+    puts "Code plan (every remaining PICK/MANUAL item needs its own source-change PR):"
+    code_args = ["--source", source, "--target", "main", "--check"]
+    @options.fetch(:ack_manual).each { |sha| code_args.push("--ack-manual", sha) }
+    code_complete = run_forward_port_check(*code_args)
+
+    puts
+    puts "Changelog plan (remaining reconciliation needs its own squash PR):"
+    changelog_args = ["--source", source, "--target", "main", "--changelog", "--check"]
+    if (sha = @options[:ack_final_changelog_source])
+      changelog_args.push("--ack-final-changelog-source", sha)
+    end
+    changelog_complete = run_forward_port_check(*changelog_args)
+
+    if code_complete && changelog_complete
+      puts "\nAll source and changelog forward-port work is complete on main."
+      return true
     end
 
-    if @options[:dry_run]
-      puts
-      puts "DRY RUN: the plan above is read-only; the apply step (forward-port without --dry-run) was skipped."
-      return
-    end
-
-    unless confirm?("Apply the forward-port plan above onto main?")
-      raise AbortError, "review the plan and re-run close-out when ready to forward-port"
-    end
-
-    forwarded = system(FORWARD_PORT_SCRIPT, "--source", source, "--target", "main")
-    return if forwarded
-
-    raise AbortError,
-          "#{FORWARD_PORT_SCRIPT} did not complete (conflict or MANUAL item). Resolve per the runbook, " \
-          "then re-run close-out; the helper is idempotent and the branch deletion below was not run."
+    puts "\nNext: follow the runbook's one-source-PR-at-a-time loop, then merge the release/changelog squash PR."
+    false
   end
 
-  def delete_release_branch!(release_branch, remote)
+  def run_forward_port_check(*)
+    launched = system(FORWARD_PORT_SCRIPT, *)
+    status = Process.last_status
+    raise GitError, "could not launch #{FORWARD_PORT_SCRIPT}" if launched.nil? || status.nil?
+
+    return true if status.success?
+    return false if status.exitstatus == FORWARD_PORT_INCOMPLETE_STATUS
+
+    raise GitError, "#{FORWARD_PORT_SCRIPT} verification failed with status #{status.exitstatus}"
+  end
+
+  def delete_release_branch!(release_branch, remote, checked_main_sha:, checked_source_sha:)
     section "Delete the ephemeral branch #{release_branch} on #{remote} (tags are the durable record)"
+    recovery_ref = release_recovery_ref(release_branch, checked_source_sha)
 
     if @options[:dry_run]
-      puts "DRY RUN: would verify the forward-ported commits are on #{remote}/main, then run:"
-      run_or_print("git", "push", remote, "--delete", release_branch)
+      puts "DRY RUN: would verify the checked source and main tips, then atomically move the release tip"
+      puts "to temporary recovery branch #{recovery_ref.delete_prefix('refs/heads/')} while deleting"
+      puts "with a source lease:"
+      run_or_print(
+        *leased_branch_delete_command(release_branch, remote, checked_source_sha:, recovery_ref:)
+      )
+      puts "DRY RUN: would re-fetch #{remote}/main, restore #{release_branch} if main raced,"
+      puts "then remove the recovery branch."
       return
     end
-
-    # SAFETY: never delete the source branch while its forward-ported commits
-    # exist only on LOCAL main. close-out applies the cherry-picks locally but
-    # deliberately does not push main (main may be protected), so the operator
-    # must push first. Re-fetch and verify local main is now on origin/main
-    # before allowing the delete.
-    ensure_forward_port_durable_on_remote!(remote)
 
     confirm_outward!(
       "Delete #{release_branch} on #{remote} now? Tags persist; this only removes the branch.",
-      "git push #{remote} --delete #{release_branch}"
+      "git push --atomic #{remote} <checked-source>:#{recovery_ref} :#{release_branch} (with matching leases)"
     )
-    run_or_print("git", "push", remote, "--delete", release_branch)
+
+    ensure_forward_port_durable_on_remote!(
+      remote,
+      release_branch,
+      checked_main_sha:,
+      checked_source_sha:
+    )
+    begin
+      run_or_print(
+        *leased_branch_delete_command(release_branch, remote, checked_source_sha:, recovery_ref:)
+      )
+    rescue GitError => e
+      raise AbortError, <<~ERROR.strip
+        The leased delete transaction could not be confirmed; its remote outcome is UNKNOWN.
+        Inspect #{remote}/#{release_branch} and #{recovery_ref.delete_prefix('refs/heads/')} before retrying.
+        A retained recovery branch at a conflicting tip intentionally rejects reuse until it is accounted for.
+        Git command failure: #{e.message}
+      ERROR
+    end
+    verify_main_after_delete!(
+      remote,
+      release_branch,
+      checked_main_sha:,
+      checked_source_sha:,
+      recovery_ref:
+    )
+  end
+
+  def release_recovery_ref(release_branch, checked_source_sha)
+    version = release_branch.delete_prefix("release/")
+    "refs/heads/release-finish-recovery/#{version}-#{checked_source_sha[0, 12]}"
+  end
+
+  def leased_branch_delete_command(release_branch, remote, checked_source_sha:, recovery_ref:)
+    source_ref = "refs/heads/#{release_branch}"
+    [
+      "git",
+      "push",
+      "--atomic",
+      "--force-with-lease=#{source_ref}:#{checked_source_sha}",
+      "--force-with-lease=#{recovery_ref}:",
+      remote,
+      "#{checked_source_sha}:#{recovery_ref}",
+      ":#{source_ref}"
+    ]
+  end
+
+  def verify_main_after_delete!(remote, release_branch, checked_main_sha:, checked_source_sha:, recovery_ref:)
+    begin
+      fetch_remote!(remote)
+      current_main_sha = git("rev-parse", "#{remote}/main").strip
+      recreated_source_sha = remote_branch_sha(remote, release_branch)
+    rescue GitError => e
+      raise AbortError, <<~ERROR.strip
+        Post-delete verification did not complete.
+        The temporary recovery branch #{recovery_ref.delete_prefix('refs/heads/')} was created for the checked source tip.
+        Inspect #{remote}/main, #{remote}/#{release_branch}, and the recovery branch before retrying.
+        Git command failure: #{e.message}
+      ERROR
+    end
+
+    if recreated_source_sha
+      raise AbortError, <<~ERROR.strip
+        #{remote}/#{release_branch} reappeared during post-delete verification
+          checked: #{checked_source_sha}
+          current: #{recreated_source_sha}
+        The temporary recovery branch #{recovery_ref.delete_prefix('refs/heads/')} remains at the checked tip.
+        Re-run the code and changelog checks against the recreated source branch before removing recovery.
+      ERROR
+    end
+
+    if current_main_sha == checked_main_sha
+      delete_recovery_if_source_absent!(
+        remote,
+        release_branch,
+        checked_source_sha:,
+        recovery_ref:
+      )
+      return
+    end
+
+    restore_release_branch!(
+      remote,
+      release_branch,
+      checked_source_sha:,
+      recovery_ref:
+    )
+    raise AbortError, <<~ERROR.strip
+      #{remote}/main changed during the release-branch deletion
+        checked: #{checked_main_sha}
+        current: #{current_main_sha}
+      Restored #{release_branch} at #{checked_source_sha}.
+      Re-run close-out against the new main tip; no release-branch commit was discarded.
+    ERROR
+  end
+
+  def remote_branch_sha(remote, branch)
+    stdout, stderr, status =
+      capture_git("ls-remote", "--exit-code", "--heads", "--", remote, branch)
+    return stdout.split.first if status.success?
+    return if status.exitstatus == 2
+
+    raise GitError, git_error(["ls-remote", "--exit-code", "--heads", "--", remote, branch], stdout, stderr, status)
+  end
+
+  def delete_recovery_if_source_absent!(remote, release_branch, checked_source_sha:, recovery_ref:)
+    run_or_print(
+      *leased_recovery_delete_command(
+        remote,
+        release_branch,
+        checked_source_sha:,
+        recovery_ref:
+      )
+    )
+  rescue GitError => e
+    raise AbortError, <<~ERROR.strip
+      Recovery cleanup was not confirmed while proving #{remote}/#{release_branch} remained absent.
+      Inspect #{remote}/#{release_branch} and #{recovery_ref.delete_prefix('refs/heads/')} before retrying.
+      Git command failure: #{e.message}
+    ERROR
+  end
+
+  def leased_recovery_delete_command(remote, release_branch, checked_source_sha:, recovery_ref:)
+    source_ref = "refs/heads/#{release_branch}"
+    [
+      "git",
+      "push",
+      "--atomic",
+      "--force-with-lease=#{source_ref}:",
+      "--force-with-lease=#{recovery_ref}:#{checked_source_sha}",
+      remote,
+      ":#{source_ref}",
+      ":#{recovery_ref}"
+    ]
+  end
+
+  def restore_release_branch!(remote, release_branch, checked_source_sha:, recovery_ref:)
+    source_ref = "refs/heads/#{release_branch}"
+    command = [
+      "git",
+      "push",
+      "--atomic",
+      "--force-with-lease=#{source_ref}:",
+      "--force-with-lease=#{recovery_ref}:#{checked_source_sha}",
+      remote,
+      "#{checked_source_sha}:#{source_ref}",
+      ":#{recovery_ref}"
+    ]
+    run_or_print(*command)
+  rescue GitError => e
+    raise AbortError, <<~ERROR.strip
+      #{remote}/main changed during the release-branch deletion, and automatic restoration failed.
+      The checked release tip remains protected by #{recovery_ref} at #{checked_source_sha}.
+      Inspect #{remote}/#{release_branch} and restore it from that recovery branch before retrying.
+      Recovery command failure: #{e.message}
+    ERROR
   end
 
   # ---------------------------------------------------------------------------
@@ -376,35 +588,40 @@ class ReleaseFinish
     ERROR
   end
 
-  # SAFETY GATE for the branch delete: the forward-port applies cherry-picks to
-  # LOCAL main but close-out never pushes main itself (main may be protected), so
-  # the operator must push (or merge the forward-port PR) first. Re-fetch and
-  # require local main — which carries those cherry-picks — to be reachable from
-  # the remote main. If the operator has not pushed, local main holds commits
-  # absent from #{remote}/main and this aborts, making it impossible to delete
-  # the source branch while its unique forward-ported commits exist only locally.
-  # (Cherry-picks get new SHAs, so this checks the pushed local-main tip, not the
-  # original release-branch commit identities, which are never ancestors of main
-  # under the trunk-based -x model.)
-  def ensure_forward_port_durable_on_remote!(remote)
+  # SAFETY GATE for the branch delete: re-fetch and require both checked tips to
+  # remain unchanged. The following atomic push leases the source and preserves
+  # its exact tip on a temporary remote recovery branch. A post-delete fetch then
+  # detects a main race and restores the source before aborting.
+  def ensure_forward_port_durable_on_remote!(remote, release_branch, checked_main_sha:, checked_source_sha:)
     fetch_remote!(remote)
-    remote_main = "#{remote}/main"
-    local_main = git("rev-parse", "main").strip
-    return if commit_reachable_from?(local_main, remote_main)
+    ensure_local_main_matches_remote!(remote)
+    ensure_remote_ref_unchanged!("#{remote}/main", checked_main_sha)
+    ensure_remote_ref_unchanged!("#{remote}/#{release_branch}", checked_source_sha)
+  end
+
+  def ensure_remote_ref_unchanged!(ref, checked_sha)
+    current_sha = git("rev-parse", ref).strip
+    return if current_sha == checked_sha
 
     raise AbortError, <<~ERROR.strip
-      the forward-ported commits on local main are not yet on #{remote_main}.
-      Push main before deleting the source branch — its unique commits would
-      otherwise be lost (tags do not preserve the forward-port onto main):
-        git push   # or merge the forward-port PR into main
-      Then re-run: script/release-finish close-out #{@options.fetch(:version)}
+      #{ref} changed after the forward-port checks
+        checked: #{checked_sha}
+        current: #{current_sha}
+      Re-run close-out against the new tips; the release branch was not deleted.
     ERROR
   end
 
   def ensure_clean_worktree!
+    raise AbortError, CHERRY_PICK_IN_PROGRESS_MESSAGE if cherry_pick_in_progress?
+
     return if git("status", "--porcelain").strip.empty?
 
     raise AbortError, "working tree is not clean; commit, stash, or discard local changes before continuing"
+  end
+
+  def cherry_pick_in_progress?
+    git_dir = git("rev-parse", "--git-dir").strip
+    File.exist?(File.expand_path("CHERRY_PICK_HEAD", git_dir))
   end
 
   def ensure_tag_exists!(tag)

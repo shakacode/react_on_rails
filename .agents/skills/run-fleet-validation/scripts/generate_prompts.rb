@@ -70,6 +70,7 @@ module FleetValidation
     end
 
     def write_pack(output_dir)
+      output_dir = File.expand_path(output_dir)
       @lifecycle.validate_existing_ledger(File.join(output_dir, "result-ledger.json"))
       FileUtils.mkdir_p(output_dir)
       clear_generated_prompts(output_dir)
@@ -86,7 +87,7 @@ module FleetValidation
         rendered_prompts << [assignment.fetch(:machine), relative_path, assignment]
       end
 
-      File.write(File.join(output_dir, "INDEX.md"), render_index(rendered_prompts))
+      File.write(File.join(output_dir, "INDEX.md"), render_index(rendered_prompts, output_dir))
       @lifecycle.write_artifacts(output_dir)
     end
 
@@ -282,7 +283,7 @@ module FleetValidation
       (["## Machine allocation", ""] + rows).join("\n")
     end
 
-    def render_index(rendered_prompts)
+    def render_index(rendered_prompts, output_dir)
       rows = rendered_prompts.map do |machine, path, assignment|
         targets = assignment.fetch(:targets).map { |target| target.fetch("name") }.join("; ")
         "| #{machine} | [#{File.basename(path)}](#{path}) | #{targets} |"
@@ -307,19 +308,20 @@ module FleetValidation
            comment, never from `result-ledger.json`, before running:
 
            ```bash
+           PACK_DIR=#{Shellwords.escape(output_dir)}
            EXPECTED_CANDIDATE=RESOLVED_CANDIDATE_TAG
            EXPECTED_CANDIDATE_COMMIT=RESOLVED_CANDIDATE_COMMIT
            EXPECTED_POLICY_COMMIT=FULL_POLICY_COMMIT_SHA
            EXPECTED_TRACKER_MODE=INITIAL_TRACKER_MODE
-           ruby .agents/skills/run-fleet-validation/scripts/validate_ledger.rb \
-             --ledger result-ledger.json \
+           bundle exec ruby .agents/skills/run-fleet-validation/scripts/validate_ledger.rb \
+             --ledger "$PACK_DIR/result-ledger.json" \
              --expected-pack-id #{Shellwords.escape(@pack_id)} \
              --expected-release-selector #{Shellwords.escape(@release_selector)} \
              --expected-candidate "$EXPECTED_CANDIDATE" \
              --expected-candidate-commit "$EXPECTED_CANDIDATE_COMMIT" \
              --expected-policy-commit "$EXPECTED_POLICY_COMMIT" \
              --expected-tracker-mode "$EXPECTED_TRACKER_MODE" \
-             --render-tracker tracker-closeout.md
+             --render-tracker "$PACK_DIR/tracker-closeout.md"
            ```
 
         This layout runs at most

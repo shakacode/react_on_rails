@@ -40,9 +40,9 @@ module ReactOnRailsPro
     # Configuration (see docs/pro/rolling-deploy-adapters.md):
     #
     #   ReactOnRailsPro.configure do |config|
-    #     config.rolling_deploy_adapter      = ReactOnRailsPro::RollingDeployAdapters::Http
-    #     config.rolling_deploy_token        = ENV.fetch("ROLLING_DEPLOY_TOKEN")
-    #     config.rolling_deploy_previous_url = ENV["ROLLING_DEPLOY_PREVIOUS_URL"]
+    #     config.rolling_deploy_adapter       = ReactOnRailsPro::RollingDeployAdapters::Http
+    #     config.rolling_deploy_token         = ENV.fetch("ROLLING_DEPLOY_TOKEN")
+    #     config.rolling_deploy_previous_urls = ENV["ROLLING_DEPLOY_PREVIOUS_URLS"]
     #   end
     #
     # Error contract matches the rolling_deploy_adapter protocol: every
@@ -272,15 +272,9 @@ module ReactOnRailsPro
           (deadline - monotonic_now).positive?
         end
 
-        def configured_previous_url
-          configured_previous_urls.first
-        end
-
         def configured_previous_urls
           config = ReactOnRailsPro.configuration
-          singular = config.rolling_deploy_previous_url
-          raw = singular.to_s.strip.empty? ? config.rolling_deploy_previous_urls : singular
-          values = Array(raw).flat_map do |entry|
+          values = Array(config.rolling_deploy_previous_urls).flat_map do |entry|
             entry.to_s.split(%r{,\s*(?=[a-z][a-z0-9+.-]*://)}i)
           end
                              .map(&:strip)
@@ -528,7 +522,7 @@ module ReactOnRailsPro
         # by surfacing the cleartext-token risk in build CI logs.
         #
         # Loopback hosts are intentionally exempt so developers running a
-        # local Rails server for `rolling_deploy_previous_url` during
+        # local Rails server for `rolling_deploy_previous_urls` during
         # development don't see noise on every build CI rehearsal — the
         # token never leaves the host in that case.
         LOOPBACK_HOST_PATTERN = /\A(localhost|127(?:\.\d{1,3}){3}|::1|\[::1\])\z/

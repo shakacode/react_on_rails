@@ -161,6 +161,15 @@ updates reviewed in that repo. If a repo chooses that route:
 
 Do not make repo pinning the default adoption step.
 
+React on Rails uses a reviewed pin for the helper and workflow files needed by
+checkout-only sessions. `.agents/agent-workflow-drift.yml` records the immutable
+`shakacode/agent-workflows` revision, exact copies, and reviewed overlays. The
+required CI job checks out that exact revision with credentials disabled, runs
+the consumer-owned manifest completeness test, and then runs the source pack's
+read-only byte/mode/hash drift checker. Completeness policy stays local so new
+files under governed source prefixes must be mapped or explicitly excluded with
+a reviewed reason.
+
 ## What Not To Copy Blindly
 
 - React on Rails package paths such as `react_on_rails/`,
@@ -189,6 +198,8 @@ fallback until a public backend spec exists.
 - `agent-workflow-seam-doctor --shared <path-to-shakacode/agent-workflows>` passes.
 - Markdown formatting and link checks pass for edited docs.
 - Skill `bin/` unit tests pass when the repo carries local helper scripts.
+- `.agents/bin/agent-workflow-drift-manifest-test.rb --source-root <pinned-agent-workflows>`
+  passes, followed by the pinned source pack's `bin/check-agent-workflow-drift`.
 - A dry run of `$pr-batch` stops with an exact target list and goal prompt
   before spawning workers.
 - A dry run of review triage reaches the action menu and resolves base branch,

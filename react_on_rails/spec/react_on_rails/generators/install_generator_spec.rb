@@ -410,6 +410,14 @@ describe InstallGenerator, type: :generator do
         expect(content).to include("react_on_rails:doctor FORMAT=json")
         expect(content).to include("`id`, `severity`, `message`, and `remediation.prompt`")
         expect(content).to include("Component '<Name>' Not Registered")
+        expect(content).to include("bundle show react_on_rails")
+        expect(content).to include("canonical, reliable lookup")
+        expect(content).to include("optional direct-dependency path")
+        expect(content).to include("Do not assume it exists")
+        expect(content.index("bundle show react_on_rails")).to be < content.index("node_modules/react-on-rails/")
+        %w[doctor-fix-loop install-and-upgrade rsc-adoption streaming-debug].each do |skill_name|
+          expect(content).to include("skills/#{skill_name}/SKILL.md")
+        end
       end
 
       assert_file "CLAUDE.md" do |content|

@@ -28,5 +28,8 @@ spec/react_on_rails/fixtures/i18n/locales_symbols/
 # Internal documentation - ignore formatting
 CLAUDE.md
 
+# Byte-identical shared source-pack copy; the pinned drift gate owns formatting.
+.agents/docs/installation-and-upgrades.md
+
 # Generated ShakaPerf investigation reports; keep the archived HTML untouched.
 internal/analysis/rsc-fouc-shakaperf-artifacts/reports/**/*.html

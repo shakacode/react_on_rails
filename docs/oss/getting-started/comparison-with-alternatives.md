@@ -157,7 +157,7 @@ Build speed is only part of the picture. Here's how the two approaches compare a
 
 ### React on Rails (OSS)
 
-[React on Rails](https://github.com/shakacode/react_on_rails) provides full React integration with Rails views. Components render directly in ERB/Haml templates via the `react_component` helper, with props passed from Rails. Server-side rendering uses ExecJS (via mini_racer).
+[React on Rails](https://github.com/shakacode/react_on_rails) provides full React integration with Rails views. Components render directly in ERB/Haml templates via the `react_component` helper, with props passed from Rails. Server-side rendering uses ExecJS, which auto-detects an available JavaScript runtime (Node.js, mini_racer, or Bun).
 
 **Strengths:**
 

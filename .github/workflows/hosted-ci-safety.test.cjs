@@ -67,6 +67,7 @@ function runGemMatrix(script, { full, generators }) {
 
 const labelDispatchWorkflow = read('.github/workflows/hosted-ci-label-dispatch.yml');
 const requiredWorkflow = read('.github/workflows/ci-required.yml');
+const agentWorkflowDriftManifest = read('.agents/agent-workflow-drift.yml');
 const hostedSelectorsAction = read('.github/actions/hosted-ci-selectors/action.yml');
 const ciCommandsWorkflow = read('.github/workflows/ci-commands.yml');
 const claudeWorkflow = read('.github/workflows/claude.yml');
@@ -114,6 +115,27 @@ assertMatches(
 );
 assertMatches('ci-required check-run read permission', requiredWorkflow, /checks: read/);
 assertMatches('ci-required actions-run read permission', requiredWorkflow, /actions: read/);
+const agentWorkflowRevision = agentWorkflowDriftManifest.match(
+  /^source_revision:\s*["']?([0-9a-f]{40})["']?$/m,
+);
+assert.ok(agentWorkflowRevision, 'agent workflow drift manifest must pin a full source revision');
+assertMatches(
+  'ci-required pinned agent workflow checkout',
+  requiredWorkflow,
+  new RegExp(
+    String.raw`- name: Check out pinned agent workflows[\s\S]*uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5[\s\S]*repository: shakacode/agent-workflows[\s\S]*ref: ${agentWorkflowRevision[1]}[\s\S]*path: \.agent-workflows-source[\s\S]*fetch-depth: 1[\s\S]*persist-credentials: false`,
+  ),
+);
+assertMatches(
+  'ci-required agent workflow manifest completeness check',
+  requiredWorkflow,
+  /ruby \.agents\/bin\/agent-workflow-drift-manifest-test\.rb --source-root \.agent-workflows-source/,
+);
+assertMatches(
+  'ci-required pinned agent workflow drift check',
+  requiredWorkflow,
+  /\.agent-workflows-source\/bin\/check-agent-workflow-drift[\s\S]*--manifest \.agents\/agent-workflow-drift\.yml[\s\S]*--source-root \.agent-workflows-source[\s\S]*--consumer-root \./,
+);
 assertMatches('ci-required mirrored-block lint', requiredWorkflow, /ruby bin\/lint-mirrored-blocks/);
 assertMatches(
   'ci-required mirrored-block lint tests',

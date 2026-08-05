@@ -10,6 +10,22 @@ RC to final, and close out the release branch, see
 behavioral release verification lanes, see [RC Testing Plan](rc-testing-plan.md)
 and [Release Verification Runbook](release-verification-runbook.md).
 
+> **Execution boundary:** This page is a mechanical reference, not a live-release
+> procedure. Until a repository-owned wrapper binds a compound helper to the
+> release-line lease for its whole lifetime and fences every outward operation,
+> use `bundle exec rake release`, `script/release-finish`, and other compound
+> release helpers only in dry-run or preview mode. All release-mutating examples
+> on this page are therefore previews. For a live cut or reconciliation, follow
+> the individually guarded commands in the
+> [Release-Train Runbook](release-train-runbook.md#serialize-every-release-line-write).
+> **BLOCKED** is an operational and agent policy stop, not runtime enforcement:
+> these tasks remain technically callable in live mode, but direct live
+> invocation outside that individually guarded procedure violates release
+> policy.
+> Interrupted or partial-publication recovery is currently blocked; preserve
+> the evidence and follow the dispositions in
+> [Partial-publication recovery](release-train-runbook.md#partial-publication-recovery).
+
 ## Testing the Gem before Release from a Rails App
 
 See [Contributing](https://github.com/shakacode/react_on_rails/blob/main/CONTRIBUTING.md)
@@ -55,8 +71,9 @@ React on Rails RC. Follow the ordered dependency-promotion gate in the
 4. Review the PR, verify the computed version, and merge
 
 If a stable target lacks this section, the release task aborts before confirmation, tagging, or publication.
-For a prerelease, the task warns and skips the GitHub release; after adding the section, create it with
-`sync_github_release`.
+For a prerelease, the task warns and skips the GitHub release. After adding the section, preview the idempotent update
+with the dry-run form `sync_github_release[X.Y.Z,true]`; live GitHub release creation or editing remains **BLOCKED** as
+documented in [Partial-publication recovery](release-train-runbook.md#partial-publication-recovery).
 
 #### Why changelog comes BEFORE the release
 
@@ -70,33 +87,37 @@ For a prerelease, the task warns and skips the GitHub release; after adding the 
 - A premature version header (if release fails) is harmless -- you'll release eventually
 - A prerelease or historical release missing its changelog requires manual GitHub release synchronization
 
-### 2. Run the Release Task
+### 2. Preview the Release Task
 
-The simplest way to release is with no arguments -- the task reads the version from CHANGELOG.md:
+The task reads the version from CHANGELOG.md when the version argument is empty. Preview that path,
+or an explicit target, with `dry_run=true`:
 
 ```bash
-# Recommended: reads version from CHANGELOG.md (requires step 1)
-bundle exec rake release
+# Reads version from CHANGELOG.md (requires step 1)
+bundle exec rake "release[,true]"
 
 # For a specific version (overrides CHANGELOG.md detection)
-bundle exec rake "release[16.2.0]"
+bundle exec rake "release[16.2.0,true]"
 
 # For a pre-release version (note: use period, not dash)
-bundle exec rake "release[16.2.0.beta.1]"  # Creates npm package 16.2.0-beta.1
+bundle exec rake "release[16.2.0.beta.1,true]"  # Previews npm package 16.2.0-beta.1
 
 # For a release candidate
-bundle exec rake "release[16.5.0.rc.0]"
+bundle exec rake "release[16.5.0.rc.0,true]"
 
 # Dry run to test without publishing
 bundle exec rake "release[16.2.0,true]"
 
 # Override version policy checks (monotonic + changelog/bump consistency)
-RELEASE_VERSION_POLICY_OVERRIDE=true bundle exec rake "release[16.2.0]"
-bundle exec rake "release[16.2.0,false,true]"
+RELEASE_VERSION_POLICY_OVERRIDE=true bundle exec rake "release[16.2.0,true]"
+bundle exec rake "release[16.2.0,true,true]"
 ```
 
 > **Retry safety:** Never drop the version argument when resuming an interrupted release. Retry the
-> exact prerelease version, for example `bundle exec rake "release[17.0.0.rc.10]"`. From a prerelease
+> exact prerelease version; preview it with `bundle exec rake "release[17.0.0.rc.10,true]"`, then use
+> the blocked-state dispositions in
+> [Partial-publication recovery](release-train-runbook.md#partial-publication-recovery). There is no
+> safe live retry until the required fencing exists. From a prerelease
 > checkout, an argument-less release fails closed unless the changelog advances the same release line
 > to a newer prerelease. Stable promotion must use an explicit stable version and a matching non-empty
 > changelog section.
@@ -111,6 +132,28 @@ When called with no arguments, `rake release`:
    prerelease checkout, aborts with exact retry and stable-promotion guidance
 
 Dry runs use a temporary git worktree so version bumps and installs do not modify your current checkout.
+
+Both live releases and dry runs first verify npm publication readiness in the original checkout, immediately after
+the clean-worktree check and verbosity setup. The root
+`packageManager` must pin an exact pnpm version, the installed pnpm must match it, `node_modules/.pnpm/lock.yaml`
+must byte-match the committed `pnpm-lock.yaml`, and every npm release package must pass its normal `build` script
+with lifecycle scripts enabled. This happens before release-checkout creation, `git pull`, npm or GitHub
+authentication, CI/tag/version-policy remote reads, registry probes, confirmation, version mutation, ShakaPerf
+dispatch, tagging, publication, or OTP prompting. A pnpm version mismatch must first be repaired by activating the
+exact pnpm version declared by the root `packageManager`. The release prints this frozen-install command for the
+installed-dependency repair:
+
+```bash
+pnpm install --frozen-lockfile
+```
+
+After the initial check succeeds, the task binds it to the exact current commit. A live release then runs
+`git pull --rebase` and immediately resolves `HEAD` again. If the pull advanced the checkout, all four release-package
+builds and the rest of npm readiness run again in the live release root; `HEAD` is resolved once more after that check
+so a concurrent commit change fails closed. Version resolution, authentication, CI, registry probes, confirmation,
+and mutation remain unreachable until readiness is bound to the current release SHA. An unchanged live checkout runs
+one readiness check, and a dry run neither pulls nor repeats the original-workspace check. Any missing or malformed SHA
+resolution is a hard failure.
 
 `rake release` validates release-version policy before publishing:
 
@@ -163,10 +206,98 @@ RELEASE_VERSION_POLICY_OVERRIDE=true # Override release version policy checks
 RELEASE_CI_EVALUATE_HEAD=true # Strictly evaluate the fetched exact release-source HEAD; not a waiver
 RELEASE_CI_STATUS_OVERRIDE=true # DANGEROUS last-resort waiver for the release CI-status gate
 RELEASE_ACCELERATED_RC=true # Explicit RC only: publish while named pending gates finish
-RELEASE_TRACKER=<issue> # Active release tracker for accelerated RC records and final promotion
+RELEASE_TRACKER=<issue> # Active release tracker for ShakaPerf evidence, accelerated RCs, and final promotion
+RELEASE_SHAKAPERF_RUN=<id-or-canonical-url> # Verify and durably associate one existing ShakaPerf run
+RELEASE_FINAL_SHAKAPERF_WAIVER_REASON=<single-line-reason> # Stable-only observation-failure waiver
 RELEASE_ACCELERATED_RC_REASON=<reason> # Single-line maintainer reason for accelerated publication
 GEM_RELEASE_MAX_RETRIES=<n>  # Positive base-10 integer max retry attempts (default: 3)
 ```
+
+#### Saving and reusing ShakaPerf release evidence
+
+Use the open issue whose exact title is `Release gate: react_on_rails X.Y.Z` as the durable store. `X.Y.Z`
+is always the stable base, so an RC such as `17.0.1.rc.3` is bound to `Release gate: react_on_rails 17.0.1`.
+Release-related labels are advisory and cannot substitute for the exact title. The selected tracker and every
+tracker reached by repository-wide durable-history discovery must satisfy this same target binding. To associate
+a run that was started manually or missed by automatic discovery, provide the same active tracker used by the
+release train and either the numeric run ID or its canonical GitHub URL:
+
+```bash
+RELEASE_TRACKER=4806 \
+RELEASE_SHAKAPERF_RUN=https://github.com/shakacode/react_on_rails/actions/runs/30417447319 \
+bundle exec rake "release[17.0.1,true]"
+```
+
+This preview validates the target and tracker inputs but does not fetch or persist the selected run. Live
+association remains blocked until the repository-owned release wrapper described in the execution boundary exists.
+
+This selector is not a waiver. Before appending anything, the task fetches the run and its schema-v2
+artifact from GitHub and verifies repository, workflow, branch, target version, run ID and attempt,
+terminal success, completion time, candidate SHA, evidence digest, and runtime fingerprint. The tracker
+comment is append-only, attributed to a repository maintainer, and re-fetched before the task continues.
+Saving the same association again is idempotent.
+
+An explicit `RELEASE_SHAKAPERF_RUN` is authoritative for selection, not a hint. During stable promotion it
+bypasses automatic accepted-RC ShakaPerf reuse and goes directly through strict-final selector verification and
+persistence. It cannot be combined with `RELEASE_ACCELERATED_RC=true`. It also cannot be supplied on an unflagged
+same-candidate retry once durable discovery proves that the retry is accelerated; this aborts before approver,
+CI, mutation, or evidence-refresh work.
+
+The trusted canonical tracker comment is the durable source of truth. A local
+`shakaperf-release-evidence.json` is only a downloaded artifact/cache used during verification; it is never
+the durable source of truth and cannot authorize reuse by itself.
+
+On a later invocation, set `RELEASE_TRACKER` without `RELEASE_SHAKAPERF_RUN`. The task reads trusted,
+unedited machine comments, re-fetches the saved run and artifact, and re-runs the same checks. Exact-SHA
+evidence is preferred. Existing machine-verified runtime-equivalence remains supported because the stored
+candidate is bound to the live run while the schema-v2 runtime fingerprint is compared with the current
+release commit. Output names both the tracker URL and reused run URL.
+
+Only automatic association reuse may discard naturally invalid evidence and continue through normal discovery.
+That recovery is limited to authoritative staleness, a 404-proven missing run or artifact, GitHub CLI's exact
+`no valid artifacts found to download` diagnostic, a live run now completed with `failure` or `cancelled`, or proof
+that the current runtime tree, intervening commits, or ancestry is no longer equivalent. The artifact diagnostic is
+matched case-insensitively; authentication, permission, rate-limit, server, DNS, and timeout errors remain unknown
+observation failures rather than absence. A Git `merge-base --is-ancestor` exit 1 is authoritative non-ancestry.
+Failures or malformed results from
+`git ls-tree`, `merge-base`, `rev-list`, `diff-tree`, or `script/ci-changes-detector` are unknown and block without
+dispatching a replacement run. Explicit selectors reject both authoritative invalidation and unknown verification.
+Edited, malformed, unsupported, or noncanonical trusted
+comments; author/tracker/title mismatch; conflicting latest records; record/live identity conflict; digest or
+fingerprint mutation; artifact parse or shape errors; and authentication, permission, pagination, parse, or other
+indeterminate API failures all remain hard failures. Absence must therefore be proved, never inferred from an
+unknown observation.
+
+Inspect the durable state with `gh issue view 4806 --repo shakacode/react_on_rails --comments`. To replace
+an association, run the explicit selector again with a newer verified run; the newest trusted association
+for that exact candidate becomes the default. Use `RELEASE_SHAKAPERF_RUN` to choose between equally timed
+conflicting records. Machine comments must not be edited or deleted: an edited trusted record fails closed.
+To stop using saved evidence without mutating the audit trail, omit `RELEASE_TRACKER`; normal discovery then
+applies and dispatches a fresh exact-head run when no reusable evidence exists.
+
+If GitHub observation fails after an exact run has been identified, a maintainer may use the narrowly scoped
+stable-only escape hatch:
+
+```bash
+RELEASE_TRACKER=4806 \
+RELEASE_FINAL_SHAKAPERF_WAIVER_REASON="GitHub REST observer exhausted its quota" \
+bundle exec rake "release[17.0.1]"
+```
+
+The task writes and re-fetches an append-only schema-v2 `gate_observation_failed` waiver bound to the exact tracker,
+repository, canonical workflow, `workflow_dispatch` event, branch, stable version, candidate SHA, run ID, positive
+run attempt, URL, reason, and authenticated maintainer. Canonical schema-v1 waiver markers remain readable,
+approver/tracker-bound audit history, but they are deliberately non-authorizing; a new schema-v2 record must be
+appended for the candidate. Malformed, edited, or noncanonical legacy markers still fail closed. The waiver
+preserves the last observed run status and conclusion and never reports the run as successful. The waiver
+cannot apply to prereleases, a failed/cancelled or otherwise terminal run, malformed/mismatched/stale
+evidence, a rerun attempt, or a different current run/reason. It waives only inability to observe ShakaPerf; CI, version
+policy, tag, registry, accepted-RC, and publication-boundary checks remain unchanged and blocking.
+Immediately before the remote tag push and again before package publication, the task revalidates that the
+tracker is still canonical and active, the append-only waiver and its exact attempt are unchanged, and the exact run
+identity and attempt are still active. Continued API unavailability remains covered by the recorded observation
+waiver, but a terminal, rerun, wrong-identity, or
+unknown run state, a closed/noncanonical tracker, or a changed/disappeared waiver blocks publication.
 
 #### Release CI evidence and strict HEAD evaluation
 
@@ -197,7 +328,7 @@ Examples:
 
 ```bash
 # Only after the task reports complete healthy exact-HEAD evidence, retry the explicit target version:
-RELEASE_CI_EVALUATE_HEAD=true bundle exec rake "release[17.0.0.rc.10]"
+RELEASE_CI_EVALUATE_HEAD=true bundle exec rake "release[17.0.0.rc.10,true]"
 ```
 
 Do not use `RELEASE_CI_STATUS_OVERRIDE=true` to substitute for pending, missing, failed, or
@@ -214,7 +345,7 @@ and a GitHub account that has write, maintain, or admin permission:
 RELEASE_ACCELERATED_RC=true \
 RELEASE_TRACKER=4821 \
 RELEASE_ACCELERATED_RC_REASON="Start published-artifact fleet testing while the named gates finish" \
-bundle exec rake "release[17.0.0.rc.10]"
+bundle exec rake "release[17.0.0.rc.10,true]"
 ```
 
 Accelerated publication and same-candidate durable retries must run from the exact matching
@@ -228,7 +359,8 @@ non-release feature branches.
 
 The task rejects the accelerated path when the version is implicit, the target is not a canonical
 lowercase `.rc.` version, the tracker is closed or ineligible, the reason is missing, or
-`RELEASE_CI_STATUS_OVERRIDE` is also set. Case-varied spellings such as `.RC.` are rejected before
+`RELEASE_CI_STATUS_OVERRIDE` or `RELEASE_SHAKAPERF_RUN` is also set. The selector incompatibility also applies
+after an unflagged same-candidate retry discovers persisted accelerated options. Case-varied spellings such as `.RC.` are rejected before
 tracker records or tag provenance can be created. Every numeric core component and the numeric `rc`
 identifier must also use canonical npm-semver spelling: zero itself is valid, but leading zeroes are not.
 It still fails closed on failed, missing, malformed,
@@ -349,9 +481,10 @@ malformed boundaries, duplicated markers, and
 spoofed summaries cannot prove irrelevance and therefore reach strict parsing and block. Discovery comments
 must name the canonical API issue URL in the exact requested repository; wrong hosts, repositories, paths,
 queries, and fragments are rejected before their issue number is used. Every tracker referenced by a plausible
-exact-candidate marker is fetched once and must pass the same open release-tracker eligibility check used by
-selected-tracker publication. Pull requests cannot serve as release trackers even though GitHub exposes their
-comments through the issues APIs.
+exact-candidate marker is fetched once and must be an open issue with the exact stable-base title derived from that
+record's target version; labels do not substitute. This is the same eligibility check used by selected-tracker
+publication. Pull requests cannot serve as release trackers even though GitHub exposes their comments through the
+issues APIs.
 
 ShakaPerf evidence is bound to the requested version, workflow run, run attempt, and candidate SHA
 through reconciliation and every publication boundary. Reused accepted-RC evidence remains bound to
@@ -374,16 +507,9 @@ Reconciliation performs bounded repository-wide exact-version-and-SHA validation
 tracker and canonical authorization before reporting existing terminal state or appending a new terminal
 transition, then repeats that validation after the append helper re-fetches the selected tracker.
 
-Reconcile the record after the deferred gates and all downstream RC testing finish:
-
-```bash
-RELEASE_TRACKER=4821 \
-RELEASE_ACCELERATED_RC_RECONCILIATION_REASON="All deferred gates and published-artifact checks passed" \
-RELEASE_DEMO_FLEET_EVIDENCE_URL=https://github.com/example/demo-evidence \
-RELEASE_BEHAVIORAL_EVIDENCE_URL=https://github.com/example/behavioral-evidence \
-RELEASE_ARTIFACT_EVIDENCE_URL=https://github.com/example/artifact-evidence \
-bundle exec rake "release:reconcile_accelerated_rc[17.0.0.rc.10]"
-```
+Reconcile the record after the deferred gates and all downstream RC testing finish. The live
+reconciliation command is intentionally omitted here; run it only from the guarded release coordinator
+flow in the [Release-Train Runbook](release-train-runbook.md#serialize-every-release-line-write).
 
 Reconciliation refreshes exact-candidate CI and the recorded ShakaPerf run. A known failure writes
 `candidate-rejected` with do-not-promote guidance; fix the cause and cut the next immutable RC.
@@ -431,8 +557,10 @@ docs/comment-only delta. Every intervening commit is inspected:
 package manifests, version files, and `Gemfile.lock` files may differ only by their normalized product-version
 metadata, while dependency, lockfile, or any other runtime-bearing content change requires a new accepted RC
 and cannot fall back to a fresh final ShakaPerf run. Accepted ShakaPerf evidence is
-refreshed and re-verified against the final tip; otherwise the normal strict final ShakaPerf gate runs
-only for a still-runtime-equivalent finalization. After that gate completes, the task re-fetches the live
+refreshed and re-verified against the final tip when automatic reuse applies. An explicit
+`RELEASE_SHAKAPERF_RUN` instead bypasses that reuse and must pass and persist through the strict final selector
+path; otherwise the normal strict final ShakaPerf gate runs only for a still-runtime-equivalent finalization.
+After that gate completes, the task re-fetches the live
 remote RC tag, repository-wide canonical tracker chain, and exact accepted-RC CI immediately before stable
 tagging and publication. The re-fetched accepted record must differ from the originally gated record only by its
 permitted retry timestamp. Local `HEAD` must still equal the validated final candidate, and the stable tag
@@ -477,15 +605,13 @@ CI override flags cannot weaken final promotion.
 **Examples:**
 
 ```bash
-bundle exec rake release                                  # Auto-detect version; stable targets require changelog
-bundle exec rake "release[patch]"                         # Bump patch version (16.1.1 → 16.1.2)
-bundle exec rake "release[minor]"                         # Bump minor version (16.1.1 → 16.2.0)
-bundle exec rake "release[major]"                         # Bump major version (16.1.1 → 17.0.0)
-bundle exec rake "release[16.2.0]"                        # Set explicit version
-bundle exec rake "release[16.2.0.beta.1]"                 # Set pre-release version (→ 16.2.0-beta.1 for NPM)
-bundle exec rake "release[patch,true]"                    # Dry run
-VERBOSE=1 bundle exec rake "release[patch]"               # Release with verbose logging
-NPM_OTP=123456 RUBYGEMS_OTP=789012 bundle exec rake "release[patch]"  # Skip OTP prompts
+bundle exec rake "release[,true]"                         # Preview auto-detected version
+bundle exec rake "release[patch,true]"                    # Preview patch bump (16.1.1 → 16.1.2)
+bundle exec rake "release[minor,true]"                    # Preview minor bump (16.1.1 → 16.2.0)
+bundle exec rake "release[major,true]"                    # Preview major bump (16.1.1 → 17.0.0)
+bundle exec rake "release[16.2.0,true]"                   # Preview explicit version
+bundle exec rake "release[16.2.0.beta.1,true]"            # Preview prerelease (→ 16.2.0-beta.1 for NPM)
+VERBOSE=1 bundle exec rake "release[patch,true]"          # Preview with verbose logging
 ```
 
 ### 3. What the Release Task Does
@@ -495,6 +621,8 @@ The `rake release` task automatically:
 1. **Validates release prerequisites**:
    - Checks for uncommitted changes (will abort if found)
    - Verifies NPM authentication (will run `npm login` if needed)
+   - Verifies the exact pinned pnpm version, frozen installed lock state, and lifecycle-enabled builds for all npm
+     release packages before registry checks or any release mutation
    - Requires a non-empty matching CHANGELOG.md section for stable targets; prereleases without one emit a warning,
      including during dry runs
    - Validates version policy (monotonic + changelog/bump consistency)
@@ -601,27 +729,29 @@ The task automatically converts Ruby gem format to npm semver format:
    Run `$update-changelog 16.5.0` (using the already-released version) to analyze
    commits, write entries, and automatically open a PR. Use
    `$react-on-rails-update-changelog` instead when the catch-up PR must target
-   `release/X.Y.Z`. After the PR merges, pull the updated changelog and sync the
-   GitHub release:
+   `release/X.Y.Z`. After the PR merges, preview the GitHub release update. The
+   `sync_github_release` command below is preview-only; live GitHub release creation or editing remains
+   **BLOCKED** as documented in
+   [Partial-publication recovery](release-train-runbook.md#partial-publication-recovery):
 
    ```bash
    git pull --rebase
-   bundle exec rake "sync_github_release[16.5.0]"
+   bundle exec rake "sync_github_release[16.5.0,true]"
    ```
 
    **Option B - Manual (headers only, you must write entries):**
 
    ```bash
    bundle exec rake "update_changelog[16.5.0]"
-   # Write entries manually, then:
-   git commit -a -m 'Update CHANGELOG.md'
-   git push
-   bundle exec rake "sync_github_release[16.5.0]"
+   # Write entries manually, then preview the GitHub release update:
+   bundle exec rake "sync_github_release[16.5.0,true]"
    ```
 
 ### Syncing GitHub Releases Manually
 
-If the automatic GitHub release creation was skipped (e.g., CHANGELOG.md section was missing during release), you can create it manually after updating the changelog:
+If the automatic GitHub release creation was skipped (e.g., CHANGELOG.md section was missing during release),
+preview the recovery after updating the changelog. The live path is blocked, as documented in
+[Partial-publication recovery](release-train-runbook.md#partial-publication-recovery):
 
 1. Update `CHANGELOG.md` with the published version section
 2. Commit and push `CHANGELOG.md`
@@ -629,18 +759,16 @@ If the automatic GitHub release creation was skipped (e.g., CHANGELOG.md section
 
 ```bash
 # Stable
-bundle exec rake "sync_github_release[16.5.0]"
+bundle exec rake "sync_github_release[16.5.0,true]"
 
 # Prerelease
-bundle exec rake "sync_github_release[16.5.0.rc.1]"
-
-# Dry run
-bundle exec rake "sync_github_release[16.5.0,true]"
+bundle exec rake "sync_github_release[16.5.0.rc.1,true]"
 ```
 
 `sync_github_release` reads release notes from the matching `CHANGELOG.md` section, applies the same size preparation
 as the main release task, and creates or updates the GitHub release for the corresponding tag. It is the idempotent
-recovery path when package publication succeeded but the final GitHub step failed.
+recovery behavior when package publication succeeded but the final GitHub step failed. Its live GitHub create/edit
+boundary remains unfenced, so the commands above are preview-only until the required wrapper exists.
 
 ### Pre-Release Checklist
 
@@ -661,6 +789,11 @@ You'll need to enter OTP tokens when prompted:
 
 - Once for publishing `react-on-rails` to NPM (reused for subsequent NPM packages if valid)
 - Once for publishing `react_on_rails` to RubyGems (reused for `react_on_rails_pro` if valid)
+
+npm retries are classified from captured, sanitized output. Only an explicit npm OTP challenge prompts for a fresh
+OTP. A transient network or registry-service failure retries with the same OTP and bounded exponential backoff.
+Authentication failures such as `E401`/`ENEEDAUTH`, local lifecycle/build failures, registry rejections, and unknown
+failures stop immediately without an OTP prompt. OTP values are redacted from raised diagnostics.
 
 ## Requirements
 
@@ -724,37 +857,49 @@ If you see errors like "Access token expired" or "E404 Not Found" during NPM pub
 
 The release script now checks NPM authentication at the start and will automatically run `npm login` if needed, so this issue will be caught and handled before any changes are made.
 
+### NPM Release Readiness Issues
+
+If the release reports a pnpm version mismatch, first activate the exact pnpm version declared by the root
+`packageManager`. Then run the exact frozen-install repair command it prints from the repository root for the
+installed dependency check:
+
+```bash
+pnpm install --frozen-lockfile
+```
+
+Then fix any remaining build error and rerun the same explicit release version. The release will not have reached
+release-checkout creation, pull/authentication, remote CI/tag/version reads, confirmation, version mutation,
+ShakaPerf dispatch, tagging, publication, or OTP prompting.
+
+During npm publication, only explicit transient diagnostics are retried with bounded backoff and the same OTP:
+network codes such as `ECONNRESET`, npm/pnpm codes such as `E429`, `E503`, or `ERR_PNPM_FETCH_503`, and HTTP or
+response/status-code contexts such as `HTTP 429` or `status code 503`. Successful `prepublishOnly`, `tsc`, or TypeScript
+banner lines do not override a real transient diagnostic elsewhere in the output. Deterministic lifecycle codes and
+tool/lifecycle lines containing `failed`, `failure`, `not found`, `not recognized`, or `error TS...` remain local hard
+failures even when the same output also mentions a transient code. Bare numbers such as `429` or `500`, package sizes,
+successful tool banners without a transient diagnostic, registry rejections, authentication failures, and unknown
+output fail immediately. Only an explicit OTP challenge (`EOTP` or an equivalent one-time-password prompt) requests
+a fresh code; all printed OTP values remain redacted.
+
 ### If Release Fails
 
 If the release fails partway through (e.g., during NPM publish):
 
-1. Check what was published:
+1. Stop the compound helper and keep the release-line lease. Do not delete or move tags, rewrite the
+   release branch, rerun publication, or manually publish missing packages.
+2. Check what was published with read-only registry queries:
    - NPM: `npm view react-on-rails@X.Y.Z`
    - RubyGems: `gem list react_on_rails -r -a`
-
-2. If the git tag was created but packages weren't published:
-   - Delete the tag: `git tag -d vX.Y.Z && git push origin :vX.Y.Z`
-   - Revert the version commit: `git reset --hard HEAD~1 && git push -f`
-   - Start over with `bundle exec rake "release[X.Y.Z]"`
-
-3. If GitHub release creation fails after successful publishing:
-   - Fix GitHub auth (`gh auth login`) or permissions
-   - Ensure `CHANGELOG.md` has matching header `### [X.Y.Z]`
-   - Do not rerun registry publication; the failure message prints the GitHub-only recovery command
-   - Rerun only: `bundle exec rake "sync_github_release[X.Y.Z]"`
-
-4. If some packages were published but not others:
-   - You can manually publish the missing packages:
-     ```bash
-     cd packages/react-on-rails && pnpm version X.Y.Z && pnpm publish
-     cd ../react-on-rails-pro && pnpm version X.Y.Z && pnpm publish
-     gem release
-     ```
-     `pnpm publish -r` will publish all packages where current version isn't published yet.
+3. Record the exact branch tip, local and remote tag identity, published artifact set, and helper output.
+4. Follow the blocked-state dispositions in
+   [Partial-publication recovery](release-train-runbook.md#partial-publication-recovery). Current live recovery paths
+   are blocked until the required fencing exists. If lease state or any remote/artifact identity is `UNKNOWN`, remain
+   stopped.
 
 ## Version History
 
-Running `bundle exec rake "release[X.Y.Z]"` will create a commit that looks like this:
+A dry-run preview with `bundle exec rake "release[X.Y.Z,true]"` shows the generated commit, which looks
+like this:
 
 ```
 commit abc123...

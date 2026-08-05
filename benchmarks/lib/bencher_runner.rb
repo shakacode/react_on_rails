@@ -30,11 +30,12 @@ class BencherRunner
   private_constant :MAX_SAMPLE
 
   # Per-measure t-test boundaries (the confidence level Bencher uses for its
-  # prediction interval). Tuned from a sweep of recent main-branch reports so fewer
-  # than 1/20 commits raise a false regression across all benchmarks: rps and p50
-  # individually need ~0.9995 / ~0.9999 to clear that bar. failed_pct stays at 0.95
-  # because healthy runs sit at ~0 with near-zero variance, so its boundary rarely
-  # matters.
+  # prediction interval), used by MODE :statistical — the local dedicated-hardware
+  # trend runs (benchmarks/run-local-benchmark.rb, #4073). Tuned from a sweep of recent
+  # main-branch reports so fewer than 1/20 commits raise a false regression across all
+  # benchmarks: rps and p50 individually need ~0.9995 / ~0.9999 to clear that bar.
+  # failed_pct stays at 0.95 because healthy runs sit at ~0 with near-zero variance,
+  # so its boundary rarely matters.
   # Bencher's t-test threshold is a prediction interval, so each one-sided boundary B
   # gives a per-test false-positive rate of ~(1 - B):
   # https://bencher.dev/docs/explanation/thresholds/
@@ -48,9 +49,42 @@ class BencherRunner
     ["failed_pct", :upper, "0.95"]
   ].freeze
 
-  def initialize(benchmark_json:, report_json:)
+  # Per-measure percentage boundaries, used by MODE :relative_head — the CI relative
+  # continuous benchmarking comparison (#3492,
+  # https://bencher.dev/docs/how-to/track-benchmarks/#relative-continuous-benchmarking).
+  # The baseline is the base ref's results measured moments earlier ON THE SAME RUNNER
+  # (a single sample on a per-run throwaway branch), so the boundary is a plain
+  # percentage of that run: limit = baseline * (1 -/+ boundary). 0.25 (25%) follows the
+  # Bencher how-to's example and stays deliberately loose while shared GitHub-hosted
+  # runners are the testbed — same-runner comparison removes cross-runner variance, but
+  # CPU contention can still move throughput within a job. Tighten once real runs show
+  # the same-runner spread. Directions match THRESHOLDS (pinned by a spec).
+  # failed_pct's healthy baseline is ~0, which makes its upper limit ~0 — effectively
+  # "any newly-failing request alerts", the same strictness the t-test gave it.
+  RELATIVE_THRESHOLDS = [
+    ["rps", :lower, "0.25"],
+    ["p50_latency", :upper, "0.25"],
+    ["failed_pct", :upper, "0.25"]
+  ].freeze
+
+  # How each mode runs Bencher:
+  #   :statistical       — t-test thresholds vs the branch's own history + --err
+  #                        (local dedicated-hardware trend tracking; the default so
+  #                        run-local-benchmark.rb keeps its behavior).
+  #   :relative_baseline — no thresholds, no --err: just records the base ref's results
+  #                        as the fresh same-runner baseline series.
+  #   :relative_head     — percentage thresholds vs that baseline + --thresholds-reset
+  #                        (so stale server-side threshold models never alert) + --err.
+  MODES = %i[statistical relative_baseline relative_head].freeze
+
+  def initialize(benchmark_json:, report_json:, mode: :statistical)
+    unless MODES.include?(mode)
+      raise ArgumentError, "unknown mode #{mode.inspect} (expected one of #{MODES.join(', ')})"
+    end
+
     @benchmark_json = benchmark_json
     @report_json = report_json
+    @mode = mode
   end
 
   # Returns a Result with :stderr, :exit_code, and :report accessors. The
@@ -70,7 +104,7 @@ class BencherRunner
 
   private
 
-  attr_reader :benchmark_json, :report_json
+  attr_reader :benchmark_json, :report_json, :mode
 
   def emit_stderr(stderr)
     return if stderr.empty?
@@ -85,16 +119,42 @@ class BencherRunner
     ENV.fetch("BENCHER_TESTBED", DEFAULT_TESTBED)
   end
 
-  def threshold_args(measure, direction, boundary)
+  def threshold_args(test, measure, direction, boundary)
     # "_" is Bencher's sentinel for "no boundary on this side".
     lower, upper = direction == :lower ? [boundary, "_"] : ["_", boundary]
     [
       "--threshold-measure", measure,
-      "--threshold-test", "t_test",
-      "--threshold-max-sample-size", MAX_SAMPLE,
+      "--threshold-test", test,
+      # A percentage boundary is computed from the (single-sample) baseline directly,
+      # so the sample-size cap only applies to the t-test's history window.
+      *(test == "t_test" ? ["--threshold-max-sample-size", MAX_SAMPLE] : []),
       "--threshold-lower-boundary", lower,
       "--threshold-upper-boundary", upper
     ]
+  end
+
+  def mode_args
+    case mode
+    when :relative_baseline
+      # The baseline run only records data; it must never gate the job, so no
+      # thresholds and no --err (any non-zero exit is operational, handled by callers).
+      []
+    when :relative_head
+      [
+        "--err",
+        # Deactivate any threshold not (re)specified here so an orphaned server-side
+        # model (e.g. from the earlier statistical setup) can't raise a stray alert.
+        "--thresholds-reset",
+        *RELATIVE_THRESHOLDS.flat_map do |measure, direction, boundary|
+          threshold_args("percentage", measure, direction, boundary)
+        end
+      ]
+    else
+      [
+        "--err",
+        *THRESHOLDS.flat_map { |measure, direction, boundary| threshold_args("t_test", measure, direction, boundary) }
+      ]
+    end
   end
 
   def args(branch, start_point_args)
@@ -106,10 +166,9 @@ class BencherRunner
       "--testbed", testbed,
       "--adapter", "json",
       "--file", benchmark_json,
-      "--err",
       "--quiet",
       "--format", "json",
-      *THRESHOLDS.flat_map { |measure, direction, boundary| threshold_args(measure, direction, boundary) }
+      *mode_args
     ]
   end
 
@@ -160,11 +219,22 @@ class BencherRunner
   end
 
   def parse_report(stdout)
-    BencherReport.parse(stdout, tracked_measures: THRESHOLDS.map(&:first))
+    BencherReport.parse(stdout, tracked_measures:)
   rescue BencherReport::FormatError, JSON::ParserError => e
     raise ReportParseError,
           "Bencher JSON report has an unexpected shape — re-verify against " \
           "benchmarks/spec/bencher_report_spec.rb before bumping the CLI pin. #{e.message}"
+  end
+
+  # The measures this mode alerts on, for filtering orphaned server-side thresholds
+  # out of regression detection. A baseline run configures no thresholds, so it can't
+  # alert at all — nil (track everything) keeps its report parsing permissive.
+  def tracked_measures
+    case mode
+    when :relative_baseline then nil
+    when :relative_head then RELATIVE_THRESHOLDS.map(&:first)
+    else THRESHOLDS.map(&:first)
+    end
   end
 
   def safe_remove_tmp(path)
