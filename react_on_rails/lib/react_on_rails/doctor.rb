@@ -152,8 +152,9 @@ module ReactOnRails
     /mx
     NODE_RENDERER_BARE_CALL_PATTERN =
       /(?<![.\p{ID_Continue}$#])reactOnRailsProNodeRenderer\s*\(\s*/
-    # The canonical export must be a shorthand specifier. A different export
-    # aliased to this local name is not evidence that the real renderer runs.
+    # The canonical export must be a shorthand specifier and the binding must
+    # end explicitly. Aliases and trusted-looking expression prefixes are not
+    # evidence that the real renderer runs.
     NODE_RENDERER_PACKAGE_BINDING_PATTERN = /
       (?:\A|[;\n])\s*
       (?:
@@ -178,7 +179,7 @@ module ReactOnRails
           )*
           \s*,?\s*\}\s+from\s+
           ["']react-on-rails-pro-node-renderer["']
-      )\s*;?
+      )\s*(?:;|\z)
     /mx
     NODE_RENDERER_LOCAL_BINDING_PATTERN = %r{
       \b(?:const|let|var)\s+
@@ -195,6 +196,12 @@ module ReactOnRails
     }mx
     NODE_RENDERER_IDENTIFIER_PATTERN =
       /(?<![.\p{ID_Continue}$#])reactOnRailsProNodeRenderer\b/
+    NODE_RENDERER_GLOBAL_BRACKET_PROPERTY_PATTERN = /
+      \[\s*["']reactOnRailsProNodeRenderer["']\s*\]
+    /x
+    NODE_RENDERER_GLOBAL_PROPERTY_PATTERN = /
+      (?<![.\p{ID_Continue}$#])(?:globalThis|global)\s*\.\s*reactOnRailsProNodeRenderer\b
+    /x
     NODE_RENDERER_UNPROVEN_CALL_CONTROL_PATTERN = /
       (?:&&|\|\||=>|\?) |
       \b(?:if|else|for|while|do|switch|case|catch|finally|function|return|throw)\b
@@ -3396,8 +3403,19 @@ module ReactOnRails
       without_package_binding = content.gsub(NODE_RENDERER_PACKAGE_BINDING_PATTERN, " ")
       masked_content = node_renderer_mask_quoted_string_contents(without_package_binding)
 
-      masked_content.match?(NODE_RENDERER_LOCAL_BINDING_PATTERN) ||
+      node_renderer_global_renderer_reference?(without_package_binding) ||
+        masked_content.match?(NODE_RENDERER_LOCAL_BINDING_PATTERN) ||
         node_renderer_non_call_identifier_reference?(masked_content)
+    end
+
+    def node_renderer_global_renderer_reference?(content)
+      normalized_content = content.gsub(
+        NODE_RENDERER_GLOBAL_BRACKET_PROPERTY_PATTERN,
+        ".reactOnRailsProNodeRenderer"
+      )
+      masked_content = node_renderer_mask_quoted_string_contents(normalized_content)
+
+      masked_content.match?(NODE_RENDERER_GLOBAL_PROPERTY_PATTERN)
     end
 
     def node_renderer_non_call_identifier_reference?(content)

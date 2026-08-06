@@ -3659,6 +3659,16 @@ RSpec.describe ReactOnRails::Doctor do
         "import { renderToPipeableStream, reactOnRailsProNodeRenderer, version as packageVersion } from " \
         "'react-on-rails-pro-node-renderer';\n" \
         "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "an unrelated global-object member",
+        "globalThis.fetch = globalThis.fetch;\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a quoted global renderer-property decoy",
+        "const helpText = \"globalThis['reactOnRailsProNodeRenderer'] = shim\";\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
       ]
     ].each do |description, source|
       it "observes a direct inline literal with #{description}" do
@@ -3984,6 +3994,38 @@ RSpec.describe ReactOnRails::Doctor do
         "a wrong-export ESM alias",
         "import { otherRenderer as reactOnRailsProNodeRenderer } from " \
         "'react-on-rails-pro-node-renderer';\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a CommonJS package binding from the default export",
+        "const { reactOnRailsProNodeRenderer } = " \
+        "require('react-on-rails-pro-node-renderer').default;\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a CommonJS package binding from an invoked export",
+        "const { reactOnRailsProNodeRenderer } = " \
+        "require('react-on-rails-pro-node-renderer')();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a globalThis renderer assignment",
+        "globalThis.reactOnRailsProNodeRenderer = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a globalThis renderer prefix update",
+        "++globalThis.reactOnRailsProNodeRenderer;\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a bracketed globalThis renderer assignment",
+        "globalThis['reactOnRailsProNodeRenderer'] = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a Node global renderer compound assignment",
+        "global.reactOnRailsProNodeRenderer ||= getRendererShim();\n" \
         "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
       ],
       [
@@ -4511,6 +4553,38 @@ RSpec.describe ReactOnRails::Doctor do
         "a wrong-export ESM alias",
         "import { otherRenderer as reactOnRailsProNodeRenderer } from " \
         "'react-on-rails-pro-node-renderer';\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a CommonJS package binding from the default export",
+        "const { reactOnRailsProNodeRenderer } = " \
+        "require('react-on-rails-pro-node-renderer').default;\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a CommonJS package binding from an invoked export",
+        "const { reactOnRailsProNodeRenderer } = " \
+        "require('react-on-rails-pro-node-renderer')();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a globalThis renderer assignment",
+        "globalThis.reactOnRailsProNodeRenderer = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a globalThis renderer prefix update",
+        "++globalThis.reactOnRailsProNodeRenderer;\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a bracketed globalThis renderer assignment",
+        "globalThis['reactOnRailsProNodeRenderer'] = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a Node global renderer compound assignment",
+        "global.reactOnRailsProNodeRenderer ||= getRendererShim();\n" \
         "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
       ],
       [
