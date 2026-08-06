@@ -152,13 +152,31 @@ module ReactOnRails
     /mx
     NODE_RENDERER_BARE_CALL_PATTERN =
       /(?<![.\p{ID_Continue}$#])reactOnRailsProNodeRenderer\s*\(\s*/
+    # The canonical export must be a shorthand specifier. A different export
+    # aliased to this local name is not evidence that the real renderer runs.
     NODE_RENDERER_PACKAGE_BINDING_PATTERN = /
       (?:\A|[;\n])\s*
       (?:
-        const\s*\{[^{}]*\breactOnRailsProNodeRenderer\b\s*(?=,|\})[^{}]*\}\s*=\s*
+        const\s*\{\s*
+          (?:
+            [A-Za-z_$][A-Za-z0-9_$]*(?:\s*:\s*[A-Za-z_$][A-Za-z0-9_$]*)?\s*,\s*
+          )*
+          reactOnRailsProNodeRenderer
+          (?:
+            \s*,\s*[A-Za-z_$][A-Za-z0-9_$]*(?:\s*:\s*[A-Za-z_$][A-Za-z0-9_$]*)?
+          )*
+          \s*,?\s*\}\s*=\s*
           require\s*\(\s*["']react-on-rails-pro-node-renderer["']\s*\)
         |
-        import\s*\{[^{}]*\breactOnRailsProNodeRenderer\b\s*(?=,|\})[^{}]*\}\s+from\s+
+        import\s*\{\s*
+          (?:
+            [A-Za-z_$][A-Za-z0-9_$]*(?:\s+as\s+[A-Za-z_$][A-Za-z0-9_$]*)?\s*,\s*
+          )*
+          reactOnRailsProNodeRenderer
+          (?:
+            \s*,\s*[A-Za-z_$][A-Za-z0-9_$]*(?:\s+as\s+[A-Za-z_$][A-Za-z0-9_$]*)?
+          )*
+          \s*,?\s*\}\s+from\s+
           ["']react-on-rails-pro-node-renderer["']
       )\s*;?
     /mx

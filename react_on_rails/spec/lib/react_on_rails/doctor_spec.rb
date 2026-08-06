@@ -3647,6 +3647,18 @@ RSpec.describe ReactOnRails::Doctor do
         "an ESM package binding",
         "import { reactOnRailsProNodeRenderer } from 'react-on-rails-pro-node-renderer';\n" \
         "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a multi-specifier CommonJS package binding",
+        "const { renderToPipeableStream, reactOnRailsProNodeRenderer, version: packageVersion } = " \
+        "require('react-on-rails-pro-node-renderer');\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a multi-specifier ESM package binding",
+        "import { renderToPipeableStream, reactOnRailsProNodeRenderer, version as packageVersion } from " \
+        "'react-on-rails-pro-node-renderer';\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
       ]
     ].each do |description, source|
       it "observes a direct inline literal with #{description}" do
@@ -3950,6 +3962,28 @@ RSpec.describe ReactOnRails::Doctor do
       [
         "an array-destructured local declaration",
         "const [reactOnRailsProNodeRenderer] = getRenderers();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a nested array-destructured local declaration",
+        "const [[reactOnRailsProNodeRenderer]] = getNestedRenderers();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a defaulted array-destructured local declaration",
+        "const [reactOnRailsProNodeRenderer = getDefaultRenderer()] = getRenderers();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a wrong-export CommonJS alias",
+        "const { otherRenderer: reactOnRailsProNodeRenderer } = " \
+        "require('react-on-rails-pro-node-renderer');\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a wrong-export ESM alias",
+        "import { otherRenderer as reactOnRailsProNodeRenderer } from " \
+        "'react-on-rails-pro-node-renderer';\n" \
         "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
       ],
       [
@@ -4455,6 +4489,28 @@ RSpec.describe ReactOnRails::Doctor do
       [
         "an array-destructured local declaration",
         "const [reactOnRailsProNodeRenderer] = getRenderers();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a nested array-destructured local declaration",
+        "const [[reactOnRailsProNodeRenderer]] = getNestedRenderers();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a defaulted array-destructured local declaration",
+        "const [reactOnRailsProNodeRenderer = getDefaultRenderer()] = getRenderers();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a wrong-export CommonJS alias",
+        "const { otherRenderer: reactOnRailsProNodeRenderer } = " \
+        "require('react-on-rails-pro-node-renderer');\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a wrong-export ESM alias",
+        "import { otherRenderer as reactOnRailsProNodeRenderer } from " \
+        "'react-on-rails-pro-node-renderer';\n" \
         "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
       ],
       [
