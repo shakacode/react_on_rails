@@ -184,17 +184,9 @@ module ReactOnRails
           ["']react-on-rails-pro-node-renderer["']
       )\s*(?:;|\z)
     /mx
-    NODE_RENDERER_COMMONJS_REQUIRE_REBINDING_PATTERN = %r~
-      \b(?:const|let|var|function|class)\s+require\b
-      |
-      \b(?:const|let|var)\s*
-        (?:\{[^};\n]*\brequire\b[^};\n]*\}|\[[^\];\n]*\brequire\b[^\];\n]*\])
-      |
-      (?<![.\p{ID_Continue}$#])require\b\s*
-        (?:\+\+|--|\*\*=|&&=|\|\|=|\?\?=|[+\-*/%&|^]=|=(?!=|>))
-      |
-      (?:\+\+|--)\s*(?<![.\p{ID_Continue}$#])require\b
-    ~mx
+    NODE_RENDERER_REQUIRE_IDENTIFIER_PATTERN = /(?<![.\p{ID_Continue}$#])require\b/
+    NODE_RENDERER_REQUIRE_FUNCTION_DECLARATION_PATTERN = /\bfunction\s*\*?\s+require\b/
+    NODE_RENDERER_ARGUMENTS_IDENTIFIER_PATTERN = /(?<![.\p{ID_Continue}$#])arguments\b/
     NODE_RENDERER_DIRECT_EVAL_PATTERN = /(?<![.\p{ID_Continue}$#])eval\s*\(/
     NODE_RENDERER_LOCAL_BINDING_PATTERN = %r{
       \b(?:const|let|var)\s+
@@ -3567,8 +3559,14 @@ module ReactOnRails
     def node_renderer_commonjs_require_rebound?(binding, masked_content)
       return false unless binding[0].match?(/\brequire\s*\(/)
 
-      masked_content.match?(NODE_RENDERER_COMMONJS_REQUIRE_REBINDING_PATTERN) ||
-        masked_content.match?(NODE_RENDERER_DIRECT_EVAL_PATTERN)
+      return true if masked_content.match?(NODE_RENDERER_DIRECT_EVAL_PATTERN)
+      return true if masked_content.match?(NODE_RENDERER_REQUIRE_FUNCTION_DECLARATION_PATTERN)
+      return true if masked_content.match?(NODE_RENDERER_ARGUMENTS_IDENTIFIER_PATTERN)
+
+      masked_content.to_enum(:scan, NODE_RENDERER_REQUIRE_IDENTIFIER_PATTERN).any? do
+        require_identifier = Regexp.last_match
+        !masked_content[require_identifier.end(0)..].match?(/\A\s*\(/)
+      end
     end
 
     def node_renderer_proven_package_binding_match?(binding, masked_content)

@@ -3833,11 +3833,41 @@ RSpec.describe ReactOnRails::Doctor do
       ],
       [
         "a CommonJS require function rebound through destructuring assignment",
-        "({ replacement: require } = { replacement: (_specifier) => " \
-        "({ reactOnRailsProNodeRenderer: (_config) => undefined }) });\n" \
+        "const holder = { loader: require };\n" \
+        "({ loader: require } = holder);\n" \
         "const { reactOnRailsProNodeRenderer } = " \
         "require('react-on-rails-pro-node-renderer');\n" \
         "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a CommonJS require function rebound through array assignment",
+        "const holder = [require];\n" \
+        "[require] = holder;\n" \
+        "const { reactOnRailsProNodeRenderer } = " \
+        "require('react-on-rails-pro-node-renderer');\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a CommonJS require assignment separated by a block comment",
+        "const replacement = require;\n" \
+        "require /* gap */ = replacement;\n" \
+        "const { reactOnRailsProNodeRenderer } = " \
+        "require('react-on-rails-pro-node-renderer');\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a CommonJS require function rebound through the wrapper arguments object",
+        "arguments[1] = Object;\n" \
+        "const { reactOnRailsProNodeRenderer } = " \
+        "require('react-on-rails-pro-node-renderer');\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a CommonJS require function declaration hoisted from after the renderer call",
+        "const { reactOnRailsProNodeRenderer } = " \
+        "require('react-on-rails-pro-node-renderer');\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });\n" \
+        "function require(_specifier) { return Object.create(null); }"
       ],
       [
         "a duplicate local name hidden in another CommonJS destructuring specifier",
