@@ -3597,6 +3597,27 @@ RSpec.describe ReactOnRails::Doctor do
       )
     end
 
+    it "fails closed when Node cannot prove launcher syntax" do
+      write_node_renderer_script(
+        "renderer/node-renderer.js",
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      )
+      allow(Open3).to receive(:capture3).and_raise(Errno::ENOENT)
+
+      doctor.send(:check_node_renderer_rollout_capacity)
+
+      expect(checker.messages).to include(
+        hash_including(
+          type: :warning,
+          content: a_string_including(
+            "evidence=unverified",
+            "reason=renderer_javascript_syntax_not_proven"
+          )
+        )
+      )
+      expect(checker.messages).not_to include(hash_including(type: :success))
+    end
+
     it "fails closed when a bare renderer call has no canonical package binding" do
       File.write("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });")
 
@@ -3633,6 +3654,30 @@ RSpec.describe ReactOnRails::Doctor do
         "require('react-on-rails-pro-node-renderer');\n" \
         "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });",
         "renderer_configuration_binding_not_proven",
+        true
+      ],
+      [
+        "a syntax-invalid member-expression binding collision",
+        "const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');\n" \
+        "const obj.reactOnRailsProNodeRenderer = shim;\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });",
+        "renderer_javascript_syntax_invalid",
+        true
+      ],
+      [
+        "a syntax-invalid private-identifier binding collision",
+        "const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');\n" \
+        "const #reactOnRailsProNodeRenderer = shim;\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });",
+        "renderer_javascript_syntax_invalid",
+        true
+      ],
+      [
+        "a syntax-invalid hexadecimal identifier escape collision",
+        "const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');\n" \
+        "const \\x72eactOnRailsProNodeRenderer = shim;\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });",
+        "renderer_javascript_syntax_invalid",
         true
       ],
       [
@@ -3774,12 +3819,14 @@ RSpec.describe ReactOnRails::Doctor do
         "new Factory(reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 }));"
       ],
       [
-        "a byte-zero call followed by a trailing new decoy",
-        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });\nnew"
+        "a byte-zero call followed by a trailing constructor decoy",
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });\n" \
+        "class Factory {}\nnew Factory();"
       ],
       [
-        "a byte-zero parenthesized call followed by a trailing new decoy",
-        "(reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 }));\nnew"
+        "a byte-zero parenthesized call followed by a trailing constructor decoy",
+        "(reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 }));\n" \
+        "class Factory {}\nnew Factory();"
       ],
       [
         "a CommonJS package binding",

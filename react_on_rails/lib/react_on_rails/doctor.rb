@@ -2,6 +2,7 @@
 
 require "json"
 require "erb"
+require "open3"
 require "stringio"
 require "tempfile"
 require "timeout"
@@ -119,6 +120,7 @@ module ReactOnRails
     # Per-file safety gate to bound IO during the scan, not a meaningful size limit.
     RENDERER_CACHE_DEPLOY_SCRIPT_MAX_BYTES = 1_048_576
     NODE_RENDERER_CONFIG_MAX_BYTES = 1_048_576
+    NODE_RENDERER_SYNTAX_CHECK_TIMEOUT_SECONDS = 5
     NODE_RENDERER_ROLLOUT_GENERATIONS = 2
     NODE_RENDERER_LAUNCHER_PATHS = %w[
       Procfile
@@ -3346,7 +3348,26 @@ module ReactOnRails
       config_object = node_renderer_call_config_object(active_content)
       return { state: :unverified, reason: "renderer_configuration_binding_not_proven" } unless config_object
 
+      syntax_failure_reason = node_renderer_javascript_syntax_failure_reason(active_content)
+      return { state: :unverified, reason: syntax_failure_reason } if syntax_failure_reason
+
       node_renderer_config_object_capacity_evidence(config_object, mentions.length)
+    end
+
+    def node_renderer_javascript_syntax_failure_reason(content)
+      package_binding = node_renderer_canonical_package_binding(content)
+      return "renderer_configuration_binding_not_proven" unless package_binding
+
+      input_type = package_binding[0].match?(/\bimport\s*\{/) ? "module" : "commonjs"
+      _stdout, _stderr, status = Timeout.timeout(NODE_RENDERER_SYNTAX_CHECK_TIMEOUT_SECONDS) do
+        Open3.capture3("node", "--check", "--input-type=#{input_type}", stdin_data: content)
+      end
+
+      "renderer_javascript_syntax_invalid" unless status.success?
+    rescue StandardError
+      # Static capacity is positive evidence. If Node is absent, too old for
+      # this check, or unexpectedly fails, keep the diagnosis conservative.
+      "renderer_javascript_syntax_not_proven"
     end
 
     def node_renderer_config_object_capacity_evidence(config_object, total_mentions)
