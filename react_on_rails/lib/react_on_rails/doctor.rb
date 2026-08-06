@@ -175,6 +175,8 @@ module ReactOnRails
       |
       (?:\+\+|--)\s*(?<![.\p{ID_Continue}$#])reactOnRailsProNodeRenderer\b
     }mx
+    NODE_RENDERER_IDENTIFIER_PATTERN =
+      /(?<![.\p{ID_Continue}$#])reactOnRailsProNodeRenderer\b/
     NODE_RENDERER_UNPROVEN_CALL_CONTROL_PATTERN = /
       (?:&&|\|\||=>|\?) |
       \b(?:if|else|for|while|do|switch|case|catch|finally|function|return|throw)\b
@@ -3376,7 +3378,19 @@ module ReactOnRails
       without_package_binding = content.gsub(NODE_RENDERER_PACKAGE_BINDING_PATTERN, " ")
       masked_content = node_renderer_mask_quoted_string_contents(without_package_binding)
 
-      masked_content.match?(NODE_RENDERER_LOCAL_BINDING_PATTERN)
+      masked_content.match?(NODE_RENDERER_LOCAL_BINDING_PATTERN) ||
+        node_renderer_non_call_identifier_reference?(masked_content)
+    end
+
+    def node_renderer_non_call_identifier_reference?(content)
+      identifier_positions = content.to_enum(:scan, NODE_RENDERER_IDENTIFIER_PATTERN).map do
+        Regexp.last_match.begin(0)
+      end
+      call_positions = content.to_enum(:scan, NODE_RENDERER_BARE_CALL_PATTERN).map do
+        Regexp.last_match.begin(0)
+      end
+
+      (identifier_positions - call_positions).any?
     end
 
     def node_renderer_call_reachability_proven?(content, call)

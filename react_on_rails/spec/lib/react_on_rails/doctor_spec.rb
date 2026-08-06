@@ -3948,6 +3948,21 @@ RSpec.describe ReactOnRails::Doctor do
         "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
       ],
       [
+        "an array-destructured local declaration",
+        "const [reactOnRailsProNodeRenderer] = getRenderers();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "an object-destructuring assignment target",
+        "({ reactOnRailsProNodeRenderer } = getRendererShim());\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "an array-destructuring assignment target",
+        "[reactOnRailsProNodeRenderer] = getRenderers();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
         "a later renderer reassignment",
         "const { reactOnRailsProNodeRenderer } = " \
         "require('react-on-rails-pro-node-renderer');\n" \
@@ -4435,6 +4450,21 @@ RSpec.describe ReactOnRails::Doctor do
       [
         "a locally rebound renderer identifier",
         "var reactOnRailsProNodeRenderer = console.log;\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "an array-destructured local declaration",
+        "const [reactOnRailsProNodeRenderer] = getRenderers();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "an object-destructuring assignment target",
+        "({ reactOnRailsProNodeRenderer } = getRendererShim());\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "an array-destructuring assignment target",
+        "[reactOnRailsProNodeRenderer] = getRenderers();\n" \
         "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
       ],
       [
