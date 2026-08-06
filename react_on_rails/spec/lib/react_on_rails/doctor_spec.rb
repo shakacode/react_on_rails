@@ -3626,6 +3626,18 @@ RSpec.describe ReactOnRails::Doctor do
         "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });\n" \
         "const { reactOnRailsProNodeRenderer } = " \
         "require('react-on-rails-pro-node-renderer');"
+      ],
+      [
+        "a CommonJS package binding lookalike inside a quoted string",
+        'const help = "; const { reactOnRailsProNodeRenderer } = ' \
+        "require('react-on-rails-pro-node-renderer');\";\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "an ESM package binding lookalike inside a quoted string",
+        'const help = "; import { reactOnRailsProNodeRenderer } from ' \
+        "'react-on-rails-pro-node-renderer';\";\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
       ]
     ].each do |description, source|
       it "requires proven binding scope for #{description}" do
@@ -3643,6 +3655,28 @@ RSpec.describe ReactOnRails::Doctor do
           )
         )
         expect(checker.messages).not_to include(hash_including(type: :success))
+      end
+
+      it "emits unverified JSON when provenance resembles #{description}" do
+        File.write("renderer/node-renderer.js", source)
+        json_doctor = described_class.new(format: :json, only: "node_renderer_rollout_capacity")
+        allow(json_doctor).to receive(:ensure_rails_environment_loaded).and_return(true)
+        allow(json_doctor).to receive(:exit)
+        output = []
+        allow(json_doctor).to receive(:puts) { |argument| output << argument.to_s }
+
+        json_doctor.run_diagnosis
+
+        check = JSON.parse(output.join("\n")).fetch("checks").first
+        expect(check).to include(
+          "id" => "node_renderer_rollout_capacity",
+          "status" => "warn",
+          "message" => a_string_including(
+            "evidence=unverified",
+            "reason=renderer_configuration_binding_not_proven"
+          )
+        )
+        expect(check.fetch("details")).not_to include(hash_including("level" => "success"))
       end
     end
 

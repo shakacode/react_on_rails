@@ -3403,11 +3403,15 @@ module ReactOnRails
     end
 
     def node_renderer_canonical_package_binding(content)
-      bindings = content.to_enum(:scan, NODE_RENDERER_PACKAGE_BINDING_PATTERN).map { Regexp.last_match }
+      masked_content = node_renderer_mask_quoted_string_contents(content)
+      bindings = content.to_enum(:scan, NODE_RENDERER_PACKAGE_BINDING_PATTERN).filter_map do
+        binding = Regexp.last_match
+        binding if binding.begin(0).zero? || masked_content[binding.begin(0)] != " "
+      end
       return unless bindings.one?
 
       binding = bindings.first
-      prefix = node_renderer_mask_quoted_string_contents(content[...binding.begin(0)])
+      prefix = masked_content[...binding.begin(0)]
       delimiters = node_renderer_delimiter_stack(prefix)
       binding if delimiters&.empty?
     end
