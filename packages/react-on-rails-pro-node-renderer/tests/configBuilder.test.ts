@@ -221,6 +221,20 @@ describe('configBuilder', () => {
       });
     });
 
+    it.each([
+      ['maxVMPoolSize', true, 'maxVMPoolSize must be a positive integer'],
+      ['maxVMPoolSize', [4], 'maxVMPoolSize must be a positive integer'],
+      ['vmPoolRolloutDrainTimeout', true, 'vmPoolRolloutDrainTimeout must be a positive number of seconds'],
+      ['vmPoolRolloutDrainTimeout', [45.5], 'vmPoolRolloutDrainTimeout must be a positive number of seconds'],
+    ])('rejects nonnumeric runtime %s=%p', (setting, value, expectedError) => {
+      const processExit = mockProcessExit();
+      const { buildConfig, error } = loadConfigBuilderWithMockedLogger();
+
+      expect(() => buildConfig({ [setting]: value } as never)).toThrow('process.exit: 1');
+      expect(error).toHaveBeenCalledWith(expectedError);
+      expect(processExit).toHaveBeenCalledWith(1);
+    });
+
     it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])(
       'rejects an invalid rollout drain timeout of %p',
       (vmPoolRolloutDrainTimeout) => {

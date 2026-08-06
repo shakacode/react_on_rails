@@ -237,6 +237,13 @@ function truthyHealthEndpointFlag(value: unknown) {
   return value === '1' || truthy(value);
 }
 
+function numericRuntimeConfigValue(value: unknown) {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string' && value.trim() !== '') return Number(value);
+
+  return Number.NaN;
+}
+
 // Re-evaluated at build time as well as module load so env vars set post-import take effect.
 function defaultMaxVMPoolSize() {
   return env.MAX_VM_POOL_SIZE != null ? Number(env.MAX_VM_POOL_SIZE) : 4;
@@ -495,11 +502,9 @@ export function buildConfig(providedUserConfig?: Partial<Config>): Config {
   // Coerce in case a user config passes an env-derived string (e.g. "true").
   config.enableHealthEndpoints = truthyHealthEndpointFlag(config.enableHealthEndpoints);
 
-  // Coerce numeric settings because JavaScript user configs may pass env-derived strings.
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-conversion -- runtime value may be a string
-  config.maxVMPoolSize = Number(config.maxVMPoolSize);
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-conversion -- runtime value may be a string
-  config.vmPoolRolloutDrainTimeout = Number(config.vmPoolRolloutDrainTimeout);
+  // Accept env-derived numeric strings without letting JavaScript coerce booleans, arrays, or objects.
+  config.maxVMPoolSize = numericRuntimeConfigValue(config.maxVMPoolSize);
+  config.vmPoolRolloutDrainTimeout = numericRuntimeConfigValue(config.vmPoolRolloutDrainTimeout);
   if (config.maxVMPoolSize <= 0 || !Number.isInteger(config.maxVMPoolSize)) {
     log.error('maxVMPoolSize must be a positive integer');
     process.exit(1);
