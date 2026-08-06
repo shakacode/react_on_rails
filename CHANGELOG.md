@@ -40,6 +40,72 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4811](https://github.com/shakacode/react_on_rails/pull/4811) by
   [justin808](https://github.com/justin808).
 
+- **Generated server webpack configs no longer include an unused `merge` import or stale comments**:
+  `commonWebpackConfig` already clones the shared client configuration, so the generated server configuration
+  stays lint-clean without changing its runtime behavior. Fixes
+  [Issue 4791](https://github.com/shakacode/react_on_rails/issues/4791).
+  [PR 4840](https://github.com/shakacode/react_on_rails/pull/4840) by
+  [ihabadham](https://github.com/ihabadham).
+
+- **Release retries now durably reuse maintainer-verified ShakaPerf evidence**: `rake release` can bind an
+  existing successful run to the canonical release tracker with `RELEASE_SHAKAPERF_RUN`, then re-fetch and
+  re-verify the exact SHA or machine-proven runtime-equivalent evidence on later invocations instead of
+  dispatching duplicate performance runs. Tracker trust is bound to the exact
+  `Release gate: react_on_rails X.Y.Z` stable-base title, explicit selectors take precedence over automatic
+  accepted-RC reuse, and persisted accelerated retries cannot silently consume a selector. Automatic reuse
+  falls back to normal discovery only for authoritative natural invalidation such as stale or missing evidence,
+  a failed/cancelled live run, or proven runtime divergence; indeterminate API or Git failures, detector errors,
+  and record mutations remain blocking. Raw REST-selected runs now preserve their creation timestamp through
+  strict-final verification. Before either a live release or dry run can reach registry checks, confirmation,
+  mutation, tagging, or publication, the task also verifies the frozen pnpm install state, the repository-pinned
+  pnpm version, and lifecycle-enabled builds of all four npm release packages before creating a release checkout,
+  pulling, authenticating, or reading any remote release state. The successful check is bound to the exact commit;
+  when a live `git pull --rebase` advances `HEAD`, the task rebuilds and rebinds readiness before resolving the release
+  version or continuing. npm publication now retries only explicit OTP challenges and context-qualified transient
+  network/HTTP failures; successful lifecycle/tool banners no longer mask those diagnostics, while authentication,
+  actual lifecycle failures, registry rejection, incidental numeric diagnostics, and unknown failures stop immediately
+  with OTP values redacted. Saved ShakaPerf evidence also recognizes GitHub CLI's exact
+  `no valid artifacts found to download` diagnostic as authoritative absence while preserving observation failures as
+  blocking. Stable releases also support
+  an append-only, tracker-bound schema-v2 observation waiver bound to the exact run attempt and canonical
+  repository/workflow/event/branch identity. Legacy schema-v1 waiver markers remain readable audit history but cannot
+  authorize publication. The waiver does not
+  claim the run succeeded or bypass any other release gate; the tracker, waiver, and exact run are revalidated
+  before remote tag push and package publication, and a rerun attempt blocks both boundaries. Fixes
+  [Issue 4812](https://github.com/shakacode/react_on_rails/issues/4812).
+  [PR 4833](https://github.com/shakacode/react_on_rails/pull/4833) by
+  [justin808](https://github.com/justin808).
+
+- **[Pro]** **RSC render-error details are no longer sent to the browser on the fetched payload path**:
+  The RSC payload fetched during client-side navigation (via `rsc_payload_generation_url_path`) included
+  the server's rendering-error message and source-mapped stack — which contains server file paths — in its
+  metadata, in every environment. The inline (first-paint) payload path was already redacted, so error
+  detail that was hidden on first paint could still reach the browser on a client navigation. The fetched
+  path now applies the same fail-closed gate: full detail only in `development` and `test`, while
+  `production`, `staging`, and any unrecognized environment receive a generic `hasErrors: true` signal so
+  client error boundaries still fire. Server-side error handling is unaffected — `raise_prerender_error`
+  still receives the full message and stack, because redaction happens at the browser-facing boundary
+  after the server's own error transform runs. Fixes
+  [Issue 4736](https://github.com/shakacode/react_on_rails/issues/4736).
+  [PR 4821](https://github.com/shakacode/react_on_rails/pull/4821) by
+  [justin808](https://github.com/justin808).
+
+- **HTTP-served SSR bundle loading now honors the response charset, rejects non-2xx responses,
+  and no longer leaks URL credentials into error messages**:
+  When `server_bundle_js_file` resolves to an HTTP(S) URL, `RubyEmbeddedJavaScript.file_url_to_string`
+  no longer assumes the `Content-Type` header always ends in an exact `; charset=...` form. A response
+  with no charset, a `Content-Type` with no charset parameter, a missing `Content-Type` header, or a
+  quoted charset value (`charset="ISO-8859-1"`) now transcodes to UTF-8 successfully instead of
+  raising or silently mislabeling the bytes, falling back to UTF-8 when no usable charset is declared.
+  A non-2xx response (for example a 404 page or a proxy error) is now rejected with a clear
+  bundle-load error naming the URL and status, instead of being returned as if it were JavaScript
+  bundle source. Additionally, a `server_bundle_js_file` URL with embedded HTTP basic-auth
+  credentials (e.g. `https://:password@host:3800/bundle.js`) no longer leaks that password into
+  raised errors or logs on a load failure. Fixes
+  [Issue 4584](https://github.com/shakacode/react_on_rails/issues/4584).
+  [PR 4817](https://github.com/shakacode/react_on_rails/pull/4817) by
+  [justin808](https://github.com/justin808).
+
 - **RailsContext now stays current across Turbo and Turbolinks navigation**: Parsed context is cached
   only while its source element and JSON text remain unchanged. Replacing the context element or
   morphing its payload in place now makes the next core render or immediate Pro hydration receive the
@@ -217,6 +283,15 @@ pair`, returns invalid UTF-8, or silently mis-decodes the value. The parser now 
 
 #### Added
 
+- **Version-matched agent skills and bundled docs**: The `react_on_rails` gem and
+  `react-on-rails` npm package now ship install/upgrade, React Server Components adoption,
+  streaming debugging, and doctor fix-loop skills with concise package-local references.
+  Newly scaffolded `AGENTS.md` files point agents to the installed package content before
+  the hosted docs, avoiding guidance drift across releases. Fixes
+  [Issue 4605](https://github.com/shakacode/react_on_rails/issues/4605).
+  [PR 4809](https://github.com/shakacode/react_on_rails/pull/4809) by
+  [justin808](https://github.com/justin808).
+
 - **[Pro]** **RSC agent guardrails installer**: New
   `rake react_on_rails:install_rsc_agent_guardrails` task (also run automatically by the RSC
   generator) installs a Claude Code `rsc-app-safety` skill and an advisory hook into a host app's
@@ -271,6 +346,16 @@ pair`, returns invalid UTF-8, or silently mis-decodes the value. The parser now 
   [Issue 3584](https://github.com/shakacode/react_on_rails/issues/3584).
   [PR 4579](https://github.com/shakacode/react_on_rails/pull/4579) by
   [alexeyr-ci2](https://github.com/alexeyr-ci2).
+
+### [17.0.1] - 2026-07-26
+
+#### Fixed
+
+- **Corrected the OSS npm package license metadata and packed license**: `react-on-rails` now declares
+  `MIT`, includes a package-local MIT license in the published tarball, and verifies the packed
+  artifact cannot inherit React on Rails Pro commercial terms.
+  [PR 4792](https://github.com/shakacode/react_on_rails/pull/4792) by
+  [justin808](https://github.com/justin808).
 
 ### [17.0.0] - 2026-07-16
 
@@ -3019,7 +3104,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.0.0...main
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.0.1...main
+[17.0.1]: https://github.com/shakacode/react_on_rails/compare/v17.0.0...v17.0.1
 [17.0.0]: https://github.com/shakacode/react_on_rails/compare/v16.6.0...v17.0.0
 [16.6.0]: https://github.com/shakacode/react_on_rails/compare/v16.5.1...v16.6.0
 [16.5.1]: https://github.com/shakacode/react_on_rails/compare/v16.5.0...v16.5.1

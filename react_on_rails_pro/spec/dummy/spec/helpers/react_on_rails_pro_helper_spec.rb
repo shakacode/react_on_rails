@@ -748,23 +748,155 @@ describe ReactOnRailsProHelper do
   end
 
   describe "#internal_rsc_payload_react_component" do
-    it "frames the payload without removing html from the input chunk" do
-      input_chunk = { "hasErrors" => false, "html" => "payload" }
+    # Obviously-synthetic stand-ins for server-internal error text. These deliberately mirror the
+    # fixtures in packages/react-on-rails-pro/tests/injectRSCPayload.test.ts so the inline and
+    # fetched redaction paths can be compared case-for-case.
+    let(:synthetic_message) { "User 48213 not authorized for org 77" }
+    let(:synthetic_stack) do
+      "Error: User 48213 not authorized\n    at Auth (/app/components/Auth.server.tsx:12:5)"
+    end
+    let(:rendering_error) { { "message" => synthetic_message, "stack" => synthetic_stack } }
+    let(:error_chunk) do
+      { "hasErrors" => true, "renderingError" => rendering_error, "html" => "payload" }
+    end
+
+    def stub_rails_env(name)
+      allow(Rails).to receive(:env).and_return(ActiveSupport::StringInquirer.new(name))
+    end
+
+    # Runs `chunk` through the real helper transform chain and returns the wire bytes a browser
+    # would receive. An optional block mirrors the raise-transform that
+    # `server_rendered_react_component` installs (react_on_rails/lib/react_on_rails/helper.rb),
+    # which always runs BEFORE the framing transform added here.
+    def framed_wire_bytes(chunk, &inner_transform)
       upstream_stream = Struct.new(:input) do
         def each_chunk
           yield input
         end
-      end.new(input_chunk)
+      end.new(chunk)
       json_stream = ReactOnRailsPro::StreamDecorator.new(upstream_stream)
+      json_stream.transform(&inner_transform) if inner_transform
       render_options = instance_double(ReactOnRails::ReactComponent::RenderOptions)
 
       allow(self).to receive(:create_render_options).and_return(render_options)
       allow(self).to receive(:server_rendered_react_component).with(render_options).and_return(json_stream)
 
-      framed_stream = send(:internal_rsc_payload_react_component, "RscEchoProps")
+      send(:internal_rsc_payload_react_component, "RscEchoProps").each_chunk.to_a.join
+    end
 
-      expect(framed_stream.each_chunk.to_a).to eq(["{\"hasErrors\":false}\t00000007\npayload"])
+    it "frames the payload without removing html from the input chunk" do
+      input_chunk = { "hasErrors" => false, "html" => "payload" }
+
+      expect(framed_wire_bytes(input_chunk)).to eq("{\"hasErrors\":false}\t00000007\npayload")
       expect(input_chunk).to include("html" => "payload")
+    end
+
+    it "redacts renderingError from the fetched payload metadata in production" do
+      stub_rails_env("production")
+
+      wire = framed_wire_bytes(error_chunk)
+
+      expect(wire).to include("\"hasErrors\":true")
+      expect(wire).not_to include("renderingError")
+      expect(wire).not_to include("User 48213")
+      expect(wire).not_to include("not authorized")
+      expect(wire).not_to include("Auth.server.tsx")
+    end
+
+    it "redacts renderingError in non-development/test environments like staging" do
+      stub_rails_env("staging")
+
+      wire = framed_wire_bytes(error_chunk)
+
+      expect(wire).to include("\"hasErrors\":true")
+      expect(wire).not_to include("renderingError")
+      expect(wire).not_to include("User 48213")
+      expect(wire).not_to include("Auth.server.tsx")
+    end
+
+    it "redacts renderingError in an unrecognized environment (fail-closed)" do
+      stub_rails_env("qa-sandbox")
+
+      wire = framed_wire_bytes(error_chunk)
+
+      expect(wire).to include("\"hasErrors\":true")
+      expect(wire).not_to include("renderingError")
+      expect(wire).not_to include("User 48213")
+      expect(wire).not_to include("Auth.server.tsx")
+    end
+
+    it "forces hasErrors:true in production when the chunk reports hasErrors:false with an error signal" do
+      stub_rails_env("production")
+
+      wire = framed_wire_bytes(error_chunk.merge("hasErrors" => false))
+
+      expect(wire).to include("\"hasErrors\":true")
+      expect(wire).not_to include("renderingError")
+      expect(wire).not_to include("Auth.server.tsx")
+    end
+
+    it "leaves a clean production chunk untouched" do
+      stub_rails_env("production")
+
+      wire = framed_wire_bytes({ "hasErrors" => false, "html" => "payload" })
+
+      expect(wire).to eq("{\"hasErrors\":false}\t00000007\npayload")
+    end
+
+    it "includes the full renderingError in development" do
+      stub_rails_env("development")
+
+      wire = framed_wire_bytes(error_chunk)
+
+      expect(wire).to include("renderingError")
+      expect(wire).to include(synthetic_message)
+      expect(wire).to include("Auth.server.tsx")
+    end
+
+    it "includes the full renderingError in test" do
+      stub_rails_env("test")
+
+      wire = framed_wire_bytes(error_chunk)
+
+      expect(wire).to include("renderingError")
+      expect(wire).to include(synthetic_message)
+    end
+
+    it "does not mutate the upstream chunk when redacting, so StreamCache buffers the full payload" do
+      stub_rails_env("production")
+      input_chunk = error_chunk
+
+      wire = framed_wire_bytes(input_chunk)
+
+      expect(wire).not_to include("renderingError")
+      # StreamCache buffers a reference to this Hash and writes it to Rails.cache after the stream
+      # completes; mutating it here would persist a torn payload.
+      # See https://github.com/shakacode/react_on_rails/issues/4550.
+      expect(input_chunk).to eq(
+        "hasErrors" => true,
+        "renderingError" => { "message" => synthetic_message, "stack" => synthetic_stack },
+        "html" => "payload"
+      )
+    end
+
+    it "leaves renderingError intact for the server-side raise that runs before framing" do
+      stub_rails_env("production")
+      seen_by_server = nil
+
+      wire = framed_wire_bytes(error_chunk) do |chunk|
+        seen_by_server = chunk
+        chunk
+      end
+
+      # The browser-facing bytes are redacted...
+      expect(wire).not_to include("Auth.server.tsx")
+      # ...but raise_prerender_error/rendering_error_from_result still receive full detail.
+      expect(seen_by_server["renderingError"]).to eq(
+        "message" => synthetic_message, "stack" => synthetic_stack
+      )
+      server_side_error = send(:rendering_error_from_result, seen_by_server)
+      expect(server_side_error.message).to eq(synthetic_message)
+      expect(server_side_error.backtrace).to include("at Auth (/app/components/Auth.server.tsx:12:5)")
     end
   end
 
