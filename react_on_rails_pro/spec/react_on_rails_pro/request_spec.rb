@@ -811,6 +811,43 @@ describe ReactOnRailsPro::Request do
       described_class.instance_variable_set(:@connection, nil)
     end
 
+    it "keeps routine connection setup at debug level" do
+      connection = instance_double(ReactOnRailsPro::RendererHttpClient)
+      setup_messages = []
+      allow(ReactOnRailsPro.configuration).to receive_messages(
+        renderer_http_pool_timeout: 5,
+        ssr_timeout: 10
+      )
+      allow(ReactOnRailsPro::RendererHttpClient).to receive(:new).and_return(connection)
+      allow(logger_mock).to receive(:debug) { |&block| setup_messages << block.call }
+      expect(logger_mock).not_to receive(:info)
+
+      expect(described_class.send(:create_connection)).to be(connection)
+      expect(setup_messages).to eq(["[ReactOnRailsPro] Setting up Node Renderer connection to #{renderer_url}"])
+    end
+
+    it "keeps renderer connection failures actionable" do
+      allow(ReactOnRailsPro.configuration).to receive_messages(
+        renderer_http_pool_timeout: 5,
+        renderer_http_pool_warn_timeout: 10,
+        renderer_http_keep_alive_timeout: 15,
+        ssr_timeout: 20
+      )
+      allow(ReactOnRailsPro::RendererHttpClient).to receive(:new)
+        .and_raise(StandardError, "invalid renderer URL")
+
+      expect { described_class.send(:create_connection) }
+        .to raise_error(
+          ReactOnRailsPro::Error,
+          a_string_including(
+            "Error creating async-http connection",
+            "renderer_url = #{renderer_url}",
+            "Be sure to use a url that contains the protocol of http or https",
+            "invalid renderer URL"
+          )
+        )
+    end
+
     it "creates only one connection when accessed concurrently" do
       connections_created = 0
       counter_mutex = Mutex.new

@@ -109,7 +109,7 @@ module ReactOnRailsPro
 
         message += " Attribution required for this license type." if attribution_required
 
-        Rails.logger.info message
+        Rails.logger.debug message
       end
 
       def plan_display_name(plan)
@@ -134,7 +134,7 @@ module ReactOnRailsPro
                     "If this deployment is Production Use, #{action}"
           Rails.logger.warn "#{prefix} #{warning}"
         else
-          Rails.logger.info "#{prefix} No license required for development/test environments."
+          Rails.logger.debug "#{prefix} No license required for development/test environments."
         end
       end
     end

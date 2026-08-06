@@ -26,6 +26,12 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **Routine startup diagnostics no longer clutter Rails command output**: Successful package validation, valid
+  Pro license checks, non-production license notices, and Node renderer connection setup now log at `DEBUG`
+  instead of `INFO`. Package validation still runs, while production license warnings and renderer failures remain
+  visible and actionable. Fixes [Issue 4848](https://github.com/shakacode/react_on_rails/issues/4848), reported by
+  [Justin Gordon](https://github.com/justin808).
+
 - **Generated server webpack configs no longer include an unused `merge` import or stale comments**:
   `commonWebpackConfig` already clones the shared client configuration, so the generated server configuration
   stays lint-clean without changing its runtime behavior. Fixes

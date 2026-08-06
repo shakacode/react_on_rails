@@ -20,7 +20,7 @@ require_relative "spec_helper"
 RSpec.describe ReactOnRailsPro::Engine do
   let(:test_private_key) { OpenSSL::PKey::RSA.new(2048) }
   let(:test_public_key) { test_private_key.public_key }
-  let(:mock_logger) { instance_double(Logger, warn: nil, info: nil) }
+  let(:mock_logger) { instance_double(Logger, warn: nil, info: nil, debug: nil) }
 
   let(:valid_payload) do
     {
@@ -119,13 +119,14 @@ RSpec.describe ReactOnRailsPro::Engine do
           ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
         end
 
-        it "logs success info" do
-          expect(mock_logger).to receive(:info).with(/License validated successfully/)
+        it "keeps successful validation at debug level" do
+          expect(mock_logger).to receive(:debug).with(/License validated successfully/)
+          expect(mock_logger).not_to receive(:info)
           described_class.log_license_status
         end
 
         it "keeps the organization in private diagnostics and does not include the paid plan name" do
-          expect(mock_logger).to receive(:info)
+          expect(mock_logger).to receive(:debug)
             .with("[React on Rails Pro] License validated successfully (Acme Corp). " \
                   "Attribution required for this license type.")
           described_class.log_license_status
@@ -142,8 +143,8 @@ RSpec.describe ReactOnRailsPro::Engine do
           ReactOnRailsPro.configuration.license_token = JWT.encode(valid_payload, test_private_key, "RS256")
         end
 
-        it "logs success info" do
-          expect(mock_logger).to receive(:info).with(/License validated successfully/)
+        it "logs successful validation at debug level" do
+          expect(mock_logger).to receive(:debug).with(/License validated successfully/)
           described_class.log_license_status
         end
       end
@@ -175,7 +176,7 @@ RSpec.describe ReactOnRailsPro::Engine do
 
           it "logs success with plan type" do
             pattern = /License validated successfully \(#{Regexp.escape(config[:org])} - #{config[:display]}\)/
-            expect(mock_logger).to receive(:info).with(pattern)
+            expect(mock_logger).to receive(:debug).with(pattern)
             described_class.log_license_status
           end
         end
@@ -188,14 +189,15 @@ RSpec.describe ReactOnRailsPro::Engine do
       end
 
       context "with missing license" do
-        it "logs info instead of warning" do
-          expect(mock_logger).to receive(:info).with(/No license found/)
+        it "keeps the non-actionable status at debug level" do
+          expect(mock_logger).to receive(:debug).with(/No license found/)
+          expect(mock_logger).not_to receive(:info)
           expect(mock_logger).not_to receive(:warn)
           described_class.log_license_status
         end
 
         it "includes the development/test message" do
-          expect(mock_logger).to receive(:info).with(%r{No license required for development/test environments})
+          expect(mock_logger).to receive(:debug).with(%r{No license required for development/test environments})
           described_class.log_license_status
         end
       end
@@ -209,20 +211,20 @@ RSpec.describe ReactOnRailsPro::Engine do
           ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
         end
 
-        it "logs info instead of warning" do
-          expect(mock_logger).to receive(:info).with(/License has expired/)
+        it "logs debug instead of warning" do
+          expect(mock_logger).to receive(:debug).with(/License has expired/)
           expect(mock_logger).not_to receive(:warn)
           described_class.log_license_status
         end
 
         it "includes the expiration date" do
           expected_date = Time.at(expired_time).strftime("%Y-%m-%d")
-          expect(mock_logger).to receive(:info).with(/expired on #{expected_date}/)
+          expect(mock_logger).to receive(:debug).with(/expired on #{expected_date}/)
           described_class.log_license_status
         end
 
         it "includes the development/test message" do
-          expect(mock_logger).to receive(:info).with(%r{No license required for development/test environments})
+          expect(mock_logger).to receive(:debug).with(%r{No license required for development/test environments})
           described_class.log_license_status
         end
       end
@@ -233,8 +235,8 @@ RSpec.describe ReactOnRailsPro::Engine do
           ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
         end
 
-        it "logs success info" do
-          expect(mock_logger).to receive(:info).with(/License validated successfully/)
+        it "logs successful validation at debug level" do
+          expect(mock_logger).to receive(:debug).with(/License validated successfully/)
           described_class.log_license_status
         end
       end
@@ -257,7 +259,7 @@ RSpec.describe ReactOnRailsPro::Engine do
         end
 
         it "logs success with plan type" do
-          expect(mock_logger).to receive(:info)
+          expect(mock_logger).to receive(:debug)
             .with(/License validated successfully \(Startup Inc - startup license\)/)
           described_class.log_license_status
         end
