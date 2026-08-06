@@ -3597,12 +3597,43 @@ RSpec.describe ReactOnRails::Doctor do
       )
     end
 
+    it "syntax-checks without executing launcher code or inherited Node hooks" do
+      launcher_marker = File.join(Dir.pwd, "launcher-executed")
+      hook_marker = File.join(Dir.pwd, "node-options-hook-executed")
+      hook_path = File.join(Dir.pwd, "node-options-hook.cjs")
+      File.write(hook_path, "require('fs').writeFileSync(#{hook_marker.to_json}, 'executed');")
+      original_node_options = ENV.fetch("NODE_OPTIONS", nil)
+      ENV["NODE_OPTIONS"] = "--require=#{hook_path}"
+      write_node_renderer_script(
+        "renderer/node-renderer.js",
+        "require('fs').writeFileSync(#{launcher_marker.to_json}, 'executed');\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      )
+
+      doctor.send(:check_node_renderer_rollout_capacity)
+
+      expect(checker.messages).to include(
+        hash_including(
+          type: :success,
+          content: a_string_including("evidence=observed", "configured=4")
+        )
+      )
+      expect(File).not_to exist(launcher_marker)
+      expect(File).not_to exist(hook_marker)
+    ensure
+      if original_node_options
+        ENV["NODE_OPTIONS"] = original_node_options
+      else
+        ENV.delete("NODE_OPTIONS")
+      end
+    end
+
     it "fails closed when Node cannot prove launcher syntax" do
       write_node_renderer_script(
         "renderer/node-renderer.js",
         "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
       )
-      allow(Open3).to receive(:capture3).and_raise(Errno::ENOENT)
+      allow(Process).to receive(:spawn).and_raise(Errno::ENOENT)
 
       doctor.send(:check_node_renderer_rollout_capacity)
 
@@ -3616,6 +3647,48 @@ RSpec.describe ReactOnRails::Doctor do
         )
       )
       expect(checker.messages).not_to include(hash_including(type: :success))
+    end
+
+    it "terminates and reaps a stalled Node syntax check" do
+      fake_bin = File.join(Dir.pwd, "fake-bin")
+      fake_node = File.join(fake_bin, "node")
+      FileUtils.mkdir_p(fake_bin)
+      File.write(
+        fake_node,
+        <<~SH
+          #!/bin/sh
+          sleep 1
+        SH
+      )
+      File.chmod(0o755, fake_node)
+      allow(doctor).to receive(:node_renderer_syntax_check_command).and_return([fake_node])
+      spawned_pid = nil
+      allow(Process).to receive(:spawn).and_wrap_original do |original, *arguments|
+        spawned_pid = original.call(*arguments)
+      end
+      stub_const("ReactOnRails::Doctor::NODE_RENDERER_SYNTAX_CHECK_TIMEOUT_SECONDS", 0.1)
+      stub_const("ReactOnRails::Doctor::NODE_RENDERER_SYNTAX_CHECK_TERMINATION_GRACE_SECONDS", 0.1)
+      write_node_renderer_script(
+        "renderer/node-renderer.js",
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      )
+
+      started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      doctor.send(:check_node_renderer_rollout_capacity)
+      elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at
+
+      expect(elapsed).to be < 0.75
+      expect(checker.messages).to include(
+        hash_including(
+          type: :warning,
+          content: a_string_including(
+            "evidence=unverified",
+            "reason=renderer_javascript_syntax_not_proven"
+          )
+        )
+      )
+      expect(spawned_pid).not_to be_nil
+      expect { Process.kill(0, spawned_pid) }.to raise_error(Errno::ESRCH)
     end
 
     it "fails closed when a bare renderer call has no canonical package binding" do

@@ -121,6 +121,7 @@ module ReactOnRails
     RENDERER_CACHE_DEPLOY_SCRIPT_MAX_BYTES = 1_048_576
     NODE_RENDERER_CONFIG_MAX_BYTES = 1_048_576
     NODE_RENDERER_SYNTAX_CHECK_TIMEOUT_SECONDS = 5
+    NODE_RENDERER_SYNTAX_CHECK_TERMINATION_GRACE_SECONDS = 0.5
     NODE_RENDERER_ROLLOUT_GENERATIONS = 2
     NODE_RENDERER_LAUNCHER_PATHS = %w[
       Procfile
@@ -3359,15 +3360,84 @@ module ReactOnRails
       return "renderer_configuration_binding_not_proven" unless package_binding
 
       input_type = package_binding[0].match?(/\bimport\s*\{/) ? "module" : "commonjs"
-      _stdout, _stderr, status = Timeout.timeout(NODE_RENDERER_SYNTAX_CHECK_TIMEOUT_SECONDS) do
-        Open3.capture3("node", "--check", "--input-type=#{input_type}", stdin_data: content)
-      end
+      syntax_status = node_renderer_javascript_syntax_status(content, input_type)
+      return "renderer_javascript_syntax_invalid" if syntax_status == :invalid
+      return "renderer_javascript_syntax_not_proven" unless syntax_status == :valid
 
-      "renderer_javascript_syntax_invalid" unless status.success?
+      nil
     rescue StandardError
       # Static capacity is positive evidence. If Node is absent, too old for
       # this check, or unexpectedly fails, keep the diagnosis conservative.
       "renderer_javascript_syntax_not_proven"
+    end
+
+    def node_renderer_javascript_syntax_status(content, input_type)
+      suffix = input_type == "module" ? ".mjs" : ".cjs"
+      Tempfile.create(["react-on-rails-doctor-renderer", suffix]) do |file|
+        file.binmode
+        file.write(content)
+        file.flush
+        node_renderer_syntax_check_status(file.path)
+      end
+    end
+
+    def node_renderer_syntax_check_status(path)
+      pid = nil
+      process_reaped = false
+      pid = Process.spawn(
+        { "NODE_OPTIONS" => nil },
+        *node_renderer_syntax_check_command(path),
+        out: File::NULL,
+        err: File::NULL,
+        pgroup: true
+      )
+      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + NODE_RENDERER_SYNTAX_CHECK_TIMEOUT_SECONDS
+
+      loop do
+        _waited_pid, status = Process.wait2(pid, Process::WNOHANG)
+        if status
+          process_reaped = true
+          return status.success? ? :valid : :invalid
+        end
+
+        if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
+          terminate_node_renderer_syntax_check(pid)
+          process_reaped = true
+          return :unavailable
+        end
+
+        sleep 0.05
+      end
+    ensure
+      terminate_node_renderer_syntax_check(pid) if pid && !process_reaped
+    end
+
+    def node_renderer_syntax_check_command(path)
+      ["node", "--check", path]
+    end
+
+    def terminate_node_renderer_syntax_check(pid)
+      signal_node_renderer_syntax_check("TERM", pid)
+      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) +
+                 NODE_RENDERER_SYNTAX_CHECK_TERMINATION_GRACE_SECONDS
+      loop do
+        _waited_pid, status = Process.wait2(pid, Process::WNOHANG)
+        return if status
+        break if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
+
+        sleep 0.05
+      end
+
+      signal_node_renderer_syntax_check("KILL", pid)
+      Process.wait(pid)
+    rescue Errno::ECHILD, Errno::ESRCH
+      nil
+    end
+
+    def signal_node_renderer_syntax_check(signal, pid)
+      Process.kill(signal, -pid)
+    rescue Errno::ESRCH
+      Process.kill(signal, pid)
     end
 
     def node_renderer_config_object_capacity_evidence(config_object, total_mentions)
