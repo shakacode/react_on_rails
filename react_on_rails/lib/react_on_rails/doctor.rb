@@ -3422,14 +3422,10 @@ module ReactOnRails
 
     def terminate_node_renderer_syntax_check(pid)
       signal_node_renderer_syntax_check("TERM", pid)
-      process_reaped = false
       deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) +
                  NODE_RENDERER_SYNTAX_CHECK_TERMINATION_GRACE_SECONDS
-      loop do
-        process_reaped ||= node_renderer_syntax_check_process_reaped?(pid)
-        break unless node_renderer_syntax_check_process_group_alive?(pid)
-        break if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
-
+      while node_renderer_syntax_check_process_group_alive?(pid) &&
+            Process.clock_gettime(Process::CLOCK_MONOTONIC) < deadline
         sleep 0.05
       end
 
@@ -3437,20 +3433,11 @@ module ReactOnRails
         signal_node_renderer_syntax_check("KILL", pid)
         wait_for_node_renderer_syntax_check_process_group_exit(pid)
       end
-      reap_node_renderer_syntax_check(pid) unless process_reaped
-    end
-
-    def node_renderer_syntax_check_process_reaped?(pid)
-      _waited_pid, status = Process.wait2(pid, Process::WNOHANG)
-      !status.nil?
-    rescue Errno::ECHILD, Errno::ESRCH
-      # Another waiter may reap the leader while descendants remain in the
-      # process group. Keep group cleanup running even though no wait remains.
-      true
+      reap_node_renderer_syntax_check(pid)
     end
 
     def reap_node_renderer_syntax_check(pid)
-      Process.wait(pid)
+      Process.detach(pid).join(NODE_RENDERER_SYNTAX_CHECK_TERMINATION_GRACE_SECONDS)
     rescue Errno::ECHILD, Errno::ESRCH
       nil
     end
@@ -3461,7 +3448,18 @@ module ReactOnRails
     rescue Errno::ESRCH
       false
     rescue Errno::EPERM
+      node_renderer_syntax_check_group_alive_after_eperm?(pid)
+    end
+
+    def node_renderer_syntax_check_group_alive_after_eperm?(pid)
+      Process.getpgid(pid)
+      false
+    rescue Errno::ESRCH
+      # A competing waiter reaped the leader while a descendant can still own
+      # the process group. Preserve cleanup for that group-only state.
       true
+    rescue Errno::EPERM
+      false
     end
 
     def wait_for_node_renderer_syntax_check_process_group_exit(pid)
@@ -3475,10 +3473,10 @@ module ReactOnRails
 
     def signal_node_renderer_syntax_check(signal, pid)
       Process.kill(signal, -pid)
-    rescue Errno::ESRCH
+    rescue Errno::ESRCH, Errno::EPERM
       # The syntax checker was spawned as its own process-group leader. Once
-      # that group is gone, never signal the positive PID: it may be reused by
-      # an unrelated process.
+      # that group is gone or unsignalable, never fall back to the positive
+      # PID: it may be reused by an unrelated process.
       nil
     end
 

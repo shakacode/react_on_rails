@@ -3689,6 +3689,10 @@ RSpec.describe ReactOnRails::Doctor do
       allow(Process).to receive(:spawn).and_wrap_original do |original, *arguments|
         spawned_pid = original.call(*arguments)
       end
+      detached_waiter = nil
+      allow(Process).to receive(:detach).and_wrap_original do |original, pid|
+        detached_waiter = original.call(pid)
+      end
       stub_const("ReactOnRails::Doctor::NODE_RENDERER_SYNTAX_CHECK_TIMEOUT_SECONDS", 0.1)
       stub_const("ReactOnRails::Doctor::NODE_RENDERER_SYNTAX_CHECK_TERMINATION_GRACE_SECONDS", 0.1)
       write_node_renderer_script(
@@ -3711,6 +3715,8 @@ RSpec.describe ReactOnRails::Doctor do
         )
       )
       expect(spawned_pid).not_to be_nil
+      expect(detached_waiter).not_to be_nil
+      expect(detached_waiter.join(2)).not_to be_nil
       expect { Process.kill(0, spawned_pid) }.to raise_error(Errno::ESRCH)
     end
 
@@ -3766,6 +3772,65 @@ RSpec.describe ReactOnRails::Doctor do
       allow(Process).to receive(:wait2).and_return([1234, core_status])
 
       expect { doctor.send(:terminate_node_renderer_syntax_check, 1234) }.not_to raise_error
+    end
+
+    it "keeps the process-group leader unreaped until group signaling is complete" do
+      events = []
+      waiter = instance_double(Thread, join: nil)
+      allow(doctor).to receive(:signal_node_renderer_syntax_check) { events << :signal }
+      allow(doctor).to receive(:node_renderer_syntax_check_process_group_alive?) do
+        events << :group_probe
+        false
+      end
+      allow(Process).to receive(:detach) do
+        events << :reap
+        waiter
+      end
+
+      doctor.send(:terminate_node_renderer_syntax_check, 1234)
+
+      expect(events.index(:group_probe)).to be < events.index(:reap)
+    end
+
+    it "detaches instead of blocking when bounded syntax-check reaping cannot finish" do
+      allow(doctor).to receive(:signal_node_renderer_syntax_check)
+      allow(doctor).to receive(:node_renderer_syntax_check_process_group_alive?).and_return(false)
+      allow(Process).to receive(:wait).and_raise("blocking wait was attempted")
+      waiter = instance_double(Thread, join: nil)
+      allow(Process).to receive(:detach).and_return(waiter)
+      stub_const("ReactOnRails::Doctor::NODE_RENDERER_SYNTAX_CHECK_TERMINATION_GRACE_SECONDS", 0)
+
+      expect { doctor.send(:terminate_node_renderer_syntax_check, 1234) }.not_to raise_error
+      expect(Process).not_to have_received(:wait)
+      expect(Process).to have_received(:detach).with(1234)
+      expect(waiter).to have_received(:join).with(0)
+    end
+
+    it "does not signal an unsignalable syntax-check process group after an EPERM probe" do
+      allow(doctor).to receive(:signal_node_renderer_syntax_check)
+      allow(Process).to receive(:kill).with(0, -1234).and_raise(Errno::EPERM)
+      allow(Process).to receive(:getpgid).with(1234).and_return(1234)
+      waiter = instance_double(Thread, join: nil)
+      allow(Process).to receive(:detach).and_return(waiter)
+      stub_const("ReactOnRails::Doctor::NODE_RENDERER_SYNTAX_CHECK_TERMINATION_GRACE_SECONDS", 0)
+
+      doctor.send(:terminate_node_renderer_syntax_check, 1234)
+
+      expect(doctor).to have_received(:signal_node_renderer_syntax_check).once.with("TERM", 1234)
+      expect(waiter).to have_received(:join).with(0)
+    end
+
+    it "continues group cleanup after EPERM when a competing waiter already reaped the leader" do
+      allow(doctor).to receive(:signal_node_renderer_syntax_check)
+      allow(Process).to receive(:kill).with(0, -1234).and_raise(Errno::EPERM)
+      allow(Process).to receive(:getpgid).with(1234).and_raise(Errno::ESRCH)
+      allow(Process).to receive(:detach).and_raise(Errno::ECHILD)
+      stub_const("ReactOnRails::Doctor::NODE_RENDERER_SYNTAX_CHECK_TERMINATION_GRACE_SECONDS", 0)
+
+      doctor.send(:terminate_node_renderer_syntax_check, 1234)
+
+      expect(doctor).to have_received(:signal_node_renderer_syntax_check).with("TERM", 1234).ordered
+      expect(doctor).to have_received(:signal_node_renderer_syntax_check).with("KILL", 1234).ordered
     end
 
     it "continues process-group cleanup after a competing waiter reaps the group leader" do
