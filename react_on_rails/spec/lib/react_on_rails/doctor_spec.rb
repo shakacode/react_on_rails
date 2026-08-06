@@ -3637,6 +3637,16 @@ RSpec.describe ReactOnRails::Doctor do
       [
         "a byte-zero parenthesized call followed by a trailing new decoy",
         "(reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 }));\nnew"
+      ],
+      [
+        "a CommonJS package binding",
+        "const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "an ESM package binding",
+        "import { reactOnRailsProNodeRenderer } from 'react-on-rails-pro-node-renderer';\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
       ]
     ].each do |description, source|
       it "observes a direct inline literal with #{description}" do
@@ -3916,7 +3926,38 @@ RSpec.describe ReactOnRails::Doctor do
       expect(checker.messages).not_to include(hash_including(type: :success))
     end
 
+    it "fails closed for a locally rebound renderer identifier" do
+      File.write(
+        "renderer/node-renderer.js",
+        "var reactOnRailsProNodeRenderer = console.log;\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      )
+
+      doctor.send(:check_node_renderer_rollout_capacity)
+
+      expect(checker.messages).to include(
+        hash_including(type: :warning, content: a_string_including("evidence=unverified"))
+      )
+      expect(checker.messages).not_to include(hash_including(type: :success))
+    end
+
     [
+      [
+        "a non-package destructuring binding",
+        "const { reactOnRailsProNodeRenderer } = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a later renderer reassignment",
+        "const { reactOnRailsProNodeRenderer } = " \
+        "require('react-on-rails-pro-node-renderer');\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });\n" \
+        "reactOnRailsProNodeRenderer = console.log;"
+      ],
+      [
+        "a later renderer update",
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });\nreactOnRailsProNodeRenderer++;"
+      ],
       [
         "a post-declaration Object.assign override",
         "const config = { maxVMPoolSize: 4 };\n" \
@@ -4392,6 +4433,11 @@ RSpec.describe ReactOnRails::Doctor do
         "const config = { maxVMPoolSize: 4 };\nreactOnRailsProNodeRenderer(config);"
       ],
       [
+        "a locally rebound renderer identifier",
+        "var reactOnRailsProNodeRenderer = console.log;\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
         "a direct member-call decoy before a dynamic aliased renderer call",
         "const startRenderer = reactOnRailsProNodeRenderer;\n" \
         "shim.reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });\n" \
@@ -4612,6 +4658,29 @@ RSpec.describe ReactOnRails::Doctor do
       end
       expect(guidance.fetch(:content)).to include("client/node-renderer.js")
       expect(guidance.fetch(:content)).not_to include("renderer/node-renderer.js")
+    end
+
+    it "fails closed when an unproven active launcher references another canonical renderer script" do
+      FileUtils.mkdir_p("client")
+      File.write("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });")
+      File.write("client/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
+      File.write(
+        "Procfile.production",
+        "renderer: node renderer/node-renderer.js\nclient: env FOO=1 node client/node-renderer.js\n"
+      )
+
+      doctor.send(:check_node_renderer_rollout_capacity)
+
+      expect(checker.messages).to include(
+        hash_including(
+          type: :warning,
+          content: a_string_including(
+            "evidence=unverified",
+            "reason=renderer_script_selection_not_proven"
+          )
+        )
+      )
+      expect(checker.messages).not_to include(hash_including(type: :success))
     end
 
     [

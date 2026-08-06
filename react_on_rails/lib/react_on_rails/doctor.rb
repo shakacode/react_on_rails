@@ -152,6 +152,29 @@ module ReactOnRails
     /mx
     NODE_RENDERER_BARE_CALL_PATTERN =
       /(?<![.\p{ID_Continue}$#])reactOnRailsProNodeRenderer\s*\(\s*/
+    NODE_RENDERER_PACKAGE_BINDING_PATTERN = /
+      (?:\A|[;\n])\s*
+      (?:
+        const\s*\{[^{}]*\breactOnRailsProNodeRenderer\b\s*(?=,|\})[^{}]*\}\s*=\s*
+          require\s*\(\s*["']react-on-rails-pro-node-renderer["']\s*\)
+        |
+        import\s*\{[^{}]*\breactOnRailsProNodeRenderer\b\s*(?=,|\})[^{}]*\}\s+from\s+
+          ["']react-on-rails-pro-node-renderer["']
+      )\s*;?
+    /mx
+    NODE_RENDERER_LOCAL_BINDING_PATTERN = %r{
+      \b(?:const|let|var)\s+
+        (?:reactOnRailsProNodeRenderer\b|\{[^{}]*\breactOnRailsProNodeRenderer\b[^{}]*\})
+      |
+      \b(?:function|class)\s+reactOnRailsProNodeRenderer\b
+      |
+      \bimport\s*\{[^{}]*\breactOnRailsProNodeRenderer\b[^{}]*\}\s+from\b
+      |
+      (?<![.\p{ID_Continue}$#])reactOnRailsProNodeRenderer\b\s*
+        (?:\+\+|--|\*\*=|&&=|\|\|=|\?\?=|[+\-*\/%&|^]=|=(?!=|>))
+      |
+      (?:\+\+|--)\s*(?<![.\p{ID_Continue}$#])reactOnRailsProNodeRenderer\b
+    }mx
     NODE_RENDERER_UNPROVEN_CALL_CONTROL_PATTERN = /
       (?:&&|\|\||=>|\?) |
       \b(?:if|else|for|while|do|switch|case|catch|finally|function|return|throw)\b
@@ -3236,7 +3259,8 @@ module ReactOnRails
       return [existing_paths.first, nil] if existing_paths.one?
 
       launched_paths = node_renderer_direct_launcher_script_paths & existing_paths
-      return [launched_paths.first, nil] if launched_paths.one?
+      unproven_paths = node_renderer_unproven_launcher_script_paths & existing_paths
+      return [launched_paths.first, nil] if launched_paths.one? && (unproven_paths - launched_paths).empty?
 
       [nil, "renderer_script_selection_not_proven"]
     end
@@ -3245,6 +3269,12 @@ module ReactOnRails
       node_renderer_launcher_classifications.filter_map do |classification|
         classification[:path] if classification[:state] == :proven
       end.uniq
+    end
+
+    def node_renderer_unproven_launcher_script_paths
+      node_renderer_launcher_classifications.filter_map do |classification|
+        classification[:paths] if classification[:state] == :unproven
+      end.flatten.uniq
     end
 
     def node_renderer_launcher_classifications
@@ -3325,6 +3355,8 @@ module ReactOnRails
     end
 
     def node_renderer_call_config_object(active_content)
+      return nil if node_renderer_local_renderer_binding?(active_content)
+
       masked_content = node_renderer_mask_quoted_string_contents(active_content)
       calls = masked_content.to_enum(:scan, NODE_RENDERER_BARE_CALL_PATTERN).filter_map do
         call = Regexp.last_match
@@ -3338,6 +3370,13 @@ module ReactOnRails
       argument = active_content[call.end(0)..]
 
       argument.match(/\A(#{NODE_RENDERER_CONFIG_OBJECT_PATTERN})\s*\)/o)&.[](1)
+    end
+
+    def node_renderer_local_renderer_binding?(content)
+      without_package_binding = content.gsub(NODE_RENDERER_PACKAGE_BINDING_PATTERN, " ")
+      masked_content = node_renderer_mask_quoted_string_contents(without_package_binding)
+
+      masked_content.match?(NODE_RENDERER_LOCAL_BINDING_PATTERN)
     end
 
     def node_renderer_call_reachability_proven?(content, call)

@@ -76,6 +76,8 @@ The drain timeout bounds how long inactive generation metadata and unshared cont
 
 The request protocol identifies bundle paths but does not declare which deployment generation is chronologically newer. The pool therefore protects the **most recently observed successful bundle set**, not a claimed "new" revision. If the last overlap request comes from the old revision and traffic then goes idle, the timer can retire the new set. The next new-revision request rebuilds that set once, subsequent requests reuse it, and the already-expired old set becomes eligible for retirement. Pooled context retention remains bounded throughout; total transient memory also depends on concurrent in-flight work that has not released evicted contexts and source maps.
 
+The pool intentionally combines bounded bundle-set retention with one global per-worker hard cap instead of permanently reserving slots for individual bundle paths. Per-bundle reservations would need trusted generation identity, a complete declared bundle set, and an admission policy for when all reservations cannot fit under the cap; the current request protocol provides none of those guarantees. Generation-affinity routing can reduce overlap pressure only when the deployment platform guarantees that every renderer receives one revision. That is an advanced topology option, not behavior this package provides or Doctor can verify, so size the pool for the generations that can actually reach each renderer.
+
 Disk-cache seeding and VM retention solve different cold paths:
 
 - `pre_seed_renderer_cache` places bundle files and companion artifacts on disk, avoiding a `410 Gone`, upload, and retry.
