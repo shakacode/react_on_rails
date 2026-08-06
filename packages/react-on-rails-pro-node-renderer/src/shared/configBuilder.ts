@@ -495,6 +495,11 @@ export function buildConfig(providedUserConfig?: Partial<Config>): Config {
   // Coerce in case a user config passes an env-derived string (e.g. "true").
   config.enableHealthEndpoints = truthyHealthEndpointFlag(config.enableHealthEndpoints);
 
+  // Coerce numeric settings because JavaScript user configs may pass env-derived strings.
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-conversion -- runtime value may be a string
+  config.maxVMPoolSize = Number(config.maxVMPoolSize);
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-conversion -- runtime value may be a string
+  config.vmPoolRolloutDrainTimeout = Number(config.vmPoolRolloutDrainTimeout);
   if (config.maxVMPoolSize <= 0 || !Number.isInteger(config.maxVMPoolSize)) {
     log.error('maxVMPoolSize must be a positive integer');
     process.exit(1);

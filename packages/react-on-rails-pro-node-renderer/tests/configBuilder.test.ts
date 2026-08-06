@@ -207,6 +207,20 @@ describe('configBuilder', () => {
       });
     });
 
+    it('coerces env-derived string values passed through user configuration', () => {
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      expect(
+        buildConfig({
+          maxVMPoolSize: '6' as unknown as number,
+          vmPoolRolloutDrainTimeout: '45.5' as unknown as number,
+        }),
+      ).toMatchObject({
+        maxVMPoolSize: 6,
+        vmPoolRolloutDrainTimeout: 45.5,
+      });
+    });
+
     it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])(
       'rejects an invalid rollout drain timeout of %p',
       (vmPoolRolloutDrainTimeout) => {

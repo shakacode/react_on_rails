@@ -3528,6 +3528,9 @@ module ReactOnRails
       masked_content = node_renderer_mask_quoted_string_contents(content)
       return unless masked_content
 
+      delimiters = node_renderer_delimiter_stack(masked_content)
+      return unless delimiters&.empty?
+
       calls = masked_content.to_enum(:scan, NODE_RENDERER_BARE_CALL_PATTERN).filter_map do
         call = Regexp.last_match
         next if node_renderer_constructor_call?(masked_content, call)
@@ -3604,9 +3607,6 @@ module ReactOnRails
     end
 
     def node_renderer_call_reachability_proven?(content, call)
-      delimiters = node_renderer_delimiter_stack(content)
-      return false unless delimiters && delimiters.empty?
-
       prefix = content[...call.begin(0)]
       return false unless node_renderer_call_at_top_level?(prefix)
       return false if node_renderer_call_in_unproven_initializer?(prefix)

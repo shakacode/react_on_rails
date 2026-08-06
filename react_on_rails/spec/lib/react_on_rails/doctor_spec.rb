@@ -3530,6 +3530,19 @@ RSpec.describe ReactOnRails::Doctor do
       File.write(path, source)
     end
 
+    def wait_for_published_child_pid(path)
+      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 2
+      loop do
+        contents = File.read(path) if File.file?(path)
+        return contents.to_i if contents&.match?(/\A[1-9]\d*\n\z/)
+
+        deadline_reached = Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
+        raise "syntax-check child pid was not published" if deadline_reached
+
+        sleep 0.01
+      end
+    end
+
     around do |example|
       previous_max_vm_pool_size = ENV.fetch("MAX_VM_POOL_SIZE", nil)
       ENV.delete("MAX_VM_POOL_SIZE")
@@ -3595,6 +3608,16 @@ RSpec.describe ReactOnRails::Doctor do
           content: a_string_including("sufficient", "evidence=observed", "configured=4", "required=4")
         )
       )
+    end
+
+    it "validates the complete renderer script delimiters once for multiple candidate calls" do
+      content = "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });\n" \
+                "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      allow(doctor).to receive(:node_renderer_delimiter_stack).and_call_original
+
+      doctor.send(:node_renderer_single_reachable_call, content)
+
+      expect(doctor).to have_received(:node_renderer_delimiter_stack).with(content).once
     end
 
     it "syntax-checks without executing launcher code or inherited Node hooks" do
@@ -3720,7 +3743,7 @@ RSpec.describe ReactOnRails::Doctor do
 
       doctor.send(:check_node_renderer_rollout_capacity)
 
-      child_pid = File.read(child_pid_path).to_i
+      child_pid = wait_for_published_child_pid(child_pid_path)
       expect(spawned_pid).not_to be_nil
       expect { Process.kill(0, spawned_pid) }.to raise_error(Errno::ESRCH)
       expect { Process.kill(0, child_pid) }.to raise_error(Errno::ESRCH)
@@ -3759,13 +3782,7 @@ RSpec.describe ReactOnRails::Doctor do
       )
       File.chmod(0o755, fake_node)
       leader_pid = Process.spawn(fake_node, out: File::NULL, err: File::NULL, pgroup: true)
-      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 2
-      until File.file?(child_pid_path)
-        raise "syntax-check child pid was not published" if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
-
-        sleep 0.01
-      end
-      child_pid = File.read(child_pid_path).to_i
+      child_pid = wait_for_published_child_pid(child_pid_path)
       reaper = Thread.new { Process.wait(leader_pid) }
       allow(doctor).to receive(:signal_node_renderer_syntax_check) do |signal, pid|
         Process.kill(signal, -pid)

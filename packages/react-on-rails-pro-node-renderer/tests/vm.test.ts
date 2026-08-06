@@ -770,6 +770,7 @@ describe('buildVM and runInVM', () => {
 
     afterEach(async () => {
       await resetForTest(testName);
+      jest.restoreAllMocks();
     });
 
     test('reuses old and new server plus RSC contexts while rollout requests alternate', async () => {
