@@ -3411,7 +3411,7 @@ module ReactOnRails
 
       bindings = content.to_enum(:scan, NODE_RENDERER_PACKAGE_BINDING_PATTERN).filter_map do
         binding = Regexp.last_match
-        binding if binding.begin(0).zero? || masked_content[binding.begin(0)] != " "
+        binding if node_renderer_proven_package_binding_match?(binding, masked_content)
       end
       return unless bindings.one?
 
@@ -3419,6 +3419,12 @@ module ReactOnRails
       prefix = masked_content[...binding.begin(0)]
       delimiters = node_renderer_delimiter_stack(prefix)
       binding if delimiters&.empty?
+    end
+
+    def node_renderer_proven_package_binding_match?(binding, masked_content)
+      return false if !binding.begin(0).zero? && masked_content[binding.begin(0)] == " "
+
+      binding[0].scan(NODE_RENDERER_IDENTIFIER_PATTERN).one?
     end
 
     def node_renderer_local_renderer_binding?(content)

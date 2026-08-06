@@ -3628,6 +3628,14 @@ RSpec.describe ReactOnRails::Doctor do
         "require('react-on-rails-pro-node-renderer');"
       ],
       [
+        "a duplicate local name hidden in another CommonJS destructuring specifier",
+        "const { foo: reactOnRailsProNodeRenderer, reactOnRailsProNodeRenderer } = " \
+        "require('react-on-rails-pro-node-renderer');\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });",
+        "renderer_configuration_binding_not_proven",
+        true
+      ],
+      [
         "a CommonJS package binding lookalike inside a quoted string",
         'const help = "; const { reactOnRailsProNodeRenderer } = ' \
         "require('react-on-rails-pro-node-renderer');\";\n" \
@@ -3644,6 +3652,7 @@ RSpec.describe ReactOnRails::Doctor do
         'const help = "; const { reactOnRailsProNodeRenderer } = ' \
         "require('react-on-rails-pro-node-renderer');\n" \
         "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });",
+        "ambiguous_javascript_configuration",
         true
       ],
       [
@@ -3651,6 +3660,7 @@ RSpec.describe ReactOnRails::Doctor do
         'const help = "; import { reactOnRailsProNodeRenderer } from ' \
         "'react-on-rails-pro-node-renderer';\n" \
         "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });",
+        "ambiguous_javascript_configuration",
         true
       ],
       [
@@ -3658,6 +3668,7 @@ RSpec.describe ReactOnRails::Doctor do
         "const help = '; const { reactOnRailsProNodeRenderer } = " \
         'require("react-on-rails-pro-node-renderer");' \
         "\nreactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });",
+        "ambiguous_javascript_configuration",
         true
       ],
       [
@@ -3665,11 +3676,11 @@ RSpec.describe ReactOnRails::Doctor do
         "const help = '; import { reactOnRailsProNodeRenderer } from " \
         '"react-on-rails-pro-node-renderer";' \
         "\nreactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });",
+        "ambiguous_javascript_configuration",
         true
       ]
-    ].each do |description, source, node_syntax_error|
-      expected_reason =
-        node_syntax_error ? "ambiguous_javascript_configuration" : "renderer_configuration_binding_not_proven"
+    ].each do |description, source, expected_reason, node_syntax_error|
+      expected_reason ||= "renderer_configuration_binding_not_proven"
 
       it "requires proven binding scope for #{description}" do
         File.write("renderer/node-renderer.js", source)
