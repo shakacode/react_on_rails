@@ -3661,11 +3661,6 @@ RSpec.describe ReactOnRails::Doctor do
         "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
       ],
       [
-        "an unrelated global-object member",
-        "globalThis.fetch = globalThis.fetch;\n" \
-        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
-      ],
-      [
         "a quoted global renderer-property decoy",
         "const helpText = \"globalThis['reactOnRailsProNodeRenderer'] = shim\";\n" \
         "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
@@ -4026,6 +4021,17 @@ RSpec.describe ReactOnRails::Doctor do
       [
         "a Node global renderer compound assignment",
         "global.reactOnRailsProNodeRenderer ||= getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "an unrelated global-object reference",
+        "globalThis.fetch = globalThis.fetch;\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "an aliased global-object mutation",
+        "const rendererGlobal = globalThis;\n" \
+        "rendererGlobal[getRendererKey()] = getRendererShim();\n" \
         "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
       ],
       [
@@ -4585,6 +4591,17 @@ RSpec.describe ReactOnRails::Doctor do
       [
         "a Node global renderer compound assignment",
         "global.reactOnRailsProNodeRenderer ||= getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "an unrelated global-object reference",
+        "globalThis.fetch = globalThis.fetch;\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "an aliased global-object mutation",
+        "const rendererGlobal = globalThis;\n" \
+        "rendererGlobal[getRendererKey()] = getRendererShim();\n" \
         "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
       ],
       [
