@@ -128,11 +128,11 @@ module ReactOnRails
       Procfile.production
     ].freeze
     NODE_RENDERER_SCRIPT_REFERENCE_PATTERN =
-      %r{\bnode\s+\.?/?((?:renderer|client)/node-renderer\.js)(?=\s|\z)}
+      %r{\bnode\s+(?:\./)?((?:renderer|client)/node-renderer\.js)(?=\s|\z)}
     NODE_RENDERER_DIRECT_LAUNCHER_PATTERN = %r{
       \A[ \t]*[A-Za-z0-9_-]+:[ \t]*
       (?:MAX_VM_POOL_SIZE=(?<assignment>[^\s]+)[ \t]+)?
-      node[ \t]+\.?/?(?<path>(?:renderer|client)/node-renderer\.js)
+      node[ \t]+(?:\./)?(?<path>(?:renderer|client)/node-renderer\.js)
       [ \t]*(?:\r?\n)?\z
     }x
     NODE_RENDERER_JS_STRING_PATTERN = /
@@ -3378,21 +3378,38 @@ module ReactOnRails
     end
 
     def node_renderer_call_config_object(active_content)
+      package_binding = node_renderer_canonical_package_binding(active_content)
+      return nil unless package_binding
       return nil if node_renderer_local_renderer_binding?(active_content)
 
-      masked_content = node_renderer_mask_quoted_string_contents(active_content)
+      call = node_renderer_single_reachable_call(active_content)
+      return nil unless call && package_binding.end(0) <= call.begin(0)
+
+      argument = active_content[call.end(0)..]
+
+      argument.match(/\A(#{NODE_RENDERER_CONFIG_OBJECT_PATTERN})\s*\)/o)&.[](1)
+    end
+
+    def node_renderer_single_reachable_call(content)
+      masked_content = node_renderer_mask_quoted_string_contents(content)
       calls = masked_content.to_enum(:scan, NODE_RENDERER_BARE_CALL_PATTERN).filter_map do
         call = Regexp.last_match
         next if node_renderer_constructor_call?(masked_content, call)
 
         call if node_renderer_call_reachability_proven?(masked_content, call)
       end
-      return nil unless calls.one?
 
-      call = calls.first
-      argument = active_content[call.end(0)..]
+      calls.first if calls.one?
+    end
 
-      argument.match(/\A(#{NODE_RENDERER_CONFIG_OBJECT_PATTERN})\s*\)/o)&.[](1)
+    def node_renderer_canonical_package_binding(content)
+      bindings = content.to_enum(:scan, NODE_RENDERER_PACKAGE_BINDING_PATTERN).map { Regexp.last_match }
+      return unless bindings.one?
+
+      binding = bindings.first
+      prefix = node_renderer_mask_quoted_string_contents(content[...binding.begin(0)])
+      delimiters = node_renderer_delimiter_stack(prefix)
+      binding if delimiters&.empty?
     end
 
     def node_renderer_local_renderer_binding?(content)

@@ -3523,6 +3523,13 @@ RSpec.describe ReactOnRails::Doctor do
       )
     end
 
+    def write_node_renderer_script(path, source)
+      canonical_binding =
+        "const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');"
+      source = "#{canonical_binding}\n#{source}" unless source.include?("react-on-rails-pro-node-renderer")
+      File.write(path, source)
+    end
+
     around do |example|
       previous_max_vm_pool_size = ENV.fetch("MAX_VM_POOL_SIZE", nil)
       ENV.delete("MAX_VM_POOL_SIZE")
@@ -3547,7 +3554,7 @@ RSpec.describe ReactOnRails::Doctor do
     end
 
     it "reports observed insufficient capacity with the per-worker formula" do
-      File.write("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 3 });")
+      write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 3 });")
 
       doctor.send(:check_node_renderer_rollout_capacity)
 
@@ -3575,7 +3582,7 @@ RSpec.describe ReactOnRails::Doctor do
     end
 
     it "passes observed capacity that covers an RSC rollout" do
-      File.write(
+      write_node_renderer_script(
         "renderer/node-renderer.js",
         "reactOnRailsProNodeRenderer({ rendererUrl: 'http://localhost', maxVMPoolSize: 4 });"
       )
@@ -3588,6 +3595,55 @@ RSpec.describe ReactOnRails::Doctor do
           content: a_string_including("sufficient", "evidence=observed", "configured=4", "required=4")
         )
       )
+    end
+
+    it "fails closed when a bare renderer call has no canonical package binding" do
+      File.write("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });")
+
+      doctor.send(:check_node_renderer_rollout_capacity)
+
+      expect(checker.messages).to include(
+        hash_including(
+          type: :warning,
+          content: a_string_including(
+            "evidence=unverified",
+            "reason=renderer_configuration_binding_not_proven"
+          )
+        )
+      )
+      expect(checker.messages).not_to include(hash_including(type: :success))
+    end
+
+    [
+      [
+        "a package binding scoped to an earlier block",
+        "{\nconst { reactOnRailsProNodeRenderer } = " \
+        "require('react-on-rails-pro-node-renderer');\n}\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a CommonJS package binding declared after the call",
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });\n" \
+        "const { reactOnRailsProNodeRenderer } = " \
+        "require('react-on-rails-pro-node-renderer');"
+      ]
+    ].each do |description, source|
+      it "requires proven binding scope for #{description}" do
+        File.write("renderer/node-renderer.js", source)
+
+        doctor.send(:check_node_renderer_rollout_capacity)
+
+        expect(checker.messages).to include(
+          hash_including(
+            type: :warning,
+            content: a_string_including(
+              "evidence=unverified",
+              "reason=renderer_configuration_binding_not_proven"
+            )
+          )
+        )
+        expect(checker.messages).not_to include(hash_including(type: :success))
+      end
     end
 
     [
@@ -3693,7 +3749,7 @@ RSpec.describe ReactOnRails::Doctor do
       ]
     ].each do |description, source|
       it "observes a direct inline literal with #{description}" do
-        File.write("renderer/node-renderer.js", source)
+        write_node_renderer_script("renderer/node-renderer.js", source)
 
         doctor.send(:check_node_renderer_rollout_capacity)
 
@@ -3706,7 +3762,7 @@ RSpec.describe ReactOnRails::Doctor do
       end
 
       it "emits observed JSON evidence for a direct inline literal with #{description}" do
-        File.write("renderer/node-renderer.js", source)
+        write_node_renderer_script("renderer/node-renderer.js", source)
         json_doctor = described_class.new(format: :json, only: "node_renderer_rollout_capacity")
         allow(json_doctor).to receive(:ensure_rails_environment_loaded).and_return(true)
         allow(json_doctor).to receive(:exit)
@@ -3730,7 +3786,7 @@ RSpec.describe ReactOnRails::Doctor do
     end
 
     it "ignores real line and block comments around a direct inline literal" do
-      File.write(
+      write_node_renderer_script(
         "renderer/node-renderer.js",
         "// reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });\n" \
         "reactOnRailsProNodeRenderer({\n" \
@@ -3809,7 +3865,7 @@ RSpec.describe ReactOnRails::Doctor do
     end
 
     it "keeps non-accessor method syntax eligible for direct inline observation" do
-      File.write(
+      write_node_renderer_script(
         "renderer/node-renderer.js",
         "reactOnRailsProNodeRenderer({\n" \
         "get() { return 1; },\n" \
@@ -3832,7 +3888,7 @@ RSpec.describe ReactOnRails::Doctor do
     end
 
     it "does not misclassify a fractional JavaScript value as an observed integer" do
-      File.write("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4.5 });")
+      write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4.5 });")
 
       doctor.send(:check_node_renderer_rollout_capacity)
 
@@ -3845,7 +3901,7 @@ RSpec.describe ReactOnRails::Doctor do
     end
 
     it "does not infer the package default from a loopback endpoint and canonical script alone" do
-      File.write("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ workersCount: 2 });")
+      write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ workersCount: 2 });")
 
       doctor.send(:check_node_renderer_rollout_capacity)
 
@@ -3863,7 +3919,7 @@ RSpec.describe ReactOnRails::Doctor do
     end
 
     it "parses a quoted JavaScript object property instead of falling through to package defaults" do
-      File.write("renderer/node-renderer.js", 'reactOnRailsProNodeRenderer({ "maxVMPoolSize": 2 });')
+      write_node_renderer_script("renderer/node-renderer.js", 'reactOnRailsProNodeRenderer({ "maxVMPoolSize": 2 });')
 
       doctor.send(:check_node_renderer_rollout_capacity)
 
@@ -3881,7 +3937,7 @@ RSpec.describe ReactOnRails::Doctor do
     end
 
     it "fails closed for an assignment form the static scanner does not parse" do
-      File.write(
+      write_node_renderer_script(
         "renderer/node-renderer.js",
         "const config = { workersCount: 2 };\nconfig.maxVMPoolSize = 2;\nreactOnRailsProNodeRenderer(config);"
       )
@@ -3901,7 +3957,7 @@ RSpec.describe ReactOnRails::Doctor do
     end
 
     it "does not treat an unrelated file-wide literal as renderer configuration" do
-      File.write(
+      write_node_renderer_script(
         "renderer/node-renderer.js",
         "const unrelated = { maxVMPoolSize: 8 };\n" \
         "reactOnRailsProNodeRenderer({ workersCount: 2 });"
@@ -3925,8 +3981,8 @@ RSpec.describe ReactOnRails::Doctor do
 
     it "emits JSON guidance for the renderer script selected by an active direct Procfile launcher" do
       FileUtils.mkdir_p("client")
-      File.write("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });")
-      File.write("client/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
+      write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });")
+      write_node_renderer_script("client/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
       File.write("Procfile.production", "node-renderer: node client/node-renderer.js\n")
       json_doctor = described_class.new(format: :json, only: "node_renderer_rollout_capacity")
       allow(json_doctor).to receive(:ensure_rails_environment_loaded).and_return(true)
@@ -3949,7 +4005,7 @@ RSpec.describe ReactOnRails::Doctor do
     end
 
     it "fails closed for a top-level literal on a named object passed to the renderer" do
-      File.write(
+      write_node_renderer_script(
         "renderer/node-renderer.js",
         "const config = { nested: { value: 1 }, maxVMPoolSize: 4 };\n" \
         "reactOnRailsProNodeRenderer(config);"
@@ -3970,7 +4026,7 @@ RSpec.describe ReactOnRails::Doctor do
     end
 
     it "fails closed for a locally rebound renderer identifier" do
-      File.write(
+      write_node_renderer_script(
         "renderer/node-renderer.js",
         "var reactOnRailsProNodeRenderer = console.log;\n" \
         "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
@@ -4486,7 +4542,7 @@ RSpec.describe ReactOnRails::Doctor do
       ]
     ].each do |description, source|
       it "fails closed for #{description}" do
-        File.write("renderer/node-renderer.js", source)
+        write_node_renderer_script("renderer/node-renderer.js", source)
 
         doctor.send(:check_node_renderer_rollout_capacity)
 
@@ -4930,7 +4986,7 @@ RSpec.describe ReactOnRails::Doctor do
       ]
     ].each do |description, source|
       it "emits unverified JSON evidence for #{description}" do
-        File.write("renderer/node-renderer.js", source)
+        write_node_renderer_script("renderer/node-renderer.js", source)
         json_doctor = described_class.new(format: :json, only: "node_renderer_rollout_capacity")
         allow(json_doctor).to receive(:ensure_rails_environment_loaded).and_return(true)
         allow(json_doctor).to receive(:exit)
@@ -4953,8 +5009,8 @@ RSpec.describe ReactOnRails::Doctor do
 
     it "selects the renderer script named by an active direct Procfile launcher" do
       FileUtils.mkdir_p("client")
-      File.write("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });")
-      File.write("client/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
+      write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });")
+      write_node_renderer_script("client/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
       File.write("Procfile.production", "node-renderer: node client/node-renderer.js\n")
 
       doctor.send(:check_node_renderer_rollout_capacity)
@@ -4977,8 +5033,8 @@ RSpec.describe ReactOnRails::Doctor do
 
     it "fails closed when an unproven active launcher references another canonical renderer script" do
       FileUtils.mkdir_p("client")
-      File.write("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });")
-      File.write("client/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
+      write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });")
+      write_node_renderer_script("client/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
       File.write(
         "Procfile.production",
         "renderer: node renderer/node-renderer.js\nclient: env FOO=1 node client/node-renderer.js\n"
@@ -5005,6 +5061,7 @@ RSpec.describe ReactOnRails::Doctor do
       ["a single-quoted mention", "node-renderer: 'node renderer/node-renderer.js'"],
       ["an unlabeled command", "MAX_VM_POOL_SIZE=8 node renderer/node-renderer.js"],
       ["a command with trailing arguments", "node-renderer: node renderer/node-renderer.js --inspect"],
+      ["an absolute script path", "node-renderer: node /renderer/node-renderer.js"],
       [
         "renderer-first multiple references",
         "node-renderer: echo node renderer/node-renderer.js && exec node client/node-renderer.js"
@@ -5016,8 +5073,8 @@ RSpec.describe ReactOnRails::Doctor do
     ].each do |description, launcher_line|
       it "does not prove renderer selection from #{description}" do
         FileUtils.mkdir_p("client")
-        File.write("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });")
-        File.write("client/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
+        write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });")
+        write_node_renderer_script("client/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
         File.write("Procfile.production", "#{launcher_line}\n")
 
         doctor.send(:check_node_renderer_rollout_capacity)
@@ -5036,8 +5093,8 @@ RSpec.describe ReactOnRails::Doctor do
 
       it "emits unverified JSON for #{description}" do
         FileUtils.mkdir_p("client")
-        File.write("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });")
-        File.write("client/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
+        write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });")
+        write_node_renderer_script("client/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
         File.write("Procfile.production", "#{launcher_line}\n")
         json_doctor = described_class.new(format: :json, only: "node_renderer_rollout_capacity")
         allow(json_doctor).to receive(:ensure_rails_environment_loaded).and_return(true)
@@ -5065,8 +5122,8 @@ RSpec.describe ReactOnRails::Doctor do
     %w[.bak #suffix -other /other].each do |suffix|
       it "does not select a canonical renderer script from a #{suffix} token suffix" do
         FileUtils.mkdir_p("client")
-        File.write("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });")
-        File.write("client/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
+        write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });")
+        write_node_renderer_script("client/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
         File.write("Procfile.production", "node-renderer: node renderer/node-renderer.js#{suffix}\n")
 
         doctor.send(:check_node_renderer_rollout_capacity)
@@ -5085,8 +5142,8 @@ RSpec.describe ReactOnRails::Doctor do
 
       it "emits unverified JSON for a canonical renderer path with a #{suffix} token suffix" do
         FileUtils.mkdir_p("client")
-        File.write("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });")
-        File.write("client/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
+        write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });")
+        write_node_renderer_script("client/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
         File.write("Procfile.production", "node-renderer: node renderer/node-renderer.js#{suffix}\n")
         json_doctor = described_class.new(format: :json, only: "node_renderer_rollout_capacity")
         allow(json_doctor).to receive(:ensure_rails_environment_loaded).and_return(true)
@@ -5113,8 +5170,8 @@ RSpec.describe ReactOnRails::Doctor do
 
     it "emits unverified JSON when one launcher line references both canonical renderer scripts" do
       FileUtils.mkdir_p("client")
-      File.write("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });")
-      File.write("client/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
+      write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });")
+      write_node_renderer_script("client/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
       File.write(
         "Procfile.production",
         "node-renderer: echo node renderer/node-renderer.js && exec node client/node-renderer.js\n"
@@ -5143,8 +5200,8 @@ RSpec.describe ReactOnRails::Doctor do
 
     it "fails closed when separate valid process lines select different canonical scripts" do
       FileUtils.mkdir_p("client")
-      File.write("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });")
-      File.write("client/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
+      write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });")
+      write_node_renderer_script("client/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
       File.write(
         "Procfile.production",
         "renderer-a: node renderer/node-renderer.js\nrenderer-b: node client/node-renderer.js\n"
@@ -5166,8 +5223,8 @@ RSpec.describe ReactOnRails::Doctor do
 
     it "fails closed when both renderer scripts exist and no active launcher proves selection" do
       FileUtils.mkdir_p("client")
-      File.write("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });")
-      File.write("client/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
+      write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });")
+      write_node_renderer_script("client/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
       File.write("Procfile.production", "# node-renderer: node client/node-renderer.js\n")
 
       doctor.send(:check_node_renderer_rollout_capacity)
@@ -5186,7 +5243,7 @@ RSpec.describe ReactOnRails::Doctor do
 
     it "does not treat a Rails-process ENV value as observed renderer state for a loopback sidecar" do
       ENV["MAX_VM_POOL_SIZE"] = "8"
-      File.write("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ workersCount: 2 });")
+      write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ workersCount: 2 });")
 
       doctor.send(:check_node_renderer_rollout_capacity)
 
@@ -5216,7 +5273,7 @@ RSpec.describe ReactOnRails::Doctor do
 
     it "uses a static inline launcher assignment ahead of the Doctor process ENV" do
       ENV["MAX_VM_POOL_SIZE"] = "4"
-      File.write("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ workersCount: 2 });")
+      write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ workersCount: 2 });")
       File.write(
         "Procfile.production",
         "node-renderer: MAX_VM_POOL_SIZE=2 node renderer/node-renderer.js"
@@ -5242,7 +5299,7 @@ RSpec.describe ReactOnRails::Doctor do
     end
 
     it "fails closed when separate valid process lines assign conflicting capacities" do
-      File.write("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ workersCount: 2 });")
+      write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ workersCount: 2 });")
       File.write(
         "Procfile.production",
         "renderer-a: MAX_VM_POOL_SIZE=8 node renderer/node-renderer.js\n" \
@@ -5264,7 +5321,7 @@ RSpec.describe ReactOnRails::Doctor do
     end
 
     it "observes matching assignments across separate valid process lines" do
-      File.write("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ workersCount: 2 });")
+      write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ workersCount: 2 });")
       File.write(
         "Procfile.production",
         "renderer-a: MAX_VM_POOL_SIZE=2 node renderer/node-renderer.js\n" \
@@ -5287,7 +5344,7 @@ RSpec.describe ReactOnRails::Doctor do
     end
 
     it "accepts a directly scoped literal launcher assignment with a Procfile label and varied whitespace" do
-      File.write("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ workersCount: 2 });")
+      write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ workersCount: 2 });")
       File.write(
         "Procfile.production",
         "node-renderer:\tMAX_VM_POOL_SIZE=2\t\tnode\t\t./renderer/node-renderer.js # direct launcher\n"
@@ -5314,7 +5371,7 @@ RSpec.describe ReactOnRails::Doctor do
     ].each do |launcher_line|
       it "does not attribute an earlier shell assignment to the selected renderer invocation" do
         ENV["MAX_VM_POOL_SIZE"] = "2"
-        File.write("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ workersCount: 2 });")
+        write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ workersCount: 2 });")
         File.write("Procfile.production", "#{launcher_line}\n")
 
         doctor.send(:check_node_renderer_rollout_capacity)
@@ -5333,7 +5390,7 @@ RSpec.describe ReactOnRails::Doctor do
 
       it "emits unverified JSON for an earlier shell assignment outside the selected renderer invocation" do
         ENV["MAX_VM_POOL_SIZE"] = "2"
-        File.write("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ workersCount: 2 });")
+        write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ workersCount: 2 });")
         File.write("Procfile.production", "#{launcher_line}\n")
         json_doctor = described_class.new(format: :json, only: "node_renderer_rollout_capacity")
         allow(json_doctor).to receive(:ensure_rails_environment_loaded).and_return(true)
@@ -5359,7 +5416,7 @@ RSpec.describe ReactOnRails::Doctor do
     end
 
     it "fails closed when one launcher line invokes the selected script more than once" do
-      File.write("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ workersCount: 2 });")
+      write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ workersCount: 2 });")
       File.write(
         "Procfile.production",
         "node-renderer: MAX_VM_POOL_SIZE=8 node renderer/node-renderer.js && " \
@@ -5382,7 +5439,7 @@ RSpec.describe ReactOnRails::Doctor do
 
     it "fails closed when the selected launcher computes MAX_VM_POOL_SIZE dynamically" do
       ENV["MAX_VM_POOL_SIZE"] = "4"
-      File.write("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ workersCount: 2 });")
+      write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ workersCount: 2 });")
       File.write(
         "Procfile.production",
         "node-renderer: MAX_VM_POOL_SIZE=${MAX_VM_POOL_SIZE:-4} node renderer/node-renderer.js"
@@ -5403,7 +5460,7 @@ RSpec.describe ReactOnRails::Doctor do
     end
 
     it "warns instead of passing when JavaScript computes the capacity dynamically" do
-      File.write(
+      write_node_renderer_script(
         "renderer/node-renderer.js",
         "reactOnRailsProNodeRenderer({ maxVMPoolSize: Number(process.env.MAX_VM_POOL_SIZE) });"
       )
@@ -5426,7 +5483,7 @@ RSpec.describe ReactOnRails::Doctor do
       let(:renderer_url) { "https://renderer.internal.example:3800" }
 
       it "warns even when the local canonical script has a sufficient literal" do
-        File.write("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });")
+        write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });")
 
         doctor.send(:check_node_renderer_rollout_capacity)
 
@@ -5448,7 +5505,7 @@ RSpec.describe ReactOnRails::Doctor do
       let(:renderer_url) { "http://[::1]:3800" }
 
       it "normalizes the URI host before classifying topology" do
-        File.write("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });")
+        write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });")
 
         doctor.send(:check_node_renderer_rollout_capacity)
 
@@ -5469,7 +5526,7 @@ RSpec.describe ReactOnRails::Doctor do
       let(:enable_rsc_support) { false }
 
       it "requires one server context for each overlapping generation" do
-        File.write("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
+        write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
 
         doctor.send(:check_node_renderer_rollout_capacity)
 
@@ -5493,7 +5550,7 @@ RSpec.describe ReactOnRails::Doctor do
         "config/initializers/react_on_rails_pro.rb",
         "config.server_renderer = \"NodeRenderer\"\n# config.enable_rsc_support = false\n"
       )
-      File.write("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });")
+      write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });")
       allow(pro_config).to receive(:enable_rsc_support).and_return(false)
 
       doctor.send(:check_node_renderer_rollout_capacity)
@@ -5525,7 +5582,7 @@ RSpec.describe ReactOnRails::Doctor do
         "config/initializers/react_on_rails_pro.rb",
         "#{prefix}#{padding}\nconfig.enable_rsc_support = true\n"
       )
-      File.write("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
+      write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
 
       doctor.send(:check_node_renderer_rollout_capacity)
 
@@ -5557,7 +5614,7 @@ RSpec.describe ReactOnRails::Doctor do
         "config/initializers/react_on_rails_pro.rb",
         "#{prefix}#{padding}\nconfig.enable_rsc_support = true\n"
       )
-      File.write("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
+      write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
       json_doctor = described_class.new(format: :json, only: "node_renderer_rollout_capacity")
       allow(json_doctor).to receive(:ensure_rails_environment_loaded).and_return(false)
       allow(json_doctor).to receive(:exit)
@@ -5674,7 +5731,7 @@ RSpec.describe ReactOnRails::Doctor do
           "config/initializers/react_on_rails_pro.rb",
           "config.server_renderer = \"NodeRenderer\"\n#{dynamic_source}"
         )
-        File.write("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
+        write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
 
         doctor.send(:check_node_renderer_rollout_capacity)
 
@@ -5705,7 +5762,7 @@ RSpec.describe ReactOnRails::Doctor do
           defined?(config.enable_rsc_support = false)
         RUBY
       )
-      File.write("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
+      write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
       json_doctor = described_class.new(format: :json, only: "node_renderer_rollout_capacity")
       allow(json_doctor).to receive(:ensure_rails_environment_loaded).and_return(false)
       allow(json_doctor).to receive(:exit)
@@ -5745,7 +5802,7 @@ RSpec.describe ReactOnRails::Doctor do
           config.server_renderer = "NodeRenderer"
         RUBY
       )
-      File.write("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
+      write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
       allow(pro_config).to receive(:enable_rsc_support).and_return(true)
 
       doctor.send(:check_node_renderer_rollout_capacity)
@@ -5778,7 +5835,7 @@ RSpec.describe ReactOnRails::Doctor do
           config.enable_rsc_support = true
         RUBY
       )
-      File.write("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
+      write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
 
       doctor.send(:check_node_renderer_rollout_capacity)
 
@@ -5811,7 +5868,7 @@ RSpec.describe ReactOnRails::Doctor do
           end
         RUBY
       )
-      File.write("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
+      write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
       allow(pro_config).to receive(:enable_rsc_support).and_return(false)
 
       doctor.send(:check_node_renderer_rollout_capacity)
@@ -5847,8 +5904,8 @@ RSpec.describe ReactOnRails::Doctor do
         RUBY
       )
       FileUtils.mkdir_p("client")
-      File.write("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });")
-      File.write("client/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
+      write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });")
+      write_node_renderer_script("client/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
       File.write("Procfile.production", "node-renderer: node client/node-renderer.js\n")
       FileUtils.mkdir_p("tmp/doctor")
 
@@ -5875,7 +5932,7 @@ RSpec.describe ReactOnRails::Doctor do
     end
 
     it "emits the unverified evidence state in the stable JSON check" do
-      File.write(
+      write_node_renderer_script(
         "renderer/node-renderer.js",
         "reactOnRailsProNodeRenderer({ maxVMPoolSize: Number(process.env.MAX_VM_POOL_SIZE) });"
       )
