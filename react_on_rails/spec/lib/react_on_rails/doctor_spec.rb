@@ -3691,6 +3691,47 @@ RSpec.describe ReactOnRails::Doctor do
       expect { Process.kill(0, spawned_pid) }.to raise_error(Errno::ESRCH)
     end
 
+    it "terminates a stalled Node syntax check process group after its leader exits" do
+      fake_bin = File.join(Dir.pwd, "fake-bin")
+      fake_node = File.join(fake_bin, "node")
+      child_pid_path = File.join(Dir.pwd, "syntax-check-child-pid")
+      FileUtils.mkdir_p(fake_bin)
+      File.write(
+        fake_node,
+        <<~SH
+          #!/bin/sh
+          sh -c 'trap "" TERM; while :; do sleep 1; done' &
+          echo $! > #{child_pid_path}
+          wait
+        SH
+      )
+      File.chmod(0o755, fake_node)
+      allow(doctor).to receive(:node_renderer_syntax_check_command).and_return([fake_node])
+      spawned_pid = nil
+      allow(Process).to receive(:spawn).and_wrap_original do |original, *arguments|
+        spawned_pid = original.call(*arguments)
+      end
+      stub_const("ReactOnRails::Doctor::NODE_RENDERER_SYNTAX_CHECK_TIMEOUT_SECONDS", 0.5)
+      stub_const("ReactOnRails::Doctor::NODE_RENDERER_SYNTAX_CHECK_TERMINATION_GRACE_SECONDS", 0.1)
+      write_node_renderer_script(
+        "renderer/node-renderer.js",
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      )
+
+      doctor.send(:check_node_renderer_rollout_capacity)
+
+      child_pid = File.read(child_pid_path).to_i
+      expect(spawned_pid).not_to be_nil
+      expect { Process.kill(0, spawned_pid) }.to raise_error(Errno::ESRCH)
+      expect { Process.kill(0, child_pid) }.to raise_error(Errno::ESRCH)
+    ensure
+      begin
+        Process.kill("KILL", -spawned_pid) if spawned_pid
+      rescue Errno::ESRCH
+        nil
+      end
+    end
+
     it "fails closed when a bare renderer call has no canonical package binding" do
       File.write("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });")
 

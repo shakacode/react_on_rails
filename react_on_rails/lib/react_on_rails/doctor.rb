@@ -3418,20 +3418,45 @@ module ReactOnRails
 
     def terminate_node_renderer_syntax_check(pid)
       signal_node_renderer_syntax_check("TERM", pid)
+      process_reaped = false
       deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) +
                  NODE_RENDERER_SYNTAX_CHECK_TERMINATION_GRACE_SECONDS
       loop do
-        _waited_pid, status = Process.wait2(pid, Process::WNOHANG)
-        return if status
+        unless process_reaped
+          _waited_pid, status = Process.wait2(pid, Process::WNOHANG)
+          process_reaped = status.present?
+        end
+        break unless node_renderer_syntax_check_process_group_alive?(pid)
         break if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
 
         sleep 0.05
       end
 
-      signal_node_renderer_syntax_check("KILL", pid)
-      Process.wait(pid)
+      if node_renderer_syntax_check_process_group_alive?(pid)
+        signal_node_renderer_syntax_check("KILL", pid)
+        wait_for_node_renderer_syntax_check_process_group_exit(pid)
+      end
+      Process.wait(pid) unless process_reaped
     rescue Errno::ECHILD, Errno::ESRCH
       nil
+    end
+
+    def node_renderer_syntax_check_process_group_alive?(pid)
+      Process.kill(0, -pid)
+      true
+    rescue Errno::ESRCH
+      false
+    rescue Errno::EPERM
+      true
+    end
+
+    def wait_for_node_renderer_syntax_check_process_group_exit(pid)
+      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) +
+                 NODE_RENDERER_SYNTAX_CHECK_TERMINATION_GRACE_SECONDS
+      while node_renderer_syntax_check_process_group_alive?(pid) &&
+            Process.clock_gettime(Process::CLOCK_MONOTONIC) < deadline
+        sleep 0.01
+      end
     end
 
     def signal_node_renderer_syntax_check(signal, pid)
