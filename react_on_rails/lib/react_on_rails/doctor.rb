@@ -184,6 +184,18 @@ module ReactOnRails
           ["']react-on-rails-pro-node-renderer["']
       )\s*(?:;|\z)
     /mx
+    NODE_RENDERER_COMMONJS_REQUIRE_REBINDING_PATTERN = %r~
+      \b(?:const|let|var|function|class)\s+require\b
+      |
+      \b(?:const|let|var)\s*
+        (?:\{[^};\n]*\brequire\b[^};\n]*\}|\[[^\];\n]*\brequire\b[^\];\n]*\])
+      |
+      (?<![.\p{ID_Continue}$#])require\b\s*
+        (?:\+\+|--|\*\*=|&&=|\|\|=|\?\?=|[+\-*/%&|^]=|=(?!=|>))
+      |
+      (?:\+\+|--)\s*(?<![.\p{ID_Continue}$#])require\b
+    ~mx
+    NODE_RENDERER_DIRECT_EVAL_PATTERN = /(?<![.\p{ID_Continue}$#])eval\s*\(/
     NODE_RENDERER_LOCAL_BINDING_PATTERN = %r{
       \b(?:const|let|var)\s+
         (?:reactOnRailsProNodeRenderer\b|\{[^{}]*\breactOnRailsProNodeRenderer\b[^{}]*\})
@@ -3422,10 +3434,7 @@ module ReactOnRails
       deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) +
                  NODE_RENDERER_SYNTAX_CHECK_TERMINATION_GRACE_SECONDS
       loop do
-        unless process_reaped
-          _waited_pid, status = Process.wait2(pid, Process::WNOHANG)
-          process_reaped = !status.nil?
-        end
+        process_reaped ||= node_renderer_syntax_check_process_reaped?(pid)
         break unless node_renderer_syntax_check_process_group_alive?(pid)
         break if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
 
@@ -3436,7 +3445,20 @@ module ReactOnRails
         signal_node_renderer_syntax_check("KILL", pid)
         wait_for_node_renderer_syntax_check_process_group_exit(pid)
       end
-      Process.wait(pid) unless process_reaped
+      reap_node_renderer_syntax_check(pid) unless process_reaped
+    end
+
+    def node_renderer_syntax_check_process_reaped?(pid)
+      _waited_pid, status = Process.wait2(pid, Process::WNOHANG)
+      !status.nil?
+    rescue Errno::ECHILD, Errno::ESRCH
+      # Another waiter may reap the leader while descendants remain in the
+      # process group. Keep group cleanup running even though no wait remains.
+      true
+    end
+
+    def reap_node_renderer_syntax_check(pid)
+      Process.wait(pid)
     rescue Errno::ECHILD, Errno::ESRCH
       nil
     end
@@ -3462,7 +3484,10 @@ module ReactOnRails
     def signal_node_renderer_syntax_check(signal, pid)
       Process.kill(signal, -pid)
     rescue Errno::ESRCH
-      Process.kill(signal, pid)
+      # The syntax checker was spawned as its own process-group leader. Once
+      # that group is gone, never signal the positive PID: it may be reused by
+      # an unrelated process.
+      nil
     end
 
     def node_renderer_config_object_capacity_evidence(config_object, total_mentions)
@@ -3532,9 +3557,18 @@ module ReactOnRails
       return unless bindings.one?
 
       binding = bindings.first
+      return if node_renderer_commonjs_require_rebound?(binding, masked_content)
+
       prefix = masked_content[...binding.begin(0)]
       delimiters = node_renderer_delimiter_stack(prefix)
       binding if delimiters&.empty?
+    end
+
+    def node_renderer_commonjs_require_rebound?(binding, masked_content)
+      return false unless binding[0].match?(/\brequire\s*\(/)
+
+      masked_content.match?(NODE_RENDERER_COMMONJS_REQUIRE_REBINDING_PATTERN) ||
+        masked_content.match?(NODE_RENDERER_DIRECT_EVAL_PATTERN)
     end
 
     def node_renderer_proven_package_binding_match?(binding, masked_content)

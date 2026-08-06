@@ -3745,6 +3745,48 @@ RSpec.describe ReactOnRails::Doctor do
       expect { doctor.send(:terminate_node_renderer_syntax_check, 1234) }.not_to raise_error
     end
 
+    it "continues process-group cleanup after a competing waiter reaps the group leader" do
+      fake_node = File.join(Dir.pwd, "competing-waiter-node")
+      child_pid_path = File.join(Dir.pwd, "competing-waiter-child-pid")
+      File.write(
+        fake_node,
+        <<~SH
+          #!/bin/sh
+          (trap '' TERM; while :; do sleep 1; done) &
+          echo $! > #{child_pid_path}
+          wait
+        SH
+      )
+      File.chmod(0o755, fake_node)
+      leader_pid = Process.spawn(fake_node, out: File::NULL, err: File::NULL, pgroup: true)
+      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 2
+      until File.file?(child_pid_path)
+        raise "syntax-check child pid was not published" if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
+
+        sleep 0.01
+      end
+      child_pid = File.read(child_pid_path).to_i
+      reaper = Thread.new { Process.wait(leader_pid) }
+      allow(doctor).to receive(:signal_node_renderer_syntax_check) do |signal, pid|
+        Process.kill(signal, -pid)
+        reaper.join if signal == "TERM"
+      end
+      stub_const("ReactOnRails::Doctor::NODE_RENDERER_SYNTAX_CHECK_TERMINATION_GRACE_SECONDS", 0.1)
+
+      doctor.send(:terminate_node_renderer_syntax_check, leader_pid)
+
+      expect(reaper).not_to be_alive
+      expect { Process.kill(0, child_pid) }.to raise_error(Errno::ESRCH)
+      expect { Process.kill(0, -leader_pid) }.to raise_error(Errno::ESRCH)
+    ensure
+      begin
+        Process.kill("KILL", -leader_pid) if leader_pid && leader_pid > 1 && leader_pid != Process.getpgrp
+      rescue Errno::ESRCH
+        nil
+      end
+      reaper&.join(1)
+    end
+
     it "fails closed when a bare renderer call has no canonical package binding" do
       File.write("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });")
 
@@ -3774,6 +3816,28 @@ RSpec.describe ReactOnRails::Doctor do
         "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });\n" \
         "const { reactOnRailsProNodeRenderer } = " \
         "require('react-on-rails-pro-node-renderer');"
+      ],
+      [
+        "a CommonJS require function rebound before the package binding",
+        "require = eval(\"(_specifier) => ({ reactOnRailsProNodeRenderer: (_config) => undefined })\");\n" \
+        "const { reactOnRailsProNodeRenderer } = " \
+        "require('react-on-rails-pro-node-renderer');\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a CommonJS require function rebound through direct eval",
+        "eval(\"require = (_specifier) => ({ reactOnRailsProNodeRenderer: (_config) => undefined })\");\n" \
+        "const { reactOnRailsProNodeRenderer } = " \
+        "require('react-on-rails-pro-node-renderer');\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a CommonJS require function rebound through destructuring assignment",
+        "({ replacement: require } = { replacement: (_specifier) => " \
+        "({ reactOnRailsProNodeRenderer: (_config) => undefined }) });\n" \
+        "const { reactOnRailsProNodeRenderer } = " \
+        "require('react-on-rails-pro-node-renderer');\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
       ],
       [
         "a duplicate local name hidden in another CommonJS destructuring specifier",
