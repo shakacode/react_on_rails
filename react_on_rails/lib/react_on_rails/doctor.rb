@@ -3424,7 +3424,7 @@ module ReactOnRails
       loop do
         unless process_reaped
           _waited_pid, status = Process.wait2(pid, Process::WNOHANG)
-          process_reaped = status.present?
+          process_reaped = !status.nil?
         end
         break unless node_renderer_syntax_check_process_group_alive?(pid)
         break if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline

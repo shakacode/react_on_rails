@@ -3700,7 +3700,7 @@ RSpec.describe ReactOnRails::Doctor do
         fake_node,
         <<~SH
           #!/bin/sh
-          sh -c 'trap "" TERM; while :; do sleep 1; done' &
+          (trap '' TERM; while :; do sleep 1; done) &
           echo $! > #{child_pid_path}
           wait
         SH
@@ -3730,6 +3730,19 @@ RSpec.describe ReactOnRails::Doctor do
       rescue Errno::ESRCH
         nil
       end
+    end
+
+    it "does not require ActiveSupport status predicates during syntax-check cleanup" do
+      core_status = Class.new(BasicObject) do
+        def nil?
+          false
+        end
+      end.new
+      allow(doctor).to receive(:signal_node_renderer_syntax_check)
+      allow(doctor).to receive(:node_renderer_syntax_check_process_group_alive?).and_return(false)
+      allow(Process).to receive(:wait2).and_return([1234, core_status])
+
+      expect { doctor.send(:terminate_node_renderer_syntax_check, 1234) }.not_to raise_error
     end
 
     it "fails closed when a bare renderer call has no canonical package binding" do
