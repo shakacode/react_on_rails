@@ -198,7 +198,6 @@ module ReactOnRails
       /(?<![.\p{ID_Continue}$#])reactOnRailsProNodeRenderer\b/
     NODE_RENDERER_GLOBAL_OBJECT_PATTERN =
       /(?<![.\p{ID_Continue}$#])(?:globalThis|global)\b/
-    NODE_RENDERER_UNICODE_ESCAPE_PATTERN = /\\u(?:\{([0-9A-Fa-f]{1,6})\}|([0-9A-Fa-f]{4}))/
     NODE_RENDERER_UNPROVEN_CALL_CONTROL_PATTERN = /
       (?:&&|\|\||=>|\?) |
       \b(?:if|else|for|while|do|switch|case|catch|finally|function|return|throw)\b
@@ -3407,18 +3406,8 @@ module ReactOnRails
 
     def node_renderer_global_object_reference?(content)
       masked_content = node_renderer_mask_quoted_string_contents(content)
-      normalized_content = node_renderer_decode_unicode_escapes(masked_content)
 
-      normalized_content.match?(NODE_RENDERER_GLOBAL_OBJECT_PATTERN)
-    end
-
-    def node_renderer_decode_unicode_escapes(content)
-      content.gsub(NODE_RENDERER_UNICODE_ESCAPE_PATTERN) do |escape|
-        codepoint = (Regexp.last_match(1) || Regexp.last_match(2)).to_i(16)
-        next escape if codepoint > 0x10ffff || (0xd800..0xdfff).cover?(codepoint)
-
-        codepoint.chr(Encoding::UTF_8)
-      end
+      masked_content.include?("\\u") || masked_content.match?(NODE_RENDERER_GLOBAL_OBJECT_PATTERN)
     end
 
     def node_renderer_non_call_identifier_reference?(content)

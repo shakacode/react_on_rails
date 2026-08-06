@@ -3669,6 +3669,12 @@ RSpec.describe ReactOnRails::Doctor do
         "a quoted Unicode-escaped global renderer-property decoy",
         "const helpText = \"glob\\u0061lThis.reactOnRailsProNodeRenderer = shim\";\n" \
         "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a commented Unicode-escaped global renderer-property decoy",
+        "// glob\\u0061lThis.reactOnRailsProNodeRenderer = shim\n" \
+        "/* glob\\u0061l.reactOnRailsProNodeRenderer = shim */\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
       ]
     ].each do |description, source|
       it "observes a direct inline literal with #{description}" do
@@ -4052,6 +4058,36 @@ RSpec.describe ReactOnRails::Doctor do
       [
         "a Unicode-escaped Node global renderer assignment",
         "glob\\u0061l.reactOnRailsProNodeRenderer = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "an escaped-punctuation invalid identifier",
+        "shim\\u002eglobalThis.reactOnRailsProNodeRenderer = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "an out-of-range Unicode escape",
+        "glob\\u{110000}alThis.reactOnRailsProNodeRenderer = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a surrogate Unicode escape",
+        "glob\\u{D800}alThis.reactOnRailsProNodeRenderer = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a non-hex Unicode escape",
+        "glob\\u{zz}alThis.reactOnRailsProNodeRenderer = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a short Unicode escape",
+        "glob\\u061lThis.reactOnRailsProNodeRenderer = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "an empty Unicode escape",
+        "glob\\u{}alThis.reactOnRailsProNodeRenderer = getRendererShim();\n" \
         "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
       ],
       [
@@ -4648,6 +4684,36 @@ RSpec.describe ReactOnRails::Doctor do
       [
         "a Unicode-escaped Node global renderer assignment",
         "glob\\u0061l.reactOnRailsProNodeRenderer = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "an escaped-punctuation invalid identifier",
+        "shim\\u002eglobalThis.reactOnRailsProNodeRenderer = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "an out-of-range Unicode escape",
+        "glob\\u{110000}alThis.reactOnRailsProNodeRenderer = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a surrogate Unicode escape",
+        "glob\\u{D800}alThis.reactOnRailsProNodeRenderer = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a non-hex Unicode escape",
+        "glob\\u{zz}alThis.reactOnRailsProNodeRenderer = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a short Unicode escape",
+        "glob\\u061lThis.reactOnRailsProNodeRenderer = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "an empty Unicode escape",
+        "glob\\u{}alThis.reactOnRailsProNodeRenderer = getRendererShim();\n" \
         "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
       ],
       [
