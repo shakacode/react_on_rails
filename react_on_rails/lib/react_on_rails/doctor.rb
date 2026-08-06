@@ -203,6 +203,7 @@ module ReactOnRails
       \b(?:if|else|for|while|do|switch|case|catch|finally|function|return|throw)\b
     /x
     NODE_RENDERER_OPENING_DELIMITERS = ["(", "[", "{"].freeze
+    NODE_RENDERER_QUOTE_CHARACTERS = ['"', "'"].freeze
     NODE_RENDERER_MATCHING_OPENING_DELIMITERS = { ")" => "(", "]" => "[", "}" => "{" }.freeze
     NODE_RENDERER_UNPROVEN_INITIALIZER_OPENINGS = ["(", "["].freeze
     # Defense-in-depth cap on how many files a single glob may contribute.
@@ -3392,6 +3393,8 @@ module ReactOnRails
 
     def node_renderer_single_reachable_call(content)
       masked_content = node_renderer_mask_quoted_string_contents(content)
+      return unless masked_content
+
       calls = masked_content.to_enum(:scan, NODE_RENDERER_BARE_CALL_PATTERN).filter_map do
         call = Regexp.last_match
         next if node_renderer_constructor_call?(masked_content, call)
@@ -3404,6 +3407,8 @@ module ReactOnRails
 
     def node_renderer_canonical_package_binding(content)
       masked_content = node_renderer_mask_quoted_string_contents(content)
+      return unless masked_content
+
       bindings = content.to_enum(:scan, NODE_RENDERER_PACKAGE_BINDING_PATTERN).filter_map do
         binding = Regexp.last_match
         binding if binding.begin(0).zero? || masked_content[binding.begin(0)] != " "
@@ -3419,6 +3424,7 @@ module ReactOnRails
     def node_renderer_local_renderer_binding?(content)
       without_package_binding = content.gsub(NODE_RENDERER_PACKAGE_BINDING_PATTERN, " ")
       masked_content = node_renderer_mask_quoted_string_contents(without_package_binding)
+      return true unless masked_content
 
       node_renderer_global_object_reference?(without_package_binding) ||
         masked_content.match?(NODE_RENDERER_LOCAL_BINDING_PATTERN) ||
@@ -3427,6 +3433,7 @@ module ReactOnRails
 
     def node_renderer_global_object_reference?(content)
       masked_content = node_renderer_mask_quoted_string_contents(content)
+      return true unless masked_content
 
       masked_content.include?("\\u") || masked_content.match?(NODE_RENDERER_GLOBAL_OBJECT_PATTERN)
     end
@@ -3513,13 +3520,31 @@ module ReactOnRails
     end
 
     def node_renderer_mask_quoted_string_contents(content)
-      content.gsub(/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/m) do |string|
-        "#{string[0]}#{' ' * (string.length - 2)}#{string[-1]}"
+      masked_content = content.dup
+      quote = nil
+      escaped = false
+
+      content.each_char.with_index do |character, index|
+        quote, escaped = node_renderer_mask_quoted_character(masked_content, character, index, quote, escaped)
       end
+
+      masked_content unless quote
+    end
+
+    def node_renderer_mask_quoted_character(masked_content, character, index, quote, escaped)
+      return [character, false] if quote.nil? && NODE_RENDERER_QUOTE_CHARACTERS.include?(character)
+      return [nil, false] unless quote
+      return [nil, false] if character == quote && !escaped
+
+      masked_content[index] = " "
+      return [quote, false] if escaped
+
+      [quote, character == "\\"]
     end
 
     def node_renderer_regexp_call_lookalike?(content)
       masked_content = node_renderer_mask_quoted_string_contents(content)
+      return true unless masked_content
 
       masked_content.each_line.any? do |line|
         first_call = line.index("reactOnRailsProNodeRenderer")

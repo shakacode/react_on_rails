@@ -3638,8 +3638,39 @@ RSpec.describe ReactOnRails::Doctor do
         'const help = "; import { reactOnRailsProNodeRenderer } from ' \
         "'react-on-rails-pro-node-renderer';\";\n" \
         "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a CommonJS package binding lookalike inside an unterminated double-quoted string",
+        'const help = "; const { reactOnRailsProNodeRenderer } = ' \
+        "require('react-on-rails-pro-node-renderer');\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });",
+        true
+      ],
+      [
+        "an ESM package binding lookalike inside an unterminated double-quoted string",
+        'const help = "; import { reactOnRailsProNodeRenderer } from ' \
+        "'react-on-rails-pro-node-renderer';\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });",
+        true
+      ],
+      [
+        "a CommonJS package binding lookalike inside an unterminated single-quoted string",
+        "const help = '; const { reactOnRailsProNodeRenderer } = " \
+        'require("react-on-rails-pro-node-renderer");' \
+        "\nreactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });",
+        true
+      ],
+      [
+        "an ESM package binding lookalike inside an unterminated single-quoted string",
+        "const help = '; import { reactOnRailsProNodeRenderer } from " \
+        '"react-on-rails-pro-node-renderer";' \
+        "\nreactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });",
+        true
       ]
-    ].each do |description, source|
+    ].each do |description, source, node_syntax_error|
+      expected_reason =
+        node_syntax_error ? "ambiguous_javascript_configuration" : "renderer_configuration_binding_not_proven"
+
       it "requires proven binding scope for #{description}" do
         File.write("renderer/node-renderer.js", source)
 
@@ -3650,7 +3681,7 @@ RSpec.describe ReactOnRails::Doctor do
             type: :warning,
             content: a_string_including(
               "evidence=unverified",
-              "reason=renderer_configuration_binding_not_proven"
+              "reason=#{expected_reason}"
             )
           )
         )
@@ -3673,10 +3704,21 @@ RSpec.describe ReactOnRails::Doctor do
           "status" => "warn",
           "message" => a_string_including(
             "evidence=unverified",
-            "reason=renderer_configuration_binding_not_proven"
+            "reason=#{expected_reason}"
           )
         )
         expect(check.fetch("details")).not_to include(hash_including("level" => "success"))
+      end
+
+      next unless node_syntax_error
+
+      it "proves malformed source fails Node parsing for #{description}" do
+        require_node_runtime!
+
+        _stdout, stderr, status = Open3.capture3("node", "--eval", source)
+
+        expect(status).not_to be_success
+        expect(stderr).to include("SyntaxError")
       end
     end
 
