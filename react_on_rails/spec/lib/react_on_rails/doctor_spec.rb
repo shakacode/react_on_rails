@@ -3664,6 +3664,11 @@ RSpec.describe ReactOnRails::Doctor do
         "a quoted global renderer-property decoy",
         "const helpText = \"globalThis['reactOnRailsProNodeRenderer'] = shim\";\n" \
         "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a quoted Unicode-escaped global renderer-property decoy",
+        "const helpText = \"glob\\u0061lThis.reactOnRailsProNodeRenderer = shim\";\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
       ]
     ].each do |description, source|
       it "observes a direct inline literal with #{description}" do
@@ -4021,6 +4026,32 @@ RSpec.describe ReactOnRails::Doctor do
       [
         "a Node global renderer compound assignment",
         "global.reactOnRailsProNodeRenderer ||= getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a Unicode-escaped globalThis renderer assignment",
+        "glob\\u0061lThis.reactOnRailsProNodeRenderer = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a leading-Unicode-escaped globalThis renderer assignment",
+        "\\u0067lobalThis.reactOnRailsProNodeRenderer = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a braced-Unicode-escaped globalThis renderer assignment",
+        "\\u{67}lobalThis.reactOnRailsProNodeRenderer = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a fully Unicode-escaped globalThis renderer assignment",
+        "\\u0067\\u006c\\u006f\\u0062\\u0061\\u006cThis." \
+        "reactOnRailsProNodeRenderer = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a Unicode-escaped Node global renderer assignment",
+        "glob\\u0061l.reactOnRailsProNodeRenderer = getRendererShim();\n" \
         "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
       ],
       [
@@ -4591,6 +4622,32 @@ RSpec.describe ReactOnRails::Doctor do
       [
         "a Node global renderer compound assignment",
         "global.reactOnRailsProNodeRenderer ||= getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a Unicode-escaped globalThis renderer assignment",
+        "glob\\u0061lThis.reactOnRailsProNodeRenderer = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a leading-Unicode-escaped globalThis renderer assignment",
+        "\\u0067lobalThis.reactOnRailsProNodeRenderer = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a braced-Unicode-escaped globalThis renderer assignment",
+        "\\u{67}lobalThis.reactOnRailsProNodeRenderer = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a fully Unicode-escaped globalThis renderer assignment",
+        "\\u0067\\u006c\\u006f\\u0062\\u0061\\u006cThis." \
+        "reactOnRailsProNodeRenderer = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a Unicode-escaped Node global renderer assignment",
+        "glob\\u0061l.reactOnRailsProNodeRenderer = getRendererShim();\n" \
         "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
       ],
       [
