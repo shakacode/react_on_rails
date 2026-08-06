@@ -3675,6 +3675,21 @@ RSpec.describe ReactOnRails::Doctor do
         "// glob\\u0061lThis.reactOnRailsProNodeRenderer = shim\n" \
         "/* glob\\u0061l.reactOnRailsProNodeRenderer = shim */\n" \
         "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a Unicode-escaped comment decoy ending with carriage return",
+        "// glob\\u0061lThis.reactOnRailsProNodeRenderer = shim\r" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a Unicode-escaped comment decoy ending with a line separator",
+        "// glob\\u0061lThis.reactOnRailsProNodeRenderer = shim\u2028" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a Unicode-escaped comment decoy ending with a paragraph separator",
+        "// glob\\u0061lThis.reactOnRailsProNodeRenderer = shim\u2029" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
       ]
     ].each do |description, source|
       it "observes a direct inline literal with #{description}" do

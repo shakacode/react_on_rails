@@ -3265,7 +3265,7 @@ module ReactOnRails
         File.size(doctor_app_path(config_path)) > NODE_RENDERER_CONFIG_MAX_BYTES
 
       active_content = node_renderer_active_config_content(
-        File.read(doctor_app_path(config_path), NODE_RENDERER_CONFIG_MAX_BYTES)
+        File.read(doctor_app_path(config_path), NODE_RENDERER_CONFIG_MAX_BYTES).force_encoding(Encoding::UTF_8)
       )
       evidence =
         node_renderer_static_capacity_evidence(active_content) ||
@@ -3370,7 +3370,7 @@ module ReactOnRails
     end
 
     def node_renderer_config_object_ambiguous?(config_object, top_level_syntax)
-      accessor_syntax = top_level_syntax.gsub(%r{/\*.*?\*/|//[^\n]*}m, " ")
+      accessor_syntax = top_level_syntax.gsub(%r{/\*.*?\*/|//[^\n\r\u2028\u2029]*}m, " ")
 
       top_level_syntax.include?("[") ||
         config_object.include?("\\") ||
@@ -3569,7 +3569,7 @@ module ReactOnRails
       return content if content.include?("`")
 
       content.gsub(
-        %r{(#{NODE_RENDERER_JS_STRING_PATTERN})|/\*.*?\*/|//[^\n]*}mxo
+        %r{(#{NODE_RENDERER_JS_STRING_PATTERN})|/\*.*?\*/|//[^\n\r\u2028\u2029]*}mxo
       ) { Regexp.last_match(1) || " " }
     end
 
