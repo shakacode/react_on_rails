@@ -32,18 +32,29 @@ import { cache, cacheSignal } from 'react';
 import * as mock from 'mock-fs';
 import * as path from 'path';
 import ReactOnRails, { RailsContextWithServerStreamingCapabilities } from '../src/ReactOnRailsRSC.ts';
-import { flushMacrotasks } from './testUtils.ts';
 
 // ── Observable signal state ──
 // The RSC component records cacheSignal() state here during render so the test can inspect it.
+// Promise-based synchronization avoids timing assumptions (sleep/flushMacrotasks) that can flake
+// on slow CI runners.
 let capturedSignal: AbortSignal | null = null;
 let signalAbortedDuringRender = false;
-let signalAbortedAfterDisconnect = false;
+
+let resolveCaptured: (() => void) | null = null;
+let capturedPromise: Promise<void>;
+
+let resolveAborted: (() => void) | null = null;
+let abortedPromise: Promise<void>;
 
 const resetSignalState = () => {
   capturedSignal = null;
   signalAbortedDuringRender = false;
-  signalAbortedAfterDisconnect = false;
+  capturedPromise = new Promise<void>((r) => {
+    resolveCaptured = r;
+  });
+  abortedPromise = new Promise<void>((r) => {
+    resolveAborted = r;
+  });
 };
 
 // ── Test component ──
@@ -59,9 +70,12 @@ const slowFetch = cache(async () => {
   if (signal) {
     signalAbortedDuringRender = signal.aborted;
     signal.addEventListener('abort', () => {
-      signalAbortedAfterDisconnect = true;
+      resolveAborted?.();
     });
   }
+
+  // Notify the test that the signal has been captured and the abort listener is registered.
+  resolveCaptured?.();
 
   // Simulate a slow data fetch that never completes — keeps the component suspended so the render
   // stays in flight. When the consumer destroys the output stream, the abort chain fires and
@@ -94,11 +108,6 @@ ReactOnRails.register({ ShellWithSuspendedChild });
 // ── Manifest mock ──
 const manifestFileDirectory = path.resolve(__dirname, '../src');
 const clientManifestPath = path.join(manifestFileDirectory, 'react-client-manifest.json');
-
-const sleep = (ms: number) =>
-  new Promise<void>((resolve) => {
-    setTimeout(resolve, ms);
-  });
 
 describe('cacheSignal settlement on client disconnect (issue #3885)', () => {
   beforeEach(() => {
@@ -137,17 +146,9 @@ describe('cacheSignal settlement on client disconnect (issue #3885)', () => {
       stream.on('error', () => {});
     });
 
-    // The component's render body should have executed by now and captured the signal.
-    // (It may still be null if the render hasn't reached the Suspense child yet — wait a tick.)
-    await flushMacrotasks();
-
-    // Simulate client disconnect: Fastify destroys the response payload stream.
-    stream.destroy();
-
-    // Wait for the abort chain to propagate:
-    // readableStream 'close' → cancelUpstream() → pipedStream.abort() → React abort()
-    // → request.cacheController.abort() → cacheSignal fires
-    await sleep(300);
+    // Wait for the component's render body to capture the signal and register the abort listener.
+    // This is deterministic — no timing assumptions.
+    await capturedPromise;
 
     // cacheSignal() must have returned a non-null signal during the render.
     expect(capturedSignal).not.toBeNull();
@@ -156,8 +157,15 @@ describe('cacheSignal settlement on client disconnect (issue #3885)', () => {
     // render end / abort / error).
     expect(signalAbortedDuringRender).toBe(false);
 
+    // Simulate client disconnect: Fastify destroys the response payload stream.
+    stream.destroy();
+
+    // Wait for the abort chain to propagate deterministically:
+    // readableStream 'close' → cancelUpstream() → pipedStream.abort() → React abort()
+    // → request.cacheController.abort() → cacheSignal fires → resolveAborted()
+    await abortedPromise;
+
     // After the consumer disconnect, the signal must have been settled.
-    expect(signalAbortedAfterDisconnect).toBe(true);
     expect(capturedSignal!.aborted).toBe(true);
   }, 15000);
 

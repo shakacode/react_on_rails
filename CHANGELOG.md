@@ -32,6 +32,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   `cacheController.abort()` → signal fires). Added a data-fetching cleanup guide showing how to pass
   `cacheSignal()` to `fetch()` and database clients to cancel in-flight work on abandoned renders.
   [Issue 3885](https://github.com/shakacode/react_on_rails/issues/3885).
+  [PR 4847](https://github.com/shakacode/react_on_rails/pull/4847) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 #### Fixed
 

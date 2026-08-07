@@ -57,8 +57,8 @@ The only change is adding `{ signal }` to the `fetch()` call. When the client di
 
 1. React on Rails Pro detects the disconnect and calls `PipeableStream.abort()`
 2. React settles `cacheSignal()` (calls `request.cacheController.abort()`)
-3. The `fetch()` throws an `AbortError` and the in-flight HTTP request to Rails is cancelled
-4. No wasted work — the Rails controller never processes the abandoned request
+3. The `fetch()` throws an `AbortError` and the in-flight HTTP request is cancelled
+4. Reduced wasted work — if Rails hasn't started processing the request yet, it never will; if processing has already begun, compatible server infrastructure can observe the client disconnect and stop early
 
 ## Error Handling
 
@@ -88,38 +88,25 @@ const getProduct = cache(async (id) => {
 
 ## Database Queries
 
-Many database clients support `AbortSignal`. For example, with the `pg` (node-postgres) package:
+If your database client supports `AbortSignal`, pass it directly (check your client's documentation — support varies by library and version). For clients that don't support `AbortSignal` natively, listen for the abort event manually and use `try/finally` to ensure connections are always released:
 
 ```jsx
 import { cache, cacheSignal } from 'react';
-import { pool } from '../lib/db';
+import { getConnection } from '../lib/db';
 
-const getProducts = cache(async (categoryId) => {
-  const signal = cacheSignal();
-  const result = await pool.query({
-    text: 'SELECT * FROM products WHERE category_id = $1',
-    values: [categoryId],
-    signal, // pg@8.14+ supports AbortSignal
-  });
-  return result.rows;
-});
-```
-
-If your database client does not support `AbortSignal` natively, you can still listen for the abort event manually:
-
-```jsx
 const getProducts = cache(async (categoryId) => {
   const signal = cacheSignal();
   const connection = await getConnection();
+  const cancelQuery = () => connection.cancel();
 
-  // Listen for abort and cancel the query
-  signal?.addEventListener('abort', () => {
-    connection.cancel(); // Client-specific cancellation method
-  });
-
-  const result = await connection.query('SELECT * FROM products WHERE category_id = $1', [categoryId]);
-  connection.release();
-  return result.rows;
+  signal?.addEventListener('abort', cancelQuery, { once: true });
+  try {
+    const result = await connection.query('SELECT * FROM products WHERE category_id = $1', [categoryId]);
+    return result.rows;
+  } finally {
+    signal?.removeEventListener('abort', cancelQuery);
+    connection.release();
+  }
 });
 ```
 
@@ -129,7 +116,7 @@ const getProducts = cache(async (categoryId) => {
 
 - **Cleanup-only.** The signal fires when the render _ends_ — you cannot abort it manually. It is not a request-scoped `AbortController`. If you need manual abort control, create your own `AbortController` and combine it with `cacheSignal()` via [`AbortSignal.any()`](https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal/any_static).
 
-- **Requires React ≥ 19.2.** `cacheSignal()` is a React 19.2 API. On earlier React versions, it returns `null`. React on Rails Pro's RSC path runs React 19.2.7 via `react-server-dom-webpack`, so it is available in all Pro RSC components.
+- **Requires React ≥ 19.2.** `cacheSignal()` is a React 19.2 API and is not available in earlier React versions. React on Rails Pro's RSC path runs React 19.2.7 via `react-server-dom-webpack`, so it is available in all Pro RSC components. The `null` return value indicates the call is outside an active server render, not a version issue.
 
 - **Fires on success too.** The signal fires when the render completes _successfully_, not just on abort. This is by design — it cancels any in-flight work that was started but whose result was never consumed (e.g., a `cache()`-wrapped fetch that was started but the component tree didn't render the branch that uses it).
 
