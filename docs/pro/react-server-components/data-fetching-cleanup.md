@@ -126,13 +126,12 @@ The abort chain that makes `cacheSignal()` work was shipped in [PR #4093](https:
 
 1. **Client disconnects** → Fastify `res.raw.close` event fires
 2. **Node renderer worker** destroys the render source stream
-3. **`cancelUpstream()`** in `streamingUtils.ts` aborts the piped render stream
-4. **`cancelUpstream()`** then fires registered `onConsumerAbort` handlers
-5. **`renderingStream.abort()`** (registered via `onConsumerAbort`) tells React to abort the render
-6. **React internally** calls `request.cacheController.abort()` → `cacheSignal()` settles
-7. **Your `fetch({ signal })`** throws `AbortError` → in-flight work cancelled
+3. **`cancelUpstream()`** in `streamingUtils.ts` aborts the piped render stream and fires `onConsumerAbort` handlers
+4. **React's render is aborted** — on the RSC Flight path, `cancelUpstream()` directly aborts the Flight `PipeableStream` in step 3; on the HTML SSR path, `renderingStream.abort()` is called via an `onConsumerAbort` handler
+5. **React internally** calls `request.cacheController.abort()` → `cacheSignal()` settles
+6. **Your `fetch({ signal })`** throws `AbortError` → in-flight work cancelled
 
-This chain works for both the HTML SSR path (`streamServerRenderedReactComponent`) and the RSC Flight path (`proRSC.ts`).
+This chain works for both the RSC Flight path (`proRSC.ts`) and the HTML SSR path (`streamServerRenderedReactComponent`).
 
 ## Related
 
