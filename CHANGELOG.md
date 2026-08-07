@@ -24,16 +24,6 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
-#### Added
-
-- **[Pro]** **`cacheSignal()` abort-on-disconnect test and documentation**: Added an RSC integration
-  test proving that React 19.2's `cacheSignal()` settles when a client disconnects mid-stream,
-  verifying the abort chain shipped in PR #4093 (client disconnect → stream destroy → React abort →
-  `cacheController.abort()` → signal fires). Added a data-fetching cleanup guide showing how to pass
-  `cacheSignal()` to `fetch()` and database clients to cancel in-flight work on abandoned renders.
-  [Issue 3885](https://github.com/shakacode/react_on_rails/issues/3885).
-  [PR 4847](https://github.com/shakacode/react_on_rails/pull/4847) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
-
 #### Fixed
 
 - **Routine startup diagnostics no longer appear in default `INFO` logs**: Successful package validation, valid
