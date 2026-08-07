@@ -666,7 +666,7 @@ module ReactOnRailsPro
 
       def create_connection
         url = ReactOnRailsPro.configuration.renderer_url
-        Rails.logger.info do
+        Rails.logger.debug do
           "[ReactOnRailsPro] Setting up Node Renderer connection to #{url}"
         end
 
