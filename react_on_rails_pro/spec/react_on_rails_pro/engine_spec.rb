@@ -211,20 +211,29 @@ RSpec.describe ReactOnRailsPro::Engine do
           ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
         end
 
-        it "logs debug instead of warning" do
-          expect(mock_logger).to receive(:debug).with(/License has expired/)
-          expect(mock_logger).not_to receive(:warn)
+        it "warns because the configured license needs attention" do
+          expect(mock_logger).to receive(:warn).with(/License has expired/)
+          expect(mock_logger).not_to receive(:debug)
           described_class.log_license_status
         end
 
-        it "includes the expiration date" do
+        it "includes the expiration date and renewal URL" do
           expected_date = Time.at(expired_time).strftime("%Y-%m-%d")
-          expect(mock_logger).to receive(:debug).with(/expired on #{expected_date}/)
+          expect(mock_logger).to receive(:warn).with(/expired on #{expected_date}.*pro\.reactonrails\.com/)
           described_class.log_license_status
         end
+      end
 
-        it "includes the development/test message" do
-          expect(mock_logger).to receive(:debug).with(%r{No license required for development/test environments})
+      context "with invalid license" do
+        before do
+          wrong_key = OpenSSL::PKey::RSA.new(2048)
+          token = JWT.encode(valid_payload, wrong_key, "RS256")
+          ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+        end
+
+        it "warns with the license URL because the configured token needs attention" do
+          expect(mock_logger).to receive(:warn).with(/Invalid license.*pro\.reactonrails\.com/)
+          expect(mock_logger).not_to receive(:debug)
           described_class.log_license_status
         end
       end

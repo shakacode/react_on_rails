@@ -26,10 +26,11 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
-- **Routine startup diagnostics no longer clutter Rails command output**: Successful package validation, valid
-  Pro license checks, non-production license notices, and Node renderer connection setup now log at `DEBUG`
-  instead of `INFO`. Package validation still runs, while production license warnings and renderer failures remain
-  visible and actionable. Fixes [Issue 4848](https://github.com/shakacode/react_on_rails/issues/4848).
+- **Routine startup diagnostics no longer appear in default `INFO` logs**: Successful package validation, valid
+  Pro license checks, non-production missing-license notices, and Node renderer connection setup now log at `DEBUG`
+  instead of `INFO`. Package validation still runs, while expired or invalid configured licenses remain visible outside
+  production, and production license warnings and renderer failures remain actionable. Fixes
+  [Issue 4848](https://github.com/shakacode/react_on_rails/issues/4848).
   [PR 4849](https://github.com/shakacode/react_on_rails/pull/4849) by
   [Justin Gordon](https://github.com/justin808).
 
