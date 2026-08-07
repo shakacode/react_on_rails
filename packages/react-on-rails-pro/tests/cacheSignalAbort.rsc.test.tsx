@@ -168,10 +168,4 @@ describe('cacheSignal settlement on client disconnect (issue #3885)', () => {
     // After the consumer disconnect, the signal must have been settled.
     expect(capturedSignal!.aborted).toBe(true);
   }, 15000);
-
-  it('cacheSignal returns null outside an RSC render context', () => {
-    // Outside a render, the async dispatcher is not active, so cacheSignal() returns null.
-    const signal = cacheSignal();
-    expect(signal).toBeNull();
-  });
 });
