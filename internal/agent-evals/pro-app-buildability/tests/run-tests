@@ -75,6 +75,19 @@ fi
 rg -q 'credential bytes found in run output' "$tmp/immutable-credential-snapshot-error"
 : >"$tmp/credential-output/rotated.txt"
 
+printf '%s' safe >"$tmp/symlink-target"
+ln -s "$tmp/symlink-target" "$tmp/credential-output/dependency-link"
+if printf '%s' 'unrelated-credential-value' |
+  "$eval_dir/bin/assert-credential-absent" "$tmp/credential-output" - \
+    2>"$tmp/rejected-symlink-error"; then
+  echo "strict credential scan accepted a run-output symlink" >&2
+  exit 1
+fi
+rg -q 'symbolic link' "$tmp/rejected-symlink-error"
+printf '%s' 'unrelated-credential-value' |
+  "$eval_dir/bin/assert-credential-absent" "$tmp/credential-output" - --skip-symlinks
+unlink "$tmp/credential-output/dependency-link"
+
 for newline_mode in newline no-newline; do
   claude_helper_dir="$tmp/claude-helper-$newline_mode"
   mkdir "$claude_helper_dir"
@@ -447,6 +460,7 @@ rg -q 'auth_material_available:\$auth_material_available' "$eval_dir/bin/run-eva
 rg -q 'auth_source:\$auth_source' "$eval_dir/bin/run-eval"
 rg -q -- '--model-credential-file' "$eval_dir/bin/run-eval"
 rg -q 'agent_args=.*-p --bare' "$eval_dir/bin/run-eval"
+rg -Fq -- "--mcp-config '{\"mcpServers\":{}}'" "$eval_dir/bin/run-eval"
 rg -q 'apiKeyHelper:\$helper' "$eval_dir/bin/run-eval"
 rg -Fq "credential_helper_command='/bin/sh \"\$TMPDIR/../credential-helper\"'" \
   "$eval_dir/bin/run-eval"
@@ -470,6 +484,7 @@ test "$(rg -n 'shasum -a 256 \"\$file\"; done <\"\$checksum_files\" >SHA256SUMS'
   "$eval_dir/bin/run-eval" | cut -d: -f1)" -lt \
   "$(rg -n 'assert_credential_absent \"\$output\"' "$eval_dir/bin/run-eval" | cut -d: -f1)"
 rg -q 'assert_credential_absent \"\$workspace\"' "$eval_dir/bin/run-eval"
+rg -q 'assert_credential_absent \"\$workspace\" --skip-symlinks' "$eval_dir/bin/run-eval"
 rg -Fq 'credential_snapshot=' "$eval_dir/bin/run-eval"
 rg -Fq 'assert_credential_absent' "$eval_dir/bin/run-eval"
 rg -Fq 'cache=' "$eval_dir/bin/run-eval"

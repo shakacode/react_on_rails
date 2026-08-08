@@ -272,7 +272,7 @@ if [[ "$agent" == codex ]]; then
 else
   agent_command="claude -p"
   agent_args=(-p --bare --no-session-persistence --disable-slash-commands --no-chrome)
-  agent_args+=(--strict-mcp-config --mcp-config '{}' --tools 'Bash,Read,Write,Edit,Glob,Grep')
+  agent_args+=(--strict-mcp-config --mcp-config '{"mcpServers":{}}' --tools 'Bash,Read,Write,Edit,Glob,Grep')
   agent_args+=(--model "$model" --output-format stream-json --verbose --settings "$claude_settings")
   agent_args+=(--json-schema "$(jq -c . "$eval_dir/schemas/agent-report.schema.json")")
   [[ "$isolated_host_attestation" == true ]] && agent_args+=(--dangerously-skip-permissions)
@@ -304,8 +304,11 @@ normalize_agent_events() {
 
 assert_credential_absent() {
   local scan_target="$1"
+  local symlink_policy="${2:-}"
+  local scan_args=("$scan_target" -)
+  [[ -z "$symlink_policy" ]] || scan_args+=("$symlink_policy")
   printf '%s' "$credential_snapshot" |
-    "$eval_dir/bin/assert-credential-absent" "$scan_target" -
+    "$eval_dir/bin/assert-credential-absent" "${scan_args[@]}"
 }
 
 probe_timeout_seconds="$timeout_seconds"
@@ -344,7 +347,7 @@ probe_exit=$?
 set -e
 normalize_agent_events "$raw_probe_events" "$normalized_probe_events" "$probe_exit"
 if [[ "$auth_material_available" == true ]]; then
-  assert_credential_absent "$workspace"
+  assert_credential_absent "$workspace" --skip-symlinks
 fi
 EVAL_PRIVATE_DIR="$private_dir" EVAL_WORKSPACE="$workspace" EVAL_OUTPUT="$output" \
   perl "$eval_dir/bin/sanitize-events.pl" "$normalized_probe_events" >"$safe_probe_events"
@@ -375,7 +378,7 @@ if "$eval_dir/bin/probe-allows-scaffold" "$probe_exit" "$probe_result" "$sandbox
   [[ "$runner_exit" == 124 ]] && timed_out=true
   normalize_agent_events "$raw_scaffold_events" "$normalized_scaffold_events" "$runner_exit"
   if [[ "$auth_material_available" == true ]]; then
-    assert_credential_absent "$workspace"
+    assert_credential_absent "$workspace" --skip-symlinks
   fi
   EVAL_PRIVATE_DIR="$private_dir" EVAL_WORKSPACE="$workspace" EVAL_OUTPUT="$output" \
     perl "$eval_dir/bin/sanitize-events.pl" "$normalized_scaffold_events" >"$safe_scaffold_events"

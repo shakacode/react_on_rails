@@ -37,7 +37,9 @@ output after checksums are written. The unchanged snapshot remains authoritative
 even if the CLI rotates or replaces its writable credential store. For Codex
 JSON credentials, sensitive token/key/secret leaf values are searched
 independently as well. A match, unreadable artifact, or output symlink fails
-closed. The committed output continues to record
+closed. Workspace scans skip dependency symlinks without following them, while
+continuing to inspect every regular file; completed-output scans reject all
+symlinks. The committed output continues to record
 `auth_material_persisted: false`; it records availability and the attested file
 broker, never credential values or paths.
 
