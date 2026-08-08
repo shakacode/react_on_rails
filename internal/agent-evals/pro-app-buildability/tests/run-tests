@@ -903,6 +903,7 @@ rg -Fq -- 'source=$git_common_dir,target=$git_common_dir,readonly' \
 rg -Fq -- 'EVAL_HARNESS_DEPENDENCY_ROOT=/opt/pro-app-buildability' \
   "$isolated_host/run-in-container"
 rg -Fq -- 'EVAL_ISOLATED_PID_NAMESPACE=1' "$isolated_host/run-in-container"
+rg -Fq -- 'EVAL_AGENT_CONTAINMENT_TEST_MODE=0' "$isolated_host/run-in-container"
 rg -Fq 'No React on Rails Pro license token is required for evaluation, development, or CI.' \
   "$isolated_host/README.md"
 rg -Uq 'Do not provision a\s+Pro license token in this harness\.' "$isolated_host/README.md"
@@ -980,6 +981,8 @@ test "$(cat "$tmp/fake-docker-stdin-sha")" = \
   "$(shasum -a 256 "$tmp/wrapper-model-credential" | awk '{print $1}')"
 rg -Fxq -- '--model-credential-stdin' "$tmp/fake-docker-args"
 test "$(awk '$0 == "--pids-limit" { getline; print; exit }' "$tmp/fake-docker-args")" = 4096
+test "$(awk '$0 == "--env" { getline; if ($0 == "EVAL_AGENT_CONTAINMENT_TEST_MODE=0") { print; exit } }' \
+  "$tmp/fake-docker-args")" = EVAL_AGENT_CONTAINMENT_TEST_MODE=0
 test "$(awk '$0 == "--run-id" { getline; print; exit }' "$tmp/fake-docker-args")" = \
   requested-run-id
 rg -Fxq -- '/run/eval-private:rw,noexec,nosuid,nodev,mode=0700,uid='"$(id -u)"',gid='"$(id -g)" \

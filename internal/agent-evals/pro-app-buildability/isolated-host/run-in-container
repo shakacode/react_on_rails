@@ -117,6 +117,7 @@ docker_args=(
   --env TMPDIR=/run/eval-private
   --env EVAL_HARNESS_DEPENDENCY_ROOT=/opt/pro-app-buildability
   --env EVAL_ISOLATED_PID_NAMESPACE=1
+  --env EVAL_AGENT_CONTAINMENT_TEST_MODE=0
   --workdir /repo
 )
 case "$git_common_dir/" in
