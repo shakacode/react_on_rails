@@ -216,6 +216,23 @@ module ReactOnRails
           end
         end
 
+        context "when a configured typo-scheme renderer authority has multiple at signs" do
+          let(:error) { Errno::ECONNREFUSED.new }
+
+          before do
+            ENV["REACT_RENDERER_URL"] =
+              "htps://synthetic-user:synthetic-prefix@synthetic-secret@renderer.example.com:3800/path"
+          end
+
+          it "fails closed through the final at sign while retaining the scheme, host, and path" do
+            message = render_error_for(error).message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-prefix")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("htps://renderer.example.com:3800/path")
+          end
+        end
+
         context "when the error message itself names a renderer URL with embedded credentials" do
           let(:error) do
             StandardError.new(
@@ -910,6 +927,59 @@ module ReactOnRails
             stub_http_bundle_failure(failure_message)
 
             expect(bundle_load_error_message).to include(failure_message)
+          end
+        end
+
+        context "when a configured typo-scheme bundle authority embeds credentials" do
+          it "redacts the credentials while retaining the scheme, host, and path" do
+            server_bundle_path =
+              "htps://synthetic-user:synthetic-secret@renderer.example/bundle.js"
+            stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("htps://renderer.example/bundle.js")
+          end
+
+          it "preserves an at sign that belongs only to the path" do
+            server_bundle_path = "htps://renderer.example/bundle@example.js"
+            stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)
+
+            expect(bundle_load_error_message).to include(server_bundle_path)
+          end
+
+          it "preserves a scheme-only value without masking the bundle-load diagnostic" do
+            server_bundle_path = "htps://"
+            stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)
+
+            expect(bundle_load_error_message).to include(server_bundle_path)
+          end
+        end
+
+        context "when the configured scheme parser discards userinfo" do
+          it "uses the parser's sanitized value rather than returning the raw credentials" do
+            server_bundle_path = "file://synthetic-user:synthetic-secret@renderer.example/bundle.js"
+            stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("file://renderer.example/bundle.js")
+          end
+        end
+
+        context "when a configured typo-scheme value contains another authority scheme" do
+          it "fails closed across the ambiguous prefix while retaining the credential authority's host and path" do
+            server_bundle_path =
+              "htps://outer.example/pathcustom://synthetic-user:synthetic-secret@renderer.example/bundle.js"
+            stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("outer.example")
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("htps://renderer.example/bundle.js")
           end
         end
 

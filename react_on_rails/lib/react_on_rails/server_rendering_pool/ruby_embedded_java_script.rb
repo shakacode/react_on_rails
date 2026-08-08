@@ -45,6 +45,8 @@ module ReactOnRails
         | error\son\srenderer\srequest
       /xi
 
+      CONFIGURED_AUTHORITY_SCHEME_REGEX = %r{[a-z][a-z0-9+.-]*://}i
+
       class << self
         def reset_pool
           @js_context_pool = ConnectionPool.new(
@@ -400,24 +402,26 @@ module ReactOnRails
           nil
         end
 
-        # Strips any embedded credentials from a configured renderer URL before it is
-        # interpolated into an error message, so a password in the URL (a supported config
-        # convenience, e.g. https://:password@host:3800) cannot leak into logs or error
-        # trackers. One configured value is not free-form prose: multiple schemes or line breaks
-        # after its first scheme make it structurally ambiguous, so that URL suffix fails closed
-        # through its final @. Any non-URL prefix is preserved for useful error context.
+        # Strips embedded credentials from a configured renderer value before it is interpolated
+        # into an error message. HTTP(S) credentials are supported configuration, while a
+        # syntactically scheme-like typo or unsupported authority is still sanitized so malformed
+        # configuration cannot leak secrets. One configured value is not free-form prose: multiple
+        # schemes or line breaks after its first scheme make it structurally ambiguous, so that URL
+        # suffix fails closed through its final @. Any non-URL prefix is preserved for context.
         def sanitized_renderer_url(url)
           return url if url.nil? || url.empty?
 
-          scheme = url.match(%r{https?://}i)
+          scheme = url.match(CONFIGURED_AUTHORITY_SCHEME_REGEX)
           return url unless scheme
 
           prefix = url[...scheme.begin(0)]
           configured_url = url[scheme.begin(0)..]
-          sanitized_url = if configured_url.match?(/[\r\n]/) || configured_url.scan(%r{https?://}i).length > 1
+          sanitized_url = if configured_url.match?(/[\r\n]/) ||
+                             configured_url.scan(CONFIGURED_AUTHORITY_SCHEME_REGEX).length > 1
                             strip_malformed_url_userinfo(configured_url)
                           else
-                            sanitized_valid_http_url(configured_url) || strip_malformed_url_userinfo(configured_url)
+                            sanitized_valid_authority_url(configured_url) ||
+                              strip_malformed_url_userinfo(configured_url)
                           end
 
           "#{prefix}#{sanitized_url}"
@@ -447,7 +451,7 @@ module ReactOnRails
 
           text.to_enum(:scan, %r{https?://(?:(?!https?://)[^\s"'])+}i).each do
             match = Regexp.last_match
-            protected_url = sanitized_valid_http_url(match[0])
+            protected_url = sanitized_valid_authority_url(match[0])
             next unless protected_url
             next if userinfo_delimiter_before_next_scheme?(text, match)
 
@@ -474,11 +478,18 @@ module ReactOnRails
           text[...unresolved_scheme.begin(0)]
         end
 
-        # URI handles valid URLs structurally, so an @ in the path is never mistaken for userinfo.
-        # Returning nil for invalid input keeps that token unprotected for the fail-closed pass.
-        def sanitized_valid_http_url(url)
+        # URI handles valid authority URLs structurally, so an @ in the path is never mistaken for
+        # userinfo. Some scheme-specific parsers, such as URI::File, discard authority credentials
+        # while exposing no userinfo; use their serialized value only when the raw authority contained
+        # an @ so ordinary scheme spelling and valid path @ characters remain unchanged. Returning nil
+        # for invalid input keeps that token unprotected for fail-closed handling.
+        def sanitized_valid_authority_url(url)
           uri = URI.parse(url)
-          return url if uri.userinfo.nil?
+          if uri.userinfo.nil?
+            scheme = url.match(CONFIGURED_AUTHORITY_SCHEME_REGEX)
+            authority = url[scheme.end(0)..].split(%r{[/?#]}, 2).first
+            return authority&.include?("@") ? uri.to_s : url
+          end
 
           # URI rejects a password without a user, so clear password first.
           uri.password = nil
@@ -495,9 +506,9 @@ module ReactOnRails
         # For malformed URLs or unprotected scheme-delimited spans, remove through the last @. The
         # retained suffix is best-effort context; ambiguous malformed diagnostics may lose text.
         def strip_malformed_url_userinfo(url)
-          scheme = url.match(%r{\Ahttps?://}i)
+          scheme = url.match(CONFIGURED_AUTHORITY_SCHEME_REGEX)
           userinfo_delimiter = url.rindex("@")
-          return url unless scheme && userinfo_delimiter
+          return url unless scheme&.begin(0)&.zero? && userinfo_delimiter
 
           "#{url[...scheme.end(0)]}#{url[(userinfo_delimiter + 1)..]}"
         end
