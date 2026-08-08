@@ -13,13 +13,30 @@ for fake_agent in codex claude; do
     >"$tmp/forced-timeout-agents/$fake_agent"
   chmod 700 "$tmp/forced-timeout-agents/$fake_agent"
   set +e
-  "$timeout_command" --kill-after 1 1 "$tmp/forced-timeout-agents/$fake_agent" \
-    >"$tmp/$fake_agent-forced-timeout-output" 2>"$tmp/$fake_agent-forced-timeout-error"
+  "$eval_dir/bin/run-with-timeout" "$timeout_command" 1 1 \
+    "$tmp/$fake_agent-forced-timeout-error" "$tmp/forced-timeout-agents/$fake_agent" \
+    >"$tmp/$fake_agent-forced-timeout-output"
   forced_timeout_exit=$?
   set -e
-  test "$forced_timeout_exit" = 137
-  test "$("$eval_dir/bin/canonicalize-timeout-exit" "$forced_timeout_exit")" = 124
+  test "$forced_timeout_exit" = 124
+  rg -Fq "timeout: sending signal KILL to command '" \
+    "$tmp/$fake_agent-forced-timeout-error"
+  test ! -e "$tmp/$fake_agent-forced-timeout-error.timeout"
+  test ! -e "$tmp/$fake_agent-forced-timeout-error.shell"
 done
+printf '%s\n' '#!/bin/sh' \
+  'printf "%s\n" "timeout: sending signal KILL to command '\''spoofed'\''" >&2' \
+  'kill -KILL $$' >"$tmp/forced-timeout-agents/unrelated-sigkill"
+chmod 700 "$tmp/forced-timeout-agents/unrelated-sigkill"
+set +e
+"$eval_dir/bin/run-with-timeout" "$timeout_command" 5 5 "$tmp/unrelated-sigkill-error" \
+  "$tmp/forced-timeout-agents/unrelated-sigkill" >"$tmp/unrelated-sigkill-output"
+unrelated_sigkill_exit=$?
+set -e
+test "$unrelated_sigkill_exit" = 137
+rg -Fq "timeout: sending signal KILL to command 'spoofed'" "$tmp/unrelated-sigkill-error"
+test ! -e "$tmp/unrelated-sigkill-error.timeout"
+test ! -e "$tmp/unrelated-sigkill-error.shell"
 
 node "$eval_dir/bin/validate-json.mjs" --schemas-only
 claude_agent_report_schema="$("$eval_dir/bin/build-claude-agent-report-schema")"
@@ -548,7 +565,7 @@ node "$eval_dir/bin/normalize-claude-events.mjs" \
   "$tmp/pending-claude-events.timeout.jsonl")" == $'sleep 999\t124\tfailed\t' ]]
 node "$eval_dir/bin/normalize-claude-events.mjs" \
   "$tmp/pending-claude-events.jsonl" "$tmp/pending-claude-events.forced-timeout.jsonl" \
-  "$("$eval_dir/bin/canonicalize-timeout-exit" 137)"
+  124
 [[ "$(jq -r '.item | [.command,.exit_code,.status,.aggregated_output] | @tsv' \
   "$tmp/pending-claude-events.forced-timeout.jsonl")" == $'sleep 999\t124\tfailed\t' ]]
 printf '%s\n' 'not-json' >"$tmp/malformed-claude-events.jsonl"
@@ -574,8 +591,18 @@ test ! -s "$tmp/truncated-timeout-claude-events.normalized.jsonl"
 node "$eval_dir/bin/normalize-claude-events.mjs" \
   "$tmp/truncated-timeout-claude-events.jsonl" \
   "$tmp/truncated-forced-timeout-claude-events.normalized.jsonl" \
-  "$("$eval_dir/bin/canonicalize-timeout-exit" 137)"
+  124
 test ! -s "$tmp/truncated-forced-timeout-claude-events.normalized.jsonl"
+dd if=/dev/zero of="$tmp/oversized-claude-events.jsonl" bs=1 count=0 seek=67108865 \
+  2>/dev/null
+if node "$eval_dir/bin/normalize-claude-events.mjs" \
+  "$tmp/oversized-claude-events.jsonl" "$tmp/oversized-claude-events.normalized.jsonl" \
+  2>"$tmp/oversized-claude-events-error"; then
+  echo "oversized Claude transcript was accepted" >&2
+  exit 1
+fi
+test ! -e "$tmp/oversized-claude-events.normalized.jsonl"
+rg -q 'exceeds 67108864-byte normalization limit' "$tmp/oversized-claude-events-error"
 if node "$eval_dir/bin/normalize-claude-events.mjs" \
   "$tmp/truncated-timeout-claude-events.jsonl" \
   "$tmp/truncated-nontimeout-claude-events.normalized.jsonl" 1 \
@@ -821,13 +848,9 @@ rg -q '^isolated_host_attestation=false$' "$eval_dir/bin/run-eval"
 rg -q -- '--ack-disposable-secret-free-host' "$eval_dir/bin/run-eval"
 rg -Fq '[--model-credential-stdin]' "$eval_dir/bin/run-eval"
 rg -Fq 'timeout_kill_grace_seconds=10' "$eval_dir/bin/run-eval"
-rg -Fq -- '--kill-after "$timeout_kill_grace_seconds"' "$eval_dir/bin/run-eval"
-test "$("$eval_dir/bin/canonicalize-timeout-exit" 124)" = 124
-test "$("$eval_dir/bin/canonicalize-timeout-exit" 0)" = 0
-rg -Fq 'probe_exit="$("$eval_dir/bin/canonicalize-timeout-exit" "$?")"' \
-  "$eval_dir/bin/run-eval"
-rg -Fq 'runner_exit="$("$eval_dir/bin/canonicalize-timeout-exit" "$?")"' \
-  "$eval_dir/bin/run-eval"
+rg -Fq '"$eval_dir/bin/run-with-timeout" "$timeout_command"' "$eval_dir/bin/run-eval"
+rg -Fq -- '--verbose --kill-after "$kill_grace" "$duration"' \
+  "$eval_dir/bin/run-with-timeout"
 rg -Fq 'maximum_agent_call_wall_clock_seconds=$((probe_timeout_seconds + timeout_seconds +' \
   "$eval_dir/bin/run-eval"
 rg -Fq 'timeout_kill_grace_seconds:$timeout_kill_grace' "$eval_dir/bin/run-eval"
@@ -936,7 +959,7 @@ rg -Fq 'build-claude-agent-report-schema' "$isolated_host/smoke-runtime"
 rg -Fq 'CODEX_EVAL' "$isolated_host/smoke-runtime"
 rg -Fq 'http.createServer' "$isolated_host/smoke-runtime"
 rg -Fq 'Claude did not attempt the loopback endpoint' "$isolated_host/smoke-runtime"
-rg -Fq "'^POST /v1/messages([?].*)?$'" "$isolated_host/smoke-runtime"
+rg -Fq "'^POST /v1/messages([?].*)? brokered_auth=yes$'" "$isolated_host/smoke-runtime"
 if rg -Fq '127.0.0.1:9' "$isolated_host/smoke-runtime"; then
   echo "Claude schema smoke still relies on an unobserved closed endpoint" >&2
   exit 1
@@ -1073,6 +1096,19 @@ set -e
 test "$wrapper_fail_exit" = 42
 test ! -e "$tmp/wrapper-output-parent/failed-run"
 test ! -e "$(cat "$tmp/fake-docker-fail-evidence")"
+
+mkdir "$tmp/wrapper-output-parent/locked-run.lock"
+if (cd "$tmp/wrapper-repo" && PATH="$tmp/fake-bin:$PATH" \
+  "$isolated_host/run-in-container" \
+    --agent claude --model test-model --timeout 10 \
+    --model-credential-file "$tmp/wrapper-model-credential" \
+    --output "$tmp/wrapper-output-parent/locked-run") \
+  2>"$tmp/wrapper-output-lock-error"; then
+  echo "wrapper ignored an existing destination lock" >&2
+  exit 1
+fi
+rg -q 'another publisher holds the output lock' "$tmp/wrapper-output-lock-error"
+rmdir "$tmp/wrapper-output-parent/locked-run.lock"
 
 if (cd "$tmp/wrapper-repo" && \
   PATH="$tmp/fake-bin:$PATH" \

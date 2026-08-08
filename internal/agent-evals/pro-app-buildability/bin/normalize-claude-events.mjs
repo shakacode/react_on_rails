@@ -40,6 +40,9 @@ const MAX_COMMANDS = 5000;
 const MAX_OUTPUT_BYTES = 16 * 1024;
 
 const inputSize = fs.statSync(inputPath).size;
+if (inputSize > MAX_INPUT_BYTES) {
+  throw new Error(`Claude transcript exceeds ${MAX_INPUT_BYTES}-byte normalization limit`);
+}
 let inputEndsWithNewline = true;
 if (inputSize > 0) {
   const inputFile = fs.openSync(inputPath, 'r');

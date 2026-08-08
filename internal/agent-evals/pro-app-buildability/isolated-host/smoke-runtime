@@ -89,6 +89,11 @@ chmod 700 "$synthetic_gem_dir/bin/ror-eval-runtime-smoke"
 "${minimal_env[@]}" claude --version >/dev/null
 
 claude_schema="$("$eval_dir/bin/build-claude-agent-report-schema")"
+printf '%s' synthetic-invalid-never-valid >"$private_dir/model-credential"
+"$eval_dir/bin/build-claude-credential-helper" "$private_dir/credential-helper"
+claude_settings="$private_dir/claude-settings.json"
+jq -n --arg helper '/bin/sh "$TMPDIR/../credential-helper"' '{apiKeyHelper:$helper}' \
+  >"$claude_settings"
 claude_stub_port_file="$private_dir/claude-loopback-port"
 claude_stub_request_file="$private_dir/claude-loopback-request"
 node --input-type=module - "$claude_stub_port_file" "$claude_stub_request_file" <<'NODE' &
@@ -97,7 +102,10 @@ import http from 'node:http';
 
 const [portFile, requestFile] = process.argv.slice(2);
 const server = http.createServer((request, response) => {
-  fs.appendFileSync(requestFile, `${request.method} ${request.url}\n`, { mode: 0o600 });
+  const brokeredAuth = request.headers['x-api-key'] === 'synthetic-invalid-never-valid' ? 'yes' : 'no';
+  fs.appendFileSync(requestFile, `${request.method} ${request.url} brokered_auth=${brokeredAuth}\n`, {
+    mode: 0o600,
+  });
   request.resume();
   response.writeHead(503, { 'content-type': 'application/json' });
   response.end(JSON.stringify({ error: { type: 'offline_smoke', message: 'loopback only' } }));
@@ -118,9 +126,10 @@ done
 claude_stub_port="$(<"$claude_stub_port_file")"
 set +e
 env -i "PATH=$safe_path" "HOME=$agent_home" "TMPDIR=$private_dir/tmp" LANG=C LC_ALL=C SHELL=/bin/sh \
-  CODEX_EVAL=1 ANTHROPIC_API_KEY=synthetic-invalid-never-valid \
+  CODEX_EVAL=1 \
   ANTHROPIC_BASE_URL="http://127.0.0.1:$claude_stub_port" timeout 8 claude -p --model sonnet \
-  --output-format json --json-schema "$claude_schema" 'schema parser compatibility only' \
+  --settings "$claude_settings" --output-format json --json-schema "$claude_schema" \
+  'schema parser and credential helper compatibility only' \
   >"$private_dir/claude-schema-output" 2>"$private_dir/claude-schema-error"
 claude_schema_exit=$?
 set -e
@@ -132,8 +141,8 @@ set -e
   echo "Claude did not attempt the loopback endpoint after schema parsing" >&2
   exit 1
 }
-grep -Eq '^POST /v1/messages([?].*)?$' "$claude_stub_request_file" || {
-  echo "Claude did not issue the expected loopback model request" >&2
+grep -Eq '^POST /v1/messages([?].*)? brokered_auth=yes$' "$claude_stub_request_file" || {
+  echo "Claude did not issue the expected authenticated loopback model request" >&2
   exit 1
 }
 if grep -Fq 'no schema with key or ref' \

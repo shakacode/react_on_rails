@@ -42,10 +42,9 @@ Each agent call receives `TERM` at its configured timeout and `KILL` after a
 fixed 10-second grace. Both possible grace periods are included in the recorded
 maximum agent-call wall-clock budget. GNU `timeout` reports a cooperative
 timeout as exit 124 and a forced `KILL` as exit 137; the harness maps both to
-timeout status 124 before normalization and evidence generation. This
-deliberately accepts that a process independently exiting 137 is
-indistinguishable from the deadline's forced kill, but either case remains an
-incomplete, failed run and cannot claim successful evidence.
+timeout status 124 before normalization and evidence generation only when
+GNU `timeout`'s isolated diagnostic stream proves that `--kill-after` sent the
+signal. An agent that independently exits 137 remains a non-timeout failure.
 
 The agent CLI and its tools run under the same container UID. File-backed
 authentication therefore cannot be hidden from a malicious agent or tool while
@@ -54,6 +53,10 @@ it does not create a privilege boundary within that shared UID. This harness
 accepts that limitation only for the repository-owned eval prompt on a
 disposable, otherwise secret-free host. It must not be used to run untrusted
 prompts or to claim model-credential non-disclosure against a hostile agent.
+Network egress is intentionally available for the model API and package
+registries; the preflight checks reachability but is not an egress allowlist.
+The disposable host must therefore have no ambient network credentials, cloud
+instance role, or reachable metadata service (including `169.254.169.254`).
 
 The private directory is removed by the harness traps. Exact credential bytes
 are snapshotted in runner memory before the agent starts, then searched as a
@@ -73,6 +76,16 @@ them, while continuing to inspect every regular file; completed-output scans
 reject all symlinks. The committed output continues to record
 `auth_material_persisted: false`; it records availability and the attested file
 broker, never credential values or paths.
+
+The wrapper holds an atomic destination lock from before container launch
+through the final rename. Concurrent wrapper invocations for the same output
+therefore fail rather than nesting or overwriting evidence. Unrelated writers
+must not mutate the selected output parent while an eval is running.
+
+Process containment is deliberately conservative: any residual process-table
+entry other than the PID-1 runner and the active inspector, including a zombie,
+rejects the run. Discard the contaminated container rather than publishing
+evidence from it.
 
 No React on Rails Pro license token is required for evaluation, development, or CI.
 The real eval requires only the operator model credential. Do not provision a Pro license token in this harness.

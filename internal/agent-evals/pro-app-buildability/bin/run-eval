@@ -300,12 +300,15 @@ agent_version="$("${minimal_env[@]}" "$agent" --version 2>&1)"
 run_agent() {
   local prompt_file="$1"
   local call_timeout="$2"
+  local stderr_file="$3"
   if [[ "$agent" == codex ]]; then
-    "$timeout_command" --kill-after "$timeout_kill_grace_seconds" "$call_timeout" \
+    "$eval_dir/bin/run-with-timeout" "$timeout_command" "$timeout_kill_grace_seconds" \
+      "$call_timeout" "$stderr_file" \
       "${minimal_env[@]}" "CODEX_HOME=$private_dir/codex-home" \
       codex "${agent_args[@]}" <"$prompt_file"
   else
-    (cd "$workspace" && "$timeout_command" --kill-after "$timeout_kill_grace_seconds" "$call_timeout" \
+    (cd "$workspace" && "$eval_dir/bin/run-with-timeout" "$timeout_command" \
+      "$timeout_kill_grace_seconds" "$call_timeout" "$stderr_file" \
       "${minimal_env[@]}" claude "${agent_args[@]}" <"$prompt_file")
   fi
 }
@@ -363,9 +366,9 @@ raw_probe_stderr="$private_dir/probe-stderr.log"
 safe_probe_events="$private_dir/probe-events.safe.jsonl"
 safe_probe_stderr="$private_dir/probe-stderr.safe.log"
 set +e
-run_agent "$eval_dir/network-probe-prompt.md" "$probe_timeout_seconds" \
-  >"$raw_probe_events" 2>"$raw_probe_stderr"
-probe_exit="$("$eval_dir/bin/canonicalize-timeout-exit" "$?")"
+run_agent "$eval_dir/network-probe-prompt.md" "$probe_timeout_seconds" "$raw_probe_stderr" \
+  >"$raw_probe_events"
+probe_exit=$?
 set -e
 "$eval_dir/bin/assert-agent-call-contained" "$output"
 normalize_agent_events "$raw_probe_events" "$normalized_probe_events" "$probe_exit"
@@ -400,9 +403,9 @@ if "$eval_dir/bin/probe-allows-scaffold" "$probe_exit" "$probe_result" "$sandbox
   safe_scaffold_events="$private_dir/scaffold-events.safe.jsonl"
   safe_scaffold_stderr="$private_dir/scaffold-stderr.safe.log"
   set +e
-  run_agent "$eval_dir/prompt.md" "$timeout_seconds" \
-    >"$raw_scaffold_events" 2>"$raw_scaffold_stderr"
-  runner_exit="$("$eval_dir/bin/canonicalize-timeout-exit" "$?")"
+  run_agent "$eval_dir/prompt.md" "$timeout_seconds" "$raw_scaffold_stderr" \
+    >"$raw_scaffold_events"
+  runner_exit=$?
   set -e
   "$eval_dir/bin/assert-agent-call-contained" "$output"
   [[ "$runner_exit" == 124 ]] && timed_out=true

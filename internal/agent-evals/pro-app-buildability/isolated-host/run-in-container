@@ -88,6 +88,8 @@ image="${EVAL_HARNESS_IMAGE:-react-on-rails-pro-app-eval:local}"
 host_uid="$(id -u)"
 host_gid="$(id -g)"
 staging_parent="$(mktemp -d "$output_parent/.ror-eval-output.XXXXXX")"
+publication_lock="$output.lock"
+lock_acquired=false
 publication_started=false
 published=false
 cleanup_staging() {
@@ -95,12 +97,22 @@ cleanup_staging() {
     chmod -R u+rwX "$output" 2>/dev/null || true
     find "$output" -depth -delete 2>/dev/null || true
   fi
-  [[ -d "$staging_parent" ]] || return 0
-  chmod -R u+rwX "$staging_parent" 2>/dev/null || true
-  find "$staging_parent" -depth -delete 2>/dev/null || true
+  if [[ -d "$staging_parent" ]]; then
+    chmod -R u+rwX "$staging_parent" 2>/dev/null || true
+    find "$staging_parent" -depth -delete 2>/dev/null || true
+  fi
+  if [[ "$lock_acquired" == true ]]; then
+    rmdir "$publication_lock" 2>/dev/null || true
+  fi
 }
 trap cleanup_staging EXIT
 trap 'exit 130' INT TERM
+
+mkdir "$publication_lock" 2>/dev/null || {
+  echo "another publisher holds the output lock" >&2
+  exit 1
+}
+lock_acquired=true
 
 docker_args=(
   run --rm --interactive
@@ -159,4 +171,6 @@ publication_started=true
 mv "$staging_parent/run" "$output"
 published=true
 rmdir "$staging_parent"
+rmdir "$publication_lock"
+lock_acquired=false
 trap - EXIT
