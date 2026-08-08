@@ -16,6 +16,17 @@ historical_run="$eval_dir/runs/2026-07-12-codex-gpt-5.4-final21-network-off"
 node "$eval_dir/bin/validate-json.mjs" "$historical_run" >/dev/null
 "$eval_dir/bin/validate-run-pair" "$historical_run/run.json" \
   "$historical_run/invocation.json"
+missing_dependency_root="$tmp/missing-validator-dependencies"
+set +e
+EVAL_HARNESS_DEPENDENCY_ROOT="$missing_dependency_root" \
+  "$eval_dir/bin/validate-run" "$historical_run" \
+  >"$tmp/missing-validator-dependencies-output" \
+  2>"$tmp/missing-validator-dependencies-error"
+missing_dependencies_exit=$?
+set -e
+test "$missing_dependencies_exit" = 69
+rg -Fq "pnpm --dir $missing_dependency_root install" \
+  "$tmp/missing-validator-dependencies-error"
 "$eval_dir/bin/validate-evidence-entries" "$historical_run"
 invalid_entries_run="$tmp/invalid-evidence-entries"
 cp -R "$historical_run" "$invalid_entries_run"
@@ -28,17 +39,45 @@ fi
 rg -q 'evidence top-level entries mismatch' "$tmp/invalid-evidence-entries-error"
 
 mkdir "$tmp/fake-proc" "$tmp/fake-proc/1"
-EVAL_ISOLATED_PID_NAMESPACE=1 EVAL_PROC_ROOT="$tmp/fake-proc" EVAL_RUNNER_PID=1 \
+: >"$tmp/fake-proc/1/status"
+if EVAL_PROC_ROOT="$tmp/fake-proc" \
+  "$eval_dir/bin/assert-agent-call-contained" "$tmp/absent-agent-output" \
+  2>"$tmp/inactive-proc-override-error"; then
+  echo "agent containment ignored a test-only override outside test mode" >&2
+  exit 1
+fi
+rg -q 'process overrides require explicit test mode' "$tmp/inactive-proc-override-error"
+if EVAL_ISOLATED_PID_NAMESPACE=1 EVAL_PROC_ROOT="$tmp/fake-proc" EVAL_RUNNER_PID=1 \
+  "$eval_dir/bin/assert-agent-call-contained" "$tmp/absent-agent-output" \
+  2>"$tmp/unauthorized-proc-override-error"; then
+  echo "agent containment accepted test-only process overrides without test mode" >&2
+  exit 1
+fi
+rg -q 'process overrides require explicit test mode' "$tmp/unauthorized-proc-override-error"
+EVAL_AGENT_CONTAINMENT_TEST_MODE=1 EVAL_ISOLATED_PID_NAMESPACE=1 \
+  EVAL_PROC_ROOT="$tmp/fake-proc" EVAL_RUNNER_PID=1 \
   "$eval_dir/bin/assert-agent-call-contained" "$tmp/absent-agent-output"
 mkdir "$tmp/fake-proc/42"
-if EVAL_ISOLATED_PID_NAMESPACE=1 EVAL_PROC_ROOT="$tmp/fake-proc" EVAL_RUNNER_PID=1 \
+: >"$tmp/fake-proc/42/status"
+if EVAL_AGENT_CONTAINMENT_TEST_MODE=1 EVAL_ISOLATED_PID_NAMESPACE=1 \
+  EVAL_PROC_ROOT="$tmp/fake-proc" EVAL_RUNNER_PID=1 \
   "$eval_dir/bin/assert-agent-call-contained" "$tmp/absent-agent-output" \
   2>"$tmp/lingering-agent-error"; then
   echo "agent containment accepted a lingering process" >&2
   exit 1
 fi
 rg -q 'agent process remains' "$tmp/lingering-agent-error"
-rmdir "$tmp/fake-proc/42"
+rm -r "$tmp/fake-proc/42"
+mkdir "$tmp/fake-proc/2"
+if EVAL_AGENT_CONTAINMENT_TEST_MODE=1 EVAL_ISOLATED_PID_NAMESPACE=1 \
+  EVAL_PROC_ROOT="$tmp/fake-proc" EVAL_RUNNER_PID=1 \
+  "$eval_dir/bin/assert-agent-call-contained" "$tmp/absent-agent-output" \
+  2>"$tmp/empty-process-dir-error"; then
+  echo "agent containment accepted an empty process directory" >&2
+  exit 1
+fi
+rg -q 'process directory is empty' "$tmp/empty-process-dir-error"
+rm -r "$tmp/fake-proc/2"
 mkdir "$tmp/injected-agent-output"
 if "$eval_dir/bin/assert-agent-call-contained" "$tmp/injected-agent-output" \
   2>"$tmp/injected-agent-output-error"; then
@@ -208,6 +247,11 @@ NODE
 
 mkdir "$tmp/credential-output"
 printf '%s' 'test-model-credential-with-embedded-byte-check' >"$tmp/model-credential"
+printf '\001' >"$tmp/one-byte-model-credential"
+head -c 131073 /dev/zero >"$tmp/credential-output/large-nonmatching-artifact.bin"
+"$eval_dir/bin/assert-credential-absent" "$tmp/credential-output" \
+  "$tmp/one-byte-model-credential"
+rg -Fq '$carry = $carry_length == 0 ? ""' "$eval_dir/bin/assert-credential-absent"
 printf '%s' 'prefix:test-model-credential-with-embedded-byte-check:suffix' \
   >"$tmp/credential-output/embedded.txt"
 if "$eval_dir/bin/assert-credential-absent" "$tmp/credential-output" "$tmp/model-credential" \
@@ -730,6 +774,7 @@ rg -Fq 'agent_args+=(--sandbox workspace-write)' "$eval_dir/bin/run-eval"
 rg -Fq 'execution_boundary="isolated-host-attested"' "$eval_dir/bin/run-eval"
 rg -q '^isolated_host_attestation=false$' "$eval_dir/bin/run-eval"
 rg -q -- '--ack-disposable-secret-free-host' "$eval_dir/bin/run-eval"
+rg -Fq '[--model-credential-stdin]' "$eval_dir/bin/run-eval"
 rg -Fq 'maximum_agent_call_wall_clock_seconds=$((probe_timeout_seconds + timeout_seconds))' \
   "$eval_dir/bin/run-eval"
 rg -q 'scaffold_timeout_seconds:\$scaffold_timeout' "$eval_dir/bin/run-eval"
@@ -835,12 +880,20 @@ rg -Fq 'codex exec --help' "$isolated_host/smoke-runtime"
 rg -Fq 'claude --version' "$isolated_host/smoke-runtime"
 rg -Fq 'build-claude-agent-report-schema' "$isolated_host/smoke-runtime"
 rg -Fq 'CODEX_EVAL' "$isolated_host/smoke-runtime"
+rg -Fq 'http.createServer' "$isolated_host/smoke-runtime"
+rg -Fq 'Claude did not attempt the loopback endpoint' "$isolated_host/smoke-runtime"
+rg -Fq "'^POST /v1/messages([?].*)?$'" "$isolated_host/smoke-runtime"
+if rg -Fq '127.0.0.1:9' "$isolated_host/smoke-runtime"; then
+  echo "Claude schema smoke still relies on an unobserved closed endpoint" >&2
+  exit 1
+fi
 rg -Fq -- '--mount "type=bind,source=$root,target=/repo,readonly"' \
   "$isolated_host/run-in-container"
 rg -Fq -- '--mount "type=bind,source=$staging_parent,target=/evidence"' \
   "$isolated_host/run-in-container"
 rg -Fq -- '--read-only' "$isolated_host/run-in-container"
 rg -Fq -- '--cap-drop ALL' "$isolated_host/run-in-container"
+rg -Fq -- '--pids-limit 4096' "$isolated_host/run-in-container"
 rg -Fq -- '--security-opt no-new-privileges' "$isolated_host/run-in-container"
 rg -Fq -- '--model-credential-stdin' "$isolated_host/run-in-container"
 rg -Fq -- '<"$credential_real"' "$isolated_host/run-in-container"
@@ -850,6 +903,13 @@ rg -Fq -- 'source=$git_common_dir,target=$git_common_dir,readonly' \
 rg -Fq -- 'EVAL_HARNESS_DEPENDENCY_ROOT=/opt/pro-app-buildability' \
   "$isolated_host/run-in-container"
 rg -Fq -- 'EVAL_ISOLATED_PID_NAMESPACE=1' "$isolated_host/run-in-container"
+rg -Fq 'No React on Rails Pro license token is required for evaluation, development, or CI.' \
+  "$isolated_host/README.md"
+rg -Uq 'Do not provision a\s+Pro license token in this harness\.' "$isolated_host/README.md"
+rg -Fxq 'FROM node:22-bookworm@sha256:0557ac14e0d45d02ed563067b82856ca5e7aa3437fa28d98d4350ea9c3d9494a AS node_runtime' \
+  "$isolated_host/Dockerfile"
+rg -Fxq 'FROM ruby:3.4-bookworm@sha256:56e0c9fdbf64d090e45072d32f0d3be7f2e392e733444f7d176a50881e6c325a' \
+  "$isolated_host/Dockerfile"
 rg -Fq -- 'pnpm --dir /opt/pro-app-buildability install --frozen-lockfile --ignore-workspace' \
   "$isolated_host/Dockerfile"
 rg -Fq -- "createRequire(path.join(dependencyRoot, 'package.json'))" \
@@ -919,6 +979,7 @@ fi
 test "$(cat "$tmp/fake-docker-stdin-sha")" = \
   "$(shasum -a 256 "$tmp/wrapper-model-credential" | awk '{print $1}')"
 rg -Fxq -- '--model-credential-stdin' "$tmp/fake-docker-args"
+test "$(awk '$0 == "--pids-limit" { getline; print; exit }' "$tmp/fake-docker-args")" = 4096
 test "$(awk '$0 == "--run-id" { getline; print; exit }' "$tmp/fake-docker-args")" = \
   requested-run-id
 rg -Fxq -- '/run/eval-private:rw,noexec,nosuid,nodev,mode=0700,uid='"$(id -u)"',gid='"$(id -g)" \
@@ -1097,6 +1158,17 @@ if "$eval_dir/bin/run-eval" --agent codex --model test-model --timeout 10 \
   exit 1
 fi
 rg -q 'workspace must be outside the repository' "$tmp/nested-error"
+
+ln -s "$root" "$tmp/repository-link"
+if (cd "$tmp/repository-link" && \
+  "$tmp/repository-link/internal/agent-evals/pro-app-buildability/bin/run-eval" \
+    --agent codex --model test-model --timeout 10 \
+    --workspace "$root/nested-eval-workspace" --output "$tmp/symlinked-root-output") \
+  2>"$tmp/symlinked-root-error"; then
+  echo "symlinked repository path bypassed workspace containment" >&2
+  exit 1
+fi
+rg -q 'workspace must be outside the repository' "$tmp/symlinked-root-error"
 
 printf '%s\n' \
   '{"schema_version":"1.0","sandbox_network_access":true,"limits":{"max_bytes":1048576,"max_events":5000,"observed_bytes":1,"observed_events":1,"exceeded":false,"reason":null},"npm":{"attempts":[{"command_id":"command-1","exit_code":1}],"status":"pass"},"rubygems":{"attempts":[],"status":"fail"},"overall":"pass"}' \

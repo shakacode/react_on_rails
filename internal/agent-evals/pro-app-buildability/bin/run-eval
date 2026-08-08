@@ -3,7 +3,7 @@ set -euo pipefail
 umask 077
 
 usage() {
-  echo "usage: $0 --agent codex|claude --model MODEL --timeout SECONDS --workspace ABSOLUTE_PATH --output PATH [--run-id ID] [--model-credential-file FILE] [--ack-disposable-secret-free-host]" >&2
+  echo "usage: $0 --agent codex|claude --model MODEL --timeout SECONDS --workspace ABSOLUTE_PATH --output PATH [--run-id ID] [--model-credential-file FILE] [--model-credential-stdin] [--ack-disposable-secret-free-host]" >&2
 }
 
 agent=""
@@ -67,7 +67,7 @@ if [[ -n "$model_credential_file" || "$model_credential_stdin" == true ]]; then
   fi
 fi
 
-root="$(git rev-parse --show-toplevel)"
+root="$(realpath "$(git rev-parse --show-toplevel)")"
 eval_dir="$root/internal/agent-evals/pro-app-buildability"
 dependency_root="${EVAL_HARNESS_DEPENDENCY_ROOT:-$eval_dir}"
 if command -v timeout >/dev/null; then

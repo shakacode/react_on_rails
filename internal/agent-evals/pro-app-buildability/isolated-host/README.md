@@ -28,7 +28,8 @@ For attested Codex only, the runner therefore uses
 `--dangerously-bypass-approvals-and-sandbox` and records
 `isolated-host-attested`. The outer container remains read-only except for its
 UID-owned tmpfs workspace/private areas and evidence staging bind, drops every
-capability, and enables `no-new-privileges`. No extra privilege, capability, or
+capability, limits the container to 4096 processes, and enables
+`no-new-privileges`. No extra privilege, capability, or
 environment inheritance is added. Non-attested Codex diagnostics retain the
 inner `workspace-write` sandbox; never use the attested bypass outside this
 reviewed disposable-host boundary.
@@ -60,11 +61,9 @@ reject all symlinks. The committed output continues to record
 `auth_material_persisted: false`; it records availability and the attested file
 broker, never credential values or paths.
 
-The React on Rails Pro license is not handled by this broker. Provision it only
-through the product's supported licensing flow on the disposable isolated host;
-never add it to the environment, image, repository, prompt, or command line.
-Do not run the real eval until both the operator model credential and required
-Pro license are available on that host.
+No React on Rails Pro license token is required for evaluation, development, or CI.
+The real eval requires only the operator model credential. Do not provision a Pro license token in this harness.
+Never add one to the environment, image, repository, prompt, or command line.
 
 ## Build
 

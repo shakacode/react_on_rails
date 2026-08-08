@@ -1,6 +1,6 @@
-FROM node:22-bookworm AS node_runtime
+FROM node:22-bookworm@sha256:0557ac14e0d45d02ed563067b82856ca5e7aa3437fa28d98d4350ea9c3d9494a AS node_runtime
 
-FROM ruby:3.4-bookworm
+FROM ruby:3.4-bookworm@sha256:56e0c9fdbf64d090e45072d32f0d3be7f2e392e733444f7d176a50881e6c325a
 
 ARG CODEX_VERSION=0.144.4
 ARG CLAUDE_CODE_VERSION=2.1.210

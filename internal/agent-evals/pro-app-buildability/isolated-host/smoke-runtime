@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Non-network runtime smoke for the isolated image. This prepares the exact
 # package state used by run-eval, starts CLI help/version surfaces, and checks
-# Claude schema parsing with a synthetic invalid key against a closed local
-# endpoint. It never reaches a model API or reads an operator credential.
+# Claude schema parsing with a synthetic invalid key against a loopback stub.
+# It never reaches a model API or reads an operator credential.
 set -euo pipefail
 umask 077
 
@@ -12,8 +12,13 @@ private_dir=/run/eval-private/runtime-smoke
 state_dir="$workspace/.ror-eval-state"
 runner_home="$private_dir/runner-home"
 agent_home="$private_dir/agent-home"
+claude_stub_pid=""
 
 cleanup() {
+  if [[ -n "$claude_stub_pid" ]]; then
+    kill "$claude_stub_pid" 2>/dev/null || true
+    wait "$claude_stub_pid" 2>/dev/null || true
+  fi
   chmod -R u+rwX "$workspace" "$private_dir" 2>/dev/null || true
   rm -rf "$workspace" "$private_dir"
 }
@@ -84,10 +89,37 @@ chmod 700 "$synthetic_gem_dir/bin/ror-eval-runtime-smoke"
 "${minimal_env[@]}" claude --version >/dev/null
 
 claude_schema="$("$eval_dir/bin/build-claude-agent-report-schema")"
+claude_stub_port_file="$private_dir/claude-loopback-port"
+claude_stub_request_file="$private_dir/claude-loopback-request"
+node --input-type=module - "$claude_stub_port_file" "$claude_stub_request_file" <<'NODE' &
+import fs from 'node:fs';
+import http from 'node:http';
+
+const [portFile, requestFile] = process.argv.slice(2);
+const server = http.createServer((request, response) => {
+  fs.appendFileSync(requestFile, `${request.method} ${request.url}\n`, { mode: 0o600 });
+  request.resume();
+  response.writeHead(503, { 'content-type': 'application/json' });
+  response.end(JSON.stringify({ error: { type: 'offline_smoke', message: 'loopback only' } }));
+});
+server.listen(0, '127.0.0.1', () => {
+  fs.writeFileSync(portFile, String(server.address().port), { mode: 0o600 });
+});
+NODE
+claude_stub_pid=$!
+for _ in {1..50}; do
+  [[ -s "$claude_stub_port_file" ]] && break
+  sleep 0.1
+done
+[[ -s "$claude_stub_port_file" ]] || {
+  echo "Claude loopback stub failed to start" >&2
+  exit 1
+}
+claude_stub_port="$(<"$claude_stub_port_file")"
 set +e
 env -i "PATH=$safe_path" "HOME=$agent_home" "TMPDIR=$private_dir/tmp" LANG=C LC_ALL=C SHELL=/bin/sh \
   CODEX_EVAL=1 ANTHROPIC_API_KEY=synthetic-invalid-never-valid \
-  ANTHROPIC_BASE_URL=http://127.0.0.1:9 timeout 8 claude -p --model sonnet \
+  ANTHROPIC_BASE_URL="http://127.0.0.1:$claude_stub_port" timeout 8 claude -p --model sonnet \
   --output-format json --json-schema "$claude_schema" 'schema parser compatibility only' \
   >"$private_dir/claude-schema-output" 2>"$private_dir/claude-schema-error"
 claude_schema_exit=$?
@@ -96,10 +128,21 @@ set -e
   echo "Claude schema smoke unexpectedly completed a model call" >&2
   exit 1
 }
+[[ -s "$claude_stub_request_file" ]] || {
+  echo "Claude did not attempt the loopback endpoint after schema parsing" >&2
+  exit 1
+}
+grep -Eq '^POST /v1/messages([?].*)?$' "$claude_stub_request_file" || {
+  echo "Claude did not issue the expected loopback model request" >&2
+  exit 1
+}
 if grep -Fq 'no schema with key or ref' \
   "$private_dir/claude-schema-output" "$private_dir/claude-schema-error"; then
   echo "Claude rejected its compatible agent-report schema" >&2
   exit 1
 fi
+kill "$claude_stub_pid" 2>/dev/null || true
+wait "$claude_stub_pid" 2>/dev/null || true
+claude_stub_pid=""
 
 echo "isolated runtime smoke passed"

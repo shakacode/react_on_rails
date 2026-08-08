@@ -106,6 +106,7 @@ docker_args=(
   run --rm --interactive
   --read-only
   --cap-drop ALL
+  --pids-limit 4096
   --security-opt no-new-privileges
   --user "$host_uid:$host_gid"
   --mount "type=bind,source=$root,target=/repo,readonly"

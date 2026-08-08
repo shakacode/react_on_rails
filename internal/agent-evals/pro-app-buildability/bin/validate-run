@@ -12,7 +12,7 @@ for command in jq node rg shasum; do
 done
 [[ -d "$dependency_root/node_modules/ajv" && -d "$dependency_root/node_modules/ajv-formats" && \
   -d "$dependency_root/node_modules/prettier" ]] || {
-  echo "install pinned validator dependencies: pnpm --dir $eval_dir install --frozen-lockfile --ignore-workspace" >&2
+  echo "install pinned validator dependencies: pnpm --dir $dependency_root install --frozen-lockfile --ignore-workspace" >&2
   exit 69
 }
 
