@@ -13,6 +13,7 @@ workspace=""
 output=""
 run_id=""
 model_credential_file=""
+model_credential_fd=9
 model_credential_stdin=false
 isolated_host_attestation=false
 while (($#)); do
@@ -49,19 +50,6 @@ if [[ -n "$model_credential_file" || "$model_credential_stdin" == true ]]; then
   if [[ -n "$model_credential_file" ]]; then
     [[ ! -L "$model_credential_file" && -f "$model_credential_file" && -s "$model_credential_file" ]] || {
       echo "model credential must be a nonempty regular file, not a symbolic link" >&2
-      exit 65
-    }
-    [[ "$(wc -c <"$model_credential_file" | tr -d ' ')" -le 1048576 ]] || {
-      echo "model credential exceeds 1048576-byte limit" >&2
-      exit 65
-    }
-    credential_mode="$("$(dirname "${BASH_SOURCE[0]}")/file-permission-mode" \
-      "$model_credential_file")" || {
-      echo "cannot determine model credential permissions" >&2
-      exit 65
-    }
-    (( (8#$credential_mode & 077) == 0 )) || {
-      echo "model credential must not be group- or world-accessible" >&2
       exit 65
     }
   fi
@@ -193,7 +181,30 @@ if [[ "$auth_material_available" == true ]]; then
   if [[ "$model_credential_stdin" == true ]]; then
     head -c 1048577 >"$brokered_credential"
   else
-    cp "$model_credential_file" "$brokered_credential"
+    exec 9<"$model_credential_file" || {
+      echo "cannot open model credential" >&2
+      exit 65
+    }
+    credential_metadata="$("$eval_dir/bin/file-descriptor-metadata" "$model_credential_fd")" || {
+      echo "cannot inspect model credential" >&2
+      exit 65
+    }
+    IFS=: read -r credential_kind credential_mode credential_size <<<"$credential_metadata"
+    [[ "$credential_kind" == regular && "$credential_size" =~ ^[1-9][0-9]*$ ]] || {
+      echo "model credential must be a nonempty regular file" >&2
+      exit 65
+    }
+    [[ "$credential_size" -le 1048576 ]] || {
+      echo "model credential exceeds 1048576-byte limit" >&2
+      exit 65
+    }
+    [[ "$credential_mode" =~ ^[0-7]{4}$ ]] || { echo "unexpected model credential mode" >&2; exit 65; }
+    (( (8#$credential_mode & 077) == 0 )) || {
+      echo "model credential must not be group- or world-accessible" >&2
+      exit 65
+    }
+    head -c 1048577 <&"$model_credential_fd" >"$brokered_credential"
+    exec 9<&-
   fi
   [[ -s "$brokered_credential" && "$(wc -c <"$brokered_credential" | tr -d ' ')" -le 1048576 ]] || {
     echo "brokered model credential must contain 1 to 1048576 bytes" >&2

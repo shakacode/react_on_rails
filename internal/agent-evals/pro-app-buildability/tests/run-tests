@@ -7,6 +7,14 @@ tmp="$(mktemp -d "${TMPDIR:-/tmp}/ror-eval-tests.XXXXXX")"
 trap 'rm -rf "$tmp"' EXIT INT TERM
 
 timeout_command="$(command -v timeout || command -v gtimeout)"
+exec 9<"$eval_dir/README.md"
+IFS=: read -r fixture_kind fixture_mode fixture_size \
+  <<<"$("$eval_dir/bin/file-descriptor-metadata" 9)"
+test "$fixture_kind" = regular
+test "$fixture_mode" = "0$("$eval_dir/bin/file-permission-mode" "$eval_dir/README.md")"
+test "$fixture_size" = "$(wc -c <"$eval_dir/README.md" | tr -d ' ')"
+test "$(head -c 1 <&9)" = '#'
+exec 9<&-
 mkdir "$tmp/forced-timeout-agents"
 for fake_agent in codex claude; do
   printf '%s\n' '#!/bin/sh' 'trap "" TERM' 'while :; do :; done' \
@@ -973,7 +981,13 @@ rg -Fq -- '--cap-drop ALL' "$isolated_host/run-in-container"
 rg -Fq -- '--pids-limit 4096' "$isolated_host/run-in-container"
 rg -Fq -- '--security-opt no-new-privileges' "$isolated_host/run-in-container"
 rg -Fq -- '--model-credential-stdin' "$isolated_host/run-in-container"
-rg -Fq -- '<"$credential_real"' "$isolated_host/run-in-container"
+rg -Fq -- '<&"$model_credential_fd"' "$isolated_host/run-in-container"
+test "$(rg -Fc -- '<"$credential_real"' "$isolated_host/run-in-container")" = 1
+rg -Fq -- 'exec 9<"$credential_real"' "$isolated_host/run-in-container"
+if rg -Fq -- 'cp "$model_credential_file"' "$eval_dir/bin/run-eval"; then
+  echo "runner reopened the credential path after validation" >&2
+  exit 1
+fi
 rg -Fq -- 'uid=$host_uid,gid=$host_gid' "$isolated_host/run-in-container"
 rg -Fq -- 'source=$git_common_dir,target=$git_common_dir,readonly' \
   "$isolated_host/run-in-container"
@@ -1014,6 +1028,7 @@ git -C "$tmp/wrapper-repo" -c user.name=Eval -c user.email=eval@example.test \
   commit --quiet -m fixture
 printf '%s' 'wrapper-test-model-credential' >"$tmp/wrapper-model-credential"
 chmod 600 "$tmp/wrapper-model-credential"
+wrapper_model_credential_sha="$(shasum -a 256 "$tmp/wrapper-model-credential" | awk '{print $1}')"
 # The generated fake expands these variables when the wrapper invokes it.
 # shellcheck disable=SC2016
 printf '%s\n' '#!/bin/sh' 'set -eu' \
@@ -1023,6 +1038,11 @@ printf '%s\n' '#!/bin/sh' 'set -eu' \
   '    type=bind,source=*,target=/evidence) evidence=${argument#type=bind,source=}; evidence=${evidence%,target=/evidence} ;;' \
   '  esac' \
   'done' \
+  'if [ -n "${FAKE_DOCKER_REPLACE_CREDENTIAL:-}" ]; then' \
+  '  printf "%s" replacement-model-credential >"$FAKE_DOCKER_REPLACE_CREDENTIAL.replacement"' \
+  '  chmod 600 "$FAKE_DOCKER_REPLACE_CREDENTIAL.replacement"' \
+  '  mv "$FAKE_DOCKER_REPLACE_CREDENTIAL.replacement" "$FAKE_DOCKER_REPLACE_CREDENTIAL"' \
+  'fi' \
   'printf "%s" "$evidence" >"$FAKE_DOCKER_EVIDENCE"' \
   'mkdir "$evidence/run"' \
   'for artifact in SHA256SUMS agent-report.json artifact-evidence.json command-evidence.json invocation.json prompt.md rubric-results.json rubric.md run.json runner-diagnostics.json sandbox-network-probe.json scenario.md workspace-status.txt; do' \
@@ -1042,6 +1062,7 @@ chmod +x "$tmp/fake-bin/docker"
   FAKE_DOCKER_ARGS="$tmp/fake-docker-args" \
   FAKE_DOCKER_EVIDENCE="$tmp/fake-docker-evidence" \
   FAKE_DOCKER_MODE=success \
+  FAKE_DOCKER_REPLACE_CREDENTIAL="$tmp/wrapper-model-credential" \
   FAKE_DOCKER_STDIN_SHA="$tmp/fake-docker-stdin-sha" \
   "$isolated_host/run-in-container" \
     --agent claude --model test-model --timeout 10 \
@@ -1054,8 +1075,8 @@ if [[ "$(dirname "$(cat "$tmp/fake-docker-evidence")")" != \
   echo "wrapper staging directory was outside the destination parent" >&2
   exit 1
 fi
-test "$(cat "$tmp/fake-docker-stdin-sha")" = \
-  "$(shasum -a 256 "$tmp/wrapper-model-credential" | awk '{print $1}')"
+test "$(cat "$tmp/fake-docker-stdin-sha")" = "$wrapper_model_credential_sha"
+test "$(cat "$tmp/wrapper-model-credential")" = replacement-model-credential
 rg -Fxq -- '--model-credential-stdin' "$tmp/fake-docker-args"
 test "$(awk '$0 == "--pids-limit" { getline; print; exit }' "$tmp/fake-docker-args")" = 4096
 test "$(awk '$0 == "--env" { getline; if ($0 == "EVAL_AGENT_CONTAINMENT_TEST_MODE=0") { print; exit } }' \

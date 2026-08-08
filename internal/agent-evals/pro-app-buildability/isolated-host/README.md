@@ -77,6 +77,15 @@ reject all symlinks. The committed output continues to record
 `auth_material_persisted: false`; it records availability and the attested file
 broker, never credential values or paths.
 
+These leak checks detect the exact credential bytes and, for Codex JSON,
+selected decoded token/key/secret leaf values. They do not prove that a
+transformed, re-encoded, encrypted, hashed, or split representation is absent.
+Accordingly, `auth_material_persisted: false` means that the defined checks
+found no raw credential or selected sensitive leaf value in the workspace or
+published evidence; it is not a cryptographic noninterference claim against a
+hostile same-UID agent. The repository-owned prompt and disposable,
+otherwise-secret-free host remain mandatory parts of this boundary.
+
 The wrapper holds an atomic destination lock from before container launch
 through the final rename. Concurrent wrapper invocations for the same output
 therefore fail rather than nesting or overwriting evidence. Unrelated writers

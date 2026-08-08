@@ -10,6 +10,7 @@ agent=""
 model=""
 timeout_seconds=""
 model_credential_file=""
+model_credential_fd=9
 output=""
 while (($#)); do
   case "$1" in
@@ -32,20 +33,12 @@ done
   exit 65
 }
 eval_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
-credential_mode="$("$eval_dir/bin/file-permission-mode" "$model_credential_file")" || {
-  echo "cannot determine model credential permissions" >&2
-  exit 65
-}
-(( (8#$credential_mode & 077) == 0 )) || {
-  echo "model credential must not be group- or world-accessible" >&2
-  exit 65
-}
 [[ ! -L "$output" && ! -e "$output" ]] || {
   echo "output must not already exist or be a symbolic link" >&2
   exit 65
 }
 
-for command_name in docker find git realpath; do
+for command_name in docker find git perl realpath; do
   command -v "$command_name" >/dev/null || {
     echo "missing required command: $command_name" >&2
     exit 69
@@ -137,6 +130,28 @@ case "$git_common_dir/" in
   *) docker_args+=(--mount "type=bind,source=$git_common_dir,target=$git_common_dir,readonly") ;;
 esac
 
+exec 9<"$credential_real" || {
+  echo "cannot open model credential" >&2
+  exit 65
+}
+credential_metadata="$("$eval_dir/bin/file-descriptor-metadata" "$model_credential_fd")" || {
+  echo "cannot inspect model credential" >&2
+  exit 65
+}
+IFS=: read -r credential_kind credential_mode credential_size <<<"$credential_metadata"
+[[ "$credential_kind" == regular && "$credential_size" =~ ^[1-9][0-9]*$ ]] || {
+  echo "model credential must be a nonempty regular file" >&2
+  exit 65
+}
+[[ "$credential_size" -le 1048576 ]] || {
+  echo "model credential exceeds 1048576-byte limit" >&2
+  exit 65
+}
+[[ "$credential_mode" =~ ^[0-7]{4}$ ]] || { echo "unexpected model credential mode" >&2; exit 65; }
+(( (8#$credential_mode & 077) == 0 )) || {
+  echo "model credential must not be group- or world-accessible" >&2
+  exit 65
+}
 docker "${docker_args[@]}" \
   "$image" \
   internal/agent-evals/pro-app-buildability/bin/run-eval \
@@ -148,7 +163,8 @@ docker "${docker_args[@]}" \
     --run-id "$run_id" \
     --model-credential-stdin \
     --ack-disposable-secret-free-host \
-  <"$credential_real"
+  <&"$model_credential_fd"
+exec 9<&-
 
 staged_entry_count=0
 expected_run_found=false
