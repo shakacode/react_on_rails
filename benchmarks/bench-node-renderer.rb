@@ -16,20 +16,30 @@ require_relative "lib/benchmark_config"
 require_relative "lib/benchmark_helpers"
 require_relative "lib/bmf_helpers"
 
+# The monorepo checkout under test. These reads target the APP side (the phase's
+# checked-out package/config/bundles), NOT the benchmark harness: CI stashes the
+# head ref's benchmarks/ outside the workspace and runs both phases with it (one
+# measuring instrument), so script-relative "../" would escape the stash instead
+# of reaching the workspace. GITHUB_WORKSPACE points at the checkout in CI; local
+# in-tree runs fall back to this script's parent directory as before.
+def workspace_root
+  ENV.fetch("GITHUB_WORKSPACE") { File.expand_path("..", __dir__) }
+end
+
 # Read configuration from source files
 def read_protocol_version
-  package_json_path = File.expand_path(
-    "../packages/react-on-rails-pro-node-renderer/package.json",
-    __dir__
+  package_json_path = File.join(
+    workspace_root,
+    "packages/react-on-rails-pro-node-renderer/package.json"
   )
   package_json = JSON.parse(File.read(package_json_path))
   package_json["protocolVersion"] || raise("protocolVersion not found in #{package_json_path}")
 end
 
 def read_password_from_config
-  config_path = File.expand_path(
-    "../react_on_rails_pro/spec/dummy/renderer/node-renderer.js",
-    __dir__
+  config_path = File.join(
+    workspace_root,
+    "react_on_rails_pro/spec/dummy/renderer/node-renderer.js"
   )
   config_content = File.read(config_path)
   match = config_content.match(/password:\s*['"]([^'"]+)['"]/)
@@ -41,6 +51,8 @@ PASSWORD = read_password_from_config
 BASE_URL = env_or_default("BASE_URL", "localhost:3800")
 PROTOCOL_VERSION = read_protocol_version
 LOAD_GENERATOR_SHARDS = env_or_default("LOAD_GENERATOR_SHARDS", 1).to_i
+RAW_RENDER_CONTENT_TYPE = "application/vnd.react-on-rails.render-request+javascript"
+RAW_RENDER_PROTOCOL_HEADER = "X-React-On-Rails-Pro-Protocol-Version"
 
 # Test cases: JavaScript expressions to evaluate
 # Format: { name: "test_name", request: "javascript_code", rsc: true/false }
@@ -73,9 +85,9 @@ end
 
 # Find all production bundles in the node-renderer bundles directory
 def find_all_production_bundles
-  bundles_dir = File.expand_path(
-    "../react_on_rails_pro/spec/dummy/.node-renderer-bundles",
-    __dir__
+  bundles_dir = File.join(
+    workspace_root,
+    "react_on_rails_pro/spec/dummy/.node-renderer-bundles"
   )
 
   unless Dir.exist?(bundles_dir)
@@ -105,8 +117,10 @@ def rsc_bundle?(bundle_timestamp)
   # Use curl with h2c since Net::HTTP doesn't support HTTP/2
   result, status = Open3.capture2(
     "curl", "-s", "--http2-prior-knowledge", "-X", "POST",
-    "-H", "Content-Type: application/x-www-form-urlencoded",
-    "-d", body,
+    "-H", "Content-Type: #{RAW_RENDER_CONTENT_TYPE}",
+    "-H", "#{RAW_RENDER_PROTOCOL_HEADER}: #{PROTOCOL_VERSION}",
+    "-H", "Authorization: Bearer #{PASSWORD}",
+    "--data-binary", body,
     url
   )
   return nil unless status.success?
@@ -145,11 +159,6 @@ def categorize_bundles(bundles)
   [rsc_bundle, non_rsc_bundle]
 end
 
-# URL-encode special characters for form body
-def url_encode(str)
-  URI.encode_www_form_component(str)
-end
-
 # Build render URL for a bundle and render name
 def render_url(bundle_timestamp, render_name)
   "http://#{BASE_URL}/bundles/#{bundle_timestamp}/render/#{render_name}"
@@ -157,11 +166,7 @@ end
 
 # Build request body for a rendering request
 def render_body(rendering_request)
-  [
-    "protocolVersion=#{url_encode(PROTOCOL_VERSION)}",
-    "password=#{url_encode(PASSWORD)}",
-    "renderingRequest=#{url_encode(rendering_request)}"
-  ].join("&")
+  rendering_request
 end
 
 def validate_node_renderer_benchmark_config!
@@ -380,7 +385,9 @@ def run_vegeta_benchmark(test_case, bundle_timestamp, shard_count: LOAD_GENERATO
   # Write targets file (Vegeta format with @body reference)
   File.write(targets_file, <<~TARGETS)
     POST #{target_url}
-    Content-Type: application/x-www-form-urlencoded
+    Content-Type: #{RAW_RENDER_CONTENT_TYPE}
+    #{RAW_RENDER_PROTOCOL_HEADER}: #{PROTOCOL_VERSION}
+    Authorization: Bearer #{PASSWORD}
     @#{body_file}
   TARGETS
 

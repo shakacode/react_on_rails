@@ -9,7 +9,7 @@ For general React on Rails configuration options, see [Configuration](README.md)
 
 1. You don't need to create an initializer if you are satisfied with the defaults as described below.
 1. Values beginning with `renderer` pertain only to using an external rendering server. You will need to ensure these values are consistent with your configuration for the external rendering server, as given in [JS configuration](../building-features/node-renderer/js-configuration.md)
-1. `config.prerender_caching` works for standard mini_racer server rendering and using an external rendering server.
+1. `config.prerender_caching` works for standard ExecJS server rendering and using an external rendering server.
 
 ## Example of Configuration
 
@@ -58,7 +58,7 @@ ReactOnRailsPro.configure do |config|
 
   # NodeRenderer is for a renderer that is stateless. It does not need restarting when the JS bundles
   # are updated. It is the only custom renderer currently supported. Leave blank to use the standard
-  # mini_racer rendering. Other option is NodeRenderer
+  # ExecJS rendering. Other option is NodeRenderer
   # Default for `server_renderer` is "ExecJS"
   config.server_renderer = "NodeRenderer"
 
@@ -92,6 +92,25 @@ ReactOnRailsPro.configure do |config|
   # the per-read socket timeout on the renderer connection. Increase this value for long-running
   # streaming SSR responses with legitimate gaps between chunks.
   config.ssr_timeout = 5
+
+  # Controls the buffer size for concurrent component streaming. When multiple
+  # streamed React components render concurrently, each writes chunks into a
+  # buffer of this size before flushing to the HTTP response. Increase for
+  # pages with many concurrent streamed components; decrease to lower memory
+  # usage per request. Must be a positive integer.
+  # Default: 64
+  # config.concurrent_component_streaming_buffer_size = 64
+
+  # Controls error handling for streaming SSR errors that occur after the
+  # initial shell HTML has been flushed to the client. When false (default),
+  # errors in async/Suspense boundaries during streamed RSC rendering are
+  # swallowed — the client sees the shell but the failing boundary never
+  # resolves. When true, those post-shell errors raise as exceptions on the
+  # Rails side, which typically aborts the stream. Set to true in
+  # development/test to surface all rendering errors; keep false in production
+  # where a partial page is usually better than no page.
+  # Default: false
+  # config.raise_non_shell_server_rendering_errors = false
 
   # If false, then crash if no backup rendering when the remote renderer is not available
   # Can be useful to set to false in development or testing to make sure that the remote renderer
@@ -189,6 +208,70 @@ ReactOnRailsPro.configure do |config|
   # - Faster page loading
   # - Selective hydration of client components
   # - Progressive rendering with Suspense boundaries
+
+  # URL path prefix for RSC payload generation routes. This is the base path
+  # where the mounted RSC payload endpoint serves Flight payloads.
+  # See: https://reactonrails.com/docs/pro/react-server-components/how-react-server-components-work
+  # Default: "rsc_payload/"
+  # config.rsc_payload_generation_url_path = "rsc_payload/"
+
+  ################################################################################
+  # ROLLING DEPLOY CONFIGURATION
+  ################################################################################
+
+  # Adapter for seeding previously-deployed bundle hashes into the Node Renderer
+  # cache during rolling deploys. The built-in adapter is
+  # ReactOnRailsPro::RollingDeployAdapters::Http; custom adapters must implement
+  # the rolling-deploy protocol (previous_bundle_hashes, fetch, upload).
+  # See: https://reactonrails.com/docs/pro/rolling-deploy-adapters
+  # Default: nil
+  # config.rolling_deploy_adapter = nil
+
+  # Bearer token for the HTTP rolling-deploy adapter (minimum 32 bytes).
+  # Required when using the built-in Http adapter.
+  # Default: nil
+  # config.rolling_deploy_token = nil
+
+  # URL(s) to seed bundles from during a rolling deploy. Accepts a string,
+  # comma-separated string, or Array of URLs.
+  # Default: nil
+  # config.rolling_deploy_previous_urls = nil
+
+  # Auto-mount path for the rolling-deploy bundles controller. Set to nil or
+  # blank to opt out of auto-mounting and keep a manual mount.
+  # Default: "/react_on_rails_pro/rolling_deploy"
+  # config.rolling_deploy_mount_path = "/react_on_rails_pro/rolling_deploy"
+
+  ################################################################################
+  # PROFILING
+  ################################################################################
+
+  # Enable server-side rendering JavaScript code profiling. When true, the Pro
+  # gem generates V8 CPU profiles during server rendering that can be analyzed
+  # with `rake react_on_rails_pro:process_v8_logs`.
+  # **ExecJS only** — this setting has no effect when using the Pro Node
+  # Renderer (`server_renderer = "NodeRenderer"`). It reconfigures the ExecJS
+  # runtime to use `node --prof` or `d8 --prof`.
+  # See: https://reactonrails.com/docs/pro/profiling-server-side-rendering-code
+  # Default: false
+  # config.profile_server_rendering_js_code = false
+
+  ################################################################################
+  # CACHE TAG INDEX
+  ################################################################################
+
+  # TTL for tag-based cache index entries (in seconds or ActiveSupport::Duration).
+  # Controls how long the tag->cache-key index entries live. After expiry, a
+  # revalidateTag call cannot find the entry — the cached fragment still lives
+  # until its own expires_in, but it won't be invalidated by tag.
+  # See: https://reactonrails.com/docs/building-features/caching
+  # Default: 604800 (7 days)
+  # config.cache_tag_index_expires_in = 604800
+
+  # Maximum number of cache-entry keys tracked per tag in the index. The oldest
+  # keys are dropped (with a warning) beyond this limit.
+  # Default: 5000
+  # config.cache_tag_index_max_keys = 5000
 end
 ```
 

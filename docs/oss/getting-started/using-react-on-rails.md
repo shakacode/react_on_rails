@@ -88,7 +88,7 @@ You must configure bundler entry points and manually register each component.
 ### Modern Auto-Bundling (Recommended)
 
 ```erb
-<%= react_component("HelloWorld", { name: "World" }, { auto_load_bundle: true }) %>
+<%= react_component("HelloWorld", props: { name: "World" }, auto_load_bundle: true) %>
 ```
 
 With auto-bundling enabled:

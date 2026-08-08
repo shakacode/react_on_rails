@@ -70,6 +70,7 @@ BENCHMARKS_CHANGED=false
 SPEC_DUMMY_CHANGED=false
 JS_CHANGED=false
 GENERATORS_CHANGED=false
+GEM_GENERATOR_SPECS_INPUT_CHANGED=false
 PRO_RUBY_CORE_CHANGED=false
 PRO_RSPEC_CHANGED=false
 PRO_JS_CHANGED=false
@@ -578,6 +579,17 @@ while IFS= read -r file; do
         SOURCE_COMMENT_ONLY_CHANGED=true
       else
         RSPEC_CHANGED=true
+        case "$file" in
+          .github/workflows/gem-tests.yml|\
+          react_on_rails/spec/react_on_rails/simplecov_helper.rb|\
+          react_on_rails/spec/react_on_rails/spec_helper.rb|\
+          react_on_rails/spec/react_on_rails/support/generator_spec_helper.rb|\
+          react_on_rails/spec/react_on_rails/support/version_test_helpers.rb|\
+          react_on_rails/spec/react_on_rails/support/shared_examples/*|\
+          react_on_rails/spec/react_on_rails/support/shared_examples/**/*)
+            GEM_GENERATOR_SPECS_INPUT_CHANGED=true
+            ;;
+        esac
         # Spec-only changes set no BENCH_* flag: specs are never shipped in the
         # gem, so they cannot move runtime performance (e.g. #3854 changed only
         # CI-config specs yet ran the core+pro suites). Benchmarks are driven by
@@ -783,6 +795,7 @@ if [ "$DOCS_ONLY" = true ]; then
     "non_runtime_only:true"
     "run_lint:false"
     "run_ruby_tests:false"
+    "run_gem_generator_specs:false"
     "run_js_tests:false"
     "run_dummy_tests:false"
     "run_generators:false"
@@ -854,6 +867,7 @@ echo "Recommended CI jobs:"
 # Determine which jobs to run
 RUN_LINT=false
 RUN_RUBY_TESTS=false
+RUN_GEM_GENERATOR_SPECS=false
 RUN_JS_TESTS=false
 RUN_DUMMY_TESTS=false
 RUN_GENERATORS=false
@@ -873,6 +887,19 @@ fi
 
 if [ "$RUBY_CORE_CHANGED" = true ] || [ "$RSPEC_CHANGED" = true ] || [ "$GENERATORS_CHANGED" = true ]; then
   RUN_RUBY_TESTS=true
+fi
+
+# Gem generator specs are much slower than the unit shard, so select them
+# independently from generic RSpec coverage. Keep the selector conservative for
+# shared/core/JS/unknown CI inputs while excluding isolated specs and the
+# release-tooling paths classified above.
+if [ "$GENERATORS_CHANGED" = true ] ||
+  [ "$GEM_GENERATOR_SPECS_INPUT_CHANGED" = true ] ||
+  [ "$RUBY_CORE_CHANGED" = true ] ||
+  [ "$JS_CHANGED" = true ] ||
+  [ "$CI_INFRA_CHANGED" = true ] ||
+  [ "$UNCATEGORIZED_CHANGED" = true ]; then
+  RUN_GEM_GENERATOR_SPECS=true
 fi
 
 # Benchmark scripts live outside the gem: they're linted by rubocop and covered
@@ -994,6 +1021,7 @@ if [ -n "${GITHUB_OUTPUT:-}" ]; then
     echo "non_runtime_only=$NON_RUNTIME_ONLY"
     echo "run_lint=$RUN_LINT"
     echo "run_ruby_tests=$RUN_RUBY_TESTS"
+    echo "run_gem_generator_specs=$RUN_GEM_GENERATOR_SPECS"
     echo "run_js_tests=$RUN_JS_TESTS"
     echo "run_dummy_tests=$RUN_DUMMY_TESTS"
     echo "run_generators=$RUN_GENERATORS"
@@ -1017,6 +1045,7 @@ if [ "${CI_JSON_OUTPUT:-}" = "1" ]; then
   "non_runtime_only": $NON_RUNTIME_ONLY,
   "run_lint": $RUN_LINT,
   "run_ruby_tests": $RUN_RUBY_TESTS,
+  "run_gem_generator_specs": $RUN_GEM_GENERATOR_SPECS,
   "run_js_tests": $RUN_JS_TESTS,
   "run_dummy_tests": $RUN_DUMMY_TESTS,
   "run_generators": $RUN_GENERATORS,

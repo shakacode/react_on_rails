@@ -58,6 +58,12 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
 
       attr_writer :using_rspack
 
+      def use_pro?
+        @use_pro == true
+      end
+
+      attr_writer :use_pro
+
       def use_rsc?
         @use_rsc == true
       end
@@ -1008,6 +1014,22 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
   end
 
   describe "#add_js_dependencies" do
+    it "uses Pro dependencies when the host exposes Pro capability privately" do
+      test_class.send(:private, :use_pro?)
+      instance.use_pro = true
+      allow(instance).to receive_messages(
+        add_react_dependencies: nil,
+        add_css_dependencies: nil,
+        add_transpiler_dependencies: nil,
+        add_dev_dependencies: nil
+      )
+
+      expect(instance).not_to receive(:add_react_on_rails_package)
+      expect(instance).to receive(:add_pro_dependencies).once
+
+      instance.send(:add_js_dependencies)
+    end
+
     it "adds Babel React preset when SWC is not used" do
       instance.using_swc = false
 

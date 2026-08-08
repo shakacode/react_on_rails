@@ -7,4 +7,4 @@
 # For manual worktree setup (no base-port tool), see .env.example.
 rails: bundle exec rails s -p ${PORT:-3000}
 dev-server: bin/shakapacker-dev-server
-server-bundle: SERVER_BUNDLE_ONLY=true bin/shakapacker-watch --watch
+server-bundle: SERVER_BUNDLE_ONLY=true <%= shakapacker_watch_command %>

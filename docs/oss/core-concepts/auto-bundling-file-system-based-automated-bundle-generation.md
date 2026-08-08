@@ -213,8 +213,8 @@ For example, if you wanted to utilize our file-system based entrypoint generatio
    4. You no longer need to register the React components within the `ReactOnRails.configuration.components_subdirectory` nor directly add their bundles. For example, you can have a Rails view using three components:
 
       ```erb
-      <%= react_component("FooComponentOne", {}, auto_load_bundle: true) %>
-      <%= react_component("BarComponentOne", {}, auto_load_bundle: true) %>
+      <%= react_component("FooComponentOne", auto_load_bundle: true) %>
+      <%= react_component("BarComponentOne", auto_load_bundle: true) %>
 
       <% append_javascript_pack_tag('SpecialComponentNotToAutoLoadBundle') %>
       <%= react_component("SpecialComponentNotToAutoLoadBundle", {}) %>
@@ -262,7 +262,7 @@ When using `auto_load_bundle: true`, your Rails layout needs to include empty pa
 
 **How it works:**
 
-1. **Component calls automatically append bundles**: When you use `<%= react_component("ComponentName", props, auto_load_bundle: true) %>` in a view, React on Rails automatically calls `append_javascript_pack_tag "generated/ComponentName"` and `append_stylesheet_pack_tag "generated/ComponentName"` (in static/production modes).
+1. **Component calls automatically append bundles**: When you use `<%= react_component("ComponentName", props: props, auto_load_bundle: true) %>` in a view, React on Rails automatically calls `append_javascript_pack_tag "generated/ComponentName"` and `append_stylesheet_pack_tag "generated/ComponentName"` (in static/production modes).
 
 2. **Layout renders appended bundles**: The empty `<%= stylesheet_pack_tag %>` and `<%= javascript_pack_tag %>` calls in your layout are where the appended component bundles get rendered.
 
@@ -273,8 +273,8 @@ When using `auto_load_bundle: true`, your Rails layout needs to include empty pa
 If your view contains:
 
 ```erb
-<%= react_component("HelloWorld", @hello_world_props, auto_load_bundle: true) %>
-<%= react_component("HeavyMarkdownEditor", @editor_props, auto_load_bundle: true) %>
+<%= react_component("HelloWorld", props: @hello_world_props, auto_load_bundle: true) %>
+<%= react_component("HeavyMarkdownEditor", props: @editor_props, auto_load_bundle: true) %>
 ```
 
 React on Rails automatically generates HTML equivalent to:
@@ -453,13 +453,13 @@ end
 `app/views/hello_world/index.html.erb`:
 
 ```erb
-<%= react_component("HelloWorld", @hello_world_props, prerender: true) %>
+<%= react_component("HelloWorld", props: @hello_world_props, prerender: true) %>
 ```
 
 `app/views/hello_world/editor.html.erb`:
 
 ```erb
-<%= react_component("HeavyMarkdownEditor", @editor_props, prerender: true) %>
+<%= react_component("HeavyMarkdownEditor", props: @editor_props, prerender: true) %>
 ```
 
 ### 7. Generate Bundles

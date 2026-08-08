@@ -154,6 +154,16 @@ describe('loadRSCClientChunkStylesheetHrefsByChunkName', () => {
     );
     expect(readFileSync).toHaveBeenCalledTimes(2);
     expect(consoleWarn).toHaveBeenCalledTimes(1);
+
+    // Once the read succeeds, the success state is cached for the life of the
+    // process: later renders reuse it and must not re-read loadable-stats.json,
+    // even far past any retry window (issue #4371 no per-request re-read).
+    now += 30_000;
+    await expect(renderWithDefaultStylesheetInference(injectRSCPayload, flightData)).resolves.toContain(
+      '<link rel="stylesheet" href="/webpack/test/css/client1-12345678.css" data-precedence="rsc-css">',
+    );
+    expect(readFileSync).toHaveBeenCalledTimes(2);
+    expect(consoleWarn).toHaveBeenCalledTimes(1);
   });
 
   it('does not repeat identical unexpected loadable-stats warnings on retry', async () => {

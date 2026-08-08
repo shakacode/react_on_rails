@@ -1,0 +1,90 @@
+schema_version: 1
+
+lifecycle:
+  required_paths:
+    - id: standard-generator
+      evidence_source: core_generator
+    - id: pro-ssr
+      evidence_source: core_generator
+    - id: pro-rsc
+      evidence_source: core_generator
+    - id: rspack
+      evidence_source: fleet
+    - id: webpack-rsc-production
+      evidence_source: release_must_have
+    - id: ssr-rsc-html
+      evidence_source: fleet
+    - id: client-navigation-interaction
+      evidence_source: fleet
+
+defaults:
+  package_manager: pnpm
+  ruby_test: bundle exec rspec
+  build: bin/build
+  review_app: null
+
+repos:
+  - name: sanitized/hard-01
+    headline: Sanitized hard gate 01
+    tier: hard_gate
+    needs_pro: false
+    packages: [{ ecosystem: gem, name: example-package }]
+    smoke: [/]
+    verify: false
+  - name: sanitized/hard-02
+    headline: Sanitized hard gate 02
+    tier: hard_gate
+    needs_pro: false
+    packages: [{ ecosystem: gem, name: example-package }]
+    smoke: [/]
+    verify: false
+  - name: sanitized/hard-03
+    headline: Sanitized hard gate 03
+    tier: hard_gate
+    needs_pro: false
+    packages: [{ ecosystem: npm, name: example-package }]
+    smoke: [/]
+    verify: false
+  - name: sanitized/hard-04
+    headline: Sanitized hard gate 04
+    tier: hard_gate
+    needs_pro: false
+    packages: [{ ecosystem: npm, name: example-package }]
+    smoke: [/]
+    verify: false
+  - name: sanitized/hard-05
+    headline: Sanitized hard gate 05
+    tier: hard_gate
+    needs_pro: false
+    packages: [{ ecosystem: gem, name: example-package }]
+    smoke: [/]
+    verify: false
+  - name: sanitized/hard-06
+    headline: Sanitized hard gate 06
+    tier: hard_gate
+    needs_pro: false
+    packages: [{ ecosystem: npm, name: example-package }]
+    smoke: [/]
+    verify: false
+  - name: sanitized/hard-07
+    headline: Sanitized hard gate 07
+    tier: hard_gate
+    needs_pro: false
+    packages: [{ ecosystem: gem, name: example-package }]
+    smoke: [/]
+    verify: false
+  - name: sanitized/soft-01
+    headline: Sanitized soft track 01
+    tier: soft_track
+  - name: sanitized/soft-02
+    headline: Sanitized soft track 02
+    tier: soft_track
+  - name: sanitized/soft-03
+    headline: Sanitized soft track 03
+    tier: soft_track
+  - name: sanitized/soft-04
+    headline: Sanitized soft track 04
+    tier: soft_track
+  - name: sanitized/soft-05
+    headline: Sanitized soft track 05
+    tier: soft_track

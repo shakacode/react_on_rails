@@ -34,7 +34,7 @@ module ReactOnRailsPro
     DEFAULT_REMOTE_BUNDLE_CACHE_ADAPTER: nil
     DEFAULT_ROLLING_DEPLOY_ADAPTER: nil
     DEFAULT_ROLLING_DEPLOY_TOKEN: nil
-    DEFAULT_ROLLING_DEPLOY_PREVIOUS_URL: nil
+    DEFAULT_ROLLING_DEPLOY_PREVIOUS_URLS: nil
     DEFAULT_ROLLING_DEPLOY_MOUNT_PATH: String
     DEFAULT_RENDERER_REQUEST_RETRY_LIMIT: Integer
     DEFAULT_THROW_JS_ERRORS: bool
@@ -71,7 +71,7 @@ module ReactOnRailsPro
     attr_accessor remote_bundle_cache_adapter: Module?
     attr_accessor rolling_deploy_adapter: Module?
     attr_accessor rolling_deploy_token: String?
-    attr_accessor rolling_deploy_previous_url: String?
+    attr_accessor rolling_deploy_previous_urls: (String | Array[String])?
     attr_accessor rolling_deploy_mount_path: String?
     attr_accessor ssr_pre_hook_js: String?
     attr_accessor assets_to_copy: Array[String]?
@@ -109,7 +109,7 @@ module ReactOnRailsPro
       ?remote_bundle_cache_adapter: Module?,
       ?rolling_deploy_adapter: Module?,
       ?rolling_deploy_token: String?,
-      ?rolling_deploy_previous_url: String?,
+      ?rolling_deploy_previous_urls: (String | Array[String])?,
       ?rolling_deploy_mount_path: String?,
       ?ssr_pre_hook_js: String?,
       ?assets_to_copy: Array[String]?,

@@ -5,7 +5,7 @@
 
 ## Requirements
 
-- You must use React on Rails v11.0.7 or higher.
+- You must use **React on Rails Pro** v16.4.0 or higher.
 
 ## Install the Gem and the Node Module
 
@@ -42,10 +42,11 @@ See the [Memory Leaks guide](../../../pro/js-memory-leaks.md) for common leak pa
    - `RENDERER_ALL_WORKERS_RESTART_INTERVAL`
    - `RENDERER_DELAY_BETWEEN_INDIVIDUAL_WORKER_RESTARTS`
    - `RENDERER_SUPPORT_MODULES`
-2. Configure ENV values and run the command. Note, you can set port with args `-p <PORT>`. For example, assuming node-renderer is in your path:
+2. Configure ENV values and run your launch script. For example:
    ```bash
-   RENDERER_SERVER_BUNDLE_CACHE_PATH=/app/.node-renderer-bundles node-renderer
+   RENDERER_SERVER_BUNDLE_CACHE_PATH=/app/.node-renderer-bundles node renderer/node-renderer.js
    ```
+   Or via a script you define in package.json, e.g. `pnpm run node-renderer` (see [JavaScript Configuration File](#javascript-configuration-file) below).
 3. You can use a command line argument of `-p SOME_PORT` to override any ENV value for the PORT.
 
 ## JavaScript Configuration File
@@ -57,7 +58,7 @@ For the most control over the setup, create a JavaScript file to start the NodeR
    mkdir renderer-app
    cd renderer-app
    ```
-2. Make sure you have **Node.js 18+** and a JavaScript package manager such as **npm**, **pnpm**, **Yarn**, or **bun**.
+2. Make sure you have **Node.js 20+** and a JavaScript package manager such as **npm**, **pnpm**, **Yarn**, or **bun**. The default setup bundles Fastify 5, which requires Node.js 20+ — on Node.js 18 the renderer exits at startup unless you pin Fastify 4 via your package manager's dependency-override mechanism (npm [`overrides`](https://docs.npmjs.com/cli/v11/configuring-npm/package-json#overrides), Yarn/Bun [`resolutions`](https://yarnpkg.com/configuration/manifest#resolutions), or pnpm [`pnpm.overrides`](https://pnpm.io/package_json#pnpmoverrides)). (The package's `engines.node` floor is `>=18.19.0`, which applies only to that Fastify 4 path.)
 3. Initialize a Node application and install the `react-on-rails-pro-node-renderer` package.
    ```sh
    npm init -y

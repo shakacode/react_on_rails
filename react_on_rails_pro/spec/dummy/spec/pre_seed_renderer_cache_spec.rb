@@ -14,6 +14,7 @@
 # https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
 
 require "rails_helper"
+require "io/wait"
 
 # Spec lives under spec/dummy/spec/ because it requires the dummy Rails environment (Rails.root, webpack paths).
 describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePath,RSpec/SpecFilePathFormat
@@ -23,7 +24,7 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
   let(:asset_filename2) { "loadable-stats3.json" }
   let(:fixture_path) { File.expand_path("./spec/fixtures/#{asset_filename}") }
   let(:fixture_path2) { File.expand_path("./spec/fixtures/#{asset_filename2}") }
-  let(:bundle_hash) { "test-bundle-hash-abc123" }
+  let(:bundle_hash) { ReactOnRailsPro::Utils.bundle_hash }
   let(:cache_dir) { Rails.root.join(".node-renderer-bundles").to_s }
   let(:bundle_dir) { File.join(cache_dir, bundle_hash) }
   let(:server_bundle_path) { Rails.root.join("public", "webpack", "production", "server-bundle.js").to_s }
@@ -43,9 +44,6 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
     allow(ReactOnRailsPro).to receive(:configuration).and_return(dbl_configuration)
     allow(ReactOnRails::Utils).to receive(:server_bundle_js_file_path).and_return(server_bundle_path)
 
-    pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
-    allow(pool).to receive(:server_bundle_hash).and_return(bundle_hash)
-
     FileUtils.mkdir_p(File.dirname(server_bundle_path))
     File.write(server_bundle_path, "// server bundle content")
 
@@ -60,6 +58,8 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
 
   after do
     FileUtils.rm_rf(cache_dir)
+    FileUtils.rm_rf("#{cache_dir}.artifact-snapshots")
+    FileUtils.rm_f("#{cache_dir}.preseed.lock")
     FileUtils.rm_f(server_bundle_path)
     FileUtils.rm_f(path_in_webpack_folder(asset_filename))
     FileUtils.rm_f(path_in_webpack_folder(asset_filename2))
@@ -80,7 +80,150 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
     end
   end
 
+  it "releases the snapshot lock before seeding previous deploys" do
+    lock_held = false
+    allow(described_class).to receive(:with_cache_mutation_lock).and_wrap_original do |method, *args, &block|
+      method.call(*args) do
+        lock_held = true
+        begin
+          block.call
+        ensure
+          lock_held = false
+        end
+      end
+    end
+    expect(ReactOnRailsPro::RollingDeployCacheStager).to receive(:call) do
+      expect(lock_held).to be(false)
+    end
+
+    described_class.call(mode: :copy)
+  end
+
   context "when mode is :symlink" do
+    it "normalizes trailing-slash and relative cache aliases to one sibling lock" do
+      expected = "#{File.expand_path(cache_dir)}.preseed.lock"
+      relative_cache = Pathname.new(cache_dir).relative_path_from(Pathname.new(Dir.pwd)).to_s
+
+      expect(described_class.send(:cache_mutation_lock_path, "#{cache_dir}/")).to eq(expected)
+      expect(described_class.send(:cache_mutation_lock_path, relative_cache)).to eq(expected)
+      expect(Pathname.new(expected).dirname).to eq(Pathname.new(cache_dir).dirname)
+    end
+
+    it "normalizes filesystem symlink aliases to one lock and snapshot root" do
+      Dir.mktmpdir("renderer-cache-alias-test") do |directory|
+        real_cache = File.join(directory, "real-cache")
+        cache_alias = File.join(directory, "cache-alias")
+        FileUtils.mkdir_p(real_cache)
+        File.symlink(real_cache, cache_alias)
+
+        expect(described_class.send(:cache_mutation_lock_path, cache_alias))
+          .to eq(described_class.send(:cache_mutation_lock_path, real_cache))
+        expect(described_class.send(:snapshot_root, cache_alias))
+          .to eq(described_class.send(:snapshot_root, real_cache))
+      end
+    end
+
+    it "serializes snapshot staging and pruning across processes" do
+      artifact_id = "rorp-v2-s-#{'a' * 64}"
+      snapshot = File.join("#{cache_dir}.artifact-snapshots", artifact_id, "#{artifact_id}.js")
+      destination = File.join(cache_dir, artifact_id, "#{artifact_id}.js")
+      writer_ready_reader, writer_ready_writer = IO.pipe
+      writer_release_reader, writer_release_writer = IO.pipe
+      pruner_attempt_reader, pruner_attempt_writer = IO.pipe
+      pruner_entered_reader, pruner_entered_writer = IO.pipe
+
+      writer_pid = fork do
+        writer_ready_reader.close
+        writer_release_writer.close
+        pruner_attempt_reader.close
+        pruner_attempt_writer.close
+        pruner_entered_reader.close
+        pruner_entered_writer.close
+        described_class.send(:with_cache_mutation_lock, cache_dir) do
+          FileUtils.mkdir_p(File.dirname(snapshot))
+          File.binwrite(snapshot, "immutable bundle")
+          writer_ready_writer.write("1")
+          writer_ready_writer.close
+          writer_release_reader.read(1)
+          ReactOnRailsPro::RendererCacheHelpers.stage_file(
+            snapshot,
+            destination,
+            :symlink,
+            log_prefix: "Pre-staged renderer cache"
+          )
+        end
+        exit! 0
+      rescue StandardError
+        exit! 1
+      end
+
+      writer_ready_writer.close
+      writer_release_reader.close
+      expect(writer_ready_reader.wait_readable(5)).not_to be_nil
+      expect(writer_ready_reader.read(1)).to eq("1")
+
+      pruner_pid = fork do
+        writer_ready_reader.close
+        writer_release_writer.close
+        pruner_attempt_reader.close
+        pruner_entered_reader.close
+        cache_alias = "#{cache_dir}/"
+        lock_path = described_class.send(:cache_mutation_lock_path, cache_alias)
+        File.open(lock_path, File::RDWR | File::CREAT, 0o600) do |lock|
+          acquired = lock.flock(File::LOCK_EX | File::LOCK_NB)
+          pruner_attempt_writer.write(acquired ? "1" : "0")
+          lock.flock(File::LOCK_UN) if acquired
+        end
+        pruner_attempt_writer.close
+        described_class.send(:with_cache_mutation_lock, cache_alias) do
+          pruner_entered_writer.write("1")
+          pruner_entered_writer.close
+          described_class.send(:prune_orphaned_artifact_snapshots, cache_alias)
+        end
+        exit! 0
+      rescue StandardError
+        exit! 1
+      end
+
+      pruner_attempt_writer.close
+      pruner_entered_writer.close
+      expect(pruner_attempt_reader.wait_readable(5)).not_to be_nil
+      expect(pruner_attempt_reader.read(1)).to eq("0")
+
+      writer_release_writer.write("1")
+      writer_release_writer.close
+      expect(pruner_entered_reader.wait_readable(5)).not_to be_nil
+      expect(pruner_entered_reader.read(1)).to eq("1")
+
+      _, writer_status = Process.wait2(writer_pid)
+      _, pruner_status = Process.wait2(pruner_pid)
+      expect(writer_status).to be_success
+      expect(pruner_status).to be_success
+      expect(File.symlink?(destination)).to be(true)
+      expect(File.realpath(destination)).to eq(File.realpath(snapshot))
+      expect(File).to exist("#{cache_dir}.preseed.lock")
+    ensure
+      [writer_ready_reader, writer_release_writer, pruner_attempt_reader, pruner_entered_reader].compact.each do |io|
+        io.close unless io.closed?
+      end
+      [writer_pid, pruner_pid].compact.each do |pid|
+        Process.kill("TERM", pid)
+        Process.wait(pid)
+      rescue Errno::ESRCH, Errno::ECHILD
+        nil
+      end
+    end
+
+    it "prunes snapshot directories whose renderer-facing cache entry was removed" do
+      snapshot_dir = File.join("#{cache_dir}.artifact-snapshots", "orphaned-id")
+      FileUtils.mkdir_p(snapshot_dir)
+      File.write(File.join(snapshot_dir, "orphaned-id.js"), "orphaned")
+
+      described_class.call(mode: :symlink)
+
+      expect(File.exist?(snapshot_dir)).to be(false)
+    end
+
     it "symlinks the bundle instead of copying it" do
       described_class.call(mode: :symlink)
 
@@ -99,7 +242,8 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
       second_asset = File.join(bundle_dir, asset_filename2)
       expect(File.symlink?(first_asset)).to be(true)
       expect(File.symlink?(second_asset)).to be(true)
-      expect(File.realpath(first_asset)).to eq(path_in_webpack_folder(asset_filename).to_s)
+      expect(File.realpath(first_asset)).to include(".artifact-snapshots/#{bundle_hash}/#{asset_filename}")
+      expect(File.binread(first_asset)).to eq(File.binread(fixture_path))
     end
 
     it "logs symlink operations with symlink-specific labels" do
@@ -116,7 +260,8 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
       File.symlink(stale_source, dest_file)
 
       expect { described_class.call(mode: :symlink) }.to output(/Pre-staged renderer cache: .* ->/).to_stdout
-      expect(File.realpath(dest_file)).to eq(server_bundle_path)
+      expect(File.realpath(dest_file)).to include(".artifact-snapshots/#{bundle_hash}/#{bundle_hash}.js")
+      expect(File.read(dest_file)).to eq("// server bundle content")
     end
 
     it "cleans up the temporary symlink when atomic replacement fails" do
@@ -142,7 +287,8 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
       described_class.call(mode: :symlink)
 
       expect(FileUtils).not_to have_received(:rm_f).with(dest_file)
-      expect(File.realpath(dest_file)).to eq(server_bundle_path)
+      expect(File.realpath(dest_file)).to include(".artifact-snapshots/#{bundle_hash}/#{bundle_hash}.js")
+      expect(File.read(dest_file)).to eq("// server bundle content")
     end
 
     it "reads each RSC manifest path once so required validation shares the asset snapshot" do
@@ -177,6 +323,26 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
           !out.include?("Pre-seeded renderer cache")
       end
       expect { described_class.call(mode: :symlink) }.to output(accurate_symlink_logs).to_stdout
+    end
+
+    it "keeps symlink targets pinned to persistent per-ID snapshot bytes" do
+      FileUtils.cp(fixture_path, path_in_webpack_folder(asset_filename))
+      allow(ReactOnRailsPro.configuration).to receive(:assets_to_copy)
+        .and_return([path_in_webpack_folder(asset_filename)])
+      artifacts = ReactOnRailsPro::Utils.renderer_artifacts(action_description: "testing immutable symlink")
+      artifact = artifacts.fetch(0)
+      File.write(server_bundle_path, "later bundle")
+      File.write(path_in_webpack_folder(asset_filename), "later companion")
+      allow(ReactOnRailsPro::Utils).to receive(:renderer_artifacts).and_return(artifacts)
+
+      described_class.call(mode: :symlink)
+
+      bundle_link = File.join(cache_dir, artifact.id, "#{artifact.id}.js")
+      companion_link = File.join(cache_dir, artifact.id, asset_filename)
+      expect(File.symlink?(bundle_link)).to be(true)
+      expect(File.binread(bundle_link)).to eq("// server bundle content")
+      expect(File.binread(companion_link)).to eq(File.binread(fixture_path))
+      expect(File.file?(File.realpath(bundle_link))).to be(true)
     end
   end
 
@@ -254,6 +420,57 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
 
       expect { pre_seed_cache }.to output(copy_logs).to_stdout
     end
+
+    it "stages a second artifact directory when only a companion changes" do
+      first_id = ReactOnRailsPro::Utils.bundle_hash
+      pre_seed_cache
+
+      File.write(path_in_webpack_folder(asset_filename), "changed companion bytes")
+      second_id = ReactOnRailsPro::Utils.bundle_hash
+      described_class.call(mode: :copy)
+
+      expect(second_id).not_to eq(first_id)
+      expect(File).to exist(File.join(cache_dir, first_id, "#{first_id}.js"))
+      expect(File).to exist(File.join(cache_dir, second_id, "#{second_id}.js"))
+    end
+
+    it "stages the captured bytes when live bundle and companion files mutate afterward" do
+      artifacts = ReactOnRailsPro::Utils.renderer_artifacts(action_description: "testing immutable pre-seed")
+      artifact = artifacts.fetch(0)
+      File.write(server_bundle_path, "later bundle")
+      File.write(path_in_webpack_folder(asset_filename), "later companion")
+      allow(ReactOnRailsPro::Utils).to receive(:renderer_artifacts).and_return(artifacts)
+
+      pre_seed_cache
+
+      immutable_bundle = File.join(cache_dir, artifact.id, "#{artifact.id}.js")
+      immutable_companion = File.join(cache_dir, artifact.id, asset_filename)
+      expect(File.binread(immutable_bundle)).to eq("// server bundle content")
+      expect(File.binread(immutable_companion)).to eq(File.binread(fixture_path))
+    end
+
+    it "keeps the previous live directory intact until the complete artifact is promoted" do
+      FileUtils.mkdir_p(bundle_dir)
+      File.write(File.join(bundle_dir, "#{bundle_hash}.js"), "previous bundle")
+      File.write(File.join(bundle_dir, asset_filename), "previous companion")
+      observed_staging_dir = nil
+
+      allow(described_class).to receive(:stage_assets).and_wrap_original do |method, artifact, staging_dir, *args|
+        observed_staging_dir = staging_dir
+        expect(staging_dir).not_to eq(bundle_dir)
+        expect(File.read(File.join(bundle_dir, "#{bundle_hash}.js"))).to eq("previous bundle")
+        method.call(artifact, staging_dir, *args)
+        expect(File.read(File.join(bundle_dir, "#{bundle_hash}.js"))).to eq("previous bundle")
+        expect(File.read(File.join(bundle_dir, asset_filename))).to eq("previous companion")
+      end
+
+      pre_seed_cache
+
+      expect(File.read(File.join(bundle_dir, "#{bundle_hash}.js"))).to eq("// server bundle content")
+      expect(File.binread(File.join(bundle_dir, asset_filename))).to eq(File.binread(fixture_path))
+      expect(File.binread(File.join(bundle_dir, asset_filename2))).to eq(File.binread(fixture_path2))
+      expect(File.exist?(observed_staging_dir)).to be(false)
+    end
   end
 
   context "when assets don't exist" do
@@ -324,6 +541,7 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
   end
 
   context "when an RSC client manifest path is a dev-server URL" do
+    let(:client_manifest_url) { "http://localhost:3035/packs/react-client-manifest.json" }
     let(:server_client_manifest_path) { path_in_webpack_folder("react-server-client-manifest.json") }
 
     before do
@@ -332,19 +550,20 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
       allow(ReactOnRailsPro::Utils).to receive_messages(
         rsc_bundle_js_file_path: server_bundle_path,
         # asset_uri_from_packer returns an HTTP URL while the dev server is running
-        react_client_manifest_file_path: "http://localhost:3035/packs/react-client-manifest.json",
+        react_client_manifest_file_path: client_manifest_url,
         react_server_client_manifest_file_path: server_client_manifest_path
       )
-
-      pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
-      allow(pool).to receive(:rsc_bundle_hash).and_return("rsc-hash")
+      allow(ReactOnRailsPro::RendererCacheHelpers).to receive(:load_url_companion)
+        .with(client_manifest_url).and_return('{"from":"dev-server"}')
     end
 
     after { FileUtils.rm_f(server_client_manifest_path) }
 
-    it "skips the URL-backed manifest with a warning instead of raising" do
+    it "materializes the URL-backed manifest so its bytes match the artifact ID" do
       expect { pre_seed_cache }
-        .to output(%r{Skipping URL-backed asset http://localhost:3035/packs/react-client-manifest\.json}).to_stderr
+        .to output(/Materialized URL asset: .*react-client-manifest\.json/).to_stdout
+
+      expect(File.read(File.join(bundle_dir, "react-client-manifest.json"))).to eq('{"from":"dev-server"}')
     end
 
     it "still stages the file-backed RSC manifest" do
@@ -359,9 +578,15 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
     before do
       FileUtils.mkdir_p(bundle_dir)
       File.write(dest_file, "// previous bundle content")
-      allow(FileUtils).to receive(:cp).and_call_original
-      allow(FileUtils).to receive(:cp)
-        .with(server_bundle_path, a_string_matching(/#{Regexp.escape(dest_file)}\.tmp-/))
+      staging_dest = %r{\A#{Regexp.escape(bundle_dir)}\.staging-\d+-[0-9a-f]+/#{Regexp.escape(bundle_hash)}\.js\z}
+      allow(ReactOnRailsPro::RendererCacheHelpers).to receive(:write_content_atomically).and_call_original
+      allow(ReactOnRailsPro::RendererCacheHelpers).to receive(:write_content_atomically)
+        .with(
+          "// server bundle content",
+          a_string_matching(staging_dest),
+          log_prefix: "Pre-seeded renderer cache",
+          source_label: Pathname.new(server_bundle_path)
+        )
         .and_raise(Errno::EIO, "disk full")
     end
 
@@ -398,18 +623,18 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
     after { FileUtils.rm_rf(directory_bundle_path) }
 
     it "raises the friendly bundle error before hashing or staging" do
-      expect { pre_seed_cache }.to raise_error(ReactOnRailsPro::Error, /Bundle not found/)
+      expect { pre_seed_cache }.to raise_error(ReactOnRailsPro::Error, /exists but is not a file/)
     end
   end
 
-  context "when the pool returns a blank server_bundle_hash" do
+  context "when canonical artifact identity construction fails" do
     before do
-      pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
-      allow(pool).to receive(:server_bundle_hash).and_return(nil)
+      allow(ReactOnRailsPro::Utils).to receive(:renderer_artifacts)
+        .and_raise(ReactOnRailsPro::Error, "artifact identity failed")
     end
 
-    it "raises rather than staging at <cache_dir>/.js" do
-      expect { pre_seed_cache }.to raise_error(ReactOnRailsPro::Error, /hash for .* is nil or blank/)
+    it "fails before staging any anonymous cache entry" do
+      expect { pre_seed_cache }.to raise_error(ReactOnRailsPro::Error, /artifact identity failed/)
       expect(File.exist?(File.join(cache_dir, ".js"))).to be(false)
     end
   end
@@ -489,7 +714,10 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
       allow(ReactOnRailsPro.configuration).to receive(:assets_to_copy).and_return(nil)
     end
 
-    after { FileUtils.rm_rf(custom_cache_dir) }
+    after do
+      FileUtils.rm_rf(custom_cache_dir)
+      FileUtils.rm_f("#{custom_cache_dir}.preseed.lock")
+    end
 
     it "uses the env var path" do
       pre_seed_cache
@@ -508,7 +736,10 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
       allow(ReactOnRailsPro.configuration).to receive(:assets_to_copy).and_return(nil)
     end
 
-    after { FileUtils.rm_rf(custom_cache_dir) }
+    after do
+      FileUtils.rm_rf(custom_cache_dir)
+      FileUtils.rm_f("#{custom_cache_dir}.preseed.lock")
+    end
 
     it "uses the deprecated env var with a warning" do
       expect { pre_seed_cache }.to output(/RENDERER_BUNDLE_PATH is deprecated/).to_stderr
@@ -527,7 +758,10 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
       allow(ReactOnRailsPro.configuration).to receive(:assets_to_copy).and_return(nil)
     end
 
-    after { FileUtils.rm_rf(custom_cache_dir) }
+    after do
+      FileUtils.rm_rf(custom_cache_dir)
+      FileUtils.rm_f("#{custom_cache_dir}.preseed.lock")
+    end
 
     it "uses the preferred env var and emits no deprecation warning" do
       expect { pre_seed_cache }.not_to output(/deprecated/).to_stderr
@@ -539,7 +773,7 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
 
   context "when RSC support is enabled" do
     let(:rsc_bundle_path) { Rails.root.join("public", "webpack", "production", "rsc-bundle.js").to_s }
-    let(:rsc_bundle_hash) { "rsc-bundle-hash-xyz789" }
+    let(:rsc_bundle_hash) { ReactOnRailsPro::Utils.rsc_bundle_hash }
     let(:client_manifest_path) { path_in_webpack_folder("react-client-manifest.json") }
     let(:server_client_manifest_path) { path_in_webpack_folder("react-server-client-manifest.json") }
 
@@ -558,9 +792,6 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
         react_client_manifest_file_path: client_manifest_path,
         react_server_client_manifest_file_path: server_client_manifest_path
       )
-
-      pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
-      allow(pool).to receive(:rsc_bundle_hash).and_return(rsc_bundle_hash)
 
       FileUtils.mkdir_p(File.dirname(rsc_bundle_path))
       File.write(rsc_bundle_path, "// rsc bundle content")

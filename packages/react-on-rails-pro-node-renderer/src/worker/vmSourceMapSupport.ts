@@ -122,8 +122,12 @@ const sourceMapLookupAttempts = new WeakSet<SourceMapLookupAttempt>();
 let warnedMissingSourceMapConstructor = false;
 
 const MAX_MISSING_SOURCE_MAP_RETRIES = 5;
+// Shared ceiling for both source-map size gates below. Kept private so the two
+// exported caps stay distinct symbols (knip flags re-exporting one value under
+// two names as a duplicate export).
+const MAX_SOURCE_MAP_BYTES = 50 * 1024 * 1024;
 /** @internal Exported for tests. */
-export const MAX_INLINE_SOURCE_MAP_BYTES = 50 * 1024 * 1024;
+export const MAX_INLINE_SOURCE_MAP_BYTES = MAX_SOURCE_MAP_BYTES;
 // External `.map` files get the same ceiling as inline maps. This is a pre-read
 // size gate, not a hard memory bound: a map that grows between the `statSync` in
 // `resolveReadableSourceMapPath` and the read below still gets read in full.
@@ -134,7 +138,7 @@ export const MAX_INLINE_SOURCE_MAP_BYTES = 50 * 1024 * 1024;
 // characters admits a different amount of data inline than externally. The
 // inline unit predates this constant and is left alone here.
 /** @internal Exported for tests. */
-export const MAX_EXTERNAL_SOURCE_MAP_BYTES = MAX_INLINE_SOURCE_MAP_BYTES;
+export const MAX_EXTERNAL_SOURCE_MAP_BYTES = MAX_SOURCE_MAP_BYTES;
 
 // `preloadSourceMapJsonForBundle` re-checks the map on every VM build, and with
 // `maxVMPoolSize` defaulting to 2 an app with more bundles than that rebuilds

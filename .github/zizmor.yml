@@ -73,12 +73,12 @@ rules:
       - examples.yml:208
       - examples.yml:209
       - examples.yml:210
-      - gem-tests.yml:56
-      - gem-tests.yml:58
-      - gem-tests.yml:61
-      - gem-tests.yml:171
-      - gem-tests.yml:172
-      - gem-tests.yml:173
+      - gem-tests.yml:57
+      - gem-tests.yml:59
+      - gem-tests.yml:62
+      - gem-tests.yml:186
+      - gem-tests.yml:187
+      - gem-tests.yml:188
       - integration-tests.yml:55
       - integration-tests.yml:57
       - integration-tests.yml:60

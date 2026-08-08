@@ -1,0 +1,115 @@
+manifest:
+  schema_version: 1
+  standing_health:
+    schema_version: 1
+    stable_release: v17.0.0
+    rsc_version: 19.2.1
+    max_minor_lag: 1
+    max_default_age_days: 45
+    dependabot_policy: v1
+    archived_targets:
+      - name: sanitized/archived
+        headline: Archived demo
+        packages: []
+  repos:
+    - name: sanitized/active-current
+      headline: Active current demo
+      tier: hard_gate
+      packages:
+        - { ecosystem: gem, name: react_on_rails }
+        - { ecosystem: npm, name: react-on-rails }
+      standing_health:
+        public: true
+        disposition: active
+        review_app: required
+        review_app_workflow: .github/workflows/cpflow-deploy-review-app.yml
+    - name: sanitized/active-drifted
+      headline: Active drifted demo
+      tier: hard_gate
+      packages:
+        - { ecosystem: gem, name: react_on_rails }
+        - { ecosystem: npm, name: react-on-rails }
+        - { ecosystem: npm, name: react-on-rails-rsc }
+      standing_health:
+        public: true
+        disposition: active
+        review_app: required
+        review_app_workflow: .github/workflows/cpflow-deploy-review-app.yml
+    - name: sanitized/report-only
+      headline: Report-only historical demo
+      tier: soft_track
+      packages:
+        - { ecosystem: gem, name: react_on_rails }
+      standing_health:
+        public: true
+        disposition: report_only
+        review_app: not_required
+    - name: sanitized/not-in-public-health
+      headline: Excluded target
+      tier: hard_gate
+      packages:
+        - { ecosystem: gem, name: react_on_rails }
+
+observations:
+  sanitized-active-current:
+    default_branch: main
+    default_commit: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    default_commit_at: "2026-07-17T12:00:00Z"
+    repository_archived: false
+    observed_at: "2026-07-18T12:00:00Z"
+    package_versions:
+      - { ecosystem: gem, name: react_on_rails, version: 17.0.0, source: lockfile }
+      - { ecosystem: npm, name: react-on-rails, version: 17.0.0, source: lockfile }
+    default_ci: { status: passed, evidence: "sanitized current-head CI" }
+    smoke: { status: passed, shared_contract: true, evidence: "sanitized exact-head smoke" }
+    review_app: { status: passed, evidence: "sanitized review-app smoke" }
+    dependabot:
+      status: passed
+      policy: v1
+      evidence: "sanitized Dependabot ecosystems and weekly groups"
+  sanitized-active-drifted:
+    default_branch: main
+    default_commit: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    default_commit_at: "2026-03-01T12:00:00Z"
+    repository_archived: false
+    observed_at: "2026-07-18T12:00:00Z"
+    package_versions:
+      - { ecosystem: gem, name: react_on_rails, version: 16.6.0, source: lockfile }
+      - { ecosystem: npm, name: react-on-rails, version: 16.6.0, source: lockfile }
+      - { ecosystem: npm, name: react-on-rails-rsc, version: 19.2.1-rc.0, source: lockfile }
+    default_ci: { status: blocked, evidence: "sanitized baseline gate failure" }
+    smoke: { status: blocked, shared_contract: false, evidence: "sanitized interaction drift" }
+    review_app: { status: unknown, evidence: "sanitized inconclusive deployed smoke" }
+    dependabot:
+      status: blocked
+      policy: v1
+      evidence: "sanitized missing ecosystem coverage"
+  sanitized-report-only:
+    default_branch: main
+    default_commit: cccccccccccccccccccccccccccccccccccccccc
+    default_commit_at: "2024-01-01T12:00:00Z"
+    repository_archived: false
+    observed_at: "2026-07-18T12:00:00Z"
+    package_versions:
+      - { ecosystem: gem, name: react_on_rails, version: 14.0.3, source: lockfile }
+    default_ci: { status: unknown, evidence: "sanitized report-only CI" }
+    smoke: { status: unknown, shared_contract: false, evidence: "sanitized report-only smoke" }
+    review_app: { status: not_applicable, evidence: "report-only" }
+    dependabot:
+      status: blocked
+      policy: v1
+      evidence: "sanitized report-only missing config"
+  sanitized-archived:
+    default_branch: main
+    default_commit: dddddddddddddddddddddddddddddddddddddddd
+    default_commit_at: "2023-01-01T12:00:00Z"
+    repository_archived: true
+    observed_at: "2026-07-18T12:00:00Z"
+    package_versions: []
+    default_ci: { status: not_applicable, evidence: "archived" }
+    smoke: { status: not_applicable, shared_contract: false, evidence: "archived" }
+    review_app: { status: not_applicable, evidence: "archived" }
+    dependabot:
+      status: not_applicable
+      policy: v1
+      evidence: "archived"

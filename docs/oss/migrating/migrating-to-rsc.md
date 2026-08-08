@@ -5,7 +5,7 @@ This guide covers the React-side challenges of migrating an existing React on Ra
 > [!NOTE]
 > **Summary for AI agents:** Use this page when the user has an existing React on Rails app and wants to adopt RSC. This covers the React-side migration (component restructuring, state, data fetching). For the initial RSC setup, see the [RSC tutorial](../../pro/react-server-components/tutorial.md). RSC requires Pro with the Node renderer.
 
-> **React on Rails Pro required:** RSC support requires [React on Rails Pro](../../pro/react-on-rails-pro.md) 4+ with the node renderer. The Pro gem provides the streaming view helpers (`stream_react_component`, `stream_react_component_with_async_props`, `rsc_payload_react_component`, and `rsc_payload_react_component_with_async_props`), the RSC webpack plugin and loader, and the `registerServerComponent` API. For setup, see the [RSC tutorial](../../pro/react-server-components/tutorial.md). For upgrade steps, see the [performance breakthroughs guide](../../pro/major-performance-breakthroughs-upgrade-guide.md).
+> **React on Rails Pro required:** RSC support requires [React on Rails Pro](../../pro/react-on-rails-pro.md) with the node renderer. Current public releases (16.2.0+) are version-aligned: install Pro at the same version as `react_on_rails`. The Pro gem provides the streaming view helpers (`stream_react_component`, `stream_react_component_with_async_props`, `rsc_payload_react_component`, and `rsc_payload_react_component_with_async_props`), the RSC webpack plugin and loader, and the `registerServerComponent` API. For setup, see the [RSC tutorial](../../pro/react-server-components/tutorial.md). For upgrade steps, see the [performance breakthroughs guide](../../pro/major-performance-breakthroughs-upgrade-guide.md).
 
 ## Why Migrate?
 
@@ -213,7 +213,7 @@ These mistakes account for the majority of setup failures:
 ## Prerequisites
 
 - React 19+
-- [React on Rails Pro](../../pro/react-on-rails-pro.md) 4+ with React on Rails 15+
+- [React on Rails Pro](../../pro/react-on-rails-pro.md) installed at the same version as React on Rails (current public releases, 16.2.0+, are version-aligned)
 - Node renderer configured (RSC requires server-side JavaScript execution)
 - RSC webpack bundle configured (see [RSC tutorial](../../pro/react-server-components/tutorial.md))
 - Node.js 20+

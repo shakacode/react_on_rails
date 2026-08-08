@@ -21,7 +21,7 @@ After these steps, every component is still a Client Component (because of the `
 
 Before starting, ensure you have:
 
-- **React on Rails Pro 4+** with **React on Rails 15+**
+- **React on Rails Pro** and **React on Rails** installed at the same version — current public releases (16.2.0+) are version-aligned, and the Pro gem depends on the exact matching `react_on_rails` release
 - **React 19.2.x** (`react` and `react-dom` both at 19.2.x with patch `>= 19.2.7` for the React on Rails Pro 17 RSC path)
 - **Node renderer** configured and running (RSC requires server-side JavaScript execution via the node renderer, not ExecJS). If you're still using ExecJS, migrate to the node renderer first -- see [Node Renderer Basics](../building-features/node-renderer/basics.md).
 - **Shakapacker** (or webpack configured via Shakapacker)

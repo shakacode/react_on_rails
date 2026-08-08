@@ -159,6 +159,70 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
     end
   end
 
+  context "when an adapter returns bytes that do not match a v2 artifact ID" do
+    let(:expected_bundle) { source_file("expected.js", contents: "expected") }
+    let(:returned_bundle) { source_file("returned.js", contents: "different") }
+    let(:asset) { source_file("manifest.json", contents: "{}") }
+    let(:artifact_id) do
+      ReactOnRailsPro::RendererArtifact.new(
+        role: :server,
+        bundle: expected_bundle,
+        companions: { "manifest.json" => asset }
+      ).id
+    end
+
+    before do
+      allow(adapter).to receive_messages(previous_bundle_hashes: [artifact_id])
+      allow(adapter).to receive(:fetch).with(artifact_id).and_return(bundle: returned_bundle, assets: [asset])
+    end
+
+    it "rejects the payload before promoting its staging directory" do
+      expect { described_class.call(cache_dir:, current_hashes: [], mode: :copy) }
+        .to output(/does not match advertised v2 artifact ID/).to_stderr
+      expect(File.exist?(File.join(cache_dir, artifact_id))).to be(false)
+    end
+  end
+
+  context "when a verified v2 payload source changes before staging" do
+    let(:src_bundle) { source_file("verified.js", contents: "verified bundle") }
+    let(:asset) { source_file("manifest.json", contents: "verified manifest") }
+    let(:artifact_id) do
+      ReactOnRailsPro::RendererArtifact.new(
+        role: :server,
+        bundle: src_bundle,
+        companions: { "manifest.json" => asset }
+      ).id
+    end
+
+    before do
+      advertised_id = artifact_id
+      allow(adapter).to receive_messages(previous_bundle_hashes: [advertised_id])
+      allow(adapter).to receive(:fetch).with(advertised_id).and_return(bundle: src_bundle, assets: [asset])
+      allow(ReactOnRailsPro::RendererArtifact).to receive(:new).and_wrap_original do |original, **keywords|
+        artifact = original.call(**keywords)
+        if keywords.fetch(:bundle).to_s == src_bundle
+          File.binwrite(src_bundle, "later bundle")
+          File.binwrite(asset, "later manifest")
+        end
+        artifact
+      end
+    end
+
+    %i[copy symlink].each do |mode|
+      it "stages the bytes bound into the verified ID in #{mode} mode" do
+        described_class.call(cache_dir:, current_hashes: [], mode:)
+
+        bundle_dir = File.join(cache_dir, artifact_id)
+        staged_bundle = File.join(bundle_dir, "#{artifact_id}.js")
+        staged_asset = File.join(bundle_dir, "manifest.json")
+        expect(File.binread(staged_bundle)).to eq("verified bundle")
+        expect(File.binread(staged_asset)).to eq("verified manifest")
+        expect(File.symlink?(staged_bundle)).to be(false)
+        expect(File.symlink?(staged_asset)).to be(false)
+      end
+    end
+  end
+
   context "when adapter#fetch returns a directory as the bundle path" do
     let(:bundle_directory) { File.join(cache_dir, "not-a-file") }
 

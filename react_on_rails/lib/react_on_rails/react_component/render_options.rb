@@ -123,7 +123,7 @@ module ReactOnRails
       end
 
       def html_options
-        options[:html_options].to_h
+        options[:html_options].to_h.dup
       end
 
       def prerender

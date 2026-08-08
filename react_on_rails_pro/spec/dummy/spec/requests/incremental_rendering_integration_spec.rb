@@ -68,6 +68,7 @@ describe "Incremental Rendering Integration", :integration do
     # Mock populate_form_with_bundle_and_assets to use fixture bundles directly
     # rubocop:disable Lint/UnusedBlockArgument
     allow(ReactOnRailsPro::Request).to receive(:populate_form_with_bundle_and_assets) do |form, check_bundle:,
+                                                                                       artifacts: nil,
                                                                                        assets_to_copy: nil|
       # rubocop:enable Lint/UnusedBlockArgument
       assets_to_copy ||= ReactOnRailsPro::Request.send(:assets_to_copy_for_upload)
@@ -364,9 +365,25 @@ describe "Incremental Rendering Integration", :integration do
           server_bundle_hash: unique_hash,
           renderer_bundle_file_name: "#{unique_hash}.js"
         )
+        retry_artifacts = [
+          instance_double(
+            ReactOnRailsPro::RendererArtifact,
+            role: :server,
+            id: unique_hash,
+            companions: {}
+          ),
+          instance_double(
+            ReactOnRailsPro::RendererArtifact,
+            role: :rsc,
+            id: rsc_bundle_hash,
+            companions: {}
+          )
+        ]
+        allow(ReactOnRailsPro::Utils).to receive(:renderer_artifacts).and_return(retry_artifacts)
 
         # rubocop:disable Lint/UnusedBlockArgument
         allow(ReactOnRailsPro::Request).to receive(:populate_form_with_bundle_and_assets) do |form, check_bundle:,
+                                                                                         artifacts: nil,
                                                                                          assets_to_copy: nil|
           # rubocop:enable Lint/UnusedBlockArgument
           assets_to_copy ||= ReactOnRailsPro::Request.send(:assets_to_copy_for_upload)
@@ -414,6 +431,21 @@ describe "Incremental Rendering Integration", :integration do
           server_bundle_hash: always_missing_hash,
           renderer_bundle_file_name: "#{always_missing_hash}.js"
         )
+        artifacts = [
+          instance_double(
+            ReactOnRailsPro::RendererArtifact,
+            role: :server,
+            id: always_missing_hash,
+            companions: {}
+          ),
+          instance_double(
+            ReactOnRailsPro::RendererArtifact,
+            role: :rsc,
+            id: rsc_bundle_hash,
+            companions: {}
+          )
+        ]
+        allow(ReactOnRailsPro::Utils).to receive(:renderer_artifacts).and_return(artifacts)
 
         # Make upload_assets a no-op so the bundle is never actually uploaded
         allow(ReactOnRailsPro::Request).to receive(:upload_assets)

@@ -3,6 +3,7 @@
 require "open-uri"
 require "execjs"
 require "react_on_rails/length_prefixed_parser"
+require "react_on_rails/lenient_json"
 
 module ReactOnRails
   module ServerRenderingPool
@@ -154,9 +155,17 @@ module ReactOnRails
             File.read(server_js_file)
           end
         rescue StandardError => e
-          msg = "You specified server rendering JS file: #{server_js_file}, but it cannot be " \
-                "read. You may set the server_bundle_js_file in your configuration to be \"\" to " \
-                "avoid this warning.\nError is: #{e}\n\n#{Utils.default_troubleshooting_section}"
+          # Sanitized: server_js_file may be an HTTP(S) URL with embedded basic-auth credentials
+          # (a supported config convenience, e.g. https://:password@host:3800). This is the
+          # public entry point that file_url_to_string is called from, so without this the
+          # sanitization inside file_url_to_string's own raise/rescue is moot for any real
+          # caller — the credential would still leak here regardless. e.message is scrubbed too:
+          # a URL malformed enough that URI.parse raises embeds the raw, unsanitized URL verbatim
+          # in URI::InvalidURIError's own message.
+          msg = "You specified server rendering JS file: #{sanitized_renderer_url(server_js_file)}, but it cannot " \
+                "be read. You may set the server_bundle_js_file in your configuration to be \"\" to " \
+                "avoid this warning.\nError is: #{strip_userinfo(e.message)}\n\n" \
+                "#{Utils.default_troubleshooting_section}"
           raise ReactOnRails::ServerBundleLoadError, msg
         end
 
@@ -398,20 +407,80 @@ module ReactOnRails
           uri.user = nil
           uri.to_s
         rescue URI::InvalidURIError
-          # Best-effort strip of the common user:pass@ form so a URL that URI rejects as
-          # malformed still doesn't leak a password into the message or logs.
-          url.to_s.gsub(%r{//[^/@]*@}, "//")
+          # A URL malformed enough that URI rejects it still shouldn't leak credentials.
+          strip_userinfo(url)
+        end
+
+        # Best-effort strip of the common user:pass@ form from arbitrary text — not just a URL
+        # value, but also free-form text that may quote one, such as the message of a
+        # URI::InvalidURIError raised from an unparseable credential-bearing URL (that message
+        # embeds the raw original string verbatim). Shared by sanitized_renderer_url's malformed-
+        # URL fallback and by the rescue blocks below, so there is exactly one definition of
+        # "strip userinfo" rather than two regexes that can drift apart.
+        def strip_userinfo(text)
+          text.to_s.gsub(%r{//[^/@]*@}, "//")
         end
 
         def file_url_to_string(url)
           response = Net::HTTP.get_response(URI.parse(url))
-          content_type_header = response["content-type"]
-          match = content_type_header.match(/\A.*; charset=(?<encoding>.*)\z/)
-          encoding_type = match[:encoding]
-          response.body.force_encoding(encoding_type)
+          unless response.is_a?(Net::HTTPSuccess)
+            raise "GET #{sanitized_renderer_url(url)} returned a non-success HTTP status: " \
+                  "#{response.code} #{response.message}"
+          end
+
+          # Label the bytes with the declared charset, then transcode to UTF-8: ExecJS's
+          # underlying JS runtime parses source as UTF-8, so a body merely *tagged* with its
+          # declared encoding (e.g. ISO-8859-1) rather than actually converted would have its
+          # non-ASCII bytes silently corrupted once the runtime re-interprets them as UTF-8.
+          #
+          # String#encode is a no-op — it does NOT validate — when the source encoding already
+          # equals the destination (UTF-8). charset_from_content_type returns UTF-8 for three of
+          # the four cases this method exists to handle (no Content-Type header, no charset
+          # parameter, and an explicit charset=utf-8), so `.encode(Encoding::UTF_8)` alone would
+          # silently let invalid bytes through unchanged on those three paths — only a genuine
+          # cross-encoding transcode (e.g. a declared ISO-8859-1 body) actually validates via
+          # `encode`. valid_encoding? is therefore checked explicitly afterward so every path
+          # fails fast, not just the cross-encoding one.
+          #
+          # An undecodable byte sequence (a charset that doesn't actually match the bytes) is
+          # deliberately raised here rather than silently replaced with U+FFFD: this is source
+          # code, and replacing corrupt bytes would produce a bundle that parses but behaves
+          # wrongly, which is harder to diagnose than a clear load failure naming the URL.
+          decoded = response.body.dup
+                            .force_encoding(charset_from_content_type(response["content-type"]))
+                            .encode(Encoding::UTF_8)
+          unless decoded.valid_encoding?
+            raise "response body is not valid UTF-8 after decoding from the declared charset " \
+                  "(GET #{sanitized_renderer_url(url)})"
+          end
+
+          decoded
         rescue StandardError => e
-          msg = "file_url_to_string #{url} failed\nError is: #{e}\n\n#{Utils.default_troubleshooting_section}"
+          # Sanitized here too: a non-2xx response (e.g. 401/403 from a bad-credentials config) is
+          # exactly the failure mode that would otherwise put a URL's embedded password into this
+          # message, which Rails.logger and error trackers can persist. e.message is scrubbed as
+          # well as url itself: a URL malformed enough that URI.parse raises embeds the raw,
+          # unsanitized URL verbatim in URI::InvalidURIError's own message.
+          msg = "file_url_to_string #{sanitized_renderer_url(url)} failed\nError is: " \
+                "#{strip_userinfo(e.message)}\n\n#{Utils.default_troubleshooting_section}"
           raise ReactOnRails::ServerBundleLoadError, msg
+        end
+
+        # Extracts the charset from a Content-Type header value (e.g. "application/javascript;
+        # charset=utf-8"), tolerating a quoted charset value (`charset="UTF-8"`, valid per RFC
+        # 7231's quoted-string parameter syntax) and additional parameters after it (e.g.
+        # `charset=utf-8; boundary=...`). Falls back to UTF-8 — the standard default for
+        # JavaScript/JSON source — when the header is missing, has no charset parameter, or
+        # names an encoding Ruby does not recognize, rather than raising on an absent or
+        # malformed charset. See issue #4584.
+        def charset_from_content_type(content_type_header)
+          match = content_type_header.to_s.match(/;\s*charset=(?<encoding>[^;]+)/i)
+          return Encoding::UTF_8 unless match
+
+          charset = match[:encoding].strip.delete_prefix('"').delete_suffix('"')
+          Encoding.find(charset)
+        rescue ArgumentError
+          Encoding::UTF_8
         end
 
         def parse_render_result(result_string, render_options)
@@ -420,7 +489,8 @@ module ReactOnRails
           result = if result_string.to_s.include?("\t")
                      ReactOnRails::LengthPrefixedParser.parse_one_chunk_result(result_string)
                    else
-                     JSON.parse(result_string.to_s)
+                     # LenientJson repairs lone-surrogate escapes the JS renderer can emit (#4710).
+                     ReactOnRails::LenientJson.parse(result_string.to_s)
                    end
           replay_console_to_rails_logger(result, render_options)
           result

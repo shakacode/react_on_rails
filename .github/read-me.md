@@ -17,10 +17,41 @@ confirmation:
 +ci-run-hosted
 ```
 
-The command dispatches hosted workflows for the current head SHA, creates
-`ready-for-hosted-ci` if needed, and adds it so future pushes on the PR keep
-running optimized hosted CI. Hosted CI is still path-selected by
-`script/ci-changes-detector`; it does not automatically run every hosted suite.
+Start commands coordinate against older visible active CI-command runs after a
+visibility delay. Polls query only the preceding 24 hours, and a command may
+wait about 65 seconds before failing closed. This prevents routine concurrent
+duplicate dispatches, but it is not an atomic lock: a rare Actions
+list-visibility race can omit a just-queued older run and allow duplicate work.
+Exact run-ID, workflow, head, and mode validation still prevents proof
+misattribution. The command then inventories workflow runs and auditable dispatch
+proofs bound to the exact head SHA, PR number, base ref, base SHA, and workflow
+run ID.
+It skips equivalent optimized,
+queued, running, or successful coverage; dispatches only missing workflows;
+creates `ready-for-hosted-ci` if needed; and adds it so future pushes keep
+running optimized hosted CI. Before dispatch, it re-reads the PR and rejects a
+changed head or base. It then creates a head/base-bound `UNKNOWN` anchor comment;
+if that durable anchor cannot be created, no workflow is dispatched. Dispatches
+use the versioned `2026-03-10` API's `200`
+response workflow run ID, then verify that exact run's workflow path, event, and
+head SHA. A newly returned run gets up to three reads over four seconds when
+GitHub reports a transient `404` or server error; an unavailable or mismatched
+run then fails closed without recording trusted dispatch proof. Validated run
+IDs replace the anchor in place. The final update is retried; if every update
+fails, the original `UNKNOWN` anchor remains and blocks blind same-head retry.
+If GitHub persists an anchor but its create response is lost, the command
+reconciles it by source comment and workflow-run identity before dispatching.
+It revalidates the PR snapshot again after anchoring and replaces the anchor
+with a stopped audit result if the head or base moved.
+No-dispatch audit results retain the same bounded comment retry behavior.
+Manual reruns of a `CI Commands` workflow fail closed; post a new `+ci-*` comment
+to create a safely ordered command run. Selector-only
+`pull_request` workflow shells do not
+count as hosted coverage. The exception is a base-matched automatic run for a
+same-repository, non-Dependabot release-target PR, where release policy already
+runs the hosted jobs. Hosted CI is still path-selected by
+`script/ci-changes-detector`; it does
+not automatically run every hosted suite.
 
 ### `+ci-force-full` - Request Force-Full Hosted CI
 
@@ -31,9 +62,19 @@ selection:
 +ci-force-full
 ```
 
-The command dispatches the same hosted workflows with `force_full_hosted: true`,
-creates `ready-for-hosted-ci` and `force-full-hosted-ci`, and keeps future pushes
-in force-full mode until `+ci-stop-full` removes the override.
+The command dispatches only workflows missing proven exact-head force-full
+coverage, with `force_full_hosted: true`; creates `ready-for-hosted-ci` and
+`force-full-hosted-ci`; and keeps future pushes in force-full mode until
+`+ci-stop-full` removes the override. An optimized or automatic release-target
+run is not force-full evidence merely because it has the same workflow name.
+Optimized and force-full proofs identify their exact returned workflow run IDs,
+so concurrent or same-second dispatches cannot be attributed to the wrong mode.
+If an older release branch rejects the new base-context inputs, the legacy
+fallback records each workflow's effective mode; a fallback that adds
+`force_full_hosted: true` is reusable as force-full evidence.
+If an exact run is temporarily absent from the run inventory, it receives a
+two-minute visibility grace period; after that, the workflow is missing and can
+be retried instead of remaining pending forever.
 
 ### Stop And Waiver Commands
 
@@ -57,8 +98,20 @@ commits keep running optimized hosted CI.
 Records a SHA-bound hosted-CI waiver. The waiver does not cancel or block any
 workflow run and does not apply after another push.
 
-`+ci-status` summarizes labels, the current SHA, the docs-only heuristic, and
-whether a waiver exists for the current SHA. `+ci-help` prints the command list.
+`+ci-status` summarizes labels, the current SHA, the docs-only heuristic,
+automatic same-repository release-target mode, exact-head per-workflow coverage,
+the actual per-workflow mode counts, and whether a waiver exists for the current
+SHA. Status and dispatch comments
+include a machine-readable coverage marker. If Actions coverage cannot be read,
+the result is `UNKNOWN` and start commands dispatch nothing rather than guessing.
+An uncorrelated dispatch writes a durable `UNKNOWN` marker bound to the PR head
+and base. This intentionally blocks same-head retries because workflow
+acceptance cannot be proven. The operator must inspect and cancel any uncertain
+exact-head runs or let them finish, then push a new commit and retry against the
+new head; there is no same-head reset.
+Repeated all-covered Dependabot requests retain a nonzero trusted current-base
+dispatch proof so selector trust remains idempotent.
+`+ci-help` prints the command list.
 
 ## Human, Agent, And Workflow-Token Paths
 
@@ -111,8 +164,8 @@ a comment line.
 
 Comment-triggered workflows (`issue_comment`) execute from the default branch
 (`main`), not from the PR branch. When changing `ci-commands.yml`, validate the
-YAML and script locally, merge the workflow change, then test commands on a
-follow-up PR.
+YAML and run `node --test .github/workflows/ci-commands.test.cjs` locally, merge
+the workflow change, then test commands on a follow-up PR.
 
 ## Post-Merge Exercise Follow-Ups
 

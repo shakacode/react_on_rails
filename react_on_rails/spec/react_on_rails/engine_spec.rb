@@ -9,6 +9,55 @@ require "tmpdir"
 
 module ReactOnRails
   RSpec.describe Engine do
+    describe "package validation initializer" do
+      subject(:run_after_initialize) do
+        after_initialize_callback = nil
+        allow(described_class.config).to receive(:after_initialize) do |&block|
+          after_initialize_callback = block
+        end
+
+        initializer.bind(described_class.instance).run
+        after_initialize_callback.call
+      end
+
+      let(:initializer) do
+        described_class.initializers.find do |candidate|
+          candidate.name == "react_on_rails.validate_version_and_package_compatibility"
+        end
+      end
+      let(:logger) { instance_spy(ActiveSupport::Logger) }
+      let(:version_checker) { instance_spy(VersionChecker) }
+
+      before do
+        allow(described_class).to receive(:skip_version_validation?).and_return(false)
+        allow(VersionChecker).to receive(:build).and_return(version_checker)
+        allow(Rails).to receive(:logger).and_return(logger)
+      end
+
+      it "runs package validation while keeping healthy diagnostics at debug level" do
+        run_after_initialize
+
+        expect(version_checker).to have_received(:validate_version_and_package_compatibility!)
+        expect(logger).to have_received(:debug)
+          .with("[React on Rails] Validating package version and compatibility...")
+        expect(logger).to have_received(:debug)
+          .with("[React on Rails] Package validation successful")
+        expect(logger).not_to have_received(:info)
+      end
+
+      it "still fails startup when package validation finds an incompatibility" do
+        allow(version_checker).to receive(:validate_version_and_package_compatibility!)
+          .and_raise(ReactOnRails::Error, "react-on-rails package version mismatch")
+
+        expect { run_after_initialize }
+          .to raise_error(ReactOnRails::Error, "react-on-rails package version mismatch")
+        expect(logger).to have_received(:debug)
+          .with("[React on Rails] Validating package version and compatibility...")
+        expect(logger).not_to have_received(:debug)
+          .with("[React on Rails] Package validation successful")
+      end
+    end
+
     describe ".skip_version_validation?" do
       let(:package_json_path) { "/fake/path/package.json" }
 

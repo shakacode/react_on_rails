@@ -177,7 +177,7 @@ module ReactOnRails
       end
 
       def add_js_dependencies
-        using_pro = respond_to?(:use_pro?) && use_pro?
+        using_pro = respond_to?(:use_pro?, true) && use_pro?
         using_rsc = respond_to?(:use_rsc?) && use_rsc?
         # Pro package includes react-on-rails, so skip base package when using Pro
         add_react_on_rails_package unless using_pro

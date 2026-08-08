@@ -1235,6 +1235,51 @@ describe('streamServerRenderedReactComponent', () => {
     expect(chunks[0].hasErrors && chunks[1].hasErrors).toBe(false);
   });
 
+  it('emits a renderingError event when shell errors with throwJsErrors false', async () => {
+    const { renderResult } = setupStreamTest({ throwSyncError: true, throwJsErrors: false });
+    const onRenderingError = jest.fn();
+    const onError = jest.fn();
+    renderResult.on('renderingError', onRenderingError);
+    renderResult.on('error', onError);
+    await new Promise((resolve) => {
+      renderResult.once('end', resolve);
+    });
+
+    expect(onError).not.toHaveBeenCalled();
+    expect(onRenderingError).toHaveBeenCalledTimes(1);
+    expect(onRenderingError.mock.calls[0][0]).toBeInstanceOf(Error);
+    expect(onRenderingError.mock.calls[0][0].message).toContain('Sync Error');
+  });
+
+  it('emits a renderingError event when async errors with throwJsErrors false', async () => {
+    const { renderResult } = setupStreamTest({ throwAsyncError: true, throwJsErrors: false });
+    const onRenderingError = jest.fn();
+    const onError = jest.fn();
+    renderResult.on('renderingError', onRenderingError);
+    renderResult.on('error', onError);
+    await new Promise((resolve) => {
+      renderResult.once('end', resolve);
+    });
+
+    expect(onError).not.toHaveBeenCalled();
+    expect(onRenderingError).toHaveBeenCalledTimes(1);
+    expect(onRenderingError.mock.calls[0][0]).toBeInstanceOf(Error);
+  });
+
+  it('does not emit renderingError when throwJsErrors is true (uses standard error event)', async () => {
+    const { renderResult } = setupStreamTest({ throwSyncError: true, throwJsErrors: true });
+    const onRenderingError = jest.fn();
+    const onError = jest.fn();
+    renderResult.on('renderingError', onRenderingError);
+    renderResult.on('error', onError);
+    await new Promise((resolve) => {
+      renderResult.once('end', resolve);
+    });
+
+    expect(onError).toHaveBeenCalled();
+    expect(onRenderingError).not.toHaveBeenCalled();
+  });
+
   it.each(['asyncRenderFunction', 'renderFunction'])(
     'streams a component from a %s that resolves to a React component',
     async (componentType) => {

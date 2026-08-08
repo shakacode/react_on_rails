@@ -57,6 +57,14 @@ require_relative "../../react_on_rails_pro/support/caching"
 require_relative "../../react_on_rails_pro/support/mock_stream_helper"
 
 RSpec.configure do |config|
+  config.before do
+    # Preserve production-style memoization within an example without leaking
+    # process-global renderer IDs into examples that use different fixtures.
+    node_pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
+    node_pool.instance_variable_set(:@server_bundle_hash, nil)
+    node_pool.instance_variable_set(:@rsc_bundle_hash, nil)
+  end
+
   # Ensure that if we are running js tests, we are using latest webpack assets
   # This is false since we're using rails/webpacker shakapacker.yml test.compile == true
   # ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config, :requires_webpack_assets)

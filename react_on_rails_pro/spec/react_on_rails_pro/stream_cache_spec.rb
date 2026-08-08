@@ -69,6 +69,50 @@ RSpec.describe ReactOnRailsPro::StreamCache, :caching do
     end
   end
 
+  # Regression for https://github.com/shakacode/react_on_rails/issues/4581.
+  #
+  # A stream whose shell renders but whose async boundary errors emits a chunk
+  # with "hasErrors" => true yet still completes "normally" under production
+  # defaults (raise_non_shell_server_rendering_errors: false). Such a broken
+  # render must never be persisted, or the errored fragment is served from cache
+  # to every subsequent visitor until the entry expires.
+  describe "error-containing streams" do
+    let(:clean_chunk) do
+      { "consoleReplayScript" => "", "hasErrors" => false, "isShellReady" => true, "html" => "ok" }
+    end
+    let(:error_chunk) do
+      { "consoleReplayScript" => "", "hasErrors" => true, "isShellReady" => true, "html" => "boom" }
+    end
+
+    it "does not cache a stream when any chunk reports hasErrors" do
+      described_class
+        .wrap_and_cache(cache_key, upstream_yielding([clean_chunk, error_chunk]))
+        .each_chunk { |_chunk| nil }
+
+      expect(Rails.cache.read(cache_key)).to be_nil
+    end
+
+    it "still yields every chunk downstream even when the render is not cached" do
+      yielded = []
+      described_class
+        .wrap_and_cache(cache_key, upstream_yielding([clean_chunk, error_chunk]))
+        .each_chunk { |chunk| yielded << chunk }
+
+      expect(yielded.length).to eq(2)
+      expect(Rails.cache.read(cache_key)).to be_nil
+    end
+
+    it "still caches a clean stream (no chunk reports hasErrors)" do
+      described_class
+        .wrap_and_cache(cache_key, upstream_yielding([clean_chunk]))
+        .each_chunk { |_chunk| nil }
+
+      cached = Rails.cache.read(cache_key)
+      expect(cached).to be_an(Array)
+      expect(cached.first).to include("html" => "ok")
+    end
+  end
+
   describe ".fetch_stream" do
     it "returns nil when nothing was cached" do
       expect(described_class.fetch_stream("missing-key")).to be_nil

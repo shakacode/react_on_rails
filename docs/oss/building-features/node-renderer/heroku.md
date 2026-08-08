@@ -68,7 +68,7 @@ To avoid the initial round trip to get a bundle on the renderer, you can pre-sta
 See [lib/tasks/assets.rake](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/lib/tasks/assets.rake) for a couple tasks that you can use.
 
 For same-dyno / same-filesystem deployments such as Heroku, the legacy
-`react_on_rails_pro:pre_stage_bundle_for_node_renderer` task is still appropriate. It pre-stages the same bundle-hash cache layout the renderer uses at runtime, but does so with symlinks instead of copies. Prefer `react_on_rails_pro:pre_seed_renderer_cache` for Docker/image-build workflows where the cache needs to be copied into an immutable artifact.
+`react_on_rails_pro:pre_stage_bundle_for_node_renderer` task is deprecated: it emits a deprecation warning and delegates to `react_on_rails_pro:pre_seed_renderer_cache` with `MODE=symlink`. That mode pre-stages the same bundle-hash cache layout the renderer uses at runtime, but does so with symlinks instead of copies. Use `MODE=copy` (the default) for Docker/image-build workflows where the cache needs to be copied into an immutable artifact.
 
 If you're not using the default cache location, set `RENDERER_SERVER_BUNDLE_CACHE_PATH` so the files stage into the right place. `RENDERER_BUNDLE_PATH` remains a deprecated compatibility alias.
 
@@ -77,10 +77,7 @@ Then you can use the rake task: `react_on_rails_pro:pre_seed_renderer_cache MODE
 You might do something like this:
 
 ```ruby
-Rake::Task["assets:precompile"]
-    .clear_prerequisites
-    .enhance([:environment, "react_on_rails:assets:compile_environment"])
-    .enhance do
+Rake::Task["assets:precompile"].enhance do
   ReactOnRailsPro::PreSeedRendererCache.call(mode: :symlink)
 end
 ```

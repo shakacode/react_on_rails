@@ -242,7 +242,7 @@ The `pre_seed_renderer_cache` rake task stages compiled server bundles directly 
 It supports two modes, both producing the same on-disk cache layout (`<cache>/<bundleHash>/<bundleHash>.js`):
 
 - **`MODE=copy`** (default) — copies files. Use in Docker/image builds so the cache is baked into an immutable artifact.
-- **`MODE=symlink`** — creates relative symlinks. For same-filesystem workflows (local dev, CI, Heroku-style same-dyno deploys, bundle-caching restores).
+- **`MODE=symlink`** — creates relative symlinks to immutable per-artifact snapshots. For same-filesystem workflows (local dev, CI, Heroku-style same-dyno deploys, bundle-caching restores).
 
 ```dockerfile
 # After webpack/assets build step (Docker image build)
@@ -251,6 +251,8 @@ RUN bundle exec rake react_on_rails_pro:pre_seed_renderer_cache
 ```
 
 Both modes stage the server bundle, any configured `assets_to_copy`, and (when RSC is enabled) the RSC bundle and its companion manifests.
+
+Symlink mode stores its persistent targets in a sibling directory named `<cache>.artifact-snapshots/<artifact-id>/` rather than linking directly to mutable webpack outputs. This keeps the bytes behind an artifact ID stable even if a watcher rebuilds the source files. A snapshot is pruned after its corresponding `<cache>/<artifact-id>/` directory is removed and pre-seeding runs again. Pre-seeding also leaves a sibling `<cache>.preseed.lock` file in place so concurrent build processes continue to coordinate on one lock inode. If deployment cleanup removes the whole renderer cache manually, remove the sibling `.artifact-snapshots` directory at the same time; only remove the lock file when no pre-seed process is running. Moving only the cache directory without its sibling snapshots will leave dangling links.
 
 The `pre_seed_renderer_cache` task is also invoked automatically at the end of `assets:precompile`, defaulting to `MODE=symlink` so the local/CI/Heroku path has zero new configuration. To bake the cache into a Docker image when `assets:precompile` is the final asset step (rather than calling the rake task explicitly), set `ASSETS_PRECOMPILE_RENDERER_CACHE_MODE=copy` in the build environment:
 

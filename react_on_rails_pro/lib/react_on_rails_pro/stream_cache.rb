@@ -64,7 +64,9 @@ module ReactOnRailsPro
         return enum_for(:each_chunk) unless block
 
         buffered_chunks = []
+        stream_has_errors = false
         @upstream_stream.each_chunk do |chunk|
+          stream_has_errors ||= chunk_has_errors?(chunk)
           # Snapshot the chunk before handing it downstream. A downstream consumer
           # receives the same object we buffer here, and this buffered array is
           # persisted to Rails.cache after the stream completes. If a consumer
@@ -75,7 +77,23 @@ module ReactOnRailsPro
           buffered_chunks << chunk.dup
           yield(chunk)
         end
+        # Never persist a render that emitted an error chunk. With production
+        # defaults (`raise_non_shell_server_rendering_errors: false`), a stream
+        # whose shell succeeded but whose async boundary errored completes
+        # "normally", so without this guard the broken fragment would be cached
+        # and served to every subsequent visitor on this key until it expires.
+        # See https://github.com/shakacode/react_on_rails/issues/4581.
+        return if stream_has_errors
+
         Rails.cache.write(@cache_key, buffered_chunks, @cache_options || {})
+      end
+
+      private
+
+      # Chunks from the renderer are parsed JSON Hashes carrying a boolean
+      # `"hasErrors"` flag. Guard the type so a non-Hash chunk can never raise here.
+      def chunk_has_errors?(chunk)
+        chunk.is_a?(Hash) && chunk["hasErrors"] == true
       end
     end
   end

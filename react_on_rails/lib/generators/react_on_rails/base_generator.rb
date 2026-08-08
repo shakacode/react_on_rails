@@ -251,9 +251,7 @@ module ReactOnRails
         ensure_new_app_root_route_initialized
 
         base_path = "base/base/"
-        base_files = %w[Procfile.dev
-                        Procfile.dev-static-assets
-                        Procfile.dev-prod-assets
+        base_files = %w[Procfile.dev-prod-assets
                         .dev-services.yml.example
                         .env.example
                         bin/shakapacker-precompile-hook]
@@ -262,7 +260,9 @@ module ReactOnRails
         # Exception: Redux still needs the HelloWorld controller even with RSC
         base_files << "app/controllers/hello_world_controller.rb" unless use_rsc? && !options.redux?
         base_files << "app/controllers/home_controller.rb" if generate_new_app_home_page?
-        base_templates = %w[config/initializers/react_on_rails.rb]
+        base_templates = %w[Procfile.dev
+                            Procfile.dev-static-assets
+                            config/initializers/react_on_rails.rb]
         base_files.each { |file| copy_file("#{base_path}#{file}", file) }
         copy_react_on_rails_default_layout(base_path)
         warn_existing_hello_world_tailwind_layout

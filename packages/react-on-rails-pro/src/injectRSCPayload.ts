@@ -100,13 +100,24 @@ function createRSCDiagnosticScript(
   metadata: Record<string, unknown>,
   cacheKey: string,
   sanitizedNonce?: string,
+  railsEnv?: string,
 ) {
   const { hasErrors, renderingError } = metadata;
   // `hasErrors` is a boolean per the server wire contract; renderingError only carries
   // a useful diagnostic when the server provided a non-blank message or stack.
   if (hasErrors !== true && !hasRenderingErrorSignal(renderingError)) return undefined;
+  // Outside development/test, emit only the error signal without the server error message or stack.
+  // Full diagnostics are reported server-side via the streaming error reporter (Sentry/Honeybadger).
+  // Fail-closed: unknown or missing railsEnv defaults to redacted (safe for a security gate).
+  const showFullDiagnostics = railsEnv === 'development' || railsEnv === 'test';
+  // The two branches normalize `hasErrors` differently on purpose. The redacted (production)
+  // branch forces `hasErrors: true` so a chunk that only tripped `hasRenderingErrorSignal`
+  // (server sent `hasErrors: false` but a non-blank message/stack) still emits a positive
+  // generic signal for error boundaries. The development/test branch instead passes the raw
+  // metadata through unchanged to preserve the exact historical dev payload shape for debugging.
+  const clientPayload = showFullDiagnostics ? { hasErrors, renderingError } : { hasErrors: true };
   return createScriptTag(
-    `${cacheKeyDiagnosticObject(cacheKey)}||=${JSON.stringify({ hasErrors, renderingError })}`,
+    `${cacheKeyDiagnosticObject(cacheKey)}||=${JSON.stringify(clientPayload)}`,
     sanitizedNonce,
     true,
   );
@@ -1596,6 +1607,7 @@ type InjectRSCPayloadOptions = {
   rscClientManifestStylesheetHrefs?: ReadonlySet<string>;
   rscClientChunkStylesheetHrefsByChunkName?: RSCClientChunkStylesheetHrefsByChunkName;
   rscStreamObservability?: boolean;
+  railsEnv?: string;
 };
 
 /**
@@ -1635,6 +1647,7 @@ export default function injectRSCPayload(
     rscClientManifestStylesheetHrefs = new Set<string>(),
     rscClientChunkStylesheetHrefsByChunkName = loadRSCClientChunkStylesheetHrefsByChunkName(),
     rscStreamObservability = false,
+    railsEnv,
   } = options;
   const sanitizedNonce = sanitizeNonce(cspNonce);
   const htmlStream = new PassThrough();
@@ -2010,7 +2023,12 @@ export default function injectRSCPayload(
             const handleParsedChunk = (content: Uint8Array, metadata: Record<string, unknown>) => {
               const flightData = textDecoder.decode(content);
               if (!hasEmittedDiagnosticScript) {
-                const diagnosticScript = createRSCDiagnosticScript(metadata, rscPayloadKey, sanitizedNonce);
+                const diagnosticScript = createRSCDiagnosticScript(
+                  metadata,
+                  rscPayloadKey,
+                  sanitizedNonce,
+                  railsEnv,
+                );
                 if (diagnosticScript) {
                   rscPayloadBuffers.push(Buffer.from(diagnosticScript));
                   hasEmittedDiagnosticScript = true;

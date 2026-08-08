@@ -112,6 +112,16 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
     end
 
     describe ".rolling_deploy_adapter" do
+      it "accepts plural previous URLs" do
+        config = described_class.new(
+          rolling_deploy_adapter: ReactOnRailsPro::RollingDeployAdapters::Http,
+          rolling_deploy_token: "t" * 32,
+          rolling_deploy_previous_urls: ["https://new.example.com/rolling"]
+        )
+
+        expect { config.setup_config_values }.not_to raise_error
+      end
+
       it "throws if upload does not accept bundle and assets keyword arguments" do
         adapter = Class.new do
           def self.previous_bundle_hashes = []

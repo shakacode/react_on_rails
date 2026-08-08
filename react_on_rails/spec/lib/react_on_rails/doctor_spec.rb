@@ -1173,6 +1173,108 @@ RSpec.describe ReactOnRails::Doctor do
     end
   end
 
+  describe "#check_layout_files" do
+    let(:checker) { doctor.instance_variable_get(:@checker) }
+
+    def stub_layouts(layouts)
+      allow(Dir).to receive(:glob).with("app/views/layouts/**/*.erb").and_return(layouts.keys)
+      layouts.each do |path, content|
+        allow(File).to receive(:exist?).with(path).and_return(true)
+        allow(File).to receive(:read).with(path).and_return(content)
+      end
+    end
+
+    context "when a layout uses javascript_pack_tag with Propshaft stylesheet_link_tag (fresh RSC app)" do
+      before do
+        stub_layouts(
+          "app/views/layouts/application.html.erb" =>
+            %(<%= stylesheet_link_tag :app %>\n<%= javascript_pack_tag "application" %>)
+        )
+      end
+
+      it "does not warn about a missing stylesheet_pack_tag" do
+        doctor.send(:check_layout_files)
+        expect(checker.warnings?).to be(false)
+        expect(checker.messages).to include(
+          hash_including(type: :info, content: "  ℹ️  application: has javascript_pack_tag")
+        )
+      end
+    end
+
+    context "when a layout is JavaScript-pack only" do
+      before do
+        stub_layouts(
+          "app/views/layouts/application.html.erb" => %(<%= javascript_pack_tag "application" %>)
+        )
+      end
+
+      it "does not emit a symmetry warning" do
+        doctor.send(:check_layout_files)
+        expect(checker.warnings?).to be(false)
+      end
+    end
+
+    context "when a layout is stylesheet-pack only" do
+      before do
+        stub_layouts(
+          "app/views/layouts/marketing.html.erb" => %(<%= stylesheet_pack_tag "marketing" %>)
+        )
+      end
+
+      it "does not emit a symmetry warning" do
+        doctor.send(:check_layout_files)
+        expect(checker.warnings?).to be(false)
+      end
+    end
+
+    context "when a layout contains both flush helpers" do
+      before do
+        stub_layouts(
+          "app/views/layouts/react_on_rails_default.html.erb" =>
+            %(<%= stylesheet_pack_tag %>\n<%= javascript_pack_tag %>)
+        )
+      end
+
+      it "reports the layout as correctly configured without warning" do
+        doctor.send(:check_layout_files)
+        expect(checker.warnings?).to be(false)
+        expect(checker.messages).to include(
+          hash_including(
+            type: :info,
+            content: "  ✅ react_on_rails_default: has both stylesheet_pack_tag and javascript_pack_tag"
+          )
+        )
+      end
+    end
+
+    context "with the fresh generated app's two layouts (Propshaft application + RoR default)" do
+      before do
+        stub_layouts(
+          "app/views/layouts/application.html.erb" =>
+            %(<%= stylesheet_link_tag :app %>\n<%= javascript_pack_tag "application" %>),
+          "app/views/layouts/react_on_rails_default.html.erb" =>
+            %(<%= stylesheet_pack_tag %>\n<%= javascript_pack_tag %>)
+        )
+      end
+
+      it "does not increase the Doctor warning count" do
+        doctor.send(:check_layout_files)
+        expect(checker.warnings?).to be(false)
+      end
+    end
+
+    context "when no layout files are present" do
+      before do
+        allow(Dir).to receive(:glob).with("app/views/layouts/**/*.erb").and_return([])
+      end
+
+      it "produces no messages" do
+        doctor.send(:check_layout_files)
+        expect(checker.messages).to be_empty
+      end
+    end
+  end
+
   describe "#scan_view_files_for_async_pack_tag" do
     before do
       allow(Dir).to receive(:glob).and_call_original

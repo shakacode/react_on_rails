@@ -273,7 +273,7 @@ Enable Rspack in `config/shakapacker.yml`:
 ```yaml
 default: &default
   assets_bundler: 'rspack' # or 'webpack'
-  webpack_loader: 'swc' # Rspack works best with SWC
+  javascript_transpiler: 'swc' # Rspack works best with SWC
 ```
 
 ## Troubleshooting

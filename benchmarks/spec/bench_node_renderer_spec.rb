@@ -141,6 +141,32 @@ RSpec.describe "bench-node-renderer" do
   end
 
   describe "#run_vegeta_benchmark" do
+    it "sends the rendering request verbatim using the raw renderer protocol" do
+      stub_const("CONNECTIONS", 1)
+      stub_const("MAX_CONNECTIONS", 1)
+      stub_const("RATE", "max")
+      stub_const("DURATION", "1s")
+
+      writes = {}
+      allow(File).to receive(:write) { |path, contents| writes[path] = contents }
+      allow(FileUtils).to receive(:rm_f)
+      allow(Process).to receive_messages(spawn: 1, wait2: [1, process_status(success: true)])
+      allow(self).to receive_messages(system: true, parse_json_file: { "throughput" => 1,
+                                                                       "latencies" => { "50th" => 1_000_000,
+                                                                                        "90th" => 2_000_000 },
+                                                                       "status_codes" => { "200" => 1 } })
+
+      rendering_request = 'render({quoted: "value & more"})'
+      run_vegeta_benchmark({ name: "raw_request", request: rendering_request }, "bundleX", shard_count: 1)
+
+      expect(writes.fetch("#{OUTDIR}/raw_request_vegeta_body.txt")).to eq(rendering_request)
+      expect(writes.fetch("#{OUTDIR}/raw_request_vegeta_targets.txt")).to include(
+        "Content-Type: #{RAW_RENDER_CONTENT_TYPE}",
+        "#{RAW_RENDER_PROTOCOL_HEADER}: #{PROTOCOL_VERSION}",
+        "Authorization: Bearer #{PASSWORD}"
+      )
+    end
+
     it "runs all shards concurrently before merging their result streams into one Vegeta report" do
       stub_const("CONNECTIONS", 10)
       stub_const("MAX_CONNECTIONS", 10)

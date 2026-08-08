@@ -46,6 +46,40 @@ end %>
 
 A `cached_react_component_hash` variant is also available for cases where you need to extract metadata (like `<title>`) from the rendered output.
 
+### Additional Cached Helpers
+
+React on Rails Pro provides additional cached helpers for streaming, async, and RSC rendering. All share the same caching options (`cache_key`, `cache_tags`, `cache_options`, `:if`/`:unless`) as `cached_react_component`:
+
+| Helper                                   | Use case                                                                 | Prerequisites                                                        |
+| ---------------------------------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------- |
+| `cached_stream_react_component`          | Cache streamed React 18 components with Suspense                         | Requires `stream_view_containing_react_components`                   |
+| `cached_buffered_stream_react_component` | Cache streamed output as buffered HTML (no streaming setup needed)       | —                                                                    |
+| `cached_static_rsc_component`            | Cache static RSC pages with sidecar packs (strips RSC bootstrap scripts) | Requires `enable_rsc_support = true`                                 |
+| `cached_async_react_component`           | Cache async-rendered components                                          | Requires `AsyncRendering` concern and `enable_async_react_rendering` |
+
+```erb
+<%# Streaming with caching %>
+<%= cached_stream_react_component("StreamedApp", cache_key: [@user]) do
+  { user: @user.to_props }
+end %>
+
+<%# Buffered streaming (no ActionController::Live needed) %>
+<%= cached_buffered_stream_react_component("BufferedApp", cache_key: [@post]) do
+  { post: @post.to_props }
+end %>
+
+<%# Static RSC (strips RSC bootstrap scripts for fully static pages) %>
+<%= cached_static_rsc_component("StaticPage", cache_key: [@page]) do
+  { page: @page.to_props }
+end %>
+
+<%# Async rendering with caching (cache hits return immediately) %>
+<% card = cached_async_react_component("ProductCard", cache_key: [@product]) { @product.to_props } %>
+<%= card.value %>
+```
+
+> **Note:** `cached_static_rsc_component` strips only the embedded RSC payload bootstrap scripts, not general component pack scripts. For fully static pages with no client interactivity, also pass `auto_load_bundle: false` and load your explicit sidecar pack separately.
+
 ### Rails Context And Render Order
 
 Fragment-cached helpers cache the final rendered HTML. That HTML includes the Rails context tag only when the helper call that populated the cache was the first component render in that request. If the same cached fragment is later served in a different view order, the page can either miss the Rails context tag or include a duplicate one.
