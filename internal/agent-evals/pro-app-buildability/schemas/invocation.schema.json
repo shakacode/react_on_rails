@@ -28,6 +28,7 @@
     "model": { "type": "string", "minLength": 1 },
     "scaffold_timeout_seconds": { "type": "integer", "minimum": 1 },
     "probe_timeout_seconds": { "type": "integer", "minimum": 1 },
+    "timeout_kill_grace_seconds": { "type": "integer", "minimum": 0 },
     "maximum_agent_call_wall_clock_seconds": { "type": "integer", "minimum": 2 },
     "sandbox": {
       "enum": ["workspace-write", "isolated-host-attested", "claude-permission-gated"]

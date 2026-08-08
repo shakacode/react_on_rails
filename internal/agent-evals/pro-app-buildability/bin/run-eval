@@ -176,6 +176,7 @@ done
 # The positional parameter expands inside the stripped child shell.
 # shellcheck disable=SC2016
 timeout_command="$("${minimal_env[@]}" /bin/sh -c 'command -v "$1"' sh "$timeout_name")"
+timeout_kill_grace_seconds=10
 
 auth_material_available="$auth_requested"
 auth_source=none
@@ -300,10 +301,11 @@ run_agent() {
   local prompt_file="$1"
   local call_timeout="$2"
   if [[ "$agent" == codex ]]; then
-    "$timeout_command" "$call_timeout" "${minimal_env[@]}" "CODEX_HOME=$private_dir/codex-home" \
+    "$timeout_command" --kill-after "$timeout_kill_grace_seconds" "$call_timeout" \
+      "${minimal_env[@]}" "CODEX_HOME=$private_dir/codex-home" \
       codex "${agent_args[@]}" <"$prompt_file"
   else
-    (cd "$workspace" && "$timeout_command" "$call_timeout" \
+    (cd "$workspace" && "$timeout_command" --kill-after "$timeout_kill_grace_seconds" "$call_timeout" \
       "${minimal_env[@]}" claude "${agent_args[@]}" <"$prompt_file")
   fi
 }
@@ -331,19 +333,22 @@ assert_credential_absent() {
 
 probe_timeout_seconds="$timeout_seconds"
 ((probe_timeout_seconds > 120)) && probe_timeout_seconds=120
-maximum_agent_call_wall_clock_seconds=$((probe_timeout_seconds + timeout_seconds))
+maximum_agent_call_wall_clock_seconds=$((probe_timeout_seconds + timeout_seconds +
+  (2 * timeout_kill_grace_seconds)))
 
 invocation_json="$(jq -n --arg command "$agent_command" --arg agent "$agent" --arg model "$model" \
   --arg execution_boundary "$execution_boundary" \
   --arg auth_source "$auth_source" --argjson auth_material_available "$auth_material_available" \
   --argjson scaffold_timeout "$timeout_seconds" \
   --argjson probe_timeout "$probe_timeout_seconds" \
+  --argjson timeout_kill_grace "$timeout_kill_grace_seconds" \
   --argjson maximum_agent_wall_clock "$maximum_agent_call_wall_clock_seconds" \
   --arg npm_probe "$npm_probe_command" --arg rubygems_probe "$rubygems_probe_command" \
   --argjson sandbox_network_access "$sandbox_network_access" \
   --argjson isolated_host_attestation "$isolated_host_attestation" \
   '{command:$command,agent:$agent,model:$model,scaffold_timeout_seconds:$scaffold_timeout,
-    probe_timeout_seconds:$probe_timeout,maximum_agent_call_wall_clock_seconds:$maximum_agent_wall_clock,
+    probe_timeout_seconds:$probe_timeout,timeout_kill_grace_seconds:$timeout_kill_grace,
+    maximum_agent_call_wall_clock_seconds:$maximum_agent_wall_clock,
     sandbox:$execution_boundary,ephemeral:true,
     ignore_user_config:true,ignore_rules:true,strict_config:true,multi_agent:false,
     sandbox_network_access:$sandbox_network_access,isolated_host_attestation:$isolated_host_attestation,
@@ -459,6 +464,7 @@ jq -n \
   --arg execution_boundary "$execution_boundary" \
   --argjson isolated_host_attestation "$isolated_host_attestation" \
   --arg timeout_command "$timeout_command" --argjson scaffold_timeout "$timeout_seconds" \
+  --argjson timeout_kill_grace "$timeout_kill_grace_seconds" \
   --argjson maximum_agent_wall_clock "$maximum_agent_call_wall_clock_seconds" --argjson exit_code "$runner_exit" \
   --argjson probe_timeout "$probe_timeout_seconds" --argjson scaffold_invoked "$scaffold_invoked" \
   --argjson timed_out "$timed_out" --arg classification "$classification" --arg reason "$reason" \
@@ -472,7 +478,8 @@ jq -n \
       raw_cleanup:"EXIT/INT/TERM",auth_material_persisted:false},
     network_preflight:$network,
     runner:{timeout_command:$timeout_command,scaffold_timeout_seconds:$scaffold_timeout,
-      probe_timeout_seconds:$probe_timeout,maximum_agent_call_wall_clock_seconds:$maximum_agent_wall_clock,
+      probe_timeout_seconds:$probe_timeout,timeout_kill_grace_seconds:$timeout_kill_grace,
+      maximum_agent_call_wall_clock_seconds:$maximum_agent_wall_clock,
       sandbox_network_access:$sandbox_network_access,
       isolated_host_attestation:$isolated_host_attestation,network_probe_artifact:"sandbox-network-probe.json",
       exit_code:$exit_code,timed_out:$timed_out,config_artifact:"invocation.json",

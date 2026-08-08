@@ -38,6 +38,10 @@ The wrapper forces agent-containment test mode off. A custom image therefore
 cannot enable fake process-root or runner-PID overrides for a production run;
 any such image-provided override fails closed.
 
+Each agent call receives `TERM` at its configured timeout and `KILL` after a
+fixed 10-second grace. Both possible grace periods are included in the recorded
+maximum agent-call wall-clock budget.
+
 The agent CLI and its tools run under the same container UID. File-backed
 authentication therefore cannot be hidden from a malicious agent or tool while
 remaining readable by the CLI. Mode `0700` prevents access by other Unix users;

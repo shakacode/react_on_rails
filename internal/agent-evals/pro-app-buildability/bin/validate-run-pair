@@ -36,7 +36,9 @@ jq -e --slurpfile invocation "$invocation_file" \
       )
     ) and
     .runner.sandbox_network_access == $invocation[0].sandbox_network_access and
-    .runner.isolated_host_attestation == $invocation[0].isolated_host_attestation' \
+    .runner.isolated_host_attestation == $invocation[0].isolated_host_attestation and
+    (.runner.timeout_kill_grace_seconds // 0) ==
+      ($invocation[0].timeout_kill_grace_seconds // 0)' \
   "$run_file" >/dev/null || {
   echo "run/invocation security or agent identity disagrees" >&2
   exit 1

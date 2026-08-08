@@ -16,6 +16,26 @@ historical_run="$eval_dir/runs/2026-07-12-codex-gpt-5.4-final21-network-off"
 node "$eval_dir/bin/validate-json.mjs" "$historical_run" >/dev/null
 "$eval_dir/bin/validate-run-pair" "$historical_run/run.json" \
   "$historical_run/invocation.json"
+timeout_grace_run="$tmp/timeout-kill-grace"
+cp -R "$historical_run" "$timeout_grace_run"
+jq '.timeout_kill_grace_seconds = 10 |
+  .maximum_agent_call_wall_clock_seconds += 20' \
+  "$historical_run/invocation.json" >"$timeout_grace_run/invocation.json"
+jq '.runner.timeout_kill_grace_seconds = 10 |
+  .runner.maximum_agent_call_wall_clock_seconds += 20' \
+  "$historical_run/run.json" >"$timeout_grace_run/run.json"
+node "$eval_dir/bin/validate-json.mjs" "$timeout_grace_run" >/dev/null
+"$eval_dir/bin/validate-run-pair" "$timeout_grace_run/run.json" \
+  "$timeout_grace_run/invocation.json"
+jq '.runner.timeout_kill_grace_seconds = 9' "$timeout_grace_run/run.json" \
+  >"$tmp/mismatched-timeout-grace-run.json"
+if "$eval_dir/bin/validate-run-pair" "$tmp/mismatched-timeout-grace-run.json" \
+  "$timeout_grace_run/invocation.json" 2>"$tmp/mismatched-timeout-grace-error"; then
+  echo "run/invocation validator accepted mismatched timeout kill grace" >&2
+  exit 1
+fi
+rg -q 'run/invocation security or agent identity disagrees' \
+  "$tmp/mismatched-timeout-grace-error"
 missing_dependency_root="$tmp/missing-validator-dependencies"
 set +e
 EVAL_HARNESS_DEPENDENCY_ROOT="$missing_dependency_root" \
@@ -775,8 +795,11 @@ rg -Fq 'execution_boundary="isolated-host-attested"' "$eval_dir/bin/run-eval"
 rg -q '^isolated_host_attestation=false$' "$eval_dir/bin/run-eval"
 rg -q -- '--ack-disposable-secret-free-host' "$eval_dir/bin/run-eval"
 rg -Fq '[--model-credential-stdin]' "$eval_dir/bin/run-eval"
-rg -Fq 'maximum_agent_call_wall_clock_seconds=$((probe_timeout_seconds + timeout_seconds))' \
+rg -Fq 'timeout_kill_grace_seconds=10' "$eval_dir/bin/run-eval"
+rg -Fq -- '--kill-after "$timeout_kill_grace_seconds"' "$eval_dir/bin/run-eval"
+rg -Fq 'maximum_agent_call_wall_clock_seconds=$((probe_timeout_seconds + timeout_seconds +' \
   "$eval_dir/bin/run-eval"
+rg -Fq 'timeout_kill_grace_seconds:$timeout_kill_grace' "$eval_dir/bin/run-eval"
 rg -q 'scaffold_timeout_seconds:\$scaffold_timeout' "$eval_dir/bin/run-eval"
 rg -q 'maximum_agent_call_wall_clock_seconds:\$maximum_agent_wall_clock' "$eval_dir/bin/run-eval"
 rg -q 'invocation timeout budget mismatch' "$eval_dir/bin/validate-run"
