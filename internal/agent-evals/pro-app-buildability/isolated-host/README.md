@@ -22,6 +22,17 @@ native file-backed credential source:
   through the private `apiKeyHelper` script. The private tmpfs remains
   `noexec`; the reviewed setting invokes that script through `/bin/sh`.
 
+Codex cannot create the namespaces required by its inner bubblewrap
+`workspace-write` sandbox under the container's deliberately restricted flags.
+For attested Codex only, the runner therefore uses
+`--dangerously-bypass-approvals-and-sandbox` and records
+`isolated-host-attested`. The outer container remains read-only except for its
+UID-owned tmpfs workspace/private areas and evidence staging bind, drops every
+capability, and enables `no-new-privileges`. No extra privilege, capability, or
+environment inheritance is added. Non-attested Codex diagnostics retain the
+inner `workspace-write` sandbox; never use the attested bypass outside this
+reviewed disposable-host boundary.
+
 The agent CLI and its tools run under the same container UID. File-backed
 authentication therefore cannot be hidden from a malicious agent or tool while
 remaining readable by the CLI. Mode `0700` prevents access by other Unix users;
@@ -69,17 +80,20 @@ Create a new output path whose parent already exists. The wrapper refuses a
 dirty repository, an existing output, symlink inputs, permissive credential
 files, and missing credential files. It mounts the repository and linked
 worktree Git metadata read-only, streams the credential on standard input, and
-uses UID/GID-owned tmpfs filesystems for the workspace, runner-private data,
-temporary files, and installed gems. The runner-private tmpfs stays `noexec`;
-an automatically removed npm cache lives beside the workspace on its executable
-tmpfs so `npx` can run downloaded package shims without widening the agent
-environment allowlist.
+uses UID/GID-owned tmpfs filesystems for the workspace, runner-private data, and
+temporary files. The runner-private tmpfs stays `noexec`. Private-home Bundler,
+RubyGems, and npm configuration directs executable caches and installed bundle
+state into `.ror-eval-state` inside the writable workspace tmpfs. The runner
+scans that state for credential bytes, removes it before evidence derivation,
+and also removes it on every exit without widening the agent environment
+allowlist.
 
 The credential source must be outside both the repository and any external Git
-metadata bind. Evidence is first written to a private host staging directory.
-Failed/rejected runs and any staging directory with unexpected siblings are
-deleted; only one completed `run` directory is published to the requested
-output path after Docker exits successfully.
+metadata bind. Evidence is staged in a mode-`0700` directory inside the requested
+destination parent, so publication is a same-filesystem directory rename rather
+than a cross-filesystem copy. Failed/rejected runs, interrupted publication, and
+any staging directory with unexpected siblings are deleted fail closed; only
+one completed `run` directory is published after Docker exits successfully.
 
 ```bash
 internal/agent-evals/pro-app-buildability/isolated-host/run-in-container \

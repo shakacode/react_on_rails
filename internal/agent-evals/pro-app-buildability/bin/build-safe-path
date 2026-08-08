@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 source_path="${SAFE_PATH_SOURCE:-${PATH:-}}"
 resolve_command() {
   local command_name="$1"
@@ -42,9 +43,11 @@ safe_path=""
 append_safe_directory() {
   local directory="$1"
   local mode
-  [[ -d "$directory" ]] || return
+  if [[ ! -d "$directory" ]]; then
+    return 0
+  fi
   directory="$(cd "$directory" && pwd -P)"
-  mode="$(stat -f '%Lp' "$directory" 2>/dev/null || stat -c '%a' "$directory")"
+  mode="$("$script_dir/file-permission-mode" "$directory")"
   case "${mode: -1}" in 2|3|6|7) echo "refusing world-writable command directory: $directory" >&2; exit 69 ;; esac
   case ":$safe_path:" in *":$directory:"*) ;; *) safe_path="${safe_path:+$safe_path:}$directory" ;; esac
 }

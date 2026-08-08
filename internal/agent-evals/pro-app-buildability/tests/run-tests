@@ -7,6 +7,8 @@ tmp="$(mktemp -d "${TMPDIR:-/tmp}/ror-eval-tests.XXXXXX")"
 trap 'rm -rf "$tmp"' EXIT INT TERM
 
 node "$eval_dir/bin/validate-json.mjs" --schemas-only
+eval_dir_mode="$("$eval_dir/bin/file-permission-mode" "$eval_dir")"
+[[ "$eval_dir_mode" =~ ^[0-7]{3,4}$ ]]
 
 (cd "$eval_dir" && node --input-type=module - <<'NODE'
 import fs from 'node:fs';
@@ -20,6 +22,21 @@ const invocationValidate = ajv.compile(load('schemas/invocation.schema.json'));
 const runValidate = ajv.compile(load('schemas/run.schema.json'));
 const fixtureDir = 'runs/2026-07-12-codex-gpt-5.4-final21-network-off';
 const invocation = load(`${fixtureDir}/invocation.json`);
+const nonattestedCodexInvocation = {
+  ...invocation,
+  agent: 'codex',
+  auth_material_available: false,
+  auth_source: 'none',
+  isolated_host_attestation: false,
+  sandbox: 'workspace-write',
+};
+if (!invocationValidate(nonattestedCodexInvocation)) {
+  throw new Error(ajv.errorsText(invocationValidate.errors));
+}
+nonattestedCodexInvocation.sandbox = 'isolated-host-attested';
+if (invocationValidate(nonattestedCodexInvocation)) {
+  throw new Error('non-attested Codex invocation escaped workspace-write');
+}
 const legacyClaudeCommand = { ...invocation, command: 'claude -p' };
 delete legacyClaudeCommand.agent;
 if (invocationValidate(legacyClaudeCommand)) {
@@ -33,6 +50,10 @@ Object.assign(invocation, {
 });
 if (invocationValidate(invocation)) throw new Error('unattested invocation accepted auth material');
 invocation.isolated_host_attestation = true;
+if (invocationValidate(invocation)) {
+  throw new Error('attested Codex invocation claimed unavailable inner workspace sandbox');
+}
+invocation.sandbox = 'isolated-host-attested';
 if (!invocationValidate(invocation)) throw new Error(ajv.errorsText(invocationValidate.errors));
 Object.assign(invocation, { agent: 'claude', command: 'claude -p', sandbox: 'workspace-write' });
 if (invocationValidate(invocation)) throw new Error('Claude invocation claimed Codex workspace sandbox');
@@ -40,6 +61,15 @@ invocation.sandbox = 'isolated-host-attested';
 if (!invocationValidate(invocation)) throw new Error(ajv.errorsText(invocationValidate.errors));
 
 const run = load(`${fixtureDir}/run.json`);
+const nonattestedCodexRun = structuredClone(run);
+Object.assign(nonattestedCodexRun.security, { auth_material_available: false, auth_source: 'none' });
+Object.assign(nonattestedCodexRun.runner, {
+  isolated_host_attestation: false,
+  execution_boundary: 'workspace-write',
+});
+if (!runValidate(nonattestedCodexRun)) throw new Error(ajv.errorsText(runValidate.errors));
+nonattestedCodexRun.runner.execution_boundary = 'isolated-host-attested';
+if (runValidate(nonattestedCodexRun)) throw new Error('non-attested Codex run escaped workspace-write');
 Object.assign(run.security, {
   auth_material_available: true,
   auth_source: 'operator-attested-file-broker',
@@ -47,6 +77,8 @@ Object.assign(run.security, {
 run.runner.isolated_host_attestation = false;
 if (runValidate(run)) throw new Error('unattested run accepted auth material');
 run.runner.isolated_host_attestation = true;
+if (runValidate(run)) throw new Error('attested Codex run claimed unavailable inner workspace sandbox');
+run.runner.execution_boundary = 'isolated-host-attested';
 if (!runValidate(run)) throw new Error(ajv.errorsText(runValidate.errors));
 NODE
 )
@@ -87,6 +119,54 @@ rg -q 'symbolic link' "$tmp/rejected-symlink-error"
 printf '%s' 'unrelated-credential-value' |
   "$eval_dir/bin/assert-credential-absent" "$tmp/credential-output" - --skip-symlinks
 unlink "$tmp/credential-output/dependency-link"
+
+ln -s "$tmp/credential-output" "$tmp/credential-output-link"
+set +e
+printf '%s' 'unrelated-root-symlink-credential' |
+  "$eval_dir/bin/assert-credential-absent" "$tmp/credential-output-link" - --skip-symlinks \
+    2>"$tmp/root-symlink-scan-error"
+root_symlink_scan_exit=$?
+set -e
+test "$root_symlink_scan_exit" = 2
+rg -q 'credential absence scan failed closed' "$tmp/root-symlink-scan-error"
+if rg -Fq "$tmp/credential-output-link" "$tmp/root-symlink-scan-error"; then
+  echo "credential scan exposed its root path" >&2
+  exit 1
+fi
+
+mkdir "$tmp/credential-output/unreadable-directory"
+chmod 000 "$tmp/credential-output/unreadable-directory"
+set +e
+printf '%s' 'unrelated-unreadable-directory-credential' |
+  "$eval_dir/bin/assert-credential-absent" "$tmp/credential-output" - --skip-symlinks \
+    2>"$tmp/unreadable-directory-scan-error"
+unreadable_directory_scan_exit=$?
+set -e
+chmod 700 "$tmp/credential-output/unreadable-directory"
+test "$unreadable_directory_scan_exit" = 2
+rg -q 'credential absence scan failed closed' "$tmp/unreadable-directory-scan-error"
+if rg -Fq 'unrelated-unreadable-directory-credential' "$tmp/unreadable-directory-scan-error" ||
+  rg -Fq "$tmp/credential-output/unreadable-directory" "$tmp/unreadable-directory-scan-error"; then
+  echo "credential scan exposed credential or artifact path on read failure" >&2
+  exit 1
+fi
+
+path_credential='synthetic-relative-path-credential'
+mkdir "$tmp/credential-output/prefix-$path_credential-suffix"
+set +e
+printf '%s' "$path_credential" |
+  "$eval_dir/bin/assert-credential-absent" "$tmp/credential-output" - --skip-symlinks \
+    2>"$tmp/relative-path-credential-error"
+relative_path_scan_exit=$?
+set -e
+rmdir "$tmp/credential-output/prefix-$path_credential-suffix"
+test "$relative_path_scan_exit" = 1
+rg -q 'credential bytes found in run output' "$tmp/relative-path-credential-error"
+if rg -Fq "$path_credential" "$tmp/relative-path-credential-error" ||
+  rg -Fq "$tmp/credential-output" "$tmp/relative-path-credential-error"; then
+  echo "credential path scan exposed credential or artifact path" >&2
+  exit 1
+fi
 
 for newline_mode in newline no-newline; do
   claude_helper_dir="$tmp/claude-helper-$newline_mode"
@@ -152,12 +232,48 @@ test "$(jq -r 'select(.item.type == "command_execution") | .item.command' \
 test "$(jq -r 'select(.item.type == "agent_message") | .item.text | fromjson | .status' \
   "$tmp/claude-events.normalized.jsonl")" = passed
 printf '%s\n' \
+  '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"interrupted-tool","name":"Bash","input":{"command":"long-running-command"}}]}}' \
+  '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"interrupted-tool","content":"interrupted output","is_error":false}]},"tool_use_result":{"stdout":"interrupted output","stderr":"","interrupted":true}}' \
+  >"$tmp/interrupted-claude-events.jsonl"
+node "$eval_dir/bin/normalize-claude-events.mjs" \
+  "$tmp/interrupted-claude-events.jsonl" "$tmp/interrupted-claude-events.normalized.jsonl" 0
+interrupted_command_result="$(jq -r '.item | [.command,.exit_code,.status] | @tsv' \
+  "$tmp/interrupted-claude-events.normalized.jsonl")"
+if [[ "$interrupted_command_result" != $'long-running-command\t130\tfailed' ]]; then
+  echo "interrupted Claude Bash result normalized as completed success" >&2
+  exit 1
+fi
+printf '%s\n' \
+  '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"background-tool","name":"Bash","input":{"command":"background-command"}}]}}' \
+  '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"background-tool","content":"Command running in background","is_error":false}]},"tool_use_result":{"status":"running","background_task_id":"task-1"}}' \
+  >"$tmp/background-claude-events.jsonl"
+node "$eval_dir/bin/normalize-claude-events.mjs" \
+  "$tmp/background-claude-events.jsonl" "$tmp/background-claude-events.normalized.jsonl" 0
+background_command_result="$(jq -r '.item | [.command,.exit_code,.status] | @tsv' \
+  "$tmp/background-claude-events.normalized.jsonl")"
+if [[ "$background_command_result" != $'background-command\t\tincomplete' ]]; then
+  echo "background Claude Bash result normalized as completed success" >&2
+  exit 1
+fi
+printf '%s\n' \
+  '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"timed-out-tool","name":"Bash","input":{"command":"timed-out-command"}}]}}' \
+  '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"timed-out-tool","content":"timed out","is_error":false}]},"tool_use_result":{"timed_out":true}}' \
+  >"$tmp/timed-out-claude-events.jsonl"
+node "$eval_dir/bin/normalize-claude-events.mjs" \
+  "$tmp/timed-out-claude-events.jsonl" "$tmp/timed-out-claude-events.normalized.jsonl" 0
+timed_out_command_result="$(jq -r '.item | [.command,.exit_code,.status] | @tsv' \
+  "$tmp/timed-out-claude-events.normalized.jsonl")"
+if [[ "$timed_out_command_result" != $'timed-out-command\t124\tfailed' ]]; then
+  echo "timed-out Claude Bash result normalized as completed success" >&2
+  exit 1
+fi
+printf '%s\n' \
   '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"structured-timeout","name":"StructuredOutput","input":{"status":"completed","summary":"must not survive timeout","commands":[],"checks":[],"friction":[],"human_interventions":0,"blockers":[]}}]}}' \
   >"$tmp/structured-timeout-claude-events.jsonl"
 node "$eval_dir/bin/normalize-claude-events.mjs" \
   "$tmp/structured-timeout-claude-events.jsonl" \
   "$tmp/structured-timeout-claude-events.normalized.jsonl" 124
-if jq -e 'select(.item.type == "agent_message")' \
+if jq -s -e 'any(.[]; .item.type == "agent_message")' \
   "$tmp/structured-timeout-claude-events.normalized.jsonl" >/dev/null; then
   echo "timeout Claude invocation promoted StructuredOutput to a completed report" >&2
   exit 1
@@ -168,7 +284,7 @@ printf '%s\n' \
 node "$eval_dir/bin/normalize-claude-events.mjs" \
   "$tmp/result-failure-claude-events.jsonl" \
   "$tmp/result-failure-claude-events.normalized.jsonl" 1
-if jq -e 'select(.item.type == "agent_message")' \
+if jq -s -e 'any(.[]; .item.type == "agent_message")' \
   "$tmp/result-failure-claude-events.normalized.jsonl" >/dev/null; then
   echo "failed Claude invocation promoted a success result to a completed report" >&2
   exit 1
@@ -444,8 +560,10 @@ rg -q '^umask 077$' "$eval_dir/bin/run-eval"
 rg -q '^trap cleanup EXIT$' "$eval_dir/bin/run-eval"
 rg -q "^trap 'exit 130' INT TERM$" "$eval_dir/bin/run-eval"
 rg -q 'minimal_env=\(env -i' "$eval_dir/bin/run-eval"
-rg -q "shell_environment_policy.inherit='?\\\"none\\\"'?" "$eval_dir/bin/run-eval"
-rg -q 'sandbox_workspace_write.network_access=\$sandbox_network_access' "$eval_dir/bin/run-eval"
+rg -Fq 'shell_environment_policy.inherit="none"' "$eval_dir/bin/run-eval"
+rg -Fq 'agent_args+=(--dangerously-bypass-approvals-and-sandbox)' "$eval_dir/bin/run-eval"
+rg -Fq 'agent_args+=(--sandbox workspace-write)' "$eval_dir/bin/run-eval"
+rg -Fq 'execution_boundary="isolated-host-attested"' "$eval_dir/bin/run-eval"
 rg -q '^isolated_host_attestation=false$' "$eval_dir/bin/run-eval"
 rg -q -- '--ack-disposable-secret-free-host' "$eval_dir/bin/run-eval"
 rg -Fq 'maximum_agent_call_wall_clock_seconds=$((probe_timeout_seconds + timeout_seconds))' \
@@ -480,26 +598,63 @@ if rg -q 'cp .*auth|install .*auth' "$eval_dir/bin/run-eval"; then
   echo "runner must not copy authentication into the sandbox filesystem" >&2
   exit 1
 fi
-test "$(rg -n 'shasum -a 256 \"\$file\"; done <\"\$checksum_files\" >SHA256SUMS' \
+test "$(rg -Fn 'shasum -a 256 "$file"; done <"$checksum_files" >SHA256SUMS' \
   "$eval_dir/bin/run-eval" | cut -d: -f1)" -lt \
-  "$(rg -n 'assert_credential_absent \"\$output\"' "$eval_dir/bin/run-eval" | cut -d: -f1)"
-rg -q 'assert_credential_absent \"\$workspace\"' "$eval_dir/bin/run-eval"
-rg -q 'assert_credential_absent \"\$workspace\" --skip-symlinks' "$eval_dir/bin/run-eval"
+  "$(rg -Fn 'assert_credential_absent "$output"' "$eval_dir/bin/run-eval" | cut -d: -f1)"
+rg -Fq 'assert_credential_absent "$workspace"' "$eval_dir/bin/run-eval"
+rg -Fq 'assert_credential_absent "$workspace" --skip-symlinks' "$eval_dir/bin/run-eval"
 rg -Fq 'credential_snapshot=' "$eval_dir/bin/run-eval"
 rg -Fq 'assert_credential_absent' "$eval_dir/bin/run-eval"
 rg -q '^credentialed_output_publishable=false$' "$eval_dir/bin/run-eval"
 rg -Fq '[[ "$auth_requested" == true && "$credentialed_output_publishable" == false ]]' \
   "$eval_dir/bin/run-eval"
-test "$(rg -n 'assert_credential_absent "\$output"' "$eval_dir/bin/run-eval" | cut -d: -f1)" -lt \
+test "$(rg -Fn 'assert_credential_absent "$output"' "$eval_dir/bin/run-eval" | cut -d: -f1)" -lt \
   "$(rg -n '^  credentialed_output_publishable=true$' "$eval_dir/bin/run-eval" | cut -d: -f1)"
-rg -Fq 'cache=' "$eval_dir/bin/run-eval"
-rg -Fq '.npmrc' "$eval_dir/bin/run-eval"
+rg -Fq 'npm config set cache "$npm_cache" --location=user' "$eval_dir/bin/prepare-agent-state"
+rg -Fq '"BUNDLE_PATH" => ARGV.fetch(1)' "$eval_dir/bin/prepare-agent-state"
+rg -Fq 'agent_state_dir="$workspace/.ror-eval-state"' "$eval_dir/bin/run-eval"
+if rg -Fq 'mktemp -d "$(dirname "$workspace")/.ror-eval-npm-cache.' "$eval_dir/bin/run-eval"; then
+  echo "npm cache escaped the writable workspace" >&2
+  exit 1
+fi
 rg -Fq '"$eval_dir/bin" "$eval_dir/isolated-host" "$eval_dir/schemas"' \
   "$eval_dir/bin/run-eval"
+
+agent_state_safe_path="$(SAFE_PATH_SOURCE="$PATH" BASH_ENV=/dev/null \
+  "$eval_dir/bin/build-safe-path" env node npm ruby sh)"
+mkdir "$tmp/prepared-runner-home" "$tmp/prepared-agent-home"
+agent_state_path="$("$eval_dir/bin/prepare-agent-state" \
+  "$tmp/prepared-agent-state" "$tmp/prepared-runner-home" "$tmp/prepared-agent-home" \
+  "$agent_state_safe_path")"
+prepared_agent_home="$tmp/prepared-agent-home"
+prepared_bundle_path="$(realpath "$tmp")/prepared-agent-state/bundle"
+prepared_gem_user_dir="$(env -i PATH="$agent_state_path" HOME="$prepared_agent_home" \
+  TMPDIR="$tmp" LANG=C LC_ALL=C SHELL=/bin/sh CODEX_EVAL=1 \
+  ruby -e 'require "rubygems"; print Gem.user_dir')"
+case "$prepared_gem_user_dir/" in
+  "$prepared_agent_home"/*) ;;
+  *) echo "RubyGems user directory escaped private HOME" >&2; exit 1 ;;
+esac
+test -w "$prepared_gem_user_dir"
+prepared_bundle_actual="$(env -i PATH="$agent_state_path" HOME="$prepared_agent_home" \
+  TMPDIR="$tmp" LANG=C LC_ALL=C SHELL=/bin/sh CODEX_EVAL=1 \
+  ruby -rbundler -e 'print Bundler.bundle_path')"
+case "$prepared_bundle_actual/" in
+  "$prepared_bundle_path"/*) ;;
+  *) echo "Bundler path escaped prepared agent state" >&2; exit 1 ;;
+esac
+test -w "$prepared_bundle_actual"
+test "$(env -i PATH="$agent_state_path" HOME="$prepared_agent_home" \
+  TMPDIR="$tmp" LANG=C LC_ALL=C SHELL=/bin/sh CODEX_EVAL=1 npm config get cache)" = \
+  "$(realpath "$tmp")/prepared-agent-state/npm-cache"
 
 isolated_host="$eval_dir/isolated-host"
 bash -n "$isolated_host/run-in-container"
 test -x "$isolated_host/run-in-container"
+test -x "$isolated_host/smoke-runtime"
+rg -Fq 'codex exec --help' "$isolated_host/smoke-runtime"
+rg -Fq 'claude --version' "$isolated_host/smoke-runtime"
+rg -Fq 'CODEX_EVAL' "$isolated_host/smoke-runtime"
 rg -Fq -- '--mount "type=bind,source=$root,target=/repo,readonly"' \
   "$isolated_host/run-in-container"
 rg -Fq -- '--mount "type=bind,source=$staging_parent,target=/evidence"' \
@@ -525,6 +680,10 @@ fi
 if rg -q 'ANTHROPIC_API_KEY|OPENAI_API_KEY|REACT_ON_RAILS_PRO_LICENSE' \
   "$isolated_host/Dockerfile" "$isolated_host/run-in-container"; then
   echo "isolated host must not place credentials or licenses in build args or environment" >&2
+  exit 1
+fi
+if rg -Fq '/usr/local/bundle:rw' "$isolated_host/run-in-container"; then
+  echo "isolated host retained a writable system Bundler mount" >&2
   exit 1
 fi
 
@@ -567,6 +726,11 @@ chmod +x "$tmp/fake-bin/docker"
     --output "$tmp/wrapper-output-parent/run")
 test -d "$tmp/wrapper-output-parent/run"
 test ! -e "$(cat "$tmp/fake-docker-evidence")"
+if [[ "$(dirname "$(cat "$tmp/fake-docker-evidence")")" != \
+  "$(realpath "$tmp/wrapper-output-parent")" ]]; then
+  echo "wrapper staging directory was outside the destination parent" >&2
+  exit 1
+fi
 test "$(cat "$tmp/fake-docker-stdin-sha")" = \
   "$(shasum -a 256 "$tmp/wrapper-model-credential" | awk '{print $1}')"
 rg -Fxq -- '--model-credential-stdin' "$tmp/fake-docker-args"
@@ -671,6 +835,11 @@ resolved_path="$(SAFE_PATH_SOURCE="$test_path" BASH_ENV=/dev/null PATH="$test_pa
 env -i PATH="$resolved_path" /bin/sh -c 'command -v user-tool >/dev/null'
 test "$(realpath "$(env -i PATH="$resolved_path" /bin/sh -c 'command -v node')")" = \
   "$(realpath "$tmp/user-bin/node")"
+if [[ "$(uname -s)" == Linux ]]; then
+  test ! -d /opt/homebrew/bin
+  SAFE_PATH_SOURCE="$test_path" BASH_ENV=/dev/null PATH="$test_path" \
+    "$eval_dir/bin/build-safe-path" user-tool node sh >/dev/null
+fi
 
 mise_node="$(SAFE_PATH_SOURCE="$PATH" BASH_ENV=/dev/null \
   "$eval_dir/bin/build-safe-path" --resolve node)"

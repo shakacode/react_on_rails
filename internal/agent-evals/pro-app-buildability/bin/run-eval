@@ -53,13 +53,9 @@ if [[ -n "$model_credential_file" || "$model_credential_stdin" == true ]]; then
       echo "model credential exceeds 1048576-byte limit" >&2
       exit 65
     }
-    credential_mode="$(stat -f '%Lp' "$model_credential_file" 2>/dev/null || \
-      stat -c '%a' "$model_credential_file" 2>/dev/null)" || {
+    credential_mode="$("$(dirname "${BASH_SOURCE[0]}")/file-permission-mode" \
+      "$model_credential_file")" || {
       echo "cannot determine model credential permissions" >&2
-      exit 65
-    }
-    [[ "$credential_mode" =~ ^[0-7]{3,4}$ ]] || {
-      echo "unexpected model credential permission format" >&2
       exit 65
     }
     (( (8#$credential_mode & 077) == 0 )) || {
@@ -124,8 +120,13 @@ fi
 
 private_dir="$(mktemp -d "${TMPDIR:-/tmp}/ror-pro-agent-eval.XXXXXX")"
 chmod 700 "$private_dir"
-npm_cache_dir=""
+agent_state_dir="$workspace/.ror-eval-state"
 credentialed_output_publishable=false
+remove_agent_state() {
+  [[ -e "$agent_state_dir" ]] || return 0
+  chmod -R u+rwX "$agent_state_dir" 2>/dev/null || true
+  rm -rf "$agent_state_dir"
+}
 cleanup() {
   # A credentialed run is publishable only after its final byte scan. Remove
   # the exact, prevalidated output path on every earlier exit so a rejected
@@ -133,20 +134,16 @@ cleanup() {
   if [[ "$auth_requested" == true && "$credentialed_output_publishable" == false ]]; then
     rm -rf "$output"
   fi
+  remove_agent_state
   rm -rf "$private_dir"
-  [[ -z "$npm_cache_dir" ]] || rm -rf "$npm_cache_dir"
 }
 trap cleanup EXIT
 trap 'exit 130' INT TERM
-npm_cache_dir="$(mktemp -d "$(dirname "$workspace")/.ror-eval-npm-cache.XXXXXX")"
-chmod 700 "$npm_cache_dir"
+mkdir -p "$workspace"
+chmod 700 "$workspace"
 mkdir -m 700 "$private_dir/runner-home" "$private_dir/agent-home" "$private_dir/codex-home" "$private_dir/tmp"
-# npm/npx installs transient executable shims below its cache. Keep that cache
-# on the same executable disposable mount as the workspace instead of the
-# intentionally noexec private credential tmpfs. This config is discovered via
-# HOME, so the stripped seven-variable allowlist remains unchanged.
-printf 'cache=%s\n' "$npm_cache_dir" >"$private_dir/runner-home/.npmrc"
-printf 'cache=%s\n' "$npm_cache_dir" >"$private_dir/agent-home/.npmrc"
+safe_path="$("$eval_dir/bin/prepare-agent-state" "$agent_state_dir" \
+  "$private_dir/runner-home" "$private_dir/agent-home" "$safe_path")"
 
 minimal_env=(env -i "PATH=$safe_path" "HOME=$private_dir/runner-home" "TMPDIR=$private_dir/tmp" LANG=C LC_ALL=C SHELL=/bin/sh CODEX_EVAL=1)
 for command_name in "${required_commands[@]}"; do
@@ -237,8 +234,8 @@ while IFS= read -r variable; do
     <<<"$stripped_categories")"
 done < <(compgen -e)
 
-mkdir -p "$workspace" "$output"
-chmod 700 "$workspace" "$output"
+mkdir -p "$output"
+chmod 700 "$output"
 git -C "$workspace" init --quiet
 started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 revision="$(git -C "$root" rev-parse HEAD)"
@@ -259,20 +256,24 @@ done
 
 sandbox_network_access="$isolated_host_attestation"
 execution_boundary="workspace-write"
-if [[ "$agent" == claude ]]; then
-  if [[ "$isolated_host_attestation" == true ]]; then
-    execution_boundary="isolated-host-attested"
-  else
-    execution_boundary="claude-permission-gated"
-  fi
+if [[ "$isolated_host_attestation" == true ]]; then
+  execution_boundary="isolated-host-attested"
+elif [[ "$agent" == claude ]]; then
+  execution_boundary="claude-permission-gated"
 fi
 shell_policy="shell_environment_policy.set={PATH=\"$safe_path\",HOME=\"$private_dir/agent-home\",TMPDIR=\"$private_dir/tmp\",LANG=\"C\",LC_ALL=\"C\",SHELL=\"/bin/sh\",CODEX_EVAL=\"1\"}"
 npm_probe_command='npm view create-react-on-rails-app version --json'
 rubygems_probe_command="gem search --remote --exact '^rails$'"
 agent_command="codex exec"
 if [[ "$agent" == codex ]]; then
-  agent_args=(exec --ephemeral --ignore-user-config --ignore-rules --strict-config --sandbox workspace-write --model "$model")
-  agent_args+=(-c 'features.multi_agent=false' -c "sandbox_workspace_write.network_access=$sandbox_network_access")
+  agent_args=(exec --ephemeral --ignore-user-config --ignore-rules --strict-config --model "$model")
+  if [[ "$isolated_host_attestation" == true ]]; then
+    agent_args+=(--dangerously-bypass-approvals-and-sandbox)
+  else
+    agent_args+=(--sandbox workspace-write)
+    agent_args+=(-c "sandbox_workspace_write.network_access=$sandbox_network_access")
+  fi
+  agent_args+=(-c 'features.multi_agent=false')
   agent_args+=(-c 'cli_auth_credentials_store="file"')
   agent_args+=(-c 'shell_environment_policy.inherit="none"' -c "$shell_policy")
   agent_args+=(--output-schema "$eval_dir/schemas/agent-report.schema.json" --json -C "$workspace" -)
@@ -284,6 +285,7 @@ else
   agent_args+=(--json-schema "$(jq -c . "$eval_dir/schemas/agent-report.schema.json")")
   [[ "$isolated_host_attestation" == true ]] && agent_args+=(--dangerously-skip-permissions)
 fi
+agent_version="$("${minimal_env[@]}" "$agent" --version 2>&1)"
 
 run_agent() {
   local prompt_file="$1"
@@ -406,6 +408,7 @@ else
     '{status:"blocked",summary:$reason,commands:[],checks:[],friction:[$reason],human_interventions:0,blockers:[$reason]}' \
     >"$output/agent-report.json"
 fi
+remove_agent_state
 
 TMPDIR="$private_dir/tmp" "$eval_dir/bin/build-runner-diagnostics" \
   "$safe_stderr" "$output/runner-diagnostics.json"
@@ -417,7 +420,6 @@ git -C "$workspace" status --short --untracked-files=normal >"$output/workspace-
 finished_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 classification="$(jq -r .overall "$output/rubric-results.json")"
 reason="Machine-derived rubric result: $classification; see rubric-results.json"
-agent_version="$("${minimal_env[@]}" "$agent" --version 2>&1)"
 
 jq -n \
   --arg run_id "$(basename "$output")" --arg started "$started_at" --arg finished "$finished_at" \

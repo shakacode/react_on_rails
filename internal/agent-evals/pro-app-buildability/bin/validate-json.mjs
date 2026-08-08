@@ -9,8 +9,10 @@ const evalDir = path.resolve(here, '..');
 const dependencyRoot = process.env.EVAL_HARNESS_DEPENDENCY_ROOT || evalDir;
 const require = createRequire(path.join(dependencyRoot, 'package.json'));
 // Ajv exposes its Draft 2020 build through this extension-qualified subpath.
+// eslint-disable-next-line import/extensions
 const Ajv2020 = require('ajv/dist/2020.js').default;
 const addFormats = require('ajv-formats').default;
+
 const [runDir] = process.argv.slice(2);
 
 if (!runDir) {

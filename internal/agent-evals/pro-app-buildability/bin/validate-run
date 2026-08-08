@@ -47,7 +47,7 @@ jq -e --slurpfile invocation "$run_dir/invocation.json" \
     .security.credential_store == $invocation[0].credential_store and
     .security.auth_material_available == $invocation[0].auth_material_available and
     (.security.auth_source // "none") == ($invocation[0].auth_source // "none") and
-    (.runner.execution_boundary // "workspace-write") == $invocation[0].sandbox and
+    .runner.execution_boundary == $invocation[0].sandbox and
     .runner.sandbox_network_access == $invocation[0].sandbox_network_access and
     .runner.isolated_host_attestation == $invocation[0].isolated_host_attestation' \
   "$run_dir/run.json" >/dev/null || { echo "run/invocation security or agent identity disagrees" >&2; exit 1; }

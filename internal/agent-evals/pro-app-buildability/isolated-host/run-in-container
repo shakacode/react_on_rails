@@ -31,13 +31,9 @@ done
   echo "model credential must be a nonempty regular file, not a symbolic link" >&2
   exit 65
 }
-credential_mode="$(stat -f '%Lp' "$model_credential_file" 2>/dev/null || \
-  stat -c '%a' "$model_credential_file" 2>/dev/null)" || {
+eval_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+credential_mode="$("$eval_dir/bin/file-permission-mode" "$model_credential_file")" || {
   echo "cannot determine model credential permissions" >&2
-  exit 65
-}
-[[ "$credential_mode" =~ ^[0-7]{3,4}$ ]] || {
-  echo "unexpected model credential permission format" >&2
   exit 65
 }
 (( (8#$credential_mode & 077) == 0 )) || {
@@ -78,11 +74,22 @@ esac
 output_parent="$(dirname "$output")"
 [[ -d "$output_parent" ]] || { echo "output parent must exist" >&2; exit 65; }
 output_parent="$(realpath "$output_parent")"
+output="$output_parent/$(basename "$output")"
+[[ ! -L "$output" && ! -e "$output" ]] || {
+  echo "output must not already exist or be a symbolic link" >&2
+  exit 65
+}
 image="${EVAL_HARNESS_IMAGE:-react-on-rails-pro-app-eval:local}"
 host_uid="$(id -u)"
 host_gid="$(id -g)"
-staging_parent="$(mktemp -d "${TMPDIR:-/tmp}/ror-eval-output.XXXXXX")"
+staging_parent="$(mktemp -d "$output_parent/.ror-eval-output.XXXXXX")"
+publication_started=false
+published=false
 cleanup_staging() {
+  if [[ "$publication_started" == true && "$published" == false && -e "$output" ]]; then
+    chmod -R u+rwX "$output" 2>/dev/null || true
+    find "$output" -depth -delete 2>/dev/null || true
+  fi
   [[ -d "$staging_parent" ]] || return 0
   chmod -R u+rwX "$staging_parent" 2>/dev/null || true
   find "$staging_parent" -depth -delete 2>/dev/null || true
@@ -101,7 +108,6 @@ docker_args=(
   --tmpfs "/tmp:rw,noexec,nosuid,nodev,mode=1777,uid=$host_uid,gid=$host_gid"
   --tmpfs "/run/eval-private:rw,noexec,nosuid,nodev,mode=0700,uid=$host_uid,gid=$host_gid"
   --tmpfs "/workspace:rw,exec,nosuid,nodev,mode=0700,uid=$host_uid,gid=$host_gid"
-  --tmpfs "/usr/local/bundle:rw,exec,nosuid,nodev,mode=1777,uid=$host_uid,gid=$host_gid"
   --env TMPDIR=/run/eval-private
   --env EVAL_HARNESS_DEPENDENCY_ROOT=/opt/pro-app-buildability
   --workdir /repo
@@ -139,6 +145,8 @@ done < <(find "$staging_parent" -mindepth 1 -maxdepth 1 -print0)
   echo "container produced missing or unexpected staged evidence" >&2
   exit 1
 }
+publication_started=true
 mv "$staging_parent/run" "$output"
+published=true
 rmdir "$staging_parent"
 trap - EXIT

@@ -80,7 +80,7 @@ let resultReport = null;
 let structuredOutputReport = null;
 let truncatedTimeoutTailSeen = false;
 
-const emitCommand = (command, exitCode, rawOutput) => {
+const emitCommand = (command, exitCode, rawOutput, status = exitCode === 0 ? 'completed' : 'failed') => {
   if (commandCount >= MAX_COMMANDS) {
     throw new Error(`Claude transcript exceeds ${MAX_COMMANDS}-command normalization limit`);
   }
@@ -89,7 +89,7 @@ const emitCommand = (command, exitCode, rawOutput) => {
     type: 'command_execution',
     command,
     exit_code: exitCode,
-    status: exitCode === 0 ? 'completed' : 'failed',
+    status,
     aggregated_output: truncateOutput(rawOutput),
   };
   output.write(`${JSON.stringify({ type: 'item.completed', item })}\n`);
@@ -107,6 +107,8 @@ for await (const line of rl) {
     throw new Error('Claude stream-json transcript contains a malformed event');
   }
   const trimmed = line.trim();
+  // Skipping empty JSONL records keeps the streaming parser flat and bounded.
+  // eslint-disable-next-line no-continue
   if (!trimmed) continue;
   let event;
   try {
@@ -114,6 +116,8 @@ for await (const line of rl) {
   } catch {
     if (agentExitCode === 124 && !inputEndsWithNewline) {
       truncatedTimeoutTailSeen = true;
+      // A timeout may truncate only the final record; later records are rejected above.
+      // eslint-disable-next-line no-continue
       continue;
     }
     throw new Error('Claude stream-json transcript contains a malformed event');
@@ -122,6 +126,8 @@ for await (const line of rl) {
     const blocks = event.message?.content;
     if (Array.isArray(blocks)) {
       for (const block of blocks) {
+        // Ignore non-tool content while retaining a flat streaming loop.
+        // eslint-disable-next-line no-continue
         if (block?.type !== 'tool_use') continue;
         if (
           block.name === 'Bash' &&
@@ -141,7 +147,35 @@ for await (const line of rl) {
         if (block?.type === 'tool_result' && pendingBash.has(block.tool_use_id)) {
           const command = pendingBash.get(block.tool_use_id);
           pendingBash.delete(block.tool_use_id);
-          emitCommand(command, block.is_error === true ? 1 : 0, extractText(block.content));
+          const resultMetadata =
+            block.tool_use_result ??
+            block.toolUseResult ??
+            event.tool_use_result ??
+            event.toolUseResult ??
+            {};
+          const resultWasInterrupted = resultMetadata.interrupted === true;
+          const resultStatus = String(resultMetadata.status ?? '').toLowerCase();
+          const resultTimedOut =
+            resultMetadata.timed_out === true ||
+            resultMetadata.timedOut === true ||
+            ['timed_out', 'timeout'].includes(resultStatus);
+          const resultIsBackground =
+            resultMetadata.is_background === true ||
+            resultMetadata.isBackground === true ||
+            typeof resultMetadata.background_task_id === 'string' ||
+            typeof resultMetadata.backgroundTaskId === 'string' ||
+            ['background', 'pending', 'running'].includes(resultStatus);
+          let commandExitCode = block.is_error === true ? 1 : 0;
+          let commandStatus;
+          if (resultWasInterrupted) {
+            commandExitCode = 130;
+          } else if (resultTimedOut) {
+            commandExitCode = 124;
+          } else if (resultIsBackground) {
+            commandExitCode = null;
+            commandStatus = 'incomplete';
+          }
+          emitCommand(command, commandExitCode, extractText(block.content), commandStatus);
         }
       }
     }

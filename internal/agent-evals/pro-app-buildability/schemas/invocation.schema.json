@@ -84,8 +84,7 @@
       "if": { "properties": { "agent": { "const": "codex" } }, "required": ["agent"] },
       "then": {
         "properties": {
-          "command": { "const": "codex exec" },
-          "sandbox": { "const": "workspace-write" }
+          "command": { "const": "codex exec" }
         }
       }
     },
@@ -101,6 +100,26 @@
           "sandbox": { "const": "workspace-write" }
         }
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "agent": { "const": "codex" },
+          "isolated_host_attestation": { "const": true }
+        },
+        "required": ["agent", "isolated_host_attestation"]
+      },
+      "then": { "properties": { "sandbox": { "const": "isolated-host-attested" } } }
+    },
+    {
+      "if": {
+        "properties": {
+          "agent": { "const": "codex" },
+          "isolated_host_attestation": { "const": false }
+        },
+        "required": ["agent", "isolated_host_attestation"]
+      },
+      "then": { "properties": { "sandbox": { "const": "workspace-write" } } }
     },
     {
       "if": {

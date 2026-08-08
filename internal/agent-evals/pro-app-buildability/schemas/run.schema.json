@@ -131,7 +131,8 @@
         "network_probe_artifact",
         "exit_code",
         "timed_out",
-        "config_artifact"
+        "config_artifact",
+        "execution_boundary"
       ],
       "properties": {
         "timeout_command": { "type": "string", "minLength": 1 },
@@ -167,6 +168,58 @@
     }
   },
   "allOf": [
+    {
+      "if": {
+        "properties": {
+          "agent": {
+            "type": "object",
+            "properties": { "name": { "const": "codex" } },
+            "required": ["name"]
+          },
+          "runner": {
+            "type": "object",
+            "properties": { "isolated_host_attestation": { "const": true } },
+            "required": ["isolated_host_attestation"]
+          }
+        },
+        "required": ["agent", "runner"]
+      },
+      "then": {
+        "properties": {
+          "runner": {
+            "type": "object",
+            "properties": { "execution_boundary": { "const": "isolated-host-attested" } },
+            "required": ["execution_boundary"]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "agent": {
+            "type": "object",
+            "properties": { "name": { "const": "codex" } },
+            "required": ["name"]
+          },
+          "runner": {
+            "type": "object",
+            "properties": { "isolated_host_attestation": { "const": false } },
+            "required": ["isolated_host_attestation"]
+          }
+        },
+        "required": ["agent", "runner"]
+      },
+      "then": {
+        "properties": {
+          "runner": {
+            "type": "object",
+            "properties": { "execution_boundary": { "const": "workspace-write" } },
+            "required": ["execution_boundary"]
+          }
+        }
+      }
+    },
     {
       "if": {
         "type": "object",

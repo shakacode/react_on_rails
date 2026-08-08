@@ -65,35 +65,34 @@ their full budgets. That maximum covers agent call time only; small runner
 preflight, sanitization, evidence derivation, and validation overhead is outside
 it.
 
-The configured file credential store is inside the mode-`0700` disposable
-private directory. Without `--model-credential-file`, no credential is copied
-or inherited into the process. Private homes prevent default discovery and
-inheritance, but the workspace-write sandbox does **not** confine absolute-path
-reads from the host, and Claude does not use that Codex sandbox. The invocation
-records `workspace-write` for Codex, `isolated-host-attested` for attested
-Claude runs, and `claude-permission-gated` for unattested Claude diagnostics.
-The default local eval therefore keeps model-shell network access off and
-records an authentication-blocked `incomplete` result. This is known evidence,
-not a supported onboarding claim.
+The configured file credential store and private agent homes are inside the
+mode-`0700` disposable directory. Without `--model-credential-file`, no
+credential is copied or inherited into the process. Home-discovered Bundler,
+RubyGems, and npm configuration sends writable package state to the removable
+`.ror-eval-state` directory inside the workspace; that state is scanned and
+deleted before evidence derivation and on every exit. The seven-variable agent
+environment allowlist remains unchanged.
 
-A network-enabled capability/scaffold run is allowed only on a disposable VM or
-container that contains no host secrets. The operator must acknowledge that
-boundary explicitly:
+Non-attested Codex diagnostics retain the inner `workspace-write` sandbox and
+record `workspace-write`. Docker prevents that inner bubblewrap sandbox from
+creating its namespaces under the isolated-host flags, so an attested Codex run
+uses `--dangerously-bypass-approvals-and-sandbox` and records
+`isolated-host-attested`. That bypass is allowed only behind
+`--ack-disposable-secret-free-host`, where the reviewed outer container supplies
+the read-only repository, writable workspace tmpfs, dropped capabilities, and
+`no-new-privileges` boundary. Attested Claude records the same outer boundary;
+unattested Claude diagnostics record `claude-permission-gated`. Never use the
+attested Codex bypass directly on a developer workstation.
 
-```bash
-internal/agent-evals/pro-app-buildability/bin/run-eval \
-  --agent codex --model gpt-5.4 --timeout 2700 \
-  --workspace /tmp/ror-pro-agent-eval \
-  --output internal/agent-evals/pro-app-buildability/runs/isolated-codex \
-  --ack-disposable-secret-free-host
-```
-
-That flag records `isolated_host_attestation: true` and enables the supported
-`sandbox_workspace_write.network_access=true` setting. It is an operator
-attestation, not technical confinement. Before scaffold work, the capability
-turn must run the exact commands in `network-probe-prompt.md`; a missing command,
-nonzero exit, disabled sandbox network, missing attestation, or evidence-limit
-overflow fails closed and prevents scaffolding.
+A network-enabled capability/scaffold run is allowed only through the reviewed
+isolated-host wrapper on a disposable host that contains no unrelated secrets.
+The wrapper supplies `--ack-disposable-secret-free-host`; that flag records
+`isolated_host_attestation: true` and permits model-shell network access within
+the outer container boundary. It is an operator attestation, not technical
+confinement by the agent CLI. Before scaffold work, the capability turn must run
+the exact commands in `network-probe-prompt.md`; a missing command, nonzero exit,
+disabled network, missing attestation, or evidence-limit overflow fails closed
+and prevents scaffolding.
 
 Credentialed runs additionally require `--model-credential-file` and refuse
 that option without the isolated-host attestation. Codex accepts a complete
