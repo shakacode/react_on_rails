@@ -51,16 +51,20 @@ streams in and replaces the fallback.
 **Build time** — `prerender()` produces the static shell:
 
 ```html
-<!DOCTYPE html><html><head></head><body>
-<div>
-  <h1>My App</h1>
-  <nav>Home | About | Contact</nav>
-  <!--$?--><template id="B:0"></template>
-  <p>👤 Loading user...</p>
-  <!--/$-->
-  <footer>© 2024 MyApp</footer>
-</div>
-</body></html>
+<!DOCTYPE html>
+<html>
+  <head></head>
+  <body>
+    <div>
+      <h1>My App</h1>
+      <nav>Home | About | Contact</nav>
+      <!--$?--><template id="B:0"></template>
+      <p>👤 Loading user...</p>
+      <!--/$-->
+      <footer>© 2024 MyApp</footer>
+    </div>
+  </body>
+</html>
 ```
 
 **Request time** — `resumeToPipeableStream()` fills the hole:
@@ -87,7 +91,7 @@ Here's what each one means:
 
 ```html
 <!--$-->
-  <div>This content resolved successfully</div>
+<div>This content resolved successfully</div>
 <!--/$-->
 ```
 
@@ -98,8 +102,8 @@ below is the actual component output." The `<!--/$-->` marks the end.
 
 ```html
 <!--$?-->
-  <template id="B:0"></template>
-  <p>Loading...</p>
+<template id="B:0"></template>
+<p>Loading...</p>
 <!--/$-->
 ```
 
@@ -117,7 +121,7 @@ function App() {
     <div>
       <h1>Static Header</h1>
       <Suspense fallback={<p>Loading...</p>}>
-        <DynamicComponent />       {/* hangs during prerender */}
+        <DynamicComponent /> {/* hangs during prerender */}
       </Suspense>
       <footer>Static Footer</footer>
     </div>
@@ -130,7 +134,9 @@ function App() {
 ```html
 <div>
   <h1>Static Header</h1>
-  <!--$?--><template id="B:0"></template><p>Loading...</p><!--/$-->
+  <!--$?--><template id="B:0"></template>
+  <p>Loading...</p>
+  <!--/$-->
   <footer>Static Footer</footer>
 </div>
 ```
@@ -153,7 +159,9 @@ Same component, two scenarios:
 **Scenario A**: `AsyncContent` resolves before abort (e.g., cache hit):
 
 ```html
-<!--$--><div>Async Content</div><!--/$-->
+<!--$-->
+<div>Async Content</div>
+<!--/$-->
 ```
 
 No `<template>`, no fallback. The content is directly in the shell. The
@@ -163,7 +171,9 @@ and it resolved." This is purely for hydration — the user just sees the conten
 **Scenario B**: `AsyncContent` is still pending at abort time:
 
 ```html
-<!--$?--><template id="B:0"></template><p>Loading...</p><!--/$-->
+<!--$?--><template id="B:0"></template>
+<p>Loading...</p>
+<!--/$-->
 ```
 
 The fallback renders. The `<template>` marker waits for the resume stream.
@@ -182,11 +192,11 @@ function Dashboard() {
   return (
     <div>
       <Suspense fallback={<p>Loading notifications...</p>}>
-        <Notifications />     {/* dynamic — reads user session */}
+        <Notifications /> {/* dynamic — reads user session */}
       </Suspense>
       <p>Dashboard overview (static)</p>
       <Suspense fallback={<p>Loading activity...</p>}>
-        <RecentActivity />    {/* dynamic — reads user session */}
+        <RecentActivity /> {/* dynamic — reads user session */}
       </Suspense>
     </div>
   );
@@ -211,10 +221,22 @@ Each hole gets its own boundary ID (`B:0`, `B:1`). At request time, the resume
 stream fills each one independently:
 
 ```html
-<div hidden id="S:0"><ul><li>3 new messages</li></ul></div>
-<script>$RC("B:0","S:0")</script>
-<div hidden id="S:1"><ul><li>Deployed v2.1</li></ul></div>
-<script>$RC("B:1","S:1")</script>
+<div hidden id="S:0">
+  <ul>
+    <li>3 new messages</li>
+  </ul>
+</div>
+<script>
+  $RC('B:0', 'S:0');
+</script>
+<div hidden id="S:1">
+  <ul>
+    <li>Deployed v2.1</li>
+  </ul>
+</div>
+<script>
+  $RC('B:1', 'S:1');
+</script>
 ```
 
 Static content between holes renders normally in the shell.
@@ -233,11 +255,12 @@ const { prelude, postponed } = await prerender(<App />, { signal });
 ```
 
 Returns:
+
 - **`prelude`** — a `ReadableStream` of the static HTML shell
 - **`postponed`** — an opaque object describing the holes (or `null` if
   everything resolved)
 
-The prelude contains the *final* HTML for everything that resolved. Pending
+The prelude contains the _final_ HTML for everything that resolved. Pending
 boundaries show their fallbacks. Nothing more will come from this API —
 the prelude is complete and cacheable.
 
@@ -247,11 +270,14 @@ the prelude is complete and cacheable.
 
 ```js
 const { pipe } = renderToPipeableStream(<App />, {
-  onShellReady() { pipe(response); },
+  onShellReady() {
+    pipe(response);
+  },
 });
 ```
 
 Streams HTML in real-time:
+
 1. First: the shell (with fallbacks for pending boundaries)
 2. Then: resolved content in hidden `<div>`s + `$RC` replacement scripts
 
@@ -267,9 +293,12 @@ a hanging component):
 ```html
 <div>
   <h1>Shell</h1>
-  <!--$--><p>[Slow content resolved after 50ms]</p><!--/$-->
+  <!--$-->
+  <p>[Slow content resolved after 50ms]</p>
+  <!--/$-->
   <!--$?--><template id="B:0"></template>
-  <p>Loading dynamic...</p><!--/$-->
+  <p>Loading dynamic...</p>
+  <!--/$-->
 </div>
 ```
 
@@ -284,16 +313,20 @@ pending boundary.
 <div>
   <h1>Shell</h1>
   <!--$?--><template id="B:0"></template>
-  <p>Loading slow...</p><!--/$-->
+  <p>Loading slow...</p>
+  <!--/$-->
   <!--$?--><template id="B:1"></template>
-  <p>Loading dynamic...</p><!--/$-->
+  <p>Loading dynamic...</p>
+  <!--/$-->
 </div>
 
 <!-- STREAMED LATER (after 50ms): -->
 <div hidden id="S:0">
   <p>[Slow content resolved after 50ms]</p>
 </div>
-<script>$RC("B:0","S:0")</script>
+<script>
+  $RC('B:0', 'S:0');
+</script>
 ```
 
 With streaming, the shell ships immediately with **both** fallbacks visible.
@@ -441,8 +474,8 @@ HTML generation, they're replayed as an **unclosing stream**:
 new ReadableStream({
   pull(controller) {
     if (i < chunks.length) controller.enqueue(chunks[i++]);
-    else controller.close();  // ← stream ends
-  }
+    else controller.close(); // ← stream ends
+  },
 });
 
 // Unclosing stream: delivers all chunks, then HANGS
@@ -450,7 +483,7 @@ new ReadableStream({
   pull(controller) {
     if (i < chunks.length) controller.enqueue(chunks[i++]);
     // ← no close() call — stream stays "open" forever
-  }
+  },
 });
 ```
 
@@ -475,26 +508,35 @@ Let's trace what a user's browser receives for a PPR page:
 ```html
 <!DOCTYPE html>
 <html>
-<head>...</head>
-<body>
-  <div>
-    <h1>My App</h1>
-    <nav>Home | About | Contact</nav>
-    <!--$?--><template id="B:0"></template>
-    <p>👤 Loading user...</p>
-    <!--/$-->
-    <footer>© 2024 MyApp</footer>
-  </div>
+  <head>
+    ...
+  </head>
+  <body>
+    <div>
+      <h1>My App</h1>
+      <nav>Home | About | Contact</nav>
+      <!--$?--><template id="B:0"></template>
+      <p>👤 Loading user...</p>
+      <!--/$-->
+      <footer>© 2024 MyApp</footer>
+    </div>
 
-  <!-- RSC data for hydration: -->
-  <script>(self.__next_f=self.__next_f||[]).push([0])</script>
-  <script>self.__next_f.push([1,"0:..."])</script>
-  <script>self.__next_f.push([1,"1:..."])</script>
-</body>
+    <!-- RSC data for hydration: -->
+    <script>
+      (self.__next_f = self.__next_f || []).push([0]);
+    </script>
+    <script>
+      self.__next_f.push([1, '0:...']);
+    </script>
+    <script>
+      self.__next_f.push([1, '1:...']);
+    </script>
+  </body>
 </html>
 ```
 
 The browser renders immediately:
+
 - Header ✓
 - Navigation ✓
 - "👤 Loading user..." (fallback) ✓
@@ -506,10 +548,13 @@ The browser renders immediately:
 <div hidden id="S:0">
   <p>Hello, Abanoub!</p>
 </div>
-<script>$RC("B:0","S:0")</script>
+<script>
+  $RC('B:0', 'S:0');
+</script>
 ```
 
 The `$RC` script:
+
 1. Finds `<template id="B:0">` in the DOM
 2. Finds `<div hidden id="S:0">`
 3. Removes the fallback ("👤 Loading user...")
@@ -525,11 +570,17 @@ of the Flight protocol:
 
 ```html
 <!-- Initialize the buffer -->
-<script>(self.__next_f=self.__next_f||[]).push([0])</script>
+<script>
+  (self.__next_f = self.__next_f || []).push([0]);
+</script>
 
 <!-- Flight data chunks (the serialized component tree) -->
-<script>self.__next_f.push([1,"0:{\"key\":\"value\"}\n"])</script>
-<script>self.__next_f.push([1,"1:[\"$\",\"div\",null,{...}]\n"])</script>
+<script>
+  self.__next_f.push([1, '0:{"key":"value"}\n']);
+</script>
+<script>
+  self.__next_f.push([1, '1:["$","div",null,{...}]\n']);
+</script>
 ```
 
 The client-side React code reads these chunks, reconstructs the component
@@ -542,11 +593,11 @@ interactive.
 
 A PPR prerender produces three things:
 
-| Output | What it is | When it's used |
-|--------|-----------|----------------|
-| **Prelude HTML** | Complete HTML document with fallbacks for dynamic holes | Served instantly from cache |
-| **Postponed state** | Opaque object describing which boundaries need to be filled | Passed to `resumeToPipeableStream()` at request time |
-| **RSC data** | Serialized component tree (Flight protocol) embedded as `<script>` tags | Used by the client for hydration |
+| Output              | What it is                                                              | When it's used                                       |
+| ------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------- |
+| **Prelude HTML**    | Complete HTML document with fallbacks for dynamic holes                 | Served instantly from cache                          |
+| **Postponed state** | Opaque object describing which boundaries need to be filled             | Passed to `resumeToPipeableStream()` at request time |
+| **RSC data**        | Serialized component tree (Flight protocol) embedded as `<script>` tags | Used by the client for hydration                     |
 
 The **prelude** is what the user sees immediately.
 The **postponed state** is what the server needs to fill in the gaps.
@@ -554,5 +605,5 @@ The **RSC data** is what React needs to make the page interactive.
 
 ---
 
-*All examples verified on React 19.2.8, Node.js, macOS.*
-*Source experiments: 13, 14, 15 in the settle-criterion directory.*
+_All examples verified on React 19.2.8, Node.js, macOS._
+_Source experiments: 13, 14, 15 in the settle-criterion directory._

@@ -127,6 +127,7 @@ timer is scheduled. This loop continues until no more reads start during the
 settle window — only then does `cacheReady()` resolve.
 
 **Two-tier resolution.** CacheSignal offers two resolution speeds:
+
 - **`inputReady()`** — fast tier (`queueMicrotask(() => process.nextTick(…))`).
   Used to abort hanging promise inputs to cached functions when all cache
   inputs are ready. Fires quickly, essentially same-tick.
@@ -179,7 +180,7 @@ For React on Rails this means two APIs:
 
    ```jsx
    async function UserGreeting() {
-     await connection();  // ← hangs during prerender, no-op at request time
+     await connection(); // ← hangs during prerender, no-op at request time
      const user = getCurrentUser();
      return <p>Hello, {user.name}!</p>;
    }
@@ -539,6 +540,7 @@ refs), and identical per-request behavior under counters and timing.
 > **Evidence base.** This section is backed by source-code analysis of the
 > Next.js canary (August 2026) and 15 empirical experiments run on React
 > 19.2.8. The findings are documented in full at:
+>
 > - [`internal/analysis/ppr-settle-criterion-findings.md`](../analysis/ppr-settle-criterion-findings.md)
 > - [`internal/analysis/ppr-settle-by-example.md`](../analysis/ppr-settle-by-example.md)
 > - [`internal/analysis/ppr-rsc-payload-by-example.md`](../analysis/ppr-rsc-payload-by-example.md)
@@ -557,11 +559,11 @@ promises. Both failures are silent — the output is valid HTML, just worse.
 
 ### The three abort points
 
-| # | Abort point | Settle criterion | Mechanism | Window |
-|---|---|---|---|---|
-| 1 | **RSC prospective pass** | `CacheSignal.cacheReady()` | Reference counter + deferred check | Until all tracked work settles |
-| 2 | **RSC final pass** | `runInSequentialTasks` | Fixed task schedule | ~4 macrotask turns |
-| 3 | **HTML/Fizz prerender** | `runInSequentialTasks` | Fixed task schedule | ~2 macrotask turns |
+| #   | Abort point              | Settle criterion           | Mechanism                          | Window                         |
+| --- | ------------------------ | -------------------------- | ---------------------------------- | ------------------------------ |
+| 1   | **RSC prospective pass** | `CacheSignal.cacheReady()` | Reference counter + deferred check | Until all tracked work settles |
+| 2   | **RSC final pass**       | `runInSequentialTasks`     | Fixed task schedule                | ~4 macrotask turns             |
+| 3   | **HTML/Fizz prerender**  | `runInSequentialTasks`     | Fixed task schedule                | ~2 macrotask turns             |
 
 The prospective pass is the only one with an open-ended wait. The final pass
 and HTML pass use fixed schedules because their inputs are already resolved
@@ -583,7 +585,13 @@ import { cacheRead } from 'react-on-rails-pro';
 
 async function ProductList() {
   const products = await cacheRead(() => db.query('SELECT * FROM products'));
-  return <ul>{products.map(p => <li key={p.id}>{p.name}</li>)}</ul>;
+  return (
+    <ul>
+      {products.map((p) => (
+        <li key={p.id}>{p.name}</li>
+      ))}
+    </ul>
+  );
 }
 ```
 
@@ -621,13 +629,14 @@ immediately:
 import { connection } from 'react-on-rails-pro';
 
 async function UserProfile() {
-  await connection();  // hangs during prerender → dynamic hole
+  await connection(); // hangs during prerender → dynamic hole
   const user = await getCurrentUser();
   return <div>{user.name}</div>;
 }
 ```
 
 **Design properties:**
+
 - The hanging promise is **NOT** tracked by CacheSignal. It is invisible to
   the settle criterion. This is what prevents deadlock.
 - At request time, `connection()` resolves immediately (a no-op).
@@ -637,16 +646,16 @@ async function UserProfile() {
 
 ### Tracked vs untracked work
 
-| Async operation | Tracked by CacheSignal? | Makes it into the shell? |
-|---|---|---|
-| `await cacheRead(() => ...)` | ✅ Yes | ✅ Yes — CacheSignal waits |
-| `await cachedFunction()` (with `"use cache"`) | ✅ Yes | ✅ Yes |
-| Module/chunk loads (`import()`, `React.lazy`) | ✅ Yes (module loading subscription) | ✅ Yes |
-| `await connection()` | ❌ No (by design) | ❌ No — becomes a hole |
-| `await rawFetch(url)` (untracked) | ❌ No | ⚠️ Only if microtask-fast |
-| `await db.query()` (untracked) | ❌ No | ⚠️ Only if microtask-fast |
-| Client component async during SSR | ❌ No | ⚠️ Only if microtask-fast |
-| Third-party `throw promise` / `React.use(p)` | ❌ No | ⚠️ Only if microtask-fast |
+| Async operation                               | Tracked by CacheSignal?              | Makes it into the shell?   |
+| --------------------------------------------- | ------------------------------------ | -------------------------- |
+| `await cacheRead(() => ...)`                  | ✅ Yes                               | ✅ Yes — CacheSignal waits |
+| `await cachedFunction()` (with `"use cache"`) | ✅ Yes                               | ✅ Yes                     |
+| Module/chunk loads (`import()`, `React.lazy`) | ✅ Yes (module loading subscription) | ✅ Yes                     |
+| `await connection()`                          | ❌ No (by design)                    | ❌ No — becomes a hole     |
+| `await rawFetch(url)` (untracked)             | ❌ No                                | ⚠️ Only if microtask-fast  |
+| `await db.query()` (untracked)                | ❌ No                                | ⚠️ Only if microtask-fast  |
+| Client component async during SSR             | ❌ No                                | ⚠️ Only if microtask-fast  |
+| Third-party `throw promise` / `React.use(p)`  | ❌ No                                | ⚠️ Only if microtask-fast  |
 
 **The "microtask-fast" cutoff.** Untracked async work that resolves via
 `Promise.resolve()` (already-fulfilled promise) always makes it into the shell
@@ -667,7 +676,7 @@ A hard timeout cap prevents pathological applications from stalling builds:
 ```js
 const settled = await Promise.race([
   cacheSignal.cacheReady(),
-  timeout(SETTLE_TIMEOUT_MS).then(() => 'TIMEOUT')
+  timeout(SETTLE_TIMEOUT_MS).then(() => 'TIMEOUT'),
 ]);
 
 if (settled === 'TIMEOUT') {

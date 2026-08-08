@@ -9,7 +9,7 @@
 ### The Problem in One Sentence
 
 When you prerender a page with Partial Prerendering (PPR), React needs to render
-as much of the static shell as possible, then *stop* and leave "holes" for
+as much of the static shell as possible, then _stop_ and leave "holes" for
 dynamic content. The question is: **when exactly should it stop?**
 
 ### Why Getting It Wrong Is Bad
@@ -41,19 +41,19 @@ page layout like this:
 └────────────────────────────────┘
 ```
 
-If you abort *before* the Layout component finishes loading, the entire middle
+If you abort _before_ the Layout component finishes loading, the entire middle
 section shows a spinner ("Loading..."). The user sees Header + spinner + Footer.
 
-If you abort *after* Layout finishes but before Content and Comments resolve,
+If you abort _after_ Layout finishes but before Content and Comments resolve,
 the user sees Header + Layout + Sidebar + "Content loading..." + Footer.
 
-If you wait for *everything* to resolve (Layout → Content → Comments) and then
+If you wait for _everything_ to resolve (Layout → Content → Comments) and then
 abort, the user sees the complete page with only the tiny Replies section as a
 dynamic hole. This is vastly better for LCP/TTFB — the user sees the whole page
 structure instantly.
 
 **Abort too late** → You never abort at all. Dynamic content (like user-specific
-replies) is backed by promises that *never resolve* during prerender. If the
+replies) is backed by promises that _never resolve_ during prerender. If the
 abort criterion waits for "no pending work" without understanding that some
 promises are deliberately hanging, you get a deadlock. The prerender hangs
 forever.
@@ -62,21 +62,22 @@ forever.
 
 Next.js solves this with a two-pass prerender:
 
-**Pass 1: "Fill the caches"** (called the *prospective* prerender)
+**Pass 1: "Fill the caches"** (called the _prospective_ prerender)
 
 Think of it like a dry run. Next.js renders your entire component tree, letting
 every `"use cache"` function, `fetch()` call, and async component run to
 completion. The goal is purely to fill caches — the HTML output is thrown away.
 
 The key mechanism is a **counter** called `CacheSignal`:
+
 - Every time a cache read starts → counter goes up
 - Every time a cache read finishes → counter goes down
-- When the counter hits zero and *stays at zero* for a brief window → all caches
+- When the counter hits zero and _stays at zero_ for a brief window → all caches
   are filled
 
-Only *after* all caches are filled does Next.js abort this pass.
+Only _after_ all caches are filled does Next.js abort this pass.
 
-**Pass 2: "Render with warm caches"** (called the *final* prerender)
+**Pass 2: "Render with warm caches"** (called the _final_ prerender)
 
 Now Next.js renders again, but this time all the cache data is already available.
 Async components that read from cache resolve instantly (within a microtask).
@@ -100,20 +101,24 @@ Here's a page with three levels of async components:
 export default async function Page() {
   return (
     <div>
-      <Header />                  {/* sync — always in shell */}
+      <Header /> {/* sync — always in shell */}
       <Suspense fallback={<Spinner />}>
-        <ProductLayout>           {/* async — loads categories from cache */}
-          <Sidebar />             {/* sync child */}
+        <ProductLayout>
+          {' '}
+          {/* async — loads categories from cache */}
+          <Sidebar /> {/* sync child */}
           <Suspense fallback={<ContentSkeleton />}>
-            <ProductList>         {/* async — loads products from cache */}
+            <ProductList>
+              {' '}
+              {/* async — loads products from cache */}
               <Suspense fallback={<ReviewsSkeleton />}>
-                <UserReviews />   {/* dynamic — needs user session */}
+                <UserReviews /> {/* dynamic — needs user session */}
               </Suspense>
             </ProductList>
           </Suspense>
         </ProductLayout>
       </Suspense>
-      <Footer />                  {/* sync — always in shell */}
+      <Footer /> {/* sync — always in shell */}
     </div>
   );
 }
@@ -139,12 +144,12 @@ and a skeleton where reviews will stream in.
 The critical difference between the two passes is **whether async work is
 tracked**:
 
-| | Pass 1 (Prospective) | Pass 2 (Final) |
-|---|---|---|
-| **Cache tracking** | Yes — CacheSignal | None — caches are warm |
-| **Abort trigger** | CacheSignal settles | Fixed task schedule |
-| **Dynamic APIs** | Keep rendering past them | Abort on encounter |
-| **Purpose** | Fill caches | Produce output |
+|                    | Pass 1 (Prospective)     | Pass 2 (Final)         |
+| ------------------ | ------------------------ | ---------------------- |
+| **Cache tracking** | Yes — CacheSignal        | None — caches are warm |
+| **Abort trigger**  | CacheSignal settles      | Fixed task schedule    |
+| **Dynamic APIs**   | Keep rendering past them | Abort on encounter     |
+| **Purpose**        | Fill caches              | Produce output         |
 
 This means: **if your async component does I/O that doesn't go through a tracked
 channel (cache, fetch, module load), the framework cannot see it, and a bare
@@ -163,6 +168,7 @@ When count drops to 0:
 ```
 
 **Why two levels?** React schedules new rendering work in different ways:
+
 - During prerender, React uses **microtasks** to schedule follow-up work
 - During normal rendering, React uses **setImmediate**
 
@@ -181,6 +187,7 @@ We ran 8 experiments on React 19.2.8 to verify this:
 
 **Experiment 1 — Fallback Reachability**: An outer async component (50ms) wraps
 an inner Suspense boundary backed by a hanging promise.
+
 - Abort at 0ms → shows "Loading outer..." (outer's coarser fallback — **bad**)
 - Abort at 100ms → shows "Loading inner..." (inner's own fallback — **good**)
 - The difference is whether the framework waited for the outer component to
@@ -188,6 +195,7 @@ an inner Suspense boundary backed by a hanging promise.
 
 **Experiment 3 — Complex Nested Tree**: Header/Layout/Sidebar/Content/Comments/
 Replies with 4 Suspense boundaries at different depths.
+
 - Abort at 5ms → only "Main loading..." (everything behind outer spinner)
 - Abort at 30ms → Layout+Sidebar visible, "Content loading..." shown
 - Abort at 80ms → Content visible, "Comments loading..." shown
@@ -207,6 +215,7 @@ L3.beginRead → L3.endRead → [setImmediate+setTimeout → SETTLED]
 Result: all three levels rendered, deep fallback shown. ✓
 
 **Experiment 8 — Untracked I/O** (the critical finding):
+
 - **Without tracking**: bare `setImmediate` abort → premature abort, shows outer
   fallback. The cross-process reads (20ms each) were invisible to the framework.
 - **With CacheSignal tracking**: waits for both reads, shows deep fallback. ✓
@@ -230,6 +239,7 @@ Server Components tree.
 
 **Settle criterion**: `CacheSignal.cacheReady()` — a reference-counting signal
 that tracks every `beginRead()`/`endRead()` pair across:
+
 - `"use cache"` function calls
 - `fetch()` calls (the patched version)
 - `unstable_cache` calls
@@ -349,6 +359,7 @@ queue drains).
 **Standard tier: `cacheReady()`** — `setImmediate(() => setTimeout(0))`
 
 Used for the main prerender abort decision. Fires after two event-loop turns:
+
 1. `setImmediate` runs after I/O callbacks but before timers
 2. `setTimeout(0)` runs in the next timer phase
 
@@ -412,6 +423,7 @@ if (prerenderStore.type === 'prerender') {
 ```
 
 `makeRuntimeHangingPromise` returns:
+
 ```javascript
 new Promise((_, reject) => {
   signal.addEventListener('abort', () => reject(error), { once: true });
@@ -429,18 +441,18 @@ rejects, and React knows to finalize that boundary as a "postponed" placeholder.
 The system distinguishes between "work that will finish" and "work that should
 never finish during prerender" through what gets tracked:
 
-| Type | Tracked by CacheSignal? | Resolves during prerender? |
-|---|---|---|
-| `fetch('/api/data')` with cache | ✓ Yes (beginRead/endRead) | Yes |
-| `"use cache"` function | ✓ Yes | Yes |
-| `import('./Component')` | ✓ Yes (module loading) | Yes |
-| `cookies()` | ✗ No | No (hanging promise) |
-| `headers()` | ✗ No | No (hanging promise) |
-| `searchParams` | ✗ No | No (hanging promise) |
-| `connection()` | ✗ No | No (hanging promise) |
+| Type                            | Tracked by CacheSignal?   | Resolves during prerender? |
+| ------------------------------- | ------------------------- | -------------------------- |
+| `fetch('/api/data')` with cache | ✓ Yes (beginRead/endRead) | Yes                        |
+| `"use cache"` function          | ✓ Yes                     | Yes                        |
+| `import('./Component')`         | ✓ Yes (module loading)    | Yes                        |
+| `cookies()`                     | ✗ No                      | No (hanging promise)       |
+| `headers()`                     | ✗ No                      | No (hanging promise)       |
+| `searchParams`                  | ✗ No                      | No (hanging promise)       |
+| `connection()`                  | ✗ No                      | No (hanging promise)       |
 
 The CacheSignal only counts tracked work. Hanging promises are invisible to it.
-So when CacheSignal says "settled," it means "all the work that *can* resolve has
+So when CacheSignal says "settled," it means "all the work that _can_ resolve has
 resolved." The hanging promises are still hanging, but that's correct — they're
 the dynamic holes.
 
@@ -458,11 +470,13 @@ framework-controlled channels (`fetch`, `"use cache"`, `import()`). The framewor
 intercepts each one and brackets it with `beginRead()`/`endRead()`.
 
 For react_on_rails, the tracked operations should be:
+
 1. **Resume Data Cache reads** — equivalent to Next.js's `"use cache"` reads
 2. **Module/chunk loads** — same as Next.js
 3. **Any other framework-controlled async** — e.g., our own data-fetching helpers
 
 The deliberately-hanging operations should be:
+
 1. **Dynamic boundary markers** — our equivalent of cookies/headers access
 2. **Any per-request data access** that signals "this is not cacheable"
 
@@ -476,6 +490,7 @@ HTTP), even "warm" reads take real wall-clock time. A single-task abort would fi
 before those reads complete.
 
 **Solution options**:
+
 1. **Keep the RDC in-process** (JavaScript-side cache): The final pass's
    single-task abort works correctly, matching Next.js's behavior.
 2. **Track RDC reads in the final pass too**: Use a CacheSignal even in the
@@ -523,11 +538,13 @@ produce slightly different shells on different builds if component resolution
 times vary.
 
 Next.js handles this implicitly because:
+
 - Cached values resolve synchronously (microtask-fast) on the final pass
 - The task schedule is deterministic (same number of macrotasks)
 - The only variance is in the prospective pass, whose output is discarded
 
 For react_on_rails, determinism requires:
+
 1. The RDC must be in-process (so final-pass reads are synchronous)
 2. The settle criterion must be event-driven (CacheSignal), not time-based
 3. Builds should be validated with a diff check: prerender twice, compare shells
@@ -536,11 +553,11 @@ For react_on_rails, determinism requires:
 
 ## Part 6: Summary Table
 
-| Abort Point | Next.js Criterion | Mechanism | Window |
-|---|---|---|---|
+| Abort Point     | Next.js Criterion          | Mechanism                          | Window                         |
+| --------------- | -------------------------- | ---------------------------------- | ------------------------------ |
 | RSC Prospective | `CacheSignal.cacheReady()` | Reference counter + deferred check | Until all tracked work settles |
-| RSC Final | `runInSequentialTasks` | Task-schedule (4 macrotasks) | ~4 event-loop turns |
-| HTML/Fizz | `runInSequentialTasks` | Task-schedule (2 macrotasks) | ~2 event-loop turns |
+| RSC Final       | `runInSequentialTasks`     | Task-schedule (4 macrotasks)       | ~4 event-loop turns            |
+| HTML/Fizz       | `runInSequentialTasks`     | Task-schedule (2 macrotasks)       | ~2 event-loop turns            |
 
 The prospective pass is the only one with an open-ended wait. The final pass and
 HTML pass use fixed schedules because their inputs are already resolved.
@@ -549,16 +566,16 @@ HTML pass use fixed schedules because their inputs are already resolved.
 
 ## Appendix A: Experiment Results Summary
 
-| # | Experiment | Key Finding |
-|---|---|---|
-| 1 | Fallback reachability | Abort timing determines WHICH Suspense fallback appears — inner (narrow) or outer (coarse) |
-| 2 | Deep nested async | 3 levels of async (30ms each): setImmediate abort misses all; 150ms gets all |
-| 3 | Complex tree | Progressive reveal: each resolved level exposes one more Suspense boundary |
-| 4 | CacheSignal simulation | CacheSignal correctly chains through L1→L2→L3, settling only after L3 |
-| 5 | setImmediate vs deferred | With *already-tracked* components (manual beginRead/endRead), all strategies work because React's own scheduling is microtask-fast |
-| 6 | Microtask gap | Warm-cache scenario (Promise.resolve): CacheSignal survives the gap between endRead and React's follow-up render |
-| 7 | Bare abort without tracking | When all components are microtask-fast, even bare setImmediate works (React resolves everything in one task) |
-| 8 | **Untracked I/O** | **The critical finding**: Without CacheSignal tracking, a 20ms cross-process read is invisible → premature abort → shallow shell. With tracking: correct. |
+| #   | Experiment                  | Key Finding                                                                                                                                               |
+| --- | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Fallback reachability       | Abort timing determines WHICH Suspense fallback appears — inner (narrow) or outer (coarse)                                                                |
+| 2   | Deep nested async           | 3 levels of async (30ms each): setImmediate abort misses all; 150ms gets all                                                                              |
+| 3   | Complex tree                | Progressive reveal: each resolved level exposes one more Suspense boundary                                                                                |
+| 4   | CacheSignal simulation      | CacheSignal correctly chains through L1→L2→L3, settling only after L3                                                                                     |
+| 5   | setImmediate vs deferred    | With _already-tracked_ components (manual beginRead/endRead), all strategies work because React's own scheduling is microtask-fast                        |
+| 6   | Microtask gap               | Warm-cache scenario (Promise.resolve): CacheSignal survives the gap between endRead and React's follow-up render                                          |
+| 7   | Bare abort without tracking | When all components are microtask-fast, even bare setImmediate works (React resolves everything in one task)                                              |
+| 8   | **Untracked I/O**           | **The critical finding**: Without CacheSignal tracking, a 20ms cross-process read is invisible → premature abort → shallow shell. With tracking: correct. |
 
 **Experiment 8 is the proof that tracking is necessary.** A bare timing abort
 only works when all async work resolves within the first macrotask (microtask-
@@ -597,5 +614,5 @@ takes longer and is invisible without explicit tracking.
 
 ---
 
-*Experiments run on: Node.js, React 19.2.8, macOS Darwin 25.5.0*
-*Source: Next.js canary (latest as of 2026-08-08)*
+_Experiments run on: Node.js, React 19.2.8, macOS Darwin 25.5.0_
+_Source: Next.js canary (latest as of 2026-08-08)_

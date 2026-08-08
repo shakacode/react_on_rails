@@ -11,11 +11,17 @@ pending at that moment becomes a "hole" showing its Suspense fallback.
 ## Rule #1: The abort timing decides which fallback the user sees
 
 ```jsx
-<Suspense fallback={<Spinner />}>      ← "coarse" fallback
-  <ProductLayout>                       ← async, loads in 20ms
-    <Sidebar />                         ← sync
-    <Suspense fallback={<Skeleton />}>  ← "fine" fallback
-      <UserReviews />                   ← dynamic (never resolves)
+<Suspense fallback={<Spinner />}>
+  {' '}
+  ← "coarse" fallback
+  <ProductLayout>
+    {' '}
+    ← async, loads in 20ms
+    <Sidebar /> ← sync
+    <Suspense fallback={<Skeleton />}>
+      {' '}
+      ← "fine" fallback
+      <UserReviews /> ← dynamic (never resolves)
     </Suspense>
   </ProductLayout>
 </Suspense>
@@ -24,7 +30,7 @@ pending at that moment becomes a "hole" showing its Suspense fallback.
 **If you abort before `ProductLayout` finishes (before 20ms):**
 
 ```html
-<Spinner />       ← the coarse fallback — the user sees a blank spinner
+<Spinner /> ← the coarse fallback — the user sees a blank spinner
 ```
 
 The whole middle of the page is gone. `Sidebar` is gone. The fine `<Skeleton />`
@@ -35,8 +41,7 @@ Suspense boundary at all.
 
 ```html
 <ProductLayout>
-  <Sidebar />     ← ✓ fully rendered
-  <Skeleton />    ← the FINE fallback — much better!
+  <Sidebar /> ← ✓ fully rendered <Skeleton /> ← the FINE fallback — much better!
 </ProductLayout>
 ```
 
@@ -44,7 +49,7 @@ Now the user sees the layout, the sidebar, and a small skeleton where reviews
 will stream in. This is what PPR is supposed to deliver.
 
 **The lesson**: aborting too early doesn't produce an error — it produces a
-*valid but worse* page. The output is correct HTML, just shallower than it could be.
+_valid but worse_ page. The output is correct HTML, just shallower than it could be.
 This is the most dangerous failure mode because it's silent.
 
 ---
@@ -60,28 +65,28 @@ There are two kinds of abort strategies:
 
 ### What gets tracked? What doesn't?
 
-| Code pattern | Tracked? | Will it make it into the shell? |
-|---|---|---|
-| `await Promise.resolve()` | doesn't matter | ✓ Yes — resolves within a microtask, fast enough for any abort |
-| `await setTimeout(0)` | doesn't matter | ✓ Yes — resolves within one macrotask |
-| `await fetch(url)` through framework | ✓ tracked | ✓ Yes |
-| `await fetch(url)` raw (your own) | ✗ untracked | ❌ **No** — invisible to the framework |
-| `await db.query(...)` | ✗ untracked | ❌ **No** |
-| `await readFile(...)` | ✗ untracked | ❌ **No** |
-| `await crossProcessCacheRead()` | ✗ untracked | ❌ **No** — even if it's "fast" (5ms+) |
+| Code pattern                         | Tracked?       | Will it make it into the shell?                                |
+| ------------------------------------ | -------------- | -------------------------------------------------------------- |
+| `await Promise.resolve()`            | doesn't matter | ✓ Yes — resolves within a microtask, fast enough for any abort |
+| `await setTimeout(0)`                | doesn't matter | ✓ Yes — resolves within one macrotask                          |
+| `await fetch(url)` through framework | ✓ tracked      | ✓ Yes                                                          |
+| `await fetch(url)` raw (your own)    | ✗ untracked    | ❌ **No** — invisible to the framework                         |
+| `await db.query(...)`                | ✗ untracked    | ❌ **No**                                                      |
+| `await readFile(...)`                | ✗ untracked    | ❌ **No**                                                      |
+| `await crossProcessCacheRead()`      | ✗ untracked    | ❌ **No** — even if it's "fast" (5ms+)                         |
 
 ### Proof: the speed cutoff
 
 We tested a single async component at different speeds, with a task-schedule
 abort (the strategy used for the final render pass):
 
-| Async work | Time | Result |
-|---|---|---|
-| `await Promise.resolve()` | ~0ms (microtask) | ✓ Rendered |
-| `await setTimeout(0)` | ~1ms (one macrotask) | ✓ Rendered |
-| `await setTimeout(5)` | ~5ms | ❌ **Premature abort** |
-| `await setTimeout(20)` | ~20ms | ❌ **Premature abort** |
-| `await setTimeout(100)` | ~100ms | ❌ **Premature abort** |
+| Async work                | Time                 | Result                 |
+| ------------------------- | -------------------- | ---------------------- |
+| `await Promise.resolve()` | ~0ms (microtask)     | ✓ Rendered             |
+| `await setTimeout(0)`     | ~1ms (one macrotask) | ✓ Rendered             |
+| `await setTimeout(5)`     | ~5ms                 | ❌ **Premature abort** |
+| `await setTimeout(20)`    | ~20ms                | ❌ **Premature abort** |
+| `await setTimeout(100)`   | ~100ms               | ❌ **Premature abort** |
 
 **The cutoff is around 1-2ms.** Anything slower than a single macrotask turn
 gets missed by a task-schedule abort. Any real I/O (database queries, network
@@ -93,14 +98,24 @@ calls, file reads, cross-process communication) takes longer than that.
 
 This is the most important rule. When an untracked async component is still
 pending at abort time, React hasn't descended into it. So any Suspense boundaries,
-children, or static content *below* it in the tree are completely lost.
+children, or static content _below_ it in the tree are completely lost.
 
 ```jsx
-<Suspense fallback={<p>Loading all...</p>}>      ← boundary A
-  <TrackedLayout>                                  ← tracked, 20ms → renders ✓
-    <TrackedSidebar>                               ← tracked, 20ms → renders ✓
-      <UntrackedContent>                           ← UNTRACKED, 20ms
-        <Suspense fallback={<p>Dynamic hole</p>}>  ← boundary B (never reached!)
+<Suspense fallback={<p>Loading all...</p>}>
+  {' '}
+  ← boundary A
+  <TrackedLayout>
+    {' '}
+    ← tracked, 20ms → renders ✓
+    <TrackedSidebar>
+      {' '}
+      ← tracked, 20ms → renders ✓
+      <UntrackedContent>
+        {' '}
+        ← UNTRACKED, 20ms
+        <Suspense fallback={<p>Dynamic hole</p>}>
+          {' '}
+          ← boundary B (never reached!)
           <HangingComponent />
         </Suspense>
       </UntrackedContent>
@@ -118,7 +133,8 @@ CacheSignal doesn't know about it). Since `UntrackedContent` is between
 boundary A and boundary B, it suspends at boundary A. The user sees:
 
 ```html
-<p>Loading all...</p>     ← the OUTERMOST fallback!
+<p>Loading all...</p>
+← the OUTERMOST fallback!
 ```
 
 Layout and Sidebar are in a hidden `<div>` (React's streaming buffer), but
@@ -126,13 +142,15 @@ they're invisible. Boundary B's "Dynamic hole" fallback never appears because
 React never reached it.
 
 **The fix**: either track `UntrackedContent` with beginRead/endRead, or put a
-Suspense boundary *directly above* it:
+Suspense boundary _directly above_ it:
 
 ```jsx
 <Suspense fallback={<p>Loading layout...</p>}>
   <TrackedLayout>
     <TrackedSidebar>
-      <Suspense fallback={<p>Loading content...</p>}>   ← NEW boundary
+      <Suspense fallback={<p>Loading content...</p>}>
+        {' '}
+        ← NEW boundary
         <UntrackedContent>
           <Suspense fallback={<p>Dynamic hole</p>}>
             <HangingComponent />
@@ -154,13 +172,17 @@ The user sees Layout + Sidebar + "Loading content..." instead of just
 
 When tracked and untracked components are mixed in the same tree, the CacheSignal
 correctly waits for tracked components but then settles immediately — even if
-an untracked child was *just* discovered by the tracked component's resolution.
+an untracked child was _just_ discovered by the tracked component's resolution.
 
 ```jsx
 <Suspense fallback={<p>Loading...</p>}>
-  <TrackedLayout>              ← tracked, 20ms
+  <TrackedLayout>
+    {' '}
+    ← tracked, 20ms
     <Suspense fallback={<p>Content loading...</p>}>
-      <UntrackedContent>       ← untracked, 20ms
+      <UntrackedContent>
+        {' '}
+        ← untracked, 20ms
         <Suspense fallback={<p>Details loading...</p>}>
           <HangingComponent />
         </Suspense>
@@ -171,6 +193,7 @@ an untracked child was *just* discovered by the tracked component's resolution.
 ```
 
 Timeline:
+
 ```
   0ms: TrackedLayout starts (beginRead, count=1)
  20ms: TrackedLayout finishes (endRead, count=0)
@@ -189,7 +212,8 @@ component. You get the middle fallback, not the deepest one.
 ```html
 <div>
   [Layout-tracked]
-  <p>Content loading...</p>    ← middle fallback, not "Details loading..."
+  <p>Content loading...</p>
+  ← middle fallback, not "Details loading..."
 </div>
 ```
 
@@ -203,7 +227,9 @@ The "Details loading..." fallback would have been more specific.
 
 ```jsx
 // ⚠️ DANGEROUS: async fallback
-<Suspense fallback={<AsyncFallback />}>     ← fallback is async (50ms)!
+<Suspense fallback={<AsyncFallback />}>
+  {' '}
+  ← fallback is async (50ms)!
   <HangingComponent />
 </Suspense>
 ```
@@ -211,7 +237,7 @@ The "Details loading..." fallback would have been more specific.
 **If you abort before `AsyncFallback` resolves (before 50ms):**
 
 ```html
-(empty)     ← the shell is COMPLETELY EMPTY
+(empty) ← the shell is COMPLETELY EMPTY
 ```
 
 React needs to show the fallback, but the fallback itself is pending. There's no
@@ -222,11 +248,15 @@ Suspense boundary above it to catch the suspension. The prelude is empty.
 **Safe version** — wrap the async fallback in its own Suspense:
 
 ```jsx
-<Suspense fallback={
-  <Suspense fallback={<p>Loading...</p>}>   ← sync fallback catches it
-    <AsyncFallback />
-  </Suspense>
-}>
+<Suspense
+  fallback={
+    <Suspense fallback={<p>Loading...</p>}>
+      {' '}
+      ← sync fallback catches it
+      <AsyncFallback />
+    </Suspense>
+  }
+>
   <HangingComponent />
 </Suspense>
 ```
@@ -247,7 +277,7 @@ abort strategy:
 
 ```jsx
 async function FastComponent({ children }) {
-  const data = await Promise.resolve(cachedData);  // ← instant
+  const data = await Promise.resolve(cachedData); // ← instant
   return <div>{data}</div>;
 }
 ```
@@ -295,17 +325,18 @@ wall-clock time.
 
 ## Summary: When does each component pattern make it into the static shell?
 
-| Your component does... | Prospective pass (CacheSignal) | Final pass (task-schedule) |
-|---|---|---|
-| `await Promise.resolve(data)` | ✓ always works | ✓ always works |
-| `await trackedCacheRead()` (20ms) | ✓ CacheSignal waits | ✓ if cache is warm (instant) |
-| `await rawFetch(url)` (20ms) | ❌ missed (untracked) | ❌ missed (too slow) |
-| `await db.query()` (20ms) | ❌ missed (untracked) | ❌ missed (too slow) |
-| `await crossProcessRead()` (5ms) | ❌ missed (untracked) | ❌ missed (too slow) |
-| `cookies()` / `headers()` | hanging (correct) | hanging (correct) |
+| Your component does...            | Prospective pass (CacheSignal) | Final pass (task-schedule)   |
+| --------------------------------- | ------------------------------ | ---------------------------- |
+| `await Promise.resolve(data)`     | ✓ always works                 | ✓ always works               |
+| `await trackedCacheRead()` (20ms) | ✓ CacheSignal waits            | ✓ if cache is warm (instant) |
+| `await rawFetch(url)` (20ms)      | ❌ missed (untracked)          | ❌ missed (too slow)         |
+| `await db.query()` (20ms)         | ❌ missed (untracked)          | ❌ missed (too slow)         |
+| `await crossProcessRead()` (5ms)  | ❌ missed (untracked)          | ❌ missed (too slow)         |
+| `cookies()` / `headers()`         | hanging (correct)              | hanging (correct)            |
 
 **The takeaway**: the only async work that reliably makes it into the shell is
 work that either:
+
 1. Resolves instantly (already-fulfilled promise), or
 2. Is explicitly tracked by the framework (beginRead/endRead)
 
@@ -340,5 +371,5 @@ More work at request time.       Less work at request time.
 
 ---
 
-*All findings verified empirically on React 19.2.8, Node.js, macOS.*
-*Source experiments: experiments 9-12 in the settle-criterion directory.*
+_All findings verified empirically on React 19.2.8, Node.js, macOS._
+_Source experiments: experiments 9-12 in the settle-criterion directory._
