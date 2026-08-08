@@ -125,7 +125,14 @@ fi
 private_dir="$(mktemp -d "${TMPDIR:-/tmp}/ror-pro-agent-eval.XXXXXX")"
 chmod 700 "$private_dir"
 npm_cache_dir=""
+credentialed_output_publishable=false
 cleanup() {
+  # A credentialed run is publishable only after its final byte scan. Remove
+  # the exact, prevalidated output path on every earlier exit so a rejected
+  # partial run cannot be mistaken for credential-free evidence.
+  if [[ "$auth_requested" == true && "$credentialed_output_publishable" == false ]]; then
+    rm -rf "$output"
+  fi
   rm -rf "$private_dir"
   [[ -z "$npm_cache_dir" ]] || rm -rf "$npm_cache_dir"
 }
@@ -451,6 +458,7 @@ checksum_files="$private_dir/checksum-files"
 (cd "$output" && while IFS= read -r file; do shasum -a 256 "$file"; done <"$checksum_files" >SHA256SUMS)
 if [[ "$auth_material_available" == true ]]; then
   assert_credential_absent "$output"
+  credentialed_output_publishable=true
 fi
 
 echo "recorded run: $output"

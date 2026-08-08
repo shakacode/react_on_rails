@@ -487,6 +487,11 @@ rg -q 'assert_credential_absent \"\$workspace\"' "$eval_dir/bin/run-eval"
 rg -q 'assert_credential_absent \"\$workspace\" --skip-symlinks' "$eval_dir/bin/run-eval"
 rg -Fq 'credential_snapshot=' "$eval_dir/bin/run-eval"
 rg -Fq 'assert_credential_absent' "$eval_dir/bin/run-eval"
+rg -q '^credentialed_output_publishable=false$' "$eval_dir/bin/run-eval"
+rg -Fq '[[ "$auth_requested" == true && "$credentialed_output_publishable" == false ]]' \
+  "$eval_dir/bin/run-eval"
+test "$(rg -n 'assert_credential_absent "\$output"' "$eval_dir/bin/run-eval" | cut -d: -f1)" -lt \
+  "$(rg -n '^  credentialed_output_publishable=true$' "$eval_dir/bin/run-eval" | cut -d: -f1)"
 rg -Fq 'cache=' "$eval_dir/bin/run-eval"
 rg -Fq '.npmrc' "$eval_dir/bin/run-eval"
 rg -Fq '"$eval_dir/bin" "$eval_dir/isolated-host" "$eval_dir/schemas"' \
