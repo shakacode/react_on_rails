@@ -1,0 +1,17 @@
+#!/usr/bin/env perl
+use strict;
+use warnings;
+
+@ARGV == 1 && $ARGV[0] =~ /\A[0-9]+\z/
+  or die "usage: $0 FILE_DESCRIPTOR\n";
+
+my $descriptor = $ARGV[0];
+open my $file, "<&=$descriptor"
+  or die "cannot inspect file descriptor\n";
+my @metadata = stat $file;
+@metadata or die "cannot stat file descriptor\n";
+
+my $kind = -f $file ? "regular" : "other";
+my $mode = sprintf "%04o", $metadata[2] & 07777;
+my $size = $metadata[7];
+print "$kind:$mode:$size\n";
