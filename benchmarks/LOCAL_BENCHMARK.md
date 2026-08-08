@@ -51,8 +51,9 @@ BENCHER_API_KEY=... ruby benchmarks/run-local-benchmark-comparison.rb core \
 ```
 
 If the machine keeps credentials in a local shell file, source that file before running the
-command. Do not commit or print local credential files. For Pro suites, load
-`REACT_ON_RAILS_PRO_LICENSE` as well.
+command. Do not commit or print local credential files. Pro suites run without
+`REACT_ON_RAILS_PRO_LICENSE`; when an ambient license is present, the runner passes it through
+to the benchmark subprocesses.
 
 ## Why a local script (not a self-hosted runner)
 
@@ -85,8 +86,9 @@ On the dedicated machine:
   the active one before running.
 - The [`bencher`](https://bencher.dev/docs/explanation/bencher-run/) CLI on `PATH`.
 - `BENCHER_API_KEY` exported (for uploads). This can be a project-scoped
-  `bencher_run_...` key for this project or a user-scoped `bencher_user_...` key. For Pro
-  suites, also `REACT_ON_RAILS_PRO_LICENSE`.
+  `bencher_run_...` key for this project or a user-scoped `bencher_user_...` key.
+- Pro suites do not require `REACT_ON_RAILS_PRO_LICENSE`. If one is already present in the
+  environment, the runner passes it through to the benchmark subprocesses.
 - Create the `m1-bench` testbed in the
   [`react-on-rails-t8a9ncxo`](https://bencher.dev/perf/react-on-rails-t8a9ncxo) Bencher
   project (or let the first upload create it). Its baseline is independent from the shared
@@ -103,19 +105,20 @@ BENCHER_API_KEY=… ruby benchmarks/run-local-benchmark.rb core
 ruby benchmarks/run-local-benchmark.rb core --no-upload
 
 # Pro Rails suite, fail (exit 1) if a regression is flagged — useful as a release-candidate gate:
-BENCHER_API_KEY=… REACT_ON_RAILS_PRO_LICENSE=… \
-  ruby benchmarks/run-local-benchmark.rb pro --fail-on-alert
+BENCHER_API_KEY=… ruby benchmarks/run-local-benchmark.rb pro --fail-on-alert
 
 # Pro Node Renderer suite on the same dedicated testbed:
-BENCHER_API_KEY=… REACT_ON_RAILS_PRO_LICENSE=… \
-  ruby benchmarks/run-local-benchmark.rb pro-node-renderer --fail-on-alert
+BENCHER_API_KEY=… ruby benchmarks/run-local-benchmark.rb pro-node-renderer --fail-on-alert
 
 # Re-run against an already-built app (skip the build/setup steps):
 ruby benchmarks/run-local-benchmark.rb core --no-setup --no-upload
 ```
 
 Options: `--testbed NAME` (default `m1-bench`), `--branch NAME`, `--[no-]upload`,
-`--fail-on-alert`, `--[no-]setup`, `--duration`, `--rate`, `--connections`. See `--help`.
+`--fail-on-alert`, `--[no-]setup`, `--preflight-only`, `--duration`, `--rate`, `--connections`.
+`--preflight-only` validates the selected suite and any enabled upload prerequisites, prints
+the suite summary, and exits before setup or benchmark execution. Pair it with `--no-upload`
+for a credential-free preflight. See `--help`.
 
 Local runs keep bench.rb's single-sample default (one 30s k6 run per route);
 `BENCHMARK_SAMPLES=3` opts into CI's repeated-sample mode (medians per route,
@@ -187,8 +190,9 @@ dedicated main trend, while an RC tag or feature branch forms its own series ins
 polluting that baseline.
 
 **Supported suites:** `core`, `pro` (Rails + k6), and `pro-node-renderer` (node renderer +
-Vegeta). Run all three separately for a full benchmark pass; the Pro suites require
-`REACT_ON_RAILS_PRO_LICENSE`.
+Vegeta). Run all three separately for a full benchmark pass. The Pro suites run without
+`REACT_ON_RAILS_PRO_LICENSE`; an optional ambient license is passed through to their benchmark
+subprocesses.
 
 ## Posting results
 
