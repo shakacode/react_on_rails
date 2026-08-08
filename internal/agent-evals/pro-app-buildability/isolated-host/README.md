@@ -44,7 +44,11 @@ prompts or to claim model-credential non-disclosure against a hostile agent.
 The private directory is removed by the harness traps. Exact credential bytes
 are snapshotted in runner memory before the agent starts, then searched as a
 binary stream in the workspace after each agent call and in the completed
-output after checksums are written. The unchanged original snapshot remains
+output after checksums are written. The evidence output path remains absent
+while either agent call runs. After each call, the PID-1 runner rejects any
+agent-created output path or process left in the container PID namespace; only
+then does it construct evidence in runner-private storage, validate the exact
+top-level regular-file manifest, and publish it. The unchanged original snapshot remains
 authoritative even if the CLI rotates or replaces its writable credential
 store; when Codex's current store still exists, its final bytes are scanned as
 a second independent needle. For Codex JSON credentials, sensitive
@@ -94,8 +98,10 @@ The credential source must be outside both the repository and any external Git
 metadata bind. Evidence is staged in a mode-`0700` directory inside the requested
 destination parent, so publication is a same-filesystem directory rename rather
 than a cross-filesystem copy. Failed/rejected runs, interrupted publication, and
-any staging directory with unexpected siblings are deleted fail closed; only
-one completed `run` directory is published after Docker exits successfully.
+any staging directory with unexpected siblings or nested entries are deleted
+fail closed. The requested output basename is carried separately into the run
+metadata; only one completed `run` staging directory is published under that
+requested name after Docker exits successfully.
 
 ```bash
 internal/agent-evals/pro-app-buildability/isolated-host/run-in-container \

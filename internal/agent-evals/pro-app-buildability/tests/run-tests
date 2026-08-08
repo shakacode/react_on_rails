@@ -12,6 +12,103 @@ jq -e 'has("$schema") | not' <<<"$claude_agent_report_schema" >/dev/null
 jq -e --argjson compatible "$claude_agent_report_schema" \
   'has("$schema") and del(."$schema") == $compatible' \
   "$eval_dir/schemas/agent-report.schema.json" >/dev/null
+historical_run="$eval_dir/runs/2026-07-12-codex-gpt-5.4-final21-network-off"
+node "$eval_dir/bin/validate-json.mjs" "$historical_run" >/dev/null
+"$eval_dir/bin/validate-run-pair" "$historical_run/run.json" \
+  "$historical_run/invocation.json"
+"$eval_dir/bin/validate-evidence-entries" "$historical_run"
+invalid_entries_run="$tmp/invalid-evidence-entries"
+cp -R "$historical_run" "$invalid_entries_run"
+mkdir "$invalid_entries_run/agent-created-directory"
+if "$eval_dir/bin/validate-evidence-entries" "$invalid_entries_run" \
+  2>"$tmp/invalid-evidence-entries-error"; then
+  echo "evidence entry validation accepted an unexpected directory" >&2
+  exit 1
+fi
+rg -q 'evidence top-level entries mismatch' "$tmp/invalid-evidence-entries-error"
+
+mkdir "$tmp/fake-proc" "$tmp/fake-proc/1"
+EVAL_ISOLATED_PID_NAMESPACE=1 EVAL_PROC_ROOT="$tmp/fake-proc" EVAL_RUNNER_PID=1 \
+  "$eval_dir/bin/assert-agent-call-contained" "$tmp/absent-agent-output"
+mkdir "$tmp/fake-proc/42"
+if EVAL_ISOLATED_PID_NAMESPACE=1 EVAL_PROC_ROOT="$tmp/fake-proc" EVAL_RUNNER_PID=1 \
+  "$eval_dir/bin/assert-agent-call-contained" "$tmp/absent-agent-output" \
+  2>"$tmp/lingering-agent-error"; then
+  echo "agent containment accepted a lingering process" >&2
+  exit 1
+fi
+rg -q 'agent process remains' "$tmp/lingering-agent-error"
+rmdir "$tmp/fake-proc/42"
+mkdir "$tmp/injected-agent-output"
+if "$eval_dir/bin/assert-agent-call-contained" "$tmp/injected-agent-output" \
+  2>"$tmp/injected-agent-output-error"; then
+  echo "agent containment accepted a pre-created output" >&2
+  exit 1
+fi
+rg -q 'agent created the evidence output' "$tmp/injected-agent-output-error"
+
+for boundary_case in attested-codex unattested-codex unattested-claude; do
+  boundary_run="$tmp/missing-boundary-$boundary_case"
+  cp -R "$historical_run" "$boundary_run"
+  if [[ "$boundary_case" == attested-codex ]]; then
+    jq '. + {agent:"codex"} |
+      .isolated_host_attestation = true |
+      .sandbox_network_access = true |
+      .sandbox = "isolated-host-attested"' \
+      "$boundary_run/invocation.json" >"$tmp/boundary-invocation.json"
+    jq '.agent.name = "codex" |
+      .runner.isolated_host_attestation = true |
+      .runner.sandbox_network_access = true |
+      del(.runner.execution_boundary)' \
+      "$boundary_run/run.json" >"$tmp/boundary-run.json"
+  elif [[ "$boundary_case" == unattested-codex ]]; then
+    jq '. + {agent:"codex", auth_source:"none"} |
+      .isolated_host_attestation = false |
+      .sandbox_network_access = false |
+      .sandbox = "workspace-write"' \
+      "$boundary_run/invocation.json" >"$tmp/boundary-invocation.json"
+    jq '.agent.name = "codex" |
+      .security.auth_source = "none" |
+      .runner.isolated_host_attestation = false |
+      .runner.sandbox_network_access = false |
+      del(.runner.execution_boundary)' \
+      "$boundary_run/run.json" >"$tmp/boundary-run.json"
+  else
+    jq '. + {agent:"claude"} |
+      .command = "claude -p" |
+      .isolated_host_attestation = false |
+      .sandbox_network_access = false |
+      .sandbox = "claude-permission-gated"' \
+      "$boundary_run/invocation.json" >"$tmp/boundary-invocation.json"
+    jq '.agent.name = "claude" |
+      .runner.isolated_host_attestation = false |
+      .runner.sandbox_network_access = false |
+      del(.runner.execution_boundary)' \
+      "$boundary_run/run.json" >"$tmp/boundary-run.json"
+  fi
+  mv "$tmp/boundary-invocation.json" "$boundary_run/invocation.json"
+  mv "$tmp/boundary-run.json" "$boundary_run/run.json"
+  set +e
+  node "$eval_dir/bin/validate-json.mjs" "$boundary_run" \
+    >"$tmp/missing-boundary-$boundary_case-output" \
+    2>"$tmp/missing-boundary-$boundary_case-error"
+  missing_boundary_exit=$?
+  set -e
+  test "$missing_boundary_exit" = 1
+  rg -q "must have required property 'execution_boundary'" \
+    "$tmp/missing-boundary-$boundary_case-error"
+
+  set +e
+  "$eval_dir/bin/validate-run-pair" "$boundary_run/run.json" \
+    "$boundary_run/invocation.json" \
+    >"$tmp/missing-boundary-pair-$boundary_case-output" \
+    2>"$tmp/missing-boundary-pair-$boundary_case-error"
+  missing_boundary_pair_exit=$?
+  set -e
+  test "$missing_boundary_pair_exit" = 1
+  rg -q 'run/invocation security or agent identity disagrees' \
+    "$tmp/missing-boundary-pair-$boundary_case-error"
+done
 eval_dir_mode="$("$eval_dir/bin/file-permission-mode" "$eval_dir")"
 [[ "$eval_dir_mode" =~ ^[0-7]{3,4}$ ]]
 
@@ -639,10 +736,11 @@ rg -q 'scaffold_timeout_seconds:\$scaffold_timeout' "$eval_dir/bin/run-eval"
 rg -q 'maximum_agent_call_wall_clock_seconds:\$maximum_agent_wall_clock' "$eval_dir/bin/run-eval"
 rg -q 'invocation timeout budget mismatch' "$eval_dir/bin/validate-run"
 rg -q 'run/invocation timeout budgets disagree' "$eval_dir/bin/validate-run"
-rg -q 'run/invocation security or agent identity disagrees' "$eval_dir/bin/validate-run"
+rg -q 'run/invocation security or agent identity disagrees' "$eval_dir/bin/validate-run-pair"
 rg -q 'cli_auth_credentials_store=.?file' "$eval_dir/bin/run-eval"
 rg -q 'auth_material_available:\$auth_material_available' "$eval_dir/bin/run-eval"
 rg -q 'auth_source:\$auth_source' "$eval_dir/bin/run-eval"
+rg -Fq -- '--arg run_id "$run_id"' "$eval_dir/bin/run-eval"
 rg -q -- '--model-credential-file' "$eval_dir/bin/run-eval"
 rg -q 'agent_args=.*-p --bare' "$eval_dir/bin/run-eval"
 rg -Fq -- "--mcp-config '{\"mcpServers\":{}}'" "$eval_dir/bin/run-eval"
@@ -673,11 +771,15 @@ rg -Fq 'assert_credential_absent "$workspace" --skip-symlinks' "$eval_dir/bin/ru
 rg -Fq 'credential_snapshot=' "$eval_dir/bin/run-eval"
 rg -Fq 'assert-brokered-credential-absent' "$eval_dir/bin/run-eval"
 rg -Fq 'assert_credential_absent' "$eval_dir/bin/run-eval"
-rg -q '^credentialed_output_publishable=false$' "$eval_dir/bin/run-eval"
-rg -Fq '[[ "$auth_requested" == true && "$credentialed_output_publishable" == false ]]' \
+rg -q '^output_publishable=false$' "$eval_dir/bin/run-eval"
+rg -Fq '[[ "$output_publishable" == false && ( -e "$output" || -L "$output" ) ]]' \
   "$eval_dir/bin/run-eval"
 test "$(rg -Fn 'assert_credential_absent "$output"' "$eval_dir/bin/run-eval" | cut -d: -f1)" -lt \
-  "$(rg -n '^  credentialed_output_publishable=true$' "$eval_dir/bin/run-eval" | cut -d: -f1)"
+  "$(rg -n '^output_publishable=true$' "$eval_dir/bin/run-eval" | cut -d: -f1)"
+test "$(rg -n '^evidence_dir=' "$eval_dir/bin/run-eval" | cut -d: -f1)" -gt \
+  "$(rg -Fn 'run_agent "$eval_dir/prompt.md"' "$eval_dir/bin/run-eval" | cut -d: -f1)"
+test "$(rg -Fc '"$eval_dir/bin/assert-agent-call-contained" "$output"' \
+  "$eval_dir/bin/run-eval")" -eq 3
 rg -Fq 'npm config set cache "$npm_cache" --location=user' "$eval_dir/bin/prepare-agent-state"
 rg -Fq '"BUNDLE_PATH" => ARGV.fetch(1)' "$eval_dir/bin/prepare-agent-state"
 rg -Fq '"--install-dir", ARGV.fetch(1), "--bindir", ARGV.fetch(2)' \
@@ -747,6 +849,7 @@ rg -Fq -- 'source=$git_common_dir,target=$git_common_dir,readonly' \
   "$isolated_host/run-in-container"
 rg -Fq -- 'EVAL_HARNESS_DEPENDENCY_ROOT=/opt/pro-app-buildability' \
   "$isolated_host/run-in-container"
+rg -Fq -- 'EVAL_ISOLATED_PID_NAMESPACE=1' "$isolated_host/run-in-container"
 rg -Fq -- 'pnpm --dir /opt/pro-app-buildability install --frozen-lockfile --ignore-workspace' \
   "$isolated_host/Dockerfile"
 rg -Fq -- "createRequire(path.join(dependencyRoot, 'package.json'))" \
@@ -784,10 +887,14 @@ printf '%s\n' '#!/bin/sh' 'set -eu' \
   'done' \
   'printf "%s" "$evidence" >"$FAKE_DOCKER_EVIDENCE"' \
   'mkdir "$evidence/run"' \
+  'for artifact in SHA256SUMS agent-report.json artifact-evidence.json command-evidence.json invocation.json prompt.md rubric-results.json rubric.md run.json runner-diagnostics.json sandbox-network-probe.json scenario.md workspace-status.txt; do' \
+  '  : >"$evidence/run/$artifact"' \
+  'done' \
   'case "$FAKE_DOCKER_MODE" in' \
   '  success) ;;' \
   '  fail) exit 42 ;;' \
   '  sibling) printf "%s" unexpected >"$evidence/unexpected" ;;' \
+  '  nested) mkdir "$evidence/run/agent-created-directory" ;;' \
   'esac' \
   'shasum -a 256 | awk '\''{print $1}'\'' >"$FAKE_DOCKER_STDIN_SHA"' \
   >"$tmp/fake-bin/docker"
@@ -801,8 +908,8 @@ chmod +x "$tmp/fake-bin/docker"
   "$isolated_host/run-in-container" \
     --agent claude --model test-model --timeout 10 \
     --model-credential-file "$tmp/wrapper-model-credential" \
-    --output "$tmp/wrapper-output-parent/run")
-test -d "$tmp/wrapper-output-parent/run"
+    --output "$tmp/wrapper-output-parent/requested-run-id")
+test -d "$tmp/wrapper-output-parent/requested-run-id"
 test ! -e "$(cat "$tmp/fake-docker-evidence")"
 if [[ "$(dirname "$(cat "$tmp/fake-docker-evidence")")" != \
   "$(realpath "$tmp/wrapper-output-parent")" ]]; then
@@ -812,12 +919,25 @@ fi
 test "$(cat "$tmp/fake-docker-stdin-sha")" = \
   "$(shasum -a 256 "$tmp/wrapper-model-credential" | awk '{print $1}')"
 rg -Fxq -- '--model-credential-stdin' "$tmp/fake-docker-args"
+test "$(awk '$0 == "--run-id" { getline; print; exit }' "$tmp/fake-docker-args")" = \
+  requested-run-id
 rg -Fxq -- '/run/eval-private:rw,noexec,nosuid,nodev,mode=0700,uid='"$(id -u)"',gid='"$(id -g)" \
   "$tmp/fake-docker-args"
 if rg -Fq "$tmp/wrapper-model-credential" "$tmp/fake-docker-args"; then
   echo "wrapper exposed the host credential path to the container command" >&2
   exit 1
 fi
+
+if (cd "$tmp/wrapper-repo" && PATH="$tmp/fake-bin:$PATH" \
+  "$isolated_host/run-in-container" \
+    --agent claude --model test-model --timeout 10 \
+    --model-credential-file "$tmp/wrapper-model-credential" \
+    --output "$tmp/wrapper-output-parent/invalid run id") \
+  2>"$tmp/wrapper-invalid-run-id-error"; then
+  echo "wrapper accepted an invalid run identifier" >&2
+  exit 1
+fi
+rg -q 'output basename must match' "$tmp/wrapper-invalid-run-id-error"
 
 set +e
 (cd "$tmp/wrapper-repo" && \
@@ -852,6 +972,23 @@ fi
 test ! -e "$tmp/wrapper-output-parent/sibling-run"
 test ! -e "$(cat "$tmp/fake-docker-sibling-evidence")"
 rg -q 'unexpected staged evidence' "$tmp/wrapper-sibling-error"
+
+if (cd "$tmp/wrapper-repo" && \
+  PATH="$tmp/fake-bin:$PATH" \
+  FAKE_DOCKER_ARGS="$tmp/fake-docker-nested-args" \
+  FAKE_DOCKER_EVIDENCE="$tmp/fake-docker-nested-evidence" \
+  FAKE_DOCKER_MODE=nested \
+  FAKE_DOCKER_STDIN_SHA="$tmp/fake-docker-nested-stdin-sha" \
+  "$isolated_host/run-in-container" \
+    --agent claude --model test-model --timeout 10 \
+    --model-credential-file "$tmp/wrapper-model-credential" \
+    --output "$tmp/wrapper-output-parent/nested-run") 2>"$tmp/wrapper-nested-error"; then
+  echo "wrapper accepted an unexpected directory inside staged evidence" >&2
+  exit 1
+fi
+test ! -e "$tmp/wrapper-output-parent/nested-run"
+test ! -e "$(cat "$tmp/fake-docker-nested-evidence")"
+rg -q 'evidence top-level entries mismatch' "$tmp/wrapper-nested-error"
 
 printf '%s' 'repo-contained-credential' >"$tmp/wrapper-repo/model-credential"
 chmod 600 "$tmp/wrapper-repo/model-credential"

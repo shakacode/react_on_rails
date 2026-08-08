@@ -79,6 +79,11 @@ output="$output_parent/$(basename "$output")"
   echo "output must not already exist or be a symbolic link" >&2
   exit 65
 }
+run_id="$(basename "$output")"
+[[ "$run_id" =~ ^[A-Za-z0-9._-]+$ ]] || {
+  echo "output basename must match ^[A-Za-z0-9._-]+$" >&2
+  exit 65
+}
 image="${EVAL_HARNESS_IMAGE:-react-on-rails-pro-app-eval:local}"
 host_uid="$(id -u)"
 host_gid="$(id -g)"
@@ -110,6 +115,7 @@ docker_args=(
   --tmpfs "/workspace:rw,exec,nosuid,nodev,mode=0700,uid=$host_uid,gid=$host_gid"
   --env TMPDIR=/run/eval-private
   --env EVAL_HARNESS_DEPENDENCY_ROOT=/opt/pro-app-buildability
+  --env EVAL_ISOLATED_PID_NAMESPACE=1
   --workdir /repo
 )
 case "$git_common_dir/" in
@@ -125,6 +131,7 @@ docker "${docker_args[@]}" \
     --timeout "$timeout_seconds" \
     --workspace /workspace/run \
     --output /evidence/run \
+    --run-id "$run_id" \
     --model-credential-stdin \
     --ack-disposable-secret-free-host \
   <"$credential_real"
@@ -145,6 +152,7 @@ done < <(find "$staging_parent" -mindepth 1 -maxdepth 1 -print0)
   echo "container produced missing or unexpected staged evidence" >&2
   exit 1
 }
+"$eval_dir/bin/validate-evidence-entries" "$staging_parent/run"
 publication_started=true
 mv "$staging_parent/run" "$output"
 published=true

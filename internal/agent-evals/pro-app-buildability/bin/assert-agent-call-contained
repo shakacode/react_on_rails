@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+output="${1:-}"
+[[ -n "$output" ]] || { echo "usage: $0 OUTPUT_PATH" >&2; exit 64; }
+[[ ! -e "$output" && ! -L "$output" ]] || {
+  echo "agent created the evidence output before runner publication" >&2
+  exit 1
+}
+
+[[ "${EVAL_ISOLATED_PID_NAMESPACE:-0}" == 1 ]] || exit 0
+proc_root="${EVAL_PROC_ROOT:-/proc}"
+runner_pid="${EVAL_RUNNER_PID:-$PPID}"
+if [[ "$proc_root" == /proc && "$runner_pid" != 1 ]]; then
+  echo "attested eval runner is not PID 1 in its isolated process namespace" >&2
+  exit 1
+fi
+
+shopt -s nullglob
+for process_dir in "$proc_root"/[0-9]*; do
+  process_pid="${process_dir##*/}"
+  [[ "$process_pid" == "$runner_pid" || "$process_pid" == "$$" ]] && continue
+  echo "agent process remains after the agent call" >&2
+  exit 1
+done

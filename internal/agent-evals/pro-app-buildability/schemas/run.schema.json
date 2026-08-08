@@ -131,8 +131,7 @@
         "network_probe_artifact",
         "exit_code",
         "timed_out",
-        "config_artifact",
-        "execution_boundary"
+        "config_artifact"
       ],
       "properties": {
         "timeout_command": { "type": "string", "minLength": 1 },
@@ -214,10 +213,41 @@
         "properties": {
           "runner": {
             "type": "object",
-            "properties": { "execution_boundary": { "const": "workspace-write" } },
-            "required": ["execution_boundary"]
+            "properties": { "execution_boundary": { "const": "workspace-write" } }
           }
-        }
+        },
+        "anyOf": [
+          {
+            "properties": {
+              "runner": {
+                "type": "object",
+                "properties": { "execution_boundary": {} },
+                "required": ["execution_boundary"]
+              }
+            }
+          },
+          {
+            "properties": {
+              "security": {
+                "type": "object",
+                "required": ["auth_material_available"],
+                "properties": {
+                  "auth_material_available": { "const": false },
+                  "auth_source": false
+                }
+              },
+              "runner": {
+                "type": "object",
+                "properties": {
+                  "execution_boundary": false,
+                  "sandbox_network_access": { "const": false }
+                },
+                "required": ["sandbox_network_access"]
+              }
+            },
+            "required": ["security", "runner"]
+          }
+        ]
       }
     },
     {

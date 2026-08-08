@@ -3,7 +3,7 @@ set -euo pipefail
 umask 077
 
 usage() {
-  echo "usage: $0 --agent codex|claude --model MODEL --timeout SECONDS --workspace ABSOLUTE_PATH --output PATH [--model-credential-file FILE] [--ack-disposable-secret-free-host]" >&2
+  echo "usage: $0 --agent codex|claude --model MODEL --timeout SECONDS --workspace ABSOLUTE_PATH --output PATH [--run-id ID] [--model-credential-file FILE] [--ack-disposable-secret-free-host]" >&2
 }
 
 agent=""
@@ -11,6 +11,7 @@ model=""
 timeout_seconds=""
 workspace=""
 output=""
+run_id=""
 model_credential_file=""
 model_credential_stdin=false
 isolated_host_attestation=false
@@ -21,6 +22,7 @@ while (($#)); do
     --timeout) timeout_seconds="${2:-}"; shift 2 ;;
     --workspace) workspace="${2:-}"; shift 2 ;;
     --output) output="${2:-}"; shift 2 ;;
+    --run-id) run_id="${2:-}"; shift 2 ;;
     --model-credential-file) model_credential_file="${2:-}"; shift 2 ;;
     --model-credential-stdin) model_credential_stdin=true; shift ;;
     --ack-disposable-secret-free-host) isolated_host_attestation=true; shift ;;
@@ -93,6 +95,11 @@ if [[ "$output" != /* ]]; then output="$root/$output"; fi
 [[ ! -L "$output" ]] || { echo "output symlink inputs are forbidden" >&2; exit 65; }
 workspace="$(resolve_future_path "$workspace")"
 output="$(resolve_future_path "$output")"
+[[ -n "$run_id" ]] || run_id="$(basename "$output")"
+[[ "$run_id" =~ ^[A-Za-z0-9._-]+$ ]] || {
+  echo "run ID must match ^[A-Za-z0-9._-]+$" >&2
+  exit 65
+}
 if [[ -n "$model_credential_file" ]]; then
   model_credential_file="$(realpath "$model_credential_file")"
   case "$model_credential_file" in
@@ -113,6 +120,11 @@ case "$workspace/" in "$root/"*) echo "workspace must be outside the repository"
   exit 65
 }
 [[ ! -e "$output" ]] || { echo "output already exists: $output" >&2; exit 65; }
+if [[ "$isolated_host_attestation" == true && \
+  ("${EVAL_ISOLATED_PID_NAMESPACE:-0}" != 1 || "$$" != 1) ]]; then
+  echo "attested evals require the isolated PID namespace wrapper" >&2
+  exit 65
+fi
 if [[ -e "$workspace" && -n "$(find "$workspace" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null)" ]]; then
   echo "workspace must be absent or empty: $workspace" >&2
   exit 65
@@ -121,17 +133,17 @@ fi
 private_dir="$(mktemp -d "${TMPDIR:-/tmp}/ror-pro-agent-eval.XXXXXX")"
 chmod 700 "$private_dir"
 agent_state_dir="$workspace/.ror-eval-state"
-credentialed_output_publishable=false
+output_publishable=false
 remove_agent_state() {
   [[ -e "$agent_state_dir" ]] || return 0
   chmod -R u+rwX "$agent_state_dir" 2>/dev/null || true
   rm -rf "$agent_state_dir"
 }
 cleanup() {
-  # A credentialed run is publishable only after its final byte scan. Remove
-  # the exact, prevalidated output path on every earlier exit so a rejected
-  # partial run cannot be mistaken for credential-free evidence.
-  if [[ "$auth_requested" == true && "$credentialed_output_publishable" == false ]]; then
+  # Evidence is publishable only after final validation and any credential
+  # scan. Remove the exact, prevalidated output path on every earlier exit so
+  # a rejected partial run cannot be mistaken for completed evidence.
+  if [[ "$output_publishable" == false && ( -e "$output" || -L "$output" ) ]]; then
     rm -rf "$output"
   fi
   remove_agent_state
@@ -234,13 +246,10 @@ while IFS= read -r variable; do
     <<<"$stripped_categories")"
 done < <(compgen -e)
 
-mkdir -p "$output"
-chmod 700 "$output"
 git -C "$workspace" init --quiet
 started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 revision="$(git -C "$root" rev-parse HEAD)"
 
-cp "$eval_dir/prompt.md" "$eval_dir/scenario.md" "$eval_dir/rubric.md" "$output/"
 input_hashes='[]'
 while IFS= read -r file; do
   relative="${file#"$eval_dir/"}"
@@ -324,7 +333,7 @@ probe_timeout_seconds="$timeout_seconds"
 ((probe_timeout_seconds > 120)) && probe_timeout_seconds=120
 maximum_agent_call_wall_clock_seconds=$((probe_timeout_seconds + timeout_seconds))
 
-jq -n --arg command "$agent_command" --arg agent "$agent" --arg model "$model" \
+invocation_json="$(jq -n --arg command "$agent_command" --arg agent "$agent" --arg model "$model" \
   --arg execution_boundary "$execution_boundary" \
   --arg auth_source "$auth_source" --argjson auth_material_available "$auth_material_available" \
   --argjson scaffold_timeout "$timeout_seconds" \
@@ -341,8 +350,7 @@ jq -n --arg command "$agent_command" --arg agent "$agent" --arg model "$model" \
     capability_probe:{npm:$npm_probe,rubygems:$rubygems_probe},
     credential_store:"file",auth_material_available:$auth_material_available,auth_source:$auth_source,
     human_followups_sent:0,
-    shell_environment_policy:{inherit:"none",allowlist:["PATH","HOME","TMPDIR","LANG","LC_ALL","SHELL","CODEX_EVAL"]}}' \
-  >"$output/invocation.json"
+    shell_environment_policy:{inherit:"none",allowlist:["PATH","HOME","TMPDIR","LANG","LC_ALL","SHELL","CODEX_EVAL"]}}')"
 
 raw_probe_events="$private_dir/probe-events.jsonl"
 normalized_probe_events="$private_dir/probe-events.normalized.jsonl"
@@ -354,6 +362,7 @@ run_agent "$eval_dir/network-probe-prompt.md" "$probe_timeout_seconds" \
   >"$raw_probe_events" 2>"$raw_probe_stderr"
 probe_exit=$?
 set -e
+"$eval_dir/bin/assert-agent-call-contained" "$output"
 normalize_agent_events "$raw_probe_events" "$normalized_probe_events" "$probe_exit"
 if [[ "$auth_material_available" == true ]]; then
   assert_credential_absent "$workspace" --skip-symlinks
@@ -362,9 +371,15 @@ EVAL_PRIVATE_DIR="$private_dir" EVAL_WORKSPACE="$workspace" EVAL_OUTPUT="$output
   perl "$eval_dir/bin/sanitize-events.pl" "$normalized_probe_events" >"$safe_probe_events"
 EVAL_PRIVATE_DIR="$private_dir" EVAL_WORKSPACE="$workspace" EVAL_OUTPUT="$output" \
   perl "$eval_dir/bin/sanitize-events.pl" "$raw_probe_stderr" >"$safe_probe_stderr"
-node "$eval_dir/bin/derive-network-probe.mjs" "$safe_probe_events" "$output/sandbox-network-probe.json" \
+network_probe_file="$private_dir/sandbox-network-probe.json"
+node "$eval_dir/bin/derive-network-probe.mjs" "$safe_probe_events" "$network_probe_file" \
   "$sandbox_network_access"
-probe_result="$(jq -r .overall "$output/sandbox-network-probe.json")"
+probe_result="$(jq -r .overall "$network_probe_file")"
+network_probe_json="$(<"$network_probe_file")"
+safe_probe_events_text="$(<"$safe_probe_events")"
+safe_probe_stderr_text="$(<"$safe_probe_stderr")"
+rm -f "$raw_probe_events" "$normalized_probe_events" "$raw_probe_stderr" \
+  "$safe_probe_events" "$safe_probe_stderr" "$network_probe_file"
 
 safe_events="$private_dir/events.safe.jsonl"
 safe_stderr="$private_dir/stderr.safe.log"
@@ -384,6 +399,7 @@ if "$eval_dir/bin/probe-allows-scaffold" "$probe_exit" "$probe_result" "$sandbox
     >"$raw_scaffold_events" 2>"$raw_scaffold_stderr"
   runner_exit=$?
   set -e
+  "$eval_dir/bin/assert-agent-call-contained" "$output"
   [[ "$runner_exit" == 124 ]] && timed_out=true
   normalize_agent_events "$raw_scaffold_events" "$normalized_scaffold_events" "$runner_exit"
   if [[ "$auth_material_available" == true ]]; then
@@ -393,36 +409,47 @@ if "$eval_dir/bin/probe-allows-scaffold" "$probe_exit" "$probe_result" "$sandbox
     perl "$eval_dir/bin/sanitize-events.pl" "$normalized_scaffold_events" >"$safe_scaffold_events"
   EVAL_PRIVATE_DIR="$private_dir" EVAL_WORKSPACE="$workspace" EVAL_OUTPUT="$output" \
     perl "$eval_dir/bin/sanitize-events.pl" "$raw_scaffold_stderr" >"$safe_scaffold_stderr"
-  cat "$safe_probe_events" "$safe_scaffold_events" >"$safe_events"
-  cat "$safe_probe_stderr" "$safe_scaffold_stderr" >"$safe_stderr"
+  printf '%s\n' "$safe_probe_events_text" >"$safe_events"
+  cat "$safe_scaffold_events" >>"$safe_events"
+  printf '%s\n' "$safe_probe_stderr_text" >"$safe_stderr"
+  cat "$safe_scaffold_stderr" >>"$safe_stderr"
+  agent_report_file="$private_dir/agent-report.json"
   if ! jq -s '[.[] | select(.type == "item.completed" and .item.type == "agent_message") | .item.text] | last // empty | fromjson' \
-    "$safe_scaffold_events" >"$output/agent-report.json" || [[ ! -s "$output/agent-report.json" ]]; then
+    "$safe_scaffold_events" >"$agent_report_file" || [[ ! -s "$agent_report_file" ]]; then
     jq -n --arg reason "$agent scaffold runner exited without a schema-constrained final report (exit $runner_exit)" \
       '{status:"failed",summary:$reason,commands:[],checks:[],friction:[$reason],human_interventions:0,blockers:[$reason]}' \
-      >"$output/agent-report.json"
+      >"$agent_report_file"
   fi
 else
-  cp "$safe_probe_events" "$safe_events"
-  cp "$safe_probe_stderr" "$safe_stderr"
+  printf '%s\n' "$safe_probe_events_text" >"$safe_events"
+  printf '%s\n' "$safe_probe_stderr_text" >"$safe_stderr"
+  agent_report_file="$private_dir/agent-report.json"
   jq -n --arg reason "In-sandbox npm/RubyGems capability probe failed; scaffold was not started" \
     '{status:"blocked",summary:$reason,commands:[],checks:[],friction:[$reason],human_interventions:0,blockers:[$reason]}' \
-    >"$output/agent-report.json"
+    >"$agent_report_file"
 fi
 remove_agent_state
 
-TMPDIR="$private_dir/tmp" "$eval_dir/bin/build-runner-diagnostics" \
-  "$safe_stderr" "$output/runner-diagnostics.json"
+evidence_dir="$private_dir/evidence"
+mkdir -m 700 "$evidence_dir"
+cp "$eval_dir/prompt.md" "$eval_dir/scenario.md" "$eval_dir/rubric.md" "$evidence_dir/"
+cp "$agent_report_file" "$evidence_dir/agent-report.json"
+printf '%s\n' "$invocation_json" >"$evidence_dir/invocation.json"
+printf '%s\n' "$network_probe_json" >"$evidence_dir/sandbox-network-probe.json"
 
-node "$eval_dir/bin/derive-evidence.mjs" "$safe_events" "$workspace" "$output" \
-  "$output/agent-report.json" "$output/invocation.json"
-git -C "$workspace" status --short --untracked-files=normal >"$output/workspace-status.txt"
+TMPDIR="$private_dir/tmp" "$eval_dir/bin/build-runner-diagnostics" \
+  "$safe_stderr" "$evidence_dir/runner-diagnostics.json"
+
+node "$eval_dir/bin/derive-evidence.mjs" "$safe_events" "$workspace" "$evidence_dir" \
+  "$evidence_dir/agent-report.json" "$evidence_dir/invocation.json"
+git -C "$workspace" status --short --untracked-files=normal >"$evidence_dir/workspace-status.txt"
 
 finished_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-classification="$(jq -r .overall "$output/rubric-results.json")"
+classification="$(jq -r .overall "$evidence_dir/rubric-results.json")"
 reason="Machine-derived rubric result: $classification; see rubric-results.json"
 
 jq -n \
-  --arg run_id "$(basename "$output")" --arg started "$started_at" --arg finished "$finished_at" \
+  --arg run_id "$run_id" --arg started "$started_at" --arg finished "$finished_at" \
   --arg revision "$revision" --arg agent "$agent" --arg version "$agent_version" --arg model "$model" \
   --arg auth_source "$auth_source" --argjson auth_material_available "$auth_material_available" \
   --arg os "$(uname -srm)" --arg ruby "$(ruby --version 2>&1)" --arg node "$(node --version)" \
@@ -450,18 +477,27 @@ jq -n \
       isolated_host_attestation:$isolated_host_attestation,network_probe_artifact:"sandbox-network-probe.json",
       exit_code:$exit_code,timed_out:$timed_out,config_artifact:"invocation.json",
       execution_boundary:$execution_boundary},
-    result:{classification:$classification,reason:$reason,tutorial_claims_supported:false}}' >"$output/run.json"
+    result:{classification:$classification,reason:$reason,tutorial_claims_supported:false}}' >"$evidence_dir/run.json"
 
 checksum_files="$private_dir/checksum-files"
-(cd "$output" && find . -maxdepth 1 -type f ! -name SHA256SUMS -print | LC_ALL=C sort | sed 's#^./##') \
+(cd "$evidence_dir" && find . -maxdepth 1 -type f ! -name SHA256SUMS -print | LC_ALL=C sort | sed 's#^./##') \
   >"$checksum_files"
 "${minimal_env[@]}" node "$dependency_root/node_modules/prettier/bin/prettier.cjs" \
-  --write "$output"/*.json >/dev/null
-(cd "$output" && while IFS= read -r file; do shasum -a 256 "$file"; done <"$checksum_files" >SHA256SUMS)
+  --write "$evidence_dir"/*.json >/dev/null
+(cd "$evidence_dir" && while IFS= read -r file; do shasum -a 256 "$file"; done <"$checksum_files" >SHA256SUMS)
+"$eval_dir/bin/validate-evidence-entries" "$evidence_dir"
+if [[ "$auth_material_available" == true ]]; then
+  assert_credential_absent "$evidence_dir"
+fi
+
+"$eval_dir/bin/assert-agent-call-contained" "$output"
+mkdir -m 700 "$output"
+cp "$evidence_dir"/* "$output/"
+"$eval_dir/bin/validate-evidence-entries" "$output"
 if [[ "$auth_material_available" == true ]]; then
   assert_credential_absent "$output"
-  credentialed_output_publishable=true
 fi
+output_publishable=true
 
 echo "recorded run: $output"
 echo "runner exit: $runner_exit; classification: $classification"
