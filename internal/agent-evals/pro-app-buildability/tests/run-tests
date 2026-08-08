@@ -6,6 +6,21 @@ eval_dir="$root/internal/agent-evals/pro-app-buildability"
 tmp="$(mktemp -d "${TMPDIR:-/tmp}/ror-eval-tests.XXXXXX")"
 trap 'rm -rf "$tmp"' EXIT INT TERM
 
+timeout_command="$(command -v timeout || command -v gtimeout)"
+mkdir "$tmp/forced-timeout-agents"
+for fake_agent in codex claude; do
+  printf '%s\n' '#!/bin/sh' 'trap "" TERM' 'while :; do :; done' \
+    >"$tmp/forced-timeout-agents/$fake_agent"
+  chmod 700 "$tmp/forced-timeout-agents/$fake_agent"
+  set +e
+  "$timeout_command" --kill-after 1 1 "$tmp/forced-timeout-agents/$fake_agent" \
+    >"$tmp/$fake_agent-forced-timeout-output" 2>"$tmp/$fake_agent-forced-timeout-error"
+  forced_timeout_exit=$?
+  set -e
+  test "$forced_timeout_exit" = 137
+  test "$("$eval_dir/bin/canonicalize-timeout-exit" "$forced_timeout_exit")" = 124
+done
+
 node "$eval_dir/bin/validate-json.mjs" --schemas-only
 claude_agent_report_schema="$("$eval_dir/bin/build-claude-agent-report-schema")"
 jq -e 'has("$schema") | not' <<<"$claude_agent_report_schema" >/dev/null
@@ -531,6 +546,11 @@ node "$eval_dir/bin/normalize-claude-events.mjs" \
   "$tmp/pending-claude-events.jsonl" "$tmp/pending-claude-events.timeout.jsonl" 124
 [[ "$(jq -r '.item | [.command,.exit_code,.status,.aggregated_output] | @tsv' \
   "$tmp/pending-claude-events.timeout.jsonl")" == $'sleep 999\t124\tfailed\t' ]]
+node "$eval_dir/bin/normalize-claude-events.mjs" \
+  "$tmp/pending-claude-events.jsonl" "$tmp/pending-claude-events.forced-timeout.jsonl" \
+  "$("$eval_dir/bin/canonicalize-timeout-exit" 137)"
+[[ "$(jq -r '.item | [.command,.exit_code,.status,.aggregated_output] | @tsv' \
+  "$tmp/pending-claude-events.forced-timeout.jsonl")" == $'sleep 999\t124\tfailed\t' ]]
 printf '%s\n' 'not-json' >"$tmp/malformed-claude-events.jsonl"
 if node "$eval_dir/bin/normalize-claude-events.mjs" \
   "$tmp/malformed-claude-events.jsonl" "$tmp/malformed-claude-events.normalized.jsonl" \
@@ -551,6 +571,11 @@ node "$eval_dir/bin/normalize-claude-events.mjs" \
   "$tmp/truncated-timeout-claude-events.jsonl" \
   "$tmp/truncated-timeout-claude-events.normalized.jsonl" 124
 test ! -s "$tmp/truncated-timeout-claude-events.normalized.jsonl"
+node "$eval_dir/bin/normalize-claude-events.mjs" \
+  "$tmp/truncated-timeout-claude-events.jsonl" \
+  "$tmp/truncated-forced-timeout-claude-events.normalized.jsonl" \
+  "$("$eval_dir/bin/canonicalize-timeout-exit" 137)"
+test ! -s "$tmp/truncated-forced-timeout-claude-events.normalized.jsonl"
 if node "$eval_dir/bin/normalize-claude-events.mjs" \
   "$tmp/truncated-timeout-claude-events.jsonl" \
   "$tmp/truncated-nontimeout-claude-events.normalized.jsonl" 1 \
@@ -797,6 +822,12 @@ rg -q -- '--ack-disposable-secret-free-host' "$eval_dir/bin/run-eval"
 rg -Fq '[--model-credential-stdin]' "$eval_dir/bin/run-eval"
 rg -Fq 'timeout_kill_grace_seconds=10' "$eval_dir/bin/run-eval"
 rg -Fq -- '--kill-after "$timeout_kill_grace_seconds"' "$eval_dir/bin/run-eval"
+test "$("$eval_dir/bin/canonicalize-timeout-exit" 124)" = 124
+test "$("$eval_dir/bin/canonicalize-timeout-exit" 0)" = 0
+rg -Fq 'probe_exit="$("$eval_dir/bin/canonicalize-timeout-exit" "$?")"' \
+  "$eval_dir/bin/run-eval"
+rg -Fq 'runner_exit="$("$eval_dir/bin/canonicalize-timeout-exit" "$?")"' \
+  "$eval_dir/bin/run-eval"
 rg -Fq 'maximum_agent_call_wall_clock_seconds=$((probe_timeout_seconds + timeout_seconds +' \
   "$eval_dir/bin/run-eval"
 rg -Fq 'timeout_kill_grace_seconds:$timeout_kill_grace' "$eval_dir/bin/run-eval"

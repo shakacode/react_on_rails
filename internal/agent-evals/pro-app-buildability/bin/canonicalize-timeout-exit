@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+exit_code="${1:-}"
+[[ "$exit_code" =~ ^[0-9]+$ && "$exit_code" -le 255 ]] || {
+  echo "usage: $0 EXIT_CODE" >&2
+  exit 64
+}
+
+# GNU timeout returns 137 when --kill-after escalates from TERM to KILL. Map
+# that forced-stop result to the same timeout status used for a cooperative
+# TERM so every downstream agent path records one unambiguous timeout state.
+if [[ "$exit_code" == 137 ]]; then
+  printf '%s\n' 124
+else
+  printf '%s\n' "$exit_code"
+fi

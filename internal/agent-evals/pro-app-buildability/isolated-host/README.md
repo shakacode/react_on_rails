@@ -40,7 +40,12 @@ any such image-provided override fails closed.
 
 Each agent call receives `TERM` at its configured timeout and `KILL` after a
 fixed 10-second grace. Both possible grace periods are included in the recorded
-maximum agent-call wall-clock budget.
+maximum agent-call wall-clock budget. GNU `timeout` reports a cooperative
+timeout as exit 124 and a forced `KILL` as exit 137; the harness maps both to
+timeout status 124 before normalization and evidence generation. This
+deliberately accepts that a process independently exiting 137 is
+indistinguishable from the deadline's forced kill, but either case remains an
+incomplete, failed run and cannot claim successful evidence.
 
 The agent CLI and its tools run under the same container UID. File-backed
 authentication therefore cannot be hidden from a malicious agent or tool while
