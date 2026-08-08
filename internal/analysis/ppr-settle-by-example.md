@@ -13,15 +13,15 @@ pending at that moment becomes a "hole" showing its Suspense fallback.
 ```jsx
 <Suspense fallback={<Spinner />}>
   {' '}
-  ← "coarse" fallback
+  {/* "coarse" fallback */}
   <ProductLayout>
     {' '}
-    ← async, loads in 20ms
-    <Sidebar /> ← sync
+    {/* async, loads in 20ms */}
+    <Sidebar /> {/* sync */}
     <Suspense fallback={<Skeleton />}>
       {' '}
-      ← "fine" fallback
-      <UserReviews /> ← dynamic (never resolves)
+      {/* "fine" fallback */}
+      <UserReviews /> {/* dynamic (never resolves) */}
     </Suspense>
   </ProductLayout>
 </Suspense>
@@ -30,7 +30,8 @@ pending at that moment becomes a "hole" showing its Suspense fallback.
 **If you abort before `ProductLayout` finishes (before 20ms):**
 
 ```html
-<Spinner /> ← the coarse fallback — the user sees a blank spinner
+<!-- the coarse fallback — the user sees a blank spinner -->
+<Spinner />
 ```
 
 The whole middle of the page is gone. `Sidebar` is gone. The fine `<Skeleton />`
@@ -41,7 +42,10 @@ Suspense boundary at all.
 
 ```html
 <ProductLayout>
-  <Sidebar /> ← ✓ fully rendered <Skeleton /> ← the FINE fallback — much better!
+  <Sidebar />
+  <!-- ✓ fully rendered -->
+  <Skeleton />
+  <!-- the FINE fallback — much better! -->
 </ProductLayout>
 ```
 
@@ -103,19 +107,19 @@ children, or static content _below_ it in the tree are completely lost.
 ```jsx
 <Suspense fallback={<p>Loading all...</p>}>
   {' '}
-  ← boundary A
+  {/* boundary A */}
   <TrackedLayout>
     {' '}
-    ← tracked, 20ms → renders ✓
+    {/* tracked, 20ms → renders ✓ */}
     <TrackedSidebar>
       {' '}
-      ← tracked, 20ms → renders ✓
+      {/* tracked, 20ms → renders ✓ */}
       <UntrackedContent>
         {' '}
-        ← UNTRACKED, 20ms
+        {/* UNTRACKED, 20ms */}
         <Suspense fallback={<p>Dynamic hole</p>}>
           {' '}
-          ← boundary B (never reached!)
+          {/* boundary B (never reached!) */}
           <HangingComponent />
         </Suspense>
       </UntrackedContent>
@@ -133,8 +137,8 @@ CacheSignal doesn't know about it). Since `UntrackedContent` is between
 boundary A and boundary B, it suspends at boundary A. The user sees:
 
 ```html
+<!-- the OUTERMOST fallback! -->
 <p>Loading all...</p>
-← the OUTERMOST fallback!
 ```
 
 Layout and Sidebar are in a hidden `<div>` (React's streaming buffer), but
@@ -150,7 +154,7 @@ Suspense boundary _directly above_ it:
     <TrackedSidebar>
       <Suspense fallback={<p>Loading content...</p>}>
         {' '}
-        ← NEW boundary
+        {/* NEW boundary */}
         <UntrackedContent>
           <Suspense fallback={<p>Dynamic hole</p>}>
             <HangingComponent />
@@ -178,11 +182,11 @@ an untracked child was _just_ discovered by the tracked component's resolution.
 <Suspense fallback={<p>Loading...</p>}>
   <TrackedLayout>
     {' '}
-    ← tracked, 20ms
+    {/* tracked, 20ms */}
     <Suspense fallback={<p>Content loading...</p>}>
       <UntrackedContent>
         {' '}
-        ← untracked, 20ms
+        {/* untracked, 20ms */}
         <Suspense fallback={<p>Details loading...</p>}>
           <HangingComponent />
         </Suspense>
@@ -212,8 +216,8 @@ component. You get the middle fallback, not the deepest one.
 ```html
 <div>
   [Layout-tracked]
+  <!-- middle fallback, not "Details loading..." -->
   <p>Content loading...</p>
-  ← middle fallback, not "Details loading..."
 </div>
 ```
 
@@ -227,17 +231,18 @@ The "Details loading..." fallback would have been more specific.
 
 ```jsx
 // ⚠️ DANGEROUS: async fallback
+{
+  /* ⚠️ fallback is async (50ms)! */
+}
 <Suspense fallback={<AsyncFallback />}>
-  {' '}
-  ← fallback is async (50ms)!
   <HangingComponent />
-</Suspense>
+</Suspense>;
 ```
 
 **If you abort before `AsyncFallback` resolves (before 50ms):**
 
 ```html
-(empty) ← the shell is COMPLETELY EMPTY
+<!-- the shell is COMPLETELY EMPTY -->
 ```
 
 React needs to show the fallback, but the fallback itself is pending. There's no
@@ -252,7 +257,7 @@ Suspense boundary above it to catch the suspension. The prelude is empty.
   fallback={
     <Suspense fallback={<p>Loading...</p>}>
       {' '}
-      ← sync fallback catches it
+      {/* sync fallback catches it */}
       <AsyncFallback />
     </Suspense>
   }
