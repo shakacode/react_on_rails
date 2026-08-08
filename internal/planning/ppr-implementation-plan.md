@@ -607,17 +607,32 @@ equivalent mechanism without requiring SWC/Babel integration. If we later add
 a `"use cache"` directive with compiler support, the wrapper becomes its
 compiled output — the runtime mechanism is the same.
 
-**What `cacheRead` tracks.** Only the top-level promise returned by `fn` is
-tracked. If `fn` does multiple internal awaits, they are all covered by the
-single `beginRead()`/`endRead()` pair. Nested `cacheRead()` calls are also
+**What `cacheRead` does.** `cacheRead` is both a **tracker** and a **caching
+wrapper**. It calls `beginRead()` before the work starts, executes `fn`,
+stores the result in the Resume Data Cache (RDC) keyed by a stable identifier,
+and calls `endRead()` when the work settles. On subsequent calls with the same
+key, it returns the cached result from the RDC instead of re-executing `fn`.
+
+If `fn` does multiple internal awaits, they are all covered by the single
+`beginRead()`/`endRead()` pair. Nested `cacheRead()` calls are also
 supported — each gets its own pair, and the settle criterion waits for all of
 them.
 
 **Interaction with the two-pass system.** During the prospective pass,
-`cacheRead` registers the work with CacheSignal. During the final pass,
-`cacheSignal` is null — `cacheRead` still runs the function but does not
-register it (the cache should already be warm, so the function resolves via
-an already-fulfilled promise from the Resume Data Cache).
+`cacheRead` registers the work with CacheSignal and populates the RDC with the
+result. During the final pass, `cacheSignal` is null — `cacheRead` reads from
+the already-populated RDC, returning an already-fulfilled promise
+(microtask-fast). This is what makes the final pass's fixed task-schedule
+abort safe: every `cacheRead` call resolves within a microtask because the
+data is already in the in-process RDC.
+
+**Relationship to `"use cache"`.** `cacheRead` is the runtime primitive that
+`"use cache"` compiles down to. The `"use cache"` directive adds build-time
+key derivation (stable ID from filename + export name), argument serialization
+via `encodeReply`, and storage via the full `CacheHandler` interface.
+`cacheRead` is a simpler entry point for users who need tracking without the
+full `"use cache"` infrastructure — it uses the RDC directly with a
+user-provided or auto-derived key.
 
 #### `connection()` — "this component needs a real request"
 
