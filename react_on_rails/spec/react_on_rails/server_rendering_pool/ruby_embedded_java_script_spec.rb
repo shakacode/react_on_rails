@@ -302,6 +302,29 @@ module ReactOnRails
       end
 
       describe ".read_bundle_js_code" do
+        def stub_http_bundle_failure(error, bundle_url: "http://localhost:3035/webpack/development/server-bundle.js")
+          allow(ReactOnRails::Utils).to receive_messages(
+            server_bundle_js_file_path: bundle_url,
+            server_bundle_path_is_http?: true
+          )
+          allow(Net::HTTP).to receive(:get_response).and_raise(error)
+        end
+
+        def stub_local_bundle_failure(error, bundle_path: "/tmp/server-bundle.js")
+          allow(ReactOnRails::Utils).to receive_messages(
+            server_bundle_js_file_path: bundle_path,
+            server_bundle_path_is_http?: false
+          )
+          allow(File).to receive(:read).with(bundle_path).and_raise(error)
+        end
+
+        def bundle_load_error_message
+          described_class.read_bundle_js_code
+          raise "expected read_bundle_js_code to raise"
+        rescue ReactOnRails::ServerBundleLoadError => e
+          e.message
+        end
+
         it "raises a bundle-load error when an HTTP server bundle cannot be read" do
           server_bundle_url = "http://localhost:3035/webpack/development/server-bundle.js"
 
@@ -393,23 +416,16 @@ module ReactOnRails
         context "when the HTTP-served bundle URL embeds credentials and the connection fails" do
           it "does not leak the credential into the raised error message" do
             server_bundle_url = "http://bundle-user:s3cr3t@localhost:3035/webpack/development/server-bundle.js"
-
-            allow(ReactOnRails::Utils).to receive_messages(
-              server_bundle_js_file_path: server_bundle_url,
-              server_bundle_path_is_http?: true
-            )
-            allow(Net::HTTP).to receive(:get_response).and_raise(
-              Errno::ECONNREFUSED.new("connect(2) for localhost:3035")
+            stub_http_bundle_failure(
+              Errno::ECONNREFUSED.new("connect(2) for localhost:3035"),
+              bundle_url: server_bundle_url
             )
 
-            expect do
-              described_class.read_bundle_js_code
-            end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
-              expect(error.message).not_to include("s3cr3t")
-              expect(error.message).not_to include("bundle-user")
-              expect(error.message).to include("localhost:3035")
-              expect(error.message).to include("cannot be read")
-            }
+            message = bundle_load_error_message
+            expect(message).not_to include("s3cr3t")
+            expect(message).not_to include("bundle-user")
+            expect(message).to include("localhost:3035")
+            expect(message).to include("cannot be read")
           end
         end
 
@@ -420,22 +436,480 @@ module ReactOnRails
         context "when the HTTP-served bundle URL embeds credentials and is malformed enough to fail URI parsing" do
           it "does not leak the credential into the raised error message" do
             server_bundle_url = "http://bundle-user:s3cr3t@bad host/webpack/development/server-bundle.js"
+            stub_http_bundle_failure("connection failed", bundle_url: server_bundle_url)
 
-            allow(ReactOnRails::Utils).to receive_messages(
-              server_bundle_js_file_path: server_bundle_url,
-              server_bundle_path_is_http?: true
-            )
+            message = bundle_load_error_message
+            expect(message).not_to include("s3cr3t")
+            expect(message).not_to include("bundle-user")
+            # The error must still say the URL was malformed and show enough of it (host/path
+            # minus credentials) for an operator to identify which configured URL failed.
+            expect(message).to include("bad URI")
+            expect(message).to include("bad host")
+          end
+        end
 
-            expect do
-              described_class.read_bundle_js_code
-            end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
-              expect(error.message).not_to include("s3cr3t")
-              expect(error.message).not_to include("bundle-user")
-              # The error must still say the URL was malformed and show enough of it (host/path
-              # minus credentials) for an operator to identify which configured URL failed.
-              expect(error.message).to include("bad URI")
-              expect(error.message).to include("bad host")
-            }
+        context "when malformed URL userinfo contains multiple at signs" do
+          it "redacts the entire userinfo while retaining the host and path" do
+            server_bundle_url =
+              "http://bundle-user:password-prefix@password-suffix@bad host/webpack/development/server-bundle.js"
+            stub_http_bundle_failure("connection failed", bundle_url: server_bundle_url)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("bundle-user")
+            expect(message).not_to include("password-prefix")
+            expect(message).not_to include("password-suffix")
+            expect(message).to include("bad URI")
+            expect(message).to include("bad host/webpack/development/server-bundle.js")
+          end
+        end
+
+        context "when malformed URL userinfo contains an unescaped slash" do
+          it "redacts every credential fragment while retaining the host and path" do
+            server_bundle_url = "http://user:prefix/secret@host/path"
+            stub_http_bundle_failure("connection failed", bundle_url: server_bundle_url)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("user")
+            expect(message).not_to include("prefix")
+            expect(message).not_to include("secret")
+            expect(message).to include("bad URI")
+            expect(message).to include("host/path")
+          end
+        end
+
+        context "when malformed URL userinfo contains whitespace" do
+          it "redacts the quoted URL from the URI error while retaining the host and path" do
+            server_bundle_url = "http://user:prefix secret@host/path"
+            stub_http_bundle_failure("connection failed", bundle_url: server_bundle_url)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("user")
+            expect(message).not_to include("prefix")
+            expect(message).not_to include("secret")
+            expect(message).to include("bad URI")
+            expect(message).to include("host/path")
+          end
+        end
+
+        context "when whitespace makes malformed userinfo look like a valid host prefix" do
+          it "does not protect the prefix quoted by the configured URL's URI error" do
+            server_bundle_url = "http://synthetic-user secret-final@host/path"
+            stub_http_bundle_failure("connection failed", bundle_url: server_bundle_url)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("secret-final")
+            expect(message).to include("bad URI")
+            expect(message).to include("host/path")
+          end
+        end
+
+        context "when configured malformed userinfo has a delayed at sign" do
+          [
+            ["multiple intervening words", "http://synthetic-user secret-middle secret-final@host/path",
+             %w[synthetic-user secret-middle secret-final]],
+            ["a quote and whitespace", 'http://synthetic-user" secret-final@host/path',
+             %w[synthetic-user secret-final]],
+            ["a quote and multiple intervening words",
+             'http://synthetic-user" secret-middle secret-final@host/path',
+             %w[synthetic-user secret-middle secret-final]]
+          ].each do |description, server_bundle_url, credential_fragments|
+            it "redacts credentials after #{description}" do
+              stub_http_bundle_failure("connection failed", bundle_url: server_bundle_url)
+
+              message = bundle_load_error_message
+              credential_fragments.each { |fragment| expect(message).not_to include(fragment) }
+              expect(message).to include("bad URI")
+              expect(message).to include("host/path")
+            end
+          end
+        end
+
+        nested_scheme_cases = [
+          ["a comma", "http://outer.test/first,http://synthetic-user:synthetic-secret@host/path"],
+          ["a semicolon", "http://outer.test/first;http://synthetic-user:synthetic-secret@host/path"],
+          ["a parenthesis", "http://outer.test/first(http://synthetic-user:synthetic-secret@host/path)"],
+          ["a valid URL directly before a valid credential URL",
+           "http://outer.test/firsthttp://synthetic-user:synthetic-secret@host/path"],
+          ["mixed-case HTTP then HTTPS",
+           "hTtP://outer.test/first;HtTpS://synthetic-user:synthetic-secret@host/path"],
+          ["mixed-case HTTPS then HTTP",
+           "HtTpS://outer.test/first;hTtP://synthetic-user:synthetic-secret@host/path"]
+        ]
+
+        context "when the configured URL contains another scheme without whitespace" do
+          nested_scheme_cases.each do |description, server_bundle_url|
+            it "sanitizes credentials after #{description}" do
+              stub_http_bundle_failure("connection failed", bundle_url: server_bundle_url)
+
+              message = bundle_load_error_message
+              expect(message).not_to include("synthetic-user")
+              expect(message).not_to include("synthetic-secret")
+              expect(message).not_to include("outer.test/first")
+              expect(message).to include("host/path")
+            end
+          end
+        end
+
+        unresolved_prefix_cases = [
+          ["an invalid prefix before a valid credential URL",
+           "http://synthetic-user:nonnumeric-prefixhttp://synthetic-secret@host/path",
+           %w[synthetic-user nonnumeric-prefix synthetic-secret]],
+          ["a numeric-port prefix",
+           "http://synthetic-user:123synthetic-prefixhttp://synthetic-secret@host/path",
+           %w[synthetic-user 123synthetic-prefix synthetic-secret]],
+          ["a slash in the invalid prefix",
+           "http://synthetic-user:nonnumeric-prefix/synthetic-tailhttp://synthetic-secret@host/path",
+           %w[synthetic-user nonnumeric-prefix synthetic-tail synthetic-secret]],
+          ["a semicolon in the invalid prefix",
+           "http://synthetic-user:nonnumeric-prefix;synthetic-tailhttp://synthetic-secret@host/path",
+           %w[synthetic-user nonnumeric-prefix synthetic-tail synthetic-secret]]
+        ]
+
+        context "when the configured URL has an unresolved scheme before a credential URL" do
+          unresolved_prefix_cases.each do |description, server_bundle_url, credential_fragments|
+            it "fails closed across #{description}" do
+              stub_http_bundle_failure("connection failed", bundle_url: server_bundle_url)
+
+              message = bundle_load_error_message
+              credential_fragments.each { |fragment| expect(message).not_to include(fragment) }
+              expect(message).to include("host/path")
+            end
+          end
+        end
+
+        context "when configured malformed userinfo spans line breaks" do
+          [
+            ["LF", "http://synthetic-user\nsynthetic-secret@host/path"],
+            ["CR", "http://synthetic-user\rsynthetic-secret@host/path"],
+            ["CRLF", "http://synthetic-user\r\nsynthetic-secret@host/path"],
+            ["a quote and newline", "http://synthetic-user\"\nsynthetic-secret@host/path"]
+          ].each do |description, server_bundle_url|
+            it "fails closed across #{description} within the configured value" do
+              stub_http_bundle_failure("connection failed", bundle_url: server_bundle_url)
+
+              message = bundle_load_error_message
+              expect(message).not_to include("synthetic-user")
+              expect(message).not_to include("synthetic-secret")
+              expect(message).to include("host/path")
+            end
+          end
+        end
+
+        context "when a configured URL has an at sign only in its path" do
+          it "preserves the URL because the configured value parses without userinfo" do
+            server_bundle_url = "http://host/path@example"
+            stub_http_bundle_failure("connection failed", bundle_url: server_bundle_url)
+
+            expect(bundle_load_error_message).to include(server_bundle_url)
+          end
+        end
+
+        context "when non-URL text precedes a configured credential URL" do
+          classifications = [["HTTP", true], ["local-path", false]]
+
+          [
+            ["a space", " ", "http"],
+            ["a tab", "\t", "http"],
+            ["a newline", "\n", "http"],
+            ["a quote", '"', "http"],
+            ["a label and mixed-case scheme", "URL=", "hTtPs"]
+          ].each do |description, prefix, scheme|
+            classifications.each do |classification, http_path|
+              it "sanitizes #{description} through the #{classification} branch" do
+                server_bundle_url = "#{prefix}#{scheme}://synthetic-user:synthetic-secret@host/path"
+                sanitized_url = "#{prefix}#{scheme.downcase}://host/path"
+                failure_message = "raw=#{server_bundle_url} inspected=#{server_bundle_url.inspect} " \
+                                  "repeated=#{server_bundle_url}"
+
+                if http_path
+                  stub_http_bundle_failure(failure_message, bundle_url: server_bundle_url)
+                else
+                  stub_local_bundle_failure(failure_message, bundle_path: server_bundle_url)
+                end
+
+                message = bundle_load_error_message
+                expect(message).not_to include("synthetic-user")
+                expect(message).not_to include("synthetic-secret")
+                expect(message).to include(sanitized_url)
+              end
+            end
+          end
+        end
+
+        context "when malformed URL userinfo contains a literal double quote" do
+          it "redacts the escaped URL from the URI error" do
+            server_bundle_url = "http://synthetic-user:sec\"ret@host/path"
+            stub_http_bundle_failure("connection failed", bundle_url: server_bundle_url)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("sec")
+            expect(message).not_to include("ret")
+            expect(message).to include("bad URI")
+            expect(message).to include("host/path")
+          end
+        end
+
+        context "when URI parsing raises another URI::Error subtype" do
+          it "redacts configured credentials through the public entrypoint" do
+            server_bundle_url = "http://synthetic-user:synthetic-secret@host/path"
+            allow(URI).to receive(:parse).and_call_original
+            allow(URI).to receive(:parse).with(server_bundle_url)
+                                         .and_raise(URI::BadURIError, "bad URI for #{server_bundle_url}")
+            stub_http_bundle_failure("connection failed", bundle_url: server_bundle_url)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("bad URI for http://host/path")
+          end
+        end
+
+        context "when a local bundle path contains replacement metacharacters" do
+          it "preserves them literally while redacting credentials from the load error" do
+            server_bundle_path = %q(/tmp/\k<foo>-\1-\&-\0-literal\backslash/server-bundle.js)
+            failure_message = "raw=#{server_bundle_path} inspected=#{server_bundle_path.inspect} " \
+                              "credential=http://synthetic-user:synthetic-secret@host/path"
+            stub_local_bundle_failure(failure_message, bundle_path: server_bundle_path)
+
+            message = bundle_load_error_message
+            expect(message).to include(server_bundle_path)
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("http://host/path")
+            expect(message).to include("react_on_rails@shakacode.com")
+          end
+        end
+
+        context "when a bundle-load failure embeds an unquoted malformed credential URL" do
+          it "fails closed across whitespace in the credential" do
+            failure_message = "Failure loading http://synthetic-user:prefix secret-final@host/path"
+            stub_http_bundle_failure(failure_message)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("prefix")
+            expect(message).not_to include("secret-final")
+            expect(message).to include("Failure loading http://host/path")
+          end
+        end
+
+        context "when malformed userinfo looks like a valid host prefix in an ordinary error" do
+          it "does not protect the prefix before the whitespace-delimited credential suffix" do
+            failure_message = "Failure loading http://synthetic-user:123 secret-final@host/path"
+            stub_http_bundle_failure(failure_message)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("123")
+            expect(message).not_to include("secret-final")
+            expect(message).to include("Failure loading http://host/path")
+          end
+        end
+
+        context "when an ordinary error has a delayed credential at sign" do
+          [
+            ["multiple intervening words", "http://synthetic-user secret-middle secret-final@host/path",
+             %w[synthetic-user secret-middle secret-final]],
+            ["a quote and whitespace", 'http://synthetic-user" secret-final@host/path',
+             %w[synthetic-user secret-final]],
+            ["a quote and multiple intervening words",
+             'http://synthetic-user" secret-middle secret-final@host/path',
+             %w[synthetic-user secret-middle secret-final]]
+          ].each do |description, malformed_url, credential_fragments|
+            it "redacts credentials after #{description}" do
+              failure_message = "Failure loading #{malformed_url}"
+              stub_http_bundle_failure(failure_message)
+
+              message = bundle_load_error_message
+              credential_fragments.each { |fragment| expect(message).not_to include(fragment) }
+              expect(message).to include("Failure loading http://host/path")
+            end
+          end
+        end
+
+        context "when malformed userinfo in an ordinary error spans line breaks" do
+          [
+            ["LF", "http://synthetic-user\nsynthetic-secret@host/path"],
+            ["CR", "http://synthetic-user\rsynthetic-secret@host/path"],
+            ["CRLF", "http://synthetic-user\r\nsynthetic-secret@host/path"],
+            ["a quote and LF", "http://synthetic-user\"\nsynthetic-secret@host/path"]
+          ].each do |description, malformed_url|
+            it "fails closed across #{description}" do
+              failure_message = "Failure loading #{malformed_url}"
+              stub_local_bundle_failure(failure_message)
+
+              message = bundle_load_error_message
+              expect(message).not_to include("synthetic-user")
+              expect(message).not_to include("synthetic-secret")
+              expect(message).to include("Failure loading http://host/path")
+            end
+          end
+        end
+
+        context "when an ordinary error contains another scheme without whitespace" do
+          nested_scheme_cases.each do |description, nested_urls|
+            it "sanitizes credentials after #{description}" do
+              failure_message = "Failure loading #{nested_urls}"
+              stub_http_bundle_failure(failure_message)
+
+              message = bundle_load_error_message
+              expect(message).not_to include("synthetic-user")
+              expect(message).not_to include("synthetic-secret")
+              expect(message).to include("outer.test/first")
+              expect(message).to include("host/path")
+            end
+          end
+        end
+
+        context "when an ordinary error has an unresolved scheme before a credential URL" do
+          unresolved_prefix_cases.each do |description, nested_urls, credential_fragments|
+            it "fails closed across #{description}" do
+              failure_message = "Failure loading #{nested_urls}"
+              stub_http_bundle_failure(failure_message)
+
+              message = bundle_load_error_message
+              credential_fragments.each { |fragment| expect(message).not_to include(fragment) }
+              expect(message).to include("Failure loading http://host/path")
+            end
+          end
+        end
+
+        context "when an invalid credential URL is followed by a valid URL" do
+          it "redacts the credential and preserves the later URL" do
+            failure_message = "Failure loading http://synthetic-user secret-final@host/path " \
+                              "http://healthy-host/path"
+            stub_http_bundle_failure(failure_message)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("secret-final")
+            expect(message).to include("Failure loading http://host/path http://healthy-host/path")
+          end
+        end
+
+        context "when an ordinary error quotes malformed userinfo across whitespace" do
+          it "redacts the quoted credential while retaining the host and path" do
+            failure_message = 'Failure loading "http://synthetic-user secret-final@host/path"'
+            stub_http_bundle_failure(failure_message)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("secret-final")
+            expect(message).to include('Failure loading "http://host/path"')
+          end
+        end
+
+        context "when a quote truncates a malformed credential URL token" do
+          it "does not protect the valid-looking prefix before the double quote" do
+            failure_message = 'Failure loading http://synthetic-user"secret-final@host/path'
+            stub_http_bundle_failure(failure_message)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("secret-final")
+            expect(message).to include("Failure loading http://host/path")
+          end
+
+          it "does not protect the valid-looking prefix before the single quote" do
+            failure_message = "Failure loading http://synthetic-user'secret-final@host/path"
+            stub_http_bundle_failure(failure_message)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("secret-final")
+            expect(message).to include("Failure loading http://host/path")
+          end
+        end
+
+        context "when a bundle-load failure embeds a valid URL with an at sign in its path" do
+          it "preserves the URL because it has no userinfo" do
+            failure_message = "Failure loading http://host/path@example"
+            stub_http_bundle_failure(failure_message)
+
+            expect(bundle_load_error_message).to include(failure_message)
+          end
+        end
+
+        context "when a bundle-load failure contains two valid URLs" do
+          it "preserves both URLs, including an at sign in the second URL's path" do
+            failure_message = "Failure loading http://first-host/path http://second-host/path@example"
+            stub_http_bundle_failure(failure_message)
+
+            expect(bundle_load_error_message).to include(failure_message)
+          end
+        end
+
+        context "when a line boundary precedes an ambiguous email at sign" do
+          [["LF", "\n"], ["CR", "\r"], ["CRLF", "\r\n"]].each do |description, boundary|
+            it "fails closed across #{description}" do
+              failure_message = "Failure loading http://host/path#{boundary}contact dev@example.com"
+              stub_http_bundle_failure(failure_message)
+
+              message = bundle_load_error_message
+              expect(message).not_to include("host/path")
+              expect(message).not_to include("contact dev")
+              expect(message).to include("Failure loading http://example.com")
+            end
+          end
+        end
+
+        context "when multiline error text contains a later URL scheme" do
+          it "redacts malformed multiline userinfo without consuming the later URL" do
+            failure_message = "Failure loading http://synthetic-user\nsynthetic-secret@host/path\n" \
+                              "hTtPs://healthy-host/path@example"
+            stub_local_bundle_failure(failure_message)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("Failure loading http://host/path\nhTtPs://healthy-host/path@example")
+          end
+
+          it "fails closed before the later scheme while preserving that separate URL" do
+            failure_message = "Failure loading http://first-host/path\ncontact dev@example.com\n" \
+                              "HTTP://second-host/path"
+            stub_local_bundle_failure(failure_message)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("first-host/path")
+            expect(message).not_to include("contact dev")
+            expect(message).to include("Failure loading http://example.com\nHTTP://second-host/path")
+          end
+
+          it "discards an unresolved multiline region before sanitizing the next credential URL" do
+            failure_message = "Failure loading http://synthetic-user:nonnumeric-prefix\nsynthetic-tail " \
+                              "HtTpS://synthetic-secret@host/path"
+            stub_local_bundle_failure(failure_message)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("nonnumeric-prefix")
+            expect(message).not_to include("synthetic-tail")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("Failure loading https://host/path")
+          end
+        end
+
+        context "when a valid-looking URL is followed by prose containing an email address" do
+          it "fails closed because no structural boundary separates the later at sign" do
+            failure_message = "Failure loading http://host/path; contact dev@example.com"
+            stub_http_bundle_failure(failure_message)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("host/path")
+            expect(message).not_to include("contact dev")
+            expect(message).to include("Failure loading http://example.com")
+          end
+        end
+
+        context "when a bundle-load failure contains non-URL double-slash text" do
+          it "preserves the arbitrary message text" do
+            failure_message = "// contact dev@example"
+            stub_http_bundle_failure(failure_message)
+
+            expect(bundle_load_error_message).to include(failure_message)
           end
         end
 
