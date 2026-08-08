@@ -386,11 +386,13 @@ Flight renderer produces an RSC stream. That stream is fed into React DOM's
 prelude HTML  ──→  Saved as static file (e.g., /page.html)
 postponed     ──→  Serialized to metadata
 RSC chunks    ──→  Inlined as <script> tags in the HTML
-                   (self.__next_f.push([1, "..."]))
+                   (framework-specific embedding mechanism)
 ```
 
 The RSC payload is embedded in the HTML as `<script>` tags, so the client
-can hydrate without a separate data fetch.
+can hydrate without a separate data fetch. The exact embedding format is a
+framework concern — Next.js uses `self.__next_f.push(...)`, React on Rails
+will need its own equivalent.
 
 ### Step 4: Request time — Serve the shell
 
@@ -500,6 +502,16 @@ renderer produces a prelude with fallbacks for the hanging parts.
 ---
 
 ## Chapter 8: What the Browser Sees
+
+> **Note:** Chapters 1–7 use vanilla React APIs (`react-dom/static`,
+> `react-dom/server`) — no framework code. This chapter shows the
+> **framework-level** integration that Next.js adds on top: specifically, how
+> the Flight data is inlined into the HTML as `<script>` tags. The
+> `self.__next_f` naming convention, the `$RC` replacement script, and the
+> `[0]`/`[1]`/`[3]` type codes are all **Next.js-specific implementation
+> details**, not React built-ins. React on Rails will need its own equivalent
+> inlining mechanism — the wire protocol (Flight rows) is the same, but the
+> HTML embedding is a framework concern.
 
 Let's trace what a user's browser receives for a PPR page:
 

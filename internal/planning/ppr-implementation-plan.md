@@ -703,7 +703,10 @@ controller.abort();
 When the timeout trips, the result is a shallower shell (more dynamic holes),
 not a build failure. The page still works — it just has more content streaming
 in dynamically. The timeout should be configurable, with a sensible default
-(e.g., 30 seconds for the prospective pass).
+(e.g., 10 seconds for the prospective pass). Note: the findings doc uses 5s
+in its illustrative code snippet; the actual default is an implementation
+decision for #3571 — the key property is that the timeout exists, is
+configurable, and degrades gracefully rather than failing the build.
 
 ### Determinism
 
