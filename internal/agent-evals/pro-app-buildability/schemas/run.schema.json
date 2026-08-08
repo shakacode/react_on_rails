@@ -222,6 +222,58 @@
     },
     {
       "if": {
+        "properties": {
+          "agent": {
+            "type": "object",
+            "properties": { "name": { "const": "claude" } },
+            "required": ["name"]
+          },
+          "runner": {
+            "type": "object",
+            "properties": { "isolated_host_attestation": { "const": true } },
+            "required": ["isolated_host_attestation"]
+          }
+        },
+        "required": ["agent", "runner"]
+      },
+      "then": {
+        "properties": {
+          "runner": {
+            "type": "object",
+            "properties": { "execution_boundary": { "const": "isolated-host-attested" } },
+            "required": ["execution_boundary"]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "agent": {
+            "type": "object",
+            "properties": { "name": { "const": "claude" } },
+            "required": ["name"]
+          },
+          "runner": {
+            "type": "object",
+            "properties": { "isolated_host_attestation": { "const": false } },
+            "required": ["isolated_host_attestation"]
+          }
+        },
+        "required": ["agent", "runner"]
+      },
+      "then": {
+        "properties": {
+          "runner": {
+            "type": "object",
+            "properties": { "execution_boundary": { "const": "claude-permission-gated" } },
+            "required": ["execution_boundary"]
+          }
+        }
+      }
+    },
+    {
+      "if": {
         "type": "object",
         "properties": {
           "security": {

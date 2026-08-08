@@ -282,7 +282,7 @@ else
   agent_args=(-p --bare --no-session-persistence --disable-slash-commands --no-chrome)
   agent_args+=(--strict-mcp-config --mcp-config '{"mcpServers":{}}' --tools 'Bash,Read,Write,Edit,Glob,Grep')
   agent_args+=(--model "$model" --output-format stream-json --verbose --settings "$claude_settings")
-  agent_args+=(--json-schema "$(jq -c . "$eval_dir/schemas/agent-report.schema.json")")
+  agent_args+=(--json-schema "$("$eval_dir/bin/build-claude-agent-report-schema")")
   [[ "$isolated_host_attestation" == true ]] && agent_args+=(--dangerously-skip-permissions)
 fi
 agent_version="$("${minimal_env[@]}" "$agent" --version 2>&1)"
@@ -314,10 +314,10 @@ normalize_agent_events() {
 assert_credential_absent() {
   local scan_target="$1"
   local symlink_policy="${2:-}"
-  local scan_args=("$scan_target" -)
+  local scan_args=("$agent" "$scan_target" "$brokered_credential")
   [[ -z "$symlink_policy" ]] || scan_args+=("$symlink_policy")
   printf '%s' "$credential_snapshot" |
-    "$eval_dir/bin/assert-credential-absent" "${scan_args[@]}"
+    "$eval_dir/bin/assert-brokered-credential-absent" "${scan_args[@]}"
 }
 
 probe_timeout_seconds="$timeout_seconds"

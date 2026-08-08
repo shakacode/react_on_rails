@@ -17,10 +17,10 @@ file is mounted into the container. The private copy is used as the agent's
 native file-backed credential source:
 
 - Codex expects a complete `auth.json` JSON object.
-- Claude expects a single-line Anthropic API key. The broker removes one
-  optional trailing newline before Claude `--bare` reads the effective bytes
-  through the private `apiKeyHelper` script. The private tmpfs remains
-  `noexec`; the reviewed setting invokes that script through `/bin/sh`.
+- Claude expects a single-line Anthropic API key without control bytes. The
+  broker removes one optional trailing newline before Claude `--bare` reads the
+  effective bytes through the private `apiKeyHelper` script. The private tmpfs
+  remains `noexec`; the reviewed setting invokes that script through `/bin/sh`.
 
 Codex cannot create the namespaces required by its inner bubblewrap
 `workspace-write` sandbox under the container's deliberately restricted flags.
@@ -44,13 +44,15 @@ prompts or to claim model-credential non-disclosure against a hostile agent.
 The private directory is removed by the harness traps. Exact credential bytes
 are snapshotted in runner memory before the agent starts, then searched as a
 binary stream in the workspace after each agent call and in the completed
-output after checksums are written. The unchanged snapshot remains authoritative
-even if the CLI rotates or replaces its writable credential store. For Codex
-JSON credentials, sensitive token/key/secret leaf values are searched
-independently as well. A match, unreadable artifact, or output symlink fails
-closed. Workspace scans skip dependency symlinks without following them, while
-continuing to inspect every regular file; completed-output scans reject all
-symlinks. The committed output continues to record
+output after checksums are written. The unchanged original snapshot remains
+authoritative even if the CLI rotates or replaces its writable credential
+store; when Codex's current store still exists, its final bytes are scanned as
+a second independent needle. For Codex JSON credentials, sensitive
+token/key/secret leaf values from both generations are searched independently
+as well. A match, nonregular current store, unreadable artifact, or output
+symlink fails closed. Workspace scans skip dependency symlinks without following
+them, while continuing to inspect every regular file; completed-output scans
+reject all symlinks. The committed output continues to record
 `auth_material_persisted: false`; it records availability and the attested file
 broker, never credential values or paths.
 

@@ -24,11 +24,13 @@ agent_home="$(realpath "$agent_home")"
 bundle_path="$state_dir/bundle"
 bundle_cache="$state_dir/bundle-cache"
 npm_cache="$state_dir/npm-cache"
+gem_install_dir="$state_dir/gems"
+gem_bin_dir="$state_dir/gem-bin"
 state_tmp="$state_dir/tmp"
-mkdir -p "$bundle_path" "$bundle_cache" "$npm_cache" "$state_tmp"
-chmod 700 "$state_dir" "$bundle_path" "$bundle_cache" "$npm_cache" "$state_tmp"
+mkdir -p "$bundle_path" "$bundle_cache" "$npm_cache" "$gem_install_dir" "$gem_bin_dir" "$state_tmp"
+chmod 700 "$state_dir" "$bundle_path" "$bundle_cache" "$npm_cache" "$gem_install_dir" "$gem_bin_dir" "$state_tmp"
 
-augmented_path="$safe_path"
+augmented_path="$safe_path:$gem_bin_dir"
 configure_home() {
   local configured_home="$1"
   local bundler_runtime_path
@@ -56,7 +58,14 @@ configure_home() {
   esac
   mkdir -p "$bundler_runtime_path"
   chmod 700 "$bundler_runtime_path"
-  printf '%s\n' 'gem: --user-install --no-document' >"$configured_home/.gemrc"
+  "${state_env[@]}" ruby -rshellwords -e '
+    File.write(
+      ARGV.fetch(0),
+      "gem: #{["--install-dir", ARGV.fetch(1), "--bindir", ARGV.fetch(2), "--no-document"].shelljoin}\n",
+      mode: "w",
+      perm: 0o600,
+    )
+  ' "$configured_home/.gemrc" "$gem_install_dir" "$gem_bin_dir"
   "${state_env[@]}" npm config set cache "$npm_cache" --location=user
 
   gem_user_dir="$("${state_env[@]}" ruby -e 'require "rubygems"; print Gem.user_dir')"
@@ -64,12 +73,8 @@ configure_home() {
     "$configured_home"/*) ;;
     *) echo "RubyGems user directory escaped agent HOME" >&2; exit 65 ;;
   esac
-  mkdir -p "$gem_user_dir/bin"
-  chmod 700 "$gem_user_dir" "$gem_user_dir/bin"
-  case ":$augmented_path:" in
-    *":$gem_user_dir/bin:"*) ;;
-    *) augmented_path="$augmented_path:$gem_user_dir/bin" ;;
-  esac
+  mkdir -p "$(dirname "$gem_user_dir")"
+  ln -s "$gem_install_dir" "$gem_user_dir"
 }
 
 configure_home "$runner_home"

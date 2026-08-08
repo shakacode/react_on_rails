@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Non-network runtime smoke for the isolated image. This prepares the exact
-# package state used by run-eval and starts only CLI help/version surfaces; it
-# never invokes an agent request or reads a model credential.
+# package state used by run-eval, starts CLI help/version surfaces, and checks
+# Claude schema parsing with a synthetic invalid key against a closed local
+# endpoint. It never reaches a model API or reads an operator credential.
 set -euo pipefail
 umask 077
 
@@ -45,16 +46,6 @@ for private_home in "$runner_home" "$agent_home"; do
     exit 1
   }
 
-  gem_user_dir="$("${minimal_env[@]}" ruby -e 'require "rubygems"; print Gem.user_dir')"
-  case "$gem_user_dir/" in
-    "$private_home"/*) ;;
-    *) echo "RubyGems user directory escaped private HOME" >&2; exit 1 ;;
-  esac
-  [[ -d "$gem_user_dir" && -w "$gem_user_dir" ]] || {
-    echo "RubyGems user directory is not writable" >&2
-    exit 1
-  }
-
   [[ "$("${minimal_env[@]}" npm config get cache)" == "$state_dir/npm-cache" ]] || {
     echo "npm cache escaped writable agent state" >&2
     exit 1
@@ -67,7 +58,48 @@ chmod 700 "$cache_executable"
 "$cache_executable"
 
 minimal_env=(env -i "PATH=$safe_path" "HOME=$runner_home" "TMPDIR=$private_dir/tmp" LANG=C LC_ALL=C SHELL=/bin/sh CODEX_EVAL=1)
+synthetic_gem_dir="$workspace/synthetic-gem"
+mkdir -p "$synthetic_gem_dir/bin" "$synthetic_gem_dir/lib"
+printf '%s\n' \
+  'Gem::Specification.new do |spec|' \
+  '  spec.name = "ror-eval-runtime-smoke"' \
+  '  spec.version = "0.0.1"' \
+  '  spec.summary = "Local runtime smoke fixture"' \
+  '  spec.authors = ["ShakaCode"]' \
+  '  spec.files = ["bin/ror-eval-runtime-smoke", "lib/ror_eval_runtime_smoke.rb"]' \
+  '  spec.bindir = "bin"' \
+  '  spec.executables = ["ror-eval-runtime-smoke"]' \
+  '  spec.require_paths = ["lib"]' \
+  'end' >"$synthetic_gem_dir/ror-eval-runtime-smoke.gemspec"
+printf '%s\n' '#!/usr/bin/env ruby' 'puts "synthetic gem executable passed"' \
+  >"$synthetic_gem_dir/bin/ror-eval-runtime-smoke"
+printf '%s\n' 'module RorEvalRuntimeSmoke; end' >"$synthetic_gem_dir/lib/ror_eval_runtime_smoke.rb"
+chmod 700 "$synthetic_gem_dir/bin/ror-eval-runtime-smoke"
+(cd "$synthetic_gem_dir" && "${minimal_env[@]}" gem build --output "$state_dir/ror-eval-runtime-smoke.gem" \
+  ror-eval-runtime-smoke.gemspec >/dev/null)
+"${minimal_env[@]}" gem install --local "$state_dir/ror-eval-runtime-smoke.gem" >/dev/null
+"${minimal_env[@]}" ror-eval-runtime-smoke | grep -Fxq 'synthetic gem executable passed'
+
 "${minimal_env[@]}" codex exec --help 2>&1 | grep -q -- '--dangerously-bypass-approvals-and-sandbox'
 "${minimal_env[@]}" claude --version >/dev/null
+
+claude_schema="$("$eval_dir/bin/build-claude-agent-report-schema")"
+set +e
+env -i "PATH=$safe_path" "HOME=$agent_home" "TMPDIR=$private_dir/tmp" LANG=C LC_ALL=C SHELL=/bin/sh \
+  CODEX_EVAL=1 ANTHROPIC_API_KEY=synthetic-invalid-never-valid \
+  ANTHROPIC_BASE_URL=http://127.0.0.1:9 timeout 8 claude -p --model sonnet \
+  --output-format json --json-schema "$claude_schema" 'schema parser compatibility only' \
+  >"$private_dir/claude-schema-output" 2>"$private_dir/claude-schema-error"
+claude_schema_exit=$?
+set -e
+[[ "$claude_schema_exit" != 0 ]] || {
+  echo "Claude schema smoke unexpectedly completed a model call" >&2
+  exit 1
+}
+if grep -Fq 'no schema with key or ref' \
+  "$private_dir/claude-schema-output" "$private_dir/claude-schema-error"; then
+  echo "Claude rejected its compatible agent-report schema" >&2
+  exit 1
+fi
 
 echo "isolated runtime smoke passed"

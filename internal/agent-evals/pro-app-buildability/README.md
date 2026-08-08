@@ -96,10 +96,10 @@ and prevents scaffolding.
 
 Credentialed runs additionally require `--model-credential-file` and refuse
 that option without the isolated-host attestation. Codex accepts a complete
-`auth.json` object; Claude accepts one nonempty API-key line. The operator input
-must be a non-symlink file with no group/world access. The broker copies it only
-into the disposable private directory, never widens environment inheritance,
-and records `auth_material_available: true` with
+`auth.json` object; Claude accepts one nonempty API-key line without control
+bytes. The operator input must be a non-symlink file with no group/world access.
+The broker copies it only into the disposable private directory, never widens
+environment inheritance, and records `auth_material_available: true` with
 `auth_source: operator-attested-file-broker`. Use the reviewed container wrapper
 instead of running this directly on a workstation:
 
@@ -134,7 +134,10 @@ passed to the agent. Exact credential bytes are rejected if they appear in the
 workspace or completed output, including when embedded inside a larger file.
 Claude's optional trailing newline is removed before scanning so the effective
 key is checked. Sensitive string leaves from Codex JSON authentication are
-checked separately from the complete JSON document.
+checked separately from the complete JSON document. If Codex rotates its
+private credential store, both the immutable original snapshot and the final
+current store are scanned so neither generation can reach workspace or output
+artifacts.
 
 If timeout terminates Claude with a Bash call still pending, normalization
 records that call as failed with exit `124` and continues to the incomplete,

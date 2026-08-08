@@ -7,6 +7,11 @@ tmp="$(mktemp -d "${TMPDIR:-/tmp}/ror-eval-tests.XXXXXX")"
 trap 'rm -rf "$tmp"' EXIT INT TERM
 
 node "$eval_dir/bin/validate-json.mjs" --schemas-only
+claude_agent_report_schema="$("$eval_dir/bin/build-claude-agent-report-schema")"
+jq -e 'has("$schema") | not' <<<"$claude_agent_report_schema" >/dev/null
+jq -e --argjson compatible "$claude_agent_report_schema" \
+  'has("$schema") and del(."$schema") == $compatible' \
+  "$eval_dir/schemas/agent-report.schema.json" >/dev/null
 eval_dir_mode="$("$eval_dir/bin/file-permission-mode" "$eval_dir")"
 [[ "$eval_dir_mode" =~ ^[0-7]{3,4}$ ]]
 
@@ -80,6 +85,27 @@ run.runner.isolated_host_attestation = true;
 if (runValidate(run)) throw new Error('attested Codex run claimed unavailable inner workspace sandbox');
 run.runner.execution_boundary = 'isolated-host-attested';
 if (!runValidate(run)) throw new Error(ajv.errorsText(runValidate.errors));
+
+const attestedClaudeRun = structuredClone(run);
+attestedClaudeRun.agent.name = 'claude';
+attestedClaudeRun.runner.execution_boundary = 'claude-permission-gated';
+if (runValidate(attestedClaudeRun)) {
+  throw new Error('attested Claude run claimed its non-attested permission boundary');
+}
+attestedClaudeRun.runner.execution_boundary = 'isolated-host-attested';
+if (!runValidate(attestedClaudeRun)) throw new Error(ajv.errorsText(runValidate.errors));
+
+const nonattestedClaudeRun = structuredClone(attestedClaudeRun);
+Object.assign(nonattestedClaudeRun.security, { auth_material_available: false, auth_source: 'none' });
+Object.assign(nonattestedClaudeRun.runner, {
+  isolated_host_attestation: false,
+  execution_boundary: 'workspace-write',
+});
+if (runValidate(nonattestedClaudeRun)) {
+  throw new Error('non-attested Claude run claimed the Codex workspace boundary');
+}
+nonattestedClaudeRun.runner.execution_boundary = 'claude-permission-gated';
+if (!runValidate(nonattestedClaudeRun)) throw new Error(ajv.errorsText(runValidate.errors));
 NODE
 )
 
@@ -105,6 +131,21 @@ if printf '%s' 'original-credential-snapshot-value' |
   exit 1
 fi
 rg -q 'credential bytes found in run output' "$tmp/immutable-credential-snapshot-error"
+: >"$tmp/credential-output/rotated.txt"
+
+printf '%s' 'prefix:rotated-credential-store-value:suffix' >"$tmp/credential-output/rotated.txt"
+if printf '%s' 'original-credential-snapshot-value' |
+  "$eval_dir/bin/assert-brokered-credential-absent" codex "$tmp/credential-output" \
+    "$tmp/model-credential" 2>"$tmp/rotated-credential-error"; then
+  echo "rotated Codex credential leak was accepted in run output" >&2
+  exit 1
+fi
+rg -q 'credential bytes found in run output' "$tmp/rotated-credential-error"
+if rg -Fq 'rotated-credential-store-value' "$tmp/rotated-credential-error" ||
+  rg -Fq 'original-credential-snapshot-value' "$tmp/rotated-credential-error"; then
+  echo "rotated credential scan exposed credential bytes" >&2
+  exit 1
+fi
 : >"$tmp/credential-output/rotated.txt"
 
 printf '%s' safe >"$tmp/symlink-target"
@@ -195,6 +236,32 @@ for newline_mode in newline no-newline; do
   rg -q 'credential bytes found in run output' "$tmp/claude-$newline_mode-leak-error"
   : >"$tmp/credential-output/claude-$newline_mode.txt"
 done
+
+printf 'synthetic-claude-prefix\0synthetic-claude-suffix' >"$tmp/claude-nul-credential"
+set +e
+"$eval_dir/bin/canonicalize-model-credential" claude "$tmp/claude-nul-credential" \
+  >"$tmp/claude-nul-output" 2>"$tmp/claude-nul-error"
+claude_nul_exit=$?
+set -e
+test "$claude_nul_exit" = 65
+if rg -aFq 'synthetic-claude-prefix' "$tmp/claude-nul-output" "$tmp/claude-nul-error" ||
+  rg -aFq 'synthetic-claude-suffix' "$tmp/claude-nul-output" "$tmp/claude-nul-error"; then
+  echo "Claude credential rejection exposed credential bytes" >&2
+  exit 1
+fi
+
+printf 'synthetic-claude-prefix\tsynthetic-claude-suffix' >"$tmp/claude-control-credential"
+set +e
+"$eval_dir/bin/canonicalize-model-credential" claude "$tmp/claude-control-credential" \
+  >"$tmp/claude-control-output" 2>"$tmp/claude-control-error"
+claude_control_exit=$?
+set -e
+test "$claude_control_exit" = 65
+if rg -aFq 'synthetic-claude-prefix' "$tmp/claude-control-output" "$tmp/claude-control-error" ||
+  rg -aFq 'synthetic-claude-suffix' "$tmp/claude-control-output" "$tmp/claude-control-error"; then
+  echo "Claude credential control-byte rejection exposed credential bytes" >&2
+  exit 1
+fi
 
 printf '%s\n' \
   '{"tokens":{"access_token":"synthetic-codex-access-token-value","refresh_token":"synthetic-codex-refresh-token-value"},"account":{"label":"not-sensitive-metadata"}}' \
@@ -604,6 +671,7 @@ test "$(rg -Fn 'shasum -a 256 "$file"; done <"$checksum_files" >SHA256SUMS' \
 rg -Fq 'assert_credential_absent "$workspace"' "$eval_dir/bin/run-eval"
 rg -Fq 'assert_credential_absent "$workspace" --skip-symlinks' "$eval_dir/bin/run-eval"
 rg -Fq 'credential_snapshot=' "$eval_dir/bin/run-eval"
+rg -Fq 'assert-brokered-credential-absent' "$eval_dir/bin/run-eval"
 rg -Fq 'assert_credential_absent' "$eval_dir/bin/run-eval"
 rg -q '^credentialed_output_publishable=false$' "$eval_dir/bin/run-eval"
 rg -Fq '[[ "$auth_requested" == true && "$credentialed_output_publishable" == false ]]' \
@@ -612,6 +680,8 @@ test "$(rg -Fn 'assert_credential_absent "$output"' "$eval_dir/bin/run-eval" | c
   "$(rg -n '^  credentialed_output_publishable=true$' "$eval_dir/bin/run-eval" | cut -d: -f1)"
 rg -Fq 'npm config set cache "$npm_cache" --location=user' "$eval_dir/bin/prepare-agent-state"
 rg -Fq '"BUNDLE_PATH" => ARGV.fetch(1)' "$eval_dir/bin/prepare-agent-state"
+rg -Fq '"--install-dir", ARGV.fetch(1), "--bindir", ARGV.fetch(2)' \
+  "$eval_dir/bin/prepare-agent-state"
 rg -Fq 'agent_state_dir="$workspace/.ror-eval-state"' "$eval_dir/bin/run-eval"
 if rg -Fq 'mktemp -d "$(dirname "$workspace")/.ror-eval-npm-cache.' "$eval_dir/bin/run-eval"; then
   echo "npm cache escaped the writable workspace" >&2
@@ -628,6 +698,8 @@ agent_state_path="$("$eval_dir/bin/prepare-agent-state" \
   "$agent_state_safe_path")"
 prepared_agent_home="$tmp/prepared-agent-home"
 prepared_bundle_path="$(realpath "$tmp")/prepared-agent-state/bundle"
+prepared_gem_install_dir="$(realpath "$tmp")/prepared-agent-state/gems"
+prepared_gem_bin_dir="$(realpath "$tmp")/prepared-agent-state/gem-bin"
 prepared_gem_user_dir="$(env -i PATH="$agent_state_path" HOME="$prepared_agent_home" \
   TMPDIR="$tmp" LANG=C LC_ALL=C SHELL=/bin/sh CODEX_EVAL=1 \
   ruby -e 'require "rubygems"; print Gem.user_dir')"
@@ -635,7 +707,12 @@ case "$prepared_gem_user_dir/" in
   "$prepared_agent_home"/*) ;;
   *) echo "RubyGems user directory escaped private HOME" >&2; exit 1 ;;
 esac
-test -w "$prepared_gem_user_dir"
+test -L "$prepared_gem_user_dir"
+test "$(realpath "$prepared_gem_user_dir")" = "$prepared_gem_install_dir"
+case ":$agent_state_path:" in
+  *":$prepared_gem_bin_dir:"*) ;;
+  *) echo "RubyGems executable directory missing from safe PATH" >&2; exit 1 ;;
+esac
 prepared_bundle_actual="$(env -i PATH="$agent_state_path" HOME="$prepared_agent_home" \
   TMPDIR="$tmp" LANG=C LC_ALL=C SHELL=/bin/sh CODEX_EVAL=1 \
   ruby -rbundler -e 'print Bundler.bundle_path')"
@@ -654,6 +731,7 @@ test -x "$isolated_host/run-in-container"
 test -x "$isolated_host/smoke-runtime"
 rg -Fq 'codex exec --help' "$isolated_host/smoke-runtime"
 rg -Fq 'claude --version' "$isolated_host/smoke-runtime"
+rg -Fq 'build-claude-agent-report-schema' "$isolated_host/smoke-runtime"
 rg -Fq 'CODEX_EVAL' "$isolated_host/smoke-runtime"
 rg -Fq -- '--mount "type=bind,source=$root,target=/repo,readonly"' \
   "$isolated_host/run-in-container"
