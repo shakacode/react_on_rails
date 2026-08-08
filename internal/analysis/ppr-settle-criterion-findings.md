@@ -324,8 +324,16 @@ Two tasks, one macrotask window. The Flight stream is already fully produced, so
 there are no pending data reads. Any postponed boundaries become `postponed`
 state that React DOM returns alongside the HTML prelude.
 
+**Module loading is also tracked.** While no _data_ reads are pending, the HTML
+pass does need to load client component modules (chunks referenced in the Flight
+stream). A separate per-pass CacheSignal tracks module/chunk loads via
+`trackPendingModules(cacheSignal)`. The HTML pass waits for module loading to
+settle before aborting. If a module hasn't loaded by abort time, its component
+becomes a postponed placeholder. In practice, modules are warm from the
+prospective pass, so they resolve instantly.
+
 **Why this is safe**: The Flight stream is complete. React DOM is just converting
-it to HTML. All the async resolution happened in the RSC passes. React DOM's
+it to HTML. All the async data resolution happened in the RSC passes. React DOM's
 prerender processes the Flight data, emits HTML for resolved subtrees, and emits
 `<template>` placeholders for postponed boundaries.
 
@@ -422,12 +430,20 @@ if (prerenderStore.type === 'prerender') {
 }
 ```
 
-`makeRuntimeHangingPromise` returns:
+`makeRuntimeHangingPromise` returns (simplified from Next.js's
+`makeHangingPromiseWithError`):
 
 ```javascript
-new Promise((_, reject) => {
-  signal.addEventListener('abort', () => reject(error), { once: true });
-});
+function makeHangingPromise(signal, error) {
+  if (signal.aborted) {
+    return Promise.reject(error); // already aborted — reject immediately
+  }
+  const promise = new Promise((_, reject) => {
+    signal.addEventListener('abort', () => reject(error), { once: true });
+  });
+  promise.catch(() => {}); // suppress unhandled rejection warnings
+  return promise;
+}
 ```
 
 This promise never resolves. React sees it, suspends at the nearest Suspense
