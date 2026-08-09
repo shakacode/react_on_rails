@@ -149,8 +149,11 @@ const waitForImmediate = () =>
  * Renders a tree whose <Suspense> child stays pending until we explicitly resolve it,
  * splitting the emitted Flight bytes into the part flushed while pending (part1: shell rows
  * plus the fallback and an unresolved $L reference) and the rows emitted after resolution
- * (part2). Deterministic: resolution happens only after the shell rows were observed and the
- * Flight flush (setImmediate-scheduled) settled.
+ * (part2). Deterministic: resolution happens only after the pending-side emission provably
+ * quiesced — the chunk count is polled until it stays stable across consecutive event-loop
+ * turns (not a fixed tick count, which could under-wait on a loaded machine or a future
+ * Flight version that flushes across more turns), and part1's completeness is verified by
+ * content before returning.
  */
 const collectPendingSplit = async () => {
   let resolveLate;
@@ -190,18 +193,50 @@ const collectPendingSplit = async () => {
   });
 
   await firstChunkSeen;
-  // Let the setImmediate-scheduled Flight flush finish emitting everything it can while the
-  // boundary is still pending, so the split point is stable.
-  await waitForImmediate();
-  await waitForImmediate();
+  // Wait until the pending-side Flight emission quiesces: the boundary's data promise is
+  // gated on `resolveLate`, so once the setImmediate-scheduled flush stops producing chunks
+  // there is nothing more Flight CAN emit. Require the chunk count to hold stable across
+  // several consecutive event-loop turns rather than a fixed tick count.
+  const STABLE_TURNS_REQUIRED = 3;
+  const MAX_QUIESCE_TURNS = 1000;
+  let stableTurns = 0;
+  let lastCount = chunks.length;
+  for (let turn = 0; stableTurns < STABLE_TURNS_REQUIRED; turn += 1) {
+    if (turn >= MAX_QUIESCE_TURNS) {
+      throw new Error(`pending-split emission did not quiesce within ${MAX_QUIESCE_TURNS} event-loop turns`);
+    }
+    // eslint-disable-next-line no-await-in-loop -- deliberately sequential turn-by-turn polling
+    await waitForImmediate();
+    if (chunks.length === lastCount) {
+      stableTurns += 1;
+    } else {
+      stableTurns = 0;
+      lastCount = chunks.length;
+    }
+  }
   const splitIndex = chunks.length;
   resolveLate('PENDING_LATE_MARKER');
   await finished;
 
-  return {
-    part1: Buffer.concat(chunks.slice(0, splitIndex)),
-    part2: Buffer.concat(chunks.slice(splitIndex)),
-  };
+  const part1 = Buffer.concat(chunks.slice(0, splitIndex));
+  const part2 = Buffer.concat(chunks.slice(splitIndex));
+
+  // Self-check the split so a bad fixture fails HERE (loudly, in the generator) instead of
+  // surfacing as a confusing consuming-test failure: part1 must carry the complete pending
+  // shell (shell + fallback rows, no late content) and part2 the late rows.
+  const part1Text = part1.toString('utf8');
+  const part2Text = part2.toString('utf8');
+  if (!part1Text.includes('PENDING_SHELL_MARKER') || !part1Text.includes('PENDING_FALLBACK_MARKER')) {
+    throw new Error('pending-split part1 is missing shell/fallback rows — split captured too early');
+  }
+  if (part1Text.includes('PENDING_LATE_MARKER')) {
+    throw new Error('pending-split part1 contains late rows — split captured too late');
+  }
+  if (!part2Text.includes('PENDING_LATE_MARKER')) {
+    throw new Error('pending-split part2 is missing the late rows');
+  }
+
+  return { part1, part2 };
 };
 
 const main = async () => {

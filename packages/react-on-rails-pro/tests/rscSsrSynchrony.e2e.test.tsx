@@ -97,7 +97,7 @@ import RSCRoute from '../src/RSCRoute.tsx';
 import ReactOnRails from '../src/ReactOnRails.node.ts';
 import * as ComponentRegistry from '../src/ComponentRegistry.ts';
 import LengthPrefixedStreamParser from '../src/parseLengthPrefixedStream.ts';
-import { flushMacrotasks } from './testUtils.ts';
+import { flushMacrotasks, toLengthPrefixedEnvelope } from './testUtils.ts';
 
 jest.setTimeout(30_000);
 
@@ -168,16 +168,8 @@ const webpackGlobals = globalThis as WebpackGlobals;
 let chunkLoadCalls = 0;
 
 // ---------------------------------------------------------------------------
-// Stream + envelope helpers (mirror the node renderer's length-prefixed protocol)
+// Stream helpers (envelope framing shared via testUtils.toLengthPrefixedEnvelope)
 // ---------------------------------------------------------------------------
-
-const toLengthPrefixedEnvelope = (content: Buffer): Buffer => {
-  const metadata = JSON.stringify({ consoleReplayScript: '', hasErrors: false, isShellReady: true });
-  return Buffer.concat([
-    Buffer.from(`${metadata}\t${content.length.toString(16).padStart(8, '0')}\n`, 'utf8'),
-    content,
-  ]);
-};
 
 // The "complete payload" premise: the whole Flight document, already buffered,
 // delivered as a single chunk with EOF before any consumer attaches.
@@ -210,21 +202,17 @@ const pendingPayloadStream = (
 
 type Tripwire = { fired: () => boolean; disarm: () => void };
 
-const armSetTimeoutTripwire = (): Tripwire => {
+const armTripwire = <H,>(schedule: (callback: () => void) => H, cancel: (handle: H) => void): Tripwire => {
   let fired = false;
-  const timer = setTimeout(() => {
-    fired = true;
-  }, 0);
-  return { fired: () => fired, disarm: () => clearTimeout(timer) };
-};
-
-const armSetImmediateTripwire = (): Tripwire => {
-  let fired = false;
-  const immediate = setImmediate(() => {
+  const handle = schedule(() => {
     fired = true;
   });
-  return { fired: () => fired, disarm: () => clearImmediate(immediate) };
+  return { fired: () => fired, disarm: () => cancel(handle) };
 };
+
+const armSetTimeoutTripwire = () => armTripwire((cb) => setTimeout(cb, 0), clearTimeout);
+
+const armSetImmediateTripwire = () => armTripwire(setImmediate, clearImmediate);
 
 // ---------------------------------------------------------------------------
 // Decode-level helpers (issue cases 1–4)
@@ -430,7 +418,14 @@ beforeAll(async () => {
   // cache/manifestStylesheets.ts), putting the process in the warm steady state
   // the zero-macrotask contract is defined for. Cold behavior is tested
   // explicitly, in an isolated module registry, below.
-  await decodeCompletePayload(flight.withClientComponent);
+  //
+  // Deliberately a payload with NO client references: warming with a client-ref
+  // payload would prime the Flight client's per-process chunkCache before case 2
+  // arms its tripwires, so the chunk-load hop would happen outside the timed
+  // window and case 2 would only ever exercise the cache-hit path. With
+  // plainServer the manifests are warm but the chunkCache is cold, and case 2's
+  // decode is the first client-reference resolution in the process.
+  await decodeCompletePayload(flight.plainServer);
   await collectRenderStream(renderThroughFullPipeline(() => completePayloadStream(flight.plainServer)))
     .finished;
 });
@@ -475,17 +470,29 @@ describe('complete payload decodes within the same macrotask turn (warm manifest
     const chunkLoadCallsBefore = chunkLoadCalls;
     const element = await expectDecodeBeatsTripwires(flight.withClientComponent);
 
-    // Guard against this test silently weakening: the manifest's non-empty
-    // chunks array must have routed the reference through the Flight client's
-    // blocked-chunk path (preloadModule → __webpack_chunk_load__ → microtask
-    // wake). preloadModule caches the chunk-load promise per chunk id, so this
-    // asserts ≥ (not +1): the warm-up decode in beforeAll already primed it —
-    // what matters is that the path was exercised in this process at all.
-    expect(chunkLoadCalls).toBeGreaterThanOrEqual(1);
-    expect(chunkLoadCalls).toBeGreaterThanOrEqual(chunkLoadCallsBefore);
+    // Strict delta: this decode is the FIRST client-reference resolution in the
+    // process (the beforeAll warm-up deliberately used a payload without client
+    // references), so the Flight client's blocked-chunk path — preloadModule →
+    // __webpack_chunk_load__ → "blocked" chunk woken from the promise's .then —
+    // ran INSIDE the tripwire window above, cold chunkCache and all. This both
+    // proves the cold chunk-load hop is microtask-only and guards against the
+    // test silently degrading to a path that never touches module loading.
+    expect(chunkLoadCalls).toBeGreaterThan(chunkLoadCallsBefore);
 
     const html = await renderElementToHtml(element);
     expect(html).toContain('<h2>SERVER_WRAPPER_MARKER</h2>');
+    expect(html).toContain('client:CARD_LABEL_MARKER');
+  });
+
+  it('case 2 (warm chunk cache): a repeat client-component decode stays microtask-only', async () => {
+    // After case 2, preloadModule's chunkCache marks the chunk loaded (entry
+    // nulled on resolution), so this decode takes the synchronous cache-hit
+    // path — the steady state of a long-running renderer. Same contract.
+    const chunkLoadCallsBefore = chunkLoadCalls;
+    const element = await expectDecodeBeatsTripwires(flight.withClientComponent);
+    expect(chunkLoadCalls).toBe(chunkLoadCallsBefore);
+
+    const html = await renderElementToHtml(element);
     expect(html).toContain('client:CARD_LABEL_MARKER');
   });
 
