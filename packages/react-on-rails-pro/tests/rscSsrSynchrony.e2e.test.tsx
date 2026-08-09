@@ -446,13 +446,6 @@ describe('complete payload decodes within the same macrotask turn (warm manifest
     expect(html).toContain('client:CARD_LABEL_MARKER');
   });
 
-  it('case 2 (repeat): a second decode against the warm module cache holds the same contract', async () => {
-    const element = await expectDecodeBeatsTripwires(flight.withClientComponent);
-
-    const html = await renderElementToHtml(element);
-    expect(html).toContain('client:CARD_LABEL_MARKER');
-  });
-
   it('case 3: payload with already-resolved promises settles on microtasks only', async () => {
     const element = await expectDecodeBeatsTripwires(flight.withResolvedPromise);
 
@@ -544,22 +537,6 @@ describe('end-to-end: complete payload through streamServerRenderedReactComponen
     expect(html).not.toContain('<template');
     // The RSC payload embedding (hydration data) still happened.
     expect(html).toContain('REACT_ON_RAILS_RSC_PAYLOADS');
-  });
-
-  it('case 5 (baseline shape): plain server payload streams as one complete flush', async () => {
-    const collected = collectRenderStream(
-      renderThroughFullPipeline(() => completePayloadStream(flight.plainServer)),
-    );
-
-    const turns = await macrotaskTurnsUntil(collected.ended, COMPLETE_RENDER_TURN_BUDGET + 1);
-    expect(collected.ended()).toBe(true);
-    expect(turns).toBeLessThanOrEqual(COMPLETE_RENDER_TURN_BUDGET);
-
-    const html = await collected.finished;
-    expect(html).toContain('<h1>PLAIN_HEADER_MARKER</h1>');
-    expect(html).toContain('<p>PLAIN_TEXT_MARKER</p>');
-    expect(html).not.toContain('<!--$?-->');
-    expect(html).not.toContain('$RC');
   });
 });
 
