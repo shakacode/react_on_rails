@@ -161,6 +161,12 @@ type WebpackGlobals = {
 
 const webpackGlobals = globalThis as WebpackGlobals;
 
+// Counts __webpack_chunk_load__ calls so tests can assert the blocked-chunk
+// path (preloadModule → chunk-load promise → microtask wake) actually ran —
+// with an empty chunks array the Flight client short-circuits before ever
+// touching __webpack_chunk_load__, which would silently weaken case 2.
+let chunkLoadCalls = 0;
+
 // ---------------------------------------------------------------------------
 // Stream + envelope helpers (mirror the node renderer's length-prefixed protocol)
 // ---------------------------------------------------------------------------
@@ -351,6 +357,18 @@ beforeAll(async () => {
 
   // Real manifest files on disk. loadJsonFile resolves absolute paths as-is, so
   // the tests exercise the real fs-backed manifest loading (no fs mocking).
+  //
+  // The server-client manifest entry carries a NON-EMPTY chunks array, matching
+  // what RSCWebpackPlugin emits for the real single-chunk server bundle
+  // (LimitChunkCountPlugin maxChunks:1 → every entry gets
+  // chunks: ["server-bundle", "server-bundle.js"], see
+  // spec/dummy/ssr-generated/react-server-client-manifest.json). A non-empty
+  // array forces the Flight client through its blocked-chunk path: preloadModule
+  // calls __webpack_chunk_load__, marks the reference chunk "blocked", and only
+  // resolves it from the chunk-load promise's .then — i.e. on a microtask. An
+  // empty array would short-circuit that whole path (preloadModule returns null,
+  // the reference resolves synchronously) and the test would prove nothing about
+  // module-loading timing.
   manifestDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rsc-ssr-synchrony-'));
   clientManifestPath = path.join(manifestDir, 'react-client-manifest.json');
   serverClientManifestPath = path.join(manifestDir, 'react-server-client-manifest.json');
@@ -367,22 +385,31 @@ beforeAll(async () => {
     serverClientManifestPath,
     JSON.stringify({
       filePathToModuleMetadata: {
-        [fixture.clientComponentFilePath]: { id: SSR_MODULE_ID, chunks: [] },
+        [fixture.clientComponentFilePath]: {
+          id: SSR_MODULE_ID,
+          chunks: ['server-bundle', 'server-bundle.js'],
+        },
       },
       moduleLoading: { prefix: '', crossOrigin: null },
     }),
   );
 
   // Wire the webpack module system the Flight SSR client uses to load the client
-  // component's server-bundle implementation. Synchronous, like a standard
-  // (non-async-module) webpack server bundle.
+  // component's server-bundle implementation. __webpack_require__ is synchronous,
+  // like a standard (non-async-module) webpack server bundle; __webpack_chunk_load__
+  // resolves immediately, exactly like the single-chunk server bundle's runtime
+  // (webpack emits `__webpack_require__.e = () => (Promise.resolve())` when
+  // LimitChunkCountPlugin leaves no async chunks to load).
   webpackGlobals.__webpack_require__ = (id: string) => {
     if (id !== SSR_MODULE_ID) {
       throw new Error(`Unexpected SSR module id: ${id}`);
     }
     return { default: ClientCardSSR };
   };
-  webpackGlobals.__webpack_chunk_load__ = () => Promise.resolve();
+  webpackGlobals.__webpack_chunk_load__ = () => {
+    chunkLoadCalls += 1;
+    return Promise.resolve();
+  };
 
   // Register the production-style component wrapper once: this is exactly what
   // registerServerComponent/server does internally (RSCRoute inside
@@ -445,7 +472,17 @@ describe('complete payload decodes within the same macrotask turn (warm manifest
   });
 
   it('case 2: payload with a client component resolves through the manifest without a macrotask hop', async () => {
+    const chunkLoadCallsBefore = chunkLoadCalls;
     const element = await expectDecodeBeatsTripwires(flight.withClientComponent);
+
+    // Guard against this test silently weakening: the manifest's non-empty
+    // chunks array must have routed the reference through the Flight client's
+    // blocked-chunk path (preloadModule → __webpack_chunk_load__ → microtask
+    // wake). preloadModule caches the chunk-load promise per chunk id, so this
+    // asserts ≥ (not +1): the warm-up decode in beforeAll already primed it —
+    // what matters is that the path was exercised in this process at all.
+    expect(chunkLoadCalls).toBeGreaterThanOrEqual(1);
+    expect(chunkLoadCalls).toBeGreaterThanOrEqual(chunkLoadCallsBefore);
 
     const html = await renderElementToHtml(element);
     expect(html).toContain('<h2>SERVER_WRAPPER_MARKER</h2>');
