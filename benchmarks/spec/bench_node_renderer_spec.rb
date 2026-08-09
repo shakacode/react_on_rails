@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "tmpdir"
 require_relative "spec_helper"
 require_relative "../bench-node-renderer"
 
@@ -12,6 +13,70 @@ require_relative "../bench-node-renderer"
 RSpec.describe "bench-node-renderer" do
   def process_status(success:, exitstatus: nil, termsig: nil)
     instance_double(Process::Status, success?: success, exitstatus:, termsig:)
+  end
+
+  def create_renderer_bundle(bundles_dir, entry, mtime:, payload: true)
+    entry_dir = File.join(bundles_dir, entry)
+    FileUtils.mkdir_p(entry_dir)
+    File.write(File.join(entry_dir, "#{entry}.js"), "") if payload
+    File.utime(mtime, mtime, entry_dir)
+  end
+
+  describe "#find_all_production_bundles" do
+    it "finds only the newest renderer-ready v2 bundle for each encoded role" do
+      Dir.mktmpdir do |root|
+        bundles_dir = File.join(root, "react_on_rails_pro/spec/dummy/.node-renderer-bundles")
+        old_server = "rorp-v2-s-#{'a' * 64}"
+        old_rsc = "rorp-v2-r-#{'b' * 64}"
+        new_server = "rorp-v2-s-#{'c' * 64}"
+        new_rsc = "rorp-v2-r-#{'d' * 64}"
+        legacy = "#{'e' * 32}-production"
+        bundle_mtimes = {
+          old_server => 10, new_rsc => 40, "not-a-bundle" => 80,
+          new_server => 50, legacy => 30,
+          "rorp-v2-x-#{'0' * 64}" => 70, "rorp-v2-s-#{'1' * 63}" => 90, old_rsc => 20
+        }
+        bundle_mtimes.each do |entry, mtime|
+          create_renderer_bundle(bundles_dir, entry, mtime: Time.at(mtime))
+        end
+
+        allow(self).to receive(:workspace_root).and_return(root)
+
+        expect(find_all_production_bundles).to eq([new_server, new_rsc])
+      end
+    end
+
+    it "raises when the newest v2 candidate for a role is missing its payload" do
+      Dir.mktmpdir do |root|
+        bundles_dir = File.join(root, "react_on_rails_pro/spec/dummy/.node-renderer-bundles")
+        old_server = "rorp-v2-s-#{'a' * 64}"
+        old_rsc = "rorp-v2-r-#{'b' * 64}"
+        new_server = "rorp-v2-s-#{'c' * 64}"
+        new_rsc = "rorp-v2-r-#{'d' * 64}"
+        { old_server => 10, old_rsc => 20, new_server => 50, new_rsc => 40 }.each do |entry, mtime|
+          create_renderer_bundle(bundles_dir, entry, mtime: Time.at(mtime), payload: entry != new_server)
+        end
+        allow(self).to receive(:workspace_root).and_return(root)
+        expected_payload = File.join(bundles_dir, new_server, "#{new_server}.js")
+
+        expect { find_all_production_bundles }
+          .to raise_error("Newest node renderer bundle for role s is missing its payload: #{expected_payload}")
+      end
+    end
+
+    it "keeps legacy production bundles newest-first when no v2 candidates exist" do
+      Dir.mktmpdir do |root|
+        bundles_dir = File.join(root, "react_on_rails_pro/spec/dummy/.node-renderer-bundles")
+        old_legacy = "#{'a' * 32}-production"
+        new_legacy = "#{'b' * 32}-production"
+        create_renderer_bundle(bundles_dir, old_legacy, mtime: Time.at(10))
+        create_renderer_bundle(bundles_dir, "not-a-bundle", mtime: Time.at(30))
+        create_renderer_bundle(bundles_dir, new_legacy, mtime: Time.at(20))
+        allow(self).to receive(:workspace_root).and_return(root)
+
+        expect(find_all_production_bundles).to eq([new_legacy, old_legacy])
+      end
+    end
   end
 
   describe "#validate_node_renderer_benchmark_config!" do
