@@ -147,7 +147,7 @@ def find_all_production_bundles
 
   raise "No production bundles found in #{bundles_dir}" if bundles.empty?
 
-  validate_bundle_payloads!(bundles_dir, bundles)
+  validate_bundle_payloads!(bundles_dir, bundles) unless v2_candidates.empty?
 
   bundles
 end

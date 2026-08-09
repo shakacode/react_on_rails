@@ -91,6 +91,19 @@ RSpec.describe "bench-node-renderer" do
         expect(find_all_production_bundles).to eq([new_legacy, old_legacy])
       end
     end
+
+    it "does not add eager payload validation to legacy discovery" do
+      Dir.mktmpdir do |root|
+        bundles_dir = File.join(root, "react_on_rails_pro/spec/dummy/.node-renderer-bundles")
+        old_legacy = "#{'a' * 32}-production"
+        new_legacy = "#{'b' * 32}-production"
+        create_renderer_bundle(bundles_dir, old_legacy, mtime: Time.at(10), payload: false)
+        create_renderer_bundle(bundles_dir, new_legacy, mtime: Time.at(20))
+        allow(self).to receive(:workspace_root).and_return(root)
+
+        expect(find_all_production_bundles).to eq([new_legacy, old_legacy])
+      end
+    end
   end
 
   describe "#validate_node_renderer_benchmark_config!" do
