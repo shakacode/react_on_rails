@@ -181,15 +181,21 @@ const completePayloadStream = (flightBytes: Buffer): PassThrough => {
   return stream;
 };
 
-// Negative control: part1 (shell + fallback rows) available immediately, part2
-// (the late Suspense rows) only after a real macrotask delay.
-const pendingPayloadStream = (part1: Buffer, part2: Buffer, delayMs: number): PassThrough => {
+// Negative control: part1 (shell + fallback rows) available immediately; part2
+// (the late Suspense rows) held back until the test explicitly releases it.
+// An explicit release signal — not a wall-clock timer — keeps the control
+// deterministic: the pre-release assertions can never race the late rows, no
+// matter how slow a loaded CI worker's macrotask turns get.
+const pendingPayloadStream = (
+  part1: Buffer,
+  part2: Buffer,
+): { stream: PassThrough; releaseLateRows: () => void } => {
   const stream = new PassThrough();
   stream.write(toLengthPrefixedEnvelope(part1));
-  setTimeout(() => {
-    stream.end(toLengthPrefixedEnvelope(part2));
-  }, delayMs);
-  return stream;
+  return {
+    stream,
+    releaseLateRows: () => stream.end(toLengthPrefixedEnvelope(part2)),
+  };
 };
 
 // ---------------------------------------------------------------------------
@@ -478,6 +484,17 @@ describe('cold manifest cache', () => {
       // Fresh module registry: getReactServerComponent.server.ts's module-level
       // clientRendererPromise and loadJsonFile's cache start empty — the real
       // first-render-in-a-new-renderer-process situation.
+      //
+      // Module-registry mixing note: the isolated registry gets its own copies of
+      // getReactServerComponent's dependency graph (react-on-rails-rsc/client.node
+      // and the 'react' it pulls in), while renderElementToHtml below renders the
+      // decoded tree through the OUTER react-dom/server. That is safe because the
+      // isolated side only CONSTRUCTS elements — element/Suspense/lazy types are
+      // tagged with Symbol.for(...), a global registry shared across module copies
+      // — and every hook dispatch (use() in CardData) happens inside the outer
+      // React/react-dom pairing during the Fizz render. If the decode path ever
+      // becomes dispatcher-dependent (context reads, useId-style pooling), stop
+      // mixing registries and render inside the isolated scope instead.
       // eslint-disable-next-line global-require, @typescript-eslint/no-var-requires
       const freshModule = require('../src/getReactServerComponent.server.ts') as DecodeModule;
 
@@ -546,12 +563,11 @@ describe('end-to-end: complete payload through streamServerRenderedReactComponen
 
 describe('negative control: genuinely pending payload', () => {
   it('case 6: first flush carries the Suspense fallback; completion arrives in a later macrotask', async () => {
-    const collected = collectRenderStream(
-      renderThroughFullPipeline(() => pendingPayloadStream(pendingPart1, pendingPart2, 10)),
-    );
+    const pending = pendingPayloadStream(pendingPart1, pendingPart2);
+    const collected = collectRenderStream(renderThroughFullPipeline(() => pending.stream));
 
     // Give the pipeline the same budget the complete-payload cases get. The late
-    // rows arrive ~10ms in, so the stream must still be open here...
+    // rows have not been released yet, so the stream must still be open here...
     await macrotaskTurnsUntil(
       () => collected.htmlSoFar().includes('PENDING_SHELL_MARKER'),
       COMPLETE_RENDER_TURN_BUDGET + 1,
@@ -568,8 +584,9 @@ describe('negative control: genuinely pending payload', () => {
     expect(firstFlushHtml).toContain('<!--$?-->');
     expect(firstFlushHtml).not.toContain('late:PENDING_LATE_MARKER');
 
-    // Once the pending rows land, React streams the real content plus the
+    // Only now hand over the late rows: React streams the real content plus the
     // boundary-completion script that swaps out the fallback.
+    pending.releaseLateRows();
     const fullHtml = await collected.finished;
     expect(fullHtml).toContain('late:PENDING_LATE_MARKER');
     expect(fullHtml).toContain('$RC');

@@ -129,7 +129,15 @@ const collect = (tree) =>
       },
     });
     sink.on('error', reject);
-    renderToPipeableStream(tree).pipe(sink);
+    // Fail the generator loudly if the tree throws during Flight encoding —
+    // otherwise the error is serialized into the payload as an error row and
+    // only surfaces later as a confusing consuming-test failure.
+    renderToPipeableStream(tree, {
+      onError(error) {
+        sink.destroy();
+        reject(error instanceof Error ? error : new Error(String(error)));
+      },
+    }).pipe(sink);
   });
 
 const waitForImmediate = () =>
@@ -219,5 +227,7 @@ const main = async () => {
 
 main().catch((error) => {
   console.error(error);
-  process.exit(1);
+  // process.exitCode (not process.exit) lets the stderr pipe flush before the
+  // child exits, so execFileSync surfaces the full failure message.
+  process.exitCode = 1;
 });
