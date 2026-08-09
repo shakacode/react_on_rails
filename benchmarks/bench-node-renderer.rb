@@ -77,10 +77,46 @@ VEGETA_DURATION_UNITS_IN_SECONDS = {
   "m" => 60,
   "h" => 3600
 }.freeze
+V2_BUNDLE_ID_PATTERN = /\Arorp-v2-([sr])-[a-f0-9]{64}\z/
 
 # Local wrapper for add_summary_line to use local constant
 def add_to_summary(*parts)
   add_summary_line(SUMMARY_TXT, *parts)
+end
+
+def bundle_entry_mtime(bundles_dir, entry)
+  File.mtime(File.join(bundles_dir, entry))
+end
+
+def newest_v2_bundles_by_role(bundles_dir, candidates)
+  candidates.group_by { |entry| entry[V2_BUNDLE_ID_PATTERN, 1] }
+            .map do |role, role_entries|
+    entries_by_mtime = role_entries.group_by { |entry| bundle_entry_mtime(bundles_dir, entry) }
+    newest_mtime, newest_entries = entries_by_mtime.max_by { |mtime, _entries| mtime }
+    if newest_entries.size > 1
+      raise format(
+        "Ambiguous newest node renderer bundles for role %<role>s: %<entries>s (shared mtime %<mtime>s)",
+        role:, entries: newest_entries.sort.join(", "), mtime: newest_mtime.to_f
+      )
+    end
+
+    newest_entries.first
+  end
+end
+
+def validate_bundle_payloads!(bundles_dir, bundles)
+  bundles.each do |entry|
+    payload_path = File.join(bundles_dir, entry, "#{entry}.js")
+    next if File.file?(payload_path)
+
+    role = entry[V2_BUNDLE_ID_PATTERN, 1]
+    message = if role
+                "Newest node renderer bundle for role #{role} is missing its payload: #{payload_path}"
+              else
+                "Node renderer bundle #{entry} is missing its payload: #{payload_path}"
+              end
+    raise message
+  end
 end
 
 # Find all production bundles in the node-renderer bundles directory
@@ -95,14 +131,23 @@ def find_all_production_bundles
           "Make sure the Pro dummy app has been compiled with NODE_ENV=production"
   end
 
-  # Bundle directories have format: <hash>-<environment> (e.g., 623229694671afc1ac9137f2715bb654-production)
-  # Filter to only include production bundles with hash-like names
-  bundles = Dir.children(bundles_dir).select do |entry|
-    File.directory?(File.join(bundles_dir, entry)) &&
-      entry.match?(/^[a-f0-9]+-production$/)
+  bundle_dirs = Dir.children(bundles_dir).select do |entry|
+    File.directory?(File.join(bundles_dir, entry))
+  end
+  v2_candidates = bundle_dirs.grep(V2_BUNDLE_ID_PATTERN)
+
+  bundles = if v2_candidates.empty?
+              bundle_dirs.grep(/\A[a-f0-9]+-production\z/)
+            else
+              newest_v2_bundles_by_role(bundles_dir, v2_candidates)
+            end
+  bundles.sort_by! do |entry|
+    -bundle_entry_mtime(bundles_dir, entry).to_f
   end
 
   raise "No production bundles found in #{bundles_dir}" if bundles.empty?
+
+  validate_bundle_payloads!(bundles_dir, bundles) unless v2_candidates.empty?
 
   bundles
 end
