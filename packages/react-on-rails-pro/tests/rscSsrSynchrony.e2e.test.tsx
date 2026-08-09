@@ -132,6 +132,12 @@ const generateFixture = (): FlightFixture => {
   const stdout = execFileSync(process.execPath, ['--conditions', 'react-server', generatorPath], {
     encoding: 'utf8',
     maxBuffer: 16 * 1024 * 1024,
+    // Bounded: if the generator ever hangs (e.g. a React upgrade keeps the
+    // pending-split fixture from seeing its first Flight chunk), kill the child
+    // and fail here promptly — a synchronous execFileSync without a timeout
+    // cannot be interrupted by Jest's own test timeout.
+    timeout: 20_000,
+    killSignal: 'SIGKILL',
   });
   return JSON.parse(stdout) as FlightFixture;
 };
@@ -485,9 +491,14 @@ describe('complete payload decodes within the same macrotask turn (warm manifest
   });
 
   it('case 2 (warm chunk cache): a repeat client-component decode stays microtask-only', async () => {
-    // After case 2, preloadModule's chunkCache marks the chunk loaded (entry
-    // nulled on resolution), so this decode takes the synchronous cache-hit
-    // path — the steady state of a long-running renderer. Same contract.
+    // Prime the chunk cache inside THIS test so it stays valid standalone,
+    // reordered, or under test randomization — no silent coupling to case 2
+    // having run first. (Idempotent: if case 2 already primed the cache this
+    // decode is itself a warm cache-hit.) After priming, preloadModule's
+    // chunkCache marks the chunk loaded (entry nulled on resolution), so the
+    // timed decode takes the synchronous cache-hit path — the steady state of
+    // a long-running renderer. Same tripwire contract.
+    await decodeCompletePayload(flight.withClientComponent);
     const chunkLoadCallsBefore = chunkLoadCalls;
     const element = await expectDecodeBeatsTripwires(flight.withClientComponent);
     expect(chunkLoadCalls).toBe(chunkLoadCallsBefore);
