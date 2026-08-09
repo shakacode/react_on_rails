@@ -70,18 +70,19 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4833](https://github.com/shakacode/react_on_rails/pull/4833) by
   [justin808](https://github.com/justin808).
 
-- **[Pro]** **RSC render-error details are no longer sent to the browser on the fetched payload path**:
-  The RSC payload fetched during client-side navigation (via `rsc_payload_generation_url_path`) included
-  the server's rendering-error message and source-mapped stack — which contains server file paths — in its
-  metadata, in every environment. The inline (first-paint) payload path was already redacted, so error
-  detail that was hidden on first paint could still reach the browser on a client navigation. The fetched
-  path now applies the same fail-closed gate: full detail only in `development` and `test`, while
-  `production`, `staging`, and any unrecognized environment receive a generic `hasErrors: true` signal so
-  client error boundaries still fire. Server-side error handling is unaffected — `raise_prerender_error`
-  still receives the full message and stack, because redaction happens at the browser-facing boundary
-  after the server's own error transform runs. Fixes
-  [Issue 4736](https://github.com/shakacode/react_on_rails/issues/4736).
-  [PR 4821](https://github.com/shakacode/react_on_rails/pull/4821) by
+- **[Pro]** **RSC render-error details no longer reach browser-facing payloads in production-like
+  environments**: Fetched RSC payload metadata now uses a fail-closed allowlist that exposes only the
+  generic `hasErrors` signal needed by client error boundaries. Inline error-bearing payload chunks now
+  also suppress console replay in `production`, `staging`, and unrecognized environments, closing a path
+  that could repeat the server error message or source-mapped file paths after diagnostic metadata was
+  redacted. Full diagnostics and console replay remain available in `development` and `test`, clean
+  production chunks retain console replay, and server-side reporting still receives the original error
+  details before the browser-boundary redaction runs. Fixes
+  [Issue 4736](https://github.com/shakacode/react_on_rails/issues/4736),
+  [Issue 4822](https://github.com/shakacode/react_on_rails/issues/4822), and
+  [Issue 4827](https://github.com/shakacode/react_on_rails/issues/4827).
+  [PR 4821](https://github.com/shakacode/react_on_rails/pull/4821) and
+  [PR 4856](https://github.com/shakacode/react_on_rails/pull/4856) by
   [justin808](https://github.com/justin808).
 
 - **HTTP-served SSR bundle loading now honors the response charset, rejects non-2xx responses,
