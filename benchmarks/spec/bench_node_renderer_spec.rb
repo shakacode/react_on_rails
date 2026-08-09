@@ -64,6 +64,20 @@ RSpec.describe "bench-node-renderer" do
       end
     end
 
+    it "raises when multiple v2 candidates for a role share the newest mtime" do
+      Dir.mktmpdir do |root|
+        bundles_dir = File.join(root, "react_on_rails_pro/spec/dummy/.node-renderer-bundles")
+        first_server = "rorp-v2-s-#{'a' * 64}"
+        second_server = "rorp-v2-s-#{'b' * 64}"
+        create_renderer_bundle(bundles_dir, first_server, mtime: Time.at(50))
+        create_renderer_bundle(bundles_dir, second_server, mtime: Time.at(50))
+        allow(self).to receive(:workspace_root).and_return(root)
+
+        expect { find_all_production_bundles }
+          .to raise_error(/Ambiguous newest node renderer bundles for role s: #{first_server}, #{second_server}/)
+      end
+    end
+
     it "keeps legacy production bundles newest-first when no v2 candidates exist" do
       Dir.mktmpdir do |root|
         bundles_dir = File.join(root, "react_on_rails_pro/spec/dummy/.node-renderer-bundles")

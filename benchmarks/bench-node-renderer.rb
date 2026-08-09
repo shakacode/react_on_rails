@@ -77,6 +77,7 @@ VEGETA_DURATION_UNITS_IN_SECONDS = {
   "m" => 60,
   "h" => 3600
 }.freeze
+V2_BUNDLE_ID_PATTERN = /\Arorp-v2-([sr])-[a-f0-9]{64}\z/
 
 # Local wrapper for add_summary_line to use local constant
 def add_to_summary(*parts)
@@ -88,10 +89,18 @@ def bundle_entry_mtime(bundles_dir, entry)
 end
 
 def newest_v2_bundles_by_role(bundles_dir, candidates)
-  candidates.group_by { |entry| entry[/\Arorp-v2-([sr])-/, 1] }
-            .values
-            .map do |role_entries|
-    role_entries.max_by { |entry| bundle_entry_mtime(bundles_dir, entry) }
+  candidates.group_by { |entry| entry[V2_BUNDLE_ID_PATTERN, 1] }
+            .map do |role, role_entries|
+    entries_by_mtime = role_entries.group_by { |entry| bundle_entry_mtime(bundles_dir, entry) }
+    newest_mtime, newest_entries = entries_by_mtime.max_by { |mtime, _entries| mtime }
+    if newest_entries.size > 1
+      raise format(
+        "Ambiguous newest node renderer bundles for role %<role>s: %<entries>s (shared mtime %<mtime>s)",
+        role:, entries: newest_entries.sort.join(", "), mtime: newest_mtime.to_f
+      )
+    end
+
+    newest_entries.first
   end
 end
 
@@ -100,7 +109,7 @@ def validate_bundle_payloads!(bundles_dir, bundles)
     payload_path = File.join(bundles_dir, entry, "#{entry}.js")
     next if File.file?(payload_path)
 
-    role = entry[/\Arorp-v2-([sr])-/, 1]
+    role = entry[V2_BUNDLE_ID_PATTERN, 1]
     message = if role
                 "Newest node renderer bundle for role #{role} is missing its payload: #{payload_path}"
               else
@@ -125,7 +134,7 @@ def find_all_production_bundles
   bundle_dirs = Dir.children(bundles_dir).select do |entry|
     File.directory?(File.join(bundles_dir, entry))
   end
-  v2_candidates = bundle_dirs.grep(/\Arorp-v2-[sr]-[a-f0-9]{64}\z/)
+  v2_candidates = bundle_dirs.grep(V2_BUNDLE_ID_PATTERN)
 
   bundles = if v2_candidates.empty?
               bundle_dirs.grep(/\A[a-f0-9]+-production\z/)
