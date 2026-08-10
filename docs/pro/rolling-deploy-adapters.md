@@ -179,7 +179,7 @@ The adapter and `pre_seed_renderer_cache` populate the renderer's **disk cache**
 RENDERER_CURRENT_GENERATION_MANIFEST=/app/.node-renderer-bundles/.current-generations/rorp-generation-v1-<digest>.json
 ```
 
-Each cluster worker validates that immutable declaration and its artifact roots, compiles the complete declared set, and pins it as current before listening. Do not use a shared mutable `current` file or symlink: old and new workload revisions can race to rewrite a shared volume.
+Each cluster worker validates that immutable declaration and its artifact roots, compiles the complete declared set, and pins it as current before listening. In supported `MODE=symlink` deployments, it compiles the validated immutable snapshot target and aliases the renderer-facing cache path to that same VM identity in memory, so the first request is a hit without request-time `realpath` work. Do not use a shared mutable `current` file or symlink: old and new workload revisions can race to rewrite a shared volume.
 
 Keep the declared current contexts plus draining request generations resident during the overlap with:
 

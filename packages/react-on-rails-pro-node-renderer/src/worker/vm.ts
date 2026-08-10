@@ -57,6 +57,7 @@ import {
   remapStackTrace,
   preloadSourceMapJsonForBundle,
 } from './vmSourceMapSupport.js';
+import type { CurrentGenerationBundlePathAlias } from './currentGenerationManifest.js';
 
 const readFileAsync = promisify(fs.readFile);
 
@@ -75,6 +76,15 @@ export interface VMContext {
 
 // Store contexts by their bundle file paths
 const vmContexts = new Map<string, VMContext>();
+
+// Populated once from the trusted startup declaration. Requests keep using the
+// renderer-facing cache path while VM/source-map identity stays on the already
+// validated immutable target, with no per-request filesystem resolution.
+const trustedBundlePathAliases = new Map<string, string>();
+
+function bundleIdentityPath(bundlePath: string) {
+  return trustedBundlePathAliases.get(bundlePath) ?? bundlePath;
+}
 
 // Track VM creation promises to handle concurrent buildVM requests
 const vmCreationPromises = new Map<string, Promise<VMContext>>();
@@ -351,14 +361,14 @@ export function setVMPoolClockForTest(clock: VMPoolClock | undefined) {
  * @internal Used in tests
  */
 export function hasVMContextForBundle(bundlePath: string) {
-  return vmContexts.has(bundlePath);
+  return vmContexts.has(bundleIdentityPath(bundlePath));
 }
 
 /**
  * Get a specific VM context by bundle path
  */
 export function getVMContext(bundlePath: string): VMContext | undefined {
-  return vmContexts.get(bundlePath);
+  return vmContexts.get(bundleIdentityPath(bundlePath));
 }
 
 /**
@@ -732,19 +742,20 @@ async function buildVM(filePath: string): Promise<VMContext> {
 }
 
 async function getOrBuildVMContext(bundleFilePath: string, buildVmsIfNeeded: boolean): Promise<VMContext> {
-  const vmContext = getVMContext(bundleFilePath);
+  const identityPath = bundleIdentityPath(bundleFilePath);
+  const vmContext = vmContexts.get(identityPath);
   if (vmContext) {
     vmPoolActivity.cacheHits += 1;
     return vmContext;
   }
 
-  const vmCreationPromise = vmCreationPromises.get(bundleFilePath);
+  const vmCreationPromise = vmCreationPromises.get(identityPath);
   if (vmCreationPromise) {
     return vmCreationPromise;
   }
 
   if (buildVmsIfNeeded) {
-    return buildVM(bundleFilePath);
+    return buildVM(identityPath);
   }
 
   throw new VMContextNotFoundError(bundleFilePath);
@@ -796,10 +807,11 @@ export async function buildExecutionContext(
   await Promise.allSettled(
     bundlePaths.map(async (bundleFilePath) => {
       try {
-        const vmContext = await getOrBuildVMContext(bundleFilePath, buildVmsIfNeeded);
+        const identityPath = bundleIdentityPath(bundleFilePath);
+        const vmContext = await getOrBuildVMContext(identityPath, buildVmsIfNeeded);
         retainSourceMapRegistrationOnce(vmContext.sourceMapRegistration);
         vmContext.lastUsed = Date.now();
-        mapBundleFilePathToVMContext.set(bundleFilePath, vmContext);
+        mapBundleFilePathToVMContext.set(identityPath, vmContext);
         // Enforce the hard pool cap only after the request retains the context.
         // If pressure immediately evicts the just-built draining context, its
         // source-map registration remains alive until this ExecutionContext releases it.
@@ -821,7 +833,7 @@ export async function buildExecutionContext(
   // Only a fully usable request bundle set may affect rollout retirement.
   // Recording before every bundle succeeds could make a failed upload appear
   // current and later retire the last known-good generation.
-  observeBundleGeneration(bundlePaths);
+  observeBundleGeneration(bundlePaths.map(bundleIdentityPath));
 
   // This Map persists for the lifetime of this ExecutionContext (one HTTP request).
   // It allows data to be shared between the initial render and subsequent update chunks.
@@ -833,7 +845,7 @@ export async function buildExecutionContext(
     let sourceMapRegistrationForRequest: BundleSourceMapRegistration | undefined;
     try {
       const { serverBundleCachePath } = getConfig();
-      const vmContext = mapBundleFilePathToVMContext.get(bundleFilePath);
+      const vmContext = mapBundleFilePathToVMContext.get(bundleIdentityPath(bundleFilePath));
       if (!vmContext) {
         throw new VMContextNotFoundError(bundleFilePath);
       }
@@ -951,7 +963,8 @@ export async function buildExecutionContext(
   };
 
   return {
-    getVMContext: (bundleFilePath: string) => mapBundleFilePathToVMContext.get(bundleFilePath),
+    getVMContext: (bundleFilePath: string) =>
+      mapBundleFilePathToVMContext.get(bundleIdentityPath(bundleFilePath)),
     runInVM,
     release: () => {
       if (released) {
@@ -968,7 +981,10 @@ export async function buildExecutionContext(
  * Compiles and pins the trusted current revision's complete bundle set.
  * Incoming request generations remain draining and cannot replace this identity.
  */
-export async function prewarmDeclaredBundleGeneration(bundlePaths: string[]): Promise<ExecutionContext> {
+export async function prewarmDeclaredBundleGeneration(
+  bundlePaths: string[],
+  bundlePathAliases: CurrentGenerationBundlePathAlias[] = [],
+): Promise<ExecutionContext> {
   const normalizedBundlePaths = Array.from(new Set(bundlePaths)).sort();
   const { maxVMPoolSize } = getConfig();
   if (normalizedBundlePaths.length === 0) {
@@ -980,6 +996,22 @@ export async function prewarmDeclaredBundleGeneration(bundlePaths: string[]): Pr
         `but maxVMPoolSize is ${maxVMPoolSize}`,
     );
   }
+
+  const declaredBundlePathSet = new Set(normalizedBundlePaths);
+  const nextTrustedAliases = new Map<string, string>();
+  bundlePathAliases.forEach(({ requestBundlePath, canonicalBundlePath }) => {
+    if (!declaredBundlePathSet.has(canonicalBundlePath)) {
+      throw new Error('Current generation bundle path alias must target a declared canonical bundle');
+    }
+    if (nextTrustedAliases.has(requestBundlePath)) {
+      throw new Error('Current generation bundle path aliases must have unique request paths');
+    }
+    nextTrustedAliases.set(requestBundlePath, canonicalBundlePath);
+  });
+  trustedBundlePathAliases.clear();
+  nextTrustedAliases.forEach((canonicalBundlePath, requestBundlePath) => {
+    trustedBundlePathAliases.set(requestBundlePath, canonicalBundlePath);
+  });
 
   declaredCurrentGenerationKey = bundleGenerationKey(normalizedBundlePaths);
   declaredCurrentBundlePaths = new Set(normalizedBundlePaths);
@@ -1007,6 +1039,7 @@ export function resetVM() {
     generationRetirementTimer = undefined;
   }
   vmContexts.clear();
+  trustedBundlePathAliases.clear();
   vmCreationPromises.clear();
   bundleGenerations.clear();
   generationObservationSequence = 0;
@@ -1029,12 +1062,13 @@ export function resetVM() {
  * @public TODO: Remove the line below when this function is actually used
  */
 export function removeVM(bundlePath: string) {
-  const vmContext = vmContexts.get(bundlePath);
-  vmContexts.delete(bundlePath);
-  vmCreationPromises.delete(bundlePath);
+  const identityPath = bundleIdentityPath(bundlePath);
+  const vmContext = vmContexts.get(identityPath);
+  vmContexts.delete(identityPath);
+  vmCreationPromises.delete(identityPath);
   if (vmContext) {
     retireSourceMapRegistrationAfterEviction(vmContext.sourceMapRegistration);
   } else {
-    unregisterBundleForSourceMaps(bundlePath);
+    unregisterBundleForSourceMaps(identityPath);
   }
 }

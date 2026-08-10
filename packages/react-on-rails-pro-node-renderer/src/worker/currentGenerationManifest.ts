@@ -25,10 +25,15 @@ export const CURRENT_GENERATION_MANIFEST_MAX_BYTES = 64 * 1024;
 
 export type CurrentGenerationRole = 'server' | 'rsc';
 export type CurrentGenerationArtifact = { role: CurrentGenerationRole; id: string };
+export type CurrentGenerationBundlePathAlias = {
+  requestBundlePath: string;
+  canonicalBundlePath: string;
+};
 
 export type LoadedCurrentGeneration = {
   generationId: string;
   bundlePaths: string[];
+  bundlePathAliases: CurrentGenerationBundlePathAlias[];
   roles: CurrentGenerationRole[];
 };
 
@@ -119,7 +124,8 @@ export async function loadCurrentGenerationManifest({
     throw new Error('Current generation manifest path must be absolute');
   }
 
-  const canonicalCachePath = await realpath(serverBundleCachePath);
+  const requestCachePath = path.resolve(serverBundleCachePath);
+  const canonicalCachePath = await realpath(requestCachePath);
   const declarationDirectory = path.join(canonicalCachePath, CURRENT_GENERATION_DIRECTORY);
   const canonicalDeclarationDirectory = await realpath(declarationDirectory);
   const manifestMetadata = await lstat(manifestPath);
@@ -169,10 +175,10 @@ export async function loadCurrentGenerationManifest({
     if (errorCode !== 'ENOENT') throw error;
   }
 
-  const bundlePaths = await Promise.all(
+  const resolvedBundlePaths = await Promise.all(
     artifacts.map(async ({ id }) => {
-      const bundlePath = path.join(canonicalCachePath, id, `${id}.js`);
-      const canonicalBundlePath = await realpath(bundlePath);
+      const requestBundlePath = path.join(requestCachePath, id, `${id}.js`);
+      const canonicalBundlePath = await realpath(requestBundlePath);
       if (!allowedRoots.some((allowedRoot) => isWithin(allowedRoot, canonicalBundlePath))) {
         throw new Error(`Current generation artifact resolves outside allowed cache roots: ${id}`);
       }
@@ -181,13 +187,14 @@ export async function loadCurrentGenerationManifest({
       }
       // Compile the validated immutable target, not a renderer-facing symlink
       // that another local process could retarget after this validation step.
-      return canonicalBundlePath;
+      return { requestBundlePath, canonicalBundlePath };
     }),
   );
 
   return {
     generationId: expectedGenerationId,
-    bundlePaths,
+    bundlePaths: resolvedBundlePaths.map(({ canonicalBundlePath }) => canonicalBundlePath),
+    bundlePathAliases: resolvedBundlePaths,
     roles: artifacts.map(({ role }) => role),
   };
 }

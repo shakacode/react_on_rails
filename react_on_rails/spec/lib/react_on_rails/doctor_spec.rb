@@ -5803,6 +5803,43 @@ RSpec.describe ReactOnRails::Doctor do
       )
     end
 
+    it "fails closed for launcher capacity and a declared current generation when renderer syntax is invalid" do
+      write_node_renderer_script(
+        "renderer/node-renderer.js",
+        "reactOnRailsProNodeRenderer({ currentGenerationManifestPath: " \
+        "'/app/.node-renderer-bundles/.current-generations/rorp-generation-v1-#{'a' * 64}.json' });\n" \
+        "const broken ="
+      )
+      File.write(
+        "Procfile.production",
+        "node-renderer: MAX_VM_POOL_SIZE=4 node renderer/node-renderer.js\n"
+      )
+
+      doctor.send(:check_node_renderer_rollout_capacity)
+
+      expect(checker.messages).to include(
+        hash_including(
+          type: :warning,
+          content: a_string_including(
+            "evidence=unverified",
+            "reason=renderer_javascript_syntax_invalid"
+          )
+        )
+      )
+      expect(checker.messages).to include(
+        hash_including(
+          type: :info,
+          content: a_string_including(
+            "Fix JavaScript syntax in renderer/node-renderer.js",
+            "rerun Doctor"
+          )
+        )
+      )
+      expect(checker.messages).not_to include(
+        hash_including(type: :success, content: a_string_including("Declared-current"))
+      )
+    end
+
     it "fails closed when separate valid process lines assign conflicting capacities" do
       write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ workersCount: 2 });")
       File.write(

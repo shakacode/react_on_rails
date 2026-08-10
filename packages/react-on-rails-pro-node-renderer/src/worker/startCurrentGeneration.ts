@@ -23,7 +23,10 @@ type StartupOptions = {
   serverBundleCachePath: string;
   listen: () => Promise<void>;
   loadManifest?: typeof loadCurrentGenerationManifest;
-  prewarm?: (bundlePaths: string[]) => Promise<PrewarmResult>;
+  prewarm?: (
+    bundlePaths: string[],
+    bundlePathAliases: Awaited<ReturnType<typeof loadCurrentGenerationManifest>>['bundlePathAliases'],
+  ) => Promise<PrewarmResult>;
 };
 
 /** Worker startup barrier: a configured worker cannot listen until its complete declared set is compiled. */
@@ -38,7 +41,7 @@ export async function prewarmCurrentGenerationBeforeListen({
     manifestPath: currentGenerationManifestPath,
     serverBundleCachePath,
   });
-  const executionContext = await prewarm(declaration.bundlePaths);
+  const executionContext = await prewarm(declaration.bundlePaths, declaration.bundlePathAliases);
   executionContext.release();
   log.info(
     {

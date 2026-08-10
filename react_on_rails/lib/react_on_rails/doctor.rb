@@ -3279,10 +3279,21 @@ module ReactOnRails
       evidence =
         node_renderer_static_capacity_evidence(active_content) ||
         node_renderer_env_or_default_capacity_evidence(config_path)
+      evidence = node_renderer_launcher_capacity_with_syntax_evidence(evidence, active_content)
       evidence.merge(
         config_path:,
         current_generation_declaration: node_renderer_current_generation_declaration_evidence(active_content)
       )
+    end
+
+    def node_renderer_launcher_capacity_with_syntax_evidence(evidence, active_content)
+      return evidence unless evidence[:state] == :observed &&
+                             evidence[:source] == "selected_launcher_static_assignment"
+
+      syntax_failure_reason = node_renderer_javascript_syntax_failure_reason(active_content)
+      return evidence unless syntax_failure_reason
+
+      { state: :unverified, reason: syntax_failure_reason }
     end
 
     def node_renderer_current_generation_declaration_evidence(active_content)
@@ -3819,7 +3830,7 @@ module ReactOnRails
           "(evidence=unverified, topology=#{topology_label}, reason=#{evidence.fetch(:reason)}). " \
           "Doctor does not query the live renderer process."
         )
-        add_node_renderer_capacity_guidance(required_capacity, evidence[:config_path])
+        add_node_renderer_unverified_capacity_guidance(evidence, required_capacity)
         return
       end
 
@@ -3843,6 +3854,16 @@ module ReactOnRails
         checker.add_warning("⚠️  VM pool rollout capacity is insufficient (#{evidence_summary}).")
         add_node_renderer_capacity_guidance(required_capacity, evidence[:config_path])
       end
+    end
+
+    def add_node_renderer_unverified_capacity_guidance(evidence, required_capacity)
+      unless evidence.fetch(:reason).start_with?("renderer_javascript_syntax_")
+        add_node_renderer_capacity_guidance(required_capacity, evidence[:config_path])
+        return
+      end
+
+      config_path = evidence[:config_path] || NodeRendererProcfile::NEW_RENDERER_SCRIPT_PATH
+      checker.add_info("💡 Fix JavaScript syntax in #{config_path}, then rerun Doctor to prove capacity.")
     end
 
     def add_node_renderer_current_generation_guidance(config_path = nil)

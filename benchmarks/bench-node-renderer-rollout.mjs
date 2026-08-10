@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -94,6 +95,7 @@ async function run() {
 
   const configModulePath = path.join(packageRoot, 'lib/shared/configBuilder.js');
   const vmModulePath = path.join(packageRoot, 'lib/worker/vm.js');
+  const manifestModulePath = path.join(packageRoot, 'lib/worker/currentGenerationManifest.js');
   const fixturePath = path.join(packageRoot, 'tests/fixtures/bundle.js');
   const missingRequiredPaths = [configModulePath, vmModulePath, fixturePath].filter(
     (requiredPath) => !fs.existsSync(requiredPath),
@@ -111,6 +113,8 @@ async function run() {
   const { buildConfig } = require(configModulePath);
   // eslint-disable-next-line import/no-dynamic-require -- computed path was checked above
   const vmModule = require(vmModulePath);
+  // eslint-disable-next-line import/no-dynamic-require -- optional production module path is fixed under packageRoot
+  const manifestModule = fs.existsSync(manifestModulePath) ? require(manifestModulePath) : undefined;
   const {
     buildExecutionContext,
     getVMContext,
@@ -119,21 +123,48 @@ async function run() {
     resetVM,
   } = vmModule;
   const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ror-node-renderer-rollout-'));
+  const cachePath = path.join(temporaryRoot, 'cache');
+  const snapshotRoot = `${cachePath}.artifact-snapshots`;
+  const serverId = `rorp-v2-s-${'a'.repeat(64)}`;
+  const rscId = `rorp-v2-r-${'b'.repeat(64)}`;
+  const currentArtifacts = [
+    { role: 'server', id: serverId },
+    { role: 'rsc', id: rscId },
+  ];
+  const generationDigest = createHash('sha256');
+  generationDigest.update('react-on-rails-pro-current-generation-v1\0');
+  currentArtifacts.forEach(({ role, id }) => generationDigest.update(`${role}\0${id}\0`));
+  const generationId = `rorp-generation-v1-${generationDigest.digest('hex')}`;
   const bundleSets = {
-    old: ['server', 'rsc'].map((role) => path.join(temporaryRoot, 'old', `${role}.js`)),
-    new: ['server', 'rsc'].map((role) => path.join(temporaryRoot, 'new', `${role}.js`)),
+    old: ['server', 'rsc'].map((role) => path.join(cachePath, 'old', `${role}.js`)),
+    new: currentArtifacts.map(({ id }) => path.join(cachePath, id, `${id}.js`)),
   };
+  const canonicalCurrentBundlePaths = currentArtifacts.map(({ id }) =>
+    path.join(snapshotRoot, id, `${id}.js`),
+  );
 
-  Object.values(bundleSets)
-    .flat()
-    .forEach((bundlePath) => {
-      fs.mkdirSync(path.dirname(bundlePath), { recursive: true });
-      fs.copyFileSync(fixturePath, bundlePath);
-    });
-  const allBundlePaths = Object.values(bundleSets).flat();
+  bundleSets.old.forEach((bundlePath) => {
+    fs.mkdirSync(path.dirname(bundlePath), { recursive: true });
+    fs.copyFileSync(fixturePath, bundlePath);
+  });
+  bundleSets.new.forEach((requestBundlePath, index) => {
+    const canonicalBundlePath = canonicalCurrentBundlePaths[index];
+    fs.mkdirSync(path.dirname(canonicalBundlePath), { recursive: true });
+    fs.mkdirSync(path.dirname(requestBundlePath), { recursive: true });
+    fs.copyFileSync(fixturePath, canonicalBundlePath);
+    fs.symlinkSync(path.relative(path.dirname(requestBundlePath), canonicalBundlePath), requestBundlePath);
+  });
+  const declarationDirectory = path.join(cachePath, '.current-generations');
+  const manifestPath = path.join(declarationDirectory, `${generationId}.json`);
+  fs.mkdirSync(declarationDirectory, { recursive: true });
+  fs.writeFileSync(
+    manifestPath,
+    JSON.stringify({ schema_version: 1, generation_id: generationId, artifacts: currentArtifacts }),
+  );
+  const identityProbePaths = [...bundleSets.old, ...bundleSets.new, ...canonicalCurrentBundlePaths];
 
   const config = buildConfig({
-    serverBundleCachePath: temporaryRoot,
+    serverBundleCachePath: cachePath,
     workersCount: 0,
     supportModules: true,
     logLevel: 'silent',
@@ -143,38 +174,36 @@ async function run() {
   resetVM();
   global.gc?.();
 
-  const identityByBundlePath = new Map();
+  const observedContextIdentities = new Set();
   let inferredBuildCount = 0;
-  let inferredRebuildCount = 0;
   let evictionTransitionCount = 0;
   let peakRssBytes = process.memoryUsage().rss;
   let peakHeapUsedBytes = process.memoryUsage().heapUsed;
 
   const observePoolTransition = (retainedBefore) => {
     const retainedAfter = new Set(
-      allBundlePaths.filter((bundlePath) => getVMContext(bundlePath) !== undefined),
+      identityProbePaths
+        .map((bundlePath) => getVMContext(bundlePath))
+        .filter((context) => context !== undefined),
     );
-    retainedBefore.forEach((bundlePath) => {
-      if (!retainedAfter.has(bundlePath)) {
+    retainedBefore.forEach((context) => {
+      if (!retainedAfter.has(context)) {
         evictionTransitionCount += 1;
       }
     });
-    retainedAfter.forEach((bundlePath) => {
-      const currentIdentity = getVMContext(bundlePath);
-      const previousIdentity = identityByBundlePath.get(bundlePath);
-      if (previousIdentity === undefined) {
+    retainedAfter.forEach((context) => {
+      if (!observedContextIdentities.has(context)) {
         inferredBuildCount += 1;
-      } else if (previousIdentity !== currentIdentity) {
-        inferredBuildCount += 1;
-        inferredRebuildCount += 1;
       }
-      identityByBundlePath.set(bundlePath, currentIdentity);
+      observedContextIdentities.add(context);
     });
   };
 
   const buildBundleSet = async (bundlePaths, build = buildExecutionContext) => {
     const retainedBefore = new Set(
-      allBundlePaths.filter((bundlePath) => getVMContext(bundlePath) !== undefined),
+      identityProbePaths
+        .map((bundlePath) => getVMContext(bundlePath))
+        .filter((context) => context !== undefined),
     );
     const buildStartedAt = performance.now();
     const executionContext = await build(bundlePaths, true);
@@ -188,14 +217,24 @@ async function run() {
   };
 
   try {
+    const declaration = manifestModule
+      ? await manifestModule.loadCurrentGenerationManifest({
+          manifestPath,
+          serverBundleCachePath: cachePath,
+        })
+      : {
+          bundlePaths: canonicalCurrentBundlePaths.map((bundlePath) => fs.realpathSync(bundlePath)),
+          bundlePathAliases: [],
+        };
     const startupStartedAt = performance.now();
     await buildBundleSet(
-      bundleSets.new,
+      declaration.bundlePaths,
       typeof prewarmDeclaredBundleGeneration === 'function'
-        ? (bundlePaths) => prewarmDeclaredBundleGeneration(bundlePaths)
+        ? (bundlePaths) => prewarmDeclaredBundleGeneration(bundlePaths, declaration.bundlePathAliases)
         : buildExecutionContext,
     );
     const startupPrewarmMilliseconds = performance.now() - startupStartedAt;
+    const startupPoolDiagnostics = getVMPoolDiagnostics();
     global.gc?.();
     const rssBeforeSamplesBytes = process.memoryUsage().rss;
     const heapUsedBeforeSamplesBytes = process.memoryUsage().heapUsed;
@@ -221,12 +260,14 @@ async function run() {
     await sleep(options.drainTimeoutMilliseconds + 25);
     const oldOnlyGapMilliseconds = performance.now() - scheduleStartedAt;
     const buildsBeforeFirstNewRequest = getVMPoolDiagnostics().contextsBuilt;
+    const beforeFirstNewRequestPoolDiagnostics = getVMPoolDiagnostics();
     const firstNewRequestLatencyMilliseconds = await buildBundleSet(bundleSets.new);
     const firstNewRequestBuildCount = getVMPoolDiagnostics().contextsBuilt - buildsBeforeFirstNewRequest;
     const drainWaitMilliseconds = performance.now() - drainWaitStartedAt;
 
     global.gc?.();
     const finalMemory = process.memoryUsage();
+    const finalPoolDiagnostics = getVMPoolDiagnostics();
     const retainedByGeneration = Object.fromEntries(
       Object.entries(bundleSets).map(([generation, bundlePaths]) => [
         generation,
@@ -257,11 +298,16 @@ async function run() {
         requestsPerSecond: options.requestsPerSecond,
         scheduler: 'serial_fixed_rate',
         declaredCurrentPrewarmAvailable: typeof prewarmDeclaredBundleGeneration === 'function',
+        productionManifestLoaderAvailable: manifestModule !== undefined,
+        startupBundleIdentity: 'validated_canonical_snapshot_target',
+        firstNewRequestBundleIdentity: 'renderer_visible_symlink_path',
         drainTimeoutMilliseconds: options.drainTimeoutMilliseconds,
         measuredOldOnlyGapMilliseconds: oldOnlyGapMilliseconds,
         measuredDrainWaitMilliseconds: drainWaitMilliseconds,
       },
       startupPrewarmMilliseconds,
+      startupPoolDiagnostics,
+      beforeFirstNewRequestPoolDiagnostics,
       firstNewRequest: {
         latencyMilliseconds: firstNewRequestLatencyMilliseconds,
         buildCount: firstNewRequestBuildCount,
@@ -276,9 +322,12 @@ async function run() {
         timeoutCount: latenciesMilliseconds.filter((latency) => latency > options.timeoutMilliseconds).length,
       },
       inferredPoolActivity: {
-        buildCount: inferredBuildCount,
-        rebuildCount: inferredRebuildCount,
+        buildCount: finalPoolDiagnostics.contextsBuilt,
+        rebuildCount: Math.max(0, finalPoolDiagnostics.contextsBuilt - 4),
+        observedContextIdentityCount: inferredBuildCount,
         evictionTransitionCount,
+        hardLimitEvictions: finalPoolDiagnostics.hardLimitEvictions,
+        drainedContextRetirements: finalPoolDiagnostics.drainedContextRetirements,
         retainedContexts: Object.values(retainedByGeneration).reduce((sum, retained) => sum + retained, 0),
         retainedByGeneration,
       },
@@ -294,10 +343,11 @@ async function run() {
         'Synthetic tiny fixture bundles; this does not claim cloned Rails workload parity.',
         'Serial fixed-rate scheduling models deterministic old-only traffic, not concurrent saturation.',
         'Latency isolates pool lookup/buildExecutionContext plus release; retained-set scans, transition instrumentation, memory sampling, and runInVM/render execution are excluded.',
-        'Build and eviction counts are inferred from baseline-compatible VM identity and retained-path transitions.',
+        'Build, hard-limit, and drain counts come from pool diagnostics; transition and observed-identity counts are baseline-compatible instrumentation.',
         'Timeout count means completed samples above the threshold; the harness does not cancel in-flight builds.',
         'Disk seeding, manifest parsing, worker fork/listen, HTTP upload, and network latency are outside this harness.',
-        'Baseline revisions without declared-current prewarm use the same startup compile sequence but cannot pin it; declaredCurrentPrewarmAvailable records that distinction.',
+        'Startup compiles canonical snapshot targets while the first new request uses renderer-facing symlink paths; this exercises trusted alias identity.',
+        'Baseline revisions without manifest loading or declared-current prewarm use the same canonical-to-symlink sequence but cannot register or pin aliases; availability fields record that distinction.',
         'ROLLOUT_BENCH_REPOSITORY_ROOT may point this unchanged harness at an exact detached baseline worktree.',
         'Runtime-only benchmark; visual parity is not applicable.',
         'Fresh processes and at least five quiet repeats are required for release evidence.',

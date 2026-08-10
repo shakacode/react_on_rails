@@ -32,8 +32,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   drain window, while inactive contexts, generation metadata, and pressure logs stay bounded. Pre-seeding now emits
   an immutable revision-scoped current-generation declaration; each configured renderer worker validates and compiles
   that complete server/RSC set before listening, pins it across old-only traffic gaps, and reports ready only after the
-  compile barrier. Doctor now reports both rollout capacity and observed/unverified declaration evidence rather than
-  claiming a false warm pass from loopback or Rails-process configuration. **Upgrade memory impact:** the
+  compile barrier. Symlink-mode cache paths reuse the validated immutable snapshot VM identity without rebuilding on
+  the first request. Doctor now requires valid renderer JavaScript before launcher-derived capacity can prove a warm
+  pass, and reports observed/unverified declaration evidence rather than claiming success from invalid syntax,
+  loopback, or Rails-process configuration. **Upgrade memory impact:** the
   default `maxVMPoolSize` doubles from 2 to 4 per worker, and total VM retention scales with renderer workers and
   replicas, so operators should re-check deployment memory requests and limits. Invalid `MAX_VM_POOL_SIZE` values
   that previously fell back to the default now fail fast during renderer startup. Fixes

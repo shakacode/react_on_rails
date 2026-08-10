@@ -16,7 +16,15 @@
 import { createHash } from 'crypto';
 import fs from 'fs/promises';
 import path from 'path';
+import { getConfig } from '../src/shared/configBuilder';
 import { loadCurrentGenerationManifest } from '../src/worker/currentGenerationManifest';
+import { prewarmCurrentGenerationBeforeListen } from '../src/worker/startCurrentGeneration';
+import {
+  buildExecutionContext,
+  getVMPoolDiagnostics,
+  getVMContext,
+  isDeclaredCurrentGenerationReady,
+} from '../src/worker/vm';
 import { getFixtureBundle, resetForTest, serverBundleCachePath } from './helper';
 
 const testName = 'currentGenerationManifest';
@@ -86,6 +94,10 @@ describe('current generation manifest', () => {
     ).resolves.toEqual({
       generationId: generationId(),
       bundlePaths: artifacts.map(({ id }) => path.join(cachePath, id, `${id}.js`)),
+      bundlePathAliases: artifacts.map(({ id }) => ({
+        requestBundlePath: path.join(cachePath, id, `${id}.js`),
+        canonicalBundlePath: path.join(cachePath, id, `${id}.js`),
+      })),
       roles: ['server', 'rsc'],
     });
   });
@@ -167,5 +179,53 @@ describe('current generation manifest', () => {
     });
 
     expect(declaration.bundlePaths[0]).toBe(snapshotPath);
+  });
+
+  test('prewarms symlink-mode server and RSC artifacts under their request-visible identities', async () => {
+    const cachePath = serverBundleCachePath(testName);
+    await writeArtifacts(cachePath);
+    const snapshotRoot = `${cachePath}.artifact-snapshots`;
+    const requestBundlePaths = artifacts.map(({ id }) => path.join(cachePath, id, `${id}.js`));
+    const snapshotBundlePaths = artifacts.map(({ id }) => path.join(snapshotRoot, id, `${id}.js`));
+    await Promise.all(
+      requestBundlePaths.map(async (requestPath, index) => {
+        const snapshotPath = snapshotBundlePaths[index];
+        if (!snapshotPath) throw new Error('missing snapshot test path');
+        await fs.mkdir(path.dirname(snapshotPath), { recursive: true });
+        await fs.copyFile(getFixtureBundle(), snapshotPath);
+        await fs.unlink(requestPath);
+        await fs.symlink(path.relative(path.dirname(requestPath), snapshotPath), requestPath);
+      }),
+    );
+    const manifestPath = await writeManifest(cachePath);
+    getConfig().maxVMPoolSize = 2;
+
+    let listened = false;
+    await prewarmCurrentGenerationBeforeListen({
+      currentGenerationManifestPath: manifestPath,
+      serverBundleCachePath: cachePath,
+      listen: async () => {
+        expect(isDeclaredCurrentGenerationReady()).toBe(true);
+        listened = true;
+      },
+    });
+    expect(listened).toBe(true);
+    const prewarmDiagnostics = getVMPoolDiagnostics();
+    const prewarmedContexts = snapshotBundlePaths.map((bundlePath) => getVMContext(bundlePath));
+
+    const firstRequest = await buildExecutionContext(requestBundlePaths, /* buildVmsIfNeeded */ false);
+    requestBundlePaths.forEach((bundlePath, index) => {
+      expect(firstRequest.getVMContext(bundlePath)).toBe(prewarmedContexts[index]);
+    });
+    await expect(firstRequest.runInVM('1 + 1', requestBundlePaths[0]!)).resolves.toBe('2');
+    expect(getVMPoolDiagnostics()).toMatchObject({
+      contextsBuilt: prewarmDiagnostics.contextsBuilt,
+      cacheHits: prewarmDiagnostics.cacheHits + 2,
+      retainedContexts: 2,
+      declaredCurrentContexts: 2,
+      declaredCurrentGenerationReady: true,
+      hardLimitEvictions: 0,
+    });
+    firstRequest.release();
   });
 });
