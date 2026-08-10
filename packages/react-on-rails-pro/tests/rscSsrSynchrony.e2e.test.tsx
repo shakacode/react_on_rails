@@ -309,6 +309,27 @@ const collectRenderStream = (stream: NodeJS.ReadableStream): CollectedRender => 
       }
     });
     stream.on('end', () => {
+      // A truncated final envelope must fail the test, not silently drop the
+      // partial record: parser.flush() reports leftover buffered bytes via
+      // console.warn, so capture that and reject. (jest.setup.js replaces
+      // console with jest.fn()s, so spy-and-restore is safe here.)
+      const warnings: unknown[] = [];
+      const originalWarn = console.warn;
+      console.warn = (...args: unknown[]) => {
+        warnings.push(args[0]);
+      };
+      try {
+        parser.flush();
+      } finally {
+        console.warn = originalWarn;
+      }
+      const truncationWarning = warnings.find((message) =>
+        String(message).includes('Incomplete length-prefixed stream'),
+      );
+      if (truncationWarning) {
+        reject(new Error(String(truncationWarning)));
+        return;
+      }
       ended = true;
       resolve(html);
     });
