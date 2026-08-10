@@ -26,6 +26,19 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **`reactOnRailsComponentLoaded` no longer resets already-hydrated Redux stores**: Rendering a
+  component on demand (e.g. for asynchronously fetched HTML) re-ran every store generator on the
+  page from the original server props, discarding all Redux state accumulated since page load and
+  leaving previously mounted components bound to a stale store instance while new renders and
+  `getStore()` calls saw a fresh one — divergent shared state under a single store name. Stores
+  that are already hydrated are now skipped (new stores arriving with injected fragments still
+  hydrate), and hydrated stores are cleared on Turbo/Turbolinks page unload so navigation still
+  re-initializes them with the new page's props. Store generators now run once per store per page
+  lifetime. Fixes [Issue 4572](https://github.com/shakacode/react_on_rails/issues/4572) and
+  [Issue 4862](https://github.com/shakacode/react_on_rails/issues/4862).
+  [PR 4591](https://github.com/shakacode/react_on_rails/pull/4591) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 - **Routine startup diagnostics no longer appear in default `INFO` logs**: Successful package validation, valid
   Pro license checks, non-production missing-license notices, and Node renderer connection setup now log at `DEBUG`
   instead of `INFO`. Package validation still runs, while expired or invalid configured licenses remain visible outside

@@ -3,7 +3,7 @@
  */
 
 import * as React from 'react';
-import { renderComponent, reactOnRailsComponentLoaded } from '../src/ClientRenderer.ts';
+import { renderComponent, renderAllComponents, reactOnRailsComponentLoaded } from '../src/ClientRenderer.ts';
 import type { RendererFunction } from '../src/types/index.ts';
 import ComponentRegistry from '../src/ComponentRegistry.ts';
 import StoreRegistry from '../src/StoreRegistry.ts';
@@ -1540,6 +1540,162 @@ describe('ClientRenderer', () => {
 
       // The stores should be different instances
       expect(secondStore).not.toBe(firstStore);
+    });
+  });
+
+  describe('store preservation on on-demand component render (issue #4862)', () => {
+    beforeEach(() => {
+      runPageUnload();
+      setupRailsContext();
+      StoreRegistry.clearHydratedStores();
+      StoreRegistry.clearStoreGenerators();
+    });
+
+    afterEach(() => {
+      StoreRegistry.clearHydratedStores();
+      StoreRegistry.clearStoreGenerators();
+    });
+
+    const setupStoreElement = (storeName: string, props: Record<string, unknown>): void => {
+      const storeElement = document.createElement('div');
+      storeElement.setAttribute('data-js-react-on-rails-store', storeName);
+      storeElement.textContent = JSON.stringify(props);
+      document.body.appendChild(storeElement);
+    };
+
+    const setupComponentIsland = (componentName: string, domId: string): void => {
+      const componentElement = document.createElement('div');
+      componentElement.className = 'js-react-on-rails-component';
+      componentElement.setAttribute('data-component-name', componentName);
+      componentElement.setAttribute('data-dom-id', domId);
+      componentElement.textContent = JSON.stringify({});
+      document.body.appendChild(componentElement);
+
+      const targetNode = document.createElement('div');
+      targetNode.id = domId;
+      document.body.appendChild(targetNode);
+    };
+
+    type MiniStoreAction = { type: string; item: string };
+    type MiniStore = {
+      getState: () => { items: string[] };
+      dispatch: (action: MiniStoreAction) => void;
+      subscribe: (listener: () => void) => void;
+    };
+
+    // A minimal functional store (rather than jest.fn() stubs) so the tests can assert that
+    // dispatched state — not just the store instance — survives the on-demand render.
+    const createMiniStoreGenerator = (): { generator: jest.Mock<MiniStore>; calls: () => number } => {
+      const generator = jest.fn((props: Record<string, unknown>): MiniStore => {
+        let state = { items: (props as { items?: string[] }).items ?? [] };
+        const listeners: Array<() => void> = [];
+        return {
+          getState: () => state,
+          dispatch: (action: MiniStoreAction) => {
+            state = { items: [...state.items, action.item] };
+            listeners.forEach((listener) => listener());
+          },
+          subscribe: (listener: () => void) => listeners.push(listener),
+        };
+      });
+      return { generator, calls: () => generator.mock.calls.length };
+    };
+
+    it('reactOnRailsComponentLoaded after page load preserves accumulated store state', async () => {
+      const { generator, calls } = createMiniStoreGenerator();
+      StoreRegistry.register({ cartStore: generator });
+      setupStoreElement('cartStore', { items: [] });
+
+      const CartWidget: React.FC = () => React.createElement('div', null, 'Cart');
+      const ReviewsPanel: React.FC = () => React.createElement('div', null, 'Reviews');
+      ComponentRegistry.register({ CartWidget, ReviewsPanel });
+
+      setupComponentIsland('CartWidget', 'CartWidget-react-component-0');
+
+      // Initial page load renders everything and hydrates the store.
+      renderAllComponents();
+      expect(calls()).toBe(1);
+      const storeAfterLoad = StoreRegistry.getStore('cartStore') as MiniStore;
+
+      // The user accumulates client-side state after page load.
+      storeAfterLoad.dispatch({ type: 'ADD', item: 'a' });
+      storeAfterLoad.dispatch({ type: 'ADD', item: 'b' });
+      storeAfterLoad.dispatch({ type: 'ADD', item: 'c' });
+
+      // Async content arrives (fetched fragment, lazy panel) and is activated via the
+      // documented public API for asynchronously loaded content.
+      setupComponentIsland('ReviewsPanel', 'ReviewsPanel-react-component-0');
+      await reactOnRailsComponentLoaded('ReviewsPanel-react-component-0');
+
+      // The new island rendered (assert via the render mock, not innerHTML: an earlier test
+      // overrides the shared mock's return value, and clearMocks does not restore it)...
+      const mockHydrateOrRender = require('../src/reactHydrateOrRender.ts').default as jest.Mock;
+      expect(mockHydrateOrRender).toHaveBeenLastCalledWith(
+        document.getElementById('ReviewsPanel-react-component-0'),
+        expect.anything(),
+        false,
+        expect.anything(),
+      );
+      // ...without re-running the generator or replacing the hydrated store,
+      expect(calls()).toBe(1);
+      expect(StoreRegistry.getStore('cartStore')).toBe(storeAfterLoad);
+      // ...so the state accumulated since page load is still there.
+      expect(storeAfterLoad.getState().items).toEqual(['a', 'b', 'c']);
+    });
+
+    it('still hydrates a NEW store that arrives with the injected fragment', async () => {
+      const existing = createMiniStoreGenerator();
+      const arriving = createMiniStoreGenerator();
+      StoreRegistry.register({ cartStore: existing.generator, reviewsStore: arriving.generator });
+      setupStoreElement('cartStore', { items: [] });
+
+      const CartWidget: React.FC = () => React.createElement('div', null, 'Cart');
+      const ReviewsPanel: React.FC = () => React.createElement('div', null, 'Reviews');
+      ComponentRegistry.register({ CartWidget, ReviewsPanel });
+
+      setupComponentIsland('CartWidget', 'CartWidget-react-component-0');
+      renderAllComponents();
+      const cartStore = StoreRegistry.getStore('cartStore') as MiniStore;
+      cartStore.dispatch({ type: 'ADD', item: 'kept' });
+
+      // The async fragment carries its own store element alongside the island.
+      setupStoreElement('reviewsStore', { items: ['from-fragment'] });
+      setupComponentIsland('ReviewsPanel', 'ReviewsPanel-react-component-0');
+      await reactOnRailsComponentLoaded('ReviewsPanel-react-component-0');
+
+      // The store that did not exist yet is hydrated from the fragment's props...
+      expect(arriving.calls()).toBe(1);
+      expect((StoreRegistry.getStore('reviewsStore') as MiniStore).getState().items).toEqual([
+        'from-fragment',
+      ]);
+      // ...while the already-hydrated store is left untouched.
+      expect(existing.calls()).toBe(1);
+      expect(StoreRegistry.getStore('cartStore')).toBe(cartStore);
+      expect(cartStore.getState().items).toEqual(['kept']);
+    });
+
+    it('keeps the store stable across repeated on-demand renders', async () => {
+      const { generator, calls } = createMiniStoreGenerator();
+      StoreRegistry.register({ cartStore: generator });
+      setupStoreElement('cartStore', { items: [] });
+
+      const TestComponent: React.FC = () => React.createElement('div', null, 'Test');
+      ComponentRegistry.register({ TestComponent });
+
+      setupComponentIsland('TestComponent', 'island-0');
+      renderAllComponents();
+      const store = StoreRegistry.getStore('cartStore');
+
+      // Several fragments arrive over time; some islands get re-announced (e.g. a fragment
+      // re-inserted by the host app). None of it may touch the hydrated store.
+      setupComponentIsland('TestComponent', 'island-1');
+      await reactOnRailsComponentLoaded('island-1');
+      setupComponentIsland('TestComponent', 'island-2');
+      await reactOnRailsComponentLoaded('island-2');
+      await reactOnRailsComponentLoaded('island-1');
+
+      expect(calls()).toBe(1);
+      expect(StoreRegistry.getStore('cartStore')).toBe(store);
     });
   });
 });

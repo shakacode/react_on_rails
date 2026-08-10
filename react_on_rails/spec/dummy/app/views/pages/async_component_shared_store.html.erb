@@ -1,0 +1,54 @@
+<%= redux_store("SharedReduxStore", props: @app_props_server_render) %>
+
+<h1>Test: reactOnRailsComponentLoaded() Store Preservation (Issue #4862)</h1>
+
+<p>
+  This page tests that calling <code>ReactOnRails.reactOnRailsComponentLoaded()</code> for an
+  asynchronously injected component does NOT re-create already-hydrated Redux stores from their
+  original server props. Re-creating them discards all state accumulated since page load and
+  leaves previously mounted components bound to a different (stale) store instance.
+</p>
+
+<hr/>
+
+<h2>Test Scenario</h2>
+<ol>
+  <li>Initial page load hydrates <code>SharedReduxStore</code> and renders the first island</li>
+  <li>Type into the first island's input — this dispatches to the shared store</li>
+  <li>Click "Load async island" — the page fetches a server-rendered fragment containing a
+    second island and calls <code>reactOnRailsComponentLoaded()</code> for it (the documented
+    flow for asynchronously loaded content)</li>
+  <li>The second island must render with the accumulated store state, and both islands must
+    stay connected to the same store instance</li>
+</ol>
+
+<hr/>
+
+<h2>First island (rendered at page load)</h2>
+<%= react_component("ReduxSharedStoreApp", prerender: false, trace: true, id: "ReduxSharedStoreApp-react-component-0") %>
+
+<hr/>
+
+<h2>Async island (injected on demand)</h2>
+<button id="load-async-island-btn" type="button">Load async island</button>
+<div id="async-island-placeholder"></div>
+
+<script>
+  (function() {
+    document.getElementById('load-async-island-btn').addEventListener('click', function() {
+      fetch('/async_component_shared_store_island')
+        .then(function(response) { return response.text(); })
+        .then(function(html) {
+          // Inject the server-rendered fragment. The component-specification tag it contains is
+          // type="application/json", so innerHTML injection is fine — nothing needs to execute.
+          document.getElementById('async-island-placeholder').innerHTML = html;
+
+          // The documented core API for rendering an asynchronously injected component.
+          ReactOnRails.reactOnRailsComponentLoaded('ReduxSharedStoreApp-react-component-1');
+        })
+        .catch(function(error) {
+          console.error('Failed to load async island:', error);
+        });
+    });
+  })();
+</script>
