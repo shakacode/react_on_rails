@@ -3681,6 +3681,15 @@ RSpec.describe ReactOnRails::Doctor do
       expect(doctor).to have_received(:node_renderer_delimiter_stack).with(content).once
     end
 
+    it "fails closed before reachability analysis when candidate calls exceed the bounded limit" do
+      content = Array.new(33, "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });").join("\n")
+      expect(doctor).not_to receive(:node_renderer_call_reachability_proven?)
+
+      call = doctor.send(:node_renderer_single_reachable_call, content)
+
+      expect(call).to be_nil
+    end
+
     it "syntax-checks without executing launcher code or inherited Node hooks" do
       launcher_marker = File.join(Dir.pwd, "launcher-executed")
       hook_marker = File.join(Dir.pwd, "node-options-hook-executed")

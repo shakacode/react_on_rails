@@ -156,6 +156,9 @@ module ReactOnRails
     /mx
     NODE_RENDERER_BARE_CALL_PATTERN =
       /(?<![.\p{ID_Continue}$#])reactOnRailsProNodeRenderer\s*\(\s*/
+    # A canonical launcher needs one bare renderer call. This generous allowance
+    # bounds prefix-based reachability work while tolerating benign decoys.
+    MAX_NODE_RENDERER_BARE_CALL_CANDIDATES = 32
     # The canonical export must be a shorthand specifier and the binding must
     # end explicitly. Aliases and trusted-looking expression prefixes are not
     # evidence that the real renderer runs.
@@ -3580,14 +3583,24 @@ module ReactOnRails
       delimiters = node_renderer_delimiter_stack(masked_content)
       return unless delimiters&.empty?
 
-      calls = masked_content.to_enum(:scan, NODE_RENDERER_BARE_CALL_PATTERN).filter_map do
-        call = Regexp.last_match
+      candidate_calls = node_renderer_bare_call_candidates(masked_content)
+      calls = candidate_calls.filter_map do |call|
         next if node_renderer_constructor_call?(masked_content, call)
 
         call if node_renderer_call_reachability_proven?(masked_content, call)
       end
 
       calls.first if calls.one?
+    end
+
+    def node_renderer_bare_call_candidates(content)
+      candidates = []
+      content.to_enum(:scan, NODE_RENDERER_BARE_CALL_PATTERN).each do
+        return [] if candidates.length >= MAX_NODE_RENDERER_BARE_CALL_CANDIDATES
+
+        candidates << Regexp.last_match
+      end
+      candidates
     end
 
     def node_renderer_canonical_package_binding(content)
