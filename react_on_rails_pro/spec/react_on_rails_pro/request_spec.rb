@@ -1213,22 +1213,29 @@ describe ReactOnRailsPro::Request do
     end
 
     it "preserves the Rails OpenTelemetry context inside the async props block" do
-      parent_context = Object.new
-      observed_context = nil
-      allow(ReactOnRailsPro::OpenTelemetry).to receive(:capture_context).and_return(parent_context)
-      allow(ReactOnRailsPro::OpenTelemetry).to receive(:with_context) do |context, &block|
-        observed_context = context
-        block.call
+      captured_contexts = []
+      active_contexts = []
+      observed_contexts = nil
+      allow(ReactOnRailsPro::OpenTelemetry).to receive(:capture_context) do
+        Object.new.tap { |context| captured_contexts << context }
       end
+      allow(ReactOnRailsPro::OpenTelemetry).to receive(:with_context) do |context, &block|
+        active_contexts.push(context)
+        block.call
+      ensure
+        active_contexts.pop
+      end
+      test_async_props_block = proc { |_emitter| observed_contexts = active_contexts.dup }
 
       stream = described_class.render_code_with_incremental_updates(
         "/render-incremental",
         js_code,
-        async_props_block:
+        async_props_block: test_async_props_block
       )
       stream.each_chunk(&:itself)
 
-      expect(observed_context).to be(parent_context)
+      expect(captured_contexts.length).to eq(2)
+      expect(observed_contexts).to eq(captured_contexts)
     end
 
     it "uses rsc_bundle_hash for the AsyncPropsEmitter" do
