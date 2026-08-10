@@ -154,12 +154,20 @@ describe('current generation manifest', () => {
     await fs.rm(path.join(path.dirname(serverBundleCachePath(testName)), 'outside-current-generation.js'), {
       force: true,
     });
+    await fs.rm(path.join(path.dirname(serverBundleCachePath(testName)), 'redirected-artifact-snapshots'), {
+      recursive: true,
+      force: true,
+    });
   });
 
   afterAll(async () => {
     await resetForTest(testName);
     await fs.rm(`${serverBundleCachePath(testName)}.artifact-snapshots`, { recursive: true, force: true });
     await fs.rm(path.join(path.dirname(serverBundleCachePath(testName)), 'outside-current-generation.js'), {
+      force: true,
+    });
+    await fs.rm(path.join(path.dirname(serverBundleCachePath(testName)), 'redirected-artifact-snapshots'), {
+      recursive: true,
       force: true,
     });
   });
@@ -353,6 +361,34 @@ describe('current generation manifest', () => {
     });
 
     expect(declaration.bundlePaths[0]).toBe(snapshotPath);
+  });
+
+  test('rejects a redirected snapshot root before prewarm or readiness', async () => {
+    const cachePath = serverBundleCachePath(testName);
+    await writeArtifacts(cachePath);
+    const snapshotRoot = `${cachePath}.artifact-snapshots`;
+    const redirectedRoot = path.join(path.dirname(cachePath), 'redirected-artifact-snapshots');
+    const redirectedBundlePath = path.join(redirectedRoot, serverId, `${serverId}.js`);
+    await fs.mkdir(path.dirname(redirectedBundlePath), { recursive: true });
+    await fs.copyFile(getFixtureBundle(), redirectedBundlePath);
+    await fs.symlink(redirectedRoot, snapshotRoot);
+    const requestBundlePath = path.join(cachePath, serverId, `${serverId}.js`);
+    await fs.unlink(requestBundlePath);
+    await fs.symlink(redirectedBundlePath, requestBundlePath);
+    const manifestPath = await writeManifest(cachePath);
+    let listened = false;
+
+    await expect(
+      prewarmCurrentGenerationBeforeListen({
+        currentGenerationManifestPath: manifestPath,
+        serverBundleCachePath: cachePath,
+        listen: async () => {
+          listened = true;
+        },
+      }),
+    ).rejects.toThrow('snapshot root must not be redirected');
+    expect(listened).toBe(false);
+    expect(isDeclaredCurrentGenerationReady()).toBe(false);
   });
 
   test('prewarms symlink-mode server and RSC artifacts under their request-visible identities', async () => {

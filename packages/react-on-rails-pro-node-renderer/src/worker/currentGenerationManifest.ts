@@ -134,6 +134,35 @@ function assertSameManifest(first: Stats, second: Stats) {
   }
 }
 
+function assertUnredirectedSnapshotRoot(snapshotRootStat: Stats) {
+  if (snapshotRootStat.isSymbolicLink() || !snapshotRootStat.isDirectory()) {
+    throw new Error('Current generation artifact snapshot root must not be redirected');
+  }
+}
+
+async function resolveValidatedSnapshotRoot(snapshotRootPath: string) {
+  let snapshotRootStatBeforeRealpath: Stats;
+  try {
+    snapshotRootStatBeforeRealpath = await lstat(snapshotRootPath);
+  } catch (error) {
+    const errorCode = (error as NodeJS.ErrnoException).code;
+    if (errorCode === 'ENOENT') return undefined;
+    throw error;
+  }
+  assertUnredirectedSnapshotRoot(snapshotRootStatBeforeRealpath);
+
+  const canonicalSnapshotRoot = await realpath(snapshotRootPath);
+  const snapshotRootStatAfterRealpath = await lstat(snapshotRootPath);
+  assertUnredirectedSnapshotRoot(snapshotRootStatAfterRealpath);
+  if (
+    !sameFileIdentity(snapshotRootStatBeforeRealpath, snapshotRootStatAfterRealpath) ||
+    !isSamePath(snapshotRootPath, canonicalSnapshotRoot)
+  ) {
+    throw new Error('Current generation artifact snapshot root must not be redirected or replaced');
+  }
+  return canonicalSnapshotRoot;
+}
+
 async function readBoundedRegularFile(manifestPath: string, validatedManifestStat: Stats) {
   const pathStatBeforeOpen = await lstat(manifestPath);
   assertRegularManifest(pathStatBeforeOpen);
@@ -240,12 +269,8 @@ export async function loadCurrentGenerationManifest({
     `${path.basename(canonicalCachePath)}.artifact-snapshots`,
   );
   const allowedRoots = [canonicalCachePath];
-  try {
-    allowedRoots.push(await realpath(snapshotRootPath));
-  } catch (error) {
-    const errorCode = (error as NodeJS.ErrnoException).code;
-    if (errorCode !== 'ENOENT') throw error;
-  }
+  const canonicalSnapshotRoot = await resolveValidatedSnapshotRoot(snapshotRootPath);
+  if (canonicalSnapshotRoot) allowedRoots.push(canonicalSnapshotRoot);
 
   const resolvedBundlePaths = await Promise.all(
     artifacts.map(async ({ id }) => {
