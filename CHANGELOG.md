@@ -26,6 +26,19 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **Hydrated Redux stores no longer leak across Turbo/Turbolinks navigations**: The hydrated-store
+  registry is now cleared on client-side page unload (soft navigation), alongside the existing component
+  teardown. Previously a leftover entry from the previous page made `getOrWaitForStore` resolve immediately
+  with the previous page's store, silently defeating the `store_dependencies` hydration gate — most visibly
+  with deferred stores (`redux_store(..., defer: true)`), where a mid-page component could render the
+  previous page's Redux state instead of waiting for its own page's hydration data. Registered store
+  generators are unaffected and persist across navigations. Note for apps that relied on a store surviving a
+  soft navigation without re-rendering its hydration data: each page using a store must now render its own
+  `redux_store` call (the documented model). Fixes
+  [Issue 4861](https://github.com/shakacode/react_on_rails/issues/4861).
+  [PR 4871](https://github.com/shakacode/react_on_rails/pull/4871) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 - **Routine startup diagnostics no longer appear in default `INFO` logs**: Successful package validation, valid
   Pro license checks, non-production missing-license notices, and Node renderer connection setup now log at `DEBUG`
   instead of `INFO`. Package validation still runs, while expired or invalid configured licenses remain visible outside
