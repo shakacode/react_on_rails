@@ -32,6 +32,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   OpenTelemetry remains optional, and spans record only the HTTP method, normalized request path, response status, and
   request/response byte sizes. Fixes
   [Issue 4866](https://github.com/shakacode/react_on_rails/issues/4866).
+  [PR 4869](https://github.com/shakacode/react_on_rails/pull/4869) by
+  [sashakhar1](https://github.com/sashakhar1).
 
 - **[Pro]** **Bounded Node Renderer VM retention now avoids old/new RSC rebuild thrash during rolling deploys**:
   The default per-worker VM hard cap now retains four contexts, enough for the server and RSC bundles from one
