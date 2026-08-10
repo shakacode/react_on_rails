@@ -1214,18 +1214,26 @@ describe ReactOnRailsPro::Request do
 
     it "preserves the Rails OpenTelemetry context inside the async props block" do
       captured_contexts = []
+      capture_fibers = []
       active_contexts = []
+      with_context_fibers = []
       observed_contexts = nil
+      props_fiber = nil
       allow(ReactOnRailsPro::OpenTelemetry).to receive(:capture_context) do
+        capture_fibers << Fiber.current
         Object.new.tap { |context| captured_contexts << context }
       end
       allow(ReactOnRailsPro::OpenTelemetry).to receive(:with_context) do |context, &block|
+        with_context_fibers << Fiber.current
         active_contexts.push(context)
         block.call
       ensure
         active_contexts.pop
       end
-      test_async_props_block = proc { |_emitter| observed_contexts = active_contexts.dup }
+      test_async_props_block = proc do |_emitter|
+        props_fiber = Fiber.current
+        observed_contexts = active_contexts.dup
+      end
 
       stream = described_class.render_code_with_incremental_updates(
         "/render-incremental",
@@ -1236,6 +1244,8 @@ describe ReactOnRailsPro::Request do
 
       expect(captured_contexts.length).to eq(2)
       expect(observed_contexts).to eq(captured_contexts)
+      expect(capture_fibers).not_to include(props_fiber)
+      expect(with_context_fibers.last).to be(props_fiber)
     end
 
     it "uses rsc_bundle_hash for the AsyncPropsEmitter" do
