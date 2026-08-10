@@ -30,6 +30,8 @@ import { getFixtureBundle, resetForTest, serverBundleCachePath } from './helper'
 const testName = 'currentGenerationManifest';
 const serverId = `rorp-v2-s-${'a'.repeat(64)}`;
 const rscId = `rorp-v2-r-${'b'.repeat(64)}`;
+const otherServerId = `rorp-v2-s-${'c'.repeat(64)}`;
+const otherRscId = `rorp-v2-r-${'d'.repeat(64)}`;
 const artifacts = [
   { role: 'server', id: serverId },
   { role: 'rsc', id: rscId },
@@ -236,6 +238,40 @@ describe('current generation manifest', () => {
       loadCurrentGenerationManifest({ manifestPath, serverBundleCachePath: cachePath }),
     ).rejects.toThrow('resolves outside allowed cache roots');
   });
+
+  test.each([
+    ['server', 'cache', serverId, otherServerId],
+    ['server', 'snapshot', serverId, otherServerId],
+    ['rsc', 'cache', rscId, otherRscId],
+    ['rsc', 'snapshot', rscId, otherRscId],
+  ] as const)(
+    'rejects a declared %s artifact symlinked to another id inside the %s root',
+    async (_role, targetRoot, declaredId, otherId) => {
+      const cachePath = serverBundleCachePath(testName);
+      await writeArtifacts(cachePath);
+      const allowedTargetRoot = targetRoot === 'cache' ? cachePath : `${cachePath}.artifact-snapshots`;
+      const otherBundlePath = path.join(allowedTargetRoot, otherId, `${otherId}.js`);
+      await fs.mkdir(path.dirname(otherBundlePath), { recursive: true });
+      await fs.copyFile(getFixtureBundle(), otherBundlePath);
+      const declaredBundlePath = path.join(cachePath, declaredId, `${declaredId}.js`);
+      await fs.unlink(declaredBundlePath);
+      await fs.symlink(otherBundlePath, declaredBundlePath);
+      const manifestPath = await writeManifest(cachePath);
+      let listened = false;
+
+      await expect(
+        prewarmCurrentGenerationBeforeListen({
+          currentGenerationManifestPath: manifestPath,
+          serverBundleCachePath: cachePath,
+          listen: async () => {
+            listened = true;
+          },
+        }),
+      ).rejects.toThrow(`does not match declared artifact path: ${declaredId}`);
+      expect(listened).toBe(false);
+      expect(isDeclaredCurrentGenerationReady()).toBe(false);
+    },
+  );
 
   test('accepts pre-seed symlinks only by returning their validated immutable snapshot targets', async () => {
     const cachePath = serverBundleCachePath(testName);

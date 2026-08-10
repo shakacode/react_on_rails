@@ -54,6 +54,11 @@ function isWithin(root: string, candidate: string) {
   );
 }
 
+function isSamePath(first: string, second: string) {
+  // path.relative follows the host platform's path and case semantics.
+  return path.relative(first, second) === '';
+}
+
 export function currentGenerationIdForArtifacts(artifacts: CurrentGenerationArtifact[]) {
   const digest = createHash('sha256');
   digest.update('react-on-rails-pro-current-generation-v1\0');
@@ -223,6 +228,12 @@ export async function loadCurrentGenerationManifest({
       const canonicalBundlePath = await realpath(requestBundlePath);
       if (!allowedRoots.some((allowedRoot) => isWithin(allowedRoot, canonicalBundlePath))) {
         throw new Error(`Current generation artifact resolves outside allowed cache roots: ${id}`);
+      }
+      const expectedCanonicalPaths = allowedRoots.map((allowedRoot) =>
+        path.join(allowedRoot, id, `${id}.js`),
+      );
+      if (!expectedCanonicalPaths.some((expectedPath) => isSamePath(expectedPath, canonicalBundlePath))) {
+        throw new Error(`Current generation artifact does not match declared artifact path: ${id}`);
       }
       if (!(await stat(canonicalBundlePath)).isFile()) {
         throw new Error(`Current generation artifact must resolve to a regular file: ${id}`);
