@@ -67,6 +67,42 @@ async function writeManifest(
   return manifestPath;
 }
 
+async function loadManifestWithoutNoFollow(
+  manifestPath: string,
+  cachePath: string,
+  beforeOpen?: (openedPath: string) => Promise<void>,
+): Promise<Awaited<ReturnType<typeof loadCurrentGenerationManifest>>> {
+  jest.resetModules();
+  jest.doMock('fs', () => {
+    const actual = jest.requireActual<typeof import('fs')>('fs');
+    return {
+      ...actual,
+      constants: { ...actual.constants, O_NOFOLLOW: undefined },
+    };
+  });
+  jest.doMock('fs/promises', () => {
+    const actual = jest.requireActual<typeof import('fs/promises')>('fs/promises');
+    return {
+      ...actual,
+      open: async (openedPath: string, flags: number) => {
+        await beforeOpen?.(openedPath);
+        return actual.open(openedPath, flags);
+      },
+    };
+  });
+
+  try {
+    const { loadCurrentGenerationManifest: fallbackLoader } = await import(
+      '../src/worker/currentGenerationManifest'
+    );
+    return await fallbackLoader({ manifestPath, serverBundleCachePath: cachePath });
+  } finally {
+    jest.dontMock('fs');
+    jest.dontMock('fs/promises');
+    jest.resetModules();
+  }
+}
+
 describe('current generation manifest', () => {
   beforeEach(async () => {
     await resetForTest(testName);
@@ -100,6 +136,45 @@ describe('current generation manifest', () => {
       })),
       roles: ['server', 'rsc'],
     });
+  });
+
+  test('loads a regular declaration when O_NOFOLLOW is unavailable', async () => {
+    const cachePath = serverBundleCachePath(testName);
+    await writeArtifacts(cachePath);
+    const manifestPath = await writeManifest(cachePath);
+
+    await expect(loadManifestWithoutNoFollow(manifestPath, cachePath)).resolves.toMatchObject({
+      generationId: generationId(),
+      roles: ['server', 'rsc'],
+    });
+  });
+
+  test('rejects a declaration symlink when O_NOFOLLOW is unavailable', async () => {
+    const cachePath = serverBundleCachePath(testName);
+    await writeArtifacts(cachePath);
+    const manifestPath = await writeManifest(cachePath);
+    const targetPath = path.join(path.dirname(manifestPath), 'manifest-target.json');
+    await fs.rename(manifestPath, targetPath);
+    await fs.symlink(targetPath, manifestPath);
+
+    await expect(loadManifestWithoutNoFollow(manifestPath, cachePath)).rejects.toThrow(
+      'must not be a symbolic link',
+    );
+  });
+
+  test('rejects a declaration replaced while the fallback opens it', async () => {
+    const cachePath = serverBundleCachePath(testName);
+    await writeArtifacts(cachePath);
+    const manifestPath = await writeManifest(cachePath);
+    const replacementPath = path.join(path.dirname(manifestPath), 'replacement.json');
+    await fs.copyFile(manifestPath, replacementPath);
+
+    await expect(
+      loadManifestWithoutNoFollow(manifestPath, cachePath, async (openedPath) => {
+        await fs.unlink(openedPath);
+        await fs.rename(replacementPath, openedPath);
+      }),
+    ).rejects.toThrow('changed while it was being opened');
   });
 
   test('fails truthfully when the declaration is missing', async () => {

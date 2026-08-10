@@ -14,7 +14,7 @@
  */
 
 import { createHash } from 'crypto';
-import { constants } from 'fs';
+import { constants, type Stats } from 'fs';
 import { lstat, open, realpath, stat } from 'fs/promises';
 import path from 'path';
 
@@ -98,13 +98,55 @@ function parseArtifacts(value: unknown): CurrentGenerationArtifact[] {
   return artifacts;
 }
 
-async function readBoundedRegularFile(manifestPath: string) {
-  const fileHandle = await open(manifestPath, constants.O_RDONLY + constants.O_NOFOLLOW);
+function sameFileIdentity(first: Stats, second: Stats) {
+  if (first.dev !== 0 || first.ino !== 0 || second.dev !== 0 || second.ino !== 0) {
+    return first.dev === second.dev && first.ino === second.ino;
+  }
+
+  // Some Windows filesystems report zero for dev/ino. Fall back to the stable
+  // metadata available through both path and file-handle stat calls.
+  return (
+    first.size === second.size &&
+    first.mode === second.mode &&
+    first.birthtimeMs === second.birthtimeMs &&
+    first.ctimeMs === second.ctimeMs &&
+    first.mtimeMs === second.mtimeMs
+  );
+}
+
+function assertRegularManifest(fileStat: Stats) {
+  if (fileStat.isSymbolicLink()) {
+    throw new Error('Current generation manifest must not be a symbolic link');
+  }
+  if (!fileStat.isFile()) {
+    throw new Error('Current generation manifest must be a regular file');
+  }
+}
+
+function assertSameManifest(first: Stats, second: Stats) {
+  if (!sameFileIdentity(first, second)) {
+    throw new Error('Current generation manifest changed while it was being opened');
+  }
+}
+
+async function readBoundedRegularFile(manifestPath: string, validatedManifestStat: Stats) {
+  const pathStatBeforeOpen = await lstat(manifestPath);
+  assertRegularManifest(pathStatBeforeOpen);
+  assertSameManifest(validatedManifestStat, pathStatBeforeOpen);
+
+  const noFollowFlag = constants.O_NOFOLLOW;
+  // eslint-disable-next-line no-bitwise -- Node open flags are bitmasks.
+  const openFlags = typeof noFollowFlag === 'number' ? constants.O_RDONLY | noFollowFlag : constants.O_RDONLY;
+  const fileHandle = await open(manifestPath, openFlags);
   try {
     const fileStat = await fileHandle.stat();
-    if (!fileStat.isFile()) {
-      throw new Error('Current generation manifest must be a regular file');
-    }
+    assertRegularManifest(fileStat);
+    assertSameManifest(pathStatBeforeOpen, fileStat);
+
+    const pathStatAfterOpen = await lstat(manifestPath);
+    assertRegularManifest(pathStatAfterOpen);
+    assertSameManifest(fileStat, pathStatAfterOpen);
+
     if (fileStat.size > CURRENT_GENERATION_MANIFEST_MAX_BYTES) {
       throw new Error(
         `Current generation manifest exceeds ${CURRENT_GENERATION_MANIFEST_MAX_BYTES} byte limit`,
@@ -137,7 +179,7 @@ export async function loadCurrentGenerationManifest({
     throw new Error(`Current generation manifest must be directly inside ${declarationDirectory}`);
   }
 
-  const body = await readBoundedRegularFile(canonicalManifestPath);
+  const body = await readBoundedRegularFile(canonicalManifestPath, manifestMetadata);
   let parsed: unknown;
   try {
     parsed = JSON.parse(body);
