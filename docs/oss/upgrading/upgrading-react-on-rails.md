@@ -46,7 +46,7 @@ install.
 
 Before changing versions, check these first:
 
-1. **Ruby and Node requirements**: React on Rails v17 requires Ruby 3.3+ and Node 18+. React on Rails v16 remains the upgrade path for apps that need older Ruby versions.
+1. **Ruby and Node requirements**: React on Rails v17 requires Ruby 3.3+ and Node 18+. If you use the React on Rails Pro Node renderer, `react-on-rails-pro-node-renderer` declares Node 18.19.0+ as its support floor through `engines.node`. React on Rails v16 remains the upgrade path for apps that need older Ruby versions.
 2. **Bundler age**: legacy apps may have lockfiles created by Bundler 1.x. Those lockfiles can fail on modern Ruby before the React on Rails upgrade even starts.
 3. **Rails version**: current `react_on_rails` requires Ruby 3.3+, which is incompatible with Rails < 7.0. Older Rails apps need a Rails upgrade first.
 4. **Asset stack**: if the app still uses `webpacker`, upgrade to `shakapacker` first.
@@ -228,7 +228,7 @@ This is a minor release - update your gem and npm package versions, then run `bu
 - **Webpacker support completely removed**. Shakapacker >= 6.0 is now required.
 - **Updated runtime requirements**:
   - Minimum Ruby version: 3.0 (v16 minimum; v17 requires 3.3+)
-  - Minimum Node.js version: 18
+  - Minimum Node.js version: 18 (the Pro Node renderer declares >= 18.19.0 as its support floor)
   - CI tests against newer Ruby and Node.js versions than these minimums; CI targets are not support floors
 - **Install generator now validates prerequisites** and requires at least one JavaScript package manager
 

@@ -155,6 +155,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4811](https://github.com/shakacode/react_on_rails/pull/4811) by
   [justin808](https://github.com/justin808).
 
+- **[Pro]** **Raised the `jwt` floor to `>= 2.8` for reliable offline license validation on Ruby 3.4+**:
+  jwt 2.8 first declares `base64` as a runtime dependency, so the gemspec now requires `jwt >= 2.8, < 4`.
+  jwt 3.x remains supported and 4.x remains unsupported. Documentation now identifies Node 18.19.0 as the
+  Pro Node renderer's declared support floor through `engines.node`, rather than rounding it to "Node 18". Fixes
+  [Issue 4730](https://github.com/shakacode/react_on_rails/issues/4730).
+  [PR 4864](https://github.com/shakacode/react_on_rails/pull/4864) by
+  [justin808](https://github.com/justin808).
+
 - **Routine startup diagnostics no longer appear in default `INFO` logs**: Successful package validation, valid
   Pro license checks, non-production missing-license notices, and Node renderer connection setup now log at `DEBUG`
   instead of `INFO`. Package validation still runs, while expired or invalid configured licenses remain visible outside

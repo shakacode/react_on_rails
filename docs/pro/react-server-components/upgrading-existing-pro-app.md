@@ -16,7 +16,7 @@ Before running the generator, verify your environment:
 | React version            | `npm ls react` / `yarn why react` / `pnpm list react` / `bun pm why react`                                                     | 19.2.x with patch >= 19.2.7 |
 | React DOM version        | `npm ls react-dom` / `yarn why react-dom` / `pnpm list react-dom` / `bun pm why react-dom`                                     | Must match `react` version  |
 | `react-on-rails-rsc`     | `npm ls react-on-rails-rsc` / `yarn why react-on-rails-rsc` / `pnpm list react-on-rails-rsc` / `bun pm why react-on-rails-rsc` | 19.2.x with patch >= 19.2.1 |
-| Node.js                  | `node --version`                                                                                                               | 18+                         |
+| Node.js                  | `node --version`                                                                                                               | Support floor: >= 18.19.0   |
 | Pro initializer exists   | `ls config/initializers/react_on_rails_pro.rb`                                                                                 | File exists                 |
 | Node renderer configured | Check `react_on_rails_pro.rb` for `server_renderer = "NodeRenderer"`                                                           | NodeRenderer enabled        |
 
