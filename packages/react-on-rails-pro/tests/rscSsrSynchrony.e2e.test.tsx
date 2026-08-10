@@ -353,6 +353,13 @@ const macrotaskTurnsUntil = async (predicate: () => boolean, maxTurns: number): 
 // setTimeout(0)-based turn completes; 3 leaves headroom against incidental
 // scheduling noise without masking a real regression, which costs a pending
 // promise/timer and blows well past it).
+//
+// This budget assumes a WARM pipeline and depends on the beforeAll warm-up
+// render below: the very first streamServerRenderedReactComponent call in a
+// process pays cold manifest fs reads and empirically takes 3–7 turns
+// (measured across repeated 200-render stress runs — only ever render #0).
+// If the warm-up is removed or a budgeted test is made to run first, this
+// assertion becomes a ~1-in-2 flake on the first case.
 const COMPLETE_RENDER_TURN_BUDGET = 3;
 
 // ---------------------------------------------------------------------------
