@@ -418,6 +418,75 @@ const extendContext = (contextObject: vm.Context, additionalContext: Record<stri
   Object.assign(contextObject, additionalContext);
 };
 
+function logVMPoolPressure(event: string, message: string) {
+  const { maxVMPoolSize } = getConfig();
+  const currentTime = vmPoolClock.now();
+  if (
+    lastPressureWarningAt !== undefined &&
+    currentTime - lastPressureWarningAt < VM_POOL_PRESSURE_WARNING_INTERVAL_MS
+  ) {
+    return;
+  }
+
+  lastPressureWarningAt = currentTime;
+  log.warn(
+    {
+      event,
+      retainedContexts: vmContexts.size,
+      trackedGenerations: bundleGenerations.size,
+      maxVMPoolSize,
+      hardLimitEvictions: vmPoolActivity.hardLimitEvictions,
+      contextsBuilt: vmPoolActivity.contextsBuilt,
+      warningIntervalMilliseconds: VM_POOL_PRESSURE_WARNING_INTERVAL_MS,
+    },
+    message,
+  );
+}
+
+function admitVMContextToPool(bundlePath: string, vmContext: VMContext) {
+  const pooledContext = vmContexts.get(bundlePath);
+  if (pooledContext) {
+    return pooledContext === vmContext;
+  }
+
+  const { maxVMPoolSize } = getConfig();
+  if (vmContexts.size < maxVMPoolSize) {
+    vmContexts.set(bundlePath, vmContext);
+    return true;
+  }
+
+  const newContextIsDeclaredCurrent = declaredCurrentBundlePaths.has(bundlePath);
+  const evictionCandidate = Array.from(vmContexts.entries())
+    .filter(([candidatePath]) => {
+      return newContextIsDeclaredCurrent || !declaredCurrentBundlePaths.has(candidatePath);
+    })
+    .sort(([pathA, contextA], [pathB, contextB]) => {
+      const currentPriorityA = declaredCurrentBundlePaths.has(pathA) ? 1 : 0;
+      const currentPriorityB = declaredCurrentBundlePaths.has(pathB) ? 1 : 0;
+      return (
+        currentPriorityA - currentPriorityB ||
+        contextA.lastUsed - contextB.lastUsed ||
+        pathA.localeCompare(pathB)
+      );
+    })[0];
+
+  if (!evictionCandidate) {
+    logVMPoolPressure(
+      'vm_pool_context_not_retained_at_hard_limit',
+      'VM pool retained declared-current contexts and kept a draining context request-scoped',
+    );
+    return false;
+  }
+
+  removeVMContextFromPool(evictionCandidate[0], 'hard_limit');
+  vmContexts.set(bundlePath, vmContext);
+  logVMPoolPressure(
+    'vm_pool_hard_limit_eviction',
+    'VM pool pressure is evicting least-recently-used contexts at the configured hard limit',
+  );
+  return true;
+}
+
 const readPrepareStackTraceHook = (context: vm.Context): unknown => {
   try {
     return vm.runInContext('typeof Error === "undefined" ? undefined : Error.prepareStackTrace', context);
@@ -449,25 +518,10 @@ function manageVMPoolSize() {
     if (oldestEntry) {
       const [oldestPath] = oldestEntry;
       removeVMContextFromPool(oldestPath, 'hard_limit');
-      const currentTime = vmPoolClock.now();
-      if (
-        lastPressureWarningAt === undefined ||
-        currentTime - lastPressureWarningAt >= VM_POOL_PRESSURE_WARNING_INTERVAL_MS
-      ) {
-        lastPressureWarningAt = currentTime;
-        log.warn(
-          {
-            event: 'vm_pool_hard_limit_eviction',
-            retainedContexts: vmContexts.size,
-            trackedGenerations: bundleGenerations.size,
-            maxVMPoolSize,
-            hardLimitEvictions: vmPoolActivity.hardLimitEvictions,
-            contextsBuilt: vmPoolActivity.contextsBuilt,
-            warningIntervalMilliseconds: VM_POOL_PRESSURE_WARNING_INTERVAL_MS,
-          },
-          'VM pool pressure is evicting least-recently-used contexts at the configured hard limit',
-        );
-      }
+      logVMPoolPressure(
+        'vm_pool_hard_limit_eviction',
+        'VM pool pressure is evicting least-recently-used contexts at the configured hard limit',
+      );
     }
   }
 }
@@ -659,14 +713,15 @@ async function buildVM(filePath: string): Promise<VMContext> {
         );
       }
 
-      // Only now, after VM is fully initialized, store the context
+      // Only now, after VM is fully initialized, expose the context to its
+      // waiting request. The request retains its source map before atomically
+      // admitting the context to the bounded pool.
       const newVmContext: VMContext = {
         context,
         sharedConsoleHistory,
         sourceMapRegistration: currentSourceMapRegistration,
         lastUsed: Date.now(),
       };
-      vmContexts.set(filePath, newVmContext);
       vmPoolActivity.contextsBuilt += 1;
 
       log.debug(
@@ -812,9 +867,13 @@ export async function buildExecutionContext(
         retainSourceMapRegistrationOnce(vmContext.sourceMapRegistration);
         vmContext.lastUsed = Date.now();
         mapBundleFilePathToVMContext.set(identityPath, vmContext);
-        // Enforce the hard pool cap only after the request retains the context.
-        // If pressure immediately evicts the just-built draining context, its
-        // source-map registration remains alive until this ExecutionContext releases it.
+        const retainedInPool = admitVMContextToPool(identityPath, vmContext);
+        if (!retainedInPool) {
+          // A draining build cannot displace the declared current set. Keep it
+          // request-scoped, with its already-retained source map retired only
+          // after every waiting ExecutionContext releases it.
+          retireSourceMapRegistrationAfterEviction(vmContext.sourceMapRegistration);
+        }
         manageVMPoolSize();
       } catch (error) {
         if (!buildRejected) {
