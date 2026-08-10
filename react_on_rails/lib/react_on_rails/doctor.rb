@@ -3297,6 +3297,8 @@ module ReactOnRails
     end
 
     def node_renderer_current_generation_declaration_evidence(active_content)
+      return :unverified if active_content.include?("`")
+
       config_object = node_renderer_call_config_object(active_content)
       return :unverified unless config_object
 
