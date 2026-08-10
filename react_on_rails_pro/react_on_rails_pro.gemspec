@@ -55,7 +55,13 @@ Gem::Specification.new do |s|
   s.add_runtime_dependency "io-endpoint", "~> 0.17.0"
   # Pro's only JWT call site (LicenseValidator) pins algorithm: "RS256" with
   # public-key verification, which is safe on jwt 2.x as well as 3.x.
-  s.add_runtime_dependency "jwt", ">= 2.5", "< 4"
+  # The 2.8 floor is required, not stylistic: jwt only began declaring its
+  # `base64` runtime dependency in 2.8.0, while `jwt/base64.rb` has always done
+  # `require "base64"`. Ruby 3.4 demoted base64 from a default gem to a bundled
+  # gem, so on Ruby >= 3.4 a resolved jwt 2.5-2.7 bundles cleanly and then
+  # raises `LoadError: cannot load such file -- base64` during offline license
+  # validation. Our required_ruby_version is >= 3.3.0, so that range is reachable.
+  s.add_runtime_dependency "jwt", ">= 2.8", "< 4"
   s.add_runtime_dependency "nokogiri", ">= 1.12", "< 2"
   s.add_runtime_dependency "react_on_rails", ReactOnRails::VERSION
   # rubocop:disable Gemspec/DevelopmentDependencies

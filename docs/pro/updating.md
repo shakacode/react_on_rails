@@ -429,11 +429,18 @@ Before upgrading:
 
 ##### JWT gem requirement
 
-`react_on_rails_pro` uses `jwt` for offline license validation. Current versions require `jwt >= 2.5, < 4`, so apps still pinned to a compatible jwt 2.x release can bundle without upgrading. Apps that can resolve `jwt 3.2.0` or newer in the 3.x line will continue to do so; jwt 4.x is not supported. If your Gemfile pins `jwt` below 2.5 (e.g., `2.2.x` for compatibility with OAuth gems), you will need to upgrade it. Check for conflicts with:
+`react_on_rails_pro` uses `jwt` for offline license validation. Current versions require `jwt >= 2.8, < 4`, so apps still pinned to a compatible jwt 2.x release can bundle without upgrading. Apps that can resolve `jwt 3.2.0` or newer in the 3.x line will continue to do so; jwt 4.x is not supported. If your Gemfile pins `jwt` below 2.8 (e.g., `2.2.x` for compatibility with OAuth gems), you will need to upgrade it. Check for conflicts with:
 
 ```bash
 bundle update jwt
 ```
+
+> **Why the floor is 2.8 and not 2.5.** `jwt/base64.rb` calls `require "base64"` in every 2.x
+> release, but jwt only declared `base64` as a runtime dependency starting in 2.8.0. Ruby 3.4
+> demoted `base64` from a default gem to a bundled gem, so under Bundler a resolved jwt 2.5–2.7
+> installs cleanly and then raises `LoadError: cannot load such file -- base64` the first time
+> offline license validation runs. If you must stay on jwt 2.5–2.7 for another gem's sake, add
+> `gem "base64"` to your Gemfile explicitly.
 
 ##### Node renderer config: `bundlePath` → `serverBundleCachePath`
 

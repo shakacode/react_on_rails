@@ -26,6 +26,20 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **Raised the `jwt` floor to `>= 2.8` so offline license validation cannot fail on Ruby 3.4+**:
+  `react_on_rails_pro` declared `jwt >= 2.5, < 4`, but jwt only began declaring its own `base64` runtime
+  dependency in 2.8.0 — every 2.x release calls `require "base64"` inside `jwt/base64.rb`. Ruby 3.4 demoted
+  `base64` from a default gem to a bundled gem, so an app on Ruby 3.4+ that resolved jwt 2.5–2.7 (and had no
+  other `base64` dependency) bundled successfully and then raised
+  `LoadError: cannot load such file -- base64` the first time offline license validation ran. The gemspec now
+  requires `jwt >= 2.8, < 4`; jwt 3.x remains supported and 4.x remains unsupported. Apps that must stay on
+  jwt 2.5–2.7 for another gem's sake can add `gem "base64"` explicitly. Documentation also now states the Pro
+  Node renderer's real Node floor of `>= 18.19.0`, which `react-on-rails-pro-node-renderer` has always enforced
+  through `engines.node` but which the support-floor docs rounded to "Node 18". Fixes
+  [Issue 4730](https://github.com/shakacode/react_on_rails/issues/4730).
+  [PR 4864](https://github.com/shakacode/react_on_rails/pull/4864) by
+  [justin808](https://github.com/justin808).
+
 - **Routine startup diagnostics no longer appear in default `INFO` logs**: Successful package validation, valid
   Pro license checks, non-production missing-license notices, and Node renderer connection setup now log at `DEBUG`
   instead of `INFO`. Package validation still runs, while expired or invalid configured licenses remain visible outside
