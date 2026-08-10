@@ -59,7 +59,7 @@ module ReactOnRailsPro
 
       def record_response(status)
         @span.set_attribute(STATUS_ATTRIBUTE, status)
-        mark_error if status >= 500
+        mark_error if status >= 400 && status != ReactOnRailsPro::STATUS_SEND_BUNDLE
       rescue StandardError
         nil
       end

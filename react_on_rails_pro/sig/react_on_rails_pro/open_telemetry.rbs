@@ -13,6 +13,16 @@
 
 module ReactOnRailsPro
   module OpenTelemetry
+    INSTRUMENTATION_NAME: String
+    SPAN_NAME: String
+    METHOD_ATTRIBUTE: String
+    PATH_ATTRIBUTE: String
+    REQUEST_SIZE_ATTRIBUTE: String
+    RESPONSE_SIZE_ATTRIBUTE: String
+    STATUS_ATTRIBUTE: String
+    TRACE_HEADER_NAMES: Array[String]
+    RENDER_PATH_PATTERN: Regexp
+
     class ClientSpan
       def initialize: (untyped span, untyped context) -> void
 

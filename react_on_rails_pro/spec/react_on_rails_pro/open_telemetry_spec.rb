@@ -274,6 +274,39 @@ RSpec.describe ReactOnRailsPro::OpenTelemetry do
       client&.close
     end
 
+    it "preserves the Rails parent context across an Async barrier task" do
+      span = install_open_telemetry(provider)
+      outer_span = fake_span_class.new("fedcba9876543210", "abcdef0123456789abcdef0123456789")
+      captured_headers = nil
+      async_client = double
+      allow(async_client).to receive(:post) do |_path, headers:, **|
+        captured_headers = headers
+        response_with("rendered")
+      end
+      client = build_client(async_client)
+
+      OpenTelemetry::Context.with_current(outer_span) do
+        parent_context = described_class.capture_context
+        Sync do
+          barrier = Async::Barrier.new
+          barrier.async do
+            described_class.with_context(parent_context) do
+              client.post("/render", json: { renderingRequest: "private props" })
+            end
+          end
+          barrier.wait
+        end
+      end
+
+      expect(captured_headers["traceparent"]).to eq(
+        ["00-#{outer_span.trace_id}-#{span.span_id}-01"]
+      )
+      expect(span.trace_id).to eq(outer_span.trace_id)
+      expect(span).to be_finished
+    ensure
+      client&.close
+    end
+
     it "keeps a streaming renderer request in the Rails trace through StreamRequest" do
       span = install_open_telemetry(provider)
       outer_span = fake_span_class.new("fedcba9876543210", "abcdef0123456789abcdef0123456789")
@@ -387,6 +420,18 @@ RSpec.describe ReactOnRailsPro::OpenTelemetry do
       expect(span).to be_finished
     end
 
+    it "marks non-protocol client error responses as errors" do
+      span = install_open_telemetry(provider)
+      trace = described_class.start_client_span(:post, "/render", parent_context: nil)
+
+      trace.record_response(412)
+      trace.within_context { nil }
+
+      expect(span.status).to eq(:error)
+      expect(span.attributes["http.response.status_code"]).to eq(412)
+      expect(span).to be_finished
+    end
+
     it "marks server error responses as errors" do
       span = install_open_telemetry(provider)
       trace = described_class.start_client_span(:post, "/render", parent_context: nil)
@@ -454,10 +499,61 @@ RSpec.describe ReactOnRailsPro::OpenTelemetry do
 
       client.post("/render", raw: raw_request)
 
-      expect(raw_request[:headers]).to include(["traceparent", traceparent])
+      expect(raw_request[:headers]).not_to include(["traceparent", traceparent])
       expect(captured_headers["traceparent"]).to eq([traceparent])
       expect(span.attributes["http.request.body.size"]).to eq(24)
       expect(span).to be_finished
+    ensure
+      client&.close
+    end
+
+    it "replaces propagation headers for each retry without mutating raw request headers" do
+      install_open_telemetry_constants
+      first_span = fake_span_class.new("1111111111111111")
+      second_span = fake_span_class.new("2222222222222222")
+      tracers = [fake_tracer_class.new(first_span), fake_tracer_class.new(second_span)]
+      sequential_provider = Class.new do
+        def initialize(tracers)
+          @tracers = tracers
+        end
+
+        def tracer(_name)
+          @tracers.shift
+        end
+      end.new(tracers)
+      propagator = fake_propagator_class.new
+      OpenTelemetry.define_singleton_method(:tracer_provider) { sequential_provider }
+      OpenTelemetry.define_singleton_method(:propagation) { propagator }
+      raw_headers = [%w[authorization private-token]]
+      sent_headers = []
+      async_client = double
+      allow(async_client).to receive(:post) do |_path, headers:, **|
+        sent_headers << headers
+        response_with("rendered")
+      end
+      client = build_client(async_client)
+
+      2.times do
+        client.post("/render", raw: { body: "private props", headers: raw_headers })
+      end
+
+      expect(sent_headers.map(&:to_a)).to eq(
+        [
+          [
+            ["authorization", "private-token"],
+            ["traceparent", "00-#{first_span.trace_id}-#{first_span.span_id}-01"],
+            ["tracestate", "vendor=value"]
+          ],
+          [
+            ["authorization", "private-token"],
+            ["traceparent", "00-#{second_span.trace_id}-#{second_span.span_id}-01"],
+            ["tracestate", "vendor=value"]
+          ]
+        ]
+      )
+      expect(raw_headers).to eq([%w[authorization private-token]])
+      expect(first_span).to be_finished
+      expect(second_span).to be_finished
     ensure
       client&.close
     end
@@ -482,7 +578,7 @@ RSpec.describe ReactOnRailsPro::OpenTelemetry do
       output << "later props\n"
       output.close
 
-      expect(request_headers).to include(["traceparent", traceparent])
+      expect(request_headers).not_to include(["traceparent", traceparent])
       expect(captured_headers["traceparent"]).to eq([traceparent])
       expect(span.attributes).to include(
         "http.request.method" => "POST",

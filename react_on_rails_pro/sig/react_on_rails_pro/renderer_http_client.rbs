@@ -77,7 +77,7 @@ module ReactOnRailsPro
 
       def write: (String chunk) -> untyped
 
-      def trace=: (OpenTelemetry::ClientSpan trace) -> OpenTelemetry::ClientSpan
+      def trace=: (OpenTelemetry::ClientSpan trace) -> untyped
 
       def close_write: (*untyped) -> untyped
     end

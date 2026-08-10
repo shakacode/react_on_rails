@@ -761,15 +761,17 @@ module ReactOnRailsPro
 
     def execute_request_with_trace(method, path, request_body, stream:, response_handlers:, parent_context:)
       headers, body = request_body
-      trace = start_client_trace(method, path, headers, body, parent_context:)
+      trace = start_client_trace(method, path, body, parent_context:)
       return execute_request(method, path, request_body, stream:, response_handlers:) unless trace
 
+      traced_headers = headers.map(&:dup)
+      trace.inject(traced_headers)
       trace.within_context do
-        execute_request(method, path, request_body, stream:, response_handlers:, trace:)
+        execute_request(method, path, [traced_headers, body], stream:, response_handlers:, trace:)
       end
     end
 
-    def start_client_trace(method, path, headers, body, parent_context:)
+    def start_client_trace(method, path, body, parent_context:)
       trace = ReactOnRailsPro::OpenTelemetry.start_client_span(method, path, parent_context:)
       return unless trace
 
@@ -778,7 +780,6 @@ module ReactOnRailsPro
       else
         trace.request_body = body
       end
-      trace.inject(headers)
       trace
     end
 
