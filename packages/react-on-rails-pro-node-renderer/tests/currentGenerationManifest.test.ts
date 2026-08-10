@@ -17,7 +17,10 @@ import { createHash } from 'crypto';
 import fs from 'fs/promises';
 import path from 'path';
 import { getConfig } from '../src/shared/configBuilder';
-import { loadCurrentGenerationManifest } from '../src/worker/currentGenerationManifest';
+import {
+  CURRENT_GENERATION_MANIFEST_MAX_BYTES,
+  loadCurrentGenerationManifest,
+} from '../src/worker/currentGenerationManifest';
 import { prewarmCurrentGenerationBeforeListen } from '../src/worker/startCurrentGeneration';
 import {
   buildExecutionContext,
@@ -69,26 +72,54 @@ async function writeManifest(
   return manifestPath;
 }
 
-async function loadManifestWithoutNoFollow(
+async function loadManifestWithFileHooks(
   manifestPath: string,
   cachePath: string,
-  beforeOpen?: (openedPath: string) => Promise<void>,
+  {
+    noFollowAvailable = true,
+    beforeOpen,
+    beforeRead,
+  }: {
+    noFollowAvailable?: boolean;
+    beforeOpen?: (openedPath: string) => Promise<void>;
+    beforeRead?: (openedPath: string) => Promise<void>;
+  } = {},
 ): Promise<Awaited<ReturnType<typeof loadCurrentGenerationManifest>>> {
   jest.resetModules();
-  jest.doMock('fs', () => {
-    const actual = jest.requireActual<typeof import('fs')>('fs');
-    return {
-      ...actual,
-      constants: { ...actual.constants, O_NOFOLLOW: undefined },
-    };
-  });
+  if (!noFollowAvailable) {
+    jest.doMock('fs', () => {
+      const actual = jest.requireActual<typeof import('fs')>('fs');
+      return {
+        ...actual,
+        constants: { ...actual.constants, O_NOFOLLOW: undefined },
+      };
+    });
+  }
   jest.doMock('fs/promises', () => {
     const actual = jest.requireActual<typeof import('fs/promises')>('fs/promises');
     return {
       ...actual,
       open: async (openedPath: string, flags: number) => {
         await beforeOpen?.(openedPath);
-        return actual.open(openedPath, flags);
+        const fileHandle = await actual.open(openedPath, flags);
+        let beforeReadCalled = false;
+        const callBeforeRead = async () => {
+          if (beforeReadCalled) return;
+          beforeReadCalled = true;
+          await beforeRead?.(openedPath);
+        };
+        return {
+          stat: fileHandle.stat.bind(fileHandle),
+          read: async (buffer: Buffer, offset: number, length: number, position: number | null) => {
+            await callBeforeRead();
+            return fileHandle.read(buffer, offset, length, position);
+          },
+          readFile: async (encoding: BufferEncoding) => {
+            await callBeforeRead();
+            return fileHandle.readFile(encoding);
+          },
+          close: fileHandle.close.bind(fileHandle),
+        };
       },
     };
   });
@@ -103,6 +134,17 @@ async function loadManifestWithoutNoFollow(
     jest.dontMock('fs/promises');
     jest.resetModules();
   }
+}
+
+async function loadManifestWithoutNoFollow(
+  manifestPath: string,
+  cachePath: string,
+  beforeOpen?: (openedPath: string) => Promise<void>,
+) {
+  return loadManifestWithFileHooks(manifestPath, cachePath, {
+    noFollowAvailable: false,
+    beforeOpen,
+  });
 }
 
 describe('current generation manifest', () => {
@@ -178,6 +220,27 @@ describe('current generation manifest', () => {
       }),
     ).rejects.toThrow('changed while it was being opened');
   });
+
+  test.each([
+    ['native no-follow flags', true],
+    ['portable fallback flags', false],
+  ])(
+    'rejects same-file growth after metadata validation with %s',
+    async (_description, noFollowAvailable) => {
+      const cachePath = serverBundleCachePath(testName);
+      await writeArtifacts(cachePath);
+      const manifestPath = await writeManifest(cachePath);
+
+      await expect(
+        loadManifestWithFileHooks(manifestPath, cachePath, {
+          noFollowAvailable,
+          beforeRead: async (openedPath) => {
+            await fs.appendFile(openedPath, ' '.repeat(CURRENT_GENERATION_MANIFEST_MAX_BYTES));
+          },
+        }),
+      ).rejects.toThrow(`exceeds ${CURRENT_GENERATION_MANIFEST_MAX_BYTES} byte limit`);
+    },
+  );
 
   test('fails truthfully when the declaration is missing', async () => {
     const cachePath = serverBundleCachePath(testName);

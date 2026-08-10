@@ -157,7 +157,32 @@ async function readBoundedRegularFile(manifestPath: string, validatedManifestSta
         `Current generation manifest exceeds ${CURRENT_GENERATION_MANIFEST_MAX_BYTES} byte limit`,
       );
     }
-    return await fileHandle.readFile('utf8');
+
+    // The extra byte is an overflow sentinel. Never allocate based on mutable
+    // file metadata or let a concurrently growing declaration expand memory.
+    const buffer = Buffer.allocUnsafe(CURRENT_GENERATION_MANIFEST_MAX_BYTES + 1);
+    let totalBytesRead = 0;
+    while (totalBytesRead < buffer.length) {
+      // eslint-disable-next-line no-await-in-loop -- Each bounded read starts after the previous chunk.
+      const { bytesRead } = await fileHandle.read(
+        buffer,
+        totalBytesRead,
+        buffer.length - totalBytesRead,
+        totalBytesRead,
+      );
+      if (bytesRead === 0) break;
+      totalBytesRead += bytesRead;
+    }
+    const fileStatAfterRead = await fileHandle.stat();
+    if (
+      totalBytesRead > CURRENT_GENERATION_MANIFEST_MAX_BYTES ||
+      fileStatAfterRead.size > CURRENT_GENERATION_MANIFEST_MAX_BYTES
+    ) {
+      throw new Error(
+        `Current generation manifest exceeds ${CURRENT_GENERATION_MANIFEST_MAX_BYTES} byte limit`,
+      );
+    }
+    return buffer.toString('utf8', 0, totalBytesRead);
   } finally {
     await fileHandle.close();
   }
