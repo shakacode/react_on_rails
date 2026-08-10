@@ -635,6 +635,12 @@ export const hydrateAllStores = () =>
 function unmountAllStores(): void {
   storeRenderers.forEach((storeRenderer) => storeRenderer.unmount());
   storeRenderers.clear();
+  // Hydrated stores are per-page data (created from the unloading page's props); drop them so
+  // the next page's `store_dependencies` hydration gate waits for its own hydration data
+  // instead of resolving against the previous page's store (issue #4861). Store GENERATORS
+  // stay registered — they are code, and the bundles remain loaded across soft navigations.
+  // The core client renderer does the equivalent in its own page-unload callback.
+  StoreRegistry.clearHydratedStoresOnPageUnload();
 }
 
 function clearRSCPreloadedPayloadGlobals(): void {

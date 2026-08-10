@@ -105,6 +105,22 @@ export function clearHydratedStores(): void {
 }
 
 /**
+ * Internally used on page unload (Turbo/Turbolinks soft navigation) to drop the previous
+ * page's hydrated stores. Stores are per-page data hydrated from that page's props, so a
+ * surviving entry would make `getOrWaitForStore` resolve immediately with the previous
+ * page's store instead of waiting for the new page's hydration data — silently defeating
+ * the `store_dependencies` hydration gate (issue #4861). Registered store generators are
+ * code, not data, and persist because the bundles stay loaded across soft navigations.
+ *
+ * Unlike `clearHydratedStores`, this leaves pending waiters untouched: the registry's own
+ * page-unload handler rejects them with a page-unload cancellation (which render paths
+ * treat as benign), and the two unload callbacks must compose in either execution order.
+ */
+export function clearHydratedStoresOnPageUnload(): void {
+  hydratedStoreRegistry.clear();
+}
+
+/**
  * Reset registered store generators and pending generator waiters.
  * @public
  */

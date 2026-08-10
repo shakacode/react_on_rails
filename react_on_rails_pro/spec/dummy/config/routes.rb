@@ -123,6 +123,7 @@ Rails.application.routes.draw do
   get "pure_component" => "pages#pure_component"
   get "css_modules_images_fonts_example" => "pages#css_modules_images_fonts_example"
   get "turbolinks_cache_disabled" => "pages#turbolinks_cache_disabled"
+  get "stale_store_probe" => "pages#stale_store_probe"
   get "rendered_html" => "pages#rendered_html"
   get "xhr_refresh" => "pages#xhr_refresh"
   get "react_helmet" => "pages#react_helmet"
