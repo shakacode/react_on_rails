@@ -171,11 +171,17 @@ Keep build-time seeding too; the layers are complementary:
 > [!IMPORTANT]
 > Gate renderer start and readiness on the boot seed **completing, not succeeding**. A failed seed must degrade to the 410 fallback rather than wedge the deploy; the task already warns and continues on fetch failures.
 
-## Disk warmup and VM warmup are separate
+## Pre-seeding declares and prewarms the new renderer revision
 
-The adapter and `pre_seed_renderer_cache` warm the renderer's **disk cache**. They make old and new bundle files plus companion manifests available before traffic, so a request avoids `410 Gone`, upload, and retry. They do not precompile the JavaScript into every renderer worker's VM pool.
+The adapter and `pre_seed_renderer_cache` populate the renderer's **disk cache** with old and new bundle files plus companion manifests, so requests avoid `410 Gone`, upload, and retry. The seed also emits a content-addressed declaration containing only the new revision's server artifact and optional RSC artifact. Configure the new renderer revision with the exact emitted path:
 
-Each worker compiles a disk-cached bundle on its first render. Keep those contexts resident during the overlap with:
+```bash
+RENDERER_CURRENT_GENERATION_MANIFEST=/app/.node-renderer-bundles/.current-generations/rorp-generation-v1-<digest>.json
+```
+
+Each cluster worker validates that immutable declaration and its artifact roots, compiles the complete declared set, and pins it as current before listening. Do not use a shared mutable `current` file or symlink: old and new workload revisions can race to rewrite a shared volume.
+
+Keep the declared current contexts plus draining request generations resident during the overlap with:
 
 ```text
 maxVMPoolSize >= simultaneous bundle generations × contexts per generation
@@ -183,9 +189,9 @@ maxVMPoolSize >= simultaneous bundle generations × contexts per generation
 
 SSR-only has one context per generation. RSC has two: server plus RSC. The common old/new RSC rollout therefore needs `2 × 2 = 4` contexts per worker, which is the default. `maxVMPoolSize` is always a hard cap on pooled contexts; setting it to `2` during that four-context overlap causes least-recently-used eviction and can recreate the old/new rebuild loop even when every file was pre-seeded successfully.
 
-Inactive bundle sets drain after `vmPoolRolloutDrainTimeout` (60 seconds by default). Set that timeout longer than the maximum period in which your deploy platform can still route a draining revision to the renderer. The cleanup timer runs without waiting for another request, and shared paths stay pooled while referenced. The hard cap bounds pooled contexts, but an in-flight request can keep an evicted execution context and source-map registration alive until release, so transient memory also requires concurrency headroom.
+Inactive nonmatching bundle sets drain after `vmPoolRolloutDrainTimeout` (60 seconds by default). The declared current set remains pinned across an arbitrarily long old-only request gap; old traffic cannot demote it. The cleanup timer runs without waiting for another request, and shared paths stay pooled while referenced. The hard cap bounds pooled contexts and prefers declared current contexts, but an in-flight old request can keep an unpooled execution context and source-map registration alive until release, so transient memory also requires concurrency headroom.
 
-The renderer sees exact bundle paths, not a trusted deployment-generation sequence. It retains the most recently observed **successful** bundle set. If the final overlap request is from the old revision and traffic goes idle past the drain timeout, the new set can be retired; its next request performs one bounded rebuild, is reused afterward, and makes the expired old set eligible for retirement. This is a memory-bound tradeoff, not a guarantee that the renderer can identify chronological "old" and "new" revisions.
+If `maxVMPoolSize` cannot hold the complete declared set, startup fails before the worker listens and `/ready` cannot pass. Additional draining contexts may be used by active requests without entering the shared pool, but the absolute pooled-context cap is never exceeded.
 
 The fleet-wide pooled-context upper bound is:
 
@@ -195,7 +201,7 @@ overlapping renderer replicas × effective workers per replica × maxVMPoolSize
 
 Include old replicas and rollout surge in the replica count. Use one effective worker for `workersCount: 0`. Size each renderer replica's memory request and limit from its worker/pooled-context count plus measured process, V8 heap, bundle-buffer, and safety overhead, including source maps and evicted execution contexts held by concurrent in-flight requests; multiply the per-replica request by overlapping replicas for total cluster capacity.
 
-There is no supported eager VM-prewarm API. The built-in `/ready` signal becomes ready after at least one context compiles and is not proof that every old/new server and RSC context is warm. After disk seeding and renderer liveness, use application-owned, authenticated Rails smoke requests to exercise the required SSR and RSC paths before public readiness when your platform supports that gate. Smoke verifies only the workers reached because there is no supported worker-targeting API. Otherwise, expect one first-render compilation per bundle and worker; the correctly sized pool prevents the repeated alternating rebuilds.
+The built-in `/ready` signal means the answering worker's complete declared current set is compiled when `RENDERER_CURRENT_GENERATION_MANIFEST` is configured. Application-owned, authenticated Rails smoke requests remain valuable end-to-end checks, but are not needed to target every worker for VM compilation. Without a configured declaration, the backward-compatible behavior remains request-driven and `/ready` means only that some VM exists.
 
 For configuration details, pressure log events, and topology-specific minimums, see [Sizing and draining the VM pool](../oss/building-features/node-renderer/js-configuration.md#sizing-and-draining-the-vm-pool) and [Rollout VM capacity and memory tradeoff](../oss/building-features/node-renderer/container-deployment.md#rollout-vm-capacity-and-memory-tradeoff).
 
@@ -238,7 +244,7 @@ This ordering is also what makes the [boot seed](#promotion-deploys-need-a-relea
 - ℹ️ The resolved renderer cache dir and how many bundle-hash subdirectories are present.
 - ℹ️ Whether `PREVIOUS_BUNDLE_HASHES` env override is set.
 - ✅/⚠️ The conservative old/new VM-cap formula per worker, including RSC context count.
-- ℹ️ Whether the capacity is `observed` or `unverified`; separate workloads and ambiguous loopback sidecars stay unverified rather than producing a false pass.
+- ℹ️ Whether both capacity and the current-generation declaration are `observed` or `unverified`; separate workloads and ambiguous loopback sidecars stay unverified rather than producing a false warm pass.
 
 Doctor never calls `fetch` or `upload` and does not query the live Node Renderer process — those have side effects or would require a new privileged diagnostics channel.
 

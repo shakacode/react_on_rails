@@ -129,6 +129,10 @@ export interface Config {
   // Seconds that an inactive bundle generation remains eligible for VM reuse during a rolling deploy.
   // The default 60-second window covers the representative 40-second overlap with 20 seconds of drain margin.
   vmPoolRolloutDrainTimeout: number;
+  // Absolute path to the immutable, revision-scoped current-generation declaration emitted by
+  // ReactOnRailsPro::PreSeedRendererCache. When configured, every worker compiles the complete
+  // declared server/RSC set before listening and keeps it pinned as current.
+  currentGenerationManifestPath: string | undefined;
   // If set to true, the renderer registers built-in, unauthenticated GET /health (liveness) and
   // GET /ready (readiness) probe endpoints. Both return status-only JSON bodies and never expose
   // runtime version or path details. Defaults to false.
@@ -310,6 +314,8 @@ const defaultConfig: Config = {
   // 20 seconds of scheduling/drain margin. Operators should tune this to their deployment window.
   vmPoolRolloutDrainTimeout: defaultVmPoolRolloutDrainTimeout(),
 
+  currentGenerationManifestPath: env.RENDERER_CURRENT_GENERATION_MANIFEST || undefined,
+
   // Built-in /health and /ready probe endpoints are opt-in.
   enableHealthEndpoints: truthyHealthEndpointFlag(env.RENDERER_ENABLE_HEALTH_ENDPOINTS),
 };
@@ -343,6 +349,8 @@ function envValuesUsed() {
       !userConfig.replayServerAsyncOperationLogs && env.REPLAY_SERVER_ASYNC_OPERATION_LOGS,
     MAX_VM_POOL_SIZE: !userConfig.maxVMPoolSize && env.MAX_VM_POOL_SIZE,
     VM_POOL_ROLLOUT_DRAIN_TIMEOUT: !userConfig.vmPoolRolloutDrainTimeout && env.VM_POOL_ROLLOUT_DRAIN_TIMEOUT,
+    RENDERER_CURRENT_GENERATION_MANIFEST:
+      !('currentGenerationManifestPath' in userConfig) && env.RENDERER_CURRENT_GENERATION_MANIFEST,
     RENDERER_ENABLE_HEALTH_ENDPOINTS:
       !('enableHealthEndpoints' in userConfig) && env.RENDERER_ENABLE_HEALTH_ENDPOINTS,
   };
@@ -468,6 +476,7 @@ export function buildConfig(providedUserConfig?: Partial<Config>): Config {
     replayServerAsyncOperationLogs: defaultReplayServerAsyncOperationLogs(),
     maxVMPoolSize: defaultMaxVMPoolSize(),
     vmPoolRolloutDrainTimeout: defaultVmPoolRolloutDrainTimeout(),
+    currentGenerationManifestPath: env.RENDERER_CURRENT_GENERATION_MANIFEST || undefined,
     enableHealthEndpoints: truthyHealthEndpointFlag(env.RENDERER_ENABLE_HEALTH_ENDPOINTS),
   };
   config = { ...runtimeDefaultConfig, ...userConfig };
@@ -475,6 +484,7 @@ export function buildConfig(providedUserConfig?: Partial<Config>): Config {
     config.password = runtimeDefaultConfig.password;
   }
   config.licenseToken = userConfig.licenseToken?.trim() || runtimeDefaultConfig.licenseToken;
+  config.currentGenerationManifestPath = config.currentGenerationManifestPath?.trim() || undefined;
 
   // Handle bundlePath deprecation
   if ('bundlePath' in userConfig) {

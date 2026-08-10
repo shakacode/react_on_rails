@@ -10,7 +10,9 @@ import { performance } from 'node:perf_hooks';
 
 const require = createRequire(import.meta.url);
 const benchmarkPath = fileURLToPath(import.meta.url);
-const repositoryRoot = path.resolve(path.dirname(benchmarkPath), '..');
+const repositoryRoot = process.env.ROLLOUT_BENCH_REPOSITORY_ROOT
+  ? path.resolve(process.env.ROLLOUT_BENCH_REPOSITORY_ROOT)
+  : path.resolve(path.dirname(benchmarkPath), '..');
 const packageRoot = path.join(repositoryRoot, 'packages/react-on-rails-pro-node-renderer');
 
 function parseArguments(argv) {
@@ -19,6 +21,7 @@ function parseArguments(argv) {
     durationSeconds: undefined,
     requestsPerSecond: 3,
     timeoutMilliseconds: 1_000,
+    drainTimeoutMilliseconds: 500,
   };
 
   for (let argumentIndex = 0; argumentIndex < argv.length; argumentIndex += 1) {
@@ -41,6 +44,10 @@ function parseArguments(argv) {
         options.timeoutMilliseconds = Number(value);
         argumentIndex += 1;
         break;
+      case '--drain-timeout-ms':
+        options.drainTimeoutMilliseconds = Number(value);
+        argumentIndex += 1;
+        break;
       default:
         throw new Error(`Unknown argument: ${argument}`);
     }
@@ -54,6 +61,7 @@ function parseArguments(argv) {
     ['durationSeconds', options.durationSeconds],
     ['requestsPerSecond', options.requestsPerSecond],
     ['timeoutMilliseconds', options.timeoutMilliseconds],
+    ['drainTimeoutMilliseconds', options.drainTimeoutMilliseconds],
   ]) {
     if (!Number.isFinite(value) || value <= 0) {
       throw new Error(`${name} must be a positive finite number`);
@@ -102,7 +110,14 @@ async function run() {
   // eslint-disable-next-line import/no-dynamic-require -- computed path was checked above
   const { buildConfig } = require(configModulePath);
   // eslint-disable-next-line import/no-dynamic-require -- computed path was checked above
-  const { buildExecutionContext, getVMContext, resetVM } = require(vmModulePath);
+  const vmModule = require(vmModulePath);
+  const {
+    buildExecutionContext,
+    getVMContext,
+    getVMPoolDiagnostics,
+    prewarmDeclaredBundleGeneration,
+    resetVM,
+  } = vmModule;
   const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ror-node-renderer-rollout-'));
   const bundleSets = {
     old: ['server', 'rsc'].map((role) => path.join(temporaryRoot, 'old', `${role}.js`)),
@@ -123,6 +138,7 @@ async function run() {
     supportModules: true,
     logLevel: 'silent',
     logHttpLevel: 'silent',
+    vmPoolRolloutDrainTimeout: options.drainTimeoutMilliseconds / 1_000,
   });
   resetVM();
   global.gc?.();
@@ -156,12 +172,12 @@ async function run() {
     });
   };
 
-  const buildBundleSet = async (bundlePaths) => {
+  const buildBundleSet = async (bundlePaths, build = buildExecutionContext) => {
     const retainedBefore = new Set(
       allBundlePaths.filter((bundlePath) => getVMContext(bundlePath) !== undefined),
     );
     const buildStartedAt = performance.now();
-    const executionContext = await buildExecutionContext(bundlePaths, true);
+    const executionContext = await build(bundlePaths, true);
     executionContext.release();
     const buildLatencyMilliseconds = performance.now() - buildStartedAt;
     observePoolTransition(retainedBefore);
@@ -172,8 +188,14 @@ async function run() {
   };
 
   try {
-    await buildBundleSet(bundleSets.old);
-    await buildBundleSet(bundleSets.new);
+    const startupStartedAt = performance.now();
+    await buildBundleSet(
+      bundleSets.new,
+      typeof prewarmDeclaredBundleGeneration === 'function'
+        ? (bundlePaths) => prewarmDeclaredBundleGeneration(bundlePaths)
+        : buildExecutionContext,
+    );
+    const startupPrewarmMilliseconds = performance.now() - startupStartedAt;
     global.gc?.();
     const rssBeforeSamplesBytes = process.memoryUsage().rss;
     const heapUsedBeforeSamplesBytes = process.memoryUsage().heapUsed;
@@ -190,11 +212,18 @@ async function run() {
       // Sequential pacing is intentional: this measures one renderer worker's request path.
       // eslint-disable-next-line no-await-in-loop
       await sleep(Math.max(0, scheduledAt - performance.now()));
-      const bundlePaths = sampleIndex % 2 === 0 ? bundleSets.old : bundleSets.new;
       // eslint-disable-next-line no-await-in-loop
-      const buildLatencyMilliseconds = await buildBundleSet(bundlePaths);
+      const buildLatencyMilliseconds = await buildBundleSet(bundleSets.old);
       latenciesMilliseconds.push(buildLatencyMilliseconds);
     }
+
+    const drainWaitStartedAt = performance.now();
+    await sleep(options.drainTimeoutMilliseconds + 25);
+    const oldOnlyGapMilliseconds = performance.now() - scheduleStartedAt;
+    const buildsBeforeFirstNewRequest = getVMPoolDiagnostics().contextsBuilt;
+    const firstNewRequestLatencyMilliseconds = await buildBundleSet(bundleSets.new);
+    const firstNewRequestBuildCount = getVMPoolDiagnostics().contextsBuilt - buildsBeforeFirstNewRequest;
+    const drainWaitMilliseconds = performance.now() - drainWaitStartedAt;
 
     global.gc?.();
     const finalMemory = process.memoryUsage();
@@ -216,7 +245,8 @@ async function run() {
         gcExposed: typeof global.gc === 'function',
       },
       scenario: {
-        topology: 'one_shared_renderer_process_receiving_alternating_old_and_new_rsc_bundle_sets',
+        topology:
+          'new_renderer_revision_prewarmed_then_receiving_only_old_rsc_traffic_before_first_new_request',
         bundleGenerations: 2,
         contextsPerGeneration: 2,
         workersCount: 0,
@@ -226,6 +256,16 @@ async function run() {
         durationSeconds: options.durationSeconds,
         requestsPerSecond: options.requestsPerSecond,
         scheduler: 'serial_fixed_rate',
+        declaredCurrentPrewarmAvailable: typeof prewarmDeclaredBundleGeneration === 'function',
+        drainTimeoutMilliseconds: options.drainTimeoutMilliseconds,
+        measuredOldOnlyGapMilliseconds: oldOnlyGapMilliseconds,
+        measuredDrainWaitMilliseconds: drainWaitMilliseconds,
+      },
+      startupPrewarmMilliseconds,
+      firstNewRequest: {
+        latencyMilliseconds: firstNewRequestLatencyMilliseconds,
+        buildCount: firstNewRequestBuildCount,
+        vmHit: firstNewRequestBuildCount === 0,
       },
       latencyMilliseconds: {
         samples: latenciesMilliseconds.length,
@@ -252,11 +292,14 @@ async function run() {
       },
       caveats: [
         'Synthetic tiny fixture bundles; this does not claim cloned Rails workload parity.',
-        'Serial fixed-rate scheduling models deterministic 3 rps alternation, not concurrent saturation.',
+        'Serial fixed-rate scheduling models deterministic old-only traffic, not concurrent saturation.',
         'Latency isolates pool lookup/buildExecutionContext plus release; retained-set scans, transition instrumentation, memory sampling, and runInVM/render execution are excluded.',
         'Build and eviction counts are inferred from baseline-compatible VM identity and retained-path transitions.',
         'Timeout count means completed samples above the threshold; the harness does not cancel in-flight builds.',
-        'Disk seeding and HTTP upload are outside this harness; no supported eager VM-prewarm API is invoked.',
+        'Disk seeding, manifest parsing, worker fork/listen, HTTP upload, and network latency are outside this harness.',
+        'Baseline revisions without declared-current prewarm use the same startup compile sequence but cannot pin it; declaredCurrentPrewarmAvailable records that distinction.',
+        'ROLLOUT_BENCH_REPOSITORY_ROOT may point this unchanged harness at an exact detached baseline worktree.',
+        'Runtime-only benchmark; visual parity is not applicable.',
         'Fresh processes and at least five quiet repeats are required for release evidence.',
       ],
     };

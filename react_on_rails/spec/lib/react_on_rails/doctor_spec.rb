@@ -3597,7 +3597,9 @@ RSpec.describe ReactOnRails::Doctor do
     it "passes observed capacity that covers an RSC rollout" do
       write_node_renderer_script(
         "renderer/node-renderer.js",
-        "reactOnRailsProNodeRenderer({ rendererUrl: 'http://localhost', maxVMPoolSize: 4 });"
+        "reactOnRailsProNodeRenderer({ rendererUrl: 'http://localhost', maxVMPoolSize: 4, " \
+        "currentGenerationManifestPath: '/app/.node-renderer-bundles/.current-generations/" \
+        "rorp-generation-v1-#{'a' * 64}.json' });"
       )
 
       doctor.send(:check_node_renderer_rollout_capacity)
@@ -3605,8 +3607,67 @@ RSpec.describe ReactOnRails::Doctor do
       expect(checker.messages).to include(
         hash_including(
           type: :success,
-          content: a_string_including("sufficient", "evidence=observed", "configured=4", "required=4")
+          content: a_string_including(
+            "sufficient",
+            "evidence=observed",
+            "configured=4",
+            "required=4",
+            "current_generation_declaration=observed"
+          )
         )
+      )
+    end
+
+    [
+      "/app/.node-renderer-bundles/.current-generations/current.json",
+      ".node-renderer-bundles/.current-generations/rorp-generation-v1-#{'a' * 64}.json",
+      ""
+    ].each do |declaration_path|
+      it "does not observe unsupported current-generation declaration path #{declaration_path.inspect}" do
+        write_node_renderer_script(
+          "renderer/node-renderer.js",
+          "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4, " \
+          "currentGenerationManifestPath: #{declaration_path.to_json} });"
+        )
+
+        doctor.send(:check_node_renderer_rollout_capacity)
+
+        expect(checker.messages).to include(
+          hash_including(
+            type: :warning,
+            content: a_string_including("current_generation_declaration=unverified")
+          )
+        )
+        expect(checker.messages).not_to include(
+          hash_including(type: :success, content: a_string_including("Declared-current"))
+        )
+      end
+    end
+
+    it "does not claim a declared-current warm pass when capacity is observed but the declaration is not" do
+      write_node_renderer_script(
+        "renderer/node-renderer.js",
+        "reactOnRailsProNodeRenderer({ rendererUrl: 'http://localhost', maxVMPoolSize: 4 });"
+      )
+
+      doctor.send(:check_node_renderer_rollout_capacity)
+
+      expect(checker.messages).to include(
+        hash_including(
+          type: :warning,
+          content: a_string_including(
+            "capacity is sufficient but declared-current prewarm is unverified",
+            "configured=4",
+            "required=4",
+            "current_generation_declaration=unverified"
+          )
+        )
+      )
+      expect(checker.messages).to include(
+        hash_including(type: :success, content: a_string_including("VM pool rollout capacity is sufficient"))
+      )
+      expect(checker.messages).not_to include(
+        hash_including(type: :success, content: a_string_including("Declared-current"))
       )
     end
 
@@ -3630,7 +3691,9 @@ RSpec.describe ReactOnRails::Doctor do
       write_node_renderer_script(
         "renderer/node-renderer.js",
         "require('fs').writeFileSync(#{launcher_marker.to_json}, 'executed');\n" \
-        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4, " \
+        "currentGenerationManifestPath: '/app/.node-renderer-bundles/.current-generations/" \
+        "rorp-generation-v1-#{'a' * 64}.json' });"
       )
 
       doctor.send(:check_node_renderer_rollout_capacity)
@@ -4211,12 +4274,17 @@ RSpec.describe ReactOnRails::Doctor do
         check = JSON.parse(output.join("\n")).fetch("checks").first
         expect(check).to include(
           "id" => "node_renderer_rollout_capacity",
-          "status" => "pass"
+          "status" => "warn",
+          "message" => a_string_including("current_generation_declaration=unverified")
         )
         expect(check.fetch("details")).to include(
           hash_including(
             "level" => "success",
             "content" => a_string_including("evidence=observed", "configured=4", "required=4")
+          ),
+          hash_including(
+            "level" => "warning",
+            "content" => a_string_including("current_generation_declaration=unverified")
           )
         )
       end

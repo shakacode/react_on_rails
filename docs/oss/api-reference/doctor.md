@@ -153,11 +153,13 @@ Optional React on Rails Pro package and configuration consistency.
 
 ### Check ID: `node_renderer_rollout_capacity` {#check-id-node-renderer-rollout-capacity}
 
-Conservative per-worker VM capacity for overlapping Node Renderer bundle
-generations. Details include the old/new × SSR/RSC formula and classify
-configuration evidence as `observed` or `unverified`. A loopback
-endpoint does not prove a shared process environment, and separate renderer
-workloads remain unverified because Doctor does not query the live renderer.
+Conservative per-worker VM capacity and declared-current startup prewarm for
+overlapping Node Renderer bundle generations. Details include the old/new ×
+SSR/RSC formula and classify an observed `currentGenerationManifestPath`
+separately from unverified evidence. Capacity alone never produces a warm pass.
+A loopback endpoint does not prove a shared process environment, and separate
+renderer workloads remain unverified because Doctor does not query the live
+renderer.
 
 ### Check ID: `react_server_components` {#check-id-react-server-components}
 

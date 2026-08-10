@@ -27,6 +27,7 @@ describe('configBuilder', () => {
     'RENDERER_WORKERS_COUNT',
     'MAX_VM_POOL_SIZE',
     'VM_POOL_ROLLOUT_DRAIN_TIMEOUT',
+    'RENDERER_CURRENT_GENERATION_MANIFEST',
   ] as const;
   const savedEnvValues = Object.fromEntries(envVarsToRestore.map((key) => [key, process.env[key]]));
 
@@ -136,6 +137,16 @@ describe('configBuilder', () => {
   });
 
   describe('rolling-deploy VM pool configuration', () => {
+    it('reads the revision-scoped current generation manifest path from ENV', () => {
+      process.env.RENDERER_CURRENT_GENERATION_MANIFEST =
+        '/app/.node-renderer-bundles/.current-generations/rorp-generation-v1-current.json';
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      expect(buildConfig().currentGenerationManifestPath).toBe(
+        process.env.RENDERER_CURRENT_GENERATION_MANIFEST,
+      );
+    });
+
     it('defaults to capacity for one draining and one current RSC generation', () => {
       delete process.env.MAX_VM_POOL_SIZE;
       delete process.env.VM_POOL_ROLLOUT_DRAIN_TIMEOUT;

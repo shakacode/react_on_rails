@@ -100,6 +100,9 @@ const vmPoolActivity: VMPoolActivity = {
   drainedContextRetirements: 0,
 };
 let generationObservationSequence = 0;
+let declaredCurrentGenerationKey: string | undefined;
+let declaredCurrentBundlePaths = new Set<string>();
+let declaredCurrentGenerationReady = false;
 type VMPoolTimer = ReturnType<typeof setTimeout>;
 export interface VMPoolClock {
   now: () => number;
@@ -186,6 +189,10 @@ function bundleGenerationKey(bundlePaths: string[]) {
 }
 
 function latestBundleGenerationKey() {
+  if (declaredCurrentGenerationKey) {
+    return declaredCurrentGenerationKey;
+  }
+
   let latestKey: string | undefined;
   let latestSequence = -1;
   bundleGenerations.forEach((generation, key) => {
@@ -300,8 +307,9 @@ function observeBundleGeneration(bundlePaths: string[]) {
   while (bundleGenerations.size > maxVMPoolSize) {
     let oldestKey: string | undefined;
     let oldestSequence = Number.POSITIVE_INFINITY;
+    const currentGenerationKey = declaredCurrentGenerationKey;
     bundleGenerations.forEach((generation, candidateKey) => {
-      if (candidateKey !== key && generation.observationSequence < oldestSequence) {
+      if (candidateKey !== currentGenerationKey && generation.observationSequence < oldestSequence) {
         oldestSequence = generation.observationSequence;
         oldestKey = candidateKey;
       }
@@ -320,6 +328,11 @@ export function getVMPoolDiagnostics() {
   return {
     retainedContexts: vmContexts.size,
     trackedGenerations: bundleGenerations.size,
+    declaredCurrentContexts: Array.from(declaredCurrentBundlePaths).filter((bundlePath) =>
+      vmContexts.has(bundlePath),
+    ).length,
+    declaredCurrentContextsRequired: declaredCurrentBundlePaths.size,
+    declaredCurrentGenerationReady,
     ...vmPoolActivity,
   };
 }
@@ -362,6 +375,10 @@ export function getVMContext(bundlePath: string): VMContext | undefined {
  */
 export function hasAnyVMContext() {
   return vmContexts.size > 0;
+}
+
+export function isDeclaredCurrentGenerationReady() {
+  return declaredCurrentBundlePaths.size > 0 && declaredCurrentGenerationReady;
 }
 
 /**
@@ -407,10 +424,15 @@ function manageVMPoolSize() {
     return;
   }
 
-  const sortedEntries = Array.from(vmContexts.entries()).sort(
-    ([pathA, contextA], [pathB, contextB]) =>
-      contextA.lastUsed - contextB.lastUsed || pathA.localeCompare(pathB),
-  );
+  const sortedEntries = Array.from(vmContexts.entries()).sort(([pathA, contextA], [pathB, contextB]) => {
+    const currentPriorityA = declaredCurrentBundlePaths.has(pathA) ? 1 : 0;
+    const currentPriorityB = declaredCurrentBundlePaths.has(pathB) ? 1 : 0;
+    return (
+      currentPriorityA - currentPriorityB ||
+      contextA.lastUsed - contextB.lastUsed ||
+      pathA.localeCompare(pathB)
+    );
+  });
 
   while (sortedEntries.length > maxVMPoolSize) {
     const oldestEntry = sortedEntries.shift();
@@ -637,8 +659,6 @@ async function buildVM(filePath: string): Promise<VMContext> {
       vmContexts.set(filePath, newVmContext);
       vmPoolActivity.contextsBuilt += 1;
 
-      // Manage pool size after adding new VM
-      manageVMPoolSize();
       log.debug(
         {
           event: 'vm_pool_context_built',
@@ -780,6 +800,10 @@ export async function buildExecutionContext(
         retainSourceMapRegistrationOnce(vmContext.sourceMapRegistration);
         vmContext.lastUsed = Date.now();
         mapBundleFilePathToVMContext.set(bundleFilePath, vmContext);
+        // Enforce the hard pool cap only after the request retains the context.
+        // If pressure immediately evicts the just-built draining context, its
+        // source-map registration remains alive until this ExecutionContext releases it.
+        manageVMPoolSize();
       } catch (error) {
         if (!buildRejected) {
           buildRejected = true;
@@ -940,6 +964,42 @@ export async function buildExecutionContext(
   };
 }
 
+/**
+ * Compiles and pins the trusted current revision's complete bundle set.
+ * Incoming request generations remain draining and cannot replace this identity.
+ */
+export async function prewarmDeclaredBundleGeneration(bundlePaths: string[]): Promise<ExecutionContext> {
+  const normalizedBundlePaths = Array.from(new Set(bundlePaths)).sort();
+  const { maxVMPoolSize } = getConfig();
+  if (normalizedBundlePaths.length === 0) {
+    throw new Error('Declared current bundle generation must include at least one bundle');
+  }
+  if (normalizedBundlePaths.length > maxVMPoolSize) {
+    throw new Error(
+      `Declared current bundle generation requires ${normalizedBundlePaths.length} VM contexts, ` +
+        `but maxVMPoolSize is ${maxVMPoolSize}`,
+    );
+  }
+
+  declaredCurrentGenerationKey = bundleGenerationKey(normalizedBundlePaths);
+  declaredCurrentBundlePaths = new Set(normalizedBundlePaths);
+  declaredCurrentGenerationReady = false;
+  generationObservationSequence += 1;
+  bundleGenerations.set(declaredCurrentGenerationKey, {
+    bundlePaths: new Set(normalizedBundlePaths),
+    lastObservedAt: vmPoolClock.now(),
+    observationSequence: generationObservationSequence,
+  });
+
+  const executionContext = await buildExecutionContext(normalizedBundlePaths, /* buildVmsIfNeeded */ true);
+  declaredCurrentGenerationReady = normalizedBundlePaths.every((bundlePath) => vmContexts.has(bundlePath));
+  if (!declaredCurrentGenerationReady) {
+    executionContext.release();
+    throw new Error('Declared current bundle generation did not remain compiled within maxVMPoolSize');
+  }
+  return executionContext;
+}
+
 /** @internal Used in tests */
 export function resetVM() {
   if (generationRetirementTimer) {
@@ -950,6 +1010,9 @@ export function resetVM() {
   vmCreationPromises.clear();
   bundleGenerations.clear();
   generationObservationSequence = 0;
+  declaredCurrentGenerationKey = undefined;
+  declaredCurrentBundlePaths = new Set();
+  declaredCurrentGenerationReady = false;
   vmPoolActivity.contextsBuilt = 0;
   vmPoolActivity.cacheHits = 0;
   vmPoolActivity.hardLimitEvictions = 0;

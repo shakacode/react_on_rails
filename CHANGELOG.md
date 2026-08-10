@@ -29,10 +29,11 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 - **[Pro]** **Bounded Node Renderer VM retention now avoids old/new RSC rebuild thrash during rolling deploys**:
   The default per-worker VM hard cap now retains four contexts, enough for the server and RSC bundles from one
   draining and one current revision. Successful bundle sets remain reusable through a configurable, timer-driven
-  drain window, while inactive contexts, generation metadata, and pressure logs stay bounded. Doctor now reports the
-  rollout-capacity formula with observed or unverified evidence instead of treating a loopback endpoint or
-  Rails-process environment as live renderer proof. The deployment guides distinguish disk pre-seeding from VM
-  compilation and document topology, memory, and last-observed-generation tradeoffs. **Upgrade memory impact:** the
+  drain window, while inactive contexts, generation metadata, and pressure logs stay bounded. Pre-seeding now emits
+  an immutable revision-scoped current-generation declaration; each configured renderer worker validates and compiles
+  that complete server/RSC set before listening, pins it across old-only traffic gaps, and reports ready only after the
+  compile barrier. Doctor now reports both rollout capacity and observed/unverified declaration evidence rather than
+  claiming a false warm pass from loopback or Rails-process configuration. **Upgrade memory impact:** the
   default `maxVMPoolSize` doubles from 2 to 4 per worker, and total VM retention scales with renderer workers and
   replicas, so operators should re-check deployment memory requests and limits. Invalid `MAX_VM_POOL_SIZE` values
   that previously fell back to the default now fail fast during renderer startup. Fixes

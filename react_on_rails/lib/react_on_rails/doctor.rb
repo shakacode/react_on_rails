@@ -123,6 +123,7 @@ module ReactOnRails
     NODE_RENDERER_SYNTAX_CHECK_TIMEOUT_SECONDS = 5
     NODE_RENDERER_SYNTAX_CHECK_TERMINATION_GRACE_SECONDS = 0.5
     NODE_RENDERER_ROLLOUT_GENERATIONS = 2
+    NODE_RENDERER_CURRENT_GENERATION_MANIFEST_FILENAME = /\Arorp-generation-v1-[0-9a-f]{64}\.json\z/
     NODE_RENDERER_LAUNCHER_PATHS = %w[
       Procfile
       Procfile.dev
@@ -3278,7 +3279,44 @@ module ReactOnRails
       evidence =
         node_renderer_static_capacity_evidence(active_content) ||
         node_renderer_env_or_default_capacity_evidence(config_path)
-      evidence.merge(config_path:)
+      evidence.merge(
+        config_path:,
+        current_generation_declaration: node_renderer_current_generation_declaration_evidence(active_content)
+      )
+    end
+
+    def node_renderer_current_generation_declaration_evidence(active_content)
+      config_object = node_renderer_call_config_object(active_content)
+      return :unverified unless config_object
+
+      top_level_content = node_renderer_top_level_config_content(config_object)
+      return :unverified unless top_level_content
+
+      literal_match = top_level_content.match(
+        /
+          (?:\A|,)\s*
+          (?:currentGenerationManifestPath|["']currentGenerationManifestPath["'])\s*:\s*
+          (?<literal>#{NODE_RENDERER_JS_STRING_PATTERN})\s*(?=,|\z)
+        /xo
+      )
+      return :unverified unless literal_match
+
+      literal = literal_match[:literal]
+      return :unverified unless node_renderer_supported_current_generation_declaration_path?(literal)
+
+      :observed
+    end
+
+    def node_renderer_supported_current_generation_declaration_path?(literal)
+      return false unless literal.length > 2
+
+      declaration_path = literal[1...-1]
+      return false if declaration_path.include?("\\")
+
+      path = Pathname.new(declaration_path)
+      path.absolute? &&
+        path.basename.to_s.match?(NODE_RENDERER_CURRENT_GENERATION_MANIFEST_FILENAME) &&
+        path.dirname.basename.to_s == ".current-generations"
     end
 
     def node_renderer_config_path
@@ -3788,13 +3826,31 @@ module ReactOnRails
       configured_capacity = evidence.fetch(:value)
       evidence_summary =
         "evidence=#{evidence_state}, configured=#{configured_capacity}, required=#{required_capacity}, " \
-        "topology=#{topology_label}, source=#{evidence.fetch(:source)}, scope=configuration_not_live_process"
+        "topology=#{topology_label}, source=#{evidence.fetch(:source)}, " \
+        "current_generation_declaration=#{evidence.fetch(:current_generation_declaration, :unverified)}, " \
+        "scope=configuration_not_live_process"
       if configured_capacity >= required_capacity
-        checker.add_success("✅ VM pool rollout capacity is sufficient (#{evidence_summary}).")
+        if evidence[:current_generation_declaration] == :observed
+          checker.add_success("✅ Declared-current VM pool rollout capacity is sufficient (#{evidence_summary}).")
+        else
+          checker.add_success("✅ VM pool rollout capacity is sufficient (#{evidence_summary}).")
+          checker.add_warning(
+            "⚠️  VM pool capacity is sufficient but declared-current prewarm is unverified (#{evidence_summary})."
+          )
+          add_node_renderer_current_generation_guidance(evidence[:config_path])
+        end
       else
         checker.add_warning("⚠️  VM pool rollout capacity is insufficient (#{evidence_summary}).")
         add_node_renderer_capacity_guidance(required_capacity, evidence[:config_path])
       end
+    end
+
+    def add_node_renderer_current_generation_guidance(config_path = nil)
+      config_path ||= NodeRendererProcfile::NEW_RENDERER_SCRIPT_PATH
+      checker.add_info(
+        "💡 Configure RENDERER_CURRENT_GENERATION_MANIFEST in each NodeRenderer revision, or set " \
+        "currentGenerationManifestPath in #{config_path}, to the immutable declaration emitted by pre-seeding."
+      )
     end
 
     def add_node_renderer_capacity_guidance(required_capacity, config_path = nil)

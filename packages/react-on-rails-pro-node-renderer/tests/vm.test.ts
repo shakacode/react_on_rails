@@ -33,6 +33,7 @@ import {
   buildExecutionContext,
   getVMPoolDiagnostics,
   hasVMContextForBundle,
+  prewarmDeclaredBundleGeneration,
   resetVM,
   setVMPoolClockForTest,
   type VMPoolClock,
@@ -805,6 +806,76 @@ describe('buildVM and runInVM', () => {
       });
       expect(testClock.pendingTimers()).toBe(1);
       expect(testClock.scheduledCalls()).toBe(1);
+    });
+
+    test('pins a prewarmed declared current generation across an arbitrarily long old-only gap', async () => {
+      const { oldGeneration, newGeneration } = rolloutBundlePaths();
+      const testClock = createTestVMPoolClock();
+      setVMPoolClockForTest(testClock.clock);
+
+      const prewarmedCurrent = await prewarmDeclaredBundleGeneration(newGeneration);
+      const originalCurrentContexts = newGeneration.map((bundlePath) =>
+        prewarmedCurrent.getVMContext(bundlePath),
+      );
+      prewarmedCurrent.release();
+
+      const oldExecutionContext = await buildExecutionContext(oldGeneration, /* buildVmsIfNeeded */ true);
+      oldExecutionContext.release();
+      testClock.advanceBy(getConfig().vmPoolRolloutDrainTimeout * 1000 + 1);
+
+      oldGeneration.forEach((bundlePath) => {
+        expect(hasVMContextForBundle(bundlePath)).toBe(false);
+      });
+      newGeneration.forEach((bundlePath) => {
+        expect(hasVMContextForBundle(bundlePath)).toBe(true);
+      });
+
+      const buildsBeforeFirstCurrentRequest = getVMPoolDiagnostics().contextsBuilt;
+      const firstCurrentRequest = await buildExecutionContext(newGeneration, /* buildVmsIfNeeded */ false);
+      newGeneration.forEach((bundlePath, bundleIndex) => {
+        expect(firstCurrentRequest.getVMContext(bundlePath)).toBe(originalCurrentContexts[bundleIndex]);
+      });
+      firstCurrentRequest.release();
+      expect(getVMPoolDiagnostics().contextsBuilt).toBe(buildsBeforeFirstCurrentRequest);
+    });
+
+    test('keeps the hard cap absolute and prefers declared current contexts under old-request pressure', async () => {
+      const { oldGeneration, newGeneration } = rolloutBundlePaths();
+      getConfig().maxVMPoolSize = newGeneration.length;
+
+      const prewarmedCurrent = await prewarmDeclaredBundleGeneration(newGeneration);
+      prewarmedCurrent.release();
+
+      const activeOldRequest = await buildExecutionContext(oldGeneration, /* buildVmsIfNeeded */ true);
+      expect(await activeOldRequest.runInVM('1 + 1', oldGeneration[0])).toBe('2');
+
+      expect(getVMPoolDiagnostics()).toMatchObject({
+        retainedContexts: newGeneration.length,
+        declaredCurrentContexts: newGeneration.length,
+        declaredCurrentContextsRequired: newGeneration.length,
+        declaredCurrentGenerationReady: true,
+      });
+      newGeneration.forEach((bundlePath) => expect(hasVMContextForBundle(bundlePath)).toBe(true));
+      oldGeneration.forEach((bundlePath) => expect(hasVMContextForBundle(bundlePath)).toBe(false));
+
+      // The returned execution context remains safe until the in-flight request releases it,
+      // even though pressure prevented its draining generation from entering the shared pool.
+      expect(activeOldRequest.getVMContext(oldGeneration[0])).toBeDefined();
+      activeOldRequest.release();
+    });
+
+    test('rejects startup when the hard cap cannot hold the declared current set', async () => {
+      const { newGeneration } = rolloutBundlePaths();
+      getConfig().maxVMPoolSize = newGeneration.length - 1;
+
+      await expect(prewarmDeclaredBundleGeneration(newGeneration)).rejects.toThrow(
+        'requires 2 VM contexts, but maxVMPoolSize is 1',
+      );
+      expect(getVMPoolDiagnostics()).toMatchObject({
+        retainedContexts: 0,
+        declaredCurrentContextsRequired: 0,
+        declaredCurrentGenerationReady: false,
+      });
     });
 
     test('retires a drained generation without removing the current generation', async () => {

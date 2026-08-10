@@ -53,6 +53,7 @@ available default ENV values if you wire them into your own launch script.
    Note that `performance` (exposed when `supportModules: true`) is the host's real `performance` object and is **not** stubbed by `stubTimers`; if rendered output embeds `performance.now()` values (e.g., dev-only timing annotations) they will vary between renders. Override via `additionalContext` (e.g., `{ performance: { now: () => 0 } }`) if strict SSR determinism is required.
    See also `supportModules`.
 1. **enableHealthEndpoints** - (default: `false`; set `RENDERER_ENABLE_HEALTH_ENDPOINTS` to `true`, `TRUE`, `yes`, `YES`, or `1` to enable) - If set to `true`, the renderer registers built-in, unauthenticated `GET /health` (liveness) and `GET /ready` (readiness) probe endpoints with status-only response bodies. See [Health and Readiness Endpoints](./health-checks.md) for semantics and working Kubernetes/ECS probe examples (the renderer's h2c listener cannot be probed with HTTP/1.1 `httpGet` probes).
+1. **currentGenerationManifestPath** (default: `process.env.RENDERER_CURRENT_GENERATION_MANIFEST`) - Absolute path to the immutable, revision-scoped current-generation declaration emitted by `react_on_rails_pro:pre_seed_renderer_cache`. When configured, every renderer worker validates the declaration and its server plus optional RSC artifacts, compiles the complete set, and pins it as current before listening. Startup fails if the declaration is missing, malformed, oversized, outside the cache declaration directory, resolves an artifact outside the allowed immutable cache roots, or needs more contexts than `maxVMPoolSize`. Point each renderer revision at its own content-addressed declaration; do not create a mutable shared-volume `current` pointer.
 1. **replayServerAsyncOperationLogs** (default: `process.env.REPLAY_SERVER_ASYNC_OPERATION_LOGS` if set, otherwise `true` when `NODE_ENV=development`, `false` in other environments) - If set to `true`, enables replay of console logs from asynchronous server operations. If `false`, only logs that occur before any awaited asynchronous operations are replayed. Note: unlike `password`, this option only checks `NODE_ENV`, not `RAILS_ENV` — async log replay is a JS debugging concern, so it keys off the JS runtime environment alone.
 1. **maxVMPoolSize** (default: `4`; set via `MAX_VM_POOL_SIZE` env var, parsed as integer) - Absolute maximum number of compiled VM contexts retained in the pool **per renderer worker**. The default holds the server and RSC contexts for one draining and one current bundle generation. Least-recently-used pooled contexts are evicted when the hard cap is exceeded. Must be a positive integer.
 1. **vmPoolRolloutDrainTimeout** (default: `60`; set via `VM_POOL_ROLLOUT_DRAIN_TIMEOUT`, parsed as seconds) - How long an inactive bundle set remains eligible for VM reuse during a rolling deploy. The default covers a representative 40-second overlap plus 20 seconds of drain and scheduling margin. Must be a positive finite number. Tune it to exceed the longest interval during which a draining app revision can still send a render request.
@@ -74,15 +75,15 @@ maxVMPoolSize >= simultaneous bundle generations × contexts per generation
 
 The drain timeout bounds how long inactive generation metadata and unshared contexts remain in the pool. Cleanup runs from one unreferenced timer, so it does not require another render request. Shared bundle paths remain pooled while any live bundle set references them. An already-running request can keep an evicted execution context and source-map registration alive outside the pool until it releases them.
 
-The request protocol identifies bundle paths but does not declare which deployment generation is chronologically newer. The pool therefore protects the **most recently observed successful bundle set**, not a claimed "new" revision. If the last overlap request comes from the old revision and traffic then goes idle, the timer can retire the new set. The next new-revision request rebuilds that set once, subsequent requests reuse it, and the already-expired old set becomes eligible for retirement. Pooled context retention remains bounded throughout; total transient memory also depends on concurrent in-flight work that has not released evicted contexts and source maps.
+With `currentGenerationManifestPath`, the trusted revision-scoped declaration—not request order—identifies the current bundle set. Old requests cannot demote it, even across an arbitrarily long old-only traffic gap. Inactive nonmatching generations drain on the configured timer, while the declared current contexts remain pinned. Without a declaration, the compatibility path retains the most recently observed successful bundle set and `/ready` keeps its legacy “any compiled context” meaning.
 
-The pool intentionally combines bounded bundle-set retention with one global per-worker hard cap instead of permanently reserving slots for individual bundle paths. Per-bundle reservations would need trusted generation identity, a complete declared bundle set, and an admission policy for when all reservations cannot fit under the cap; the current request protocol provides none of those guarantees. Generation-affinity routing can reduce overlap pressure only when the deployment platform guarantees that every renderer receives one revision. That is an advanced topology option, not behavior this package provides or Doctor can verify, so size the pool for the generations that can actually reach each renderer.
+The pool uses one global per-worker hard cap. Declared current contexts have eviction priority over draining request generations; a draining context that cannot be pooled is still safe for its active request until release. Startup fails instead of weakening the cap when the declared set itself cannot fit. Generation-affinity routing can reduce overlap pressure only when the deployment platform guarantees that every renderer receives one revision, so size the pool for the generations that can actually reach each renderer.
 
 Disk-cache seeding and VM retention solve different cold paths:
 
-- `pre_seed_renderer_cache` places bundle files and companion artifacts on disk, avoiding a `410 Gone`, upload, and retry.
-- The first render for a disk-cached bundle still compiles its VM context.
-- A correctly sized VM pool avoids repeating that compilation while rollout requests alternate.
+- `pre_seed_renderer_cache` places bundle files and companion artifacts on disk, avoiding a `410 Gone`, upload, and retry, and emits the new revision's immutable current-generation declaration.
+- Configuring that exact declaration makes each worker compile the new server and optional RSC contexts before it listens.
+- A correctly sized VM pool retains those pinned contexts while old request generations drain.
 
 At `debug`, `vm_pool_context_built` reports cumulative builds and hard-cap evictions. `vm_pool_hard_limit_eviction` is a rate-limited warning that indicates the configured cap is causing pressure. `vm_pool_rollout_generation_retired` reports bounded drain cleanup without logging bundle paths.
 
@@ -94,14 +95,14 @@ renderer replicas × effective workers per replica × maxVMPoolSize
 
 `workersCount: 0` means one effective in-process worker; otherwise use the configured worker count. During a rollout, use the maximum simultaneously live renderer replicas, including old replicas and `maxSurge`, not only steady-state replicas. Estimate each replica's memory request and limit from `effective workers × maxVMPoolSize × measured memory per pooled context`, then add the master process, base V8 heaps, bundle buffers, and headroom for source maps and evicted execution contexts held by concurrent in-flight requests. The total cluster reservation multiplies that per-replica budget by the overlapping replica count.
 
-There is currently no supported eager VM-prewarm API. `/ready` becomes ready after at least one context is compiled; it does not prove that every rollout bundle and role is compiled. A safe controlled rollout is:
+With `currentGenerationManifestPath`, startup is the supported eager prewarm seam and `/ready` means the answering worker compiled its complete declared current set. A safe controlled rollout is:
 
-1. Complete disk seeding before renderer startup.
-2. Start the renderer on private networking with the normal render password configured.
-3. Wait for liveness, then send application-owned, authenticated smoke requests through Rails that exercise each required SSR and RSC render path.
-4. Mark the Rails candidate ready for public traffic only after those renders succeed.
+1. Complete pre-seeding and capture the exact emitted declaration path for this renderer revision.
+2. Set `RENDERER_CURRENT_GENERATION_MANIFEST` to that immutable file and start the renderer on private networking.
+3. Wait for the renderer to listen and for `/ready`; each worker crosses its own compile barrier before accepting connections.
+4. Deploy the matching Rails revision. Application-owned authenticated smoke requests remain useful for end-to-end behavior, but are no longer the VM prewarm mechanism.
 
-The smoke verifies the workers that receive those requests; there is no supported worker-targeting API that proves every worker is precompiled. If your platform cannot run that smoke before cutover, the first request for each disk-cached bundle performs one compilation in the selected worker. The correctly sized pool prevents repeated old/new compilation within that worker after the first render; it does not eliminate the initial compilation.
+If no declaration is configured, startup remains backward compatible: bundles compile on requests and `/ready` means only that some VM exists. That mode cannot guarantee a prewarmed new generation through an old-only request gap.
 
 Deprecated options:
 

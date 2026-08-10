@@ -117,8 +117,8 @@ containers:
       periodSeconds: 5
       failureThreshold: 12 # tune to your cold-start time; 10 + (5 * 12) = 70 s total
       timeoutSeconds: 1
-    # Readiness: shallow TCP check. Do NOT gate readiness on /ready unless you
-    # also pre-warm the renderer — see "Gating traffic on /ready" below.
+    # Readiness: use /ready after configuring the revision-scoped current
+    # generation manifest; shallow TCP remains the compatibility fallback.
     # (httpGet cannot be used in any case: the renderer listener is h2c-only.)
     readinessProbe:
       tcpSocket:
@@ -137,18 +137,10 @@ containers:
 
 ### Gating traffic on `/ready`
 
-`/ready` reports `503` until the answering worker has compiled at least one bundle, and each worker compiles its
-first bundle when it serves its first render request. If the readiness probe is the only thing standing between a
-fresh pod and its first render — a standalone renderer behind a Service, or a sidecar (pod readiness requires
-**all** containers to be ready, so an unready renderer container blocks traffic to the Rails container too) — then
-gating readiness on `/ready` deadlocks the rollout: no traffic → no first render → never ready.
-
-Only use `/ready` as the readiness gate when something other than probe-gated traffic delivers the first render,
-for example a deployment pipeline step or Rails initializer that POSTs a warm-up render to each new replica
-directly (bypassing the Service), or a container `postStart` hook that does the same. That warm-up must reach
-every renderer worker that can answer probes; with `workersCount > 1`, one render per replica is not enough
-unless you intentionally run a single worker or fan out warm-up renders to each worker. With a warm-up path in
-place:
+When `RENDERER_CURRENT_GENERATION_MANIFEST` points to the immutable declaration emitted by pre-seeding, every
+worker validates and compiles its complete server plus optional RSC set before listening. `/ready` then means the
+answering worker completed that declaration. No unauthenticated warmup endpoint or probe-generated render is
+needed:
 
 ```yaml
 readinessProbe:
@@ -165,16 +157,17 @@ readinessProbe:
   timeoutSeconds: 5
 ```
 
-Without a warm-up path, keep the shallow `tcpSocket` readiness probe and use `/ready` for monitoring, dashboards,
-and post-deploy verification instead.
+Without a configured declaration, compatibility behavior remains: `/ready` reports `503` until the answering
+worker compiles any bundle from a render request. In that mode, keep the shallow `tcpSocket` readiness probe or
+provide your own authenticated application smoke path; otherwise probe-gated traffic can deadlock startup.
 
 For stricter hung-process detection, replace the `tcpSocket` liveness probe with an `exec` probe against `/health`
 (same curl command as the `/ready` example above, with the path changed). A fully blocked event loop still accepts TCP connections, so
 only the `exec` form catches it. Use the stricter form deliberately — it restarts the container on slow event loops,
 not just dead ones.
 
-> **Cold-start note:** Each worker compiles its first bundle when it serves its first render request, so `/ready`
-> stays `503` until then — pre-seeding the bundle cache on disk does not by itself flip `/ready`. This is harmless
+> **Compatibility-mode cold-start note:** Without `RENDERER_CURRENT_GENERATION_MANIFEST`, each worker compiles its
+> first bundle when it serves its first render request, so `/ready` stays `503` until then. This is harmless
 > wherever the check does not gate the traffic that would deliver that first render or replace the container
 > (monitoring, dashboards, post-deploy checks). Wherever it does gate that traffic or container lifetime — a
 > Kubernetes Service routing only to ready replicas, a sidecar whose unready state blocks pod readiness, an ECS
@@ -184,8 +177,8 @@ not just dead ones.
 ## ECS Health Check
 
 ECS container health checks run **inside** the container (like a Kubernetes `exec` probe), so they work against the
-h2c listener with curl and the default `localhost` binding. Use `/health` by default so a normal cold start cannot
-fail the task before the first render compiles a bundle:
+h2c listener with curl and the default `localhost` binding. Use `/ready` when the revision-scoped current declaration
+is configured; use `/health` in compatibility mode so request-driven compilation cannot fail the task:
 
 ```json
 {
@@ -210,11 +203,11 @@ fail the task before the first render compiles a bundle:
 }
 ```
 
-Tune `startPeriod` to match the observed image pull, boot, and first-render latency for your app. Larger bundles or
+Tune `startPeriod` to match the observed image pull, boot, and prewarm latency for your app. Larger bundles or
 slower registries may need 60 seconds or more.
 
-If you intentionally warm the renderer before `startPeriod` expires and want ECS to replace a task that cannot serve
-compiled bundles, change the path to `/ready`.
+With a configured declaration, change the path to `/ready` when ECS should replace a task that cannot compile its
+declared current bundle set.
 
 > **ALB note:** ALB target-group health checks are HTTP/1.1 and cannot probe the renderer's h2c port. If the renderer
 > sits behind a load balancer, prefer the ECS container health check above for renderer health, or use an NLB with the
@@ -245,8 +238,9 @@ HTTP/1.1 and **cannot speak the renderer's h2c listener** (see [h2c](#h2c-why-ht
 always fails against these endpoints — use a **Command** probe with an h2c-aware curl instead. Command probes run
 inside the container, so the default `localhost` binding works and no `0.0.0.0` host is required.
 
-Use `/health` (always `200`) for liveness and readiness by default so a normal cold start cannot fail the workload
-before the first render compiles a bundle. Control Plane uses the Kubernetes-style `readinessProbe` / `livenessProbe`
+Use `/ready` for readiness when the revision-scoped declaration is configured; use `/health` for liveness. In
+compatibility mode, keep `/health` for readiness so request-driven compilation cannot deadlock the workload. Control
+Plane uses the Kubernetes-style `readinessProbe` / `livenessProbe`
 fields on the workload container (the same shape as the [Kubernetes example above](#kubernetes-probes) and the
 existing [Control Plane deployment docs](../../deployment/docker-deployment.md#deploying-with-control-plane)), with a Command
 probe expressed as `exec.command`:
@@ -284,20 +278,15 @@ spec:
         timeoutSeconds: 5 # exceed curl --max-time 3 so the probe, not the orchestrator, owns the timeout
 ```
 
-Do **not** point a `--fail` Command probe at `/ready` unless something pre-warms the renderer, or the probe will fail
-on the cold-start `503` and the workload never becomes ready (the exact failure in
-[Status-Code Contract](#status-code-contract)). Only switch the path to `/ready` once a warm-up path delivers the
-first render to every worker that answers probes — see [Gating traffic on `/ready`](#gating-traffic-on-ready).
+Do **not** point a `--fail` Command probe at `/ready` in compatibility mode without another authenticated warmup
+path. Prefer configuring the revision-scoped declaration so startup itself compiles every worker before listen.
 
 ## Semantics and Caveats
 
 - **Per-worker checks.** With `workersCount > 1`, the Node.js cluster module distributes incoming connections across
-  worker processes, and each worker has its own VM pool. A probe therefore checks the one worker that answers it.
-  Workers load bundles independently (each compiles the bundle on its first render request), so a freshly restarted
-  worker can briefly report `503` on `/ready` while its siblings serve traffic. This is the intended per-process
-  readiness signal for orchestrators probing one container. During a rollout or cold start, raw probe logs may show a
-  short mix of `503` and `200` responses; Kubernetes smooths that with `failureThreshold` / `successThreshold`, so a
-  single unloaded-worker `503` should not flap pod readiness.
+  worker processes, and each worker has its own VM pool. With a current-generation declaration, each worker compiles
+  the complete declared set before listening, so any worker that answers `/ready` has crossed its own barrier. In
+  compatibility mode, a probe still checks only the answering worker and readiness means only that worker has some VM.
 - **No license check.** License validation happens on the Rails side; `/ready` does not (and cannot) report license
   state.
 - **Liveness checks nothing but the event loop.** Do not point `/health` at dependency monitoring; that is what

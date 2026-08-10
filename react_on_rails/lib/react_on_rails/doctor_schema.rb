@@ -68,7 +68,8 @@ module ReactOnRails
       "node_renderer_rollout_capacity" => {
         files: ["renderer/node-renderer.js", "client/node-renderer.js", "deployment environment"],
         expected_end_state:
-          "The NodeRenderer VM hard cap can hold every server and RSC context needed by overlapping deploy generations."
+          "The NodeRenderer declares and prewarms its current server/RSC set, and its VM hard cap can hold " \
+          "rollout overlap."
       },
       "react_server_components" => {
         files: ["config/initializers/react_on_rails.rb", "config/shakapacker.yml", "app/javascript"],
