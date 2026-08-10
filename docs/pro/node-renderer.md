@@ -314,6 +314,14 @@ See [Rolling-Deploy Adapters](./rolling-deploy-adapters.md) for the full protoco
 
 The Node Renderer ships an optional OpenTelemetry integration for distributed tracing. When enabled, every SSR request becomes a trace you can inspect in any OTLP-compatible backend (Jaeger, Honeycomb, Datadog, Grafana Tempo, New Relic, etc.).
 
+### Continue Rails traces into the Node Renderer
+
+React on Rails Pro creates a CLIENT span for every Rails request to the Node Renderer and injects the active W3C trace context into the request headers. The renderer's server spans therefore continue the Rails trace instead of starting a separate root trace.
+
+Initialize the OpenTelemetry Ruby SDK and register its tracer provider in the Rails application before the first renderer request. The Pro gem does not add an OpenTelemetry dependency or initialize an exporter for the application. If OpenTelemetry is not loaded, or only the API's default proxy provider is present, renderer requests remain uninstrumented.
+
+This covers regular and streaming renders, incremental async-props renders, raw-render requests, asset uploads, and other requests sent through the renderer HTTP client. The Rails CLIENT span records only `http.request.method`, `url.path`, `http.response.status_code`, `http.request.body.size`, and `http.response.body.size`.
+
 ### Install the OpenTelemetry packages (peer dependencies)
 
 **npm:**
@@ -424,7 +432,7 @@ As a trace, the spans nest under the root `ror.ssr.request`. On the warm path `r
 
 ### Privacy note
 
-The `renderingRequest` payload and rendered response body are **never** included in span attributes. Only bundle hashes, counts, and byte sizes (`bytes.total`, `response.bytes`) are recorded. This matches the renderer's existing logging policy.
+The `renderingRequest` payload and rendered response body are **never** included in span attributes. Rails CLIENT spans contain only the request method and path, response status, and request/response byte sizes. Renderer spans contain only bundle hashes, counts, and byte sizes (`bytes.total`, `response.bytes`). This matches the renderer's existing logging policy.
 
 ## Further Reading
 
