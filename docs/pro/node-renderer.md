@@ -316,9 +316,9 @@ The Node Renderer ships an optional OpenTelemetry integration for distributed tr
 
 ### Continue Rails traces into the Node Renderer
 
-React on Rails Pro creates a CLIENT span for every Rails request to the Node Renderer and injects the active W3C trace context into the request headers. The renderer's server spans therefore continue the Rails trace instead of starting a separate root trace.
+React on Rails Pro creates a CLIENT span for every Rails request to the Node Renderer and injects the active W3C trace context into the request headers. With `fastify: true` in the renderer's OpenTelemetry configuration, its server spans extract that context and continue the Rails trace instead of starting a separate root trace.
 
-Initialize the OpenTelemetry Ruby SDK and register its tracer provider in the Rails application before the first renderer request. The Pro gem does not add an OpenTelemetry dependency or initialize an exporter for the application. If OpenTelemetry is not loaded, or only the API's default proxy provider is present, renderer requests remain uninstrumented.
+Run `OpenTelemetry::SDK.configure` in the Rails application before the first renderer request so both the tracer provider and W3C propagator are registered. The Pro gem does not add an OpenTelemetry dependency or initialize an exporter for the application. If OpenTelemetry is not loaded, or only the API's default proxy provider is present, renderer requests remain uninstrumented.
 
 This covers regular and streaming renders, incremental async-props renders, raw-render requests, asset uploads, and other requests sent through the renderer HTTP client. The Rails CLIENT span records only `http.request.method`, `url.path`, `http.response.status_code`, `http.request.body.size`, and `http.response.body.size`.
 
@@ -406,7 +406,7 @@ await reactOnRailsProNodeRenderer().catch((e) => {
 
 | Span                                 | Where                                                             | Attributes                                                                |
 | ------------------------------------ | ----------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| `ror.ssr.request`                    | Root span for each SSR render request                             | (none — root)                                                             |
+| `ror.ssr.request`                    | Entry span for each SSR render request                            | (none)                                                                    |
 | `ror.bundle.build_execution_context` | Loading a bundle into the VM                                      | `bundle.timestamp`, `bundle.paths.count`, `cache.strategy`                |
 | `ror.bundle.upload`                  | When new bundles are uploaded mid-request or via `/upload-assets` | `bundle.count`, `assets.count`, `bytes.total` (sum of upload source size) |
 | `ror.vm.execute`                     | The actual SSR JS execution inside the VM                         | `bundle.timestamp`                                                        |
@@ -418,7 +418,7 @@ Outbound HTTP calls inside your SSR bundle are automatically captured by `HttpIn
 
 **Cache-miss note:** On a cache-miss path `ror.bundle.build_execution_context` appears twice. The first span has `cache.strategy=cache-first` and can end with ERROR status when the VM cache probe misses. The second span has `cache.strategy=cache-miss` for the real VM build after bundle upload or bundle discovery. Scope error alerts to exclude `cache.strategy=cache-first` when that miss is expected.
 
-As a trace, the spans nest under the root `ror.ssr.request`. On the warm path `ror.bundle.build_execution_context` (`cache-first`) fires first to load the bundle into the VM, then `ror.result.prepare` opens and runs `ror.vm.execute` **inside it** (`vm.execute` is a child of `result.prepare`, not a sibling after it). Cold-path spans (upload and `cache-miss` build) appear only after the `cache-first` probe and before `result.prepare`; outbound `fetch` calls from your bundle are captured automatically as HTTP child spans under `vm.execute`; and incremental (async-props) renders add their own stream/chunk spans:
+The renderer spans nest under `ror.ssr.request`. With `fastify: true`, that entry span is a child of the Rails CLIENT span; otherwise it is a renderer-side root. On the warm path `ror.bundle.build_execution_context` (`cache-first`) fires first to load the bundle into the VM, then `ror.result.prepare` opens and runs `ror.vm.execute` **inside it** (`vm.execute` is a child of `result.prepare`, not a sibling after it). Cold-path spans (upload and `cache-miss` build) appear only after the `cache-first` probe and before `result.prepare`; outbound `fetch` calls from your bundle are captured automatically as HTTP child spans under `vm.execute`; and incremental (async-props) renders add their own stream/chunk spans:
 
 <p>
   <img src="images/otel-span-tree.svg" alt="OpenTelemetry span tree rooted at one server-render request: the cache-first build probe runs first, then (on a cache miss) a cold start adds bundle-upload and cache-miss build spans, then ror.result.prepare opens and wraps ror.vm.execute as its child; outbound fetches appear as HTTP child spans under vm.execute; and streaming async-props renders add their own stream and per-chunk spans." width="840" />
@@ -432,7 +432,7 @@ As a trace, the spans nest under the root `ror.ssr.request`. On the warm path `r
 
 ### Privacy note
 
-The `renderingRequest` payload and rendered response body are **never** included in span attributes. Rails CLIENT spans contain only the request method and path, response status, and request/response byte sizes. Renderer spans contain only bundle hashes, counts, and byte sizes (`bytes.total`, `response.bytes`). This matches the renderer's existing logging policy.
+The `renderingRequest` payload and rendered response body are **never** included in span attributes. Rails CLIENT spans contain only the request method, a normalized path without bundle or props digests, response status, and request/response byte sizes. Only W3C `traceparent` and `tracestate` fields are forwarded; baggage is not sent to the renderer. Renderer spans contain only bundle hashes, counts, and byte sizes (`bytes.total`, `response.bytes`). This matches the renderer's existing logging policy.
 
 ## Further Reading
 

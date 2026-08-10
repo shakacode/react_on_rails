@@ -413,11 +413,12 @@ Before upgrading:
 - Expect renderer connection drops to surface immediately as `ReactOnRailsPro::Error`/connection failures. HTTPX
   previously performed one implicit transport retry for some connection drops; the async-http adapter uses
   `retries: 0` and leaves retry policy to the existing bundle-upload retry loop and caller behavior.
-- If your Rails application uses OpenTelemetry, keep initializing the Ruby SDK and registering its tracer provider
-  before the first renderer request. HTTPX instrumentation no longer observes the async-http transport. React on Rails
-  Pro now creates the replacement CLIENT span itself and injects W3C trace context for regular, streaming,
-  incremental, raw-render, and asset-upload requests. No OpenTelemetry dependency is added by the Pro gem; when the
-  SDK is absent or no provider is registered, renderer requests remain uninstrumented.
+- If your Rails application uses OpenTelemetry, run `OpenTelemetry::SDK.configure` before the first renderer request
+  so both the tracer provider and W3C propagator are registered. HTTPX instrumentation no longer observes the
+  async-http transport. React on Rails Pro now creates the replacement CLIENT span itself and injects W3C trace
+  context for regular, streaming, incremental, raw-render, and asset-upload requests. Configure the Node Renderer
+  with `fastify: true` so its server spans extract that context. No OpenTelemetry dependency is added by the Pro gem;
+  when the SDK is absent or no provider is registered, renderer requests remain uninstrumented.
 - Run the node renderer client from the normal Rails request path. **Note for Falcon/async-rails users:** the earlier
   advisory to keep Falcon deployments on the HTTPX renderer client is superseded; HTTPX has been removed and async-http
   now handles Falcon natively. Async Rails servers (Falcon, Puma with an async scheduler) are supported: the async-http

@@ -15,6 +15,7 @@
 
 require "English"
 require "erb/util"
+require_relative "../open_telemetry"
 
 module ReactOnRailsPro
   module StreamCacheWrites
@@ -223,16 +224,19 @@ module ReactOnRailsPro
       require_streaming_dependencies
       warn_on_non_html_formats_without_content_type(render_options[:formats], content_type)
       initialize_rsc_stream_observability_state(rsc_stream_observability)
+      parent_context = ReactOnRailsPro::OpenTelemetry.capture_context
 
       Sync do |parent_task|
-        ReactOnRailsPro::Stream.with_renderer_server_timing_collector(renderer_server_timing_collector_for_stream) do
-          stream_view_containing_react_components_in_sync(
-            parent_task,
-            template:,
-            close_stream_at_end:,
-            content_type:,
-            render_options:
-          )
+        ReactOnRailsPro::OpenTelemetry.with_context(parent_context) do
+          ReactOnRailsPro::Stream.with_renderer_server_timing_collector(renderer_server_timing_collector_for_stream) do
+            stream_view_containing_react_components_in_sync(
+              parent_task,
+              template:,
+              close_stream_at_end:,
+              content_type:,
+              render_options:
+            )
+          end
         end
       end
     ensure

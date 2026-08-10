@@ -209,13 +209,31 @@ module ReactOnRailsPro
       def initialize
         super
         @bytesize = 0
+        @trace = nil
+        @write_closed = false
       end
 
       def write(chunk)
+        result = super
         @bytesize += chunk.bytesize
+        result
+      end
+
+      def trace=(trace)
+        @trace = trace
+        trace.wait_for_request_close
+        trace.request_body = self
+        trace.seal_request_size if @write_closed
+      end
+
+      def close_write(...)
         super
+      ensure
+        @write_closed = true
+        @trace&.seal_request_size
       end
     end
+    private_constant :WritableBody
 
     class PersistentThreadClient
       ResponseEnvelope = Struct.new(:status, :body, :headers)
@@ -602,38 +620,24 @@ module ReactOnRailsPro
     def post(path, form: nil, json: nil, raw: nil, stream: false)
       ensure_open!
       headers, body = request_body(form:, json:, raw:)
-      trace = start_client_trace(:post, path, headers, body)
+      parent_context = ReactOnRailsPro::OpenTelemetry.capture_context
       build_response(stream:) do |yielder, status_assigner, headers_assigner|
-        if trace
-          trace.within_context do
-            execute_request(:post, path, [headers, body],
-                            stream:,
-                            response_handlers: [yielder, status_assigner, headers_assigner], trace:)
-          end
-        else
-          execute_request(:post, path, [headers, body],
-                          stream:,
-                          response_handlers: [yielder, status_assigner, headers_assigner])
-        end
+        execute_request_with_trace(:post, path, [headers, body],
+                                   stream:,
+                                   response_handlers: [yielder, status_assigner, headers_assigner],
+                                   parent_context:)
       end
     end
 
     def get(path)
       ensure_open!
       headers = []
-      trace = start_client_trace(:get, path, headers, nil)
+      parent_context = ReactOnRailsPro::OpenTelemetry.capture_context
       build_response(stream: false) do |yielder, status_assigner, headers_assigner|
-        if trace
-          trace.within_context do
-            execute_request(:get, path, [headers, nil],
-                            stream: false,
-                            response_handlers: [yielder, status_assigner, headers_assigner], trace:)
-          end
-        else
-          execute_request(:get, path, [headers, nil],
-                          stream: false,
-                          response_handlers: [yielder, status_assigner, headers_assigner])
-        end
+        execute_request_with_trace(:get, path, [headers, nil],
+                                   stream: false,
+                                   response_handlers: [yielder, status_assigner, headers_assigner],
+                                   parent_context:)
       end
     end
 
@@ -646,19 +650,12 @@ module ReactOnRailsPro
     def post_bidi(path, headers:)
       ensure_open!
       writable = WritableBody.new
-      trace = start_client_trace(:post, path, headers, writable)
+      parent_context = ReactOnRailsPro::OpenTelemetry.capture_context
       response = build_response(stream: true) do |yielder, status_assigner, headers_assigner|
-        if trace
-          trace.within_context do
-            execute_request(:post, path, [headers, writable],
-                            stream: true,
-                            response_handlers: [yielder, status_assigner, headers_assigner], trace:)
-          end
-        else
-          execute_request(:post, path, [headers, writable],
-                          stream: true,
-                          response_handlers: [yielder, status_assigner, headers_assigner])
-        end
+        execute_request_with_trace(:post, path, [headers, writable],
+                                   stream: true,
+                                   response_handlers: [yielder, status_assigner, headers_assigner],
+                                   parent_context:)
       end
       [writable.output, response]
     end
@@ -762,11 +759,25 @@ module ReactOnRailsPro
       raise ConnectionError, e.message
     end
 
-    def start_client_trace(method, path, headers, body)
-      trace = ReactOnRailsPro::OpenTelemetry.start_client_span(method, path)
+    def execute_request_with_trace(method, path, request_body, stream:, response_handlers:, parent_context:)
+      headers, body = request_body
+      trace = start_client_trace(method, path, headers, body, parent_context:)
+      return execute_request(method, path, request_body, stream:, response_handlers:) unless trace
+
+      trace.within_context do
+        execute_request(method, path, request_body, stream:, response_handlers:, trace:)
+      end
+    end
+
+    def start_client_trace(method, path, headers, body, parent_context:)
+      trace = ReactOnRailsPro::OpenTelemetry.start_client_span(method, path, parent_context:)
       return unless trace
 
-      trace.request_body = body
+      if body.is_a?(WritableBody)
+        body.trace = trace
+      else
+        trace.request_body = body
+      end
       trace.inject(headers)
       trace
     end

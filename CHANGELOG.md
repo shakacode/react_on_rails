@@ -28,8 +28,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 - **[Pro]** **Rails requests to the Node Renderer once again continue OpenTelemetry traces**: The async-http transport
   now creates a CLIENT span and injects W3C trace context for regular and streaming renders, incremental async-props
-  renders, raw-render requests, and asset uploads when the Rails application has registered an OpenTelemetry tracer
-  provider. OpenTelemetry remains optional, and spans record only the HTTP method, request path, response status, and
+  renders, raw-render requests, and asset uploads when the Rails application has configured the OpenTelemetry SDK.
+  OpenTelemetry remains optional, and spans record only the HTTP method, normalized request path, response status, and
   request/response byte sizes. Fixes
   [Issue 4866](https://github.com/shakacode/react_on_rails/issues/4866).
 
