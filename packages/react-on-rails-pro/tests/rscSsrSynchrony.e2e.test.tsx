@@ -449,21 +449,30 @@ afterAll(() => {
 // Cases 1–4: decode-level zero-macrotask contract (warm manifests)
 // ---------------------------------------------------------------------------
 
-describe('complete payload decodes within the same macrotask turn (warm manifests)', () => {
-  const expectDecodeBeatsTripwires = async (flightBytes: Buffer): Promise<React.ReactNode> => {
-    const immediateTripwire = armSetImmediateTripwire();
-    const timeoutTripwire = armSetTimeoutTripwire();
-    try {
-      const element = await decodeCompletePayload(flightBytes);
-      expect(immediateTripwire.fired()).toBe(false);
-      expect(timeoutTripwire.fired()).toBe(false);
-      return element;
-    } finally {
-      immediateTripwire.disarm();
-      timeoutTripwire.disarm();
-    }
-  };
+// The single arm/assert/disarm implementation of the timing contract, shared by
+// every decode-level case (including the cold-manifest test, which passes its
+// isolated-registry module) so a future change to the tripwire contract only
+// has one place to live.
+const expectDecodeBeatsTripwires = async (
+  flightBytes: Buffer,
+  decodeModule?: DecodeModule,
+): Promise<React.ReactNode> => {
+  const immediateTripwire = armSetImmediateTripwire();
+  const timeoutTripwire = armSetTimeoutTripwire();
+  try {
+    const element = await (decodeModule
+      ? decodeCompletePayload(flightBytes, decodeModule)
+      : decodeCompletePayload(flightBytes));
+    expect(immediateTripwire.fired()).toBe(false);
+    expect(timeoutTripwire.fired()).toBe(false);
+    return element;
+  } finally {
+    immediateTripwire.disarm();
+    timeoutTripwire.disarm();
+  }
+};
 
+describe('complete payload decodes within the same macrotask turn (warm manifests)', () => {
   it('case 1: plain server-component payload (baseline)', async () => {
     const element = await expectDecodeBeatsTripwires(flight.plainServer);
 
@@ -472,39 +481,41 @@ describe('complete payload decodes within the same macrotask turn (warm manifest
     expect(html).toContain('<p>PLAIN_TEXT_MARKER</p>');
   });
 
-  it('case 2: payload with a client component resolves through the manifest without a macrotask hop', async () => {
-    const chunkLoadCallsBefore = chunkLoadCalls;
-    const element = await expectDecodeBeatsTripwires(flight.withClientComponent);
+  it('case 2: client-component payload resolves through the manifest without a macrotask hop, cold then warm chunk cache', async () => {
+    // COLD-then-WARM in one test so the ordering the two halves depend on is
+    // guaranteed by construction — no coupling to it() declaration order or
+    // test selection (a reorder/randomization/`-t` run can't silently flip
+    // which cache state each half sees).
+    //
+    // Cold half — strict delta: this decode is the FIRST client-reference
+    // resolution in this module registry (the beforeAll warm-up deliberately
+    // used a payload without client references; the cold-manifest test below
+    // uses an isolated registry with its own chunkCache), so the Flight
+    // client's blocked-chunk path — preloadModule → __webpack_chunk_load__ →
+    // "blocked" chunk woken from the promise's .then — runs INSIDE the
+    // tripwire window, cold chunkCache and all. This both proves the cold
+    // chunk-load hop is microtask-only and guards against the test silently
+    // degrading to a path that never touches module loading. If a future test
+    // ever primes this registry's cache first, the delta here drops to zero
+    // and this fails loudly — pointing straight at the coupling.
+    const coldCallsBefore = chunkLoadCalls;
+    const coldElement = await expectDecodeBeatsTripwires(flight.withClientComponent);
+    expect(chunkLoadCalls).toBeGreaterThan(coldCallsBefore);
 
-    // Strict delta: this decode is the FIRST client-reference resolution in the
-    // process (the beforeAll warm-up deliberately used a payload without client
-    // references), so the Flight client's blocked-chunk path — preloadModule →
-    // __webpack_chunk_load__ → "blocked" chunk woken from the promise's .then —
-    // ran INSIDE the tripwire window above, cold chunkCache and all. This both
-    // proves the cold chunk-load hop is microtask-only and guards against the
-    // test silently degrading to a path that never touches module loading.
-    expect(chunkLoadCalls).toBeGreaterThan(chunkLoadCallsBefore);
+    const coldHtml = await renderElementToHtml(coldElement);
+    expect(coldHtml).toContain('<h2>SERVER_WRAPPER_MARKER</h2>');
+    expect(coldHtml).toContain('client:CARD_LABEL_MARKER');
 
-    const html = await renderElementToHtml(element);
-    expect(html).toContain('<h2>SERVER_WRAPPER_MARKER</h2>');
-    expect(html).toContain('client:CARD_LABEL_MARKER');
-  });
+    // Warm half — zero delta: preloadModule's chunkCache now marks the chunk
+    // loaded (entry nulled on resolution), so a repeat decode takes the
+    // synchronous cache-hit path — the steady state of a long-running
+    // renderer. Same tripwire contract.
+    const warmCallsBefore = chunkLoadCalls;
+    const warmElement = await expectDecodeBeatsTripwires(flight.withClientComponent);
+    expect(chunkLoadCalls).toBe(warmCallsBefore);
 
-  it('case 2 (warm chunk cache): a repeat client-component decode stays microtask-only', async () => {
-    // Prime the chunk cache inside THIS test so it stays valid standalone,
-    // reordered, or under test randomization — no silent coupling to case 2
-    // having run first. (Idempotent: if case 2 already primed the cache this
-    // decode is itself a warm cache-hit.) After priming, preloadModule's
-    // chunkCache marks the chunk loaded (entry nulled on resolution), so the
-    // timed decode takes the synchronous cache-hit path — the steady state of
-    // a long-running renderer. Same tripwire contract.
-    await decodeCompletePayload(flight.withClientComponent);
-    const chunkLoadCallsBefore = chunkLoadCalls;
-    const element = await expectDecodeBeatsTripwires(flight.withClientComponent);
-    expect(chunkLoadCalls).toBe(chunkLoadCallsBefore);
-
-    const html = await renderElementToHtml(element);
-    expect(html).toContain('client:CARD_LABEL_MARKER');
+    const warmHtml = await renderElementToHtml(warmElement);
+    expect(warmHtml).toContain('client:CARD_LABEL_MARKER');
   });
 
   it('case 3: payload with already-resolved promises settles on microtasks only', async () => {
@@ -564,18 +575,9 @@ describe('cold manifest cache', () => {
 
       // One decode is enough to warm the process: the very next decode meets the
       // full zero-macrotask contract.
-      const immediateTripwire = armSetImmediateTripwire();
-      const timeoutTripwire = armSetTimeoutTripwire();
-      try {
-        const warmElement = await decodeCompletePayload(flight.withClientComponent, freshModule);
-        expect(immediateTripwire.fired()).toBe(false);
-        expect(timeoutTripwire.fired()).toBe(false);
-        const warmHtml = await renderElementToHtml(warmElement);
-        expect(warmHtml).toContain('client:CARD_LABEL_MARKER');
-      } finally {
-        immediateTripwire.disarm();
-        timeoutTripwire.disarm();
-      }
+      const warmElement = await expectDecodeBeatsTripwires(flight.withClientComponent, freshModule);
+      const warmHtml = await renderElementToHtml(warmElement);
+      expect(warmHtml).toContain('client:CARD_LABEL_MARKER');
     });
   });
 });
@@ -621,12 +623,15 @@ describe('negative control: genuinely pending payload', () => {
     const pending = pendingPayloadStream(pendingPart1, pendingPart2);
     const collected = collectRenderStream(renderThroughFullPipeline(() => pending.stream));
 
-    // Give the pipeline the same budget the complete-payload cases get. The late
-    // rows have not been released yet, so the stream must still be open here...
-    await macrotaskTurnsUntil(
+    // Give the pipeline the same budget the complete-payload cases get, and hold
+    // it to the same turn budget (a violation should fail HERE as an explicit
+    // budget breach, not later as a vaguer missing-content failure). The late
+    // rows have not been released yet, so the stream must still be open...
+    const turns = await macrotaskTurnsUntil(
       () => collected.htmlSoFar().includes('PENDING_SHELL_MARKER'),
       COMPLETE_RENDER_TURN_BUDGET + 1,
     );
+    expect(turns).toBeLessThanOrEqual(COMPLETE_RENDER_TURN_BUDGET);
     expect(collected.ended()).toBe(false);
 
     // ...and what HAS flushed is the shell with the rendered fallback and an

@@ -189,8 +189,24 @@ const collectPendingSplit = async () => {
       },
     });
     sink.on('error', reject);
-    renderToPipeableStream(tree).pipe(sink);
+    // Same loud-failure wiring as collect(): an encoding error must reject the
+    // generator, not get serialized into the fixture as an error row. It also
+    // unblocks firstChunkSeen so a synchronous render failure can't leave the
+    // quiesce loop awaiting a first chunk that will never come.
+    renderToPipeableStream(tree, {
+      onError(error) {
+        sink.destroy();
+        const rejection = error instanceof Error ? error : new Error(String(error));
+        reject(rejection);
+        sawFirstChunk();
+      },
+    }).pipe(sink);
   });
+
+  // Mark `finished` handled right away: on the onError path it rejects while the quiesce
+  // loop below is still running, and Node's default unhandled-rejection mode would crash
+  // the process before the `await finished` attaches its handler.
+  void finished.catch(() => undefined);
 
   await firstChunkSeen;
   // Wait until the pending-side Flight emission quiesces: the boundary's data promise is
