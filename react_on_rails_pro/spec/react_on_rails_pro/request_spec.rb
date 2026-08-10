@@ -1212,6 +1212,25 @@ describe ReactOnRailsPro::Request do
       expect(emitter_received).to be_a(ReactOnRailsPro::AsyncPropsEmitter)
     end
 
+    it "preserves the Rails OpenTelemetry context inside the async props block" do
+      parent_context = Object.new
+      observed_context = nil
+      allow(ReactOnRailsPro::OpenTelemetry).to receive(:capture_context).and_return(parent_context)
+      allow(ReactOnRailsPro::OpenTelemetry).to receive(:with_context) do |context, &block|
+        observed_context = context
+        block.call
+      end
+
+      stream = described_class.render_code_with_incremental_updates(
+        "/render-incremental",
+        js_code,
+        async_props_block:
+      )
+      stream.each_chunk(&:itself)
+
+      expect(observed_context).to be(parent_context)
+    end
+
     it "uses rsc_bundle_hash for the AsyncPropsEmitter" do
       allow(ReactOnRailsPro.configuration).to receive(:enable_rsc_support).and_return(true)
 

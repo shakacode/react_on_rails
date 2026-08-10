@@ -193,7 +193,7 @@ module ReactOnRailsPro
         index = 0
         while index < @chunks.length
           chunk = @chunks[index]
-          chunk_size = chunk.bytesize if chunk.respond_to?(:bytesize)
+          chunk_size = chunk.respond_to?(:bytesize) ? chunk.bytesize : nil
           return unless chunk_size.is_a?(Integer)
 
           total += chunk_size
