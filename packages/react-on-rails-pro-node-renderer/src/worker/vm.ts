@@ -798,7 +798,7 @@ async function buildVM(filePath: string): Promise<VMContext> {
 
 async function getOrBuildVMContext(bundleFilePath: string, buildVmsIfNeeded: boolean): Promise<VMContext> {
   const identityPath = bundleIdentityPath(bundleFilePath);
-  const vmContext = vmContexts.get(identityPath);
+  const vmContext = getVMContext(bundleFilePath);
   if (vmContext) {
     vmPoolActivity.cacheHits += 1;
     return vmContext;
