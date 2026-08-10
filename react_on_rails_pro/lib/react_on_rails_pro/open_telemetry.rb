@@ -13,6 +13,8 @@
 # For licensing terms:
 # https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
 
+require_relative "constants"
+
 module ReactOnRailsPro
   module OpenTelemetry
     INSTRUMENTATION_NAME = "react_on_rails_pro"
