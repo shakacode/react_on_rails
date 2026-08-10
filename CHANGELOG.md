@@ -40,6 +40,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4811](https://github.com/shakacode/react_on_rails/pull/4811) by
   [justin808](https://github.com/justin808).
 
+- **Routine startup diagnostics no longer appear in default `INFO` logs**: Successful package validation, valid
+  Pro license checks, non-production missing-license notices, and Node renderer connection setup now log at `DEBUG`
+  instead of `INFO`. Package validation still runs, while expired or invalid configured licenses remain visible outside
+  production, and production license warnings and renderer failures remain actionable. Fixes
+  [Issue 4848](https://github.com/shakacode/react_on_rails/issues/4848).
+  [PR 4849](https://github.com/shakacode/react_on_rails/pull/4849) by
+  [Justin Gordon](https://github.com/justin808).
+
 - **Generated server webpack configs no longer include an unused `merge` import or stale comments**:
   `commonWebpackConfig` already clones the shared client configuration, so the generated server configuration
   stays lint-clean without changing its runtime behavior. Fixes

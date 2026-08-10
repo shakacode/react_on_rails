@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+run_dir="${1:-}"
+[[ -d "$run_dir" && ! -L "$run_dir" ]] || {
+  echo "usage: $0 RUN_DIRECTORY" >&2
+  exit 64
+}
+
+expected_entries='SHA256SUMS
+agent-report.json
+artifact-evidence.json
+command-evidence.json
+invocation.json
+prompt.md
+rubric-results.json
+rubric.md
+run.json
+runner-diagnostics.json
+sandbox-network-probe.json
+scenario.md
+workspace-status.txt'
+actual_entries="$(find "$run_dir" -mindepth 1 -maxdepth 1 -print | sed 's#^.*/##' | LC_ALL=C sort)"
+[[ "$actual_entries" == "$expected_entries" ]] || {
+  echo "evidence top-level entries mismatch" >&2
+  exit 1
+}
+
+while IFS= read -r entry; do
+  [[ -f "$run_dir/$entry" && ! -L "$run_dir/$entry" ]] || {
+    echo "evidence entry must be a regular file: $entry" >&2
+    exit 1
+  }
+done <<<"$expected_entries"

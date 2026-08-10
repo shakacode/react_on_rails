@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "${1:-}" == --child ]]; then
+  child_stderr="${2:-}"
+  [[ -n "$child_stderr" && $# -ge 3 ]] || exit 64
+  shift 2
+  exec "$@" 2>>"$child_stderr"
+fi
+
+[[ $# -ge 5 ]] || {
+  echo "usage: $0 TIMEOUT_COMMAND KILL_GRACE DURATION STDERR_FILE COMMAND [ARG...]" >&2
+  exit 64
+}
+
+timeout_command="$1"
+kill_grace="$2"
+duration="$3"
+child_stderr="$4"
+shift 4
+timeout_diagnostics="$child_stderr.timeout"
+shell_diagnostics="$child_stderr.shell"
+
+# Invoked indirectly by the EXIT trap.
+# shellcheck disable=SC2329
+cleanup() {
+  rm -f "$timeout_diagnostics" "$shell_diagnostics"
+}
+trap cleanup EXIT
+: >"$child_stderr"
+
+set +e
+{
+  LC_ALL=C "$timeout_command" --verbose --kill-after "$kill_grace" "$duration" \
+    "$0" --child "$child_stderr" "$@" 2>"$timeout_diagnostics"
+} 2>"$shell_diagnostics"
+exit_code=$?
+set -e
+
+# GNU timeout returns 137 both when --kill-after escalates to KILL and when the
+# child independently exits on SIGKILL. Only its isolated diagnostic stream can
+# establish timeout provenance; unrelated 137 exits remain 137.
+if [[ "$exit_code" == 137 ]] && \
+  grep -Fq "timeout: sending signal KILL to command '" "$timeout_diagnostics"; then
+  exit_code=124
+fi
+cat "$timeout_diagnostics" "$shell_diagnostics" >>"$child_stderr"
+rm -f "$timeout_diagnostics" "$shell_diagnostics"
+trap - EXIT
+exit "$exit_code"
