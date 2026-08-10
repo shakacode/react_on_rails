@@ -22,9 +22,16 @@
 // selective-hydration E2E can interact with the visible tab first.
 import React from 'react';
 
+// Same ceiling as PagesController#activity_rsc_tabs. The controller clamps the
+// query param, but the generic rsc_payload route passes client-controlled
+// props JSON straight to this component — clamp here too so a crafted
+// /rsc_payload/RSCActivityTabsPage request cannot pin a renderer timeout.
+const MAX_ARTIFICIAL_DELAY_MS = 8_000;
+
 const SlowDraftsServerContent = async ({ artificialDelay }) => {
+  const delayMs = Math.min(Math.max(Number(artificialDelay) || 0, 0), MAX_ARTIFICIAL_DELAY_MS);
   await new Promise((resolve) => {
-    setTimeout(resolve, Number(artificialDelay) || 0);
+    setTimeout(resolve, delayMs);
   });
 
   return <section data-testid="drafts-server-sentinel">hidden-drafts-server-sentinel</section>;

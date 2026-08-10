@@ -8892,7 +8892,7 @@ Everything here is verified by the Pro dummy app's working example and tests —
 
 The `react-server` condition build of React — the one your RSC bundle resolves — **does not export `Activity`**. A server component that does `import { Activity } from 'react'` gets `undefined` and the render fails with:
 
-```
+```text
 Element type is invalid: expected a string (for built-in components) or a
 class/function (for composite components) but got: undefined.
 ```
@@ -8943,7 +8943,7 @@ export default function RSCActivityTabsPage() {
 }
 ```
 
-This is the standard server-content-through-client-component pattern (see [RSC Inside Client Components](./inside-client-components.md)). The element type itself — `Symbol.for('react.activity')` — serializes through the Flight protocol like any other built-in, so React on Rails needs no configuration for it.
+This is the standard server-content-through-client-component pattern (see [RSC Inside Client Components](./inside-client-components.md)). Note that in this pattern the `<Activity>` element never crosses the RSC (Flight) boundary at all: `ActivityTabsClient` travels as a client reference, and the `<Activity>` boundaries are constructed inside its own render during SSR and hydration — only the server-rendered content props cross the boundary. React on Rails needs no configuration for any of this.
 
 ## Hidden is not free on the server
 

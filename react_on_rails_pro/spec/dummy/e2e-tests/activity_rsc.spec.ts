@@ -152,6 +152,14 @@ test.describe('React 19.2 Activity inside a streamed RSC tree', () => {
     await draftsDraft.click();
     await draftsDraft.fill('draft typed on drafts tab');
 
+    // While the profile tab is hidden, its effect cleanup ran (the update
+    // commits at background priority, so the auto-retrying assertion waits
+    // for it) — pinning deactivation directly, not just inferring it from
+    // the later re-activation.
+    await expect(page.locator('[data-effect-status="profile"]')).toHaveText(
+      'effects deactivated (state preserved)',
+    );
+
     // Switch back: the profile draft survived being hidden, effects re-ran.
     await clickTabUntilSelected(page, 'profile');
     await expect(page.getByTestId('profile-server-sentinel')).toBeVisible();
