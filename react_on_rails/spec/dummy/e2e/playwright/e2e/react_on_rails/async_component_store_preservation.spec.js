@@ -29,7 +29,10 @@ test.describe('Issue #4862: reactOnRailsComponentLoaded() store preservation', (
   const loadPageAndAccumulateState = async (page) => {
     await page.goto('/async_component_shared_store');
 
-    // The first island is interactive and shows the server-sent name from the store.
+    // The first island is interactive and shows the server-sent name from the store
+    // ('Mr. Server Side Rendering' comes from @app_props_server_render in the dummy
+    // PagesController). Confirming it rendered also makes the later "shows the updated
+    // value" assertions meaningful — the server value was present, then superseded.
     await expect(firstIslandInput(page)).toHaveValue('Mr. Server Side Rendering');
 
     // Accumulate client-side state in the shared store, as a user would after page load.
