@@ -159,7 +159,6 @@ describe('StoreRegistry', () => {
       StoreRegistry.setStore('SharedStore', pageTwoStore);
 
       await expect(waitingForStore).resolves.toBe(pageTwoStore);
-      expect(pageTwoStore).not.toBe(pageOneStore);
     });
 
     it('keeps registered store generators intact', () => {

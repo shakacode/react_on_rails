@@ -55,11 +55,9 @@ const loadProbePage = async (page: Page, variant: 'one' | 'two') => {
 };
 
 test.describe('hydrated store registry across soft navigations (issue #4861)', () => {
-  test('control: direct load waits for the deferred store of variant one', async ({ page }) => {
-    await loadProbePage(page, 'one');
-    await expectProbeDeliveredStoreOfVariant(page, 'one');
-  });
-
+  // Variant one's direct-load behavior needs no standalone control: the soft-navigation test
+  // below performs exactly that load-and-wait as its arrange step, and the variant-two control
+  // covers the fresh-load behavior for the page in isolation.
   test('control: direct load waits for the deferred store of variant two', async ({ page }) => {
     await loadProbePage(page, 'two');
     await expectProbeDeliveredStoreOfVariant(page, 'two');
