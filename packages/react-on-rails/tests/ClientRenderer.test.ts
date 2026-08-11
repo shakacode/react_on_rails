@@ -4,6 +4,7 @@
 
 import * as React from 'react';
 import { renderComponent, renderAllComponents, reactOnRailsComponentLoaded } from '../src/ClientRenderer.ts';
+import { reactOnRailsPageLoaded } from '../src/clientStartup.ts';
 import type { RendererFunction } from '../src/types/index.ts';
 import ComponentRegistry from '../src/ComponentRegistry.ts';
 import StoreRegistry from '../src/StoreRegistry.ts';
@@ -1660,7 +1661,7 @@ describe('ClientRenderer', () => {
       // reactOnRailsPageLoaded is documented to be callable multiple times (e.g. for
       // asynchronously loaded content), so a repeat full page-load pass must not refresh
       // hydrated stores either — the invariant holds for BOTH public re-entry points.
-      renderAllComponents();
+      reactOnRailsPageLoaded();
       expect(calls()).toBe(1);
       expect(StoreRegistry.getStore('cartStore')).toBe(storeAfterLoad);
       expect(storeAfterLoad.getState().items).toEqual(['a', 'b', 'c']);
