@@ -74,6 +74,41 @@ test.describe('Issue #4862: reactOnRailsComponentLoaded() store preservation', (
     await expect(secondIslandInput(page)).toHaveValue('Edited In First Island');
   });
 
+  test('declared-deps async island takes the dependency-scoped path and stays connected', async ({
+    page,
+  }) => {
+    const declaredIslandInput = (p) => p.locator('#ReduxSharedStoreApp-react-component-2 input');
+
+    await loadPageAndAccumulateState(page);
+
+    await page.click('#load-declared-async-island-btn');
+    await expect(declaredIslandInput(page)).toBeVisible();
+
+    // The fragment's react_component call declares store_dependencies, so the injected spec tag
+    // carries the exact attribute Rails emits and core's dependency-scoped initialization reads.
+    // This pins the Ruby-emission ↔ JS-parsing seam the jest fixtures can only fake.
+    const declaredDeps = await page.getAttribute(
+      '[data-dom-id="ReduxSharedStoreApp-react-component-2"]',
+      'data-store-dependencies',
+    );
+    expect(JSON.parse(declaredDeps)).toEqual(['SharedReduxStore']);
+
+    // The fragment also carries a store element with no registered generator. The island being
+    // visible above proves the scoped path ignored it — the legacy sweep threw on it before
+    // rendering the island. Pin the element is really present so this net cannot rot silently.
+    const unregisteredStoreCount = await page
+      .locator('[data-js-react-on-rails-store="UnregisteredTestStore"]')
+      .count();
+    expect(unregisteredStoreCount).toBe(1);
+
+    // Scoped initialization skips the already-hydrated store: accumulated state survives...
+    await expect(declaredIslandInput(page)).toHaveValue(UPDATED_NAME);
+
+    // ...and the island is live-connected to the same store instance as the first island.
+    await declaredIslandInput(page).fill('Edited In Declared Island');
+    await expect(firstIslandInput(page)).toHaveValue('Edited In Declared Island');
+  });
+
   test('getStore() returns the same store instance after the async render', async ({ page }) => {
     await loadPageAndAccumulateState(page);
 

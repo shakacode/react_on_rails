@@ -33,26 +33,51 @@
 <button id="load-async-island-btn" type="button">Load async island</button>
 <div id="async-island-placeholder"></div>
 
+<h2>Async island with declared store dependencies (injected on demand)</h2>
+<button id="load-declared-async-island-btn" type="button">Load declared-deps async island</button>
+<div id="declared-async-island-placeholder"></div>
+
 <script>
   (function() {
-    document.getElementById('load-async-island-btn').addEventListener('click', function() {
-      fetch('/async_component_shared_store_island')
-        .then(function(response) { return response.text(); })
-        .then(function(html) {
-          // Inject the server-rendered fragment. Browsers never execute <script> tags inserted
-          // via innerHTML, and nothing here needs to execute: the component-specification tag is
-          // inert type="application/json" data that reactOnRailsComponentLoaded reads from the DOM.
-          // (In Pro, react_component also emits an executable immediate-hydration script tag —
-          // equally inert via innerHTML — which is why the explicit componentLoaded call below is
-          // the documented activation step for injected fragments.)
-          document.getElementById('async-island-placeholder').innerHTML = html;
+    function wireAsyncIslandLoader(buttonId, placeholderId, fragmentPath, domId) {
+      document.getElementById(buttonId).addEventListener('click', function() {
+        fetch(fragmentPath)
+          .then(function(response) { return response.text(); })
+          .then(function(html) {
+            // Inject the server-rendered fragment. Browsers never execute <script> tags inserted
+            // via innerHTML, and nothing here needs to execute: the component-specification tag is
+            // inert type="application/json" data that reactOnRailsComponentLoaded reads from the DOM.
+            // (In Pro, react_component also emits an executable immediate-hydration script tag —
+            // equally inert via innerHTML — which is why the explicit componentLoaded call below is
+            // the documented activation step for injected fragments.)
+            document.getElementById(placeholderId).innerHTML = html;
 
-          // The documented core API for rendering an asynchronously injected component.
-          ReactOnRails.reactOnRailsComponentLoaded('ReduxSharedStoreApp-react-component-1');
-        })
-        .catch(function(error) {
-          console.error('Failed to load async island:', error);
-        });
-    });
+            // The documented core API for rendering an asynchronously injected component.
+            ReactOnRails.reactOnRailsComponentLoaded(domId);
+          })
+          .catch(function(error) {
+            console.error('Failed to load async island:', error);
+          });
+      });
+    }
+
+    // This island's fragment omits store_dependencies, exercising the legacy
+    // initialize-every-store sweep (with the hydrated-store guard).
+    wireAsyncIslandLoader(
+      'load-async-island-btn',
+      'async-island-placeholder',
+      '/async_component_shared_store_island',
+      'ReduxSharedStoreApp-react-component-1'
+    );
+
+    // This island's fragment declares store_dependencies on its react_component call, so the
+    // on-demand render takes the dependency-scoped initialization path (issue #4862) instead
+    // of sweeping every store element on the page.
+    wireAsyncIslandLoader(
+      'load-declared-async-island-btn',
+      'declared-async-island-placeholder',
+      '/async_component_shared_store_island?declared=1',
+      'ReduxSharedStoreApp-react-component-2'
+    );
   })();
 </script>

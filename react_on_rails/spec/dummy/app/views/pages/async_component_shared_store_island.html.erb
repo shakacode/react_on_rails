@@ -1,8 +1,26 @@
 <%# Server-rendered fragment fetched by async_component_shared_store.html.erb. %>
 <%# auto_load_bundle is disabled because the fragment is injected into a page that already %>
 <%# loaded the component's bundle — there is no layout here to render additional pack tags. %>
-<%= react_component("ReduxSharedStoreApp",
-                    prerender: false,
-                    trace: true,
-                    id: "ReduxSharedStoreApp-react-component-1",
-                    auto_load_bundle: false) %>
+<% if params[:declared].present? %>
+  <%# A store element whose generator is never registered client-side. Under the legacy %>
+  <%# initialize-every-store sweep this made reactOnRailsComponentLoaded throw before the %>
+  <%# island rendered (the #4862 blast-radius failure); the dependency-scoped path must %>
+  <%# ignore it because the island below does not declare it. %>
+  <%= redux_store("UnregisteredTestStore", props: { fromFragment: true }, auto_load_bundle: false) %>
+  <%# Declares its store dependency explicitly: SharedReduxStore lives on the host page, so %>
+  <%# the auto-default (this request's registered stores) would not include it. With the %>
+  <%# attribute, the on-demand render initializes only the declared stores (the dependency- %>
+  <%# scoped path for issue #4862) instead of sweeping every store element on the page. %>
+  <%= react_component("ReduxSharedStoreApp",
+                      prerender: false,
+                      trace: true,
+                      id: "ReduxSharedStoreApp-react-component-2",
+                      store_dependencies: ["SharedReduxStore"],
+                      auto_load_bundle: false) %>
+<% else %>
+  <%= react_component("ReduxSharedStoreApp",
+                      prerender: false,
+                      trace: true,
+                      id: "ReduxSharedStoreApp-react-component-1",
+                      auto_load_bundle: false) %>
+<% end %>

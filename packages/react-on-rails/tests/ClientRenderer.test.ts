@@ -1567,11 +1567,25 @@ describe('ClientRenderer', () => {
       document.body.appendChild(storeElement);
     };
 
-    const setupComponentIsland = (componentName: string, domId: string): void => {
+    // `storeDependencies` mirrors the `data-store-dependencies` attribute emitted by
+    // generate_component_script (`render_options.store_dependencies&.to_json`); pass a raw
+    // string to simulate malformed hand-written markup. Omitting it mirrors markup rendered
+    // by a request that registered no stores (the attribute is omitted entirely).
+    const setupComponentIsland = (
+      componentName: string,
+      domId: string,
+      storeDependencies?: string[] | string,
+    ): void => {
       const componentElement = document.createElement('div');
       componentElement.className = 'js-react-on-rails-component';
       componentElement.setAttribute('data-component-name', componentName);
       componentElement.setAttribute('data-dom-id', domId);
+      if (storeDependencies !== undefined) {
+        componentElement.setAttribute(
+          'data-store-dependencies',
+          typeof storeDependencies === 'string' ? storeDependencies : JSON.stringify(storeDependencies),
+        );
+      }
       componentElement.textContent = JSON.stringify({});
       document.body.appendChild(componentElement);
 
@@ -1733,6 +1747,132 @@ describe('ClientRenderer', () => {
       expect(calls()).toBe(1);
       expect(StoreRegistry.getStore('cartStore')).toBe(store);
       expect(store.getState().items).toEqual(['accumulated']);
+    });
+
+    it('initializes only the declared store dependencies of the requested island', async () => {
+      // The react_component helper defaults data-store-dependencies to the stores registered
+      // in its request, so real markup declares what each island needs. Rendering one island
+      // on demand must initialize exactly those stores — not every store element on the page.
+      const declared = createMiniStoreGenerator();
+      const unrelated = createMiniStoreGenerator();
+      StoreRegistry.register({ widgetStore: declared.generator, otherStore: unrelated.generator });
+
+      // Two fragments were injected; each carries a store element. Neither store is hydrated
+      // yet, and only the first fragment's island is being announced.
+      setupStoreElement('widgetStore', { items: ['from-fragment'] });
+      setupStoreElement('otherStore', { items: ['other-fragment'] });
+
+      // A 2-arg render function runs synchronously inside the mount, so recording the store
+      // state it sees pins that the declared dependency hydrates BEFORE the island renders.
+      let itemsSeenAtRender: string[] | null = null;
+      const Widget = (_props: Record<string, unknown>, _railsContext: unknown) => {
+        itemsSeenAtRender = (StoreRegistry.getStore('widgetStore') as MiniStore).getState().items;
+        return () => React.createElement('div', null, 'Widget');
+      };
+      ComponentRegistry.register({ Widget });
+      setupComponentIsland('Widget', 'Widget-react-component-0', ['widgetStore']);
+
+      await reactOnRailsComponentLoaded('Widget-react-component-0');
+
+      expect(declared.calls()).toBe(1);
+      expect(itemsSeenAtRender).toEqual(['from-fragment']);
+      // The unrelated store element was not touched: no generator run, nothing hydrated.
+      expect(unrelated.calls()).toBe(0);
+      expect(StoreRegistry.getStore('otherStore', false)).toBeUndefined();
+
+      // Re-announcing the island keeps the once-per-name-per-page-lifetime guard.
+      await reactOnRailsComponentLoaded('Widget-react-component-0');
+      expect(declared.calls()).toBe(1);
+    });
+
+    it('renders the requested island even when an unrelated store element has no registered generator', async () => {
+      // A fragment can carry a store element whose generator lives in a bundle that has not
+      // registered yet. Before the fix, the on-demand sweep called getStoreGenerator for
+      // EVERY store element and threw before the requested — unrelated — island rendered.
+      const declared = createMiniStoreGenerator();
+      StoreRegistry.register({ widgetStore: declared.generator });
+      setupStoreElement('widgetStore', { items: [] });
+      setupStoreElement('pendingStore', { items: ['bundle-not-loaded'] }); // no generator registered
+
+      const Widget: React.FC = () => React.createElement('div', null, 'Widget');
+      ComponentRegistry.register({ Widget });
+      setupComponentIsland('Widget', 'Widget-react-component-0', ['widgetStore']);
+
+      await reactOnRailsComponentLoaded('Widget-react-component-0');
+
+      const mockHydrateOrRender = require('../src/reactHydrateOrRender.ts').default as jest.Mock;
+      expect(mockHydrateOrRender.mock.lastCall?.[0]).toBe(
+        document.getElementById('Widget-react-component-0'),
+      );
+      expect(declared.calls()).toBe(1);
+      expect(StoreRegistry.getStore('pendingStore', false)).toBeUndefined();
+    });
+
+    it('renders the island when a declared store dependency cannot initialize, logging the failure', async () => {
+      // Islands routinely over-declare dependencies (the helper defaults to every store in
+      // the request), so one dependency that cannot initialize yet must be logged — not
+      // abort the render or the initialization of the remaining declared dependencies.
+      const working = createMiniStoreGenerator();
+      StoreRegistry.register({ widgetStore: working.generator });
+      setupStoreElement('lazyStore', { items: [] }); // declared below, but no generator registered
+      setupStoreElement('widgetStore', { items: ['ok'] });
+
+      const Widget: React.FC = () => React.createElement('div', null, 'Widget');
+      ComponentRegistry.register({ Widget });
+      setupComponentIsland('Widget', 'Widget-react-component-0', ['lazyStore', 'widgetStore']);
+
+      const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      try {
+        await reactOnRailsComponentLoaded('Widget-react-component-0');
+        // The failure was surfaced with the store's name.
+        expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('lazyStore'), expect.any(Error));
+      } finally {
+        errorSpy.mockRestore();
+      }
+
+      const mockHydrateOrRender = require('../src/reactHydrateOrRender.ts').default as jest.Mock;
+      expect(mockHydrateOrRender.mock.lastCall?.[0]).toBe(
+        document.getElementById('Widget-react-component-0'),
+      );
+      // The dependency after the failing one still initialized...
+      expect(working.calls()).toBe(1);
+      expect((StoreRegistry.getStore('widgetStore') as MiniStore).getState().items).toEqual(['ok']);
+    });
+
+    it('does not touch stores when the requested dom id has no component element', async () => {
+      // The Pro renderer no-ops when the element is missing; core must too, rather than
+      // hydrating every store on the page as a side effect of a failed lookup.
+      const { generator, calls } = createMiniStoreGenerator();
+      StoreRegistry.register({ cartStore: generator });
+      setupStoreElement('cartStore', { items: [] });
+
+      await reactOnRailsComponentLoaded('missing-dom-id');
+
+      expect(calls()).toBe(0);
+      expect(StoreRegistry.getStore('cartStore', false)).toBeUndefined();
+    });
+
+    it('falls back to initializing every store when data-store-dependencies is malformed', async () => {
+      // Hand-written markup with a malformed attribute must warn and behave like markup
+      // without the attribute (the legacy initialize-every-store sweep, hydration guard intact).
+      const { generator, calls } = createMiniStoreGenerator();
+      StoreRegistry.register({ cartStore: generator });
+      setupStoreElement('cartStore', { items: ['swept'] });
+
+      const Widget: React.FC = () => React.createElement('div', null, 'Widget');
+      ComponentRegistry.register({ Widget });
+      setupComponentIsland('Widget', 'Widget-react-component-0', 'not-a-json-array');
+
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        await reactOnRailsComponentLoaded('Widget-react-component-0');
+        expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('data-store-dependencies'));
+      } finally {
+        warnSpy.mockRestore();
+      }
+
+      expect(calls()).toBe(1);
+      expect((StoreRegistry.getStore('cartStore') as MiniStore).getState().items).toEqual(['swept']);
     });
   });
 });

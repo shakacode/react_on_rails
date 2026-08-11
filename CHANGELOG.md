@@ -39,6 +39,20 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4591](https://github.com/shakacode/react_on_rails/pull/4591) by
   [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
+- **On-demand renders initialize only the island's declared store dependencies**:
+  `reactOnRailsComponentLoaded` walked every store element on the page even when asked to render a
+  single component, so an unrelated store element whose generator was not registered (e.g. its
+  bundle had not loaded yet) aborted the requested render, and unrelated new stores were hydrated
+  as a side effect. It now reads the `data-store-dependencies` attribute the `react_component`
+  helper already emits (defaulted to the stores registered in the request, or set explicitly with
+  the `store_dependencies` option) and initializes exactly those stores, matching the Pro
+  renderer's dependency gating; a declared dependency that cannot initialize is logged without
+  aborting the render. Markup without the attribute keeps the previous initialize-every-store
+  behavior, and `reactOnRailsPageLoaded`/full page loads are unchanged. Completes
+  [Issue 4862](https://github.com/shakacode/react_on_rails/issues/4862).
+  [PR 4870](https://github.com/shakacode/react_on_rails/pull/4870) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 - **Routine startup diagnostics no longer appear in default `INFO` logs**: Successful package validation, valid
   Pro license checks, non-production missing-license notices, and Node renderer connection setup now log at `DEBUG`
   instead of `INFO`. Package validation still runs, while expired or invalid configured licenses remain visible outside
