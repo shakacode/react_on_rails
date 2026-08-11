@@ -33,6 +33,7 @@ import {
   buildExecutionContext,
   getVMPoolDiagnostics,
   hasVMContextForBundle,
+  isDeclaredCurrentGenerationReady,
   prewarmDeclaredBundleGeneration,
   resetVM,
   setVMPoolClockForTest,
@@ -876,6 +877,48 @@ describe('buildVM and runInVM', () => {
         declaredCurrentContextsRequired: 0,
         declaredCurrentGenerationReady: false,
       });
+    });
+
+    test('makes readiness follow complete declared-set membership after a runtime cap decrease', async () => {
+      const { newGeneration } = rolloutBundlePaths();
+      getConfig().maxVMPoolSize = 2;
+
+      const prewarmedCurrent = await prewarmDeclaredBundleGeneration(newGeneration);
+      prewarmedCurrent.release();
+      expect(isDeclaredCurrentGenerationReady()).toBe(true);
+
+      getConfig().maxVMPoolSize = 1;
+      const cachedCurrentRequest = await buildExecutionContext(
+        [newGeneration[0]],
+        /* buildVmsIfNeeded */ false,
+      );
+
+      expect(getVMPoolDiagnostics()).toMatchObject({
+        retainedContexts: 1,
+        declaredCurrentContexts: 1,
+        declaredCurrentContextsRequired: 2,
+        declaredCurrentGenerationReady: false,
+      });
+      expect(isDeclaredCurrentGenerationReady()).toBe(false);
+
+      getConfig().maxVMPoolSize = 2;
+      const evictedCurrentBundle = newGeneration.find((bundlePath) => !hasVMContextForBundle(bundlePath));
+      expect(evictedCurrentBundle).toBeDefined();
+      const rebuiltCurrentRequest = await buildExecutionContext(
+        [evictedCurrentBundle!],
+        /* buildVmsIfNeeded */ true,
+      );
+
+      expect(getVMPoolDiagnostics()).toMatchObject({
+        retainedContexts: 2,
+        declaredCurrentContexts: 2,
+        declaredCurrentContextsRequired: 2,
+        declaredCurrentGenerationReady: true,
+      });
+      expect(isDeclaredCurrentGenerationReady()).toBe(true);
+
+      cachedCurrentRequest.release();
+      rebuiltCurrentRequest.release();
     });
 
     test('retires a drained generation without removing the current generation', async () => {

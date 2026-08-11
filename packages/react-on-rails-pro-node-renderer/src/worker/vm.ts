@@ -112,7 +112,6 @@ const vmPoolActivity: VMPoolActivity = {
 let generationObservationSequence = 0;
 let declaredCurrentGenerationKey: string | undefined;
 let declaredCurrentBundlePaths = new Set<string>();
-let declaredCurrentGenerationReady = false;
 type VMPoolTimer = ReturnType<typeof setTimeout>;
 export interface VMPoolClock {
   now: () => number;
@@ -362,6 +361,13 @@ function observeBundleGeneration(bundlePaths: string[]) {
   scheduleGenerationRetirement();
 }
 
+function declaredCurrentGenerationIsReady() {
+  return (
+    declaredCurrentBundlePaths.size > 0 &&
+    Array.from(declaredCurrentBundlePaths).every((bundlePath) => vmContexts.has(bundlePath))
+  );
+}
+
 /** @internal Used in tests and diagnostic instrumentation. */
 export function getVMPoolDiagnostics() {
   return {
@@ -371,7 +377,7 @@ export function getVMPoolDiagnostics() {
       vmContexts.has(bundlePath),
     ).length,
     declaredCurrentContextsRequired: declaredCurrentBundlePaths.size,
-    declaredCurrentGenerationReady,
+    declaredCurrentGenerationReady: declaredCurrentGenerationIsReady(),
     ...vmPoolActivity,
   };
 }
@@ -417,7 +423,7 @@ export function hasAnyVMContext() {
 }
 
 export function isDeclaredCurrentGenerationReady() {
-  return declaredCurrentBundlePaths.size > 0 && declaredCurrentGenerationReady;
+  return declaredCurrentGenerationIsReady();
 }
 
 /**
@@ -1108,7 +1114,6 @@ export async function prewarmDeclaredBundleGeneration(
 
   declaredCurrentGenerationKey = bundleGenerationKey(normalizedBundlePaths);
   declaredCurrentBundlePaths = new Set(normalizedBundlePaths);
-  declaredCurrentGenerationReady = false;
   generationObservationSequence += 1;
   bundleGenerations.set(declaredCurrentGenerationKey, {
     bundlePaths: new Set(normalizedBundlePaths),
@@ -1117,8 +1122,7 @@ export async function prewarmDeclaredBundleGeneration(
   });
 
   const executionContext = await buildExecutionContext(normalizedBundlePaths, /* buildVmsIfNeeded */ true);
-  declaredCurrentGenerationReady = normalizedBundlePaths.every((bundlePath) => vmContexts.has(bundlePath));
-  if (!declaredCurrentGenerationReady) {
+  if (!isDeclaredCurrentGenerationReady()) {
     executionContext.release();
     throw new Error('Declared current bundle generation did not remain compiled within maxVMPoolSize');
   }
@@ -1138,7 +1142,6 @@ export function resetVM() {
   generationObservationSequence = 0;
   declaredCurrentGenerationKey = undefined;
   declaredCurrentBundlePaths = new Set();
-  declaredCurrentGenerationReady = false;
   vmPoolActivity.contextsBuilt = 0;
   vmPoolActivity.cacheHits = 0;
   vmPoolActivity.hardLimitEvictions = 0;
