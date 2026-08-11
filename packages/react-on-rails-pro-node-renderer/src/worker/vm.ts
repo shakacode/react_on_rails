@@ -178,30 +178,49 @@ function retireSourceMapRegistrationAfterEviction(sourceMapRegistration: BundleS
 
 type VMRemovalReason = 'hard_limit' | 'drained_generation';
 
-function removeVMContextFromPool(bundlePath: string, reason: VMRemovalReason) {
-  const vmContext = vmContexts.get(bundlePath);
-  if (!vmContext) {
-    return false;
-  }
+function removeVMContextsFromPool(
+  bundlePaths: string[],
+  reason: VMRemovalReason,
+  admittedBundlePath?: string,
+) {
+  const removedBundlePaths: string[] = [];
+  bundlePaths.forEach((bundlePath) => {
+    const vmContext = vmContexts.get(bundlePath);
+    if (!vmContext) {
+      return;
+    }
 
-  vmContexts.delete(bundlePath);
-  retireSourceMapRegistrationAfterEviction(vmContext.sourceMapRegistration);
-  if (reason === 'hard_limit') {
-    vmPoolActivity.hardLimitEvictions += 1;
-  } else {
-    vmPoolActivity.drainedContextRetirements += 1;
-  }
-  log.debug(
-    {
-      event: 'vm_pool_context_evicted',
-      bundlePath,
-      reason,
-      retainedContexts: vmContexts.size,
-      maxVMPoolSize: getConfig().maxVMPoolSize,
-    },
-    'Removed VM context from the pool',
-  );
-  return true;
+    vmContexts.delete(bundlePath);
+    retireSourceMapRegistrationAfterEviction(vmContext.sourceMapRegistration);
+    if (reason === 'hard_limit') {
+      vmPoolActivity.hardLimitEvictions += 1;
+    } else {
+      vmPoolActivity.drainedContextRetirements += 1;
+    }
+    removedBundlePaths.push(bundlePath);
+  });
+
+  // Emit only after the complete batch is removed. A runtime cap decrease can
+  // require several removals, and no diagnostic may expose an intermediate
+  // retained count above the configured hard limit.
+  removedBundlePaths.forEach((bundlePath) => {
+    log.debug(
+      {
+        event: 'vm_pool_context_evicted',
+        bundlePath,
+        reason,
+        retainedContexts: vmContexts.size,
+        maxVMPoolSize: getConfig().maxVMPoolSize,
+        ...(admittedBundlePath === undefined ? {} : { admittedBundlePath }),
+      },
+      'Removed VM context from the pool',
+    );
+  });
+  return removedBundlePaths;
+}
+
+function removeVMContextFromPool(bundlePath: string, reason: VMRemovalReason) {
+  return removeVMContextsFromPool([bundlePath], reason).length === 1;
 }
 
 function bundleGenerationKey(bundlePaths: string[]) {
@@ -458,7 +477,43 @@ function logVMPoolPressure(
   );
 }
 
+function sortedVMPoolEntries() {
+  return Array.from(vmContexts.entries()).sort(([pathA, contextA], [pathB, contextB]) => {
+    const currentPriorityA = declaredCurrentBundlePaths.has(pathA) ? 1 : 0;
+    const currentPriorityB = declaredCurrentBundlePaths.has(pathB) ? 1 : 0;
+    return (
+      currentPriorityA - currentPriorityB ||
+      contextA.lastUsed - contextB.lastUsed ||
+      pathA.localeCompare(pathB)
+    );
+  });
+}
+
+function shrinkVMPoolToConfiguredCap(admittedBundlePath: string) {
+  const { maxVMPoolSize } = getConfig();
+  const excessContextCount = vmContexts.size - maxVMPoolSize;
+  if (excessContextCount <= 0) {
+    return;
+  }
+
+  const evictedBundlePaths = removeVMContextsFromPool(
+    sortedVMPoolEntries()
+      .slice(0, excessContextCount)
+      .map(([bundlePath]) => bundlePath),
+    'hard_limit',
+    admittedBundlePath,
+  );
+  evictedBundlePaths.forEach((evictedBundlePath) => {
+    logVMPoolPressure(
+      'vm_pool_hard_limit_eviction',
+      'VM pool pressure is evicting least-recently-used contexts at the configured hard limit',
+      { evictedBundlePath, admittedBundlePath },
+    );
+  });
+}
+
 function admitVMContextToPool(bundlePath: string, vmContext: VMContext) {
+  shrinkVMPoolToConfiguredCap(bundlePath);
   const pooledContext = vmContexts.get(bundlePath);
   if (pooledContext) {
     return pooledContext === vmContext;
@@ -471,19 +526,9 @@ function admitVMContextToPool(bundlePath: string, vmContext: VMContext) {
   }
 
   const newContextIsDeclaredCurrent = declaredCurrentBundlePaths.has(bundlePath);
-  const evictionCandidate = Array.from(vmContexts.entries())
-    .filter(([candidatePath]) => {
-      return newContextIsDeclaredCurrent || !declaredCurrentBundlePaths.has(candidatePath);
-    })
-    .sort(([pathA, contextA], [pathB, contextB]) => {
-      const currentPriorityA = declaredCurrentBundlePaths.has(pathA) ? 1 : 0;
-      const currentPriorityB = declaredCurrentBundlePaths.has(pathB) ? 1 : 0;
-      return (
-        currentPriorityA - currentPriorityB ||
-        contextA.lastUsed - contextB.lastUsed ||
-        pathA.localeCompare(pathB)
-      );
-    })[0];
+  const evictionCandidate = sortedVMPoolEntries().filter(([candidatePath]) => {
+    return newContextIsDeclaredCurrent || !declaredCurrentBundlePaths.has(candidatePath);
+  })[0];
 
   if (!evictionCandidate) {
     logVMPoolPressure(
@@ -493,7 +538,7 @@ function admitVMContextToPool(bundlePath: string, vmContext: VMContext) {
     return false;
   }
 
-  removeVMContextFromPool(evictionCandidate[0], 'hard_limit');
+  removeVMContextsFromPool([evictionCandidate[0]], 'hard_limit', bundlePath);
   vmContexts.set(bundlePath, vmContext);
   logVMPoolPressure(
     'vm_pool_hard_limit_eviction',
@@ -510,37 +555,6 @@ const readPrepareStackTraceHook = (context: vm.Context): unknown => {
     return undefined;
   }
 };
-
-// Helper function to manage VM pool size
-function manageVMPoolSize() {
-  const { maxVMPoolSize } = getConfig();
-
-  if (vmContexts.size <= maxVMPoolSize) {
-    return;
-  }
-
-  const sortedEntries = Array.from(vmContexts.entries()).sort(([pathA, contextA], [pathB, contextB]) => {
-    const currentPriorityA = declaredCurrentBundlePaths.has(pathA) ? 1 : 0;
-    const currentPriorityB = declaredCurrentBundlePaths.has(pathB) ? 1 : 0;
-    return (
-      currentPriorityA - currentPriorityB ||
-      contextA.lastUsed - contextB.lastUsed ||
-      pathA.localeCompare(pathB)
-    );
-  });
-
-  while (sortedEntries.length > maxVMPoolSize) {
-    const oldestEntry = sortedEntries.shift();
-    if (oldestEntry) {
-      const [oldestPath] = oldestEntry;
-      removeVMContextFromPool(oldestPath, 'hard_limit');
-      logVMPoolPressure(
-        'vm_pool_hard_limit_eviction',
-        'VM pool pressure is evicting least-recently-used contexts at the configured hard limit',
-      );
-    }
-  }
-}
 
 export class VMContextNotFoundError extends Error {
   constructor(bundleFilePath: string) {
@@ -740,6 +754,11 @@ async function buildVM(filePath: string): Promise<VMContext> {
       };
       vmPoolActivity.contextsBuilt += 1;
 
+      // Configuration is normally immutable after startup, but keeping the
+      // live object testable also permits a runtime cap decrease. Normalize
+      // before the build event so neither logs nor diagnostics can observe a
+      // retained pool above the newly configured absolute cap.
+      shrinkVMPoolToConfiguredCap(filePath);
       log.debug(
         {
           event: 'vm_pool_context_built',
@@ -890,7 +909,6 @@ export async function buildExecutionContext(
           // after every waiting ExecutionContext releases it.
           retireSourceMapRegistrationAfterEviction(vmContext.sourceMapRegistration);
         }
-        manageVMPoolSize();
       } catch (error) {
         if (!buildRejected) {
           buildRejected = true;

@@ -1042,6 +1042,83 @@ describe('buildVM and runInVM', () => {
       );
     });
 
+    test('never reports an over-cap pool when the configured cap decreases before admission', async () => {
+      getConfig().maxVMPoolSize = 4;
+      const existingBundles = Array.from({ length: 4 }, (_unused, index) =>
+        createRolloutBundle(`mutable-cap-generation-${index}`, 'server'),
+      );
+      const activeExecutionContexts = [];
+      for (const bundlePath of existingBundles) {
+        // eslint-disable-next-line no-await-in-loop -- Ordered admissions establish the pre-change pool.
+        activeExecutionContexts.push(
+          // eslint-disable-next-line no-await-in-loop -- Each context must remain active across eviction.
+          await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true),
+        );
+      }
+      expect(getVMPoolDiagnostics().retainedContexts).toBe(4);
+
+      getConfig().maxVMPoolSize = 1;
+      const admittedBundle = createRolloutBundle('mutable-cap-generation-4', 'server');
+      const observedRetainedCounts: number[] = [];
+      const observePoolSize = (payload: unknown) => {
+        if (
+          typeof payload === 'object' &&
+          payload !== null &&
+          'retainedContexts' in payload &&
+          typeof payload.retainedContexts === 'number'
+        ) {
+          observedRetainedCounts.push(payload.retainedContexts, getVMPoolDiagnostics().retainedContexts);
+        }
+      };
+      const debugSpy = jest.spyOn(log, 'debug').mockImplementation(observePoolSize);
+      const warningSpy = jest.spyOn(log, 'warn').mockImplementation(observePoolSize);
+
+      const admittedExecutionContext = await buildExecutionContext(
+        [admittedBundle],
+        /* buildVmsIfNeeded */ true,
+      );
+
+      expect(observedRetainedCounts.length).toBeGreaterThan(0);
+      expect(Math.max(...observedRetainedCounts)).toBeLessThanOrEqual(1);
+      expect(getVMPoolDiagnostics()).toMatchObject({
+        retainedContexts: 1,
+        hardLimitEvictions: 4,
+      });
+      const evictedPaths = debugSpy.mock.calls
+        .map(([payload]) => payload)
+        .filter(
+          (payload): payload is { event: string; bundlePath: string } =>
+            typeof payload === 'object' &&
+            payload !== null &&
+            'event' in payload &&
+            payload.event === 'vm_pool_context_evicted' &&
+            'bundlePath' in payload &&
+            typeof payload.bundlePath === 'string',
+        )
+        .map(({ bundlePath }) => bundlePath);
+      expect(evictedPaths).toEqual(expect.arrayContaining(existingBundles));
+      expect(warningSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: 'vm_pool_hard_limit_eviction',
+          evictedBundlePath: expect.stringMatching(/mutable-cap-generation-/),
+          admittedBundlePath: admittedBundle,
+          retainedContexts: 1,
+          maxVMPoolSize: 1,
+        }),
+        expect.any(String),
+      );
+
+      await Promise.all(
+        activeExecutionContexts.map((executionContext, index) =>
+          executionContext.runInVM('1 + 1', existingBundles[index]),
+        ),
+      ).then((results) => expect(results).toEqual(['2', '2', '2', '2']));
+      expect(await admittedExecutionContext.runInVM('1 + 1', admittedBundle)).toBe('2');
+
+      activeExecutionContexts.forEach((executionContext) => executionContext.release());
+      admittedExecutionContext.release();
+    });
+
     test('rate-limits hard-limit pressure warnings while retaining cumulative counters', async () => {
       const testClock = createTestVMPoolClock();
       setVMPoolClockForTest(testClock.clock);
