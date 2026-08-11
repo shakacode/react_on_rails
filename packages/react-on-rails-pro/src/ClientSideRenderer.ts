@@ -640,7 +640,7 @@ function unmountAllStores(): void {
   // instead of resolving against the previous page's store (issue #4861). Store GENERATORS
   // stay registered — they are code, and the bundles remain loaded across soft navigations.
   // The core client renderer does the equivalent in its own page-unload callback.
-  StoreRegistry.clearHydratedStoresOnPageUnload();
+  StoreRegistry.clearHydratedStoresKeepingWaiters();
 }
 
 function clearRSCPreloadedPayloadGlobals(): void {

@@ -72,7 +72,7 @@ describe('CallbackRegistry', () => {
     expect(isPageUnloadRegistryError(rejection)).toBe(true);
   });
 
-  // Issue #4861's fix (StoreRegistry.clearHydratedStoresOnPageUnload) deliberately leaves
+  // Issue #4861's fix (StoreRegistry.clearHydratedStoresKeepingWaiters) deliberately leaves
   // waiter/timeout lifecycle to this registry's own page-unload handling. That makes the
   // handler's timed-out reset part of the fix's contract: if a registry timed out on page A
   // and the unload did NOT re-arm it, then on every later soft-navigation page set() would
