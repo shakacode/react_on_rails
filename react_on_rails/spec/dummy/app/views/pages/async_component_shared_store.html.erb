@@ -39,8 +39,12 @@
       fetch('/async_component_shared_store_island')
         .then(function(response) { return response.text(); })
         .then(function(html) {
-          // Inject the server-rendered fragment. The component-specification tag it contains is
-          // type="application/json", so innerHTML injection is fine — nothing needs to execute.
+          // Inject the server-rendered fragment. Browsers never execute <script> tags inserted
+          // via innerHTML, and nothing here needs to execute: the component-specification tag is
+          // inert type="application/json" data that reactOnRailsComponentLoaded reads from the DOM.
+          // (In Pro, react_component also emits an executable immediate-hydration script tag —
+          // equally inert via innerHTML — which is why the explicit componentLoaded call below is
+          // the documented activation step for injected fragments.)
           document.getElementById('async-island-placeholder').innerHTML = html;
 
           // The documented core API for rendering an asynchronously injected component.
