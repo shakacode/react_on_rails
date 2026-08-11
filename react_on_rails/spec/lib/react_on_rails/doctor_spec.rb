@@ -3432,6 +3432,25 @@ RSpec.describe ReactOnRails::Doctor do
     end
   end
 
+  describe "#doctor_app_root" do
+    it "prefers Rails.root when it becomes available after a cwd fallback" do
+      Dir.mktmpdir do |cwd_root|
+        Dir.mktmpdir do |rails_root|
+          current_rails_root = nil
+          allow(Rails).to receive(:root) { current_rails_root }
+
+          Dir.chdir(cwd_root) do
+            cwd_fallback = File.expand_path(Dir.pwd)
+            expect(doctor.send(:doctor_app_root)).to eq(cwd_fallback)
+
+            current_rails_root = Pathname.new(rails_root)
+            expect(doctor.send(:doctor_app_root)).to eq(rails_root)
+          end
+        end
+      end
+    end
+  end
+
   # ── Pro Setup Checks ──────────────────────────────────────────────
   # ReactOnRailsPro class may not be loaded in the test environment (Pro is optional),
   # so we must use unverified doubles for stub_const.

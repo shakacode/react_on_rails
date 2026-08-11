@@ -1012,6 +1012,36 @@ describe('buildVM and runInVM', () => {
       expect([...oldGeneration, ...newGeneration].filter(hasVMContextForBundle)).toHaveLength(2);
     });
 
+    test('identifies each bundle removed by hard-limit eviction', async () => {
+      getConfig().maxVMPoolSize = 1;
+      const firstBundle = createRolloutBundle('diagnostic-generation-1', 'server');
+      const secondBundle = createRolloutBundle('diagnostic-generation-2', 'server');
+      const debugSpy = jest.spyOn(log, 'debug').mockImplementation(() => undefined);
+      const warningSpy = jest.spyOn(log, 'warn').mockImplementation(() => undefined);
+
+      await buildExecutionContext([firstBundle], /* buildVmsIfNeeded */ true);
+      await buildExecutionContext([secondBundle], /* buildVmsIfNeeded */ true);
+
+      expect(debugSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: 'vm_pool_context_evicted',
+          bundlePath: firstBundle,
+          reason: 'hard_limit',
+          retainedContexts: 0,
+          maxVMPoolSize: 1,
+        }),
+        'Removed VM context from the pool',
+      );
+      expect(warningSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: 'vm_pool_hard_limit_eviction',
+          evictedBundlePath: firstBundle,
+          admittedBundlePath: secondBundle,
+        }),
+        expect.any(String),
+      );
+    });
+
     test('rate-limits hard-limit pressure warnings while retaining cumulative counters', async () => {
       const testClock = createTestVMPoolClock();
       setVMPoolClockForTest(testClock.clock);

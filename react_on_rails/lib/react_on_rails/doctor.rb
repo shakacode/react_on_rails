@@ -5668,13 +5668,13 @@ module ReactOnRails
     end
 
     def doctor_app_root
-      return @doctor_app_root if defined?(@doctor_app_root)
-
       rails_root = Rails.root if defined?(Rails) && Rails.respond_to?(:root)
       rails_root = rails_root.to_s
-      @doctor_app_root = rails_root.empty? ? doctor_app_root_from_cwd : rails_root
+      return rails_root unless rails_root.empty?
+
+      @doctor_app_root ||= doctor_app_root_from_cwd
     rescue StandardError
-      @doctor_app_root = doctor_app_root_from_cwd
+      @doctor_app_root ||= doctor_app_root_from_cwd
     end
 
     def doctor_app_root_from_cwd

@@ -191,6 +191,16 @@ function removeVMContextFromPool(bundlePath: string, reason: VMRemovalReason) {
   } else {
     vmPoolActivity.drainedContextRetirements += 1;
   }
+  log.debug(
+    {
+      event: 'vm_pool_context_evicted',
+      bundlePath,
+      reason,
+      retainedContexts: vmContexts.size,
+      maxVMPoolSize: getConfig().maxVMPoolSize,
+    },
+    'Removed VM context from the pool',
+  );
   return true;
 }
 
@@ -418,7 +428,11 @@ const extendContext = (contextObject: vm.Context, additionalContext: Record<stri
   Object.assign(contextObject, additionalContext);
 };
 
-function logVMPoolPressure(event: string, message: string) {
+function logVMPoolPressure(
+  event: string,
+  message: string,
+  bundlePaths: { evictedBundlePath: string; admittedBundlePath: string } | undefined = undefined,
+) {
   const { maxVMPoolSize } = getConfig();
   const currentTime = vmPoolClock.now();
   if (
@@ -438,6 +452,7 @@ function logVMPoolPressure(event: string, message: string) {
       hardLimitEvictions: vmPoolActivity.hardLimitEvictions,
       contextsBuilt: vmPoolActivity.contextsBuilt,
       warningIntervalMilliseconds: VM_POOL_PRESSURE_WARNING_INTERVAL_MS,
+      ...bundlePaths,
     },
     message,
   );
@@ -483,6 +498,7 @@ function admitVMContextToPool(bundlePath: string, vmContext: VMContext) {
   logVMPoolPressure(
     'vm_pool_hard_limit_eviction',
     'VM pool pressure is evicting least-recently-used contexts at the configured hard limit',
+    { evictedBundlePath: evictionCandidate[0], admittedBundlePath: bundlePath },
   );
   return true;
 }
