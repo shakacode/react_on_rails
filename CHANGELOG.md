@@ -26,6 +26,12 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **HTTP/1.1 is now a supported Node Renderer transport for load balancers and HTTP/1.1-only probes**:
+  Rails can opt out of forcing h2c with `config.renderer_http_force_http2 = false`, paired with
+  `fastifyServerOptions: { http2: false }` on the Node Renderer. The default remains h2c, which is still required for
+  bidirectional async-props streaming. Fixes
+  [Issue 4868](https://github.com/shakacode/react_on_rails/issues/4868).
+
 - **[Pro]** **Bounded Node Renderer VM retention now avoids old/new RSC rebuild thrash during rolling deploys**:
   The default per-worker VM hard cap now retains four contexts, enough for the server and RSC bundles from one
   draining and one current revision. Successful bundle sets remain reusable through a configurable, timer-driven

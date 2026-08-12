@@ -674,7 +674,8 @@ module ReactOnRailsPro
           origin: url,
           pool_size: ReactOnRailsPro.configuration.renderer_http_pool_size,
           connect_timeout: ReactOnRailsPro.configuration.renderer_http_pool_timeout,
-          read_timeout: ReactOnRailsPro.configuration.ssr_timeout
+          read_timeout: ReactOnRailsPro.configuration.ssr_timeout,
+          force_http2: ReactOnRailsPro.configuration.renderer_http_force_http2
         )
       rescue StandardError => e
         message = <<~MSG
@@ -683,6 +684,7 @@ module ReactOnRailsPro
           renderer_http_pool_timeout = #{ReactOnRailsPro.configuration.renderer_http_pool_timeout}
           renderer_http_pool_warn_timeout = #{ReactOnRailsPro.configuration.renderer_http_pool_warn_timeout}
           renderer_http_keep_alive_timeout = #{ReactOnRailsPro.configuration.renderer_http_keep_alive_timeout}
+          renderer_http_force_http2 = #{ReactOnRailsPro.configuration.renderer_http_force_http2}
           renderer_url = #{url}
           Be sure to use a url that contains the protocol of http or https.
           Original error is

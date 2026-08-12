@@ -23,7 +23,8 @@ import cluster from 'cluster';
 import { randomUUID } from 'crypto';
 import { rm } from 'fs/promises';
 import { Readable, Transform } from 'stream';
-import fastify from 'fastify';
+import fastify, { type FastifyServerOptions } from 'fastify';
+import type { Http2Server } from 'http2';
 import fastifyFormbody from '@fastify/formbody';
 import fastifyMultipart, { type MultipartFile } from '@fastify/multipart';
 import log, { sharedLoggerOptions } from './shared/log.js';
@@ -610,15 +611,15 @@ export default function run(config: Partial<Config>) {
     currentGenerationManifestPath,
   } = getConfig();
 
-  // The renderer uses cleartext HTTP/2 (h2c). Node's `allowHTTP1` option only
-  // applies to TLS servers (http2.createSecureServer), so it cannot enable
-  // HTTP/1.1 Kubernetes httpGet probes on this listener.
+  // Keep the existing HTTP/2-centric internal Fastify types. The original
+  // object is spread at runtime, so an explicit `http2: false` still wins.
+  const serverOptionsForFastify: FastifyServerOptions<Http2Server> = fastifyServerOptions;
   const app = fastify({
     http2: useHttp2 as true,
     bodyLimit: BODY_SIZE_LIMIT,
     logger:
       logHttpLevel !== 'silent' ? { name: 'RORP HTTP', level: logHttpLevel, ...sharedLoggerOptions } : false,
-    ...fastifyServerOptions,
+    ...serverOptionsForFastify,
   });
 
   handleGracefulShutdown(app);

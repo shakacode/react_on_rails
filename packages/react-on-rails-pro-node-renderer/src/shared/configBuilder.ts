@@ -34,6 +34,10 @@ const DEFAULT_LOG_LEVEL = 'info';
 const { env } = process;
 const MAX_DEBUG_SNIPPET_LENGTH = 1000;
 
+export type RendererFastifyServerOptions = FastifyServerOptions<http2.Http2Server> & {
+  http2?: false;
+};
+
 /* Update ./docs/node-renderer/js-configuration.md when something here changes */
 // Node renderer configuration
 export interface Config {
@@ -49,9 +53,10 @@ export interface Config {
   logLevel: LevelWithSilent;
   // The HTTP server log level
   logHttpLevel: LevelWithSilent;
-  // Additional options to pass to the Fastify server factory.
+  // Additional options to pass to the Fastify server factory. Set `http2: false`
+  // to use HTTP/1.1 instead of the default cleartext HTTP/2 (h2c) transport.
   // See https://fastify.dev/docs/latest/Reference/Server/#factory.
-  fastifyServerOptions: FastifyServerOptions<http2.Http2Server>;
+  fastifyServerOptions: RendererFastifyServerOptions;
   // Path to a cache directory where uploaded server bundle files will be stored.
   // This is distinct from Shakapacker's public asset directory.
   serverBundleCachePath: string;
@@ -136,9 +141,9 @@ export interface Config {
   // If set to true, the renderer registers built-in, unauthenticated GET /health (liveness) and
   // GET /ready (readiness) probe endpoints. Both return status-only JSON bodies and never expose
   // runtime version or path details. Defaults to false.
-  // NOTE: the renderer listens with cleartext HTTP/2 (h2c), so HTTP/1.1-only probes (e.g.
-  // Kubernetes httpGet) cannot reach these endpoints. Use tcpSocket or exec probes
-  // (`curl --http2-prior-knowledge`). See docs/oss/building-features/node-renderer/health-checks.md.
+  // The default cleartext HTTP/2 (h2c) listener needs a tcpSocket or h2c-aware exec probe.
+  // Set `fastifyServerOptions.http2` to false for ordinary HTTP/1.1 probes.
+  // See docs/oss/building-features/node-renderer/health-checks.md.
   enableHealthEndpoints: boolean;
 }
 

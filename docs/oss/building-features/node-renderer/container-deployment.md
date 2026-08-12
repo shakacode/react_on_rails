@@ -12,6 +12,43 @@ This guide covers deploying the Node Renderer in containerized environments (Doc
 - **Ruby** 3.1+ with Bundler
 - The `react-on-rails-pro-node-renderer` npm package installed in your project
 
+## HTTP Transport: h2c or HTTP/1.1
+
+The Node Renderer and Rails client use cleartext HTTP/2 (h2c) by default. Keep that default when the application uses
+bidirectional streaming for async props.
+
+Deployments that require HTTP/1.1 can select it explicitly. A common example is a separate renderer workload behind an
+AWS Application Load Balancer, whose target-group health checks connect with HTTP/1.1. Configure both sides:
+
+```js
+// renderer/node-renderer.js
+const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');
+
+reactOnRailsProNodeRenderer({
+  host: '0.0.0.0',
+  enableHealthEndpoints: true,
+  fastifyServerOptions: { http2: false },
+});
+```
+
+```ruby
+# config/initializers/react_on_rails_pro.rb
+ReactOnRailsPro.configure do |config|
+  config.server_renderer = "NodeRenderer"
+  config.renderer_url = ENV.fetch("RENDERER_URL")
+  config.renderer_http_force_http2 = false
+end
+```
+
+The paired settings make regular renderer traffic and `/health` or `/ready` use HTTP/1.1, so an ALB can route requests
+and probe the renderer directly. Do not set only one side: an HTTP/1.1 client cannot connect to an h2c-only listener,
+and a client that forces h2c cannot connect to an HTTP/1.1 listener.
+
+The tradeoff is that HTTP/1.1 cannot carry the bidirectional stream used for async props. Regular rendering and one-way
+response streaming remain available. Use the default h2c transport, plus an h2c-aware `exec` probe or a TCP probe, when
+async props are required. See [Node Renderer Health and Readiness Endpoints](./health-checks.md#choosing-h2c-or-http11)
+for probe details.
+
 ## Architecture Options
 
 When running Rails and the Node Renderer in containers, you have three options, listed from simplest to most complex:
@@ -170,8 +207,9 @@ Never expose a separately deployed renderer directly to the public network. The 
 ## Control Plane Deployment Shapes
 
 For Control Plane deployments, choose the probe target based on where the node renderer runs. Control Plane configures
-probes per container. Renderer probe targets below mean `tcpSocket` or h2c-aware `exec` probes, not HTTP/1.1 `httpGet`
-probes directly against the renderer.
+probes per container. The examples below keep the default h2c transport and therefore use `tcpSocket` or h2c-aware
+`exec` probes. An HTTP/1.1 `httpGet` probe is also available when both sides use the paired
+[HTTP/1.1 configuration](#http-transport-h2c-or-http11).
 
 [Control Plane Flow](https://github.com/shakacode/control-plane-flow)'s default `rails` template models Rails as a
 single-container standard workload. If you follow that template and run the renderer inside the Rails container,
@@ -553,10 +591,10 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
 > The full copy-paste YAML lives in [Kubernetes Sidecar Manifest](#kubernetes-sidecar-manifest) below. Update the JS
 > Configuration section first when tuning thresholds, then reflect the change in the manifest.
 
-1. **Health check endpoint** — The Node Renderer exposes a built-in `/info` endpoint that returns the node version and
-   renderer version. The renderer uses cleartext HTTP/2, so Kubernetes `httpGet` probes (HTTP/1.1) are incompatible —
-   use a `tcpSocket` probe, an `exec` probe with an h2c-aware client such as `curl --http2-prior-knowledge`, or a
-   dedicated HTTP/1.1 sidecar/port for probes. For a custom `/health` route with more granular checks, see
+1. **Health check endpoint** - The Node Renderer exposes a built-in `/info` endpoint that returns the node version and
+   renderer version. The default cleartext HTTP/2 listener requires a `tcpSocket` probe or an `exec` probe with an
+   h2c-aware client such as `curl --http2-prior-knowledge`. If the renderer and Rails client both use HTTP/1.1, a
+   Kubernetes `httpGet` probe can reach the renderer directly. For a custom `/health` route with more granular checks, see
    [JS Configuration: Adding a Health Check Endpoint](./js-configuration.md#adding-a-health-check-endpoint).
 2. **Startup probe** — A startup probe is the primary mitigation for this error. It defers readiness and liveness until
    the renderer has bound its port, so Rails only sends render requests after workers are ready:

@@ -1084,6 +1084,36 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
       end
     end
 
+    describe ".renderer_http_force_http2" do
+      it "defaults to true" do
+        ReactOnRailsPro.configure {} # rubocop:disable Lint/EmptyBlock
+
+        expect(ReactOnRailsPro.configuration.renderer_http_force_http2).to be(true)
+      end
+
+      it "accepts false to select HTTP/1.1" do
+        ReactOnRailsPro.configure do |config|
+          config.renderer_http_force_http2 = false
+        end
+
+        expect(ReactOnRailsPro.configuration.renderer_http_force_http2).to be(false)
+      end
+
+      it "rejects non-boolean values" do
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.renderer_http_force_http2 = nil
+          end
+        end.to raise_error(ReactOnRailsPro::Error, /must be true or false/)
+      end
+
+      it "validates constructor values before storing them" do
+        expect do
+          described_class.new(renderer_http_force_http2: "false")
+        end.to raise_error(ReactOnRailsPro::Error, /must be true or false/)
+      end
+    end
+
     describe ".cache_tag_index_expires_in / .cache_tag_index_max_keys" do
       it "accepts valid values" do
         ReactOnRailsPro.configure do |config|

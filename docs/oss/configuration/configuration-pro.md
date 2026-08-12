@@ -83,6 +83,14 @@ ReactOnRailsPro.configure do |config|
   # Default for `renderer_url` is "http://localhost:3800".
   config.renderer_url = ENV["REACT_RENDERER_URL"]
 
+  # Force HTTP/2 prior knowledge (h2c) for cleartext renderer URLs. Keep the
+  # default true unless the Node Renderer also sets
+  # `fastifyServerOptions: { http2: false }` to listen with HTTP/1.1.
+  # HTTP/1.1 supports regular rendering and health checks, but not
+  # bidirectional streaming for async props.
+  # Default for `renderer_http_force_http2` is true.
+  config.renderer_http_force_http2 = true
+
   # If you don't want to worry about special characters in your password within the url, use this config value
   # Default for `renderer_password` is nil
   # config.renderer_password = ENV["RENDERER_PASSWORD"]
@@ -278,6 +286,26 @@ end
 ## Renderer Performance Tuning for Streamed RSC
 
 The dominant contributors to a streamed route's `responseEnd` tail are Node renderer round-trip overhead, cold or under-warmed renderer workers, and per-request connection setup between Rails and the renderer. Three levers address these (see [issue #4240](https://github.com/shakacode/react_on_rails/issues/4240)). Measure changes with before/after page-load timing for the streamed route, `Server-Timing` for the early Rails/renderer phases that are known before the first stream write, the inline RSC stream performance marks described in the [Streaming SSR guide](../../pro/streaming-ssr.md), and renderer logs or tracing for cold-worker behavior. Inline marks remain the source for late payload, flush, hydration, and stream-drain timing because `ActionController::Live` commits headers on the first stream write.
+
+The default renderer transport is cleartext HTTP/2 (h2c). Deployments that require HTTP/1.1, including an AWS ALB
+target group whose health checks connect directly to the renderer, must configure both sides of the connection:
+
+```js
+reactOnRailsProNodeRenderer({
+  fastifyServerOptions: { http2: false },
+});
+```
+
+```ruby
+ReactOnRailsPro.configure do |config|
+  config.renderer_http_force_http2 = false
+end
+```
+
+This keeps the Node listener and Rails client on HTTP/1.1. The tradeoff is that bidirectional streaming for async props
+requires HTTP/2 and is unavailable in this mode. Leave both defaults unchanged when async props are required. See
+[Node Renderer health checks](../building-features/node-renderer/health-checks.md#choosing-h2c-or-http11) for probe and
+load-balancer guidance.
 
 ### 1. Warm up renderer workers
 
