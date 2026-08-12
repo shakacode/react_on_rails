@@ -18,8 +18,11 @@
 // haven't installed the optional OTel peer dependencies can still import this
 // module without crashing — init() will simply log an error and no-op.
 import type { Attributes } from '@opentelemetry/api';
+import type { Instrumentation } from '@opentelemetry/instrumentation';
+import type { ResourceDetector } from '@opentelemetry/resources';
 import type { NodeTracerProvider as NodeTracerProviderType } from '@opentelemetry/sdk-trace-node';
 import type { SpanExporter, SpanProcessor } from '@opentelemetry/sdk-trace-base';
+import { resolveResource, resolveServiceName } from './opentelemetryConfig.js';
 import {
   getOpenTelemetryTracerProvider,
   log,
@@ -60,15 +63,22 @@ export interface OpenTelemetryInitOptions {
   spanProcessor?: SpanProcessor;
   /** Additional resource attributes merged into the default resource. */
   resourceAttributes?: Record<string, string>;
+  /** Resource detectors whose attributes are merged below explicit resource configuration. */
+  resourceDetectors?: ResourceDetector[];
+  /** Additional instrumentations appended after the built-in HTTP and Fastify instrumentations. */
+  instrumentations?: Instrumentation[];
+  /** Use the provider already registered through the OpenTelemetry API.
+   *  The host application retains ownership of SDK configuration and shutdown. */
+  useExistingGlobalProvider?: boolean;
   /** Maximum time to wait for provider.shutdown() during Fastify onClose. Default: 5000ms. */
   shutdownTimeoutMs?: number;
 }
 
-const DEFAULT_SERVICE_NAME = 'react-on-rails-pro-node-renderer';
 const DEFAULT_SHUTDOWN_TIMEOUT_MS = 5_000;
 // Leave 1s of headroom under the worker's hard cap so the shutdown hook can
 // resolve cleanly even when provider.shutdown() runs right at its limit.
 const MAX_SHUTDOWN_TIMEOUT_MS = WORKER_SHUTDOWN_HOOKS_TIMEOUT_MS - 1_000;
+let usingExistingGlobalProvider = false;
 
 interface InstalledTracingAdapters {
   tracing: boolean;
@@ -77,10 +87,6 @@ interface InstalledTracingAdapters {
 
 function isProduction(): boolean {
   return process.env.NODE_ENV === 'production' || process.env.RAILS_ENV === 'production';
-}
-
-function resolveConfiguredServiceName(opts: OpenTelemetryInitOptions): string | undefined {
-  return process.env.OTEL_SERVICE_NAME ?? opts.serviceName;
 }
 
 function resolveShutdownTimeoutMs(opts: OpenTelemetryInitOptions): number {
@@ -101,30 +107,6 @@ function resolveShutdownTimeoutMs(opts: OpenTelemetryInitOptions): number {
     return MAX_SHUTDOWN_TIMEOUT_MS;
   }
   return requested;
-}
-
-function parseResourceAttributes(value: string | undefined): Record<string, string> {
-  if (!value) return {};
-
-  // OTel resource attributes are comma-separated. Literal commas in values must
-  // be percent-encoded by callers; unencoded commas split the value.
-  const attributes: Record<string, string> = {};
-  for (const pair of value.split(',')) {
-    const [rawKey, ...rawValueParts] = pair.split('=');
-    const key = rawKey?.trim();
-
-    if (key && rawValueParts.length > 0) {
-      const rawValue = rawValueParts.join('=').trim().replace(/^"|"$/g, '');
-      try {
-        attributes[key] = decodeURIComponent(rawValue);
-      } catch {
-        // Keep init resilient when callers provide malformed percent-encoding.
-        attributes[key] = rawValue;
-      }
-    }
-  }
-
-  return attributes;
 }
 
 function configureOpenTelemetryDiagnostics(otelApi: typeof import('@opentelemetry/api')): void {
@@ -161,6 +143,98 @@ function resetInstalledTracingAdapters(
   }
 
   return { tracing: false, subSpan: false };
+}
+
+function installTracingAdapters(
+  otelApi: typeof import('@opentelemetry/api'),
+  serviceName: string,
+): InstalledTracingAdapters {
+  const installedAdapters: InstalledTracingAdapters = { tracing: false, subSpan: false };
+  const tracer = otelApi.trace.getTracer(serviceName);
+
+  installedAdapters.tracing = setupTracing({
+    startSsrRequestOptions: () => ({
+      // Keep the root span free of request payload data. Future safe
+      // attributes should be derived from structured metadata supplied by
+      // Ruby, not parsed out of the executable renderingRequest string.
+      opentelemetry: { name: 'ror.ssr.request' },
+    }),
+    executor: async (fn, unitOfWorkOptions) => {
+      const otelOpts = unitOfWorkOptions.opentelemetry ?? { name: 'ror.ssr.request' };
+      return tracer.startActiveSpan(otelOpts.name, { attributes: otelOpts.attributes }, async (span) => {
+        try {
+          return await fn();
+        } catch (err) {
+          span.setStatus({
+            code: otelApi.SpanStatusCode.ERROR,
+            message: err instanceof Error ? err.message : String(err),
+          });
+          throw err;
+        } finally {
+          span.end();
+        }
+      });
+    },
+  });
+
+  if (installedAdapters.tracing) {
+    const subSpanImpl: SubSpanFn = (subOpts, fn) =>
+      tracer.startActiveSpan(subOpts.name, { attributes: subOpts.attributes }, async (span) => {
+        const controller = {
+          setAttributes(attributes: Record<string, string | number | boolean>) {
+            span.setAttributes(attributes);
+          },
+        };
+        try {
+          return await fn(controller);
+        } catch (err) {
+          span.setStatus({
+            code: otelApi.SpanStatusCode.ERROR,
+            message: err instanceof Error ? err.message : String(err),
+          });
+          throw err;
+        } finally {
+          span.end();
+        }
+      });
+    installedAdapters.subSpan = setupSubSpan(subSpanImpl);
+  } else {
+    message(
+      '[OpenTelemetry] tracing integration was not installed because another tracing integration is ' +
+        'active; skipping OpenTelemetry sub-spans.',
+    );
+  }
+
+  return installedAdapters;
+}
+
+function initWithExistingGlobalProvider(opts: OpenTelemetryInitOptions): void {
+  if (!opts.tracing) {
+    message(
+      '[OpenTelemetry] useExistingGlobalProvider requires tracing: true; no renderer spans were installed.',
+    );
+    return;
+  }
+
+  let installedAdapters: InstalledTracingAdapters = { tracing: false, subSpan: false };
+  try {
+    /* eslint-disable @typescript-eslint/no-require-imports, global-require --
+     * This opt-in path uses only the API facade. The host application owns SDK
+     * configuration, instrumentations, resources, and provider shutdown. */
+    const otelApi = require('@opentelemetry/api') as typeof import('@opentelemetry/api');
+    /* eslint-enable @typescript-eslint/no-require-imports, global-require */
+    const serviceName = resolveServiceName(opts, 'service.name');
+    installedAdapters = installTracingAdapters(otelApi, serviceName);
+
+    if (installedAdapters.tracing) {
+      usingExistingGlobalProvider = true;
+      log.info('[OpenTelemetry] Renderer tracing attached to the existing global provider');
+    }
+  } catch (err) {
+    installedAdapters = resetInstalledTracingAdapters(installedAdapters);
+    usingExistingGlobalProvider = false;
+    message(`[OpenTelemetry] init failed: ${String(err)}`);
+  }
 }
 
 async function shutdownProviderWithTimeout(
@@ -200,8 +274,13 @@ async function shutdownProviderWithTimeout(
 }
 
 export function init(opts: OpenTelemetryInitOptions = {}): void {
-  if (getOpenTelemetryTracerProvider()) {
+  if (getOpenTelemetryTracerProvider() || usingExistingGlobalProvider) {
     message('[OpenTelemetry] init() called more than once; ignoring duplicate call.');
+    return;
+  }
+
+  if (opts.useExistingGlobalProvider) {
+    initWithExistingGlobalProvider(opts);
     return;
   }
 
@@ -220,26 +299,14 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
       require('@opentelemetry/sdk-trace-node') as typeof import('@opentelemetry/sdk-trace-node');
     const { BatchSpanProcessor, SimpleSpanProcessor } =
       require('@opentelemetry/sdk-trace-base') as typeof import('@opentelemetry/sdk-trace-base');
-    const { resourceFromAttributes } =
-      require('@opentelemetry/resources') as typeof import('@opentelemetry/resources');
+    const resources = require('@opentelemetry/resources') as typeof import('@opentelemetry/resources');
     const { ATTR_SERVICE_NAME } =
       require('@opentelemetry/semantic-conventions') as typeof import('@opentelemetry/semantic-conventions');
     otelApi = require('@opentelemetry/api') as typeof import('@opentelemetry/api');
     const loadedOtelApi = otelApi;
 
-    const resourceAttributes = {
-      ...parseResourceAttributes(process.env.OTEL_RESOURCE_ATTRIBUTES),
-      ...(opts.resourceAttributes ?? {}),
-    };
-    const configuredServiceName = resolveConfiguredServiceName(opts);
-    const serviceName =
-      configuredServiceName ?? resourceAttributes[ATTR_SERVICE_NAME] ?? DEFAULT_SERVICE_NAME;
     const shutdownTimeoutMs = resolveShutdownTimeoutMs(opts);
-    const resource = resourceFromAttributes({
-      [ATTR_SERVICE_NAME]: serviceName,
-      ...resourceAttributes,
-      ...(configuredServiceName ? { [ATTR_SERVICE_NAME]: configuredServiceName } : {}),
-    });
+    const { resource, serviceName } = resolveResource(opts, resources, ATTR_SERVICE_NAME);
 
     const defaultExporter = () => {
       const { OTLPTraceExporter } =
@@ -289,7 +356,7 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
     provider.register();
     configureOpenTelemetryDiagnostics(loadedOtelApi);
 
-    if (opts.fastify) {
+    if (opts.fastify || opts.instrumentations !== undefined) {
       /* eslint-disable @typescript-eslint/no-require-imports, global-require */
       const { registerInstrumentations } =
         require('@opentelemetry/instrumentation') as typeof import('@opentelemetry/instrumentation');
@@ -304,66 +371,14 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
           // HTTP first — Fastify instrumentation depends on it.
           new HttpInstrumentation(),
           new FastifyOtelInstrumentation({ registerOnInitialization: true }),
+          ...(opts.instrumentations ?? []),
         ],
         tracerProvider: provider,
       });
     }
 
     if (opts.tracing) {
-      const tracer = loadedOtelApi.trace.getTracer(serviceName);
-
-      installedAdapters.tracing = setupTracing({
-        startSsrRequestOptions: () => ({
-          // Keep the root span free of request payload data. Future safe
-          // attributes should be derived from structured metadata supplied by
-          // Ruby, not parsed out of the executable renderingRequest string.
-          opentelemetry: { name: 'ror.ssr.request' },
-        }),
-        executor: async (fn, unitOfWorkOptions) => {
-          const otelOpts = unitOfWorkOptions.opentelemetry ?? { name: 'ror.ssr.request' };
-          return tracer.startActiveSpan(otelOpts.name, { attributes: otelOpts.attributes }, async (span) => {
-            try {
-              return await fn();
-            } catch (err) {
-              span.setStatus({
-                code: loadedOtelApi.SpanStatusCode.ERROR,
-                message: err instanceof Error ? err.message : String(err),
-              });
-              throw err;
-            } finally {
-              span.end();
-            }
-          });
-        },
-      });
-
-      if (installedAdapters.tracing) {
-        const subSpanImpl: SubSpanFn = (subOpts, fn) =>
-          tracer.startActiveSpan(subOpts.name, { attributes: subOpts.attributes }, async (span) => {
-            const controller = {
-              setAttributes(attributes: Record<string, string | number | boolean>) {
-                span.setAttributes(attributes);
-              },
-            };
-            try {
-              return await fn(controller);
-            } catch (err) {
-              span.setStatus({
-                code: loadedOtelApi.SpanStatusCode.ERROR,
-                message: err instanceof Error ? err.message : String(err),
-              });
-              throw err;
-            } finally {
-              span.end();
-            }
-          });
-        installedAdapters.subSpan = setupSubSpan(subSpanImpl);
-      } else {
-        message(
-          '[OpenTelemetry] tracing integration was not installed because another tracing integration is ' +
-            'active; skipping OpenTelemetry sub-spans.',
-        );
-      }
+      installedAdapters = installTracingAdapters(loadedOtelApi, serviceName);
     }
 
     let shutdownOpenTelemetryPromise: Promise<void> | undefined;

@@ -392,6 +392,45 @@ await reactOnRailsProNodeRenderer().catch((e) => {
 > [!NOTE]
 > With `fastify: true`, OpenTelemetry patches the HTTP and Fastify modules process-wide. If a later init step fails after those patches are installed, OpenTelemetry does not provide a rollback API; the patched modules remain installed and use a no-op tracer until the process restarts.
 
+### Add instrumentations and resource detectors
+
+Pass additional OpenTelemetry instrumentations through `instrumentations`. The renderer appends them after its built-in `HttpInstrumentation` and `FastifyOtelInstrumentation` instances, so the custom list extends rather than replaces the renderer defaults. Passing `instrumentations` registers the full combined list even when `fastify` is not set separately.
+
+Pass OpenTelemetry resource detectors through `resourceDetectors`. For example, an ECS deployment can install `@opentelemetry/resource-detector-aws` and let the AWS ECS detector discover container and cloud attributes. Extra instrumentation packages and detector packages remain application-owned optional dependencies.
+
+```js
+import { AwsInstrumentation } from '@opentelemetry/instrumentation-aws-sdk';
+import { awsEcsDetector } from '@opentelemetry/resource-detector-aws';
+import { init as initOpenTelemetry } from 'react-on-rails-pro-node-renderer/integrations/opentelemetry';
+
+initOpenTelemetry({
+  tracing: true,
+  instrumentations: [new AwsInstrumentation()],
+  resourceDetectors: [awsEcsDetector],
+});
+```
+
+Detected resource attributes are merged below the existing resource configuration. Explicit `resourceAttributes` override detected attributes, and service naming keeps its existing priority: `OTEL_SERVICE_NAME`, then `init({ serviceName })`, then `resourceAttributes['service.name']`, then the renderer default. A detector-provided `service.name` does not override that chain.
+
+### Attach renderer spans to an existing provider
+
+By default, `init()` still stops without installing renderer tracing adapters when another SDK already owns the global tracer provider. This avoids patching modules under a provider whose lifecycle the renderer does not own.
+
+If the application deliberately initializes its own provider first, opt in to using it with `useExistingGlobalProvider: true` and `tracing: true`:
+
+```js
+// This module must register the application's provider before renderer init.
+import './configure-opentelemetry.js';
+import { init as initOpenTelemetry } from 'react-on-rails-pro-node-renderer/integrations/opentelemetry';
+
+initOpenTelemetry({
+  tracing: true,
+  useExistingGlobalProvider: true,
+});
+```
+
+This path uses the global API tracer only to install `setupTracing` and `setupSubSpan`, preserving the renderer's `ror.*` spans. The application continues to own exporters, processors, resources, instrumentations, propagators, and provider shutdown. Configure custom instrumentations and resource detectors on that application-owned SDK; the renderer does not register or shut them down in this mode.
+
 ### Configuration via standard OpenTelemetry environment variables
 
 | Env var                                          | Purpose                                                                                                                     | Default                            |
