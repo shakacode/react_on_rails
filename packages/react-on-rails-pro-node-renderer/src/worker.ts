@@ -63,7 +63,8 @@ import {
 } from './shared/utils.js';
 import { startSsrRequestOptions, subSpan, trace, type TracingContext } from './shared/tracing.js';
 import { applyFastifyConfigFunctions } from './worker/fastifyConfig.js';
-import { hasAnyVMContext } from './worker/vm.js';
+import { hasAnyVMContext, isDeclaredCurrentGenerationReady } from './worker/vm.js';
+import { prewarmCurrentGenerationBeforeListen } from './worker/startCurrentGeneration.js';
 
 export { configureFastify, type FastifyConfigFunction } from './worker/fastifyConfig.js';
 
@@ -606,6 +607,7 @@ export default function run(config: Partial<Config>) {
     fastifyServerOptions,
     workersCount,
     enableHealthEndpoints,
+    currentGenerationManifestPath,
   } = getConfig();
 
   // The renderer uses cleartext HTTP/2 (h2c). Node's `allowHTTP1` option only
@@ -1506,35 +1508,58 @@ export default function run(config: Partial<Config>) {
     // codeql[js/missing-rate-limiting]
     // lgtm[js/missing-rate-limiting]
     app.get('/ready', (_req, res) => {
-      if (hasAnyVMContext()) {
+      const ready = currentGenerationManifestPath ? isDeclaredCurrentGenerationReady() : hasAnyVMContext();
+      if (ready) {
         res.send({ status: 'ready' });
       } else {
         res
           .status(503)
           .header('Retry-After', String(READY_RETRY_AFTER_SECONDS))
-          .send({ status: 'waiting_for_bundle' });
+          .send({
+            status: currentGenerationManifestPath ? 'waiting_for_current_generation' : 'waiting_for_bundle',
+          });
       }
     });
   }
 
-  // In tests we will run worker in master thread, so we need to ensure server
-  // will not listen:
-  // we are extracting worker from cluster to avoid false TS error
+  // Integration hooks must be registered before Fastify boots during listen.
+  applyFastifyConfigWithHealthEndpointMigrationHint(app, enableHealthEndpoints);
+
+  // In tests we will run worker in master thread, so we need to ensure server will not listen.
+  // We are extracting worker from cluster to avoid false TS error.
   const { worker } = cluster;
   if (workersCount === 0 || cluster.isWorker) {
-    app.listen({ port, host }, (err, address) => {
-      if (err) {
-        handleStartupListenError({ err, host, port });
-        return;
-      }
-      const workerName = worker ? `worker #${worker.id}` : 'master (single-process)';
-      log.info({ workerName, address }, 'Node renderer listening');
+    let startupStage: 'prewarm' | 'listen' = currentGenerationManifestPath ? 'prewarm' : 'listen';
+    const listen = () => {
+      startupStage = 'listen';
+      return new Promise<void>((resolve, reject) => {
+        app.listen({ port, host }, (err, address) => {
+          if (err) {
+            reject(err);
+            return;
+          }
+          const workerName = worker ? `worker #${worker.id}` : 'master (single-process)';
+          log.info({ workerName, address }, 'Node renderer listening');
+          resolve();
+        });
+      });
+    };
+    const start = currentGenerationManifestPath
+      ? prewarmCurrentGenerationBeforeListen({
+          currentGenerationManifestPath,
+          serverBundleCachePath,
+          listen,
+        })
+      : listen();
+    void start.catch((error: unknown) => {
+      handleStartupListenError({
+        err: error instanceof Error ? error : new Error(String(error)),
+        host,
+        port,
+        stage: startupStage,
+      });
     });
   }
-
-  // Integration hooks registered before the worker loads are applied here, immediately after
-  // listen() is scheduled and before Fastify finishes booting.
-  applyFastifyConfigWithHealthEndpointMigrationHint(app, enableHealthEndpoints);
 
   return app;
 }

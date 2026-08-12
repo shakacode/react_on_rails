@@ -26,6 +26,23 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **Bounded Node Renderer VM retention now avoids old/new RSC rebuild thrash during rolling deploys**:
+  The default per-worker VM hard cap now retains four contexts, enough for the server and RSC bundles from one
+  draining and one current revision. Successful bundle sets remain reusable through a configurable, timer-driven
+  drain window, while inactive contexts, generation metadata, and pressure logs stay bounded. Pre-seeding now emits
+  an immutable revision-scoped current-generation declaration; each configured renderer worker validates and compiles
+  that complete server/RSC set before listening, pins it across old-only traffic gaps, and reports ready only after the
+  compile barrier. Symlink-mode cache paths reuse the validated immutable snapshot VM identity without rebuilding on
+  the first request. Doctor now requires valid renderer JavaScript before launcher-derived capacity can prove a warm
+  pass, and reports observed/unverified declaration evidence rather than claiming success from invalid syntax,
+  loopback, or Rails-process configuration. **Upgrade memory impact:** the
+  default `maxVMPoolSize` doubles from 2 to 4 per worker, and total VM retention scales with renderer workers and
+  replicas, so operators should re-check deployment memory requests and limits. Invalid `MAX_VM_POOL_SIZE` values
+  that previously fell back to the default now fail fast during renderer startup. Fixes
+  [Issue 4810](https://github.com/shakacode/react_on_rails/issues/4810).
+  [PR 4811](https://github.com/shakacode/react_on_rails/pull/4811) by
+  [justin808](https://github.com/justin808).
+
 - **Routine startup diagnostics no longer appear in default `INFO` logs**: Successful package validation, valid
   Pro license checks, non-production missing-license notices, and Node renderer connection setup now log at `DEBUG`
   instead of `INFO`. Package validation still runs, while expired or invalid configured licenses remain visible outside

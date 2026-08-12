@@ -171,6 +171,40 @@ Keep build-time seeding too; the layers are complementary:
 > [!IMPORTANT]
 > Gate renderer start and readiness on the boot seed **completing, not succeeding**. A failed seed must degrade to the 410 fallback rather than wedge the deploy; the task already warns and continues on fetch failures.
 
+## Pre-seeding declares and prewarms the new renderer revision
+
+The adapter and `pre_seed_renderer_cache` populate the renderer's **disk cache** with old and new bundle files plus companion manifests, so requests avoid `410 Gone`, upload, and retry. The seed also emits a content-addressed declaration containing only the new revision's server artifact and optional RSC artifact. Configure the new renderer revision with the exact emitted path:
+
+```bash
+RENDERER_CURRENT_GENERATION_MANIFEST=/app/.node-renderer-bundles/.current-generations/rorp-generation-v1-<digest>.json
+```
+
+Each cluster worker validates that immutable declaration and its artifact roots, compiles the complete declared set, and pins it as current before listening. In supported `MODE=symlink` deployments, it compiles the validated immutable snapshot target and aliases the renderer-facing cache path to that same VM identity in memory, so the first request is a hit without request-time `realpath` work. Do not use a shared mutable `current` file or symlink: old and new workload revisions can race to rewrite a shared volume.
+
+Keep the declared current contexts plus draining request generations resident during the overlap with:
+
+```text
+maxVMPoolSize >= simultaneous bundle generations × contexts per generation
+```
+
+SSR-only has one context per generation. RSC has two: server plus RSC. The common old/new RSC rollout therefore needs `2 × 2 = 4` contexts per worker, which is the default. `maxVMPoolSize` is always a hard cap on pooled contexts; setting it to `2` during that four-context overlap causes least-recently-used eviction and can recreate the old/new rebuild loop even when every file was pre-seeded successfully.
+
+Inactive nonmatching bundle sets drain after `vmPoolRolloutDrainTimeout` (60 seconds by default). The declared current set remains pinned across an arbitrarily long old-only request gap; old traffic cannot demote it. The cleanup timer runs without waiting for another request, and shared paths stay pooled while referenced. The hard cap bounds pooled contexts and prefers declared current contexts, but an in-flight old request can keep an unpooled execution context and source-map registration alive until release, so transient memory also requires concurrency headroom.
+
+If `maxVMPoolSize` cannot hold the complete declared set, startup fails before the worker listens and `/ready` cannot pass. Additional draining contexts may be used by active requests without entering the shared pool, but the absolute pooled-context cap is never exceeded.
+
+The fleet-wide pooled-context upper bound is:
+
+```text
+overlapping renderer replicas × effective workers per replica × maxVMPoolSize
+```
+
+Include old replicas and rollout surge in the replica count. Use one effective worker for `workersCount: 0`. Size each renderer replica's memory request and limit from its worker/pooled-context count plus measured process, V8 heap, bundle-buffer, and safety overhead, including source maps and evicted execution contexts held by concurrent in-flight requests; multiply the per-replica request by overlapping replicas for total cluster capacity.
+
+The built-in `/ready` signal means the answering worker's complete declared current set is compiled when `RENDERER_CURRENT_GENERATION_MANIFEST` is configured. Application-owned, authenticated Rails smoke requests remain valuable end-to-end checks, but are not needed to target every worker for VM compilation. Without a configured declaration, the backward-compatible behavior remains request-driven and `/ready` means only that some VM exists.
+
+For configuration details, pressure log events, and topology-specific minimums, see [Sizing and draining the VM pool](../oss/building-features/node-renderer/js-configuration.md#sizing-and-draining-the-vm-pool) and [Rollout VM capacity and memory tradeoff](../oss/building-features/node-renderer/container-deployment.md#rollout-vm-capacity-and-memory-tradeoff).
+
 ## Deploy the renderer before Rails
 
 **This ordering requirement applies only when the renderer is a _separate workload_ from Rails** — Option 3 in [Container deployment](../oss/building-features/node-renderer/container-deployment.md#architecture-options). If Rails and the renderer share one workload — a single container or sidecar containers (Options 1–2) — they deploy on one atomic lifecycle. A Ruby-capable startup step can run the [boot seed](#promotion-deploys-need-a-release-time-boot-seed) before Node serves traffic.
@@ -192,8 +226,9 @@ Rails and the Node Renderer are **separate workloads** with independent deploy l
 Make the ordering explicit in your pipeline rather than relying on timing:
 
 1. Deploy/promote the **Node Renderer** workload (new image, cache pre-seeded during its build).
-2. Wait until its new revision is **live and healthy** — readiness passing and all new renderer instances up.
-3. Only then deploy/promote the **Rails** workload.
+2. Keep it on private service networking with renderer password authentication.
+3. Wait until its new revision is **live and healthy** — readiness passing and all new renderer instances up.
+4. Only then deploy/promote the **Rails** workload; use a non-public candidate smoke gate for SSR/RSC when available.
 
 The invariant to enforce is **renderer-ready-before-Rails-live**: gate the Rails workload's release on the renderer workload's release completing (sequence them as separate steps in your deploy pipeline), and/or tune the renderer's readiness probe and Rails' startup so Rails does not accept traffic until the renderer reports ready. Prefer a readiness gate over a fixed sleep — it tracks actual state. The exact wiring depends on your deploy tooling.
 
@@ -208,8 +243,10 @@ This ordering is also what makes the [boot seed](#promotion-deploys-need-a-relea
 - ⚠️ Empty-list returns (often indicates the upload side has never run on a prior deploy).
 - ℹ️ The resolved renderer cache dir and how many bundle-hash subdirectories are present.
 - ℹ️ Whether `PREVIOUS_BUNDLE_HASHES` env override is set.
+- ✅/⚠️ The conservative old/new VM-cap formula per worker, including RSC context count.
+- ℹ️ Whether both capacity and the current-generation declaration are `observed` or `unverified`; separate workloads and ambiguous loopback sidecars stay unverified rather than producing a false warm pass.
 
-Doctor never calls `fetch` or `upload` — those have side effects.
+Doctor never calls `fetch` or `upload` and does not query the live Node Renderer process — those have side effects or would require a new privileged diagnostics channel.
 
 ## Need your own artifact store?
 

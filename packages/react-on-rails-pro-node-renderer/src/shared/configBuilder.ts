@@ -122,10 +122,17 @@ export interface Config {
   // If set to false, only logs that occur on the server prior to any awaited asynchronous operations will be replayed.
   // The default value is true in development, otherwise it is set to false.
   replayServerAsyncOperationLogs: boolean;
-  // Maximum number of VM contexts to keep in memory. Defaults to 2 since typically only two contexts
-  // are needed - one for the server bundle and one for React Server Components (RSC) if enabled.
+  // Maximum number of VM contexts to keep in memory. Defaults to 4 so one draining and one current
+  // RSC-enabled bundle generation can coexist during a rolling deployment.
   // Older contexts are removed when this limit is reached.
   maxVMPoolSize: number;
+  // Seconds that an inactive bundle generation remains eligible for VM reuse during a rolling deploy.
+  // The default 60-second window covers the representative 40-second overlap with 20 seconds of drain margin.
+  vmPoolRolloutDrainTimeout: number;
+  // Absolute path to the immutable, revision-scoped current-generation declaration emitted by
+  // ReactOnRailsPro::PreSeedRendererCache. When configured, every worker compiles the complete
+  // declared server/RSC set before listening and keeps it pinned as current.
+  currentGenerationManifestPath: string | undefined;
   // If set to true, the renderer registers built-in, unauthenticated GET /health (liveness) and
   // GET /ready (readiness) probe endpoints. Both return status-only JSON bodies and never expose
   // runtime version or path details. Defaults to false.
@@ -234,6 +241,22 @@ function truthyHealthEndpointFlag(value: unknown) {
   return value === '1' || truthy(value);
 }
 
+function numericRuntimeConfigValue(value: unknown) {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string' && value.trim() !== '') return Number(value);
+
+  return Number.NaN;
+}
+
+// Re-evaluated at build time as well as module load so env vars set post-import take effect.
+function defaultMaxVMPoolSize() {
+  return env.MAX_VM_POOL_SIZE != null ? Number(env.MAX_VM_POOL_SIZE) : 4;
+}
+
+function defaultVmPoolRolloutDrainTimeout() {
+  return env.VM_POOL_ROLLOUT_DRAIN_TIMEOUT != null ? Number(env.VM_POOL_ROLLOUT_DRAIN_TIMEOUT) : 60;
+}
+
 const defaultConfig: Config = {
   // Use env port if we run on Heroku
   port: Number(env.RENDERER_PORT) || DEFAULT_PORT,
@@ -283,9 +306,15 @@ const defaultConfig: Config = {
   // Default to true in development, otherwise it is set to false.
   replayServerAsyncOperationLogs: defaultReplayServerAsyncOperationLogs(),
 
-  // Maximum number of VM contexts to keep in memory. Defaults to 2 since typically only two contexts
-  // are needed - one for the server bundle and one for React Server Components (RSC) if enabled.
-  maxVMPoolSize: (env.MAX_VM_POOL_SIZE && parseInt(env.MAX_VM_POOL_SIZE, 10)) || 2,
+  // Maximum number of VM contexts to keep in memory. Four covers one draining and one current
+  // RSC-enabled generation (server + RSC for each generation).
+  maxVMPoolSize: defaultMaxVMPoolSize(),
+
+  // Keep a draining generation reusable for the representative 40-second rollout overlap plus
+  // 20 seconds of scheduling/drain margin. Operators should tune this to their deployment window.
+  vmPoolRolloutDrainTimeout: defaultVmPoolRolloutDrainTimeout(),
+
+  currentGenerationManifestPath: env.RENDERER_CURRENT_GENERATION_MANIFEST || undefined,
 
   // Built-in /health and /ready probe endpoints are opt-in.
   enableHealthEndpoints: truthyHealthEndpointFlag(env.RENDERER_ENABLE_HEALTH_ENDPOINTS),
@@ -319,6 +348,9 @@ function envValuesUsed() {
     REPLAY_SERVER_ASYNC_OPERATION_LOGS:
       !userConfig.replayServerAsyncOperationLogs && env.REPLAY_SERVER_ASYNC_OPERATION_LOGS,
     MAX_VM_POOL_SIZE: !userConfig.maxVMPoolSize && env.MAX_VM_POOL_SIZE,
+    VM_POOL_ROLLOUT_DRAIN_TIMEOUT: !userConfig.vmPoolRolloutDrainTimeout && env.VM_POOL_ROLLOUT_DRAIN_TIMEOUT,
+    RENDERER_CURRENT_GENERATION_MANIFEST:
+      !('currentGenerationManifestPath' in userConfig) && env.RENDERER_CURRENT_GENERATION_MANIFEST,
     RENDERER_ENABLE_HEALTH_ENDPOINTS:
       !('enableHealthEndpoints' in userConfig) && env.RENDERER_ENABLE_HEALTH_ENDPOINTS,
   };
@@ -442,6 +474,9 @@ export function buildConfig(providedUserConfig?: Partial<Config>): Config {
     licenseToken: env.REACT_ON_RAILS_PRO_LICENSE?.trim() || undefined,
     // Re-evaluate env-derived defaults at build time in case env vars are set post-import.
     replayServerAsyncOperationLogs: defaultReplayServerAsyncOperationLogs(),
+    maxVMPoolSize: defaultMaxVMPoolSize(),
+    vmPoolRolloutDrainTimeout: defaultVmPoolRolloutDrainTimeout(),
+    currentGenerationManifestPath: env.RENDERER_CURRENT_GENERATION_MANIFEST || undefined,
     enableHealthEndpoints: truthyHealthEndpointFlag(env.RENDERER_ENABLE_HEALTH_ENDPOINTS),
   };
   config = { ...runtimeDefaultConfig, ...userConfig };
@@ -449,6 +484,7 @@ export function buildConfig(providedUserConfig?: Partial<Config>): Config {
     config.password = runtimeDefaultConfig.password;
   }
   config.licenseToken = userConfig.licenseToken?.trim() || runtimeDefaultConfig.licenseToken;
+  config.currentGenerationManifestPath = config.currentGenerationManifestPath?.trim() || undefined;
 
   // Handle bundlePath deprecation
   if ('bundlePath' in userConfig) {
@@ -476,8 +512,16 @@ export function buildConfig(providedUserConfig?: Partial<Config>): Config {
   // Coerce in case a user config passes an env-derived string (e.g. "true").
   config.enableHealthEndpoints = truthyHealthEndpointFlag(config.enableHealthEndpoints);
 
+  // Accept env-derived numeric strings without letting JavaScript coerce booleans, arrays, or objects.
+  config.maxVMPoolSize = numericRuntimeConfigValue(config.maxVMPoolSize);
+  config.vmPoolRolloutDrainTimeout = numericRuntimeConfigValue(config.vmPoolRolloutDrainTimeout);
   if (config.maxVMPoolSize <= 0 || !Number.isInteger(config.maxVMPoolSize)) {
-    throw new Error('maxVMPoolSize must be a positive integer');
+    log.error('maxVMPoolSize must be a positive integer');
+    process.exit(1);
+  }
+  if (config.vmPoolRolloutDrainTimeout <= 0 || !Number.isFinite(config.vmPoolRolloutDrainTimeout)) {
+    log.error('vmPoolRolloutDrainTimeout must be a positive number of seconds');
+    process.exit(1);
   }
 
   let currentArg: string | undefined;
