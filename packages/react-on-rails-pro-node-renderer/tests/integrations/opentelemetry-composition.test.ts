@@ -159,6 +159,7 @@ describe('opentelemetry integration: composable init()', () => {
   test('resource detector failures are logged and their attributes are omitted', async () => {
     const thrownError = new Error('detector threw');
     const rejectedError = new Error('attribute rejected');
+    const anonymousError = new Error('anonymous detector threw');
     const throwingDetector: ResourceDetector = {
       detect: () => {
         throw thrownError;
@@ -167,13 +168,17 @@ describe('opentelemetry integration: composable init()', () => {
     const rejectingDetector: ResourceDetector = {
       detect: () => ({ attributes: { 'cloud.platform': Promise.reject(rejectedError) } }),
     };
+    const anonymousDetector = Object.create(null) as ResourceDetector;
+    anonymousDetector.detect = () => {
+      throw anonymousError;
+    };
     const log = (await import('../../src/shared/log')).default;
     const warnSpy = jest.spyOn(log, 'warn').mockImplementation(() => undefined);
     const exporter = new InMemorySpanExporter();
     const spanProcessor = new SimpleSpanProcessor(exporter);
     const { init } = await import('../../src/integrations/opentelemetry');
 
-    init({ resourceDetectors: [throwingDetector, rejectingDetector], spanProcessor });
+    init({ resourceDetectors: [throwingDetector, rejectingDetector, anonymousDetector], spanProcessor });
     otelTrace.getTracer('test').startActiveSpan('manual.span', (span) => span.end());
     await spanProcessor.forceFlush();
 
@@ -186,6 +191,10 @@ describe('opentelemetry integration: composable init()', () => {
     );
     expect(warnSpy).toHaveBeenCalledWith(
       expect.objectContaining({ err: rejectedError }),
+      expect.stringContaining('resource detector failed'),
+    );
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ detector: '<anonymous>', err: anonymousError }),
       expect.stringContaining('resource detector failed'),
     );
   });

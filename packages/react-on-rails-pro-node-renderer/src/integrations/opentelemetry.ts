@@ -359,7 +359,7 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
     const shutdownTimeoutMs = resolveShutdownTimeoutMs(opts);
     const { resource, serviceName } = resolveResource(opts, resources, ATTR_SERVICE_NAME, (detector, err) => {
       log.warn(
-        { detector: detector.constructor.name, err },
+        { detector: detector?.constructor?.name ?? '<anonymous>', err },
         '[OpenTelemetry] resource detector failed; unavailable attributes are omitted',
       );
     });
