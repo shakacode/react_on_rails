@@ -39,8 +39,11 @@
  *
  * Spike simplifications (a shipped loader would parse with acorn like React's node-loader):
  * - only modules under client/app/actions/ with a leading 'use server' directive transform;
- * - only top-level `export async function X` / `export function X` / `export const X =`
- *   named exports are supported; default/list/re-exports fail the build loudly;
+ * - only top-level `export async function X` / `export function X` / single-declarator
+ *   `export const X =` named exports are supported; every other export form (default, list,
+ *   re-export, class/let/var, multi-declarator const) — and a directive module with no
+ *   transformable export at all — fails the build loudly, so untransformed server-module
+ *   source can never ship to the client bundle;
  * - function-level 'use server' directives (inline actions) are out of scope — those
  *   genuinely require a compiler transform (closure extraction), not a module rewrite.
  */
@@ -54,7 +57,12 @@ const CALL_SERVER_MODULE = path.resolve(__dirname, '../../client/app/utils/spike
 const USE_SERVER_DIRECTIVE_REGEX = /^(?:\s|\/\/[^\n]*\n|\/\*[\s\S]*?\*\/)*(['"])use server\1\s*;?/;
 const NAMED_EXPORT_REGEX =
   /^export\s+(?:async\s+)?(?:function\s+([A-Za-z_$][\w$]*)|const\s+([A-Za-z_$][\w$]*)\s*=)/gm;
-const UNSUPPORTED_EXPORT_REGEX = /^export\s+(?:default\b|\{|\*)/m;
+const UNSUPPORTED_EXPORT_REGEX = /^export\s+(?:default\b|\{|\*|class\b|let\b|var\b)/m;
+// Top-level-ish comma between declarators of one `export const` statement. Spike-grade:
+// may false-positive on commas inside initializers, which fails the build loudly — the
+// safe direction for a transform that must never silently drop an export.
+const MULTI_DECLARATOR_EXPORT_REGEX =
+  /^export\s+const\s+[A-Za-z_$][\w$]*\s*=[^;\n]*,\s*[A-Za-z_$][\w$]*\s*=/m;
 
 module.exports = function spikeServerFunctionsLoader(source) {
   if (!this.resourcePath.startsWith(`${ACTIONS_DIR}${path.sep}`)) return source;
@@ -73,7 +81,21 @@ module.exports = function spikeServerFunctionsLoader(source) {
   for (let match = NAMED_EXPORT_REGEX.exec(text); match; match = NAMED_EXPORT_REGEX.exec(text)) {
     exportNames.push(match[1] || match[2]);
   }
-  if (exportNames.length === 0) return source;
+  // Fail closed: every `export` token must be one the transform rewrote. A 'use server'
+  // module with unmatched or zero transformable exports must never reach the client
+  // bundle as untransformed server-module source.
+  const exportTokenCount = (text.match(/^export\b/gm) || []).length;
+  if (
+    exportNames.length === 0 ||
+    exportTokenCount !== exportNames.length ||
+    MULTI_DECLARATOR_EXPORT_REGEX.test(text)
+  ) {
+    throw new Error(
+      `[spikeServerFunctionsLoader] ${this.resourcePath}: a 'use server' module must consist ` +
+        'entirely of single-declarator named function/const exports the spike transform can ' +
+        'rewrite — refusing to ship untransformed server-module source to the client bundle.',
+    );
+  }
 
   const moduleId = pathToFileURL(this.resourcePath).href;
   const lines = [
