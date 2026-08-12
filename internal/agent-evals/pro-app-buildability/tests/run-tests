@@ -1680,4 +1680,139 @@ for row in rsc.route form.validation tests.page tests.form; do
     "$tmp/full-suite-output/rubric-results.json")" = pass
 done
 
+mkdir -p "$tmp/classifier-workspace/eval_app/app/controllers" \
+  "$tmp/classifier-workspace/eval_app/app/javascript/src/HelloServer/ror_components" \
+  "$tmp/classifier-workspace/eval_app/app/models" \
+  "$tmp/classifier-workspace/eval_app/config" \
+  "$tmp/classifier-workspace/eval_app/test/integration"
+printf '%s\n' "gem 'react_on_rails_pro'" >"$tmp/classifier-workspace/eval_app/Gemfile"
+printf '%s\n' \
+  '{"dependencies":{"react-on-rails-pro":"1.0.0"},"scripts":{"build":"RAILS_ENV=production NODE_ENV=production rspack build"}}' \
+  >"$tmp/classifier-workspace/eval_app/package.json"
+printf '%s\n' 'rsc_payload_route' >"$tmp/classifier-workspace/eval_app/config/routes.rb"
+printf '%s\n' "'use server'; export default async function HelloServer() { return 'server data'; }" \
+  >"$tmp/classifier-workspace/eval_app/app/javascript/src/HelloServer/ror_components/HelloServer.tsx"
+printf '%s\n' 'validates :email, presence: true' \
+  >"$tmp/classifier-workspace/eval_app/app/models/waitlist_signup.rb"
+printf '%s\n' 'render errors, status: :unprocessable_entity' \
+  >"$tmp/classifier-workspace/eval_app/app/controllers/waitlist_signups_controller.rb"
+printf '%s\n' 'test "page renders" do; assert_response :success; end' \
+  >"$tmp/classifier-workspace/eval_app/test/integration/hello_page_test.rb"
+printf '%s\n' 'test "invalid then valid signup" do; assert invalid; assert valid; end' \
+  >"$tmp/classifier-workspace/eval_app/test/integration/waitlist_signups_test.rb"
+printf '%s\n' \
+  '{"type":"item.completed","item":{"type":"command_execution","command":"npx create-react-on-rails-app eval_app --pro","exit_code":0,"status":"completed","aggregated_output":"created successfully"}}' \
+  '{"type":"item.completed","item":{"type":"command_execution","command":"bin/rails test","exit_code":0,"status":"completed","aggregated_output":"3 runs, 30 assertions, 0 failures"}}' \
+  '{"type":"item.completed","item":{"type":"command_execution","command":"npm run build","exit_code":0,"status":"completed","aggregated_output":"Loading production config; Rspack compiled successfully"}}' \
+  >"$tmp/classifier-events.jsonl"
+mkdir "$tmp/classifier-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/classifier-events.jsonl" \
+  "$tmp/classifier-workspace" "$tmp/classifier-output" "$tmp/fixture-report.json" \
+  "$tmp/fixture-invocation.json"
+for row in rsc.route form.validation tests.form build.production evidence.complete; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/classifier-output/rubric-results.json")" = pass
+done
+test "$(jq -r '.overall' "$tmp/classifier-output/rubric-results.json")" = pass
+test "$(jq -r '.items[] | select(.id == "build.production") | .citations | index("artifact-evidence.json#eval_app/package.json") != null' \
+  "$tmp/classifier-output/rubric-results.json")" = true
+
+mkdir -p "$tmp/rsc-source-negative-workspace/eval_app/app/javascript/components" \
+  "$tmp/rsc-source-negative-workspace/eval_app/config" \
+  "$tmp/rsc-source-negative-workspace/eval_app/test/integration"
+printf '%s\n' 'rsc_payload_route' \
+  >"$tmp/rsc-source-negative-workspace/eval_app/config/routes.rb"
+printf '%s\n' 'export const GenericComponent = () => null' \
+  >"$tmp/rsc-source-negative-workspace/eval_app/app/javascript/components/GenericComponent.tsx"
+printf '%s\n' 'class RscPageTest; test "page" do; assert true; end; end' \
+  >"$tmp/rsc-source-negative-workspace/eval_app/test/integration/rsc_page_test.rb"
+mkdir "$tmp/rsc-source-negative-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/full-suite-events.jsonl" \
+  "$tmp/rsc-source-negative-workspace" "$tmp/rsc-source-negative-output" "$tmp/fixture-report.json" \
+  "$tmp/fixture-invocation.json"
+test "$(jq -r '.items[] | select(.id == "rsc.route") | .status' \
+  "$tmp/rsc-source-negative-output/rubric-results.json")" = unknown
+
+mkdir -p "$tmp/form-unit-negative-workspace/eval_app/app/controllers" \
+  "$tmp/form-unit-negative-workspace/eval_app/app/models" \
+  "$tmp/form-unit-negative-workspace/eval_app/test/unit"
+printf '%s\n' 'validates :email, presence: true' \
+  >"$tmp/form-unit-negative-workspace/eval_app/app/models/waitlist_signup.rb"
+printf '%s\n' 'render errors, status: :unprocessable_entity' \
+  >"$tmp/form-unit-negative-workspace/eval_app/app/controllers/waitlist_signups_controller.rb"
+printf '%s\n' 'test "invalid then valid signup" do; assert invalid; assert valid; end' \
+  >"$tmp/form-unit-negative-workspace/eval_app/test/unit/waitlist_signups_test.rb"
+mkdir "$tmp/form-unit-negative-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/full-suite-events.jsonl" \
+  "$tmp/form-unit-negative-workspace" "$tmp/form-unit-negative-output" "$tmp/fixture-report.json" \
+  "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/form-unit-negative-output/rubric-results.json")" = unknown
+done
+
+mkdir -p "$tmp/build-one-env-workspace/eval_app" "$tmp/build-no-env-workspace/eval_app" \
+  "$tmp/build-malformed-package-workspace/eval_app" \
+  "$tmp/build-wrong-package-workspace/eval_app" "$tmp/build-wrong-package-workspace/other" \
+  "$tmp/build-truncated-package-workspace/eval_app"
+printf '%s\n' '{"scripts":{"build":"NODE_ENV=production rspack build"}}' \
+  >"$tmp/build-one-env-workspace/eval_app/package.json"
+printf '%s\n' '{"scripts":{"build":"rspack build"}}' \
+  >"$tmp/build-no-env-workspace/eval_app/package.json"
+printf '%s\n' '{"scripts":{"build":"RAILS_ENV=production NODE_ENV=production rspack build"}' \
+  >"$tmp/build-malformed-package-workspace/eval_app/package.json"
+printf '%s\n' '{"scripts":{"build":"rspack build"}}' \
+  >"$tmp/build-wrong-package-workspace/eval_app/package.json"
+printf '%s\n' \
+  '{"scripts":{"build":"RAILS_ENV=production NODE_ENV=production rspack build"}}' \
+  >"$tmp/build-wrong-package-workspace/other/package.json"
+printf '%s' \
+  '{"scripts":{"build":"RAILS_ENV=production NODE_ENV=production rspack build"},"padding":"' \
+  >"$tmp/build-truncated-package-workspace/eval_app/package.json"
+printf '%017000d' 0 >>"$tmp/build-truncated-package-workspace/eval_app/package.json"
+printf '%s\n' '"}' >>"$tmp/build-truncated-package-workspace/eval_app/package.json"
+for build_workspace in build-one-env build-no-env build-malformed-package build-wrong-package \
+  build-truncated-package; do
+  mkdir "$tmp/$build_workspace-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/classifier-events.jsonl" \
+    "$tmp/$build_workspace-workspace" "$tmp/$build_workspace-output" "$tmp/fixture-report.json" \
+    "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "build.production") | .status' \
+    "$tmp/$build_workspace-output/rubric-results.json")" = unknown
+done
+
+printf '%s\n' \
+  '{"type":"item.completed","item":{"type":"command_execution","command":"npm run build","exit_code":0,"status":"completed","aggregated_output":"Usage: build [options]; Rspack compiled successfully"}}' \
+  >"$tmp/build-help-events.jsonl"
+printf '%s\n' \
+  '{"type":"item.completed","item":{"type":"command_execution","command":"npm run build","exit_code":1,"status":"failed","aggregated_output":"Rspack compiled successfully"}}' \
+  >"$tmp/build-failed-events.jsonl"
+for build_case in help failed; do
+  mkdir "$tmp/build-$build_case-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/build-$build_case-events.jsonl" \
+    "$tmp/classifier-workspace" "$tmp/build-$build_case-output" "$tmp/fixture-report.json" \
+    "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "build.production") | .status' \
+    "$tmp/build-$build_case-output/rubric-results.json")" = unknown
+done
+
+printf '%s\n' \
+  '{"type":"item.completed","item":{"type":"command_execution","command":"pnpm run build","exit_code":0,"status":"completed","aggregated_output":"Rspack compiled successfully"}}' \
+  >"$tmp/pnpm-build-events.jsonl"
+printf '%s\n' \
+  '{"type":"item.completed","item":{"type":"command_execution","command":"npm run build:production","exit_code":0,"status":"completed","aggregated_output":"Rspack compiled successfully"}}' \
+  >"$tmp/explicit-production-build-events.jsonl"
+mkdir "$tmp/pnpm-build-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/pnpm-build-events.jsonl" \
+  "$tmp/classifier-workspace" "$tmp/pnpm-build-output" "$tmp/fixture-report.json" \
+  "$tmp/fixture-invocation.json"
+test "$(jq -r '.items[] | select(.id == "build.production") | .status' \
+  "$tmp/pnpm-build-output/rubric-results.json")" = pass
+mkdir "$tmp/explicit-production-build-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/explicit-production-build-events.jsonl" \
+  "$tmp/build-no-env-workspace" "$tmp/explicit-production-build-output" "$tmp/fixture-report.json" \
+  "$tmp/fixture-invocation.json"
+test "$(jq -r '.items[] | select(.id == "build.production") | .status' \
+  "$tmp/explicit-production-build-output/rubric-results.json")" = pass
+
 echo "focused harness tests passed"

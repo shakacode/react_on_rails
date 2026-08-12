@@ -150,6 +150,22 @@ const isHelpOrVersion = (command) => /(?:^|\s)(?:--help|--version|-h|-V)(?:\s|$)
 
 const rubyProManifests = matchingArtifacts(/Gemfile$/, /react_on_rails_pro/);
 const jsProManifests = matchingArtifacts(/package\.json$/, /react-on-rails-pro/);
+const evalAppPackageManifest = artifacts.find(
+  (artifact) => artifact.path === 'eval_app/package.json' && !artifact.excerpt_truncated,
+);
+let manifestBackedProductionBuild = false;
+if (evalAppPackageManifest) {
+  try {
+    const packageManifest = JSON.parse(evalAppPackageManifest.excerpt);
+    const buildScript = packageManifest?.scripts?.build;
+    manifestBackedProductionBuild =
+      typeof buildScript === 'string' &&
+      /(?:^|\s)RAILS_ENV=production(?=\s|$)/.test(buildScript) &&
+      /(?:^|\s)NODE_ENV=production(?=\s|$)/.test(buildScript);
+  } catch {
+    manifestBackedProductionBuild = false;
+  }
+}
 const installCommands = successfulCommands.filter((command) => {
   const invocation = unwrapShellCommand(command.command);
   if (isHelpOrVersion(invocation)) return false;
@@ -159,7 +175,7 @@ const installCommands = successfulCommands.filter((command) => {
 });
 const rscRoutes = matchingArtifacts(/config\/routes\.rb$/, /rsc|server_component|server-component/i);
 const rscSources = matchingArtifacts(
-  /app\/.*(?:\.server\.|rsc|server_component)/i,
+  /(?:^|\/)app\/(?:(?:.*(?:\.server\.|rsc|server_component))|(?:.*\/)?ror_components(?:\/|$))/i,
   /export|class|module|render/i,
 );
 const validationModels = matchingArtifacts(/app\/models\/.*\.rb$/, /validates|validate\s/);
@@ -172,16 +188,18 @@ const pageTests = matchingArtifacts(
   /expect|assert|test\s|it\s/,
 );
 const formTests = matchingArtifacts(
-  /(?:spec|test)\/.*(?:form|request|system).*(?:_spec\.rb|_test\.rb|\.(?:test|spec)\.[jt]sx?)$/i,
+  /(?:spec|test)\/(?:(?:.*\/)?integration\/.*|.*(?:form|request|system).*)(?:_spec\.rb|_test\.rb|\.(?:test|spec)\.[jt]sx?)$/i,
   /invalid[\s\S]*valid|valid[\s\S]*invalid/i,
 );
+const plainManifestBuildInvocation = (invocation) =>
+  manifestBackedProductionBuild && /^(?:npm|pnpm) run build$/i.test(invocation);
 const buildCommands = successfulCommands.filter((command) => {
   const invocation = unwrapShellCommand(command.command);
   if (isHelpOrVersion(invocation)) return false;
   const allowedInvocation =
     /^(?:(?:RAILS_ENV|NODE_ENV)=production\s+)?(?:(?:bin\/rails|bundle exec rails|bundle exec rake|rake) assets:precompile|(?:bin\/shakapacker|bundle exec rake shakapacker:compile)|(?:npm|pnpm) run build:production)$/i.test(
       invocation,
-    );
+    ) || plainManifestBuildInvocation(invocation);
   const buildResult =
     /compiled|compilation (?:complete|successful)|built successfully|assets? (?:written|built)|webpack compiled|rspack compiled/i.test(
       command.output,
@@ -189,6 +207,9 @@ const buildCommands = successfulCommands.filter((command) => {
   const helpOutput = /usage:|options:|available commands/i.test(command.output);
   return allowedInvocation && buildResult && !helpOutput;
 });
+const manifestBackedBuildCommands = buildCommands.filter((command) =>
+  plainManifestBuildInvocation(unwrapShellCommand(command.command)),
+);
 const testCommands = successfulOutcome(
   /rspec|rails test|rake test|npm (?:run )?test|pnpm (?:run )?test|jest|playwright/i,
   /0 failures|0 failed|pass(?:ed|ing)|[1-9][0-9]* examples?, 0 failures|[1-9][0-9]* tests?, 0 failures/i,
@@ -301,7 +322,12 @@ const outcomeRows = [
       buildCommands.length > 0
         ? 'A production-relevant build command completed with exit status 0.'
         : 'No successful production build command was captured.',
-    citations: commandCitations(buildCommands),
+    citations: [
+      ...(evalAppPackageManifest && manifestBackedBuildCommands.length > 0
+        ? artifactCitations([evalAppPackageManifest])
+        : []),
+      ...commandCitations(buildCommands),
+    ],
   },
   {
     id: 'tests.green',
