@@ -14,7 +14,7 @@ const unwrapShellCommand = (command) => {
   const match = command.match(/^\/(?:usr\/)?bin\/(?:zsh|bash|sh) -lc (['"])([\s\S]*)\1$/);
   if (!match) return command.trim();
 
-  return match[2].replaceAll(`'"'"'`, "'").trim();
+  return match[2].replaceAll(`'"'"'`, "'").replaceAll(`'"'`, "'").trim();
 };
 const requiredCommand = {
   npm: 'npm view create-react-on-rails-app version --json',

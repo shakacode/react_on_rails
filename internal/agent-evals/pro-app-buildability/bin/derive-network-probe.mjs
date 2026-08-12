@@ -23,7 +23,7 @@ const unwrapShellCommand = (command) => {
   const match = command.match(/^\/(?:usr\/)?bin\/(?:zsh|bash|sh) -lc (['"])([\s\S]*)\1$/);
   if (!match) return command.trim();
 
-  return match[2].replaceAll(`'"'"'`, "'").trim();
+  return match[2].replaceAll(`'"'"'`, "'").replaceAll(`'"'`, "'").trim();
 };
 const probeAttempts = (requiredCommand) =>
   commands

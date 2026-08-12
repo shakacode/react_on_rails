@@ -1351,6 +1351,18 @@ node "$eval_dir/bin/derive-network-probe.mjs" "$tmp/quote-concatenated-probe-eve
 test "$(jq -r '.rubygems.status' "$tmp/quote-concatenated-probe.json")" = pass
 test "$(jq -r '.overall' "$tmp/quote-concatenated-probe.json")" = pass
 
+three_quote_rubygems_command=$'/usr/bin/bash -lc "gem search --remote --exact \047"\047^rails$\047"\047"'
+printf '%s\n' \
+  '{"type":"item.completed","item":{"type":"command_execution","command":"npm view create-react-on-rails-app version --json","exit_code":0}}' \
+  >"$tmp/three-quote-probe-events.jsonl"
+jq -cn --arg command "$three_quote_rubygems_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0}}' \
+  >>"$tmp/three-quote-probe-events.jsonl"
+node "$eval_dir/bin/derive-network-probe.mjs" "$tmp/three-quote-probe-events.jsonl" \
+  "$tmp/three-quote-probe.json" true
+test "$(jq -r '.rubygems.status' "$tmp/three-quote-probe.json")" = pass
+test "$(jq -r '.overall' "$tmp/three-quote-probe.json")" = pass
+
 mkdir "$tmp/evidence-workspace" "$tmp/evidence-output"
 printf '%s\n' \
   '{"type":"item.completed","item":{"type":"command_execution","command":"bin/rails assets:precompile --help","exit_code":0,"status":"completed","aggregated_output":"Usage: assets:precompile [options] - assets compiled successfully"}}' \
@@ -1419,6 +1431,13 @@ node "$eval_dir/bin/derive-evidence.mjs" "$tmp/quote-concatenated-probe-events.j
 node "$eval_dir/bin/validate-network-probe.mjs" \
   "$tmp/quote-concatenated-probe.json" \
   "$tmp/quote-concatenated-evidence-output/command-evidence.json"
+mkdir "$tmp/three-quote-evidence-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/three-quote-probe-events.jsonl" \
+  "$tmp/evidence-workspace" "$tmp/three-quote-evidence-output" "$tmp/fixture-report.json" \
+  "$tmp/fixture-invocation.json"
+node "$eval_dir/bin/validate-network-probe.mjs" \
+  "$tmp/three-quote-probe.json" \
+  "$tmp/three-quote-evidence-output/command-evidence.json"
 node "$eval_dir/bin/derive-evidence.mjs" "$tmp/generic-build-events.jsonl" \
   "$tmp/evidence-workspace" "$tmp/evidence-output" "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
 if jq -e '.artifacts[] | select(.path | endswith("oversized.server.tsx"))' \
