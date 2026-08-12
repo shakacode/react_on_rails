@@ -78,11 +78,11 @@ describe('configBuilder', () => {
     return logPayload['ENV values used for settings'] as Record<string, unknown>;
   }
 
-  it('accepts and preserves the HTTP/1.1 Fastify server override', () => {
-    const http1Config = { fastifyServerOptions: { http2: false } } satisfies Partial<Config>;
+  it.each([true, false])('accepts and preserves an explicit Fastify http2=%s setting', (http2) => {
+    const transportConfig = { fastifyServerOptions: { http2 } } satisfies Partial<Config>;
     const { buildConfig } = loadConfigBuilderWithMockedLogger();
 
-    expect(buildConfig(http1Config).fastifyServerOptions).toEqual({ http2: false });
+    expect(buildConfig(transportConfig).fastifyServerOptions).toEqual({ http2 });
   });
 
   it('marks RENDERER_HOST as env-provided when host is omitted from user config', () => {

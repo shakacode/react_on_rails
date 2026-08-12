@@ -378,6 +378,49 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
     end
   end
 
+  describe "transport selection" do
+    def build_client(origin:, force_http2:)
+      described_class.new(
+        origin:,
+        pool_size: 1,
+        connect_timeout: 1,
+        read_timeout: 1,
+        force_http2:
+      )
+    end
+
+    it "forces HTTP/2 prior knowledge for a cleartext URL by default" do
+      client = build_client(origin: "http://localhost:3800", force_http2: true)
+
+      endpoint = client.send(:endpoint_for, "http://localhost:3800")
+
+      expect(endpoint.protocol).to be(Async::HTTP::Protocol::HTTP2)
+    ensure
+      client&.close
+    end
+
+    it "selects HTTP/1.1 for a cleartext URL when forcing HTTP/2 is disabled" do
+      client = build_client(origin: "http://localhost:3800", force_http2: false)
+
+      endpoint = client.send(:endpoint_for, "http://localhost:3800")
+
+      expect(endpoint.protocol).to be(Async::HTTP::Protocol::HTTP)
+    ensure
+      client&.close
+    end
+
+    it "leaves HTTPS protocol selection to ALPN for either setting" do
+      protocols = [true, false].map do |force_http2|
+        client = build_client(origin: "https://localhost:3800", force_http2:)
+        client.send(:endpoint_for, "https://localhost:3800").protocol
+      ensure
+        client&.close
+      end
+
+      expect(protocols).to eq([Async::HTTP::Protocol::HTTPS, Async::HTTP::Protocol::HTTPS])
+    end
+  end
+
   describe "#post" do
     it "reuses one persistent async-http client across no-scheduler non-streaming posts" do
       stub_const(

@@ -14,8 +14,8 @@ This guide covers deploying the Node Renderer in containerized environments (Doc
 
 ## HTTP Transport: h2c or HTTP/1.1
 
-The Node Renderer and Rails client use cleartext HTTP/2 (h2c) by default. Keep that default when the application uses
-bidirectional streaming for async props.
+The Node Renderer and Rails client use cleartext HTTP/2 (h2c) by default. Keep that default when async props must cross
+an intermediary that may buffer an HTTP/1.1 request.
 
 Deployments that require HTTP/1.1 can select it explicitly. A common example is a separate renderer workload behind an
 AWS Application Load Balancer, whose target-group health checks connect with HTTP/1.1. Configure both sides:
@@ -28,6 +28,7 @@ reactOnRailsProNodeRenderer({
   host: '0.0.0.0',
   enableHealthEndpoints: true,
   fastifyServerOptions: { http2: false },
+  password: process.env.RENDERER_PASSWORD,
 });
 ```
 
@@ -36,18 +37,35 @@ reactOnRailsProNodeRenderer({
 ReactOnRailsPro.configure do |config|
   config.server_renderer = "NodeRenderer"
   config.renderer_url = ENV.fetch("RENDERER_URL")
+  config.renderer_password = ENV.fetch("RENDERER_PASSWORD")
   config.renderer_http_force_http2 = false
 end
 ```
 
 The paired settings make regular renderer traffic and `/health` or `/ready` use HTTP/1.1, so an ALB can route requests
 and probe the renderer directly. Do not set only one side: an HTTP/1.1 client cannot connect to an h2c-only listener,
-and a client that forces h2c cannot connect to an HTTP/1.1 listener.
+and a client that forces h2c cannot connect to an HTTP/1.1 listener. The Rails setting applies only to a cleartext
+`http://` renderer URL; HTTPS selects its protocol through ALPN.
 
-The tradeoff is that HTTP/1.1 cannot carry the bidirectional stream used for async props. Regular rendering and one-way
-response streaming remain available. Use the default h2c transport, plus an h2c-aware `exec` probe or a TCP probe, when
-async props are required. See [Node Renderer Health and Readiness Endpoints](./health-checks.md#choosing-h2c-or-http11)
-for probe details.
+Regular rendering and response streaming remain available. Direct HTTP/1.1 connections can stream async props in both
+directions, but a request-buffering or half-duplex intermediary can delay the response or stall pull mode. Async props
+through an ALB or another unverified HTTP/1.1 intermediary are not supported. Use a direct h2c renderer path, plus an
+h2c-aware `exec` probe or TCP probe, when that behavior is required.
+
+For an ALB, use an internal load balancer with private targets and restrict the renderer security group to the ALB and
+Rails callers. Configure the target group as protocol `HTTP`, protocol version `HTTP1`, renderer traffic port, health
+path `/health`, and success matcher `200`. Use `/ready` only with revision-scoped prewarming. The renderer password
+protects render requests; health routes intentionally remain unauthenticated.
+
+With Falcon or another long-lived `Fiber.scheduler`, each HTTP/1.1 connection serves one request at a time, so
+`renderer_http_pool_size` is the shared client's renderer-request concurrency cap. The default is `10`; size it with
+renderer `workersCount` and measured concurrency. Standard Puma uses request-scoped clients and has no cross-request
+cap from this setting.
+
+Roll the paired settings atomically. If Rails and the renderer deploy independently, start and verify a parallel
+HTTP/1.1 renderer endpoint, switch Rails to it with `renderer_http_force_http2 = false`, and only then drain the h2c
+endpoint. See [Node Renderer Health and Readiness Endpoints](./health-checks.md#choosing-h2c-or-http11) for the canonical
+transport and probe details.
 
 ## Architecture Options
 

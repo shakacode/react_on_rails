@@ -66,8 +66,8 @@ module ReactOnRailsPro
     DEFAULT_RENDERER_URL = "http://localhost:3800"
     DEFAULT_RENDERER_METHOD = "ExecJS"
     DEFAULT_RENDERER_FALLBACK_EXEC_JS = true
-    # Maximum concurrent renderer connections per persistent client. When Fiber.scheduler is available,
-    # clients are reused across requests within the same scheduler, making this limit effective.
+    # Maximum concurrent renderer connections per persistent client. With HTTP/1.1, each connection serves one
+    # request at a time, so this is also the request-concurrency cap for a client shared by a long-lived scheduler.
     # Without a scheduler, clients are per-request and this limits connections within that single request.
     DEFAULT_RENDERER_HTTP_POOL_SIZE = 10
     # TCP connect timeout. Request and response processing are still bounded by ssr_timeout.
@@ -202,8 +202,8 @@ module ReactOnRailsPro
 
     # Sets whether cleartext renderer connections force HTTP/2 prior knowledge (h2c).
     #
-    # Set this to false only when the Node Renderer is also configured for HTTP/1.1.
-    # Bidirectional async-props streaming requires HTTP/2.
+    # Set this to false only when the Node Renderer is also configured for HTTP/1.1. Direct HTTP/1.1 connections can
+    # stream in both directions, but async props are not supported through request-buffering or half-duplex proxies.
     #
     # @param value [Boolean] true to force h2c for http URLs, false to use HTTP/1.1
     # @raise [ReactOnRailsPro::Error] if value is not true or false

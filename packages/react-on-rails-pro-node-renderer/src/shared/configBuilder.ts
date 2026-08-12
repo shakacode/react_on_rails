@@ -35,7 +35,7 @@ const { env } = process;
 const MAX_DEBUG_SNIPPET_LENGTH = 1000;
 
 export type RendererFastifyServerOptions = FastifyServerOptions<http2.Http2Server> & {
-  http2?: false;
+  http2?: boolean;
 };
 
 /* Update ./docs/node-renderer/js-configuration.md when something here changes */

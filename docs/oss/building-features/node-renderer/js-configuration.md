@@ -25,9 +25,10 @@ available default ENV values if you wire them into your own launch script.
 1. **logHttpLevel** (default: `process.env.RENDERER_LOG_HTTP_LEVEL || 'error'`) - The HTTP server log level (same allowed values as `logLevel`).
 1. **fastifyServerOptions** (default: `{}`) - Additional options to pass to the Fastify server factory. The options
    override the renderer defaults, so `fastifyServerOptions: { http2: false }` is the supported way to select an
-   HTTP/1.1 listener. Pair it with `config.renderer_http_force_http2 = false` in Rails. HTTP/1.1 supports regular
-   rendering and HTTP/1.1-only health checks, but bidirectional streaming for async props requires the default h2c
-   transport. See [Health and Readiness Endpoints](./health-checks.md#choosing-h2c-or-http11) and the
+   HTTP/1.1 listener. For a cleartext renderer URL, pair it with `config.renderer_http_force_http2 = false` in Rails;
+   HTTPS negotiates its protocol through ALPN. HTTP/1.1 supports regular rendering and health checks. Direct
+   connections can stream async props in both directions, but request-buffering or half-duplex intermediaries are not
+   supported for async props. See [Health and Readiness Endpoints](./health-checks.md#choosing-h2c-or-http11) and the
    [Fastify documentation](https://fastify.dev/docs/latest/Reference/Server/#factory).
 1. **serverBundleCachePath** (default: `process.env.RENDERER_SERVER_BUNDLE_CACHE_PATH || process.env.RENDERER_BUNDLE_PATH || '/tmp/react-on-rails-pro-node-renderer-bundles'` ) - Path to a cache directory where uploaded server bundle files will be stored. This is distinct from Shakapacker's public asset directory. For example you can set it to `path.resolve(__dirname, './.node-renderer-bundles')` if you configured renderer from the `/` directory of your app.
 1. **workersCount** (default: `process.env.RENDERER_WORKERS_COUNT || defaultWorkersCount()` where default is your CPUs count - 1) - Number of workers that will be forked to serve rendering requests. If you set this manually make sure that value is a **Number** and is `>= 0`. Setting this to `0` will run the renderer in a single process mode without forking any workers, which is useful for debugging purposes. For production use, the value should be `>= 1`.

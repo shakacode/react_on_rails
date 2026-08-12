@@ -474,8 +474,8 @@ When running the Node Renderer in containers:
 - Set `host` to `0.0.0.0` so health checks and the Rails container can reach it. See [Node Renderer configuration](../building-features/node-renderer/js-configuration.md).
 - On Control Plane, use `process.env.PORT` for the port — Control Plane assigns the port dynamically. See the [Control Plane port docs](https://docs.controlplane.com/reference/workload/containers#port-variable).
 - Set `workersCount` explicitly rather than relying on CPU auto-detection, which can over-allocate workers in constrained containers.
-- Use `tcpSocket` probes for shallow Kubernetes startup, readiness, and liveness checks. Kubernetes `httpGet` probes use HTTP/1.1 and cannot check the h2c-only Node Renderer listener directly.
-- The manifest above uses portable `tcpSocket` checks. For application-level readiness, use an `exec` probe with an h2c-capable client packaged in the renderer image, or expose a separate HTTP/1.1 health endpoint in your own application code. See [Configuring Startup, Readiness, and Liveness Probes](../building-features/node-renderer/js-configuration.md#configuring-startup-readiness-and-liveness-probes) for timing values and `curl --http2-prior-knowledge` examples.
+- The default listener is h2c, so use `tcpSocket` for shallow probes or an `exec` probe with an h2c-capable client for application-level checks.
+- To use ordinary Kubernetes `httpGet` probes, enable the renderer's built-in health endpoints, set `fastifyServerOptions: { http2: false }`, and pair it with `config.renderer_http_force_http2 = false` in Rails. No custom health server is needed. See [Node Renderer Health and Readiness Endpoints](../building-features/node-renderer/health-checks.md#choosing-h2c-or-http11) for the complete paired configuration, async-props tradeoff, and probe timing.
 
 ## Static assets and CDN
 

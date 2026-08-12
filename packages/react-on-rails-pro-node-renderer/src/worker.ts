@@ -611,8 +611,9 @@ export default function run(config: Partial<Config>) {
     currentGenerationManifestPath,
   } = getConfig();
 
-  // Keep the existing HTTP/2-centric internal Fastify types. The original
-  // object is spread at runtime, so an explicit `http2: false` still wins.
+  // Fastify's overloads cannot represent a runtime-selectable protocol while the
+  // route internals retain their existing HTTP/2 raw-server type. The unmodified
+  // options are still spread at runtime, and socket tests cover `http2: false`.
   const serverOptionsForFastify: FastifyServerOptions<Http2Server> = fastifyServerOptions;
   const app = fastify({
     http2: useHttp2 as true,
@@ -1481,9 +1482,9 @@ export default function run(config: Partial<Config>) {
   // asset endpoints: orchestrator probes cannot carry the renderer password.
   // Both intentionally return status-only bodies — no versions, paths, or
   // license details — so leaving them reachable exposes nothing sensitive.
-  // NOTE: this listener speaks cleartext HTTP/2 (h2c), so HTTP/1.1-only probes
-  // (e.g. Kubernetes httpGet) cannot reach these routes. Use tcpSocket or exec
-  // probes (`curl --http2-prior-knowledge`). See
+  // The listener uses cleartext HTTP/2 (h2c) by default. With
+  // fastifyServerOptions.http2 set to false, ordinary HTTP/1.1 probes can reach
+  // these routes. See
   // docs/oss/building-features/node-renderer/health-checks.md.
   if (enableHealthEndpoints) {
     // Liveness: 200 whenever this process can answer — i.e. the event loop is

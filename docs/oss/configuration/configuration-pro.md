@@ -83,11 +83,10 @@ ReactOnRailsPro.configure do |config|
   # Default for `renderer_url` is "http://localhost:3800".
   config.renderer_url = ENV["REACT_RENDERER_URL"]
 
-  # Force HTTP/2 prior knowledge (h2c) for cleartext renderer URLs. Keep the
-  # default true unless the Node Renderer also sets
-  # `fastifyServerOptions: { http2: false }` to listen with HTTP/1.1.
-  # HTTP/1.1 supports regular rendering and health checks, but not
-  # bidirectional streaming for async props.
+  # Force HTTP/2 prior knowledge (h2c) for cleartext renderer URLs. Set false
+  # only when the Node Renderer also sets
+  # `fastifyServerOptions: { http2: false }`. See "Renderer HTTP Transport"
+  # below for HTTPS, async-props, proxy, and rollout constraints.
   # Default for `renderer_http_force_http2` is true.
   config.renderer_http_force_http2 = true
 
@@ -283,9 +282,7 @@ ReactOnRailsPro.configure do |config|
 end
 ```
 
-## Renderer Performance Tuning for Streamed RSC
-
-The dominant contributors to a streamed route's `responseEnd` tail are Node renderer round-trip overhead, cold or under-warmed renderer workers, and per-request connection setup between Rails and the renderer. Three levers address these (see [issue #4240](https://github.com/shakacode/react_on_rails/issues/4240)). Measure changes with before/after page-load timing for the streamed route, `Server-Timing` for the early Rails/renderer phases that are known before the first stream write, the inline RSC stream performance marks described in the [Streaming SSR guide](../../pro/streaming-ssr.md), and renderer logs or tracing for cold-worker behavior. Inline marks remain the source for late payload, flush, hydration, and stream-drain timing because `ActionController::Live` commits headers on the first stream write.
+## Renderer HTTP Transport
 
 The default renderer transport is cleartext HTTP/2 (h2c). Deployments that require HTTP/1.1, including an AWS ALB
 target group whose health checks connect directly to the renderer, must configure both sides of the connection:
@@ -303,9 +300,19 @@ end
 ```
 
 This keeps the Node listener and Rails client on HTTP/1.1. The tradeoff is that bidirectional streaming for async props
-requires HTTP/2 and is unavailable in this mode. Leave both defaults unchanged when async props are required. See
-[Node Renderer health checks](../building-features/node-renderer/health-checks.md#choosing-h2c-or-http11) for probe and
-load-balancer guidance.
+depends on full-duplex behavior across every hop. A buffering or half-duplex HTTP/1.1 intermediary can delay the
+response until the request body finishes, and pull mode can stall. Async props through an ALB or another unverified
+HTTP/1.1 intermediary are not supported; retain a direct h2c path for that traffic.
+
+`renderer_http_force_http2` affects only cleartext `http://` URLs. HTTPS selects the protocol through ALPN. Change both
+cleartext settings atomically, or bring up a parallel renderer endpoint and switch Rails after it is verified, because
+rolling only one side creates a temporary protocol mismatch. See
+[Node Renderer health checks](../building-features/node-renderer/health-checks.md#choosing-h2c-or-http11) for the
+canonical proxy, security, probe, and rollout guidance.
+
+## Renderer Performance Tuning for Streamed RSC
+
+The dominant contributors to a streamed route's `responseEnd` tail are Node renderer round-trip overhead, cold or under-warmed renderer workers, and per-request connection setup between Rails and the renderer. Three levers address these (see [issue #4240](https://github.com/shakacode/react_on_rails/issues/4240)). Measure changes with before/after page-load timing for the streamed route, `Server-Timing` for the early Rails/renderer phases that are known before the first stream write, the inline RSC stream performance marks described in the [Streaming SSR guide](../../pro/streaming-ssr.md), and renderer logs or tracing for cold-worker behavior. Inline marks remain the source for late payload, flush, hydration, and stream-drain timing because `ActionController::Live` commits headers on the first stream write.
 
 ### 1. Warm up renderer workers
 
@@ -327,7 +334,7 @@ Two independent limits gate renderer throughput:
 
 Guidance:
 
-- With Falcon or another long-lived scheduler, keep `renderer_http_pool_size` close to (and generally not far above) `workersCount`; streamed renders sharing that scheduler use the same async-http client, and HTTP/2 may multiplex request streams over the pooled connections. Sending many more concurrent renderer requests than there are workers just queues renders at the renderer while adding connection and scheduling overhead.
+- With Falcon or another long-lived scheduler, keep `renderer_http_pool_size` close to (and generally not far above) `workersCount`; streamed renders sharing that scheduler use the same async-http client. HTTP/2 can multiplex request streams, while each HTTP/1.1 connection handles one request at a time and makes this pool size a hard shared-client concurrency cap. Sending many more concurrent renderer requests than there are workers just queues renders at the renderer while adding connection and scheduling overhead.
 - Under standard Puma streaming, `Sync {}` creates a request-scoped client, so `renderer_http_pool_size` only bounds concurrent async-http connections inside one streamed response. Use a value near the number of renderer calls one response can overlap; scale `workersCount` and renderer replicas for cross-request concurrency.
 - Account for your Rails concurrency: with many Puma threads/workers all streaming, a renderer with only one or two workers becomes the bottleneck. Scale `workersCount` (and renderer replicas) to your real concurrent streamed-render load.
 - Tune `ssr_timeout` for legitimate long gaps between streamed chunks — it applies as a per-read socket timeout, so it fires when a single read from the renderer blocks for `ssr_timeout` seconds. It is not a total response-duration cap; avoid masking renderer hangs with an unnecessarily high value.

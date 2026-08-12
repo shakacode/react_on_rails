@@ -576,12 +576,12 @@ module ReactOnRailsPro
       end
     end
 
-    # Bidirectional HTTP/2 streaming POST. Returns [output, response] where:
+    # Bidirectional streaming POST. Returns [output, response] where:
     # - output is a Protocol::HTTP::Body::Writable::Output (supports << and close)
     # - response is a lazy Response whose body is consumed via Response#each
     #
     # The caller writes NDJSON lines to output while concurrently reading response
-    # chunks. Calling output.close sends END_STREAM on the HTTP/2 stream.
+    # chunks. Calling output.close signals request-body EOF to the selected transport.
     def post_bidi(path, headers:)
       ensure_open!
       writable = Protocol::HTTP::Body::Writable.new
