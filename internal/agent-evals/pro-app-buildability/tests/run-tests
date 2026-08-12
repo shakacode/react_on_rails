@@ -1586,7 +1586,8 @@ printf '%s\n' \
 printf '%070000d' 0 >"$tmp/evidence-workspace/eval_app/app/components/oversized.server.tsx"
 printf '%s\n' '{"status":"completed","summary":"fixture","commands":[],"checks":[],"friction":[],"human_interventions":99,"blockers":[]}' \
   >"$tmp/fixture-report.json"
-printf '%s\n' '{"human_followups_sent":0}' >"$tmp/fixture-invocation.json"
+printf '%s\n' '{"human_followups_sent":0,"scaffold_timeout_seconds":600}' \
+  >"$tmp/fixture-invocation.json"
 printf '%s\n' '{}' >"$tmp/missing-followup-invocation.json"
 printf '%s\n' \
   '{"type":"item.completed","item":{"type":"command_execution","command":"printenv","exit_code":0,"status":"completed","aggregated_output":"SECRET_KEY_BASE=base-secret-value-123\nAWS_SECRET_ACCESS_KEY=aws-secret-value-456\nSTRIPE_SECRET_KEY=stripe-secret-value-789"}}' \
@@ -1915,8 +1916,7 @@ mkdir -p "$tmp/claude-classifier-workspace/eval_app/app/controllers" \
   "$tmp/claude-classifier-workspace/eval_app/app/javascript/src/HelloServer/ror_components" \
   "$tmp/claude-classifier-workspace/eval_app/app/models" \
   "$tmp/claude-classifier-workspace/eval_app/config" \
-  "$tmp/claude-classifier-workspace/eval_app/test/controllers" \
-  "$tmp/claude-classifier-workspace/eval_app/test/integration"
+  "$tmp/claude-classifier-workspace/eval_app/test/controllers"
 printf '%s\n' "gem 'react_on_rails_pro'" >"$tmp/claude-classifier-workspace/eval_app/Gemfile"
 printf '%s\n' \
   '{"dependencies":{"react-on-rails-pro":"1.0.0"},"scripts":{"build":"RAILS_ENV=production NODE_ENV=production rspack build"}}' \
@@ -1925,30 +1925,30 @@ printf '%s\n' 'rsc_payload_route' >"$tmp/claude-classifier-workspace/eval_app/co
 printf '%s\n' "'use server'; export default async function HelloServer() { return 'server data'; }" \
   >"$tmp/claude-classifier-workspace/eval_app/app/javascript/src/HelloServer/ror_components/HelloServer.tsx"
 printf '%s\n' 'validates :email, presence: true' \
-  >"$tmp/claude-classifier-workspace/eval_app/app/models/subscriber.rb"
+  >"$tmp/claude-classifier-workspace/eval_app/app/models/contact_message.rb"
 printf '%s\n' 'render errors, status: :unprocessable_entity' \
-  >"$tmp/claude-classifier-workspace/eval_app/app/controllers/subscribers_controller.rb"
+  >"$tmp/claude-classifier-workspace/eval_app/app/controllers/contact_messages_controller.rb"
 printf '%s\n' \
-  'class HelloServerTest < ActionDispatch::IntegrationTest' \
+  'class HelloServerControllerTest < ActionDispatch::IntegrationTest' \
   '  test "React Server Component page with server-provided data" do' \
   '    get hello_server_path' \
   '    assert_response :success' \
   '  end' \
-  'end' >"$tmp/claude-classifier-workspace/eval_app/test/integration/hello_server_test.rb"
+  'end' >"$tmp/claude-classifier-workspace/eval_app/test/controllers/hello_server_controller_test.rb"
 printf '%s\n' \
-  'class SubscribersControllerTest < ActionDispatch::IntegrationTest' \
-  '  test "invalid then valid subscriber" do' \
+  'class ContactMessagesControllerTest < ActionDispatch::IntegrationTest' \
+  '  test "invalid then valid contact message" do' \
   '    assert invalid' \
   '    assert valid' \
   '  end' \
-  'end' >"$tmp/claude-classifier-workspace/eval_app/test/controllers/subscribers_controller_test.rb"
-claude_scaffold_command=$'set -o pipefail\nnpx --yes create-react-on-rails-app@latest eval_app --rsc --template typescript --package-manager npm 2>&1 | tee "$TMPDIR/scaffold.log" | tail -n 80\nprintf "%s\\n" scaffold-finished'
-claude_build_command=$'set -o pipefail\nnpm run build 2>&1 | tee build.log | tail -80\nprintf "%s\\n" build-finished'
+  'end' >"$tmp/claude-classifier-workspace/eval_app/test/controllers/contact_messages_controller_test.rb"
+claude_scaffold_command=$'set -o pipefail\ntimeout 580 npx --yes create-react-on-rails-app@latest eval_app --rsc --package-manager npm 2>&1 | tee <LOCAL_PATH> | tail -200\nprintf "%s\\n" scaffold-finished'
+claude_build_command=$'rm -rf public/packs public/packs-test\nnpm run build > <LOCAL_PATH> 2>&1\necho "BUILD_EXIT_CODE=$?"\ntail -30 <LOCAL_PATH>'
 jq -cn --arg command "$claude_scaffold_command" \
   '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"created successfully"}}' \
   >"$tmp/claude-classifier-events.jsonl"
 jq -cn --arg command "$claude_build_command" \
-  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"Loading production config; Rspack compiled successfully"}}' \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"BUILD_EXIT_CODE=0\nLoading production config; Rspack compiled successfully"}}' \
   >>"$tmp/claude-classifier-events.jsonl"
 printf '%s\n' \
   '{"type":"item.completed","item":{"type":"command_execution","command":"bin/rails test","exit_code":0,"status":"completed","aggregated_output":"3 runs, 30 assertions, 0 failures"}}' \
@@ -1983,6 +1983,33 @@ for row in rsc.route tests.page; do
     "$tmp/semantic-page-negative-output/rubric-results.json")" = unknown
 done
 
+controller_page_negative_contents=(
+  $'class HelloServerControllerTest\n  test "React Server Component page with server-provided data" do\n    get hello_server_path\n    assert_response :success\n  end\nend'
+  $'class HelloServerControllerTest < ActionDispatch::IntegrationTest\n  test "React Server Component page with server-provided data" do\n    assert_response :success\n  end\nend'
+)
+controller_page_negative_index=0
+for controller_page_negative_content in "${controller_page_negative_contents[@]}"; do
+  controller_page_negative_index=$((controller_page_negative_index + 1))
+  mkdir -p "$tmp/controller-page-negative-$controller_page_negative_index-workspace/eval_app/app/components" \
+    "$tmp/controller-page-negative-$controller_page_negative_index-workspace/eval_app/config" \
+    "$tmp/controller-page-negative-$controller_page_negative_index-workspace/eval_app/test/controllers"
+  printf '%s\n' 'rsc_payload_route' \
+    >"$tmp/controller-page-negative-$controller_page_negative_index-workspace/eval_app/config/routes.rb"
+  printf '%s\n' 'export default function Page() { return null; }' \
+    >"$tmp/controller-page-negative-$controller_page_negative_index-workspace/eval_app/app/components/page.server.tsx"
+  printf '%s\n' "$controller_page_negative_content" \
+    >"$tmp/controller-page-negative-$controller_page_negative_index-workspace/eval_app/test/controllers/hello_server_controller_test.rb"
+  mkdir "$tmp/controller-page-negative-$controller_page_negative_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/full-suite-events.jsonl" \
+    "$tmp/controller-page-negative-$controller_page_negative_index-workspace" \
+    "$tmp/controller-page-negative-$controller_page_negative_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in rsc.route tests.page; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/controller-page-negative-$controller_page_negative_index-output/rubric-results.json")" = unknown
+  done
+done
+
 mkdir -p "$tmp/controller-form-negative-workspace/eval_app/app/controllers" \
   "$tmp/controller-form-negative-workspace/eval_app/app/models" \
   "$tmp/controller-form-negative-workspace/eval_app/test/controllers"
@@ -2009,6 +2036,16 @@ rejected_multiline_commands=(
   $'npx create-react-on-rails-app eval_app --pro && true\nnpm run build && true'
   $'npx create-react-on-rails-app eval_app --pro 2>&1 | tee scaffold.log\nnpm run build 2>&1 | tee build.log'
   $'npx create-react-on-rails-app eval_app --pro 2>&1 | tee scaffold.log | tail -n 10000\nnpm run build 2>&1 | tee build.log | tail -10000'
+  $'timeout 601 npx create-react-on-rails-app eval_app --pro 2>&1 | tee <LOCAL_PATH> | tail -200\ntimeout 601 npm run build > <LOCAL_PATH> 2>&1'
+  $'sudo timeout 580 npx create-react-on-rails-app eval_app --pro 2>&1 | tee <LOCAL_PATH> | tail -200\nenv npm run build > <LOCAL_PATH> 2>&1'
+  $'npx create-react-on-rails-app eval_app --pro > arbitrary.log 2>&1\nnpm run build > arbitrary.log 2>&1'
+  $'npx create-react-on-rails-app eval_app --pro > <LOCAL_PATH> 2>&1 && true\nnpm run build > <LOCAL_PATH> 2>&1 && true'
+  $'echo "timeout 580 npx create-react-on-rails-app eval_app --pro"\n# npm run build > <LOCAL_PATH> 2>&1'
+  $'npx create-react-on-rails-app eval_app --pro && true\nrm -rf stale && timeout 300 npm run build > <LOCAL_PATH> 2>&1'
+  $'timeout 580 npx create-react-on-rails-app eval_app --pro 2>&1 | tee <LOCAL_PATH> | tail -200\nnpm run build 2>&1 | tee <LOCAL_PATH> | tail -200'
+  $'echo "not a scaffold"\nnpm run build > <LOCAL_PATH> 2>&1\ntail -200 <LOCAL_PATH>'
+  $'echo "not a scaffold"\nnpm run build > <LOCAL_PATH> 2>&1\nbuild_exit=$?\ntail -200 <LOCAL_PATH>\nexit 0'
+  $'echo "BUILD_EXIT_CODE=0"\nnpm run build > <LOCAL_PATH> 2>&1\ntail -200 <LOCAL_PATH>\necho "BUILD_EXIT_CODE=0"'
 )
 rejected_multiline_index=0
 for rejected_multiline_command in "${rejected_multiline_commands[@]}"; do
@@ -2026,5 +2063,27 @@ for rejected_multiline_command in "${rejected_multiline_commands[@]}"; do
       "$tmp/rejected-multiline-$rejected_multiline_index-output/rubric-results.json")" = unknown
   done
 done
+
+masked_failed_build_command=$'rm -rf public/packs public/packs-test\nnpm run build > <LOCAL_PATH> 2>&1\necho "BUILD_EXIT_CODE=$?"\ntail -30 <LOCAL_PATH>'
+jq -cn --arg command "$masked_failed_build_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"BUILD_EXIT_CODE=1\nRspack compiled successfully"}}' \
+  >"$tmp/masked-failed-build-events.jsonl"
+mkdir "$tmp/masked-failed-build-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/masked-failed-build-events.jsonl" \
+  "$tmp/claude-classifier-workspace" "$tmp/masked-failed-build-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+test "$(jq -r '.items[] | select(.id == "build.production") | .status' \
+  "$tmp/masked-failed-build-output/rubric-results.json")" = unknown
+
+literal_build_marker_command=$'rm -rf public/packs public/packs-test\nnpm run build > <LOCAL_PATH> 2>&1\necho "BUILD_EXIT_CODE=0"\ntail -30 <LOCAL_PATH>'
+jq -cn --arg command "$literal_build_marker_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"BUILD_EXIT_CODE=0\nRspack compiled successfully"}}' \
+  >"$tmp/literal-build-marker-events.jsonl"
+mkdir "$tmp/literal-build-marker-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/literal-build-marker-events.jsonl" \
+  "$tmp/claude-classifier-workspace" "$tmp/literal-build-marker-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+test "$(jq -r '.items[] | select(.id == "build.production") | .status' \
+  "$tmp/literal-build-marker-output/rubric-results.json")" = unknown
 
 echo "focused harness tests passed"

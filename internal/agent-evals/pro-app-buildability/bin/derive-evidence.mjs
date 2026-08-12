@@ -148,13 +148,33 @@ const unwrapShellCommand = (command) => {
 };
 const isHelpOrVersion = (command) => /(?:^|\s)(?:--help|--version|-h|-V)(?:\s|$)/.test(command);
 const boundedLogPipeline =
-  /^(.*\S)\s+2>&1\s*\|\s*tee\s+(?:--\s+)?(?:"(?:[A-Za-z0-9_./-]|\$(?:[A-Za-z_][A-Za-z0-9_]*|\{[A-Za-z_][A-Za-z0-9_]*\}))*"|'[A-Za-z0-9_./${}-]+'|[A-Za-z0-9_./${}-]+)\s*\|\s*tail\s+(?:-n\s+|-)([1-9][0-9]{0,4})$/;
-const stripBoundedLogPipeline = (line) => {
-  const match = line.match(boundedLogPipeline);
-  if (!match || Number(match[2]) > 1000) return line;
-  return match[1];
+  /^(.*\S)\s+2>&1\s*\|\s*tee\s+(?:--\s+)?(?:"<LOCAL_PATH>"|'<LOCAL_PATH>'|<LOCAL_PATH>|"(?:[A-Za-z0-9_./-]|\$(?:[A-Za-z_][A-Za-z0-9_]*|\{[A-Za-z_][A-Za-z0-9_]*\}))*"|'[A-Za-z0-9_./${}-]+'|[A-Za-z0-9_./${}-]+)\s*\|\s*tail\s+(?:-n\s+|-)([1-9][0-9]{0,4})$/;
+const safeOutputRedirection = /^(.*\S)\s+>\s+(?:"<LOCAL_PATH>"|'<LOCAL_PATH>'|<LOCAL_PATH>)\s+2>&1$/;
+const boundedPlaceholderTail =
+  /^tail\s+(?:-n\s+|-)([1-9][0-9]{0,4})\s+(?:"<LOCAL_PATH>"|'<LOCAL_PATH>'|<LOCAL_PATH>)$/;
+const exactBuildMarkerProof = (lines, targetIndex, output) => {
+  const tailMatch = lines[targetIndex + 2]?.match(boundedPlaceholderTail);
+  const markers = output.split(/\r?\n/).filter((line) => /^BUILD_EXIT_CODE=-?[0-9]+$/.test(line));
+  return (
+    targetIndex === 1 &&
+    lines.length === 4 &&
+    lines[0] === 'rm -rf public/packs public/packs-test' &&
+    lines[targetIndex + 1] === 'echo "BUILD_EXIT_CODE=$?"' &&
+    tailMatch !== null &&
+    Number(tailMatch[1]) <= 1000 &&
+    markers.length === 1 &&
+    markers[0] === 'BUILD_EXIT_CODE=0'
+  );
 };
-const executableShellLines = (command) => {
+const stripBoundedTimeoutPrefix = (line) => {
+  const match = line.match(/^timeout ([1-9][0-9]{0,8}) (.+)$/);
+  if (!match) return line;
+  const timeoutSeconds = Number(match[1]);
+  const scaffoldLimit = invocation.scaffold_timeout_seconds;
+  if (!Number.isSafeInteger(scaffoldLimit) || timeoutSeconds > scaffoldLimit) return null;
+  return match[2];
+};
+const executableShellLines = (command, output) => {
   const invocation = unwrapShellCommand(command);
   if (invocation.includes('<<')) return [];
 
@@ -185,11 +205,22 @@ const executableShellLines = (command) => {
     const continuedToNext = quote !== "'" && escaped;
     if (!startedInsideSyntax && quote === null && !continuedToNext) {
       const candidate = physicalLine.slice(0, commentAt).trim();
-      if (candidate) executableLines.push(stripBoundedLogPipeline(candidate));
+      if (candidate) executableLines.push(candidate);
     }
     continuedFromPrevious = continuedToNext;
   }
-  return executableLines;
+  return executableLines.flatMap((line, index) => {
+    const pipelineMatch = line.match(boundedLogPipeline);
+    if (pipelineMatch) {
+      const hasTopLevelPipefail = index === 1 && executableLines[0] === 'set -o pipefail';
+      return hasTopLevelPipefail && Number(pipelineMatch[2]) <= 1000 ? [pipelineMatch[1]] : [];
+    }
+    const redirectionMatch = line.match(safeOutputRedirection);
+    if (redirectionMatch) {
+      return exactBuildMarkerProof(executableLines, index, output) ? [redirectionMatch[1]] : [];
+    }
+    return [line];
+  });
 };
 
 const rubyProManifests = matchingArtifacts(/Gemfile$/, /react_on_rails_pro/);
@@ -211,13 +242,16 @@ if (evalAppPackageManifest) {
   }
 }
 const installCommands = successfulCommands.filter((command) => {
-  return executableShellLines(command.command).some(
-    (invocation) =>
-      !isHelpOrVersion(invocation) &&
-      /^(?:npx(?: --yes)?|npm exec|pnpm dlx) create-react-on-rails-app(?:@[^\s]+)? [A-Za-z0-9][A-Za-z0-9._-]*(?:\s+[^;&|]+)?$/.test(
-        invocation,
-      ),
-  );
+  return executableShellLines(command.command, command.output).some((invocationLine) => {
+    const targetCommand = stripBoundedTimeoutPrefix(invocationLine);
+    return (
+      targetCommand !== null &&
+      !isHelpOrVersion(targetCommand) &&
+      /^(?:npx(?: --yes)?|npm exec|pnpm dlx) create-react-on-rails-app(?:@[^\s]+)? [A-Za-z0-9][A-Za-z0-9._-]*(?:\s+[^;&|<>]+)?$/.test(
+        targetCommand,
+      )
+    );
+  });
 });
 const rscRoutes = matchingArtifacts(/config\/routes\.rb$/, /rsc|server_component|server-component/i);
 const rscSources = matchingArtifacts(
@@ -234,8 +268,12 @@ const pageTests = artifacts.filter((artifact) => {
   const namedPageTest =
     /(?:spec|test)\/.*(?:page|rsc).*(?:_spec\.rb|_test\.rb|\.(?:test|spec)\.[jt]sx?)$/i.test(artifact.path);
   const uncommentedRuby = artifact.excerpt.replace(/^\s*#.*$/gm, '');
+  const controllerIntegrationTest =
+    /test\/controllers\/.*_test\.rb$/i.test(artifact.path) &&
+    /^\s*class\s+[A-Za-z_][A-Za-z0-9_:]*\s*<\s*ActionDispatch::IntegrationTest\b/m.test(uncommentedRuby);
   const semanticRscIntegrationTest =
-    /(?:spec|test)\/integration\/.*(?:_spec\.rb|_test\.rb)$/i.test(artifact.path) &&
+    (/(?:spec|test)\/integration\/.*(?:_spec\.rb|_test\.rb)$/i.test(artifact.path) ||
+      controllerIntegrationTest) &&
     /^\s*(?:test|it)\s+["'][^"'\r\n]*(?:react server component|server-provided data)[^"'\r\n]*["']/im.test(
       uncommentedRuby,
     ) &&
@@ -259,14 +297,17 @@ const formTests = artifacts.filter((artifact) => {
 const plainManifestBuildInvocation = (invocation) =>
   manifestBackedProductionBuild && /^(?:npm|pnpm) run build$/i.test(invocation);
 const buildCommands = successfulCommands.filter((command) => {
-  const allowedInvocation = executableShellLines(command.command).some(
-    (invocation) =>
-      !isHelpOrVersion(invocation) &&
+  const allowedInvocation = executableShellLines(command.command, command.output).some((invocationLine) => {
+    const targetCommand = stripBoundedTimeoutPrefix(invocationLine);
+    return (
+      targetCommand !== null &&
+      !isHelpOrVersion(targetCommand) &&
       (/^(?:(?:RAILS_ENV|NODE_ENV)=production\s+)?(?:(?:bin\/rails|bundle exec rails|bundle exec rake|rake) assets:precompile|(?:bin\/shakapacker|bundle exec rake shakapacker:compile)|(?:npm|pnpm) run build:production)$/i.test(
-        invocation,
+        targetCommand,
       ) ||
-        plainManifestBuildInvocation(invocation)),
-  );
+        plainManifestBuildInvocation(targetCommand))
+    );
+  });
   const buildResult =
     /compiled|compilation (?:complete|successful)|built successfully|assets? (?:written|built)|webpack compiled|rspack compiled/i.test(
       command.output,
@@ -275,7 +316,10 @@ const buildCommands = successfulCommands.filter((command) => {
   return allowedInvocation && buildResult && !helpOutput;
 });
 const manifestBackedBuildCommands = buildCommands.filter((command) =>
-  executableShellLines(command.command).some(plainManifestBuildInvocation),
+  executableShellLines(command.command, command.output).some((invocationLine) => {
+    const targetCommand = stripBoundedTimeoutPrefix(invocationLine);
+    return targetCommand !== null && plainManifestBuildInvocation(targetCommand);
+  }),
 );
 const testCommands = successfulOutcome(
   /rspec|rails test|rake test|npm (?:run )?test|pnpm (?:run )?test|jest|playwright/i,
