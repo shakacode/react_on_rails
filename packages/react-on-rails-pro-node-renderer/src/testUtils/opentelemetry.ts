@@ -17,6 +17,7 @@ import {
   getOpenTelemetryTracerProvider,
   setOpenTelemetryTracerProvider,
 } from '../shared/opentelemetryState.js';
+import { setUsingExistingGlobalTracerProvider } from '../integrations/internal/opentelemetryState.js';
 import { resetSubSpan, resetTracing } from '../shared/tracing.js';
 import * as fastifyConfig from '../worker/fastifyConfig.js';
 import * as shutdownHooks from '../worker/shutdownHooks.js';
@@ -30,6 +31,7 @@ export async function resetOpenTelemetryForTest(): Promise<void> {
 
   resetSubSpan();
   resetTracing();
+  setUsingExistingGlobalTracerProvider(false);
 
   // eslint-disable-next-line no-underscore-dangle
   fastifyConfig.__resetFastifyConfigFunctionsForTest();

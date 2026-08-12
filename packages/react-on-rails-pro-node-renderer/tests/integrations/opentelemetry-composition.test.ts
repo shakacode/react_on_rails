@@ -46,6 +46,7 @@ describe('opentelemetry integration: composable init()', () => {
     jest.dontMock('@opentelemetry/instrumentation');
     jest.dontMock('@opentelemetry/instrumentation-http');
     jest.dontMock('@opentelemetry/sdk-trace-node');
+    jest.dontMock('../../src/integrations/api.js');
     jest.restoreAllMocks();
     otelTrace.disable();
     otelContext.disable();
@@ -89,7 +90,7 @@ describe('opentelemetry integration: composable init()', () => {
     const detector: ResourceDetector = {
       detect: () => ({
         attributes: {
-          'cloud.platform': 'aws_ecs',
+          'cloud.platform': Promise.resolve('aws_ecs'),
           'service.name': 'detected-renderer',
         },
       }),
@@ -99,14 +100,16 @@ describe('opentelemetry integration: composable init()', () => {
       options: Pick<OpenTelemetryInitOptions, 'resourceAttributes' | 'serviceName'>,
     ): Promise<Record<string, unknown>> => {
       const exporter = new InMemorySpanExporter();
+      const spanProcessor = new SimpleSpanProcessor(exporter);
       const { init } = await import('../../src/integrations/opentelemetry');
 
       init({
         resourceDetectors: [detector],
-        spanProcessor: new SimpleSpanProcessor(exporter),
+        spanProcessor,
         ...options,
       });
       otelTrace.getTracer('test').startActiveSpan('manual.span', (span) => span.end());
+      await spanProcessor.forceFlush();
 
       const attributes = exporter.getFinishedSpans()[0]!.resource.attributes;
       await resetOpenTelemetryForTest();
@@ -155,14 +158,14 @@ describe('opentelemetry integration: composable init()', () => {
 
   test('an existing global provider can emit renderer ror spans without loading a second SDK', async () => {
     const exporter = new InMemorySpanExporter();
-    const existingProvider = new NodeTracerProvider({
-      spanProcessors: [new SimpleSpanProcessor(exporter)],
-    });
+    const spanProcessor = new SimpleSpanProcessor(exporter);
+    const existingProvider = new NodeTracerProvider({ spanProcessors: [spanProcessor] });
     existingProvider.register();
 
-    jest.doMock('@opentelemetry/sdk-trace-node', () => {
+    const rendererSdkFactory = jest.fn(() => {
       throw new Error('renderer-managed SDK must not load');
     });
+    jest.doMock('@opentelemetry/sdk-trace-node', rendererSdkFactory);
 
     const { init } = await import('../../src/integrations/opentelemetry');
     const tracing = await import('../../src/shared/tracing');
@@ -176,6 +179,7 @@ describe('opentelemetry integration: composable init()', () => {
       () => tracing.subSpan({ name: 'ror.vm.execute' }, async () => 'ok'),
       tracing.startSsrRequestOptions({ renderingRequest: 'irrelevant' }),
     );
+    await spanProcessor.forceFlush();
 
     const spans = exporter.getFinishedSpans();
     const ssrSpan = spans.find((span) => span.name === 'ror.ssr.request');
@@ -183,7 +187,130 @@ describe('opentelemetry integration: composable init()', () => {
     expect(ssrSpan).toBeDefined();
     expect(vmSpan).toBeDefined();
     expect(vmSpan!.parentSpanContext?.spanId).toBe(ssrSpan!.spanContext().spanId);
+    expect(rendererSdkFactory).not.toHaveBeenCalled();
 
+    await existingProvider.shutdown();
+  });
+
+  test('an empty instrumentation list does not load or register built-in instrumentations', async () => {
+    const instrumentationFactory = jest.fn(() => ({ registerInstrumentations: jest.fn() }));
+    const httpInstrumentationFactory = jest.fn(() => ({ HttpInstrumentation: jest.fn() }));
+    const fastifyInstrumentationFactory = jest.fn(() => ({ FastifyOtelInstrumentation: jest.fn() }));
+    jest.doMock('@opentelemetry/instrumentation', instrumentationFactory);
+    jest.doMock('@opentelemetry/instrumentation-http', httpInstrumentationFactory);
+    jest.doMock('@fastify/otel', fastifyInstrumentationFactory);
+
+    const exporter = new InMemorySpanExporter();
+    const { init } = await import('../../src/integrations/opentelemetry');
+
+    init({
+      instrumentations: [],
+      spanProcessor: new SimpleSpanProcessor(exporter),
+    });
+
+    expect(instrumentationFactory).not.toHaveBeenCalled();
+    expect(httpInstrumentationFactory).not.toHaveBeenCalled();
+    expect(fastifyInstrumentationFactory).not.toHaveBeenCalled();
+  });
+
+  test('existing-provider init remains retryable until the host registers a provider', async () => {
+    const exporter = new InMemorySpanExporter();
+    const spanProcessor = new SimpleSpanProcessor(exporter);
+    const rendererSdkFactory = jest.fn(() => {
+      throw new Error('renderer-managed SDK must not load');
+    });
+    jest.doMock('@opentelemetry/sdk-trace-node', rendererSdkFactory);
+
+    const { init } = await import('../../src/integrations/opentelemetry');
+    const tracing = await import('../../src/shared/tracing');
+
+    init({ tracing: true, useExistingGlobalProvider: true });
+
+    const existingProvider = new NodeTracerProvider({ spanProcessors: [spanProcessor] });
+    existingProvider.register();
+    init({ tracing: true, useExistingGlobalProvider: true });
+    await tracing.trace(
+      () => tracing.subSpan({ name: 'ror.vm.execute' }, async () => 'ok'),
+      tracing.startSsrRequestOptions({ renderingRequest: 'irrelevant' }),
+    );
+    await spanProcessor.forceFlush();
+
+    expect(exporter.getFinishedSpans().map((span) => span.name)).toEqual([
+      'ror.vm.execute',
+      'ror.ssr.request',
+    ]);
+    expect(rendererSdkFactory).not.toHaveBeenCalled();
+    await existingProvider.shutdown();
+  });
+
+  test('the test reset clears existing-provider attachment state for the same init function', async () => {
+    const firstExporter = new InMemorySpanExporter();
+    const firstProcessor = new SimpleSpanProcessor(firstExporter);
+    const firstProvider = new NodeTracerProvider({ spanProcessors: [firstProcessor] });
+    firstProvider.register();
+
+    const { init } = await import('../../src/integrations/opentelemetry');
+    const tracing = await import('../../src/shared/tracing');
+    const render = () =>
+      tracing.trace(
+        () => tracing.subSpan({ name: 'ror.vm.execute' }, async () => 'ok'),
+        tracing.startSsrRequestOptions({ renderingRequest: 'irrelevant' }),
+      );
+
+    init({ tracing: true, useExistingGlobalProvider: true });
+    await render();
+    await firstProcessor.forceFlush();
+    const firstSpanNames = firstExporter.getFinishedSpans().map((span) => span.name);
+    await resetOpenTelemetryForTest();
+    await firstProvider.shutdown();
+    otelTrace.disable();
+    otelContext.disable();
+    otelPropagation.disable();
+
+    const secondExporter = new InMemorySpanExporter();
+    const secondProcessor = new SimpleSpanProcessor(secondExporter);
+    const secondProvider = new NodeTracerProvider({ spanProcessors: [secondProcessor] });
+    secondProvider.register();
+
+    init({ tracing: true, useExistingGlobalProvider: true });
+    await render();
+    await secondProcessor.forceFlush();
+
+    expect(firstSpanNames).toEqual(['ror.vm.execute', 'ror.ssr.request']);
+    expect(secondExporter.getFinishedSpans().map((span) => span.name)).toEqual([
+      'ror.vm.execute',
+      'ror.ssr.request',
+    ]);
+    await secondProvider.shutdown();
+  });
+
+  test('existing-provider init rolls back tracing when sub-span installation fails', async () => {
+    const resetTracing = jest.fn();
+    const message = jest.fn();
+    jest.doMock('../../src/integrations/api.js', () => ({
+      WORKER_SHUTDOWN_HOOKS_TIMEOUT_MS: 10_000,
+      getOpenTelemetryTracerProvider: jest.fn(() => null),
+      log: { debug: jest.fn(), error: jest.fn(), info: jest.fn(), warn: jest.fn() },
+      message,
+      registerFastifyConfigFunction: jest.fn(),
+      registerWorkerShutdownHook: jest.fn(),
+      resetSubSpan: jest.fn(),
+      resetTracing,
+      setOpenTelemetryTracerProvider: jest.fn(),
+      setupSubSpan: jest.fn(() => {
+        throw new Error('sub-span setup failed');
+      }),
+      setupTracing: jest.fn(() => true),
+    }));
+
+    const existingProvider = new NodeTracerProvider();
+    existingProvider.register();
+    const { init } = await import('../../src/integrations/opentelemetry');
+
+    init({ tracing: true, useExistingGlobalProvider: true });
+
+    expect(resetTracing).toHaveBeenCalledTimes(1);
+    expect(message).toHaveBeenCalledWith(expect.stringContaining('[OpenTelemetry] init failed'));
     await existingProvider.shutdown();
   });
 });

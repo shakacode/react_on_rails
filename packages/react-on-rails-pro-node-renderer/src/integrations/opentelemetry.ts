@@ -22,7 +22,11 @@ import type { Instrumentation } from '@opentelemetry/instrumentation';
 import type { ResourceDetector } from '@opentelemetry/resources';
 import type { NodeTracerProvider as NodeTracerProviderType } from '@opentelemetry/sdk-trace-node';
 import type { SpanExporter, SpanProcessor } from '@opentelemetry/sdk-trace-base';
-import { resolveResource, resolveServiceName } from './opentelemetryConfig.js';
+import { resolveResource, resolveServiceName } from './internal/opentelemetryConfig.js';
+import {
+  isUsingExistingGlobalTracerProvider,
+  setUsingExistingGlobalTracerProvider,
+} from './internal/opentelemetryState.js';
 import {
   getOpenTelemetryTracerProvider,
   log,
@@ -65,7 +69,8 @@ export interface OpenTelemetryInitOptions {
   resourceAttributes?: Record<string, string>;
   /** Resource detectors whose attributes are merged below explicit resource configuration. */
   resourceDetectors?: ResourceDetector[];
-  /** Additional instrumentations appended after the built-in HTTP and Fastify instrumentations. */
+  /** Additional instrumentations appended after the built-in HTTP and Fastify instrumentations.
+   *  A nonempty list registers all three groups and applies process-global module patches. */
   instrumentations?: Instrumentation[];
   /** Use the provider already registered through the OpenTelemetry API.
    *  The host application retains ownership of SDK configuration and shutdown. */
@@ -78,7 +83,6 @@ const DEFAULT_SHUTDOWN_TIMEOUT_MS = 5_000;
 // Leave 1s of headroom under the worker's hard cap so the shutdown hook can
 // resolve cleanly even when provider.shutdown() runs right at its limit.
 const MAX_SHUTDOWN_TIMEOUT_MS = WORKER_SHUTDOWN_HOOKS_TIMEOUT_MS - 1_000;
-let usingExistingGlobalProvider = false;
 
 interface InstalledTracingAdapters {
   tracing: boolean;
@@ -149,8 +153,8 @@ function installTracingAdapters(
   otelApi: typeof import('@opentelemetry/api'),
   serviceName: string,
 ): InstalledTracingAdapters {
-  const installedAdapters: InstalledTracingAdapters = { tracing: false, subSpan: false };
   const tracer = otelApi.trace.getTracer(serviceName);
+  const installedAdapters: InstalledTracingAdapters = { tracing: false, subSpan: false };
 
   installedAdapters.tracing = setupTracing({
     startSsrRequestOptions: () => ({
@@ -197,7 +201,12 @@ function installTracingAdapters(
           span.end();
         }
       });
-    installedAdapters.subSpan = setupSubSpan(subSpanImpl);
+    try {
+      installedAdapters.subSpan = setupSubSpan(subSpanImpl);
+    } catch (error) {
+      resetInstalledTracingAdapters(installedAdapters);
+      throw error;
+    }
   } else {
     message(
       '[OpenTelemetry] tracing integration was not installed because another tracing integration is ' +
@@ -206,6 +215,37 @@ function installTracingAdapters(
   }
 
   return installedAdapters;
+}
+
+function hasRegisteredGlobalTracerProvider(
+  otelApi: typeof import('@opentelemetry/api'),
+  tracerName: string,
+): boolean {
+  const provider = otelApi.trace.getTracerProvider() as {
+    getDelegateTracer?: (name: string) => unknown;
+  };
+
+  // The supported API 1.x proxy returns undefined until a delegate is registered.
+  return provider.getDelegateTracer?.(tracerName) !== undefined;
+}
+
+function warnAboutExistingProviderOptions(opts: OpenTelemetryInitOptions): void {
+  const ignoredOptions = [
+    opts.fastify ? 'fastify' : undefined,
+    opts.exporter !== undefined ? 'exporter' : undefined,
+    opts.spanProcessor !== undefined ? 'spanProcessor' : undefined,
+    opts.resourceDetectors?.length ? 'resourceDetectors' : undefined,
+    opts.instrumentations?.length ? 'instrumentations' : undefined,
+    opts.shutdownTimeoutMs !== undefined ? 'shutdownTimeoutMs' : undefined,
+  ].filter((option): option is string => option !== undefined);
+
+  if (ignoredOptions.length > 0) {
+    log.warn(
+      `[OpenTelemetry] useExistingGlobalProvider does not apply renderer-managed options: ${ignoredOptions.join(
+        ', ',
+      )}. Configure them on the application-owned SDK.`,
+    );
+  }
 }
 
 function initWithExistingGlobalProvider(opts: OpenTelemetryInitOptions): void {
@@ -224,15 +264,24 @@ function initWithExistingGlobalProvider(opts: OpenTelemetryInitOptions): void {
     const otelApi = require('@opentelemetry/api') as typeof import('@opentelemetry/api');
     /* eslint-enable @typescript-eslint/no-require-imports, global-require */
     const serviceName = resolveServiceName(opts, 'service.name');
+    if (!hasRegisteredGlobalTracerProvider(otelApi, serviceName)) {
+      message(
+        '[OpenTelemetry] useExistingGlobalProvider: no global tracer provider is registered; ' +
+          'register the application SDK before init(). No renderer spans were installed.',
+      );
+      return;
+    }
+
+    warnAboutExistingProviderOptions(opts);
     installedAdapters = installTracingAdapters(otelApi, serviceName);
 
     if (installedAdapters.tracing) {
-      usingExistingGlobalProvider = true;
+      setUsingExistingGlobalTracerProvider(true);
       log.info('[OpenTelemetry] Renderer tracing attached to the existing global provider');
     }
   } catch (err) {
     installedAdapters = resetInstalledTracingAdapters(installedAdapters);
-    usingExistingGlobalProvider = false;
+    setUsingExistingGlobalTracerProvider(false);
     message(`[OpenTelemetry] init failed: ${String(err)}`);
   }
 }
@@ -274,7 +323,7 @@ async function shutdownProviderWithTimeout(
 }
 
 export function init(opts: OpenTelemetryInitOptions = {}): void {
-  if (getOpenTelemetryTracerProvider() || usingExistingGlobalProvider) {
+  if (getOpenTelemetryTracerProvider() || isUsingExistingGlobalTracerProvider()) {
     message('[OpenTelemetry] init() called more than once; ignoring duplicate call.');
     return;
   }
@@ -356,7 +405,7 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
     provider.register();
     configureOpenTelemetryDiagnostics(loadedOtelApi);
 
-    if (opts.fastify || opts.instrumentations !== undefined) {
+    if (opts.fastify || (opts.instrumentations?.length ?? 0) > 0) {
       /* eslint-disable @typescript-eslint/no-require-imports, global-require */
       const { registerInstrumentations } =
         require('@opentelemetry/instrumentation') as typeof import('@opentelemetry/instrumentation');

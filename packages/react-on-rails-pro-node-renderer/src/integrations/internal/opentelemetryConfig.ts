@@ -15,9 +15,9 @@
 
 import type { Resource, ResourceDetector } from '@opentelemetry/resources';
 
-export const DEFAULT_SERVICE_NAME = 'react-on-rails-pro-node-renderer';
+const DEFAULT_SERVICE_NAME = 'react-on-rails-pro-node-renderer';
 
-export interface OpenTelemetryResourceOptions {
+interface OpenTelemetryResourceOptions {
   serviceName?: string;
   resourceAttributes?: Record<string, string>;
   resourceDetectors?: ResourceDetector[];
@@ -57,7 +57,7 @@ function parseResourceAttributes(value: string | undefined): Record<string, stri
   return attributes;
 }
 
-export function resolveConfiguredServiceName(opts: OpenTelemetryResourceOptions): string | undefined {
+function resolveConfiguredServiceName(opts: OpenTelemetryResourceOptions): string | undefined {
   return process.env.OTEL_SERVICE_NAME ?? opts.serviceName;
 }
 
@@ -85,7 +85,7 @@ export function resolveResource(
   const serviceName =
     configuredServiceName ?? resourceAttributes[serviceNameAttribute] ?? DEFAULT_SERVICE_NAME;
 
-  if (opts.resourceDetectors === undefined) {
+  if (!opts.resourceDetectors?.length) {
     return {
       resource: resources.resourceFromAttributes({
         [serviceNameAttribute]: serviceName,

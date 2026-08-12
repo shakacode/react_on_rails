@@ -390,11 +390,11 @@ await reactOnRailsProNodeRenderer().catch((e) => {
 ```
 
 > [!NOTE]
-> With `fastify: true`, OpenTelemetry patches the HTTP and Fastify modules process-wide. If a later init step fails after those patches are installed, OpenTelemetry does not provide a rollback API; the patched modules remain installed and use a no-op tracer until the process restarts.
+> With `fastify: true` or a nonempty `instrumentations` list, OpenTelemetry patches modules process-wide. If a later init step fails after those patches are installed, OpenTelemetry does not provide a rollback API; the patches remain installed until the process restarts, but the renderer resets its tracing adapters and shuts down its provider.
 
 ### Add instrumentations and resource detectors
 
-Pass additional OpenTelemetry instrumentations through `instrumentations`. The renderer appends them after its built-in `HttpInstrumentation` and `FastifyOtelInstrumentation` instances, so the custom list extends rather than replaces the renderer defaults. Passing `instrumentations` registers the full combined list even when `fastify` is not set separately.
+Pass one or more additional OpenTelemetry instrumentations through `instrumentations`. The renderer appends them after its built-in `HttpInstrumentation` and `FastifyOtelInstrumentation` instances, so the custom list extends rather than replaces the renderer defaults. A nonempty list registers the full combined list even when `fastify` is not set separately. An empty list is inert and does not load or register the built-in instrumentations.
 
 Pass OpenTelemetry resource detectors through `resourceDetectors`. For example, an ECS deployment can install `@opentelemetry/resource-detector-aws` and let the AWS ECS detector discover container and cloud attributes. Extra instrumentation packages and detector packages remain application-owned optional dependencies.
 
@@ -429,7 +429,11 @@ initOpenTelemetry({
 });
 ```
 
-This path uses the global API tracer only to install `setupTracing` and `setupSubSpan`, preserving the renderer's `ror.*` spans. The application continues to own exporters, processors, resources, instrumentations, propagators, and provider shutdown. Configure custom instrumentations and resource detectors on that application-owned SDK; the renderer does not register or shut them down in this mode.
+The renderer verifies that a global tracer provider has been registered before it installs `setupTracing` and `setupSubSpan`, preserving the renderer's `ror.*` spans. If no provider is registered yet, `init()` reports the ordering problem and remains retryable after the application registers its provider.
+
+The application continues to own exporters, processors, resources, instrumentations, propagators, flushing, and provider shutdown. Renderer-managed options such as `fastify`, `instrumentations`, `resourceDetectors`, `exporter`, `spanProcessor`, and `shutdownTimeoutMs` are ignored in this mode and produce a warning when supplied. Configure those features on the application-owned SDK before starting the renderer. In particular, register HTTP and Fastify instrumentation before the Fastify server loads so incoming `traceparent` context from Rails becomes the parent of the renderer's `ror.*` spans. The renderer does not add a shutdown hook for an external provider, so the host must flush and shut down its SDK during application shutdown.
+
+`serviceName`, or `resourceAttributes['service.name']` when no higher-priority name is set, selects the tracer instrumentation scope for renderer spans. It does not change the existing provider's resource. Configure the resource `service.name` on the host-owned SDK.
 
 ### Configuration via standard OpenTelemetry environment variables
 
@@ -467,7 +471,7 @@ The renderer spans nest under `ror.ssr.request`. With `fastify: true`, that entr
 
 - **Span processor**: `BatchSpanProcessor` in production (`NODE_ENV=production` or `RAILS_ENV=production`), `SimpleSpanProcessor` otherwise. Override with `init({ spanProcessor })`.
 - **Exporter**: OTLP HTTP. Override with `init({ exporter })`.
-- **Graceful shutdown**: Pending batched spans are flushed when Fastify's `onClose` hook fires (during worker shutdown), so traces are not lost on rolling restarts. The renderer waits up to 5000ms by default before continuing worker shutdown; override with `init({ shutdownTimeoutMs })`. The worker also has a 10s `app.close()` watchdog, so keep custom OTel shutdown timeouts below that window.
+- **Graceful shutdown**: For a renderer-managed provider, pending batched spans are flushed when Fastify's `onClose` hook fires (during worker shutdown), so traces are not lost on rolling restarts. The renderer waits up to 5000ms by default before continuing worker shutdown; override with `init({ shutdownTimeoutMs })`. The worker also has a 10s `app.close()` watchdog, so keep custom OTel shutdown timeouts below that window. For `useExistingGlobalProvider`, the host application must flush and shut down its own provider.
 
 ### Privacy note
 
