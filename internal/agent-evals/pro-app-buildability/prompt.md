@@ -14,6 +14,11 @@ immediately before a single bounded `tee | tail` scaffold pipeline. Do not use
 later generated files or manifests as a substitute for the scaffold command's
 own successful completion evidence.
 
+Final test and production-build evidence must likewise preserve the target command
+status: either make a bounded pipeline terminal under `pipefail`, or capture its
+pipeline status immediately in a unique zero-status marker. Avoid ambiguous later
+commands whose status could mask the test or build result.
+
 Keep a concise record of commands, decisions, friction, and failed attempts in
 your final structured response. A check is successful only if you actually ran
 it and observed exit status 0. Do not claim support for a feature based only on
