@@ -7,6 +7,16 @@ tmp="$(mktemp -d "${TMPDIR:-/tmp}/ror-eval-tests.XXXXXX")"
 trap 'rm -rf "$tmp"' EXIT INT TERM
 
 timeout_command="$(command -v timeout || command -v gtimeout)"
+rg -Fq 'The initial public scaffold command itself must propagate generator failures' \
+  "$eval_dir/prompt.md"
+rg -Fq 'and preserve bounded terminal completion evidence.' \
+  "$eval_dir/prompt.md"
+rg -Fq 'one shell invocation with `set -o pipefail` as the exact top-level line' \
+  "$eval_dir/prompt.md"
+rg -Fq 'immediately before a single bounded `tee | tail` scaffold pipeline.' \
+  "$eval_dir/prompt.md"
+rg -Fq 'later generated files or manifests as a substitute for the scaffold command' \
+  "$eval_dir/prompt.md"
 exec 9<"$eval_dir/README.md"
 IFS=: read -r fixture_kind fixture_mode fixture_size \
   <<<"$("$eval_dir/bin/file-descriptor-metadata" 9)"
@@ -3481,5 +3491,160 @@ node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-spaced-marker-mismatch-eve
   "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
 test "$(jq -r '.items[] | select(.id == "build.production") | .status' \
   "$tmp/claude-spaced-marker-mismatch-output/rubric-results.json")" = unknown
+
+cp -R "$tmp/claude-v6-workspace" "$tmp/claude-v8-form-workspace"
+rm "$tmp/claude-v8-form-workspace/eval_app/test/integration/subscribers_test.rb"
+printf '%s\n' \
+  'class SubscriptionsTest < ActionDispatch::IntegrationTest' \
+  '  test "server-side validation failure re-renders the form with error messages" do' \
+  '    assert_no_difference("Subscriber.count") do' \
+  '      post subscriptions_path, params: { subscriber: { name: "", email: "bad" } }' \
+  '    end' \
+  '    assert_response :unprocessable_entity' \
+  '    assert_match "error", response.body' \
+  '    assert_match "must be a valid email address", response.body' \
+  '    assert_match "can&#x27;t be blank", response.body' \
+  '  end' \
+  '  test "successful submission saves the subscriber and shows a success message" do' \
+  '    assert_difference("Subscriber.count", 1) do' \
+  '      post subscriptions_path, params: { subscriber: { name: "Marie Curie", email: "marie@example.com" } }' \
+  '    end' \
+  '    assert_redirected_to subscriptions_path' \
+  '    follow_redirect!' \
+  '    assert_response :success' \
+  '    assert_match "Thanks, Marie Curie!", response.body' \
+  '  end' \
+  'end' >"$tmp/claude-v8-form-workspace/eval_app/test/integration/subscriptions_test.rb"
+mkdir "$tmp/claude-v8-form-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+  "$tmp/claude-v8-form-workspace" "$tmp/claude-v8-form-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/claude-v8-form-output/rubric-results.json")" = pass
+done
+
+claude_v8_form_rejections=(
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "", response.body\n  end\n  test "successful submission saves the subscriber and shows a success message" do\n    post subscriptions_path\n    assert_redirected_to subscriptions_path\n    follow_redirect!\n    assert_match "", response.body\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match error_pattern, response.body\n  end\n  test "successful submission saves the subscriber and shows a success message" do\n    post subscriptions_path\n    assert_redirected_to subscriptions_path\n    follow_redirect!\n    assert_match success_pattern, response.body\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n  end\n  assert_match "error", response.body\n  test "successful submission saves the subscriber and shows a success message" do\n    post subscriptions_path\n    assert_redirected_to subscriptions_path\n    follow_redirect!\n    assert_match "Thanks", response.body\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n  end\n  test "successful submission saves the subscriber and shows a success message" do\n    post subscriptions_path\n    assert_match "error", response.body\n    assert_redirected_to subscriptions_path\n    follow_redirect!\n    assert_match "Thanks", response.body\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission saves the subscriber and shows a success message" do\n    post subscriptions_path\n    assert_redirected_to subscriptions_path\n    assert_match "Thanks", response.body\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :success\n    assert_match "error", response.body\n  end\n  test "successful submission saves the subscriber and shows a success message" do\n    post subscriptions_path\n    assert_redirected_to subscriptions_path\n    follow_redirect!\n    assert_match "Thanks", response.body\n  end\nend'
+)
+claude_v8_form_rejection_index=0
+for form_content in "${claude_v8_form_rejections[@]}"; do
+  claude_v8_form_rejection_index=$((claude_v8_form_rejection_index + 1))
+  cp -R "$tmp/claude-v8-form-workspace" \
+    "$tmp/claude-v8-form-rejection-$claude_v8_form_rejection_index-workspace"
+  printf '%s\n' "$form_content" \
+    >"$tmp/claude-v8-form-rejection-$claude_v8_form_rejection_index-workspace/eval_app/test/integration/subscriptions_test.rb"
+  mkdir "$tmp/claude-v8-form-rejection-$claude_v8_form_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+    "$tmp/claude-v8-form-rejection-$claude_v8_form_rejection_index-workspace" \
+    "$tmp/claude-v8-form-rejection-$claude_v8_form_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/claude-v8-form-rejection-$claude_v8_form_rejection_index-output/rubric-results.json")" = unknown
+  done
+done
+
+claude_v8_build_command=$'cd <LOCAL_PATH>/eval_app\nrm -rf public/packs ssr-generated\nnpm run build > <LOCAL_PATH> 2>&1\necho "build_prod_exit=$?"\ntail -10 <LOCAL_PATH>\nls public/packs/manifest.json ssr-generated/server-bundle.js ssr-generated/rsc-bundle.js 2>&1'
+jq -cn --arg command "$claude_v8_build_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"build_prod_exit=0\nRspack client compiled successfully\nRspack server compiled successfully"}}' \
+  >"$tmp/claude-v8-build-events.jsonl"
+mkdir "$tmp/claude-v8-build-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v8-build-events.jsonl" \
+  "$tmp/claude-v8-form-workspace" "$tmp/claude-v8-build-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+test "$(jq -r '.items[] | select(.id == "build.production") | .status' \
+  "$tmp/claude-v8-build-output/rubric-results.json")" = pass
+
+claude_v8_build_rejections=(
+  $'cd <LOCAL_PATH>/eval_app\nrm -rf public/packs public/packs-test\nnpm run build > <LOCAL_PATH> 2>&1\necho "build_prod_exit=$?"\ntail -10 <LOCAL_PATH>\nls public/packs/manifest.json ssr-generated/server-bundle.js ssr-generated/rsc-bundle.js 2>&1'
+  $'cd <LOCAL_PATH>/eval_app\nnpm run build > <LOCAL_PATH> 2>&1\nrm -rf public/packs ssr-generated\necho "build_prod_exit=$?"\ntail -10 <LOCAL_PATH>\nls public/packs/manifest.json ssr-generated/server-bundle.js ssr-generated/rsc-bundle.js 2>&1'
+  $'cd <LOCAL_PATH>/eval_app\nrm -rf public/packs ssr-generated\necho "build_prod_exit=0"\nnpm run build > <LOCAL_PATH> 2>&1\necho "build_prod_exit=$?"\ntail -10 <LOCAL_PATH>\nls public/packs/manifest.json ssr-generated/server-bundle.js ssr-generated/rsc-bundle.js 2>&1'
+  $'cd <LOCAL_PATH>/eval_app\nrm -rf public/packs ssr-generated\nnpm run build > <LOCAL_PATH> 2>&1\necho "build_prod_exit=0"\ntail -10 <LOCAL_PATH>\nls public/packs/manifest.json ssr-generated/server-bundle.js ssr-generated/rsc-bundle.js 2>&1'
+  $'cd <LOCAL_PATH>/eval_app\nrm -rf public/packs ssr-generated\nnpm run build > <LOCAL_PATH> 2>&1\necho "BUILD_PROD_EXIT=$?"\ntail -10 <LOCAL_PATH>\nls public/packs/manifest.json ssr-generated/server-bundle.js ssr-generated/rsc-bundle.js 2>&1'
+  $'cd <LOCAL_PATH>/eval_app\nrm -rf public/packs ssr-generated\nnpm run build > <LOCAL_PATH> 2>&1\necho "build_prod_exit=$?"\ntail -1001 <LOCAL_PATH>\nls public/packs/manifest.json ssr-generated/server-bundle.js ssr-generated/rsc-bundle.js 2>&1'
+  $'cd <LOCAL_PATH>/eval_app\nrm -rf public/packs ssr-generated\nnpm run build > build.log 2>&1\necho "build_prod_exit=$?"\ntail -10 build.log\nls public/packs/manifest.json ssr-generated/server-bundle.js ssr-generated/rsc-bundle.js 2>&1'
+  $'cd <LOCAL_PATH>/eval_app\nrm -rf public/packs ssr-generated\nnpm run build > <LOCAL_PATH> 2>&1\necho "build_prod_exit=$?"\ntail -10 build.log\nls public/packs/manifest.json ssr-generated/server-bundle.js ssr-generated/rsc-bundle.js 2>&1'
+  $'cd <LOCAL_PATH>/eval_app\nrm -rf public/packs ssr-generated\nnpm run build > <LOCAL_PATH> 2>&1\necho "build_prod_exit=$?"\ntail -10 <LOCAL_PATH>\nls public/packs/manifest.json ssr-generated/server-bundle.js 2>&1'
+  $'cd <LOCAL_PATH>/eval_app\nrm -rf public/packs ssr-generated\nnpm run build > <LOCAL_PATH> 2>&1\necho "build_prod_exit=$?"\ntail -10 <LOCAL_PATH>\nls public/packs/manifest.json ssr-generated/server-bundle.js ssr-generated/rsc-bundle.js 2>&1\ntrue'
+)
+claude_v8_build_rejection_index=0
+for build_command in "${claude_v8_build_rejections[@]}"; do
+  claude_v8_build_rejection_index=$((claude_v8_build_rejection_index + 1))
+  jq -cn --arg command "$build_command" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"build_prod_exit=0\nRspack compiled successfully"}}' \
+    >"$tmp/claude-v8-build-rejection-$claude_v8_build_rejection_index-events.jsonl"
+  mkdir "$tmp/claude-v8-build-rejection-$claude_v8_build_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" \
+    "$tmp/claude-v8-build-rejection-$claude_v8_build_rejection_index-events.jsonl" \
+    "$tmp/claude-v8-form-workspace" \
+    "$tmp/claude-v8-build-rejection-$claude_v8_build_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "build.production") | .status' \
+    "$tmp/claude-v8-build-rejection-$claude_v8_build_rejection_index-output/rubric-results.json")" = unknown
+done
+
+claude_v8_build_output_rejections=(
+  $'build_prod_exit=1\nRspack compiled successfully'
+  $'build_prod_exit=0\nbuild_prod_exit=0\nRspack compiled successfully'
+  $'other_exit=0\nRspack compiled successfully'
+  'build_prod_exit=0'
+  $'build_prod_exit=0\nUsage: build [options]\nRspack compiled successfully'
+  $'build_prod_exit=0\nERROR: build failed\nRspack compiled successfully'
+)
+claude_v8_build_output_rejection_index=0
+for build_output in "${claude_v8_build_output_rejections[@]}"; do
+  claude_v8_build_output_rejection_index=$((claude_v8_build_output_rejection_index + 1))
+  jq -cn --arg command "$claude_v8_build_command" --arg output "$build_output" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:$output}}' \
+    >"$tmp/claude-v8-build-output-rejection-$claude_v8_build_output_rejection_index-events.jsonl"
+  mkdir "$tmp/claude-v8-build-output-rejection-$claude_v8_build_output_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" \
+    "$tmp/claude-v8-build-output-rejection-$claude_v8_build_output_rejection_index-events.jsonl" \
+    "$tmp/claude-v8-form-workspace" \
+    "$tmp/claude-v8-build-output-rejection-$claude_v8_build_output_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "build.production") | .status' \
+    "$tmp/claude-v8-build-output-rejection-$claude_v8_build_output_rejection_index-output/rubric-results.json")" = unknown
+done
+
+jq -cn --arg command "$claude_v8_build_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:1,status:"failed",aggregated_output:"build_prod_exit=0\nRspack compiled successfully"}}' \
+  >"$tmp/claude-v8-build-nonzero-event.jsonl"
+mkdir "$tmp/claude-v8-build-nonzero-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v8-build-nonzero-event.jsonl" \
+  "$tmp/claude-v8-form-workspace" "$tmp/claude-v8-build-nonzero-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+test "$(jq -r '.items[] | select(.id == "build.production") | .status' \
+  "$tmp/claude-v8-build-nonzero-output/rubric-results.json")" = unknown
+
+for manifest_variant in missing no-production-env one-production-env truncated; do
+  cp -R "$tmp/claude-v8-form-workspace" "$tmp/claude-v8-build-$manifest_variant-workspace"
+  manifest="$tmp/claude-v8-build-$manifest_variant-workspace/eval_app/package.json"
+  if [[ "$manifest_variant" == missing ]]; then
+    rm "$manifest"
+  elif [[ "$manifest_variant" == no-production-env ]]; then
+    printf '%s\n' '{"scripts":{"build":"rspack build"}}' >"$manifest"
+  elif [[ "$manifest_variant" == one-production-env ]]; then
+    printf '%s\n' '{"scripts":{"build":"RAILS_ENV=production rspack build"}}' >"$manifest"
+  else
+    printf '%s' '{"scripts":{"build":"RAILS_ENV=production NODE_ENV=production rspack build"},"padding":"' \
+      >"$manifest"
+    printf '%020000d' 0 >>"$manifest"
+    printf '%s\n' '"}' >>"$manifest"
+  fi
+  mkdir "$tmp/claude-v8-build-$manifest_variant-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v8-build-events.jsonl" \
+    "$tmp/claude-v8-build-$manifest_variant-workspace" \
+    "$tmp/claude-v8-build-$manifest_variant-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "build.production") | .status' \
+    "$tmp/claude-v8-build-$manifest_variant-output/rubric-results.json")" = unknown
+done
 
 echo "focused harness tests passed"

@@ -234,6 +234,26 @@ const isolatedProductionBuildTarget = (lines, output) => {
     ? 'npm run build'
     : null;
 };
+const artifactCheckedProductionBuildTarget = (lines, output) => {
+  if (
+    lines.length !== 5 ||
+    lines[0] !== 'rm -rf public/packs ssr-generated' ||
+    lines[1] !== 'npm run build > <LOCAL_PATH> 2>&1' ||
+    lines[2] !== 'echo "build_prod_exit=$?"' ||
+    lines[4] !==
+      'ls public/packs/manifest.json ssr-generated/server-bundle.js ssr-generated/rsc-bundle.js 2>&1'
+  ) {
+    return null;
+  }
+  const tailMatch = lines[3].match(/^tail\s+(?:-n\s+|-)([1-9][0-9]{0,4})\s+<LOCAL_PATH>$/);
+  const markers = output.split(/\r?\n/).filter((line) => /^build_prod_exit=-?[0-9]+$/.test(line));
+  return tailMatch &&
+    Number(tailMatch[1]) <= 1000 &&
+    markers.length === 1 &&
+    markers[0] === 'build_prod_exit=0'
+    ? 'npm run build'
+    : null;
+};
 const directRuntimeProductionBuildTarget = (lines) =>
   lines.length === 1 && lines[0] === 'SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>" npm run build'
     ? 'npm run build'
@@ -327,6 +347,8 @@ const buildEvidenceTargets = (command) => {
   if (inlineColonTarget) targets.push(inlineColonTarget);
   const isolatedProductionTarget = isolatedProductionBuildTarget(lines, command.output);
   if (isolatedProductionTarget) targets.push(isolatedProductionTarget);
+  const artifactCheckedProductionTarget = artifactCheckedProductionBuildTarget(lines, command.output);
+  if (artifactCheckedProductionTarget) targets.push(artifactCheckedProductionTarget);
   const directRuntimeProductionTarget = directRuntimeProductionBuildTarget(lines);
   if (directRuntimeProductionTarget) targets.push(directRuntimeProductionTarget);
   for (const [index, line] of lines.entries()) {
@@ -443,7 +465,10 @@ const semanticFormIntegrationTest = (artifact, uncommentedRuby) => {
 
   const hasPost = (body) => /^\s*post(?:\s+|\()/m.test(body);
   const hasRenderedBodyAssertion = (body) =>
-    /^\s*(?:assert_includes|refute_includes)(?:\s+|\()\s*(?:@response|response)\.body\s*,/m.test(body);
+    /^\s*(?:assert_includes|refute_includes)(?:\s+|\()\s*(?:@response|response)\.body\s*,/m.test(body) ||
+    /^\s*assert_match(?:\s+|\()\s*(?:"[^"\r\n]*[^\s"\r\n][^"\r\n]*"|'[^'\r\n]*[^\s'\r\n][^'\r\n]*')\s*,\s*(?:@response|response)\.body\s*\)?\s*$/m.test(
+      body,
+    );
   const failureResponse =
     /^\s*assert_response(?:\s+|\()\s*(?::(?:unprocessable_entity|unprocessable_content)\b|422\b)/m.test(
       failureCase.body,
