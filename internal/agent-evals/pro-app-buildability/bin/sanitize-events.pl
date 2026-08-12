@@ -112,6 +112,38 @@ sub redact_structured_sensitive_values {
   return $output . substr($value, $cursor);
 }
 
+sub quoted_value_end {
+  my ($value, $start, $quote) = @_;
+  my $escaped = 0;
+  for (my $index = $start; $index < length($value); $index++) {
+    my $character = substr($value, $index, 1);
+    return $index if !$escaped && $character eq $quote;
+    return $index if $character eq "\n";
+    $escaped = !$escaped && $character eq '\\';
+  }
+  return length($value);
+}
+
+sub redact_quoted_sensitive_values {
+  my ($value) = @_;
+  my $output = '';
+  my $cursor = 0;
+  while ($value =~ /([a-z0-9_-]+)(["']?\s*[:=]\s*)(["'])/ig) {
+    my ($name, $separator, $quote) = ($1, $2, $3);
+    my $value_start = $+[0];
+    my $value_end = quoted_value_end($value, $value_start, $quote);
+    my $closed = $value_end < length($value) && substr($value, $value_end, 1) eq $quote;
+    my $quoted_value = substr($value, $value_start, $value_end - $value_start);
+    if (sensitive_name($name) && credential_value($quoted_value)) {
+      $output .= substr($value, $cursor, $value_start - $cursor) . '[REDACTED]';
+      $output .= $quote if $closed;
+      $cursor = $value_end + ($closed ? 1 : 0);
+    }
+    pos($value) = $value_end + ($closed ? 1 : 0);
+  }
+  return $output . substr($value, $cursor);
+}
+
 @ARGV <= 1 or die "usage: sanitize-events.pl [INPUT]\n";
 my $input;
 if (@ARGV) {
@@ -153,18 +185,7 @@ for my $part (@path_parts) {
   $part =~ s{/var/folders/[^\s"']+}{<LOCAL_PATH>}g;
 }
 $content = join '', @path_parts;
-$content =~ s{([a-z0-9_-]+)(["']?\s*[:=]\s*)(["'])((?:\\.|(?!\3)[^\n])*)\3}{
-  my ($name, $separator, $quote, $value) = ($1, $2, $3, $4);
-  sensitive_name($name) && credential_value($value)
-    ? "$name$separator$quote\[REDACTED\]$quote"
-    : $&;
-}ige;
-$content =~ s{([a-z0-9_-]+)(["']?\s*[:=]\s*)(["'])((?:\\.|(?!\3)[^\n])*)$}{
-  my ($name, $separator, $quote, $value) = ($1, $2, $3, $4);
-  sensitive_name($name) && credential_value($value)
-    ? "$name$separator$quote\[REDACTED\]"
-    : $&;
-}igem;
+$content = redact_quoted_sensitive_values($content);
 $content =~ s{([a-z0-9_-]+)(["']?\s*[:=]\s*)([^"'\s\n][^\n]*)}{
   my ($name, $separator, $value) = ($1, $2, $3);
   sensitive_name($name) && credential_value($value)

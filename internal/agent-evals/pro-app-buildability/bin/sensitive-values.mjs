@@ -1,5 +1,7 @@
-const quotedNamedValue = /([a-z0-9_-]+)(["']?\s*[:=]\s*)(["'])((?:\\.|(?!\3)[^\n])*)\3/gi;
-const unterminatedQuotedNamedValue = /([a-z0-9_-]+)(["']?\s*[:=]\s*)(["'])((?:\\.|(?!\3)[^\n])*)$/gim;
+const quotedNamedValue =
+  /([a-z0-9_-]+)(["']?\s*[:=]\s*)(?:"((?:\\[^\n]|[^"\\\n])*)"|'((?:\\[^\n]|[^'\\\n])*)')/gi;
+const unterminatedQuotedNamedValue =
+  /([a-z0-9_-]+)(["']?\s*[:=]\s*)(?:"((?:\\[^\n]|[^"\\\n])*\\?)$|'((?:\\[^\n]|[^'\\\n])*\\?)$)/gim;
 const unquotedNamedValue = /([a-z0-9_-]+)(["']?\s*[:=]\s*)([^"'\s\n][^\n]*)/gi;
 const sensitiveName =
   /^(?:authorization|cookie)$|(?:api[_-]?key|access[_-]?key|secret|token|password|passwd|credential|private[_-]?key|license[_-]?key)|(?:^|[_-])key(?:$|[_-])/i;
@@ -105,12 +107,18 @@ const redactStructuredSensitiveValues = (value) => {
 
 export const redactSensitiveValues = (value) =>
   redactStructuredSensitiveValues(redactCredentialsInWebUrls(value))
-    .replace(quotedNamedValue, (match, name, separator, quote, quotedValue) =>
-      shouldRedact(name, quotedValue) ? `${name}${separator}${quote}[REDACTED]${quote}` : match,
-    )
-    .replace(unterminatedQuotedNamedValue, (match, name, separator, quote, quotedValue) =>
-      shouldRedact(name, quotedValue) ? `${name}${separator}${quote}[REDACTED]` : match,
-    )
+    .replace(quotedNamedValue, (match, name, separator, doubleQuotedValue, singleQuotedValue) => {
+      const doubleQuoted = doubleQuotedValue !== undefined;
+      const quote = doubleQuoted ? '"' : "'";
+      const quotedValue = doubleQuoted ? doubleQuotedValue : singleQuotedValue;
+      return shouldRedact(name, quotedValue) ? `${name}${separator}${quote}[REDACTED]${quote}` : match;
+    })
+    .replace(unterminatedQuotedNamedValue, (match, name, separator, doubleQuotedValue, singleQuotedValue) => {
+      const doubleQuoted = doubleQuotedValue !== undefined;
+      const quote = doubleQuoted ? '"' : "'";
+      const quotedValue = doubleQuoted ? doubleQuotedValue : singleQuotedValue;
+      return shouldRedact(name, quotedValue) ? `${name}${separator}${quote}[REDACTED]` : match;
+    })
     .replace(unquotedNamedValue, (match, name, separator, unquotedValue) =>
       shouldRedact(name, unquotedValue) ? `${name}${separator}[REDACTED]` : match,
     )

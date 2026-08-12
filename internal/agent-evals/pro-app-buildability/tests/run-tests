@@ -775,6 +775,37 @@ if "$eval_dir/bin/scan-sensitive-artifacts" "$tmp/unclosed-structured-perl-safe"
   echo "final scanner rejected fail-closed unclosed structured redaction" >&2
   exit 1
 fi
+
+# The template expression is evaluated by Node, not the shell.
+# shellcheck disable=SC2016
+node -e \
+  'const fs = require("node:fs"); fs.writeFileSync(process.argv[1], `ordinary:"${"\\a".repeat(100000)}`);' \
+  "$tmp/unterminated-escape-unsafe"
+"$timeout_command" 3 perl "$eval_dir/bin/sanitize-events.pl" \
+  "$tmp/unterminated-escape-unsafe" >"$tmp/unterminated-escape-perl-safe"
+cmp "$tmp/unterminated-escape-unsafe" "$tmp/unterminated-escape-perl-safe"
+"$timeout_command" 3 node --input-type=module -e \
+  'import fs from "node:fs"; import { pathToFileURL } from "node:url";
+   const [helper, input] = process.argv.slice(1);
+   const { redactSensitiveValues } = await import(pathToFileURL(helper));
+   process.stdout.write(redactSensitiveValues(fs.readFileSync(input, "utf8")));' \
+  "$eval_dir/bin/sensitive-values.mjs" "$tmp/unterminated-escape-unsafe" \
+  >"$tmp/unterminated-escape-js-safe"
+cmp "$tmp/unterminated-escape-unsafe" "$tmp/unterminated-escape-js-safe"
+
+printf '%s' $'api_key:"synthetic\\' >"$tmp/trailing-escape-unsafe"
+perl "$eval_dir/bin/sanitize-events.pl" "$tmp/trailing-escape-unsafe" \
+  >"$tmp/trailing-escape-perl-safe"
+node --input-type=module -e \
+  'import fs from "node:fs"; import { pathToFileURL } from "node:url";
+   const [helper, input] = process.argv.slice(1);
+   const { redactSensitiveValues } = await import(pathToFileURL(helper));
+   process.stdout.write(redactSensitiveValues(fs.readFileSync(input, "utf8")));' \
+  "$eval_dir/bin/sensitive-values.mjs" "$tmp/trailing-escape-unsafe" \
+  >"$tmp/trailing-escape-js-safe"
+cmp "$tmp/trailing-escape-perl-safe" "$tmp/trailing-escape-js-safe"
+test "$(cat "$tmp/trailing-escape-perl-safe")" = 'api_key:"[REDACTED]'
+
 rg -q 'credential_store:"file"' "$tmp/parity-perl-safe"
 "$eval_dir/bin/scan-sensitive-artifacts" "$tmp/parity-unsafe" >/dev/null
 if "$eval_dir/bin/scan-sensitive-artifacts" "$tmp/parity-perl-safe" >/dev/null; then
