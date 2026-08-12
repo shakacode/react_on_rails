@@ -345,6 +345,18 @@ assert_credential_absent() {
     "$eval_dir/bin/assert-brokered-credential-absent" "${scan_args[@]}"
 }
 
+scan_evidence_for_sensitive_artifacts() {
+  local evidence_directory="$1"
+  local sensitive_scan_exit=0
+  "$eval_dir/bin/scan-sensitive-artifacts" "$evidence_directory" >/dev/null 2>&1 ||
+    sensitive_scan_exit=$?
+  case "$sensitive_scan_exit" in
+    0) echo "sensitive-artifact scan rejected evidence" >&2; return 1 ;;
+    1) return 0 ;;
+    *) echo "sensitive-artifact scan failed" >&2; return 1 ;;
+  esac
+}
+
 probe_timeout_seconds="$timeout_seconds"
 ((probe_timeout_seconds > 120)) && probe_timeout_seconds=120
 maximum_agent_call_wall_clock_seconds=$((probe_timeout_seconds + timeout_seconds +
@@ -449,6 +461,10 @@ else
     '{status:"blocked",summary:$reason,commands:[],checks:[],friction:[$reason],human_interventions:0,blockers:[$reason]}' \
     >"$agent_report_file"
 fi
+sanitized_agent_report_file="$private_dir/agent-report.sanitized.json"
+"${minimal_env[@]}" "EVAL_HARNESS_DEPENDENCY_ROOT=$dependency_root" node \
+  "$eval_dir/bin/sanitize-agent-report.mjs" "$agent_report_file" "$sanitized_agent_report_file"
+mv "$sanitized_agent_report_file" "$agent_report_file"
 remove_agent_state
 
 evidence_dir="$private_dir/evidence"
@@ -512,6 +528,7 @@ checksum_files="$private_dir/checksum-files"
 if [[ "$auth_material_available" == true ]]; then
   assert_credential_absent "$evidence_dir"
 fi
+scan_evidence_for_sensitive_artifacts "$evidence_dir"
 
 "$eval_dir/bin/assert-agent-call-contained" "$output"
 mkdir -m 700 "$output"

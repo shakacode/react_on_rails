@@ -1089,6 +1089,131 @@ scanner_entries_exit=$?
 set -e
 test "$scanner_entries_exit" = 2
 
+cat >"$tmp/agent-report-sensitive-phrasing.json" <<'EOF'
+{
+  "status": "completed",
+  "summary": "Completed without any credentials: the generated app uses only public package metadata.",
+  "commands": [
+    "authorization: synthetic-sensitive-value",
+    "credential_store: file",
+    "already safe: [REDACTED]"
+  ],
+  "checks": [
+    {"command": "bin/rails test", "exit_code": 0, "result": "pass"}
+  ],
+  "friction": ["token: synthetic-sensitive-value"],
+  "human_interventions": 0,
+  "blockers": []
+}
+EOF
+"$eval_dir/bin/scan-sensitive-artifacts" "$tmp/agent-report-sensitive-phrasing.json" >/dev/null
+node "$eval_dir/bin/sanitize-agent-report.mjs" \
+  "$tmp/agent-report-sensitive-phrasing.json" "$tmp/agent-report-sensitive-phrasing.safe.json"
+set +e
+"$eval_dir/bin/scan-sensitive-artifacts" "$tmp/agent-report-sensitive-phrasing.safe.json" >/dev/null
+agent_report_safe_scan_exit=$?
+set -e
+test "$agent_report_safe_scan_exit" = 1
+jq -e '
+  .summary == "Completed without any credentials: [REDACTED]" and
+  .commands[0] == "authorization: [REDACTED]" and
+  .commands[1] == "credential_store: file" and
+  .commands[2] == "already safe: [REDACTED]" and
+  .friction[0] == "token: [REDACTED]" and
+  .checks[0].exit_code == 0 and
+  .human_interventions == 0
+' "$tmp/agent-report-sensitive-phrasing.safe.json" >/dev/null
+jq -S 'walk(if type == "string" then "<STRING>" else . end)' \
+  "$tmp/agent-report-sensitive-phrasing.json" >"$tmp/agent-report-sensitive-phrasing.shape"
+jq -S 'walk(if type == "string" then "<STRING>" else . end)' \
+  "$tmp/agent-report-sensitive-phrasing.safe.json" >"$tmp/agent-report-sensitive-phrasing.safe.shape"
+cmp "$tmp/agent-report-sensitive-phrasing.shape" "$tmp/agent-report-sensitive-phrasing.safe.shape"
+node "$eval_dir/bin/sanitize-agent-report.mjs" \
+  "$tmp/agent-report-sensitive-phrasing.safe.json" "$tmp/agent-report-sensitive-phrasing.safe-twice.json"
+cmp "$tmp/agent-report-sensitive-phrasing.safe.json" \
+  "$tmp/agent-report-sensitive-phrasing.safe-twice.json"
+test "$(node -e 'process.stdout.write((require("node:fs").statSync(process.argv[1]).mode & 0o777).toString(8))' \
+  "$tmp/agent-report-sensitive-phrasing.safe.json")" = 600
+agent_report_safe_path="$(SAFE_PATH_SOURCE="$PATH" BASH_ENV=/dev/null \
+  "$eval_dir/bin/build-safe-path" env node sh)"
+env -i PATH="$agent_report_safe_path" HOME="$tmp" TMPDIR="$tmp" LANG=C LC_ALL=C \
+  SHELL=/bin/sh CODEX_EVAL=1 EVAL_HARNESS_DEPENDENCY_ROOT="$eval_dir" \
+  node "$eval_dir/bin/sanitize-agent-report.mjs" \
+  "$tmp/agent-report-sensitive-phrasing.safe.json" "$tmp/agent-report-env-i.json"
+cmp "$tmp/agent-report-sensitive-phrasing.safe.json" "$tmp/agent-report-env-i.json"
+
+printf '%s' '{"status":' >"$tmp/agent-report-malformed.json"
+perl -e 'print "\xFF"' >"$tmp/agent-report-invalid-utf8.json"
+printf '%s\n' '[]' >"$tmp/agent-report-non-object.json"
+printf '%s\n' \
+  '{"status":"completed","summary":"done","commands":[],"checks":[],"friction":[],"human_interventions":"0","blockers":[]}' \
+  >"$tmp/agent-report-invalid-schema.json"
+head -c 1048577 /dev/zero >"$tmp/agent-report-oversized.json"
+node -e \
+  'const fs = require("node:fs"); let value = "safe";
+   for (let depth = 0; depth < 65; depth += 1) value = {nested:value};
+   fs.writeFileSync(process.argv[1], JSON.stringify(value));' \
+  "$tmp/agent-report-over-depth.json"
+node -e \
+  'const fs = require("node:fs"); const report = {status:"completed",summary:"done",
+   commands:Array(50000).fill("safe"),checks:[],friction:[],human_interventions:0,blockers:[]};
+   fs.writeFileSync(process.argv[1], JSON.stringify(report));' \
+  "$tmp/agent-report-over-nodes.json"
+node -e \
+  'const fs = require("node:fs"); const report = {status:"completed",summary:"done",
+   commands:Array(49990).fill("password:x"),checks:[],friction:[],human_interventions:0,blockers:[]};
+   fs.writeFileSync(process.argv[1], JSON.stringify(report));' \
+  "$tmp/agent-report-output-oversized.json"
+agent_report_failure_inputs=(
+  malformed
+  invalid-utf8
+  non-object
+  invalid-schema
+  oversized
+  over-depth
+  over-nodes
+  output-oversized
+)
+for failure_case in "${agent_report_failure_inputs[@]}"; do
+  failure_output="$tmp/agent-report-$failure_case.safe.json"
+  if node "$eval_dir/bin/sanitize-agent-report.mjs" "$tmp/agent-report-$failure_case.json" \
+    "$failure_output" 2>"$tmp/agent-report-$failure_case.error"; then
+    echo "agent-report sanitizer accepted invalid $failure_case input" >&2
+    exit 1
+  fi
+  test ! -e "$failure_output"
+  rg -q '^agent report sanitization failed:' "$tmp/agent-report-$failure_case.error"
+  if rg -Fq "$tmp/" "$tmp/agent-report-$failure_case.error"; then
+    echo "agent-report sanitizer exposed a private path" >&2
+    exit 1
+  fi
+done
+rg -q '^agent report sanitization failed: malformed JSON$' \
+  "$tmp/agent-report-malformed.error" "$tmp/agent-report-invalid-utf8.error"
+rg -q '^agent report sanitization failed: top level must be a plain object$' \
+  "$tmp/agent-report-non-object.error"
+rg -q '^agent report sanitization failed: sanitized report does not match schema$' \
+  "$tmp/agent-report-invalid-schema.error"
+rg -q '^agent report sanitization failed: input exceeds 1048576-byte limit$' \
+  "$tmp/agent-report-oversized.error"
+rg -q '^agent report sanitization failed: JSON depth exceeds 64$' \
+  "$tmp/agent-report-over-depth.error"
+rg -q '^agent report sanitization failed: JSON nodes exceed 50000$' \
+  "$tmp/agent-report-over-nodes.error"
+rg -q '^agent report sanitization failed: output exceeds 1048576-byte limit$' \
+  "$tmp/agent-report-output-oversized.error"
+
+printf '%s\n' 'existing-output-sentinel' >"$tmp/agent-report-existing-output.json"
+if node "$eval_dir/bin/sanitize-agent-report.mjs" \
+  "$tmp/agent-report-sensitive-phrasing.json" "$tmp/agent-report-existing-output.json" \
+  2>"$tmp/agent-report-existing-output.error"; then
+  echo "agent-report sanitizer overwrote an existing output" >&2
+  exit 1
+fi
+test "$(<"$tmp/agent-report-existing-output.json")" = existing-output-sentinel
+rg -q '^agent report sanitization failed: output already exists$' \
+  "$tmp/agent-report-existing-output.error"
+
 head -c 1048577 /dev/zero >"$tmp/oversized-raw-events"
 if perl "$eval_dir/bin/sanitize-events.pl" "$tmp/oversized-raw-events" \
   >"$tmp/oversized-raw-events.safe" 2>"$tmp/oversized-raw-events.stderr"; then
@@ -1166,11 +1291,90 @@ rg -Fq 'assert_credential_absent "$workspace" --skip-symlinks' "$eval_dir/bin/ru
 rg -Fq 'credential_snapshot=' "$eval_dir/bin/run-eval"
 rg -Fq 'assert-brokered-credential-absent' "$eval_dir/bin/run-eval"
 rg -Fq 'assert_credential_absent' "$eval_dir/bin/run-eval"
+rg -Fq 'sanitize-agent-report.mjs" "$agent_report_file" "$sanitized_agent_report_file"' \
+  "$eval_dir/bin/run-eval"
+rg -Fq 'mv "$sanitized_agent_report_file" "$agent_report_file"' "$eval_dir/bin/run-eval"
+agent_report_sanitizer_line="$(rg -Fn \
+  'sanitize-agent-report.mjs" "$agent_report_file" "$sanitized_agent_report_file"' \
+  "$eval_dir/bin/run-eval" | cut -d: -f1)"
+test "$agent_report_sanitizer_line" -lt \
+  "$(rg -Fn 'mv "$sanitized_agent_report_file" "$agent_report_file"' \
+    "$eval_dir/bin/run-eval" | cut -d: -f1)"
+test "$agent_report_sanitizer_line" -lt \
+  "$(rg -Fn 'cp "$agent_report_file" "$evidence_dir/agent-report.json"' \
+    "$eval_dir/bin/run-eval" | cut -d: -f1)"
 rg -q '^output_publishable=false$' "$eval_dir/bin/run-eval"
 rg -Fq '[[ "$output_publishable" == false && ( -e "$output" || -L "$output" ) ]]' \
   "$eval_dir/bin/run-eval"
 test "$(rg -Fn 'assert_credential_absent "$output"' "$eval_dir/bin/run-eval" | cut -d: -f1)" -lt \
   "$(rg -n '^output_publishable=true$' "$eval_dir/bin/run-eval" | cut -d: -f1)"
+final_sensitive_scan_line="$(rg -Fn 'scan_evidence_for_sensitive_artifacts "$evidence_dir"' \
+  "$eval_dir/bin/run-eval" | cut -d: -f1)"
+test -n "$final_sensitive_scan_line"
+test "$(rg -Fc 'scan_evidence_for_sensitive_artifacts "$evidence_dir"' \
+  "$eval_dir/bin/run-eval")" -eq 1
+test "$final_sensitive_scan_line" -gt \
+  "$(rg -Fn 'shasum -a 256 "$file"; done <"$checksum_files" >SHA256SUMS' \
+    "$eval_dir/bin/run-eval" | cut -d: -f1)"
+test "$final_sensitive_scan_line" -gt \
+  "$(rg -Fn 'validate-evidence-entries" "$evidence_dir"' \
+    "$eval_dir/bin/run-eval" | cut -d: -f1)"
+test "$final_sensitive_scan_line" -gt \
+  "$(rg -Fn 'assert_credential_absent "$evidence_dir"' "$eval_dir/bin/run-eval" | cut -d: -f1)"
+test "$final_sensitive_scan_line" -lt \
+  "$(rg -Fn 'mkdir -m 700 "$output"' "$eval_dir/bin/run-eval" | cut -d: -f1)"
+test "$final_sensitive_scan_line" -lt \
+  "$(rg -n '^output_publishable=true$' "$eval_dir/bin/run-eval" | cut -d: -f1)"
+rg -Fq 'scan-sensitive-artifacts" "$evidence_directory" >/dev/null 2>&1' \
+  "$eval_dir/bin/run-eval"
+rg -Fq '0) echo "sensitive-artifact scan rejected evidence" >&2; return 1 ;;' \
+  "$eval_dir/bin/run-eval"
+rg -Fq '1) return 0 ;;' "$eval_dir/bin/run-eval"
+rg -Fq '*) echo "sensitive-artifact scan failed" >&2; return 1 ;;' \
+  "$eval_dir/bin/run-eval"
+awk '/^scan_evidence_for_sensitive_artifacts\(\)/ { copying = 1 }
+  copying { print }
+  copying && /^}$/ { exit }' "$eval_dir/bin/run-eval" >"$tmp/sensitive-publication-gate"
+bash -c 'set -euo pipefail
+  eval_dir="$1"
+  source "$2"
+  scan_evidence_for_sensitive_artifacts "$3"' \
+  _ "$eval_dir" "$tmp/sensitive-publication-gate" \
+  "$tmp/agent-report-sensitive-phrasing.safe.json"
+if bash -c 'set -euo pipefail
+  eval_dir="$1"
+  source "$2"
+  scan_evidence_for_sensitive_artifacts "$3"
+  mkdir -m 700 "$4"' \
+  _ "$eval_dir" "$tmp/sensitive-publication-gate" \
+  "$tmp/agent-report-sensitive-phrasing.json" "$tmp/rejected-publication-output" \
+  >"$tmp/sensitive-publication-gate.output" 2>"$tmp/sensitive-publication-gate.error"; then
+  echo "sensitive evidence passed the publication gate" >&2
+  exit 1
+fi
+test ! -e "$tmp/rejected-publication-output"
+test ! -s "$tmp/sensitive-publication-gate.output"
+test "$(<"$tmp/sensitive-publication-gate.error")" = \
+  'sensitive-artifact scan rejected evidence'
+if rg -Fq "$tmp/" "$tmp/sensitive-publication-gate.error"; then
+  echo "sensitive publication rejection exposed a private path" >&2
+  exit 1
+fi
+if bash -c 'set -euo pipefail
+  eval_dir="$1"
+  source "$2"
+  scan_evidence_for_sensitive_artifacts "$3"' \
+  _ "$eval_dir" "$tmp/sensitive-publication-gate" "$tmp/scanner-malformed.json" \
+  >"$tmp/failed-publication-gate.output" 2>"$tmp/failed-publication-gate.error"; then
+  echo "failed sensitive scanner passed the publication gate" >&2
+  exit 1
+fi
+test ! -s "$tmp/failed-publication-gate.output"
+test "$(<"$tmp/failed-publication-gate.error")" = 'sensitive-artifact scan failed'
+if rg -Fq "$tmp/" "$tmp/failed-publication-gate.error"; then
+  echo "sensitive scanner failure exposed a private path" >&2
+  exit 1
+fi
 test "$(rg -n '^evidence_dir=' "$eval_dir/bin/run-eval" | cut -d: -f1)" -gt \
   "$(rg -Fn 'run_agent "$eval_dir/prompt.md"' "$eval_dir/bin/run-eval" | cut -d: -f1)"
 test "$(rg -Fc '"$eval_dir/bin/assert-agent-call-contained" "$output"' \
