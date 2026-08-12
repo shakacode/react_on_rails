@@ -147,6 +147,50 @@ const unwrapShellCommand = (command) => {
   return (match?.[2] ?? command).trim();
 };
 const isHelpOrVersion = (command) => /(?:^|\s)(?:--help|--version|-h|-V)(?:\s|$)/.test(command);
+const boundedLogPipeline =
+  /^(.*\S)\s+2>&1\s*\|\s*tee\s+(?:--\s+)?(?:"(?:[A-Za-z0-9_./-]|\$(?:[A-Za-z_][A-Za-z0-9_]*|\{[A-Za-z_][A-Za-z0-9_]*\}))*"|'[A-Za-z0-9_./${}-]+'|[A-Za-z0-9_./${}-]+)\s*\|\s*tail\s+(?:-n\s+|-)([1-9][0-9]{0,4})$/;
+const stripBoundedLogPipeline = (line) => {
+  const match = line.match(boundedLogPipeline);
+  if (!match || Number(match[2]) > 1000) return line;
+  return match[1];
+};
+const executableShellLines = (command) => {
+  const invocation = unwrapShellCommand(command);
+  if (invocation.includes('<<')) return [];
+
+  const executableLines = [];
+  let quote = null;
+  let continuedFromPrevious = false;
+  for (const physicalLine of invocation.split(/\r?\n/)) {
+    const startedInsideSyntax = quote !== null || continuedFromPrevious;
+    let escaped = false;
+    let commentAt = physicalLine.length;
+    for (let index = 0; index < physicalLine.length; index += 1) {
+      const character = physicalLine[index];
+      if (quote !== null) {
+        if (quote !== "'" && escaped) escaped = false;
+        else if (quote !== "'" && character === '\\') escaped = true;
+        else if (character === quote) quote = null;
+      } else if (escaped) {
+        escaped = false;
+      } else if (character === '\\') {
+        escaped = true;
+      } else if (character === '"' || character === "'") {
+        quote = character;
+      } else if (character === '#' && (index === 0 || /\s/.test(physicalLine[index - 1]))) {
+        commentAt = index;
+        break;
+      }
+    }
+    const continuedToNext = quote !== "'" && escaped;
+    if (!startedInsideSyntax && quote === null && !continuedToNext) {
+      const candidate = physicalLine.slice(0, commentAt).trim();
+      if (candidate) executableLines.push(stripBoundedLogPipeline(candidate));
+    }
+    continuedFromPrevious = continuedToNext;
+  }
+  return executableLines;
+};
 
 const rubyProManifests = matchingArtifacts(/Gemfile$/, /react_on_rails_pro/);
 const jsProManifests = matchingArtifacts(/package\.json$/, /react-on-rails-pro/);
@@ -167,10 +211,12 @@ if (evalAppPackageManifest) {
   }
 }
 const installCommands = successfulCommands.filter((command) => {
-  const invocation = unwrapShellCommand(command.command);
-  if (isHelpOrVersion(invocation)) return false;
-  return /^(?:npx(?: --yes)?|npm exec|pnpm dlx) create-react-on-rails-app(?:@[^\s]+)? [A-Za-z0-9][A-Za-z0-9._-]*(?:\s+[^;&|]+)?$/.test(
-    invocation,
+  return executableShellLines(command.command).some(
+    (invocation) =>
+      !isHelpOrVersion(invocation) &&
+      /^(?:npx(?: --yes)?|npm exec|pnpm dlx) create-react-on-rails-app(?:@[^\s]+)? [A-Za-z0-9][A-Za-z0-9._-]*(?:\s+[^;&|]+)?$/.test(
+        invocation,
+      ),
   );
 });
 const rscRoutes = matchingArtifacts(/config\/routes\.rb$/, /rsc|server_component|server-component/i);
@@ -183,23 +229,44 @@ const validationControllers = matchingArtifacts(
   /app\/controllers\/.*\.rb$/,
   /unprocessable_entity|unprocessable_content|errors/,
 );
-const pageTests = matchingArtifacts(
-  /(?:spec|test)\/.*(?:page|rsc).*(?:_spec\.rb|_test\.rb|\.(?:test|spec)\.[jt]sx?)$/i,
-  /expect|assert|test\s|it\s/,
-);
-const formTests = matchingArtifacts(
-  /(?:spec|test)\/(?:(?:.*\/)?integration\/.*|.*(?:form|request|system).*)(?:_spec\.rb|_test\.rb|\.(?:test|spec)\.[jt]sx?)$/i,
-  /invalid[\s\S]*valid|valid[\s\S]*invalid/i,
-);
+const pageTests = artifacts.filter((artifact) => {
+  const testContent = /expect|assert|test\s|it\s/.test(artifact.excerpt);
+  const namedPageTest =
+    /(?:spec|test)\/.*(?:page|rsc).*(?:_spec\.rb|_test\.rb|\.(?:test|spec)\.[jt]sx?)$/i.test(artifact.path);
+  const uncommentedRuby = artifact.excerpt.replace(/^\s*#.*$/gm, '');
+  const semanticRscIntegrationTest =
+    /(?:spec|test)\/integration\/.*(?:_spec\.rb|_test\.rb)$/i.test(artifact.path) &&
+    /^\s*(?:test|it)\s+["'][^"'\r\n]*(?:react server component|server-provided data)[^"'\r\n]*["']/im.test(
+      uncommentedRuby,
+    ) &&
+    /^\s*(?:get|visit)(?:\s+|\()[^\r\n]+/m.test(uncommentedRuby) &&
+    /^\s*(?:assert\w*|expect)(?:\s|\()/m.test(uncommentedRuby);
+  return testContent && (namedPageTest || semanticRscIntegrationTest);
+});
+const formTests = artifacts.filter((artifact) => {
+  const bothOutcomes = /invalid[\s\S]*valid|valid[\s\S]*invalid/i.test(artifact.excerpt);
+  const categorizedFormTest =
+    /(?:spec|test)\/(?:(?:.*\/)?integration\/.*|.*(?:form|request|system).*)(?:_spec\.rb|_test\.rb|\.(?:test|spec)\.[jt]sx?)$/i.test(
+      artifact.path,
+    );
+  const uncommentedRuby = artifact.excerpt.replace(/^\s*#.*$/gm, '');
+  const controllerIntegrationTest =
+    /test\/controllers\/.*_test\.rb$/i.test(artifact.path) &&
+    /^\s*class\s+[A-Za-z_][A-Za-z0-9_:]*\s*<\s*ActionDispatch::IntegrationTest\b/m.test(uncommentedRuby) &&
+    /invalid[\s\S]*valid|valid[\s\S]*invalid/i.test(uncommentedRuby);
+  return (bothOutcomes && categorizedFormTest) || controllerIntegrationTest;
+});
 const plainManifestBuildInvocation = (invocation) =>
   manifestBackedProductionBuild && /^(?:npm|pnpm) run build$/i.test(invocation);
 const buildCommands = successfulCommands.filter((command) => {
-  const invocation = unwrapShellCommand(command.command);
-  if (isHelpOrVersion(invocation)) return false;
-  const allowedInvocation =
-    /^(?:(?:RAILS_ENV|NODE_ENV)=production\s+)?(?:(?:bin\/rails|bundle exec rails|bundle exec rake|rake) assets:precompile|(?:bin\/shakapacker|bundle exec rake shakapacker:compile)|(?:npm|pnpm) run build:production)$/i.test(
-      invocation,
-    ) || plainManifestBuildInvocation(invocation);
+  const allowedInvocation = executableShellLines(command.command).some(
+    (invocation) =>
+      !isHelpOrVersion(invocation) &&
+      (/^(?:(?:RAILS_ENV|NODE_ENV)=production\s+)?(?:(?:bin\/rails|bundle exec rails|bundle exec rake|rake) assets:precompile|(?:bin\/shakapacker|bundle exec rake shakapacker:compile)|(?:npm|pnpm) run build:production)$/i.test(
+        invocation,
+      ) ||
+        plainManifestBuildInvocation(invocation)),
+  );
   const buildResult =
     /compiled|compilation (?:complete|successful)|built successfully|assets? (?:written|built)|webpack compiled|rspack compiled/i.test(
       command.output,
@@ -208,7 +275,7 @@ const buildCommands = successfulCommands.filter((command) => {
   return allowedInvocation && buildResult && !helpOutput;
 });
 const manifestBackedBuildCommands = buildCommands.filter((command) =>
-  plainManifestBuildInvocation(unwrapShellCommand(command.command)),
+  executableShellLines(command.command).some(plainManifestBuildInvocation),
 );
 const testCommands = successfulOutcome(
   /rspec|rails test|rake test|npm (?:run )?test|pnpm (?:run )?test|jest|playwright/i,
@@ -252,14 +319,14 @@ const formTestCommands = testCommandsFor(formTests);
 
 const installProPassed =
   rubyProManifests.length > 0 && jsProManifests.length > 0 && installCommands.length > 0;
-const rscRoutePassed = rscRoutes.length > 0 && rscSources.length > 0 && pageTestCommands.length > 0;
+const pageTestsPassed = pageTests.length > 0 && pageTestCommands.length > 0;
+const formTestsPassed = formTests.length > 0 && formTestCommands.length > 0;
+const rscRoutePassed = rscRoutes.length > 0 && rscSources.length > 0 && pageTestsPassed;
 const formValidationPassed =
   validationModels.length > 0 &&
   validationControllers.length > 0 &&
   formTests.length > 0 &&
   formTestCommands.length > 0;
-const pageTestsPassed = pageTests.length > 0 && pageTestCommands.length > 0;
-const formTestsPassed = formTests.length > 0 && formTestCommands.length > 0;
 
 const outcomeRows = [
   {
