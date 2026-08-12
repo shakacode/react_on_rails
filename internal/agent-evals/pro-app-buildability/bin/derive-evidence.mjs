@@ -193,14 +193,15 @@ const inlineBuildMarkerTarget = (lines, output) => {
 const inlineColonBuildMarkerTarget = (lines, output) => {
   if (lines.length !== 1) return null;
   const match = lines[0].match(
-    /^(npm run build) > <LOCAL_PATH> 2>&1;\s*echo "([A-Z][A-Z0-9_]*): \$\?";\s*tail\s+(?:-n\s+|-)([1-9][0-9]{0,4})\s+<LOCAL_PATH>$/,
+    /^(npm run build) > <LOCAL_PATH> 2>&1;\s*echo "([A-Z][A-Z0-9_]*):( ?)\$\?";\s*tail\s+(?:-n\s+|-)([1-9][0-9]{0,4})\s+<LOCAL_PATH>$/,
   );
-  if (!match || Number(match[3]) > 1000) return null;
+  if (!match || Number(match[4]) > 1000) return null;
 
   const markerName = match[2];
-  const markerPattern = new RegExp(`^${markerName}: -?[0-9]+$`);
+  const markerSpacing = match[3];
+  const markerPattern = new RegExp(`^${markerName}:${markerSpacing}-?[0-9]+$`);
   const markers = output.split(/\r?\n/).filter((line) => markerPattern.test(line));
-  return markers.length === 1 && markers[0] === `${markerName}: 0` ? match[1] : null;
+  return markers.length === 1 && markers[0] === `${markerName}:${markerSpacing}0` ? match[1] : null;
 };
 const isolatedProductionBuildTarget = (lines, output) => {
   if (
