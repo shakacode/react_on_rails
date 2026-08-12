@@ -12,7 +12,9 @@ const evidence = JSON.parse(fs.readFileSync(evidencePath, 'utf8'));
 const commands = new Map(evidence.commands.map((command) => [command.id, command]));
 const unwrapShellCommand = (command) => {
   const match = command.match(/^\/(?:usr\/)?bin\/(?:zsh|bash|sh) -lc (['"])([\s\S]*)\1$/);
-  return (match?.[2] ?? command).trim();
+  if (!match) return command.trim();
+
+  return match[2].replaceAll(`'"'"'`, "'").trim();
 };
 const requiredCommand = {
   npm: 'npm view create-react-on-rails-app version --json',
