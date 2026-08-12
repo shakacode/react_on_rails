@@ -147,14 +147,27 @@ const unwrapShellCommand = (command) => {
 const isHelpOrVersion = (command) => /(?:^|\s)(?:--help|--version|-h|-V)(?:\s|$)/.test(command);
 const boundedLogPipeline =
   /^(.*\S)\s+2>&1\s*\|\s*tee\s+(?:--\s+)?(?:"<LOCAL_PATH>"|'<LOCAL_PATH>'|<LOCAL_PATH>|<LOCAL_PATH>\/\.ror-eval-state\/create-app\.log|"(?:[A-Za-z0-9_./-]|\$(?:[A-Za-z_][A-Za-z0-9_]*|\{[A-Za-z_][A-Za-z0-9_]*\}))*"|'[A-Za-z0-9_./${}-]+'|[A-Za-z0-9_./${}-]+)\s*\|\s*tail\s+(?:-n\s+|-)([1-9][0-9]{0,4})$/;
+const completedScaffoldLogPipeline =
+  /^(.*\S)\s+2>&1\s*\|\s*tee\s+(?:--\s+)?(?:"<LOCAL_PATH>"|'<LOCAL_PATH>'|<LOCAL_PATH>|<LOCAL_PATH>\/\.create-app\.log|<LOCAL_PATH>\/\.ror-eval-state\/create-app\.log|"(?:[A-Za-z0-9_./-]|\$(?:[A-Za-z_][A-Za-z0-9_]*|\{[A-Za-z_][A-Za-z0-9_]*\}))*"|'[A-Za-z0-9_./${}-]+'|[A-Za-z0-9_./${}-]+)\s*\|\s*tail\s+(?:-n\s+|-)([1-9][0-9]{0,4})$/;
 const safeOutputRedirection = /^(.*\S)\s+>\s+(?:"<LOCAL_PATH>"|'<LOCAL_PATH>'|<LOCAL_PATH>)\s+2>&1$/;
 const boundedPlaceholderTail =
   /^tail\s+(?:-n\s+|-)([1-9][0-9]{0,4})\s+(?:"<LOCAL_PATH>"|'<LOCAL_PATH>'|<LOCAL_PATH>)$/;
 const boundedTailPipeline = /^(.*\S)\s+2>&1\s*\|\s*tail\s+(?:-n\s+|-)([1-9][0-9]{0,4})$/;
-const stripSanitizedSetup = (lines) =>
-  lines[0] === 'source <LOCAL_PATH>/.ror-eval-state/pgenv.sh' ? lines.slice(1) : lines;
-const stripSanitizedWorkingDirectory = (lines) =>
-  lines.length > 1 && /^cd <LOCAL_PATH>(?:\/eval_app)?$/.test(lines[0]) ? lines.slice(1) : lines;
+const normalizedSetupLines = [
+  'source <LOCAL_PATH>/.ror-eval-state/pgenv.sh',
+  'export HOME=<LOCAL_PATH>/runner-home',
+  'export PGHOST=<LOCAL_PATH>/.pgsocket PGPORT=5433 PGUSER=postgres',
+];
+const stripSanitizedSetupPrefix = (lines) => {
+  let cursor = 0;
+  for (const setupLine of normalizedSetupLines) {
+    if (lines[cursor] === setupLine) cursor += 1;
+  }
+  if (cursor < lines.length - 1 && /^cd <LOCAL_PATH>(?:\/eval_app)?$/.test(lines[cursor])) {
+    cursor += 1;
+  }
+  return lines.slice(cursor);
+};
 const exactBuildMarkerProof = (lines, targetIndex, output) => {
   const tailMatch = lines[targetIndex + 2]?.match(boundedPlaceholderTail);
   const markers = output.split(/\r?\n/).filter((line) => /^BUILD_EXIT_CODE=-?[0-9]+$/.test(line));
@@ -207,7 +220,7 @@ const isolatedProductionBuildTarget = (lines, output) => {
   if (
     lines.length !== 4 ||
     lines[0] !==
-      'RAILS_ENV=production NODE_ENV=production SECRET_KEY_BASE=$(bin/rails secret) npm run build > <LOCAL_PATH>/.ror-eval-state/prod-build.log 2>&1' ||
+      'RAILS_ENV=production NODE_ENV=production SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>" npm run build > <LOCAL_PATH>/.ror-eval-state/prod-build.log 2>&1' ||
     lines[1] !== 'echo "EXIT CODE: $?"' ||
     lines[3] !== 'ls public/packs/js | head -20'
   ) {
@@ -221,6 +234,10 @@ const isolatedProductionBuildTarget = (lines, output) => {
     ? 'npm run build'
     : null;
 };
+const directRuntimeProductionBuildTarget = (lines) =>
+  lines.length === 1 && lines[0] === 'SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>" npm run build'
+    ? 'npm run build'
+    : null;
 const completedScaffoldOutput = (output) => {
   const lines = output.split(/\r?\n/).map((line) => line.trim());
   const created = lines.filter((line) => line === 'Created eval_app with React on Rails!');
@@ -239,6 +256,8 @@ const stripBoundedTimeoutPrefix = (line) => {
   return match[2];
 };
 const stripScaffoldTimePrefix = (line) => (line.startsWith('time ') ? line.slice(5) : line);
+const stripScaffoldNodeVersionPrefix = (line) =>
+  line.startsWith('node -v; ') ? line.slice('node -v; '.length) : line;
 const topLevelShellLines = (command) => {
   const invocation = unwrapShellCommand(command);
   if (invocation.includes('<<')) return [];
@@ -276,8 +295,7 @@ const topLevelShellLines = (command) => {
   }
   return executableLines;
 };
-const normalizedEvidenceLines = (command) =>
-  stripSanitizedWorkingDirectory(stripSanitizedSetup(topLevelShellLines(command)));
+const normalizedEvidenceLines = (command) => stripSanitizedSetupPrefix(topLevelShellLines(command));
 const pipefailPipelineTargets = (lines) =>
   lines.flatMap((line, index) => {
     const pipelineMatch = line.match(boundedLogPipeline);
@@ -289,9 +307,9 @@ const installEvidenceTargets = (command) => {
   const pipefailTargets = pipefailPipelineTargets(lines);
   const completionBackedTarget = (() => {
     if (lines.length !== 1 || !completedScaffoldOutput(command.output)) return [];
-    const pipelineMatch = lines[0].match(boundedLogPipeline);
+    const pipelineMatch = lines[0].match(completedScaffoldLogPipeline);
     return pipelineMatch && Number(pipelineMatch[2]) <= 1000
-      ? [stripScaffoldTimePrefix(pipelineMatch[1])]
+      ? [stripScaffoldNodeVersionPrefix(stripScaffoldTimePrefix(pipelineMatch[1]))]
       : [];
   })();
   const directTargets = lines.length === 1 && !/[;&|<>]/.test(lines[0]) ? lines : [];
@@ -309,6 +327,8 @@ const buildEvidenceTargets = (command) => {
   if (inlineColonTarget) targets.push(inlineColonTarget);
   const isolatedProductionTarget = isolatedProductionBuildTarget(lines, command.output);
   if (isolatedProductionTarget) targets.push(isolatedProductionTarget);
+  const directRuntimeProductionTarget = directRuntimeProductionBuildTarget(lines);
+  if (directRuntimeProductionTarget) targets.push(directRuntimeProductionTarget);
   for (const [index, line] of lines.entries()) {
     const redirectionMatch = line.match(safeOutputRedirection);
     if (

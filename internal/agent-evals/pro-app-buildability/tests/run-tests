@@ -2993,10 +2993,8 @@ mkdir "$tmp/claude-v6-build-output"
 node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-build-events.jsonl" \
   "$tmp/claude-v6-workspace" "$tmp/claude-v6-build-output" \
   "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
-# Runtime-generated secret expressions are canonicalized before evidence derivation.
-# Keep the old classifier fail closed until its exact placeholder matcher is updated separately.
 test "$(jq -r '.items[] | select(.id == "build.production") | .status' \
-  "$tmp/claude-v6-build-output/rubric-results.json")" = unknown
+  "$tmp/claude-v6-build-output/rubric-results.json")" = pass
 
 claude_v6_test_command=$'source <LOCAL_PATH>/.ror-eval-state/pgenv.sh\ncd <LOCAL_PATH>/eval_app\nRAILS_ENV=test bin/rails test 2>&1 | tail -150'
 jq -cn --arg command "$claude_v6_test_command" \
@@ -3017,15 +3015,12 @@ mkdir "$tmp/claude-v6-classifier-output"
 node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-classifier-events.jsonl" \
   "$tmp/claude-v6-workspace" "$tmp/claude-v6-classifier-output" \
   "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
-for row in install.pro rsc.route form.validation tests.page tests.form tests.green unaided; do
+for row in install.pro rsc.route form.validation tests.page tests.form build.production \
+  tests.green unaided evidence.complete; do
   test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
     "$tmp/claude-v6-classifier-output/rubric-results.json")" = pass
 done
-for row in build.production evidence.complete; do
-  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
-    "$tmp/claude-v6-classifier-output/rubric-results.json")" = unknown
-done
-test "$(jq -r '.overall' "$tmp/claude-v6-classifier-output/rubric-results.json")" = fail
+test "$(jq -r '.overall' "$tmp/claude-v6-classifier-output/rubric-results.json")" = pass
 
 claude_v6_scaffold_rejections=(
   $'source "<LOCAL_PATH>/.ror-eval-state/pgenv.sh"\nnpx --yes create-react-on-rails-app eval_app --rsc --template typescript 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/create-app.log | tail -150'
@@ -3156,6 +3151,244 @@ for form_content in "${claude_v6_form_rejections[@]}"; do
     test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
       "$tmp/claude-v6-form-rejection-$claude_v6_form_rejection_index-output/rubric-results.json")" = unknown
   done
+done
+
+cp -R "$tmp/claude-v6-workspace" "$tmp/claude-v7-workspace"
+mkdir -p "$tmp/claude-v7-workspace/eval_app/test/controllers"
+mv "$tmp/claude-v7-workspace/eval_app/test/integration/hello_server_test.rb" \
+  "$tmp/claude-v7-workspace/eval_app/test/controllers/hello_server_controller_test.rb"
+rm "$tmp/claude-v7-workspace/eval_app/test/integration/subscribers_test.rb"
+printf '%s\n' 'validates :message, presence: true' \
+  >"$tmp/claude-v7-workspace/eval_app/app/models/contact_message.rb"
+printf '%s\n' 'render errors, status: :unprocessable_entity' \
+  >"$tmp/claude-v7-workspace/eval_app/app/controllers/contact_messages_controller.rb"
+printf '%s\n' \
+  'class ContactMessagesControllerTest < ActionDispatch::IntegrationTest' \
+  '  test "server-side validation failure renders error messages" do' \
+  '    post contact_messages_path, params: { contact_message: { message: "" } }' \
+  '    assert_response :unprocessable_entity' \
+  '    assert_includes @response.body, "Message cannot be blank"' \
+  '  end' \
+  '  test "successful submission redirects with a success message" do' \
+  '    post contact_messages_path, params: { contact_message: { message: "Hello" } }' \
+  '    assert_redirected_to new_contact_message_path' \
+  '    follow_redirect!' \
+  '    assert_includes @response.body, "Thanks for contacting us"' \
+  '  end' \
+  'end' >"$tmp/claude-v7-workspace/eval_app/test/controllers/contact_messages_controller_test.rb"
+
+claude_v7_scaffold_command=$'export HOME=<LOCAL_PATH>/runner-home\nnode -v; npx --yes create-react-on-rails-app eval_app --rsc --template typescript --package-manager npm 2>&1 | tee <LOCAL_PATH>/.create-app.log | tail -150'
+claude_v7_test_command=$'export HOME=<LOCAL_PATH>/runner-home\nexport PGHOST=<LOCAL_PATH>/.pgsocket PGPORT=5433 PGUSER=postgres\ncd <LOCAL_PATH>/eval_app\nbin/rails test 2>&1 | tail -150'
+claude_v7_build_command=$'export HOME=<LOCAL_PATH>/runner-home\nexport PGHOST=<LOCAL_PATH>/.pgsocket PGPORT=5433 PGUSER=postgres\ncd <LOCAL_PATH>/eval_app\nSECRET_KEY_BASE="<GENERATED_AT_RUNTIME>" npm run build'
+jq -cn --arg command "$claude_v7_scaffold_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"✓ Done!\nCreated eval_app with React on Rails!"}}' \
+  >"$tmp/claude-v7-scaffold-events.jsonl"
+jq -cn --arg command "$claude_v7_test_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"8 runs, 47 assertions, 0 failures, 0 errors, 0 skips"}}' \
+  >"$tmp/claude-v7-test-events.jsonl"
+jq -cn --arg command "$claude_v7_build_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"Loading production config; Rspack compiled successfully"}}' \
+  >"$tmp/claude-v7-build-events.jsonl"
+cat "$tmp/claude-v7-scaffold-events.jsonl" "$tmp/claude-v7-test-events.jsonl" \
+  "$tmp/claude-v7-build-events.jsonl" >"$tmp/claude-v7-events.jsonl"
+mkdir "$tmp/claude-v7-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v7-events.jsonl" \
+  "$tmp/claude-v7-workspace" "$tmp/claude-v7-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in install.pro rsc.route form.validation tests.page tests.form build.production \
+  tests.green unaided evidence.complete; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/claude-v7-output/rubric-results.json")" = pass
+done
+test "$(jq -r '.overall' "$tmp/claude-v7-output/rubric-results.json")" = pass
+
+claude_v7_scaffold_without_setup='node -v; npx --yes create-react-on-rails-app eval_app --rsc --template typescript --package-manager npm 2>&1 | tee <LOCAL_PATH>/.create-app.log | tail -150'
+claude_v7_test_without_setup='bin/rails test 2>&1 | tail -20'
+claude_v7_build_without_setup='SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>" npm run build'
+jq -cn --arg command "$claude_v7_scaffold_without_setup" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"✓ Done!\nCreated eval_app with React on Rails!"}}' \
+  >"$tmp/claude-v7-no-setup-scaffold.jsonl"
+jq -cn --arg command "$claude_v7_test_without_setup" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"8 runs, 47 assertions, 0 failures, 0 errors, 0 skips"}}' \
+  >"$tmp/claude-v7-no-setup-test.jsonl"
+jq -cn --arg command "$claude_v7_build_without_setup" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"Rspack compiled successfully"}}' \
+  >"$tmp/claude-v7-no-setup-build.jsonl"
+cat "$tmp/claude-v7-no-setup-scaffold.jsonl" "$tmp/claude-v7-no-setup-test.jsonl" \
+  "$tmp/claude-v7-no-setup-build.jsonl" >"$tmp/claude-v7-no-setup.jsonl"
+mkdir "$tmp/claude-v7-no-setup-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v7-no-setup.jsonl" \
+  "$tmp/claude-v7-workspace" "$tmp/claude-v7-no-setup-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+test "$(jq -r '.overall' "$tmp/claude-v7-no-setup-output/rubric-results.json")" = pass
+
+claude_v7_scaffold_rejections=(
+  $'export HOME=<LOCAL_PATH>/runner-home\nexport HOME=<LOCAL_PATH>/runner-home\nnode -v; npx --yes create-react-on-rails-app eval_app --rsc --template typescript --package-manager npm 2>&1 | tee <LOCAL_PATH>/.create-app.log | tail -150'
+  $'export HOME=<LOCAL_PATH>/other-home\nnode -v; npx --yes create-react-on-rails-app eval_app --rsc --template typescript --package-manager npm 2>&1 | tee <LOCAL_PATH>/.create-app.log | tail -150'
+  $'export PGHOST=<LOCAL_PATH>/.pgsocket PGPORT=5433 PGUSER=postgres\nexport HOME=<LOCAL_PATH>/runner-home\nnode -v; npx --yes create-react-on-rails-app eval_app --rsc --template typescript --package-manager npm 2>&1 | tee <LOCAL_PATH>/.create-app.log | tail -150'
+  $'export HOME=<LOCAL_PATH>/runner-home\ntrue\nnode -v; npx --yes create-react-on-rails-app eval_app --rsc --template typescript --package-manager npm 2>&1 | tee <LOCAL_PATH>/.create-app.log | tail -150'
+  $'export HOME=<LOCAL_PATH>/runner-home\nnode --version; npx --yes create-react-on-rails-app eval_app --rsc --template typescript --package-manager npm 2>&1 | tee <LOCAL_PATH>/.create-app.log | tail -150'
+  $'export HOME=<LOCAL_PATH>/runner-home\nnode -v; node -v; npx --yes create-react-on-rails-app eval_app --rsc --template typescript --package-manager npm 2>&1 | tee <LOCAL_PATH>/.create-app.log | tail -150'
+  $'export HOME=<LOCAL_PATH>/runner-home\nnode -v; npx --yes create-react-on-rails-app eval_app --rsc --template typescript --package-manager npm 2>&1 | tee <LOCAL_PATH>/.other.log | tail -150'
+  $'export HOME=<LOCAL_PATH>/runner-home\nnode -v; npx --yes create-react-on-rails-app eval_app --rsc --template typescript --package-manager npm 2>&1 | tee <LOCAL_PATH>/.create-app.log | tail -1001'
+  $'export HOME=<LOCAL_PATH>/runner-home\nnode -v; npx --yes create-react-on-rails-app eval_app --rsc --template typescript --package-manager npm 2>&1 | tee <LOCAL_PATH>/.create-app.log | tail -150\ntrue'
+  $'export HOME=<LOCAL_PATH>/runner-home\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc --template typescript --package-manager npm 2>&1 | tee <LOCAL_PATH>/.create-app.log | tail -150'
+)
+claude_v7_scaffold_rejection_index=0
+for scaffold_command in "${claude_v7_scaffold_rejections[@]}"; do
+  claude_v7_scaffold_rejection_index=$((claude_v7_scaffold_rejection_index + 1))
+  jq -cn --arg command "$scaffold_command" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"✓ Done!\nCreated eval_app with React on Rails!"}}' \
+    >"$tmp/claude-v7-scaffold-rejection-$claude_v7_scaffold_rejection_index-events.jsonl"
+  mkdir "$tmp/claude-v7-scaffold-rejection-$claude_v7_scaffold_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" \
+    "$tmp/claude-v7-scaffold-rejection-$claude_v7_scaffold_rejection_index-events.jsonl" \
+    "$tmp/claude-v7-workspace" \
+    "$tmp/claude-v7-scaffold-rejection-$claude_v7_scaffold_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "install.pro") | .status' \
+    "$tmp/claude-v7-scaffold-rejection-$claude_v7_scaffold_rejection_index-output/rubric-results.json")" = unknown
+done
+
+claude_v7_scaffold_output_rejections=(
+  'Created eval_app with React on Rails!'
+  '✓ Done!'
+  $'✓ Done!\n✓ Done!\nCreated eval_app with React on Rails!'
+  $'✓ Done!\nCreated eval_app with React on Rails!\nERROR: scaffold failed'
+)
+claude_v7_scaffold_output_rejection_index=0
+for scaffold_output in "${claude_v7_scaffold_output_rejections[@]}"; do
+  claude_v7_scaffold_output_rejection_index=$((claude_v7_scaffold_output_rejection_index + 1))
+  jq -cn --arg command "$claude_v7_scaffold_command" --arg output "$scaffold_output" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:$output}}' \
+    >"$tmp/claude-v7-scaffold-output-rejection-$claude_v7_scaffold_output_rejection_index-events.jsonl"
+  mkdir "$tmp/claude-v7-scaffold-output-rejection-$claude_v7_scaffold_output_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" \
+    "$tmp/claude-v7-scaffold-output-rejection-$claude_v7_scaffold_output_rejection_index-events.jsonl" \
+    "$tmp/claude-v7-workspace" \
+    "$tmp/claude-v7-scaffold-output-rejection-$claude_v7_scaffold_output_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "install.pro") | .status' \
+    "$tmp/claude-v7-scaffold-output-rejection-$claude_v7_scaffold_output_rejection_index-output/rubric-results.json")" = unknown
+done
+
+claude_v7_test_rejections=(
+  $'export HOME=<LOCAL_PATH>/runner-home\nexport HOME=<LOCAL_PATH>/runner-home\nexport PGHOST=<LOCAL_PATH>/.pgsocket PGPORT=5433 PGUSER=postgres\ncd <LOCAL_PATH>/eval_app\nbin/rails test 2>&1 | tail -150'
+  $'export PGHOST=<LOCAL_PATH>/.pgsocket PGPORT=5433 PGUSER=postgres\nexport HOME=<LOCAL_PATH>/runner-home\ncd <LOCAL_PATH>/eval_app\nbin/rails test 2>&1 | tail -150'
+  $'export HOME=<LOCAL_PATH>/runner-home\nexport PGHOST=<LOCAL_PATH>/.pgsocket PGPORT=5432 PGUSER=postgres\ncd <LOCAL_PATH>/eval_app\nbin/rails test 2>&1 | tail -150'
+  $'export HOME=<LOCAL_PATH>/runner-home\nexport PGHOST=<LOCAL_PATH>/.pgsocket PGPORT=5433 PGUSER=postgres\nexport PGHOST=<LOCAL_PATH>/.pgsocket PGPORT=5433 PGUSER=postgres\ncd <LOCAL_PATH>/eval_app\nbin/rails test 2>&1 | tail -150'
+  $'export HOME=<LOCAL_PATH>/runner-home\nexport PGHOST=<LOCAL_PATH>/.pgsocket PGPORT=5433 PGUSER=postgres\ncd <LOCAL_PATH>/other\nbin/rails test 2>&1 | tail -150'
+  $'export HOME=<LOCAL_PATH>/runner-home\nexport PGHOST=<LOCAL_PATH>/.pgsocket PGPORT=5433 PGUSER=postgres\ncd <LOCAL_PATH>/eval_app\nbin/rails test 2>&1 | tail -1001'
+  $'export HOME=<LOCAL_PATH>/runner-home\nexport PGHOST=<LOCAL_PATH>/.pgsocket PGPORT=5433 PGUSER=postgres\ncd <LOCAL_PATH>/eval_app\nbin/rails test 2>&1 | tail -150\ntrue'
+)
+claude_v7_test_rejection_index=0
+for test_command in "${claude_v7_test_rejections[@]}"; do
+  claude_v7_test_rejection_index=$((claude_v7_test_rejection_index + 1))
+  jq -cn --arg command "$test_command" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"8 runs, 47 assertions, 0 failures, 0 errors, 0 skips"}}' \
+    >"$tmp/claude-v7-test-rejection-$claude_v7_test_rejection_index-events.jsonl"
+  mkdir "$tmp/claude-v7-test-rejection-$claude_v7_test_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" \
+    "$tmp/claude-v7-test-rejection-$claude_v7_test_rejection_index-events.jsonl" \
+    "$tmp/claude-v7-workspace" \
+    "$tmp/claude-v7-test-rejection-$claude_v7_test_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in rsc.route form.validation tests.page tests.form tests.green; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/claude-v7-test-rejection-$claude_v7_test_rejection_index-output/rubric-results.json")" = unknown
+  done
+done
+
+claude_v7_test_output_rejections=(
+  '0 runs, 0 assertions, 0 failures, 0 errors, 0 skips'
+  '8 runs, 47 assertions, 1 failures, 0 errors, 0 skips'
+  $'8 runs, 47 assertions, 0 failures, 0 errors, 0 skips\nlater output'
+  $'8 runs, 47 assertions, 0 failures, 0 errors, 0 skips\n8 runs, 47 assertions, 0 failures, 0 errors, 0 skips'
+)
+claude_v7_test_output_rejection_index=0
+for test_output in "${claude_v7_test_output_rejections[@]}"; do
+  claude_v7_test_output_rejection_index=$((claude_v7_test_output_rejection_index + 1))
+  jq -cn --arg command "$claude_v7_test_command" --arg output "$test_output" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:$output}}' \
+    >"$tmp/claude-v7-test-output-rejection-$claude_v7_test_output_rejection_index-events.jsonl"
+  mkdir "$tmp/claude-v7-test-output-rejection-$claude_v7_test_output_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" \
+    "$tmp/claude-v7-test-output-rejection-$claude_v7_test_output_rejection_index-events.jsonl" \
+    "$tmp/claude-v7-workspace" \
+    "$tmp/claude-v7-test-output-rejection-$claude_v7_test_output_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in rsc.route form.validation tests.page tests.form tests.green; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/claude-v7-test-output-rejection-$claude_v7_test_output_rejection_index-output/rubric-results.json")" = unknown
+  done
+done
+
+claude_v7_build_rejections=(
+  $'export HOME=<LOCAL_PATH>/runner-home\nexport HOME=<LOCAL_PATH>/runner-home\nexport PGHOST=<LOCAL_PATH>/.pgsocket PGPORT=5433 PGUSER=postgres\ncd <LOCAL_PATH>/eval_app\nSECRET_KEY_BASE="<GENERATED_AT_RUNTIME>" npm run build'
+  $'export PGHOST=<LOCAL_PATH>/.pgsocket PGPORT=5433 PGUSER=postgres\nexport HOME=<LOCAL_PATH>/runner-home\ncd <LOCAL_PATH>/eval_app\nSECRET_KEY_BASE="<GENERATED_AT_RUNTIME>" npm run build'
+  $'export HOME=<LOCAL_PATH>/runner-home\nexport PGHOST=<LOCAL_PATH>/.pgsocket PGPORT=5432 PGUSER=postgres\ncd <LOCAL_PATH>/eval_app\nSECRET_KEY_BASE="<GENERATED_AT_RUNTIME>" npm run build'
+  $'export HOME=<LOCAL_PATH>/runner-home\nexport PGHOST=<LOCAL_PATH>/.pgsocket PGPORT=5433 PGUSER=postgres\ncd <LOCAL_PATH>/other\nSECRET_KEY_BASE="<GENERATED_AT_RUNTIME>" npm run build'
+  $'export HOME=<LOCAL_PATH>/runner-home\nexport PGHOST=<LOCAL_PATH>/.pgsocket PGPORT=5433 PGUSER=postgres\ncd <LOCAL_PATH>/eval_app\nSECRET_KEY_BASE="<GENERATED_AT_RUNTIME>" npm run build\ntrue'
+  $'export HOME=<LOCAL_PATH>/runner-home\nexport PGHOST=<LOCAL_PATH>/.pgsocket PGPORT=5433 PGUSER=postgres\ncd <LOCAL_PATH>/eval_app\nSECRET_KEY_BASE=real-value npm run build'
+  $'export HOME=<LOCAL_PATH>/runner-home\nexport PGHOST=<LOCAL_PATH>/.pgsocket PGPORT=5433 PGUSER=postgres\ncd <LOCAL_PATH>/eval_app\nSECRET_KEY_BASE="$(bin/rails secret)" npm run build'
+  $'export HOME=<LOCAL_PATH>/runner-home\nexport PGHOST=<LOCAL_PATH>/.pgsocket PGPORT=5433 PGUSER=postgres\ncd <LOCAL_PATH>/eval_app\nSECRET_KEY_BASE="<generated_at_runtime>" npm run build'
+  $'export HOME=<LOCAL_PATH>/runner-home\nexport PGHOST=<LOCAL_PATH>/.pgsocket PGPORT=5433 PGUSER=postgres\ncd <LOCAL_PATH>/eval_app\nSECRET_KEY_BASE="<GENERATED_AT_RUNTIME>" npm run build 2>&1 | tail -150'
+)
+claude_v7_build_rejection_index=0
+for build_command in "${claude_v7_build_rejections[@]}"; do
+  claude_v7_build_rejection_index=$((claude_v7_build_rejection_index + 1))
+  jq -cn --arg command "$build_command" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"Rspack compiled successfully"}}' \
+    >"$tmp/claude-v7-build-rejection-$claude_v7_build_rejection_index-events.jsonl"
+  mkdir "$tmp/claude-v7-build-rejection-$claude_v7_build_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" \
+    "$tmp/claude-v7-build-rejection-$claude_v7_build_rejection_index-events.jsonl" \
+    "$tmp/claude-v7-workspace" \
+    "$tmp/claude-v7-build-rejection-$claude_v7_build_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "build.production") | .status' \
+    "$tmp/claude-v7-build-rejection-$claude_v7_build_rejection_index-output/rubric-results.json")" = unknown
+done
+
+claude_v7_build_output_rejections=(
+  'build output complete'
+  $'Usage: build [options]\nRspack compiled successfully'
+  $'ERROR: build failed\nRspack compiled successfully'
+)
+claude_v7_build_output_rejection_index=0
+for build_output in "${claude_v7_build_output_rejections[@]}"; do
+  claude_v7_build_output_rejection_index=$((claude_v7_build_output_rejection_index + 1))
+  jq -cn --arg command "$claude_v7_build_command" --arg output "$build_output" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:$output}}' \
+    >"$tmp/claude-v7-build-output-rejection-$claude_v7_build_output_rejection_index-events.jsonl"
+  mkdir "$tmp/claude-v7-build-output-rejection-$claude_v7_build_output_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" \
+    "$tmp/claude-v7-build-output-rejection-$claude_v7_build_output_rejection_index-events.jsonl" \
+    "$tmp/claude-v7-workspace" \
+    "$tmp/claude-v7-build-output-rejection-$claude_v7_build_output_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "build.production") | .status' \
+    "$tmp/claude-v7-build-output-rejection-$claude_v7_build_output_rejection_index-output/rubric-results.json")" = unknown
+done
+
+for manifest_variant in missing-package-manifest no-production-env one-production-env; do
+  cp -R "$tmp/claude-v7-workspace" "$tmp/claude-v7-$manifest_variant-workspace"
+  if [[ "$manifest_variant" == missing-package-manifest ]]; then
+    rm "$tmp/claude-v7-$manifest_variant-workspace/eval_app/package.json"
+  elif [[ "$manifest_variant" == no-production-env ]]; then
+    jq '.scripts.build = "rspack build"' "$tmp/claude-v7-workspace/eval_app/package.json" \
+      >"$tmp/claude-v7-$manifest_variant-workspace/eval_app/package.json"
+  else
+    jq '.scripts.build = "RAILS_ENV=production rspack build"' \
+      "$tmp/claude-v7-workspace/eval_app/package.json" \
+      >"$tmp/claude-v7-$manifest_variant-workspace/eval_app/package.json"
+  fi
+  mkdir "$tmp/claude-v7-$manifest_variant-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v7-build-events.jsonl" \
+    "$tmp/claude-v7-$manifest_variant-workspace" "$tmp/claude-v7-$manifest_variant-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "build.production") | .status' \
+    "$tmp/claude-v7-$manifest_variant-output/rubric-results.json")" = unknown
 done
 
 cp -R "$tmp/claude-v6-workspace" "$tmp/claude-compact-build-workspace"
