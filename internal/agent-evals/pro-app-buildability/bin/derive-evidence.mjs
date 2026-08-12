@@ -134,10 +134,6 @@ const artifactEvidence = { schema_version: '1.0', limits: artifactLimits, artifa
 const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
 const invocation = JSON.parse(fs.readFileSync(invocationPath, 'utf8'));
 const successfulCommands = commands.filter((command) => command.exit_code === 0);
-const successfulOutcome = (commandPattern, outputPattern) =>
-  successfulCommands.filter(
-    (command) => commandPattern.test(command.command) && outputPattern.test(command.output),
-  );
 const matchingArtifacts = (pathPattern, contentPattern) =>
   artifacts.filter((artifact) => pathPattern.test(artifact.path) && contentPattern.test(artifact.excerpt));
 const artifactCitations = (matched) => matched.map((artifact) => `artifact-evidence.json#${artifact.path}`);
@@ -152,6 +148,7 @@ const boundedLogPipeline =
 const safeOutputRedirection = /^(.*\S)\s+>\s+(?:"<LOCAL_PATH>"|'<LOCAL_PATH>'|<LOCAL_PATH>)\s+2>&1$/;
 const boundedPlaceholderTail =
   /^tail\s+(?:-n\s+|-)([1-9][0-9]{0,4})\s+(?:"<LOCAL_PATH>"|'<LOCAL_PATH>'|<LOCAL_PATH>)$/;
+const boundedTailPipeline = /^(.*\S)\s+2>&1\s*\|\s*tail\s+(?:-n\s+|-)([1-9][0-9]{0,4})$/;
 const exactBuildMarkerProof = (lines, targetIndex, output) => {
   const tailMatch = lines[targetIndex + 2]?.match(boundedPlaceholderTail);
   const markers = output.split(/\r?\n/).filter((line) => /^BUILD_EXIT_CODE=-?[0-9]+$/.test(line));
@@ -166,6 +163,25 @@ const exactBuildMarkerProof = (lines, targetIndex, output) => {
     markers[0] === 'BUILD_EXIT_CODE=0'
   );
 };
+const inlineBuildMarkerTarget = (lines, output) => {
+  if (lines.length !== 1) return null;
+  const match = lines[0].match(
+    /^echo "last exit status check:";\s*(npm run build)\s+>\s+<LOCAL_PATH>\s+2>&1;\s*echo "EXIT_CODE:\$\?";\s*tail\s+(?:-n\s+|-)([1-9][0-9]{0,4})\s+<LOCAL_PATH>$/,
+  );
+  const markers = output.split(/\r?\n/).filter((line) => /^EXIT_CODE:-?[0-9]+$/.test(line));
+  return match && Number(match[2]) <= 1000 && markers.length === 1 && markers[0] === 'EXIT_CODE:0'
+    ? match[1]
+    : null;
+};
+const completedScaffoldOutput = (output) => {
+  const lines = output.split(/\r?\n/).map((line) => line.trim());
+  const created = lines.filter((line) => line === 'Created eval_app with React on Rails!');
+  const done = lines.filter((line) => line === '✓ Done!');
+  const errorBanner = lines.some((line) =>
+    /\b(?:error|failed|aborted)\b(?::|\s|$)|(?:^|\s)(?:npm\s+ERR!|ERR!)/i.test(line),
+  );
+  return created.length === 1 && done.length === 1 && !errorBanner;
+};
 const stripBoundedTimeoutPrefix = (line) => {
   const match = line.match(/^timeout ([1-9][0-9]{0,8}) (.+)$/);
   if (!match) return line;
@@ -174,7 +190,7 @@ const stripBoundedTimeoutPrefix = (line) => {
   if (!Number.isSafeInteger(scaffoldLimit) || timeoutSeconds > scaffoldLimit) return null;
   return match[2];
 };
-const executableShellLines = (command, output) => {
+const topLevelShellLines = (command) => {
   const invocation = unwrapShellCommand(command);
   if (invocation.includes('<<')) return [];
 
@@ -209,18 +225,40 @@ const executableShellLines = (command, output) => {
     }
     continuedFromPrevious = continuedToNext;
   }
-  return executableLines.flatMap((line, index) => {
+  return executableLines;
+};
+const pipefailPipelineTargets = (lines) =>
+  lines.flatMap((line, index) => {
     const pipelineMatch = line.match(boundedLogPipeline);
-    if (pipelineMatch) {
-      const hasTopLevelPipefail = index === 1 && executableLines[0] === 'set -o pipefail';
-      return hasTopLevelPipefail && Number(pipelineMatch[2]) <= 1000 ? [pipelineMatch[1]] : [];
-    }
-    const redirectionMatch = line.match(safeOutputRedirection);
-    if (redirectionMatch) {
-      return exactBuildMarkerProof(executableLines, index, output) ? [redirectionMatch[1]] : [];
-    }
-    return [line];
+    const hasTopLevelPipefail = lines.length === 2 && index === 1 && lines[0] === 'set -o pipefail';
+    return pipelineMatch && hasTopLevelPipefail && Number(pipelineMatch[2]) <= 1000 ? [pipelineMatch[1]] : [];
   });
+const installEvidenceTargets = (command) => {
+  const lines = topLevelShellLines(command.command);
+  const pipefailTargets = pipefailPipelineTargets(lines);
+  const completionBackedTarget = (() => {
+    if (lines.length !== 1 || !completedScaffoldOutput(command.output)) return [];
+    const pipelineMatch = lines[0].match(boundedLogPipeline);
+    return pipelineMatch && Number(pipelineMatch[2]) <= 1000 ? [pipelineMatch[1]] : [];
+  })();
+  const directTargets = lines.length === 1 && !/[;&|<>]/.test(lines[0]) ? lines : [];
+  return [...directTargets, ...pipefailTargets, ...completionBackedTarget];
+};
+const buildEvidenceTargets = (command) => {
+  const lines = topLevelShellLines(command.command);
+  const targets = [
+    ...(lines.length === 1 && !/[;&|<>]/.test(lines[0]) ? lines : []),
+    ...pipefailPipelineTargets(lines),
+  ];
+  const inlineTarget = inlineBuildMarkerTarget(lines, command.output);
+  if (inlineTarget) targets.push(inlineTarget);
+  for (const [index, line] of lines.entries()) {
+    const redirectionMatch = line.match(safeOutputRedirection);
+    if (redirectionMatch && exactBuildMarkerProof(lines, index, command.output)) {
+      targets.push(redirectionMatch[1]);
+    }
+  }
+  return targets;
 };
 
 const rubyProManifests = matchingArtifacts(/Gemfile$/, /react_on_rails_pro/);
@@ -242,7 +280,7 @@ if (evalAppPackageManifest) {
   }
 }
 const installCommands = successfulCommands.filter((command) => {
-  return executableShellLines(command.command, command.output).some((invocationLine) => {
+  return installEvidenceTargets(command).some((invocationLine) => {
     const targetCommand = stripBoundedTimeoutPrefix(invocationLine);
     return (
       targetCommand !== null &&
@@ -297,7 +335,7 @@ const formTests = artifacts.filter((artifact) => {
 const plainManifestBuildInvocation = (invocation) =>
   manifestBackedProductionBuild && /^(?:npm|pnpm) run build$/i.test(invocation);
 const buildCommands = successfulCommands.filter((command) => {
-  const allowedInvocation = executableShellLines(command.command, command.output).some((invocationLine) => {
+  const allowedInvocation = buildEvidenceTargets(command).some((invocationLine) => {
     const targetCommand = stripBoundedTimeoutPrefix(invocationLine);
     return (
       targetCommand !== null &&
@@ -316,14 +354,44 @@ const buildCommands = successfulCommands.filter((command) => {
   return allowedInvocation && buildResult && !helpOutput;
 });
 const manifestBackedBuildCommands = buildCommands.filter((command) =>
-  executableShellLines(command.command, command.output).some((invocationLine) => {
+  buildEvidenceTargets(command).some((invocationLine) => {
     const targetCommand = stripBoundedTimeoutPrefix(invocationLine);
     return targetCommand !== null && plainManifestBuildInvocation(targetCommand);
   }),
 );
-const testCommands = successfulOutcome(
-  /rspec|rails test|rake test|npm (?:run )?test|pnpm (?:run )?test|jest|playwright/i,
-  /0 failures|0 failed|pass(?:ed|ing)|[1-9][0-9]* examples?, 0 failures|[1-9][0-9]* tests?, 0 failures/i,
+const testOutputPassed =
+  /0 failures|0 failed|pass(?:ed|ing)|[1-9][0-9]* examples?, 0 failures|[1-9][0-9]* tests?, 0 failures/i;
+const railsTestSummary =
+  /^[1-9][0-9]* runs?, [1-9][0-9]* assertions?, 0 failures, 0 errors(?:, [0-9]+ skips?)?$/;
+const railsTestOutputPassed = (output) => {
+  const lines = output
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const summaries = lines.filter((line) => railsTestSummary.test(line));
+  return summaries.length === 1 && lines.at(-1) === summaries[0];
+};
+const recognizedTestInvocation = (line) =>
+  /^(?:(?:bundle exec )?(?:rspec|rails test|rake test)|bin\/rails test|npm (?:run )?test|pnpm (?:run )?test|jest|playwright)(?:\s|$)/i.test(
+    line,
+  ) && !/[;&|<>]/.test(line);
+const testEvidenceTargets = (command) => {
+  const lines = topLevelShellLines(command.command);
+  const directTargets = lines.length === 1 && recognizedTestInvocation(lines[0]) ? [lines[0]] : [];
+  if (lines.length !== 1) return directTargets;
+  const pipelineMatch = lines[0].match(boundedTailPipeline);
+  if (
+    !pipelineMatch ||
+    Number(pipelineMatch[2]) > 1000 ||
+    !recognizedTestInvocation(pipelineMatch[1]) ||
+    !railsTestOutputPassed(command.output)
+  ) {
+    return directTargets;
+  }
+  return [...directTargets, pipelineMatch[1]];
+};
+const testCommands = successfulCommands.filter(
+  (command) => testEvidenceTargets(command).length > 0 && testOutputPassed.test(command.output),
 );
 const fullSuitePrefixes = [
   ['rspec'],
@@ -350,12 +418,13 @@ const fullSuiteTest = (invocation) => {
 };
 const testCommandsFor = (matchedArtifacts) =>
   testCommands.filter((command) => {
-    const invocation = unwrapShellCommand(command.command);
-    if (fullSuiteTest(invocation)) return true;
-    return matchedArtifacts.some((artifact) => {
-      const testPath = artifact.path.match(/(?:^|\/)((?:spec|test)\/.*)$/i)?.[1];
-      if (!testPath) return false;
-      return invocation.includes(testPath) || invocation.includes(path.posix.dirname(testPath));
+    return testEvidenceTargets(command).some((invocation) => {
+      if (fullSuiteTest(invocation)) return true;
+      return matchedArtifacts.some((artifact) => {
+        const testPath = artifact.path.match(/(?:^|\/)((?:spec|test)\/.*)$/i)?.[1];
+        if (!testPath) return false;
+        return invocation.includes(testPath) || invocation.includes(path.posix.dirname(testPath));
+      });
     });
   });
 const pageTestCommands = testCommandsFor(pageTests);

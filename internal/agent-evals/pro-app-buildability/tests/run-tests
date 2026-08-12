@@ -1916,7 +1916,9 @@ mkdir -p "$tmp/claude-classifier-workspace/eval_app/app/controllers" \
   "$tmp/claude-classifier-workspace/eval_app/app/javascript/src/HelloServer/ror_components" \
   "$tmp/claude-classifier-workspace/eval_app/app/models" \
   "$tmp/claude-classifier-workspace/eval_app/config" \
-  "$tmp/claude-classifier-workspace/eval_app/test/controllers"
+  "$tmp/claude-classifier-workspace/eval_app/test/controllers" \
+  "$tmp/claude-classifier-workspace/eval_app/test/integration" \
+  "$tmp/claude-classifier-workspace/eval_app/app/javascript/src/SubscribeForm"
 printf '%s\n' "gem 'react_on_rails_pro'" >"$tmp/claude-classifier-workspace/eval_app/Gemfile"
 printf '%s\n' \
   '{"dependencies":{"react-on-rails-pro":"1.0.0"},"scripts":{"build":"RAILS_ENV=production NODE_ENV=production rspack build"}}' \
@@ -1942,7 +1944,28 @@ printf '%s\n' \
   '    assert valid' \
   '  end' \
   'end' >"$tmp/claude-classifier-workspace/eval_app/test/controllers/contact_messages_controller_test.rb"
-claude_scaffold_command=$'set -o pipefail\ntimeout 580 npx --yes create-react-on-rails-app@latest eval_app --rsc --package-manager npm 2>&1 | tee <LOCAL_PATH> | tail -200\nprintf "%s\\n" scaffold-finished'
+printf '%s\n' 'validates :email, presence: true' \
+  >"$tmp/claude-classifier-workspace/eval_app/app/models/subscriber.rb"
+printf '%s\n' 'render errors, status: :unprocessable_entity' \
+  >"$tmp/claude-classifier-workspace/eval_app/app/controllers/subscribers_controller.rb"
+printf '%s\n' \
+  'class HelloServerTest < ActionDispatch::IntegrationTest' \
+  '  test "React Server Component page with server-provided data" do' \
+  '    get hello_server_path' \
+  '    assert_response :success' \
+  '  end' \
+  'end' >"$tmp/claude-classifier-workspace/eval_app/test/integration/hello_server_test.rb"
+printf '%s\n' \
+  'class SubscribersControllerTest < ActionDispatch::IntegrationTest' \
+  '  test "invalid then valid subscriber" do' \
+  '    assert invalid' \
+  '    assert valid' \
+  '  end' \
+  'end' >"$tmp/claude-classifier-workspace/eval_app/test/controllers/subscribers_controller_test.rb"
+printf '%s\n' \
+  'test("SubscribeForm invalid then valid", () => { expect("invalid").not.toBe("valid"); });' \
+  >"$tmp/claude-classifier-workspace/eval_app/app/javascript/src/SubscribeForm/SubscribeForm.test.tsx"
+claude_scaffold_command=$'set -o pipefail\ntimeout 580 npx --yes create-react-on-rails-app@latest eval_app --rsc --package-manager npm 2>&1 | tee <LOCAL_PATH> | tail -200'
 claude_build_command=$'rm -rf public/packs public/packs-test\nnpm run build > <LOCAL_PATH> 2>&1\necho "BUILD_EXIT_CODE=$?"\ntail -30 <LOCAL_PATH>'
 jq -cn --arg command "$claude_scaffold_command" \
   '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"created successfully"}}' \
@@ -1963,6 +1986,127 @@ for row in install.pro rsc.route form.validation tests.page tests.form build.pro
     "$tmp/claude-classifier-output/rubric-results.json")" = pass
 done
 test "$(jq -r '.overall' "$tmp/claude-classifier-output/rubric-results.json")" = pass
+
+claude_v3_scaffold_command='npx --yes create-react-on-rails-app@17.0.1 eval_app --rsc --package-manager npm 2>&1 | tee <LOCAL_PATH> | tail -150'
+claude_v3_build_command='echo "last exit status check:"; npm run build > <LOCAL_PATH> 2>&1; echo "EXIT_CODE:$?"; tail -20 <LOCAL_PATH>'
+claude_v3_test_command='bin/rails test 2>&1 | tail -60'
+jq -cn --arg command "$claude_v3_scaffold_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"Created eval_app with React on Rails!\n✓ Done!"}}' \
+  >"$tmp/claude-v3-classifier-events.jsonl"
+jq -cn --arg command "$claude_v3_build_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"EXIT_CODE:0\nLoading production config; Rspack compiled successfully"}}' \
+  >>"$tmp/claude-v3-classifier-events.jsonl"
+jq -cn --arg command "$claude_v3_test_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"9 runs, 35 assertions, 0 failures, 0 errors, 0 skips"}}' \
+  >>"$tmp/claude-v3-classifier-events.jsonl"
+mkdir "$tmp/claude-v3-classifier-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v3-classifier-events.jsonl" \
+  "$tmp/claude-classifier-workspace" "$tmp/claude-v3-classifier-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in install.pro rsc.route form.validation tests.page tests.form build.production \
+  tests.green evidence.complete; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/claude-v3-classifier-output/rubric-results.json")" = pass
+done
+test "$(jq -r '.overall' "$tmp/claude-v3-classifier-output/rubric-results.json")" = pass
+for citation in \
+  artifact-evidence.json#eval_app/test/integration/hello_server_test.rb \
+  artifact-evidence.json#eval_app/test/controllers/subscribers_controller_test.rb; do
+  jq -e --arg citation "$citation" \
+    '.items[] | select(.citations | index($citation) != null)' \
+    "$tmp/claude-v3-classifier-output/rubric-results.json" >/dev/null
+done
+
+claude_v3_scaffold_failures=(
+  'generator still running'
+  $'Created eval_app with React on Rails!\nERROR: install failed\n✓ Done!'
+  'Created eval_app with React on Rails! ERROR: install failed ✓ Done!'
+  $'Created eval_app with React on Rails!\nnpm ERR! install failed\n✓ Done!'
+)
+claude_v3_scaffold_failure_index=0
+for scaffold_output in "${claude_v3_scaffold_failures[@]}"; do
+  claude_v3_scaffold_failure_index=$((claude_v3_scaffold_failure_index + 1))
+  jq -cn --arg command "$claude_v3_scaffold_command" --arg output "$scaffold_output" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:$output}}' \
+    >"$tmp/claude-v3-scaffold-failure-$claude_v3_scaffold_failure_index-events.jsonl"
+  mkdir "$tmp/claude-v3-scaffold-failure-$claude_v3_scaffold_failure_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" \
+    "$tmp/claude-v3-scaffold-failure-$claude_v3_scaffold_failure_index-events.jsonl" \
+    "$tmp/claude-classifier-workspace" \
+    "$tmp/claude-v3-scaffold-failure-$claude_v3_scaffold_failure_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "install.pro") | .status' \
+    "$tmp/claude-v3-scaffold-failure-$claude_v3_scaffold_failure_index-output/rubric-results.json")" = unknown
+done
+
+claude_v3_build_failure_outputs=(
+  $'EXIT_CODE:1\nRspack compiled successfully'
+  $'EXIT_CODE:0\nEXIT_CODE:0\nRspack compiled successfully'
+)
+claude_v3_build_failure_index=0
+for build_output in "${claude_v3_build_failure_outputs[@]}"; do
+  claude_v3_build_failure_index=$((claude_v3_build_failure_index + 1))
+  jq -cn --arg command "$claude_v3_build_command" --arg output "$build_output" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:$output}}' \
+    >"$tmp/claude-v3-build-failure-$claude_v3_build_failure_index-events.jsonl"
+  mkdir "$tmp/claude-v3-build-failure-$claude_v3_build_failure_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" \
+    "$tmp/claude-v3-build-failure-$claude_v3_build_failure_index-events.jsonl" \
+    "$tmp/claude-classifier-workspace" \
+    "$tmp/claude-v3-build-failure-$claude_v3_build_failure_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "build.production") | .status' \
+    "$tmp/claude-v3-build-failure-$claude_v3_build_failure_index-output/rubric-results.json")" = unknown
+done
+
+claude_v3_test_failures=(
+  '0 runs, 0 assertions, 0 failures, 0 errors, 0 skips'
+  '9 runs, 35 assertions, 0 failures, 1 errors, 0 skips'
+  $'9 runs, 35 assertions, 0 failures, 0 errors, 0 skips\ntest process aborted'
+)
+claude_v3_test_failure_index=0
+for test_output in "${claude_v3_test_failures[@]}"; do
+  claude_v3_test_failure_index=$((claude_v3_test_failure_index + 1))
+  jq -cn --arg command "$claude_v3_test_command" --arg output "$test_output" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:$output}}' \
+    >"$tmp/claude-v3-test-failure-$claude_v3_test_failure_index-events.jsonl"
+  mkdir "$tmp/claude-v3-test-failure-$claude_v3_test_failure_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" \
+    "$tmp/claude-v3-test-failure-$claude_v3_test_failure_index-events.jsonl" \
+    "$tmp/claude-classifier-workspace" \
+    "$tmp/claude-v3-test-failure-$claude_v3_test_failure_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in rsc.route form.validation tests.page tests.form tests.green; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/claude-v3-test-failure-$claude_v3_test_failure_index-output/rubric-results.json")" = unknown
+  done
+done
+
+oversized_test_command='bin/rails test 2>&1 | tail -10000'
+jq -cn --arg command "$oversized_test_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"9 runs, 35 assertions, 0 failures, 0 errors, 0 skips"}}' \
+  >"$tmp/claude-v3-oversized-test-events.jsonl"
+mkdir "$tmp/claude-v3-oversized-test-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v3-oversized-test-events.jsonl" \
+  "$tmp/claude-classifier-workspace" "$tmp/claude-v3-oversized-test-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in rsc.route form.validation tests.page tests.form tests.green; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/claude-v3-oversized-test-output/rubric-results.json")" = unknown
+done
+
+stale_test_command=$'echo "9 runs, 35 assertions, 0 failures, 0 errors, 0 skips"\nbin/rails test 2>&1 | tail -60'
+jq -cn --arg command "$stale_test_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"9 runs, 35 assertions, 0 failures, 0 errors, 0 skips"}}' \
+  >"$tmp/claude-v3-stale-test-events.jsonl"
+mkdir "$tmp/claude-v3-stale-test-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v3-stale-test-events.jsonl" \
+  "$tmp/claude-classifier-workspace" "$tmp/claude-v3-stale-test-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in rsc.route form.validation tests.page tests.form tests.green; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/claude-v3-stale-test-output/rubric-results.json")" = unknown
+done
 
 mkdir -p "$tmp/semantic-page-negative-workspace/eval_app/app/components" \
   "$tmp/semantic-page-negative-workspace/eval_app/config" \
@@ -2046,6 +2190,9 @@ rejected_multiline_commands=(
   $'echo "not a scaffold"\nnpm run build > <LOCAL_PATH> 2>&1\ntail -200 <LOCAL_PATH>'
   $'echo "not a scaffold"\nnpm run build > <LOCAL_PATH> 2>&1\nbuild_exit=$?\ntail -200 <LOCAL_PATH>\nexit 0'
   $'echo "BUILD_EXIT_CODE=0"\nnpm run build > <LOCAL_PATH> 2>&1\ntail -200 <LOCAL_PATH>\necho "BUILD_EXIT_CODE=0"'
+  $'npx create-react-on-rails-app eval_app --pro\ntrue\nnpm run build\ntrue'
+  $'set -o pipefail\nnpx create-react-on-rails-app eval_app --pro 2>&1 | tee <LOCAL_PATH> | tail -200\ntrue'
+  $'set -o pipefail\nnpm run build 2>&1 | tee <LOCAL_PATH> | tail -200\necho masked'
 )
 rejected_multiline_index=0
 for rejected_multiline_command in "${rejected_multiline_commands[@]}"; do
