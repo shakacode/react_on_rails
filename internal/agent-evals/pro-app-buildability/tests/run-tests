@@ -967,6 +967,75 @@ if "$eval_dir/bin/scan-sensitive-artifacts" "$tmp/parity-perl-safe" >/dev/null; 
   exit 1
 fi
 
+printf '%s\n' \
+  '{"credential":"file","credential_store":"file","command":"credential: \"file\" credential_store: \"file\"","nested":[{"token":"[REDACTED]"},{"message":"api_key: \"[REDACTED]\""}]}' \
+  >"$tmp/scanner-serialized-safe.json"
+set +e
+"$eval_dir/bin/scan-sensitive-artifacts" "$tmp/scanner-serialized-safe.json" >/dev/null
+scanner_serialized_safe_exit=$?
+set -e
+test "$scanner_serialized_safe_exit" = 1
+
+printf '%s\n' '{"nested":{"items":[{"api_key":"synthetic-structural-secret"}]}}' \
+  >"$tmp/scanner-structural-sensitive.json"
+"$eval_dir/bin/scan-sensitive-artifacts" "$tmp/scanner-structural-sensitive.json" >/dev/null
+
+printf '%s\n' '{"nested":[{"message":"token: synthetic-string-secret"}]}' \
+  >"$tmp/scanner-string-sensitive.json"
+"$eval_dir/bin/scan-sensitive-artifacts" "$tmp/scanner-string-sensitive.json" >/dev/null
+
+printf '%s' '{"broken":' >"$tmp/scanner-malformed.json"
+set +e
+"$eval_dir/bin/scan-sensitive-artifacts" "$tmp/scanner-malformed.json" \
+  >/dev/null 2>"$tmp/scanner-malformed-error"
+scanner_malformed_json_exit=$?
+set -e
+test "$scanner_malformed_json_exit" = 2
+rg -q 'malformed JSON' "$tmp/scanner-malformed-error"
+
+node -e \
+  'const fs = require("node:fs"); fs.writeFileSync(process.argv[1], JSON.stringify({payload:"x".repeat(16777216)}));' \
+  "$tmp/scanner-oversized.json"
+set +e
+"$eval_dir/bin/scan-sensitive-artifacts" "$tmp/scanner-oversized.json" >/dev/null 2>&1
+scanner_oversized_json_exit=$?
+set -e
+test "$scanner_oversized_json_exit" = 2
+
+node -e \
+  'const fs = require("node:fs"); let value = "clean";
+   for (let depth = 0; depth < 64; depth += 1) value = {nested:value};
+   value = {token:value};
+   fs.writeFileSync(process.argv[1], JSON.stringify(value));' \
+  "$tmp/scanner-over-depth.json"
+set +e
+"$eval_dir/bin/scan-sensitive-artifacts" "$tmp/scanner-over-depth.json" \
+  >/dev/null 2>"$tmp/scanner-over-depth-error"
+scanner_over_depth_json_exit=$?
+set -e
+test "$scanner_over_depth_json_exit" = 2
+rg -q 'JSON scan depth exceeds 64' "$tmp/scanner-over-depth-error"
+
+node -e \
+  'const fs = require("node:fs"); fs.writeFileSync(process.argv[1], JSON.stringify(Array(50000).fill(null)));' \
+  "$tmp/scanner-over-nodes.json"
+set +e
+"$eval_dir/bin/scan-sensitive-artifacts" "$tmp/scanner-over-nodes.json" \
+  >/dev/null 2>"$tmp/scanner-over-nodes-error"
+scanner_over_nodes_json_exit=$?
+set -e
+test "$scanner_over_nodes_json_exit" = 2
+rg -q 'JSON scan nodes exceed 50000' "$tmp/scanner-over-nodes-error"
+
+cp "$tmp/scanner-serialized-safe.json" "$tmp/scanner-serialized-safe.txt"
+"$eval_dir/bin/scan-sensitive-artifacts" "$tmp/scanner-serialized-safe.txt" >/dev/null
+printf '%s\n' 'ordinary raw text' >"$tmp/scanner-raw-clean.txt"
+set +e
+"$eval_dir/bin/scan-sensitive-artifacts" "$tmp/scanner-raw-clean.txt" >/dev/null
+scanner_raw_clean_exit=$?
+set -e
+test "$scanner_raw_clean_exit" = 1
+
 mkdir -p "$tmp/scanner-cycle/a"
 ln -s ../a "$tmp/scanner-cycle/a/loop"
 printf '%s\n' 'ordinary content' >"$tmp/scanner-cycle/a/clean"

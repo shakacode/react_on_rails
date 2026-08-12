@@ -16,7 +16,8 @@ const looksLikeCredentialValue = (value) => {
   }
   return !nonSecretValues.has(candidate.toLowerCase());
 };
-const shouldRedact = (name, value) => sensitiveName.test(name) && looksLikeCredentialValue(value);
+export const containsSensitiveNamedValue = (name, value) =>
+  sensitiveName.test(String(name)) && looksLikeCredentialValue(value);
 
 const decodeUrlName = (value) =>
   String(value)
@@ -111,16 +112,18 @@ export const redactSensitiveValues = (value) =>
       const doubleQuoted = doubleQuotedValue !== undefined;
       const quote = doubleQuoted ? '"' : "'";
       const quotedValue = doubleQuoted ? doubleQuotedValue : singleQuotedValue;
-      return shouldRedact(name, quotedValue) ? `${name}${separator}${quote}[REDACTED]${quote}` : match;
+      return containsSensitiveNamedValue(name, quotedValue)
+        ? `${name}${separator}${quote}[REDACTED]${quote}`
+        : match;
     })
     .replace(unterminatedQuotedNamedValue, (match, name, separator, doubleQuotedValue, singleQuotedValue) => {
       const doubleQuoted = doubleQuotedValue !== undefined;
       const quote = doubleQuoted ? '"' : "'";
       const quotedValue = doubleQuoted ? doubleQuotedValue : singleQuotedValue;
-      return shouldRedact(name, quotedValue) ? `${name}${separator}${quote}[REDACTED]` : match;
+      return containsSensitiveNamedValue(name, quotedValue) ? `${name}${separator}${quote}[REDACTED]` : match;
     })
     .replace(unquotedNamedValue, (match, name, separator, unquotedValue) =>
-      shouldRedact(name, unquotedValue) ? `${name}${separator}[REDACTED]` : match,
+      containsSensitiveNamedValue(name, unquotedValue) ? `${name}${separator}[REDACTED]` : match,
     )
     .replace(privateKeyBlock, '[REDACTED]')
     .replace(privateKeyRemainder, '[REDACTED]')
