@@ -83,7 +83,8 @@ designed out" — is now addressed; see Q3.)
 
 ### 2. #3867's "new security surface" half: weakened, not eliminated
 
-#3867 assumed a renderer-side dispatch would bypass Rails middleware, forcing CSRF/auth to be reimplemented.
+The #3867 analysis assumed a renderer-side dispatch would bypass Rails middleware, forcing CSRF/auth to be
+reimplemented.
 The spike shows the opposite composition: the transport routes through a Rails controller, so the standard
 Rails stack stays authoritative — CSRF verified live (token-less POST → 422 with the stock
 `ReactOnRails.authenticityHeaders()` mechanism, no new token scheme), endpoint authorization can mirror the
@@ -128,7 +129,7 @@ to the RSC toolchain and Pro surfaces — **zero renderer-protocol changes, zero
 | 3   | `FormData` in the renderer VM sandbox globals (`decodeReply` depends on it; the spike duck-typed around it)                                             | Node renderer VM (`packages/react-on-rails-pro-node-renderer`)     |
 | 4   | `executeServerFunction` first-class RSC-runtime method plus a gem controller concern (replacing the spike's "executor mode" server-component smuggling) | Node renderer runtime + Pro gem                                    |
 | 5   | Hashed action ids + server-reference manifest (the spike's `pathToFileURL(...)#export` ids leak absolute build paths and break multi-machine builds)    | `shakacode/react_on_rails_rsc` (loader + plugin manifest emission) |
-| 6   | Endpoint authorization mirroring the existing `rsc_payload_authorizer` pattern                                                                          | Pro gem                                                            |
+| 6   | Action-scoped endpoint authorization (authorizer receives the action id + manifest metadata; see Security surface)                                      | Pro gem                                                            |
 
 ### Security surface
 
@@ -140,9 +141,15 @@ of the defense; a real implementation must make each item first-class:
   resolvable; nothing request-derived reaches module resolution. The spike verified this with a hostile id
   returning a safe error.
 - **Argument deserialization limits:** `decodeReply` consumes attacker-controlled payloads; enforce a request
-  size cap (the spike used 64KB) and reject multipart/binary until separately scoped.
-- **Authorization** (seam 6): per-endpoint authz mirroring `rsc_payload_authorizer`, so the function-call
-  endpoint is never more reachable than the RSC payload endpoint.
+  size cap **before body materialization** (Rack-level `Content-Length` / streaming limit — the spike's 64KB
+  check ran after `raw_post` had already buffered the body, which caps what reaches the renderer but not the
+  Rails-side allocation), cap/validate the action-id header, and reject multipart/binary until separately
+  scoped.
+- **Authorization** (seam 6): **action-scoped**, not merely endpoint-scoped. Endpoint-level authz mirroring
+  `rsc_payload_authorizer` only makes the dispatcher as reachable as the RSC payload endpoint; it does not
+  prove the current user may invoke a _specific_ function — a privileged action's client reference can sit in
+  a served chunk for anyone to replay. The authorizer must receive the action id (plus manifest metadata) and
+  deny before renderer execution, the way `rsc_payload_authorized?(component_name)` scopes by component.
 - **CSRF: unchanged.** The standard Rails token via `ReactOnRails.authenticityHeaders()` — verified live in
   the spike (token-less POST → 422). No new token scheme, consistent with #3867's recorded CSRF story.
 
@@ -230,10 +237,10 @@ controllers, reached via `useRailsForm`.
 
   ```bash
   cd react_on_rails_pro/spec/dummy
-  pnpm install && bundle install && bin/rails db:prepare
+  pnpm install && bundle install && bundle exec bin/rails db:prepare
   pnpm run build:dev
-  RENDERER_PORT=3821 node renderer/node-renderer.js &
-  REACT_RENDERER_URL=http://localhost:3821 bin/rails s -p 3021
+  RENDERER_PORT=3821 pnpm exec node renderer/node-renderer.js &
+  REACT_RENDERER_URL=http://localhost:3821 bundle exec bin/rails s -p 3021
   open http://localhost:3021/spike_server_functions
   ```
 
