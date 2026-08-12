@@ -390,11 +390,11 @@ await reactOnRailsProNodeRenderer().catch((e) => {
 ```
 
 > [!NOTE]
-> With `fastify: true` or a nonempty `instrumentations` list, OpenTelemetry patches modules process-wide. If a later init step fails after those patches are installed, OpenTelemetry does not provide a rollback API; the patches remain installed until the process restarts, but the renderer resets its tracing adapters and shuts down its provider.
+> With `fastify: true` or a nonempty `instrumentations` list, OpenTelemetry patches modules process-wide. If a later init step fails after those patches are installed, OpenTelemetry does not provide a rollback API; the patches remain installed until the process restarts, but the renderer resets its tracing adapters and disables the OpenTelemetry globals it owns.
 
 ### Add instrumentations and resource detectors
 
-Pass one or more additional OpenTelemetry instrumentations through `instrumentations`. The renderer appends them after its built-in `HttpInstrumentation` and `FastifyOtelInstrumentation` instances, so the custom list extends rather than replaces the renderer defaults. A nonempty list registers the full combined list even when `fastify` is not set separately. An empty list is inert and does not load or register the built-in instrumentations.
+Pass one or more additional OpenTelemetry instrumentations through `instrumentations`. The renderer appends them after its built-in `HttpInstrumentation` and `FastifyOtelInstrumentation` instances, so the custom list extends rather than replaces the renderer defaults. A nonempty list registers the full combined list even when `fastify` is not set separately and therefore requires `@opentelemetry/instrumentation`, `@opentelemetry/instrumentation-http`, and `@fastify/otel` to be installed. An empty list is inert and does not load or register the built-in instrumentations.
 
 Pass OpenTelemetry resource detectors through `resourceDetectors`. For example, an ECS deployment can install `@opentelemetry/resource-detector-aws` and let the AWS ECS detector discover container and cloud attributes. Extra instrumentation packages and detector packages remain application-owned optional dependencies.
 
@@ -429,7 +429,7 @@ initOpenTelemetry({
 });
 ```
 
-The renderer verifies that a global tracer provider has been registered before it installs `setupTracing` and `setupSubSpan`, preserving the renderer's `ror.*` spans. If no provider is registered yet, `init()` reports the ordering problem and remains retryable after the application registers its provider.
+The renderer verifies that a global tracer provider has been registered before it installs `setupTracing` and `setupSubSpan`, preserving the renderer's `ror.*` spans. If no provider is registered yet, `init()` reports the ordering problem without installing adapters. Register the provider, then call `init()` again to attach renderer tracing.
 
 The application continues to own exporters, processors, resources, instrumentations, propagators, flushing, and provider shutdown. Renderer-managed options such as `fastify`, `instrumentations`, `resourceDetectors`, `exporter`, `spanProcessor`, and `shutdownTimeoutMs` are ignored in this mode and produce a warning when supplied. Configure those features on the application-owned SDK before starting the renderer. In particular, register HTTP and Fastify instrumentation before the Fastify server loads so incoming `traceparent` context from Rails becomes the parent of the renderer's `ror.*` spans. The renderer does not add a shutdown hook for an external provider, so the host must flush and shut down its SDK during application shutdown.
 

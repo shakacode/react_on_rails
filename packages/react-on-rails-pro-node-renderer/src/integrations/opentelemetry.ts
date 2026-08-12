@@ -80,6 +80,8 @@ export interface OpenTelemetryInitOptions {
 }
 
 const DEFAULT_SHUTDOWN_TIMEOUT_MS = 5_000;
+// Existing-provider mode intentionally requires only the OpenTelemetry API facade.
+const SERVICE_NAME_ATTRIBUTE = 'service.name';
 // Leave 1s of headroom under the worker's hard cap so the shutdown hook can
 // resolve cleanly even when provider.shutdown() runs right at its limit.
 const MAX_SHUTDOWN_TIMEOUT_MS = WORKER_SHUTDOWN_HOOKS_TIMEOUT_MS - 1_000;
@@ -263,7 +265,7 @@ function initWithExistingGlobalProvider(opts: OpenTelemetryInitOptions): void {
      * configuration, instrumentations, resources, and provider shutdown. */
     const otelApi = require('@opentelemetry/api') as typeof import('@opentelemetry/api');
     /* eslint-enable @typescript-eslint/no-require-imports, global-require */
-    const serviceName = resolveServiceName(opts, 'service.name');
+    const serviceName = resolveServiceName(opts, SERVICE_NAME_ATTRIBUTE);
     if (!hasRegisteredGlobalTracerProvider(otelApi, serviceName)) {
       message(
         '[OpenTelemetry] useExistingGlobalProvider: no global tracer provider is registered; ' +
@@ -355,7 +357,12 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
     const loadedOtelApi = otelApi;
 
     const shutdownTimeoutMs = resolveShutdownTimeoutMs(opts);
-    const { resource, serviceName } = resolveResource(opts, resources, ATTR_SERVICE_NAME);
+    const { resource, serviceName } = resolveResource(opts, resources, ATTR_SERVICE_NAME, (detector, err) => {
+      log.warn(
+        { detector: detector.constructor.name, err },
+        '[OpenTelemetry] resource detector failed; unavailable attributes are omitted',
+      );
+    });
 
     const defaultExporter = () => {
       const { OTLPTraceExporter } =
@@ -417,7 +424,7 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
       /* eslint-enable @typescript-eslint/no-require-imports, global-require */
       registerInstrumentations({
         instrumentations: [
-          // HTTP first — Fastify instrumentation depends on it.
+          // HTTP first - Fastify instrumentation depends on it.
           new HttpInstrumentation(),
           new FastifyOtelInstrumentation({ registerOnInitialization: true }),
           ...(opts.instrumentations ?? []),

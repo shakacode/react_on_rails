@@ -13,7 +13,7 @@
  * https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
-import type { Resource, ResourceDetector } from '@opentelemetry/resources';
+import type { DetectedResource, Resource, ResourceDetector } from '@opentelemetry/resources';
 
 const DEFAULT_SERVICE_NAME = 'react-on-rails-pro-node-renderer';
 
@@ -32,6 +32,50 @@ type ResourcesModule = Pick<
   typeof import('@opentelemetry/resources'),
   'detectResources' | 'resourceFromAttributes'
 >;
+
+type ResourceDetectorErrorReporter = (detector: ResourceDetector, error: unknown) => void;
+
+function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
+  return (
+    value !== null &&
+    (typeof value === 'object' || typeof value === 'function') &&
+    typeof (value as PromiseLike<unknown>).then === 'function'
+  );
+}
+
+function withDetectorErrorReporting(
+  detector: ResourceDetector,
+  reportError: ResourceDetectorErrorReporter,
+): ResourceDetector {
+  return {
+    detect(config): DetectedResource {
+      try {
+        const detectedResource = detector.detect(config);
+        if (!detectedResource.attributes) {
+          return detectedResource;
+        }
+
+        return {
+          ...detectedResource,
+          attributes: Object.fromEntries(
+            Object.entries(detectedResource.attributes).map(([key, value]) => [
+              key,
+              isPromiseLike(value)
+                ? Promise.resolve(value).catch((error: unknown) => {
+                    reportError(detector, error);
+                    return undefined;
+                  })
+                : value,
+            ]),
+          ),
+        };
+      } catch (error) {
+        reportError(detector, error);
+        return {};
+      }
+    },
+  };
+}
 
 function parseResourceAttributes(value: string | undefined): Record<string, string> {
   if (!value) return {};
@@ -76,6 +120,7 @@ export function resolveResource(
   opts: OpenTelemetryResourceOptions,
   resources: ResourcesModule,
   serviceNameAttribute: string,
+  reportDetectorError: ResourceDetectorErrorReporter,
 ): ResolvedResource {
   const resourceAttributes = {
     ...parseResourceAttributes(process.env.OTEL_RESOURCE_ATTRIBUTES),
@@ -96,7 +141,11 @@ export function resolveResource(
     };
   }
 
-  const detectedResource = resources.detectResources({ detectors: opts.resourceDetectors });
+  const detectedResource = resources.detectResources({
+    detectors: opts.resourceDetectors.map((detector) =>
+      withDetectorErrorReporting(detector, reportDetectorError),
+    ),
+  });
   const configuredResource = resources.resourceFromAttributes({
     [serviceNameAttribute]: serviceName,
     ...resourceAttributes,

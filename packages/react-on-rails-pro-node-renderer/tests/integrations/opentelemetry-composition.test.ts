@@ -156,6 +156,40 @@ describe('opentelemetry integration: composable init()', () => {
     }
   });
 
+  test('resource detector failures are logged and their attributes are omitted', async () => {
+    const thrownError = new Error('detector threw');
+    const rejectedError = new Error('attribute rejected');
+    const throwingDetector: ResourceDetector = {
+      detect: () => {
+        throw thrownError;
+      },
+    };
+    const rejectingDetector: ResourceDetector = {
+      detect: () => ({ attributes: { 'cloud.platform': Promise.reject(rejectedError) } }),
+    };
+    const log = (await import('../../src/shared/log')).default;
+    const warnSpy = jest.spyOn(log, 'warn').mockImplementation(() => undefined);
+    const exporter = new InMemorySpanExporter();
+    const spanProcessor = new SimpleSpanProcessor(exporter);
+    const { init } = await import('../../src/integrations/opentelemetry');
+
+    init({ resourceDetectors: [throwingDetector, rejectingDetector], spanProcessor });
+    otelTrace.getTracer('test').startActiveSpan('manual.span', (span) => span.end());
+    await spanProcessor.forceFlush();
+
+    expect(exporter.getFinishedSpans()[0]!.resource.attributes).toMatchObject({
+      'service.name': 'react-on-rails-pro-node-renderer',
+    });
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ err: thrownError }),
+      expect.stringContaining('resource detector failed'),
+    );
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ err: rejectedError }),
+      expect.stringContaining('resource detector failed'),
+    );
+  });
+
   test('an existing global provider can emit renderer ror spans without loading a second SDK', async () => {
     const exporter = new InMemorySpanExporter();
     const spanProcessor = new SimpleSpanProcessor(exporter);
@@ -221,10 +255,13 @@ describe('opentelemetry integration: composable init()', () => {
     });
     jest.doMock('@opentelemetry/sdk-trace-node', rendererSdkFactory);
 
+    const errorReporter = await import('../../src/shared/errorReporter');
+    const messageSpy = jest.spyOn(errorReporter, 'message').mockImplementation(() => undefined);
     const { init } = await import('../../src/integrations/opentelemetry');
     const tracing = await import('../../src/shared/tracing');
 
     init({ tracing: true, useExistingGlobalProvider: true });
+    expect(messageSpy).toHaveBeenCalledWith(expect.stringContaining('no global tracer provider'));
 
     const existingProvider = new NodeTracerProvider({ spanProcessors: [spanProcessor] });
     existingProvider.register();

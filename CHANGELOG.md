@@ -26,11 +26,6 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
-- **[Pro]** **Node Renderer OpenTelemetry initialization now composes with application observability stacks**:
-  Applications can append custom instrumentations to the built-in HTTP and Fastify pair, merge resource-detector
-  attributes below explicit resource configuration, or opt in to preserving renderer `ror.*` spans through an
-  application-owned global provider. Fixes [Issue 4867](https://github.com/shakacode/react_on_rails/issues/4867).
-
 - **[Pro]** **Rails requests to the Node Renderer once again continue OpenTelemetry traces**: The async-http transport
   now creates a CLIENT span and injects W3C trace context for regular and streaming renders, incremental async-props
   renders, raw-render requests, and asset uploads when the Rails application has configured the OpenTelemetry SDK.
@@ -307,6 +302,11 @@ pair`, returns invalid UTF-8, or silently mis-decodes the value. The parser now 
   [justin808](https://github.com/justin808).
 
 #### Added
+
+- **[Pro]** **Node Renderer OpenTelemetry initialization now composes with application observability stacks**:
+  Applications can append custom instrumentations to the built-in HTTP and Fastify pair, merge resource-detector
+  attributes below explicit resource configuration, or opt in to preserving renderer `ror.*` spans through an
+  application-owned global provider. Fixes [Issue 4867](https://github.com/shakacode/react_on_rails/issues/4867).
 
 - **[Pro]** **HTTP/1.1 is now a supported Node Renderer transport for load balancers and HTTP/1.1-only probes**:
   Rails can opt out of forcing h2c for cleartext renderer URLs with
