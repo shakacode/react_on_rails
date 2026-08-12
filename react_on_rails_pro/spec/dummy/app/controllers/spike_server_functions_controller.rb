@@ -37,7 +37,9 @@ class SpikeServerFunctionsController < ApplicationController
   MAX_SPIKE_ACTION_ID_BYTES = 4 * 1024
 
   def execute
-    if request.headers["X-RSC-Action"].to_s.bytesize > MAX_SPIKE_ACTION_ID_BYTES
+    action_id = request.headers["X-RSC-Action"].to_s
+    return render plain: "Missing server-function action id", status: :bad_request if action_id.empty?
+    if action_id.bytesize > MAX_SPIKE_ACTION_ID_BYTES
       return render plain: "Server-function action id too large", status: :payload_too_large
     end
     if request.raw_post.to_s.bytesize > MAX_SPIKE_ENCODED_REPLY_BYTES
