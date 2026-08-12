@@ -62,15 +62,17 @@ The private directory is removed by the harness traps. Exact credential bytes
 are snapshotted in runner memory before the agent starts, then searched as a
 binary stream in the workspace after each agent call and in the completed
 output after checksums are written. The evidence output path remains absent
-while either agent call runs. After each call, the PID-1 runner rejects any
-agent-created output path or process left in the container PID namespace; only
-then does it construct evidence in runner-private storage, validate the exact
-top-level regular-file manifest, and publish it. The unchanged original snapshot remains
-authoritative even if the CLI rotates or replaces its writable credential
-store; when Codex's current store still exists, its final bytes are scanned as
-a second independent needle. For Codex JSON credentials, sensitive
-token/key/secret leaf values from both generations are searched independently
-as well. A match, nonregular current store, unreadable artifact, or output
+while either agent call runs. After each call, the namespace-init-supervised
+runner rejects any agent-created output path, performs bounded cleanup and
+reaping of agent descendants, and independently rejects any process that still
+remains; only then does it construct evidence in runner-private storage,
+validate the exact top-level regular-file manifest, and publish it. The
+unchanged original snapshot remains authoritative even if the CLI rotates or
+replaces its writable credential store; when Codex's current store still
+exists, its final bytes are scanned as a second independent needle. For Codex
+JSON credentials, sensitive token/key/secret leaf values from both generations
+are searched independently as well. A match, nonregular current store,
+unreadable artifact, or output
 symlink fails closed. Workspace scans skip dependency symlinks without following
 them, while continuing to inspect every regular file; completed-output scans
 reject all symlinks. The committed output continues to record
@@ -91,10 +93,11 @@ through the final rename. Concurrent wrapper invocations for the same output
 therefore fail rather than nesting or overwriting evidence. Unrelated writers
 must not mutate the selected output parent while an eval is running.
 
-Process containment is deliberately conservative: any residual process-table
-entry other than the PID-1 runner and the active inspector, including a zombie,
-rejects the run. Discard the contaminated container rather than publishing
-evidence from it.
+Process containment is deliberately conservative: cleanup excludes only the
+namespace init, its directly supervised runner, and the active cleanup or
+inspection process. After bounded TERM-then-KILL cleanup and init reaping, any
+other residual process-table entry, including a zombie, rejects the run.
+Discard the contaminated container rather than publishing evidence from it.
 
 No React on Rails Pro license token is required for evaluation, development, or CI.
 The real eval requires only the operator model credential. Do not provision a Pro license token in this harness.
@@ -113,6 +116,12 @@ docker build \
 
 The build takes no credentials. Agent CLI and pnpm versions are pinned as
 Docker build arguments so a version update remains reviewable.
+
+The wrapper requires a Docker runtime that supports `docker run --init`. The
+namespace init is PID 1, reaps exited descendants, and supervises the eval
+runner. After each agent call, the runner performs bounded TERM-then-KILL
+cleanup of every remaining non-runner process and independently requires the
+PID namespace to be quiescent before it reads or publishes evidence.
 
 ## Run
 

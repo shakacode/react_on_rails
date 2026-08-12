@@ -66,7 +66,7 @@ else
   echo "GNU timeout or gtimeout is required; refusing an unbounded run" >&2
   exit 69
 fi
-required_commands=("$agent" curl env git head jq node npm perl pnpm realpath ruby shasum "$timeout_name")
+required_commands=("$agent" curl env git head jq node npm perl pnpm realpath ruby shasum sleep stat "$timeout_name")
 safe_path="$(SAFE_PATH_SOURCE="$PATH" BASH_ENV=/dev/null "$eval_dir/bin/build-safe-path" \
   "${required_commands[@]}")"
 
@@ -109,7 +109,7 @@ case "$workspace/" in "$root/"*) echo "workspace must be outside the repository"
 }
 [[ ! -e "$output" ]] || { echo "output already exists: $output" >&2; exit 65; }
 if [[ "$isolated_host_attestation" == true && \
-  ("${EVAL_ISOLATED_PID_NAMESPACE:-0}" != 1 || "$$" != 1) ]]; then
+  ("${EVAL_ISOLATED_PID_NAMESPACE:-0}" != 1 || "$$" == 1 || "$PPID" != 1) ]]; then
   echo "attested evals require the isolated PID namespace wrapper" >&2
   exit 65
 fi
@@ -381,6 +381,7 @@ run_agent "$eval_dir/network-probe-prompt.md" "$probe_timeout_seconds" "$raw_pro
   >"$raw_probe_events"
 probe_exit=$?
 set -e
+"$eval_dir/bin/quiesce-agent-call" "$output"
 "$eval_dir/bin/assert-agent-call-contained" "$output"
 normalize_agent_events "$raw_probe_events" "$normalized_probe_events" "$probe_exit"
 if [[ "$auth_material_available" == true ]]; then
@@ -418,6 +419,7 @@ if "$eval_dir/bin/probe-allows-scaffold" "$probe_exit" "$probe_result" "$sandbox
     >"$raw_scaffold_events"
   runner_exit=$?
   set -e
+  "$eval_dir/bin/quiesce-agent-call" "$output"
   "$eval_dir/bin/assert-agent-call-contained" "$output"
   [[ "$runner_exit" == 124 ]] && timed_out=true
   normalize_agent_events "$raw_scaffold_events" "$normalized_scaffold_events" "$runner_exit"

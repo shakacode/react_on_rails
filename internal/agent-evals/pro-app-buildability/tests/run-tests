@@ -145,6 +145,95 @@ if "$eval_dir/bin/assert-agent-call-contained" "$tmp/injected-agent-output" \
   exit 1
 fi
 rg -q 'agent created the evidence output' "$tmp/injected-agent-output-error"
+if "$eval_dir/bin/quiesce-agent-call" "$tmp/injected-agent-output" \
+  2>"$tmp/quiesce-injected-agent-output-error"; then
+  echo "agent quiescence accepted a pre-created output" >&2
+  exit 1
+fi
+rg -q 'agent created the evidence output' "$tmp/quiesce-injected-agent-output-error"
+
+test -x "$eval_dir/bin/quiesce-agent-call"
+mkdir "$tmp/quiesce-proc" "$tmp/quiesce-proc/1" "$tmp/quiesce-proc/7" \
+  "$tmp/quiesce-proc/42" "$tmp/quiesce-proc/43"
+for process_id in 1 7 42 43; do
+  process_parent=0
+  [[ "$process_id" == 7 ]] && process_parent=1
+  [[ "$process_id" == 42 ]] && process_parent=7
+  [[ "$process_id" == 43 ]] && process_parent=1
+  printf 'PPid:\t%s\n' "$process_parent" >"$tmp/quiesce-proc/$process_id/status"
+done
+printf '%s\n' active >"$tmp/quiesce-proc/42/test-kind"
+printf '%s\n' exited >"$tmp/quiesce-proc/43/test-kind"
+# The generated hook expands these variables when the hook runs, not while this test writes it.
+# shellcheck disable=SC2016
+printf '%s\n' '#!/bin/sh' 'set -eu' \
+  'event=$1' 'process_id=$2' 'proc_root=$3' \
+  'printf "%s %s\n" "$event" "$process_id" >>"$QUIESCE_CONTROL_LOG"' \
+  'if [ "$event" = TERM ] && [ -f "$proc_root/$process_id/test-kind" ] &&' \
+  '  [ "$(cat "$proc_root/$process_id/test-kind")" = active ]; then' \
+  '  rm -r "$proc_root/$process_id"' \
+  '  mkdir "$proc_root/45"' \
+  '  printf "PPid:\t1\n" >"$proc_root/45/status"' \
+  '  printf "%s\n" exited >"$proc_root/45/test-kind"' \
+  'elif [ "$event" = REAP ]; then' \
+  '  for process_dir in "$proc_root"/[0-9]*; do' \
+  '    [ -f "$process_dir/test-kind" ] || continue' \
+  '    [ "$(cat "$process_dir/test-kind")" != exited ] || rm -r "$process_dir"' \
+  '  done' \
+  'fi' >"$tmp/quiesce-control-hook"
+chmod 700 "$tmp/quiesce-control-hook"
+EVAL_AGENT_CONTAINMENT_TEST_MODE=1 EVAL_ISOLATED_PID_NAMESPACE=1 \
+  EVAL_PROC_ROOT="$tmp/quiesce-proc" EVAL_RUNNER_PID=7 \
+  QUIESCE_CONTROL_LOG="$tmp/quiesce-control-log" \
+  EVAL_PROCESS_CONTROL_HOOK="$tmp/quiesce-control-hook" \
+  "$eval_dir/bin/quiesce-agent-call" "$tmp/absent-agent-output"
+test ! -e "$tmp/quiesce-proc/42"
+test ! -e "$tmp/quiesce-proc/43"
+test ! -e "$tmp/quiesce-proc/45"
+if rg -q '^(?:TERM|KILL) (?:0|1|7)$' "$tmp/quiesce-control-log"; then
+  echo "agent quiescence signaled init, runner, or its own control event" >&2
+  exit 1
+fi
+rg -Fq 'TERM 42' "$tmp/quiesce-control-log"
+rg -Fq 'REAP 0' "$tmp/quiesce-control-log"
+EVAL_AGENT_CONTAINMENT_TEST_MODE=1 EVAL_ISOLATED_PID_NAMESPACE=1 \
+  EVAL_PROC_ROOT="$tmp/quiesce-proc" EVAL_RUNNER_PID=7 \
+  "$eval_dir/bin/assert-agent-call-contained" "$tmp/absent-agent-output"
+
+mkdir "$tmp/stubborn-quiesce-proc" "$tmp/stubborn-quiesce-proc/1" \
+  "$tmp/stubborn-quiesce-proc/7" "$tmp/stubborn-quiesce-proc/44"
+for process_id in 1 7 44; do
+  process_parent=0
+  [[ "$process_id" == 7 ]] && process_parent=1
+  [[ "$process_id" == 44 ]] && process_parent=7
+  printf 'PPid:\t%s\n' "$process_parent" >"$tmp/stubborn-quiesce-proc/$process_id/status"
+done
+# The generated hook records the bounded TERM-to-KILL sequence when it runs.
+# shellcheck disable=SC2016
+printf '%s\n' '#!/bin/sh' 'printf "%s %s\n" "$1" "$2" >>"$STUBBORN_CONTROL_LOG"' \
+  >"$tmp/stubborn-quiesce-control-hook"
+chmod 700 "$tmp/stubborn-quiesce-control-hook"
+if EVAL_AGENT_CONTAINMENT_TEST_MODE=1 EVAL_ISOLATED_PID_NAMESPACE=1 \
+  EVAL_PROC_ROOT="$tmp/stubborn-quiesce-proc" EVAL_RUNNER_PID=7 \
+  EVAL_PROCESS_CONTROL_HOOK="$tmp/stubborn-quiesce-control-hook" \
+  EVAL_PROCESS_QUIESCE_DELAY=0 \
+  STUBBORN_CONTROL_LOG="$tmp/stubborn-quiesce-control-log" \
+  "$eval_dir/bin/quiesce-agent-call" "$tmp/absent-agent-output" \
+  2>"$tmp/stubborn-quiesce-error"; then
+  echo "agent quiescence accepted an unquiesceable process" >&2
+  exit 1
+fi
+rg -q 'agent processes remain after bounded cleanup' "$tmp/stubborn-quiesce-error"
+test -d "$tmp/stubborn-quiesce-proc/44"
+rg -Fq 'TERM 44' "$tmp/stubborn-quiesce-control-log"
+rg -Fq 'KILL 44' "$tmp/stubborn-quiesce-control-log"
+if EVAL_PROCESS_CONTROL_HOOK="$tmp/quiesce-control-hook" \
+  "$eval_dir/bin/quiesce-agent-call" "$tmp/absent-agent-output" \
+  2>"$tmp/inactive-quiesce-hook-error"; then
+  echo "agent quiescence accepted a test hook outside test mode" >&2
+  exit 1
+fi
+rg -q 'process overrides require explicit test mode' "$tmp/inactive-quiesce-hook-error"
 
 for boundary_case in attested-codex unattested-codex unattested-claude; do
   boundary_run="$tmp/missing-boundary-$boundary_case"
@@ -984,7 +1073,7 @@ rg -Fq -- "--mcp-config '{\"mcpServers\":{}}'" "$eval_dir/bin/run-eval"
 rg -q 'apiKeyHelper:\$helper' "$eval_dir/bin/run-eval"
 rg -Fq "credential_helper_command='/bin/sh \"\$TMPDIR/../credential-helper\"'" \
   "$eval_dir/bin/run-eval"
-rg -q 'node npm perl pnpm' "$eval_dir/bin/run-eval"
+rg -q 'node npm perl pnpm realpath ruby shasum sleep stat' "$eval_dir/bin/run-eval"
 rg -q 'CODEX_HOME=\$private_dir/codex-home' "$eval_dir/bin/run-eval"
 rg -q 'rubygems_probe_command="gem search --remote --exact '\''\^rails\$'\''"' "$eval_dir/bin/run-eval"
 rg -q 'stripped_sensitive_variable_categories' "$eval_dir/bin/run-eval"
@@ -1017,6 +1106,10 @@ test "$(rg -n '^evidence_dir=' "$eval_dir/bin/run-eval" | cut -d: -f1)" -gt \
   "$(rg -Fn 'run_agent "$eval_dir/prompt.md"' "$eval_dir/bin/run-eval" | cut -d: -f1)"
 test "$(rg -Fc '"$eval_dir/bin/assert-agent-call-contained" "$output"' \
   "$eval_dir/bin/run-eval")" -eq 3
+test "$(rg -Fc '"$eval_dir/bin/quiesce-agent-call" "$output"' \
+  "$eval_dir/bin/run-eval")" -eq 2
+rg -Fq '[[ "$process_pid" == 1 || "$process_pid" == "$runner_pid" || "$process_pid" == "$$" ]]' \
+  "$eval_dir/bin/quiesce-agent-call"
 rg -Fq 'npm config set cache "$npm_cache" --location=user' "$eval_dir/bin/prepare-agent-state"
 rg -Fq '"BUNDLE_PATH" => ARGV.fetch(1)' "$eval_dir/bin/prepare-agent-state"
 rg -Fq '"--install-dir", ARGV.fetch(1), "--bindir", ARGV.fetch(2)' \
@@ -1086,6 +1179,8 @@ rg -Fq -- '--mount "type=bind,source=$staging_parent,target=/evidence"' \
 rg -Fq -- '--read-only' "$isolated_host/run-in-container"
 rg -Fq -- '--cap-drop ALL' "$isolated_host/run-in-container"
 rg -Fq -- '--pids-limit 4096' "$isolated_host/run-in-container"
+rg -Fq -- '--init' "$isolated_host/run-in-container"
+rg -Fq 'Docker runtime that supports `docker run --init`' "$isolated_host/README.md"
 rg -Fq -- '--security-opt no-new-privileges' "$isolated_host/run-in-container"
 rg -Fq -- '--model-credential-stdin' "$isolated_host/run-in-container"
 rg -Fq -- '<&"$model_credential_fd"' "$isolated_host/run-in-container"
@@ -1186,6 +1281,7 @@ test "$(cat "$tmp/fake-docker-stdin-sha")" = "$wrapper_model_credential_sha"
 test "$(cat "$tmp/wrapper-model-credential")" = replacement-model-credential
 rg -Fxq -- '--model-credential-stdin' "$tmp/fake-docker-args"
 test "$(awk '$0 == "--pids-limit" { getline; print; exit }' "$tmp/fake-docker-args")" = 4096
+rg -Fxq -- '--init' "$tmp/fake-docker-args"
 test "$(awk '$0 == "--env" { getline; if ($0 == "EVAL_AGENT_CONTAINMENT_TEST_MODE=0") { print; exit } }' \
   "$tmp/fake-docker-args")" = EVAL_AGENT_CONTAINMENT_TEST_MODE=0
 test "$(awk '$0 == "--run-id" { getline; print; exit }' "$tmp/fake-docker-args")" = \

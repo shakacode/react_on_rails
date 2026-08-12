@@ -109,6 +109,7 @@ lock_acquired=true
 
 docker_args=(
   run --rm --interactive
+  --init
   --read-only
   --cap-drop ALL
   --pids-limit 4096
