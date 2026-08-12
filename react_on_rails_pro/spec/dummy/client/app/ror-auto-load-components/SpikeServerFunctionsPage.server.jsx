@@ -57,7 +57,14 @@ async function executeSpikeServerFunction({ actionId, encodedReply }) {
     // bundled into the (non-RSC) SSR server bundle. Executor mode only ever runs in the
     // RSC bundle, so the import is only evaluated where it is valid.
     const { decodeReply } = await import('react-on-rails-rsc/server');
-    const args = await decodeReply(String(encodedReply));
+    // SEAM FINDING: the node renderer's VM sandbox does not expose the web `FormData`
+    // global, and `decodeReply(string)` does `new FormData()` internally, so the string
+    // fast path throws "FormData is not defined" inside the renderer. Flight only calls
+    // `.get(prefix + id)` on the form-data object for the simple string encoding, so a
+    // Map is a sufficient duck-typed stand-in for the spike. A real implementation must
+    // add FormData (undici's) to the renderer VM globals instead.
+    const formDataShim = new Map([['0', String(encodedReply)]]);
+    const args = await decodeReply(formDataShim);
     const returnValue = await serverFunction(...args);
     return { spikeActionResult: returnValue };
   } catch (error) {

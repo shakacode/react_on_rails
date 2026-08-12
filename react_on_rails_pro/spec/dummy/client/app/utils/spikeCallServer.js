@@ -70,6 +70,11 @@ function extractFlightStream(body) {
             append(value);
             // Drain every complete `<metadata>\t<8-hex length>\n<content>` frame in the buffer.
             for (;;) {
+              // Frames may be separated by bare newlines (the Rails template adds one after
+              // the first rendered chunk); skip them before parsing the next frame header.
+              let skip = 0;
+              while (skip < buffer.length && buffer[skip] === 0x0a) skip += 1;
+              if (skip > 0) buffer = buffer.subarray(skip).slice();
               const newlineIndex = buffer.indexOf(0x0a);
               if (newlineIndex === -1) break;
               const header = decoder.decode(buffer.subarray(0, newlineIndex));

@@ -79,19 +79,21 @@ const SpikeServerFunctionForm = () => {
           Call addNumbers(20, 22)
         </button>
       </div>
-      {pending && <p id="spike-pending">Calling server function…</p>}
-      {result && (
-        <pre id="spike-result" style={{ background: '#f4f4f4', padding: 8, marginTop: 12 }}>
-          {JSON.stringify(result, null, 2)}
-        </pre>
-      )}
-      {error && (
-        <p id="spike-error" style={{ color: 'red', marginTop: 12 }}>
-          {error}
-        </p>
-      )}
+      <p id="spike-pending">{pending ? 'Calling server function...' : ''}</p>
+      <pre id="spike-result" style={{ background: '#f4f4f4', padding: 8, marginTop: 12 }}>
+        {result ? JSON.stringify(result, null, 2) : ''}
+      </pre>
+      <p id="spike-error" style={{ color: 'red', marginTop: 12 }}>
+        {error || ''}
+      </p>
     </div>
   );
 };
+// NOTE (probe (a) incidental finding): the published react-on-rails-rsc WebpackLoader parses
+// raw JSX with acorn-loose to find exports; several `{cond && (<jsx/>)}` blocks in this file
+// made loose-recovery swallow the trailing `export default`, so the RSC bundle got an EMPTY
+// client-reference module (component silently vanished from the payload). Ternary-content
+// nodes above keep the file loose-parseable. A faithful implementation must parse with a real
+// JSX-aware parser (babel/acorn-jsx) instead.
 
 export default SpikeServerFunctionForm;
