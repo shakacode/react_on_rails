@@ -791,6 +791,94 @@ if [[ "$sensitive_clean_exit" != 1 ]]; then
   exit 1
 fi
 
+cat >"$tmp/runtime-generated-secret-expressions" <<'EOF'
+SECRET_KEY_BASE=$(bin/rails secret) npm run build > <LOCAL_PATH>/.ror-eval-state/prod-build.log 2>&1
+SECRET_KEY_BASE=$(bin/rails secret)
+RAILS_ENV=production NODE_ENV=production SECRET_KEY_BASE=$(bin/rails secret) npm run build
+	SECRET_KEY_BASE=$(bin/rails secret) bin/rails assets:precompile
+SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>" npm run build
+EOF
+perl "$eval_dir/bin/sanitize-events.pl" "$tmp/runtime-generated-secret-expressions" \
+  >"$tmp/runtime-generated-secret-expressions.perl-safe"
+node --input-type=module -e \
+  'import fs from "node:fs"; import { pathToFileURL } from "node:url";
+   const [helper, input] = process.argv.slice(1);
+   const { redactSensitiveValues } = await import(pathToFileURL(helper));
+   process.stdout.write(redactSensitiveValues(fs.readFileSync(input, "utf8")));' \
+  "$eval_dir/bin/sensitive-values.mjs" "$tmp/runtime-generated-secret-expressions" \
+  >"$tmp/runtime-generated-secret-expressions.js-safe"
+cmp "$tmp/runtime-generated-secret-expressions.perl-safe" \
+  "$tmp/runtime-generated-secret-expressions.js-safe"
+cat >"$tmp/runtime-generated-secret-expressions.expected" <<'EOF'
+SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>" npm run build > <LOCAL_PATH>/.ror-eval-state/prod-build.log 2>&1
+SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>"
+RAILS_ENV=production NODE_ENV=production SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>" npm run build
+	SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>" bin/rails assets:precompile
+SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>" npm run build
+EOF
+cmp "$tmp/runtime-generated-secret-expressions.expected" \
+  "$tmp/runtime-generated-secret-expressions.perl-safe"
+set +e
+"$eval_dir/bin/scan-sensitive-artifacts" \
+  "$tmp/runtime-generated-secret-expressions.perl-safe" >/dev/null
+runtime_generated_safe_scan_exit=$?
+set -e
+test "$runtime_generated_safe_scan_exit" = 1
+
+cat >"$tmp/runtime-generated-secret-near-misses" <<'EOF'
+SECRET_KEY_BASE=real-runtime-value npm run build
+secret_key_base=$(bin/rails secret) npm run build
+SECRET_KEY_BASE=$(bin/rails  secret) npm run build
+SECRET_KEY_BASE=$( bin/rails secret) npm run build
+SECRET_KEY_BASE=$(bin/rails secret ) npm run build
+SECRET_KEY_BASE="$(bin/rails secret)" npm run build
+SECRET_KEY_BASE=$(bin/rails secret --hex) npm run build
+SECRET_KEY_BASE=$(rails secret) npm run build
+RAILS_MASTER_KEY=$(bin/rails secret) npm run build
+SECRET_KEY_BASE=$(bin/rails secret)x npm run build
+XSECRET_KEY_BASE=$(bin/rails secret) npm run build
+SECRET_KEY_BASE="<generated_at_runtime>" npm run build
+SECRET_KEY_BASE=" <GENERATED_AT_RUNTIME> " npm run build
+EOF
+perl "$eval_dir/bin/sanitize-events.pl" "$tmp/runtime-generated-secret-near-misses" \
+  >"$tmp/runtime-generated-secret-near-misses.perl-safe"
+node --input-type=module -e \
+  'import fs from "node:fs"; import { pathToFileURL } from "node:url";
+   const [helper, input] = process.argv.slice(1);
+   const { redactSensitiveValues } = await import(pathToFileURL(helper));
+   process.stdout.write(redactSensitiveValues(fs.readFileSync(input, "utf8")));' \
+  "$eval_dir/bin/sensitive-values.mjs" "$tmp/runtime-generated-secret-near-misses" \
+  >"$tmp/runtime-generated-secret-near-misses.js-safe"
+cmp "$tmp/runtime-generated-secret-near-misses.perl-safe" \
+  "$tmp/runtime-generated-secret-near-misses.js-safe"
+test "$(rg -c '\[REDACTED\]' "$tmp/runtime-generated-secret-near-misses.perl-safe")" = 13
+if rg -Fq '$(bin/rails secret)' "$tmp/runtime-generated-secret-near-misses.perl-safe" ||
+  rg -Fq 'real-runtime-value' "$tmp/runtime-generated-secret-near-misses.perl-safe"; then
+  echo "runtime-generated secret near miss bypassed redaction" >&2
+  exit 1
+fi
+set +e
+"$eval_dir/bin/scan-sensitive-artifacts" \
+  "$tmp/runtime-generated-secret-near-misses.perl-safe" >/dev/null
+runtime_generated_near_miss_scan_exit=$?
+set -e
+test "$runtime_generated_near_miss_scan_exit" = 1
+
+cat >"$tmp/runtime-generated-secret.jsonl" <<'EOF'
+{"type":"item.completed","item":{"type":"command_execution","command":"SECRET_KEY_BASE=$(bin/rails secret) npm run build","exit_code":0,"status":"completed","aggregated_output":"compiled successfully"},"payload":{"SECRET_KEY_BASE":"$(bin/rails secret)"}}
+EOF
+perl "$eval_dir/bin/sanitize-events.pl" --jsonl "$tmp/runtime-generated-secret.jsonl" \
+  >"$tmp/runtime-generated-secret.safe.jsonl"
+jq -e '
+  .item.command == "SECRET_KEY_BASE=\"<GENERATED_AT_RUNTIME>\" npm run build" and
+  .payload.SECRET_KEY_BASE == "[REDACTED]"
+' "$tmp/runtime-generated-secret.safe.jsonl" >/dev/null
+set +e
+"$eval_dir/bin/scan-sensitive-artifacts" "$tmp/runtime-generated-secret.safe.jsonl" >/dev/null
+runtime_generated_jsonl_scan_exit=$?
+set -e
+test "$runtime_generated_jsonl_scan_exit" = 1
+
 printf '%s\n' \
   'Authorization Bearer eyJhbGciOiJIUzI1NiJ9.payload.signature' \
   'token: "abc,secret123"' \
@@ -1096,7 +1184,8 @@ cat >"$tmp/agent-report-sensitive-phrasing.json" <<'EOF'
   "commands": [
     "authorization: synthetic-sensitive-value",
     "credential_store: file",
-    "already safe: [REDACTED]"
+    "already safe: [REDACTED]",
+    "SECRET_KEY_BASE=$(bin/rails secret) npm run build"
   ],
   "checks": [
     {"command": "bin/rails test", "exit_code": 0, "result": "pass"}
@@ -1119,6 +1208,7 @@ jq -e '
   .commands[0] == "authorization: [REDACTED]" and
   .commands[1] == "credential_store: file" and
   .commands[2] == "already safe: [REDACTED]" and
+  .commands[3] == "SECRET_KEY_BASE=\"<GENERATED_AT_RUNTIME>\" npm run build" and
   .friction[0] == "token: [REDACTED]" and
   .checks[0].exit_code == 0 and
   .human_interventions == 0
@@ -2903,8 +2993,10 @@ mkdir "$tmp/claude-v6-build-output"
 node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-build-events.jsonl" \
   "$tmp/claude-v6-workspace" "$tmp/claude-v6-build-output" \
   "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+# Runtime-generated secret expressions are canonicalized before evidence derivation.
+# Keep the old classifier fail closed until its exact placeholder matcher is updated separately.
 test "$(jq -r '.items[] | select(.id == "build.production") | .status' \
-  "$tmp/claude-v6-build-output/rubric-results.json")" = pass
+  "$tmp/claude-v6-build-output/rubric-results.json")" = unknown
 
 claude_v6_test_command=$'source <LOCAL_PATH>/.ror-eval-state/pgenv.sh\ncd <LOCAL_PATH>/eval_app\nRAILS_ENV=test bin/rails test 2>&1 | tail -150'
 jq -cn --arg command "$claude_v6_test_command" \
@@ -2925,12 +3017,15 @@ mkdir "$tmp/claude-v6-classifier-output"
 node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-classifier-events.jsonl" \
   "$tmp/claude-v6-workspace" "$tmp/claude-v6-classifier-output" \
   "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
-for row in install.pro rsc.route form.validation tests.page tests.form build.production \
-  tests.green unaided evidence.complete; do
+for row in install.pro rsc.route form.validation tests.page tests.form tests.green unaided; do
   test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
     "$tmp/claude-v6-classifier-output/rubric-results.json")" = pass
 done
-test "$(jq -r '.overall' "$tmp/claude-v6-classifier-output/rubric-results.json")" = pass
+for row in build.production evidence.complete; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/claude-v6-classifier-output/rubric-results.json")" = unknown
+done
+test "$(jq -r '.overall' "$tmp/claude-v6-classifier-output/rubric-results.json")" = fail
 
 claude_v6_scaffold_rejections=(
   $'source "<LOCAL_PATH>/.ror-eval-state/pgenv.sh"\nnpx --yes create-react-on-rails-app eval_app --rsc --template typescript 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/create-app.log | tail -150'

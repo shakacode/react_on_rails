@@ -16,9 +16,18 @@ sub sensitive_name {
 
 sub credential_value {
   my ($value) = @_;
+  return 0 if $value eq '<GENERATED_AT_RUNTIME>';
   $value =~ s/^\s+|\s+$//g;
   return 0 if !length($value) || $value eq '[REDACTED]';
   return $value !~ /^(?:auto|false|file|keyring|none|null|true|unknown)$/i;
+}
+
+sub canonicalize_runtime_generated_secret {
+  my ($value) = @_;
+  $value =~ s{(^|[ \t])SECRET_KEY_BASE=\$\(bin/rails secret\)(?=[ \t]|$)}{
+    "$1" . 'SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>"'
+  }gme;
+  return $value;
 }
 
 sub decode_url_name {
@@ -149,6 +158,7 @@ sub redact_quoted_sensitive_values {
 
 sub sanitize_text {
   my ($content) = @_;
+  $content = canonicalize_runtime_generated_secret($content);
   $content = redact_structured_sensitive_values($content);
   $content =~ s{https?://[^\s"']+}{redact_url_credentials($&)}ige;
 

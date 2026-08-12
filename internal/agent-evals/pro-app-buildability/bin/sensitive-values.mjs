@@ -10,7 +10,9 @@ const privateKeyRemainder = /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*/gi;
 const bearerToken = /bearer\s+[a-z0-9._~+/=-]{12,}/gi;
 const nonSecretValues = new Set(['auto', 'false', 'file', 'keyring', 'none', 'null', 'true', 'unknown']);
 const looksLikeCredentialValue = (value) => {
-  const candidate = String(value).trim();
+  const rawValue = String(value);
+  if (rawValue === '<GENERATED_AT_RUNTIME>') return false;
+  const candidate = rawValue.trim();
   if (!candidate || candidate === '[REDACTED]') {
     return false;
   }
@@ -64,6 +66,12 @@ const redactUrlCredentials = (url) => {
 const redactCredentialsInWebUrls = (value) =>
   String(value).replace(/https?:\/\/[^\s"']+/gi, (url) => redactUrlCredentials(url));
 
+const canonicalizeRuntimeGeneratedSecret = (value) =>
+  String(value).replace(
+    /(^|[ \t])SECRET_KEY_BASE=\$\(bin\/rails secret\)(?=[ \t]|$)/gm,
+    '$1SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>"',
+  );
+
 const structuredValueEnd = (value, start) => {
   const stack = [value[start] === '{' ? '}' : ']'];
   let quote = null;
@@ -107,7 +115,7 @@ const redactStructuredSensitiveValues = (value) => {
 };
 
 export const redactSensitiveValues = (value) =>
-  redactStructuredSensitiveValues(redactCredentialsInWebUrls(value))
+  redactStructuredSensitiveValues(redactCredentialsInWebUrls(canonicalizeRuntimeGeneratedSecret(value)))
     .replace(quotedNamedValue, (match, name, separator, doubleQuotedValue, singleQuotedValue) => {
       const doubleQuoted = doubleQuotedValue !== undefined;
       const quote = doubleQuoted ? '"' : "'";
