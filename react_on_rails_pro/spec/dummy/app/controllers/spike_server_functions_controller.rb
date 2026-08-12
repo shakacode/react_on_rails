@@ -27,12 +27,19 @@
 class SpikeServerFunctionsController < ApplicationController
   include ReactOnRailsPro::RSCPayloadRenderer
 
-  # The encoded arguments are embedded into the rendering-request JS sent to the node
-  # renderer (JSON-escaped by the existing props serialization); cap the size so the spike
-  # endpoint cannot be used to ship megabytes into the renderer VM.
+  # The encoded arguments and action id are embedded into the rendering-request JS sent to
+  # the node renderer (JSON-escaped by the existing props serialization); cap both sizes so
+  # the spike endpoint cannot be used to ship megabytes into the renderer VM. (Note: these
+  # checks run after Rails has buffered the request — a real implementation should enforce
+  # limits before body materialization; see RFC Q2 in
+  # internal/planning/server-functions-implementation/02-rfc-revisit-server-functions.md.)
   MAX_SPIKE_ENCODED_REPLY_BYTES = 64 * 1024
+  MAX_SPIKE_ACTION_ID_BYTES = 4 * 1024
 
   def execute
+    if request.headers["X-RSC-Action"].to_s.bytesize > MAX_SPIKE_ACTION_ID_BYTES
+      return render plain: "Server-function action id too large", status: :payload_too_large
+    end
     if request.raw_post.to_s.bytesize > MAX_SPIKE_ENCODED_REPLY_BYTES
       return render plain: "Encoded server-function arguments too large", status: :payload_too_large
     end
