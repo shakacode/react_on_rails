@@ -806,6 +806,71 @@ node --input-type=module -e \
 cmp "$tmp/trailing-escape-perl-safe" "$tmp/trailing-escape-js-safe"
 test "$(cat "$tmp/trailing-escape-perl-safe")" = 'api_key:"[REDACTED]'
 
+cat >"$tmp/jsonl-structured-unsafe" <<'EOF'
+{"type":"synthetic","credentials":["synthetic-value"],"credential":{"value":"synthetic-value"},"payload":{"api_key":"synthetic-value","nested":[{"password":"synthetic-value","safe":"kept"}]},"credential_store":"file","flag":true,"count":7}
+{"type":"item.completed","item":{"type":"command_execution","command":"synthetic","exit_code":0,"aggregated_output":"api_key:\\\"synthetic-value\\\" credential: [synthetic]"}}
+EOF
+perl "$eval_dir/bin/sanitize-events.pl" --jsonl "$tmp/jsonl-structured-unsafe" \
+  >"$tmp/jsonl-structured-safe"
+test "$(wc -l <"$tmp/jsonl-structured-safe" | tr -d ' ')" = 2
+while IFS= read -r event; do
+  jq -e 'type == "object"' <<<"$event" >/dev/null
+done <"$tmp/jsonl-structured-safe"
+jq -se '
+  .[0].credentials == "[REDACTED]" and
+  .[0].credential == "[REDACTED]" and
+  .[0].payload.api_key == "[REDACTED]" and
+  .[0].payload.nested[0].password == "[REDACTED]" and
+  .[0].payload.nested[0].safe == "kept" and
+  .[0].credential_store == "file" and
+  .[0].flag == true and
+  .[0].count == 7 and
+  (.[1].item.aggregated_output | contains("[REDACTED]"))
+' "$tmp/jsonl-structured-safe" >/dev/null
+
+# The template expression is evaluated by Node, not the shell.
+# shellcheck disable=SC2016
+node -e \
+  'const fs = require("node:fs"); const value = `line-one\n${"escaped \\\"quote\\\" and \\\\ tail ".repeat(6000)}`;
+   fs.writeFileSync(process.argv[1], `${JSON.stringify({type:"synthetic",item:{text:value}})}\n`);' \
+  "$tmp/jsonl-large-unsafe"
+perl "$eval_dir/bin/sanitize-events.pl" --jsonl "$tmp/jsonl-large-unsafe" \
+  >"$tmp/jsonl-large-safe"
+jq -e 'type == "object" and (.item.text | startswith("line-one\n"))' \
+  "$tmp/jsonl-large-safe" >/dev/null
+test "$(jq -r .item.text "$tmp/jsonl-large-unsafe" | shasum -a 256)" = \
+  "$(jq -r .item.text "$tmp/jsonl-large-safe" | shasum -a 256)"
+
+printf '%s' '{"type":' >"$tmp/jsonl-malformed"
+if perl "$eval_dir/bin/sanitize-events.pl" --jsonl "$tmp/jsonl-malformed" \
+  >"$tmp/jsonl-malformed-safe" 2>"$tmp/jsonl-malformed-error"; then
+  echo "JSONL sanitizer accepted malformed input" >&2
+  exit 1
+fi
+test ! -s "$tmp/jsonl-malformed-safe"
+rg -q 'malformed JSONL event at line 1' "$tmp/jsonl-malformed-error"
+printf '%s\n' '[]' >"$tmp/jsonl-unexpected"
+if perl "$eval_dir/bin/sanitize-events.pl" --jsonl "$tmp/jsonl-unexpected" \
+  >"$tmp/jsonl-unexpected-safe" 2>"$tmp/jsonl-unexpected-error"; then
+  echo "JSONL sanitizer accepted a non-object event" >&2
+  exit 1
+fi
+test ! -s "$tmp/jsonl-unexpected-safe"
+rg -q 'JSONL event at line 1 is not an object' "$tmp/jsonl-unexpected-error"
+
+node -e 'process.stdout.write("{}\n".repeat(5001))' >"$tmp/jsonl-too-many-events"
+if perl "$eval_dir/bin/sanitize-events.pl" --jsonl "$tmp/jsonl-too-many-events" \
+  >"$tmp/jsonl-too-many-events-safe" 2>"$tmp/jsonl-too-many-events-error"; then
+  echo "JSONL sanitizer accepted too many events" >&2
+  exit 1
+fi
+test ! -s "$tmp/jsonl-too-many-events-safe"
+rg -q 'JSONL input exceeds 5000-event limit' "$tmp/jsonl-too-many-events-error"
+
+printf '%s\n' 'credentials: ["synthetic-value"]' >"$tmp/raw-stderr-unsafe"
+perl "$eval_dir/bin/sanitize-events.pl" "$tmp/raw-stderr-unsafe" >"$tmp/raw-stderr-safe"
+test "$(cat "$tmp/raw-stderr-safe")" = 'credentials: [REDACTED]'
+
 rg -q 'credential_store:"file"' "$tmp/parity-perl-safe"
 "$eval_dir/bin/scan-sensitive-artifacts" "$tmp/parity-unsafe" >/dev/null
 if "$eval_dir/bin/scan-sensitive-artifacts" "$tmp/parity-perl-safe" >/dev/null; then
@@ -874,6 +939,13 @@ if perl "$eval_dir/bin/sanitize-events.pl" "$tmp/oversized-raw-events" \
 fi
 test ! -s "$tmp/oversized-raw-events.safe"
 rg -q 'exceeds 1048576-byte limit' "$tmp/oversized-raw-events.stderr"
+if perl "$eval_dir/bin/sanitize-events.pl" --jsonl "$tmp/oversized-raw-events" \
+  >"$tmp/oversized-jsonl-events.safe" 2>"$tmp/oversized-jsonl-events.stderr"; then
+  echo "oversized JSONL event stream was not rejected" >&2
+  exit 1
+fi
+test ! -s "$tmp/oversized-jsonl-events.safe"
+rg -q 'exceeds 1048576-byte limit' "$tmp/oversized-jsonl-events.stderr"
 
 rg -q '^umask 077$' "$eval_dir/bin/run-eval"
 rg -q '^trap cleanup EXIT$' "$eval_dir/bin/run-eval"
@@ -888,6 +960,10 @@ rg -q -- '--ack-disposable-secret-free-host' "$eval_dir/bin/run-eval"
 rg -Fq '[--model-credential-stdin]' "$eval_dir/bin/run-eval"
 rg -Fq 'timeout_kill_grace_seconds=10' "$eval_dir/bin/run-eval"
 rg -Fq '"$eval_dir/bin/run-with-timeout" "$timeout_command"' "$eval_dir/bin/run-eval"
+rg -Fq 'sanitize-events.pl" --jsonl "$normalized_probe_events"' "$eval_dir/bin/run-eval"
+rg -Fq 'sanitize-events.pl" --jsonl "$normalized_scaffold_events"' "$eval_dir/bin/run-eval"
+rg -Fq 'sanitize-events.pl" "$raw_probe_stderr"' "$eval_dir/bin/run-eval"
+rg -Fq 'sanitize-events.pl" "$raw_scaffold_stderr"' "$eval_dir/bin/run-eval"
 rg -Fq -- '--verbose --kill-after "$kill_grace" "$duration"' \
   "$eval_dir/bin/run-with-timeout"
 rg -Fq 'maximum_agent_call_wall_clock_seconds=$((probe_timeout_seconds + timeout_seconds +' \

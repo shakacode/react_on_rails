@@ -387,7 +387,7 @@ if [[ "$auth_material_available" == true ]]; then
   assert_credential_absent "$workspace" --skip-symlinks
 fi
 EVAL_PRIVATE_DIR="$private_dir" EVAL_WORKSPACE="$workspace" EVAL_OUTPUT="$output" \
-  perl "$eval_dir/bin/sanitize-events.pl" "$normalized_probe_events" >"$safe_probe_events"
+  perl "$eval_dir/bin/sanitize-events.pl" --jsonl "$normalized_probe_events" >"$safe_probe_events"
 EVAL_PRIVATE_DIR="$private_dir" EVAL_WORKSPACE="$workspace" EVAL_OUTPUT="$output" \
   perl "$eval_dir/bin/sanitize-events.pl" "$raw_probe_stderr" >"$safe_probe_stderr"
 network_probe_file="$private_dir/sandbox-network-probe.json"
@@ -425,7 +425,7 @@ if "$eval_dir/bin/probe-allows-scaffold" "$probe_exit" "$probe_result" "$sandbox
     assert_credential_absent "$workspace" --skip-symlinks
   fi
   EVAL_PRIVATE_DIR="$private_dir" EVAL_WORKSPACE="$workspace" EVAL_OUTPUT="$output" \
-    perl "$eval_dir/bin/sanitize-events.pl" "$normalized_scaffold_events" >"$safe_scaffold_events"
+    perl "$eval_dir/bin/sanitize-events.pl" --jsonl "$normalized_scaffold_events" >"$safe_scaffold_events"
   EVAL_PRIVATE_DIR="$private_dir" EVAL_WORKSPACE="$workspace" EVAL_OUTPUT="$output" \
     perl "$eval_dir/bin/sanitize-events.pl" "$raw_scaffold_stderr" >"$safe_scaffold_stderr"
   printf '%s\n' "$safe_probe_events_text" >"$safe_events"
