@@ -2618,4 +2618,245 @@ node "$eval_dir/bin/derive-evidence.mjs" "$tmp/literal-build-marker-events.jsonl
 test "$(jq -r '.items[] | select(.id == "build.production") | .status' \
   "$tmp/literal-build-marker-output/rubric-results.json")" = unknown
 
+mkdir -p "$tmp/claude-v6-workspace/eval_app/app/controllers" \
+  "$tmp/claude-v6-workspace/eval_app/app/javascript/src/HelloServer/ror_components" \
+  "$tmp/claude-v6-workspace/eval_app/app/models" \
+  "$tmp/claude-v6-workspace/eval_app/config" \
+  "$tmp/claude-v6-workspace/eval_app/test/integration"
+printf '%s\n' "gem 'react_on_rails_pro'" >"$tmp/claude-v6-workspace/eval_app/Gemfile"
+printf '%s\n' \
+  '{"dependencies":{"react-on-rails-pro":"1.0.0"},"scripts":{"build":"RAILS_ENV=production NODE_ENV=production rspack build"}}' \
+  >"$tmp/claude-v6-workspace/eval_app/package.json"
+printf '%s\n' 'rsc_payload_route' >"$tmp/claude-v6-workspace/eval_app/config/routes.rb"
+printf '%s\n' "'use server'; export default async function HelloServer() { return 'server data'; }" \
+  >"$tmp/claude-v6-workspace/eval_app/app/javascript/src/HelloServer/ror_components/HelloServer.tsx"
+printf '%s\n' 'validates :email, presence: true' \
+  >"$tmp/claude-v6-workspace/eval_app/app/models/subscriber.rb"
+printf '%s\n' 'render errors, status: :unprocessable_entity' \
+  >"$tmp/claude-v6-workspace/eval_app/app/controllers/subscribers_controller.rb"
+printf '%s\n' \
+  'class HelloServerTest < ActionDispatch::IntegrationTest' \
+  '  test "React Server Component page with server-provided data" do' \
+  '    get hello_server_path' \
+  '    assert_response :success' \
+  '  end' \
+  'end' >"$tmp/claude-v6-workspace/eval_app/test/integration/hello_server_test.rb"
+printf '%s\n' \
+  '# frozen_string_literal: true' \
+  '' \
+  'require "test_helper"' \
+  '' \
+  'class SubscribersTest < ActionDispatch::IntegrationTest' \
+  '  test "shows the form on GET /subscribers/new" do' \
+  '    get new_subscriber_path' \
+  '' \
+  '    assert_response :success' \
+  '    assert_includes @response.body, '\''data-testid="subscribe-form"'\''' \
+  '  end' \
+  '' \
+  '  test "server-side validation failure re-renders the form with error messages" do' \
+  '    assert_no_difference("Subscriber.count") do' \
+  '      post subscribers_path, params: { subscriber: { name: "", email: "not-an-email" } }' \
+  '    end' \
+  '' \
+  '    assert_response :unprocessable_entity' \
+  '    assert_includes @response.body, "Name can&#x27;t be blank"' \
+  '    assert_includes @response.body, "Email must be a valid email address"' \
+  '  end' \
+  '' \
+  '  test "successful submission creates a subscriber and redirects with a success message" do' \
+  '    assert_difference("Subscriber.count", 1) do' \
+  '      post subscribers_path, params: { subscriber: { name: "Ada Lovelace", email: "ada@example.com" } }' \
+  '    end' \
+  '' \
+  '    assert_redirected_to new_subscriber_path' \
+  '    subscriber = Subscriber.last' \
+  '    assert_equal "Ada Lovelace", subscriber.name' \
+  '    assert_equal "ada@example.com", subscriber.email' \
+  '' \
+  '    follow_redirect!' \
+  '' \
+  '    assert_response :success' \
+  '    assert_includes @response.body, "Thanks for subscribing, Ada Lovelace!"' \
+  '  end' \
+  'end' >"$tmp/claude-v6-workspace/eval_app/test/integration/subscribers_test.rb"
+claude_v6_scaffold_command=$'source <LOCAL_PATH>/.ror-eval-state/pgenv.sh\nnpx --yes create-react-on-rails-app eval_app --rsc --template typescript 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/create-app.log | tail -150'
+jq -cn --arg command "$claude_v6_scaffold_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"✓ Done!\nCreated eval_app with React on Rails!"}}' \
+  >"$tmp/claude-v6-scaffold-events.jsonl"
+mkdir "$tmp/claude-v6-scaffold-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-scaffold-events.jsonl" \
+  "$tmp/claude-v6-workspace" "$tmp/claude-v6-scaffold-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+test "$(jq -r '.items[] | select(.id == "install.pro") | .status' \
+  "$tmp/claude-v6-scaffold-output/rubric-results.json")" = pass
+
+claude_v6_build_command=$'source <LOCAL_PATH>/.ror-eval-state/pgenv.sh\ncd <LOCAL_PATH>/eval_app\nRAILS_ENV=production NODE_ENV=production SECRET_KEY_BASE=$(bin/rails secret) npm run build > <LOCAL_PATH>/.ror-eval-state/prod-build.log 2>&1\necho "EXIT CODE: $?"\ntail -20 <LOCAL_PATH>/.ror-eval-state/prod-build.log\nls public/packs/js | head -20'
+jq -cn --arg command "$claude_v6_build_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"EXIT CODE: 0\nLoading production config; Rspack compiled successfully"}}' \
+  >"$tmp/claude-v6-build-events.jsonl"
+mkdir "$tmp/claude-v6-build-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-build-events.jsonl" \
+  "$tmp/claude-v6-workspace" "$tmp/claude-v6-build-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+test "$(jq -r '.items[] | select(.id == "build.production") | .status' \
+  "$tmp/claude-v6-build-output/rubric-results.json")" = pass
+
+claude_v6_test_command=$'source <LOCAL_PATH>/.ror-eval-state/pgenv.sh\ncd <LOCAL_PATH>/eval_app\nRAILS_ENV=test bin/rails test 2>&1 | tail -150'
+jq -cn --arg command "$claude_v6_test_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"8 runs, 47 assertions, 0 failures, 0 errors, 0 skips"}}' \
+  >"$tmp/claude-v6-test-events.jsonl"
+mkdir "$tmp/claude-v6-test-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+  "$tmp/claude-v6-workspace" "$tmp/claude-v6-test-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in rsc.route form.validation tests.page tests.form tests.green; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/claude-v6-test-output/rubric-results.json")" = pass
+done
+
+cat "$tmp/claude-v6-scaffold-events.jsonl" "$tmp/claude-v6-test-events.jsonl" \
+  "$tmp/claude-v6-build-events.jsonl" >"$tmp/claude-v6-classifier-events.jsonl"
+mkdir "$tmp/claude-v6-classifier-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-classifier-events.jsonl" \
+  "$tmp/claude-v6-workspace" "$tmp/claude-v6-classifier-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in install.pro rsc.route form.validation tests.page tests.form build.production \
+  tests.green unaided evidence.complete; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/claude-v6-classifier-output/rubric-results.json")" = pass
+done
+test "$(jq -r '.overall' "$tmp/claude-v6-classifier-output/rubric-results.json")" = pass
+
+claude_v6_scaffold_rejections=(
+  $'source "<LOCAL_PATH>/.ror-eval-state/pgenv.sh"\nnpx --yes create-react-on-rails-app eval_app --rsc --template typescript 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/create-app.log | tail -150'
+  $'source <LOCAL_PATH>/.ror-eval-state/other.sh\nnpx --yes create-react-on-rails-app eval_app --rsc --template typescript 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/create-app.log | tail -150'
+  $'source <LOCAL_PATH>/.ror-eval-state/pgenv.sh\nsource <LOCAL_PATH>/.ror-eval-state/pgenv.sh\nnpx --yes create-react-on-rails-app eval_app --rsc --template typescript 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/create-app.log | tail -150'
+  $'cd <LOCAL_PATH>\nsource <LOCAL_PATH>/.ror-eval-state/pgenv.sh\nnpx --yes create-react-on-rails-app eval_app --rsc --template typescript 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/create-app.log | tail -150'
+  $'source <LOCAL_PATH>/.ror-eval-state/pgenv.sh\ntrue\nnpx --yes create-react-on-rails-app eval_app --rsc --template typescript 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/create-app.log | tail -150'
+  $'source <LOCAL_PATH>/.ror-eval-state/pgenv.sh\nnpx --yes create-react-on-rails-app eval_app --rsc --template typescript 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/other.log | tail -150'
+  $'source <LOCAL_PATH>/.ror-eval-state/pgenv.sh\nnpx --yes create-react-on-rails-app eval_app --rsc --template typescript 2>&1 | tee <LOCAL_PATH>/Xror-eval-state/create-app.log | tail -150'
+)
+claude_v6_scaffold_rejection_index=0
+for scaffold_command in "${claude_v6_scaffold_rejections[@]}"; do
+  claude_v6_scaffold_rejection_index=$((claude_v6_scaffold_rejection_index + 1))
+  jq -cn --arg command "$scaffold_command" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"✓ Done!\nCreated eval_app with React on Rails!"}}' \
+    >"$tmp/claude-v6-scaffold-rejection-$claude_v6_scaffold_rejection_index-events.jsonl"
+  mkdir "$tmp/claude-v6-scaffold-rejection-$claude_v6_scaffold_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" \
+    "$tmp/claude-v6-scaffold-rejection-$claude_v6_scaffold_rejection_index-events.jsonl" \
+    "$tmp/claude-v6-workspace" \
+    "$tmp/claude-v6-scaffold-rejection-$claude_v6_scaffold_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "install.pro") | .status' \
+    "$tmp/claude-v6-scaffold-rejection-$claude_v6_scaffold_rejection_index-output/rubric-results.json")" = unknown
+done
+
+claude_v6_test_rejections=(
+  $'source "<LOCAL_PATH>/.ror-eval-state/pgenv.sh"\ncd <LOCAL_PATH>/eval_app\nRAILS_ENV=test bin/rails test 2>&1 | tail -150'
+  $'source <LOCAL_PATH>/.ror-eval-state/pgenv.sh\ncd <LOCAL_PATH>/eval_app\nsource <LOCAL_PATH>/.ror-eval-state/pgenv.sh\nRAILS_ENV=test bin/rails test 2>&1 | tail -150'
+  $'source <LOCAL_PATH>/.ror-eval-state/pgenv.sh\ncd <LOCAL_PATH>/eval_app\nRAILS_ENV=test bin/rails test 2>&1 | tail -150\necho masked'
+)
+claude_v6_test_rejection_index=0
+for test_command in "${claude_v6_test_rejections[@]}"; do
+  claude_v6_test_rejection_index=$((claude_v6_test_rejection_index + 1))
+  jq -cn --arg command "$test_command" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"8 runs, 47 assertions, 0 failures, 0 errors, 0 skips"}}' \
+    >"$tmp/claude-v6-test-rejection-$claude_v6_test_rejection_index-events.jsonl"
+  mkdir "$tmp/claude-v6-test-rejection-$claude_v6_test_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" \
+    "$tmp/claude-v6-test-rejection-$claude_v6_test_rejection_index-events.jsonl" \
+    "$tmp/claude-v6-workspace" \
+    "$tmp/claude-v6-test-rejection-$claude_v6_test_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in rsc.route form.validation tests.page tests.form tests.green; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/claude-v6-test-rejection-$claude_v6_test_rejection_index-output/rubric-results.json")" = unknown
+  done
+done
+
+claude_v6_build_rejections=(
+  $'source <LOCAL_PATH>/.ror-eval-state/pgenv.sh\ncd <LOCAL_PATH>/eval_app\nRAILS_ENV=production NODE_ENV=production SECRET_KEY_BASE=$(bin/rails secret) npm run build > <LOCAL_PATH>/.ror-eval-state/prod-build.log 2>&1\necho "EXIT CODE: $?"\ntail -20 <LOCAL_PATH>/.ror-eval-state/other.log\nls public/packs/js | head -20'
+  $'source <LOCAL_PATH>/.ror-eval-state/pgenv.sh\ncd <LOCAL_PATH>/eval_app\nRAILS_ENV=production NODE_ENV=production SECRET_KEY_BASE=$(bin/rails secret) npm run build > <LOCAL_PATH>/.ror-eval-state/prod-build.log 2>&1\necho "EXIT CODE: $?"\ntail -20 <LOCAL_PATH>/Xror-eval-state/prod-build.log\nls public/packs/js | head -20'
+  $'source <LOCAL_PATH>/.ror-eval-state/pgenv.sh\ncd <LOCAL_PATH>/eval_app\nRAILS_ENV=production NODE_ENV=production SECRET_KEY_BASE=$(bin/rails secret) npm run build > <LOCAL_PATH>/.ror-eval-state/other.log 2>&1\necho "EXIT CODE: $?"\ntail -20 <LOCAL_PATH>/.ror-eval-state/other.log\nls public/packs/js | head -20'
+  $'source <LOCAL_PATH>/.ror-eval-state/pgenv.sh\ncd <LOCAL_PATH>/eval_app\nRAILS_ENV=production NODE_ENV=production SECRET_KEY_BASE=$(bin/rails secret) npm run build > <LOCAL_PATH>/.ror-eval-state/prod-build.log 2>&1\necho "EXIT CODE: 0"\ntail -20 <LOCAL_PATH>/.ror-eval-state/prod-build.log\nls public/packs/js | head -20'
+  $'source <LOCAL_PATH>/.ror-eval-state/pgenv.sh\ncd <LOCAL_PATH>/eval_app\nRAILS_ENV=production NODE_ENV=production SECRET_KEY_BASE=$(bin/rails secret) npm run build > <LOCAL_PATH>/.ror-eval-state/prod-build.log 2>&1\necho "EXIT CODE: $?"\ntail -1001 <LOCAL_PATH>/.ror-eval-state/prod-build.log\nls public/packs/js | head -20'
+  $'source <LOCAL_PATH>/.ror-eval-state/pgenv.sh\ncd <LOCAL_PATH>/eval_app\nRAILS_ENV=production NODE_ENV=production SECRET_KEY_BASE=$(bin/rails secret) npm run build > <LOCAL_PATH>/.ror-eval-state/prod-build.log 2>&1\necho "EXIT CODE: $?"\ntail -20 <LOCAL_PATH>/.ror-eval-state/prod-build.log\nls public/packs | head -20'
+  $'source <LOCAL_PATH>/.ror-eval-state/pgenv.sh\ncd <LOCAL_PATH>/eval_app\nRAILS_ENV=production NODE_ENV=production SECRET_KEY_BASE=$(bin/rails secret) npm run build > <LOCAL_PATH>/.ror-eval-state/prod-build.log 2>&1\necho "EXIT CODE: $?"\ntail -20 <LOCAL_PATH>/.ror-eval-state/prod-build.log\nls public/packs/js | head -20\ntrue'
+  $'source <LOCAL_PATH>/.ror-eval-state/pgenv.sh\ncd <LOCAL_PATH>/eval_app\nRAILS_ENV=production NODE_ENV=production SECRET_KEY_BASE=$(bin/rails secret) npm run build 2>&1 | tail -150'
+)
+claude_v6_build_rejection_index=0
+for build_command in "${claude_v6_build_rejections[@]}"; do
+  claude_v6_build_rejection_index=$((claude_v6_build_rejection_index + 1))
+  jq -cn --arg command "$build_command" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"EXIT CODE: 0\nRspack compiled successfully"}}' \
+    >"$tmp/claude-v6-build-rejection-$claude_v6_build_rejection_index-events.jsonl"
+  mkdir "$tmp/claude-v6-build-rejection-$claude_v6_build_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" \
+    "$tmp/claude-v6-build-rejection-$claude_v6_build_rejection_index-events.jsonl" \
+    "$tmp/claude-v6-workspace" \
+    "$tmp/claude-v6-build-rejection-$claude_v6_build_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "build.production") | .status' \
+    "$tmp/claude-v6-build-rejection-$claude_v6_build_rejection_index-output/rubric-results.json")" = unknown
+done
+
+claude_v6_build_rejection_outputs=(
+  $'EXIT CODE: 1\nRspack compiled successfully'
+  $'EXIT CODE: 0\nEXIT CODE: 0\nRspack compiled successfully'
+  $'OTHER CODE: 0\nRspack compiled successfully'
+  $'EXIT CODE: 0\nUsage: build [options]\nRspack compiled successfully'
+  $'EXIT CODE: 0\nERROR: stale build failed\nRspack compiled successfully'
+)
+claude_v6_build_output_rejection_index=0
+for build_output in "${claude_v6_build_rejection_outputs[@]}"; do
+  claude_v6_build_output_rejection_index=$((claude_v6_build_output_rejection_index + 1))
+  jq -cn --arg command "$claude_v6_build_command" --arg output "$build_output" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:$output}}' \
+    >"$tmp/claude-v6-build-output-rejection-$claude_v6_build_output_rejection_index-events.jsonl"
+  mkdir "$tmp/claude-v6-build-output-rejection-$claude_v6_build_output_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" \
+    "$tmp/claude-v6-build-output-rejection-$claude_v6_build_output_rejection_index-events.jsonl" \
+    "$tmp/claude-v6-workspace" \
+    "$tmp/claude-v6-build-output-rejection-$claude_v6_build_output_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "build.production") | .status' \
+    "$tmp/claude-v6-build-output-rejection-$claude_v6_build_output_rejection_index-output/rubric-results.json")" = unknown
+done
+
+claude_v6_form_rejections=(
+  $'class SubscribersTest < ActionDispatch::IntegrationTest\n  # test "server-side validation failure returns errors" do\n  #   post subscribers_path\n  #   assert_response :unprocessable_entity\n  #   assert_select ".errors"\n  # end\n  # test "successful submission redirects with a message" do\n  #   post subscribers_path\n  #   assert_redirected_to root_path\n  #   assert_equal "Thanks", flash[:notice]\n  # end\nend'
+  $'class SubscribersTest < ActiveSupport::TestCase\n  test "server-side validation failure returns errors" do\n    post subscribers_path\n    assert_response :unprocessable_entity\n    assert_select ".errors"\n  end\n  test "successful submission redirects with a message" do\n    post subscribers_path\n    assert_redirected_to root_path\n    assert_equal "Thanks", flash[:notice]\n  end\nend'
+  $'class SubscribersTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure returns errors" do\n    post subscribers_path\n    assert_response :unprocessable_entity\n    assert_select ".errors"\n  end\nend'
+  $'class SubscribersTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure returns errors" do\n    assert_response :unprocessable_entity\n    assert_select ".errors"\n  end\n  test "successful submission redirects with a message" do\n    post subscribers_path\n    assert_redirected_to root_path\n    assert_equal "Thanks", flash[:notice]\n  end\nend'
+  $'class SubscribersTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure returns errors" do\n    post subscribers_path\n    assert_response :unprocessable_entity\n  end\n  test "successful submission redirects with a message" do\n    post subscribers_path\n    assert_redirected_to root_path\n    assert_equal "Thanks", flash[:notice]\n  end\nend'
+  $'class SubscribersTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure returns errors" do\n    post subscribers_path\n    assert_response :unprocessable_entity\n    assert_select ".errors"\n  end\n  test "successful submission redirects with a message" do\n    post subscribers_path\n    assert_equal "Thanks", flash[:notice]\n  end\nend'
+  $'class SubscribersTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure returns errors" do\n    post subscribers_path\n    assert_response :unprocessable_entity\n    assert_select ".errors"\n  end\n  test "successful submission redirects with a message" do\n    post subscribers_path\n    assert_redirected_to root_path\n  end\nend'
+  $'class SubscribersTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure returns errors" do\n  end\n  post subscribers_path\n  assert_response :unprocessable_entity\n  assert_select ".errors"\n  test "successful submission redirects with a message" do\n    post subscribers_path\n    assert_redirected_to root_path\n    assert_equal "Thanks", flash[:notice]\n  end\nend'
+  $'class SubscribersTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure returns errors" do\n  end\n  test "successful submission redirects with a message" do\n    post subscribers_path\n    assert_response :unprocessable_entity\n    assert_select ".errors"\n    assert_redirected_to root_path\n    assert_equal "Thanks", flash[:notice]\n  end\nend'
+  $'class SubscribersTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure returns errors" do\n    post subscribers_path\n    assert_response :unprocessable_entity\n    assert_select ".errors"\n  end\n  test "successful submission redirects with a message" do\n  end\n  post subscribers_path\n  assert_redirected_to root_path\n  assert_equal "Thanks", flash[:notice]\nend'
+  $'class SubscribersTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders with error messages" do\n    post subscribers_path\n    assert_response :unprocessable_entity\n  end\n  test "successful submission redirects with a success message" do\n    post subscribers_path\n    assert_includes @response.body, "Name cannot be blank"\n    assert_redirected_to root_path\n    follow_redirect!\n    assert_includes @response.body, "Thanks"\n  end\nend'
+  $'class SubscribersTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders with error messages" do\n    post subscribers_path\n    assert_response :unprocessable_entity\n  end\n  test "successful submission redirects with a success message" do\n    post subscribers_path\n    assert_redirected_to root_path\n    assert_equal "Thanks", flash[:notice]\n  end\nend'
+  $'class SubscribersTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders with error messages" do\n    post subscribers_path\n    assert_response :unprocessable_entity\n    assert_includes @response.body, "Name cannot be blank"\n  end\n  test "successful submission redirects with a success message" do\n    post subscribers_path\n    assert_includes @response.body, "Thanks"\n  end\nend'
+  $'class SubscribersTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders with error messages" do\n    post subscribers_path\n    assert_response :unprocessable_entity\n    assert_includes @response.body, "Name cannot be blank"\n  end\n  test "successful submission redirects with a success message" do\n    post subscribers_path\n    assert_redirected_to root_path\n    assert_includes @response.body, "Thanks"\n  end\nend'
+  $'class SubscribersTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders with error messages" do\n    post subscribers_path\n    assert_includes @response.body, "Name cannot be blank"\n  end\n  test "successful submission redirects with a success message" do\n    post subscribers_path\n    assert_redirected_to root_path\n    assert_equal "Thanks", flash[:notice]\n  end\nend'
+)
+claude_v6_form_rejection_index=0
+for form_content in "${claude_v6_form_rejections[@]}"; do
+  claude_v6_form_rejection_index=$((claude_v6_form_rejection_index + 1))
+  cp -R "$tmp/claude-v6-workspace" "$tmp/claude-v6-form-rejection-$claude_v6_form_rejection_index-workspace"
+  printf '%s\n' "$form_content" \
+    >"$tmp/claude-v6-form-rejection-$claude_v6_form_rejection_index-workspace/eval_app/test/integration/subscribers_test.rb"
+  mkdir "$tmp/claude-v6-form-rejection-$claude_v6_form_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+    "$tmp/claude-v6-form-rejection-$claude_v6_form_rejection_index-workspace" \
+    "$tmp/claude-v6-form-rejection-$claude_v6_form_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/claude-v6-form-rejection-$claude_v6_form_rejection_index-output/rubric-results.json")" = unknown
+  done
+done
+
 echo "focused harness tests passed"

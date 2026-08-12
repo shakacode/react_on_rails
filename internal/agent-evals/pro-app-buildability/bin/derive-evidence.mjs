@@ -146,11 +146,13 @@ const unwrapShellCommand = (command) => {
 };
 const isHelpOrVersion = (command) => /(?:^|\s)(?:--help|--version|-h|-V)(?:\s|$)/.test(command);
 const boundedLogPipeline =
-  /^(.*\S)\s+2>&1\s*\|\s*tee\s+(?:--\s+)?(?:"<LOCAL_PATH>"|'<LOCAL_PATH>'|<LOCAL_PATH>|"(?:[A-Za-z0-9_./-]|\$(?:[A-Za-z_][A-Za-z0-9_]*|\{[A-Za-z_][A-Za-z0-9_]*\}))*"|'[A-Za-z0-9_./${}-]+'|[A-Za-z0-9_./${}-]+)\s*\|\s*tail\s+(?:-n\s+|-)([1-9][0-9]{0,4})$/;
+  /^(.*\S)\s+2>&1\s*\|\s*tee\s+(?:--\s+)?(?:"<LOCAL_PATH>"|'<LOCAL_PATH>'|<LOCAL_PATH>|<LOCAL_PATH>\/\.ror-eval-state\/create-app\.log|"(?:[A-Za-z0-9_./-]|\$(?:[A-Za-z_][A-Za-z0-9_]*|\{[A-Za-z_][A-Za-z0-9_]*\}))*"|'[A-Za-z0-9_./${}-]+'|[A-Za-z0-9_./${}-]+)\s*\|\s*tail\s+(?:-n\s+|-)([1-9][0-9]{0,4})$/;
 const safeOutputRedirection = /^(.*\S)\s+>\s+(?:"<LOCAL_PATH>"|'<LOCAL_PATH>'|<LOCAL_PATH>)\s+2>&1$/;
 const boundedPlaceholderTail =
   /^tail\s+(?:-n\s+|-)([1-9][0-9]{0,4})\s+(?:"<LOCAL_PATH>"|'<LOCAL_PATH>'|<LOCAL_PATH>)$/;
 const boundedTailPipeline = /^(.*\S)\s+2>&1\s*\|\s*tail\s+(?:-n\s+|-)([1-9][0-9]{0,4})$/;
+const stripSanitizedSetup = (lines) =>
+  lines[0] === 'source <LOCAL_PATH>/.ror-eval-state/pgenv.sh' ? lines.slice(1) : lines;
 const stripSanitizedWorkingDirectory = (lines) =>
   lines.length > 1 && /^cd <LOCAL_PATH>(?:\/eval_app)?$/.test(lines[0]) ? lines.slice(1) : lines;
 const exactBuildMarkerProof = (lines, targetIndex, output) => {
@@ -199,6 +201,24 @@ const inlineColonBuildMarkerTarget = (lines, output) => {
   const markerPattern = new RegExp(`^${markerName}: -?[0-9]+$`);
   const markers = output.split(/\r?\n/).filter((line) => markerPattern.test(line));
   return markers.length === 1 && markers[0] === `${markerName}: 0` ? match[1] : null;
+};
+const isolatedProductionBuildTarget = (lines, output) => {
+  if (
+    lines.length !== 4 ||
+    lines[0] !==
+      'RAILS_ENV=production NODE_ENV=production SECRET_KEY_BASE=$(bin/rails secret) npm run build > <LOCAL_PATH>/.ror-eval-state/prod-build.log 2>&1' ||
+    lines[1] !== 'echo "EXIT CODE: $?"' ||
+    lines[3] !== 'ls public/packs/js | head -20'
+  ) {
+    return null;
+  }
+  const tailMatch = lines[2].match(
+    /^tail\s+(?:-n\s+|-)([1-9][0-9]{0,4})\s+<LOCAL_PATH>\/\.ror-eval-state\/prod-build\.log$/,
+  );
+  const markers = output.split(/\r?\n/).filter((line) => /^EXIT CODE: -?[0-9]+$/.test(line));
+  return tailMatch && Number(tailMatch[1]) <= 1000 && markers.length === 1 && markers[0] === 'EXIT CODE: 0'
+    ? 'npm run build'
+    : null;
 };
 const completedScaffoldOutput = (output) => {
   const lines = output.split(/\r?\n/).map((line) => line.trim());
@@ -255,6 +275,8 @@ const topLevelShellLines = (command) => {
   }
   return executableLines;
 };
+const normalizedEvidenceLines = (command) =>
+  stripSanitizedWorkingDirectory(stripSanitizedSetup(topLevelShellLines(command)));
 const pipefailPipelineTargets = (lines) =>
   lines.flatMap((line, index) => {
     const pipelineMatch = line.match(boundedLogPipeline);
@@ -262,7 +284,7 @@ const pipefailPipelineTargets = (lines) =>
     return pipelineMatch && hasTopLevelPipefail && Number(pipelineMatch[2]) <= 1000 ? [pipelineMatch[1]] : [];
   });
 const installEvidenceTargets = (command) => {
-  const lines = stripSanitizedWorkingDirectory(topLevelShellLines(command.command));
+  const lines = normalizedEvidenceLines(command.command);
   const pipefailTargets = pipefailPipelineTargets(lines);
   const completionBackedTarget = (() => {
     if (lines.length !== 1 || !completedScaffoldOutput(command.output)) return [];
@@ -275,7 +297,7 @@ const installEvidenceTargets = (command) => {
   return [...directTargets, ...pipefailTargets, ...completionBackedTarget];
 };
 const buildEvidenceTargets = (command) => {
-  const lines = stripSanitizedWorkingDirectory(topLevelShellLines(command.command));
+  const lines = normalizedEvidenceLines(command.command);
   const targets = [
     ...(lines.length === 1 && !/[;&|<>]/.test(lines[0]) ? lines : []),
     ...pipefailPipelineTargets(lines),
@@ -284,6 +306,8 @@ const buildEvidenceTargets = (command) => {
   if (inlineTarget) targets.push(inlineTarget);
   const inlineColonTarget = inlineColonBuildMarkerTarget(lines, command.output);
   if (inlineColonTarget) targets.push(inlineColonTarget);
+  const isolatedProductionTarget = isolatedProductionBuildTarget(lines, command.output);
+  if (isolatedProductionTarget) targets.push(isolatedProductionTarget);
   for (const [index, line] of lines.entries()) {
     const redirectionMatch = line.match(safeOutputRedirection);
     if (
@@ -357,18 +381,86 @@ const pageTests = artifacts.filter((artifact) => {
     /^\s*(?:assert\w*|expect)(?:\s|\()/m.test(uncommentedRuby);
   return testContent && (namedPageTest || semanticRscIntegrationTest);
 });
+const rubyTestCases = (content) => {
+  const starts = [...content.matchAll(/^([ \t]*)test\s+(?:"([^"\r\n]+)"|'([^'\r\n]+)')\s+do\b[^\r\n]*$/gm)];
+  return starts.flatMap((match, index) => {
+    const bodyRegion = content.slice(
+      match.index + match[0].length,
+      starts[index + 1]?.index ?? content.length,
+    );
+    const declarationIndent = match[1];
+    const regionLines = bodyRegion.split(/\r?\n/);
+    const closingEnd = regionLines.findIndex(
+      (line) => line.match(/^([ \t]*)end\s*$/)?.[1] === declarationIndent,
+    );
+    if (closingEnd < 0) return [];
+
+    const body = regionLines
+      .slice(0, closingEnd)
+      .filter((line) => {
+        const indent = line.match(/^([ \t]*)\S/)?.[1];
+        return indent?.startsWith(declarationIndent) && indent.length > declarationIndent.length;
+      })
+      .join('\n');
+    return [{ name: match[2] ?? match[3], body }];
+  });
+};
+const semanticFormIntegrationTest = (artifact, uncommentedRuby) => {
+  if (
+    !/test\/(?:controllers|integration)\/.*_test\.rb$/i.test(artifact.path) ||
+    !/^\s*class\s+[A-Za-z_][A-Za-z0-9_:]*\s*<\s*ActionDispatch::IntegrationTest\b/m.test(uncommentedRuby)
+  ) {
+    return false;
+  }
+
+  const cases = rubyTestCases(uncommentedRuby);
+  const failureCase = cases.find((testCase) =>
+    /\b(?:server-side\s+)?validation failure\b/i.test(testCase.name),
+  );
+  const successCase = cases.find((testCase) => /\bsuccessful submission\b/i.test(testCase.name));
+  if (!failureCase || !successCase || failureCase === successCase) return false;
+
+  const hasPost = (body) => /^\s*post(?:\s+|\()/m.test(body);
+  const hasRenderedBodyAssertion = (body) =>
+    /^\s*(?:assert_includes|refute_includes)(?:\s+|\()\s*(?:@response|response)\.body\s*,/m.test(body);
+  const failureResponse =
+    /^\s*assert_response(?:\s+|\()\s*(?::(?:unprocessable_entity|unprocessable_content)\b|422\b)/m.test(
+      failureCase.body,
+    );
+  const failureErrors =
+    /^\s*(?:assert\w*|refute\w*)\b[^\r\n]*\berrors?\b/im.test(failureCase.body) ||
+    hasRenderedBodyAssertion(failureCase.body);
+  const successRedirect = /^\s*assert_redirected_to(?:\s+|\()/m.test(successCase.body);
+  const successMessage =
+    /^\s*(?:assert\w*|refute\w*)\b[^\r\n]*(?:\bflash\b|\bnotice\b)/im.test(successCase.body) ||
+    (/^\s*follow_redirect!(?:\s*|\(\s*\))$/m.test(successCase.body) &&
+      hasRenderedBodyAssertion(successCase.body));
+  return (
+    hasPost(failureCase.body) &&
+    hasPost(successCase.body) &&
+    failureResponse &&
+    failureErrors &&
+    successRedirect &&
+    successMessage
+  );
+};
 const formTests = artifacts.filter((artifact) => {
-  const bothOutcomes = /invalid[\s\S]*valid|valid[\s\S]*invalid/i.test(artifact.excerpt);
+  const uncommentedRuby = artifact.excerpt.replace(/^\s*#.*$/gm, '');
+  const outcomeContent = /\.rb$/i.test(artifact.path) ? uncommentedRuby : artifact.excerpt;
+  const bothOutcomes = /invalid[\s\S]*valid|valid[\s\S]*invalid/i.test(outcomeContent);
   const categorizedFormTest =
     /(?:spec|test)\/(?:(?:.*\/)?integration\/.*|.*(?:form|request|system).*)(?:_spec\.rb|_test\.rb|\.(?:test|spec)\.[jt]sx?)$/i.test(
       artifact.path,
     );
-  const uncommentedRuby = artifact.excerpt.replace(/^\s*#.*$/gm, '');
   const controllerIntegrationTest =
     /test\/controllers\/.*_test\.rb$/i.test(artifact.path) &&
     /^\s*class\s+[A-Za-z_][A-Za-z0-9_:]*\s*<\s*ActionDispatch::IntegrationTest\b/m.test(uncommentedRuby) &&
     /invalid[\s\S]*valid|valid[\s\S]*invalid/i.test(uncommentedRuby);
-  return (bothOutcomes && categorizedFormTest) || controllerIntegrationTest;
+  return (
+    (bothOutcomes && categorizedFormTest) ||
+    controllerIntegrationTest ||
+    semanticFormIntegrationTest(artifact, uncommentedRuby)
+  );
 });
 const plainManifestBuildInvocation = (invocation) =>
   manifestBackedProductionBuild && /^(?:npm|pnpm) run build$/i.test(invocation);
@@ -389,7 +481,8 @@ const buildCommands = successfulCommands.filter((command) => {
       command.output,
     );
   const helpOutput = /usage:|options:|available commands/i.test(command.output);
-  return allowedInvocation && buildResult && !helpOutput;
+  const errorOutput = /(?:^|\n)\s*(?:npm\s+ERR!|ERR!|ERROR:)|\b(?:failed|aborted)\b/i.test(command.output);
+  return allowedInvocation && buildResult && !helpOutput && !errorOutput;
 });
 const manifestBackedBuildCommands = buildCommands.filter((command) =>
   buildEvidenceTargets(command).some((invocationLine) => {
@@ -423,7 +516,7 @@ const recognizedTestInvocation = (line) => {
   );
 };
 const testEvidenceTargets = (command) => {
-  const lines = stripSanitizedWorkingDirectory(topLevelShellLines(command.command));
+  const lines = normalizedEvidenceLines(command.command);
   const directTargets = lines.length === 1 && recognizedTestInvocation(lines[0]) ? [lines[0]] : [];
   if (lines.length !== 1) return directTargets;
   const pipelineMatch = lines[0].match(boundedTailPipeline);
@@ -518,8 +611,8 @@ const outcomeRows = [
     id: 'form.validation',
     status: formValidationPassed ? 'pass' : 'unknown',
     reason: formValidationPassed
-      ? 'Model validation, invalid-response controller behavior, both-outcome tests, and successful test output are evidenced.'
-      : 'Server validation, invalid-response behavior, both-outcome tests, and successful output are not all evidenced.',
+      ? 'Model validation, invalid-response controller behavior, failure/success tests, and successful test output are evidenced.'
+      : 'Server validation, invalid-response behavior, failure/success tests, and successful output are not all evidenced.',
     citations: [
       ...artifactCitations(validationModels),
       ...artifactCitations(validationControllers),
@@ -539,8 +632,8 @@ const outcomeRows = [
     id: 'tests.form',
     status: formTestsPassed ? 'pass' : 'unknown',
     reason: formTestsPassed
-      ? 'A test containing both invalid and valid outcomes is paired with successful test output.'
-      : 'Passing coverage of both form outcomes is not independently proven.',
+      ? 'A test covering both form failure and success is paired with successful test output.'
+      : 'Passing coverage of both form failure and success is not independently proven.',
     citations: [...artifactCitations(formTests), ...commandCitations(formTestCommands)],
   },
   {
