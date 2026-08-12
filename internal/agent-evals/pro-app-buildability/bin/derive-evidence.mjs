@@ -149,6 +149,8 @@ const safeOutputRedirection = /^(.*\S)\s+>\s+(?:"<LOCAL_PATH>"|'<LOCAL_PATH>'|<L
 const boundedPlaceholderTail =
   /^tail\s+(?:-n\s+|-)([1-9][0-9]{0,4})\s+(?:"<LOCAL_PATH>"|'<LOCAL_PATH>'|<LOCAL_PATH>)$/;
 const boundedTailPipeline = /^(.*\S)\s+2>&1\s*\|\s*tail\s+(?:-n\s+|-)([1-9][0-9]{0,4})$/;
+const stripSanitizedWorkingDirectory = (lines) =>
+  lines.length > 1 && /^cd <LOCAL_PATH>(?:\/eval_app)?$/.test(lines[0]) ? lines.slice(1) : lines;
 const exactBuildMarkerProof = (lines, targetIndex, output) => {
   const tailMatch = lines[targetIndex + 2]?.match(boundedPlaceholderTail);
   const markers = output.split(/\r?\n/).filter((line) => /^BUILD_EXIT_CODE=-?[0-9]+$/.test(line));
@@ -162,6 +164,17 @@ const exactBuildMarkerProof = (lines, targetIndex, output) => {
     markers.length === 1 &&
     markers[0] === 'BUILD_EXIT_CODE=0'
   );
+};
+const immediateBuildMarkerProof = (lines, targetIndex, output) => {
+  if (targetIndex !== 0 || lines.length !== 3) return false;
+  const markerMatch = lines[1].match(/^echo "([A-Z][A-Z0-9_]*)=\$\?"$/);
+  const tailMatch = lines[2].match(boundedPlaceholderTail);
+  if (!markerMatch || !tailMatch || Number(tailMatch[1]) > 1000) return false;
+
+  const markerName = markerMatch[1];
+  const markerPattern = new RegExp(`^${markerName}=-?[0-9]+$`);
+  const markers = output.split(/\r?\n/).filter((line) => markerPattern.test(line));
+  return markers.length === 1 && markers[0] === `${markerName}=0`;
 };
 const inlineBuildMarkerTarget = (lines, output) => {
   if (lines.length !== 1) return null;
@@ -234,7 +247,7 @@ const pipefailPipelineTargets = (lines) =>
     return pipelineMatch && hasTopLevelPipefail && Number(pipelineMatch[2]) <= 1000 ? [pipelineMatch[1]] : [];
   });
 const installEvidenceTargets = (command) => {
-  const lines = topLevelShellLines(command.command);
+  const lines = stripSanitizedWorkingDirectory(topLevelShellLines(command.command));
   const pipefailTargets = pipefailPipelineTargets(lines);
   const completionBackedTarget = (() => {
     if (lines.length !== 1 || !completedScaffoldOutput(command.output)) return [];
@@ -245,7 +258,7 @@ const installEvidenceTargets = (command) => {
   return [...directTargets, ...pipefailTargets, ...completionBackedTarget];
 };
 const buildEvidenceTargets = (command) => {
-  const lines = topLevelShellLines(command.command);
+  const lines = stripSanitizedWorkingDirectory(topLevelShellLines(command.command));
   const targets = [
     ...(lines.length === 1 && !/[;&|<>]/.test(lines[0]) ? lines : []),
     ...pipefailPipelineTargets(lines),
@@ -254,7 +267,11 @@ const buildEvidenceTargets = (command) => {
   if (inlineTarget) targets.push(inlineTarget);
   for (const [index, line] of lines.entries()) {
     const redirectionMatch = line.match(safeOutputRedirection);
-    if (redirectionMatch && exactBuildMarkerProof(lines, index, command.output)) {
+    if (
+      redirectionMatch &&
+      (exactBuildMarkerProof(lines, index, command.output) ||
+        immediateBuildMarkerProof(lines, index, command.output))
+    ) {
       targets.push(redirectionMatch[1]);
     }
   }
@@ -376,7 +393,7 @@ const recognizedTestInvocation = (line) =>
     line,
   ) && !/[;&|<>]/.test(line);
 const testEvidenceTargets = (command) => {
-  const lines = topLevelShellLines(command.command);
+  const lines = stripSanitizedWorkingDirectory(topLevelShellLines(command.command));
   const directTargets = lines.length === 1 && recognizedTestInvocation(lines[0]) ? [lines[0]] : [];
   if (lines.length !== 1) return directTargets;
   const pipelineMatch = lines[0].match(boundedTailPipeline);
@@ -409,12 +426,13 @@ const fullSuitePrefixes = [
 ];
 const fullSuiteTest = (invocation) => {
   const tokens = invocation.trim().split(/\s+/);
-  return fullSuitePrefixes.some(
-    (prefix) =>
-      tokens.length === prefix.length &&
-      prefix.every((token, index) => tokens[index]?.toLowerCase() === token) &&
-      tokens.every((token) => !token.startsWith('-')),
-  );
+  return fullSuitePrefixes.some((prefix) => {
+    const prefixMatches = prefix.every((token, index) => tokens[index]?.toLowerCase() === token);
+    if (!prefixMatches) return false;
+    if (tokens.length === prefix.length) return true;
+    const railsTest = /(?:^|\/)rails$/.test(prefix.at(-2) ?? '') && prefix.at(-1) === 'test';
+    return railsTest && tokens.length === prefix.length + 1 && tokens.at(-1) === '-v';
+  });
 };
 const testCommandsFor = (matchedArtifacts) =>
   testCommands.filter((command) => {
