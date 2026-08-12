@@ -87,7 +87,9 @@ function walk(directory, depth = 0) {
           walk(absolute, depth + 1);
         } else if (entry.isFile()) {
           const relative = path.relative(workspace, absolute).replaceAll(path.sep, '/');
-          const insideSelectedRoot = selectedRoots.some((root) => relative.includes(`/${root}`));
+          const insideSelectedRoot = selectedRoots.some(
+            (root) => relative.startsWith(root) || relative.includes(`/${root}`),
+          );
           const selected =
             selectedBasenames.has(entry.name) ||
             (insideSelectedRoot && selectedExtensions.has(path.extname(entry.name)));
@@ -186,6 +188,18 @@ const inlineBuildMarkerTarget = (lines, output) => {
     ? match[1]
     : null;
 };
+const inlineColonBuildMarkerTarget = (lines, output) => {
+  if (lines.length !== 1) return null;
+  const match = lines[0].match(
+    /^(npm run build) > <LOCAL_PATH> 2>&1;\s*echo "([A-Z][A-Z0-9_]*): \$\?";\s*tail\s+(?:-n\s+|-)([1-9][0-9]{0,4})\s+<LOCAL_PATH>$/,
+  );
+  if (!match || Number(match[3]) > 1000) return null;
+
+  const markerName = match[2];
+  const markerPattern = new RegExp(`^${markerName}: -?[0-9]+$`);
+  const markers = output.split(/\r?\n/).filter((line) => markerPattern.test(line));
+  return markers.length === 1 && markers[0] === `${markerName}: 0` ? match[1] : null;
+};
 const completedScaffoldOutput = (output) => {
   const lines = output.split(/\r?\n/).map((line) => line.trim());
   const created = lines.filter((line) => line === 'Created eval_app with React on Rails!');
@@ -203,6 +217,7 @@ const stripBoundedTimeoutPrefix = (line) => {
   if (!Number.isSafeInteger(scaffoldLimit) || timeoutSeconds > scaffoldLimit) return null;
   return match[2];
 };
+const stripScaffoldTimePrefix = (line) => (line.startsWith('time ') ? line.slice(5) : line);
 const topLevelShellLines = (command) => {
   const invocation = unwrapShellCommand(command);
   if (invocation.includes('<<')) return [];
@@ -252,7 +267,9 @@ const installEvidenceTargets = (command) => {
   const completionBackedTarget = (() => {
     if (lines.length !== 1 || !completedScaffoldOutput(command.output)) return [];
     const pipelineMatch = lines[0].match(boundedLogPipeline);
-    return pipelineMatch && Number(pipelineMatch[2]) <= 1000 ? [pipelineMatch[1]] : [];
+    return pipelineMatch && Number(pipelineMatch[2]) <= 1000
+      ? [stripScaffoldTimePrefix(pipelineMatch[1])]
+      : [];
   })();
   const directTargets = lines.length === 1 && !/[;&|<>]/.test(lines[0]) ? lines : [];
   return [...directTargets, ...pipefailTargets, ...completionBackedTarget];
@@ -265,6 +282,8 @@ const buildEvidenceTargets = (command) => {
   ];
   const inlineTarget = inlineBuildMarkerTarget(lines, command.output);
   if (inlineTarget) targets.push(inlineTarget);
+  const inlineColonTarget = inlineColonBuildMarkerTarget(lines, command.output);
+  if (inlineColonTarget) targets.push(inlineColonTarget);
   for (const [index, line] of lines.entries()) {
     const redirectionMatch = line.match(safeOutputRedirection);
     if (
@@ -281,7 +300,9 @@ const buildEvidenceTargets = (command) => {
 const rubyProManifests = matchingArtifacts(/Gemfile$/, /react_on_rails_pro/);
 const jsProManifests = matchingArtifacts(/package\.json$/, /react-on-rails-pro/);
 const evalAppPackageManifest = artifacts.find(
-  (artifact) => artifact.path === 'eval_app/package.json' && !artifact.excerpt_truncated,
+  (artifact) =>
+    (artifact.path === 'package.json' || artifact.path === 'eval_app/package.json') &&
+    !artifact.excerpt_truncated,
 );
 let manifestBackedProductionBuild = false;
 if (evalAppPackageManifest) {
@@ -388,10 +409,19 @@ const railsTestOutputPassed = (output) => {
   const summaries = lines.filter((line) => railsTestSummary.test(line));
   return summaries.length === 1 && lines.at(-1) === summaries[0];
 };
-const recognizedTestInvocation = (line) =>
-  /^(?:(?:bundle exec )?(?:rspec|rails test|rake test)|bin\/rails test|npm (?:run )?test|pnpm (?:run )?test|jest|playwright)(?:\s|$)/i.test(
-    line,
-  ) && !/[;&|<>]/.test(line);
+const stripRailsTestEnvironment = (line) => {
+  if (!line.startsWith('RAILS_ENV=test ')) return line;
+  const target = line.slice('RAILS_ENV=test '.length);
+  return /^(?:(?:bundle exec )?rails test|bin\/rails test)(?:\s|$)/i.test(target) ? target : line;
+};
+const recognizedTestInvocation = (line) => {
+  const target = stripRailsTestEnvironment(line);
+  return (
+    /^(?:(?:bundle exec )?(?:rspec|rails test|rake test)|bin\/rails test|npm (?:run )?test|pnpm (?:run )?test|jest|playwright)(?:\s|$)/i.test(
+      target,
+    ) && !/[;&|<>]/.test(target)
+  );
+};
 const testEvidenceTargets = (command) => {
   const lines = stripSanitizedWorkingDirectory(topLevelShellLines(command.command));
   const directTargets = lines.length === 1 && recognizedTestInvocation(lines[0]) ? [lines[0]] : [];
@@ -425,7 +455,7 @@ const fullSuitePrefixes = [
   ['playwright'],
 ];
 const fullSuiteTest = (invocation) => {
-  const tokens = invocation.trim().split(/\s+/);
+  const tokens = stripRailsTestEnvironment(invocation).trim().split(/\s+/);
   return fullSuitePrefixes.some((prefix) => {
     const prefixMatches = prefix.every((token, index) => tokens[index]?.toLowerCase() === token);
     if (!prefixMatches) return false;

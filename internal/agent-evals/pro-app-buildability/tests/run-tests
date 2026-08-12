@@ -1981,6 +1981,204 @@ node "$eval_dir/bin/derive-evidence.mjs" "$tmp/explicit-production-build-events.
 test "$(jq -r '.items[] | select(.id == "build.production") | .status' \
   "$tmp/explicit-production-build-output/rubric-results.json")" = pass
 
+mkdir -p "$tmp/claude-v5-root-workspace/app/controllers" \
+  "$tmp/claude-v5-root-workspace/app/javascript/src/HelloServer/ror_components" \
+  "$tmp/claude-v5-root-workspace/app/models" \
+  "$tmp/claude-v5-root-workspace/config" \
+  "$tmp/claude-v5-root-workspace/test/integration" \
+  "$tmp/claude-v5-root-workspace/application" \
+  "$tmp/claude-v5-root-workspace/contest"
+printf '%s\n' "gem 'react_on_rails_pro'" >"$tmp/claude-v5-root-workspace/Gemfile"
+printf '%s\n' \
+  '{"dependencies":{"react-on-rails-pro":"1.0.0"},"scripts":{"build":"RAILS_ENV=production NODE_ENV=production rspack build"}}' \
+  >"$tmp/claude-v5-root-workspace/package.json"
+printf '%s\n' 'rsc_payload_route' >"$tmp/claude-v5-root-workspace/config/routes.rb"
+printf '%s\n' "'use server'; export default async function HelloServer() { return 'server data'; }" \
+  >"$tmp/claude-v5-root-workspace/app/javascript/src/HelloServer/ror_components/HelloServer.tsx"
+printf '%s\n' 'validates :email, presence: true' \
+  >"$tmp/claude-v5-root-workspace/app/models/message.rb"
+printf '%s\n' 'render errors, status: :unprocessable_entity' \
+  >"$tmp/claude-v5-root-workspace/app/controllers/messages_controller.rb"
+printf '%s\n' \
+  'class HelloServerTest < ActionDispatch::IntegrationTest' \
+  '  test "React Server Component page with server-provided data" do' \
+  '    get hello_server_path' \
+  '    assert_response :success' \
+  '  end' \
+  'end' >"$tmp/claude-v5-root-workspace/test/integration/hello_server_test.rb"
+printf '%s\n' \
+  'class MessagesTest < ActionDispatch::IntegrationTest' \
+  '  test "invalid then valid message" do' \
+  '    assert invalid' \
+  '    assert valid' \
+  '  end' \
+  'end' >"$tmp/claude-v5-root-workspace/test/integration/messages_test.rb"
+printf '%s\n' 'export default function Deceptive() { return null; }' \
+  >"$tmp/claude-v5-root-workspace/application/deceptive.server.tsx"
+printf '%s\n' 'test "invalid then valid" do; assert true; end' \
+  >"$tmp/claude-v5-root-workspace/contest/deceptive_test.rb"
+mkdir "$tmp/claude-v5-root-artifacts-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/full-suite-events.jsonl" \
+  "$tmp/claude-v5-root-workspace" "$tmp/claude-v5-root-artifacts-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for artifact_path in \
+  app/javascript/src/HelloServer/ror_components/HelloServer.tsx \
+  app/models/message.rb \
+  app/controllers/messages_controller.rb \
+  test/integration/hello_server_test.rb \
+  test/integration/messages_test.rb; do
+  jq -e --arg path "$artifact_path" '.artifacts[] | select(.path == $path)' \
+    "$tmp/claude-v5-root-artifacts-output/artifact-evidence.json" >/dev/null
+done
+if jq -e '.artifacts[] | select(.path | startswith("application/") or startswith("contest/"))' \
+  "$tmp/claude-v5-root-artifacts-output/artifact-evidence.json" >/dev/null; then
+  echo "deceptive selected-root substring was captured" >&2
+  exit 1
+fi
+
+claude_v5_scaffold_command='time npx --yes create-react-on-rails-app eval_app --rsc --package-manager npm 2>&1 | tee <LOCAL_PATH> | tail -150'
+jq -cn --arg command "$claude_v5_scaffold_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"✓ Done!\nCreated eval_app with React on Rails!"}}' \
+  >"$tmp/claude-v5-scaffold-events.jsonl"
+mkdir "$tmp/claude-v5-scaffold-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v5-scaffold-events.jsonl" \
+  "$tmp/claude-v5-root-workspace" "$tmp/claude-v5-scaffold-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+test "$(jq -r '.items[] | select(.id == "install.pro") | .status' \
+  "$tmp/claude-v5-scaffold-output/rubric-results.json")" = pass
+
+claude_v5_test_command='RAILS_ENV=test bin/rails test 2>&1 | tail -100'
+jq -cn --arg command "$claude_v5_test_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"8 runs, 47 assertions, 0 failures, 0 errors, 0 skips"}}' \
+  >"$tmp/claude-v5-test-events.jsonl"
+mkdir "$tmp/claude-v5-test-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v5-test-events.jsonl" \
+  "$tmp/claude-v5-root-workspace" "$tmp/claude-v5-test-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in rsc.route form.validation tests.page tests.form tests.green; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/claude-v5-test-output/rubric-results.json")" = pass
+done
+
+claude_v5_build_command='npm run build > <LOCAL_PATH> 2>&1; echo "EXIT: $?"; tail -20 <LOCAL_PATH>'
+jq -cn --arg command "$claude_v5_build_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"EXIT: 0\nLoading production config; Rspack compiled successfully"}}' \
+  >"$tmp/claude-v5-build-events.jsonl"
+mkdir "$tmp/claude-v5-build-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v5-build-events.jsonl" \
+  "$tmp/claude-v5-root-workspace" "$tmp/claude-v5-build-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+test "$(jq -r '.items[] | select(.id == "build.production") | .status' \
+  "$tmp/claude-v5-build-output/rubric-results.json")" = pass
+
+cp "$tmp/claude-v5-scaffold-events.jsonl" "$tmp/claude-v5-classifier-events.jsonl"
+cat "$tmp/claude-v5-test-events.jsonl" "$tmp/claude-v5-build-events.jsonl" \
+  >>"$tmp/claude-v5-classifier-events.jsonl"
+mkdir "$tmp/claude-v5-classifier-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v5-classifier-events.jsonl" \
+  "$tmp/claude-v5-root-workspace" "$tmp/claude-v5-classifier-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in install.pro rsc.route form.validation tests.page tests.form build.production \
+  tests.green unaided evidence.complete; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/claude-v5-classifier-output/rubric-results.json")" = pass
+done
+test "$(jq -r '.overall' "$tmp/claude-v5-classifier-output/rubric-results.json")" = pass
+
+claude_v5_scaffold_rejections=(
+  'time -p npx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH> | tail -150'
+  'time -- npx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH> | tail -150'
+  'env time npx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH> | tail -150'
+  'time sudo npx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH> | tail -150'
+  'time time npx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH> | tail -150'
+  'time npx --yes create-react-on-rails-app eval_app --rsc'
+)
+claude_v5_scaffold_rejection_index=0
+for scaffold_command in "${claude_v5_scaffold_rejections[@]}"; do
+  claude_v5_scaffold_rejection_index=$((claude_v5_scaffold_rejection_index + 1))
+  jq -cn --arg command "$scaffold_command" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"✓ Done!\nCreated eval_app with React on Rails!"}}' \
+    >"$tmp/claude-v5-scaffold-rejection-$claude_v5_scaffold_rejection_index-events.jsonl"
+  mkdir "$tmp/claude-v5-scaffold-rejection-$claude_v5_scaffold_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" \
+    "$tmp/claude-v5-scaffold-rejection-$claude_v5_scaffold_rejection_index-events.jsonl" \
+    "$tmp/claude-v5-root-workspace" \
+    "$tmp/claude-v5-scaffold-rejection-$claude_v5_scaffold_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "install.pro") | .status' \
+    "$tmp/claude-v5-scaffold-rejection-$claude_v5_scaffold_rejection_index-output/rubric-results.json")" = unknown
+done
+
+claude_v5_test_rejections=(
+  'RAILS_ENV=production bin/rails test 2>&1 | tail -100'
+  'NODE_ENV=test bin/rails test 2>&1 | tail -100'
+  'RAILS_ENV=test NODE_ENV=test bin/rails test 2>&1 | tail -100'
+  'env RAILS_ENV=test bin/rails test 2>&1 | tail -100'
+  'time RAILS_ENV=test bin/rails test 2>&1 | tail -100'
+)
+claude_v5_test_rejection_index=0
+for test_command in "${claude_v5_test_rejections[@]}"; do
+  claude_v5_test_rejection_index=$((claude_v5_test_rejection_index + 1))
+  jq -cn --arg command "$test_command" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"8 runs, 47 assertions, 0 failures, 0 errors, 0 skips"}}' \
+    >"$tmp/claude-v5-test-rejection-$claude_v5_test_rejection_index-events.jsonl"
+  mkdir "$tmp/claude-v5-test-rejection-$claude_v5_test_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" \
+    "$tmp/claude-v5-test-rejection-$claude_v5_test_rejection_index-events.jsonl" \
+    "$tmp/claude-v5-root-workspace" \
+    "$tmp/claude-v5-test-rejection-$claude_v5_test_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in rsc.route form.validation tests.page tests.form tests.green; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/claude-v5-test-rejection-$claude_v5_test_rejection_index-output/rubric-results.json")" = unknown
+  done
+done
+
+claude_v5_build_rejection_commands=(
+  'npm run build > <LOCAL_PATH> 2>&1; echo "EXIT: 0"; tail -20 <LOCAL_PATH>'
+  'echo "EXIT: $?"; npm run build > <LOCAL_PATH> 2>&1; tail -20 <LOCAL_PATH>'
+  'npm run build > build.log 2>&1; echo "EXIT: $?"; tail -20 build.log'
+  'npm run build > <LOCAL_PATH> 2>&1; echo "EXIT: $?"; tail -20 <LOCAL_PATH>; true'
+  'npm run build > <LOCAL_PATH> 2>&1; echo "EXIT: $?"; echo extra; tail -20 <LOCAL_PATH>'
+  'time npm run build 2>&1 | tail -20'
+)
+claude_v5_build_rejection_index=0
+for build_command in "${claude_v5_build_rejection_commands[@]}"; do
+  claude_v5_build_rejection_index=$((claude_v5_build_rejection_index + 1))
+  jq -cn --arg command "$build_command" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"EXIT: 0\nRspack compiled successfully"}}' \
+    >"$tmp/claude-v5-build-rejection-$claude_v5_build_rejection_index-events.jsonl"
+  mkdir "$tmp/claude-v5-build-rejection-$claude_v5_build_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" \
+    "$tmp/claude-v5-build-rejection-$claude_v5_build_rejection_index-events.jsonl" \
+    "$tmp/claude-v5-root-workspace" \
+    "$tmp/claude-v5-build-rejection-$claude_v5_build_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "build.production") | .status' \
+    "$tmp/claude-v5-build-rejection-$claude_v5_build_rejection_index-output/rubric-results.json")" = unknown
+done
+
+claude_v5_build_rejection_outputs=(
+  $'EXIT: 1\nRspack compiled successfully'
+  $'EXIT: 0\nEXIT: 0\nRspack compiled successfully'
+  $'OTHER: 0\nRspack compiled successfully'
+)
+claude_v5_build_output_rejection_index=0
+for build_output in "${claude_v5_build_rejection_outputs[@]}"; do
+  claude_v5_build_output_rejection_index=$((claude_v5_build_output_rejection_index + 1))
+  jq -cn --arg command "$claude_v5_build_command" --arg output "$build_output" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:$output}}' \
+    >"$tmp/claude-v5-build-output-rejection-$claude_v5_build_output_rejection_index-events.jsonl"
+  mkdir "$tmp/claude-v5-build-output-rejection-$claude_v5_build_output_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" \
+    "$tmp/claude-v5-build-output-rejection-$claude_v5_build_output_rejection_index-events.jsonl" \
+    "$tmp/claude-v5-root-workspace" \
+    "$tmp/claude-v5-build-output-rejection-$claude_v5_build_output_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "build.production") | .status' \
+    "$tmp/claude-v5-build-output-rejection-$claude_v5_build_output_rejection_index-output/rubric-results.json")" = unknown
+done
+
 mkdir -p "$tmp/claude-classifier-workspace/eval_app/app/controllers" \
   "$tmp/claude-classifier-workspace/eval_app/app/javascript/src/HelloServer/ror_components" \
   "$tmp/claude-classifier-workspace/eval_app/app/models" \
