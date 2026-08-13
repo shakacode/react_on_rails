@@ -178,13 +178,25 @@ const stripSanitizedSetupPrefix = (lines) => {
   return lines.slice(cursor);
 };
 const immediatePhaseStatusTarget = (lines, output, phase) => {
-  if (lines.length !== 3 || lines[0] !== 'set -o pipefail') return null;
+  if ((lines.length !== 3 && lines.length !== 4) || lines[0] !== 'set -o pipefail') return null;
 
   const pipelineMatch = lines[1].match(boundedStatusPipeline);
-  const markerMatch = lines[2].match(/^echo "([A-Z][A-Z0-9_]{0,63})=\$\{PIPESTATUS\[0\]\}"$/);
-  if (!pipelineMatch || Number(pipelineMatch[2]) > 1000 || !markerMatch) return null;
+  const directMarkerMatch =
+    lines.length === 3 ? lines[2].match(/^echo "([A-Z][A-Z0-9_]{0,63})=\$\{PIPESTATUS\[0\]\}"$/) : null;
+  const assignedMarkerMatch =
+    lines.length === 4 ? lines[2].match(/^([A-Z][A-Z0-9_]{0,63})=\$\{PIPESTATUS\[0\]\}$/) : null;
+  const assignedEchoMatch =
+    lines.length === 4 ? lines[3].match(/^echo "([A-Z][A-Z0-9_]{0,63})=\$([A-Z][A-Z0-9_]{0,63})"$/) : null;
+  const markerName = directMarkerMatch?.[1] ?? assignedMarkerMatch?.[1];
+  if (
+    !pipelineMatch ||
+    Number(pipelineMatch[2]) > 1000 ||
+    !markerName ||
+    (assignedMarkerMatch && (assignedEchoMatch?.[1] !== markerName || assignedEchoMatch?.[2] !== markerName))
+  ) {
+    return null;
+  }
 
-  const markerName = markerMatch[1];
   const markerTokens = markerName.split('_');
   if (
     !markerTokens.includes(phase) ||
@@ -318,8 +330,16 @@ const pipelineStatusProductionBuildTarget = (lines, output) => {
     : null;
 };
 const phaseStatusProductionBuildTarget = (lines, output) => {
-  const proof = immediatePhaseStatusTarget(lines, output, 'BUILD');
-  if (!proof || proof.target !== 'npm run build') return null;
+  const cleanup = 'rm -rf public/assets public/packs public/packs-test';
+  const proofLines = lines[0] === cleanup ? lines.slice(1) : lines;
+  const proof = immediatePhaseStatusTarget(proofLines, output, 'BUILD');
+  if (
+    !proof ||
+    (proof.target !== 'npm run build' &&
+      proof.target !== 'env RAILS_ENV=production NODE_ENV=production bin/rails assets:precompile')
+  ) {
+    return null;
+  }
   return proof.outputLines
     .slice(0, -1)
     .some((line) => /compiled|compilation (?:complete|successful)|built successfully/i.test(line))
@@ -632,6 +652,7 @@ const buildCommands = successfulCommands.filter((command) => {
       (/^(?:(?:RAILS_ENV|NODE_ENV)=production\s+)?(?:(?:bin\/rails|bundle exec rails|bundle exec rake|rake) assets:precompile|(?:bin\/shakapacker|bundle exec rake shakapacker:compile)|(?:npm|pnpm) run build:production)$/i.test(
         targetCommand,
       ) ||
+        targetCommand === 'env RAILS_ENV=production NODE_ENV=production bin/rails assets:precompile' ||
         plainManifestBuildInvocation(targetCommand))
     );
   });

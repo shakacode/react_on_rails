@@ -25,10 +25,11 @@ rg -Fq 'commands whose status could mask the test or build result.' \
   "$eval_dir/prompt.md"
 for marker in ROR_EVAL_SCAFFOLD_EXIT ROR_EVAL_TEST_EXIT ROR_EVAL_BUILD_EXIT; do
   rg -Fq "${marker}=\${PIPESTATUS[0]}" "$eval_dir/prompt.md"
+  rg -Fq "echo \"${marker}=\$${marker}\"" "$eval_dir/prompt.md"
 done
-rg -Fq 'after its bounded pipeline. Make each status marker the final executable line in' \
+rg -Fq 'then echo it as the final executable line in that shell invocation.' \
   "$eval_dir/prompt.md"
-rg -Fq 'its shell invocation. Prefer a bounded tail-only pipeline when no persistent log' \
+rg -Fq 'Prefer a bounded tail-only pipeline when no persistent log is needed.' \
   "$eval_dir/prompt.md"
 exec 9<"$eval_dir/README.md"
 IFS=: read -r fixture_kind fixture_mode fixture_size \
@@ -3958,6 +3959,115 @@ node "$eval_dir/bin/derive-evidence.mjs" "$tmp/stable-phase-events.jsonl" \
   "$tmp/claude-v8-form-workspace" "$tmp/stable-phase-output" \
   "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
 test "$(jq -r '.overall' "$tmp/stable-phase-output/rubric-results.json")" = pass
+
+assigned_status_scaffold_command=$'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc --package-manager npm 2>&1 | tee <LOCAL_PATH>/scaffold.log | tail -200\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+assigned_status_test_command=$'cd <LOCAL_PATH>/eval_app\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tail -100\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
+assigned_status_build_command=$'cd <LOCAL_PATH>/eval_app\nrm -rf public/assets public/packs public/packs-test\nset -o pipefail\nenv RAILS_ENV=production NODE_ENV=production bin/rails assets:precompile 2>&1 | tail -n 200\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"'
+jq -cn --arg command "$assigned_status_scaffold_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"✓ Done!\nCreated eval_app with React on Rails!\nROR_EVAL_SCAFFOLD_EXIT=0"}}' \
+  >"$tmp/assigned-status-scaffold-events.jsonl"
+jq -cn --arg command "$assigned_status_test_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"8 runs, 43 assertions, 0 failures, 0 errors, 0 skips\nROR_EVAL_TEST_EXIT=0"}}' \
+  >"$tmp/assigned-status-test-events.jsonl"
+jq -cn --arg command "$assigned_status_build_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"Rspack compiled successfully\nROR_EVAL_BUILD_EXIT=0"}}' \
+  >"$tmp/assigned-status-build-events.jsonl"
+cat "$tmp/assigned-status-scaffold-events.jsonl" "$tmp/assigned-status-test-events.jsonl" \
+  "$tmp/assigned-status-build-events.jsonl" >"$tmp/assigned-status-events.jsonl"
+mkdir "$tmp/assigned-status-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/assigned-status-events.jsonl" \
+  "$tmp/claude-v8-form-workspace" "$tmp/assigned-status-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in install.pro rsc.route form.validation tests.page tests.form build.production \
+  tests.green unaided evidence.complete; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/assigned-status-output/rubric-results.json")" = pass
+done
+test "$(jq -r '.overall' "$tmp/assigned-status-output/rubric-results.json")" = pass
+
+assigned_status_scaffold_rejections=(
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -200\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -200\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_BUILD_EXIT"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -200\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=0"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -200\nROR_EVAL_SCAFFOLD_EXIT=$?\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -200\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[1]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -200\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\ntrue\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -200\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"\ntrue'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -200\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"'
+)
+assigned_status_scaffold_rejection_index=0
+for scaffold_command in "${assigned_status_scaffold_rejections[@]}"; do
+  assigned_status_scaffold_rejection_index=$((assigned_status_scaffold_rejection_index + 1))
+  jq -cn --arg command "$scaffold_command" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"✓ Done!\nCreated eval_app with React on Rails!\nROR_EVAL_SCAFFOLD_EXIT=0"}}' \
+    >"$tmp/assigned-status-scaffold-rejection-$assigned_status_scaffold_rejection_index-events.jsonl"
+  mkdir "$tmp/assigned-status-scaffold-rejection-$assigned_status_scaffold_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" \
+    "$tmp/assigned-status-scaffold-rejection-$assigned_status_scaffold_rejection_index-events.jsonl" \
+    "$tmp/claude-v8-form-workspace" \
+    "$tmp/assigned-status-scaffold-rejection-$assigned_status_scaffold_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "install.pro") | .status' \
+    "$tmp/assigned-status-scaffold-rejection-$assigned_status_scaffold_rejection_index-output/rubric-results.json")" = unknown
+done
+
+assigned_status_scaffold_output_rejections=(
+  $'✓ Done!\nCreated eval_app with React on Rails!\nROR_EVAL_SCAFFOLD_EXIT=1'
+  $'✓ Done!\nCreated eval_app with React on Rails!\nROR_EVAL_SCAFFOLD_EXIT=0\nROR_EVAL_SCAFFOLD_EXIT=0'
+  $'ROR_EVAL_SCAFFOLD_EXIT=0\n✓ Done!\nCreated eval_app with React on Rails!'
+  $'✓ Done!\nCreated eval_app with React on Rails!\nROR_EVAL_SCAFFOLD_EXIT=0\nlater output'
+)
+assigned_status_scaffold_output_rejection_index=0
+for scaffold_output in "${assigned_status_scaffold_output_rejections[@]}"; do
+  assigned_status_scaffold_output_rejection_index=$((assigned_status_scaffold_output_rejection_index + 1))
+  jq -cn --arg command "$assigned_status_scaffold_command" --arg output "$scaffold_output" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:$output}}' \
+    >"$tmp/assigned-status-output-rejection-$assigned_status_scaffold_output_rejection_index-events.jsonl"
+  mkdir "$tmp/assigned-status-output-rejection-$assigned_status_scaffold_output_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" \
+    "$tmp/assigned-status-output-rejection-$assigned_status_scaffold_output_rejection_index-events.jsonl" \
+    "$tmp/claude-v8-form-workspace" \
+    "$tmp/assigned-status-output-rejection-$assigned_status_scaffold_output_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "install.pro") | .status' \
+    "$tmp/assigned-status-output-rejection-$assigned_status_scaffold_output_rejection_index-output/rubric-results.json")" = unknown
+done
+
+assigned_status_build_without_cleanup=$'cd <LOCAL_PATH>/eval_app\nset -o pipefail\nenv RAILS_ENV=production NODE_ENV=production bin/rails assets:precompile 2>&1 | tail -n 200\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"'
+jq -cn --arg command "$assigned_status_build_without_cleanup" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"Rspack compiled successfully\nROR_EVAL_BUILD_EXIT=0"}}' \
+  >"$tmp/assigned-status-build-without-cleanup-events.jsonl"
+mkdir "$tmp/assigned-status-build-without-cleanup-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/assigned-status-build-without-cleanup-events.jsonl" \
+  "$tmp/claude-v8-form-workspace" "$tmp/assigned-status-build-without-cleanup-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+test "$(jq -r '.items[] | select(.id == "build.production") | .status' \
+  "$tmp/assigned-status-build-without-cleanup-output/rubric-results.json")" = pass
+
+assigned_status_build_rejections=(
+  $'cd <LOCAL_PATH>/eval_app\nrm -rf public/assets public/packs\nset -o pipefail\nenv RAILS_ENV=production NODE_ENV=production bin/rails assets:precompile 2>&1 | tail -n 200\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"'
+  $'cd <LOCAL_PATH>/eval_app\nrm -rf public/assets public/packs public/packs-test\nset -o pipefail\nenv FOO=bar RAILS_ENV=production NODE_ENV=production bin/rails assets:precompile 2>&1 | tail -n 200\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"'
+  $'cd <LOCAL_PATH>/eval_app\nrm -rf public/assets public/packs public/packs-test\nset -o pipefail\nenv RAILS_ENV=production NODE_ENV=production bin/rails runner assets:precompile 2>&1 | tail -n 200\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"'
+  $'cd <LOCAL_PATH>/eval_app\nset -o pipefail\nrm -rf public/assets public/packs public/packs-test\nenv RAILS_ENV=production NODE_ENV=production bin/rails assets:precompile 2>&1 | tail -n 200\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"'
+  $'cd <LOCAL_PATH>/eval_app\nrm -rf public/assets public/packs public/packs-test\nrm -rf public/assets public/packs public/packs-test\nset -o pipefail\nenv RAILS_ENV=production NODE_ENV=production bin/rails assets:precompile 2>&1 | tail -n 200\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"'
+  $'cd <LOCAL_PATH>/eval_app\nrm -rf public/assets public/packs public/packs-test\nset -o pipefail\nenv RAILS_ENV=production NODE_ENV=production bin/rails assets:precompile 2>&1 | tail -n 200\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"\ntrue'
+  $'cd <LOCAL_PATH>/eval_app\nenv RAILS_ENV=production NODE_ENV=production bin/rails assets:precompile 2>&1 | tail -n 200'
+)
+assigned_status_build_rejection_index=0
+for build_command in "${assigned_status_build_rejections[@]}"; do
+  assigned_status_build_rejection_index=$((assigned_status_build_rejection_index + 1))
+  jq -cn --arg command "$build_command" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"Rspack compiled successfully\nROR_EVAL_BUILD_EXIT=0"}}' \
+    >"$tmp/assigned-status-build-rejection-$assigned_status_build_rejection_index-events.jsonl"
+  mkdir "$tmp/assigned-status-build-rejection-$assigned_status_build_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" \
+    "$tmp/assigned-status-build-rejection-$assigned_status_build_rejection_index-events.jsonl" \
+    "$tmp/claude-v8-form-workspace" \
+    "$tmp/assigned-status-build-rejection-$assigned_status_build_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "build.production") | .status' \
+    "$tmp/assigned-status-build-rejection-$assigned_status_build_rejection_index-output/rubric-results.json")" = unknown
+done
 
 stable_scaffold_rejections=(
   $'npx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -200\necho "ROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}"'
