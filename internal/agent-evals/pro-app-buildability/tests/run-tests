@@ -4306,6 +4306,296 @@ for missing_manifest in Gemfile package.json; do
     "$tmp/scaffold-retry-missing-${missing_manifest%.*}-output/rubric-results.json")" = unknown
 done
 
+relative_cd_test_prefix=$'cd eval_app\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\n'
+relative_cd_test_command="$relative_cd_test_prefix"$'bin/rails test 2>&1 | tail -n 200\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
+compound_shakapacker_build_target='{ RAILS_ENV=production NODE_ENV=production bin/shakapacker-precompile-hook && SHAKAPACKER_SKIP_PRECOMPILE_HOOK=true RAILS_ENV=production NODE_ENV=production bin/shakapacker; }'
+relative_cd_build_command=$'cd eval_app\n'"$compound_shakapacker_build_target"$' 2>&1 | tail -n 200\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"'
+jq -cn --arg command "$relative_cd_test_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"5 runs, 27 assertions, 0 failures, 0 errors\nROR_EVAL_TEST_EXIT=0"}}' \
+  >"$tmp/relative-cd-test-events.jsonl"
+jq -cn --arg command "$relative_cd_build_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"Loading production config\nRspack client compiled successfully\nRspack server compiled successfully\nRspack RSC compiled successfully\nROR_EVAL_BUILD_EXIT=0"}}' \
+  >"$tmp/relative-cd-build-events.jsonl"
+cat "$tmp/stable-scaffold-events.jsonl" "$tmp/relative-cd-test-events.jsonl" \
+  "$tmp/relative-cd-build-events.jsonl" >"$tmp/relative-cd-combined-events.jsonl"
+mkdir "$tmp/relative-cd-combined-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/relative-cd-combined-events.jsonl" \
+  "$tmp/claude-v8-form-workspace" "$tmp/relative-cd-combined-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in install.pro rsc.route form.validation tests.page tests.form build.production \
+  tests.green unaided evidence.complete; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/relative-cd-combined-output/rubric-results.json")" = pass
+done
+test "$(jq -r '.overall' "$tmp/relative-cd-combined-output/rubric-results.json")" = pass
+jq -e '.items[] | select(.id == "build.production") | .citations |
+  any(. == "artifact-evidence.json#eval_app/package.json")' \
+  "$tmp/relative-cd-combined-output/rubric-results.json" >/dev/null
+
+relative_cd_test_proof=$'bin/rails test 2>&1 | tail -n 200\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
+relative_cd_test_setup_rejections=(
+  $'cd other\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres'
+  $'cd eval_app\ncd eval_app\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres'
+  $'export PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\ncd eval_app'
+  $'cd eval_app\nexport PGPORT=5433\nexport PGUSER=postgres'
+  $'cd eval_app\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGUSER=postgres'
+  $'cd eval_app\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433'
+  $'cd eval_app\nexport PGPORT=5433\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGUSER=postgres'
+  $'cd eval_app\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres'
+  $'cd eval_app\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5432\nexport PGUSER=postgres'
+  $'cd eval_app\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=app'
+  $'cd eval_app\nexport PGHOST=<LOCAL_PATH>/.pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres'
+  $'cd eval_app\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nexport PGPASSWORD=[REDACTED]'
+  $'cd eval_app\nexport PATH=<LOCAL_PATH>/bin\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres'
+  $'cd eval_app\nsource <LOCAL_PATH>/.ror-eval-state/env.sh\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres'
+  $'cd eval_app\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\ntrue'
+)
+relative_cd_test_setup_rejection_index=0
+for test_setup in "${relative_cd_test_setup_rejections[@]}"; do
+  relative_cd_test_setup_rejection_index=$((relative_cd_test_setup_rejection_index + 1))
+  test_command="$test_setup"$'\n'"$relative_cd_test_proof"
+  jq -cn --arg command "$test_command" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"5 runs, 27 assertions, 0 failures, 0 errors\nROR_EVAL_TEST_EXIT=0"}}' \
+    >"$tmp/relative-cd-test-setup-rejection-$relative_cd_test_setup_rejection_index-events.jsonl"
+  mkdir "$tmp/relative-cd-test-setup-rejection-$relative_cd_test_setup_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" \
+    "$tmp/relative-cd-test-setup-rejection-$relative_cd_test_setup_rejection_index-events.jsonl" \
+    "$tmp/claude-v8-form-workspace" \
+    "$tmp/relative-cd-test-setup-rejection-$relative_cd_test_setup_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "tests.green") | .status' \
+    "$tmp/relative-cd-test-setup-rejection-$relative_cd_test_setup_rejection_index-output/rubric-results.json")" = unknown
+done
+
+relative_cd_test_proof_rejections=(
+  $'bin/rails test 2>&1 | tail -n 200\necho "ROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}"'
+  $'bin/rails test 2>&1 | tail -n 200\nROR_EVAL_TEST_EXIT=$?\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
+  $'bin/rails test 2>&1 | tail -n 200\nROR_EVAL_TEST_EXIT=${PIPESTATUS[1]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
+  $'bin/rails test 2>&1 | tail -n 200\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_BUILD_EXIT"'
+  $'bin/rails test 2>&1 | tail -n 200\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\ntrue\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
+  $'bin/rails test 2>&1 | tail -n 200\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"\ntrue'
+  $'bin/rails test 2>&1 | tail -n 0\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
+  $'bin/rails test 2>&1 | tail -n 1001\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
+  $'bin/rails test 2>&1 | cat | tail -n 200\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
+)
+relative_cd_test_proof_rejection_index=0
+for rejected_proof in "${relative_cd_test_proof_rejections[@]}"; do
+  relative_cd_test_proof_rejection_index=$((relative_cd_test_proof_rejection_index + 1))
+  test_command="$relative_cd_test_prefix$rejected_proof"
+  jq -cn --arg command "$test_command" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"5 runs, 27 assertions, 0 failures, 0 errors\nROR_EVAL_TEST_EXIT=0"}}' \
+    >"$tmp/relative-cd-test-proof-rejection-$relative_cd_test_proof_rejection_index-events.jsonl"
+  mkdir "$tmp/relative-cd-test-proof-rejection-$relative_cd_test_proof_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" \
+    "$tmp/relative-cd-test-proof-rejection-$relative_cd_test_proof_rejection_index-events.jsonl" \
+    "$tmp/claude-v8-form-workspace" \
+    "$tmp/relative-cd-test-proof-rejection-$relative_cd_test_proof_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "tests.green") | .status' \
+    "$tmp/relative-cd-test-proof-rejection-$relative_cd_test_proof_rejection_index-output/rubric-results.json")" = unknown
+done
+
+relative_cd_build_prefix=$'cd eval_app\n'
+relative_cd_build_suffix=$' 2>&1 | tail -n 200\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"'
+compound_build_target_rejections=(
+  'RAILS_ENV=production NODE_ENV=production bin/shakapacker-precompile-hook && SHAKAPACKER_SKIP_PRECOMPILE_HOOK=true RAILS_ENV=production NODE_ENV=production bin/shakapacker'
+  '{ RAILS_ENV=production NODE_ENV=production bin/shakapacker-precompile-hook ; SHAKAPACKER_SKIP_PRECOMPILE_HOOK=true RAILS_ENV=production NODE_ENV=production bin/shakapacker; }'
+  '{ RAILS_ENV=production NODE_ENV=production bin/shakapacker-precompile-hook || SHAKAPACKER_SKIP_PRECOMPILE_HOOK=true RAILS_ENV=production NODE_ENV=production bin/shakapacker; }'
+  '{ SHAKAPACKER_SKIP_PRECOMPILE_HOOK=true RAILS_ENV=production NODE_ENV=production bin/shakapacker && RAILS_ENV=production NODE_ENV=production bin/shakapacker-precompile-hook; }'
+  '{ RAILS_ENV=test NODE_ENV=production bin/shakapacker-precompile-hook && SHAKAPACKER_SKIP_PRECOMPILE_HOOK=true RAILS_ENV=production NODE_ENV=production bin/shakapacker; }'
+  '{ RAILS_ENV=production NODE_ENV=production bin/shakapacker-precompile && SHAKAPACKER_SKIP_PRECOMPILE_HOOK=true RAILS_ENV=production NODE_ENV=production bin/shakapacker; }'
+  '{ RAILS_ENV=production NODE_ENV=production bin/shakapacker-precompile-hook && SHAKAPACKER_SKIP_PRECOMPILE_HOOK=false RAILS_ENV=production NODE_ENV=production bin/shakapacker; }'
+  '{ RAILS_ENV=production NODE_ENV=production bin/shakapacker-precompile-hook && SHAKAPACKER_SKIP_PRECOMPILE_HOOK=true RAILS_ENV=production NODE_ENV=production bin/shakapacker build; }'
+  '{ RAILS_ENV=production NODE_ENV=production bin/shakapacker-precompile-hook && SHAKAPACKER_SKIP_PRECOMPILE_HOOK=true RAILS_ENV=production NODE_ENV=production bin/shakapacker && true; }'
+)
+compound_build_target_rejection_index=0
+for build_target in "${compound_build_target_rejections[@]}"; do
+  compound_build_target_rejection_index=$((compound_build_target_rejection_index + 1))
+  build_command="$relative_cd_build_prefix$build_target$relative_cd_build_suffix"
+  jq -cn --arg command "$build_command" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"Rspack compiled successfully\nROR_EVAL_BUILD_EXIT=0"}}' \
+    >"$tmp/compound-build-target-rejection-$compound_build_target_rejection_index-events.jsonl"
+  mkdir "$tmp/compound-build-target-rejection-$compound_build_target_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" \
+    "$tmp/compound-build-target-rejection-$compound_build_target_rejection_index-events.jsonl" \
+    "$tmp/claude-v8-form-workspace" \
+    "$tmp/compound-build-target-rejection-$compound_build_target_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "build.production") | .status' \
+    "$tmp/compound-build-target-rejection-$compound_build_target_rejection_index-output/rubric-results.json")" = unknown
+done
+
+relative_cd_test_output_rejections=(
+  $'bash: line 1: cd: eval_app: No such file or directory\n5 runs, 27 assertions, 0 failures, 0 errors\nROR_EVAL_TEST_EXIT=0'
+  $'5 runs, 27 assertions, 0 failures, 0 errors\nROR_EVAL_TEST_EXIT=1'
+  $'5 runs, 27 assertions, 0 failures, 0 errors\nROR_EVAL_TEST_EXIT=0\nROR_EVAL_TEST_EXIT=0'
+  $'ROR_EVAL_TEST_EXIT=0\n5 runs, 27 assertions, 0 failures, 0 errors'
+  $'5 runs, 27 assertions, 0 failures, 0 errors\nROR_EVAL_TEST_EXIT=0\nlater output'
+  $'ROR_EVAL_TEST_EXIT=0'
+  $'0 runs, 0 assertions, 0 failures, 0 errors\nROR_EVAL_TEST_EXIT=0'
+  $'5 runs, 26 assertions, 1 failures, 0 errors\nROR_EVAL_TEST_EXIT=0'
+  $'5 runs, 26 assertions, 0 failures, 1 errors\nROR_EVAL_TEST_EXIT=0'
+)
+relative_cd_test_output_rejection_index=0
+for test_output in "${relative_cd_test_output_rejections[@]}"; do
+  relative_cd_test_output_rejection_index=$((relative_cd_test_output_rejection_index + 1))
+  jq -cn --arg command "$relative_cd_test_command" --arg output "$test_output" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:$output}}' \
+    >"$tmp/relative-cd-test-output-rejection-$relative_cd_test_output_rejection_index-events.jsonl"
+  mkdir "$tmp/relative-cd-test-output-rejection-$relative_cd_test_output_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" \
+    "$tmp/relative-cd-test-output-rejection-$relative_cd_test_output_rejection_index-events.jsonl" \
+    "$tmp/claude-v8-form-workspace" \
+    "$tmp/relative-cd-test-output-rejection-$relative_cd_test_output_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "tests.green") | .status' \
+    "$tmp/relative-cd-test-output-rejection-$relative_cd_test_output_rejection_index-output/rubric-results.json")" = unknown
+done
+
+relative_cd_build_prefix_rejections=(
+  ''
+  $'cd <LOCAL_PATH>/eval_app\n'
+  $'cd other\n'
+  $'cd eval_app\ncd eval_app\n'
+  $'true\ncd eval_app\n'
+  $'cd eval_app\ntrue\n'
+)
+relative_cd_build_prefix_rejection_index=0
+for build_prefix in "${relative_cd_build_prefix_rejections[@]}"; do
+  relative_cd_build_prefix_rejection_index=$((relative_cd_build_prefix_rejection_index + 1))
+  build_command="$build_prefix$compound_shakapacker_build_target$relative_cd_build_suffix"
+  jq -cn --arg command "$build_command" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"Rspack compiled successfully\nROR_EVAL_BUILD_EXIT=0"}}' \
+    >"$tmp/relative-cd-build-prefix-rejection-$relative_cd_build_prefix_rejection_index-events.jsonl"
+  mkdir "$tmp/relative-cd-build-prefix-rejection-$relative_cd_build_prefix_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" \
+    "$tmp/relative-cd-build-prefix-rejection-$relative_cd_build_prefix_rejection_index-events.jsonl" \
+    "$tmp/claude-v8-form-workspace" \
+    "$tmp/relative-cd-build-prefix-rejection-$relative_cd_build_prefix_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "build.production") | .status' \
+    "$tmp/relative-cd-build-prefix-rejection-$relative_cd_build_prefix_rejection_index-output/rubric-results.json")" = unknown
+done
+
+compound_build_proof_rejections=(
+  $' 2>&1 | tail -n 200\necho "ROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}"'
+  $' 2>&1 | tail -n 200\nROR_EVAL_BUILD_EXIT=$?\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"'
+  $' 2>&1 | tail -n 200\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[1]}\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"'
+  $' 2>&1 | tail -n 200\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_TEST_EXIT"'
+  $' 2>&1 | tail -n 200\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_BUILD_EXIT=0"'
+  $' 2>&1 | tail -n 200\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}\ntrue\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"'
+  $' 2>&1 | tail -n 200\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"\ntrue'
+  $' 2>&1 | tail -n 0\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"'
+  $' 2>&1 | tail -n 1001\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"'
+  $' 2>&1 | cat | tail -n 200\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"'
+)
+compound_build_proof_rejection_index=0
+for rejected_suffix in "${compound_build_proof_rejections[@]}"; do
+  compound_build_proof_rejection_index=$((compound_build_proof_rejection_index + 1))
+  build_command="$relative_cd_build_prefix$compound_shakapacker_build_target$rejected_suffix"
+  jq -cn --arg command "$build_command" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"Rspack compiled successfully\nROR_EVAL_BUILD_EXIT=0"}}' \
+    >"$tmp/compound-build-proof-rejection-$compound_build_proof_rejection_index-events.jsonl"
+  mkdir "$tmp/compound-build-proof-rejection-$compound_build_proof_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" \
+    "$tmp/compound-build-proof-rejection-$compound_build_proof_rejection_index-events.jsonl" \
+    "$tmp/claude-v8-form-workspace" \
+    "$tmp/compound-build-proof-rejection-$compound_build_proof_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "build.production") | .status' \
+    "$tmp/compound-build-proof-rejection-$compound_build_proof_rejection_index-output/rubric-results.json")" = unknown
+done
+
+relative_cd_build_output_rejections=(
+  $'bash: cd: eval_app: No such file or directory\nRspack compiled successfully\nROR_EVAL_BUILD_EXIT=0'
+  $'Rspack compiled successfully\nROR_EVAL_BUILD_EXIT=1'
+  $'Rspack compiled successfully\nROR_EVAL_BUILD_EXIT=0\nROR_EVAL_BUILD_EXIT=0'
+  $'ROR_EVAL_BUILD_EXIT=0\nRspack compiled successfully'
+  $'Rspack compiled successfully\nROR_EVAL_BUILD_EXIT=0\nlater output'
+  $'ROR_EVAL_BUILD_EXIT=0'
+  $'Usage: build [options]\nRspack compiled successfully\nROR_EVAL_BUILD_EXIT=0'
+  $'ERROR: build failed\nRspack compiled successfully\nROR_EVAL_BUILD_EXIT=0'
+)
+relative_cd_build_output_rejection_index=0
+for build_output in "${relative_cd_build_output_rejections[@]}"; do
+  relative_cd_build_output_rejection_index=$((relative_cd_build_output_rejection_index + 1))
+  jq -cn --arg command "$relative_cd_build_command" --arg output "$build_output" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:$output}}' \
+    >"$tmp/relative-cd-build-output-rejection-$relative_cd_build_output_rejection_index-events.jsonl"
+  mkdir "$tmp/relative-cd-build-output-rejection-$relative_cd_build_output_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" \
+    "$tmp/relative-cd-build-output-rejection-$relative_cd_build_output_rejection_index-events.jsonl" \
+    "$tmp/claude-v8-form-workspace" \
+    "$tmp/relative-cd-build-output-rejection-$relative_cd_build_output_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "build.production") | .status' \
+    "$tmp/relative-cd-build-output-rejection-$relative_cd_build_output_rejection_index-output/rubric-results.json")" = unknown
+done
+
+printf -v truncated_padding '%13000s' ''
+for phase in test build; do
+  if [[ "$phase" == test ]]; then
+    phase_command="$relative_cd_test_command"
+    phase_output=$'5 runs, 27 assertions, 0 failures, 0 errors\nROR_EVAL_TEST_EXIT=0\n'"$truncated_padding"
+    phase_row=tests.green
+  else
+    phase_command="$relative_cd_build_command"
+    phase_output=$'Rspack compiled successfully\nROR_EVAL_BUILD_EXIT=0\n'"$truncated_padding"
+    phase_row=build.production
+  fi
+  jq -cn --arg command "$phase_command" --arg output "$phase_output" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:$output}}' \
+    >"$tmp/relative-cd-$phase-truncated-events.jsonl"
+  mkdir "$tmp/relative-cd-$phase-truncated-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/relative-cd-$phase-truncated-events.jsonl" \
+    "$tmp/claude-v8-form-workspace" "$tmp/relative-cd-$phase-truncated-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r --arg row "$phase_row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/relative-cd-$phase-truncated-output/rubric-results.json")" = unknown
+done
+
+for phase in test build; do
+  if [[ "$phase" == test ]]; then
+    phase_command="$relative_cd_test_command"
+    phase_output=$'5 runs, 27 assertions, 0 failures, 0 errors\nROR_EVAL_TEST_EXIT=0'
+    phase_row=tests.green
+  else
+    phase_command="$relative_cd_build_command"
+    phase_output=$'Rspack compiled successfully\nROR_EVAL_BUILD_EXIT=0'
+    phase_row=build.production
+  fi
+  jq -cn --arg command "$phase_command" --arg output "$phase_output" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:1,status:"failed",aggregated_output:$output}}' \
+    >"$tmp/relative-cd-$phase-nonzero-events.jsonl"
+  mkdir "$tmp/relative-cd-$phase-nonzero-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/relative-cd-$phase-nonzero-events.jsonl" \
+    "$tmp/claude-v8-form-workspace" "$tmp/relative-cd-$phase-nonzero-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r --arg row "$phase_row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/relative-cd-$phase-nonzero-output/rubric-results.json")" = unknown
+done
+
+for manifest_variant in missing one-env truncated; do
+  cp -R "$tmp/claude-v8-form-workspace" "$tmp/compound-build-$manifest_variant-workspace"
+  manifest="$tmp/compound-build-$manifest_variant-workspace/eval_app/package.json"
+  if [[ "$manifest_variant" == missing ]]; then
+    rm "$manifest"
+  elif [[ "$manifest_variant" == one-env ]]; then
+    printf '%s\n' '{"scripts":{"build":"NODE_ENV=production rspack build"}}' >"$manifest"
+  else
+    printf '%s' '{"scripts":{"build":"RAILS_ENV=production NODE_ENV=production rspack build"},"padding":"' \
+      >"$manifest"
+    printf '%020000d' 0 >>"$manifest"
+    printf '%s\n' '"}' >>"$manifest"
+  fi
+  mkdir "$tmp/compound-build-$manifest_variant-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/relative-cd-build-events.jsonl" \
+    "$tmp/compound-build-$manifest_variant-workspace" "$tmp/compound-build-$manifest_variant-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "build.production") | .status' \
+    "$tmp/compound-build-$manifest_variant-output/rubric-results.json")" = unknown
+done
+
 explicit_pg_test_command=$'export PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\ncd <LOCAL_PATH>/eval_app\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tail -100\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
 jq -cn --arg command "$explicit_pg_test_command" \
   '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"8 runs, 39 assertions, 0 failures, 0 errors, 0 skips\nROR_EVAL_TEST_EXIT=0"}}' \

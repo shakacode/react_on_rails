@@ -197,6 +197,11 @@ const stripExplicitPgTestSetupPrefix = (lines) => {
   if (!cdFirst && cursor < lines.length - 1 && sanitizedEvalDirectory.test(lines[cursor])) cursor += 1;
   return lines.slice(cursor);
 };
+const relativeCdTestSetupLines = ['cd eval_app', ...explicitPgTestSetupLines];
+const stripRelativeCdTestSetupPrefix = (lines) =>
+  relativeCdTestSetupLines.every((line, index) => lines[index] === line)
+    ? lines.slice(relativeCdTestSetupLines.length)
+    : null;
 const scaffoldRetrySetupLines = [
   'rm -rf <LOCAL_PATH>/eval_app',
   'cd <LOCAL_PATH>',
@@ -395,6 +400,20 @@ const phaseStatusProductionBuildTarget = (lines, output) => {
     ? proof.target
     : null;
 };
+const compoundShakapackerBuildTarget =
+  '{ RAILS_ENV=production NODE_ENV=production bin/shakapacker-precompile-hook && SHAKAPACKER_SKIP_PRECOMPILE_HOOK=true RAILS_ENV=production NODE_ENV=production bin/shakapacker; }';
+const relativeCdCompoundProductionBuildTarget = (lines, output, outputTruncated) => {
+  if (outputTruncated || lines[0] !== 'cd eval_app' || /(?:^|\n)\s*(?:[^\n]*:\s*)?cd:\s/i.test(output)) {
+    return null;
+  }
+  const proof = immediatePhaseStatusTarget(lines.slice(1), output, 'BUILD', true);
+  return proof?.target === compoundShakapackerBuildTarget &&
+    proof.outputLines
+      .slice(0, -1)
+      .some((line) => /compiled|compilation (?:complete|successful)|built successfully/i.test(line))
+    ? proof.target
+    : null;
+};
 const directRuntimeProductionBuildTarget = (lines) =>
   lines.length === 1 && lines[0] === 'SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>" npm run build'
     ? 'npm run build'
@@ -533,6 +552,12 @@ const buildEvidenceTargets = (command) => {
   if (pipelineStatusProductionTarget) targets.push(pipelineStatusProductionTarget);
   const phaseStatusProductionTarget = phaseStatusProductionBuildTarget(phaseLines, command.output);
   if (phaseStatusProductionTarget) targets.push(phaseStatusProductionTarget);
+  const relativeCdCompoundTarget = relativeCdCompoundProductionBuildTarget(
+    rawLines,
+    command.output,
+    command.output_truncated,
+  );
+  if (relativeCdCompoundTarget) targets.push(relativeCdCompoundTarget);
   const directRuntimeProductionTarget = directRuntimeProductionBuildTarget(lines);
   if (directRuntimeProductionTarget) targets.push(directRuntimeProductionTarget);
   for (const [index, line] of lines.entries()) {
@@ -710,6 +735,7 @@ const buildCommands = successfulCommands.filter((command) => {
       (/^(?:(?:RAILS_ENV|NODE_ENV)=production\s+)?(?:(?:bin\/rails|bundle exec rails|bundle exec rake|rake) assets:precompile|(?:bin\/shakapacker|bundle exec rake shakapacker:compile)|(?:npm|pnpm) run build:production)$/i.test(
         targetCommand,
       ) ||
+        (targetCommand === compoundShakapackerBuildTarget && manifestBackedProductionBuild) ||
         targetCommand === 'env RAILS_ENV=production NODE_ENV=production bin/rails assets:precompile' ||
         plainManifestBuildInvocation(targetCommand))
     );
@@ -725,7 +751,10 @@ const buildCommands = successfulCommands.filter((command) => {
 const manifestBackedBuildCommands = buildCommands.filter((command) =>
   buildEvidenceTargets(command).some((invocationLine) => {
     const targetCommand = stripBoundedTimeoutPrefix(invocationLine);
-    return targetCommand !== null && plainManifestBuildInvocation(targetCommand);
+    return (
+      targetCommand !== null &&
+      (plainManifestBuildInvocation(targetCommand) || targetCommand === compoundShakapackerBuildTarget)
+    );
   }),
 );
 const testOutputPassed =
@@ -787,6 +816,11 @@ const phaseStatusRailsTestTarget = (lines, output) => {
   const summaries = proof.outputLines.filter((line) => railsTestSummary.test(line));
   return summaries.length === 1 && proof.outputLines.at(-2) === summaries[0] ? proof.target : null;
 };
+const relativeCdPhaseStatusRailsTestTarget = (lines, output, outputTruncated) => {
+  if (outputTruncated || /(?:^|\n)\s*(?:[^\n]*:\s*)?cd:\s/i.test(output)) return null;
+  const proofLines = stripRelativeCdTestSetupPrefix(lines);
+  return proofLines ? phaseStatusRailsTestTarget(proofLines, output) : null;
+};
 const testEvidenceTargets = (command) => {
   const rawLines = topLevelShellLines(command.command);
   const lines = stripSanitizedSetupPrefix(rawLines);
@@ -794,11 +828,17 @@ const testEvidenceTargets = (command) => {
   const directTargets = lines.length === 1 && recognizedTestInvocation(lines[0]) ? [lines[0]] : [];
   const statusMarkedTarget = statusMarkedRailsTestTarget(rawLines, command.output);
   const phaseStatusTarget = phaseStatusRailsTestTarget(phaseLines, command.output);
-  if (statusMarkedTarget || phaseStatusTarget) {
+  const relativeCdPhaseStatusTarget = relativeCdPhaseStatusRailsTestTarget(
+    rawLines,
+    command.output,
+    command.output_truncated,
+  );
+  if (statusMarkedTarget || phaseStatusTarget || relativeCdPhaseStatusTarget) {
     return [
       ...directTargets,
       ...(statusMarkedTarget ? [statusMarkedTarget] : []),
       ...(phaseStatusTarget ? [phaseStatusTarget] : []),
+      ...(relativeCdPhaseStatusTarget ? [relativeCdPhaseStatusTarget] : []),
     ];
   }
   if (lines.length !== 1) return directTargets;
