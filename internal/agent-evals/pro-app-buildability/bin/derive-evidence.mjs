@@ -577,15 +577,22 @@ const pageTests = artifacts.filter((artifact) => {
   const namedPageTest =
     /(?:spec|test)\/.*(?:page|rsc).*(?:_spec\.rb|_test\.rb|\.(?:test|spec)\.[jt]sx?)$/i.test(artifact.path);
   const uncommentedRuby = artifact.excerpt.replace(/^\s*#.*$/gm, '');
-  const controllerIntegrationTest =
-    /test\/controllers\/.*_test\.rb$/i.test(artifact.path) &&
+  const actionDispatchIntegrationTest =
     /^\s*class\s+[A-Za-z_][A-Za-z0-9_:]*\s*<\s*ActionDispatch::IntegrationTest\b/m.test(uncommentedRuby);
+  const controllerIntegrationTest =
+    /test\/controllers\/.*_test\.rb$/i.test(artifact.path) && actionDispatchIntegrationTest;
+  const rubyIntegrationTest = /test\/integration\/.*_test\.rb$/i.test(artifact.path);
+  const semanticPhraseName =
+    /^\s*(?:test|it)\s+["'][^"'\r\n]*(?:react server component|server-provided data)[^"'\r\n]*["']/im.test(
+      uncommentedRuby,
+    );
+  const explicitRscPageName =
+    actionDispatchIntegrationTest &&
+    /^\s*test\s+["'](?=[^"'\r\n]*\bRSC\b)(?=[^"'\r\n]*\bpage\b)[^"'\r\n]+["']/im.test(uncommentedRuby);
   const semanticRscIntegrationTest =
     (/(?:spec|test)\/integration\/.*(?:_spec\.rb|_test\.rb)$/i.test(artifact.path) ||
       controllerIntegrationTest) &&
-    /^\s*(?:test|it)\s+["'][^"'\r\n]*(?:react server component|server-provided data)[^"'\r\n]*["']/im.test(
-      uncommentedRuby,
-    ) &&
+    (semanticPhraseName || ((rubyIntegrationTest || controllerIntegrationTest) && explicitRscPageName)) &&
     /^\s*(?:get|visit)(?:\s+|\()[^\r\n]+/m.test(uncommentedRuby) &&
     /^\s*(?:assert\w*|expect)(?:\s|\()/m.test(uncommentedRuby);
   return testContent && (namedPageTest || semanticRscIntegrationTest);

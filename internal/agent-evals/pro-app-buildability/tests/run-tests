@@ -3079,6 +3079,100 @@ for row in install.pro rsc.route form.validation tests.page tests.form build.pro
 done
 test "$(jq -r '.overall' "$tmp/claude-v6-classifier-output/rubric-results.json")" = pass
 
+cp -R "$tmp/claude-v6-workspace" "$tmp/codex-rsc-name-workspace"
+rm "$tmp/codex-rsc-name-workspace/eval_app/test/integration/hello_server_test.rb"
+cat >"$tmp/codex-rsc-name-workspace/eval_app/test/integration/hello_server_flow_test.rb" <<'RUBY'
+require "test_helper"
+
+class HelloServerFlowTest < ActionDispatch::IntegrationTest
+  test "renders server-provided briefing data on the RSC page" do
+    get hello_server_path
+
+    assert_response :success
+    assert_includes response.body, "React on Rails Pro Build Review"
+    assert_includes response.body, "August 20, 2026 at Workspace rehearsal room"
+    assert_includes response.body, "12 attendees were scheduled by Rails"
+    assert_includes response.body, "Stream the run-of-show panel from the React Server Component tree."
+  end
+end
+RUBY
+mkdir "$tmp/codex-rsc-name-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-classifier-events.jsonl" \
+  "$tmp/codex-rsc-name-workspace" "$tmp/codex-rsc-name-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in install.pro rsc.route form.validation tests.page tests.form build.production \
+  tests.green unaided evidence.complete; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-rsc-name-output/rubric-results.json")" = pass
+done
+test "$(jq -r '.overall' "$tmp/codex-rsc-name-output/rubric-results.json")" = pass
+
+cp -R "$tmp/codex-rsc-name-workspace" "$tmp/codex-rsc-reversed-name-workspace"
+perl -0pi -e 's/renders server-provided briefing data on the RSC page/renders the page with RSC briefing data/' \
+  "$tmp/codex-rsc-reversed-name-workspace/eval_app/test/integration/hello_server_flow_test.rb"
+mkdir "$tmp/codex-rsc-reversed-name-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+  "$tmp/codex-rsc-reversed-name-workspace" "$tmp/codex-rsc-reversed-name-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in rsc.route tests.page; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-rsc-reversed-name-output/rubric-results.json")" = pass
+done
+
+cp -R "$tmp/codex-rsc-name-workspace" "$tmp/codex-rsc-controller-path-workspace"
+mkdir -p "$tmp/codex-rsc-controller-path-workspace/eval_app/test/controllers"
+mv "$tmp/codex-rsc-controller-path-workspace/eval_app/test/integration/hello_server_flow_test.rb" \
+  "$tmp/codex-rsc-controller-path-workspace/eval_app/test/controllers/hello_server_flow_test.rb"
+mkdir "$tmp/codex-rsc-controller-path-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+  "$tmp/codex-rsc-controller-path-workspace" "$tmp/codex-rsc-controller-path-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in rsc.route tests.page; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-rsc-controller-path-output/rubric-results.json")" = pass
+done
+
+codex_rsc_name_rejections=(
+  $'class HelloServerFlowTest < ActionDispatch::IntegrationTest\n  test "renders server-provided briefing data on the RSC endpoint" do\n    get hello_server_path\n    assert_response :success\n  end\nend'
+  $'class HelloServerFlowTest < ActionDispatch::IntegrationTest\n  test "renders the server-provided briefing page" do\n    get hello_server_path\n    assert_response :success\n  end\nend'
+  $'class HelloServerFlowTest < ActionDispatch::IntegrationTest\n  test "renders RSC briefing data in the webpage" do\n    get hello_server_path\n    assert_response :success\n  end\nend'
+  $'class HelloServerFlowTest < ActionDispatch::IntegrationTest\n  # RSC page\n  test "renders the briefing" do\n    get hello_server_path\n    assert_response :success\n  end\nend'
+  $'class HelloServerFlowTest\n  test "renders the RSC page" do\n    get hello_server_path\n    assert_response :success\n  end\nend'
+  $'class HelloServerFlowTest < ActionDispatch::IntegrationTest\n  test "renders the RSC page" do\n    assert_response :success\n  end\nend'
+  $'class HelloServerFlowTest < ActionDispatch::IntegrationTest\n  test "renders the RSC page" do\n    get hello_server_path\n  end\nend'
+  $'class HelloServerFlowTest < ActionDispatch::IntegrationTest\n  DESCRIPTION = "RSC page"\n  test "renders the briefing" do\n    get hello_server_path\n    assert_response :success\n  end\nend'
+)
+codex_rsc_name_rejection_index=0
+for page_content in "${codex_rsc_name_rejections[@]}"; do
+  codex_rsc_name_rejection_index=$((codex_rsc_name_rejection_index + 1))
+  cp -R "$tmp/codex-rsc-name-workspace" \
+    "$tmp/codex-rsc-name-rejection-$codex_rsc_name_rejection_index-workspace"
+  printf '%s\n' "$page_content" \
+    >"$tmp/codex-rsc-name-rejection-$codex_rsc_name_rejection_index-workspace/eval_app/test/integration/hello_server_flow_test.rb"
+  mkdir "$tmp/codex-rsc-name-rejection-$codex_rsc_name_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+    "$tmp/codex-rsc-name-rejection-$codex_rsc_name_rejection_index-workspace" \
+    "$tmp/codex-rsc-name-rejection-$codex_rsc_name_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in rsc.route tests.page; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/codex-rsc-name-rejection-$codex_rsc_name_rejection_index-output/rubric-results.json")" = unknown
+  done
+done
+
+cp -R "$tmp/codex-rsc-name-workspace" "$tmp/codex-rsc-wrong-path-workspace"
+mkdir -p "$tmp/codex-rsc-wrong-path-workspace/eval_app/test/unit"
+mv "$tmp/codex-rsc-wrong-path-workspace/eval_app/test/integration/hello_server_flow_test.rb" \
+  "$tmp/codex-rsc-wrong-path-workspace/eval_app/test/unit/hello_server_flow_test.rb"
+mkdir "$tmp/codex-rsc-wrong-path-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+  "$tmp/codex-rsc-wrong-path-workspace" "$tmp/codex-rsc-wrong-path-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in rsc.route tests.page; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-rsc-wrong-path-output/rubric-results.json")" = unknown
+done
+
 claude_v6_scaffold_rejections=(
   $'source "<LOCAL_PATH>/.ror-eval-state/pgenv.sh"\nnpx --yes create-react-on-rails-app eval_app --rsc --template typescript 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/create-app.log | tail -150'
   $'source <LOCAL_PATH>/.ror-eval-state/other.sh\nnpx --yes create-react-on-rails-app eval_app --rsc --template typescript 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/create-app.log | tail -150'
