@@ -41,6 +41,23 @@ function collectResponse(request: http.ClientRequest) {
   });
 }
 
+test('undefined fastifyServerOptions is accepted without overriding the default transport', async () => {
+  await resetForTest(testName);
+  const app = worker({
+    fastifyServerOptions: undefined,
+    password,
+    serverBundleCachePath: serverBundleCachePath(testName),
+    stubTimers: false,
+  });
+
+  try {
+    expect(app.server).not.toBeInstanceOf(http.Server);
+  } finally {
+    await app.close();
+    await resetForTest(testName);
+  }
+});
+
 test('fastifyServerOptions selects HTTP/1.1 for probes and render requests', async () => {
   await resetForTest(testName);
   const app = worker({

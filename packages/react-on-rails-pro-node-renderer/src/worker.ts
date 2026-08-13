@@ -611,7 +611,7 @@ export default function run(config: Partial<Config>) {
     currentGenerationManifestPath,
   } = getConfig();
 
-  const { http2: configuredHttp2, ...serverOptions } = fastifyServerOptions;
+  const { http2: configuredHttp2, ...serverOptions } = fastifyServerOptions ?? {};
   const http2Enabled = configuredHttp2 ?? useHttp2;
   const serverOptionsForFastify: FastifyServerOptions<Http2Server> = serverOptions;
   const app = fastify({
