@@ -270,11 +270,9 @@ module ReactOnRailsPro
 
       def retry_or_raise_transport_error(error, available_retries, path, error_type)
         if available_retries.zero?
-          transport_config = "renderer_url = #{ReactOnRailsPro.configuration.renderer_url}\n" \
-                             "renderer_http_force_http2 = " \
-                             "#{ReactOnRailsPro.configuration.renderer_http_force_http2}"
           raise ReactOnRailsPro::Error,
-                "#{error_type} error on renderer request: #{path}.\n#{transport_config}\n" \
+                "#{error_type} error on renderer request: #{path}.\n" \
+                "#{ReactOnRailsPro::RendererHttpClient.transport_config_description}\n" \
                 "Original error:\n#{error}\n#{error.backtrace}"
         end
         Rails.logger.info do

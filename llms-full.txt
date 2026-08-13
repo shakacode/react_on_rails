@@ -15629,7 +15629,8 @@ jobs:
         run: |
           node renderer/node-renderer.js &
           # Wait for the renderer to be ready.
-          # The renderer uses cleartext HTTP/2 (h2c), so use --http2-prior-knowledge for the probe.
+          # The renderer uses cleartext HTTP/2 (h2c) by default, so use
+          # --http2-prior-knowledge unless fastifyServerOptions.http2 is false.
           # --max-time 2 prevents hangs if the port is open but the process is stalled.
           for i in $(seq 1 30); do
             if curl -s --http2-prior-knowledge --max-time 2 http://localhost:3800/ > /dev/null 2>&1; then
@@ -15648,7 +15649,7 @@ jobs:
 
 Key points:
 
-- **Readiness check**: Poll port 3800 (or your configured port) before running tests. The renderer uses **cleartext HTTP/2 (h2c)**, so the `curl` probe must include `--http2-prior-knowledge`. Without it, `curl` sends an HTTP/1.1 request that the h2c server rejects.
+- **Readiness check**: Poll port 3800 (or your configured port) before running tests. By default, the renderer uses **cleartext HTTP/2 (h2c)**, so the `curl` probe must include `--http2-prior-knowledge`. Drop that flag when you configure `fastifyServerOptions: { http2: false }` for HTTP/1.1.
 - **`RENDERER_PASSWORD`**: Must be set in the CI environment and match the value configured in `react_on_rails_pro.rb`. Add it as a CI secret. **Important:** Declare this at the job level (not just the renderer step) so Rails can also read it when running tests.
 - **Bundle pre-staging**: You do **not** need to set a bundle path env var for the renderer. In CI, run `rake react_on_rails_pro:pre_stage_bundle_for_node_renderer` after the webpack build and before starting the renderer — this symlinks the compiled bundle into the renderer's cache directory, eliminating the first-request upload latency. For remote renderers, use `rake react_on_rails_pro:copy_assets_to_remote_vm_renderer` instead.
 
@@ -17175,7 +17176,8 @@ end
 Keep the renderer on private networking. For an ALB, use an internal load balancer with private targets and restrict
 the renderer security group to the ALB and Rails callers. The renderer executes application bundles, so review
 [Node Renderer network security](./basics.md#network-security) before exposing it beyond a trusted network. Health
-routes intentionally remain unauthenticated; render requests still require `RENDERER_PASSWORD`.
+routes intentionally remain unauthenticated, and `/info` also remains unauthenticated and discloses the Node and
+renderer versions. Keep all three routes private; render requests still require `RENDERER_PASSWORD`.
 
 With this paired configuration, ordinary HTTP/1.1 probes and ALB target-group health checks can reach `/health` and
 `/ready` on the renderer port. Regular renderer requests and response streaming continue to work. A direct HTTP/1.1
@@ -17186,9 +17188,11 @@ supported transport contract. Keep a direct h2c path when async props must trave
 
 On Falcon or another long-lived `Fiber.scheduler`, one HTTP/1.1 connection handles one request at a time. In that
 environment, `renderer_http_pool_size` is a hard concurrency cap for renderer requests sharing the client, with a
-default of `10`. Size it with renderer `workersCount` and measured Rails concurrency. Standard Puma uses an ephemeral
-client for streaming renders and a persistent per-thread client for non-streaming renders, so neither path creates a
-process-wide shared-client cap.
+default of `10`. Requests beyond that cap wait for a connection without a pool-acquisition timeout; `ssr_timeout` starts
+applying only after a socket is acquired. Size the pool at or above peak concurrent renderer requests per scheduler,
+then confirm that the renderer `workersCount` can sustain that load. Standard Puma uses an ephemeral client for
+streaming renders and a persistent per-thread client for non-streaming renders, so neither path creates a process-wide
+shared-client cap.
 
 `renderer_http_force_http2` affects only cleartext `http://` URLs. For `https://`, async-http negotiates the protocol
 with ALPN, so the TLS listener or proxy controls whether the connection uses HTTP/1.1 or HTTP/2.
@@ -17334,7 +17338,8 @@ declared current bundle set.
 
 ALB target-group health checks use HTTP/1.1. Use an internal ALB and private targets, restrict the renderer target
 security group to the ALB and Rails callers, and keep renderer password authentication enabled for render requests.
-The probe routes remain intentionally unauthenticated.
+The `/health`, `/ready`, and `/info` routes remain unauthenticated. `/info` discloses the Node and renderer versions, so
+keep the renderer on a private network and never attach it to an internet-facing listener.
 
 Unlike the ECS container check above, which probes over loopback, an ALB connects to the task IP. Set the renderer
 `host` to `0.0.0.0` so the ALB can reach it.
@@ -19412,7 +19417,7 @@ ReactOnRailsPro.configure do |config|
   # `fastifyServerOptions: { http2: false }`. See "Renderer HTTP Transport"
   # below for HTTPS, async-props, proxy, concurrency, and rollout constraints.
   # Default for `renderer_http_force_http2` is true.
-  config.renderer_http_force_http2 = true
+  # config.renderer_http_force_http2 = false
 
   # If you don't want to worry about special characters in your password within the url, use this config value
   # Default for `renderer_password` is nil
@@ -22127,11 +22132,12 @@ disclosure if you expose the port publicly — one more reason never to do so.
   `packages/react-on-rails-pro-node-renderer/src/shared/configBuilder.ts`). Setting `RENDERER_HOST=0.0.0.0`
   is needed for containerized deployments; if you do, network access control must come from your
   infrastructure (security groups, network policies, private VPC subnets).
-- The renderer listens for **cleartext HTTP/2 (h2c)** and does not terminate TLS itself (see the server
-  construction in `run()` in `worker.ts`). The shared password travels in the request body. Treat the
+- The renderer listens for **cleartext HTTP/2 (h2c)** by default, or cleartext HTTP/1.1 when
+  `fastifyServerOptions.http2` is `false`, and does not terminate TLS itself (see the server construction in `run()` in
+  `worker.ts`). The shared password travels in the request body. Treat the
   Rails-to-renderer link as plaintext: keep it on a private network, or place TLS-terminating
   infrastructure in front of the renderer and use an `https://` value for `config.renderer_url` on the
-  Rails side.
+  Rails side. See [Choosing h2c or HTTP/1.1](../building-features/node-renderer/health-checks.md#choosing-h2c-or-http11).
 - **Never expose the renderer port to the public internet.** There is no rate limiting, no TLS, and the
   authenticated surface is "execute JavaScript".
 
@@ -22199,8 +22205,9 @@ Every item below maps to a configuration option or behavior verified in this rep
 2. **Keep the renderer on a private network.** Default bind is `localhost`; if you set
    `RENDERER_HOST=0.0.0.0` for containers, restrict ingress to your Rails app servers and your health
    checker.
-3. **Treat the link as plaintext.** The renderer speaks cleartext h2c; use a private network or external
-   TLS termination, and prefer an `https://` `config.renderer_url` when a TLS hop exists.
+3. **Treat the link as plaintext.** The renderer speaks cleartext h2c by default or cleartext HTTP/1.1 when configured;
+   use a private network or external TLS termination, and prefer an `https://` `config.renderer_url` when a TLS hop
+   exists. See [Choosing h2c or HTTP/1.1](../building-features/node-renderer/health-checks.md#choosing-h2c-or-http11).
 4. **Run the renderer as an unprivileged OS user / minimal container, with resource limits.** The
    bundle typically runs with host `require` (see above), so the renderer process's OS privileges and
    resource ceiling are the effective blast radius. Set `--max-old-space-size` on the Node process and

@@ -281,6 +281,7 @@ module ReactOnRailsPro
       error_type = error.is_a?(ReactOnRailsPro::RendererHttpClient::TimeoutError) ? "Time out" : "Connection"
       if @received_first_chunk || available_retries.zero?
         raise ReactOnRailsPro::Error, "#{error_type} error while server side render streaming a component.\n" \
+                                      "#{ReactOnRailsPro::RendererHttpClient.transport_config_description}\n" \
                                       "Original error:\n#{error}\n#{error.backtrace}"
       end
       Rails.logger.info do

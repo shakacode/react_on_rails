@@ -88,7 +88,7 @@ ReactOnRailsPro.configure do |config|
   # `fastifyServerOptions: { http2: false }`. See "Renderer HTTP Transport"
   # below for HTTPS, async-props, proxy, concurrency, and rollout constraints.
   # Default for `renderer_http_force_http2` is true.
-  config.renderer_http_force_http2 = true
+  # config.renderer_http_force_http2 = false
 
   # If you don't want to worry about special characters in your password within the url, use this config value
   # Default for `renderer_password` is nil

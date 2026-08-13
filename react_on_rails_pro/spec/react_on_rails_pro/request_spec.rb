@@ -864,10 +864,9 @@ describe ReactOnRailsPro::Request do
       )
     end
 
-    it "includes the paired transport settings after request retries are exhausted" do
+    it "includes the transport setting after request retries are exhausted" do
       allow(ReactOnRailsPro.configuration).to receive_messages(
-        renderer_http_force_http2: false,
-        renderer_url:
+        renderer_http_force_http2: false
       )
       transport_error = ReactOnRailsPro::RendererHttpClient::ConnectionError.new("unexpected protocol")
 
@@ -876,7 +875,6 @@ describe ReactOnRailsPro::Request do
       end.to raise_error(
         ReactOnRailsPro::Error,
         a_string_including(
-          "renderer_url = #{renderer_url}",
           "renderer_http_force_http2 = false",
           "unexpected protocol"
         )

@@ -21,6 +21,7 @@ require "pathname"
 require "protocol/http/body/readable"
 require "protocol/http/body/writable"
 require "protocol/http/headers"
+require "protocol/http1"
 require "securerandom"
 require "uri"
 
@@ -51,10 +52,15 @@ module ReactOnRailsPro
       Errno::EPIPE,
       Errno::ETIMEDOUT,
       Protocol::HTTP::RefusedError,
-      # Treat HTTP/2 stream resets as transport failures because the renderer can
-      # abort streams without a usable HTTP response for Request/StreamRequest.
-      Protocol::HTTP2::StreamError
+      # Treat protocol errors as transport failures because either selectable
+      # renderer transport can reject a client using the other protocol.
+      Protocol::HTTP1::Error,
+      Protocol::HTTP2::Error
     ].freeze
+
+    def self.transport_config_description
+      "renderer_http_force_http2 = #{ReactOnRailsPro.configuration.renderer_http_force_http2}"
+    end
 
     # Per-scheduler storage for persistent HTTP clients. When an outer Fiber.scheduler
     # exists BEFORE we enter `Sync {}`, clients are stored on the scheduler object using

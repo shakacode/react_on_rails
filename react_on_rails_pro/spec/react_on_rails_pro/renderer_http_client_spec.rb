@@ -798,7 +798,8 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
       Errno::EPIPE,
       Errno::ETIMEDOUT,
       Protocol::HTTP::RefusedError,
-      [Protocol::HTTP2::StreamError, "stream reset"]
+      [Protocol::HTTP1::ProtocolError, "protocol mismatch"],
+      [Protocol::HTTP2::FrameSizeError, "protocol mismatch"]
     ].each do |error_class, *args|
       it "wraps #{error_class} in a ConnectionError" do
         client = described_class.new(origin: "http://localhost:3800", pool_size: 1, connect_timeout: 1, read_timeout: 1)

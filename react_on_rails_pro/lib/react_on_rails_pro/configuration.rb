@@ -68,7 +68,8 @@ module ReactOnRailsPro
     DEFAULT_RENDERER_FALLBACK_EXEC_JS = true
     # Maximum concurrent renderer connections per persistent client. With HTTP/1.1, each connection serves one
     # request at a time, so this is also the request-concurrency cap for a client shared by a long-lived scheduler.
-    # Without a scheduler, clients are per-request and this limits connections within that single request.
+    # Without a Fiber.scheduler, streaming renders use an ephemeral client and non-streaming renders use a persistent
+    # per-thread client; this bounds connections within each of those clients.
     DEFAULT_RENDERER_HTTP_POOL_SIZE = 10
     # TCP connect timeout. Request and response processing are still bounded by ssr_timeout.
     DEFAULT_RENDERER_HTTP_POOL_TIMEOUT = 5
@@ -174,7 +175,8 @@ module ReactOnRailsPro
     #
     # When Fiber.scheduler is available (e.g., inside Sync {} blocks), HTTP clients are
     # reused across requests within the same scheduler context, making this limit effective
-    # for connection pooling. Without a scheduler, clients are created per-request.
+    # for connection pooling. Without a Fiber.scheduler, streaming renders use an ephemeral
+    # client and non-streaming renders use a persistent per-thread client.
     #
     # @param value [Integer, nil] A positive integer or nil (uses default)
     # @raise [ReactOnRailsPro::Error] if value is not a positive integer or nil

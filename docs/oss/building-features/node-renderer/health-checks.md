@@ -104,7 +104,8 @@ end
 Keep the renderer on private networking. For an ALB, use an internal load balancer with private targets and restrict
 the renderer security group to the ALB and Rails callers. The renderer executes application bundles, so review
 [Node Renderer network security](./basics.md#network-security) before exposing it beyond a trusted network. Health
-routes intentionally remain unauthenticated; render requests still require `RENDERER_PASSWORD`.
+routes intentionally remain unauthenticated, and `/info` also remains unauthenticated and discloses the Node and
+renderer versions. Keep all three routes private; render requests still require `RENDERER_PASSWORD`.
 
 With this paired configuration, ordinary HTTP/1.1 probes and ALB target-group health checks can reach `/health` and
 `/ready` on the renderer port. Regular renderer requests and response streaming continue to work. A direct HTTP/1.1
@@ -115,9 +116,11 @@ supported transport contract. Keep a direct h2c path when async props must trave
 
 On Falcon or another long-lived `Fiber.scheduler`, one HTTP/1.1 connection handles one request at a time. In that
 environment, `renderer_http_pool_size` is a hard concurrency cap for renderer requests sharing the client, with a
-default of `10`. Size it with renderer `workersCount` and measured Rails concurrency. Standard Puma uses an ephemeral
-client for streaming renders and a persistent per-thread client for non-streaming renders, so neither path creates a
-process-wide shared-client cap.
+default of `10`. Requests beyond that cap wait for a connection without a pool-acquisition timeout; `ssr_timeout` starts
+applying only after a socket is acquired. Size the pool at or above peak concurrent renderer requests per scheduler,
+then confirm that the renderer `workersCount` can sustain that load. Standard Puma uses an ephemeral client for
+streaming renders and a persistent per-thread client for non-streaming renders, so neither path creates a process-wide
+shared-client cap.
 
 `renderer_http_force_http2` affects only cleartext `http://` URLs. For `https://`, async-http negotiates the protocol
 with ALPN, so the TLS listener or proxy controls whether the connection uses HTTP/1.1 or HTTP/2.
@@ -263,7 +266,8 @@ declared current bundle set.
 
 ALB target-group health checks use HTTP/1.1. Use an internal ALB and private targets, restrict the renderer target
 security group to the ALB and Rails callers, and keep renderer password authentication enabled for render requests.
-The probe routes remain intentionally unauthenticated.
+The `/health`, `/ready`, and `/info` routes remain unauthenticated. `/info` discloses the Node and renderer versions, so
+keep the renderer on a private network and never attach it to an internet-facing listener.
 
 Unlike the ECS container check above, which probes over loopback, an ALB connects to the task IP. Set the renderer
 `host` to `0.0.0.0` so the ALB can reach it.

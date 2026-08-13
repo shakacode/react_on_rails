@@ -611,12 +611,11 @@ export default function run(config: Partial<Config>) {
     currentGenerationManifestPath,
   } = getConfig();
 
-  // Fastify's overloads cannot represent a runtime-selectable protocol while the
-  // route internals retain their existing HTTP/2 raw-server type. The unmodified
-  // options are still spread at runtime, and socket tests cover `http2: false`.
-  const serverOptionsForFastify: FastifyServerOptions<Http2Server> = fastifyServerOptions;
+  const { http2: configuredHttp2, ...serverOptions } = fastifyServerOptions;
+  const http2Enabled = configuredHttp2 ?? useHttp2;
+  const serverOptionsForFastify: FastifyServerOptions<Http2Server> = serverOptions;
   const app = fastify({
-    http2: useHttp2 as true,
+    http2: http2Enabled as true,
     bodyLimit: BODY_SIZE_LIMIT,
     logger:
       logHttpLevel !== 'silent' ? { name: 'RORP HTTP', level: logHttpLevel, ...sharedLoggerOptions } : false,
@@ -1478,10 +1477,9 @@ export default function run(config: Partial<Config>) {
   });
 
   // Built-in, opt-in probe endpoints (enableHealthEndpoints config option).
-  // Like /info, they are plain GET routes outside the authenticated render and
-  // asset endpoints: orchestrator probes cannot carry the renderer password.
-  // Both intentionally return status-only bodies — no versions, paths, or
-  // license details — so leaving them reachable exposes nothing sensitive.
+  // They are plain GET routes outside the authenticated render and asset
+  // endpoints because orchestrator probes cannot carry the renderer password.
+  // Unlike /info above, both return status-only bodies with no version details.
   // The listener uses cleartext HTTP/2 (h2c) by default. With
   // fastifyServerOptions.http2 set to false, ordinary HTTP/1.1 probes can reach
   // these routes. See
