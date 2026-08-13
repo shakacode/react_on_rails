@@ -31,13 +31,6 @@ SSR Streaming sends HTML to the browser in chunks as it’s generated, enabling 
 - **30% faster** full‑page load times at Hulu by combining streaming SSR with Server Components [[3]]
 - Popular libraries like styled‑components v3.1.0 have introduced streaming SSR support as the next generation of React app rendering [[4]]
 
-## 📊 Core Web Vitals & TTI Improvements
-
-- **60% faster** Time to Interactive on Meta’s developer portal after adopting RSC (from 3.5 s to \~1.4 s) [[5]]
-- **45% quicker** First Contentful Paint in the same migration [[5]]
-- **50% lower** server response time with Server Components [[5]]
-- **15% improvement** in Core Web Vitals and **23% reduction** in Time to First Byte at Airbnb after RSC migration [[5]]
-
 > **React on Rails note:** These performance benefits carry over to React on Rails Pro. In React on Rails, data delivery is prop-based — Rails controllers handle database queries, authentication, and caching, then pass data to components as [props](../../oss/migrating/rsc-data-fetching.md#data-fetching-in-react-on-rails-pro). Components do not fetch data directly. See [RSC Migration: Data Fetching Patterns](../../oss/migrating/rsc-data-fetching.md).
 
 ---
