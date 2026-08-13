@@ -187,10 +187,13 @@ const explicitPgTestSetupLines = [
   'export PGPORT=5433',
   'export PGUSER=postgres',
 ];
+const sanitizedEvalDirectory = /^cd <LOCAL_PATH>(?:\/eval_app)?$/;
 const stripExplicitPgTestSetupPrefix = (lines) => {
-  if (!explicitPgTestSetupLines.every((line, index) => lines[index] === line)) return null;
-  let cursor = explicitPgTestSetupLines.length;
-  if (cursor < lines.length - 1 && /^cd <LOCAL_PATH>(?:\/eval_app)?$/.test(lines[cursor])) cursor += 1;
+  const cdFirst = sanitizedEvalDirectory.test(lines[0]);
+  let cursor = cdFirst ? 1 : 0;
+  if (!explicitPgTestSetupLines.every((line, index) => lines[cursor + index] === line)) return null;
+  cursor += explicitPgTestSetupLines.length;
+  if (!cdFirst && cursor < lines.length - 1 && sanitizedEvalDirectory.test(lines[cursor])) cursor += 1;
   return lines.slice(cursor);
 };
 const immediatePhaseStatusTarget = (lines, output, phase) => {
