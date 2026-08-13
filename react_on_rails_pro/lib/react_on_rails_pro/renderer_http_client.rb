@@ -52,10 +52,10 @@ module ReactOnRailsPro
       Errno::EPIPE,
       Errno::ETIMEDOUT,
       Protocol::HTTP::RefusedError,
-      # Treat protocol errors as transport failures because either selectable
-      # renderer transport can reject a client using the other protocol.
-      Protocol::HTTP1::Error,
-      Protocol::HTTP2::Error
+      # A transport mismatch can surface while parsing the other protocol.
+      Protocol::HTTP1::ProtocolError,
+      Protocol::HTTP2::FrameSizeError,
+      Protocol::HTTP2::StreamError
     ].freeze
 
     def self.transport_config_description
