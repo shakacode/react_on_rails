@@ -9,7 +9,8 @@
       (Deliverable 1 item 1: preserve the architecture description, layer
       diagram, delimiter protocol, and Production Readiness Gap table before
       the closed PR's branch is garbage-collected).
-    Body below is verbatim from the source except for the annotated
+    Body below is verbatim from the source except for (a) code-fence language
+    tags added for markdown lint, and (b) the annotated
     "References > Documentation" section at the end, whose relative paths
     refer to the react_on_rails_rsc repository, not this one.
 -->
@@ -138,7 +139,7 @@ to HTML.
 
 ### Layer Diagram
 
-```
+```text
                           Prerender Path                    Resume Path
                           ============                      ===========
 
@@ -328,7 +329,7 @@ invalidate all product shells when a product is updated).
 
 ### Complete Request Lifecycle
 
-```
+```text
                                      Request
                                         |
                                         v
@@ -407,7 +408,7 @@ invalidate all product shells when a product is updated).
 The prerender response uses a simple delimiter protocol to transmit both the
 HTML shell and the PostponedState in a single stream:
 
-```
+```text
 [HTML shell bytes]
 <!--PPR_POSTPONED_STATE-->
 {"type":"postponed","value":{"segments":[...],"slots":[...]}}
