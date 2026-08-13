@@ -177,6 +177,11 @@ const stripSanitizedSetupPrefix = (lines) => {
   }
   return lines.slice(cursor);
 };
+const stripSanitizedPhaseSetupPrefix = (lines) => {
+  const cdThenSource =
+    /^cd <LOCAL_PATH>(?:\/eval_app)?$/.test(lines[0]) && normalizedStateSourceLines.has(lines[1]);
+  return cdThenSource ? lines.slice(2) : stripSanitizedSetupPrefix(lines);
+};
 const immediatePhaseStatusTarget = (lines, output, phase) => {
   if ((lines.length !== 3 && lines.length !== 4) || lines[0] !== 'set -o pipefail') return null;
 
@@ -444,9 +449,10 @@ const pipefailPipelineTargets = (lines) =>
 const installEvidenceTargets = (command) => {
   const rawLines = topLevelShellLines(command.command);
   const lines = stripSanitizedSetupPrefix(rawLines);
+  const phaseLines = stripSanitizedPhaseSetupPrefix(rawLines);
   const pipefailTargets = pipefailPipelineTargets(lines);
   const statusMarkedTarget = statusMarkedScaffoldTarget(rawLines, command.output);
-  const phaseStatusTarget = phaseStatusScaffoldTarget(lines, command.output);
+  const phaseStatusTarget = phaseStatusScaffoldTarget(phaseLines, command.output);
   const completionBackedTarget = (() => {
     if (lines.length !== 1 || !completedScaffoldOutput(command.output)) return [];
     const pipelineMatch = lines[0].match(completedScaffoldLogPipeline);
@@ -466,6 +472,7 @@ const installEvidenceTargets = (command) => {
 const buildEvidenceTargets = (command) => {
   const rawLines = topLevelShellLines(command.command);
   const lines = normalizedEvidenceLines(command.command);
+  const phaseLines = stripSanitizedPhaseSetupPrefix(rawLines);
   const targets = [
     ...(lines.length === 1 && !/[;&|<>]/.test(lines[0]) ? lines : []),
     ...pipefailPipelineTargets(lines),
@@ -480,7 +487,7 @@ const buildEvidenceTargets = (command) => {
   if (artifactCheckedProductionTarget) targets.push(artifactCheckedProductionTarget);
   const pipelineStatusProductionTarget = pipelineStatusProductionBuildTarget(rawLines, command.output);
   if (pipelineStatusProductionTarget) targets.push(pipelineStatusProductionTarget);
-  const phaseStatusProductionTarget = phaseStatusProductionBuildTarget(lines, command.output);
+  const phaseStatusProductionTarget = phaseStatusProductionBuildTarget(phaseLines, command.output);
   if (phaseStatusProductionTarget) targets.push(phaseStatusProductionTarget);
   const directRuntimeProductionTarget = directRuntimeProductionBuildTarget(lines);
   if (directRuntimeProductionTarget) targets.push(directRuntimeProductionTarget);
@@ -732,9 +739,10 @@ const phaseStatusRailsTestTarget = (lines, output) => {
 const testEvidenceTargets = (command) => {
   const rawLines = topLevelShellLines(command.command);
   const lines = stripSanitizedSetupPrefix(rawLines);
+  const phaseLines = stripSanitizedPhaseSetupPrefix(rawLines);
   const directTargets = lines.length === 1 && recognizedTestInvocation(lines[0]) ? [lines[0]] : [];
   const statusMarkedTarget = statusMarkedRailsTestTarget(rawLines, command.output);
-  const phaseStatusTarget = phaseStatusRailsTestTarget(lines, command.output);
+  const phaseStatusTarget = phaseStatusRailsTestTarget(phaseLines, command.output);
   if (statusMarkedTarget || phaseStatusTarget) {
     return [
       ...directTargets,

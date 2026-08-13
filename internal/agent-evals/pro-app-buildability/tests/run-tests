@@ -3985,6 +3985,73 @@ for row in install.pro rsc.route form.validation tests.page tests.form build.pro
 done
 test "$(jq -r '.overall' "$tmp/assigned-status-output/rubric-results.json")" = pass
 
+validated_claude_scaffold_command=$'cd <LOCAL_PATH>\nsource <LOCAL_PATH>/.ror-eval-state/env.sh\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc --package-manager npm 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -200\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+validated_claude_test_command=$'cd <LOCAL_PATH>/eval_app\nsource <LOCAL_PATH>/.ror-eval-state/env.sh\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/test.log | tail -100\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
+validated_claude_build_command=$'cd <LOCAL_PATH>/eval_app\nsource <LOCAL_PATH>/.ror-eval-state/env.sh\nset -o pipefail\nenv RAILS_ENV=production NODE_ENV=production bin/rails assets:precompile 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/build.log | tail -n 200\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"'
+jq -cn --arg command "$validated_claude_scaffold_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:1,status:"failed",aggregated_output:"generator failed\nROR_EVAL_SCAFFOLD_EXIT=1"}}' \
+  >"$tmp/validated-claude-failed-scaffold-events.jsonl"
+jq -cn --arg command "$validated_claude_scaffold_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"✓ Done!\nCreated eval_app with React on Rails!\nROR_EVAL_SCAFFOLD_EXIT=0"}}' \
+  >"$tmp/validated-claude-scaffold-events.jsonl"
+jq -cn --arg command "$validated_claude_test_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"8 runs, 43 assertions, 0 failures, 0 errors, 0 skips\nROR_EVAL_TEST_EXIT=0"}}' \
+  >"$tmp/validated-claude-test-events.jsonl"
+jq -cn --arg command "$validated_claude_build_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"Rspack compiled successfully\nROR_EVAL_BUILD_EXIT=0"}}' \
+  >"$tmp/validated-claude-build-events.jsonl"
+cat "$tmp/validated-claude-failed-scaffold-events.jsonl" \
+  "$tmp/validated-claude-scaffold-events.jsonl" "$tmp/validated-claude-test-events.jsonl" \
+  "$tmp/validated-claude-build-events.jsonl" >"$tmp/validated-claude-events.jsonl"
+mkdir "$tmp/validated-claude-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/validated-claude-events.jsonl" \
+  "$tmp/claude-v8-form-workspace" "$tmp/validated-claude-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in install.pro rsc.route form.validation tests.page tests.form build.production \
+  tests.green unaided evidence.complete; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/validated-claude-output/rubric-results.json")" = pass
+done
+test "$(jq -r '.overall' "$tmp/validated-claude-output/rubric-results.json")" = pass
+
+validated_claude_setup_test_rejections=(
+  $'cd <LOCAL_PATH>/other\nsource <LOCAL_PATH>/.ror-eval-state/env.sh\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tail -100\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
+  $'cd <LOCAL_PATH>/eval_app\nsource <LOCAL_PATH>/.ror-eval-state/other.sh\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tail -100\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
+  $'cd <LOCAL_PATH>/eval_app\ncd <LOCAL_PATH>/eval_app\nsource <LOCAL_PATH>/.ror-eval-state/env.sh\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tail -100\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
+  $'cd <LOCAL_PATH>/eval_app\nsource <LOCAL_PATH>/.ror-eval-state/env.sh\nsource <LOCAL_PATH>/.ror-eval-state/env.sh\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tail -100\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
+  $'cd <LOCAL_PATH>/eval_app\ntrue\nsource <LOCAL_PATH>/.ror-eval-state/env.sh\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tail -100\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
+  $'cd <LOCAL_PATH>/eval_app\nsource <LOCAL_PATH>/.ror-eval-state/env.sh\ntrue\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tail -100\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
+  $'export HOME=<LOCAL_PATH>/runner-home\ncd <LOCAL_PATH>/eval_app\nsource <LOCAL_PATH>/.ror-eval-state/env.sh\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tail -100\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
+  $'cd <LOCAL_PATH>/eval_app\nsource <LOCAL_PATH>/.ror-eval-state/env.sh\nexport PGHOST=<LOCAL_PATH>/.pgsocket PGPORT=5433 PGUSER=postgres\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tail -100\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
+  $'cd <LOCAL_PATH>/eval_app\nsource <LOCAL_PATH>/.ror-eval-state/env.sh\ncd <LOCAL_PATH>/eval_app\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tail -100\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
+)
+validated_claude_setup_test_rejection_index=0
+for test_command in "${validated_claude_setup_test_rejections[@]}"; do
+  validated_claude_setup_test_rejection_index=$((validated_claude_setup_test_rejection_index + 1))
+  jq -cn --arg command "$test_command" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"8 runs, 43 assertions, 0 failures, 0 errors, 0 skips\nROR_EVAL_TEST_EXIT=0"}}' \
+    >"$tmp/validated-claude-setup-test-rejection-$validated_claude_setup_test_rejection_index-events.jsonl"
+  mkdir "$tmp/validated-claude-setup-test-rejection-$validated_claude_setup_test_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" \
+    "$tmp/validated-claude-setup-test-rejection-$validated_claude_setup_test_rejection_index-events.jsonl" \
+    "$tmp/claude-v8-form-workspace" \
+    "$tmp/validated-claude-setup-test-rejection-$validated_claude_setup_test_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "tests.green") | .status' \
+    "$tmp/validated-claude-setup-test-rejection-$validated_claude_setup_test_rejection_index-output/rubric-results.json")" = unknown
+done
+
+validated_claude_cleanup_before_source=$'cd <LOCAL_PATH>/eval_app\nrm -rf public/assets public/packs public/packs-test\nsource <LOCAL_PATH>/.ror-eval-state/env.sh\nset -o pipefail\nenv RAILS_ENV=production NODE_ENV=production bin/rails assets:precompile 2>&1 | tail -200\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"'
+jq -cn --arg command "$validated_claude_cleanup_before_source" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"Rspack compiled successfully\nROR_EVAL_BUILD_EXIT=0"}}' \
+  >"$tmp/validated-claude-cleanup-before-source-events.jsonl"
+mkdir "$tmp/validated-claude-cleanup-before-source-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/validated-claude-cleanup-before-source-events.jsonl" \
+  "$tmp/claude-v8-form-workspace" "$tmp/validated-claude-cleanup-before-source-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+test "$(jq -r '.items[] | select(.id == "build.production") | .status' \
+  "$tmp/validated-claude-cleanup-before-source-output/rubric-results.json")" = unknown
+
 assigned_status_scaffold_rejections=(
   $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -200\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"'
   $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -200\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_BUILD_EXIT"'
@@ -4125,7 +4192,6 @@ done
 
 stable_test_rejections=(
   $'source <LOCAL_PATH>/.ror-eval-state/env.sh\nsource <LOCAL_PATH>/.ror-eval-state/env.sh\ncd <LOCAL_PATH>/eval_app\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tail -100\necho "ROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}"'
-  $'cd <LOCAL_PATH>/eval_app\nsource <LOCAL_PATH>/.ror-eval-state/env.sh\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tail -100\necho "ROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}"'
   $'source <LOCAL_PATH>/.ror-eval-state/other.sh\ncd <LOCAL_PATH>/eval_app\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tail -100\necho "ROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}"'
   $'source <LOCAL_PATH>/.ror-eval-state/env.sh\ncd <LOCAL_PATH>/other\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tail -100\necho "ROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}"'
   $'cd <LOCAL_PATH>/eval_app\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tee $(pwd)/test.log | tail -100\necho "ROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}"'
@@ -4149,7 +4215,6 @@ done
 
 stable_build_rejections=(
   $'source <LOCAL_PATH>/.ror-eval-state/env.sh\nsource <LOCAL_PATH>/.ror-eval-state/env.sh\ncd <LOCAL_PATH>/eval_app\nset -o pipefail\nnpm run build 2>&1 | tail -100\necho "ROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}"'
-  $'cd <LOCAL_PATH>/eval_app\nsource <LOCAL_PATH>/.ror-eval-state/env.sh\nset -o pipefail\nnpm run build 2>&1 | tail -100\necho "ROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}"'
   $'source <LOCAL_PATH>/.ror-eval-state/other.sh\ncd <LOCAL_PATH>/eval_app\nset -o pipefail\nnpm run build 2>&1 | tail -100\necho "ROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}"'
   $'cd <LOCAL_PATH>/other\nset -o pipefail\nnpm run build 2>&1 | tail -100\necho "ROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}"'
   $'cd <LOCAL_PATH>/eval_app\nset -o pipefail\nnpm run build && true 2>&1 | tail -100\necho "ROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}"'
