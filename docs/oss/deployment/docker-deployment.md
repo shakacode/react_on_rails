@@ -475,7 +475,7 @@ When running the Node Renderer in containers:
 - On Control Plane, use `process.env.PORT` for the port — Control Plane assigns the port dynamically. See the [Control Plane port docs](https://docs.controlplane.com/reference/workload/containers#port-variable).
 - Set `workersCount` explicitly rather than relying on CPU auto-detection, which can over-allocate workers in constrained containers.
 - The default listener is h2c, so use `tcpSocket` for shallow probes or an `exec` probe with an h2c-capable client for application-level checks.
-- To use ordinary Kubernetes `httpGet` probes, enable the renderer's built-in health endpoints, set `fastifyServerOptions: { http2: false }`, and pair it with `config.renderer_http_force_http2 = false` in Rails. No custom health server is needed. See [Node Renderer Health and Readiness Endpoints](../building-features/node-renderer/health-checks.md#choosing-h2c-or-http11) for the complete paired configuration, async-props tradeoff, and probe timing.
+- To use ordinary Kubernetes `httpGet` probes, enable the renderer's built-in health endpoints, set `fastifyServerOptions: { http2: false }`, and pair it with `config.renderer_http_force_http2 = false` in Rails. No custom health server is needed. Set `RENDERER_PASSWORD` on both sides and keep the renderer on private networking; probe routes intentionally remain unauthenticated. See [Node Renderer Health and Readiness Endpoints](../building-features/node-renderer/health-checks.md#choosing-h2c-or-http11) for the complete paired configuration, async-props tradeoff, and probe timing.
 
 ## Static assets and CDN
 

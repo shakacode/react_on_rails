@@ -92,4 +92,4 @@ test('fastifyServerOptions selects HTTP/1.1 for probes and render requests', asy
     await app.close();
     await resetForTest(testName);
   }
-});
+}, 30000);

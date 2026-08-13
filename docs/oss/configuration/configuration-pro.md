@@ -86,7 +86,7 @@ ReactOnRailsPro.configure do |config|
   # Force HTTP/2 prior knowledge (h2c) for cleartext renderer URLs. Set false
   # only when the Node Renderer also sets
   # `fastifyServerOptions: { http2: false }`. See "Renderer HTTP Transport"
-  # below for HTTPS, async-props, proxy, and rollout constraints.
+  # below for HTTPS, async-props, proxy, concurrency, and rollout constraints.
   # Default for `renderer_http_force_http2` is true.
   config.renderer_http_force_http2 = true
 
@@ -127,13 +127,11 @@ ReactOnRailsPro.configure do |config|
   config.renderer_use_fallback_exec_js = false
 
   # Maximum number of concurrent async-http connections per client to the Node renderer.
-  # HTTP/2 may multiplex multiple request streams over those pooled connections.
-  # When a Fiber.scheduler already exists before the renderer request enters `Sync {}`, the
-  # client is reused across requests within that long-lived scheduler (persistent connection /
-  # keep-alive; see the tuning section below), so this limit bounds connection concurrency for
-  # streamed renders sharing one client.
-  # Otherwise the adapter uses a request-scoped client. Under standard Puma (no pre-existing scheduler), `Sync {}`
-  # creates that scheduler/client for the request and cleans it up when the request ends.
+  # HTTP/2 may multiplex request streams, while each HTTP/1.1 connection handles one
+  # request at a time. With a long-lived Fiber.scheduler, HTTP/1.1 therefore makes
+  # this setting a hard shared-client request-concurrency cap. Standard Puma uses
+  # ephemeral clients for streaming renders and persistent per-thread clients for
+  # non-streaming renders, so it has no process-wide shared-client cap.
   # See "Renderer Performance Tuning for Streamed RSC" below.
   # Default for `renderer_http_pool_size` is 10
   config.renderer_http_pool_size = 10
@@ -284,31 +282,13 @@ end
 
 ## Renderer HTTP Transport
 
-The default renderer transport is cleartext HTTP/2 (h2c). Deployments that require HTTP/1.1, including an AWS ALB
-target group whose health checks connect directly to the renderer, must configure both sides of the connection:
-
-```js
-reactOnRailsProNodeRenderer({
-  fastifyServerOptions: { http2: false },
-});
-```
-
-```ruby
-ReactOnRailsPro.configure do |config|
-  config.renderer_http_force_http2 = false
-end
-```
-
-This keeps the Node listener and Rails client on HTTP/1.1. The tradeoff is that bidirectional streaming for async props
-depends on full-duplex behavior across every hop. A buffering or half-duplex HTTP/1.1 intermediary can delay the
-response until the request body finishes, and pull mode can stall. Async props through an ALB or another unverified
-HTTP/1.1 intermediary are not supported; retain a direct h2c path for that traffic.
-
-`renderer_http_force_http2` affects only cleartext `http://` URLs. HTTPS selects the protocol through ALPN. Change both
-cleartext settings atomically, or bring up a parallel renderer endpoint and switch Rails after it is verified, because
-rolling only one side creates a temporary protocol mismatch. See
+The default renderer transport is cleartext HTTP/2 (h2c). To select HTTP/1.1, pair Node's
+`fastifyServerOptions: { http2: false }` with Rails' `config.renderer_http_force_http2 = false`.
+`renderer_http_force_http2` applies only to cleartext `http://` URLs; HTTPS selects its protocol through ALPN. With a
+long-lived `Fiber.scheduler`, HTTP/1.1 also makes `renderer_http_pool_size` a hard cap on concurrent renderer requests
+sharing the client. See
 [Node Renderer health checks](../building-features/node-renderer/health-checks.md#choosing-h2c-or-http11) for the
-canonical proxy, security, probe, and rollout guidance.
+canonical async-props tradeoff, paired configuration, security requirements, proxy settings, probes, and rollout order.
 
 ## Renderer Performance Tuning for Streamed RSC
 

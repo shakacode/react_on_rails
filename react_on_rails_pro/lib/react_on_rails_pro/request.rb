@@ -116,7 +116,7 @@ module ReactOnRailsPro
         end
       end
 
-      # Performs an incremental render request with bidirectional HTTP/2 streaming.
+      # Performs an incremental render request with bidirectional streaming.
       #
       # ARCHITECTURE: This method orchestrates the async props flow:
       #
