@@ -1086,9 +1086,7 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
 
     describe ".renderer_http_force_http2" do
       it "defaults to true" do
-        ReactOnRailsPro.configure {} # rubocop:disable Lint/EmptyBlock
-
-        expect(ReactOnRailsPro.configuration.renderer_http_force_http2).to be(true)
+        expect(described_class.new.renderer_http_force_http2).to be(true)
       end
 
       it "accepts false to select HTTP/1.1" do

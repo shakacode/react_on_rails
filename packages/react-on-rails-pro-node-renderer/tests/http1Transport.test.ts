@@ -15,8 +15,7 @@
 
 import http from 'http';
 import { createReadStream } from 'fs-extra';
-// eslint-disable-next-line import/no-relative-packages
-import packageJson from '../package.json';
+import packageJson from '../src/shared/packageJson';
 import worker from '../src/worker';
 import formAutoContent from './formAutoContent';
 import { BUNDLE_TIMESTAMP, getFixtureBundle, resetForTest, serverBundleCachePath } from './helper';
