@@ -19,6 +19,14 @@ status: either make a bounded pipeline terminal under `pipefail`, or capture its
 pipeline status immediately in a unique zero-status marker. Avoid ambiguous later
 commands whose status could mask the test or build result.
 
+Use stable phase markers when capturing pipeline status:
+`ROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}`,
+`ROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}`, and
+`ROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}`. Echo the applicable marker immediately
+after its bounded pipeline. Make each status marker the final executable line in
+its shell invocation. Prefer a bounded tail-only pipeline when no persistent log
+is needed.
+
 Keep a concise record of commands, decisions, friction, and failed attempts in
 your final structured response. A check is successful only if you actually ran
 it and observed exit status 0. Do not claim support for a feature based only on

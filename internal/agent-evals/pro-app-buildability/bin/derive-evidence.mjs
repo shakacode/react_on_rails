@@ -155,13 +155,20 @@ const safeOutputRedirection = /^(.*\S)\s+>\s+(?:"<LOCAL_PATH>"|'<LOCAL_PATH>'|<L
 const boundedPlaceholderTail =
   /^tail\s+(?:-n\s+|-)([1-9][0-9]{0,4})\s+(?:"<LOCAL_PATH>"|'<LOCAL_PATH>'|<LOCAL_PATH>)$/;
 const boundedTailPipeline = /^(.*\S)\s+2>&1\s*\|\s*tail\s+(?:-n\s+|-)([1-9][0-9]{0,4})$/;
-const normalizedSetupLines = [
+const boundedStatusPipeline =
+  /^(.*\S)\s+2>&1\s*(?:\|\s*tee\s+(?:(?:<LOCAL_PATH>)|[A-Za-z0-9_./-])+\s*)?\|\s*tail\s+(?:-n\s+|-)([1-9][0-9]{0,4})$/;
+const normalizedStateSourceLines = new Set([
   'source <LOCAL_PATH>/.ror-eval-state/pgenv.sh',
+  'source <LOCAL_PATH>/.ror-eval-state/env.sh',
+  'source /workspace/pgtools/env.sh',
+]);
+const normalizedSetupLines = [
   'export HOME=<LOCAL_PATH>/runner-home',
   'export PGHOST=<LOCAL_PATH>/.pgsocket PGPORT=5433 PGUSER=postgres',
 ];
 const stripSanitizedSetupPrefix = (lines) => {
   let cursor = 0;
+  if (normalizedStateSourceLines.has(lines[cursor])) cursor += 1;
   for (const setupLine of normalizedSetupLines) {
     if (lines[cursor] === setupLine) cursor += 1;
   }
@@ -169,6 +176,34 @@ const stripSanitizedSetupPrefix = (lines) => {
     cursor += 1;
   }
   return lines.slice(cursor);
+};
+const immediatePhaseStatusTarget = (lines, output, phase) => {
+  if (lines.length !== 3 || lines[0] !== 'set -o pipefail') return null;
+
+  const pipelineMatch = lines[1].match(boundedStatusPipeline);
+  const markerMatch = lines[2].match(/^echo "([A-Z][A-Z0-9_]{0,63})=\$\{PIPESTATUS\[0\]\}"$/);
+  if (!pipelineMatch || Number(pipelineMatch[2]) > 1000 || !markerMatch) return null;
+
+  const markerName = markerMatch[1];
+  const markerTokens = markerName.split('_');
+  if (
+    !markerTokens.includes(phase) ||
+    !markerTokens.some((token) => /^(?:EXIT|EXITCODE|STATUS|PIPESTATUS)$/.test(token))
+  ) {
+    return null;
+  }
+
+  const outputLines = output
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const markerPrefix = `${markerName}=`;
+  const markers = outputLines.filter(
+    (line) => line.startsWith(markerPrefix) && /^-?[0-9]+$/.test(line.slice(markerPrefix.length)),
+  );
+  return markers.length === 1 && markers[0] === `${markerName}=0` && outputLines.at(-1) === markers[0]
+    ? { target: pipelineMatch[1], outputLines }
+    : null;
 };
 const exactBuildMarkerProof = (lines, targetIndex, output) => {
   const tailMatch = lines[targetIndex + 2]?.match(boundedPlaceholderTail);
@@ -282,6 +317,15 @@ const pipelineStatusProductionBuildTarget = (lines, output) => {
     ? pipelineMatch[1]
     : null;
 };
+const phaseStatusProductionBuildTarget = (lines, output) => {
+  const proof = immediatePhaseStatusTarget(lines, output, 'BUILD');
+  if (!proof || proof.target !== 'npm run build') return null;
+  return proof.outputLines
+    .slice(0, -1)
+    .some((line) => /compiled|compilation (?:complete|successful)|built successfully/i.test(line))
+    ? proof.target
+    : null;
+};
 const directRuntimeProductionBuildTarget = (lines) =>
   lines.length === 1 && lines[0] === 'SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>" npm run build'
     ? 'npm run build'
@@ -317,6 +361,10 @@ const statusMarkedScaffoldTarget = (lines, output) => {
     outputLines.at(-1) === markers[0]
     ? pipelineMatch[1]
     : null;
+};
+const phaseStatusScaffoldTarget = (lines, output) => {
+  const proof = immediatePhaseStatusTarget(lines, output, 'SCAFFOLD');
+  return proof && completedScaffoldOutput(output) ? proof.target : null;
 };
 const stripBoundedTimeoutPrefix = (line) => {
   const match = line.match(/^timeout ([1-9][0-9]{0,8}) (.+)$/);
@@ -378,6 +426,7 @@ const installEvidenceTargets = (command) => {
   const lines = stripSanitizedSetupPrefix(rawLines);
   const pipefailTargets = pipefailPipelineTargets(lines);
   const statusMarkedTarget = statusMarkedScaffoldTarget(rawLines, command.output);
+  const phaseStatusTarget = phaseStatusScaffoldTarget(lines, command.output);
   const completionBackedTarget = (() => {
     if (lines.length !== 1 || !completedScaffoldOutput(command.output)) return [];
     const pipelineMatch = lines[0].match(completedScaffoldLogPipeline);
@@ -391,6 +440,7 @@ const installEvidenceTargets = (command) => {
     ...pipefailTargets,
     ...completionBackedTarget,
     ...(statusMarkedTarget ? [statusMarkedTarget] : []),
+    ...(phaseStatusTarget ? [phaseStatusTarget] : []),
   ];
 };
 const buildEvidenceTargets = (command) => {
@@ -410,6 +460,8 @@ const buildEvidenceTargets = (command) => {
   if (artifactCheckedProductionTarget) targets.push(artifactCheckedProductionTarget);
   const pipelineStatusProductionTarget = pipelineStatusProductionBuildTarget(rawLines, command.output);
   if (pipelineStatusProductionTarget) targets.push(pipelineStatusProductionTarget);
+  const phaseStatusProductionTarget = phaseStatusProductionBuildTarget(lines, command.output);
+  if (phaseStatusProductionTarget) targets.push(phaseStatusProductionTarget);
   const directRuntimeProductionTarget = directRuntimeProductionBuildTarget(lines);
   if (directRuntimeProductionTarget) targets.push(directRuntimeProductionTarget);
   for (const [index, line] of lines.entries()) {
@@ -650,12 +702,25 @@ const recognizedTestInvocation = (line) => {
     ) && !/[;&|<>]/.test(target)
   );
 };
+const phaseStatusRailsTestTarget = (lines, output) => {
+  const proof = immediatePhaseStatusTarget(lines, output, 'TEST');
+  if (!proof || !recognizedTestInvocation(proof.target)) return null;
+  const summaries = proof.outputLines.filter((line) => railsTestSummary.test(line));
+  return summaries.length === 1 && proof.outputLines.at(-2) === summaries[0] ? proof.target : null;
+};
 const testEvidenceTargets = (command) => {
   const rawLines = topLevelShellLines(command.command);
   const lines = stripSanitizedSetupPrefix(rawLines);
   const directTargets = lines.length === 1 && recognizedTestInvocation(lines[0]) ? [lines[0]] : [];
   const statusMarkedTarget = statusMarkedRailsTestTarget(rawLines, command.output);
-  if (statusMarkedTarget) return [...directTargets, statusMarkedTarget];
+  const phaseStatusTarget = phaseStatusRailsTestTarget(lines, command.output);
+  if (statusMarkedTarget || phaseStatusTarget) {
+    return [
+      ...directTargets,
+      ...(statusMarkedTarget ? [statusMarkedTarget] : []),
+      ...(phaseStatusTarget ? [phaseStatusTarget] : []),
+    ];
+  }
   if (lines.length !== 1) return directTargets;
   const pipelineMatch = lines[0].match(boundedTailPipeline);
   if (

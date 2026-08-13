@@ -23,6 +23,13 @@ rg -Fq 'pipeline status immediately in a unique zero-status marker.' \
   "$eval_dir/prompt.md"
 rg -Fq 'commands whose status could mask the test or build result.' \
   "$eval_dir/prompt.md"
+for marker in ROR_EVAL_SCAFFOLD_EXIT ROR_EVAL_TEST_EXIT ROR_EVAL_BUILD_EXIT; do
+  rg -Fq "${marker}=\${PIPESTATUS[0]}" "$eval_dir/prompt.md"
+done
+rg -Fq 'after its bounded pipeline. Make each status marker the final executable line in' \
+  "$eval_dir/prompt.md"
+rg -Fq 'its shell invocation. Prefer a bounded tail-only pipeline when no persistent log' \
+  "$eval_dir/prompt.md"
 exec 9<"$eval_dir/README.md"
 IFS=: read -r fixture_kind fixture_mode fixture_size \
   <<<"$("$eval_dir/bin/file-descriptor-metadata" 9)"
@@ -3905,6 +3912,218 @@ for nonzero_index in "${!claude_v9_nonzero_commands[@]}"; do
   test "$(jq -r --arg row "${claude_v9_nonzero_rows[$nonzero_index]}" \
     '.items[] | select(.id == $row) | .status' \
     "$tmp/claude-v9-nonzero-$nonzero_index-output/rubric-results.json")" = unknown
+done
+
+claude_v10_scaffold_command=$'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc --template typescript --package-manager npm 2>&1 | tee scaffold.log | tail -n 300\necho "PIPESTATUS_SCAFFOLD=${PIPESTATUS[0]}"'
+claude_v10_test_command=$'source <LOCAL_PATH>/.ror-eval-state/env.sh\ncd <LOCAL_PATH>/eval_app\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tee <LOCAL_PATH>/.ror-eval-state<LOCAL_PATH> | tail -n 100\necho "FINAL_TEST_RUN_MARKER_EXITCODE=${PIPESTATUS[0]}"'
+claude_v10_build_command=$'source <LOCAL_PATH>/.ror-eval-state/env.sh\ncd <LOCAL_PATH>/eval_app\nset -o pipefail\nnpm run build 2>&1 | tee <LOCAL_PATH>/.ror-eval-state<LOCAL_PATH> | tail -n 100\necho "FINAL_BUILD_MARKER_EXITCODE=${PIPESTATUS[0]}"'
+jq -cn --arg command "$claude_v10_scaffold_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"✓ Done!\nCreated eval_app with React on Rails!\nPIPESTATUS_SCAFFOLD=0"}}' \
+  >"$tmp/claude-v10-scaffold-events.jsonl"
+jq -cn --arg command "$claude_v10_test_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"8 runs, 43 assertions, 0 failures, 0 errors, 0 skips\nFINAL_TEST_RUN_MARKER_EXITCODE=0"}}' \
+  >"$tmp/claude-v10-test-events.jsonl"
+jq -cn --arg command "$claude_v10_build_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"Rspack client compiled successfully\nRspack server compiled successfully\nFINAL_BUILD_MARKER_EXITCODE=0"}}' \
+  >"$tmp/claude-v10-build-events.jsonl"
+cat "$tmp/claude-v10-scaffold-events.jsonl" "$tmp/claude-v10-test-events.jsonl" \
+  "$tmp/claude-v10-build-events.jsonl" >"$tmp/claude-v10-events.jsonl"
+mkdir "$tmp/claude-v10-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v10-events.jsonl" \
+  "$tmp/claude-v8-form-workspace" "$tmp/claude-v10-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in install.pro rsc.route form.validation tests.page tests.form build.production \
+  tests.green unaided evidence.complete; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/claude-v10-output/rubric-results.json")" = pass
+done
+test "$(jq -r '.overall' "$tmp/claude-v10-output/rubric-results.json")" = pass
+
+stable_scaffold_command=$'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc --package-manager npm 2>&1 | tail -200\necho "ROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}"'
+stable_test_command=$'cd <LOCAL_PATH>/eval_app\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tail -100\necho "ROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}"'
+stable_build_command=$'cd <LOCAL_PATH>/eval_app\nset -o pipefail\nnpm run build 2>&1 | tail -100\necho "ROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}"'
+jq -cn --arg command "$stable_scaffold_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"✓ Done!\nCreated eval_app with React on Rails!\nROR_EVAL_SCAFFOLD_EXIT=0"}}' \
+  >"$tmp/stable-scaffold-events.jsonl"
+jq -cn --arg command "$stable_test_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"8 runs, 43 assertions, 0 failures, 0 errors, 0 skips\nROR_EVAL_TEST_EXIT=0"}}' \
+  >"$tmp/stable-test-events.jsonl"
+jq -cn --arg command "$stable_build_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"Rspack compiled successfully\nROR_EVAL_BUILD_EXIT=0"}}' \
+  >"$tmp/stable-build-events.jsonl"
+cat "$tmp/stable-scaffold-events.jsonl" "$tmp/stable-test-events.jsonl" \
+  "$tmp/stable-build-events.jsonl" >"$tmp/stable-phase-events.jsonl"
+mkdir "$tmp/stable-phase-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/stable-phase-events.jsonl" \
+  "$tmp/claude-v8-form-workspace" "$tmp/stable-phase-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+test "$(jq -r '.overall' "$tmp/stable-phase-output/rubric-results.json")" = pass
+
+stable_scaffold_rejections=(
+  $'npx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -200\necho "ROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}"'
+  $'set -o pipefail\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -200\necho "ROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}"'
+  $'true\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -200\necho "ROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}"'
+  $'set -o pipefail\necho start; npx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -200\necho "ROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee $LOG | tail -200\necho "ROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -1001\necho "ROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -200\necho "ROR_EVAL_SCAFFOLD_EXIT=$?"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -200\necho "ROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[1]}"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -200\necho "ror_eval_scaffold_exit=${PIPESTATUS[0]}"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -200\necho "ROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -200\necho "ROR_EVAL_SCAFFOLD_MARKER=${PIPESTATUS[0]}"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -200\necho "ROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}"\ntrue'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -200\necho "ROR_EVAL_SCAFFOLD_EXIT_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=${PIPESTATUS[0]}"'
+)
+stable_scaffold_rejection_index=0
+for scaffold_command in "${stable_scaffold_rejections[@]}"; do
+  stable_scaffold_rejection_index=$((stable_scaffold_rejection_index + 1))
+  jq -cn --arg command "$scaffold_command" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"✓ Done!\nCreated eval_app with React on Rails!\nROR_EVAL_SCAFFOLD_EXIT=0"}}' \
+    >"$tmp/stable-scaffold-rejection-$stable_scaffold_rejection_index-events.jsonl"
+  mkdir "$tmp/stable-scaffold-rejection-$stable_scaffold_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" \
+    "$tmp/stable-scaffold-rejection-$stable_scaffold_rejection_index-events.jsonl" \
+    "$tmp/claude-v8-form-workspace" "$tmp/stable-scaffold-rejection-$stable_scaffold_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "install.pro") | .status' \
+    "$tmp/stable-scaffold-rejection-$stable_scaffold_rejection_index-output/rubric-results.json")" = unknown
+done
+
+stable_scaffold_output_rejections=(
+  $'✓ Done!\nCreated eval_app with React on Rails!\nROR_EVAL_SCAFFOLD_EXIT=1'
+  $'✓ Done!\nCreated eval_app with React on Rails!\nROR_EVAL_SCAFFOLD_EXIT=0\nROR_EVAL_SCAFFOLD_EXIT=0'
+  $'✓ Done!\nCreated eval_app with React on Rails!\nOTHER_EXIT=0'
+  $'✓ Done!\nCreated eval_app with React on Rails!\nROR_EVAL_SCAFFOLD_EXIT=0\nlater output'
+  $'Created eval_app with React on Rails!\nROR_EVAL_SCAFFOLD_EXIT=0'
+  $'✓ Done!\nCreated eval_app with React on Rails!\nERROR: failed\nROR_EVAL_SCAFFOLD_EXIT=0'
+)
+stable_scaffold_output_rejection_index=0
+for scaffold_output in "${stable_scaffold_output_rejections[@]}"; do
+  stable_scaffold_output_rejection_index=$((stable_scaffold_output_rejection_index + 1))
+  jq -cn --arg command "$stable_scaffold_command" --arg output "$scaffold_output" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:$output}}' \
+    >"$tmp/stable-scaffold-output-rejection-$stable_scaffold_output_rejection_index-events.jsonl"
+  mkdir "$tmp/stable-scaffold-output-rejection-$stable_scaffold_output_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" \
+    "$tmp/stable-scaffold-output-rejection-$stable_scaffold_output_rejection_index-events.jsonl" \
+    "$tmp/claude-v8-form-workspace" \
+    "$tmp/stable-scaffold-output-rejection-$stable_scaffold_output_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "install.pro") | .status' \
+    "$tmp/stable-scaffold-output-rejection-$stable_scaffold_output_rejection_index-output/rubric-results.json")" = unknown
+done
+
+stable_test_rejections=(
+  $'source <LOCAL_PATH>/.ror-eval-state/env.sh\nsource <LOCAL_PATH>/.ror-eval-state/env.sh\ncd <LOCAL_PATH>/eval_app\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tail -100\necho "ROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}"'
+  $'cd <LOCAL_PATH>/eval_app\nsource <LOCAL_PATH>/.ror-eval-state/env.sh\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tail -100\necho "ROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}"'
+  $'source <LOCAL_PATH>/.ror-eval-state/other.sh\ncd <LOCAL_PATH>/eval_app\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tail -100\necho "ROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}"'
+  $'source <LOCAL_PATH>/.ror-eval-state/env.sh\ncd <LOCAL_PATH>/other\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tail -100\necho "ROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}"'
+  $'cd <LOCAL_PATH>/eval_app\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tee $(pwd)/test.log | tail -100\necho "ROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}"'
+  $'cd <LOCAL_PATH>/eval_app\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tail -1001\necho "ROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}"'
+  $'cd <LOCAL_PATH>/eval_app\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tail -100\necho "ROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}"'
+  $'cd <LOCAL_PATH>/eval_app\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tail -100\necho "ROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}"\ntrue'
+)
+stable_test_rejection_index=0
+for test_command in "${stable_test_rejections[@]}"; do
+  stable_test_rejection_index=$((stable_test_rejection_index + 1))
+  jq -cn --arg command "$test_command" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"8 runs, 43 assertions, 0 failures, 0 errors, 0 skips\nROR_EVAL_TEST_EXIT=0"}}' \
+    >"$tmp/stable-test-rejection-$stable_test_rejection_index-events.jsonl"
+  mkdir "$tmp/stable-test-rejection-$stable_test_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/stable-test-rejection-$stable_test_rejection_index-events.jsonl" \
+    "$tmp/claude-v8-form-workspace" "$tmp/stable-test-rejection-$stable_test_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "tests.green") | .status' \
+    "$tmp/stable-test-rejection-$stable_test_rejection_index-output/rubric-results.json")" = unknown
+done
+
+stable_build_rejections=(
+  $'source <LOCAL_PATH>/.ror-eval-state/env.sh\nsource <LOCAL_PATH>/.ror-eval-state/env.sh\ncd <LOCAL_PATH>/eval_app\nset -o pipefail\nnpm run build 2>&1 | tail -100\necho "ROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}"'
+  $'cd <LOCAL_PATH>/eval_app\nsource <LOCAL_PATH>/.ror-eval-state/env.sh\nset -o pipefail\nnpm run build 2>&1 | tail -100\necho "ROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}"'
+  $'source <LOCAL_PATH>/.ror-eval-state/other.sh\ncd <LOCAL_PATH>/eval_app\nset -o pipefail\nnpm run build 2>&1 | tail -100\necho "ROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}"'
+  $'cd <LOCAL_PATH>/other\nset -o pipefail\nnpm run build 2>&1 | tail -100\necho "ROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}"'
+  $'cd <LOCAL_PATH>/eval_app\nset -o pipefail\nnpm run build && true 2>&1 | tail -100\necho "ROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}"'
+  $'cd <LOCAL_PATH>/eval_app\nset -o pipefail\nnpm run build 2>&1 | tee $BUILD_LOG | tail -100\necho "ROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}"'
+  $'cd <LOCAL_PATH>/eval_app\nset -o pipefail\nnpm run build 2>&1 | tail -1001\necho "ROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}"'
+  $'cd <LOCAL_PATH>/eval_app\nset -o pipefail\nnpm run build 2>&1 | tail -100\necho "ROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}"'
+  $'cd <LOCAL_PATH>/eval_app\nset -o pipefail\nnpm run build 2>&1 | tail -100\necho "ROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}"\ngit status --short'
+)
+stable_build_rejection_index=0
+for build_command in "${stable_build_rejections[@]}"; do
+  stable_build_rejection_index=$((stable_build_rejection_index + 1))
+  jq -cn --arg command "$build_command" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"Rspack compiled successfully\nROR_EVAL_BUILD_EXIT=0"}}' \
+    >"$tmp/stable-build-rejection-$stable_build_rejection_index-events.jsonl"
+  mkdir "$tmp/stable-build-rejection-$stable_build_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/stable-build-rejection-$stable_build_rejection_index-events.jsonl" \
+    "$tmp/claude-v8-form-workspace" "$tmp/stable-build-rejection-$stable_build_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "build.production") | .status' \
+    "$tmp/stable-build-rejection-$stable_build_rejection_index-output/rubric-results.json")" = unknown
+done
+
+stable_phase_output_rejections=(
+  $'8 runs, 43 assertions, 0 failures, 0 errors, 0 skips\nROR_EVAL_TEST_EXIT=1'
+  $'8 runs, 43 assertions, 0 failures, 0 errors, 0 skips\nROR_EVAL_TEST_EXIT=0\nROR_EVAL_TEST_EXIT=0'
+  $'8 runs, 43 assertions, 0 failures, 0 errors, 0 skips\nlater\nROR_EVAL_TEST_EXIT=0'
+  $'ROR_EVAL_TEST_EXIT=0\n8 runs, 43 assertions, 0 failures, 0 errors, 0 skips'
+)
+stable_phase_output_rejection_index=0
+for test_output in "${stable_phase_output_rejections[@]}"; do
+  stable_phase_output_rejection_index=$((stable_phase_output_rejection_index + 1))
+  jq -cn --arg command "$stable_test_command" --arg output "$test_output" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:$output}}' \
+    >"$tmp/stable-test-output-rejection-$stable_phase_output_rejection_index-events.jsonl"
+  mkdir "$tmp/stable-test-output-rejection-$stable_phase_output_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" \
+    "$tmp/stable-test-output-rejection-$stable_phase_output_rejection_index-events.jsonl" \
+    "$tmp/claude-v8-form-workspace" "$tmp/stable-test-output-rejection-$stable_phase_output_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "tests.green") | .status' \
+    "$tmp/stable-test-output-rejection-$stable_phase_output_rejection_index-output/rubric-results.json")" = unknown
+done
+
+stable_build_output_rejections=(
+  $'Rspack compiled successfully\nROR_EVAL_BUILD_EXIT=1'
+  $'Rspack compiled successfully\nROR_EVAL_BUILD_EXIT=0\nROR_EVAL_BUILD_EXIT=0'
+  $'ROR_EVAL_BUILD_EXIT=0\nRspack compiled successfully'
+  $'Usage: build [options]\nRspack compiled successfully\nROR_EVAL_BUILD_EXIT=0'
+  $'ERROR: build failed\nRspack compiled successfully\nROR_EVAL_BUILD_EXIT=0'
+)
+stable_build_output_rejection_index=0
+for build_output in "${stable_build_output_rejections[@]}"; do
+  stable_build_output_rejection_index=$((stable_build_output_rejection_index + 1))
+  jq -cn --arg command "$stable_build_command" --arg output "$build_output" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:$output}}' \
+    >"$tmp/stable-build-output-rejection-$stable_build_output_rejection_index-events.jsonl"
+  mkdir "$tmp/stable-build-output-rejection-$stable_build_output_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" \
+    "$tmp/stable-build-output-rejection-$stable_build_output_rejection_index-events.jsonl" \
+    "$tmp/claude-v8-form-workspace" "$tmp/stable-build-output-rejection-$stable_build_output_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "build.production") | .status' \
+    "$tmp/stable-build-output-rejection-$stable_build_output_rejection_index-output/rubric-results.json")" = unknown
+done
+
+for manifest_variant in missing one-env truncated; do
+  cp -R "$tmp/claude-v8-form-workspace" "$tmp/stable-build-$manifest_variant-workspace"
+  manifest="$tmp/stable-build-$manifest_variant-workspace/eval_app/package.json"
+  if [[ "$manifest_variant" == missing ]]; then
+    rm "$manifest"
+  elif [[ "$manifest_variant" == one-env ]]; then
+    printf '%s\n' '{"scripts":{"build":"NODE_ENV=production rspack build"}}' >"$manifest"
+  else
+    printf '%s' '{"scripts":{"build":"RAILS_ENV=production NODE_ENV=production rspack build"},"padding":"' \
+      >"$manifest"
+    printf '%020000d' 0 >>"$manifest"
+    printf '%s\n' '"}' >>"$manifest"
+  fi
+  mkdir "$tmp/stable-build-$manifest_variant-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/stable-build-events.jsonl" \
+    "$tmp/stable-build-$manifest_variant-workspace" "$tmp/stable-build-$manifest_variant-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "build.production") | .status' \
+    "$tmp/stable-build-$manifest_variant-output/rubric-results.json")" = unknown
 done
 
 echo "focused harness tests passed"
