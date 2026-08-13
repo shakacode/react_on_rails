@@ -157,6 +157,7 @@ const boundedPlaceholderTail =
 const boundedTailPipeline = /^(.*\S)\s+2>&1\s*\|\s*tail\s+(?:-n\s+|-)([1-9][0-9]{0,4})$/;
 const boundedStatusPipeline =
   /^(.*\S)\s+2>&1\s*(?:\|\s*tee\s+(?:(?:<LOCAL_PATH>)|[A-Za-z0-9_./-])+\s*)?\|\s*tail\s+(?:-n\s+|-)([1-9][0-9]{0,4})$/;
+const boundedStdoutStatusPipeline = /^(.*\S)\s+\|\s*tail\s+(?:-n\s+|-)([1-9][0-9]{0,4})$/;
 const normalizedStateSourceLines = new Set([
   'source <LOCAL_PATH>/.ror-eval-state/pgenv.sh',
   'source <LOCAL_PATH>/.ror-eval-state/env.sh',
@@ -196,7 +197,13 @@ const stripExplicitPgTestSetupPrefix = (lines) => {
   if (!cdFirst && cursor < lines.length - 1 && sanitizedEvalDirectory.test(lines[cursor])) cursor += 1;
   return lines.slice(cursor);
 };
-const immediatePhaseStatusTarget = (lines, output, phase, allowWithoutPipefail = false) => {
+const immediatePhaseStatusTarget = (
+  lines,
+  output,
+  phase,
+  allowWithoutPipefail = false,
+  allowStdoutOnly = false,
+) => {
   const hasTopLevelPipefail = lines[0] === 'set -o pipefail';
   const proofLines = hasTopLevelPipefail ? lines.slice(1) : lines;
   if (
@@ -206,7 +213,9 @@ const immediatePhaseStatusTarget = (lines, output, phase, allowWithoutPipefail =
     return null;
   }
 
-  const pipelineMatch = proofLines[0].match(boundedStatusPipeline);
+  const pipelineMatch =
+    proofLines[0].match(boundedStatusPipeline) ??
+    (allowStdoutOnly && proofLines.length === 3 ? proofLines[0].match(boundedStdoutStatusPipeline) : null);
   const directMarkerMatch =
     proofLines.length === 2 && hasTopLevelPipefail
       ? proofLines[1].match(/^echo "([A-Z][A-Z0-9_]{0,63})=\$\{PIPESTATUS\[0\]\}"$/)
@@ -363,7 +372,7 @@ const phaseStatusProductionBuildTarget = (lines, output) => {
   const cleanup = 'rm -rf public/assets public/packs public/packs-test';
   const hasCleanup = lines[0] === cleanup;
   const proofLines = hasCleanup ? lines.slice(1) : lines;
-  const proof = immediatePhaseStatusTarget(proofLines, output, 'BUILD', !hasCleanup);
+  const proof = immediatePhaseStatusTarget(proofLines, output, 'BUILD', !hasCleanup, !hasCleanup);
   if (
     !proof ||
     (proof.target !== 'npm run build' &&
@@ -764,7 +773,7 @@ const recognizedTestInvocation = (line) => {
   );
 };
 const phaseStatusRailsTestTarget = (lines, output) => {
-  const proof = immediatePhaseStatusTarget(lines, output, 'TEST', true);
+  const proof = immediatePhaseStatusTarget(lines, output, 'TEST', true, true);
   if (!proof || isHelpOrVersion(proof.target) || !recognizedTestInvocation(proof.target)) return null;
   const summaries = proof.outputLines.filter((line) => railsTestSummary.test(line));
   return summaries.length === 1 && proof.outputLines.at(-2) === summaries[0] ? proof.target : null;
