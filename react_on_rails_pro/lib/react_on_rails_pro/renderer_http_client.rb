@@ -54,8 +54,7 @@ module ReactOnRailsPro
       Protocol::HTTP::RefusedError,
       # A transport mismatch can surface while parsing the other protocol.
       Protocol::HTTP1::ProtocolError,
-      Protocol::HTTP2::FrameSizeError,
-      Protocol::HTTP2::StreamError
+      Protocol::HTTP2::Error
     ].freeze
 
     def self.transport_config_description

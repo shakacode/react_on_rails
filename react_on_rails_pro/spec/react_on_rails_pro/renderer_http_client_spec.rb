@@ -799,6 +799,7 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
       Errno::ETIMEDOUT,
       Protocol::HTTP::RefusedError,
       [Protocol::HTTP1::ProtocolError, "protocol mismatch"],
+      [Protocol::HTTP2::Error, "connection closed"],
       [Protocol::HTTP2::FrameSizeError, "protocol mismatch"]
     ].each do |error_class, *args|
       it "wraps #{error_class} in a ConnectionError" do
