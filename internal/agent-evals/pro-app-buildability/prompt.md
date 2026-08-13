@@ -11,6 +11,8 @@ The initial public scaffold command itself must propagate generator failures
 and preserve bounded terminal completion evidence. When piping its output, use
 one shell invocation with `set -o pipefail` as the exact top-level line
 immediately before a single bounded `tee | tail` scaffold pipeline. Do not use
+`bash -c`, a subshell, or a background process for this proof; run it in the
+foreground so its completed event proves the generator itself finished. Do not use
 later generated files or manifests as a substitute for the scaffold command's
 own successful completion evidence.
 
@@ -18,6 +20,10 @@ Final test and production-build evidence must likewise preserve the target comma
 status: either make a bounded pipeline terminal under `pipefail`, or capture its
 pipeline status immediately in a unique zero-status marker. Avoid ambiguous later
 commands whose status could mask the test or build result.
+
+The immediate-marker alternative for final test and production-build evidence may
+omit `set -o pipefail`; the exact `PIPESTATUS[0]` assignment itself preserves the
+target status. This alternative never applies to the initial scaffold proof.
 
 Use the applicable stable phase marker immediately after its bounded pipeline,
 then echo it as the final executable line in that shell invocation. Use these

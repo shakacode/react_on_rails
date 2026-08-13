@@ -15,6 +15,10 @@ rg -Fq 'one shell invocation with `set -o pipefail` as the exact top-level line'
   "$eval_dir/prompt.md"
 rg -Fq 'immediately before a single bounded `tee | tail` scaffold pipeline.' \
   "$eval_dir/prompt.md"
+rg -Fq '`bash -c`, a subshell, or a background process for this proof; run it in the' \
+  "$eval_dir/prompt.md"
+rg -Fq 'foreground so its completed event proves the generator itself finished.' \
+  "$eval_dir/prompt.md"
 rg -Fq 'later generated files or manifests as a substitute for the scaffold command' \
   "$eval_dir/prompt.md"
 rg -Fq 'Final test and production-build evidence must likewise preserve the target command' \
@@ -22,6 +26,12 @@ rg -Fq 'Final test and production-build evidence must likewise preserve the targ
 rg -Fq 'pipeline status immediately in a unique zero-status marker.' \
   "$eval_dir/prompt.md"
 rg -Fq 'commands whose status could mask the test or build result.' \
+  "$eval_dir/prompt.md"
+rg -Fq 'The immediate-marker alternative for final test and production-build evidence may' \
+  "$eval_dir/prompt.md"
+rg -Fq 'omit `set -o pipefail`; the exact `PIPESTATUS[0]` assignment itself preserves the' \
+  "$eval_dir/prompt.md"
+rg -Fq 'target status. This alternative never applies to the initial scaffold proof.' \
   "$eval_dir/prompt.md"
 for marker in ROR_EVAL_SCAFFOLD_EXIT ROR_EVAL_TEST_EXIT ROR_EVAL_BUILD_EXIT; do
   rg -Fq "${marker}=\${PIPESTATUS[0]}" "$eval_dir/prompt.md"
@@ -4327,6 +4337,178 @@ node "$eval_dir/bin/derive-evidence.mjs" "$tmp/assigned-status-build-without-cle
 test "$(jq -r '.items[] | select(.id == "build.production") | .status' \
   "$tmp/assigned-status-build-without-cleanup-output/rubric-results.json")" = pass
 
+no_pipefail_nested_scaffold_command='bash -c "set -o pipefail; npx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -200"'
+no_pipefail_background_scaffold_command="$no_pipefail_nested_scaffold_command &"
+no_pipefail_test_command=$'cd <LOCAL_PATH>/eval_app\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nbin/rails test 2>&1 | tail -100\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
+no_pipefail_build_command=$'cd <LOCAL_PATH>/eval_app\nnpm run build 2>&1 | tail -100\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"'
+jq -cn --arg command "$no_pipefail_nested_scaffold_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:1,status:"failed",aggregated_output:"generator failed\nROR_EVAL_SCAFFOLD_EXIT=1"}}' \
+  >"$tmp/no-pipefail-failed-scaffold-events.jsonl"
+jq -cn --arg command "$no_pipefail_background_scaffold_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"✓ Done!\nCreated eval_app with React on Rails!\nROR_EVAL_SCAFFOLD_EXIT=0"}}' \
+  >"$tmp/no-pipefail-background-scaffold-events.jsonl"
+jq -cn --arg command "$no_pipefail_test_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"8 runs, 29 assertions, 0 failures, 0 errors, 0 skips\nROR_EVAL_TEST_EXIT=0"}}' \
+  >"$tmp/no-pipefail-test-events.jsonl"
+jq -cn --arg command "$no_pipefail_build_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"Rspack compiled successfully\nROR_EVAL_BUILD_EXIT=0"}}' \
+  >"$tmp/no-pipefail-build-events.jsonl"
+cat "$tmp/no-pipefail-failed-scaffold-events.jsonl" \
+  "$tmp/no-pipefail-background-scaffold-events.jsonl" "$tmp/no-pipefail-test-events.jsonl" \
+  "$tmp/no-pipefail-build-events.jsonl" >"$tmp/no-pipefail-current-events.jsonl"
+mkdir "$tmp/no-pipefail-current-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-current-events.jsonl" \
+  "$tmp/claude-v8-form-workspace" "$tmp/no-pipefail-current-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+test "$(jq -r '.items[] | select(.id == "install.pro") | .status' \
+  "$tmp/no-pipefail-current-output/rubric-results.json")" = unknown
+for row in rsc.route form.validation tests.page tests.form build.production tests.green unaided; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/no-pipefail-current-output/rubric-results.json")" = pass
+done
+test "$(jq -r '.items[] | select(.id == "evidence.complete") | .status' \
+  "$tmp/no-pipefail-current-output/rubric-results.json")" = unknown
+test "$(jq -r '.overall' "$tmp/no-pipefail-current-output/rubric-results.json")" = fail
+
+cat "$tmp/stable-scaffold-events.jsonl" "$tmp/no-pipefail-test-events.jsonl" \
+  "$tmp/no-pipefail-build-events.jsonl" >"$tmp/no-pipefail-combined-events.jsonl"
+mkdir "$tmp/no-pipefail-combined-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-combined-events.jsonl" \
+  "$tmp/claude-v8-form-workspace" "$tmp/no-pipefail-combined-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in install.pro rsc.route form.validation tests.page tests.form build.production \
+  tests.green unaided evidence.complete; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/no-pipefail-combined-output/rubric-results.json")" = pass
+done
+test "$(jq -r '.overall' "$tmp/no-pipefail-combined-output/rubric-results.json")" = pass
+
+no_pipefail_test_rejections=(
+  $'cd <LOCAL_PATH>/eval_app\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nbin/rails test 2>&1 | tail -100\necho "ROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}"'
+  $'cd <LOCAL_PATH>/eval_app\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nbin/rails test 2>&1 | tail -100\nROR_EVAL_TEST_EXIT=$?\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
+  $'cd <LOCAL_PATH>/eval_app\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nbin/rails test 2>&1 | tail -100\nROR_EVAL_TEST_EXIT=${PIPESTATUS[1]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
+  $'cd <LOCAL_PATH>/eval_app\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nbin/rails test 2>&1 | tail -100\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_BUILD_EXIT"'
+  $'cd <LOCAL_PATH>/eval_app\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nbin/rails test 2>&1 | tail -100\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=0"'
+  $'cd <LOCAL_PATH>/eval_app\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nbin/rails test 2>&1 | tail -100\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\ntrue\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
+  $'cd <LOCAL_PATH>/eval_app\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nbin/rails test 2>&1 | tail -100\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"\ntrue'
+  $'cd <LOCAL_PATH>/eval_app\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nbin/rails test 2>&1 | tail -1001\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
+  $'cd <LOCAL_PATH>/eval_app\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nbin/rails test --help 2>&1 | tail -100\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
+  $'cd <LOCAL_PATH>/eval_app\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\necho bin/rails test 2>&1 | tail -100\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
+)
+no_pipefail_test_rejection_index=0
+for test_command in "${no_pipefail_test_rejections[@]}"; do
+  no_pipefail_test_rejection_index=$((no_pipefail_test_rejection_index + 1))
+  jq -cn --arg command "$test_command" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"8 runs, 29 assertions, 0 failures, 0 errors, 0 skips\nROR_EVAL_TEST_EXIT=0"}}' \
+    >"$tmp/no-pipefail-test-rejection-$no_pipefail_test_rejection_index-events.jsonl"
+  mkdir "$tmp/no-pipefail-test-rejection-$no_pipefail_test_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" \
+    "$tmp/no-pipefail-test-rejection-$no_pipefail_test_rejection_index-events.jsonl" \
+    "$tmp/claude-v8-form-workspace" \
+    "$tmp/no-pipefail-test-rejection-$no_pipefail_test_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "tests.green") | .status' \
+    "$tmp/no-pipefail-test-rejection-$no_pipefail_test_rejection_index-output/rubric-results.json")" = unknown
+done
+
+no_pipefail_build_rejections=(
+  $'cd <LOCAL_PATH>/eval_app\nnpm run build 2>&1 | tail -100\necho "ROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}"'
+  $'cd <LOCAL_PATH>/eval_app\nnpm run build 2>&1 | tail -100\nROR_EVAL_BUILD_EXIT=$?\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"'
+  $'cd <LOCAL_PATH>/eval_app\nnpm run build 2>&1 | tail -100\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[1]}\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"'
+  $'cd <LOCAL_PATH>/eval_app\nnpm run build 2>&1 | tail -100\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_TEST_EXIT"'
+  $'cd <LOCAL_PATH>/eval_app\nnpm run build 2>&1 | tail -100\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_BUILD_EXIT=0"'
+  $'cd <LOCAL_PATH>/eval_app\nnpm run build 2>&1 | tail -100\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}\ntrue\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"'
+  $'cd <LOCAL_PATH>/eval_app\nnpm run build 2>&1 | tail -100\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"\ntrue'
+  $'cd <LOCAL_PATH>/eval_app\nnpm run build 2>&1 | tail -1001\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"'
+  $'cd <LOCAL_PATH>/eval_app\nnpm run build --help 2>&1 | tail -100\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"'
+  $'cd <LOCAL_PATH>/eval_app\nnpm test 2>&1 | tail -100\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"'
+  $'cd <LOCAL_PATH>/eval_app\nrm -rf public/assets public/packs public/packs-test\nnpm run build 2>&1 | tail -100\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"'
+)
+no_pipefail_build_rejection_index=0
+for build_command in "${no_pipefail_build_rejections[@]}"; do
+  no_pipefail_build_rejection_index=$((no_pipefail_build_rejection_index + 1))
+  jq -cn --arg command "$build_command" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"Rspack compiled successfully\nROR_EVAL_BUILD_EXIT=0"}}' \
+    >"$tmp/no-pipefail-build-rejection-$no_pipefail_build_rejection_index-events.jsonl"
+  mkdir "$tmp/no-pipefail-build-rejection-$no_pipefail_build_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" \
+    "$tmp/no-pipefail-build-rejection-$no_pipefail_build_rejection_index-events.jsonl" \
+    "$tmp/claude-v8-form-workspace" \
+    "$tmp/no-pipefail-build-rejection-$no_pipefail_build_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "build.production") | .status' \
+    "$tmp/no-pipefail-build-rejection-$no_pipefail_build_rejection_index-output/rubric-results.json")" = unknown
+done
+
+no_pipefail_test_output_rejections=(
+  $'8 runs, 29 assertions, 0 failures, 0 errors, 0 skips\nROR_EVAL_TEST_EXIT=1'
+  $'8 runs, 29 assertions, 0 failures, 0 errors, 0 skips\nROR_EVAL_TEST_EXIT=0\nROR_EVAL_TEST_EXIT=0'
+  $'ROR_EVAL_TEST_EXIT=0\n8 runs, 29 assertions, 0 failures, 0 errors, 0 skips'
+  $'8 runs, 29 assertions, 0 failures, 0 errors, 0 skips\nROR_EVAL_TEST_EXIT=0\nlater output'
+  $'ROR_EVAL_TEST_EXIT=0'
+  $'0 runs, 0 assertions, 0 failures, 0 errors, 0 skips\nROR_EVAL_TEST_EXIT=0'
+)
+no_pipefail_test_output_rejection_index=0
+for test_output in "${no_pipefail_test_output_rejections[@]}"; do
+  no_pipefail_test_output_rejection_index=$((no_pipefail_test_output_rejection_index + 1))
+  jq -cn --arg command "$no_pipefail_test_command" --arg output "$test_output" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:$output}}' \
+    >"$tmp/no-pipefail-test-output-rejection-$no_pipefail_test_output_rejection_index-events.jsonl"
+  mkdir "$tmp/no-pipefail-test-output-rejection-$no_pipefail_test_output_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" \
+    "$tmp/no-pipefail-test-output-rejection-$no_pipefail_test_output_rejection_index-events.jsonl" \
+    "$tmp/claude-v8-form-workspace" \
+    "$tmp/no-pipefail-test-output-rejection-$no_pipefail_test_output_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "tests.green") | .status' \
+    "$tmp/no-pipefail-test-output-rejection-$no_pipefail_test_output_rejection_index-output/rubric-results.json")" = unknown
+done
+
+no_pipefail_build_output_rejections=(
+  $'Rspack compiled successfully\nROR_EVAL_BUILD_EXIT=1'
+  $'Rspack compiled successfully\nROR_EVAL_BUILD_EXIT=0\nROR_EVAL_BUILD_EXIT=0'
+  $'ROR_EVAL_BUILD_EXIT=0\nRspack compiled successfully'
+  $'Rspack compiled successfully\nROR_EVAL_BUILD_EXIT=0\nlater output'
+  $'ROR_EVAL_BUILD_EXIT=0'
+  $'Usage: build [options]\nRspack compiled successfully\nROR_EVAL_BUILD_EXIT=0'
+  $'ERROR: build failed\nRspack compiled successfully\nROR_EVAL_BUILD_EXIT=0'
+)
+no_pipefail_build_output_rejection_index=0
+for build_output in "${no_pipefail_build_output_rejections[@]}"; do
+  no_pipefail_build_output_rejection_index=$((no_pipefail_build_output_rejection_index + 1))
+  jq -cn --arg command "$no_pipefail_build_command" --arg output "$build_output" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:$output}}' \
+    >"$tmp/no-pipefail-build-output-rejection-$no_pipefail_build_output_rejection_index-events.jsonl"
+  mkdir "$tmp/no-pipefail-build-output-rejection-$no_pipefail_build_output_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" \
+    "$tmp/no-pipefail-build-output-rejection-$no_pipefail_build_output_rejection_index-events.jsonl" \
+    "$tmp/claude-v8-form-workspace" \
+    "$tmp/no-pipefail-build-output-rejection-$no_pipefail_build_output_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "build.production") | .status' \
+    "$tmp/no-pipefail-build-output-rejection-$no_pipefail_build_output_rejection_index-output/rubric-results.json")" = unknown
+done
+
+jq -cn --arg command "$no_pipefail_test_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:1,status:"failed",aggregated_output:"8 runs, 29 assertions, 0 failures, 0 errors, 0 skips\nROR_EVAL_TEST_EXIT=0"}}' \
+  >"$tmp/no-pipefail-test-nonzero-event.jsonl"
+mkdir "$tmp/no-pipefail-test-nonzero-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-nonzero-event.jsonl" \
+  "$tmp/claude-v8-form-workspace" "$tmp/no-pipefail-test-nonzero-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+test "$(jq -r '.items[] | select(.id == "tests.green") | .status' \
+  "$tmp/no-pipefail-test-nonzero-output/rubric-results.json")" = unknown
+
+jq -cn --arg command "$no_pipefail_build_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:1,status:"failed",aggregated_output:"Rspack compiled successfully\nROR_EVAL_BUILD_EXIT=0"}}' \
+  >"$tmp/no-pipefail-build-nonzero-event.jsonl"
+mkdir "$tmp/no-pipefail-build-nonzero-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-build-nonzero-event.jsonl" \
+  "$tmp/claude-v8-form-workspace" "$tmp/no-pipefail-build-nonzero-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+test "$(jq -r '.items[] | select(.id == "build.production") | .status' \
+  "$tmp/no-pipefail-build-nonzero-output/rubric-results.json")" = unknown
+
 assigned_status_build_rejections=(
   $'cd <LOCAL_PATH>/eval_app\nrm -rf public/assets public/packs\nset -o pipefail\nenv RAILS_ENV=production NODE_ENV=production bin/rails assets:precompile 2>&1 | tail -n 200\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"'
   $'cd <LOCAL_PATH>/eval_app\nrm -rf public/assets public/packs public/packs-test\nset -o pipefail\nenv FOO=bar RAILS_ENV=production NODE_ENV=production bin/rails assets:precompile 2>&1 | tail -n 200\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"'
@@ -4354,6 +4536,7 @@ done
 
 stable_scaffold_rejections=(
   $'npx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -200\necho "ROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}"'
+  $'npx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -200\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
   $'set -o pipefail\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -200\necho "ROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}"'
   $'true\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -200\necho "ROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}"'
   $'set -o pipefail\necho start; npx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -200\necho "ROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}"'
@@ -4509,12 +4692,14 @@ for manifest_variant in missing one-env truncated; do
     printf '%020000d' 0 >>"$manifest"
     printf '%s\n' '"}' >>"$manifest"
   fi
-  mkdir "$tmp/stable-build-$manifest_variant-output"
-  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/stable-build-events.jsonl" \
-    "$tmp/stable-build-$manifest_variant-workspace" "$tmp/stable-build-$manifest_variant-output" \
-    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
-  test "$(jq -r '.items[] | select(.id == "build.production") | .status' \
-    "$tmp/stable-build-$manifest_variant-output/rubric-results.json")" = unknown
+  for evidence_variant in stable-build no-pipefail-build; do
+    mkdir "$tmp/$evidence_variant-$manifest_variant-output"
+    node "$eval_dir/bin/derive-evidence.mjs" "$tmp/$evidence_variant-events.jsonl" \
+      "$tmp/stable-build-$manifest_variant-workspace" "$tmp/$evidence_variant-$manifest_variant-output" \
+      "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+    test "$(jq -r '.items[] | select(.id == "build.production") | .status' \
+      "$tmp/$evidence_variant-$manifest_variant-output/rubric-results.json")" = unknown
+  done
 done
 
 echo "focused harness tests passed"

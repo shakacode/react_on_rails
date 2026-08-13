@@ -196,16 +196,27 @@ const stripExplicitPgTestSetupPrefix = (lines) => {
   if (!cdFirst && cursor < lines.length - 1 && sanitizedEvalDirectory.test(lines[cursor])) cursor += 1;
   return lines.slice(cursor);
 };
-const immediatePhaseStatusTarget = (lines, output, phase) => {
-  if ((lines.length !== 3 && lines.length !== 4) || lines[0] !== 'set -o pipefail') return null;
+const immediatePhaseStatusTarget = (lines, output, phase, allowWithoutPipefail = false) => {
+  const hasTopLevelPipefail = lines[0] === 'set -o pipefail';
+  const proofLines = hasTopLevelPipefail ? lines.slice(1) : lines;
+  if (
+    (proofLines.length !== 2 && proofLines.length !== 3) ||
+    (!hasTopLevelPipefail && (!allowWithoutPipefail || proofLines.length !== 3))
+  ) {
+    return null;
+  }
 
-  const pipelineMatch = lines[1].match(boundedStatusPipeline);
+  const pipelineMatch = proofLines[0].match(boundedStatusPipeline);
   const directMarkerMatch =
-    lines.length === 3 ? lines[2].match(/^echo "([A-Z][A-Z0-9_]{0,63})=\$\{PIPESTATUS\[0\]\}"$/) : null;
+    proofLines.length === 2 && hasTopLevelPipefail
+      ? proofLines[1].match(/^echo "([A-Z][A-Z0-9_]{0,63})=\$\{PIPESTATUS\[0\]\}"$/)
+      : null;
   const assignedMarkerMatch =
-    lines.length === 4 ? lines[2].match(/^([A-Z][A-Z0-9_]{0,63})=\$\{PIPESTATUS\[0\]\}$/) : null;
+    proofLines.length === 3 ? proofLines[1].match(/^([A-Z][A-Z0-9_]{0,63})=\$\{PIPESTATUS\[0\]\}$/) : null;
   const assignedEchoMatch =
-    lines.length === 4 ? lines[3].match(/^echo "([A-Z][A-Z0-9_]{0,63})=\$([A-Z][A-Z0-9_]{0,63})"$/) : null;
+    proofLines.length === 3
+      ? proofLines[2].match(/^echo "([A-Z][A-Z0-9_]{0,63})=\$([A-Z][A-Z0-9_]{0,63})"$/)
+      : null;
   const markerName = directMarkerMatch?.[1] ?? assignedMarkerMatch?.[1];
   if (
     !pipelineMatch ||
@@ -350,8 +361,9 @@ const pipelineStatusProductionBuildTarget = (lines, output) => {
 };
 const phaseStatusProductionBuildTarget = (lines, output) => {
   const cleanup = 'rm -rf public/assets public/packs public/packs-test';
-  const proofLines = lines[0] === cleanup ? lines.slice(1) : lines;
-  const proof = immediatePhaseStatusTarget(proofLines, output, 'BUILD');
+  const hasCleanup = lines[0] === cleanup;
+  const proofLines = hasCleanup ? lines.slice(1) : lines;
+  const proof = immediatePhaseStatusTarget(proofLines, output, 'BUILD', !hasCleanup);
   if (
     !proof ||
     (proof.target !== 'npm run build' &&
@@ -745,8 +757,8 @@ const recognizedTestInvocation = (line) => {
   );
 };
 const phaseStatusRailsTestTarget = (lines, output) => {
-  const proof = immediatePhaseStatusTarget(lines, output, 'TEST');
-  if (!proof || !recognizedTestInvocation(proof.target)) return null;
+  const proof = immediatePhaseStatusTarget(lines, output, 'TEST', true);
+  if (!proof || isHelpOrVersion(proof.target) || !recognizedTestInvocation(proof.target)) return null;
   const summaries = proof.outputLines.filter((line) => railsTestSummary.test(line));
   return summaries.length === 1 && proof.outputLines.at(-2) === summaries[0] ? proof.target : null;
 };
