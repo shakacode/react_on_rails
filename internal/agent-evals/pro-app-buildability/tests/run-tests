@@ -2146,15 +2146,26 @@ mkdir -p "$tmp/correlation-workspace/eval_app/app/components" \
   "$tmp/correlation-workspace/eval_app/app/controllers" \
   "$tmp/correlation-workspace/eval_app/config" \
   "$tmp/correlation-workspace/eval_app/spec/pages" \
-  "$tmp/correlation-workspace/eval_app/spec/requests"
+  "$tmp/correlation-workspace/eval_app/test/integration"
 printf '%s\n' 'rsc_route server_component' >"$tmp/correlation-workspace/eval_app/config/routes.rb"
 printf '%s\n' 'export const Page = () => null' >"$tmp/correlation-workspace/eval_app/app/components/page.server.tsx"
 printf '%s\n' 'it { expect(page).to be_present }' >"$tmp/correlation-workspace/eval_app/spec/pages/rsc_page_spec.rb"
 printf '%s\n' 'validates :name, presence: true' >"$tmp/correlation-workspace/eval_app/app/models/form.rb"
 printf '%s\n' 'render errors, status: :unprocessable_entity' \
   >"$tmp/correlation-workspace/eval_app/app/controllers/forms_controller.rb"
-printf '%s\n' 'it tests invalid and valid form outcomes' \
-  >"$tmp/correlation-workspace/eval_app/spec/requests/form_spec.rb"
+printf '%s\n' \
+  'class FormTest < ActionDispatch::IntegrationTest' \
+  '  test "server-side validation failure returns errors" do' \
+  '    post forms_path' \
+  '    assert_response :unprocessable_entity' \
+  '    assert_includes response.body, "error"' \
+  '  end' \
+  '  test "successful submission redirects with a message" do' \
+  '    post forms_path' \
+  '    assert_redirected_to forms_path' \
+  '    assert_equal "Thanks", flash[:notice]' \
+  '  end' \
+  'end' >"$tmp/correlation-workspace/eval_app/test/integration/form_test.rb"
 printf '%s\n' \
   '{"type":"item.completed","item":{"type":"command_execution","command":"bundle exec rspec spec/unrelated_spec.rb","exit_code":0,"status":"completed","aggregated_output":"1 example, 0 failures"}}' \
   >"$tmp/unrelated-test-events.jsonl"
@@ -2216,8 +2227,19 @@ printf '%s\n' 'render errors, status: :unprocessable_entity' \
   >"$tmp/classifier-workspace/eval_app/app/controllers/waitlist_signups_controller.rb"
 printf '%s\n' 'test "page renders" do; assert_response :success; end' \
   >"$tmp/classifier-workspace/eval_app/test/integration/hello_page_test.rb"
-printf '%s\n' 'test "invalid then valid signup" do; assert invalid; assert valid; end' \
-  >"$tmp/classifier-workspace/eval_app/test/integration/waitlist_signups_test.rb"
+printf '%s\n' \
+  'class WaitlistSignupsTest < ActionDispatch::IntegrationTest' \
+  '  test "server-side validation failure returns errors" do' \
+  '    post waitlist_signups_path' \
+  '    assert_response :unprocessable_entity' \
+  '    assert_includes response.body, "error"' \
+  '  end' \
+  '  test "successful submission redirects with a message" do' \
+  '    post waitlist_signups_path' \
+  '    assert_redirected_to waitlist_signups_path' \
+  '    assert_equal "Thanks", flash[:notice]' \
+  '  end' \
+  'end' >"$tmp/classifier-workspace/eval_app/test/integration/waitlist_signups_test.rb"
 printf '%s\n' \
   '{"type":"item.completed","item":{"type":"command_execution","command":"npx create-react-on-rails-app eval_app --pro","exit_code":0,"status":"completed","aggregated_output":"created successfully"}}' \
   '{"type":"item.completed","item":{"type":"command_execution","command":"bin/rails test","exit_code":0,"status":"completed","aggregated_output":"3 runs, 30 assertions, 0 failures"}}' \
@@ -2267,6 +2289,31 @@ node "$eval_dir/bin/derive-evidence.mjs" "$tmp/full-suite-events.jsonl" \
 for row in form.validation tests.form; do
   test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
     "$tmp/form-unit-negative-output/rubric-results.json")" = unknown
+done
+
+mkdir -p "$tmp/form-outcome-constant-negative-workspace/eval_app/app/controllers" \
+  "$tmp/form-outcome-constant-negative-workspace/eval_app/app/models" \
+  "$tmp/form-outcome-constant-negative-workspace/eval_app/test/integration"
+printf '%s\n' 'validates :email, presence: true' \
+  >"$tmp/form-outcome-constant-negative-workspace/eval_app/app/models/subscriber.rb"
+printf '%s\n' 'render errors, status: :unprocessable_entity' \
+  >"$tmp/form-outcome-constant-negative-workspace/eval_app/app/controllers/subscribers_controller.rb"
+printf '%s\n' \
+  'class SubscribersTest < ActionDispatch::IntegrationTest' \
+  '  OUTCOMES = "invalid and valid"' \
+  '  test "renders the index" do' \
+  '    get subscribers_path' \
+  '    assert_response :success' \
+  '  end' \
+  'end' \
+  >"$tmp/form-outcome-constant-negative-workspace/eval_app/test/integration/subscribers_test.rb"
+mkdir "$tmp/form-outcome-constant-negative-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/full-suite-events.jsonl" \
+  "$tmp/form-outcome-constant-negative-workspace" "$tmp/form-outcome-constant-negative-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/form-outcome-constant-negative-output/rubric-results.json")" = unknown
 done
 
 mkdir -p "$tmp/build-one-env-workspace/eval_app" "$tmp/build-no-env-workspace/eval_app" \
@@ -2360,9 +2407,15 @@ printf '%s\n' \
   'end' >"$tmp/claude-v5-root-workspace/test/integration/hello_server_test.rb"
 printf '%s\n' \
   'class MessagesTest < ActionDispatch::IntegrationTest' \
-  '  test "invalid then valid message" do' \
-  '    assert invalid' \
-  '    assert valid' \
+  '  test "server-side validation failure returns errors" do' \
+  '    post messages_path' \
+  '    assert_response :unprocessable_entity' \
+  '    assert_includes response.body, "error"' \
+  '  end' \
+  '  test "successful submission redirects with a message" do' \
+  '    post messages_path' \
+  '    assert_redirected_to messages_path' \
+  '    assert_equal "Thanks", flash[:notice]' \
   '  end' \
   'end' >"$tmp/claude-v5-root-workspace/test/integration/messages_test.rb"
 printf '%s\n' 'export default function Deceptive() { return null; }' \
@@ -2558,9 +2611,15 @@ printf '%s\n' \
   'end' >"$tmp/claude-classifier-workspace/eval_app/test/controllers/hello_server_controller_test.rb"
 printf '%s\n' \
   'class ContactMessagesControllerTest < ActionDispatch::IntegrationTest' \
-  '  test "invalid then valid contact message" do' \
-  '    assert invalid' \
-  '    assert valid' \
+  '  test "server-side validation failure returns errors" do' \
+  '    post contact_messages_path' \
+  '    assert_response :unprocessable_entity' \
+  '    assert_includes response.body, "error"' \
+  '  end' \
+  '  test "successful submission redirects with a message" do' \
+  '    post contact_messages_path' \
+  '    assert_redirected_to contact_messages_path' \
+  '    assert_equal "Thanks", flash[:notice]' \
   '  end' \
   'end' >"$tmp/claude-classifier-workspace/eval_app/test/controllers/contact_messages_controller_test.rb"
 printf '%s\n' 'validates :email, presence: true' \
@@ -2576,9 +2635,15 @@ printf '%s\n' \
   'end' >"$tmp/claude-classifier-workspace/eval_app/test/integration/hello_server_test.rb"
 printf '%s\n' \
   'class SubscribersControllerTest < ActionDispatch::IntegrationTest' \
-  '  test "invalid then valid subscriber" do' \
-  '    assert invalid' \
-  '    assert valid' \
+  '  test "server-side validation failure returns errors" do' \
+  '    post subscribers_path' \
+  '    assert_response :unprocessable_entity' \
+  '    assert_includes response.body, "error"' \
+  '  end' \
+  '  test "successful submission redirects with a message" do' \
+  '    post subscribers_path' \
+  '    assert_redirected_to subscribers_path' \
+  '    assert_equal "Thanks", flash[:notice]' \
   '  end' \
   'end' >"$tmp/claude-classifier-workspace/eval_app/test/controllers/subscribers_controller_test.rb"
 printf '%s\n' \
@@ -5320,6 +5385,9 @@ stable_test_rejections=(
   $'cd <LOCAL_PATH>/eval_app\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tail -1001\necho "ROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}"'
   $'cd <LOCAL_PATH>/eval_app\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tail -100\necho "ROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}"'
   $'cd <LOCAL_PATH>/eval_app\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tail -100\necho "ROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}"\ntrue'
+  $'cd <LOCAL_PATH>/eval_app\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tail -100\necho "ROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}"\nfalse && printf "%s\nignored" || true'
+  $'cd <LOCAL_PATH>/eval_app\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tail -100\necho "ROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}"\nfalse \\\n  && true'
+  $'cd <LOCAL_PATH>/eval_app\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tail -100\necho "ROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}"\ncat <<\'RESULT\'\nstale success\nRESULT'
 )
 stable_test_rejection_index=0
 for test_command in "${stable_test_rejections[@]}"; do
@@ -5344,6 +5412,9 @@ stable_build_rejections=(
   $'cd <LOCAL_PATH>/eval_app\nset -o pipefail\nnpm run build 2>&1 | tail -1001\necho "ROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}"'
   $'cd <LOCAL_PATH>/eval_app\nset -o pipefail\nnpm run build 2>&1 | tail -100\necho "ROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}"'
   $'cd <LOCAL_PATH>/eval_app\nset -o pipefail\nnpm run build 2>&1 | tail -100\necho "ROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}"\ngit status --short'
+  $'cd <LOCAL_PATH>/eval_app\nset -o pipefail\nnpm run build 2>&1 | tail -100\necho "ROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}"\nfalse && printf '\''%s\nstale'\'' || true'
+  $'cd <LOCAL_PATH>/eval_app\nset -o pipefail\nnpm run build 2>&1 | tail -100\necho "ROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}"\nfalse \\\n  || true'
+  $'cd <LOCAL_PATH>/eval_app\nset -o pipefail\nnpm run build 2>&1 | tail -100\necho "ROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}"\ncat <<RESULT\nstale success\nRESULT'
 )
 stable_build_rejection_index=0
 for build_command in "${stable_build_rejections[@]}"; do

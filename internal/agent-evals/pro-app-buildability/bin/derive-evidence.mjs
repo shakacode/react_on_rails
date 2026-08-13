@@ -470,10 +470,8 @@ const topLevelShellLines = (command) => {
   if (invocation.includes('<<')) return [];
 
   const executableLines = [];
-  let quote = null;
-  let continuedFromPrevious = false;
   for (const physicalLine of invocation.split(/\r?\n/)) {
-    const startedInsideSyntax = quote !== null || continuedFromPrevious;
+    let quote = null;
     let escaped = false;
     let commentAt = physicalLine.length;
     for (let index = 0; index < physicalLine.length; index += 1) {
@@ -494,11 +492,10 @@ const topLevelShellLines = (command) => {
       }
     }
     const continuedToNext = quote !== "'" && escaped;
-    if (!startedInsideSyntax && quote === null && !continuedToNext) {
-      const candidate = physicalLine.slice(0, commentAt).trim();
-      if (candidate) executableLines.push(candidate);
-    }
-    continuedFromPrevious = continuedToNext;
+    // Never discard part of a physical command and classify the remaining lines as independent proof.
+    if (quote !== null || continuedToNext) return [];
+    const candidate = physicalLine.slice(0, commentAt).trim();
+    if (candidate) executableLines.push(candidate);
   }
   return executableLines;
 };
@@ -708,21 +705,7 @@ const semanticFormIntegrationTest = (artifact, uncommentedRuby) => {
 };
 const formTests = artifacts.filter((artifact) => {
   const uncommentedRuby = artifact.excerpt.replace(/^\s*#.*$/gm, '');
-  const outcomeContent = /\.rb$/i.test(artifact.path) ? uncommentedRuby : artifact.excerpt;
-  const bothOutcomes = /invalid[\s\S]*valid|valid[\s\S]*invalid/i.test(outcomeContent);
-  const categorizedFormTest =
-    /(?:spec|test)\/(?:(?:.*\/)?integration\/.*|.*(?:form|request|system).*)(?:_spec\.rb|_test\.rb|\.(?:test|spec)\.[jt]sx?)$/i.test(
-      artifact.path,
-    );
-  const controllerIntegrationTest =
-    /test\/controllers\/.*_test\.rb$/i.test(artifact.path) &&
-    /^\s*class\s+[A-Za-z_][A-Za-z0-9_:]*\s*<\s*ActionDispatch::IntegrationTest\b/m.test(uncommentedRuby) &&
-    /invalid[\s\S]*valid|valid[\s\S]*invalid/i.test(uncommentedRuby);
-  return (
-    (bothOutcomes && categorizedFormTest) ||
-    controllerIntegrationTest ||
-    semanticFormIntegrationTest(artifact, uncommentedRuby)
-  );
+  return semanticFormIntegrationTest(artifact, uncommentedRuby);
 });
 const plainManifestBuildInvocation = (invocation) =>
   manifestBackedProductionBuild && /^(?:npm|pnpm) run build$/i.test(invocation);
