@@ -300,6 +300,8 @@ pair`, returns invalid UTF-8, or silently mis-decodes the value. The parser now 
   Renderer. Regular rendering and response streaming continue to work. Async props require full-duplex behavior across
   every hop, so request-buffering or half-duplex HTTP/1.1 intermediaries remain unsupported. Fixes
   [Issue 4868](https://github.com/shakacode/react_on_rails/issues/4868).
+  [PR 4887](https://github.com/shakacode/react_on_rails/pull/4887) by
+  [sashakhar1](https://github.com/sashakhar1).
 
 - **Version-matched agent skills and bundled docs**: The `react_on_rails` gem and
   `react-on-rails` npm package now ship install/upgrade, React Server Components adoption,
