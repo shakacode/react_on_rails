@@ -584,6 +584,298 @@ for newline_mode in newline no-newline; do
   : >"$tmp/credential-output/claude-$newline_mode.txt"
 done
 
+oauth_source="$tmp/claude-oauth-source.json"
+oauth_home="$tmp/claude-oauth-home"
+oauth_store="$oauth_home/.claude/.credentials.json"
+mkdir -m 700 "$oauth_home" "$oauth_home/.claude"
+printf '%s\n' \
+  '{"claudeAiOauth":{"accessToken":"synthetic-oauth-access-token","refreshToken":"synthetic-oauth-refresh-token","expiresAt":1780000000000,"refreshTokenExpiresAt":1790000000000,"scopes":["user:inference","user:profile"],"subscriptionType":"pro","rateLimitTier":"default"},"mcpOAuth":{"server":"discarded"}}' \
+  >"$oauth_source"
+"$eval_dir/bin/canonicalize-model-credential" claude-oauth "$oauth_source" "$oauth_store"
+test "$(node -e 'process.stdout.write((require("node:fs").statSync(process.argv[1]).mode & 0o777).toString(8))' \
+  "$oauth_store")" = 600
+test "$(jq -r 'keys | join(",")' "$oauth_store")" = claudeAiOauth
+jq -e '.claudeAiOauth == {
+  accessToken:"synthetic-oauth-access-token",
+  refreshToken:"synthetic-oauth-refresh-token",
+  expiresAt:1780000000000,
+  refreshTokenExpiresAt:1790000000000,
+  scopes:["user:inference","user:profile"],
+  subscriptionType:"pro",
+  rateLimitTier:"default"
+}' "$oauth_store" >/dev/null
+jq -e 'has("mcpOAuth") | not' "$oauth_store" >/dev/null
+
+oauth_null_metadata_source="$tmp/claude-oauth-null-metadata-source.json"
+oauth_null_metadata_home="$tmp/claude-oauth-null-metadata-home"
+oauth_null_metadata_store="$oauth_null_metadata_home/.credentials.json"
+mkdir -m 700 "$oauth_null_metadata_home"
+printf '%s' \
+  '{"claudeAiOauth":{"accessToken":"synthetic-oauth-access-token","refreshToken":"synthetic-oauth-refresh-token","expiresAt":1780000000000,"refreshTokenExpiresAt":1790000000000,"scopes":["user:inference"],"subscriptionType":null,"rateLimitTier":null}}' \
+  >"$oauth_null_metadata_source"
+"$eval_dir/bin/canonicalize-model-credential" claude-oauth \
+  "$oauth_null_metadata_source" "$oauth_null_metadata_store"
+jq -e '.claudeAiOauth.subscriptionType == null and .claudeAiOauth.rateLimitTier == null' \
+  "$oauth_null_metadata_store" >/dev/null
+
+oauth_scan_metadata_dir="$tmp/oauth-scan-metadata"
+oauth_scan_metadata_store="$oauth_scan_metadata_dir/.credentials.json"
+oauth_scan_metadata_output="$oauth_scan_metadata_dir/output"
+mkdir -m 700 "$oauth_scan_metadata_dir" "$oauth_scan_metadata_output"
+printf '%s' \
+  '{"claudeAiOauth":{"accessToken":"metadata-scan-access-token","refreshToken":"metadata-scan-refresh-token","expiresAt":1780000000000,"refreshTokenExpiresAt":1790000000000,"scopes":["user:inference"],"subscriptionType":"enterprise","rateLimitTier":"default_claude_max_5x"}}' \
+  >"$oauth_scan_metadata_store"
+printf '%s\n' enterprise user:inference default_claude_max_5x 1780000000000 1790000000000 \
+  >"$oauth_scan_metadata_output/benign-artifact.txt"
+"$eval_dir/bin/assert-credential-absent" \
+  "$oauth_scan_metadata_output" "$oauth_scan_metadata_store"
+
+assert_structured_credential_leak_rejected() {
+  local name="$1"
+  local credential="$2"
+  local artifact="$3"
+  local case_dir="$tmp/oauth-scan-reject-$name"
+  mkdir -m 700 "$case_dir" "$case_dir/output"
+  printf '%s' "$credential" >"$case_dir/.credentials.json"
+  printf '%s' "$artifact" >"$case_dir/output/artifact.txt"
+  set +e
+  "$eval_dir/bin/assert-credential-absent" \
+    "$case_dir/output" "$case_dir/.credentials.json" \
+    >"$case_dir/stdout" 2>"$case_dir/stderr"
+  local scan_exit=$?
+  set -e
+  test "$scan_exit" = 1
+  test ! -s "$case_dir/stdout"
+  test "$(cat "$case_dir/stderr")" = 'operator credential bytes found in run output'
+}
+
+assert_structured_credential_leak_rejected access_token \
+  '{"container":{"accessToken":"nested-access-token"}}' \
+  'nested-access-token'
+assert_structured_credential_leak_rejected refresh_token \
+  '{"container":{"refreshToken":"nested-refresh-token"}}' \
+  'nested-refresh-token'
+assert_structured_credential_leak_rejected password \
+  '{"container":{"password":"generic-password-value"}}' \
+  'generic-password-value'
+assert_structured_credential_leak_rejected secret \
+  '{"container":{"secret":"generic-secret-value"}}' \
+  'generic-secret-value'
+assert_structured_credential_leak_rejected token_array \
+  '{"container":{"token":["generic-array-token-value"]}}' \
+  'generic-array-token-value'
+oauth_serialized_scan='{"claudeAiOauth":{"accessToken":"serialized-access-token","refreshToken":"serialized-refresh-token"}}'
+assert_structured_credential_leak_rejected serialized \
+  "$oauth_serialized_scan" "$oauth_serialized_scan"
+
+reject_oauth_json() {
+  local name="$1"
+  local encoded="$2"
+  local case_dir="$tmp/oauth-reject-$name"
+  local source="$case_dir/source.json"
+  local output="$case_dir/.credentials.json"
+  mkdir -m 700 "$case_dir"
+  printf '%s' "$encoded" >"$source"
+  set +e
+  "$eval_dir/bin/canonicalize-model-credential" claude-oauth "$source" "$output" \
+    >"$case_dir/stdout" 2>"$case_dir/stderr"
+  local status=$?
+  set -e
+  test "$status" = 65
+  test ! -e "$output"
+  test ! -s "$case_dir/stdout"
+  test "$(cat "$case_dir/stderr")" = 'Claude model credential canonicalization failed'
+}
+
+oauth_valid='{"claudeAiOauth":{"accessToken":"synthetic-oauth-access-token","refreshToken":"synthetic-oauth-refresh-token","expiresAt":1780000000000,"refreshTokenExpiresAt":1790000000000,"scopes":["user:inference"],"subscriptionType":"pro","rateLimitTier":"default"}}'
+reject_oauth_json malformed '{'
+reject_oauth_json non_object '[]'
+reject_oauth_json missing_refresh \
+  '{"claudeAiOauth":{"accessToken":"synthetic-oauth-access-token","expiresAt":1780000000000,"refreshTokenExpiresAt":1790000000000,"scopes":["user:inference"],"subscriptionType":"pro","rateLimitTier":"default"}}'
+reject_oauth_json unknown_top \
+  "$(jq -c '.unexpected=true' <<<"$oauth_valid")"
+reject_oauth_json unknown_oauth \
+  "$(jq -c '.claudeAiOauth.unexpected=true' <<<"$oauth_valid")"
+reject_oauth_json empty_token \
+  "$(jq -c '.claudeAiOauth.accessToken=""' <<<"$oauth_valid")"
+reject_oauth_json short_token \
+  "$(jq -c '.claudeAiOauth.accessToken="short"' <<<"$oauth_valid")"
+reject_oauth_json numeric_token \
+  "$(jq -c '.claudeAiOauth.accessToken=12345678' <<<"$oauth_valid")"
+reject_oauth_json control_token \
+  "$(jq -c '.claudeAiOauth.accessToken="synthetic\nvalue"' <<<"$oauth_valid")"
+reject_oauth_json fractional_timestamp \
+  "$(jq -c '.claudeAiOauth.expiresAt=1.5' <<<"$oauth_valid")"
+reject_oauth_json string_timestamp \
+  "$(jq -c '.claudeAiOauth.expiresAt="1780000000000"' <<<"$oauth_valid")"
+reject_oauth_json zero_timestamp \
+  "$(jq -c '.claudeAiOauth.expiresAt=0' <<<"$oauth_valid")"
+reject_oauth_json wrong_scopes \
+  "$(jq -c '.claudeAiOauth.scopes={}' <<<"$oauth_valid")"
+reject_oauth_json numeric_scope \
+  "$(jq -c '.claudeAiOauth.scopes=[123]' <<<"$oauth_valid")"
+reject_oauth_json too_many_scopes \
+  "$(node -e '
+const value = JSON.parse(process.argv[1]);
+value.claudeAiOauth.scopes = Array(129).fill("user:inference");
+process.stdout.write(JSON.stringify(value));
+' "$oauth_valid")"
+reject_oauth_json control_scope \
+  "$(jq -c '.claudeAiOauth.scopes=["user:inference\nextra"]' <<<"$oauth_valid")"
+reject_oauth_json wrong_metadata \
+  "$(jq -c '.claudeAiOauth.subscriptionType=[]' <<<"$oauth_valid")"
+reject_oauth_json numeric_metadata \
+  "$(jq -c '.claudeAiOauth.subscriptionType=1' <<<"$oauth_valid")"
+reject_oauth_json over_depth \
+  "$(node -e '
+const value = JSON.parse(process.argv[1]);
+let nested = {};
+for (let index = 0; index < 70; index += 1) nested = { nested };
+value.mcpOAuth = nested;
+process.stdout.write(JSON.stringify(value));
+' "$oauth_valid")"
+
+oauth_oversized_dir="$tmp/oauth-reject-oversized"
+mkdir -m 700 "$oauth_oversized_dir"
+node -e 'require("node:fs").writeFileSync(process.argv[1], "{" + "x".repeat(1_048_576))' \
+  "$oauth_oversized_dir/source.json"
+set +e
+"$eval_dir/bin/canonicalize-model-credential" claude-oauth \
+  "$oauth_oversized_dir/source.json" "$oauth_oversized_dir/.credentials.json" \
+  >"$oauth_oversized_dir/stdout" 2>"$oauth_oversized_dir/stderr"
+oauth_oversized_exit=$?
+set -e
+test "$oauth_oversized_exit" = 65
+test ! -e "$oauth_oversized_dir/.credentials.json"
+test ! -s "$oauth_oversized_dir/stdout"
+test "$(cat "$oauth_oversized_dir/stderr")" = \
+  'Claude model credential canonicalization failed'
+
+oauth_token_oversized_dir="$tmp/oauth-reject-token-oversized"
+mkdir -m 700 "$oauth_token_oversized_dir"
+node -e '
+const fs = require("node:fs");
+const value = JSON.parse(process.argv[2]);
+value.claudeAiOauth.accessToken = "x".repeat(262145);
+fs.writeFileSync(process.argv[1], JSON.stringify(value));
+' "$oauth_token_oversized_dir/source.json" "$oauth_valid"
+set +e
+"$eval_dir/bin/canonicalize-model-credential" claude-oauth \
+  "$oauth_token_oversized_dir/source.json" "$oauth_token_oversized_dir/.credentials.json" \
+  >"$oauth_token_oversized_dir/stdout" 2>"$oauth_token_oversized_dir/stderr"
+oauth_token_oversized_exit=$?
+set -e
+test "$oauth_token_oversized_exit" = 65
+test ! -e "$oauth_token_oversized_dir/.credentials.json"
+
+oauth_bad_parent="$tmp/oauth-bad-parent"
+mkdir -m 755 "$oauth_bad_parent"
+printf '%s' "$oauth_valid" >"$oauth_bad_parent/source.json"
+set +e
+"$eval_dir/bin/canonicalize-model-credential" claude-oauth \
+  "$oauth_bad_parent/source.json" "$oauth_bad_parent/.credentials.json" \
+  >"$oauth_bad_parent/stdout" 2>"$oauth_bad_parent/stderr"
+oauth_bad_parent_exit=$?
+set -e
+test "$oauth_bad_parent_exit" = 65
+test ! -e "$oauth_bad_parent/.credentials.json"
+
+oauth_parent_target="$tmp/oauth-parent-target"
+oauth_parent_symlink="$tmp/oauth-parent-symlink"
+mkdir -m 700 "$oauth_parent_target"
+ln -s "$oauth_parent_target" "$oauth_parent_symlink"
+printf '%s' "$oauth_valid" >"$oauth_parent_target/source.json"
+set +e
+"$eval_dir/bin/canonicalize-model-credential" claude-oauth \
+  "$oauth_parent_target/source.json" "$oauth_parent_symlink/.credentials.json" \
+  >"$tmp/oauth-parent-symlink-stdout" 2>"$tmp/oauth-parent-symlink-stderr"
+oauth_parent_symlink_exit=$?
+set -e
+test "$oauth_parent_symlink_exit" = 65
+test ! -e "$oauth_parent_target/.credentials.json"
+
+oauth_existing_dir="$tmp/oauth-existing-output"
+mkdir -m 700 "$oauth_existing_dir"
+printf '%s' "$oauth_valid" >"$oauth_existing_dir/source.json"
+printf '%s' sentinel >"$oauth_existing_dir/.credentials.json"
+set +e
+"$eval_dir/bin/canonicalize-model-credential" claude-oauth \
+  "$oauth_existing_dir/source.json" "$oauth_existing_dir/.credentials.json" \
+  >"$oauth_existing_dir/stdout" 2>"$oauth_existing_dir/stderr"
+oauth_existing_exit=$?
+set -e
+test "$oauth_existing_exit" = 65
+test "$(cat "$oauth_existing_dir/.credentials.json")" = sentinel
+
+oauth_symlink_dir="$tmp/oauth-symlink-output"
+mkdir -m 700 "$oauth_symlink_dir"
+printf '%s' "$oauth_valid" >"$oauth_symlink_dir/source.json"
+printf '%s' sentinel >"$oauth_symlink_dir/target"
+ln -s "$oauth_symlink_dir/target" "$oauth_symlink_dir/.credentials.json"
+set +e
+"$eval_dir/bin/canonicalize-model-credential" claude-oauth \
+  "$oauth_symlink_dir/source.json" "$oauth_symlink_dir/.credentials.json" \
+  >"$oauth_symlink_dir/stdout" 2>"$oauth_symlink_dir/stderr"
+oauth_symlink_exit=$?
+set -e
+test "$oauth_symlink_exit" = 65
+test "$(cat "$oauth_symlink_dir/target")" = sentinel
+
+oauth_source_symlink_dir="$tmp/oauth-source-symlink"
+mkdir -m 700 "$oauth_source_symlink_dir"
+printf '%s' "$oauth_valid" >"$oauth_source_symlink_dir/target.json"
+ln -s "$oauth_source_symlink_dir/target.json" "$oauth_source_symlink_dir/source.json"
+set +e
+"$eval_dir/bin/canonicalize-model-credential" claude-oauth \
+  "$oauth_source_symlink_dir/source.json" "$oauth_source_symlink_dir/.credentials.json" \
+  >"$oauth_source_symlink_dir/stdout" 2>"$oauth_source_symlink_dir/stderr"
+oauth_source_symlink_exit=$?
+set -e
+test "$oauth_source_symlink_exit" = 65
+test ! -e "$oauth_source_symlink_dir/.credentials.json"
+
+# Both the immutable minimized native store and a rotated current generation
+# contribute exact sensitive leaves to the post-call leak scan.
+oauth_original_snapshot="$(<"$oauth_store")"
+printf '%s' 'synthetic-oauth-access-token' >"$tmp/credential-output/oauth-original.txt"
+if printf '%s' "$oauth_original_snapshot" |
+  "$eval_dir/bin/assert-brokered-credential-absent" claude "$tmp/credential-output" \
+    "$oauth_store" 2>"$tmp/oauth-original-leak-error"; then
+  echo "original Claude OAuth token leak was accepted" >&2
+  exit 1
+fi
+rg -q 'credential bytes found in run output' "$tmp/oauth-original-leak-error"
+if rg -Fq 'synthetic-oauth-access-token' "$tmp/oauth-original-leak-error"; then
+  echo "Claude OAuth scan exposed credential bytes" >&2
+  exit 1
+fi
+: >"$tmp/credential-output/oauth-original.txt"
+oauth_rotated_store="$oauth_home/.claude/.credentials.rotated"
+jq -c '.claudeAiOauth.accessToken="rotated-oauth-access-token" |
+  .claudeAiOauth.refreshToken="rotated-oauth-refresh-token"' \
+  "$oauth_store" >"$oauth_rotated_store"
+chmod 600 "$oauth_rotated_store"
+mv "$oauth_rotated_store" "$oauth_store"
+printf '%s' 'rotated-oauth-refresh-token' >"$tmp/credential-output/oauth-rotated.txt"
+if printf '%s' "$oauth_original_snapshot" |
+  "$eval_dir/bin/assert-brokered-credential-absent" claude "$tmp/credential-output" \
+    "$oauth_store" 2>"$tmp/oauth-rotated-leak-error"; then
+  echo "rotated Claude OAuth token leak was accepted" >&2
+  exit 1
+fi
+rg -q 'credential bytes found in run output' "$tmp/oauth-rotated-leak-error"
+: >"$tmp/credential-output/oauth-rotated.txt"
+mv "$oauth_store" "$oauth_home/.claude/.credentials.target"
+ln -s "$oauth_home/.claude/.credentials.target" "$oauth_store"
+set +e
+printf '%s' "$oauth_original_snapshot" |
+  "$eval_dir/bin/assert-brokered-credential-absent" claude "$tmp/credential-output" \
+    "$oauth_store" 2>"$tmp/oauth-symlink-current-error"
+oauth_symlink_current_exit=$?
+set -e
+test "$oauth_symlink_current_exit" = 2
+test "$(cat "$tmp/oauth-symlink-current-error")" = 'current credential scan failed closed'
+
 printf 'synthetic-claude-prefix\0synthetic-claude-suffix' >"$tmp/claude-nul-credential"
 set +e
 "$eval_dir/bin/canonicalize-model-credential" claude "$tmp/claude-nul-credential" \
@@ -633,6 +925,21 @@ if "$eval_dir/bin/run-eval" --agent codex --model test-model --timeout 10 \
 fi
 rg -q 'model credentials require --ack-disposable-secret-free-host' \
   "$tmp/unattested-credential-error"
+
+set +e
+"$eval_dir/bin/run-eval" --agent claude --model test-model --timeout 10 \
+  --workspace "$tmp/oauth-without-source-workspace" \
+  --output "$tmp/oauth-without-source-output" \
+  --model-credential-format claude-oauth \
+  >"$tmp/oauth-without-source-stdout" 2>"$tmp/oauth-without-source-stderr"
+oauth_without_source_exit=$?
+set -e
+test "$oauth_without_source_exit" = 64
+test ! -e "$tmp/oauth-without-source-workspace"
+test ! -e "$tmp/oauth-without-source-output"
+test ! -s "$tmp/oauth-without-source-stdout"
+test "$(cat "$tmp/oauth-without-source-stderr")" = \
+  'Claude OAuth credential format requires a credential source'
 
 printf '%s\n' \
   '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"tool-1","name":"Bash","input":{"command":"npm view create-react-on-rails-app version --json"}}]}}' \
@@ -1410,12 +1717,17 @@ rg -q 'auth_source:\$auth_source' "$eval_dir/bin/run-eval"
 rg -Fq -- '--arg run_id "$run_id"' "$eval_dir/bin/run-eval"
 rg -Fq -- '--print-width 100' "$eval_dir/bin/run-eval"
 rg -q -- '--model-credential-file' "$eval_dir/bin/run-eval"
-rg -q 'agent_args=.*-p --bare' "$eval_dir/bin/run-eval"
+rg -Fq 'agent_args=(-p --no-session-persistence --disable-slash-commands --no-chrome)' \
+  "$eval_dir/bin/run-eval"
+rg -Fq 'agent_args+=(--safe-mode)' "$eval_dir/bin/run-eval"
+rg -Fq 'agent_args+=(--bare)' "$eval_dir/bin/run-eval"
+test "$(rg -Fc 'agent_args+=(--safe-mode)' "$eval_dir/bin/run-eval")" = 1
+test "$(rg -Fc 'agent_args+=(--bare)' "$eval_dir/bin/run-eval")" = 1
 rg -Fq -- "--mcp-config '{\"mcpServers\":{}}'" "$eval_dir/bin/run-eval"
 rg -q 'apiKeyHelper:\$helper' "$eval_dir/bin/run-eval"
 rg -Fq "credential_helper_command='/bin/sh \"\$TMPDIR/../credential-helper\"'" \
   "$eval_dir/bin/run-eval"
-rg -q 'node npm perl pnpm realpath ruby shasum sleep stat' "$eval_dir/bin/run-eval"
+rg -q 'node npm perl pnpm realpath ruby shasum sleep stat unlink' "$eval_dir/bin/run-eval"
 rg -q 'CODEX_HOME=\$private_dir/codex-home' "$eval_dir/bin/run-eval"
 rg -q 'rubygems_probe_command="gem search --remote --exact '\''\^rails\$'\''"' "$eval_dir/bin/run-eval"
 rg -q 'stripped_sensitive_variable_categories' "$eval_dir/bin/run-eval"
@@ -1439,6 +1751,20 @@ rg -Fq 'assert_credential_absent "$workspace" --skip-symlinks' "$eval_dir/bin/ru
 rg -Fq 'credential_snapshot=' "$eval_dir/bin/run-eval"
 rg -Fq 'assert-brokered-credential-absent' "$eval_dir/bin/run-eval"
 rg -Fq 'assert_credential_absent' "$eval_dir/bin/run-eval"
+rg -Fq 'claude_credentials_dir="$private_dir/runner-home/.claude"' "$eval_dir/bin/run-eval"
+rg -Fq 'oauth_credential="$claude_credentials_dir/.credentials.json"' "$eval_dir/bin/run-eval"
+rg -Fq 'unlink "$private_dir/model-credential.input"' "$eval_dir/bin/run-eval"
+raw_oauth_removal_line="$(rg -Fn 'unlink "$private_dir/model-credential.input"' \
+  "$eval_dir/bin/run-eval" | cut -d: -f1)"
+test "$raw_oauth_removal_line" -lt \
+  "$(rg -n '^agent_version=' "$eval_dir/bin/run-eval" | cut -d: -f1)"
+test "$raw_oauth_removal_line" -lt \
+  "$(rg -n '^run_agent\(\)' "$eval_dir/bin/run-eval" | cut -d: -f1)"
+oauth_source_requirement_line="$(rg -Fn \
+  '[[ "$model_credential_format" != claude-oauth || "$auth_requested" == true ]]' \
+  "$eval_dir/bin/run-eval" | cut -d: -f1)"
+test "$oauth_source_requirement_line" -gt \
+  "$(rg -n '^auth_requested=false$' "$eval_dir/bin/run-eval" | cut -d: -f1)"
 rg -Fq 'sanitize-agent-report.mjs" "$agent_report_file" "$sanitized_agent_report_file"' \
   "$eval_dir/bin/run-eval"
 rg -Fq 'mv "$sanitized_agent_report_file" "$agent_report_file"' "$eval_dir/bin/run-eval"
@@ -1584,6 +1910,10 @@ test -x "$isolated_host/run-in-container"
 test -x "$isolated_host/smoke-runtime"
 rg -Fq 'codex exec --help' "$isolated_host/smoke-runtime"
 rg -Fq 'claude --version' "$isolated_host/smoke-runtime"
+rg -Fq 'claude --help' "$isolated_host/smoke-runtime"
+rg -Fq 'claude --safe-mode --version' "$isolated_host/smoke-runtime"
+rg -Fq 'canonicalize-model-credential" claude-oauth' "$isolated_host/smoke-runtime"
+rg -Fq 'native OAuth and safe mode compatibility only' "$isolated_host/smoke-runtime"
 rg -Fq 'build-claude-agent-report-schema' "$isolated_host/smoke-runtime"
 rg -Fq 'CODEX_EVAL' "$isolated_host/smoke-runtime"
 rg -Fq 'http.createServer' "$isolated_host/smoke-runtime"
@@ -1625,6 +1955,7 @@ rg -Fxq 'FROM node:22-bookworm@sha256:0557ac14e0d45d02ed563067b82856ca5e7aa3437f
   "$isolated_host/Dockerfile"
 rg -Fxq 'FROM ruby:3.4-bookworm@sha256:56e0c9fdbf64d090e45072d32f0d3be7f2e392e733444f7d176a50881e6c325a' \
   "$isolated_host/Dockerfile"
+rg -Fxq 'ARG CLAUDE_CODE_VERSION=2.1.210' "$isolated_host/Dockerfile"
 rg -Fq -- 'pnpm --dir /opt/pro-app-buildability install --frozen-lockfile --ignore-workspace' \
   "$isolated_host/Dockerfile"
 rg -Fq -- "createRequire(path.join(dependencyRoot, 'package.json'))" \
@@ -1701,6 +2032,8 @@ fi
 test "$(cat "$tmp/fake-docker-stdin-sha")" = "$wrapper_model_credential_sha"
 test "$(cat "$tmp/wrapper-model-credential")" = replacement-model-credential
 rg -Fxq -- '--model-credential-stdin' "$tmp/fake-docker-args"
+test "$(awk '$0 == "--model-credential-format" { getline; print; exit }' \
+  "$tmp/fake-docker-args")" = native
 test "$(awk '$0 == "--pids-limit" { getline; print; exit }' "$tmp/fake-docker-args")" = 4096
 rg -Fxq -- '--init' "$tmp/fake-docker-args"
 test "$(awk '$0 == "--env" { getline; if ($0 == "EVAL_AGENT_CONTAINMENT_TEST_MODE=0") { print; exit } }' \
@@ -1713,6 +2046,39 @@ if rg -Fq "$tmp/wrapper-model-credential" "$tmp/fake-docker-args"; then
   echo "wrapper exposed the host credential path to the container command" >&2
   exit 1
 fi
+
+wrapper_oauth_credential_sha="$(shasum -a 256 "$tmp/wrapper-model-credential" | awk '{print $1}')"
+(cd "$tmp/wrapper-repo" && \
+  PATH="$tmp/fake-bin:$PATH" \
+  FAKE_DOCKER_ARGS="$tmp/fake-docker-oauth-args" \
+  FAKE_DOCKER_EVIDENCE="$tmp/fake-docker-oauth-evidence" \
+  FAKE_DOCKER_MODE=success \
+  FAKE_DOCKER_STDIN_SHA="$tmp/fake-docker-oauth-stdin-sha" \
+  "$isolated_host/run-in-container" \
+    --agent claude --model test-model --timeout 10 \
+    --model-credential-format claude-oauth \
+    --model-credential-file "$tmp/wrapper-model-credential" \
+    --output "$tmp/wrapper-output-parent/oauth-run")
+test -d "$tmp/wrapper-output-parent/oauth-run"
+test ! -e "$(cat "$tmp/fake-docker-oauth-evidence")"
+test "$(cat "$tmp/fake-docker-oauth-stdin-sha")" = "$wrapper_oauth_credential_sha"
+test "$(awk '$0 == "--model-credential-format" { getline; print; exit }' \
+  "$tmp/fake-docker-oauth-args")" = claude-oauth
+
+set +e
+(cd "$tmp/wrapper-repo" && PATH="$tmp/fake-bin:$PATH" \
+  "$isolated_host/run-in-container" \
+    --agent codex --model test-model --timeout 10 \
+    --model-credential-format claude-oauth \
+    --model-credential-file "$tmp/wrapper-model-credential" \
+    --output "$tmp/wrapper-output-parent/codex-oauth-run") \
+  >"$tmp/wrapper-codex-oauth-stdout" 2>"$tmp/wrapper-codex-oauth-stderr"
+wrapper_codex_oauth_exit=$?
+set -e
+test "$wrapper_codex_oauth_exit" = 64
+test ! -e "$tmp/wrapper-output-parent/codex-oauth-run"
+test ! -s "$tmp/wrapper-codex-oauth-stdout"
+test "$(cat "$tmp/wrapper-codex-oauth-stderr")" = 'unsupported model credential format'
 
 if (cd "$tmp/wrapper-repo" && PATH="$tmp/fake-bin:$PATH" \
   "$isolated_host/run-in-container" \

@@ -17,10 +17,18 @@ file is mounted into the container. The private copy is used as the agent's
 native file-backed credential source:
 
 - Codex expects a complete `auth.json` JSON object.
-- Claude expects a single-line Anthropic API key without control bytes. The
-  broker removes one optional trailing newline before Claude `--bare` reads the
-  effective bytes through the private `apiKeyHelper` script. The private tmpfs
-  remains `noexec`; the reviewed setting invokes that script through `/bin/sh`.
+- Claude's default `native` format expects a single-line Anthropic API key
+  without control bytes. The broker removes one optional trailing newline
+  before Claude `--bare` reads the effective bytes through the private
+  `apiKeyHelper` script. The private tmpfs remains `noexec`; the reviewed setting
+  invokes that script through `/bin/sh`.
+- Claude's explicit `claude-oauth` format expects its bounded native OAuth JSON.
+  The broker rejects unknown fields, malformed types and controls, drops the
+  unrelated `mcpOAuth` store, and exclusively creates only a minimized
+  mode-`0600` `.claude/.credentials.json` beneath the mode-`0700` runner home.
+  It removes the raw streamed source before invoking Claude. OAuth runs use
+  `--safe-mode` rather than `--bare`, retain the explicit tool, settings, model,
+  and schema restrictions, and keep the strict empty MCP configuration.
 
 Codex cannot create the namespaces required by its inner bubblewrap
 `workspace-write` sandbox under the container's deliberately restricted flags.
@@ -68,10 +76,10 @@ reaping of agent descendants, and independently rejects any process that still
 remains; only then does it construct evidence in runner-private storage,
 validate the exact top-level regular-file manifest, and publish it. The
 unchanged original snapshot remains authoritative even if the CLI rotates or
-replaces its writable credential store; when Codex's current store still
-exists, its final bytes are scanned as a second independent needle. For Codex
-JSON credentials, sensitive token/key/secret leaf values from both generations
-are searched independently as well. A match, nonregular current store,
+replaces its writable credential store; when either CLI's current store still
+exists, its final bytes are scanned as a second independent needle. For JSON
+credentials, sensitive token/key/secret leaf values from both generations are
+searched independently as well. A match, nonregular current store,
 unreadable artifact, or output
 symlink fails closed. Workspace scans skip dependency symlinks without following
 them, while continuing to inspect every regular file; completed-output scans
@@ -155,7 +163,9 @@ internal/agent-evals/pro-app-buildability/isolated-host/run-in-container \
   --output /absolute/path/to/eval-output/local-codex
 ```
 
-For Claude, use `--agent claude`, a Claude model name, and a mode-`0600`
-single-line API key file. Never paste either credential into the terminal. The
-wrapper reads the file directly and does not run a real eval during image
-build or harness tests.
+For a Claude API key, use `--agent claude`, a Claude model name, and a
+mode-`0600` single-line file; `native` is the default credential format. For a
+native OAuth store, also pass `--model-credential-format claude-oauth`. The
+explicit selector is required and a missing source fails closed. Never paste
+either credential into the terminal. The wrapper reads the file directly and
+does not run a real eval during image build or harness tests.

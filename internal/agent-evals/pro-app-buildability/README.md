@@ -52,11 +52,14 @@ The repository and workspace must be clean, and workspace/output real paths
 must be disjoint. Before invoking the selected agent, the runner requires GNU `timeout` and
 checks npm and RubyGems from the same minimal environment used for the run.
 Codex runs ephemeral with strict ignored user configuration and rules. Claude
-runs `--bare` without session persistence, slash commands, plugins, Chrome,
-MCP servers, or the Agent tool. Both receive an explicit model and timeout and
-start from `env -i` with private homes inside the temporary run directory. Tool
-environment inheritance is `none`, with only `PATH`, private `HOME` and
-`TMPDIR`, locale, shell, and `CODEX_EVAL` added back.
+API-key runs use `--bare`; explicit native-OAuth runs use `--safe-mode`. Both
+Claude modes disable session persistence, slash commands, Chrome, MCP servers,
+and the Agent tool. Safe mode additionally disables workspace instructions,
+skills, plugins, hooks, custom commands and agents, and auto-memory while
+retaining the explicit built-in tool allowlist. Both agents receive an explicit
+model and timeout and start from `env -i` with private homes inside the
+temporary run directory. Tool environment inheritance is `none`, with only
+`PATH`, private `HOME` and `TMPDIR`, locale, shell, and `CODEX_EVAL` added back.
 
 `--timeout` is the scaffold-agent call budget. The capability probe has its own
 `min(--timeout, 120)` budget. `invocation.json` and `run.json` record both plus
@@ -95,11 +98,17 @@ disabled network, missing attestation, or evidence-limit overflow fails closed
 and prevents scaffolding.
 
 Credentialed runs additionally require `--model-credential-file` and refuse
-that option without the isolated-host attestation. Codex accepts a complete
-`auth.json` object; Claude accepts one nonempty API-key line without control
-bytes. The operator input must be a non-symlink file with no group/world access.
-The broker copies it only into the disposable private directory, never widens
-environment inheritance, and records `auth_material_available: true` with
+that option without the isolated-host attestation. The default
+`--model-credential-format native` accepts a complete Codex `auth.json` object
+or one nonempty Claude API-key line without control bytes. Claude native OAuth
+must be selected explicitly with `--model-credential-format claude-oauth`; no
+credential format is auto-detected. The broker rejects malformed or oversized
+OAuth JSON, removes unrelated top-level stores, and writes only the bounded
+`claudeAiOauth` fields needed by the CLI into a mode-`0600` native store beneath
+Claude's mode-`0700` private home. The raw broker input is removed before the
+agent starts. The operator input must be a non-symlink file with no group/world
+access. The broker never widens environment inheritance and records
+`auth_material_available: true` with
 `auth_source: operator-attested-file-broker`. Use the reviewed container wrapper
 instead of running this directly on a workstation:
 
@@ -116,7 +125,8 @@ docker build --tag react-on-rails-pro-app-eval:local \
 
 internal/agent-evals/pro-app-buildability/isolated-host/run-in-container \
   --agent claude --model sonnet --timeout 2700 \
-  --model-credential-file /secure/operator/claude-api-key \
+  --model-credential-format claude-oauth \
+  --model-credential-file /secure/operator/claude-native-store.json \
   --output /absolute/path/to/eval-output/local-claude
 ```
 
@@ -132,12 +142,12 @@ categories of stripped sensitive parent variables are recorded without
 exposing the operator's exact variable names; their values are neither read nor
 passed to the agent. Exact credential bytes are rejected if they appear in the
 workspace or completed output, including when embedded inside a larger file.
-Claude's optional trailing newline is removed before scanning so the effective
-key is checked. Sensitive string leaves from Codex JSON authentication are
-checked separately from the complete JSON document. If Codex rotates its
-private credential store, both the immutable original snapshot and the final
-current store are scanned so neither generation can reach workspace or output
-artifacts.
+Claude API keys have one optional trailing newline removed before scanning so
+the effective key is checked. Sensitive string leaves from JSON authentication
+are checked separately from the complete JSON document. If either CLI rotates
+its private credential store, both the immutable minimized original snapshot
+and the final current store are scanned so neither generation can reach
+workspace or output artifacts.
 
 If timeout terminates Claude with a Bash call still pending, normalization
 records that call as failed with exit `124` and continues to the incomplete,
