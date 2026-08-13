@@ -13,16 +13,10 @@
  * https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
-import type { FastifyInstance as LibFastifyInstance } from 'fastify';
-import type { Server as Http1Server } from 'http';
-import type { Http2Server } from 'http2';
 import type { FastifyInstance } from './types.js';
 
-type RendererRawServer = Http1Server | Http2Server;
-
-export type FastifyConfigFunction = <RawServer extends RendererRawServer>(
-  app: LibFastifyInstance<RawServer>,
-) => void;
+// Keep the concrete signature for callback compatibility. The runtime server can use HTTP/1.1 or HTTP/2.
+export type FastifyConfigFunction = (app: FastifyInstance) => void;
 
 const fastifyConfigFunctions: FastifyConfigFunction[] = [];
 
