@@ -307,6 +307,8 @@ pair`, returns invalid UTF-8, or silently mis-decodes the value. The parser now 
   Applications can append custom instrumentations to the built-in HTTP and Fastify pair, merge resource-detector
   attributes below explicit resource configuration, or opt in to preserving renderer `ror.*` spans through an
   application-owned global provider. Fixes [Issue 4867](https://github.com/shakacode/react_on_rails/issues/4867).
+  [PR 4878](https://github.com/shakacode/react_on_rails/pull/4878) by
+  [sashakhar1](https://github.com/sashakhar1).
 
 - **[Pro]** **HTTP/1.1 is now a supported Node Renderer transport for load balancers and HTTP/1.1-only probes**:
   Rails can opt out of forcing h2c for cleartext renderer URLs with
