@@ -197,6 +197,15 @@ const stripExplicitPgTestSetupPrefix = (lines) => {
   if (!cdFirst && cursor < lines.length - 1 && sanitizedEvalDirectory.test(lines[cursor])) cursor += 1;
   return lines.slice(cursor);
 };
+const scaffoldRetrySetupLines = [
+  'rm -rf <LOCAL_PATH>/eval_app',
+  'cd <LOCAL_PATH>',
+  ...explicitPgTestSetupLines,
+];
+const stripScaffoldRetrySetupPrefix = (lines) =>
+  scaffoldRetrySetupLines.every((line, index) => lines[index] === line)
+    ? lines.slice(scaffoldRetrySetupLines.length)
+    : null;
 const immediatePhaseStatusTarget = (
   lines,
   output,
@@ -484,7 +493,7 @@ const pipefailPipelineTargets = (lines) =>
 const installEvidenceTargets = (command) => {
   const rawLines = topLevelShellLines(command.command);
   const lines = stripSanitizedSetupPrefix(rawLines);
-  const phaseLines = stripSanitizedPhaseSetupPrefix(rawLines);
+  const phaseLines = stripScaffoldRetrySetupPrefix(rawLines) ?? stripSanitizedPhaseSetupPrefix(rawLines);
   const pipefailTargets = pipefailPipelineTargets(lines);
   const statusMarkedTarget = statusMarkedScaffoldTarget(rawLines, command.output);
   const phaseStatusTarget = phaseStatusScaffoldTarget(phaseLines, command.output);

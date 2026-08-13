@@ -4141,6 +4141,171 @@ for row in install.pro rsc.route form.validation tests.page tests.form build.pro
 done
 test "$(jq -r '.overall' "$tmp/validated-claude-output/rubric-results.json")" = pass
 
+scaffold_retry_command=$'rm -rf <LOCAL_PATH>/eval_app\ncd <LOCAL_PATH>\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+jq -cn --arg command "$scaffold_retry_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:1,status:"failed",aggregated_output:"Rails prerequisite unavailable\nROR_EVAL_SCAFFOLD_EXIT=1"}}' \
+  >"$tmp/scaffold-retry-failed-events.jsonl"
+jq -cn --arg command "$scaffold_retry_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"✓ Done!\nCreated eval_app with React on Rails!\nROR_EVAL_SCAFFOLD_EXIT=0"}}' \
+  >"$tmp/scaffold-retry-success-events.jsonl"
+cat "$tmp/scaffold-retry-failed-events.jsonl" "$tmp/scaffold-retry-success-events.jsonl" \
+  "$tmp/stable-test-events.jsonl" "$tmp/stable-build-events.jsonl" \
+  >"$tmp/scaffold-retry-combined-events.jsonl"
+mkdir "$tmp/scaffold-retry-combined-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/scaffold-retry-combined-events.jsonl" \
+  "$tmp/claude-v8-form-workspace" "$tmp/scaffold-retry-combined-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in install.pro rsc.route form.validation tests.page tests.form build.production \
+  tests.green unaided evidence.complete; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/scaffold-retry-combined-output/rubric-results.json")" = pass
+done
+test "$(jq -r '.overall' "$tmp/scaffold-retry-combined-output/rubric-results.json")" = pass
+
+scaffold_retry_setup_rejections=(
+  $'cd <LOCAL_PATH>\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'rm -rf <LOCAL_PATH>/other\ncd <LOCAL_PATH>\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'rm -rf -- <LOCAL_PATH>/eval_app\ncd <LOCAL_PATH>\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'rm -rf <LOCAL_PATH>/eval_app\nrm -rf <LOCAL_PATH>/eval_app\ncd <LOCAL_PATH>\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'cd <LOCAL_PATH>\nrm -rf <LOCAL_PATH>/eval_app\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'rm -rf <LOCAL_PATH>/eval_app\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'rm -rf <LOCAL_PATH>/eval_app\ncd <LOCAL_PATH>/eval_app\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'rm -rf <LOCAL_PATH>/eval_app\ncd <LOCAL_PATH>\ncd <LOCAL_PATH>\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'rm -rf <LOCAL_PATH>/eval_app\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\ncd <LOCAL_PATH>\nexport PGPORT=5433\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'rm -rf <LOCAL_PATH>/eval_app\ncd <LOCAL_PATH>\nexport PGPORT=5433\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'rm -rf <LOCAL_PATH>/eval_app\ncd <LOCAL_PATH>\nexport PGPORT=5433\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'rm -rf <LOCAL_PATH>/eval_app\ncd <LOCAL_PATH>\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'rm -rf <LOCAL_PATH>/eval_app\ncd <LOCAL_PATH>\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'rm -rf <LOCAL_PATH>/eval_app\ncd <LOCAL_PATH>\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'rm -rf <LOCAL_PATH>/eval_app\ncd <LOCAL_PATH>\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGPORT=5433\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'rm -rf <LOCAL_PATH>/eval_app\ncd <LOCAL_PATH>\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'rm -rf <LOCAL_PATH>/eval_app\ncd <LOCAL_PATH>\nexport PGHOST=<LOCAL_PATH>/.pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'rm -rf <LOCAL_PATH>/eval_app\ncd <LOCAL_PATH>\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5432\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'rm -rf <LOCAL_PATH>/eval_app\ncd <LOCAL_PATH>\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=app\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+)
+scaffold_retry_setup_rejection_index=0
+for scaffold_command in "${scaffold_retry_setup_rejections[@]}"; do
+  scaffold_retry_setup_rejection_index=$((scaffold_retry_setup_rejection_index + 1))
+  jq -cn --arg command "$scaffold_command" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"✓ Done!\nCreated eval_app with React on Rails!\nROR_EVAL_SCAFFOLD_EXIT=0"}}' \
+    >"$tmp/scaffold-retry-setup-rejection-$scaffold_retry_setup_rejection_index-events.jsonl"
+  mkdir "$tmp/scaffold-retry-setup-rejection-$scaffold_retry_setup_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" \
+    "$tmp/scaffold-retry-setup-rejection-$scaffold_retry_setup_rejection_index-events.jsonl" \
+    "$tmp/claude-v8-form-workspace" \
+    "$tmp/scaffold-retry-setup-rejection-$scaffold_retry_setup_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "install.pro") | .status' \
+    "$tmp/scaffold-retry-setup-rejection-$scaffold_retry_setup_rejection_index-output/rubric-results.json")" = unknown
+done
+
+scaffold_retry_setup_prefix=$'rm -rf <LOCAL_PATH>/eval_app\ncd <LOCAL_PATH>\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\n'
+scaffold_retry_proof=$'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+# shellcheck disable=SC2016
+scaffold_retry_forbidden_setup_lines=(
+  'export PGPASSWORD=[REDACTED]'
+  'export PATH="<LOCAL_PATH>/.ror-eval-state/gem-bin:$PATH"'
+  'source <LOCAL_PATH>/.ror-eval-state/env.sh'
+  'export FOO=bar'
+  'true'
+)
+scaffold_retry_forbidden_setup_index=0
+for forbidden_line in "${scaffold_retry_forbidden_setup_lines[@]}"; do
+  scaffold_retry_forbidden_setup_index=$((scaffold_retry_forbidden_setup_index + 1))
+  scaffold_command="$scaffold_retry_setup_prefix$forbidden_line"$'\n'"$scaffold_retry_proof"
+  jq -cn --arg command "$scaffold_command" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"✓ Done!\nCreated eval_app with React on Rails!\nROR_EVAL_SCAFFOLD_EXIT=0"}}' \
+    >"$tmp/scaffold-retry-forbidden-setup-$scaffold_retry_forbidden_setup_index-events.jsonl"
+  mkdir "$tmp/scaffold-retry-forbidden-setup-$scaffold_retry_forbidden_setup_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" \
+    "$tmp/scaffold-retry-forbidden-setup-$scaffold_retry_forbidden_setup_index-events.jsonl" \
+    "$tmp/claude-v8-form-workspace" \
+    "$tmp/scaffold-retry-forbidden-setup-$scaffold_retry_forbidden_setup_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "install.pro") | .status' \
+    "$tmp/scaffold-retry-forbidden-setup-$scaffold_retry_forbidden_setup_index-output/rubric-results.json")" = unknown
+done
+
+scaffold_retry_phase_rejections=(
+  $'npx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'set -o pipefail\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'set -o pipefail\nexport PGUSER=postgres\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | cat | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>;true | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 0\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 1001\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=$?\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[1]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_TEST_EXIT"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=0"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\ntrue\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"\ntrue'
+)
+scaffold_retry_phase_rejection_index=0
+for rejected_proof in "${scaffold_retry_phase_rejections[@]}"; do
+  scaffold_retry_phase_rejection_index=$((scaffold_retry_phase_rejection_index + 1))
+  scaffold_command="$scaffold_retry_setup_prefix$rejected_proof"
+  jq -cn --arg command "$scaffold_command" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"✓ Done!\nCreated eval_app with React on Rails!\nROR_EVAL_SCAFFOLD_EXIT=0"}}' \
+    >"$tmp/scaffold-retry-phase-rejection-$scaffold_retry_phase_rejection_index-events.jsonl"
+  mkdir "$tmp/scaffold-retry-phase-rejection-$scaffold_retry_phase_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" \
+    "$tmp/scaffold-retry-phase-rejection-$scaffold_retry_phase_rejection_index-events.jsonl" \
+    "$tmp/claude-v8-form-workspace" \
+    "$tmp/scaffold-retry-phase-rejection-$scaffold_retry_phase_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "install.pro") | .status' \
+    "$tmp/scaffold-retry-phase-rejection-$scaffold_retry_phase_rejection_index-output/rubric-results.json")" = unknown
+done
+
+scaffold_retry_output_rejections=(
+  $'✓ Done!\nCreated eval_app with React on Rails!\nROR_EVAL_SCAFFOLD_EXIT=1'
+  $'✓ Done!\nCreated eval_app with React on Rails!\nROR_EVAL_SCAFFOLD_EXIT=0\nROR_EVAL_SCAFFOLD_EXIT=0'
+  $'ROR_EVAL_SCAFFOLD_EXIT=0\n✓ Done!\nCreated eval_app with React on Rails!'
+  $'✓ Done!\nCreated eval_app with React on Rails!\nROR_EVAL_SCAFFOLD_EXIT=0\nlater output'
+  $'Created eval_app with React on Rails!\nROR_EVAL_SCAFFOLD_EXIT=0'
+  $'✓ Done!\nROR_EVAL_SCAFFOLD_EXIT=0'
+  $'✓ Done!\nCreated eval_app with React on Rails!\nERROR: scaffold failed\nROR_EVAL_SCAFFOLD_EXIT=0'
+)
+scaffold_retry_output_rejection_index=0
+for scaffold_output in "${scaffold_retry_output_rejections[@]}"; do
+  scaffold_retry_output_rejection_index=$((scaffold_retry_output_rejection_index + 1))
+  jq -cn --arg command "$scaffold_retry_command" --arg output "$scaffold_output" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:$output}}' \
+    >"$tmp/scaffold-retry-output-rejection-$scaffold_retry_output_rejection_index-events.jsonl"
+  mkdir "$tmp/scaffold-retry-output-rejection-$scaffold_retry_output_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" \
+    "$tmp/scaffold-retry-output-rejection-$scaffold_retry_output_rejection_index-events.jsonl" \
+    "$tmp/claude-v8-form-workspace" \
+    "$tmp/scaffold-retry-output-rejection-$scaffold_retry_output_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "install.pro") | .status' \
+    "$tmp/scaffold-retry-output-rejection-$scaffold_retry_output_rejection_index-output/rubric-results.json")" = unknown
+done
+
+jq -cn --arg command "$scaffold_retry_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:1,status:"failed",aggregated_output:"✓ Done!\nCreated eval_app with React on Rails!\nROR_EVAL_SCAFFOLD_EXIT=0"}}' \
+  >"$tmp/scaffold-retry-nonzero-event.jsonl"
+mkdir "$tmp/scaffold-retry-nonzero-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/scaffold-retry-nonzero-event.jsonl" \
+  "$tmp/claude-v8-form-workspace" "$tmp/scaffold-retry-nonzero-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+test "$(jq -r '.items[] | select(.id == "install.pro") | .status' \
+  "$tmp/scaffold-retry-nonzero-output/rubric-results.json")" = unknown
+
+for missing_manifest in Gemfile package.json; do
+  cp -R "$tmp/claude-v8-form-workspace" "$tmp/scaffold-retry-missing-${missing_manifest%.*}-workspace"
+  rm "$tmp/scaffold-retry-missing-${missing_manifest%.*}-workspace/eval_app/$missing_manifest"
+  mkdir "$tmp/scaffold-retry-missing-${missing_manifest%.*}-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/scaffold-retry-success-events.jsonl" \
+    "$tmp/scaffold-retry-missing-${missing_manifest%.*}-workspace" \
+    "$tmp/scaffold-retry-missing-${missing_manifest%.*}-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "install.pro") | .status' \
+    "$tmp/scaffold-retry-missing-${missing_manifest%.*}-output/rubric-results.json")" = unknown
+done
+
 explicit_pg_test_command=$'export PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\ncd <LOCAL_PATH>/eval_app\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tail -100\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
 jq -cn --arg command "$explicit_pg_test_command" \
   '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"8 runs, 39 assertions, 0 failures, 0 errors, 0 skips\nROR_EVAL_TEST_EXIT=0"}}' \
