@@ -1,0 +1,38 @@
+{
+  "status": "completed",
+  "summary": "Built `eval_app` from `npx create-react-on-rails-app --rsc`, added a Rails-backed tasting request form with server-side validation and success redirect, customized the RSC route to render Rails-provided data, and verified the targeted integration tests plus a production asset build. The environment lacked PostgreSQL binaries, so I switched the generated app to SQLite to keep the app buildable and testable in this repo-only environment.",
+  "commands": [
+    "npx create-react-on-rails-app eval_app --rsc",
+    "gem install rails",
+    "bundle install",
+    "bin/rails db:prepare",
+    "npm run build:test",
+    "RAILS_ENV=test RENDERER_LOG_LEVEL=info node renderer/node-renderer.js",
+    "bin/rails test test/integration/hello_server_page_test.rb test/integration/tasting_requests_test.rb",
+    "npm run build"
+  ],
+  "checks": [
+    {
+      "command": "set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 200\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho \"ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT\"",
+      "exit_code": 0,
+      "result": "pass"
+    },
+    {
+      "command": "set -o pipefail\nbin/rails test test/integration/hello_server_page_test.rb test/integration/tasting_requests_test.rb 2>&1 | tail -n 200\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho \"ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT\"",
+      "exit_code": 0,
+      "result": "pass"
+    },
+    {
+      "command": "set -o pipefail\nnpm run build 2>&1 | tail -n 200\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}\necho \"ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT\"",
+      "exit_code": 0,
+      "result": "pass"
+    }
+  ],
+  "friction": [
+    "The first scaffold attempt failed because `rails` was not installed; installing the gem resolved it and the required scaffold proof was rerun successfully.",
+    "The environment did not provide PostgreSQL client/server binaries or the expected local socket, so the generated app was adapted from PostgreSQL to SQLite for local verification.",
+    "RSC integration tests require the Pro Node renderer; tests initially failed until `renderer/node-renderer.js` was started in `RAILS_ENV=test`."
+  ],
+  "human_interventions": 0,
+  "blockers": []
+}
