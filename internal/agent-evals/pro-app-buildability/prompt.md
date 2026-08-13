@@ -33,6 +33,9 @@ echo "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"
 ```
 
 Prefer a bounded tail-only pipeline when no persistent log is needed.
+Do not source a workspace or model-created shell file in a final proof invocation.
+Complete setup in an earlier command, and express any required non-sensitive environment
+assignments explicitly in the final proof invocation.
 
 Keep a concise record of commands, decisions, friction, and failed attempts in
 your final structured response. A check is successful only if you actually ran
