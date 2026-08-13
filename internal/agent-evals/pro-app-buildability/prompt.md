@@ -36,6 +36,13 @@ Prefer a bounded tail-only pipeline when no persistent log is needed.
 Do not source a workspace or model-created shell file in a final proof invocation.
 Complete setup in an earlier command, and express any required non-sensitive environment
 assignments explicitly in the final proof invocation.
+The runner PATH already includes its prepared RubyGems executable directory.
+Do not assign or export PATH, GEM_HOME, GEM_PATH, BUNDLE_PATH, RUBYOPT, RUBYLIB,
+NODE_OPTIONS, BASH_ENV, ENV, SHELL, or SHELLOPTS in a final proof invocation.
+Configure passwordless local database access during earlier setup; never put PGPASSWORD
+in a final proof invocation. If the final test proof needs database routing, export only PGHOST, PGPORT, and PGUSER
+as separate literal lines in that order: use the workspace `.ror-eval-state/pgsocket`
+path, port 5433, and user `postgres`.
 
 Keep a concise record of commands, decisions, friction, and failed attempts in
 your final structured response. A check is successful only if you actually ran

@@ -37,6 +37,20 @@ rg -Fq 'Complete setup in an earlier command, and express any required non-sensi
   "$eval_dir/prompt.md"
 rg -Fq 'assignments explicitly in the final proof invocation.' \
   "$eval_dir/prompt.md"
+rg -Fq 'The runner PATH already includes its prepared RubyGems executable directory.' \
+  "$eval_dir/prompt.md"
+rg -Fq 'Do not assign or export PATH, GEM_HOME, GEM_PATH, BUNDLE_PATH, RUBYOPT, RUBYLIB,' \
+  "$eval_dir/prompt.md"
+rg -Fq 'NODE_OPTIONS, BASH_ENV, ENV, SHELL, or SHELLOPTS in a final proof invocation.' \
+  "$eval_dir/prompt.md"
+rg -Fq 'Configure passwordless local database access during earlier setup; never put PGPASSWORD' \
+  "$eval_dir/prompt.md"
+rg -Fq 'in a final proof invocation.' "$eval_dir/prompt.md"
+rg -Fq 'If the final test proof needs database routing, export only PGHOST, PGPORT, and PGUSER' \
+  "$eval_dir/prompt.md"
+rg -Fq 'as separate literal lines in that order: use the workspace `.ror-eval-state/pgsocket`' \
+  "$eval_dir/prompt.md"
+rg -Fq 'path, port 5433, and user `postgres`.' "$eval_dir/prompt.md"
 exec 9<"$eval_dir/README.md"
 IFS=: read -r fixture_kind fixture_mode fixture_size \
   <<<"$("$eval_dir/bin/file-descriptor-metadata" 9)"
@@ -4019,6 +4033,127 @@ for row in install.pro rsc.route form.validation tests.page tests.form build.pro
     "$tmp/validated-claude-output/rubric-results.json")" = pass
 done
 test "$(jq -r '.overall' "$tmp/validated-claude-output/rubric-results.json")" = pass
+
+explicit_pg_test_command=$'export PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\ncd <LOCAL_PATH>/eval_app\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tail -100\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
+jq -cn --arg command "$explicit_pg_test_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"8 runs, 39 assertions, 0 failures, 0 errors, 0 skips\nROR_EVAL_TEST_EXIT=0"}}' \
+  >"$tmp/explicit-pg-test-events.jsonl"
+cat "$tmp/stable-scaffold-events.jsonl" "$tmp/explicit-pg-test-events.jsonl" \
+  "$tmp/stable-build-events.jsonl" >"$tmp/explicit-pg-events.jsonl"
+mkdir "$tmp/explicit-pg-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/explicit-pg-events.jsonl" \
+  "$tmp/claude-v8-form-workspace" "$tmp/explicit-pg-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in install.pro rsc.route form.validation tests.page tests.form build.production \
+  tests.green unaided evidence.complete; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/explicit-pg-output/rubric-results.json")" = pass
+done
+test "$(jq -r '.overall' "$tmp/explicit-pg-output/rubric-results.json")" = pass
+
+mutated_path_scaffold_command=$'export PATH="<LOCAL_PATH>/.ror-eval-state/gem-bin:$PATH"\ncd <LOCAL_PATH>\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc --package-manager npm 2>&1 | tail -200\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+mutated_path_test_command=$'export PATH="<LOCAL_PATH>/.ror-eval-state/gem-bin:$PATH"\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nexport PGPASSWORD=[REDACTED]\ncd <LOCAL_PATH>/eval_app\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tail -100\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
+mutated_path_build_command=$'export PATH="<LOCAL_PATH>/.ror-eval-state/gem-bin:$PATH"\ncd <LOCAL_PATH>/eval_app\nset -o pipefail\nnpm run build 2>&1 | tail -200\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"'
+jq -cn --arg command "$mutated_path_scaffold_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"✓ Done!\nCreated eval_app with React on Rails!\nROR_EVAL_SCAFFOLD_EXIT=0"}}' \
+  >"$tmp/mutated-path-scaffold-events.jsonl"
+jq -cn --arg command "$mutated_path_test_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"8 runs, 39 assertions, 0 failures, 0 errors, 0 skips\nROR_EVAL_TEST_EXIT=0"}}' \
+  >"$tmp/mutated-path-test-events.jsonl"
+jq -cn --arg command "$mutated_path_build_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"Rspack compiled successfully\nROR_EVAL_BUILD_EXIT=0"}}' \
+  >"$tmp/mutated-path-build-events.jsonl"
+cat "$tmp/mutated-path-scaffold-events.jsonl" "$tmp/mutated-path-test-events.jsonl" \
+  "$tmp/mutated-path-build-events.jsonl" >"$tmp/mutated-path-events.jsonl"
+mkdir "$tmp/mutated-path-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/mutated-path-events.jsonl" \
+  "$tmp/claude-v8-form-workspace" "$tmp/mutated-path-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in install.pro rsc.route form.validation tests.page tests.form build.production \
+  tests.green evidence.complete; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/mutated-path-output/rubric-results.json")" = unknown
+done
+test "$(jq -r '.items[] | select(.id == "unaided") | .status' \
+  "$tmp/mutated-path-output/rubric-results.json")" = pass
+
+explicit_pg_test_rejections=(
+  $'export PATH="<LOCAL_PATH>/.ror-eval-state/gem-bin:$PATH"\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\ncd <LOCAL_PATH>/eval_app\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tail -100\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
+  $'export PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nexport PGPASSWORD=[REDACTED]\ncd <LOCAL_PATH>/eval_app\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tail -100\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
+  $'export PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nexport PGPASSWORD=secret-value\ncd <LOCAL_PATH>/eval_app\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tail -100\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
+  $'export FOO=bar\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\ncd <LOCAL_PATH>/eval_app\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tail -100\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
+  $'export PGHOST=<LOCAL_PATH>/.pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\ncd <LOCAL_PATH>/eval_app\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tail -100\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
+  $'export PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5432\nexport PGUSER=postgres\ncd <LOCAL_PATH>/eval_app\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tail -100\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
+  $'export PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=app\ncd <LOCAL_PATH>/eval_app\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tail -100\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
+  $'export PGPORT=5433\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGUSER=postgres\ncd <LOCAL_PATH>/eval_app\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tail -100\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
+  $'export PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\ncd <LOCAL_PATH>/eval_app\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tail -100\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
+  $'export PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\ncd <LOCAL_PATH>/eval_app\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tail -100\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
+  $'export PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket PGPORT=5433 PGUSER=postgres\ncd <LOCAL_PATH>/eval_app\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tail -100\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
+  $'export PGHOST=$(pwd)/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\ncd <LOCAL_PATH>/eval_app\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tail -100\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
+  $'PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\ncd <LOCAL_PATH>/eval_app\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tail -100\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
+  $'cd <LOCAL_PATH>/eval_app\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tail -100\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
+  $'set -o pipefail\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nRAILS_ENV=test bin/rails test 2>&1 | tail -100\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
+)
+explicit_pg_test_rejection_index=0
+for test_command in "${explicit_pg_test_rejections[@]}"; do
+  explicit_pg_test_rejection_index=$((explicit_pg_test_rejection_index + 1))
+  jq -cn --arg command "$test_command" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"8 runs, 39 assertions, 0 failures, 0 errors, 0 skips\nROR_EVAL_TEST_EXIT=0"}}' \
+    >"$tmp/explicit-pg-test-rejection-$explicit_pg_test_rejection_index-events.jsonl"
+  mkdir "$tmp/explicit-pg-test-rejection-$explicit_pg_test_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" \
+    "$tmp/explicit-pg-test-rejection-$explicit_pg_test_rejection_index-events.jsonl" \
+    "$tmp/claude-v8-form-workspace" "$tmp/explicit-pg-test-rejection-$explicit_pg_test_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "tests.green") | .status' \
+    "$tmp/explicit-pg-test-rejection-$explicit_pg_test_rejection_index-output/rubric-results.json")" = unknown
+done
+
+toolchain_mutation_lines=(
+  'export GEM_HOME=<LOCAL_PATH>/gems'
+  'export GEM_PATH=<LOCAL_PATH>/gems'
+  'export BUNDLE_PATH=<LOCAL_PATH>/bundle'
+  'export RUBYOPT=-r./hook.rb'
+  'export RUBYLIB=<LOCAL_PATH>/lib'
+  'export NODE_OPTIONS=--require=./hook.js'
+  'export BASH_ENV=<LOCAL_PATH>/hook.sh'
+  'export ENV=<LOCAL_PATH>/hook.sh'
+  'export SHELL=<LOCAL_PATH>/shell'
+  'export SHELLOPTS=xtrace'
+)
+toolchain_mutation_index=0
+for mutation_line in "${toolchain_mutation_lines[@]}"; do
+  toolchain_mutation_index=$((toolchain_mutation_index + 1))
+  test_command="$mutation_line"$'\n'"$explicit_pg_test_command"
+  jq -cn --arg command "$test_command" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"8 runs, 39 assertions, 0 failures, 0 errors, 0 skips\nROR_EVAL_TEST_EXIT=0"}}' \
+    >"$tmp/toolchain-mutation-$toolchain_mutation_index-events.jsonl"
+  mkdir "$tmp/toolchain-mutation-$toolchain_mutation_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/toolchain-mutation-$toolchain_mutation_index-events.jsonl" \
+    "$tmp/claude-v8-form-workspace" "$tmp/toolchain-mutation-$toolchain_mutation_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "tests.green") | .status' \
+    "$tmp/toolchain-mutation-$toolchain_mutation_index-output/rubric-results.json")" = unknown
+done
+
+explicit_pg_scaffold_command=$'export PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc --package-manager npm 2>&1 | tail -200\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+explicit_pg_build_command=$'export PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\ncd <LOCAL_PATH>/eval_app\nset -o pipefail\nnpm run build 2>&1 | tail -200\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"'
+jq -cn --arg command "$explicit_pg_scaffold_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"✓ Done!\nCreated eval_app with React on Rails!\nROR_EVAL_SCAFFOLD_EXIT=0"}}' \
+  >"$tmp/explicit-pg-scaffold-events.jsonl"
+jq -cn --arg command "$explicit_pg_build_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"Rspack compiled successfully\nROR_EVAL_BUILD_EXIT=0"}}' \
+  >"$tmp/explicit-pg-build-events.jsonl"
+for phase_row in scaffold:install.pro build:build.production; do
+  phase=${phase_row%%:*}
+  row=${phase_row#*:}
+  mkdir "$tmp/explicit-pg-$phase-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/explicit-pg-$phase-events.jsonl" \
+    "$tmp/claude-v8-form-workspace" "$tmp/explicit-pg-$phase-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/explicit-pg-$phase-output/rubric-results.json")" = unknown
+done
 
 model_created_source_scaffold_command=$'source <LOCAL_PATH>/.local/env.sh\ncd <LOCAL_PATH>\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc --package-manager npm 2>&1 | tee <LOCAL_PATH>/.local/logs/scaffold.log | tail -200\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
 model_created_source_test_command=$'source <LOCAL_PATH>/.local/env.sh\ncd <LOCAL_PATH>/eval_app\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tee <LOCAL_PATH>/.local/logs/test.log | tail -100\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'

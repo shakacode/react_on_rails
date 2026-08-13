@@ -182,6 +182,17 @@ const stripSanitizedPhaseSetupPrefix = (lines) => {
     /^cd <LOCAL_PATH>(?:\/eval_app)?$/.test(lines[0]) && normalizedStateSourceLines.has(lines[1]);
   return cdThenSource ? lines.slice(2) : stripSanitizedSetupPrefix(lines);
 };
+const explicitPgTestSetupLines = [
+  'export PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket',
+  'export PGPORT=5433',
+  'export PGUSER=postgres',
+];
+const stripExplicitPgTestSetupPrefix = (lines) => {
+  if (!explicitPgTestSetupLines.every((line, index) => lines[index] === line)) return null;
+  let cursor = explicitPgTestSetupLines.length;
+  if (cursor < lines.length - 1 && /^cd <LOCAL_PATH>(?:\/eval_app)?$/.test(lines[cursor])) cursor += 1;
+  return lines.slice(cursor);
+};
 const immediatePhaseStatusTarget = (lines, output, phase) => {
   if ((lines.length !== 3 && lines.length !== 4) || lines[0] !== 'set -o pipefail') return null;
 
@@ -739,7 +750,7 @@ const phaseStatusRailsTestTarget = (lines, output) => {
 const testEvidenceTargets = (command) => {
   const rawLines = topLevelShellLines(command.command);
   const lines = stripSanitizedSetupPrefix(rawLines);
-  const phaseLines = stripSanitizedPhaseSetupPrefix(rawLines);
+  const phaseLines = stripExplicitPgTestSetupPrefix(rawLines) ?? stripSanitizedPhaseSetupPrefix(rawLines);
   const directTargets = lines.length === 1 && recognizedTestInvocation(lines[0]) ? [lines[0]] : [];
   const statusMarkedTarget = statusMarkedRailsTestTarget(rawLines, command.output);
   const phaseStatusTarget = phaseStatusRailsTestTarget(phaseLines, command.output);
