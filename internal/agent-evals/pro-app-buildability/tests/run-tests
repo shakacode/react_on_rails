@@ -3543,6 +3543,55 @@ for row in install.pro rsc.route form.validation tests.page tests.form build.pro
 done
 test "$(jq -r '.overall' "$tmp/codex-rsc-name-output/rubric-results.json")" = pass
 
+cp -R "$tmp/claude-v6-workspace" "$tmp/codex-domain-rsc-name-workspace"
+rm "$tmp/codex-domain-rsc-name-workspace/eval_app/test/integration/hello_server_test.rb"
+cat >"$tmp/codex-domain-rsc-name-workspace/eval_app/config/routes.rb" <<'RUBY'
+Rails.application.routes.draw do
+  rsc "launch_briefing", to: "launch_briefings#show"
+end
+RUBY
+cat >"$tmp/codex-domain-rsc-name-workspace/eval_app/test/integration/launch_briefings_test.rb" <<'RUBY'
+require "test_helper"
+
+class LaunchBriefingsTest < ActionDispatch::IntegrationTest
+  test "launch briefing page streams server-provided mission data" do
+    get launch_briefing_path
+
+    assert_response :success
+    assert_includes response.body, "Orbital Launch Briefing"
+    assert_includes response.body, "EVAL-204"
+  end
+end
+RUBY
+mkdir "$tmp/codex-domain-rsc-name-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+  "$tmp/codex-domain-rsc-name-workspace" "$tmp/codex-domain-rsc-name-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in rsc.route tests.page; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-domain-rsc-name-output/rubric-results.json")" = pass
+done
+
+cp -R "$tmp/codex-domain-rsc-name-workspace" "$tmp/codex-domain-js-page-workspace"
+rm "$tmp/codex-domain-js-page-workspace/eval_app/test/integration/launch_briefings_test.rb"
+cat >"$tmp/codex-domain-js-page-workspace/eval_app/test/rsc-page.test.tsx" <<'TSX'
+const copy = `
+It's RSC
+`;
+
+test("RSC page renders", () => {
+  expect(copy).toContain("RSC");
+});
+TSX
+mkdir "$tmp/codex-domain-js-page-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+  "$tmp/codex-domain-js-page-workspace" "$tmp/codex-domain-js-page-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in rsc.route tests.page; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-domain-js-page-output/rubric-results.json")" = pass
+done
+
 cp -R "$tmp/codex-rsc-name-workspace" "$tmp/codex-rsc-reversed-name-workspace"
 perl -0pi -e 's/renders server-provided briefing data on the RSC page/renders the page with RSC briefing data/' \
   "$tmp/codex-rsc-reversed-name-workspace/eval_app/test/integration/hello_server_flow_test.rb"
@@ -3569,8 +3618,46 @@ for row in rsc.route tests.page; do
 done
 
 codex_rsc_name_rejections=(
+  $'class HelloServerFlowTest < ActionDispatch::IntegrationTest\n  test "launch briefing page does not render server-provided mission data" do\n    get hello_server_path\n    assert_response :not_found\n    assert_includes response.body, "Orbital Launch Briefing"\n  end\nend'
+  $'class HelloServerFlowTest < ActionDispatch::IntegrationTest\n  test "launch briefing page streams server-provided mission data" do\n    get missing_launch_briefing_path\n    assert_response :not_found\n  end\n\n  test "health check" do\n    get health_path\n    assert_response :success\n  end\nend'
+  $'class HelloServerFlowTest < ActionDispatch::IntegrationTest\n  test "launch briefing page omits server-provided mission data" do\n    get hello_server_path\n    assert_response :success\n    assert_not_includes response.body, "EVAL-204"\n  end\nend'
+  $'class HelloServerFlowTest\n  test "launch briefing page streams server-provided mission data" do\n    get hello_server_path\n    assert_response :success\n    assert_includes response.body, "EVAL-204"\n  end\nend'
+  $'class HelloServerFlowTest < ActionDispatch::IntegrationTest\n  test "launch briefing page fails to display server-provided mission data" do\n    get hello_server_path\n    assert_response :success\n    assert_includes response.body, "Static heading only"\n  end\nend'
+  $'class HelloServerFlowTest < ActionDispatch::IntegrationTest\n  test "launch briefing page cannot display server-provided mission data" do\n    get hello_server_path\n    assert_response :success\n    assert_includes response.body, "Static heading only"\n  end\nend'
+  $'class HelloServerFlowTest < ActionDispatch::IntegrationTest\n  test "launch briefing page streams server-provided mission data" do\n    get hello_server_path\n    assert_response :success\n    assert_includes response.body, ""\n  end\nend'
+  $'class HelloServerFlowTest < ActionDispatch::IntegrationTest\n  test "launch briefing page streams server-provided mission data" do\n    get hello_server_path\n    assert_response :success\n    assert_match(/.*/, response.body)\n  end\nend'
+  $'class HelloServerFlowTest < ActionDispatch::IntegrationTest\n  test "launch briefing page streams server-provided mission data" do\n    get hello_server_path\n    assert_response :success\n    assert_match(/^(?!.*EVAL-204).*$/, response.body)\n  end\nend'
+  $'class HelloServerFlowTest < ActionDispatch::IntegrationTest\n  test "launch briefing page streams server-provided mission data" do\n    get hello_server_path\n    assert_response :success\n    assert_includes response.body, "Static heading only"\n  end\nend'
+  $'class HelloServerFlowTest < ActionDispatch::IntegrationTest\n  test "launch briefing page streams server-provided mission data" do\n    get launch_briefing_path\n    assert_response :success\n    assert_includes response.body, "Orbital Launch Briefing"\n\n    get health_path\n    assert_response :success\n    assert_includes response.body, "EVAL-204"\n  end\nend'
+  $'class HelloServerFlowTest < ActionDispatch::IntegrationTest\n  test "launch briefing page streams server-provided mission data" do\n    get health_path\n    assert_response :success\n    assert_includes response.body, "Orbital Launch Briefing"\n    assert_includes response.body, "EVAL-204"\n  end\nend'
+  $'class HelloServerFlowTest < ActionDispatch::IntegrationTest\n  test "launch briefing page streams server-provided mission data" do\n    get launch_briefing_path\n    assert_response(:success) if false\n    assert_includes(response.body, "Orbital Launch Briefing") if false\n    assert_includes(response.body, "EVAL-204") if false\n  end\nend'
+  $'class HelloServerFlowTest < ActionDispatch::IntegrationTest\n  test "launch briefing page streams server-provided mission data" do\n    return\n    get launch_briefing_path\n    assert_response :success\n    assert_includes response.body, "Orbital Launch Briefing"\n    assert_includes response.body, "EVAL-204"\n  end\nend'
+  $'class DocumentationExample\n  def self.test(_name)\n  end\n  test "launch briefing page streams server-provided mission data" do\n    get launch_briefing_path\n    assert_response :success\n    assert_includes response.body, "Orbital Launch Briefing"\n    assert_includes response.body, "EVAL-204"\n  end\nend\n\nclass HealthTest < ActionDispatch::IntegrationTest\n  test "health" do\n    get health_path\n    assert_response :success\n  end\nend'
+  $'class LaunchBriefingsTest < ActionDispatch::IntegrationTest\nend\n\n  test "launch briefing page streams server-provided mission data" do\n    get launch_briefing_path\n    assert_response :success\n    assert_includes response.body, "Orbital Launch Briefing"\n    assert_includes response.body, "EVAL-204"\n  end'
+  $'class HelloServerFlowTest < ActionDispatch::IntegrationTest\n  test "launch briefing page streams server-provided mission data" do\n    raise "unreachable assertions"\n    get launch_briefing_path\n    assert_response :success\n    assert_includes response.body, "Orbital Launch Briefing"\n    assert_includes response.body, "EVAL-204"\n  end\nend'
+  $'class HelloServerFlowTest < ActionDispatch::IntegrationTest\n  test "launch briefing page streams server-provided mission data" do\n    fail "unreachable assertions"\n    get launch_briefing_path\n    assert_response :success\n    assert_includes response.body, "Orbital Launch Briefing"\n    assert_includes response.body, "EVAL-204"\n  end\nend'
+  $'class HelloServerFlowTest < ActionDispatch::IntegrationTest\n  test "launch briefing page streams server-provided mission data" do\n    flunk "unreachable assertions"\n    get launch_briefing_path\n    assert_response :success\n    assert_includes response.body, "Orbital Launch Briefing"\n    assert_includes response.body, "EVAL-204"\n  end\nend'
+  $'class HelloServerFlowTest < ActionDispatch::IntegrationTest\n  test "launch briefing page streams server-provided mission data" do\n    assert_raises Minitest::Assertion do\n      get launch_briefing_path\n      assert_response :success\n      assert_includes response.body, "Orbital Launch Briefing"\n      assert_includes response.body, "EVAL-204"\n    end\n  end\nend'
+  $'class HelloServerFlowTest < ActionDispatch::IntegrationTest\n  test "launch briefing page streams server-provided mission data" do\n    0.times do\n      get launch_briefing_path\n      assert_response :success\n      assert_includes response.body, "Orbital Launch Briefing"\n      assert_includes response.body, "EVAL-204"\n    end\n  end\nend'
+  $'class HelloServerFlowTest < ActionDispatch::IntegrationTest\n  test "launch briefing page streams server-provided mission data" do\n    [].each do\n      get launch_briefing_path\n      assert_response :success\n      assert_includes response.body, "Orbital Launch Briefing"\n      assert_includes response.body, "EVAL-204"\n    end\n  end\nend'
+  $'class HelloServerFlowTest < ActionDispatch::IntegrationTest\n  def self.test(_name)\n  end\n\n  test "launch briefing page streams server-provided mission data" do\n    get launch_briefing_path\n    assert_response :success\n    assert_includes response.body, "Orbital Launch Briefing"\n    assert_includes response.body, "EVAL-204"\n  end\nend'
+  $'class HelloServerFlowTest < ActionDispatch::IntegrationTest\n  class << self\n    def test(_name)\n    end\n  end\n\n  test "launch briefing page streams server-provided mission data" do\n    get launch_briefing_path\n    assert_response :success\n    assert_includes response.body, "Orbital Launch Briefing"\n    assert_includes response.body, "EVAL-204"\n  end\nend'
+  $'class HelloServerFlowTest < ActionDispatch::IntegrationTest\n  define_singleton_method(:test) { |_name, &_block| }\n\n  test "launch briefing page streams server-provided mission data" do\n    get launch_briefing_path\n    assert_response :success\n    assert_includes response.body, "Orbital Launch Briefing"\n    assert_includes response.body, "EVAL-204"\n  end\nend'
+  $'if false\n  class HelloServerFlowTest < ActionDispatch::IntegrationTest\n    test "launch briefing page streams server-provided mission data" do\n      get launch_briefing_path\n      assert_response :success\n      assert_includes response.body, "Orbital Launch Briefing"\n      assert_includes response.body, "EVAL-204"\n    end\n  end\nend\n\nclass HealthTest < ActionDispatch::IntegrationTest\n  test "health" do\n    assert true\n  end\nend'
+  $'if false\nclass HelloServerFlowTest < ActionDispatch::IntegrationTest\n  test "launch briefing page streams server-provided mission data" do\n    get launch_briefing_path\n    assert_response :success\n    assert_includes response.body, "Orbital Launch Briefing"\n    assert_includes response.body, "EVAL-204"\n  end\nend\nend\n\nclass HealthTest < ActionDispatch::IntegrationTest\n  test "health" do\n    assert true\n  end\nend'
+  $'class HelloServerFlowTest < ActionDispatch::IntegrationTest\n  test "launch briefing page streams server-provided mission data" do if false\n    get launch_briefing_path\n    assert_response :success\n    assert_includes response.body, "Orbital Launch Briefing"\n    assert_includes response.body, "EVAL-204"\n  end\n  end\nend'
+  $'class HelloServerFlowTest < ActionDispatch::IntegrationTest\n  test "launch briefing page streams server-provided mission data" do\n    [].each {\n      get launch_briefing_path\n      assert_response :success\n      assert_includes response.body, "Orbital Launch Briefing"\n      assert_includes response.body, "EVAL-204"\n    }\n  end\nend'
+  $'class HelloServerFlowTest < ActionDispatch::IntegrationTest\n  test "launch briefing page streams server-provided mission data" do\n    0.times {\n      get launch_briefing_path\n      assert_response :success\n      assert_includes response.body, "Orbital Launch Briefing"\n      assert_includes response.body, "EVAL-204"\n    }\n  end\nend'
+  $'class HelloServerFlowTest < ActionDispatch::IntegrationTest\n  test "launch briefing page streams server-provided mission data" do\n    {}.each {\n      get launch_briefing_path\n      assert_response :success\n      assert_includes response.body, "Orbital Launch Briefing"\n      assert_includes response.body, "EVAL-204"\n    }\n  end\nend'
+  $'class HelloServerFlowTest < ActionDispatch::IntegrationTest\n  test "launch briefing page streams server-provided mission data" do\n    { }.each { |pair|\n      get launch_briefing_path\n      assert_response :success\n      assert_includes response.body, "Orbital Launch Briefing"\n      assert_includes response.body, "EVAL-204"\n    }\n  end\nend'
+  $'class HelloServerFlowTest < ActionDispatch::IntegrationTest\n  test "launch briefing page streams server-provided mission data" do\n    get launch_briefing_path\n    assert_response :success\n    assert_includes response.body, "Orbital Launch Briefing"\n    assert_includes response.body, "EVAL-204"\n  end\nend if false'
+  $'class HelloServerFlowTest < ActionDispatch::IntegrationTest\n  test "launch briefing page streams server-provided mission data" do\n    false && begin\n      get launch_briefing_path\n      assert_response :success\n      assert_includes response.body, "Orbital Launch Briefing"\n      assert_includes response.body, "EVAL-204"\n    end\n  end\nend'
+  $'class HealthTest < ActionDispatch::IntegrationTest\n  test "health" do\n    assert true\n  end\nend\n__END__\nclass HelloServerFlowTest < ActionDispatch::IntegrationTest\n  test "launch briefing page streams server-provided mission data" do\n    get launch_briefing_path\n    assert_response :success\n    assert_includes response.body, "Orbital Launch Briefing"\n    assert_includes response.body, "EVAL-204"\n  end\nend'
+  $'class HelloServerFlowTest < ActionDispatch::IntegrationTest\n=begin\n  test "launch briefing page streams server-provided mission data" do\n    get launch_briefing_path\n    assert_response :success\n    assert_includes response.body, "Orbital Launch Briefing"\n    assert_includes response.body, "EVAL-204"\n  end\n=end\n\n  test "health" do\n    get health_path\n    assert_response :success\n  end\nend'
   $'class HelloServerFlowTest < ActionDispatch::IntegrationTest\n  test "renders server-provided briefing data on the RSC endpoint" do\n    get hello_server_path\n    assert_response :success\n  end\nend'
   $'class HelloServerFlowTest < ActionDispatch::IntegrationTest\n  test "renders the server-provided briefing page" do\n    get hello_server_path\n    assert_response :success\n  end\nend'
+  $'class HelloServerFlowTest < ActionDispatch::IntegrationTest\n  test "launch briefing page streams server-provided orbital mission planning data" do\n    get hello_server_path\n    assert_response :success\n  end\nend'
+  $'class HelloServerFlowTest < ActionDispatch::IntegrationTest\n  test "launch briefing page streams server-provided mission details" do\n    get hello_server_path\n    assert_response :success\n  end\nend'
   $'class HelloServerFlowTest < ActionDispatch::IntegrationTest\n  test "renders RSC briefing data in the webpage" do\n    get hello_server_path\n    assert_response :success\n  end\nend'
   $'class HelloServerFlowTest < ActionDispatch::IntegrationTest\n  # RSC page\n  test "renders the briefing" do\n    get hello_server_path\n    assert_response :success\n  end\nend'
   $'class HelloServerFlowTest\n  test "renders the RSC page" do\n    get hello_server_path\n    assert_response :success\n  end\nend'
@@ -3581,10 +3668,10 @@ codex_rsc_name_rejections=(
 codex_rsc_name_rejection_index=0
 for page_content in "${codex_rsc_name_rejections[@]}"; do
   codex_rsc_name_rejection_index=$((codex_rsc_name_rejection_index + 1))
-  cp -R "$tmp/codex-rsc-name-workspace" \
+  cp -R "$tmp/codex-domain-rsc-name-workspace" \
     "$tmp/codex-rsc-name-rejection-$codex_rsc_name_rejection_index-workspace"
   printf '%s\n' "$page_content" \
-    >"$tmp/codex-rsc-name-rejection-$codex_rsc_name_rejection_index-workspace/eval_app/test/integration/hello_server_flow_test.rb"
+    >"$tmp/codex-rsc-name-rejection-$codex_rsc_name_rejection_index-workspace/eval_app/test/integration/launch_briefings_test.rb"
   mkdir "$tmp/codex-rsc-name-rejection-$codex_rsc_name_rejection_index-output"
   node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
     "$tmp/codex-rsc-name-rejection-$codex_rsc_name_rejection_index-workspace" \
@@ -3594,6 +3681,173 @@ for page_content in "${codex_rsc_name_rejections[@]}"; do
     test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
       "$tmp/codex-rsc-name-rejection-$codex_rsc_name_rejection_index-output/rubric-results.json")" = unknown
   done
+done
+
+cp -R "$tmp/codex-domain-rsc-name-workspace" "$tmp/codex-domain-rsc-inline-comment-workspace"
+perl -0pi -e 's/assert_response :success$/assert_response :success # valid if the route is mounted/m' \
+  "$tmp/codex-domain-rsc-inline-comment-workspace/eval_app/test/integration/launch_briefings_test.rb"
+mkdir "$tmp/codex-domain-rsc-inline-comment-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+  "$tmp/codex-domain-rsc-inline-comment-workspace" "$tmp/codex-domain-rsc-inline-comment-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in rsc.route tests.page; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-domain-rsc-inline-comment-output/rubric-results.json")" = pass
+done
+
+cp -R "$tmp/codex-domain-rsc-name-workspace" "$tmp/codex-domain-rsc-bounded-syntax-control-workspace"
+perl -0pi -e 's/rsc "launch_briefing", to: "launch_briefings#show"/rsc "launch_briefing", to: "launch_briefings#show", as: :launch_briefing/' \
+  "$tmp/codex-domain-rsc-bounded-syntax-control-workspace/eval_app/config/routes.rb"
+ruby -e '
+  path = ARGV.fetch(0)
+  content = File.read(path)
+  content.sub!(/class LaunchBriefingsTest < ActionDispatch::IntegrationTest\n/) do |line|
+    "#{line}  define_singleton_method(:helper) { }\n"
+  end or abort
+  content.sub!(/^  test "launch briefing page streams server-provided mission data" do\n/) do
+    %(  test "launch briefing page streams server-provided mission data" do # bounded declaration\n)
+  end or abort
+  content.sub!(/\nend\n\z/, "\nend # active class\n") or abort
+  File.write(path, content)
+' "$tmp/codex-domain-rsc-bounded-syntax-control-workspace/eval_app/test/integration/launch_briefings_test.rb"
+mkdir "$tmp/codex-domain-rsc-bounded-syntax-control-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+  "$tmp/codex-domain-rsc-bounded-syntax-control-workspace" \
+  "$tmp/codex-domain-rsc-bounded-syntax-control-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in rsc.route tests.page; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-domain-rsc-bounded-syntax-control-output/rubric-results.json")" = pass
+done
+
+cp -R "$tmp/codex-domain-rsc-name-workspace" "$tmp/codex-domain-rsc-commented-route-workspace"
+cat >"$tmp/codex-domain-rsc-commented-route-workspace/eval_app/config/routes.rb" <<'RUBY'
+Rails.application.routes.draw do
+=begin
+  rsc "launch_briefing", to: "launch_briefings#show"
+=end
+  get "launch_briefing", to: "launch_briefings#show"
+end
+RUBY
+mkdir "$tmp/codex-domain-rsc-commented-route-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+  "$tmp/codex-domain-rsc-commented-route-workspace" "$tmp/codex-domain-rsc-commented-route-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in rsc.route tests.page; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-domain-rsc-commented-route-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/codex-domain-rsc-name-workspace" "$tmp/codex-domain-rsc-heredoc-route-workspace"
+cat >"$tmp/codex-domain-rsc-heredoc-route-workspace/eval_app/config/routes.rb" <<'RUBY'
+Rails.application.routes.draw do
+  example = <<~DOC
+    rsc "launch_briefing", to: "launch_briefings#show"
+  DOC
+  get "launch_briefing", to: "launch_briefings#show"
+end
+RUBY
+mkdir "$tmp/codex-domain-rsc-heredoc-route-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+  "$tmp/codex-domain-rsc-heredoc-route-workspace" "$tmp/codex-domain-rsc-heredoc-route-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in rsc.route tests.page; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-domain-rsc-heredoc-route-output/rubric-results.json")" = unknown
+done
+
+for route_wrapper in conditional method brace times-brace hash-brace alternate-helper; do
+  cp -R "$tmp/codex-domain-rsc-name-workspace" \
+    "$tmp/codex-domain-rsc-inactive-$route_wrapper-route-workspace"
+  if [[ "$route_wrapper" == conditional ]]; then
+    cat >"$tmp/codex-domain-rsc-inactive-$route_wrapper-route-workspace/eval_app/config/routes.rb" <<'RUBY'
+Rails.application.routes.draw do
+if false
+rsc "launch_briefing", to: "launch_briefings#show"
+end
+get "launch_briefing", to: "launch_briefings#show", as: :launch_briefing
+end
+RUBY
+  elif [[ "$route_wrapper" == method ]]; then
+    cat >"$tmp/codex-domain-rsc-inactive-$route_wrapper-route-workspace/eval_app/config/routes.rb" <<'RUBY'
+Rails.application.routes.draw do
+def unused_launch_route
+rsc "launch_briefing", to: "launch_briefings#show"
+end
+get "launch_briefing", to: "launch_briefings#show", as: :launch_briefing
+end
+RUBY
+  elif [[ "$route_wrapper" == brace ]]; then
+    cat >"$tmp/codex-domain-rsc-inactive-$route_wrapper-route-workspace/eval_app/config/routes.rb" <<'RUBY'
+Rails.application.routes.draw do
+[].each {
+rsc "launch_briefing", to: "launch_briefings#show"
+}
+get "launch_briefing", to: "launch_briefings#show", as: :launch_briefing
+end
+RUBY
+  elif [[ "$route_wrapper" == times-brace ]]; then
+    cat >"$tmp/codex-domain-rsc-inactive-$route_wrapper-route-workspace/eval_app/config/routes.rb" <<'RUBY'
+Rails.application.routes.draw do
+0.times {
+rsc "launch_briefing", to: "launch_briefings#show"
+}
+get "launch_briefing", to: "launch_briefings#show", as: :launch_briefing
+end
+RUBY
+  elif [[ "$route_wrapper" == hash-brace ]]; then
+    cat >"$tmp/codex-domain-rsc-inactive-$route_wrapper-route-workspace/eval_app/config/routes.rb" <<'RUBY'
+Rails.application.routes.draw do
+{ }.each { |pair|
+rsc "launch_briefing", to: "launch_briefings#show"
+}
+get "launch_briefing", to: "launch_briefings#show", as: :launch_briefing
+end
+RUBY
+  else
+    cat >"$tmp/codex-domain-rsc-inactive-$route_wrapper-route-workspace/eval_app/config/routes.rb" <<'RUBY'
+Rails.application.routes.draw do
+get "launch_briefing", to: "launch_briefings#regular", as: :launch_briefing
+rsc "launch_briefing", to: "launch_briefings#show", as: :unused_rsc
+end
+RUBY
+  fi
+  mkdir "$tmp/codex-domain-rsc-inactive-$route_wrapper-route-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+    "$tmp/codex-domain-rsc-inactive-$route_wrapper-route-workspace" \
+    "$tmp/codex-domain-rsc-inactive-$route_wrapper-route-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in rsc.route tests.page; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/codex-domain-rsc-inactive-$route_wrapper-route-output/rubric-results.json")" = unknown
+  done
+done
+
+cp -R "$tmp/codex-domain-rsc-name-workspace" "$tmp/codex-domain-rsc-later-positive-workspace"
+cat >"$tmp/codex-domain-rsc-later-positive-workspace/eval_app/test/integration/launch_briefings_test.rb" <<'RUBY'
+require "test_helper"
+
+class LaunchBriefingsTest < ActionDispatch::IntegrationTest
+  test "launch briefing page does not render server-provided mission data" do
+    get missing_launch_briefing_path
+    assert_response :not_found
+  end
+
+  test "launch briefing page streams server-provided mission data" do
+    get launch_briefing_path
+    assert_response :success
+    assert_includes response.body, "Orbital Launch Briefing"
+    assert_includes response.body, "EVAL-204"
+  end
+end
+RUBY
+mkdir "$tmp/codex-domain-rsc-later-positive-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+  "$tmp/codex-domain-rsc-later-positive-workspace" "$tmp/codex-domain-rsc-later-positive-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in rsc.route tests.page; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-domain-rsc-later-positive-output/rubric-results.json")" = pass
 done
 
 cp -R "$tmp/codex-rsc-name-workspace" "$tmp/codex-rsc-wrong-path-workspace"
@@ -5367,6 +5621,788 @@ for row in install.pro rsc.route form.validation tests.page tests.form build.pro
     "$tmp/no-pipefail-combined-output/rubric-results.json")" = pass
 done
 test "$(jq -r '.overall' "$tmp/no-pipefail-combined-output/rubric-results.json")" = pass
+
+byte_bounded_test_command=$'cd <LOCAL_PATH>/eval_app\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nbin/rails test 2>&1 | tail -c 4096\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
+byte_bounded_build_command=$'cd <LOCAL_PATH>/eval_app\nnpm run build 2>&1 | tail -c 4096\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"'
+jq -cn --arg command "$byte_bounded_test_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"8 runs, 34 assertions, 0 failures, 0 errors, 0 skips\nROR_EVAL_TEST_EXIT=0"}}' \
+  >"$tmp/byte-bounded-test-events.jsonl"
+jq -cn --arg command "$byte_bounded_build_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"Rspack compiled successfully\nROR_EVAL_BUILD_EXIT=0"}}' \
+  >"$tmp/byte-bounded-build-events.jsonl"
+cat "$tmp/stable-scaffold-events.jsonl" "$tmp/byte-bounded-test-events.jsonl" \
+  "$tmp/byte-bounded-build-events.jsonl" >"$tmp/byte-bounded-combined-events.jsonl"
+mkdir "$tmp/byte-bounded-combined-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/byte-bounded-combined-events.jsonl" \
+  "$tmp/claude-v8-form-workspace" "$tmp/byte-bounded-combined-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in install.pro rsc.route form.validation tests.page tests.form build.production \
+  tests.green unaided evidence.complete; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/byte-bounded-combined-output/rubric-results.json")" = pass
+done
+test "$(jq -r '.overall' "$tmp/byte-bounded-combined-output/rubric-results.json")" = pass
+
+byte_bounded_test_rejections=(
+  "${byte_bounded_test_command/tail -c 4096/tail -c 4095}"
+  "${byte_bounded_test_command/tail -c 4096/tail -c 4097}"
+  "${byte_bounded_test_command/tail -c 4096/tail -c4096}"
+  "${byte_bounded_test_command/tail -c 4096/tail -c \"\$ROR_EVAL_TAIL_BYTES\"}"
+  "${byte_bounded_test_command/tail -c 4096/cat | tail -c 4096}"
+  "${byte_bounded_test_command/ 2>&1 | tail -c 4096/ | tail -c 4096}"
+)
+byte_bounded_test_rejection_index=0
+for test_command in "${byte_bounded_test_rejections[@]}"; do
+  byte_bounded_test_rejection_index=$((byte_bounded_test_rejection_index + 1))
+  jq -cn --arg command "$test_command" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"8 runs, 34 assertions, 0 failures, 0 errors, 0 skips\nROR_EVAL_TEST_EXIT=0"}}' \
+    >"$tmp/byte-bounded-test-rejection-$byte_bounded_test_rejection_index-events.jsonl"
+  mkdir "$tmp/byte-bounded-test-rejection-$byte_bounded_test_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" \
+    "$tmp/byte-bounded-test-rejection-$byte_bounded_test_rejection_index-events.jsonl" \
+    "$tmp/claude-v8-form-workspace" \
+    "$tmp/byte-bounded-test-rejection-$byte_bounded_test_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "tests.green") | .status' \
+    "$tmp/byte-bounded-test-rejection-$byte_bounded_test_rejection_index-output/rubric-results.json")" = unknown
+done
+
+byte_bounded_build_rejections=(
+  "${byte_bounded_build_command/tail -c 4096/tail -c 4095}"
+  "${byte_bounded_build_command/tail -c 4096/tail -c 4097}"
+  "${byte_bounded_build_command/tail -c 4096/tail -c4096}"
+  "${byte_bounded_build_command/tail -c 4096/tail -c \"\$ROR_EVAL_TAIL_BYTES\"}"
+  "${byte_bounded_build_command/tail -c 4096/cat | tail -c 4096}"
+  "${byte_bounded_build_command/ 2>&1 | tail -c 4096/ | tail -c 4096}"
+  $'cd <LOCAL_PATH>/eval_app\nrm -rf public/assets public/packs public/packs-test\nnpm run build 2>&1 | tail -c 4096\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"'
+)
+byte_bounded_build_rejection_index=0
+for build_command in "${byte_bounded_build_rejections[@]}"; do
+  byte_bounded_build_rejection_index=$((byte_bounded_build_rejection_index + 1))
+  jq -cn --arg command "$build_command" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"Rspack compiled successfully\nROR_EVAL_BUILD_EXIT=0"}}' \
+    >"$tmp/byte-bounded-build-rejection-$byte_bounded_build_rejection_index-events.jsonl"
+  mkdir "$tmp/byte-bounded-build-rejection-$byte_bounded_build_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" \
+    "$tmp/byte-bounded-build-rejection-$byte_bounded_build_rejection_index-events.jsonl" \
+    "$tmp/claude-v8-form-workspace" \
+    "$tmp/byte-bounded-build-rejection-$byte_bounded_build_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "build.production") | .status' \
+    "$tmp/byte-bounded-build-rejection-$byte_bounded_build_rejection_index-output/rubric-results.json")" = unknown
+done
+
+short_yes_scaffold_command=$'set -o pipefail\nnpx -y create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -c 4096\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+jq -cn --arg command "$short_yes_scaffold_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"✓ Done!\nCreated eval_app with React on Rails!\nROR_EVAL_SCAFFOLD_EXIT=0"}}' \
+  >"$tmp/short-yes-scaffold-events.jsonl"
+mkdir "$tmp/short-yes-scaffold-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/short-yes-scaffold-events.jsonl" \
+  "$tmp/claude-v8-form-workspace" "$tmp/short-yes-scaffold-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+test "$(jq -r '.items[] | select(.id == "install.pro") | .status' \
+  "$tmp/short-yes-scaffold-output/rubric-results.json")" = pass
+
+short_yes_scaffold_rejections=(
+  "${short_yes_scaffold_command/npx -y /npx -yy }"
+  "${short_yes_scaffold_command/npx -y /npx -y=yes }"
+  "${short_yes_scaffold_command/npx -y /npx -q }"
+  "${short_yes_scaffold_command/npx -y /npx -y --yes }"
+)
+short_yes_scaffold_rejection_index=0
+for scaffold_command in "${short_yes_scaffold_rejections[@]}"; do
+  short_yes_scaffold_rejection_index=$((short_yes_scaffold_rejection_index + 1))
+  jq -cn --arg command "$scaffold_command" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"✓ Done!\nCreated eval_app with React on Rails!\nROR_EVAL_SCAFFOLD_EXIT=0"}}' \
+    >"$tmp/short-yes-scaffold-rejection-$short_yes_scaffold_rejection_index-events.jsonl"
+  mkdir "$tmp/short-yes-scaffold-rejection-$short_yes_scaffold_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" \
+    "$tmp/short-yes-scaffold-rejection-$short_yes_scaffold_rejection_index-events.jsonl" \
+    "$tmp/claude-v8-form-workspace" \
+    "$tmp/short-yes-scaffold-rejection-$short_yes_scaffold_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "install.pro") | .status' \
+    "$tmp/short-yes-scaffold-rejection-$short_yes_scaffold_rejection_index-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/claude-v8-form-workspace" "$tmp/codex-combined-form-workspace"
+rm "$tmp/codex-combined-form-workspace/eval_app/test/integration/subscriptions_test.rb"
+cat >"$tmp/codex-combined-form-workspace/eval_app/config/routes.rb" <<'RUBY'
+Rails.application.routes.draw do
+  rsc "launch_briefing", to: "launch_briefings#show"
+end
+RUBY
+cat >"$tmp/codex-combined-form-workspace/eval_app/test/integration/launch_briefings_test.rb" <<'RUBY'
+require "test_helper"
+
+class LaunchBriefingsTest < ActionDispatch::IntegrationTest
+  test "launch checklist form shows validation errors and success flow" do
+    post launch_briefing_path, params: {
+      launch_checklist_form: { operator_name: "", mission_code: "oops", docking_bay: "" }
+    }
+
+    assert_response :unprocessable_entity
+    assert_includes response.body, "Checklist blocked."
+    assert_includes response.body, "Mission code must look like EVAL-123"
+
+    post launch_briefing_path, params: {
+      launch_checklist_form: { operator_name: "Casey", mission_code: "eval-321", docking_bay: "bay-7" }
+    }
+
+    assert_redirected_to launch_briefing_path
+    follow_redirect!
+    assert_response :success
+    assert_includes response.body, "Casey cleared EVAL-321 for BAY-7."
+  end
+end
+RUBY
+mkdir "$tmp/codex-combined-form-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/byte-bounded-test-events.jsonl" \
+  "$tmp/codex-combined-form-workspace" "$tmp/codex-combined-form-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-combined-form-output/rubric-results.json")" = pass
+done
+
+cp -R "$tmp/codex-combined-form-workspace" "$tmp/codex-combined-form-unclosed-post-workspace"
+cat >"$tmp/codex-combined-form-unclosed-post-workspace/eval_app/test/integration/launch_briefings_test.rb" <<'RUBY'
+require "test_helper"
+
+class LaunchBriefingsTest < ActionDispatch::IntegrationTest
+  test "launch checklist form shows validation errors and success flow" do
+    post(
+      launch_briefing_path, params: {
+        launch_checklist_form: { operator_name: "" }
+      }
+    assert_response :unprocessable_entity
+    assert_includes response.body, "Checklist blocked."
+
+    post(
+      launch_briefing_path, params: {
+        launch_checklist_form: { operator_name: "Casey" }
+      }
+    assert_redirected_to launch_briefing_path
+    follow_redirect!
+    assert_includes response.body, "Casey cleared."
+  end
+end
+RUBY
+mkdir "$tmp/codex-combined-form-unclosed-post-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/byte-bounded-test-events.jsonl" \
+  "$tmp/codex-combined-form-unclosed-post-workspace" \
+  "$tmp/codex-combined-form-unclosed-post-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-combined-form-unclosed-post-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/codex-combined-form-unclosed-post-workspace" \
+  "$tmp/codex-combined-form-parenthesized-post-workspace"
+ruby -e '
+  path = ARGV.fetch(0)
+  content = File.read(path)
+  replacements = content.gsub!(/^    assert_(?:response|redirected_to)/) { |line| "    )\n#{line}" }
+  abort unless replacements && content.scan(/^    \)$/).length == 2
+  File.write(path, content)
+' "$tmp/codex-combined-form-parenthesized-post-workspace/eval_app/test/integration/launch_briefings_test.rb"
+ruby -c \
+  "$tmp/codex-combined-form-parenthesized-post-workspace/eval_app/test/integration/launch_briefings_test.rb" \
+  >/dev/null
+mkdir "$tmp/codex-combined-form-parenthesized-post-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/byte-bounded-test-events.jsonl" \
+  "$tmp/codex-combined-form-parenthesized-post-workspace" \
+  "$tmp/codex-combined-form-parenthesized-post-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-combined-form-parenthesized-post-output/rubric-results.json")" = pass
+done
+
+cp -R "$tmp/codex-combined-form-workspace" "$tmp/codex-combined-form-stray-post-close-workspace"
+ruby -e '
+  path = ARGV.fetch(0)
+  content = File.read(path)
+  occurrence = 0
+  replacements = content.gsub!(/^    assert_(?:response|redirected_to)/) do |line|
+    occurrence += 1
+    occurrence <= 2 ? "    )\n#{line}" : line
+  end
+  abort unless replacements && occurrence == 3 && content.scan(/^    \)$/).length == 2
+  File.write(path, content)
+' "$tmp/codex-combined-form-stray-post-close-workspace/eval_app/test/integration/launch_briefings_test.rb"
+mkdir "$tmp/codex-combined-form-stray-post-close-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/byte-bounded-test-events.jsonl" \
+  "$tmp/codex-combined-form-stray-post-close-workspace" \
+  "$tmp/codex-combined-form-stray-post-close-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-combined-form-stray-post-close-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/codex-combined-form-workspace" "$tmp/codex-combined-form-bare-nil-workspace"
+ruby -e '
+  path = ARGV.fetch(0)
+  content = File.read(path)
+  content.sub!(/docking_bay: ""/, "docking_bay: nil") or abort
+  File.write(path, content)
+' "$tmp/codex-combined-form-bare-nil-workspace/eval_app/test/integration/launch_briefings_test.rb"
+mkdir "$tmp/codex-combined-form-bare-nil-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/byte-bounded-test-events.jsonl" \
+  "$tmp/codex-combined-form-bare-nil-workspace" "$tmp/codex-combined-form-bare-nil-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-combined-form-bare-nil-output/rubric-results.json")" = pass
+done
+
+cp -R "$tmp/codex-combined-form-workspace" "$tmp/codex-combined-form-duplicate-key-workspace"
+perl -0pi -e \
+  's/launch_checklist_form: \{ operator_name: "", mission_code: "oops", docking_bay: "" \}/launch_checklist_form: { operator_name: "", operator_name: "Casey" }/' \
+  "$tmp/codex-combined-form-duplicate-key-workspace/eval_app/test/integration/launch_briefings_test.rb"
+mkdir "$tmp/codex-combined-form-duplicate-key-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/byte-bounded-test-events.jsonl" \
+  "$tmp/codex-combined-form-duplicate-key-workspace" \
+  "$tmp/codex-combined-form-duplicate-key-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-combined-form-duplicate-key-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/codex-combined-form-workspace" "$tmp/codex-combined-form-empty-iterator-workspace"
+ruby -e '
+  path = ARGV.fetch(0)
+  content = File.read(path)
+  content.sub!(/test "launch checklist form shows validation errors and success flow" do\n/) do |line|
+    "#{line}    [].each do\n"
+  end or abort
+  content.sub!(/\n  end\nend\n\z/, "\n    end\n  end\nend\n") or abort
+  File.write(path, content)
+' "$tmp/codex-combined-form-empty-iterator-workspace/eval_app/test/integration/launch_briefings_test.rb"
+mkdir "$tmp/codex-combined-form-empty-iterator-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/byte-bounded-test-events.jsonl" \
+  "$tmp/codex-combined-form-empty-iterator-workspace" \
+  "$tmp/codex-combined-form-empty-iterator-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-combined-form-empty-iterator-output/rubric-results.json")" = unknown
+done
+
+for wrapper in 'false && begin' 'if false'; do
+  wrapper_slug="${wrapper//[^a-z]/-}"
+  cp -R "$tmp/codex-combined-form-workspace" "$tmp/codex-combined-form-$wrapper_slug-workspace"
+  WRAPPER="$wrapper" ruby -e '
+    path = ARGV.fetch(0)
+    content = File.read(path)
+    content.sub!(/test "launch checklist form shows validation errors and success flow" do\n/) do |line|
+      "#{line}    #{ENV.fetch("WRAPPER")}\n"
+    end or abort
+    content.sub!(/\n  end\nend\n\z/, "\n    end\n  end\nend\n") or abort
+    File.write(path, content)
+  ' "$tmp/codex-combined-form-$wrapper_slug-workspace/eval_app/test/integration/launch_briefings_test.rb"
+  mkdir "$tmp/codex-combined-form-$wrapper_slug-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/byte-bounded-test-events.jsonl" \
+    "$tmp/codex-combined-form-$wrapper_slug-workspace" \
+    "$tmp/codex-combined-form-$wrapper_slug-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/codex-combined-form-$wrapper_slug-output/rubric-results.json")" = unknown
+  done
+done
+
+cp -R "$tmp/codex-combined-form-workspace" "$tmp/codex-combined-form-inactive-class-workspace"
+ruby -e '
+  path = ARGV.fetch(0)
+  content = File.read(path)
+  File.write(path, "if false\n#{content}end\n")
+' "$tmp/codex-combined-form-inactive-class-workspace/eval_app/test/integration/launch_briefings_test.rb"
+mkdir "$tmp/codex-combined-form-inactive-class-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/byte-bounded-test-events.jsonl" \
+  "$tmp/codex-combined-form-inactive-class-workspace" \
+  "$tmp/codex-combined-form-inactive-class-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-combined-form-inactive-class-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/codex-combined-form-workspace" "$tmp/codex-combined-form-empty-brace-workspace"
+ruby -e '
+  path = ARGV.fetch(0)
+  content = File.read(path)
+  content.sub!(/test "launch checklist form shows validation errors and success flow" do\n/) do |line|
+    "#{line}    [].each {\n"
+  end or abort
+  content.sub!(/\n  end\nend\n\z/, "\n    }\n  end\nend\n") or abort
+  File.write(path, content)
+' "$tmp/codex-combined-form-empty-brace-workspace/eval_app/test/integration/launch_briefings_test.rb"
+mkdir "$tmp/codex-combined-form-empty-brace-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/byte-bounded-test-events.jsonl" \
+  "$tmp/codex-combined-form-empty-brace-workspace" \
+  "$tmp/codex-combined-form-empty-brace-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-combined-form-empty-brace-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/codex-combined-form-workspace" "$tmp/codex-combined-form-zero-times-brace-workspace"
+ruby -e '
+  path = ARGV.fetch(0)
+  content = File.read(path)
+  content.sub!(/test "launch checklist form shows validation errors and success flow" do\n/) do |line|
+    "#{line}    0.times {\n"
+  end or abort
+  content.sub!(/\n  end\nend\n\z/, "\n    }\n  end\nend\n") or abort
+  File.write(path, content)
+' "$tmp/codex-combined-form-zero-times-brace-workspace/eval_app/test/integration/launch_briefings_test.rb"
+mkdir "$tmp/codex-combined-form-zero-times-brace-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/byte-bounded-test-events.jsonl" \
+  "$tmp/codex-combined-form-zero-times-brace-workspace" \
+  "$tmp/codex-combined-form-zero-times-brace-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-combined-form-zero-times-brace-output/rubric-results.json")" = unknown
+done
+
+for hash_iterator in '{}.each {' '{ }.each { |pair|'; do
+  hash_slug="$(printf '%s' "$hash_iterator" | tr -cs '[:alnum:]' '-')"
+  cp -R "$tmp/codex-combined-form-workspace" "$tmp/codex-combined-form-$hash_slug-workspace"
+  HASH_ITERATOR="$hash_iterator" ruby -e '
+    path = ARGV.fetch(0)
+    content = File.read(path)
+    content.sub!(/test "launch checklist form shows validation errors and success flow" do\n/) do |line|
+      "#{line}    #{ENV.fetch("HASH_ITERATOR")}\n"
+    end or abort
+    content.sub!(/\n  end\nend\n\z/, "\n    }\n  end\nend\n") or abort
+    File.write(path, content)
+  ' "$tmp/codex-combined-form-$hash_slug-workspace/eval_app/test/integration/launch_briefings_test.rb"
+  mkdir "$tmp/codex-combined-form-$hash_slug-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/byte-bounded-test-events.jsonl" \
+    "$tmp/codex-combined-form-$hash_slug-workspace" \
+    "$tmp/codex-combined-form-$hash_slug-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/codex-combined-form-$hash_slug-output/rubric-results.json")" = unknown
+  done
+done
+
+cp -R "$tmp/codex-combined-form-workspace" "$tmp/codex-combined-form-sibling-metadata-workspace"
+ruby -e '
+  path = ARGV.fetch(0)
+  content = File.read(path)
+  occurrence = 0
+  content.gsub!(/launch_checklist_form: \{[^\n]+\}/) do
+    occurrence += 1
+    suffix = occurrence == 1 ? %q{, metadata: ""} : %q{, metadata: "different"}
+    %q{launch_checklist_form: { operator_name: "Casey" }} + suffix
+  end
+  abort unless occurrence == 2
+  File.write(path, content)
+' "$tmp/codex-combined-form-sibling-metadata-workspace/eval_app/test/integration/launch_briefings_test.rb"
+mkdir "$tmp/codex-combined-form-sibling-metadata-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/byte-bounded-test-events.jsonl" \
+  "$tmp/codex-combined-form-sibling-metadata-workspace" \
+  "$tmp/codex-combined-form-sibling-metadata-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-combined-form-sibling-metadata-output/rubric-results.json")" = unknown
+done
+
+for nil_shape in symbol label; do
+  cp -R "$tmp/codex-combined-form-workspace" "$tmp/codex-combined-form-$nil_shape-nil-workspace"
+  NIL_SHAPE="$nil_shape" ruby -e '
+    path = ARGV.fetch(0)
+    content = File.read(path)
+    occurrence = 0
+    content.gsub!(/launch_checklist_form: \{[^\n]+\}/) do
+      occurrence += 1
+      if ENV.fetch("NIL_SHAPE") == "symbol"
+        value = occurrence == 1 ? ":nil" : ":bay_7"
+        "launch_checklist_form: { operator_name: \"Casey\", docking_bay: #{value} }"
+      else
+        value = occurrence == 1 ? ":bay_6" : ":bay_7"
+        "launch_checklist_form: { operator_name: \"Casey\", nil: #{value} }"
+      end
+    end
+    abort unless occurrence == 2
+    File.write(path, content)
+  ' "$tmp/codex-combined-form-$nil_shape-nil-workspace/eval_app/test/integration/launch_briefings_test.rb"
+  mkdir "$tmp/codex-combined-form-$nil_shape-nil-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/byte-bounded-test-events.jsonl" \
+    "$tmp/codex-combined-form-$nil_shape-nil-workspace" \
+    "$tmp/codex-combined-form-$nil_shape-nil-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/codex-combined-form-$nil_shape-nil-output/rubric-results.json")" = unknown
+  done
+done
+
+cp -R "$tmp/codex-combined-form-workspace" "$tmp/codex-combined-form-cross-endpoint-workspace"
+ruby -e '
+  path = ARGV.fetch(0)
+  content = File.read(path)
+  occurrence = 0
+  content.gsub!(/post launch_briefing_path/) do
+    occurrence += 1
+    occurrence == 1 ? "post invalid_probe_path" : "post unrelated_success_path"
+  end
+  abort unless occurrence == 2
+  File.write(path, content)
+' "$tmp/codex-combined-form-cross-endpoint-workspace/eval_app/test/integration/launch_briefings_test.rb"
+mkdir "$tmp/codex-combined-form-cross-endpoint-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/byte-bounded-test-events.jsonl" \
+  "$tmp/codex-combined-form-cross-endpoint-workspace" \
+  "$tmp/codex-combined-form-cross-endpoint-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-combined-form-cross-endpoint-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/codex-combined-form-workspace" "$tmp/codex-combined-form-no-params-workspace"
+ruby -e '
+  path = ARGV.fetch(0)
+  content = File.read(path)
+  replacements = content.gsub!(/post launch_briefing_path, params: \{\n.*?^    \}/m, "post launch_briefing_path")
+  abort unless replacements
+  File.write(path, content)
+' "$tmp/codex-combined-form-no-params-workspace/eval_app/test/integration/launch_briefings_test.rb"
+mkdir "$tmp/codex-combined-form-no-params-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/byte-bounded-test-events.jsonl" \
+  "$tmp/codex-combined-form-no-params-workspace" "$tmp/codex-combined-form-no-params-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-combined-form-no-params-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/codex-combined-form-workspace" "$tmp/codex-combined-form-same-params-workspace"
+ruby -e '
+  path = ARGV.fetch(0)
+  content = File.read(path)
+  invalid = content.match(/post launch_briefing_path, params: \{\n.*?^    \}/m)&.[](0) or abort
+  occurrence = 0
+  content.gsub!(/post launch_briefing_path, params: \{\n.*?^    \}/m) do |submission|
+    occurrence += 1
+    occurrence == 2 ? invalid : submission
+  end
+  abort unless occurrence == 2
+  File.write(path, content)
+' "$tmp/codex-combined-form-same-params-workspace/eval_app/test/integration/launch_briefings_test.rb"
+mkdir "$tmp/codex-combined-form-same-params-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/byte-bounded-test-events.jsonl" \
+  "$tmp/codex-combined-form-same-params-workspace" "$tmp/codex-combined-form-same-params-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-combined-form-same-params-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/codex-combined-form-workspace" "$tmp/codex-combined-form-equivalent-params-workspace"
+cat >"$tmp/codex-combined-form-equivalent-params-workspace/eval_app/test/integration/launch_briefings_test.rb" <<'RUBY'
+require "test_helper"
+
+class LaunchBriefingsTest < ActionDispatch::IntegrationTest
+  test "launch checklist form shows validation errors and success flow" do
+    post launch_briefing_path, params: {
+      launch_checklist_form: { mission_code: "same", docking_bay: "same" }
+    }
+    assert_response :unprocessable_entity
+    assert_includes response.body, "error"
+
+    post launch_briefing_path, params: {
+      launch_checklist_form: {
+        mission_code: 'same', docking_bay: 'same'
+      }
+    }
+    assert_redirected_to launch_briefing_path
+    follow_redirect!
+    assert_includes response.body, "success"
+  end
+end
+RUBY
+mkdir "$tmp/codex-combined-form-equivalent-params-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/byte-bounded-test-events.jsonl" \
+  "$tmp/codex-combined-form-equivalent-params-workspace" \
+  "$tmp/codex-combined-form-equivalent-params-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-combined-form-equivalent-params-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/codex-combined-form-workspace" "$tmp/codex-combined-form-comment-nil-workspace"
+cat >"$tmp/codex-combined-form-comment-nil-workspace/eval_app/test/integration/launch_briefings_test.rb" <<'RUBY'
+require "test_helper"
+
+class LaunchBriefingsTest < ActionDispatch::IntegrationTest
+  test "launch checklist form shows validation errors and success flow" do
+    post launch_briefing_path, params: {
+      launch_checklist_form: { mission_code: "same", # nil means absent
+        docking_bay: "same" }
+    }
+    assert_response :unprocessable_entity
+    assert_includes response.body, "error"
+
+    post launch_briefing_path, params: {
+      launch_checklist_form: { mission_code: "same", docking_bay: "same" }
+    }
+    assert_redirected_to launch_briefing_path
+    follow_redirect!
+    assert_includes response.body, "success"
+  end
+end
+RUBY
+mkdir "$tmp/codex-combined-form-comment-nil-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/byte-bounded-test-events.jsonl" \
+  "$tmp/codex-combined-form-comment-nil-workspace" \
+  "$tmp/codex-combined-form-comment-nil-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-combined-form-comment-nil-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/codex-combined-form-workspace" "$tmp/codex-combined-form-return-workspace"
+ruby -e '
+  path = ARGV.fetch(0)
+  content = File.read(path)
+  replacement = content.sub!(/test "launch checklist form shows validation errors and success flow" do\n/) do |line|
+    "#{line}    return\n"
+  end
+  abort unless replacement
+  File.write(path, content)
+' "$tmp/codex-combined-form-return-workspace/eval_app/test/integration/launch_briefings_test.rb"
+mkdir "$tmp/codex-combined-form-return-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/byte-bounded-test-events.jsonl" \
+  "$tmp/codex-combined-form-return-workspace" "$tmp/codex-combined-form-return-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-combined-form-return-output/rubric-results.json")" = unknown
+done
+
+combined_form_unconditional_exits=(
+  'raise "unreachable assertions"'
+  'fail "unreachable assertions"'
+  'flunk "unreachable assertions"'
+)
+combined_form_unconditional_exit_index=0
+for inactive_line in "${combined_form_unconditional_exits[@]}"; do
+  combined_form_unconditional_exit_index=$((combined_form_unconditional_exit_index + 1))
+  cp -R "$tmp/codex-combined-form-workspace" \
+    "$tmp/codex-combined-form-unconditional-exit-$combined_form_unconditional_exit_index-workspace"
+  INACTIVE_LINE="$inactive_line" ruby -e '
+    path = ARGV.fetch(0)
+    content = File.read(path)
+    replacement = content.sub!(/test "launch checklist form shows validation errors and success flow" do\n/) do |line|
+      "#{line}    #{ENV.fetch("INACTIVE_LINE")}\n"
+    end
+    abort unless replacement
+    File.write(path, content)
+  ' "$tmp/codex-combined-form-unconditional-exit-$combined_form_unconditional_exit_index-workspace/eval_app/test/integration/launch_briefings_test.rb"
+  mkdir "$tmp/codex-combined-form-unconditional-exit-$combined_form_unconditional_exit_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/byte-bounded-test-events.jsonl" \
+    "$tmp/codex-combined-form-unconditional-exit-$combined_form_unconditional_exit_index-workspace" \
+    "$tmp/codex-combined-form-unconditional-exit-$combined_form_unconditional_exit_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/codex-combined-form-unconditional-exit-$combined_form_unconditional_exit_index-output/rubric-results.json")" = unknown
+  done
+done
+
+cp -R "$tmp/codex-combined-form-workspace" "$tmp/codex-combined-form-expected-failure-workspace"
+ruby -e '
+  path = ARGV.fetch(0)
+  content = File.read(path)
+  content.sub!(/test "launch checklist form shows validation errors and success flow" do\n/) do |line|
+    "#{line}    assert_raises Minitest::Assertion do\n"
+  end or abort
+  content.sub!(/\n  end\nend\n\z/, "\n    end\n  end\nend\n") or abort
+  File.write(path, content)
+' "$tmp/codex-combined-form-expected-failure-workspace/eval_app/test/integration/launch_briefings_test.rb"
+mkdir "$tmp/codex-combined-form-expected-failure-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/byte-bounded-test-events.jsonl" \
+  "$tmp/codex-combined-form-expected-failure-workspace" \
+  "$tmp/codex-combined-form-expected-failure-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-combined-form-expected-failure-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/codex-combined-form-workspace" "$tmp/codex-combined-form-unrelated-params-workspace"
+cat >"$tmp/codex-combined-form-unrelated-params-workspace/eval_app/test/integration/launch_briefings_test.rb" <<'RUBY'
+require "test_helper"
+
+class LaunchBriefingsTest < ActionDispatch::IntegrationTest
+  test "launch checklist form shows validation errors and success flow" do
+    post launch_briefing_path, params: {
+      metadata: 1, invalid_probe: { operator_name: "" }
+    }
+    assert_response :unprocessable_entity
+    assert_includes response.body, "error"
+
+    post launch_briefing_path, params: {
+      metadata: 2, unrelated_success: { operator_name: "Casey" }
+    }
+    assert_redirected_to launch_briefing_path
+    follow_redirect!
+    assert_includes response.body, "success"
+  end
+end
+RUBY
+mkdir "$tmp/codex-combined-form-unrelated-params-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/byte-bounded-test-events.jsonl" \
+  "$tmp/codex-combined-form-unrelated-params-workspace" \
+  "$tmp/codex-combined-form-unrelated-params-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-combined-form-unrelated-params-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/codex-combined-form-workspace" "$tmp/codex-combined-form-wrong-class-workspace"
+cat >"$tmp/codex-combined-form-wrong-class-workspace/eval_app/test/integration/launch_briefings_test.rb" <<'RUBY'
+require "test_helper"
+
+class DocumentationExample
+  def self.test(_name)
+  end
+
+  test "launch checklist form shows validation errors and success flow" do
+    post launch_briefing_path, params: {
+      launch_checklist_form: { operator_name: "", mission_code: "oops", docking_bay: "" }
+    }
+    assert_response :unprocessable_entity
+    assert_includes response.body, "error"
+
+    post launch_briefing_path, params: {
+      launch_checklist_form: { operator_name: "Casey", mission_code: "eval-321", docking_bay: "bay-7" }
+    }
+    assert_redirected_to launch_briefing_path
+    follow_redirect!
+    assert_includes response.body, "success"
+  end
+end
+
+class HealthTest < ActionDispatch::IntegrationTest
+  test "health" do
+    get health_path
+    assert_response :success
+  end
+end
+RUBY
+mkdir "$tmp/codex-combined-form-wrong-class-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/byte-bounded-test-events.jsonl" \
+  "$tmp/codex-combined-form-wrong-class-workspace" "$tmp/codex-combined-form-wrong-class-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-combined-form-wrong-class-output/rubric-results.json")" = unknown
+done
+
+combined_form_name_rejections=(
+  'launch checklist form does not show validation errors and success flow'
+  'launch checklist form shows validation errors and no success flow'
+  'launch checklist form shows validation errors and success flow is not reached'
+  'launch checklist form shows validation errors and success flow fails'
+  'launch checklist form hides validation errors and success flow'
+  'launch checklist shows validation errors and success flow'
+  'launch checklist form shows validation details and success flow'
+)
+combined_form_name_rejection_index=0
+for rejected_name in "${combined_form_name_rejections[@]}"; do
+  combined_form_name_rejection_index=$((combined_form_name_rejection_index + 1))
+  cp -R "$tmp/codex-combined-form-workspace" \
+    "$tmp/codex-combined-form-name-rejection-$combined_form_name_rejection_index-workspace"
+  REJECTED_NAME="$rejected_name" ruby -e '
+    path = ARGV.fetch(0)
+    content = File.read(path)
+    content.sub!(/launch checklist form shows validation errors and success flow/, ENV.fetch("REJECTED_NAME")) or abort
+    File.write(path, content)
+  ' "$tmp/codex-combined-form-name-rejection-$combined_form_name_rejection_index-workspace/eval_app/test/integration/launch_briefings_test.rb"
+  mkdir "$tmp/codex-combined-form-name-rejection-$combined_form_name_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/byte-bounded-test-events.jsonl" \
+    "$tmp/codex-combined-form-name-rejection-$combined_form_name_rejection_index-workspace" \
+    "$tmp/codex-combined-form-name-rejection-$combined_form_name_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/codex-combined-form-name-rejection-$combined_form_name_rejection_index-output/rubric-results.json")" = unknown
+  done
+done
+
+for missing_proof in failure success; do
+  cp -R "$tmp/codex-combined-form-workspace" \
+    "$tmp/codex-combined-form-missing-$missing_proof-workspace"
+  case "$missing_proof" in
+    failure)
+      perl -0pi -e 's/assert_response :unprocessable_entity/assert_response :success/' \
+        "$tmp/codex-combined-form-missing-$missing_proof-workspace/eval_app/test/integration/launch_briefings_test.rb"
+      ;;
+    success)
+      perl -0pi -e 's/assert_redirected_to launch_briefing_path/assert_response :success/' \
+        "$tmp/codex-combined-form-missing-$missing_proof-workspace/eval_app/test/integration/launch_briefings_test.rb"
+      ;;
+  esac
+  mkdir "$tmp/codex-combined-form-missing-$missing_proof-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/byte-bounded-test-events.jsonl" \
+    "$tmp/codex-combined-form-missing-$missing_proof-workspace" \
+    "$tmp/codex-combined-form-missing-$missing_proof-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/codex-combined-form-missing-$missing_proof-output/rubric-results.json")" = unknown
+  done
+done
+
+cp -R "$tmp/codex-combined-form-workspace" "$tmp/codex-current-combined-workspace"
+ruby -e '
+  path = ARGV.fetch(0)
+  content = File.read(path)
+  page_test = <<~RUBY
+      test "launch briefing page streams server-provided mission data" do
+        get launch_briefing_path
+
+        assert_response :success
+        assert_includes response.body, "Orbital Launch Briefing"
+        assert_includes response.body, "EVAL-204"
+      end
+
+  RUBY
+  page_test = page_test.gsub(/^/, "  ")
+  content.sub!(/^class LaunchBriefingsTest < ActionDispatch::IntegrationTest\n/, "\\0#{page_test}") or abort
+  File.write(path, content)
+' "$tmp/codex-current-combined-workspace/eval_app/test/integration/launch_briefings_test.rb"
+failed_short_yes_scaffold_command="$short_yes_scaffold_command"
+jq -cn --arg command "$failed_short_yes_scaffold_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"Error: Rails is not installed or not found in PATH.\nROR_EVAL_SCAFFOLD_EXIT=1"}}' \
+  >"$tmp/codex-current-failed-scaffold-events.jsonl"
+cat "$tmp/codex-current-failed-scaffold-events.jsonl" "$tmp/short-yes-scaffold-events.jsonl" \
+  "$tmp/byte-bounded-test-events.jsonl" "$tmp/byte-bounded-build-events.jsonl" \
+  >"$tmp/codex-current-combined-events.jsonl"
+mkdir "$tmp/codex-current-combined-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/codex-current-combined-events.jsonl" \
+  "$tmp/codex-current-combined-workspace" "$tmp/codex-current-combined-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in install.pro rsc.route form.validation tests.page tests.form build.production \
+  tests.green unaided evidence.complete; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-current-combined-output/rubric-results.json")" = pass
+done
+test "$(jq -r '.overall' "$tmp/codex-current-combined-output/rubric-results.json")" = pass
 
 stdout_only_test_command=$'cd <LOCAL_PATH>/eval_app\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nbin/rails test | tail -n 200\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
 stdout_only_build_command=$'cd <LOCAL_PATH>/eval_app\nnpm run build | tail -n 200\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"'
