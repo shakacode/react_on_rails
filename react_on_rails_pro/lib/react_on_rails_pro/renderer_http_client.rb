@@ -21,6 +21,7 @@ require "pathname"
 require "protocol/http/body/readable"
 require "protocol/http/body/writable"
 require "protocol/http/headers"
+require "protocol/http1"
 require "securerandom"
 require "uri"
 
@@ -51,10 +52,14 @@ module ReactOnRailsPro
       Errno::EPIPE,
       Errno::ETIMEDOUT,
       Protocol::HTTP::RefusedError,
-      # Treat HTTP/2 stream resets as transport failures because the renderer can
-      # abort streams without a usable HTTP response for Request/StreamRequest.
-      Protocol::HTTP2::StreamError
+      # A transport mismatch can surface while parsing the other protocol.
+      Protocol::HTTP1::ProtocolError,
+      Protocol::HTTP2::Error
     ].freeze
+
+    def self.transport_config_description
+      "renderer_http_force_http2 = #{ReactOnRailsPro.configuration.renderer_http_force_http2}"
+    end
 
     # Per-scheduler storage for persistent HTTP clients. When an outer Fiber.scheduler
     # exists BEFORE we enter `Sync {}`, clients are stored on the scheduler object using
@@ -576,12 +581,12 @@ module ReactOnRailsPro
       end
     end
 
-    # Bidirectional HTTP/2 streaming POST. Returns [output, response] where:
+    # Bidirectional streaming POST. Returns [output, response] where:
     # - output is a Protocol::HTTP::Body::Writable::Output (supports << and close)
     # - response is a lazy Response whose body is consumed via Response#each
     #
     # The caller writes NDJSON lines to output while concurrently reading response
-    # chunks. Calling output.close sends END_STREAM on the HTTP/2 stream.
+    # chunks. Calling output.close signals request-body EOF to the selected transport.
     def post_bidi(path, headers:)
       ensure_open!
       writable = Protocol::HTTP::Body::Writable.new

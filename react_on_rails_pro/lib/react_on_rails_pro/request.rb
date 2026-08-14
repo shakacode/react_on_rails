@@ -116,7 +116,7 @@ module ReactOnRailsPro
         end
       end
 
-      # Performs an incremental render request with bidirectional HTTP/2 streaming.
+      # Performs an incremental render request with bidirectional streaming.
       #
       # ARCHITECTURE: This method orchestrates the async props flow:
       #
@@ -133,13 +133,13 @@ module ReactOnRailsPro
       # │                                   │     └── Sends NDJSON: {updateChunk} │
       # │                                   │                                     │
       # │  ... streaming HTML chunks ...    │  4. Block completes                 │
-      # │                                   │     output.close (sends END_STREAM) │
+      # │                                   │     output.close (request EOF)      │
       # └───────────────────────────────────┴─────────────────────────────────────┘
       #
       # WHY async task?
       # - We need to return the response stream immediately so Rails can start sending HTML
       # - The async_props_block runs concurrently, sending props as they become available
-      # - When the block finishes, we close the output (END_STREAM flag)
+      # - When the block finishes, we close the request body
       # - Node's handleRequestClosed then calls asyncPropsManager.endStream()
       #
       def render_code_with_incremental_updates(
@@ -166,8 +166,8 @@ module ReactOnRailsPro
         ) do |send_bundle, tasks|
           request_path, request_artifacts = prepare_streaming_request(path, send_bundle:, bundle_role:, artifacts:)
 
-          # Open a bidirectional HTTP/2 stream using async-http's Writable body.
-          # output supports << (alias for write) and close (sends END_STREAM).
+          # Open a bidirectional request using async-http's Writable body.
+          # output supports << (alias for write) and close (signals request EOF).
           output, response = connection.post_bidi(
             request_path,
             headers: [["content-type", "application/x-ndjson"]]
@@ -190,7 +190,7 @@ module ReactOnRailsPro
             async_props_block.call(emitter)
           ensure
             # When the block completes (or raises), close the output.
-            # This sends HTTP/2 END_STREAM flag, triggering Node's handleRequestClosed.
+            # This signals request-body EOF, triggering Node's handleRequestClosed.
             output.close
           end)
 
@@ -271,7 +271,9 @@ module ReactOnRailsPro
       def retry_or_raise_transport_error(error, available_retries, path, error_type)
         if available_retries.zero?
           raise ReactOnRailsPro::Error,
-                "#{error_type} error on renderer request: #{path}.\nOriginal error:\n#{error}\n#{error.backtrace}"
+                "#{error_type} error on renderer request: #{path}.\n" \
+                "#{ReactOnRailsPro::RendererHttpClient.transport_config_description}\n" \
+                "Original error:\n#{error}\n#{error.backtrace}"
         end
         Rails.logger.info do
           "[ReactOnRailsPro] #{error_type} error when making a request to the Node Renderer. " \
@@ -674,7 +676,8 @@ module ReactOnRailsPro
           origin: url,
           pool_size: ReactOnRailsPro.configuration.renderer_http_pool_size,
           connect_timeout: ReactOnRailsPro.configuration.renderer_http_pool_timeout,
-          read_timeout: ReactOnRailsPro.configuration.ssr_timeout
+          read_timeout: ReactOnRailsPro.configuration.ssr_timeout,
+          force_http2: ReactOnRailsPro.configuration.renderer_http_force_http2
         )
       rescue StandardError => e
         message = <<~MSG
@@ -683,6 +686,7 @@ module ReactOnRailsPro
           renderer_http_pool_timeout = #{ReactOnRailsPro.configuration.renderer_http_pool_timeout}
           renderer_http_pool_warn_timeout = #{ReactOnRailsPro.configuration.renderer_http_pool_warn_timeout}
           renderer_http_keep_alive_timeout = #{ReactOnRailsPro.configuration.renderer_http_keep_alive_timeout}
+          renderer_http_force_http2 = #{ReactOnRailsPro.configuration.renderer_http_force_http2}
           renderer_url = #{url}
           Be sure to use a url that contains the protocol of http or https.
           Original error is

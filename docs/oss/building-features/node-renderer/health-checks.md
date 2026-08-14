@@ -71,13 +71,65 @@ curl -s --http2-prior-knowledge http://localhost:3800/ready
 # => 503 {"status":"waiting_for_bundle"} until the first bundle upload, then 200 {"status":"ready"}
 ```
 
-## h2c: Why `httpGet` Probes Do NOT Work
+## Choosing h2c or HTTP/1.1
 
-The renderer listens with **cleartext HTTP/2 (h2c)**. Kubernetes `httpGet` probes, ALB target-group health checks,
-Control Plane HTTP probes, and other HTTP/1.1-only checkers cannot speak h2c and **cannot reach these endpoints**
-directly. Do not configure an `httpGet` probe against the renderer port — it will always fail.
+The renderer uses **cleartext HTTP/2 (h2c)** by default, and the Rails client forces h2c for an `http://` renderer URL.
+This remains the recommended transport when async props must cross an intermediary. Kubernetes `httpGet` probes, ALB
+target-group health checks, Control Plane HTTP probes, and other HTTP/1.1-only checkers cannot reach a default h2c
+listener directly.
 
-Use these probe shapes instead:
+You can instead run the entire Rails-to-renderer connection over HTTP/1.1. Configure both sides so the listener and
+client agree:
+
+```js
+// renderer/node-renderer.js
+const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');
+
+reactOnRailsProNodeRenderer({
+  host: '0.0.0.0',
+  enableHealthEndpoints: true,
+  fastifyServerOptions: { http2: false },
+  password: process.env.RENDERER_PASSWORD,
+});
+```
+
+```ruby
+# config/initializers/react_on_rails_pro.rb
+ReactOnRailsPro.configure do |config|
+  config.renderer_password = ENV.fetch("RENDERER_PASSWORD")
+  config.renderer_http_force_http2 = false
+end
+```
+
+Keep the renderer on private networking. For an ALB, use an internal load balancer with private targets and restrict
+the renderer security group to the ALB and Rails callers. The renderer executes application bundles, so review
+[Node Renderer network security](./basics.md#network-security) before exposing it beyond a trusted network. Health
+routes intentionally remain unauthenticated, and `/info` also remains unauthenticated and discloses the Node and
+renderer versions. Keep all three routes private; render requests still require `RENDERER_PASSWORD`.
+
+With this paired configuration, ordinary HTTP/1.1 probes and ALB target-group health checks can reach `/health` and
+`/ready` on the renderer port. Regular renderer requests and response streaming continue to work. A direct HTTP/1.1
+connection can also stream the request and response concurrently, but an intermediary may buffer the request body or
+operate half-duplex. That can delay the render response until Rails finishes sending async props, and pull-mode async
+props can stall. Async props through an ALB or another unverified HTTP/1.1 intermediary are therefore outside the
+supported transport contract. Keep a direct h2c path when async props must traverse such a hop.
+
+On Falcon or another long-lived `Fiber.scheduler`, one HTTP/1.1 connection handles one request at a time. In that
+environment, `renderer_http_pool_size` is a hard concurrency cap for renderer requests sharing the client, with a
+default of `10`. Requests beyond that cap wait for a connection without a pool-acquisition timeout; `ssr_timeout` starts
+applying only after a socket is acquired. Size the pool at or above peak concurrent renderer requests per scheduler,
+then confirm that the renderer `workersCount` can sustain that load. Standard Puma uses an ephemeral client for
+streaming renders and a persistent per-thread client for non-streaming renders, so neither path creates a process-wide
+shared-client cap.
+
+`renderer_http_force_http2` affects only cleartext `http://` URLs. For `https://`, async-http negotiates the protocol
+with ALPN, so the TLS listener or proxy controls whether the connection uses HTTP/1.1 or HTTP/2.
+
+Change the listener and Rails client atomically. For independently rolled workloads, bring up a parallel HTTP/1.1
+renderer endpoint, verify it, switch Rails to that endpoint with `renderer_http_force_http2 = false`, and then drain
+the h2c endpoint. Rolling one side in place first creates a temporary protocol mismatch.
+
+When keeping the default h2c transport, use these probe shapes instead:
 
 - **`exec` probe** with an h2c-aware client packaged in your image, e.g.
   `curl -sf --http2-prior-knowledge http://localhost:3800/ready`. This is the only shape that checks application-level
@@ -91,8 +143,8 @@ for the full probe-style discussion and timing guidance.
 
 ## Kubernetes Probes
 
-A working probe set for a renderer container with `enableHealthEndpoints: true` and curl (with HTTP/2 support) in the
-image:
+A working probe set for a renderer container using the default h2c transport with `enableHealthEndpoints: true` and
+curl (with HTTP/2 support) in the image:
 
 ```yaml
 containers:
@@ -119,7 +171,8 @@ containers:
       timeoutSeconds: 1
     # Readiness: use /ready after configuring the revision-scoped current
     # generation manifest; shallow TCP remains the compatibility fallback.
-    # (httpGet cannot be used in any case: the renderer listener is h2c-only.)
+    # (httpGet cannot be used with the default h2c listener. It is available
+    # when both Rails and the renderer are configured for HTTP/1.1.)
     readinessProbe:
       tcpSocket:
         port: 3800
@@ -209,9 +262,28 @@ slower registries may need 60 seconds or more.
 With a configured declaration, change the path to `/ready` when ECS should replace a task that cannot compile its
 declared current bundle set.
 
-> **ALB note:** ALB target-group health checks are HTTP/1.1 and cannot probe the renderer's h2c port. If the renderer
-> sits behind a load balancer, prefer the ECS container health check above for renderer health, or use an NLB with the
-> TCP health-check protocol for a shallow port check.
+### ALB target group
+
+ALB target-group health checks use HTTP/1.1. Use an internal ALB and private targets, restrict the renderer target
+security group to the ALB and Rails callers, and keep renderer password authentication enabled for render requests.
+The `/health`, `/ready`, and `/info` routes remain unauthenticated. `/info` discloses the Node and renderer versions, so
+keep the renderer on a private network and never attach it to an internet-facing listener.
+
+Unlike the ECS container check above, which probes over loopback, an ALB connects to the task IP. Set the renderer
+`host` to `0.0.0.0` so the ALB can reach it.
+
+Configure the target group with:
+
+- Protocol: `HTTP`
+- Protocol version: `HTTP1`
+- Traffic port: the renderer port, normally `3800`
+- Health check path: `/health`
+- Success matcher: `200`
+
+Use `/ready` instead only when `RENDERER_CURRENT_GENERATION_MANIFEST` prewarms every worker; otherwise its expected
+cold-start `503` can block the traffic needed to upload the first bundle. Pair this target group with the Node and Rails
+HTTP/1.1 settings above. If async props must cross the load-balancer hop, keep renderer traffic on a direct h2c path and
+use the ECS container health check above or an NLB TCP health check instead.
 
 ## Docker Compose
 
@@ -233,10 +305,10 @@ services:
 
 ## Control Plane (CPLN)
 
-Control Plane exposes two relevant probe shapes: an **HTTP** probe and a **Command** (exec) probe. The HTTP probe is
-HTTP/1.1 and **cannot speak the renderer's h2c listener** (see [h2c](#h2c-why-httpget-probes-do-not-work)), so it
-always fails against these endpoints — use a **Command** probe with an h2c-aware curl instead. Command probes run
-inside the container, so the default `localhost` binding works and no `0.0.0.0` host is required.
+Control Plane exposes two relevant probe shapes: an **HTTP** probe and a **Command** (exec) probe. With the default h2c
+transport, use a **Command** probe with an h2c-aware curl because the HTTP probe speaks HTTP/1.1. With the paired
+[HTTP/1.1 configuration](#choosing-h2c-or-http11), the ordinary HTTP probe can reach the renderer endpoints directly.
+Command probes run inside the container, so the default `localhost` binding works and no `0.0.0.0` host is required.
 
 Use `/ready` for readiness when the revision-scoped declaration is configured; use `/health` for liveness. In
 compatibility mode, keep `/health` for readiness so request-driven compilation cannot deadlock the workload. Control
@@ -302,5 +374,6 @@ path. Prefer configuring the revision-scoped declaration so startup itself compi
 ## Rails-Side Readiness
 
 To gate a Rails readiness endpoint on the renderer, keep using the TCP-check recipe in
-[Container Deployment](./container-deployment.md#same-rails-container-rails-and-renderer-co-located), or upgrade it to
-an HTTP/2 client call against `/ready` if your Ruby HTTP client supports h2c.
+[Container Deployment](./container-deployment.md#same-rails-container-rails-and-renderer-co-located), use an HTTP/2
+client call against `/ready` for the default h2c transport, or use an ordinary HTTP client when both sides are
+configured for HTTP/1.1.

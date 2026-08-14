@@ -83,6 +83,13 @@ ReactOnRailsPro.configure do |config|
   # Default for `renderer_url` is "http://localhost:3800".
   config.renderer_url = ENV["REACT_RENDERER_URL"]
 
+  # Force HTTP/2 prior knowledge (h2c) for cleartext renderer URLs. Set false
+  # only when the Node Renderer also sets
+  # `fastifyServerOptions: { http2: false }`. See "Renderer HTTP Transport"
+  # below for HTTPS, async-props, proxy, concurrency, and rollout constraints.
+  # Default for `renderer_http_force_http2` is true.
+  # config.renderer_http_force_http2 = false
+
   # If you don't want to worry about special characters in your password within the url, use this config value
   # Default for `renderer_password` is nil
   # config.renderer_password = ENV["RENDERER_PASSWORD"]
@@ -120,13 +127,11 @@ ReactOnRailsPro.configure do |config|
   config.renderer_use_fallback_exec_js = false
 
   # Maximum number of concurrent async-http connections per client to the Node renderer.
-  # HTTP/2 may multiplex multiple request streams over those pooled connections.
-  # When a Fiber.scheduler already exists before the renderer request enters `Sync {}`, the
-  # client is reused across requests within that long-lived scheduler (persistent connection /
-  # keep-alive; see the tuning section below), so this limit bounds connection concurrency for
-  # streamed renders sharing one client.
-  # Otherwise the adapter uses a request-scoped client. Under standard Puma (no pre-existing scheduler), `Sync {}`
-  # creates that scheduler/client for the request and cleans it up when the request ends.
+  # HTTP/2 may multiplex request streams, while each HTTP/1.1 connection handles one
+  # request at a time. With a long-lived Fiber.scheduler, HTTP/1.1 therefore makes
+  # this setting a hard shared-client request-concurrency cap. Standard Puma uses
+  # ephemeral clients for streaming renders and persistent per-thread clients for
+  # non-streaming renders, so it has no process-wide shared-client cap.
   # See "Renderer Performance Tuning for Streamed RSC" below.
   # Default for `renderer_http_pool_size` is 10
   config.renderer_http_pool_size = 10
@@ -275,6 +280,16 @@ ReactOnRailsPro.configure do |config|
 end
 ```
 
+## Renderer HTTP Transport
+
+The default renderer transport is cleartext HTTP/2 (h2c). To select HTTP/1.1, pair Node's
+`fastifyServerOptions: { http2: false }` with Rails' `config.renderer_http_force_http2 = false`.
+`renderer_http_force_http2` applies only to cleartext `http://` URLs; HTTPS selects its protocol through ALPN. With a
+long-lived `Fiber.scheduler`, HTTP/1.1 also makes `renderer_http_pool_size` a hard cap on concurrent renderer requests
+sharing the client. See
+[Node Renderer health checks](../building-features/node-renderer/health-checks.md#choosing-h2c-or-http11) for the
+canonical async-props tradeoff, paired configuration, security requirements, proxy settings, probes, and rollout order.
+
 ## Renderer Performance Tuning for Streamed RSC
 
 The dominant contributors to a streamed route's `responseEnd` tail are Node renderer round-trip overhead, cold or under-warmed renderer workers, and per-request connection setup between Rails and the renderer. Three levers address these (see [issue #4240](https://github.com/shakacode/react_on_rails/issues/4240)). Measure changes with before/after page-load timing for the streamed route, `Server-Timing` for the early Rails/renderer phases that are known before the first stream write, the inline RSC stream performance marks described in the [Streaming SSR guide](../../pro/streaming-ssr.md), and renderer logs or tracing for cold-worker behavior. Inline marks remain the source for late payload, flush, hydration, and stream-drain timing because `ActionController::Live` commits headers on the first stream write.
@@ -299,7 +314,7 @@ Two independent limits gate renderer throughput:
 
 Guidance:
 
-- With Falcon or another long-lived scheduler, keep `renderer_http_pool_size` close to (and generally not far above) `workersCount`; streamed renders sharing that scheduler use the same async-http client, and HTTP/2 may multiplex request streams over the pooled connections. Sending many more concurrent renderer requests than there are workers just queues renders at the renderer while adding connection and scheduling overhead.
+- With Falcon or another long-lived scheduler, size `renderer_http_pool_size` at or above peak concurrent renderer requests per scheduler, then confirm that `workersCount` can sustain that load. Streamed renders sharing that scheduler use the same async-http client. HTTP/2 can multiplex request streams, while each HTTP/1.1 connection handles one request at a time and makes this pool size a hard shared-client concurrency cap. Requests beyond the cap wait for a connection without a pool-acquisition timeout; `ssr_timeout` starts only after a socket is acquired.
 - Under standard Puma streaming, `Sync {}` creates a request-scoped client, so `renderer_http_pool_size` only bounds concurrent async-http connections inside one streamed response. Use a value near the number of renderer calls one response can overlap; scale `workersCount` and renderer replicas for cross-request concurrency.
 - Account for your Rails concurrency: with many Puma threads/workers all streaming, a renderer with only one or two workers becomes the bottleneck. Scale `workersCount` (and renderer replicas) to your real concurrent streamed-render load.
 - Tune `ssr_timeout` for legitimate long gaps between streamed chunks — it applies as a per-read socket timeout, so it fires when a single read from the renderer blocks for `ssr_timeout` seconds. It is not a total response-duration cap; avoid masking renderer hangs with an unnecessarily high value.
