@@ -2434,6 +2434,12 @@ describe ReactOnRailsProHelper do
         end.to raise_error(ReactOnRailsPro::Error, /Pass 'props' as a block/)
       end
 
+      it "rejects conditional caching options" do
+        expect do
+          ppr_react_component(component_name, cache_key: "ppr-key", if: false) { props }
+        end.to raise_error(ReactOnRailsPro::Error, /does not support conditional caching/)
+      end
+
       it "requires a streaming view context" do
         @async_barrier = nil
         expect do

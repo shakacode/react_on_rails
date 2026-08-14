@@ -486,6 +486,7 @@ module ReactOnRailsProHelper
   def ppr_react_component(component_name, raw_options = {}, &block)
     ReactOnRailsPro::Utils.with_trace(component_name) do
       check_caching_options!(raw_options, block)
+      check_ppr_options!(raw_options)
       ensure_streaming_view_context!("ppr_react_component")
 
       render_options = options_with_auto_load_bundle(raw_options)
@@ -1329,6 +1330,14 @@ module ReactOnRailsProHelper
 
     raise ReactOnRails::Error,
           "#{helper_name} requires the view to be rendered with stream_view_containing_react_components"
+  end
+
+  def check_ppr_options!(raw_options)
+    return unless raw_options.key?(:if) || raw_options.key?(:unless)
+
+    raise ReactOnRailsPro::Error,
+          "ppr_react_component does not support conditional caching (:if/:unless) — PPR without " \
+          "a cache would prerender on every request. Use stream_react_component for uncached streaming."
   end
 
   # The full PPR cache key: the shared component base key (bundle digests — deploys invalidate
