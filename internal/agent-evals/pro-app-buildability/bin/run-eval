@@ -363,7 +363,7 @@ normalize_agent_events() {
   local normalized_events="$2"
   local agent_exit_code="$3"
   if [[ "$agent" == codex ]]; then
-    cp "$raw_events" "$normalized_events"
+    node "$eval_dir/bin/normalize-codex-events.mjs" "$raw_events" "$normalized_events"
   else
     node "$eval_dir/bin/normalize-claude-events.mjs" \
       "$raw_events" "$normalized_events" "$agent_exit_code"
@@ -429,10 +429,10 @@ probe_exit=$?
 set -e
 "$eval_dir/bin/quiesce-agent-call" "$output"
 "$eval_dir/bin/assert-agent-call-contained" "$output"
-normalize_agent_events "$raw_probe_events" "$normalized_probe_events" "$probe_exit"
 if [[ "$auth_material_available" == true ]]; then
   assert_credential_absent "$workspace" --skip-symlinks
 fi
+normalize_agent_events "$raw_probe_events" "$normalized_probe_events" "$probe_exit"
 EVAL_PRIVATE_DIR="$private_dir" EVAL_WORKSPACE="$workspace" EVAL_OUTPUT="$output" \
   perl "$eval_dir/bin/sanitize-events.pl" --jsonl "$normalized_probe_events" >"$safe_probe_events"
 EVAL_PRIVATE_DIR="$private_dir" EVAL_WORKSPACE="$workspace" EVAL_OUTPUT="$output" \
@@ -468,10 +468,10 @@ if "$eval_dir/bin/probe-allows-scaffold" "$probe_exit" "$probe_result" "$sandbox
   "$eval_dir/bin/quiesce-agent-call" "$output"
   "$eval_dir/bin/assert-agent-call-contained" "$output"
   [[ "$runner_exit" == 124 ]] && timed_out=true
-  normalize_agent_events "$raw_scaffold_events" "$normalized_scaffold_events" "$runner_exit"
   if [[ "$auth_material_available" == true ]]; then
     assert_credential_absent "$workspace" --skip-symlinks
   fi
+  normalize_agent_events "$raw_scaffold_events" "$normalized_scaffold_events" "$runner_exit"
   EVAL_PRIVATE_DIR="$private_dir" EVAL_WORKSPACE="$workspace" EVAL_OUTPUT="$output" \
     perl "$eval_dir/bin/sanitize-events.pl" --jsonl "$normalized_scaffold_events" >"$safe_scaffold_events"
   EVAL_PRIVATE_DIR="$private_dir" EVAL_WORKSPACE="$workspace" EVAL_OUTPUT="$output" \

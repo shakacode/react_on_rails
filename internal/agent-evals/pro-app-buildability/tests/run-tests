@@ -945,6 +945,254 @@ test ! -s "$tmp/oauth-without-source-stdout"
 test "$(cat "$tmp/oauth-without-source-stderr")" = \
   'Claude OAuth credential format requires a credential source'
 
+ruby -rjson -e '
+  puts JSON.generate(type: "thread.started", thread_id: "synthetic-thread")
+  puts JSON.generate(type: "item.completed", item: { type: "reasoning", text: "r" * 1_100_000 })
+  puts JSON.generate(
+    type: "item.completed",
+    item: {
+      type: "command_execution",
+      command: "printf bounded",
+      exit_code: 0,
+      status: "completed",
+      aggregated_output: "o" * 20_000
+    }
+  )
+  puts JSON.generate(
+    type: "item.completed",
+    item: {
+      type: "agent_message",
+      text: JSON.generate(
+        status: "passed",
+        summary: "done",
+        commands: [],
+        checks: [],
+        friction: [],
+        human_interventions: 0,
+        blockers: []
+      )
+    }
+  )
+' >"$tmp/codex-events.jsonl"
+node "$eval_dir/bin/normalize-codex-events.mjs" \
+  "$tmp/codex-events.jsonl" "$tmp/codex-events.normalized.jsonl"
+test "$(jq -s 'length' "$tmp/codex-events.normalized.jsonl")" = 2
+test "$(jq -r 'select(.item.type == "command_execution") | .item.command' \
+  "$tmp/codex-events.normalized.jsonl")" = 'printf bounded'
+test "$(jq -r 'select(.item.type == "command_execution") | .item.aggregated_output | endswith("[normalized-output-truncated]")' \
+  "$tmp/codex-events.normalized.jsonl")" = true
+test "$(jq -r 'select(.item.type == "agent_message") | .item.text | fromjson | .status' \
+  "$tmp/codex-events.normalized.jsonl")" = passed
+test "$(wc -c <"$tmp/codex-events.normalized.jsonl" | tr -d ' ')" -lt 1048576
+test "$(ruby -e 'printf "%o", File.stat(ARGV.fetch(0)).mode & 0777' \
+  "$tmp/codex-events.normalized.jsonl")" = 600
+
+ruby -rjson -e '
+  secret = "SYNTHETIC-TRUNCATION-CANARY-9384"
+  authority_prefix = "https://agent:#{secret}"
+  padding_bytes = 16_384 - authority_prefix.bytesize
+  multibyte_padding = "€" * (padding_bytes / 3) + "x" * (padding_bytes % 3)
+  puts JSON.generate(
+    type: "item.completed",
+    item: {
+      type: "command_execution",
+      command: "printf bounded",
+      exit_code: 0,
+      status: "completed",
+      aggregated_output: "#{multibyte_padding}#{authority_prefix}@example.test#{"y" * 1_000}"
+    }
+  )
+' >"$tmp/codex-truncated-credential.jsonl"
+node "$eval_dir/bin/normalize-codex-events.mjs" \
+  "$tmp/codex-truncated-credential.jsonl" \
+  "$tmp/codex-truncated-credential.normalized.jsonl"
+if rg -aFq 'SYNTHETIC-TRUNCATION-CANARY-9384' \
+  "$tmp/codex-truncated-credential.normalized.jsonl"; then
+  echo "Codex output truncation bypassed credential redaction" >&2
+  exit 1
+fi
+rg -Fq '[REDACTED]' "$tmp/codex-truncated-credential.normalized.jsonl"
+rg -Fq '[normalized-output-truncated]' \
+  "$tmp/codex-truncated-credential.normalized.jsonl"
+perl "$eval_dir/bin/sanitize-events.pl" --jsonl \
+  "$tmp/codex-truncated-credential.normalized.jsonl" \
+  >"$tmp/codex-truncated-credential.safe.jsonl"
+if rg -aFq 'SYNTHETIC-TRUNCATION-CANARY-9384' \
+  "$tmp/codex-truncated-credential.safe.jsonl"; then
+  echo "Codex credential survived normalization and sanitization" >&2
+  exit 1
+fi
+
+node -e '
+  const fs = require("node:fs");
+  const prefix = Buffer.from(
+    "{\"type\":\"item.completed\",\"item\":{\"type\":\"reasoning\",\"text\":\"",
+  );
+  const suffix = Buffer.from("\"}}\n");
+  fs.writeFileSync(process.argv[1], Buffer.concat([prefix, Buffer.from([0xff]), suffix]));
+' "$tmp/invalid-utf8-codex-events.jsonl"
+if node "$eval_dir/bin/normalize-codex-events.mjs" \
+  "$tmp/invalid-utf8-codex-events.jsonl" \
+  "$tmp/invalid-utf8-codex-events.normalized.jsonl" \
+  2>"$tmp/invalid-utf8-codex-events-error"; then
+  echo "Codex normalizer accepted invalid UTF-8 in an ignored event" >&2
+  exit 1
+fi
+test ! -e "$tmp/invalid-utf8-codex-events.normalized.jsonl"
+rg -q 'Codex transcript is not valid UTF-8' \
+  "$tmp/invalid-utf8-codex-events-error"
+
+node -e '
+  const fs = require("node:fs");
+  const prefix = Buffer.from(
+    "{\"type\":\"item.completed\",\"item\":{\"type\":\"agent_message\",\"text\":\"literal � ",
+  );
+  const emoji = Buffer.from("😀");
+  const padding = Buffer.alloc(65_535 - prefix.length, "x");
+  const suffix = Buffer.from("\"}}\n");
+  fs.writeFileSync(process.argv[1], Buffer.concat([prefix, padding, emoji, suffix]));
+' "$tmp/valid-split-utf8-codex-events.jsonl"
+node "$eval_dir/bin/normalize-codex-events.mjs" \
+  "$tmp/valid-split-utf8-codex-events.jsonl" \
+  "$tmp/valid-split-utf8-codex-events.normalized.jsonl"
+jq -e '.item.text | startswith("literal � ") and endswith("😀")' \
+  "$tmp/valid-split-utf8-codex-events.normalized.jsonl" >/dev/null
+
+printf '%s\n' \
+  '{"type":"item.completed","item":{"type":"agent_message","text":"old report"}}' \
+  '{"type":"item.completed","item":{"type":"agent_message","text":"final report"}}' \
+  >"$tmp/codex-agent-messages.jsonl"
+node "$eval_dir/bin/normalize-codex-events.mjs" \
+  "$tmp/codex-agent-messages.jsonl" "$tmp/codex-agent-messages.normalized.jsonl"
+test "$(jq -s 'length' "$tmp/codex-agent-messages.normalized.jsonl")" = 1
+test "$(jq -r '.item.text' "$tmp/codex-agent-messages.normalized.jsonl")" = 'final report'
+
+ruby -rjson -e '
+  5_000.times do
+    puts JSON.generate(
+      type: "item.completed",
+      item: {
+        type: "command_execution",
+        command: "true",
+        exit_code: 0,
+        status: "completed",
+        aggregated_output: ""
+      }
+    )
+  end
+' >"$tmp/codex-command-boundary.jsonl"
+node "$eval_dir/bin/normalize-codex-events.mjs" \
+  "$tmp/codex-command-boundary.jsonl" "$tmp/codex-command-boundary.normalized.jsonl"
+test "$(wc -l <"$tmp/codex-command-boundary.normalized.jsonl" | tr -d ' ')" = 5000
+perl "$eval_dir/bin/sanitize-events.pl" --jsonl \
+  "$tmp/codex-command-boundary.normalized.jsonl" \
+  >"$tmp/codex-command-boundary.safe.jsonl"
+
+head -n 4999 "$tmp/codex-command-boundary.jsonl" \
+  >"$tmp/codex-total-boundary.jsonl"
+printf '%s\n' \
+  '{"type":"item.completed","item":{"type":"agent_message","text":"final report"}}' \
+  >>"$tmp/codex-total-boundary.jsonl"
+node "$eval_dir/bin/normalize-codex-events.mjs" \
+  "$tmp/codex-total-boundary.jsonl" "$tmp/codex-total-boundary.normalized.jsonl"
+test "$(wc -l <"$tmp/codex-total-boundary.normalized.jsonl" | tr -d ' ')" = 5000
+test "$(tail -n 1 "$tmp/codex-total-boundary.normalized.jsonl" | jq -r '.item.text')" = \
+  'final report'
+perl "$eval_dir/bin/sanitize-events.pl" --jsonl \
+  "$tmp/codex-total-boundary.normalized.jsonl" \
+  >"$tmp/codex-total-boundary.safe.jsonl"
+
+cp "$tmp/codex-command-boundary.jsonl" "$tmp/too-many-normalized-codex-events.jsonl"
+printf '%s\n' \
+  '{"type":"item.completed","item":{"type":"agent_message","text":"final report"}}' \
+  >>"$tmp/too-many-normalized-codex-events.jsonl"
+if node "$eval_dir/bin/normalize-codex-events.mjs" \
+  "$tmp/too-many-normalized-codex-events.jsonl" \
+  "$tmp/too-many-normalized-codex-events.normalized.jsonl" \
+  2>"$tmp/too-many-normalized-codex-events-error"; then
+  echo "Codex normalizer emitted more events than the sanitizer accepts" >&2
+  exit 1
+fi
+test ! -e "$tmp/too-many-normalized-codex-events.normalized.jsonl"
+rg -q 'exceeds 5000-event evidence limit' \
+  "$tmp/too-many-normalized-codex-events-error"
+
+printf '%s\n' 'not-json' >"$tmp/malformed-codex-events.jsonl"
+if node "$eval_dir/bin/normalize-codex-events.mjs" \
+  "$tmp/malformed-codex-events.jsonl" "$tmp/malformed-codex-events.normalized.jsonl" \
+  2>"$tmp/malformed-codex-events-error"; then
+  echo "malformed Codex event was accepted" >&2
+  exit 1
+fi
+test ! -e "$tmp/malformed-codex-events.normalized.jsonl"
+rg -q 'malformed event' "$tmp/malformed-codex-events-error"
+
+printf '%s\n' '[]' >"$tmp/nonobject-codex-events.jsonl"
+if node "$eval_dir/bin/normalize-codex-events.mjs" \
+  "$tmp/nonobject-codex-events.jsonl" "$tmp/nonobject-codex-events.normalized.jsonl" \
+  2>"$tmp/nonobject-codex-events-error"; then
+  echo "non-object Codex event was accepted" >&2
+  exit 1
+fi
+test ! -e "$tmp/nonobject-codex-events.normalized.jsonl"
+rg -q 'is not an object' "$tmp/nonobject-codex-events-error"
+
+printf '%s\n' \
+  '{"type":"item.completed","item":{"type":"command_execution","command":{"dynamic":true},"exit_code":0,"status":"completed","aggregated_output":"done"}}' \
+  >"$tmp/invalid-command-codex-events.jsonl"
+if node "$eval_dir/bin/normalize-codex-events.mjs" \
+  "$tmp/invalid-command-codex-events.jsonl" "$tmp/invalid-command-codex-events.normalized.jsonl" \
+  2>"$tmp/invalid-command-codex-events-error"; then
+  echo "invalid Codex command event was accepted" >&2
+  exit 1
+fi
+test ! -e "$tmp/invalid-command-codex-events.normalized.jsonl"
+rg -q 'has an invalid command' "$tmp/invalid-command-codex-events-error"
+
+ruby -rjson -e '
+  70.times do |index|
+    puts JSON.generate(
+      type: "item.completed",
+      item: {
+        type: "command_execution",
+        command: "large-output-#{index}",
+        exit_code: 0,
+        status: "completed",
+        aggregated_output: "x" * 16_384
+      }
+    )
+  end
+' >"$tmp/oversized-normalized-codex-events.jsonl"
+if node "$eval_dir/bin/normalize-codex-events.mjs" \
+  "$tmp/oversized-normalized-codex-events.jsonl" \
+  "$tmp/oversized-normalized-codex-events.normalized.jsonl" \
+  2>"$tmp/oversized-normalized-codex-events-error"; then
+  echo "oversized normalized Codex evidence was accepted" >&2
+  exit 1
+fi
+test ! -e "$tmp/oversized-normalized-codex-events.normalized.jsonl"
+rg -q 'exceeds 1048576-byte evidence limit' "$tmp/oversized-normalized-codex-events-error"
+
+dd if=/dev/zero of="$tmp/oversized-codex-events.jsonl" bs=1 count=0 seek=67108865 \
+  2>/dev/null
+if node "$eval_dir/bin/normalize-codex-events.mjs" \
+  "$tmp/oversized-codex-events.jsonl" "$tmp/oversized-codex-events.normalized.jsonl" \
+  2>"$tmp/oversized-codex-events-error"; then
+  echo "oversized raw Codex transcript was accepted" >&2
+  exit 1
+fi
+test ! -e "$tmp/oversized-codex-events.normalized.jsonl"
+rg -q 'exceeds 67108864-byte normalization limit' "$tmp/oversized-codex-events-error"
+
+printf '%s\n' 'preserve-existing-output' >"$tmp/existing-codex-events.normalized.jsonl"
+if node "$eval_dir/bin/normalize-codex-events.mjs" \
+  "$tmp/codex-agent-messages.jsonl" "$tmp/existing-codex-events.normalized.jsonl" \
+  2>"$tmp/existing-codex-events-error"; then
+  echo "Codex normalizer overwrote an existing output" >&2
+  exit 1
+fi
+test "$(cat "$tmp/existing-codex-events.normalized.jsonl")" = 'preserve-existing-output'
+
 printf '%s\n' \
   '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"tool-1","name":"Bash","input":{"command":"npm view create-react-on-rails-app version --json"}}]}}' \
   '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"tool-1","content":"1.0.0","is_error":false}]}}' \
@@ -1705,6 +1953,7 @@ rg -Fq 'sanitize-events.pl" --jsonl "$normalized_probe_events"' "$eval_dir/bin/r
 rg -Fq 'sanitize-events.pl" --jsonl "$normalized_scaffold_events"' "$eval_dir/bin/run-eval"
 rg -Fq 'sanitize-events.pl" "$raw_probe_stderr"' "$eval_dir/bin/run-eval"
 rg -Fq 'sanitize-events.pl" "$raw_scaffold_stderr"' "$eval_dir/bin/run-eval"
+rg -Fq 'normalize-codex-events.mjs" "$raw_events" "$normalized_events"' "$eval_dir/bin/run-eval"
 rg -Fq -- '--verbose --kill-after "$kill_grace" "$duration"' \
   "$eval_dir/bin/run-with-timeout"
 rg -Fq 'maximum_agent_call_wall_clock_seconds=$((probe_timeout_seconds + timeout_seconds +' \
@@ -1752,6 +2001,17 @@ test "$(rg -Fn 'shasum -a 256 "$file"; done <"$checksum_files" >SHA256SUMS' \
   "$(rg -Fn 'assert_credential_absent "$output"' "$eval_dir/bin/run-eval" | cut -d: -f1)"
 rg -Fq 'assert_credential_absent "$workspace"' "$eval_dir/bin/run-eval"
 rg -Fq 'assert_credential_absent "$workspace" --skip-symlinks' "$eval_dir/bin/run-eval"
+workspace_scan_lines="$(rg -Fn 'assert_credential_absent "$workspace" --skip-symlinks' \
+  "$eval_dir/bin/run-eval" | cut -d: -f1)"
+test "$(printf '%s\n' "$workspace_scan_lines" | wc -l | tr -d ' ')" = 2
+probe_workspace_scan_line="$(printf '%s\n' "$workspace_scan_lines" | sed -n '1p')"
+scaffold_workspace_scan_line="$(printf '%s\n' "$workspace_scan_lines" | sed -n '2p')"
+probe_normalize_line="$(rg -Fn 'normalize_agent_events "$raw_probe_events"' \
+  "$eval_dir/bin/run-eval" | cut -d: -f1)"
+scaffold_normalize_line="$(rg -Fn 'normalize_agent_events "$raw_scaffold_events"' \
+  "$eval_dir/bin/run-eval" | cut -d: -f1)"
+test "$probe_workspace_scan_line" -lt "$probe_normalize_line"
+test "$scaffold_workspace_scan_line" -lt "$scaffold_normalize_line"
 rg -Fq 'credential_snapshot=' "$eval_dir/bin/run-eval"
 rg -Fq 'assert-brokered-credential-absent' "$eval_dir/bin/run-eval"
 rg -Fq 'assert_credential_absent' "$eval_dir/bin/run-eval"
