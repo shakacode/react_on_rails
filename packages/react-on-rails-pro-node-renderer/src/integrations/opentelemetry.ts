@@ -282,7 +282,7 @@ function initWithExistingGlobalProvider(opts: OpenTelemetryInitOptions): void {
       log.info('[OpenTelemetry] Renderer tracing attached to the existing global provider');
     }
   } catch (err) {
-    installedAdapters = resetInstalledTracingAdapters(installedAdapters);
+    resetInstalledTracingAdapters(installedAdapters);
     setUsingExistingGlobalTracerProvider(false);
     message(`[OpenTelemetry] init failed: ${String(err)}`);
   }
@@ -478,6 +478,9 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
       setOpenTelemetryTracerProvider(null);
       disableOpenTelemetryGlobals(otelApi);
       ownsOpenTelemetryGlobals = false;
+    }
+    if (registeredProvider) {
+      void registeredProvider.shutdown().catch(() => undefined);
     }
     installedAdapters = resetInstalledTracingAdapters(installedAdapters);
     message(`[OpenTelemetry] init failed: ${String(err)}`);

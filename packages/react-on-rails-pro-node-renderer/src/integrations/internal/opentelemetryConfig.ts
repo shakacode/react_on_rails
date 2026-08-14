@@ -102,7 +102,7 @@ function parseResourceAttributes(value: string | undefined): Record<string, stri
 }
 
 function resolveConfiguredServiceName(opts: OpenTelemetryResourceOptions): string | undefined {
-  return process.env.OTEL_SERVICE_NAME ?? opts.serviceName;
+  return process.env.OTEL_SERVICE_NAME || opts.serviceName || undefined;
 }
 
 export function resolveServiceName(opts: OpenTelemetryResourceOptions, serviceNameAttribute: string): string {

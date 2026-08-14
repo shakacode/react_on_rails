@@ -82,6 +82,39 @@ describe('opentelemetry integration: composable init()', () => {
     );
   });
 
+  test('the managed provider is shut down when instrumentation registration fails', async () => {
+    const registrationError = new Error('custom instrumentation registration failed');
+    const registerInstrumentations = jest.fn(() => {
+      throw registrationError;
+    });
+    const customInstrumentation = { instrumentationName: 'broken' } as Instrumentation;
+
+    jest.doMock('@opentelemetry/instrumentation', () => ({ registerInstrumentations }));
+    jest.doMock('@opentelemetry/instrumentation-http', () => ({ HttpInstrumentation: jest.fn() }));
+    jest.doMock('@fastify/otel', () => ({ FastifyOtelInstrumentation: jest.fn() }));
+
+    const { NodeTracerProvider: FreshNodeTracerProvider } = await import('@opentelemetry/sdk-trace-node');
+    const shutdownSpy = jest
+      .spyOn(FreshNodeTracerProvider.prototype, 'shutdown')
+      .mockResolvedValue(undefined);
+    const exporter = new InMemorySpanExporter();
+    const errorReporter = await import('../../src/shared/errorReporter');
+    const messageSpy = jest.spyOn(errorReporter, 'message').mockImplementation(() => undefined);
+    const { init } = await import('../../src/integrations/opentelemetry');
+
+    init({
+      instrumentations: [customInstrumentation],
+      spanProcessor: new SimpleSpanProcessor(exporter),
+    });
+
+    expect(shutdownSpy).toHaveBeenCalledTimes(1);
+    expect(messageSpy).toHaveBeenCalledWith(
+      expect.stringContaining(
+        '[OpenTelemetry] init failed: Error: custom instrumentation registration failed',
+      ),
+    );
+  });
+
   test('resource detectors contribute attributes below explicit service-name configuration', async () => {
     const originalServiceName = process.env.OTEL_SERVICE_NAME;
     const originalResourceAttributes = process.env.OTEL_RESOURCE_ATTRIBUTES;
@@ -142,6 +175,16 @@ describe('opentelemetry integration: composable init()', () => {
         'cloud.platform': 'aws_ecs',
         'service.name': 'env-renderer',
       });
+
+      process.env.OTEL_SERVICE_NAME = '';
+      await expect(captureResourceAttributes({ serviceName: 'configured-renderer' })).resolves.toMatchObject({
+        'cloud.platform': 'aws_ecs',
+        'service.name': 'configured-renderer',
+      });
+      await expect(captureResourceAttributes({ serviceName: '' })).resolves.toMatchObject({
+        'cloud.platform': 'aws_ecs',
+        'service.name': 'react-on-rails-pro-node-renderer',
+      });
     } finally {
       if (originalServiceName === undefined) {
         delete process.env.OTEL_SERVICE_NAME;
@@ -157,46 +200,64 @@ describe('opentelemetry integration: composable init()', () => {
   });
 
   test('resource detector failures are logged and their attributes are omitted', async () => {
-    const thrownError = new Error('detector threw');
-    const rejectedError = new Error('attribute rejected');
-    const anonymousError = new Error('anonymous detector threw');
-    const throwingDetector: ResourceDetector = {
-      detect: () => {
-        throw thrownError;
-      },
-    };
-    const rejectingDetector: ResourceDetector = {
-      detect: () => ({ attributes: { 'cloud.platform': Promise.reject(rejectedError) } }),
-    };
-    const anonymousDetector = Object.create(null) as ResourceDetector;
-    anonymousDetector.detect = () => {
-      throw anonymousError;
-    };
-    const log = (await import('../../src/shared/log')).default;
-    const warnSpy = jest.spyOn(log, 'warn').mockImplementation(() => undefined);
-    const exporter = new InMemorySpanExporter();
-    const spanProcessor = new SimpleSpanProcessor(exporter);
-    const { init } = await import('../../src/integrations/opentelemetry');
+    const originalServiceName = process.env.OTEL_SERVICE_NAME;
+    const originalResourceAttributes = process.env.OTEL_RESOURCE_ATTRIBUTES;
+    delete process.env.OTEL_SERVICE_NAME;
+    delete process.env.OTEL_RESOURCE_ATTRIBUTES;
 
-    init({ resourceDetectors: [throwingDetector, rejectingDetector, anonymousDetector], spanProcessor });
-    otelTrace.getTracer('test').startActiveSpan('manual.span', (span) => span.end());
-    await spanProcessor.forceFlush();
+    try {
+      const thrownError = new Error('detector threw');
+      const rejectedError = new Error('attribute rejected');
+      const anonymousError = new Error('anonymous detector threw');
+      const throwingDetector: ResourceDetector = {
+        detect: () => {
+          throw thrownError;
+        },
+      };
+      const rejectingDetector: ResourceDetector = {
+        detect: () => ({ attributes: { 'cloud.platform': Promise.reject(rejectedError) } }),
+      };
+      const anonymousDetector = Object.create(null) as ResourceDetector;
+      anonymousDetector.detect = () => {
+        throw anonymousError;
+      };
+      const log = (await import('../../src/shared/log')).default;
+      const warnSpy = jest.spyOn(log, 'warn').mockImplementation(() => undefined);
+      const exporter = new InMemorySpanExporter();
+      const spanProcessor = new SimpleSpanProcessor(exporter);
+      const { init } = await import('../../src/integrations/opentelemetry');
 
-    expect(exporter.getFinishedSpans()[0]!.resource.attributes).toMatchObject({
-      'service.name': 'react-on-rails-pro-node-renderer',
-    });
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ err: thrownError }),
-      expect.stringContaining('resource detector failed'),
-    );
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ err: rejectedError }),
-      expect.stringContaining('resource detector failed'),
-    );
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ detector: '<anonymous>', err: anonymousError }),
-      expect.stringContaining('resource detector failed'),
-    );
+      init({ resourceDetectors: [throwingDetector, rejectingDetector, anonymousDetector], spanProcessor });
+      otelTrace.getTracer('test').startActiveSpan('manual.span', (span) => span.end());
+      await spanProcessor.forceFlush();
+
+      expect(exporter.getFinishedSpans()[0]!.resource.attributes).toMatchObject({
+        'service.name': 'react-on-rails-pro-node-renderer',
+      });
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ err: thrownError }),
+        expect.stringContaining('resource detector failed'),
+      );
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ err: rejectedError }),
+        expect.stringContaining('resource detector failed'),
+      );
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ detector: '<anonymous>', err: anonymousError }),
+        expect.stringContaining('resource detector failed'),
+      );
+    } finally {
+      if (originalServiceName === undefined) {
+        delete process.env.OTEL_SERVICE_NAME;
+      } else {
+        process.env.OTEL_SERVICE_NAME = originalServiceName;
+      }
+      if (originalResourceAttributes === undefined) {
+        delete process.env.OTEL_RESOURCE_ATTRIBUTES;
+      } else {
+        process.env.OTEL_RESOURCE_ATTRIBUTES = originalResourceAttributes;
+      }
+    }
   });
 
   test('an existing global provider can emit renderer ror spans without loading a second SDK', async () => {
