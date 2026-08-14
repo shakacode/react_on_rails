@@ -92,6 +92,7 @@ function walk(directory, depth = 0) {
           );
           const selected =
             selectedBasenames.has(entry.name) ||
+            /(?:^|\/)app\/views\/hello_server\/index\.html\.erb$/.test(relative) ||
             (insideSelectedRoot && selectedExtensions.has(path.extname(entry.name)));
           if (selected) {
             artifactLimits.selected_files += 1;
@@ -860,7 +861,7 @@ const maskRubyControlFlowLine = (line) => {
   return quote === null && !regex && !escaped ? masked.join('') : null;
 };
 const emptyIteratorBraceOwnerPattern =
-  /^(?:(?:\[\s*\]|\{\s*\})\.each|0\.times)\s*\{(?:\s*\|[^|\r\n]*\|)?\s*$/;
+  /^(?:[a-z_][A-Za-z0-9_]*[ \t]*=[ \t]*)?(?:(?:\[\s*\]|\{\s*\})\.(?:each|filter_map|map)|0\.times)\s*\{(?:\s*\|[^|\r\n]*\|)?\s*$/;
 const rubyOwnerFramesBefore = (content, targetIndex) => {
   const frames = [];
   let lineStart = 0;
@@ -934,6 +935,325 @@ const qualifyingRscRoutes = rscRoutes.filter(
     !launchBriefingRscRouteMentionPattern.test(artifact.excerpt) ||
     activeLaunchBriefingRscRoutes.includes(artifact),
 );
+const stripRubyLineComment = (line) => {
+  let quote = null;
+  let escaped = false;
+  for (let index = 0; index < line.length; index += 1) {
+    const character = line[index];
+    if (escaped) {
+      escaped = false;
+    } else if (quote !== null && character === '\\') {
+      escaped = true;
+    } else if (quote !== null) {
+      if (character === quote) quote = null;
+    } else if (character === '"' || character === "'") {
+      quote = character;
+    } else if (character === '#') {
+      return line.slice(0, index);
+    }
+  }
+  return quote === null && !escaped ? line : null;
+};
+const hasDirectRouteLine = (routeContent, pattern, linePredicate = () => true) => {
+  const executablePattern = new RegExp(pattern.source, pattern.flags.replaceAll('g', ''));
+  return [...routeContent.matchAll(pattern)].some((route) => {
+    const frames = rubyOwnerFramesBefore(routeContent, route.index);
+    const executableLine = stripRubyLineComment(route[0]);
+    const codeLine = executableLine === null ? null : maskRubyControlFlowLine(executableLine);
+    return (
+      frames?.length === 1 &&
+      frames[0].type === 'routes' &&
+      codeLine !== null &&
+      executablePattern.test(executableLine) &&
+      linePredicate(executableLine) &&
+      !/&&|\|\||;|\b(?:if|unless|until|while)\b/.test(codeLine)
+    );
+  });
+};
+const hasSupportedHelloServerRouteAlias = (routeLine) =>
+  /^[ \t]*(?:get[ \t]+["']\/?hello_server["'][ \t]*,[ \t]*to[ \t]*:[ \t]*["']hello_server#index["'](?:[ \t]*,[ \t]*as[ \t]*:[ \t]*(?::hello_server|["']hello_server["']))?|get\([ \t]*["']\/?hello_server["'][ \t]*,[ \t]*to[ \t]*:[ \t]*["']hello_server#index["'](?:[ \t]*,[ \t]*as[ \t]*:[ \t]*(?::hello_server|["']hello_server["']))?[ \t]*\))[ \t]*$/.test(
+    routeLine,
+  );
+const activeHelloServerRscRoutes = rscRoutes.filter((artifact) => {
+  if (artifact.excerpt_truncated) return false;
+  const routeContent = maskExecutableRubyContent(artifact.excerpt);
+  if (routeContent === null) return false;
+  return (
+    hasDirectRouteLine(
+      routeContent,
+      /^[ \t]*get(?:[ \t]+|\([ \t]*)["']\/?hello_server["'](?=[ \t]*(?:,|\)))[^\r\n]*\bto[ \t]*:[ \t]*["']hello_server#index["'][^\r\n]*$/gm,
+      hasSupportedHelloServerRouteAlias,
+    ) && hasDirectRouteLine(routeContent, /^[ \t]*rsc_payload_route[ \t]*(?:\([^\r\n]*\))?[ \t]*$/gm)
+  );
+});
+const maskJavaScriptComments = (content) => {
+  let blockComment = false;
+  let lineComment = false;
+  let quote = null;
+  let escaped = false;
+  const masked = [];
+  for (let index = 0; index < content.length; index += 1) {
+    const character = content[index];
+    const next = content[index + 1];
+    if (lineComment) {
+      if (character === '\n' || character === '\r') {
+        lineComment = false;
+        masked.push(character);
+      } else {
+        masked.push(' ');
+      }
+    } else if (blockComment) {
+      if (character === '*' && next === '/') {
+        masked.push(' ', ' ');
+        blockComment = false;
+        index += 1;
+      } else {
+        masked.push(character === '\n' || character === '\r' ? character : ' ');
+      }
+    } else if (quote !== null) {
+      masked.push(character === quote || character === '\n' || character === '\r' ? character : ' ');
+      if (escaped) {
+        escaped = false;
+      } else if (character === '\\') {
+        escaped = true;
+      } else if (character === quote) {
+        quote = null;
+      }
+    } else if (character === '/' && next === '/') {
+      masked.push(' ', ' ');
+      lineComment = true;
+      index += 1;
+    } else if (character === '/' && next === '*') {
+      masked.push(' ', ' ');
+      blockComment = true;
+      index += 1;
+    } else if (character === '"' || character === "'" || character === '`') {
+      quote = character;
+      masked.push(character);
+    } else {
+      masked.push(character);
+    }
+  }
+  return blockComment || quote !== null || escaped ? null : masked.join('');
+};
+const matchingExecutableJavaScriptLine = (rawContent, maskedContent, rawPattern, maskedPattern) => {
+  const rawLines = rawContent.split(/\r?\n/);
+  const maskedLines = maskedContent.split(/\r?\n/);
+  return rawLines.some(
+    (line, index) => rawPattern.test(line) && maskedPattern.test(maskedLines[index] ?? ''),
+  );
+};
+const directHelloServerArrowBody = (content) => {
+  const declarations = [
+    ...content.matchAll(/^[ \t]*const\s+HelloServer\s*=\s*async\b[^\r\n]*=>[ \t]*\([ \t]*$/gm),
+  ];
+  if (declarations.length !== 1) return null;
+  const declaration = declarations[0];
+  const bodyStart = declaration.index + declaration[0].length;
+  const remainder = content.slice(bodyStart);
+  const closings = [...remainder.matchAll(/^[ \t]*\);?[ \t]*$/gm)];
+  if (closings.length !== 1) return null;
+  const closing = closings[0];
+  if (
+    !/^[ \t]*(?:\r?\n[ \t]*)*export\s+default\s+HelloServer;?[ \t]*(?:\r?\n)?$/.test(
+      remainder.slice(closing.index + closing[0].length),
+    )
+  ) {
+    return null;
+  }
+  return remainder.slice(0, closing.index);
+};
+const directRubyMethodBody = (content, methodName, expectedOwnerDepth = 1) => {
+  const starts = [...content.matchAll(new RegExp(`^([ \\t]*)def[ \\t]+${methodName}[ \\t]*$`, 'gm'))];
+  if (starts.length !== 1) return null;
+  const start = starts[0];
+  const ownerFrames = rubyOwnerFramesBefore(content, start.index);
+  if (
+    ownerFrames?.length !== expectedOwnerDepth ||
+    (expectedOwnerDepth === 1 && ownerFrames[0].type !== 'class')
+  ) {
+    return null;
+  }
+  const lines = content.slice(start.index + start[0].length).split(/\r?\n/);
+  const closing = lines.findIndex((line) => line.match(/^([ \t]*)end[ \t]*$/)?.[1] === start[1]);
+  return closing < 0 ? null : lines.slice(0, closing).join('\n');
+};
+const directRubyClassBody = (content, className, superclass) => {
+  const starts = [
+    ...content.matchAll(
+      new RegExp(`^([ \\t]*)class[ \\t]+${className}[ \\t]*<[ \\t]*${superclass}[ \\t]*$`, 'gm'),
+    ),
+  ];
+  if (starts.length !== 1) return null;
+  const start = starts[0];
+  if (rubyOwnerFramesBefore(content, start.index)?.length !== 0) return null;
+  const lines = content.slice(start.index + start[0].length).split(/\r?\n/);
+  const closing = lines.findIndex((line) => line.match(/^([ \t]*)end[ \t]*$/)?.[1] === start[1]);
+  return closing < 0 ? null : lines.slice(0, closing).join('\n');
+};
+const helloServerRscControllers = artifacts.filter((artifact) => {
+  if (artifact.excerpt_truncated || !/app\/controllers\/hello_server_controller\.rb$/i.test(artifact.path)) {
+    return false;
+  }
+  const executable = maskExecutableRubyContent(artifact.excerpt)?.replace(/^[ \t]*#.*$/gm, '');
+  if (executable === undefined || executable === null) return false;
+  const controllerBody = directRubyClassBody(executable, 'HelloServerController', 'ApplicationController');
+  if (controllerBody === null) return false;
+  const directStreamInclude = [
+    ...controllerBody.matchAll(/^[ \t]*include\s+ReactOnRailsPro::Stream[ \t]*$/gm),
+  ].some((includeLine) => rubyOwnerFramesBefore(controllerBody, includeLine.index)?.length === 0);
+  if (!directStreamInclude) return false;
+  const indexBody = directRubyMethodBody(controllerBody, 'index', 0);
+  if (indexBody === null) return false;
+  const streamCalls = [
+    ...indexBody.matchAll(
+      /^[ \t]*stream_view_containing_react_components\([ \t]*template:[ \t]*["']hello_server\/index["'][ \t]*\)[ \t]*$/gm,
+    ),
+  ];
+  if (streamCalls.length !== 1) return false;
+  const streamCall = streamCalls[0];
+  if (
+    rubyOwnerFramesBefore(indexBody, streamCall.index)?.length !== 0 ||
+    !/^[ \t]*(?:\r?\n[ \t]*)*$/.test(indexBody.slice(streamCall.index + streamCall[0].length))
+  ) {
+    return false;
+  }
+  const propAssignments = [...indexBody.matchAll(/^[ \t]*@hello_server_props[ \t]*=/gm)].filter(
+    (assignment) => rubyOwnerFramesBefore(indexBody, assignment.index)?.length === 0,
+  );
+  const beforeStream = indexBody.slice(0, streamCall.index);
+  return (
+    propAssignments.length === 1 &&
+    !beforeStream
+      .split(/\r?\n/)
+      .some((line) =>
+        /\b(?:begin|case|for|head|if|raise|redirect_to|render|return|throw|unless|until|while)\b/.test(
+          maskRubyControlFlowLine(line) ?? '',
+        ),
+      )
+  );
+});
+const helloServerRscComponents = artifacts.filter((artifact) => {
+  if (
+    artifact.excerpt_truncated ||
+    !/app\/javascript\/src\/HelloServer\/components\/HelloServer\.(?:jsx|tsx)$/.test(artifact.path)
+  ) {
+    return false;
+  }
+  const executable = maskJavaScriptComments(artifact.excerpt);
+  const componentBody = executable === null ? null : directHelloServerArrowBody(executable);
+  return (
+    executable !== null &&
+    !matchingExecutableJavaScriptLine(
+      artifact.excerpt,
+      executable,
+      /^[ \t]*["']use client["'];?/,
+      /^[ \t]*["'][ ]+["'];?[ \t]*$/,
+    ) &&
+    componentBody !== null &&
+    !/(?:&&|\|\||\b(?:false|if|switch)\b|\?)/.test(componentBody) &&
+    !/(?:\[\s*\]|\{\s*\})\.(?:filter\s*\([^()\r\n]*\)\s*\.)*(?:filter_map|map)\s*\(/.test(componentBody) &&
+    /^[ \t]*\{title\}[ \t]*$/m.test(componentBody) &&
+    /Generated on the server at\s*\{generatedAt\}/.test(componentBody) &&
+    /\breleases\.map\s*\(/.test(componentBody)
+  );
+});
+const helloServerRscEntries = artifacts.filter((artifact) => {
+  if (
+    artifact.excerpt_truncated ||
+    !/app\/javascript\/src\/HelloServer\/ror_components\/HelloServer\.(?:jsx|tsx)$/.test(artifact.path)
+  ) {
+    return false;
+  }
+  const executable = maskJavaScriptComments(artifact.excerpt);
+  return (
+    executable !== null &&
+    matchingExecutableJavaScriptLine(
+      artifact.excerpt,
+      executable,
+      /^[ \t]*import\s+HelloServer\s+from\s+["']\.\.\/components\/HelloServer["'];?[ \t]*$/,
+      /^[ \t]*import\s+HelloServer\s+from\s+["'][ ]+["'];?[ \t]*$/,
+    ) &&
+    /^[ \t]*export\s+default\s+HelloServer;?[ \t]*$/m.test(executable)
+  );
+});
+const topLevelErbMountsHelloServer = (content) => {
+  const helperPattern =
+    /^[ \t]*<%=[ \t]+stream_react_component\(["']HelloServer["'],[ \t]*props:[ \t]*@hello_server_props\)[ \t]*%>[ \t]*$/gm;
+  return [...content.matchAll(helperPattern)].some((helper) => {
+    const prefix = content.slice(0, helper.index);
+    if (prefix.lastIndexOf('<!--') > prefix.lastIndexOf('-->')) return false;
+    let depth = 0;
+    for (const statement of prefix.matchAll(/<%(?!#)([\s\S]*?)%>/g)) {
+      const code = statement[1].trim();
+      if (/^}\s*$/.test(code)) {
+        if (depth === 0) return false;
+        depth -= 1;
+      } else if (/^end\b/.test(code)) {
+        if (depth === 0) return false;
+        depth -= 1;
+      } else if (
+        /^(?:begin|case|for|if|unless|until|while)\b/.test(code) ||
+        /\{[ \t]*(?:\|[^|\r\n]*\|)?[ \t]*$/.test(code) ||
+        /\bdo(?:[ \t]*\|[^|\r\n]*\|)?[ \t]*$/.test(code)
+      ) {
+        depth += 1;
+      }
+    }
+    return depth === 0;
+  });
+};
+const helloServerRscViews = artifacts.filter(
+  (artifact) =>
+    !artifact.excerpt_truncated &&
+    /app\/views\/hello_server\/index\.html\.erb$/.test(artifact.path) &&
+    topLevelErbMountsHelloServer(artifact.excerpt),
+);
+const helloServerArtifactSuffixes = [
+  'config/routes.rb',
+  'app/controllers/hello_server_controller.rb',
+  'app/javascript/src/HelloServer/components/HelloServer.jsx',
+  'app/javascript/src/HelloServer/components/HelloServer.tsx',
+  'app/javascript/src/HelloServer/ror_components/HelloServer.jsx',
+  'app/javascript/src/HelloServer/ror_components/HelloServer.tsx',
+  'app/views/hello_server/index.html.erb',
+];
+const helloServerApplicationRoot = (artifact) => {
+  for (const suffix of helloServerArtifactSuffixes) {
+    if (artifact.path === suffix) return '';
+    if (artifact.path.endsWith(`/${suffix}`)) {
+      return artifact.path.slice(0, -(suffix.length + 1));
+    }
+  }
+  return null;
+};
+const rootsForArtifacts = (matchedArtifacts) =>
+  new Set(matchedArtifacts.map(helloServerApplicationRoot).filter((root) => root !== null));
+const helloServerRscArtifactGroups = [
+  activeHelloServerRscRoutes,
+  helloServerRscControllers,
+  helloServerRscComponents,
+  helloServerRscEntries,
+  helloServerRscViews,
+];
+const helloServerRscRoots = new Set(
+  [...rootsForArtifacts(activeHelloServerRscRoutes)].filter((root) =>
+    helloServerRscArtifactGroups.every((group) => rootsForArtifacts(group).has(root)),
+  ),
+);
+const testArtifactApplicationRoot = (artifact) => {
+  for (const directory of ['test', 'spec']) {
+    if (artifact.path.startsWith(`${directory}/`)) return '';
+    const marker = `/${directory}/`;
+    const index = artifact.path.lastIndexOf(marker);
+    if (index >= 0) return artifact.path.slice(0, index);
+  }
+  return null;
+};
+const hasExactHelloServerRscImplementation = helloServerRscRoots.size > 0;
+const exactHelloServerRscArtifacts = helloServerRscArtifactGroups
+  .flat()
+  .filter((artifact) => helloServerRscRoots.has(helloServerApplicationRoot(artifact)));
 const rubyTestCases = (content) => {
   const maskedContent = maskExecutableRubyContent(content);
   if (maskedContent === null) return [];
@@ -1063,8 +1383,8 @@ const pageTests = artifacts.filter((artifact) => {
   const controllerIntegrationTest =
     /test\/controllers\/.*_test\.rb$/i.test(artifact.path) && actionDispatchIntegrationTest;
   const rubyIntegrationTest = /test\/integration\/.*_test\.rb$/i.test(artifact.path);
-  const exactRenderedDataAssertions = (body) => {
-    const assertedLiterals = new Set(
+  const assertedResponseBodyLiterals = (body) =>
+    new Set(
       body.split(/\r?\n/).flatMap((line) => {
         const assertion = line.match(
           /^\s*assert_includes(?:\s+|\(\s*)(?:@response|response)\.body\s*,\s*(?:"((?:\\.|[^"\\])*)"|'((?:\\.|[^'\\])*)')(?=\s*(?:,|\)|$))/,
@@ -1073,8 +1393,12 @@ const pageTests = artifacts.filter((artifact) => {
         return literal !== undefined && !/#(?:\{|@|\$)/.test(literal) ? [literal] : [];
       }),
     );
-    return ['Orbital Launch Briefing', 'EVAL-204'].every((literal) => assertedLiterals.has(literal));
+  const hasExactRenderedDataAssertions = (body, expectedLiterals) => {
+    const assertedLiterals = assertedResponseBodyLiterals(body);
+    return expectedLiterals.every((literal) => assertedLiterals.has(literal));
   };
+  const exactRenderedDataAssertions = (body) =>
+    hasExactRenderedDataAssertions(body, ['Orbital Launch Briefing', 'EVAL-204']);
   const qualifiedRubyCases = rubyTestCases(uncommentedRuby).filter(
     (testCase) => testCase.actionDispatchIntegrationTest && !hasPotentiallyInactivePageEvidence(testCase),
   );
@@ -1088,6 +1412,26 @@ const pageTests = artifacts.filter((artifact) => {
     (testCase) =>
       /(?:react server component|server-provided data)/i.test(testCase.name) &&
       hasRequestAndAssertion(testCase),
+  );
+  const exactServerComponentBriefingPageTest = qualifiedRubyCases.some(
+    (testCase) =>
+      testCase.name.toLowerCase() === 'renders the server component briefing page' &&
+      !artifact.excerpt_truncated &&
+      hasExactHelloServerRscImplementation &&
+      helloServerRscRoots.has(testArtifactApplicationRoot(artifact)) &&
+      rubyRequestResponseScopes(testCase).some(
+        (responseScope) =>
+          /^\s*get(?:\s+|\(\s*)(?:hello_server_path|["']\/hello_server["'])\s*\)?\s*$/m.test(
+            responseScope.body,
+          ) &&
+          /^\s*assert_response(?:\s+|\(\s*):success\b/m.test(responseScope.body) &&
+          hasExactRenderedDataAssertions(responseScope.body, [
+            'Server-rendered release briefing',
+            'Eval App release briefing',
+            'Generated on the server at',
+            'Validated launch notes form',
+          ]),
+      ),
   );
   const positiveDomainQualifiedPageTest =
     actionDispatchIntegrationTest &&
@@ -1103,7 +1447,8 @@ const pageTests = artifacts.filter((artifact) => {
         )
       );
     });
-  const semanticPhraseName = legacySemanticPhraseTest || positiveDomainQualifiedPageTest;
+  const semanticPhraseName =
+    legacySemanticPhraseTest || exactServerComponentBriefingPageTest || positiveDomainQualifiedPageTest;
   const explicitRscPageTest = qualifiedRubyCases.some(
     (testCase) =>
       /\bRSC\b/i.test(testCase.name) && /\bpage\b/i.test(testCase.name) && hasRequestAndAssertion(testCase),
@@ -2816,6 +3161,7 @@ const outcomeRows = [
     citations: [
       ...artifactCitations(qualifyingRscRoutes),
       ...artifactCitations(rscSources),
+      ...artifactCitations(exactHelloServerRscArtifacts),
       ...commandCitations(pageTestCommands),
     ],
   },

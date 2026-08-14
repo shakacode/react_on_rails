@@ -3543,6 +3543,760 @@ for row in install.pro rsc.route form.validation tests.page tests.form build.pro
 done
 test "$(jq -r '.overall' "$tmp/codex-rsc-name-output/rubric-results.json")" = pass
 
+cp -R "$tmp/codex-rsc-name-workspace" "$tmp/codex-server-component-briefing-workspace"
+mkdir -p \
+  "$tmp/codex-server-component-briefing-workspace/eval_app/app/controllers" \
+  "$tmp/codex-server-component-briefing-workspace/eval_app/app/javascript/src/HelloServer/components" \
+  "$tmp/codex-server-component-briefing-workspace/eval_app/app/javascript/src/HelloServer/ror_components" \
+  "$tmp/codex-server-component-briefing-workspace/eval_app/app/views/hello_server"
+cat >"$tmp/codex-server-component-briefing-workspace/eval_app/config/routes.rb" <<'RUBY'
+Rails.application.routes.draw do
+  get "hello_server", to: "hello_server#index"
+  rsc_payload_route
+end
+RUBY
+cat >"$tmp/codex-server-component-briefing-workspace/eval_app/app/controllers/hello_server_controller.rb" <<'RUBY'
+class HelloServerController < ApplicationController
+  include ReactOnRailsPro::Stream
+
+  def index
+    @hello_server_props = {
+      title: "Eval App release briefing",
+      generatedAt: "August 14, 2026 at 8:00 AM UTC",
+      releases: [{ name: "Validated launch notes form" }]
+    }
+    stream_view_containing_react_components(template: "hello_server/index")
+  end
+end
+RUBY
+cat >"$tmp/codex-server-component-briefing-workspace/eval_app/app/javascript/src/HelloServer/components/HelloServer.tsx" <<'TYPESCRIPT'
+interface HelloServerProps {
+  title: string;
+  generatedAt: string;
+  releases: Array<{ name: string }>;
+}
+
+const HelloServer = async ({ title, generatedAt, releases }: HelloServerProps) => (
+  <section>
+    <h1>
+      {title}
+    </h1>
+    <p>Generated on the server at {generatedAt}</p>
+    {releases.map((release) => <p key={release.name}>{release.name}</p>)}
+  </section>
+);
+
+export default HelloServer;
+TYPESCRIPT
+cat >"$tmp/codex-server-component-briefing-workspace/eval_app/app/javascript/src/HelloServer/ror_components/HelloServer.tsx" <<'TYPESCRIPT'
+import HelloServer from "../components/HelloServer";
+
+export default HelloServer;
+TYPESCRIPT
+cat >"$tmp/codex-server-component-briefing-workspace/eval_app/app/views/hello_server/index.html.erb" <<'ERB'
+<main>
+  <h1>Server-rendered release briefing</h1>
+  <%= stream_react_component("HelloServer", props: @hello_server_props) %>
+</main>
+ERB
+cat >"$tmp/codex-server-component-briefing-workspace/eval_app/test/integration/hello_server_flow_test.rb" <<'RUBY'
+# frozen_string_literal: true
+
+require "test_helper"
+
+class HelloServerFlowTest < ActionDispatch::IntegrationTest
+  test "renders the server component briefing page" do
+    get "/hello_server"
+
+    assert_response :success
+    assert_includes response.body, "Server-rendered release briefing"
+    assert_includes response.body, "Eval App release briefing"
+    assert_includes response.body, "Generated on the server at"
+    assert_includes response.body, "Validated launch notes form"
+  end
+end
+RUBY
+mkdir "$tmp/codex-server-component-briefing-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-classifier-events.jsonl" \
+  "$tmp/codex-server-component-briefing-workspace" "$tmp/codex-server-component-briefing-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in install.pro rsc.route form.validation tests.page tests.form build.production \
+  tests.green unaided evidence.complete; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-server-component-briefing-output/rubric-results.json")" = pass
+done
+test "$(jq -r '.overall' "$tmp/codex-server-component-briefing-output/rubric-results.json")" = pass
+
+cp -R "$tmp/codex-server-component-briefing-workspace" \
+  "$tmp/codex-server-component-briefing-filter-map-test-workspace"
+cat >"$tmp/codex-server-component-briefing-filter-map-test-workspace/eval_app/test/integration/hello_server_flow_test.rb" <<'RUBY'
+class HelloServerFlowTest < ActionDispatch::IntegrationTest
+  test "renders the server component briefing page" do
+    get "/hello_server"
+    assert_response :success
+    proof = [].filter_map {
+      assert_includes response.body, "Server-rendered release briefing"
+      assert_includes response.body, "Eval App release briefing"
+      assert_includes response.body, "Generated on the server at"
+      assert_includes response.body, "Validated launch notes form"
+    }
+  end
+end
+RUBY
+mkdir "$tmp/codex-server-component-briefing-filter-map-test-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-classifier-events.jsonl" \
+  "$tmp/codex-server-component-briefing-filter-map-test-workspace" \
+  "$tmp/codex-server-component-briefing-filter-map-test-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in rsc.route tests.page; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-server-component-briefing-filter-map-test-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/codex-server-component-briefing-workspace" \
+  "$tmp/codex-server-component-briefing-unmounted-rsc-workspace"
+cat >"$tmp/codex-server-component-briefing-unmounted-rsc-workspace/eval_app/app/views/hello_server/index.html.erb" <<'ERB'
+<main>
+  <h1>Server-rendered release briefing</h1>
+  <p>Eval App release briefing</p>
+  <p>Generated on the server at 2026-08-14</p>
+  <p>Validated launch notes form</p>
+</main>
+ERB
+mkdir "$tmp/codex-server-component-briefing-unmounted-rsc-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-classifier-events.jsonl" \
+  "$tmp/codex-server-component-briefing-unmounted-rsc-workspace" \
+  "$tmp/codex-server-component-briefing-unmounted-rsc-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in rsc.route tests.page; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-server-component-briefing-unmounted-rsc-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/codex-server-component-briefing-workspace" \
+  "$tmp/codex-server-component-briefing-comment-only-rsc-workspace"
+cat >"$tmp/codex-server-component-briefing-comment-only-rsc-workspace/eval_app/app/controllers/hello_server_controller.rb" <<'RUBY'
+class HelloServerController < ApplicationController
+  # include ReactOnRailsPro::Stream
+  # @hello_server_props = { title: "unused" }
+  # stream_view_containing_react_components(template: "unused")
+  def index
+    render html: "plain non-RSC page"
+  end
+end
+RUBY
+cat >"$tmp/codex-server-component-briefing-comment-only-rsc-workspace/eval_app/app/javascript/src/HelloServer/components/HelloServer.tsx" <<'TYPESCRIPT'
+/*
+const HelloServer = async ({ title, generatedAt, releases }) => (
+  <><h1>{title}</h1><p>Generated on the server at {generatedAt}</p>{releases.map(() => null)}</>
+);
+*/
+export default function Unused() { return null; }
+TYPESCRIPT
+cat >"$tmp/codex-server-component-briefing-comment-only-rsc-workspace/eval_app/app/javascript/src/HelloServer/ror_components/HelloServer.tsx" <<'TYPESCRIPT'
+// import HelloServer from "../components/HelloServer";
+// export default HelloServer;
+TYPESCRIPT
+mkdir "$tmp/codex-server-component-briefing-comment-only-rsc-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-classifier-events.jsonl" \
+  "$tmp/codex-server-component-briefing-comment-only-rsc-workspace" \
+  "$tmp/codex-server-component-briefing-comment-only-rsc-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in rsc.route tests.page; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-server-component-briefing-comment-only-rsc-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/codex-server-component-briefing-workspace" \
+  "$tmp/codex-server-component-briefing-string-decoy-rsc-workspace"
+cat >"$tmp/codex-server-component-briefing-string-decoy-rsc-workspace/eval_app/app/javascript/src/HelloServer/components/HelloServer.tsx" <<'TYPESCRIPT'
+const decoy = `
+const HelloServer = async
+{title}
+Generated on the server at {generatedAt}
+releases.map(
+export default HelloServer;
+`;
+
+export default function StaticComponent() { return null; }
+TYPESCRIPT
+cat >"$tmp/codex-server-component-briefing-string-decoy-rsc-workspace/eval_app/app/javascript/src/HelloServer/ror_components/HelloServer.tsx" <<'TYPESCRIPT'
+const decoy = `
+import HelloServer from "../components/HelloServer";
+export default HelloServer;
+`;
+
+export { decoy };
+TYPESCRIPT
+mkdir "$tmp/codex-server-component-briefing-string-decoy-rsc-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-classifier-events.jsonl" \
+  "$tmp/codex-server-component-briefing-string-decoy-rsc-workspace" \
+  "$tmp/codex-server-component-briefing-string-decoy-rsc-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in rsc.route tests.page; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-server-component-briefing-string-decoy-rsc-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/codex-server-component-briefing-workspace" \
+  "$tmp/codex-server-component-briefing-unrouted-stream-workspace"
+cat >"$tmp/codex-server-component-briefing-unrouted-stream-workspace/eval_app/app/controllers/hello_server_controller.rb" <<'RUBY'
+class HelloServerController < ApplicationController
+  include ReactOnRailsPro::Stream
+
+  def unused_stream
+    @hello_server_props = {
+      title: "Eval App release briefing",
+      generatedAt: "August 14, 2026 at 8:00 AM UTC",
+      releases: [{ name: "Validated launch notes form" }]
+    }
+    stream_view_containing_react_components(template: "hello_server/index")
+  end
+
+  def index
+    render html: "plain non-RSC page"
+  end
+end
+RUBY
+mkdir "$tmp/codex-server-component-briefing-unrouted-stream-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-classifier-events.jsonl" \
+  "$tmp/codex-server-component-briefing-unrouted-stream-workspace" \
+  "$tmp/codex-server-component-briefing-unrouted-stream-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in rsc.route tests.page; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-server-component-briefing-unrouted-stream-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/codex-server-component-briefing-workspace" \
+  "$tmp/codex-server-component-briefing-inactive-view-workspace"
+cat >"$tmp/codex-server-component-briefing-inactive-view-workspace/eval_app/app/views/hello_server/index.html.erb" <<'ERB'
+<main>
+  <h1>Server-rendered release briefing</h1>
+  <% if false %>
+    <%= stream_react_component("HelloServer", props: @hello_server_props) %>
+  <% end %>
+  <p>Eval App release briefing</p>
+  <p>Generated on the server at 2026-08-14</p>
+  <p>Validated launch notes form</p>
+</main>
+ERB
+mkdir "$tmp/codex-server-component-briefing-inactive-view-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-classifier-events.jsonl" \
+  "$tmp/codex-server-component-briefing-inactive-view-workspace" \
+  "$tmp/codex-server-component-briefing-inactive-view-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in rsc.route tests.page; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-server-component-briefing-inactive-view-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/codex-server-component-briefing-workspace" \
+  "$tmp/codex-server-component-briefing-inactive-brace-view-workspace"
+cat >"$tmp/codex-server-component-briefing-inactive-brace-view-workspace/eval_app/app/views/hello_server/index.html.erb" <<'ERB'
+<main>
+  <h1>Server-rendered release briefing</h1>
+  <% [].each { %>
+    <%= stream_react_component("HelloServer", props: @hello_server_props) %>
+  <% } %>
+  <p>Eval App release briefing</p>
+  <p>Generated on the server at 2026-08-14</p>
+  <p>Validated launch notes form</p>
+</main>
+ERB
+mkdir "$tmp/codex-server-component-briefing-inactive-brace-view-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-classifier-events.jsonl" \
+  "$tmp/codex-server-component-briefing-inactive-brace-view-workspace" \
+  "$tmp/codex-server-component-briefing-inactive-brace-view-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in rsc.route tests.page; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-server-component-briefing-inactive-brace-view-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/codex-server-component-briefing-workspace" \
+  "$tmp/codex-server-component-briefing-client-directive-workspace"
+ruby -e '
+  path = ARGV.fetch(0)
+  File.write(path, "\"use client\"; // this component must not supply server evidence\n#{File.read(path)}")
+' "$tmp/codex-server-component-briefing-client-directive-workspace/eval_app/app/javascript/src/HelloServer/components/HelloServer.tsx"
+mkdir "$tmp/codex-server-component-briefing-client-directive-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-classifier-events.jsonl" \
+  "$tmp/codex-server-component-briefing-client-directive-workspace" \
+  "$tmp/codex-server-component-briefing-client-directive-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in rsc.route tests.page; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-server-component-briefing-client-directive-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/codex-server-component-briefing-workspace" \
+  "$tmp/codex-server-component-briefing-disconnected-body-workspace"
+cat >"$tmp/codex-server-component-briefing-disconnected-body-workspace/eval_app/app/javascript/src/HelloServer/components/HelloServer.tsx" <<'TYPESCRIPT'
+const HelloServer = async () => null;
+
+const Unused = ({ title, generatedAt, releases }) => (
+  <section>
+    <h1>{title}</h1>
+    <p>Generated on the server at {generatedAt}</p>
+    {releases.map((release) => <p key={release.name}>{release.name}</p>)}
+  </section>
+);
+
+export default HelloServer;
+TYPESCRIPT
+mkdir "$tmp/codex-server-component-briefing-disconnected-body-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-classifier-events.jsonl" \
+  "$tmp/codex-server-component-briefing-disconnected-body-workspace" \
+  "$tmp/codex-server-component-briefing-disconnected-body-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in rsc.route tests.page; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-server-component-briefing-disconnected-body-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/codex-server-component-briefing-workspace" \
+  "$tmp/codex-server-component-briefing-cross-root-workspace"
+mkdir -p \
+  "$tmp/codex-server-component-briefing-cross-root-workspace/backup/eval_app/app/javascript/src/HelloServer/components"
+mv \
+  "$tmp/codex-server-component-briefing-cross-root-workspace/eval_app/app/javascript/src/HelloServer/components/HelloServer.tsx" \
+  "$tmp/codex-server-component-briefing-cross-root-workspace/backup/eval_app/app/javascript/src/HelloServer/components/HelloServer.tsx"
+mkdir "$tmp/codex-server-component-briefing-cross-root-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-classifier-events.jsonl" \
+  "$tmp/codex-server-component-briefing-cross-root-workspace" \
+  "$tmp/codex-server-component-briefing-cross-root-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in rsc.route tests.page; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-server-component-briefing-cross-root-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/codex-server-component-briefing-workspace" \
+  "$tmp/codex-server-component-briefing-cross-root-test-workspace"
+mkdir -p \
+  "$tmp/codex-server-component-briefing-cross-root-test-workspace/backup/eval_app/test/integration"
+mv \
+  "$tmp/codex-server-component-briefing-cross-root-test-workspace/eval_app/test/integration/hello_server_flow_test.rb" \
+  "$tmp/codex-server-component-briefing-cross-root-test-workspace/backup/eval_app/test/integration/hello_server_flow_test.rb"
+mkdir "$tmp/codex-server-component-briefing-cross-root-test-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-classifier-events.jsonl" \
+  "$tmp/codex-server-component-briefing-cross-root-test-workspace" \
+  "$tmp/codex-server-component-briefing-cross-root-test-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in rsc.route tests.page; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-server-component-briefing-cross-root-test-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/codex-server-component-briefing-workspace" \
+  "$tmp/codex-server-component-briefing-wrong-controller-class-workspace"
+cat >"$tmp/codex-server-component-briefing-wrong-controller-class-workspace/eval_app/app/controllers/hello_server_controller.rb" <<'RUBY'
+class HelloServerController < ApplicationController
+  define_method(:index) { render html: "static page" }
+end
+
+class DecoyController < ApplicationController
+  include ReactOnRailsPro::Stream
+
+  def index
+    @hello_server_props = {
+      title: "Eval App release briefing",
+      generatedAt: "August 14, 2026 at 8:00 AM UTC",
+      releases: [{ name: "Validated launch notes form" }]
+    }
+    stream_view_containing_react_components(template: "hello_server/index")
+  end
+end
+RUBY
+mkdir "$tmp/codex-server-component-briefing-wrong-controller-class-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-classifier-events.jsonl" \
+  "$tmp/codex-server-component-briefing-wrong-controller-class-workspace" \
+  "$tmp/codex-server-component-briefing-wrong-controller-class-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in rsc.route tests.page; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-server-component-briefing-wrong-controller-class-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/codex-server-component-briefing-workspace" \
+  "$tmp/codex-server-component-briefing-inactive-jsx-workspace"
+cat >"$tmp/codex-server-component-briefing-inactive-jsx-workspace/eval_app/app/javascript/src/HelloServer/components/HelloServer.tsx" <<'TYPESCRIPT'
+const HelloServer = async ({ title, generatedAt, releases }) => (
+  <section>
+    {false && (
+      <>
+        {title}
+        <p>Generated on the server at {generatedAt}</p>
+        {releases.map((release) => <p key={release.name}>{release.name}</p>)}
+      </>
+    )}
+  </section>
+);
+
+export default HelloServer;
+TYPESCRIPT
+mkdir "$tmp/codex-server-component-briefing-inactive-jsx-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-classifier-events.jsonl" \
+  "$tmp/codex-server-component-briefing-inactive-jsx-workspace" \
+  "$tmp/codex-server-component-briefing-inactive-jsx-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in rsc.route tests.page; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-server-component-briefing-inactive-jsx-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/codex-server-component-briefing-workspace" \
+  "$tmp/codex-server-component-briefing-truncated-controller-workspace"
+ruby -e '
+  path = ARGV.fetch(0)
+  File.open(path, "a") { |file| file.puts("#" * 17_000) }
+' "$tmp/codex-server-component-briefing-truncated-controller-workspace/eval_app/app/controllers/hello_server_controller.rb"
+mkdir "$tmp/codex-server-component-briefing-truncated-controller-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-classifier-events.jsonl" \
+  "$tmp/codex-server-component-briefing-truncated-controller-workspace" \
+  "$tmp/codex-server-component-briefing-truncated-controller-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+test "$(jq -r '.artifacts[] | select(.path | endswith("hello_server_controller.rb")) | .excerpt_truncated' \
+  "$tmp/codex-server-component-briefing-truncated-controller-output/artifact-evidence.json")" = true
+for row in rsc.route tests.page; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-server-component-briefing-truncated-controller-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/codex-server-component-briefing-workspace" \
+  "$tmp/codex-server-component-briefing-misdirected-helper-workspace"
+cat >"$tmp/codex-server-component-briefing-misdirected-helper-workspace/eval_app/config/routes.rb" <<'RUBY'
+Rails.application.routes.draw do
+  get "hello_server", to: "hello_server#index", as: :rsc_hello_server
+  get "static_briefing", to: "static_briefings#show", as: :hello_server
+  rsc_payload_route
+end
+RUBY
+ruby -e '
+  path = ARGV.fetch(0)
+  content = File.read(path)
+  content.sub!(%q{get "/hello_server"}, "get hello_server_path") or abort
+  File.write(path, content)
+' "$tmp/codex-server-component-briefing-misdirected-helper-workspace/eval_app/test/integration/hello_server_flow_test.rb"
+mkdir "$tmp/codex-server-component-briefing-misdirected-helper-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-classifier-events.jsonl" \
+  "$tmp/codex-server-component-briefing-misdirected-helper-workspace" \
+  "$tmp/codex-server-component-briefing-misdirected-helper-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in rsc.route tests.page; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-server-component-briefing-misdirected-helper-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/codex-server-component-briefing-workspace" \
+  "$tmp/codex-server-component-briefing-commented-route-workspace"
+cat >"$tmp/codex-server-component-briefing-commented-route-workspace/eval_app/config/routes.rb" <<'RUBY'
+Rails.application.routes.draw do
+  get "hello_server", to: "static_briefings#show", as: :hello_server # to: "hello_server#index"
+  rsc_payload_route
+end
+RUBY
+ruby -e '
+  path = ARGV.fetch(0)
+  content = File.read(path)
+  content.sub!(%q{get "/hello_server"}, "get hello_server_path") or abort
+  File.write(path, content)
+' "$tmp/codex-server-component-briefing-commented-route-workspace/eval_app/test/integration/hello_server_flow_test.rb"
+mkdir "$tmp/codex-server-component-briefing-commented-route-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-classifier-events.jsonl" \
+  "$tmp/codex-server-component-briefing-commented-route-workspace" \
+  "$tmp/codex-server-component-briefing-commented-route-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in rsc.route tests.page; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-server-component-briefing-commented-route-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/codex-server-component-briefing-workspace" \
+  "$tmp/codex-server-component-briefing-splat-alias-workspace"
+cat >"$tmp/codex-server-component-briefing-splat-alias-workspace/eval_app/config/routes.rb" <<'RUBY'
+Rails.application.routes.draw do
+  get "hello_server", **{ as: :rsc_hello_server }, to: "hello_server#index"
+  get "static_briefing", to: "static_briefings#show", as: :hello_server
+  rsc_payload_route
+end
+RUBY
+ruby -e '
+  path = ARGV.fetch(0)
+  content = File.read(path)
+  content.sub!(%q{get "/hello_server"}, "get hello_server_path") or abort
+  File.write(path, content)
+' "$tmp/codex-server-component-briefing-splat-alias-workspace/eval_app/test/integration/hello_server_flow_test.rb"
+mkdir "$tmp/codex-server-component-briefing-splat-alias-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-classifier-events.jsonl" \
+  "$tmp/codex-server-component-briefing-splat-alias-workspace" \
+  "$tmp/codex-server-component-briefing-splat-alias-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in rsc.route tests.page; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-server-component-briefing-splat-alias-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/codex-server-component-briefing-workspace" \
+  "$tmp/codex-server-component-briefing-inactive-props-workspace"
+ruby -e '
+  path = ARGV.fetch(0)
+  content = File.read(path)
+  content.sub!("    @hello_server_props = {", "    [].each do\n      @hello_server_props = {") or abort
+  content.sub!("    }\n    stream_view", "      }\n    end\n    stream_view") or abort
+  File.write(path, content)
+' "$tmp/codex-server-component-briefing-inactive-props-workspace/eval_app/app/controllers/hello_server_controller.rb"
+mkdir "$tmp/codex-server-component-briefing-inactive-props-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-classifier-events.jsonl" \
+  "$tmp/codex-server-component-briefing-inactive-props-workspace" \
+  "$tmp/codex-server-component-briefing-inactive-props-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in rsc.route tests.page; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-server-component-briefing-inactive-props-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/codex-server-component-briefing-workspace" \
+  "$tmp/codex-server-component-briefing-empty-map-jsx-workspace"
+cat >"$tmp/codex-server-component-briefing-empty-map-jsx-workspace/eval_app/app/javascript/src/HelloServer/components/HelloServer.tsx" <<'TYPESCRIPT'
+const HelloServer = async ({ title, generatedAt, releases }) => (
+  <section>
+    {[].map(() => (
+      <>
+        {title}
+        <p>Generated on the server at {generatedAt}</p>
+        {releases.map((release) => <p key={release.name}>{release.name}</p>)}
+      </>
+    ))}
+  </section>
+);
+
+export default HelloServer;
+TYPESCRIPT
+mkdir "$tmp/codex-server-component-briefing-empty-map-jsx-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-classifier-events.jsonl" \
+  "$tmp/codex-server-component-briefing-empty-map-jsx-workspace" \
+  "$tmp/codex-server-component-briefing-empty-map-jsx-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in rsc.route tests.page; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-server-component-briefing-empty-map-jsx-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/codex-server-component-briefing-workspace" \
+  "$tmp/codex-server-component-briefing-empty-filter-chain-jsx-workspace"
+cat >"$tmp/codex-server-component-briefing-empty-filter-chain-jsx-workspace/eval_app/app/javascript/src/HelloServer/components/HelloServer.tsx" <<'TYPESCRIPT'
+const HelloServer = async ({ title, generatedAt, releases }) => (
+  <section>
+    {[].filter(Boolean).map(() => (
+      <>
+        {title}
+        <p>Generated on the server at {generatedAt}</p>
+        {releases.map((release) => <p key={release.name}>{release.name}</p>)}
+      </>
+    ))}
+  </section>
+);
+
+export default HelloServer;
+TYPESCRIPT
+cat >"$tmp/codex-server-component-briefing-empty-filter-chain-jsx-workspace/eval_app/app/views/hello_server/index.html.erb" <<'ERB'
+<main>
+  <h1>Server-rendered release briefing</h1>
+  <p>Eval App release briefing</p>
+  <p>Generated on the server at 2026-08-14</p>
+  <p>Validated launch notes form</p>
+  <%= stream_react_component("HelloServer", props: @hello_server_props) %>
+</main>
+ERB
+mkdir "$tmp/codex-server-component-briefing-empty-filter-chain-jsx-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-classifier-events.jsonl" \
+  "$tmp/codex-server-component-briefing-empty-filter-chain-jsx-workspace" \
+  "$tmp/codex-server-component-briefing-empty-filter-chain-jsx-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in rsc.route tests.page; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-server-component-briefing-empty-filter-chain-jsx-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/codex-server-component-briefing-workspace" \
+  "$tmp/codex-server-component-briefing-filter-map-view-workspace"
+cat >"$tmp/codex-server-component-briefing-filter-map-view-workspace/eval_app/app/views/hello_server/index.html.erb" <<'ERB'
+<main>
+  <h1>Server-rendered release briefing</h1>
+  <% [].filter_map { %>
+    <%= stream_react_component("HelloServer", props: @hello_server_props) %>
+  <% } %>
+  <p>Eval App release briefing</p>
+  <p>Generated on the server at 2026-08-14</p>
+  <p>Validated launch notes form</p>
+</main>
+ERB
+mkdir "$tmp/codex-server-component-briefing-filter-map-view-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-classifier-events.jsonl" \
+  "$tmp/codex-server-component-briefing-filter-map-view-workspace" \
+  "$tmp/codex-server-component-briefing-filter-map-view-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in rsc.route tests.page; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-server-component-briefing-filter-map-view-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/codex-server-component-briefing-workspace" \
+  "$tmp/codex-server-component-briefing-output-block-view-workspace"
+cat >"$tmp/codex-server-component-briefing-output-block-view-workspace/eval_app/app/views/hello_server/index.html.erb" <<'ERB'
+<main>
+  <h1>Server-rendered release briefing</h1>
+  <%= [].map do %>
+    <%= stream_react_component("HelloServer", props: @hello_server_props) %>
+  <% end %>
+  <p>Eval App release briefing</p>
+  <p>Generated on the server at 2026-08-14</p>
+  <p>Validated launch notes form</p>
+</main>
+ERB
+mkdir "$tmp/codex-server-component-briefing-output-block-view-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-classifier-events.jsonl" \
+  "$tmp/codex-server-component-briefing-output-block-view-workspace" \
+  "$tmp/codex-server-component-briefing-output-block-view-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in rsc.route tests.page; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-server-component-briefing-output-block-view-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/codex-server-component-briefing-workspace" \
+  "$tmp/codex-server-component-briefing-jsx-workspace"
+mv \
+  "$tmp/codex-server-component-briefing-jsx-workspace/eval_app/app/javascript/src/HelloServer/components/HelloServer.tsx" \
+  "$tmp/codex-server-component-briefing-jsx-workspace/eval_app/app/javascript/src/HelloServer/components/HelloServer.jsx"
+mv \
+  "$tmp/codex-server-component-briefing-jsx-workspace/eval_app/app/javascript/src/HelloServer/ror_components/HelloServer.tsx" \
+  "$tmp/codex-server-component-briefing-jsx-workspace/eval_app/app/javascript/src/HelloServer/ror_components/HelloServer.jsx"
+cat >"$tmp/codex-server-component-briefing-jsx-workspace/eval_app/app/javascript/src/HelloServer/components/HelloServer.jsx" <<'JAVASCRIPT'
+const HelloServer = async ({ title, generatedAt, releases }) => (
+  <section>
+    <h1>
+      {title}
+    </h1>
+    <p>Generated on the server at {generatedAt}</p>
+    {releases.map((release) => <p key={release.name}>{release.name}</p>)}
+  </section>
+);
+
+export default HelloServer;
+JAVASCRIPT
+mkdir "$tmp/codex-server-component-briefing-jsx-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-classifier-events.jsonl" \
+  "$tmp/codex-server-component-briefing-jsx-workspace" \
+  "$tmp/codex-server-component-briefing-jsx-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in rsc.route tests.page; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-server-component-briefing-jsx-output/rubric-results.json")" = pass
+done
+
+cp -R "$tmp/codex-server-component-briefing-workspace" \
+  "$tmp/codex-server-component-briefing-unrelated-rsc-workspace"
+cat >"$tmp/codex-server-component-briefing-unrelated-rsc-workspace/eval_app/config/routes.rb" <<'RUBY'
+Rails.application.routes.draw do
+  rsc "unrelated", to: "unrelated#show"
+  get "hello_server", to: "briefings#show", as: :hello_server
+end
+RUBY
+rm -R \
+  "$tmp/codex-server-component-briefing-unrelated-rsc-workspace/eval_app/app/javascript/src/HelloServer" \
+  "$tmp/codex-server-component-briefing-unrelated-rsc-workspace/eval_app/app/controllers/hello_server_controller.rb"
+mkdir -p \
+  "$tmp/codex-server-component-briefing-unrelated-rsc-workspace/eval_app/app/javascript/src/Unrelated/ror_components"
+printf '%s\n' 'export default async function Unrelated() { return "unrelated server data"; }' \
+  >"$tmp/codex-server-component-briefing-unrelated-rsc-workspace/eval_app/app/javascript/src/Unrelated/ror_components/Unrelated.tsx"
+mkdir "$tmp/codex-server-component-briefing-unrelated-rsc-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-classifier-events.jsonl" \
+  "$tmp/codex-server-component-briefing-unrelated-rsc-workspace" \
+  "$tmp/codex-server-component-briefing-unrelated-rsc-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in rsc.route tests.page; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-server-component-briefing-unrelated-rsc-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/codex-server-component-briefing-workspace" \
+  "$tmp/codex-server-component-briefing-inactive-assertions-workspace"
+ruby -e '
+  path = ARGV.fetch(0)
+  content = File.read(path)
+  content.sub!(/(    assert_includes response\.body, "Server-rendered release briefing"\n(?:    assert_includes.*\n){3})/) do |assertions|
+    "    required_proof = [].map {\n#{assertions.lines.map { |line| "  #{line}" }.join}    }\n"
+  end or abort
+  File.write(path, content)
+' "$tmp/codex-server-component-briefing-inactive-assertions-workspace/eval_app/test/integration/hello_server_flow_test.rb"
+mkdir "$tmp/codex-server-component-briefing-inactive-assertions-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-classifier-events.jsonl" \
+  "$tmp/codex-server-component-briefing-inactive-assertions-workspace" \
+  "$tmp/codex-server-component-briefing-inactive-assertions-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in rsc.route tests.page; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-server-component-briefing-inactive-assertions-output/rubric-results.json")" = unknown
+done
+
+for rejected_name in \
+  'does not render the server component briefing page' \
+  'fails to render the server component briefing page' \
+  'renders the server component briefing' \
+  'renders the briefing page'; do
+  rejected_slug="$(printf '%s' "$rejected_name" | tr -cs '[:alnum:]' '-')"
+  cp -R "$tmp/codex-server-component-briefing-workspace" \
+    "$tmp/codex-server-component-briefing-$rejected_slug-workspace"
+  REJECTED_NAME="$rejected_name" ruby -e '
+    path = ARGV.fetch(0)
+    content = File.read(path)
+    content.sub!(/renders the server component briefing page/, ENV.fetch("REJECTED_NAME")) or abort
+    File.write(path, content)
+  ' "$tmp/codex-server-component-briefing-$rejected_slug-workspace/eval_app/test/integration/hello_server_flow_test.rb"
+  mkdir "$tmp/codex-server-component-briefing-$rejected_slug-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-classifier-events.jsonl" \
+    "$tmp/codex-server-component-briefing-$rejected_slug-workspace" \
+    "$tmp/codex-server-component-briefing-$rejected_slug-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in rsc.route tests.page; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/codex-server-component-briefing-$rejected_slug-output/rubric-results.json")" = unknown
+  done
+done
+
+briefing_body_rejections=(
+  'get "/hello_server"|assert_response :not_found'
+  'get health_path|assert_response :success'
+  'get health_path|assert_response :success|assert_includes response.body, "Server-rendered release briefing"|assert_includes response.body, "Eval App release briefing"|assert_includes response.body, "Generated on the server at"|assert_includes response.body, "Validated launch notes form"'
+  'get "/hello_server"|assert_response :success|assert_includes response.body, "generic page"'
+  'get "/hello_server"|assert_response :success|assert_includes response.body, ""'
+  'get "/hello_server"|assert_response :success|assert_includes response.body, "#{dynamic_copy}"'
+  'get "/hello_server"|assert_response :success|get health_path|assert_includes response.body, "Server-rendered release briefing"|assert_includes response.body, "Eval App release briefing"|assert_includes response.body, "Generated on the server at"|assert_includes response.body, "Validated launch notes form"'
+)
+for ((fixture_index = 0; fixture_index < ${#briefing_body_rejections[@]}; fixture_index += 1)); do
+  cp -R "$tmp/codex-server-component-briefing-workspace" \
+    "$tmp/codex-server-component-briefing-body-$fixture_index-workspace"
+  REJECTION="${briefing_body_rejections[$fixture_index]}" ruby -e '
+    path = ARGV.fetch(0)
+    lines = ENV.fetch("REJECTION").split("|").map { |line| "    #{line}" }.join("\n")
+    content = File.read(path)
+    content.sub!(/    get "\/hello_server"\n(?:.|\n)*?    assert_includes response\.body, "Validated launch notes form"/, lines) or abort
+    File.write(path, content)
+  ' "$tmp/codex-server-component-briefing-body-$fixture_index-workspace/eval_app/test/integration/hello_server_flow_test.rb"
+  mkdir "$tmp/codex-server-component-briefing-body-$fixture_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-classifier-events.jsonl" \
+    "$tmp/codex-server-component-briefing-body-$fixture_index-workspace" \
+    "$tmp/codex-server-component-briefing-body-$fixture_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in rsc.route tests.page; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/codex-server-component-briefing-body-$fixture_index-output/rubric-results.json")" = unknown
+  done
+done
+
 cp -R "$tmp/claude-v6-workspace" "$tmp/codex-domain-rsc-name-workspace"
 rm "$tmp/codex-domain-rsc-name-workspace/eval_app/test/integration/hello_server_test.rb"
 cat >"$tmp/codex-domain-rsc-name-workspace/eval_app/config/routes.rb" <<'RUBY'
