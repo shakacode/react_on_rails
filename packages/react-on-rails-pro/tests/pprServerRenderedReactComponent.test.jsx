@@ -276,6 +276,58 @@ describe('pprServerRenderedReactComponent', () => {
     expect(chunks.some((chunk) => chunk.hasErrors === true)).toBe(true);
   });
 
+  it('prefers PPR APIs registered by react-on-rails-pro/pprSupport over the dynamic-import fallback', async () => {
+    // Register APIs with a version below the supported floor in a fresh module registry: the
+    // resulting guard error names 19.2.0, which only the registered entry can produce (the
+    // dynamic-import fallback would load the real react-dom 19.2.7 and succeed).
+    jest.resetModules();
+    try {
+      const { pprPrerenderServerRenderedReactComponent: freshPprPrerender } = await import(
+        '../src/pprServerRenderedReactComponent.ts'
+      );
+      const { registerPPRApis } = await import('../src/pprApiRegistry.ts');
+      const freshComponentRegistry = await import('../src/ComponentRegistry.ts');
+      registerPPRApis({
+        prerenderToNodeStream: jest.fn(),
+        resumeToPipeableStream: jest.fn(),
+        version: '19.2.0',
+      });
+      freshComponentRegistry.register({ PprShellWithHole });
+
+      const renderResult = freshPprPrerender({
+        name: 'PprShellWithHole',
+        domNodeId: 'pprDomId',
+        trace: false,
+        props: {},
+        throwJsErrors: true,
+        railsContext: testingRailsContext,
+      });
+      const { errors } = await collectStreamResult(renderResult);
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0].message).toContain('19.2.0');
+      expect(errors[0].message).toContain('>=19.2.7 <20');
+    } finally {
+      jest.resetModules();
+    }
+  });
+
+  it('registers the bundled react-dom PPR APIs via the pprSupport entry', async () => {
+    jest.resetModules();
+    try {
+      await import('../src/pprSupport.ts');
+      const { getRegisteredPPRApis } = await import('../src/pprApiRegistry.ts');
+      const registered = getRegisteredPPRApis();
+
+      expect(registered).toBeDefined();
+      expect(typeof registered.prerenderToNodeStream).toBe('function');
+      expect(typeof registered.resumeToPipeableStream).toBe('function');
+      expect(registered.version).toBe(jest.requireActual('react-dom/package.json').version);
+    } finally {
+      jest.resetModules();
+    }
+  });
+
   it('raises a clear configuration error when react-dom does not satisfy the PPR version range', async () => {
     jest.resetModules();
     jest.doMock('react-dom/static.node', () => ({

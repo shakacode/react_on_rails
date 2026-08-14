@@ -448,7 +448,11 @@ module ReactOnRailsProHelper
   # `ppr.static_shell` counter (ActiveSupport::Notifications) is incremented.
   #
   # Requires `stream_view_containing_react_components` in the controller action (same contract as
-  # stream_react_component) and React/react-dom >= 19.2.7 < 20 in the server bundle.
+  # stream_react_component) and React/react-dom >= 19.2.7 < 20 in the server bundle. The server
+  # bundle entry must also register React's PPR APIs from its own bundled react-dom:
+  #
+  #   // in your server bundle entry file
+  #   import 'react-on-rails-pro/pprSupport';
   #
   # **Replay-identity constraint** (React requirement for resume): the resume phase must rebuild a
   # tree structurally identical to the one the cached shell was prerendered from —

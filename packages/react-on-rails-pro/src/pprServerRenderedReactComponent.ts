@@ -35,6 +35,7 @@ import {
 } from './streamingUtils.ts';
 import handleError from './handleError.ts';
 import { createRSCDiagnosticsEnricher, ownerStackAugmentedStack } from './streamRenderErrorSupport.ts';
+import { getRegisteredPPRApis, type RegisteredPPRApis } from './pprApiRegistry.ts';
 
 /**
  * Chunk-metadata keys of the PPR prerender wire protocol. The prerender response is a normal
@@ -69,10 +70,7 @@ const PPR_REQUIRED_REACT_DOM_RANGE = '>=19.2.7 <20';
 // Lazy-loaded PPR APIs and the React version runtime guard
 // ---------------------------------------------------------------------------
 
-interface PPRApis {
-  prerenderToNodeStream: typeof import('react-dom/static.node').prerenderToNodeStream;
-  resumeToPipeableStream: typeof import('react-dom/server.node').resumeToPipeableStream;
-}
+type PPRApis = Pick<RegisteredPPRApis, 'prerenderToNodeStream' | 'resumeToPipeableStream'>;
 
 let pprApisPromise: Promise<PPRApis> | undefined;
 
@@ -93,15 +91,48 @@ const reactDomVersionSupportsPPR = (version: string | undefined): boolean => {
   return minor > 2 || (minor === 2 && patch >= 7);
 };
 
+const validatePPRApis = (
+  prerenderToNodeStream: unknown,
+  resumeToPipeableStream: unknown,
+  version: string | undefined,
+): PPRApis => {
+  if (!reactDomVersionSupportsPPR(version)) {
+    throw pprConfigurationError(`Installed react-dom version: ${version ?? 'unknown'}.`);
+  }
+  if (typeof prerenderToNodeStream !== 'function' || typeof resumeToPipeableStream !== 'function') {
+    throw pprConfigurationError(
+      'prerenderToNodeStream/resumeToPipeableStream are not available in the installed react-dom.',
+    );
+  }
+  return {
+    prerenderToNodeStream: prerenderToNodeStream as PPRApis['prerenderToNodeStream'],
+    resumeToPipeableStream: resumeToPipeableStream as PPRApis['resumeToPipeableStream'],
+  };
+};
+
 /**
- * Loads `prerenderToNodeStream` / `resumeToPipeableStream` on first use and enforces the runtime
- * React version guard. The dynamic imports use `webpackIgnore` so the PPR APIs never enter the
- * static webpack module graph: a server bundle built against React < 19.2 still loads and serves
- * every non-PPR render path, and the failure surfaces only when a PPR helper is actually called —
- * as a clear configuration error instead of a cryptic bundling/undefined-function crash.
+ * Resolves `prerenderToNodeStream` / `resumeToPipeableStream` on first use and enforces the
+ * runtime React version guard, raising a clear configuration error at the first PPR call rather
+ * than a cryptic bundling/undefined-function crash.
+ *
+ * Primary source: the registry filled by `import 'react-on-rails-pro/pprSupport'` in the app's
+ * server bundle entry — the only source guaranteed to be the SAME react-dom instance webpack
+ * bundled (see pprApiRegistry.ts). Fallback: a native dynamic import kept out of the webpack
+ * graph with `webpackIgnore`, for runtimes that execute the bundle where `import()` works and
+ * resolves the app's own react-dom. The Node renderer's `vm` context supports neither dynamic
+ * import nor same-instance host requires, so on the renderer the registry is the only path.
  */
 const loadPPRApis = (): Promise<PPRApis> => {
   pprApisPromise ??= (async () => {
+    const registered = getRegisteredPPRApis();
+    if (registered) {
+      return validatePPRApis(
+        registered.prerenderToNodeStream,
+        registered.resumeToPipeableStream,
+        registered.version,
+      );
+    }
+
     let staticModule: typeof import('react-dom/static.node');
     let serverModule: typeof import('react-dom/server.node');
     try {
@@ -109,26 +140,16 @@ const loadPPRApis = (): Promise<PPRApis> => {
       serverModule = await import(/* webpackIgnore: true */ 'react-dom/server.node');
     } catch (importError) {
       throw pprConfigurationError(
-        `Failed to load the React PPR modules: ${convertToError(importError).message}`,
+        `The PPR React APIs are not registered and could not be dynamically imported ` +
+          `(${convertToError(importError).message}). Add "import 'react-on-rails-pro/pprSupport';" ` +
+          `to your server bundle entry file to register them from your bundled react-dom.`,
       );
     }
 
-    const { version } = staticModule;
-    if (!reactDomVersionSupportsPPR(version)) {
-      throw pprConfigurationError(`Installed react-dom version: ${version ?? 'unknown'}.`);
-    }
-
-    const { prerenderToNodeStream } = staticModule;
     // Older @types/react-dom builds may not declare resumeToPipeableStream; read it defensively so
-    // a mismatched install fails through the guard below rather than a TypeError at the call site.
+    // a mismatched install fails through the guard rather than a TypeError at the call site.
     const { resumeToPipeableStream } = serverModule as Partial<Pick<PPRApis, 'resumeToPipeableStream'>>;
-    if (typeof prerenderToNodeStream !== 'function' || typeof resumeToPipeableStream !== 'function') {
-      throw pprConfigurationError(
-        'prerenderToNodeStream/resumeToPipeableStream are not available in the installed react-dom.',
-      );
-    }
-
-    return { prerenderToNodeStream, resumeToPipeableStream };
+    return validatePPRApis(staticModule.prerenderToNodeStream, resumeToPipeableStream, staticModule.version);
   })();
   return pprApisPromise;
 };

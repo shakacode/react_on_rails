@@ -44,6 +44,7 @@
     "./ReactOnRails.full": "./lib/ReactOnRails.full.js",
     "./ReactOnRails.node": "./lib/ReactOnRails.node.js",
     "./useRailsForm": "./lib/useRailsForm.js",
+    "./pprSupport": "./lib/pprSupport.js",
     "./railsAction": {
       "types": "./lib/railsAction.d.ts",
       "default": "./lib/railsAction.js"
