@@ -120,6 +120,15 @@ export const transformRenderStreamChunksToResultObject = (renderState: StreamRen
   const consoleHistory = console.history;
   let previouslyReplayedConsoleMessages = 0;
 
+  // Extra metadata queued by writeChunk for the chunk it writes (FIFO, aligned with write order).
+  // Only chunks written through writeChunk enqueue an entry; chunks arriving through
+  // pipeToTransform never do. Renderers that pass extra metadata (the PPR prerender path uses this
+  // to attach the serialized PostponedState to its trailing chunk) must not interleave
+  // pipeToTransform content between a writeChunk call and the end of the stream, or the queue
+  // alignment breaks — today the PPR path writes all content via writeChunk, so no piped chunk can
+  // land between a tagged write and its transform.
+  const pendingExtraMetadata: (Record<string, unknown> | undefined)[] = [];
+
   const transformStream = new PassThrough({
     transform(chunk: Buffer | string, _, callback) {
       // Length-prefixed streaming protocol: metadata and content are sent separately.
@@ -135,6 +144,10 @@ export const transformRenderStreamChunksToResultObject = (renderState: StreamRen
       const contentBuf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk, 'utf-8');
       const metadataObj = buildRenderMetadata(consoleReplayScript, renderState);
       metadataObj.payloadType = 'string';
+      const extraMetadata = pendingExtraMetadata.shift();
+      if (extraMetadata) {
+        Object.assign(metadataObj, extraMetadata);
+      }
       const metadataJson = JSON.stringify(metadataObj);
       const header = `${metadataJson}\t${contentBuf.length.toString(16).padStart(8, '0')}\n`;
       this.push(Buffer.concat([Buffer.from(header), contentBuf]));
@@ -277,8 +290,9 @@ export const transformRenderStreamChunksToResultObject = (renderState: StreamRen
   // short-circuit path runs after an awaited promise, by which point a disconnect may have triggered
   // cancelUpstream() and destroyed transformStream. Writing/ending a destroyed stream would throw
   // ERR_STREAM_DESTROYED (issue #3885).
-  const writeChunk = (chunk: string) => {
+  const writeChunk = (chunk: string, extraMetadata?: Record<string, unknown>) => {
     if (!transformStream.destroyed) {
+      pendingExtraMetadata.push(extraMetadata);
       transformStream.write(chunk);
     }
   };
