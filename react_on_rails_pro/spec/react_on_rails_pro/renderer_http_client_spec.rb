@@ -319,6 +319,17 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
         expect(body.join).to include('name="bundle_server"; filename="server.js"')
       end
     end
+
+    it "returns an unknown size when a multipart chunk has no byte size" do
+      body = described_class::MultipartBody.new
+      unknown_size_chunk = Class.new do
+        def read; end
+      end.new
+      body << "known"
+      body << unknown_size_chunk
+
+      expect(body.bytesize).to be_nil
+    end
   end
 
   describe "raw request bodies" do

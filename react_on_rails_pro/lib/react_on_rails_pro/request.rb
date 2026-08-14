@@ -16,6 +16,7 @@
 require "digest"
 require "io/wait"
 require "uri"
+require_relative "open_telemetry"
 require_relative "renderer_http_client"
 require_relative "stream_request"
 require_relative "async_props_emitter"
@@ -186,8 +187,11 @@ module ReactOnRailsPro
 
           # Execute async props block in a separate fiber.
           # This runs concurrently with the response streaming back to the client.
+          parent_context = ReactOnRailsPro::OpenTelemetry.capture_context
           tasks.push(Async::Task.current.async do
-            async_props_block.call(emitter)
+            ReactOnRailsPro::OpenTelemetry.with_context(parent_context) do
+              async_props_block.call(emitter)
+            end
           ensure
             # When the block completes (or raises), close the output.
             # This signals request-body EOF, triggering Node's handleRequestClosed.
