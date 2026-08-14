@@ -154,6 +154,12 @@ const resolveSettleBudgetMs = (railsContext: PPRRailsContextFields): number => {
     : DEFAULT_PPR_SETTLE_BUDGET_MS;
 };
 
+// An AbortController aborted without an explicit reason produces a DOMException named
+// 'AbortError' — which is not `instanceof Error`, so it must be recognized on the raw thrown
+// value rather than after convertToError normalizes it into a plain Error.
+const isAbortErrorLike = (e: unknown): boolean =>
+  typeof e === 'object' && e !== null && (e as { name?: unknown }).name === 'AbortError';
+
 const rscClientManifestStylesheetHrefsFor = (reactClientManifestFileName: string | undefined) =>
   // Manifest-backed promotion is additive. If a build does not ship the manifest,
   // preserve the existing filename-regex fallback in injectRSCPayload.
@@ -252,8 +258,10 @@ const pprPrerenderRenderReactComponent = (
         // settle timer so prerenderToNodeStream captures still-pending Suspense boundaries as
         // PostponedState instead of waiting for them to resolve.
         const providedSignal = (options as RenderParams & { signal?: AbortSignal }).signal;
-        let prerenderSignal = providedSignal;
-        if (!prerenderSignal) {
+        let prerenderSignal: AbortSignal;
+        if (providedSignal) {
+          prerenderSignal = providedSignal;
+        } else {
           const settleController = new AbortController();
           prerenderSignal = settleController.signal;
           settleTimeoutId = setTimeout(() => settleController.abort(), resolveSettleBudgetMs(railsContext));
@@ -262,12 +270,16 @@ const pprPrerenderRenderReactComponent = (
         const { prerenderToNodeStream } = await loadPPRApis();
         const { prelude, postponed } = await prerenderToNodeStream(reactRenderedElement, {
           onError(e) {
-            const error = convertToError(e);
             // The settle abort is the expected mechanism that demotes pending boundaries to
-            // resume-phase holes — not a render failure.
-            if (error.name === 'AbortError') {
+            // resume-phase holes — not a render failure. React reports it by passing the
+            // signal's abort reason to onError for each demoted boundary; the default reason is
+            // a DOMException named AbortError (NOT an instanceof Error, so this must be checked
+            // on the raw value before convertToError renames it). A caller-provided signal with
+            // a custom reason is matched by identity.
+            if ((prerenderSignal.aborted && e === prerenderSignal.reason) || isAbortErrorLike(e)) {
               return undefined;
             }
+            const error = convertToError(e);
             if (isRSCRouteSSRFalseBailoutError(error)) {
               sawRSCRouteSSRFalseBailout = true;
               return error.digest;
