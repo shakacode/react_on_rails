@@ -1378,12 +1378,13 @@ module ReactOnRailsProHelper
     nil
   end
 
-  # The paired record is one Hash: :shell_html always present; :postponed_state present only when
-  # the page has dynamic holes (a shell-only record is a fully static page). A malformed record is
-  # treated as a miss and re-prerendered.
+  # The paired record is one Hash: "shell_html" always present; "postponed_state" present only
+  # when the page has dynamic holes (a shell-only record is a fully static page). String keys —
+  # the record must survive non-Marshal cache serializers (e.g. JSON), which have no Symbol type.
+  # A malformed record is treated as a miss and re-prerendered.
   def ppr_valid_cache_entry?(entry)
-    entry.is_a?(Hash) && entry[:shell_html].is_a?(String) &&
-      (entry[:postponed_state].nil? || entry[:postponed_state].is_a?(String))
+    entry.is_a?(Hash) && entry["shell_html"].is_a?(String) &&
+      (entry["postponed_state"].nil? || entry["postponed_state"].is_a?(String))
   end
 
   # Cold path: evaluate props, prerender the shell, persist the paired record, serve the shell,
@@ -1418,8 +1419,8 @@ module ReactOnRailsProHelper
     load_pack_for_generated_component(component_name, render_options)
 
     {
-      shell_html: cached_entry[:shell_html],
-      postponed_state: cached_entry[:postponed_state],
+      shell_html: cached_entry["shell_html"],
+      postponed_state: cached_entry["postponed_state"],
       console_script: "",
       render_options:,
       tag: generate_component_script(render_options)
@@ -1493,7 +1494,7 @@ module ReactOnRailsProHelper
     normalized_cache_tags = ReactOnRailsPro::Cache.normalize_tags(render_options[:cache_tags])
     Rails.cache.write(
       cache_key,
-      { shell_html: prerender_result[:shell_html], postponed_state: prerender_result[:postponed_state] },
+      { "shell_html" => prerender_result[:shell_html], "postponed_state" => prerender_result[:postponed_state] },
       cache_write_options
     )
     ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_write_options)
@@ -1502,7 +1503,8 @@ module ReactOnRailsProHelper
   # Serves the shell as the helper's synchronous return value (wrapped in the component div with
   # the spec tag and rails context, exactly like a streamed first chunk) and, when the page has
   # dynamic holes, starts the resume phase that streams them. A shell with no PostponedState is a
-  # fully static page: SUCCESS with no resume request, counted by the ppr.static_shell counter.
+  # fully static page: SUCCESS with no resume request, counted by the ppr.static_shell counter —
+  # unless the prerender reported a render error, which is a failed render, not a static page.
   def ppr_serve_shell(component_name, options, prerender_result, cache_hit:)
     shell_result = build_react_component_result_for_server_rendered_string(
       server_rendered_html: prerender_result[:shell_html],
@@ -1514,7 +1516,7 @@ module ReactOnRailsProHelper
     postponed_state = prerender_result[:postponed_state]
     if postponed_state.present?
       ppr_enqueue_resume_stream(component_name, options, postponed_state)
-    else
+    elsif !prerender_result[:had_render_error]
       ReactOnRailsPro::Ppr.instrument_static_shell(component_name:, cache_hit:)
     end
 

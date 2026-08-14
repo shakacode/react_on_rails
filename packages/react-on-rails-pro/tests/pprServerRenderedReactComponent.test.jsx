@@ -334,6 +334,56 @@ describe('pprServerRenderedReactComponent', () => {
     }
   });
 
+  it('retries loading the PPR APIs after a failed first call instead of memoizing the rejection', async () => {
+    jest.resetModules();
+    try {
+      const { pprPrerenderServerRenderedReactComponent: freshPprPrerender } = await import(
+        '../src/pprServerRenderedReactComponent.ts'
+      );
+      const { registerPPRApis } = await import('../src/pprApiRegistry.ts');
+      const freshComponentRegistry = await import('../src/ComponentRegistry.ts');
+      const staticModule = await import('react-dom/static.node');
+      const serverModule = await import('react-dom/server.node');
+      freshComponentRegistry.register({ PprShellWithHole });
+
+      const runFreshPrerender = () =>
+        collectStreamResult(
+          freshPprPrerender({
+            name: 'PprShellWithHole',
+            domNodeId: 'pprDomId',
+            trace: false,
+            props: {},
+            throwJsErrors: true,
+            railsContext: testingRailsContext,
+          }),
+        );
+
+      // First call: the registered APIs fail the version guard, so the load rejects.
+      registerPPRApis({
+        prerenderToNodeStream: jest.fn(),
+        resumeToPipeableStream: jest.fn(),
+        version: '19.2.0',
+      });
+      const first = await runFreshPrerender();
+      expect(first.errors).toHaveLength(1);
+      expect(first.errors[0].message).toContain('19.2.0');
+
+      // Second call: valid APIs are registered now — a memoized rejection would ignore them and
+      // permanently disable PPR for the process.
+      registerPPRApis({
+        prerenderToNodeStream: staticModule.prerenderToNodeStream,
+        resumeToPipeableStream: serverModule.resumeToPipeableStream,
+        version: staticModule.version,
+      });
+      const second = await runFreshPrerender();
+      expect(second.errors).toHaveLength(0);
+      const trailingChunk = second.chunks[second.chunks.length - 1];
+      expect(trailingChunk[PPR_PRERENDER_COMPLETE_CHUNK_KEY]).toBe(true);
+    } finally {
+      jest.resetModules();
+    }
+  });
+
   it('registers the bundled react-dom PPR APIs via the pprSupport entry', async () => {
     jest.resetModules();
     try {

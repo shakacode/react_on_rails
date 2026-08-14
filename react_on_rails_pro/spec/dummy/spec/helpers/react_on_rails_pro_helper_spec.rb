@@ -2304,8 +2304,8 @@ describe ReactOnRailsProHelper do
         # (no per-request spec tag or rails context baked in).
         cached_entry = Rails.cache.read(computed_ppr_cache_key)
         expect(cached_entry).to eq(
-          shell_html: ppr_shell_chunks.first[:html],
-          postponed_state: ppr_postponed_state_json
+          "shell_html" => ppr_shell_chunks.first[:html],
+          "postponed_state" => ppr_postponed_state_json
         )
       end
 
@@ -2372,8 +2372,8 @@ describe ReactOnRailsProHelper do
           expect(cold_chunks.join).not_to include("$RC(")
           expect(chunks_read.count).to eq(ppr_static_shell_chunks.count)
           expect(Rails.cache.read(computed_ppr_cache_key)).to eq(
-            shell_html: ppr_static_shell_chunks.first[:html],
-            postponed_state: nil
+            "shell_html" => ppr_static_shell_chunks.first[:html],
+            "postponed_state" => nil
           )
 
           # Warm request: served entirely from cache — NO renderer request at all.
@@ -2428,6 +2428,31 @@ describe ReactOnRailsProHelper do
         reset_stream_buffers
         run_stream
         expect(chunks_read.count).to eq(error_shell_chunks.count + ppr_resume_chunks.count)
+      end
+
+      it "does not count a fully-failed prerender as a static shell" do
+        # had_render_error with no PostponedState is a failed render, not a fully-static page:
+        # the ppr.static_shell counter must not fire and nothing may be cached.
+        failed_static_chunks = [
+          { html: "", consoleReplayScript: "", hasErrors: true, isShellReady: true },
+          { html: "", consoleReplayScript: "", hasErrors: false, isShellReady: true,
+            pprPrerenderComplete: true, pprRenderErrored: true }
+        ]
+        mock_ppr_responses(failed_static_chunks)
+        static_shell_events = []
+        subscription = ActiveSupport::Notifications.subscribe(
+          ReactOnRailsPro::Ppr::STATIC_SHELL_NOTIFICATION
+        ) { |event| static_shell_events << event }
+        stub_render_with_ppr
+
+        begin
+          run_stream
+          expect(chunks_read.count).to eq(failed_static_chunks.count)
+          expect(static_shell_events).to be_empty
+          expect(Rails.cache.read(computed_ppr_cache_key)).to be_nil
+        ensure
+          ActiveSupport::Notifications.unsubscribe(subscription)
+        end
       end
 
       it "raises a configuration error when the prerender response lacks the PPR protocol metadata" do

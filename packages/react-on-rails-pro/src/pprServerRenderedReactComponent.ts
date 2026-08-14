@@ -122,35 +122,42 @@ const validatePPRApis = (
  * resolves the app's own react-dom. The Node renderer's `vm` context supports neither dynamic
  * import nor same-instance host requires, so on the renderer the registry is the only path.
  */
+const loadPPRApisUncached = async (): Promise<PPRApis> => {
+  const registered = getRegisteredPPRApis();
+  if (registered) {
+    return validatePPRApis(
+      registered.prerenderToNodeStream,
+      registered.resumeToPipeableStream,
+      registered.version,
+    );
+  }
+
+  let staticModule: typeof import('react-dom/static.node');
+  let serverModule: typeof import('react-dom/server.node');
+  try {
+    staticModule = await import(/* webpackIgnore: true */ 'react-dom/static.node');
+    serverModule = await import(/* webpackIgnore: true */ 'react-dom/server.node');
+  } catch (importError) {
+    throw pprConfigurationError(
+      `The PPR React APIs are not registered and could not be dynamically imported ` +
+        `(${convertToError(importError).message}). Add "import 'react-on-rails-pro/pprSupport';" ` +
+        `to your server bundle entry file to register them from your bundled react-dom.`,
+    );
+  }
+
+  // Older @types/react-dom builds may not declare resumeToPipeableStream; read it defensively so
+  // a mismatched install fails through the guard rather than a TypeError at the call site.
+  const { resumeToPipeableStream } = serverModule as Partial<Pick<PPRApis, 'resumeToPipeableStream'>>;
+  return validatePPRApis(staticModule.prerenderToNodeStream, resumeToPipeableStream, staticModule.version);
+};
+
 const loadPPRApis = (): Promise<PPRApis> => {
-  pprApisPromise ??= (async () => {
-    const registered = getRegisteredPPRApis();
-    if (registered) {
-      return validatePPRApis(
-        registered.prerenderToNodeStream,
-        registered.resumeToPipeableStream,
-        registered.version,
-      );
-    }
-
-    let staticModule: typeof import('react-dom/static.node');
-    let serverModule: typeof import('react-dom/server.node');
-    try {
-      staticModule = await import(/* webpackIgnore: true */ 'react-dom/static.node');
-      serverModule = await import(/* webpackIgnore: true */ 'react-dom/server.node');
-    } catch (importError) {
-      throw pprConfigurationError(
-        `The PPR React APIs are not registered and could not be dynamically imported ` +
-          `(${convertToError(importError).message}). Add "import 'react-on-rails-pro/pprSupport';" ` +
-          `to your server bundle entry file to register them from your bundled react-dom.`,
-      );
-    }
-
-    // Older @types/react-dom builds may not declare resumeToPipeableStream; read it defensively so
-    // a mismatched install fails through the guard rather than a TypeError at the call site.
-    const { resumeToPipeableStream } = serverModule as Partial<Pick<PPRApis, 'resumeToPipeableStream'>>;
-    return validatePPRApis(staticModule.prerenderToNodeStream, resumeToPipeableStream, staticModule.version);
-  })();
+  pprApisPromise ??= loadPPRApisUncached().catch((error: unknown) => {
+    // Never memoize a rejection: a transient first-call failure (e.g. cold-start ordering of the
+    // registry, or a flaky dynamic import) must not permanently disable PPR for this process.
+    pprApisPromise = undefined;
+    throw error;
+  });
   return pprApisPromise;
 };
 
@@ -349,9 +356,12 @@ const pprPrerenderRenderReactComponent = (
 
         injectedStream.on('error', (error: Error) => {
           reportError(enrichWithCapturedRSCDiagnostics(convertToError(error)));
-          // A destroyed prelude stream never emits 'end', so close the output explicitly — the
-          // response ends without the trailing protocol chunk, which Rails treats as a failed
-          // prerender (no cache write) rather than hanging on an unterminated stream.
+          // A destroyed prelude stream never emits 'end'. Emit a trailing protocol chunk carrying
+          // the error flag (but NOT the completion flag — the prelude did not fully flush) so
+          // Rails takes the failed-prerender path (no cache write) instead of raising the
+          // missing-protocol configuration error, then close the output explicitly rather than
+          // hanging on an unterminated stream.
+          writeChunk('', { [PPR_RENDER_ERRORED_CHUNK_KEY]: true });
           streamingTrackers.rscRequestTracker.clear();
           endStream();
         });

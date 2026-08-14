@@ -31,7 +31,7 @@ module ReactOnRailsPro
 
     # Version of the {shell_html:, postponed_state:} cache-record format. Part of every PPR cache
     # key so a future storage-format change structurally misses instead of misparsing old entries.
-    CACHE_SCHEMA_VERSION = "ppr-schema-v1"
+    CACHE_SCHEMA_VERSION = "ppr-schema-v2"
 
     # ActiveSupport::Notifications event emitted each time a PPR render serves a fully-static
     # shell (prerender finished with `postponed == null`, so no resume phase runs). This is the
