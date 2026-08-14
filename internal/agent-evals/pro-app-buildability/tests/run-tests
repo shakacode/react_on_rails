@@ -15,6 +15,10 @@ rg -Fq 'one shell invocation with `set -o pipefail` as the exact top-level line'
   "$eval_dir/prompt.md"
 rg -Fq 'immediately before a single bounded `tee | tail` scaffold pipeline.' \
   "$eval_dir/prompt.md"
+rg -Fq 'Use exactly `tail -c 4096` for this scaffold proof so its terminal completion' \
+  "$eval_dir/prompt.md"
+rg -Fq 'and status marker fit within the immutable command-evidence limit.' \
+  "$eval_dir/prompt.md"
 rg -Fq '`bash -c`, a subshell, or a background process for this proof; run it in the' \
   "$eval_dir/prompt.md"
 rg -Fq 'foreground so its completed event proves the generator itself finished.' \
@@ -2807,7 +2811,7 @@ if jq -e '.artifacts[] | select(.path | startswith("application/") or startswith
   exit 1
 fi
 
-claude_v5_scaffold_command='time npx --yes create-react-on-rails-app eval_app --rsc --package-manager npm 2>&1 | tee <LOCAL_PATH> | tail -150'
+claude_v5_scaffold_command='time npx --yes create-react-on-rails-app eval_app --rsc --package-manager npm 2>&1 | tee <LOCAL_PATH> | tail -c 4096'
 jq -cn --arg command "$claude_v5_scaffold_command" \
   '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"✓ Done!\nCreated eval_app with React on Rails!"}}' \
   >"$tmp/claude-v5-scaffold-events.jsonl"
@@ -2857,11 +2861,11 @@ done
 test "$(jq -r '.overall' "$tmp/claude-v5-classifier-output/rubric-results.json")" = pass
 
 claude_v5_scaffold_rejections=(
-  'time -p npx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH> | tail -150'
-  'time -- npx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH> | tail -150'
-  'env time npx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH> | tail -150'
-  'time sudo npx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH> | tail -150'
-  'time time npx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH> | tail -150'
+  'time -p npx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH> | tail -c 4096'
+  'time -- npx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH> | tail -c 4096'
+  'env time npx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH> | tail -c 4096'
+  'time sudo npx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH> | tail -c 4096'
+  'time time npx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH> | tail -c 4096'
   'time npx --yes create-react-on-rails-app eval_app --rsc'
 )
 claude_v5_scaffold_rejection_index=0
@@ -3015,7 +3019,7 @@ printf '%s\n' \
 printf '%s\n' \
   'test("SubscribeForm invalid then valid", () => { expect("invalid").not.toBe("valid"); });' \
   >"$tmp/claude-classifier-workspace/eval_app/app/javascript/src/SubscribeForm/SubscribeForm.test.tsx"
-claude_scaffold_command=$'set -o pipefail\ntimeout 580 npx --yes create-react-on-rails-app@latest eval_app --rsc --package-manager npm 2>&1 | tee <LOCAL_PATH> | tail -200'
+claude_scaffold_command=$'set -o pipefail\ntimeout 580 npx --yes create-react-on-rails-app@latest eval_app --rsc --package-manager npm 2>&1 | tee <LOCAL_PATH> | tail -c 4096'
 claude_build_command=$'rm -rf public/packs public/packs-test\nnpm run build > <LOCAL_PATH> 2>&1\necho "BUILD_EXIT_CODE=$?"\ntail -30 <LOCAL_PATH>'
 jq -cn --arg command "$claude_scaffold_command" \
   '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"created successfully"}}' \
@@ -3037,7 +3041,7 @@ for row in install.pro rsc.route form.validation tests.page tests.form build.pro
 done
 test "$(jq -r '.overall' "$tmp/claude-classifier-output/rubric-results.json")" = pass
 
-claude_v3_scaffold_command='npx --yes create-react-on-rails-app@17.0.1 eval_app --rsc --package-manager npm 2>&1 | tee <LOCAL_PATH> | tail -150'
+claude_v3_scaffold_command='npx --yes create-react-on-rails-app@17.0.1 eval_app --rsc --package-manager npm 2>&1 | tee <LOCAL_PATH> | tail -c 4096'
 claude_v3_build_command='echo "last exit status check:"; npm run build > <LOCAL_PATH> 2>&1; echo "EXIT_CODE:$?"; tail -20 <LOCAL_PATH>'
 claude_v3_test_command='bin/rails test 2>&1 | tail -60'
 jq -cn --arg command "$claude_v3_scaffold_command" \
@@ -3067,7 +3071,7 @@ for citation in \
     "$tmp/claude-v3-classifier-output/rubric-results.json" >/dev/null
 done
 
-claude_v4_scaffold_command=$'cd <LOCAL_PATH>\nnpx --yes create-react-on-rails-app eval_app --template typescript --package-manager npm --rsc 2>&1 | tee <LOCAL_PATH> | tail -200'
+claude_v4_scaffold_command=$'cd <LOCAL_PATH>\nnpx --yes create-react-on-rails-app eval_app --template typescript --package-manager npm --rsc 2>&1 | tee <LOCAL_PATH> | tail -c 4096'
 claude_v4_test_command=$'cd <LOCAL_PATH>/eval_app\nbin/rails test -v 2>&1 | tail -60'
 claude_v4_build_command=$'cd <LOCAL_PATH>/eval_app\nnpm run build > <LOCAL_PATH> 2>&1\necho "REAL_BUILD_EXIT=$?"\ntail -5 <LOCAL_PATH>'
 jq -cn --arg command "$claude_v4_scaffold_command" \
@@ -3091,9 +3095,9 @@ done
 test "$(jq -r '.overall' "$tmp/claude-v4-classifier-output/rubric-results.json")" = pass
 
 claude_v4_scaffold_rejections=(
-  $'cd <LOCAL_PATH>/other\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH> | tail -200'
-  $'cd "<LOCAL_PATH>"\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH> | tail -200'
-  $'cd <LOCAL_PATH>\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH> | tail -200\ntrue'
+  $'cd <LOCAL_PATH>/other\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH> | tail -c 4096'
+  $'cd "<LOCAL_PATH>"\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH> | tail -c 4096'
+  $'cd <LOCAL_PATH>\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH> | tail -c 4096\ntrue'
 )
 claude_v4_scaffold_rejection_index=0
 for scaffold_command in "${claude_v4_scaffold_rejections[@]}"; do
@@ -3348,18 +3352,18 @@ rejected_multiline_commands=(
   $'npx create-react-on-rails-app eval_app --pro && true\nnpm run build && true'
   $'npx create-react-on-rails-app eval_app --pro 2>&1 | tee scaffold.log\nnpm run build 2>&1 | tee build.log'
   $'npx create-react-on-rails-app eval_app --pro 2>&1 | tee scaffold.log | tail -n 10000\nnpm run build 2>&1 | tee build.log | tail -10000'
-  $'timeout 601 npx create-react-on-rails-app eval_app --pro 2>&1 | tee <LOCAL_PATH> | tail -200\ntimeout 601 npm run build > <LOCAL_PATH> 2>&1'
-  $'sudo timeout 580 npx create-react-on-rails-app eval_app --pro 2>&1 | tee <LOCAL_PATH> | tail -200\nenv npm run build > <LOCAL_PATH> 2>&1'
+  $'timeout 601 npx create-react-on-rails-app eval_app --pro 2>&1 | tee <LOCAL_PATH> | tail -c 4096\ntimeout 601 npm run build > <LOCAL_PATH> 2>&1'
+  $'sudo timeout 580 npx create-react-on-rails-app eval_app --pro 2>&1 | tee <LOCAL_PATH> | tail -c 4096\nenv npm run build > <LOCAL_PATH> 2>&1'
   $'npx create-react-on-rails-app eval_app --pro > arbitrary.log 2>&1\nnpm run build > arbitrary.log 2>&1'
   $'npx create-react-on-rails-app eval_app --pro > <LOCAL_PATH> 2>&1 && true\nnpm run build > <LOCAL_PATH> 2>&1 && true'
   $'echo "timeout 580 npx create-react-on-rails-app eval_app --pro"\n# npm run build > <LOCAL_PATH> 2>&1'
   $'npx create-react-on-rails-app eval_app --pro && true\nrm -rf stale && timeout 300 npm run build > <LOCAL_PATH> 2>&1'
-  $'timeout 580 npx create-react-on-rails-app eval_app --pro 2>&1 | tee <LOCAL_PATH> | tail -200\nnpm run build 2>&1 | tee <LOCAL_PATH> | tail -200'
+  $'timeout 580 npx create-react-on-rails-app eval_app --pro 2>&1 | tee <LOCAL_PATH> | tail -c 4096\nnpm run build 2>&1 | tee <LOCAL_PATH> | tail -c 4096'
   $'echo "not a scaffold"\nnpm run build > <LOCAL_PATH> 2>&1\ntail -200 <LOCAL_PATH>'
   $'echo "not a scaffold"\nnpm run build > <LOCAL_PATH> 2>&1\nbuild_exit=$?\ntail -200 <LOCAL_PATH>\nexit 0'
   $'echo "BUILD_EXIT_CODE=0"\nnpm run build > <LOCAL_PATH> 2>&1\ntail -200 <LOCAL_PATH>\necho "BUILD_EXIT_CODE=0"'
   $'npx create-react-on-rails-app eval_app --pro\ntrue\nnpm run build\ntrue'
-  $'set -o pipefail\nnpx create-react-on-rails-app eval_app --pro 2>&1 | tee <LOCAL_PATH> | tail -200\ntrue'
+  $'set -o pipefail\nnpx create-react-on-rails-app eval_app --pro 2>&1 | tee <LOCAL_PATH> | tail -c 4096\ntrue'
   $'set -o pipefail\nnpm run build 2>&1 | tee <LOCAL_PATH> | tail -200\necho masked'
 )
 rejected_multiline_index=0
@@ -3463,7 +3467,7 @@ printf '%s\n' \
   '    assert_includes @response.body, "Thanks for subscribing, Ada Lovelace!"' \
   '  end' \
   'end' >"$tmp/claude-v6-workspace/eval_app/test/integration/subscribers_test.rb"
-claude_v6_scaffold_command=$'source <LOCAL_PATH>/.ror-eval-state/pgenv.sh\nnpx --yes create-react-on-rails-app eval_app --rsc --template typescript 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/create-app.log | tail -150'
+claude_v6_scaffold_command=$'source <LOCAL_PATH>/.ror-eval-state/pgenv.sh\nnpx --yes create-react-on-rails-app eval_app --rsc --template typescript 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/create-app.log | tail -c 4096'
 jq -cn --arg command "$claude_v6_scaffold_command" \
   '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"✓ Done!\nCreated eval_app with React on Rails!"}}' \
   >"$tmp/claude-v6-scaffold-events.jsonl"
@@ -3606,13 +3610,13 @@ for row in rsc.route tests.page; do
 done
 
 claude_v6_scaffold_rejections=(
-  $'source "<LOCAL_PATH>/.ror-eval-state/pgenv.sh"\nnpx --yes create-react-on-rails-app eval_app --rsc --template typescript 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/create-app.log | tail -150'
-  $'source <LOCAL_PATH>/.ror-eval-state/other.sh\nnpx --yes create-react-on-rails-app eval_app --rsc --template typescript 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/create-app.log | tail -150'
-  $'source <LOCAL_PATH>/.ror-eval-state/pgenv.sh\nsource <LOCAL_PATH>/.ror-eval-state/pgenv.sh\nnpx --yes create-react-on-rails-app eval_app --rsc --template typescript 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/create-app.log | tail -150'
-  $'cd <LOCAL_PATH>\nsource <LOCAL_PATH>/.ror-eval-state/pgenv.sh\nnpx --yes create-react-on-rails-app eval_app --rsc --template typescript 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/create-app.log | tail -150'
-  $'source <LOCAL_PATH>/.ror-eval-state/pgenv.sh\ntrue\nnpx --yes create-react-on-rails-app eval_app --rsc --template typescript 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/create-app.log | tail -150'
-  $'source <LOCAL_PATH>/.ror-eval-state/pgenv.sh\nnpx --yes create-react-on-rails-app eval_app --rsc --template typescript 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/other.log | tail -150'
-  $'source <LOCAL_PATH>/.ror-eval-state/pgenv.sh\nnpx --yes create-react-on-rails-app eval_app --rsc --template typescript 2>&1 | tee <LOCAL_PATH>/Xror-eval-state/create-app.log | tail -150'
+  $'source "<LOCAL_PATH>/.ror-eval-state/pgenv.sh"\nnpx --yes create-react-on-rails-app eval_app --rsc --template typescript 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/create-app.log | tail -c 4096'
+  $'source <LOCAL_PATH>/.ror-eval-state/other.sh\nnpx --yes create-react-on-rails-app eval_app --rsc --template typescript 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/create-app.log | tail -c 4096'
+  $'source <LOCAL_PATH>/.ror-eval-state/pgenv.sh\nsource <LOCAL_PATH>/.ror-eval-state/pgenv.sh\nnpx --yes create-react-on-rails-app eval_app --rsc --template typescript 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/create-app.log | tail -c 4096'
+  $'cd <LOCAL_PATH>\nsource <LOCAL_PATH>/.ror-eval-state/pgenv.sh\nnpx --yes create-react-on-rails-app eval_app --rsc --template typescript 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/create-app.log | tail -c 4096'
+  $'source <LOCAL_PATH>/.ror-eval-state/pgenv.sh\ntrue\nnpx --yes create-react-on-rails-app eval_app --rsc --template typescript 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/create-app.log | tail -c 4096'
+  $'source <LOCAL_PATH>/.ror-eval-state/pgenv.sh\nnpx --yes create-react-on-rails-app eval_app --rsc --template typescript 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/other.log | tail -c 4096'
+  $'source <LOCAL_PATH>/.ror-eval-state/pgenv.sh\nnpx --yes create-react-on-rails-app eval_app --rsc --template typescript 2>&1 | tee <LOCAL_PATH>/Xror-eval-state/create-app.log | tail -c 4096'
 )
 claude_v6_scaffold_rejection_index=0
 for scaffold_command in "${claude_v6_scaffold_rejections[@]}"; do
@@ -3760,7 +3764,7 @@ printf '%s\n' \
   '  end' \
   'end' >"$tmp/claude-v7-workspace/eval_app/test/controllers/contact_messages_controller_test.rb"
 
-claude_v7_scaffold_command=$'export HOME=<LOCAL_PATH>/runner-home\nnode -v; npx --yes create-react-on-rails-app eval_app --rsc --template typescript --package-manager npm 2>&1 | tee <LOCAL_PATH>/.create-app.log | tail -150'
+claude_v7_scaffold_command=$'export HOME=<LOCAL_PATH>/runner-home\nnode -v; npx --yes create-react-on-rails-app eval_app --rsc --template typescript --package-manager npm 2>&1 | tee <LOCAL_PATH>/.create-app.log | tail -c 4096'
 claude_v7_test_command=$'export HOME=<LOCAL_PATH>/runner-home\nexport PGHOST=<LOCAL_PATH>/.pgsocket PGPORT=5433 PGUSER=postgres\ncd <LOCAL_PATH>/eval_app\nbin/rails test 2>&1 | tail -150'
 claude_v7_build_command=$'export HOME=<LOCAL_PATH>/runner-home\nexport PGHOST=<LOCAL_PATH>/.pgsocket PGPORT=5433 PGUSER=postgres\ncd <LOCAL_PATH>/eval_app\nSECRET_KEY_BASE="<GENERATED_AT_RUNTIME>" npm run build'
 jq -cn --arg command "$claude_v7_scaffold_command" \
@@ -3785,7 +3789,7 @@ for row in install.pro rsc.route form.validation tests.page tests.form build.pro
 done
 test "$(jq -r '.overall' "$tmp/claude-v7-output/rubric-results.json")" = pass
 
-claude_v7_scaffold_without_setup='node -v; npx --yes create-react-on-rails-app eval_app --rsc --template typescript --package-manager npm 2>&1 | tee <LOCAL_PATH>/.create-app.log | tail -150'
+claude_v7_scaffold_without_setup='node -v; npx --yes create-react-on-rails-app eval_app --rsc --template typescript --package-manager npm 2>&1 | tee <LOCAL_PATH>/.create-app.log | tail -c 4096'
 claude_v7_test_without_setup='bin/rails test 2>&1 | tail -20'
 claude_v7_build_without_setup='SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>" npm run build'
 jq -cn --arg command "$claude_v7_scaffold_without_setup" \
@@ -3806,16 +3810,16 @@ node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v7-no-setup.jsonl" \
 test "$(jq -r '.overall' "$tmp/claude-v7-no-setup-output/rubric-results.json")" = pass
 
 claude_v7_scaffold_rejections=(
-  $'export HOME=<LOCAL_PATH>/runner-home\nexport HOME=<LOCAL_PATH>/runner-home\nnode -v; npx --yes create-react-on-rails-app eval_app --rsc --template typescript --package-manager npm 2>&1 | tee <LOCAL_PATH>/.create-app.log | tail -150'
-  $'export HOME=<LOCAL_PATH>/other-home\nnode -v; npx --yes create-react-on-rails-app eval_app --rsc --template typescript --package-manager npm 2>&1 | tee <LOCAL_PATH>/.create-app.log | tail -150'
-  $'export PGHOST=<LOCAL_PATH>/.pgsocket PGPORT=5433 PGUSER=postgres\nexport HOME=<LOCAL_PATH>/runner-home\nnode -v; npx --yes create-react-on-rails-app eval_app --rsc --template typescript --package-manager npm 2>&1 | tee <LOCAL_PATH>/.create-app.log | tail -150'
-  $'export HOME=<LOCAL_PATH>/runner-home\ntrue\nnode -v; npx --yes create-react-on-rails-app eval_app --rsc --template typescript --package-manager npm 2>&1 | tee <LOCAL_PATH>/.create-app.log | tail -150'
-  $'export HOME=<LOCAL_PATH>/runner-home\nnode --version; npx --yes create-react-on-rails-app eval_app --rsc --template typescript --package-manager npm 2>&1 | tee <LOCAL_PATH>/.create-app.log | tail -150'
-  $'export HOME=<LOCAL_PATH>/runner-home\nnode -v; node -v; npx --yes create-react-on-rails-app eval_app --rsc --template typescript --package-manager npm 2>&1 | tee <LOCAL_PATH>/.create-app.log | tail -150'
-  $'export HOME=<LOCAL_PATH>/runner-home\nnode -v; npx --yes create-react-on-rails-app eval_app --rsc --template typescript --package-manager npm 2>&1 | tee <LOCAL_PATH>/.other.log | tail -150'
+  $'export HOME=<LOCAL_PATH>/runner-home\nexport HOME=<LOCAL_PATH>/runner-home\nnode -v; npx --yes create-react-on-rails-app eval_app --rsc --template typescript --package-manager npm 2>&1 | tee <LOCAL_PATH>/.create-app.log | tail -c 4096'
+  $'export HOME=<LOCAL_PATH>/other-home\nnode -v; npx --yes create-react-on-rails-app eval_app --rsc --template typescript --package-manager npm 2>&1 | tee <LOCAL_PATH>/.create-app.log | tail -c 4096'
+  $'export PGHOST=<LOCAL_PATH>/.pgsocket PGPORT=5433 PGUSER=postgres\nexport HOME=<LOCAL_PATH>/runner-home\nnode -v; npx --yes create-react-on-rails-app eval_app --rsc --template typescript --package-manager npm 2>&1 | tee <LOCAL_PATH>/.create-app.log | tail -c 4096'
+  $'export HOME=<LOCAL_PATH>/runner-home\ntrue\nnode -v; npx --yes create-react-on-rails-app eval_app --rsc --template typescript --package-manager npm 2>&1 | tee <LOCAL_PATH>/.create-app.log | tail -c 4096'
+  $'export HOME=<LOCAL_PATH>/runner-home\nnode --version; npx --yes create-react-on-rails-app eval_app --rsc --template typescript --package-manager npm 2>&1 | tee <LOCAL_PATH>/.create-app.log | tail -c 4096'
+  $'export HOME=<LOCAL_PATH>/runner-home\nnode -v; node -v; npx --yes create-react-on-rails-app eval_app --rsc --template typescript --package-manager npm 2>&1 | tee <LOCAL_PATH>/.create-app.log | tail -c 4096'
+  $'export HOME=<LOCAL_PATH>/runner-home\nnode -v; npx --yes create-react-on-rails-app eval_app --rsc --template typescript --package-manager npm 2>&1 | tee <LOCAL_PATH>/.other.log | tail -c 4096'
   $'export HOME=<LOCAL_PATH>/runner-home\nnode -v; npx --yes create-react-on-rails-app eval_app --rsc --template typescript --package-manager npm 2>&1 | tee <LOCAL_PATH>/.create-app.log | tail -1001'
-  $'export HOME=<LOCAL_PATH>/runner-home\nnode -v; npx --yes create-react-on-rails-app eval_app --rsc --template typescript --package-manager npm 2>&1 | tee <LOCAL_PATH>/.create-app.log | tail -150\ntrue'
-  $'export HOME=<LOCAL_PATH>/runner-home\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc --template typescript --package-manager npm 2>&1 | tee <LOCAL_PATH>/.create-app.log | tail -150'
+  $'export HOME=<LOCAL_PATH>/runner-home\nnode -v; npx --yes create-react-on-rails-app eval_app --rsc --template typescript --package-manager npm 2>&1 | tee <LOCAL_PATH>/.create-app.log | tail -c 4096\ntrue'
+  $'export HOME=<LOCAL_PATH>/runner-home\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc --template typescript --package-manager npm 2>&1 | tee <LOCAL_PATH>/.create-app.log | tail -c 4096'
 )
 claude_v7_scaffold_rejection_index=0
 for scaffold_command in "${claude_v7_scaffold_rejections[@]}"; do
@@ -4220,7 +4224,7 @@ for manifest_variant in missing no-production-env one-production-env truncated; 
     "$tmp/claude-v8-build-$manifest_variant-output/rubric-results.json")" = unknown
 done
 
-claude_v9_scaffold_command=$'set -o pipefail\nnpx --yes create-react-on-rails-app@latest eval_app --rsc --package-manager npm --no-agent-files 2>&1 | tee <LOCAL_PATH>/scaffold.log | tail -n 200\necho "PIPE_EXIT_STATUS=$?"'
+claude_v9_scaffold_command=$'set -o pipefail\nnpx --yes create-react-on-rails-app@latest eval_app --rsc --package-manager npm --no-agent-files 2>&1 | tee <LOCAL_PATH>/scaffold.log | tail -c 4096\necho "PIPE_EXIT_STATUS=$?"'
 jq -cn --arg command "$claude_v9_scaffold_command" \
   '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"✓ Done!\nCreated eval_app with React on Rails!\nPIPE_EXIT_STATUS=0"}}' \
   >"$tmp/claude-v9-scaffold-events.jsonl"
@@ -4256,15 +4260,15 @@ test "$(jq -r '.items[] | select(.id == "build.production") | .status' \
   "$tmp/claude-v9-build-output/rubric-results.json")" = pass
 
 claude_v9_scaffold_rejections=(
-  $'npx --yes create-react-on-rails-app@latest eval_app --rsc --package-manager npm --no-agent-files 2>&1 | tee <LOCAL_PATH>/scaffold.log | tail -n 200\necho "PIPE_EXIT_STATUS=$?"'
-  $'true\nset -o pipefail\nnpx --yes create-react-on-rails-app@latest eval_app --rsc --package-manager npm --no-agent-files 2>&1 | tee <LOCAL_PATH>/scaffold.log | tail -n 200\necho "PIPE_EXIT_STATUS=$?"'
-  $'set -o pipefail\ntrue\nnpx --yes create-react-on-rails-app@latest eval_app --rsc --package-manager npm --no-agent-files 2>&1 | tee <LOCAL_PATH>/scaffold.log | tail -n 200\necho "PIPE_EXIT_STATUS=$?"'
-  $'set -o pipefail\nnpx --yes create-react-on-rails-app@latest eval_app --rsc --package-manager npm --no-agent-files 2>&1 | tee <LOCAL_PATH>/other.log | tail -n 200\necho "PIPE_EXIT_STATUS=$?"'
+  $'npx --yes create-react-on-rails-app@latest eval_app --rsc --package-manager npm --no-agent-files 2>&1 | tee <LOCAL_PATH>/scaffold.log | tail -c 4096\necho "PIPE_EXIT_STATUS=$?"'
+  $'true\nset -o pipefail\nnpx --yes create-react-on-rails-app@latest eval_app --rsc --package-manager npm --no-agent-files 2>&1 | tee <LOCAL_PATH>/scaffold.log | tail -c 4096\necho "PIPE_EXIT_STATUS=$?"'
+  $'set -o pipefail\ntrue\nnpx --yes create-react-on-rails-app@latest eval_app --rsc --package-manager npm --no-agent-files 2>&1 | tee <LOCAL_PATH>/scaffold.log | tail -c 4096\necho "PIPE_EXIT_STATUS=$?"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app@latest eval_app --rsc --package-manager npm --no-agent-files 2>&1 | tee <LOCAL_PATH>/other.log | tail -c 4096\necho "PIPE_EXIT_STATUS=$?"'
   $'set -o pipefail\nnpx --yes create-react-on-rails-app@latest eval_app --rsc --package-manager npm --no-agent-files 2>&1 | tee <LOCAL_PATH>/scaffold.log | tail -n 1001\necho "PIPE_EXIT_STATUS=$?"'
-  $'set -o pipefail\nnpx --yes create-react-on-rails-app@latest eval_app --rsc --package-manager npm --no-agent-files 2>&1 | tee <LOCAL_PATH>/scaffold.log | tail -n 200\ntrue\necho "PIPE_EXIT_STATUS=$?"'
-  $'set -o pipefail\nnpx --yes create-react-on-rails-app@latest eval_app --rsc --package-manager npm --no-agent-files 2>&1 | tee <LOCAL_PATH>/scaffold.log | tail -n 200\necho "PIPE_EXIT_STATUS=0"'
-  $'set -o pipefail\nnpx --yes create-react-on-rails-app@latest eval_app --rsc --package-manager npm --no-agent-files 2>&1 | tee <LOCAL_PATH>/scaffold.log | tail -n 200\necho "PIPE_EXIT_STATUS=${PIPESTATUS[0]}"'
-  $'set -o pipefail\nnpx --yes create-react-on-rails-app@latest eval_app --rsc --package-manager npm --no-agent-files 2>&1 | tee <LOCAL_PATH>/scaffold.log | tail -n 200\necho "PIPE_EXIT_STATUS=$?"\ntrue'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app@latest eval_app --rsc --package-manager npm --no-agent-files 2>&1 | tee <LOCAL_PATH>/scaffold.log | tail -c 4096\ntrue\necho "PIPE_EXIT_STATUS=$?"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app@latest eval_app --rsc --package-manager npm --no-agent-files 2>&1 | tee <LOCAL_PATH>/scaffold.log | tail -c 4096\necho "PIPE_EXIT_STATUS=0"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app@latest eval_app --rsc --package-manager npm --no-agent-files 2>&1 | tee <LOCAL_PATH>/scaffold.log | tail -c 4096\necho "PIPE_EXIT_STATUS=${PIPESTATUS[0]}"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app@latest eval_app --rsc --package-manager npm --no-agent-files 2>&1 | tee <LOCAL_PATH>/scaffold.log | tail -c 4096\necho "PIPE_EXIT_STATUS=$?"\ntrue'
 )
 claude_v9_scaffold_rejection_index=0
 for scaffold_command in "${claude_v9_scaffold_rejections[@]}"; do
@@ -4474,7 +4478,7 @@ for nonzero_index in "${!claude_v9_nonzero_commands[@]}"; do
     "$tmp/claude-v9-nonzero-$nonzero_index-output/rubric-results.json")" = unknown
 done
 
-claude_v10_scaffold_command=$'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc --template typescript --package-manager npm 2>&1 | tee scaffold.log | tail -n 300\necho "PIPESTATUS_SCAFFOLD=${PIPESTATUS[0]}"'
+claude_v10_scaffold_command=$'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc --template typescript --package-manager npm 2>&1 | tee scaffold.log | tail -c 4096\necho "PIPESTATUS_SCAFFOLD=${PIPESTATUS[0]}"'
 claude_v10_test_command=$'source <LOCAL_PATH>/.ror-eval-state/env.sh\ncd <LOCAL_PATH>/eval_app\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tee <LOCAL_PATH>/.ror-eval-state<LOCAL_PATH> | tail -n 100\necho "FINAL_TEST_RUN_MARKER_EXITCODE=${PIPESTATUS[0]}"'
 claude_v10_build_command=$'source <LOCAL_PATH>/.ror-eval-state/env.sh\ncd <LOCAL_PATH>/eval_app\nset -o pipefail\nnpm run build 2>&1 | tee <LOCAL_PATH>/.ror-eval-state<LOCAL_PATH> | tail -n 100\necho "FINAL_BUILD_MARKER_EXITCODE=${PIPESTATUS[0]}"'
 jq -cn --arg command "$claude_v10_scaffold_command" \
@@ -4499,7 +4503,7 @@ for row in install.pro rsc.route form.validation tests.page tests.form build.pro
 done
 test "$(jq -r '.overall' "$tmp/claude-v10-output/rubric-results.json")" = pass
 
-stable_scaffold_command=$'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc --package-manager npm 2>&1 | tail -200\necho "ROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}"'
+stable_scaffold_command=$'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc --package-manager npm 2>&1 | tail -c 4096\necho "ROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}"'
 stable_test_command=$'cd <LOCAL_PATH>/eval_app\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tail -100\necho "ROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}"'
 stable_build_command=$'cd <LOCAL_PATH>/eval_app\nset -o pipefail\nnpm run build 2>&1 | tail -100\necho "ROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}"'
 jq -cn --arg command "$stable_scaffold_command" \
@@ -4519,7 +4523,7 @@ node "$eval_dir/bin/derive-evidence.mjs" "$tmp/stable-phase-events.jsonl" \
   "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
 test "$(jq -r '.overall' "$tmp/stable-phase-output/rubric-results.json")" = pass
 
-assigned_status_scaffold_command=$'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc --package-manager npm 2>&1 | tee <LOCAL_PATH>/scaffold.log | tail -200\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+assigned_status_scaffold_command=$'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc --package-manager npm 2>&1 | tee <LOCAL_PATH>/scaffold.log | tail -c 4096\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
 assigned_status_test_command=$'cd <LOCAL_PATH>/eval_app\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tail -100\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
 assigned_status_build_command=$'cd <LOCAL_PATH>/eval_app\nrm -rf public/assets public/packs public/packs-test\nset -o pipefail\nenv RAILS_ENV=production NODE_ENV=production bin/rails assets:precompile 2>&1 | tail -n 200\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"'
 jq -cn --arg command "$assigned_status_scaffold_command" \
@@ -4544,7 +4548,7 @@ for row in install.pro rsc.route form.validation tests.page tests.form build.pro
 done
 test "$(jq -r '.overall' "$tmp/assigned-status-output/rubric-results.json")" = pass
 
-validated_claude_scaffold_command=$'cd <LOCAL_PATH>\nsource <LOCAL_PATH>/.ror-eval-state/env.sh\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc --package-manager npm 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -200\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+validated_claude_scaffold_command=$'cd <LOCAL_PATH>\nsource <LOCAL_PATH>/.ror-eval-state/env.sh\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc --package-manager npm 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -c 4096\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
 validated_claude_test_command=$'cd <LOCAL_PATH>/eval_app\nsource <LOCAL_PATH>/.ror-eval-state/env.sh\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/test.log | tail -100\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
 validated_claude_build_command=$'cd <LOCAL_PATH>/eval_app\nsource <LOCAL_PATH>/.ror-eval-state/env.sh\nset -o pipefail\nenv RAILS_ENV=production NODE_ENV=production bin/rails assets:precompile 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/build.log | tail -n 200\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"'
 jq -cn --arg command "$validated_claude_scaffold_command" \
@@ -4573,7 +4577,7 @@ for row in install.pro rsc.route form.validation tests.page tests.form build.pro
 done
 test "$(jq -r '.overall' "$tmp/validated-claude-output/rubric-results.json")" = pass
 
-scaffold_retry_command=$'rm -rf <LOCAL_PATH>/eval_app\ncd <LOCAL_PATH>\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+scaffold_retry_command=$'rm -rf <LOCAL_PATH>/eval_app\ncd <LOCAL_PATH>\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -c 4096\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
 jq -cn --arg command "$scaffold_retry_command" \
   '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:1,status:"failed",aggregated_output:"Rails prerequisite unavailable\nROR_EVAL_SCAFFOLD_EXIT=1"}}' \
   >"$tmp/scaffold-retry-failed-events.jsonl"
@@ -4595,25 +4599,25 @@ done
 test "$(jq -r '.overall' "$tmp/scaffold-retry-combined-output/rubric-results.json")" = pass
 
 scaffold_retry_setup_rejections=(
-  $'cd <LOCAL_PATH>\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
-  $'rm -rf <LOCAL_PATH>/other\ncd <LOCAL_PATH>\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
-  $'rm -rf -- <LOCAL_PATH>/eval_app\ncd <LOCAL_PATH>\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
-  $'rm -rf <LOCAL_PATH>/eval_app\nrm -rf <LOCAL_PATH>/eval_app\ncd <LOCAL_PATH>\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
-  $'cd <LOCAL_PATH>\nrm -rf <LOCAL_PATH>/eval_app\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
-  $'rm -rf <LOCAL_PATH>/eval_app\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
-  $'rm -rf <LOCAL_PATH>/eval_app\ncd <LOCAL_PATH>/eval_app\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
-  $'rm -rf <LOCAL_PATH>/eval_app\ncd <LOCAL_PATH>\ncd <LOCAL_PATH>\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
-  $'rm -rf <LOCAL_PATH>/eval_app\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\ncd <LOCAL_PATH>\nexport PGPORT=5433\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
-  $'rm -rf <LOCAL_PATH>/eval_app\ncd <LOCAL_PATH>\nexport PGPORT=5433\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
-  $'rm -rf <LOCAL_PATH>/eval_app\ncd <LOCAL_PATH>\nexport PGPORT=5433\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
-  $'rm -rf <LOCAL_PATH>/eval_app\ncd <LOCAL_PATH>\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
-  $'rm -rf <LOCAL_PATH>/eval_app\ncd <LOCAL_PATH>\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
-  $'rm -rf <LOCAL_PATH>/eval_app\ncd <LOCAL_PATH>\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
-  $'rm -rf <LOCAL_PATH>/eval_app\ncd <LOCAL_PATH>\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGPORT=5433\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
-  $'rm -rf <LOCAL_PATH>/eval_app\ncd <LOCAL_PATH>\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
-  $'rm -rf <LOCAL_PATH>/eval_app\ncd <LOCAL_PATH>\nexport PGHOST=<LOCAL_PATH>/.pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
-  $'rm -rf <LOCAL_PATH>/eval_app\ncd <LOCAL_PATH>\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5432\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
-  $'rm -rf <LOCAL_PATH>/eval_app\ncd <LOCAL_PATH>\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=app\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'cd <LOCAL_PATH>\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -c 4096\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'rm -rf <LOCAL_PATH>/other\ncd <LOCAL_PATH>\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -c 4096\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'rm -rf -- <LOCAL_PATH>/eval_app\ncd <LOCAL_PATH>\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -c 4096\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'rm -rf <LOCAL_PATH>/eval_app\nrm -rf <LOCAL_PATH>/eval_app\ncd <LOCAL_PATH>\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -c 4096\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'cd <LOCAL_PATH>\nrm -rf <LOCAL_PATH>/eval_app\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -c 4096\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'rm -rf <LOCAL_PATH>/eval_app\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -c 4096\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'rm -rf <LOCAL_PATH>/eval_app\ncd <LOCAL_PATH>/eval_app\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -c 4096\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'rm -rf <LOCAL_PATH>/eval_app\ncd <LOCAL_PATH>\ncd <LOCAL_PATH>\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -c 4096\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'rm -rf <LOCAL_PATH>/eval_app\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\ncd <LOCAL_PATH>\nexport PGPORT=5433\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -c 4096\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'rm -rf <LOCAL_PATH>/eval_app\ncd <LOCAL_PATH>\nexport PGPORT=5433\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -c 4096\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'rm -rf <LOCAL_PATH>/eval_app\ncd <LOCAL_PATH>\nexport PGPORT=5433\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -c 4096\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'rm -rf <LOCAL_PATH>/eval_app\ncd <LOCAL_PATH>\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -c 4096\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'rm -rf <LOCAL_PATH>/eval_app\ncd <LOCAL_PATH>\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -c 4096\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'rm -rf <LOCAL_PATH>/eval_app\ncd <LOCAL_PATH>\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -c 4096\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'rm -rf <LOCAL_PATH>/eval_app\ncd <LOCAL_PATH>\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGPORT=5433\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -c 4096\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'rm -rf <LOCAL_PATH>/eval_app\ncd <LOCAL_PATH>\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -c 4096\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'rm -rf <LOCAL_PATH>/eval_app\ncd <LOCAL_PATH>\nexport PGHOST=<LOCAL_PATH>/.pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -c 4096\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'rm -rf <LOCAL_PATH>/eval_app\ncd <LOCAL_PATH>\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5432\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -c 4096\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'rm -rf <LOCAL_PATH>/eval_app\ncd <LOCAL_PATH>\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=app\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -c 4096\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
 )
 scaffold_retry_setup_rejection_index=0
 for scaffold_command in "${scaffold_retry_setup_rejections[@]}"; do
@@ -4632,7 +4636,7 @@ for scaffold_command in "${scaffold_retry_setup_rejections[@]}"; do
 done
 
 scaffold_retry_setup_prefix=$'rm -rf <LOCAL_PATH>/eval_app\ncd <LOCAL_PATH>\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\n'
-scaffold_retry_proof=$'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+scaffold_retry_proof=$'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -c 4096\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
 # shellcheck disable=SC2016
 scaffold_retry_forbidden_setup_lines=(
   'export PGPASSWORD=[REDACTED]'
@@ -4659,20 +4663,20 @@ for forbidden_line in "${scaffold_retry_forbidden_setup_lines[@]}"; do
 done
 
 scaffold_retry_phase_rejections=(
-  $'npx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
-  $'set -o pipefail\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
-  $'set -o pipefail\nexport PGUSER=postgres\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
-  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
-  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | cat | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
-  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>;true | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'npx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -c 4096\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'set -o pipefail\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -c 4096\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'set -o pipefail\nexport PGUSER=postgres\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -c 4096\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -c 4096\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | cat | tail -c 4096\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>;true | tail -c 4096\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
   $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 0\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
   $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 1001\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
-  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=$?\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
-  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[1]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
-  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_TEST_EXIT"'
-  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=0"'
-  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\ntrue\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
-  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -n 300\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"\ntrue'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -c 4096\nROR_EVAL_SCAFFOLD_EXIT=$?\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -c 4096\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[1]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -c 4096\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_TEST_EXIT"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -c 4096\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=0"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -c 4096\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\ntrue\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/scaffold.log | tail -c 4096\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"\ntrue'
 )
 scaffold_retry_phase_rejection_index=0
 for rejected_proof in "${scaffold_retry_phase_rejections[@]}"; do
@@ -5062,7 +5066,7 @@ for row in install.pro rsc.route form.validation tests.page tests.form build.pro
 done
 test "$(jq -r '.overall' "$tmp/cd-first-explicit-pg-output/rubric-results.json")" = pass
 
-mutated_path_scaffold_command=$'export PATH="<LOCAL_PATH>/.ror-eval-state/gem-bin:$PATH"\ncd <LOCAL_PATH>\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc --package-manager npm 2>&1 | tail -200\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+mutated_path_scaffold_command=$'export PATH="<LOCAL_PATH>/.ror-eval-state/gem-bin:$PATH"\ncd <LOCAL_PATH>\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc --package-manager npm 2>&1 | tail -c 4096\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
 mutated_path_test_command=$'export PATH="<LOCAL_PATH>/.ror-eval-state/gem-bin:$PATH"\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nexport PGPASSWORD=[REDACTED]\ncd <LOCAL_PATH>/eval_app\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tail -100\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
 mutated_path_build_command=$'export PATH="<LOCAL_PATH>/.ror-eval-state/gem-bin:$PATH"\ncd <LOCAL_PATH>/eval_app\nset -o pipefail\nnpm run build 2>&1 | tail -200\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"'
 jq -cn --arg command "$mutated_path_scaffold_command" \
@@ -5151,7 +5155,7 @@ for mutation_line in "${toolchain_mutation_lines[@]}"; do
     "$tmp/toolchain-mutation-$toolchain_mutation_index-output/rubric-results.json")" = unknown
 done
 
-explicit_pg_scaffold_command=$'export PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc --package-manager npm 2>&1 | tail -200\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+explicit_pg_scaffold_command=$'export PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc --package-manager npm 2>&1 | tail -c 4096\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
 explicit_pg_build_command=$'export PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\ncd <LOCAL_PATH>/eval_app\nset -o pipefail\nnpm run build 2>&1 | tail -200\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"'
 jq -cn --arg command "$explicit_pg_scaffold_command" \
   '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"✓ Done!\nCreated eval_app with React on Rails!\nROR_EVAL_SCAFFOLD_EXIT=0"}}' \
@@ -5170,7 +5174,7 @@ for phase_row in scaffold:install.pro build:build.production; do
     "$tmp/explicit-pg-$phase-output/rubric-results.json")" = unknown
 done
 
-model_created_source_scaffold_command=$'source <LOCAL_PATH>/.local/env.sh\ncd <LOCAL_PATH>\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc --package-manager npm 2>&1 | tee <LOCAL_PATH>/.local/logs/scaffold.log | tail -200\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+model_created_source_scaffold_command=$'source <LOCAL_PATH>/.local/env.sh\ncd <LOCAL_PATH>\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc --package-manager npm 2>&1 | tee <LOCAL_PATH>/.local/logs/scaffold.log | tail -c 4096\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
 model_created_source_test_command=$'source <LOCAL_PATH>/.local/env.sh\ncd <LOCAL_PATH>/eval_app\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tee <LOCAL_PATH>/.local/logs/test.log | tail -100\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
 model_created_source_build_command=$'source <LOCAL_PATH>/.local/env.sh\ncd <LOCAL_PATH>/eval_app\nset -o pipefail\nenv RAILS_ENV=production NODE_ENV=production bin/rails assets:precompile 2>&1 | tee <LOCAL_PATH>/.local/logs/build.log | tail -200\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"'
 jq -cn --arg command "$model_created_source_scaffold_command" \
@@ -5260,14 +5264,14 @@ test "$(jq -r '.items[] | select(.id == "build.production") | .status' \
   "$tmp/validated-claude-cleanup-before-source-output/rubric-results.json")" = unknown
 
 assigned_status_scaffold_rejections=(
-  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -200\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"'
-  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -200\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_BUILD_EXIT"'
-  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -200\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=0"'
-  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -200\nROR_EVAL_SCAFFOLD_EXIT=$?\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
-  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -200\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[1]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
-  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -200\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\ntrue\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
-  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -200\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"\ntrue'
-  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -200\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -c 4096\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -c 4096\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_BUILD_EXIT"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -c 4096\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=0"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -c 4096\nROR_EVAL_SCAFFOLD_EXIT=$?\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -c 4096\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[1]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -c 4096\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\ntrue\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -c 4096\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"\ntrue'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -c 4096\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"'
 )
 assigned_status_scaffold_rejection_index=0
 for scaffold_command in "${assigned_status_scaffold_rejections[@]}"; do
@@ -5318,7 +5322,7 @@ node "$eval_dir/bin/derive-evidence.mjs" "$tmp/assigned-status-build-without-cle
 test "$(jq -r '.items[] | select(.id == "build.production") | .status' \
   "$tmp/assigned-status-build-without-cleanup-output/rubric-results.json")" = pass
 
-no_pipefail_nested_scaffold_command='bash -c "set -o pipefail; npx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -200"'
+no_pipefail_nested_scaffold_command='bash -c "set -o pipefail; npx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -c 4096"'
 no_pipefail_background_scaffold_command="$no_pipefail_nested_scaffold_command &"
 no_pipefail_test_command=$'cd <LOCAL_PATH>/eval_app\nexport PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket\nexport PGPORT=5433\nexport PGUSER=postgres\nbin/rails test 2>&1 | tail -100\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
 no_pipefail_build_command=$'cd <LOCAL_PATH>/eval_app\nnpm run build 2>&1 | tail -100\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"'
@@ -5385,7 +5389,7 @@ for row in install.pro rsc.route form.validation tests.page tests.form build.pro
 done
 test "$(jq -r '.overall' "$tmp/stdout-only-combined-output/rubric-results.json")" = pass
 
-stdout_only_scaffold_command=$'npx --yes create-react-on-rails-app eval_app --rsc | tail -200\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+stdout_only_scaffold_command=$'npx --yes create-react-on-rails-app eval_app --rsc | tail -c 4096\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
 jq -cn --arg command "$stdout_only_scaffold_command" \
   '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"✓ Done!\nCreated eval_app with React on Rails!\nROR_EVAL_SCAFFOLD_EXIT=0"}}' \
   >"$tmp/stdout-only-scaffold-events.jsonl"
@@ -5689,20 +5693,20 @@ for build_command in "${assigned_status_build_rejections[@]}"; do
 done
 
 stable_scaffold_rejections=(
-  $'npx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -200\necho "ROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}"'
-  $'npx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -200\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
-  $'set -o pipefail\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -200\necho "ROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}"'
-  $'true\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -200\necho "ROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}"'
-  $'set -o pipefail\necho start; npx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -200\necho "ROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}"'
-  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee $LOG | tail -200\necho "ROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}"'
+  $'npx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -c 4096\necho "ROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}"'
+  $'npx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -c 4096\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
+  $'set -o pipefail\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -c 4096\necho "ROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}"'
+  $'true\nset -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -c 4096\necho "ROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}"'
+  $'set -o pipefail\necho start; npx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -c 4096\necho "ROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tee $LOG | tail -c 4096\necho "ROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}"'
   $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -1001\necho "ROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}"'
-  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -200\necho "ROR_EVAL_SCAFFOLD_EXIT=$?"'
-  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -200\necho "ROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[1]}"'
-  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -200\necho "ror_eval_scaffold_exit=${PIPESTATUS[0]}"'
-  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -200\necho "ROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}"'
-  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -200\necho "ROR_EVAL_SCAFFOLD_MARKER=${PIPESTATUS[0]}"'
-  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -200\necho "ROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}"\ntrue'
-  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -200\necho "ROR_EVAL_SCAFFOLD_EXIT_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=${PIPESTATUS[0]}"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -c 4096\necho "ROR_EVAL_SCAFFOLD_EXIT=$?"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -c 4096\necho "ROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[1]}"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -c 4096\necho "ror_eval_scaffold_exit=${PIPESTATUS[0]}"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -c 4096\necho "ROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -c 4096\necho "ROR_EVAL_SCAFFOLD_MARKER=${PIPESTATUS[0]}"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -c 4096\necho "ROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}"\ntrue'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc 2>&1 | tail -c 4096\necho "ROR_EVAL_SCAFFOLD_EXIT_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=${PIPESTATUS[0]}"'
 )
 stable_scaffold_rejection_index=0
 for scaffold_command in "${stable_scaffold_rejections[@]}"; do
@@ -5861,5 +5865,1925 @@ for manifest_variant in missing one-env truncated; do
       "$tmp/$evidence_variant-$manifest_variant-output/rubric-results.json")" = unknown
   done
 done
+
+cp -R "$tmp/claude-v8-form-workspace" "$tmp/fresh-claude-form-workspace"
+mkdir -p "$tmp/fresh-claude-form-workspace/eval_app/test/controllers"
+rm -f "$tmp/fresh-claude-form-workspace/eval_app/test/integration/subscriptions_test.rb"
+printf '%s\n' \
+  'require "test_helper"' \
+  '' \
+  'class SubscribersControllerTest < ActionDispatch::IntegrationTest' \
+  '  test "gets new" do' \
+  '    get new_subscriber_url' \
+  '    assert_response :success' \
+  '    assert_select "form"' \
+  '  end' \
+  '' \
+  '  test "invalid submission fails server-side validation and does not create a subscriber" do' \
+  '    assert_no_difference("Subscriber.count") do' \
+  '      post subscribers_url, params: { subscriber: { email: "" } }' \
+  '    end' \
+  '' \
+  '    assert_response :unprocessable_entity' \
+  '    assert_select "#error_explanation"' \
+  '  end' \
+  '' \
+  '  test "valid submission creates a subscriber and succeeds" do' \
+  '    assert_difference("Subscriber.count", 1) do' \
+  '      post subscribers_url, params: { subscriber: { email: "new-subscriber@example.com" } }' \
+  '    end' \
+  '' \
+  '    assert_redirected_to new_subscriber_url' \
+  '    follow_redirect!' \
+  '    assert_select "#notice", text: "Thanks for subscribing!"' \
+  '  end' \
+  'end' >"$tmp/fresh-claude-form-workspace/eval_app/test/controllers/subscribers_controller_test.rb"
+mkdir "$tmp/fresh-claude-form-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+  "$tmp/fresh-claude-form-workspace" "$tmp/fresh-claude-form-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/fresh-claude-form-output/rubric-results.json")" = pass
+done
+
+jq -cn \
+  '{type:"item.completed",item:{type:"command_execution",command:"bin/rails test",exit_code:0,status:"completed",aggregated_output:"2 runs, 2 assertions, 0 failures, 0 errors, 2 skips"}}' \
+  >"$tmp/fresh-claude-skipped-form-events.jsonl"
+mkdir "$tmp/fresh-claude-skipped-form-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/fresh-claude-skipped-form-events.jsonl" \
+  "$tmp/fresh-claude-form-workspace" "$tmp/fresh-claude-skipped-form-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/fresh-claude-skipped-form-output/rubric-results.json")" = unknown
+done
+test "$(jq -r '.items[] | select(.id == "tests.green") | .status' \
+  "$tmp/fresh-claude-skipped-form-output/rubric-results.json")" = pass
+
+cp -R "$tmp/fresh-claude-form-workspace" "$tmp/fresh-claude-intervening-request-workspace"
+ruby -e '
+  path = ARGV.fetch(0)
+  content = File.read(path)
+  abort unless content.sub!(
+    %q{      post subscribers_url, params: { subscriber: { email: "" } }},
+    %Q{      post audit_logs_url, params: { audit_log: { message: "invalid subscriber" } }\n      get invalid_subscriber_url},
+  )
+  File.write(path, content)
+' "$tmp/fresh-claude-intervening-request-workspace/eval_app/test/controllers/subscribers_controller_test.rb"
+ruby -c \
+  "$tmp/fresh-claude-intervening-request-workspace/eval_app/test/controllers/subscribers_controller_test.rb" \
+  >/dev/null
+mkdir "$tmp/fresh-claude-intervening-request-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+  "$tmp/fresh-claude-intervening-request-workspace" \
+  "$tmp/fresh-claude-intervening-request-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/fresh-claude-intervening-request-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/fresh-claude-form-workspace" "$tmp/fresh-claude-intervening-success-request-workspace"
+ruby -e '
+  path = ARGV.fetch(0)
+  content = File.read(path)
+  abort unless content.sub!(
+    %Q{    assert_difference("Subscriber.count", 1) do\n      post subscribers_url, params: { subscriber: { email: "new-subscriber@example.com" } }\n    end},
+    %Q{    post subscribers_url, params: { subscriber: { email: "new-subscriber@example.com" } }\n    get unrelated_url},
+  )
+  File.write(path, content)
+' "$tmp/fresh-claude-intervening-success-request-workspace/eval_app/test/controllers/subscribers_controller_test.rb"
+ruby -c \
+  "$tmp/fresh-claude-intervening-success-request-workspace/eval_app/test/controllers/subscribers_controller_test.rb" \
+  >/dev/null
+mkdir "$tmp/fresh-claude-intervening-success-request-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+  "$tmp/fresh-claude-intervening-success-request-workspace" \
+  "$tmp/fresh-claude-intervening-success-request-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/fresh-claude-intervening-success-request-output/rubric-results.json")" = unknown
+done
+
+fresh_claude_inactive_failure_assertions=(
+  $'    if false\n      assert_response :unprocessable_entity\n      assert_select "#error_explanation"\n    end'
+  $'    assert_response :unprocessable_entity if nil\n    assert_select "#error_explanation" unless true'
+  $'    if 1 == 2\n      assert_response :unprocessable_entity\n      assert_select "#error_explanation"\n    end'
+)
+for ((fixture_index = 0; fixture_index < ${#fresh_claude_inactive_failure_assertions[@]}; fixture_index += 1)); do
+  cp -R "$tmp/fresh-claude-form-workspace" \
+    "$tmp/fresh-claude-inactive-failure-$fixture_index-workspace"
+  ruby -e '
+    path, replacement = ARGV
+    content = File.read(path)
+    abort unless content.sub!(
+      %Q{    assert_response :unprocessable_entity\n    assert_select "#error_explanation"},
+      replacement,
+    )
+    File.write(path, content)
+  ' "$tmp/fresh-claude-inactive-failure-$fixture_index-workspace/eval_app/test/controllers/subscribers_controller_test.rb" \
+    "${fresh_claude_inactive_failure_assertions[$fixture_index]}"
+  ruby -c \
+    "$tmp/fresh-claude-inactive-failure-$fixture_index-workspace/eval_app/test/controllers/subscribers_controller_test.rb" \
+    >/dev/null
+  mkdir "$tmp/fresh-claude-inactive-failure-$fixture_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+    "$tmp/fresh-claude-inactive-failure-$fixture_index-workspace" \
+    "$tmp/fresh-claude-inactive-failure-$fixture_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/fresh-claude-inactive-failure-$fixture_index-output/rubric-results.json")" = unknown
+  done
+done
+
+fresh_claude_inactive_success_bodies=(
+  $'    if 1 == 2\n      assert_difference("Subscriber.count", 1) do\n        post subscribers_url, params: { subscriber: { email: "new-subscriber@example.com" } }\n      end\n      assert_redirected_to new_subscriber_url\n      assert_select "#notice", text: "Thanks for subscribing!"\n    end'
+  $'    unused_proof = -> do\n      assert_difference("Subscriber.count", 1) do\n        post subscribers_url, params: { subscriber: { email: "new-subscriber@example.com" } }\n      end\n      assert_redirected_to new_subscriber_url\n    end\n    assert unused_proof'
+)
+for ((fixture_index = 0; fixture_index < ${#fresh_claude_inactive_success_bodies[@]}; fixture_index += 1)); do
+  cp -R "$tmp/fresh-claude-form-workspace" \
+    "$tmp/fresh-claude-inactive-success-$fixture_index-workspace"
+  ruby -e '
+    path, replacement = ARGV
+    content = File.read(path)
+    abort unless content.sub!(
+      %Q{    assert_difference("Subscriber.count", 1) do\n      post subscribers_url, params: { subscriber: { email: "new-subscriber@example.com" } }\n    end\n\n    assert_redirected_to new_subscriber_url\n    follow_redirect!\n    assert_select "#notice", text: "Thanks for subscribing!"},
+      replacement,
+    )
+    File.write(path, content)
+  ' "$tmp/fresh-claude-inactive-success-$fixture_index-workspace/eval_app/test/controllers/subscribers_controller_test.rb" \
+    "${fresh_claude_inactive_success_bodies[$fixture_index]}"
+  ruby -c \
+    "$tmp/fresh-claude-inactive-success-$fixture_index-workspace/eval_app/test/controllers/subscribers_controller_test.rb" \
+    >/dev/null
+  mkdir "$tmp/fresh-claude-inactive-success-$fixture_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+    "$tmp/fresh-claude-inactive-success-$fixture_index-workspace" \
+    "$tmp/fresh-claude-inactive-success-$fixture_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/fresh-claude-inactive-success-$fixture_index-output/rubric-results.json")" = unknown
+  done
+done
+
+cp -R "$tmp/fresh-claude-form-workspace" "$tmp/fresh-claude-refuted-errors-workspace"
+ruby -e \
+  'path = ARGV.fetch(0); content = File.read(path); abort unless content.sub!(%q{    assert_select "#error_explanation"}, %q{    refute_includes response.body, "validation errors"}); File.write(path, content)' \
+  "$tmp/fresh-claude-refuted-errors-workspace/eval_app/test/controllers/subscribers_controller_test.rb"
+mkdir "$tmp/fresh-claude-refuted-errors-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+  "$tmp/fresh-claude-refuted-errors-workspace" "$tmp/fresh-claude-refuted-errors-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/fresh-claude-refuted-errors-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/fresh-claude-form-workspace" "$tmp/fresh-claude-negated-success-message-workspace"
+ruby -e '
+  path = ARGV.fetch(0)
+  content = File.read(path)
+  abort unless content.sub!(
+    %Q{    assert_difference("Subscriber.count", 1) do\n      post subscribers_url, params: { subscriber: { email: "new-subscriber@example.com" } }\n    end},
+    %q{    post subscribers_url, params: { subscriber: { email: "new-subscriber@example.com" } }},
+  )
+  abort unless content.sub!(
+    %Q{    follow_redirect!\n    assert_select "#notice", text: "Thanks for subscribing!"},
+    %q{    assert_not flash[:notice]},
+  )
+  File.write(path, content)
+' "$tmp/fresh-claude-negated-success-message-workspace/eval_app/test/controllers/subscribers_controller_test.rb"
+mkdir "$tmp/fresh-claude-negated-success-message-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+  "$tmp/fresh-claude-negated-success-message-workspace" "$tmp/fresh-claude-negated-success-message-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/fresh-claude-negated-success-message-output/rubric-results.json")" = unknown
+done
+
+for assertion_variant in refute-empty assert-not-empty refute-nil assert-not-nil assert-empty assert-nil; do
+  cp -R "$tmp/fresh-claude-form-workspace" \
+    "$tmp/fresh-claude-error-polarity-$assertion_variant-workspace"
+  assertion="${assertion_variant//-/_} subscriber.errors"
+  ruby -e \
+    'path, replacement = ARGV; content = File.read(path); abort unless content.sub!(%q{    assert_select "#error_explanation"}, "    #{replacement}"); File.write(path, content)' \
+    "$tmp/fresh-claude-error-polarity-$assertion_variant-workspace/eval_app/test/controllers/subscribers_controller_test.rb" \
+    "$assertion"
+  mkdir "$tmp/fresh-claude-error-polarity-$assertion_variant-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+    "$tmp/fresh-claude-error-polarity-$assertion_variant-workspace" \
+    "$tmp/fresh-claude-error-polarity-$assertion_variant-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  expected=unknown
+  [[ "$assertion_variant" == refute-empty || "$assertion_variant" == assert-not-empty ]] && expected=pass
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/fresh-claude-error-polarity-$assertion_variant-output/rubric-results.json")" = "$expected"
+  done
+done
+
+for assertion_variant in refute-empty assert-not-empty refute-nil assert-not-nil assert-empty assert-nil; do
+  cp -R "$tmp/fresh-claude-form-workspace" \
+    "$tmp/fresh-claude-message-polarity-$assertion_variant-workspace"
+  assertion="${assertion_variant//-/_} flash[:notice]"
+  ruby -e '
+    path, replacement = ARGV
+    content = File.read(path)
+    abort unless content.sub!(
+      %Q{    assert_difference("Subscriber.count", 1) do\n      post subscribers_url, params: { subscriber: { email: "new-subscriber@example.com" } }\n    end},
+      %q{    post subscribers_url, params: { subscriber: { email: "new-subscriber@example.com" } }},
+    )
+    abort unless content.sub!(
+      %Q{    follow_redirect!\n    assert_select "#notice", text: "Thanks for subscribing!"},
+      "    #{replacement}",
+    )
+    File.write(path, content)
+  ' "$tmp/fresh-claude-message-polarity-$assertion_variant-workspace/eval_app/test/controllers/subscribers_controller_test.rb" \
+    "$assertion"
+  mkdir "$tmp/fresh-claude-message-polarity-$assertion_variant-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+    "$tmp/fresh-claude-message-polarity-$assertion_variant-workspace" \
+    "$tmp/fresh-claude-message-polarity-$assertion_variant-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  expected=unknown
+  [[ "$assertion_variant" == refute-empty || "$assertion_variant" == assert-not-empty ]] && expected=pass
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/fresh-claude-message-polarity-$assertion_variant-output/rubric-results.json")" = "$expected"
+  done
+done
+
+fresh_claude_positive_error_value_assertions=(
+  '    assert subscriber.errors.any?'
+  '    assert_match /invalid/, subscriber.errors.to_s'
+  '    assert_match /is invalid/, response.body'
+  '    assert_match(%r{invalid}, response.body)'
+  '    assert_includes response.body, "Email is invalid"'
+  '    assert_includes(@response.body, "Email is invalid")'
+  '    assert_equal ["Email is invalid"], response.parsed_body["errors"]'
+  '    assert_equal ["can\x27t be blank"], response.parsed_body.fetch("errors").fetch("email")'
+  '    assert_equal "Email is invalid", subscriber.errors.to_s'
+  '    assert_not subscriber.errors.empty?'
+  '    refute subscriber.errors.empty?'
+  '    refute(subscriber.errors.blank?)'
+  '    assert_operator subscriber.errors.size, :>, 0'
+  '    assert_operator(subscriber.errors.count, :>=, 1)'
+  '    assert_operator subscriber.errors.length, :>, 2'
+  '    assert(subscriber.errors.present?)'
+  '    assert_predicate subscriber.errors, :any?'
+  '    assert_predicate(subscriber.errors, :present?)'
+  '    refute_predicate subscriber.errors, :empty?'
+  '    refute_predicate(subscriber.errors, :blank?)'
+)
+for ((fixture_index = 0; fixture_index < ${#fresh_claude_positive_error_value_assertions[@]}; fixture_index += 1)); do
+  cp -R "$tmp/fresh-claude-form-workspace" \
+    "$tmp/fresh-claude-positive-error-value-$fixture_index-workspace"
+  ruby -e \
+    'path, replacement = ARGV; content = File.read(path); abort unless content.sub!(%q{    assert_select "#error_explanation"}, replacement); File.write(path, content)' \
+    "$tmp/fresh-claude-positive-error-value-$fixture_index-workspace/eval_app/test/controllers/subscribers_controller_test.rb" \
+    "${fresh_claude_positive_error_value_assertions[$fixture_index]}"
+  mkdir "$tmp/fresh-claude-positive-error-value-$fixture_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+    "$tmp/fresh-claude-positive-error-value-$fixture_index-workspace" \
+    "$tmp/fresh-claude-positive-error-value-$fixture_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/fresh-claude-positive-error-value-$fixture_index-output/rubric-results.json")" = pass
+  done
+done
+
+fresh_claude_nonaffirmative_error_assertions=(
+  $'    errors = ["placeholder"]\n    assert_not_empty errors'
+  '    assert "subscriber.errors".present?'
+  '    assert subscriber.errors'
+  '    assert_match //, subscriber.errors.to_s'
+  '    assert_match /^$/, subscriber.errors.to_s'
+  '    assert_match / */, subscriber.errors.to_s'
+  '    assert_match //, response.body'
+  '    assert_match /^$/, response.body'
+  '    assert_match / */, response.body'
+  '    assert_match /x*/, response.body'
+  '    assert_match /(?:error)?/, response.body'
+  '    assert_match /error/, response.body'
+  '    assert_match /\Gx?/, response.body'
+  '    assert_match /\Kx?/, response.body'
+  '    assert_includes response.body, ""'
+  '    assert_includes @response.body, "   "'
+  '    assert_includes response.body, expected_error'
+  '    assert_includes(response.body, "No validation errors")'
+  '    assert_includes(response.body, "Validation errors: none")'
+  '    assert_includes(response.body, "Validation errors were not displayed")'
+  '    assert_includes(response.body, "Validation errors do not appear")'
+  '    assert_includes(response.body, "Validation errors did not render")'
+  '    assert_includes(response.body, "Validation errors never appear")'
+  '    assert_includes(response.body, "Validation errors fail to render")'
+  $'    documentation = <<~EXAMPLE\n      assert_select ".errors"\n    EXAMPLE'
+  '    assert_equal ["No validation errors"], response.parsed_body.fetch("errors")'
+  '    assert_equal "No validation errors", subscriber.errors.to_s'
+  '    assert subscriber.errors.empty?'
+  '    assert_not subscriber.errors.any?'
+  '    refute subscriber.errors.any?'
+  '    assert_operator subscriber.errors.size, :>=, 0'
+  '    assert_operator subscriber.errors.count, :>, -1'
+  '    assert_operator subscriber.errors.length, :<=, 1'
+  '    assert_operator subscriber.errors.size, :>, expected_count'
+  '    assert_operator response.body.length, :>, 0'
+  '    assert_equal "No errors", response.body'
+  '    assert_equal subscriber.errors, "No errors"'
+  '    assert_equal "Errors present", response.body'
+  '    assert_predicate subscriber.errors, :nil?'
+  '    refute_predicate subscriber.errors, :nil?'
+)
+for ((fixture_index = 0; fixture_index < ${#fresh_claude_nonaffirmative_error_assertions[@]}; fixture_index += 1)); do
+  cp -R "$tmp/fresh-claude-form-workspace" \
+    "$tmp/fresh-claude-nonaffirmative-error-$fixture_index-workspace"
+  ruby -e \
+    'path, replacement = ARGV; content = File.read(path); abort unless content.sub!(%q{    assert_select "#error_explanation"}, replacement); File.write(path, content)' \
+    "$tmp/fresh-claude-nonaffirmative-error-$fixture_index-workspace/eval_app/test/controllers/subscribers_controller_test.rb" \
+    "${fresh_claude_nonaffirmative_error_assertions[$fixture_index]}"
+  mkdir "$tmp/fresh-claude-nonaffirmative-error-$fixture_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+    "$tmp/fresh-claude-nonaffirmative-error-$fixture_index-workspace" \
+    "$tmp/fresh-claude-nonaffirmative-error-$fixture_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/fresh-claude-nonaffirmative-error-$fixture_index-output/rubric-results.json")" = unknown
+  done
+done
+
+cp -R "$tmp/fresh-claude-form-workspace" "$tmp/fresh-claude-unsafe-regex-workspace"
+ruby -e \
+  'path = ARGV.fetch(0); content = File.read(path); abort unless content.sub!(%q{    assert_select "#error_explanation"}, %q{    assert_match /((.*)*)*X/, subscriber.errors.to_s}); File.write(path, content)' \
+  "$tmp/fresh-claude-unsafe-regex-workspace/eval_app/test/controllers/subscribers_controller_test.rb"
+mkdir "$tmp/fresh-claude-unsafe-regex-output"
+"$test_timeout" 5 node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+  "$tmp/fresh-claude-unsafe-regex-workspace" "$tmp/fresh-claude-unsafe-regex-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/fresh-claude-unsafe-regex-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/fresh-claude-form-workspace" "$tmp/fresh-claude-real-heredoc-payload-workspace"
+ruby -e '
+  path = ARGV.fetch(0)
+  content = File.read(path)
+  abort unless content.sub!(
+    %q{      post subscribers_url, params: { subscriber: { email: "" } }},
+    %Q{      payload = <<~JSON\n        {"subscriber":{"email":""}}\n      JSON\n      post subscribers_url, params: payload},
+  )
+  File.write(path, content)
+' "$tmp/fresh-claude-real-heredoc-payload-workspace/eval_app/test/controllers/subscribers_controller_test.rb"
+mkdir "$tmp/fresh-claude-real-heredoc-payload-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+  "$tmp/fresh-claude-real-heredoc-payload-workspace" \
+  "$tmp/fresh-claude-real-heredoc-payload-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/fresh-claude-real-heredoc-payload-output/rubric-results.json")" = pass
+done
+
+fresh_claude_heredoc_like_nonopeners=(
+  '    assert_select "#error_explanation" # documentation uses <<~PAYLOAD'
+  $'    documentation = "example: <<~PAYLOAD"\n    assert_select "#error_explanation"'
+  $'    documentation = \x27example: <<~PAYLOAD\x27\n    assert_select "#error_explanation"'
+  $'    documentation = %Q{example: <<~PAYLOAD}\n    assert_select "#error_explanation"'
+  $'    documentation = %q(example: <<~PAYLOAD)\n    assert_select "#error_explanation"'
+  $'    heredoc_pattern = /<<~PAYLOAD/\n    assert_select "#error_explanation"'
+)
+for ((fixture_index = 0; fixture_index < ${#fresh_claude_heredoc_like_nonopeners[@]}; fixture_index += 1)); do
+  cp -R "$tmp/fresh-claude-form-workspace" \
+    "$tmp/fresh-claude-heredoc-like-nonopener-$fixture_index-workspace"
+  ruby -e \
+    'path, replacement = ARGV; content = File.read(path); abort unless content.sub!(%q{    assert_select "#error_explanation"}, replacement); File.write(path, content)' \
+    "$tmp/fresh-claude-heredoc-like-nonopener-$fixture_index-workspace/eval_app/test/controllers/subscribers_controller_test.rb" \
+    "${fresh_claude_heredoc_like_nonopeners[$fixture_index]}"
+  mkdir "$tmp/fresh-claude-heredoc-like-nonopener-$fixture_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+    "$tmp/fresh-claude-heredoc-like-nonopener-$fixture_index-workspace" \
+    "$tmp/fresh-claude-heredoc-like-nonopener-$fixture_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/fresh-claude-heredoc-like-nonopener-$fixture_index-output/rubric-results.json")" = pass
+  done
+done
+
+cp -R "$tmp/fresh-claude-form-workspace" "$tmp/fresh-claude-local-shift-workspace"
+ruby -e '
+  path = ARGV.fetch(0)
+  content = File.read(path)
+  abort unless content.sub!(
+    "class SubscribersControllerTest < ActionDispatch::IntegrationTest",
+    %Q{class SubscribersControllerTest < ActionDispatch::IntegrationTest\n  ERROR = "Email is invalid"},
+  )
+  abort unless content.sub!(
+    %q{    assert_select "#error_explanation"},
+    %Q{    messages = []\n    messages <<ERROR\n    assert_select "#error_explanation"},
+  )
+  File.write(path, content)
+' "$tmp/fresh-claude-local-shift-workspace/eval_app/test/controllers/subscribers_controller_test.rb"
+mkdir "$tmp/fresh-claude-local-shift-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+  "$tmp/fresh-claude-local-shift-workspace" "$tmp/fresh-claude-local-shift-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/fresh-claude-local-shift-output/rubric-results.json")" = pass
+done
+
+fresh_claude_positive_notice_value_assertions=(
+  '    assert flash[:notice].present?'
+  '    assert_not flash[:notice].empty?'
+  '    refute(flash[:notice].blank?)'
+  '    assert_equal flash[:notice], "Thanks"'
+  '    assert_equal(flash[:notice], "Thanks")'
+  '    assert_predicate flash[:notice], :present?'
+  '    assert_predicate(flash[:notice], :any?)'
+  '    refute_predicate flash[:notice], :empty?'
+  '    refute_predicate(flash[:notice], :blank?)'
+)
+for ((fixture_index = 0; fixture_index < ${#fresh_claude_positive_notice_value_assertions[@]}; fixture_index += 1)); do
+  cp -R "$tmp/fresh-claude-form-workspace" \
+    "$tmp/fresh-claude-positive-notice-value-$fixture_index-workspace"
+  ruby -e '
+    path, replacement = ARGV
+    content = File.read(path)
+    abort unless content.sub!(
+      %Q{    assert_difference("Subscriber.count", 1) do\n      post subscribers_url, params: { subscriber: { email: "new-subscriber@example.com" } }\n    end},
+      %q{    post subscribers_url, params: { subscriber: { email: "new-subscriber@example.com" } }},
+    )
+    abort unless content.sub!(
+      %Q{    follow_redirect!\n    assert_select "#notice", text: "Thanks for subscribing!"},
+      replacement,
+    )
+    File.write(path, content)
+  ' "$tmp/fresh-claude-positive-notice-value-$fixture_index-workspace/eval_app/test/controllers/subscribers_controller_test.rb" \
+    "${fresh_claude_positive_notice_value_assertions[$fixture_index]}"
+  mkdir "$tmp/fresh-claude-positive-notice-value-$fixture_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+    "$tmp/fresh-claude-positive-notice-value-$fixture_index-workspace" \
+    "$tmp/fresh-claude-positive-notice-value-$fixture_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/fresh-claude-positive-notice-value-$fixture_index-output/rubric-results.json")" = pass
+  done
+done
+
+fresh_claude_positive_notice_selectors=(
+  '    assert_select ".flash", text: "Thanks for subscribing!"'
+  '    assert_select "div.notice", text: "Thanks for subscribing!"'
+  '    assert_select ".flash.notice", text: "Thanks for subscribing!"'
+  '    assert_select "main #notice", text: "Thanks for subscribing!"'
+  '    assert_select "#flash-notice"'
+  '    assert_select ".flash_notice", count: 1'
+  '    assert_selector "div.notice", count: 1'
+)
+for ((fixture_index = 0; fixture_index < ${#fresh_claude_positive_notice_selectors[@]}; fixture_index += 1)); do
+  cp -R "$tmp/fresh-claude-form-workspace" \
+    "$tmp/fresh-claude-positive-notice-selector-$fixture_index-workspace"
+  ruby -e \
+    'path, replacement = ARGV; content = File.read(path); abort unless content.sub!(%q{    assert_select "#notice", text: "Thanks for subscribing!"}, replacement); File.write(path, content)' \
+    "$tmp/fresh-claude-positive-notice-selector-$fixture_index-workspace/eval_app/test/controllers/subscribers_controller_test.rb" \
+    "${fresh_claude_positive_notice_selectors[$fixture_index]}"
+  mkdir "$tmp/fresh-claude-positive-notice-selector-$fixture_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+    "$tmp/fresh-claude-positive-notice-selector-$fixture_index-workspace" \
+    "$tmp/fresh-claude-positive-notice-selector-$fixture_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/fresh-claude-positive-notice-selector-$fixture_index-output/rubric-results.json")" = pass
+  done
+done
+
+fresh_claude_nonaffirmative_notice_assertions=(
+  '    assert flash[:notice]'
+  '    assert flash[:notice].empty?'
+  '    refute flash[:notice].any?'
+  '    assert_select ".no-notice", text: "Thanks"'
+  '    assert_select "#notice-none", text: "Thanks"'
+  '    assert_select "form, .notice", text: "Thanks"'
+  '    assert_select ":not(.notice)", text: "Thanks"'
+  '    assert_select ".notice", count: 0'
+  '    assert_equal "No notice", response.body'
+  '    assert_equal "No notice", flash[:notice]'
+  '    assert_equal flash[:notice], "No notice"'
+  '    assert_equal ["No notice"], flash[:notice]'
+  '    assert_includes flash[:notice], ""'
+  '    assert_includes flash[:notice], "No notice"'
+  '    assert_select ".notice", text: "No notice"'
+  '    assert_equal flash[:notice], expected_notice'
+  '    assert_predicate flash[:notice], :nil?'
+  '    refute_predicate flash[:notice], :nil?'
+)
+for ((fixture_index = 0; fixture_index < ${#fresh_claude_nonaffirmative_notice_assertions[@]}; fixture_index += 1)); do
+  cp -R "$tmp/fresh-claude-form-workspace" \
+    "$tmp/fresh-claude-nonaffirmative-notice-$fixture_index-workspace"
+  ruby -e '
+    path, replacement = ARGV
+    content = File.read(path)
+    abort unless content.sub!(
+      %Q{    assert_difference("Subscriber.count", 1) do\n      post subscribers_url, params: { subscriber: { email: "new-subscriber@example.com" } }\n    end},
+      %q{    post subscribers_url, params: { subscriber: { email: "new-subscriber@example.com" } }},
+    )
+    abort unless content.sub!(
+      %Q{    follow_redirect!\n    assert_select "#notice", text: "Thanks for subscribing!"},
+      replacement,
+    )
+    File.write(path, content)
+  ' "$tmp/fresh-claude-nonaffirmative-notice-$fixture_index-workspace/eval_app/test/controllers/subscribers_controller_test.rb" \
+    "${fresh_claude_nonaffirmative_notice_assertions[$fixture_index]}"
+  mkdir "$tmp/fresh-claude-nonaffirmative-notice-$fixture_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+    "$tmp/fresh-claude-nonaffirmative-notice-$fixture_index-workspace" \
+    "$tmp/fresh-claude-nonaffirmative-notice-$fixture_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/fresh-claude-nonaffirmative-notice-$fixture_index-output/rubric-results.json")" = unknown
+  done
+done
+
+fresh_claude_zero_validation_error_assertions=(
+  '    assert_match /invalid/, response.status # subscriber.errors'
+  '    assert_select ".alert", text: "0 validation errors"'
+  '    assert_select ".alert", text: "zero validation errors"'
+  '    assert_select ".alert", text: "empty validation errors"'
+  '    assert_select ".alert", text: "validation errors are empty"'
+  '    assert_select ".alert", text: "validation errors: empty"'
+  '    assert_select ".alert", text: /validation errors: 0/'
+  '    assert_select ".alert", text: /validation errors are zero/'
+  '    assert_match /validation errors:\s*0/, response.body'
+  '    assert_match /validation errors:\s*[0]/, response.body'
+  '    assert_select ".alert", text: /validation errors|/'
+  '    assert_select ".alert", text: /validation errors/'
+)
+for ((fixture_index = 0; fixture_index < ${#fresh_claude_zero_validation_error_assertions[@]}; fixture_index += 1)); do
+  cp -R "$tmp/fresh-claude-form-workspace" \
+    "$tmp/fresh-claude-zero-validation-errors-$fixture_index-workspace"
+  ruby -e \
+    'path, replacement = ARGV; content = File.read(path); abort unless content.sub!(%q{    assert_select "#error_explanation"}, replacement); File.write(path, content)' \
+    "$tmp/fresh-claude-zero-validation-errors-$fixture_index-workspace/eval_app/test/controllers/subscribers_controller_test.rb" \
+    "${fresh_claude_zero_validation_error_assertions[$fixture_index]}"
+  mkdir "$tmp/fresh-claude-zero-validation-errors-$fixture_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+    "$tmp/fresh-claude-zero-validation-errors-$fixture_index-workspace" \
+    "$tmp/fresh-claude-zero-validation-errors-$fixture_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/fresh-claude-zero-validation-errors-$fixture_index-output/rubric-results.json")" = unknown
+  done
+done
+
+for expected_count in 1 0; do
+  cp -R "$tmp/fresh-claude-form-workspace" \
+    "$tmp/fresh-claude-error-count-$expected_count-workspace"
+  ruby -e \
+    'path, count = ARGV; content = File.read(path); abort unless content.sub!(%q{    assert_select "#error_explanation"}, "    assert_equal #{count}, subscriber.errors.count"); File.write(path, content)' \
+    "$tmp/fresh-claude-error-count-$expected_count-workspace/eval_app/test/controllers/subscribers_controller_test.rb" \
+    "$expected_count"
+  mkdir "$tmp/fresh-claude-error-count-$expected_count-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+    "$tmp/fresh-claude-error-count-$expected_count-workspace" \
+    "$tmp/fresh-claude-error-count-$expected_count-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  expected=pass
+  [[ "$expected_count" == 0 ]] && expected=unknown
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/fresh-claude-error-count-$expected_count-output/rubric-results.json")" = "$expected"
+  done
+done
+
+for notice_count in 1 0; do
+  cp -R "$tmp/fresh-claude-form-workspace" \
+    "$tmp/fresh-claude-notice-selector-$notice_count-workspace"
+  ruby -e '
+    path, count = ARGV
+    content = File.read(path)
+    abort unless content.sub!(
+      %Q{    assert_difference("Subscriber.count", 1) do\n      post subscribers_url, params: { subscriber: { email: "new-subscriber@example.com" } }\n    end},
+      %q{    post subscribers_url, params: { subscriber: { email: "new-subscriber@example.com" } }},
+    )
+    abort unless content.sub!(
+      %q{    assert_select "#notice", text: "Thanks for subscribing!"},
+      "    assert_select \"#notice\", text: \"Thanks for subscribing!\", count: #{count}",
+    )
+    File.write(path, content)
+  ' "$tmp/fresh-claude-notice-selector-$notice_count-workspace/eval_app/test/controllers/subscribers_controller_test.rb" \
+    "$notice_count"
+  mkdir "$tmp/fresh-claude-notice-selector-$notice_count-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+    "$tmp/fresh-claude-notice-selector-$notice_count-workspace" \
+    "$tmp/fresh-claude-notice-selector-$notice_count-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  expected=pass
+  [[ "$notice_count" == 0 ]] && expected=unknown
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/fresh-claude-notice-selector-$notice_count-output/rubric-results.json")" = "$expected"
+  done
+done
+
+cp -R "$tmp/fresh-claude-form-workspace" "$tmp/fresh-claude-nested-selector-workspace"
+ruby -e \
+  'path = ARGV.fetch(0); content = File.read(path); abort unless content.sub!(%q{    assert_select "#error_explanation"}, %Q{    assert_select "form" do\n      assert_select "#error_explanation"\n    end}); File.write(path, content)' \
+  "$tmp/fresh-claude-nested-selector-workspace/eval_app/test/controllers/subscribers_controller_test.rb"
+mkdir "$tmp/fresh-claude-nested-selector-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+  "$tmp/fresh-claude-nested-selector-workspace" "$tmp/fresh-claude-nested-selector-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/fresh-claude-nested-selector-output/rubric-results.json")" = pass
+done
+
+fresh_claude_positive_selector_constraints=(
+  '    assert_select ".alert", text: /validation errors present/'
+  '    assert_select "#error_explanation", count: 1'
+  '    assert_select("#error_explanation", minimum: 1)'
+  '    assert_select("#error_explanation") { |nodes| assert_predicate nodes, :any? }'
+  '    assert_select "#error_explanation", text: "Email is invalid"'
+  '    assert_select ".validation-errors"'
+  '    assert_select ".validation-errors", count: 1'
+  '    assert_select ".field_with_errors"'
+  '    assert_select ".field_with_errors", count: 1'
+  '    assert_select ".errors, #error_explanation"'
+  '    assert_select ".validation-errors, .field_with_errors", count: 1'
+  '    assert_select "#errors"'
+  "    assert_select '[href=\"#errors\"] .errors'"
+  "    assert_select '[data-message=\"a,b\"].errors'"
+  '    assert_select "[data-errors=\"present\"]"'
+  '    assert_select("[data-errors=\"present\"]", count: 1)'
+  "    assert_select '[data-testid=\"validation-errors\"]'"
+  "    assert_select '[data-testid=\"error-explanation\"]', count: 1"
+  "    assert_select '[class=errors]'"
+  "    assert_select '[class=\"errors\"]'"
+  "    assert_select '[class=\"form errors alert\"]', count: 1"
+  "    assert_select '[class=\"validation-errors field\"]'"
+  '    assert_select ".errors:not(.hidden)"'
+  '    assert_select ".errors:not(.hidden)", count: 1'
+  '    assert_select ".errors:not(:empty)"'
+  '    assert_select "form:has(.errors)"'
+  '    assert_select "form:has(> .validation-errors)"'
+  "    assert_select 'form:has(.errors:not([aria-invalid=\"false\"]))'"
+  "    assert_select '.errors:not([aria-invalid=\"false\"])'"
+  "    assert_select 'form:not([data-errors=\"none\"]) .validation-errors'"
+  "    assert_select '.errors:not([data-errors=none])', count: 1"
+  '    assert_select ".validation-errors:not([hidden])"'
+  '    assert_select ".validation-errors:not([hidden])", count: 1'
+  "    assert_select '[data-label=\":not(.errors)\"] .errors'"
+  "    assert_select '[data-label=\":not(.errors)\"] .errors', count: 1"
+  '    assert_select "form:not(.errors) .validation-errors"'
+  '    assert_select "form:not(.errors) .validation-errors", count: 1'
+  "    assert_select '[data-errors=\"not found\"]'"
+  "    assert_select '[data-errors=\"none available\"]'"
+  "    assert_select '.errors[data-message=\"none\"]'"
+  "    assert_select '.errors[data-message=\"not acceptable\"]'"
+  "    assert_select '[aria-invalid=\"true\"].errors'"
+  '    assert_select ".errors", text: "none found"'
+  '    assert_select ".errors", text: /not found/'
+  '    assert_select ".errors", text: "Name, email, and phone are invalid"'
+  '    assert_select ".errors", text: "Email is invalid (required)"'
+  '    assert_select ".errors", text: /Email is invalid \(required\)/'
+  "    assert_select '.errors', text: 'Name, email, and phone are invalid'"
+  '    assert_select ".errors", text: "Name/email/phone is invalid"'
+  '    assert_select ".errors", text: /api\/v1\/users invalid/im'
+  '    assert_select ".errors", text: %r{invalid}'
+  '    assert_select ".errors", %r{invalid}'
+  '    assert_select ".errors", /api\/v1\/users invalid/'
+  '    assert_select ".errors", text: "Name, email, and phone are invalid", count: 1'
+  '    assert_select ".errors", count: 1, text: "Name, email, and phone are invalid"'
+  '    assert_select ".errors", { text: "Name, email, and phone are invalid", count: 1 }, "expected errors"'
+  '    assert_select ".errors", "Name, email, and phone are invalid", "expected errors"'
+  '    assert_selector "#error_explanation", count: 1'
+  '    assert_dom ".errors"'
+  '    assert_dom ".errors", count: 1'
+  '    assert_select "#error_explanation", 1'
+  '    assert_select "#error_explanation", true'
+  '    assert_select "#error_explanation", 1..3'
+  '    assert_select "#error_explanation", 1...3'
+  '    assert_select "#error_explanation", 1 .. 3'
+  '    assert_select "#error_explanation", 1..1'
+  '    assert_select "#error_explanation", 1...1'
+  '    assert_select("#error_explanation", 1..3)'
+  '    assert_select "#error_explanation", 1..3, "expected errors"'
+  '    assert_select ".errors", text: /invalid/, count: 1'
+  '    assert_select ".errors", count: 1, text: /invalid/'
+  '    assert_select(".errors", { text: "Email is invalid", minimum: 1 })'
+  '    assert_select ".errors", maximum: 2'
+  '    assert_select ".errors", minimum: 1, maximum: 2'
+  '    assert_select ".errors", maximum: 2, minimum: 1'
+  '    assert_select(".errors", { minimum: 1, maximum: 2 })'
+  '    assert_select ".errors", text: /invalid/, maximum: 2'
+  '    assert_select ".errors", html: /<strong>invalid<\/strong>/'
+  '    assert_select ".errors", html: "<strong>invalid</strong>"'
+  '    assert_select ".errors", html: /invalid/, count: 1'
+  '    assert_select ".errors", html: /invalid/, minimum: 1'
+  '    assert_select ".errors", html: /invalid/, maximum: 2'
+  '    assert_select ".errors", html: /invalid/, minimum: 1, maximum: 2'
+  '    assert_select ".errors", maximum: 2, html: /invalid/, minimum: 1'
+  '    assert_select ".errors", { html: /invalid/, count: 1 }'
+  '    assert_select ".errors", { html: /invalid/, count: 1 }, "expected error markup"'
+  '    assert_selector ".errors", text: /invalid/, count: 1'
+  '    assert_select ".errors", /invalid/'
+  '    assert_select ".errors", "Email is invalid"'
+  '    assert_select(".errors", /invalid/im)'
+  '    assert_select ".errors", /invalid/, "expected validation error"'
+  '    assert_select ".errors", "Email is invalid", "expected validation error"'
+  '    assert_select ".errors", "Email: is invalid", "expected validation error"'
+  '    assert_select ".errors", { text: /invalid/, count: 1 }, "expected one error"'
+  '    assert_select ".errors", true, "expected an error"'
+  $'    assert_select ".errors",\n      count: 1'
+  $'    assert_select ".errors",\n      text: /invalid/,\n      count: 1'
+  $'    assert_select(\n      ".errors",\n      { text: /invalid/, minimum: 1 }\n    )'
+  $'    assert_select ".errors",\n      /invalid/'
+  $'    assert_selector ".errors",\n      text: /invalid/,\n      count: 1'
+  '    assert_select ".errors", count: 1 # rendered errors'
+  '    assert_select ".errors" # rendered errors'
+  '    assert_select(".errors", count: 1) # rendered errors'
+  $'    assert_select ".errors", # rendered errors\n      count: 1'
+  $'    assert_select( # rendered errors\n      ".errors", # validation selector\n      count: 1 # positive cardinality\n    ) # assertion complete'
+  '    assert_select "#error_explanation", text: "invalid # value" # rendered errors'
+  '    assert_select ".errors", text: /invalid#code/ # rendered errors'
+  $'    assert_select(\n      ".errors",\n      count: 1,\n    )'
+  $'    assert_select(\n      ".errors",\n      text: /invalid/,\n      count: 1,\n    )'
+  $'    assert_select ".errors", {\n      text: /invalid/,\n      minimum: 1,\n    }'
+  $'    assert_selector(\n      ".errors",\n      text: /invalid/,\n      count: 1,\n    )'
+  $'    assert_select(\n      ".errors",\n      /invalid/,\n    )'
+  $'    assert_select(\n      ".errors",\n      { count: 1, },\n    )'
+  $'    assert_select(\n      ".errors",\n      {\n        text: /invalid/,\n        minimum: 1\n      }\n    )'
+  $'    assert_select(\n      ".errors",\n      {\n        text: /invalid/,\n        count: 1,\n      },\n    )'
+  $'    assert_select(\n      ".errors",\n      {\n        html: /invalid/,\n        minimum: 1,\n        maximum: 2,\n      },\n    )'
+  $'    assert_select(\n      "#error_explanation",\n      1..3\n    )'
+)
+for ((fixture_index = 0; fixture_index < ${#fresh_claude_positive_selector_constraints[@]}; fixture_index += 1)); do
+  cp -R "$tmp/fresh-claude-form-workspace" \
+    "$tmp/fresh-claude-positive-selector-$fixture_index-workspace"
+  ruby -e \
+    'path, replacement = ARGV; content = File.read(path); abort unless content.sub!(%q{    assert_select "#error_explanation"}, replacement); File.write(path, content)' \
+    "$tmp/fresh-claude-positive-selector-$fixture_index-workspace/eval_app/test/controllers/subscribers_controller_test.rb" \
+    "${fresh_claude_positive_selector_constraints[$fixture_index]}"
+  ruby -c \
+    "$tmp/fresh-claude-positive-selector-$fixture_index-workspace/eval_app/test/controllers/subscribers_controller_test.rb" \
+    >/dev/null
+  mkdir "$tmp/fresh-claude-positive-selector-$fixture_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+    "$tmp/fresh-claude-positive-selector-$fixture_index-workspace" \
+    "$tmp/fresh-claude-positive-selector-$fixture_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/fresh-claude-positive-selector-$fixture_index-output/rubric-results.json")" = pass
+  done
+done
+
+fresh_claude_html_selector_rejections=(
+  '    assert_select ".errors", html: /invalid/, count: 0'
+  '    assert_select(".errors", count: 0) { |nodes| assert_predicate nodes, :empty? }'
+  '    assert_select ".errors", html: /invalid/, minimum: 0'
+  '    assert_select ".errors", html: /invalid/, maximum: 0'
+  '    assert_select ".errors", html: /invalid/, minimum: 2, maximum: 1'
+  '    assert_select ".errors", html: /invalid/, count: 1, minimum: 1'
+  '    assert_select ".errors", html: /invalid/, html: /error/'
+  '    assert_select ".errors", text: /invalid/, html: /error/'
+  '    assert_select ".errors", html: expected_html'
+  '    assert_select ".errors", html: "#{dynamic_html}"'
+  '    assert_select ".errors", html: ""'
+  '    assert_selector ".errors", html: /invalid/'
+  '    assert_select ".errors", 0..3'
+  '    assert_select ".errors", 0..0'
+  '    assert_select ".errors", -1..3'
+  '    assert_select ".errors", 3..1'
+  '    assert_select ".errors", 1..0'
+  '    assert_select ".errors", minimum..maximum'
+  '    assert_select ".errors", 1..expected_maximum'
+  '    assert_select ".errors", 1..'
+  '    assert_select ".errors", ..3'
+  '    assert_select ".errors", 1..100000'
+  '    assert_selector ".errors", 1..3'
+)
+for ((fixture_index = 0; fixture_index < ${#fresh_claude_html_selector_rejections[@]}; fixture_index += 1)); do
+  cp -R "$tmp/fresh-claude-form-workspace" \
+    "$tmp/fresh-claude-html-selector-rejection-$fixture_index-workspace"
+  ruby -e \
+    'path, replacement = ARGV; content = File.read(path); abort unless content.sub!(%q{    assert_select "#error_explanation"}, replacement); File.write(path, content)' \
+    "$tmp/fresh-claude-html-selector-rejection-$fixture_index-workspace/eval_app/test/controllers/subscribers_controller_test.rb" \
+    "${fresh_claude_html_selector_rejections[$fixture_index]}"
+  mkdir "$tmp/fresh-claude-html-selector-rejection-$fixture_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+    "$tmp/fresh-claude-html-selector-rejection-$fixture_index-workspace" \
+    "$tmp/fresh-claude-html-selector-rejection-$fixture_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/fresh-claude-html-selector-rejection-$fixture_index-output/rubric-results.json")" = unknown
+  done
+done
+
+fresh_claude_form_rejection_from=(
+  'invalid submission fails server-side validation and does not create a subscriber'
+  'valid submission creates a subscriber and succeeds'
+  'valid submission creates a subscriber and succeeds'
+  'valid submission creates a subscriber and succeeds'
+  'valid submission creates a subscriber and succeeds'
+  'valid submission creates a subscriber and succeeds'
+  'invalid submission fails server-side validation and does not create a subscriber'
+  'invalid submission fails server-side validation and does not create a subscriber'
+  'invalid submission fails server-side validation and does not create a subscriber'
+  'valid submission creates a subscriber and succeeds'
+  'valid submission creates a subscriber and succeeds'
+  'valid submission creates a subscriber and succeeds'
+  '#error_explanation'
+  '#error_explanation'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+  '    assert_select "#error_explanation"'
+)
+fresh_claude_form_rejection_to=(
+  'invalid submission does not create a subscriber'
+  'form submission reports an outcome'
+  'valid submission does not succeed'
+  'valid submission never creates a record'
+  'successful submission fails'
+  'successful submission does not redirect'
+  'invalid submission is not a successful submission'
+  'does not render validation errors on invalid submission'
+  'invalid submission returns no validation errors'
+  'does not create on invalid submission'
+  'does not redirect after successful submission'
+  'not a successful submission'
+  '#form'
+  '#terror_status'
+  '    assert_select "#error_explanation", count: 0'
+  '    assert_select ".errors", count: 0'
+  '    assert_select "#error_explanation", 0'
+  '    assert_select "#error_explanation", false'
+  '    assert_select "#error_explanation", minimum: 0'
+  '    assert_select "#error_explanation", maximum: 0'
+  '    assert_select "#error_explanation", text: "Email is invalid", count: 0'
+  '    assert_select "#error_explanation", count: expected_count'
+  '    assert_select ".errors", count: 0, text: /invalid/'
+  '    assert_select ".errors", text: /invalid/, minimum: 0'
+  '    assert_select ".errors", text: /invalid/, count: expected_count'
+  '    assert_select ".errors", text: /invalid/, count: 1, minimum: 1'
+  '    assert_select ".errors", minimum: 0, maximum: 2'
+  '    assert_select ".errors", minimum: 2, maximum: 1'
+  '    assert_select ".errors", maximum: expected_maximum'
+  '    assert_select ".errors", maximum: 2, maximum: 3'
+  '    assert_select ".errors", maximum: 2.5'
+  '    assert_select ".errors", count: 1, maximum: 2'
+  '    assert_select ".errors", text: /invalid/, count: 1, class: "shown"'
+  '    assert_selector ".errors", /invalid/'
+  '    assert_selector ".errors", "Email is invalid"'
+  '    assert_select ".errors", false, "expected no errors"'
+  '    assert_select ".errors", 0, "expected no errors"'
+  '    assert_select ".errors", { count: 0 }, "expected no errors"'
+  '    assert_select ".errors", expected_text'
+  '    assert_select ".errors", ""'
+  '    assert_select ".errors", text: /invalid/, count: 1, "message"'
+  $'    assert_select ".errors",\n      count: 0'
+  $'    assert_select ".errors",\n      false'
+  $'    assert_select ".errors",\n      count: expected_count'
+  $'    assert_selector ".errors",\n      /invalid/'
+  $'    assert_select ".errors",\n\n      count: 1'
+  $'    assert_select ".errors",\n    count: 1'
+  $'    assert_select ".errors",\n      assert_equal 1, 1\n      count: 1'
+  '    assert_select ".errors", count: 0 # count: 1 rendered errors'
+  '    assert_select ".errors", false # rendered errors'
+  '    assert_select ".errors", count: expected_count # count: 1'
+  $'    assert_select(\n      ".errors",\n      count: 0,\n    )'
+  $'    assert_select(\n      ".errors",\n      false,\n    )'
+  $'    assert_select(\n      ".errors",\n      count: expected_count,\n    )'
+  $'    assert_select(\n      ".errors",\n      count: 1,,\n    )'
+  $'    assert_select ".errors",\n      count: 1,\n    assert_equal 1, 1'
+  '    assert_select ".errors", text: "Name, email, and phone are invalid", count: 0'
+  '    assert_select ".errors", text: "#{dynamic}"'
+  '    assert_select ".errors", text: /#{pattern}/'
+  '    assert_select ".errors", text: "invalid" + expected_suffix'
+  '    assert_select ".errors", text: /api\/v1\/users/y'
+  '    assert_select ":not(.errors)"'
+  '    assert_select ":not(.errors)", count: 1'
+  '    assert_select ".no-errors"'
+  '    assert_select ".no-errors", count: 1'
+  '    assert_select ".error-free"'
+  '    assert_select ".error-free", count: 1'
+  '    assert_select "[data-no-errors]"'
+  '    assert_select "[data-no-errors]", count: 1'
+  '    assert_select ".without-errors"'
+  '    assert_select ".without-errors", count: 1'
+  '    assert_select ".errors-absent"'
+  '    assert_select ".errors-absent", count: 1'
+  '    assert_select ":not(#error_explanation)"'
+  '    assert_select ":not(#error_explanation)", count: 1'
+  '    assert_select ":not(.errors"'
+  '    assert_select ".errors:empty"'
+  '    assert_select "#error_explanation:empty", count: 1'
+  '    assert_select ":empty.validation-errors"'
+  '    assert_select "form:not(:has(.errors))"'
+  '    assert_select "form:has(:not(.errors))"'
+  "    assert_select 'form:has(.errors[aria-invalid=\"false\"])'"
+  "    assert_select 'form:has([data-errors=\"none\"])'"
+  '    assert_select "form:has(.errors:empty)"'
+  '    assert_select "form:has(div:has(.errors))"'
+  '    assert_select "form:is(.errors)"'
+  '    assert_select "form:has(.errors, .validation-errors)"'
+  "    assert_select '[data-errors=\"none\"]'"
+  "    assert_select '[data-errors=\"none\"]', count: 1"
+  "    assert_select '[data_errors=\"none\"]'"
+  "    assert_select '[DATA-ERRORS=\"FALSE\"]', count: 1"
+  "    assert_select '[data-errors=false]'"
+  "    assert_select '[data-errors=0]', count: 1"
+  "    assert_select '[data-errors=\"absent\"]'"
+  "    assert_select '[data-errors=\"off\"]', count: 1"
+  "    assert_select '[aria-invalid=\"false\"].errors'"
+  "    assert_select '[aria-invalid=false].errors', count: 1"
+  "    assert_select '[data-errors=\"none\"] .validation-errors'"
+  "    assert_select '[data-errors=\"none\"] .validation-errors', count: 1"
+  "    assert_select '[data-errors=\"none\"'"
+  "    assert_select '[data-errors=\"no\\\\ne\"]'"
+  '    assert_select "[data-errors=\"none\"]"'
+  '    assert_select "[data-no-errors=\"present\"]"'
+  '    assert_select "[data-status=\"present\"]"'
+  '    assert_select ":not([data-errors=\"present\"])"'
+  '    assert_select "[data-errors=\"present\"]", count: 0'
+  "    assert_select '[class=\"no-errors\"]'"
+  "    assert_select '[class=\"errors no-errors\"]'"
+  "    assert_select '[class=\"error-free\"]'"
+  "    assert_select '[class=\"form alert\"]'"
+  "    assert_select ':not([class=\"errors\"])'"
+  "    assert_select '[class=\"errors\"][data-errors=\"none\"]'"
+  "    assert_select '[class=\"errors\"][aria-invalid=\"false\"]'"
+  '    assert_dom ".errors", count: 0'
+  '    assert_not_select ".errors"'
+  '    assert_not_dom ".errors"'
+  '    assert_no_selector ".errors"'
+  '    assert_selector ".errors", maximum: 2'
+  '    assert_select ".errors", text: "No validation errors"'
+  '    assert_select ".alert", text: /validation errors/, count: 0'
+  '    assert_select ".no-errors", text: /validation errors/'
+  '    refute_select ".errors"'
+  '    refute_dom ".errors"'
+  '    assert_select ".notice", text: "No validation errors"'
+  $'    @prefix = "No"\n    assert_select ".errors", text: "#@prefix validation errors"'
+  $'    $prefix = "No"\n    assert_select ".errors", text: "#$prefix validation errors"'
+  $'    @prefix = "No"\n    assert_select ".errors", text: /#@prefix validation errors/'
+  '    assert_select ".zero-errors"'
+  '    assert_select ".errors-none", count: 1'
+  '    assert_select ".errors-empty"'
+  "    assert_select '[data-errors=empty]'"
+)
+test "${#fresh_claude_form_rejection_from[@]}" -eq "${#fresh_claude_form_rejection_to[@]}"
+for ((fixture_index = 0; fixture_index < ${#fresh_claude_form_rejection_from[@]}; fixture_index += 1)); do
+  cp -R "$tmp/fresh-claude-form-workspace" \
+    "$tmp/fresh-claude-form-rejection-$fixture_index-workspace"
+  ruby -e \
+    'path, before, after = ARGV; content = File.read(path); abort unless content.sub!(before, after); File.write(path, content)' \
+    "$tmp/fresh-claude-form-rejection-$fixture_index-workspace/eval_app/test/controllers/subscribers_controller_test.rb" \
+    "${fresh_claude_form_rejection_from[$fixture_index]}" \
+    "${fresh_claude_form_rejection_to[$fixture_index]}"
+  mkdir "$tmp/fresh-claude-form-rejection-$fixture_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+    "$tmp/fresh-claude-form-rejection-$fixture_index-workspace" \
+    "$tmp/fresh-claude-form-rejection-$fixture_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/fresh-claude-form-rejection-$fixture_index-output/rubric-results.json")" = unknown
+  done
+done
+
+fresh_claude_negated_error_selectors=(
+  '    assert_select "form:not(.errors)"'
+  '    assert_select "form:not(.errors)", count: 1'
+  '    assert_select ".field:not(#error_explanation)"'
+  '    assert_select ".field:not(#error_explanation)", count: 1'
+  '    assert_select "form :not(.errors)"'
+  '    assert_select "form>:not(.errors)", count: 1'
+  '    assert_select "form + :not(.errors)"'
+  '    assert_select "form:not( .validation-errors )", count: 1'
+  '    assert_select "form:not(:not(.errors))"'
+  '    assert_select "form:not(.errors"'
+  "    assert_select '[data-errors=\"none\"]:not(.hidden)'"
+  "    assert_select '[data-testid=\"no-errors\"]'"
+  "    assert_select '[data-testid=\"form\"]'"
+  "    assert_select '[data-errors=\"missing\"]'"
+  "    assert_select '.errors[aria-invalid=\"false\"]'"
+  "    assert_select '[data-errors=\"none\"] .validation-errors'"
+  $'    assert_select(\n      ".errors",\n      {\n        count: 1\n    }\n    )'
+  $'    assert_select(\n      ".errors",\n      {\n        count: 1\n      )\n    }'
+)
+for ((fixture_index = 0; fixture_index < ${#fresh_claude_negated_error_selectors[@]}; fixture_index += 1)); do
+  cp -R "$tmp/fresh-claude-form-workspace" \
+    "$tmp/fresh-claude-negated-error-selector-$fixture_index-workspace"
+  ruby -e \
+    'path, replacement = ARGV; content = File.read(path); abort unless content.sub!(%q{    assert_select "#error_explanation"}, replacement); File.write(path, content)' \
+    "$tmp/fresh-claude-negated-error-selector-$fixture_index-workspace/eval_app/test/controllers/subscribers_controller_test.rb" \
+    "${fresh_claude_negated_error_selectors[$fixture_index]}"
+  mkdir "$tmp/fresh-claude-negated-error-selector-$fixture_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+    "$tmp/fresh-claude-negated-error-selector-$fixture_index-workspace" \
+    "$tmp/fresh-claude-negated-error-selector-$fixture_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/fresh-claude-negated-error-selector-$fixture_index-output/rubric-results.json")" = unknown
+  done
+done
+
+fresh_claude_dynamic_or_mixed_error_selectors=(
+  '    assert_select "form, .errors"'
+  '    assert_select ".errors, form"'
+  '    assert_select "form, #error_explanation", count: 1'
+  '    assert_select ".errors,"'
+  '    assert_select ", .errors"'
+  '    assert_select ".errors,,#error_explanation"'
+  $'    error_selector = "form"\n    assert_select ".#{error_selector}"'
+  $'    error_selector = "errors"\n    assert_select ".#{error_selector}"'
+  $'    suffix = "visible"\n    assert_select ".errors-#{suffix}"'
+  $'    @error_selector = "form"\n    assert_select ".#@error_selector"'
+  $'    $error_selector = "form"\n    assert_select ".#$error_selector"'
+  $'    target = "form"\n    assert_select \'[data-target="#{target}"] .errors\''
+  $'    error_selector = "form"\n    assert_select \'.#{error_selector}\''
+  $'    error_selector = "form"\n    assert_select(\n      ".#{error_selector}",\n      count: 1\n    )'
+)
+for ((fixture_index = 0; fixture_index < ${#fresh_claude_dynamic_or_mixed_error_selectors[@]}; fixture_index += 1)); do
+  cp -R "$tmp/fresh-claude-form-workspace" \
+    "$tmp/fresh-claude-dynamic-or-mixed-selector-$fixture_index-workspace"
+  ruby -e \
+    'path, replacement = ARGV; content = File.read(path); abort unless content.sub!(%q{    assert_select "#error_explanation"}, replacement); File.write(path, content)' \
+    "$tmp/fresh-claude-dynamic-or-mixed-selector-$fixture_index-workspace/eval_app/test/controllers/subscribers_controller_test.rb" \
+    "${fresh_claude_dynamic_or_mixed_error_selectors[$fixture_index]}"
+  mkdir "$tmp/fresh-claude-dynamic-or-mixed-selector-$fixture_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+    "$tmp/fresh-claude-dynamic-or-mixed-selector-$fixture_index-workspace" \
+    "$tmp/fresh-claude-dynamic-or-mixed-selector-$fixture_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/fresh-claude-dynamic-or-mixed-selector-$fixture_index-output/rubric-results.json")" = unknown
+  done
+done
+
+fresh_claude_positive_success_names=(
+  'successful submission'
+  'handles successful submission'
+  'valid submission'
+  'handles valid submission'
+  'does not duplicate on successful submission'
+  'never duplicates on successful submission'
+  'does not duplicate after a successful submission'
+  'successful submission does not duplicate'
+  'successful submission does not create duplicate'
+  'successful submission does not create a duplicate record'
+  'does not fail on successful submission'
+  'successful submission redirects with a message'
+  'successful submission saves the subscriber and persists it'
+  'successful submission does not fail to create'
+  'successful submission never fails to redirect'
+  'valid submission succeeds without errors'
+  'valid submission succeeds and does not show errors'
+  'valid submission returns no errors'
+  'valid submission without errors'
+  'valid submission creates a record'
+  'does not fail when processing a successful submission'
+  'does not raise when handling a successful submission'
+  'does not fail while handling successful submission'
+  'successful submission produces an error-free response'
+  'successful submission returns an error free response'
+)
+for ((fixture_index = 0; fixture_index < ${#fresh_claude_positive_success_names[@]}; fixture_index += 1)); do
+  cp -R "$tmp/fresh-claude-form-workspace" \
+    "$tmp/fresh-claude-positive-success-name-$fixture_index-workspace"
+  ruby -e \
+    'path, replacement = ARGV; content = File.read(path); abort unless content.sub!(%q{valid submission creates a subscriber and succeeds}, replacement); File.write(path, content)' \
+    "$tmp/fresh-claude-positive-success-name-$fixture_index-workspace/eval_app/test/controllers/subscribers_controller_test.rb" \
+    "${fresh_claude_positive_success_names[$fixture_index]}"
+  mkdir "$tmp/fresh-claude-positive-success-name-$fixture_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+    "$tmp/fresh-claude-positive-success-name-$fixture_index-workspace" \
+    "$tmp/fresh-claude-positive-success-name-$fixture_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/fresh-claude-positive-success-name-$fixture_index-output/rubric-results.json")" = pass
+  done
+done
+
+fresh_claude_marker_scope_rejections=(
+  'not a successful submission redirects'
+  'never a successful submission'
+  'does not result in a successful submission'
+  'does not redirect after successful submission'
+  'successful submission does not redirect'
+  'fails to create on successful submission'
+  'never succeeds on valid submission'
+  'not on successful submission redirects'
+  'does not duplicate on not a successful submission'
+  'successful submission does not create but redirects'
+  'valid submission fails to save but redirects'
+)
+for ((fixture_index = 0; fixture_index < ${#fresh_claude_marker_scope_rejections[@]}; fixture_index += 1)); do
+  cp -R "$tmp/fresh-claude-form-workspace" \
+    "$tmp/fresh-claude-marker-scope-rejection-$fixture_index-workspace"
+  ruby -e \
+    'path, replacement = ARGV; content = File.read(path); abort unless content.sub!(%q{valid submission creates a subscriber and succeeds}, replacement); File.write(path, content)' \
+    "$tmp/fresh-claude-marker-scope-rejection-$fixture_index-workspace/eval_app/test/controllers/subscribers_controller_test.rb" \
+    "${fresh_claude_marker_scope_rejections[$fixture_index]}"
+  mkdir "$tmp/fresh-claude-marker-scope-rejection-$fixture_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+    "$tmp/fresh-claude-marker-scope-rejection-$fixture_index-workspace" \
+    "$tmp/fresh-claude-marker-scope-rejection-$fixture_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/fresh-claude-marker-scope-rejection-$fixture_index-output/rubric-results.json")" = unknown
+  done
+done
+
+fresh_claude_positive_failure_names=(
+  'validation failure occurs'
+  'validation failure is present'
+  'no record on validation failure'
+  'when invalid submission renders validation errors'
+  'on invalid submission renders validation errors'
+  'an invalid submission renders validation errors'
+  'renders validation errors and does not create a record on invalid submission'
+  'invalid submission renders validation errors'
+  'invalid submission shows validation errors'
+  'invalid submission validation errors are present'
+  'invalid submission validation errors appear'
+  'invalid submission validation errors are present and does not create a record'
+  'invalid submission does not create and renders validation errors'
+  'invalid submission renders one validation error'
+  'invalid submission renders 1 validation error'
+  'server-side validation fails on invalid submission'
+  'an invalid submission fails validation'
+  'does not create on invalid submission but renders validation errors'
+)
+for ((fixture_index = 0; fixture_index < ${#fresh_claude_positive_failure_names[@]}; fixture_index += 1)); do
+  cp -R "$tmp/fresh-claude-form-workspace" \
+    "$tmp/fresh-claude-positive-failure-name-$fixture_index-workspace"
+  ruby -e \
+    'path, replacement = ARGV; content = File.read(path); abort unless content.sub!(%q{invalid submission fails server-side validation and does not create a subscriber}, replacement); File.write(path, content)' \
+    "$tmp/fresh-claude-positive-failure-name-$fixture_index-workspace/eval_app/test/controllers/subscribers_controller_test.rb" \
+    "${fresh_claude_positive_failure_names[$fixture_index]}"
+  mkdir "$tmp/fresh-claude-positive-failure-name-$fixture_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+    "$tmp/fresh-claude-positive-failure-name-$fixture_index-workspace" \
+    "$tmp/fresh-claude-positive-failure-name-$fixture_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/fresh-claude-positive-failure-name-$fixture_index-output/rubric-results.json")" = pass
+  done
+done
+
+fresh_claude_absent_failure_names=(
+  'validation failure is absent'
+  'validation failure does not occur'
+  'invalid submission avoids validation errors'
+  'invalid submission bypasses validation errors'
+  'when invalid submission does not render validation errors'
+  'an invalid submission returns no validation errors'
+  'invalid submission fails to render validation errors'
+  'invalid submission never fails validation'
+  'not an invalid submission renders validation errors'
+  'valid submission renders validation errors but invalid submission redirects'
+  'validation errors on valid submission and invalid submission does not render them'
+  'invalid submission validation errors are absent'
+  'invalid submission validation errors are missing'
+  'invalid submission validation errors are not rendered'
+  'invalid submission validation errors do not appear'
+  'invalid submission validation errors never appear'
+  'invalid submission validation errors fail to render'
+  'validation errors are absent on invalid submission'
+  'invalid submission renders zero validation errors'
+  'invalid submission renders 0 validation errors'
+)
+for ((fixture_index = 0; fixture_index < ${#fresh_claude_absent_failure_names[@]}; fixture_index += 1)); do
+  cp -R "$tmp/fresh-claude-form-workspace" \
+    "$tmp/fresh-claude-absent-failure-name-$fixture_index-workspace"
+  ruby -e \
+    'path, replacement = ARGV; content = File.read(path); abort unless content.sub!(%q{invalid submission fails server-side validation and does not create a subscriber}, replacement); File.write(path, content)' \
+    "$tmp/fresh-claude-absent-failure-name-$fixture_index-workspace/eval_app/test/controllers/subscribers_controller_test.rb" \
+    "${fresh_claude_absent_failure_names[$fixture_index]}"
+  mkdir "$tmp/fresh-claude-absent-failure-name-$fixture_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+    "$tmp/fresh-claude-absent-failure-name-$fixture_index-workspace" \
+    "$tmp/fresh-claude-absent-failure-name-$fixture_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/fresh-claude-absent-failure-name-$fixture_index-output/rubric-results.json")" = unknown
+  done
+done
+
+fresh_claude_negative_success_results=(
+  'valid submission is unsuccessful'
+  'valid submission is not successful'
+  'valid submission is a failure'
+  'valid submission is not accepted'
+  'successful submission is never accepted'
+  'valid submission is rejected'
+  'valid submission ends in rejection'
+  'valid submission remains a rejection'
+  'successful submission is rejected'
+  'valid submission is refused'
+  'successful submission was refused'
+  'successful submission creates duplicate records'
+  'valid submission creates duplicates'
+  'valid submission is blocked'
+  'successful submission is denied'
+  'valid submission is silently ignored'
+  'valid submission returns an error'
+  'valid submission errors'
+  'valid submission is invalid'
+  'request is rejected on valid submission'
+  'valid submission results in failure'
+  'valid submission succeeds but is not saved'
+  'valid submission redirects to an error page'
+  'successful submission redirects with validation errors'
+  'valid submission creates no subscriber'
+  'valid submission creates no new subscriber'
+  'successful submission persists no additional record'
+  'successful submission saves zero records'
+  'valid submission creates nothing'
+  'valid submission neither succeeds nor redirects'
+)
+for ((fixture_index = 0; fixture_index < ${#fresh_claude_negative_success_results[@]}; fixture_index += 1)); do
+  cp -R "$tmp/fresh-claude-form-workspace" \
+    "$tmp/fresh-claude-negative-success-result-$fixture_index-workspace"
+  ruby -e \
+    'path, replacement = ARGV; content = File.read(path); abort unless content.sub!(%q{valid submission creates a subscriber and succeeds}, replacement); File.write(path, content)' \
+    "$tmp/fresh-claude-negative-success-result-$fixture_index-workspace/eval_app/test/controllers/subscribers_controller_test.rb" \
+    "${fresh_claude_negative_success_results[$fixture_index]}"
+  mkdir "$tmp/fresh-claude-negative-success-result-$fixture_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+    "$tmp/fresh-claude-negative-success-result-$fixture_index-workspace" \
+    "$tmp/fresh-claude-negative-success-result-$fixture_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/fresh-claude-negative-success-result-$fixture_index-output/rubric-results.json")" = unknown
+  done
+done
+
+fresh_claude_nonnegative_success_results=(
+  'valid submission is accepted'
+  'valid submission succeeds'
+  'successful submission is not unsuccessful'
+  'successful submission is not rejected'
+  'successful submission is not blocked'
+)
+for ((fixture_index = 0; fixture_index < ${#fresh_claude_nonnegative_success_results[@]}; fixture_index += 1)); do
+  cp -R "$tmp/fresh-claude-form-workspace" \
+    "$tmp/fresh-claude-nonnegative-success-result-$fixture_index-workspace"
+  ruby -e \
+    'path, replacement = ARGV; content = File.read(path); abort unless content.sub!(%q{valid submission creates a subscriber and succeeds}, replacement); File.write(path, content)' \
+    "$tmp/fresh-claude-nonnegative-success-result-$fixture_index-workspace/eval_app/test/controllers/subscribers_controller_test.rb" \
+    "${fresh_claude_nonnegative_success_results[$fixture_index]}"
+  mkdir "$tmp/fresh-claude-nonnegative-success-result-$fixture_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+    "$tmp/fresh-claude-nonnegative-success-result-$fixture_index-workspace" \
+    "$tmp/fresh-claude-nonnegative-success-result-$fixture_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/fresh-claude-nonnegative-success-result-$fixture_index-output/rubric-results.json")" = pass
+  done
+done
+
+fresh_claude_valid_ruby_literal_forms=(
+  $'    expected_response = %Q{first line\n      second line}\n    assert_select "#error_explanation"'
+  $'    pattern = %r{\n      [a-z]+\n    }x\n    assert_select "#error_explanation"'
+  $'    pattern = /[[:alpha:]]+/\n    assert_select "#error_explanation"'
+  '    assert subscriber.errors.added?(:email, :blank)'
+  '    assert_match %r(email is invalid), response.body'
+  '    assert_match %r[email is invalid], response.body'
+  '    assert_match %r<email is invalid>, response.body'
+  '    assert_match %r!email is invalid!, response.body'
+  '    assert_match /email is invalid/, response.body # rendered error'
+  '    assert_includes response.body, "email is invalid" # rendered error'
+)
+for ((fixture_index = 0; fixture_index < ${#fresh_claude_valid_ruby_literal_forms[@]}; fixture_index += 1)); do
+  cp -R "$tmp/fresh-claude-form-workspace" \
+    "$tmp/fresh-claude-valid-ruby-literal-$fixture_index-workspace"
+  ruby -e \
+    'path, replacement = ARGV; content = File.read(path); abort unless content.sub!(%q{    assert_select "#error_explanation"}, replacement); File.write(path, content)' \
+    "$tmp/fresh-claude-valid-ruby-literal-$fixture_index-workspace/eval_app/test/controllers/subscribers_controller_test.rb" \
+    "${fresh_claude_valid_ruby_literal_forms[$fixture_index]}"
+  ruby -c \
+    "$tmp/fresh-claude-valid-ruby-literal-$fixture_index-workspace/eval_app/test/controllers/subscribers_controller_test.rb" \
+    >/dev/null
+  mkdir "$tmp/fresh-claude-valid-ruby-literal-$fixture_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+    "$tmp/fresh-claude-valid-ruby-literal-$fixture_index-workspace" \
+    "$tmp/fresh-claude-valid-ruby-literal-$fixture_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/fresh-claude-valid-ruby-literal-$fixture_index-output/rubric-results.json")" = pass
+  done
+done
+
+cp -R "$tmp/fresh-claude-form-workspace" "$tmp/fresh-claude-historical-form-names-workspace"
+ruby -e '
+  path = ARGV.fetch(0)
+  content = File.read(path)
+  abort unless content.sub!(
+    "invalid submission fails server-side validation and does not create a subscriber",
+    "renders validation errors and does not create a record on invalid submission",
+  )
+  abort unless content.sub!(
+    "valid submission creates a subscriber and succeeds",
+    "creates a subscriber and redirects on successful submission",
+  )
+  abort unless content.sub!(
+    %q{    assert_select "#notice", text: "Thanks for subscribing!"},
+    %Q{    assert_response :success\n    assert_select "#subscriber-email", text: /fresh-person@example.com/},
+  )
+  File.write(path, content)
+' "$tmp/fresh-claude-historical-form-names-workspace/eval_app/test/controllers/subscribers_controller_test.rb"
+mkdir "$tmp/fresh-claude-historical-form-names-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+  "$tmp/fresh-claude-historical-form-names-workspace" \
+  "$tmp/fresh-claude-historical-form-names-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/fresh-claude-historical-form-names-output/rubric-results.json")" = pass
+done
+
+cp -R "$tmp/fresh-claude-historical-form-names-workspace" \
+  "$tmp/fresh-claude-default-difference-success-workspace"
+perl -0pi -e 's/assert_difference\("Subscriber.count", 1\)/assert_difference("Subscriber.count")/' \
+  "$tmp/fresh-claude-default-difference-success-workspace/eval_app/test/controllers/subscribers_controller_test.rb"
+mkdir "$tmp/fresh-claude-default-difference-success-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+  "$tmp/fresh-claude-default-difference-success-workspace" \
+  "$tmp/fresh-claude-default-difference-success-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/fresh-claude-default-difference-success-output/rubric-results.json")" = pass
+done
+
+cp -R "$tmp/fresh-claude-historical-form-names-workspace" \
+  "$tmp/fresh-claude-callable-difference-success-workspace"
+perl -0pi -e 's/assert_difference\("Subscriber.count", 1\)/assert_difference -> { Subscriber.count }, 1/' \
+  "$tmp/fresh-claude-callable-difference-success-workspace/eval_app/test/controllers/subscribers_controller_test.rb"
+mkdir "$tmp/fresh-claude-callable-difference-success-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+  "$tmp/fresh-claude-callable-difference-success-workspace" \
+  "$tmp/fresh-claude-callable-difference-success-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/fresh-claude-callable-difference-success-output/rubric-results.json")" = pass
+done
+
+callable_difference_rejections=(
+  'assert_difference -> { Subscriber.count }, 0'
+  'assert_difference -> { Subscriber.delete_all }, 1'
+)
+for ((fixture_index = 0; fixture_index < ${#callable_difference_rejections[@]}; fixture_index += 1)); do
+  cp -R "$tmp/fresh-claude-historical-form-names-workspace" \
+    "$tmp/fresh-claude-callable-difference-rejection-$fixture_index-workspace"
+  ruby -e \
+    'path, replacement = ARGV; content = File.read(path); abort unless content.sub!(%q{assert_difference("Subscriber.count", 1)}, replacement); File.write(path, content)' \
+    "$tmp/fresh-claude-callable-difference-rejection-$fixture_index-workspace/eval_app/test/controllers/subscribers_controller_test.rb" \
+    "${callable_difference_rejections[$fixture_index]}"
+  mkdir "$tmp/fresh-claude-callable-difference-rejection-$fixture_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+    "$tmp/fresh-claude-callable-difference-rejection-$fixture_index-workspace" \
+    "$tmp/fresh-claude-callable-difference-rejection-$fixture_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/fresh-claude-callable-difference-rejection-$fixture_index-output/rubric-results.json")" = unknown
+  done
+done
+
+cp -R "$tmp/fresh-claude-historical-form-names-workspace" \
+  "$tmp/fresh-claude-unrelated-difference-success-workspace"
+perl -0pi -e 's/assert_difference\("Subscriber.count", 1\)/assert_difference("AuditLog.count", 1)/' \
+  "$tmp/fresh-claude-unrelated-difference-success-workspace/eval_app/test/controllers/subscribers_controller_test.rb"
+mkdir "$tmp/fresh-claude-unrelated-difference-success-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+  "$tmp/fresh-claude-unrelated-difference-success-workspace" \
+  "$tmp/fresh-claude-unrelated-difference-success-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/fresh-claude-unrelated-difference-success-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/fresh-claude-historical-form-names-workspace" \
+  "$tmp/fresh-claude-side-effect-difference-success-workspace"
+ruby -e '
+  path = ARGV.fetch(0)
+  content = File.read(path)
+  abort unless content.sub!(
+    %q{      post subscribers_url, params: { subscriber: { email: "new-subscriber@example.com" } }},
+    %Q{      Subscriber.create!(email: "side-effect@example.com")\n      post subscribers_url, params: { subscriber: { email: "new-subscriber@example.com" } }},
+  )
+  File.write(path, content)
+' "$tmp/fresh-claude-side-effect-difference-success-workspace/eval_app/test/controllers/subscribers_controller_test.rb"
+mkdir "$tmp/fresh-claude-side-effect-difference-success-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+  "$tmp/fresh-claude-side-effect-difference-success-workspace" \
+  "$tmp/fresh-claude-side-effect-difference-success-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/fresh-claude-side-effect-difference-success-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/fresh-claude-historical-form-names-workspace" \
+  "$tmp/fresh-claude-post-argument-write-success-workspace"
+ruby -e '
+  path = ARGV.fetch(0)
+  content = File.read(path)
+  abort unless content.sub!(
+    %q{      post subscribers_url, params: { subscriber: { email: "new-subscriber@example.com" } }},
+    %q{      post subscribers_url, params: { subscriber: { email: "new-subscriber@example.com" }, seed: Subscriber.new(email: "side-effect@example.com").tap(&:save!) }},
+  )
+  File.write(path, content)
+' "$tmp/fresh-claude-post-argument-write-success-workspace/eval_app/test/controllers/subscribers_controller_test.rb"
+mkdir "$tmp/fresh-claude-post-argument-write-success-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+  "$tmp/fresh-claude-post-argument-write-success-workspace" \
+  "$tmp/fresh-claude-post-argument-write-success-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/fresh-claude-post-argument-write-success-output/rubric-results.json")" = unknown
+done
+
+for bulk_write in 'insert_all!([{ email: "side-effect@example.com" }])' \
+  'upsert_all([{ email: "side-effect@example.com" }])' \
+  'find_or_create_by!(email: "side-effect@example.com")' \
+  'create_or_find_by!(email: "side-effect@example.com")'; do
+  fixture_name="${bulk_write%%(*}"
+  fixture_name="${fixture_name//!/bang}"
+  cp -R "$tmp/fresh-claude-historical-form-names-workspace" \
+    "$tmp/fresh-claude-post-argument-$fixture_name-workspace"
+  ruby -e '
+    path, bulk_write = ARGV
+    content = File.read(path)
+    abort unless content.sub!(
+      %q{      post subscribers_url, params: { subscriber: { email: "new-subscriber@example.com" } }},
+      %Q{      post subscribers_url, params: { subscriber: { email: "new-subscriber@example.com" }, seed: Subscriber.#{bulk_write} }},
+    )
+    File.write(path, content)
+  ' "$tmp/fresh-claude-post-argument-$fixture_name-workspace/eval_app/test/controllers/subscribers_controller_test.rb" \
+    "$bulk_write"
+  mkdir "$tmp/fresh-claude-post-argument-$fixture_name-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+    "$tmp/fresh-claude-post-argument-$fixture_name-workspace" \
+    "$tmp/fresh-claude-post-argument-$fixture_name-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/fresh-claude-post-argument-$fixture_name-output/rubric-results.json")" = unknown
+  done
+done
+
+fresh_claude_post_parameter_spoofs=(
+  '      post audit_logs_url, params: { audit_log: { message: "ok" } } # subscriber:'
+  '      post audit_logs_url, params: { audit_log: { message: "subscriber:" } }'
+  '      post audit_logs_url, params: { audit_log: { subscriber: true } }'
+  '      post subscribers_url, params: { subscriber: { email: "ok@example.com" } }, headers: seed_subscriber!'
+  '      post subscribers_url, params: { subscriber: seed_subscriber }'
+  "      post subscribers_url, params: { subscriber: { email: \"#{Subscriber.create!(email: 'side-effect@example.com')}\" } }"
+)
+for ((fixture_index = 0; fixture_index < ${#fresh_claude_post_parameter_spoofs[@]}; fixture_index += 1)); do
+  cp -R "$tmp/fresh-claude-form-workspace" \
+    "$tmp/fresh-claude-post-parameter-spoof-$fixture_index-workspace"
+  ruby -e '
+    path, replacement = ARGV
+    content = File.read(path)
+    abort unless content.sub!(
+      %Q{    assert_difference("Subscriber.count", 1) do\n      post subscribers_url, params: { subscriber: { email: "new-subscriber@example.com" } }\n    end},
+      %Q{    assert_difference("Subscriber.count", 1) do\n#{replacement}\n    end},
+    )
+    abort unless content.sub!(
+      %Q{    follow_redirect!\n    assert_select "#notice", text: "Thanks for subscribing!"},
+      "",
+    )
+    File.write(path, content)
+  ' "$tmp/fresh-claude-post-parameter-spoof-$fixture_index-workspace/eval_app/test/controllers/subscribers_controller_test.rb" \
+    "${fresh_claude_post_parameter_spoofs[$fixture_index]}"
+  mkdir "$tmp/fresh-claude-post-parameter-spoof-$fixture_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+    "$tmp/fresh-claude-post-parameter-spoof-$fixture_index-workspace" \
+    "$tmp/fresh-claude-post-parameter-spoof-$fixture_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/fresh-claude-post-parameter-spoof-$fixture_index-output/rubric-results.json")" = unknown
+  done
+done
+
+cp -R "$tmp/fresh-claude-historical-form-names-workspace" \
+  "$tmp/fresh-claude-multiline-difference-success-workspace"
+ruby -e '
+  path = ARGV.fetch(0)
+  content = File.read(path)
+  abort unless content.sub!(
+    %q{      post subscribers_url, params: { subscriber: { email: "new-subscriber@example.com" } }},
+    %Q{      post(\n        subscribers_url,\n        params: {\n          subscriber: {\n            email: "new-subscriber@example.com",\n            name: "Fresh Person"\n          }\n        }\n      )},
+  )
+  File.write(path, content)
+' "$tmp/fresh-claude-multiline-difference-success-workspace/eval_app/test/controllers/subscribers_controller_test.rb"
+mkdir "$tmp/fresh-claude-multiline-difference-success-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+  "$tmp/fresh-claude-multiline-difference-success-workspace" \
+  "$tmp/fresh-claude-multiline-difference-success-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/fresh-claude-multiline-difference-success-output/rubric-results.json")" = pass
+done
+
+cp -R "$tmp/fresh-claude-historical-form-names-workspace" \
+  "$tmp/fresh-claude-irregular-resource-success-workspace"
+mv "$tmp/fresh-claude-irregular-resource-success-workspace/eval_app/app/models/subscriber.rb" \
+  "$tmp/fresh-claude-irregular-resource-success-workspace/eval_app/app/models/person.rb"
+mv "$tmp/fresh-claude-irregular-resource-success-workspace/eval_app/app/controllers/subscribers_controller.rb" \
+  "$tmp/fresh-claude-irregular-resource-success-workspace/eval_app/app/controllers/people_controller.rb"
+mv "$tmp/fresh-claude-irregular-resource-success-workspace/eval_app/test/controllers/subscribers_controller_test.rb" \
+  "$tmp/fresh-claude-irregular-resource-success-workspace/eval_app/test/controllers/people_controller_test.rb"
+ruby -e '
+  ARGV.each do |path|
+    content = File.read(path)
+    content = content.gsub("Subscribers", "People").gsub("Subscriber", "Person")
+                     .gsub("subscribers", "people").gsub("subscriber", "person")
+    File.write(path, content)
+  end
+' \
+  "$tmp/fresh-claude-irregular-resource-success-workspace/eval_app/app/models/person.rb" \
+  "$tmp/fresh-claude-irregular-resource-success-workspace/eval_app/app/controllers/people_controller.rb" \
+  "$tmp/fresh-claude-irregular-resource-success-workspace/eval_app/test/controllers/people_controller_test.rb"
+mkdir "$tmp/fresh-claude-irregular-resource-success-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+  "$tmp/fresh-claude-irregular-resource-success-workspace" \
+  "$tmp/fresh-claude-irregular-resource-success-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/fresh-claude-irregular-resource-success-output/rubric-results.json")" = pass
+done
+
+cp -R "$tmp/fresh-claude-historical-form-names-workspace" \
+  "$tmp/fresh-claude-zero-difference-success-workspace"
+perl -0pi -e 's/assert_difference\("Subscriber.count", 1\)/assert_no_difference("Subscriber.count")/' \
+  "$tmp/fresh-claude-zero-difference-success-workspace/eval_app/test/controllers/subscribers_controller_test.rb"
+mkdir "$tmp/fresh-claude-zero-difference-success-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+  "$tmp/fresh-claude-zero-difference-success-workspace" \
+  "$tmp/fresh-claude-zero-difference-success-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/fresh-claude-zero-difference-success-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/fresh-claude-historical-form-names-workspace" \
+  "$tmp/fresh-claude-outside-difference-success-workspace"
+ruby -e '
+  path = ARGV.fetch(0)
+  content = File.read(path)
+  abort unless content.sub!(
+    /^    assert_difference\("Subscriber\.count", 1\) do\n      post ([^\n]+)\n    end$/,
+    %Q{    assert_difference("Subscriber.count", 1) do\n      get root_url\n    end\n    post \\1},
+  )
+  File.write(path, content)
+' "$tmp/fresh-claude-outside-difference-success-workspace/eval_app/test/controllers/subscribers_controller_test.rb"
+mkdir "$tmp/fresh-claude-outside-difference-success-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+  "$tmp/fresh-claude-outside-difference-success-workspace" \
+  "$tmp/fresh-claude-outside-difference-success-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/fresh-claude-outside-difference-success-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/fresh-claude-form-workspace" "$tmp/fresh-claude-weak-first-workspace"
+ruby -e '
+  path = ARGV.fetch(0)
+  content = File.read(path)
+  weak_failure = <<~RUBY
+      test "invalid submission shows validation errors" do
+        get new_subscriber_url
+        assert_response :success
+      end
+
+  RUBY
+  weak_success = <<~RUBY
+      test "valid submission does not succeed" do
+        get new_subscriber_url
+        assert_response :success
+      end
+
+  RUBY
+  abort unless content.sub!(%Q{  test "invalid submission fails server-side validation}, weak_failure + %Q{  test "invalid submission fails server-side validation})
+  abort unless content.sub!(%Q{  test "valid submission creates a subscriber}, weak_success + %Q{  test "valid submission creates a subscriber})
+  File.write(path, content)
+' "$tmp/fresh-claude-weak-first-workspace/eval_app/test/controllers/subscribers_controller_test.rb"
+mkdir "$tmp/fresh-claude-weak-first-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+  "$tmp/fresh-claude-weak-first-workspace" "$tmp/fresh-claude-weak-first-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/fresh-claude-weak-first-output/rubric-results.json")" = pass
+done
+
+for weak_side in failure success; do
+  cp -R "$tmp/fresh-claude-form-workspace" "$tmp/fresh-claude-weak-only-$weak_side-workspace"
+  case "$weak_side" in
+    failure)
+      ruby -e '
+        path = ARGV.fetch(0)
+        content = File.read(path)
+        content.sub!(/  test "invalid submission fails server-side validation.*?^  end\n/m, <<~RUBY) or abort
+          test "invalid submission shows validation errors" do
+            get new_subscriber_url
+            assert_response :success
+          end
+        RUBY
+        File.write(path, content)
+      ' "$tmp/fresh-claude-weak-only-$weak_side-workspace/eval_app/test/controllers/subscribers_controller_test.rb"
+      ;;
+    success)
+      ruby -e '
+        path = ARGV.fetch(0)
+        content = File.read(path)
+        content.sub!(/  test "valid submission creates a subscriber.*?^  end\n/m, <<~RUBY) or abort
+          test "valid submission succeeds" do
+            get new_subscriber_url
+            assert_response :success
+          end
+        RUBY
+        File.write(path, content)
+      ' "$tmp/fresh-claude-weak-only-$weak_side-workspace/eval_app/test/controllers/subscribers_controller_test.rb"
+      ;;
+  esac
+  mkdir "$tmp/fresh-claude-weak-only-$weak_side-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+    "$tmp/fresh-claude-weak-only-$weak_side-workspace" "$tmp/fresh-claude-weak-only-$weak_side-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/fresh-claude-weak-only-$weak_side-output/rubric-results.json")" = unknown
+  done
+done
+
+scaffold_tail_contract_commands=(
+  "$claude_scaffold_command"
+  "$claude_v3_scaffold_command"
+  "$claude_v9_scaffold_command"
+  "$stable_scaffold_command"
+)
+scaffold_tail_contract_outputs=(
+  'Created eval_app with React on Rails!'
+  $'Created eval_app with React on Rails!\n✓ Done!'
+  $'✓ Done!\nCreated eval_app with React on Rails!\nPIPE_EXIT_STATUS=0'
+  $'✓ Done!\nCreated eval_app with React on Rails!\nROR_EVAL_SCAFFOLD_EXIT=0'
+)
+for ((command_index = 0; command_index < ${#scaffold_tail_contract_commands[@]}; command_index += 1)); do
+  for tail_spacing in compact double tabbed; do
+    replacement='| tail -c 4096'
+    case "$tail_spacing" in
+      double) replacement=' |  tail -c 4096' ;;
+      tabbed) replacement=$'\t|\ttail\t-c\t4096' ;;
+    esac
+    command="${scaffold_tail_contract_commands[$command_index]/ | tail -c 4096/$replacement}"
+    jq -cn --arg command "$command" --arg output "${scaffold_tail_contract_outputs[$command_index]}" \
+      '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:$output}}' \
+      >"$tmp/scaffold-tail-spacing-$command_index-$tail_spacing-events.jsonl"
+    mkdir "$tmp/scaffold-tail-spacing-$command_index-$tail_spacing-output"
+    node "$eval_dir/bin/derive-evidence.mjs" \
+      "$tmp/scaffold-tail-spacing-$command_index-$tail_spacing-events.jsonl" \
+      "$tmp/claude-v8-form-workspace" \
+      "$tmp/scaffold-tail-spacing-$command_index-$tail_spacing-output" \
+      "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+    test "$(jq -r '.items[] | select(.id == "install.pro") | .status' \
+      "$tmp/scaffold-tail-spacing-$command_index-$tail_spacing-output/rubric-results.json")" = pass
+  done
+  for tail_variant in 4095 4097 line shorthand dynamic; do
+    replacement="tail -c $tail_variant"
+    case "$tail_variant" in
+      line) replacement='tail -n 50' ;;
+      shorthand) replacement='tail -c4096' ;;
+      dynamic) printf -v replacement 'tail -c "$%s"' SCAFFOLD_TAIL_BYTES ;;
+    esac
+    command="${scaffold_tail_contract_commands[$command_index]/tail -c 4096/$replacement}"
+    jq -cn --arg command "$command" --arg output "${scaffold_tail_contract_outputs[$command_index]}" \
+      '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:$output}}' \
+      >"$tmp/scaffold-tail-contract-$command_index-$tail_variant-events.jsonl"
+    mkdir "$tmp/scaffold-tail-contract-$command_index-$tail_variant-output"
+    node "$eval_dir/bin/derive-evidence.mjs" \
+      "$tmp/scaffold-tail-contract-$command_index-$tail_variant-events.jsonl" \
+      "$tmp/claude-v8-form-workspace" \
+      "$tmp/scaffold-tail-contract-$command_index-$tail_variant-output" \
+      "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+    test "$(jq -r '.items[] | select(.id == "install.pro") | .status' \
+      "$tmp/scaffold-tail-contract-$command_index-$tail_variant-output/rubric-results.json")" = unknown
+  done
+  command="${scaffold_tail_contract_commands[$command_index]/ | tail -c 4096/ | cat | tail -c 4096}"
+  jq -cn --arg command "$command" --arg output "${scaffold_tail_contract_outputs[$command_index]}" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:$output}}' \
+    >"$tmp/scaffold-tail-extra-pipeline-$command_index-events.jsonl"
+  mkdir "$tmp/scaffold-tail-extra-pipeline-$command_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" \
+    "$tmp/scaffold-tail-extra-pipeline-$command_index-events.jsonl" \
+    "$tmp/claude-v8-form-workspace" "$tmp/scaffold-tail-extra-pipeline-$command_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "install.pro") | .status' \
+    "$tmp/scaffold-tail-extra-pipeline-$command_index-output/rubric-results.json")" = unknown
+done
+
+scaffold_expanding_output=''
+while ((${#scaffold_expanding_output} < 3600)); do
+  scaffold_expanding_output+=$'password=x\n'
+done
+scaffold_expanding_output+=$'Created eval_app with React on Rails!\n✓ Done!\nROR_EVAL_SCAFFOLD_EXIT=0'
+jq -cn --arg command "$stable_scaffold_command" --arg output "$scaffold_expanding_output" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:$output}}' \
+  >"$tmp/scaffold-byte-tail-expansion-events.jsonl"
+mkdir "$tmp/scaffold-byte-tail-expansion-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/scaffold-byte-tail-expansion-events.jsonl" \
+  "$tmp/claude-v8-form-workspace" "$tmp/scaffold-byte-tail-expansion-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+test "$(jq -r '.commands[0].output_truncated' \
+  "$tmp/scaffold-byte-tail-expansion-output/command-evidence.json")" = false
+test "$(jq -r '.items[] | select(.id == "install.pro") | .status' \
+  "$tmp/scaffold-byte-tail-expansion-output/rubric-results.json")" = pass
+
+printf -v scaffold_oversized_padding '%12500s' ''
+scaffold_oversized_output="${scaffold_oversized_padding// /x}"$'\nCreated eval_app with React on Rails!\n✓ Done!\nROR_EVAL_SCAFFOLD_EXIT=0'
+jq -cn --arg command "$stable_scaffold_command" --arg output "$scaffold_oversized_output" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:$output}}' \
+  >"$tmp/scaffold-truncated-output-events.jsonl"
+mkdir "$tmp/scaffold-truncated-output-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/scaffold-truncated-output-events.jsonl" \
+  "$tmp/claude-v8-form-workspace" "$tmp/scaffold-truncated-output-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+test "$(jq -r '.commands[0].output_truncated' \
+  "$tmp/scaffold-truncated-output-output/command-evidence.json")" = true
+test "$(jq -r '.items[] | select(.id == "install.pro") | .status' \
+  "$tmp/scaffold-truncated-output-output/rubric-results.json")" = unknown
+
+jq -cn --arg command "$stable_scaffold_command" \
+  --arg output $'[normalized-output-truncated]\nCreated eval_app with React on Rails!\n✓ Done!\nROR_EVAL_SCAFFOLD_EXIT=0' \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:$output}}' \
+  >"$tmp/scaffold-normalized-truncation-events.jsonl"
+mkdir "$tmp/scaffold-normalized-truncation-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/scaffold-normalized-truncation-events.jsonl" \
+  "$tmp/claude-v8-form-workspace" "$tmp/scaffold-normalized-truncation-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+test "$(jq -r '.commands[0].output_truncated' \
+  "$tmp/scaffold-normalized-truncation-output/command-evidence.json")" = false
+test "$(jq -r '.items[] | select(.id == "install.pro") | .status' \
+  "$tmp/scaffold-normalized-truncation-output/rubric-results.json")" = unknown
+
+jq -cn \
+  '{type:"item.completed",item:{type:"command_execution",command:"npx --yes create-react-on-rails-app eval_app --rsc --package-manager npm",exit_code:0,status:"completed",aggregated_output:"Created eval_app with React on Rails!"}}' \
+  >"$tmp/direct-scaffold-contract-events.jsonl"
+mkdir "$tmp/direct-scaffold-contract-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/direct-scaffold-contract-events.jsonl" \
+  "$tmp/claude-v8-form-workspace" "$tmp/direct-scaffold-contract-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+test "$(jq -r '.items[] | select(.id == "install.pro") | .status' \
+  "$tmp/direct-scaffold-contract-output/rubric-results.json")" = pass
 
 echo "focused harness tests passed"

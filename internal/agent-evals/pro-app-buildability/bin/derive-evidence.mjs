@@ -158,6 +158,13 @@ const boundedTailPipeline = /^(.*\S)\s+2>&1\s*\|\s*tail\s+(?:-n\s+|-)([1-9][0-9]
 const boundedStatusPipeline =
   /^(.*\S)\s+2>&1\s*(?:\|\s*tee\s+(?:(?:<LOCAL_PATH>)|[A-Za-z0-9_./-])+\s*)?\|\s*tail\s+(?:-n\s+|-)([1-9][0-9]{0,4})$/;
 const boundedStdoutStatusPipeline = /^(.*\S)\s+\|\s*tail\s+(?:-n\s+|-)([1-9][0-9]{0,4})$/;
+const exactScaffoldTailSuffix = /[ \t]*\|[ \t]*tail[ \t]+-c[ \t]+4096$/;
+const canonicalizeExactScaffoldTail = (line) => {
+  const suffix = line.match(exactScaffoldTailSuffix);
+  return suffix ? `${line.slice(0, suffix.index).trimEnd()} | tail -n 1` : null;
+};
+const matchExactScaffoldPipeline = (line, pattern) =>
+  canonicalizeExactScaffoldTail(line)?.match(pattern) ?? null;
 const normalizedStateSourceLines = new Set([
   'source <LOCAL_PATH>/.ror-eval-state/pgenv.sh',
   'source <LOCAL_PATH>/.ror-eval-state/env.sh',
@@ -436,7 +443,7 @@ const statusMarkedScaffoldTarget = (lines, output) => {
   ) {
     return null;
   }
-  const pipelineMatch = lines[1].match(statusMarkedScaffoldPipeline);
+  const pipelineMatch = matchExactScaffoldPipeline(lines[1], statusMarkedScaffoldPipeline);
   const outputLines = output
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -451,7 +458,11 @@ const statusMarkedScaffoldTarget = (lines, output) => {
     : null;
 };
 const phaseStatusScaffoldTarget = (lines, output) => {
-  const proof = immediatePhaseStatusTarget(lines, output, 'SCAFFOLD');
+  const canonicalPipeline = canonicalizeExactScaffoldTail(lines[1] ?? '');
+  if (!canonicalPipeline) return null;
+  const canonicalLines = [...lines];
+  canonicalLines[1] = canonicalPipeline;
+  const proof = immediatePhaseStatusTarget(canonicalLines, output, 'SCAFFOLD');
   return proof && completedScaffoldOutput(output) ? proof.target : null;
 };
 const stripBoundedTimeoutPrefix = (line) => {
@@ -500,9 +511,9 @@ const topLevelShellLines = (command) => {
   return executableLines;
 };
 const normalizedEvidenceLines = (command) => stripSanitizedSetupPrefix(topLevelShellLines(command));
-const pipefailPipelineTargets = (lines) =>
+const pipefailPipelineTargets = (lines, pipelineMatcher = (line) => line.match(boundedLogPipeline)) =>
   lines.flatMap((line, index) => {
-    const pipelineMatch = line.match(boundedLogPipeline);
+    const pipelineMatch = pipelineMatcher(line);
     const hasTopLevelPipefail = lines.length === 2 && index === 1 && lines[0] === 'set -o pipefail';
     return pipelineMatch && hasTopLevelPipefail && Number(pipelineMatch[2]) <= 1000 ? [pipelineMatch[1]] : [];
   });
@@ -510,12 +521,16 @@ const installEvidenceTargets = (command) => {
   const rawLines = topLevelShellLines(command.command);
   const lines = stripSanitizedSetupPrefix(rawLines);
   const phaseLines = stripScaffoldRetrySetupPrefix(rawLines) ?? stripSanitizedPhaseSetupPrefix(rawLines);
-  const pipefailTargets = pipefailPipelineTargets(lines);
-  const statusMarkedTarget = statusMarkedScaffoldTarget(rawLines, command.output);
-  const phaseStatusTarget = phaseStatusScaffoldTarget(phaseLines, command.output);
+  const outputIsUsable =
+    !command.output_truncated && !command.output.includes('[normalized-output-truncated]');
+  const pipefailTargets = outputIsUsable
+    ? pipefailPipelineTargets(lines, (line) => matchExactScaffoldPipeline(line, boundedLogPipeline))
+    : [];
+  const statusMarkedTarget = outputIsUsable ? statusMarkedScaffoldTarget(rawLines, command.output) : null;
+  const phaseStatusTarget = outputIsUsable ? phaseStatusScaffoldTarget(phaseLines, command.output) : null;
   const completionBackedTarget = (() => {
-    if (lines.length !== 1 || !completedScaffoldOutput(command.output)) return [];
-    const pipelineMatch = lines[0].match(completedScaffoldLogPipeline);
+    if (!outputIsUsable || lines.length !== 1 || !completedScaffoldOutput(command.output)) return [];
+    const pipelineMatch = matchExactScaffoldPipeline(lines[0], completedScaffoldLogPipeline);
     return pipelineMatch && Number(pipelineMatch[2]) <= 1000
       ? [stripScaffoldNodeVersionPrefix(stripScaffoldTimePrefix(pipelineMatch[1]))]
       : [];
@@ -637,12 +652,171 @@ const pageTests = artifacts.filter((artifact) => {
     /^\s*(?:assert\w*|expect)(?:\s|\()/m.test(uncommentedRuby);
   return testContent && (namedPageTest || semanticRscIntegrationTest);
 });
+const rubyPercentLiteralDescriptor = (line, start) => {
+  const opener = line.slice(start).match(/^%([qQwWiIxrs]?)([^A-Za-z0-9_\s])/);
+  if (!opener) return undefined;
+  const opening = opener[2];
+  const closing = { '(': ')', '[': ']', '{': '}', '<': '>' }[opening] ?? opening;
+  return {
+    bodyStart: start + opener[0].length,
+    closing,
+    depth: 1,
+    escaped: false,
+    opening,
+    paired: closing !== opening,
+    type: opener[1],
+  };
+};
+const scanRubyPercentLiteral = (line, start, priorState = null) => {
+  const descriptor = priorState ?? rubyPercentLiteralDescriptor(line, start);
+  if (descriptor === undefined) return undefined;
+  const { closing, opening, paired } = descriptor;
+  let { depth, escaped } = descriptor;
+  const cursor = priorState === null ? descriptor.bodyStart : start;
+  for (let index = cursor; index < line.length; index += 1) {
+    const character = line[index];
+    if (escaped) {
+      escaped = false;
+    } else if (character === '\\') {
+      escaped = true;
+    } else if (paired && character === opening) {
+      depth += 1;
+    } else if (character === closing) {
+      depth -= 1;
+      if (depth === 0) return { descriptor, end: index, state: null };
+    }
+  }
+  return { descriptor, end: null, state: { ...descriptor, depth, escaped } };
+};
+const rubySlashRegexEnd = (line, start) => {
+  const prefix = line.slice(0, start).trimEnd();
+  if (!/(?:^|[=(:,[!&|?{};])$/.test(prefix)) return undefined;
+  let escaped = false;
+  let characterClass = false;
+  for (let index = start + 1; index < line.length; index += 1) {
+    const character = line[index];
+    if (escaped) {
+      escaped = false;
+    } else if (character === '\\') {
+      escaped = true;
+    } else if (character === '[') {
+      if (characterClass) {
+        const posixClass = line.slice(index).match(/^\[:[a-z]+:\]/i)?.[0];
+        if (posixClass === undefined) return null;
+        index += posixClass.length - 1;
+      } else {
+        characterClass = true;
+      }
+    } else if (character === ']') {
+      if (!characterClass) return null;
+      characterClass = false;
+    } else if (character === '/' && !characterClass) {
+      while (/[imxounes]/.test(line[index + 1] ?? '')) index += 1;
+      return index;
+    }
+  }
+  return null;
+};
+const rubyHeredocOpeners = (line, localVariables) => {
+  const openers = [];
+  let quote = null;
+  let escaped = false;
+  for (let index = 0; index < line.length; index += 1) {
+    const character = line[index];
+    if (escaped) {
+      escaped = false;
+    } else if (quote !== null && character === '\\') {
+      escaped = true;
+    } else if (quote !== null) {
+      if (character === quote) quote = null;
+    } else if (character === '"' || character === "'") {
+      quote = character;
+    } else if (character === '%') {
+      const percentLiteral = scanRubyPercentLiteral(line, index);
+      if (percentLiteral?.end === null) {
+        return { multilinePercent: { index, state: percentLiteral.state }, openers };
+      }
+      if (percentLiteral?.end !== undefined) index = percentLiteral.end;
+    } else if (character === '/') {
+      const regexEnd = rubySlashRegexEnd(line, index);
+      if (regexEnd === null) return null;
+      if (regexEnd !== undefined) index = regexEnd;
+    } else if (character === '#') {
+      break;
+    } else if (character === '<' && line[index + 1] === '<') {
+      const opener = line.slice(index).match(/^<<([-~]?)(["']?)([A-Za-z_][A-Za-z0-9_]*)\2/);
+      if (opener) {
+        const receiver = line.slice(0, index).match(/\b([a-z_][A-Za-z0-9_]*)[ \t]*$/)?.[1];
+        if (receiver === undefined || !localVariables.has(receiver)) {
+          openers.push({ allowIndent: opener[1] !== '', index, name: opener[3] });
+        }
+        index += opener[0].length - 1;
+      }
+    }
+  }
+  return quote === null && !escaped ? { multilinePercent: null, openers } : null;
+};
+const maskRubyHeredocs = (content) => {
+  const records = content.match(/[^\r\n]*(?:\r\n|\n|$)/g)?.filter(Boolean) ?? [];
+  let terminator = null;
+  let multilinePercent = null;
+  const masked = [];
+  const localVariables = new Set();
+  for (const record of records) {
+    const lineEnding = record.match(/\r?\n$/)?.[0] ?? '';
+    const line = record.slice(0, record.length - lineEnding.length);
+    if (terminator !== null) {
+      const candidate = terminator.allowIndent ? line.trim() : line.trimEnd();
+      const closes = candidate === terminator.name && (terminator.allowIndent || !/^[ \t]/.test(line));
+      masked.push(`${line.replace(/./g, ' ')}${lineEnding}`);
+      if (closes) terminator = null;
+    } else if (multilinePercent !== null) {
+      const scan = scanRubyPercentLiteral(line, 0, multilinePercent.state);
+      if (scan?.end === null) {
+        masked.push(`${line.replace(/./g, ' ')}${lineEnding}`);
+        multilinePercent = { state: scan.state };
+      } else {
+        const suffix = line.slice((scan?.end ?? -1) + 1);
+        const suffixPattern =
+          scan?.descriptor.type === 'r' ? /^[imxounes]*[ \t]*(?:#.*)?$/ : /^[ \t]*(?:#.*)?$/;
+        if (!suffixPattern.test(suffix)) return null;
+        masked.push(`${line.replace(/./g, ' ')}${lineEnding}`);
+        multilinePercent = null;
+      }
+    } else {
+      const localAssignment = line.match(/^[ \t]*([a-z_][A-Za-z0-9_]*)[ \t]*=(?!=)/)?.[1];
+      if (localAssignment !== undefined) localVariables.add(localAssignment);
+      const scan = rubyHeredocOpeners(line, localVariables);
+      if (scan === null || scan.openers.length > 1) return null;
+      if (scan.multilinePercent !== null) {
+        if (scan.openers.length > 0) return null;
+        const literalStart = scan.multilinePercent.index;
+        masked.push(
+          `${line.slice(0, literalStart)}${line.slice(literalStart).replace(/./g, ' ')}${lineEnding}`,
+        );
+        multilinePercent = { state: scan.multilinePercent.state };
+      } else if (scan.openers.length === 0) {
+        masked.push(record);
+      } else {
+        const opener = scan.openers[0];
+        terminator = { allowIndent: opener.allowIndent, name: opener.name };
+        const prefix = line.slice(0, opener.index);
+        masked.push(`${prefix}${line.slice(opener.index).replace(/./g, ' ')}${lineEnding}`);
+      }
+    }
+  }
+  return terminator === null && multilinePercent === null ? masked.join('') : null;
+};
 const rubyTestCases = (content) => {
-  const starts = [...content.matchAll(/^([ \t]*)test\s+(?:"([^"\r\n]+)"|'([^'\r\n]+)')\s+do\b[^\r\n]*$/gm)];
+  const maskedContent = maskRubyHeredocs(content);
+  if (maskedContent === null) return [];
+  const starts = [
+    ...maskedContent.matchAll(/^([ \t]*)test\s+(?:"([^"\r\n]+)"|'([^'\r\n]+)')\s+do\b[^\r\n]*$/gm),
+  ];
   return starts.flatMap((match, index) => {
-    const bodyRegion = content.slice(
+    const bodyRegion = maskedContent.slice(
       match.index + match[0].length,
-      starts[index + 1]?.index ?? content.length,
+      starts[index + 1]?.index ?? maskedContent.length,
     );
     const declarationIndent = match[1];
     const regionLines = bodyRegion.split(/\r?\n/);
@@ -651,14 +825,14 @@ const rubyTestCases = (content) => {
     );
     if (closingEnd < 0) return [];
 
-    const body = regionLines
-      .slice(0, closingEnd)
+    const physicalLines = regionLines.slice(0, closingEnd);
+    const body = physicalLines
       .filter((line) => {
         const indent = line.match(/^([ \t]*)\S/)?.[1];
         return indent?.startsWith(declarationIndent) && indent.length > declarationIndent.length;
       })
       .join('\n');
-    return [{ name: match[2] ?? match[3], body }];
+    return [{ name: match[2] ?? match[3], body, physicalLines }];
   });
 };
 const semanticFormIntegrationTest = (artifact, uncommentedRuby) => {
@@ -670,37 +844,1306 @@ const semanticFormIntegrationTest = (artifact, uncommentedRuby) => {
   }
 
   const cases = rubyTestCases(uncommentedRuby);
-  const failureCase = cases.find((testCase) =>
-    /\b(?:server-side\s+)?validation failure\b/i.test(testCase.name),
-  );
-  const successCase = cases.find((testCase) => /\bsuccessful submission\b/i.test(testCase.name));
-  if (!failureCase || !successCase || failureCase === successCase) return false;
+  const normalizedNameTokens = (name) =>
+    name
+      .toLowerCase()
+      .replace(/n['’]t\b/g, ' not')
+      .replace(/\bcannot\b/g, 'can not')
+      .match(/[a-z]+|[0-9]+/g) ?? [];
+  const negationTokens = new Set(['neither', 'never', 'no', 'nor', 'not', 'without']);
+  const clauseBoundaries = new Set(['and', 'but', 'yet']);
+  const conditionConnectors = new Set(['after', 'during', 'for', 'on', 'upon', 'when', 'while']);
+  const markerIsNegated = (tokens, index) => {
+    const clauseBoundary = tokens.slice(0, index).findLastIndex((token) => clauseBoundaries.has(token));
+    let connectorIndex = tokens
+      .slice(clauseBoundary + 1, index)
+      .findLastIndex((token) => conditionConnectors.has(token));
+    if (connectorIndex >= 0) {
+      connectorIndex += clauseBoundary + 1;
+      if (negationTokens.has(tokens[connectorIndex - 1])) return true;
+      return tokens.slice(connectorIndex + 1, index).some((token) => negationTokens.has(token));
+    }
+    return tokens.slice(clauseBoundary + 1, index).some((token) => negationTokens.has(token));
+  };
+  const outcomeIsNegated = (tokens, index) => {
+    const clauseBoundary = tokens.slice(0, index).findLastIndex((token) => clauseBoundaries.has(token));
+    let scopeStart = clauseBoundary + 1;
+    const connectorOffset = tokens
+      .slice(scopeStart, index)
+      .findLastIndex((token) => conditionConnectors.has(token));
+    if (connectorOffset >= 0) {
+      const connectorIndex = scopeStart + connectorOffset;
+      if (negationTokens.has(tokens[connectorIndex - 1])) return true;
+      scopeStart = connectorIndex + 1;
+    }
+    let failureIndex = -1;
+    if (/^(?:fail|fails|failed)$/.test(tokens[index - 2] ?? '') && tokens[index - 1] === 'to') {
+      failureIndex = index - 2;
+    } else if (/^(?:fail|fails|failed)$/.test(tokens[index - 3] ?? '') && tokens[index - 2] === 'to') {
+      failureIndex = index - 3;
+    }
+    if (failureIndex >= 0) {
+      const failureGovernors = tokens.slice(Math.max(scopeStart, failureIndex - 3), failureIndex);
+      return !failureGovernors.some((token) => negationTokens.has(token));
+    }
+    const governingTokens = tokens.slice(Math.max(scopeStart, index - 4), index);
+    return governingTokens.some((token) => negationTokens.has(token));
+  };
+  const positiveSubmissionMarkers = (tokens, markers) =>
+    tokens.flatMap((token, index) => {
+      if (!markers.includes(token) || tokens[index + 1] !== 'submission' || markerIsNegated(tokens, index)) {
+        return [];
+      }
+      return [{ index }];
+    });
+  const submissionMarkerIndexes = (tokens) =>
+    tokens.flatMap((token, index) =>
+      ['invalid', 'successful', 'valid'].includes(token) && tokens[index + 1] === 'submission' ? [index] : [],
+    );
+  const submissionMarkerRegion = (tokens, markerIndex) => {
+    const markers = submissionMarkerIndexes(tokens);
+    const markerPosition = markers.indexOf(markerIndex);
+    return {
+      start: markerPosition > 0 ? markers[markerPosition - 1] + 2 : 0,
+      end:
+        markerPosition >= 0 && markerPosition < markers.length - 1
+          ? markers[markerPosition + 1]
+          : tokens.length,
+    };
+  };
+  const validationErrorsAreAbsent = (tokens, validationIndex) => {
+    if (/^(?:0|zero)$/.test(tokens[validationIndex - 1] ?? '')) return true;
+    if (
+      /^(?:avoid|avoids|avoided|avoiding|bypass|bypasses|bypassed|bypassing)$/.test(
+        tokens[validationIndex - 1] ?? '',
+      )
+    ) {
+      return true;
+    }
+    const trailingClause = [];
+    for (const token of tokens.slice(validationIndex + 2, validationIndex + 8)) {
+      if (['and', 'but', 'yet', 'while'].includes(token)) break;
+      if (token === 'invalid' && trailingClause.length > 0) break;
+      trailingClause.push(token);
+    }
+    const phrase = trailingClause.join(' ');
+    return (
+      /^(?:(?:are|be|is|remain|remains|were) )?(?:absent|missing)\b/.test(phrase) ||
+      /^(?:(?:are|be|is|remain|remains|were) )?(?:not|never) (?:appear|display|displayed|present|render|rendered|show|shown|visible)\b/.test(
+        phrase,
+      ) ||
+      /^(?:do|does|did) not (?:appear|display|render|show)\b/.test(phrase) ||
+      /^never (?:appear|display|render|show)\b/.test(phrase) ||
+      /^(?:fail|fails|failed) to (?:appear|display|render|show)\b/.test(phrase)
+    );
+  };
+  const validationFailureIsAbsent = (tokens, validationIndex) => {
+    const trailingClause = [];
+    const trailingEnd = Math.min(tokens.length, validationIndex + 8);
+    for (let index = validationIndex + 2; index < trailingEnd; index += 1) {
+      const token = tokens[index];
+      if (['and', 'but', 'yet', 'while'].includes(token)) break;
+      if (
+        ['invalid', 'successful', 'valid'].includes(token) &&
+        tokens[index + 1] === 'submission' &&
+        trailingClause.length > 0
+      ) {
+        break;
+      }
+      trailingClause.push(token);
+    }
+    const phrase = trailingClause.join(' ');
+    return (
+      /^(?:(?:are|be|is|remain|remains|were) )?(?:absent|missing)\b/.test(phrase) ||
+      /^(?:(?:are|be|is|remain|remains|were) )?(?:not|never) (?:happen|happened|occur|occurred|present)\b/.test(
+        phrase,
+      ) ||
+      /^(?:do|does|did) not (?:happen|occur)\b/.test(phrase) ||
+      /^never (?:happen|occur)\b/.test(phrase) ||
+      /^(?:fail|fails|failed) to (?:happen|occur)\b/.test(phrase)
+    );
+  };
+  const positiveFailureOutcomeName = (name) => {
+    const tokens = normalizedNameTokens(name);
+    const validationFailure = tokens.some(
+      (token, index) =>
+        token === 'validation' &&
+        tokens[index + 1] === 'failure' &&
+        !outcomeIsNegated(tokens, index) &&
+        !validationFailureIsAbsent(tokens, index),
+    );
+    if (validationFailure) return true;
+    const invalidMarkers = positiveSubmissionMarkers(tokens, ['invalid']);
+    if (invalidMarkers.length === 0 || submissionMarkerIndexes(tokens).length !== 1) return false;
+    return invalidMarkers.some((marker) => {
+      const region = submissionMarkerRegion(tokens, marker.index);
+      return tokens.some((token, index) => {
+        if (index < region.start || index >= region.end || index === marker.index) return false;
+        if (token === 'validation' && /^errors?$/.test(tokens[index + 1] ?? '')) {
+          return !outcomeIsNegated(tokens, index) && !validationErrorsAreAbsent(tokens, index);
+        }
+        if (token === 'validation' && /^(?:fail|fails|failed)$/.test(tokens[index + 1] ?? '')) {
+          return !outcomeIsNegated(tokens, index + 1);
+        }
+        if (/^(?:fail|fails|failed)$/.test(token) && tokens[index + 1] === 'server') {
+          return (
+            tokens[index + 2] === 'side' &&
+            tokens[index + 3] === 'validation' &&
+            !outcomeIsNegated(tokens, index)
+          );
+        }
+        return (
+          /^(?:fail|fails|failed)$/.test(token) &&
+          tokens[index + 1] === 'validation' &&
+          !outcomeIsNegated(tokens, index)
+        );
+      });
+    });
+  };
+  const failureCandidates = cases.filter((testCase) => positiveFailureOutcomeName(testCase.name));
+  const positiveSubmissionOutcomeName = (name) => {
+    const tokens = normalizedNameTokens(name);
+    const submissionMarkers = positiveSubmissionMarkers(tokens, ['valid', 'successful']);
+    if (submissionMarkers.length === 0 || submissionMarkerIndexes(tokens).length !== 1) return false;
 
-  const hasPost = (body) => /^\s*post(?:\s+|\()/m.test(body);
+    const successOutcome =
+      /^(?:accept(?:s|ed|ing)?|creat(?:e|es|ed|ing)|succeed(?:s|ed|ing)?|sav(?:e|es|ed|ing)|persist(?:s|ed|ing)?|redirect(?:s|ed|ing)?)$/;
+    const outcomeHasNegativeObject = (index) => {
+      if (!/^(?:creat(?:e|es|ed|ing)|sav(?:e|es|ed|ing)|persist(?:s|ed|ing)?)$/.test(tokens[index])) {
+        return false;
+      }
+      const trailing = tokens.slice(index + 1, index + 7);
+      if (trailing[0] === 'nothing') return true;
+      if (!/^(?:no|without|zero)$/.test(trailing[0] ?? '')) return false;
+      let objectIndex = /^(?:a|an|any|the)$/.test(trailing[1] ?? '') ? 2 : 1;
+      if (/^(?:additional|new)$/.test(trailing[objectIndex] ?? '')) objectIndex += 1;
+      const object = trailing[objectIndex];
+      return /^(?:entries|entry|record|records|resource|resources|submission|submissions|subscriber|subscribers)$/.test(
+        object ?? '',
+      );
+    };
+    const hasNegativeResult = submissionMarkers.some((marker) => {
+      const region = submissionMarkerRegion(tokens, marker.index);
+      return tokens.some((token, index) => {
+        if (index < region.start || index >= region.end) return false;
+        if (
+          index !== marker.index &&
+          /^success(?:ful|fully)?$/.test(token) &&
+          outcomeIsNegated(tokens, index)
+        ) {
+          return true;
+        }
+        if (outcomeIsNegated(tokens, index)) return false;
+        if (outcomeHasNegativeObject(index)) return true;
+        if (
+          /^creat(?:e|es|ed|ing)$/.test(token) &&
+          tokens.slice(index + 1, index + 4).some((candidate) => /^(?:duplicate|duplicates)$/.test(candidate))
+        ) {
+          return true;
+        }
+        if (/^(?:fail|fails|failed)$/.test(token) && tokens[index + 1] !== 'to') return true;
+        if (/^(?:ignore|ignored|ignores|ignoring)$/.test(token)) return true;
+        if (/^(?:unsuccessful|unsuccessfully)$/.test(token)) return true;
+        if (
+          token === 'failure' &&
+          /^(?:a|the)$/.test(tokens[index - 1] ?? '') &&
+          /^(?:be|become|becomes|became|get|gets|got|is|remain|remains|was|were)$/.test(
+            tokens[index - 2] ?? '',
+          )
+        ) {
+          return true;
+        }
+        if (
+          /^(?:blocked|denied|invalid|refused|rejected)$/.test(token) &&
+          /^(?:be|become|becomes|became|get|gets|got|is|remain|remains|was|were)$/.test(
+            tokens[index - 1] ?? '',
+          )
+        ) {
+          return true;
+        }
+        if (
+          /^(?:produce|produced|produces|raise|raised|raises|render|rendered|renders|result|resulted|results|return|returned|returns|show|showed|shows)$/.test(
+            token,
+          )
+        ) {
+          const resultTokens = tokens.slice(index + 1, index + 4);
+          return resultTokens.some((result, offset) => {
+            const resultIndex = index + offset + 1;
+            const errorFree = /^(?:error|errors)$/.test(result) && tokens[resultIndex + 1] === 'free';
+            return (
+              /^(?:error|errors|failure|rejection)$/.test(result) &&
+              !errorFree &&
+              !outcomeIsNegated(tokens, resultIndex)
+            );
+          });
+        }
+        if (/^redirect(?:s|ed|ing)?$/.test(token) && /^(?:to|with)$/.test(tokens[index + 1] ?? '')) {
+          return tokens
+            .slice(index + 2, index + 6)
+            .some((result) => /^(?:error|errors|failure|invalid|rejection)$/.test(result));
+        }
+        const errorFree = /^(?:error|errors)$/.test(token) && tokens[index + 1] === 'free';
+        return /^(?:error|errors|failure|rejection)$/.test(token) && !errorFree;
+      });
+    });
+    if (hasNegativeResult) return false;
+    const outcomeIndexes = tokens.flatMap((token, index) => {
+      if (!successOutcome.test(token)) return [];
+      const duplicateCreation =
+        /^creat(?:e|es|ed|ing)$/.test(token) &&
+        tokens.slice(index + 1, index + 4).some((candidate) => /^(?:duplicate|duplicates)$/.test(candidate));
+      return duplicateCreation && outcomeIsNegated(tokens, index) ? [] : [index];
+    });
+    if (outcomeIndexes.length > 0) return outcomeIndexes.every((index) => !outcomeIsNegated(tokens, index));
+    return true;
+  };
+  const successCandidates = cases.filter((testCase) => positiveSubmissionOutcomeName(testCase.name));
+  const positiveInteger = /^[1-9][0-9]{0,4}$/;
+  const rubyPercentRegexParts = (literal) => {
+    if (!literal.startsWith('%r')) return undefined;
+    const descriptor = rubyPercentLiteralDescriptor(literal, 0);
+    if (descriptor?.type !== 'r') return null;
+    const scan = scanRubyPercentLiteral(literal, 0);
+    if (scan?.end === null || scan?.end === undefined) return null;
+    const flags = literal.slice(scan.end + 1);
+    if (!/^[imx]*$/.test(flags)) return null;
+    return { body: literal.slice(descriptor.bodyStart, scan.end), flags };
+  };
+  const literalKind = (rawLiteral) => {
+    const literal = rawLiteral.trim();
+    const hasControlCharacter = [...literal].some((character) => {
+      const codePoint = character.codePointAt(0);
+      return codePoint <= 0x1f || codePoint === 0x7f;
+    });
+    if (literal.length < 2 || hasControlCharacter || /#(?:\{|@|\$)/.test(literal)) return null;
+    const percentRegex = rubyPercentRegexParts(literal);
+    if (percentRegex !== undefined)
+      return percentRegex !== null && /\S/.test(percentRegex.body) ? 'regex' : null;
+    const opening = literal[0];
+    if (opening === '"' || opening === "'") {
+      let escaped = false;
+      let meaningful = false;
+      for (let index = 1; index < literal.length; index += 1) {
+        const character = literal[index];
+        if (escaped) {
+          escaped = false;
+          meaningful ||= !/\s/.test(character);
+        } else if (character === '\\') {
+          escaped = true;
+        } else if (character === opening) {
+          return index === literal.length - 1 && meaningful ? 'quoted' : null;
+        } else {
+          meaningful ||= !/\s/.test(character);
+        }
+      }
+      return null;
+    }
+    if (opening !== '/') return null;
+    let escaped = false;
+    let meaningful = false;
+    for (let index = 1; index < literal.length; index += 1) {
+      const character = literal[index];
+      if (escaped) {
+        escaped = false;
+        meaningful ||= !/\s/.test(character);
+      } else if (character === '\\') {
+        escaped = true;
+      } else if (character === '/') {
+        return meaningful && /^[imx]*$/.test(literal.slice(index + 1)) ? 'regex' : null;
+      } else {
+        meaningful ||= !/\s/.test(character);
+      }
+    }
+    return null;
+  };
+  const simpleRegexBodyIsSafe = (body) => {
+    if (body.length > 256) return false;
+    let escaped = false;
+    let characterClass = false;
+    for (const character of body) {
+      if (escaped) {
+        if (!characterClass && /[1-9]/.test(character)) return false;
+        escaped = false;
+      } else if (character === '\\') {
+        escaped = true;
+      } else if (character === '[') {
+        if (characterClass) return false;
+        characterClass = true;
+      } else if (character === ']') {
+        if (!characterClass) return false;
+        characterClass = false;
+      } else if (!characterClass && /[*+?{]/.test(character)) {
+        return false;
+      }
+    }
+    return !escaped && !characterClass;
+  };
+  const javascriptRegexForLiteral = (rawLiteral) => {
+    if (literalKind(rawLiteral) !== 'regex') return null;
+    const literal = rawLiteral.trim();
+    const percentRegex = rubyPercentRegexParts(literal);
+    const body = percentRegex?.body ?? literal.slice(1, literal.lastIndexOf('/'));
+    if (/\\[GK]/.test(body) || !simpleRegexBodyIsSafe(body)) return null;
+    let escaped = false;
+    let hasLiteralContent = false;
+    for (const character of body) {
+      if (escaped) {
+        escaped = false;
+      } else if (character === '\\') {
+        escaped = true;
+      } else if (/[A-Za-z0-9]/.test(character)) {
+        hasLiteralContent = true;
+      }
+    }
+    if (!hasLiteralContent || body.includes('(?')) return null;
+    const flags = percentRegex?.flags ?? literal.slice(literal.lastIndexOf('/') + 1);
+    if (flags.includes('x')) return null;
+    const javascriptBody = body.replaceAll('\\A', '^').replace(/\\[zZ]/g, '$');
+    try {
+      return new RegExp(javascriptBody, flags);
+    } catch {
+      return null;
+    }
+  };
+  const positiveMatchLiteral = (rawLiteral) => {
+    const kind = literalKind(rawLiteral);
+    if (kind === 'quoted') return true;
+    const regex = javascriptRegexForLiteral(rawLiteral);
+    return regex !== null && !regex.test('');
+  };
+  function splitTopLevelCommas(value) {
+    const parts = [];
+    let cursor = 0;
+    let quote = null;
+    let regex = false;
+    let escaped = false;
+    let braces = 0;
+    let brackets = 0;
+    for (let index = 0; index < value.length; index += 1) {
+      const character = value[index];
+      if (escaped) {
+        escaped = false;
+      } else if (character === '\\' && (quote !== null || regex)) {
+        escaped = true;
+      } else if (quote !== null) {
+        if (character === quote) quote = null;
+      } else if (regex) {
+        if (character === '/') regex = false;
+      } else if (character === '"' || character === "'") {
+        quote = character;
+      } else if (character === '/') {
+        regex = true;
+      } else if (character === '{') {
+        braces += 1;
+      } else if (character === '}') {
+        braces -= 1;
+        if (braces < 0) return null;
+      } else if (character === '[') {
+        brackets += 1;
+      } else if (character === ']') {
+        brackets -= 1;
+        if (brackets < 0) return null;
+      } else if (character === ',' && braces === 0 && brackets === 0) {
+        parts.push(value.slice(cursor, index).trim());
+        cursor = index + 1;
+      }
+    }
+    if (quote !== null || regex || escaped || braces !== 0 || brackets !== 0) return null;
+    parts.push(value.slice(cursor).trim());
+    return parts.some((part) => part === '') ? null : parts;
+  }
+  function positiveAssertMatch(assertion) {
+    const match = assertion.match(/^assert_match(?:[ \t]+(.+)|\([ \t]*(.+)\))$/);
+    if (!match) return null;
+    const argumentsList = splitTopLevelCommas(match[1] ?? match[2]);
+    if (
+      argumentsList === null ||
+      (argumentsList.length !== 2 &&
+        !(argumentsList.length === 3 && literalKind(argumentsList[2]) === 'quoted')) ||
+      !positiveMatchLiteral(argumentsList[0])
+    ) {
+      return null;
+    }
+    return { pattern: argumentsList[0], subject: argumentsList[1] };
+  }
+  function positiveAssertIncludes(assertion) {
+    const match = assertion.match(/^assert_includes(?:[ \t]+(.+)|\([ \t]*(.+)\))$/);
+    if (!match) return null;
+    const argumentsList = splitTopLevelCommas(match[1] ?? match[2]);
+    if (
+      argumentsList === null ||
+      (argumentsList.length !== 2 &&
+        !(argumentsList.length === 3 && literalKind(argumentsList[2]) === 'quoted')) ||
+      literalKind(argumentsList[1]) !== 'quoted'
+    ) {
+      return null;
+    }
+    return { member: argumentsList[1], subject: argumentsList[0] };
+  }
+  function validationErrorLiteralIsNegative(literal) {
+    const normalizedLiteral = literal.replace(/\\s(?:[*+?]|\{[0-9]+(?:,[0-9]*)?\})?/g, ' ');
+    const regex = javascriptRegexForLiteral(literal);
+    if (
+      regex !== null &&
+      [
+        'validation errors: 0',
+        '0 validation errors',
+        'validation errors are zero',
+        'no validation errors',
+      ].some((candidate) => regex.test(candidate))
+    ) {
+      return true;
+    }
+    return (
+      /\b(?:0|empty|no|without|zero)[ \t_-]+(?:validation[ \t_-]+)?errors?\b/i.test(normalizedLiteral) ||
+      /\b(?:validation[ \t_-]+)?errors?(?:[ \t_-]+are|[ \t]*[:=])?[ \t_-]*(?:0|empty|false|no|none|off|zero)\b/i.test(
+        normalizedLiteral,
+      ) ||
+      /\b(?:validation[ \t_-]+)?errors?[ \t_-]+(?:(?:are|is|was|were)[ \t_-]+)?(?:absent|empty|missing|not[ \t_-]+(?:displayed|present|rendered|shown|visible))\b/i.test(
+        normalizedLiteral,
+      ) ||
+      /\b(?:validation[ \t_-]+)?errors?[ \t_-]+(?:(?:do|does|did)[ \t_-]+not|never|fail(?:s|ed)?[ \t_-]+to)[ \t_-]+(?:appear|display|render|show)\b/i.test(
+        normalizedLiteral,
+      )
+    );
+  }
+  function noticeLiteralIsNegative(literal) {
+    const normalizedLiteral = literal.replace(/\\s(?:[*+?]|\{[0-9]+(?:,[0-9]*)?\})?/g, ' ');
+    return (
+      /\b(?:no|without|zero)[ \t_-]+(?:flash[ \t_-]+)?notices?\b/i.test(normalizedLiteral) ||
+      /\bnotices?[ \t_-]+(?:are[ \t_-]+)?(?:absent|empty|false|missing|no|none|off|zero)\b/i.test(
+        normalizedLiteral,
+      )
+    );
+  }
+  function positiveAssertEqualLiteralArray(assertion, negativeLiteralPredicate) {
+    const match = assertion.match(/^assert_equal(?:[ \t]+(.+)|\([ \t]*(.+)\))$/);
+    if (!match) return null;
+    const argumentsList = splitTopLevelCommas(match[1] ?? match[2]);
+    if (
+      argumentsList === null ||
+      (argumentsList.length !== 2 &&
+        !(argumentsList.length === 3 && literalKind(argumentsList[2]) === 'quoted'))
+    ) {
+      return null;
+    }
+    const expected = argumentsList[0].trim();
+    if (!expected.startsWith('[') || !expected.endsWith(']')) return null;
+    const members = splitTopLevelCommas(expected.slice(1, -1));
+    if (
+      members === null ||
+      members.length === 0 ||
+      members.length > 16 ||
+      members.some(
+        (member) =>
+          literalKind(member) !== 'quoted' ||
+          (negativeLiteralPredicate !== null && negativeLiteralPredicate(member)),
+      )
+    ) {
+      return null;
+    }
+    return { subject: argumentsList[1] };
+  }
+  const positiveSelectorComparator = (method, rawComparator) => {
+    let comparator = rawComparator.trim();
+    let parts = splitTopLevelCommas(comparator);
+    if (!parts) return false;
+    let hasMessage = false;
+    if (method === 'select' && parts.length > 1 && literalKind(parts.at(-1)) === 'quoted') {
+      hasMessage = true;
+      parts.pop();
+      comparator = parts.join(', ');
+    }
+    const braced = comparator.startsWith('{');
+    if (braced) {
+      if (!comparator.startsWith('{') || !comparator.endsWith('}')) return false;
+      comparator = comparator.slice(1, -1).trim();
+      if (comparator.endsWith(',')) comparator = comparator.slice(0, -1).trim();
+      parts = splitTopLevelCommas(comparator);
+      if (!parts) return false;
+    } else {
+      parts = splitTopLevelCommas(comparator);
+      if (
+        !parts ||
+        (hasMessage && parts.some((part) => /^(?:count|html|maximum|minimum|text)\s*:/.test(part)))
+      ) {
+        return false;
+      }
+    }
+    if (method === 'select' && (comparator === 'true' || positiveInteger.test(comparator))) return true;
+    if (method === 'select' && literalKind(comparator)) return true;
+    const rangeMatch =
+      method === 'select' && comparator.match(/^([1-9][0-9]{0,4})[ \t]*\.\.\.?[ \t]*(0|[1-9][0-9]{0,4})$/);
+    if (rangeMatch) return Number(rangeMatch[1]) <= Number(rangeMatch[2]);
+    if (parts.length > 3) return false;
+    let contentFilter = null;
+    let count = null;
+    let minimum = null;
+    let maximum = null;
+    for (const part of parts) {
+      const contentMatch = part.match(/^(text|html):\s*(.+)$/);
+      const cardinalityMatch = part.match(/^(count|minimum|maximum):\s*([0-9]{1,5})$/);
+      if (
+        contentMatch &&
+        contentFilter === null &&
+        (contentMatch[1] === 'text' || method === 'select') &&
+        literalKind(contentMatch[2])
+      ) {
+        [, contentFilter] = contentMatch;
+      } else if (cardinalityMatch) {
+        const [, key, value] = cardinalityMatch;
+        if (key === 'count' && count === null) count = Number(value);
+        else if (key === 'minimum' && minimum === null) minimum = Number(value);
+        else if (key === 'maximum' && maximum === null) maximum = Number(value);
+        else return false;
+      } else {
+        return false;
+      }
+    }
+    if (count !== null) {
+      return minimum === null && maximum === null && count >= 1;
+    }
+    if (method === 'selector' && maximum !== null && minimum === null) return false;
+    const effectiveMinimum = minimum ?? 1;
+    if (effectiveMinimum < 1 || (maximum !== null && maximum < effectiveMinimum)) return false;
+    return contentFilter !== null || minimum !== null || maximum !== null;
+  };
+  const validationErrorComparatorLiterals = (method, rawComparator) => {
+    let comparator = rawComparator.trim();
+    let parts = splitTopLevelCommas(comparator);
+    if (!parts) return [];
+    if (method === 'select' && parts.length > 1 && literalKind(parts.at(-1)) === 'quoted') {
+      parts.pop();
+      comparator = parts.join(', ').trim();
+    }
+    if (comparator.startsWith('{') && comparator.endsWith('}')) {
+      comparator = comparator.slice(1, -1).trim();
+      if (comparator.endsWith(',')) comparator = comparator.slice(0, -1).trim();
+      parts = splitTopLevelCommas(comparator);
+      if (!parts) return [];
+    } else {
+      parts = splitTopLevelCommas(comparator);
+      if (!parts) return [];
+    }
+    const literals = [];
+    if (method === 'select' && parts.length === 1 && literalKind(parts[0]) !== null) {
+      literals.push(parts[0]);
+    }
+    for (const part of parts) {
+      const content = part.match(/^(text|html):\s*(.+)$/);
+      if (
+        content !== null &&
+        (content[1] === 'text' || method === 'select') &&
+        literalKind(content[2]) !== null
+      ) {
+        literals.push(content[2]);
+      }
+    }
+    return literals;
+  };
+  const stripRubyTrailingComment = (line) => {
+    let quote = null;
+    let regex = false;
+    let escaped = false;
+    for (let index = 0; index < line.length; index += 1) {
+      const character = line[index];
+      if (escaped) {
+        escaped = false;
+      } else if (character === '\\' && (quote !== null || regex)) {
+        escaped = true;
+      } else if (quote !== null) {
+        if (character === quote) quote = null;
+      } else if (regex) {
+        if (character === '/') regex = false;
+      } else if (character === '"' || character === "'") {
+        quote = character;
+      } else if (character === '/') {
+        regex = true;
+      } else if (character === '#') {
+        return line.slice(0, index);
+      }
+    }
+    return quote === null && !regex && !escaped ? line : null;
+  };
+  const maskRubyStringAndCommentContent = (line) => {
+    const masked = [];
+    let quote = null;
+    let regex = false;
+    let escaped = false;
+    for (let index = 0; index < line.length; index += 1) {
+      const character = line[index];
+      if (escaped) {
+        masked.push(' ');
+        escaped = false;
+      } else if (character === '\\' && (quote !== null || regex)) {
+        masked.push(' ');
+        escaped = true;
+      } else if (quote !== null) {
+        masked.push(' ');
+        if (character === quote) quote = null;
+      } else if (regex) {
+        masked.push(' ');
+        if (character === '/') regex = false;
+      } else if (character === '"' || character === "'") {
+        masked.push(' ');
+        quote = character;
+      } else if (character === '/') {
+        masked.push(' ');
+        regex = true;
+      } else if (character === '#') {
+        masked.push(line.slice(index).replace(/./g, ' '));
+        break;
+      } else {
+        masked.push(character);
+      }
+    }
+    return quote === null && !regex && !escaped ? masked.join('') : null;
+  };
+  const hasPositiveValueAssertion = (
+    body,
+    subjectPattern,
+    allowSubjectFirstEquality = false,
+    negativeLiteralPredicate = null,
+  ) =>
+    body.split(/\r?\n/).some((line) => {
+      const uncommentedLine = stripRubyTrailingComment(line);
+      if (uncommentedLine === null) return false;
+      const assertion = uncommentedLine.trim();
+      const matchesSubject = (value) => {
+        const maskedValue = maskRubyStringAndCommentContent(value);
+        if (maskedValue === null) return false;
+        if (subjectPattern.test(maskedValue)) return true;
+        return (
+          subjectPattern.test(value) &&
+          /\bresponse\.parsed_body\b/.test(maskedValue) &&
+          /(?:\.fetch\(\s*["']errors?["']\s*\)|\[\s*["']errors?["']\s*\])/i.test(value)
+        );
+      };
+      let match = assertion.match(/^assert(?:\s+|\(\s*)([^,\r\n]+?\.(?:any|present)\?)(?=\s*(?:,|\)|$))/);
+      if (match && matchesSubject(match[1])) return true;
+      match = assertion.match(
+        /^assert(?:\s+|\(\s*)([^,\r\n]+?\.errors?\.added\?\(\s*(?::[a-z_][a-z0-9_]*|"[^"\r\n]+"|'[^'\r\n]+')\s*,\s*(?::[a-z_][a-z0-9_]*|"[^"\r\n]+"|'[^'\r\n]+')\s*\))(?=\s*(?:,|\)|$))/i,
+      );
+      if (match && matchesSubject(match[1])) return true;
+      match = assertion.match(
+        /^(?:assert_not|refute)(?:\s+|\(\s*)([^,\r\n]+?\.(?:blank|empty)\?)(?=\s*(?:,|\)|$))/,
+      );
+      if (match && matchesSubject(match[1])) return true;
+      match = assertion.match(/^(?:assert_not_empty|refute_empty)(?:\s+|\(\s*)([^,\r\n)]+)/);
+      if (match && matchesSubject(match[1])) return true;
+      const includesAssertion = positiveAssertIncludes(assertion);
+      if (
+        includesAssertion !== null &&
+        matchesSubject(includesAssertion.subject) &&
+        (negativeLiteralPredicate === null || !negativeLiteralPredicate(includesAssertion.member))
+      ) {
+        return true;
+      }
+      const matchAssertion = positiveAssertMatch(assertion);
+      if (
+        matchAssertion !== null &&
+        matchesSubject(matchAssertion.subject) &&
+        (negativeLiteralPredicate === null || !negativeLiteralPredicate(matchAssertion.pattern))
+      ) {
+        return true;
+      }
+      match = assertion.match(/^assert_present(?:\s+|\(\s*)([^,\r\n)]+)/);
+      if (match && matchesSubject(match[1])) return true;
+      match = assertion.match(/^assert_equal(?:\s+|\(\s*)[1-9][0-9]{0,4}\s*,\s*([^,\r\n)]+)/);
+      if (match && matchesSubject(match[1]) && /\berrors?\.(?:count|length|size)\b/i.test(match[1])) {
+        return true;
+      }
+      match = assertion.match(
+        /^assert_operator(?:\s+|\(\s*)([^,\r\n]+)\s*,\s*:(>|>=)\s*,\s*(0|[1-9][0-9]{0,4})(?=\s*(?:,|\)|$))/,
+      );
+      if (
+        match &&
+        matchesSubject(match[1]) &&
+        /\berrors?\.(?:count|length|size)\b/i.test(match[1]) &&
+        (match[2] === '>' || Number(match[3]) >= 1)
+      ) {
+        return true;
+      }
+      match = assertion.match(
+        /^assert_equal(?:\s+|\(\s*)((?:"[^"\r\n]*[^\s"\r\n][^"\r\n]*"|'[^'\r\n]*[^\s'\r\n][^'\r\n]*'))\s*,\s*([^,\r\n)]+)/,
+      );
+      if (
+        match &&
+        matchesSubject(match[2]) &&
+        (negativeLiteralPredicate === null || !negativeLiteralPredicate(match[1]))
+      ) {
+        return true;
+      }
+      if (allowSubjectFirstEquality) {
+        match = assertion.match(
+          /^assert_equal(?:\s+|\(\s*)([^,\r\n]+)\s*,\s*((?:"[^"\r\n]*[^\s"\r\n][^"\r\n]*"|'[^'\r\n]*[^\s'\r\n][^'\r\n]*'))(?=\s*(?:,|\)|$))/,
+        );
+        if (
+          match &&
+          matchesSubject(match[1]) &&
+          (negativeLiteralPredicate === null || !negativeLiteralPredicate(match[2]))
+        ) {
+          return true;
+        }
+      }
+      const arrayAssertion = positiveAssertEqualLiteralArray(assertion, negativeLiteralPredicate);
+      if (arrayAssertion !== null && matchesSubject(arrayAssertion.subject)) return true;
+      match = assertion.match(
+        /^assert_predicate(?:\s+|\(\s*)([^,\r\n]+)\s*,\s*:(?:any|present)\?(?=[\s,)]|$)/,
+      );
+      if (match && matchesSubject(match[1])) return true;
+      match = assertion.match(
+        /^refute_predicate(?:\s+|\(\s*)([^,\r\n]+)\s*,\s*:(?:blank|empty)\?(?=[\s,)]|$)/,
+      );
+      return match !== null && matchesSubject(match[1]);
+    });
   const hasRenderedBodyAssertion = (body) =>
-    /^\s*(?:assert_includes|refute_includes)(?:\s+|\()\s*(?:@response|response)\.body\s*,/m.test(body) ||
-    /^\s*assert_match(?:\s+|\()\s*(?:"[^"\r\n]*[^\s"\r\n][^"\r\n]*"|'[^'\r\n]*[^\s'\r\n][^'\r\n]*')\s*,\s*(?:@response|response)\.body\s*\)?\s*$/m.test(
-      body,
+    body.split(/\r?\n/).some((line) => {
+      const uncommentedLine = stripRubyTrailingComment(line);
+      if (uncommentedLine === null) return false;
+      const assertion = uncommentedLine.trim();
+      const includesAssertion = positiveAssertIncludes(assertion);
+      if (
+        includesAssertion !== null &&
+        /^(?:@response|response)\.body$/.test(includesAssertion.subject) &&
+        !validationErrorLiteralIsNegative(includesAssertion.member)
+      ) {
+        return true;
+      }
+      const matchAssertion = positiveAssertMatch(assertion);
+      return (
+        matchAssertion !== null &&
+        /^(?:@response|response)\.body$/.test(matchAssertion.subject) &&
+        !validationErrorLiteralIsNegative(matchAssertion.pattern)
+      );
+    });
+  const positiveValidationErrorComparator = (method, rawComparator) => {
+    if (!positiveSelectorComparator(method, rawComparator)) return false;
+    return validationErrorComparatorLiterals(method, rawComparator).some(
+      (literal) =>
+        /\bvalidation[ \t_-]+errors?\b/i.test(literal) &&
+        (literalKind(literal) !== 'regex' || positiveMatchLiteral(literal)) &&
+        !validationErrorLiteralIsNegative(literal),
     );
-  const failureResponse =
-    /^\s*assert_response(?:\s+|\()\s*(?::(?:unprocessable_entity|unprocessable_content)\b|422\b)/m.test(
-      failureCase.body,
+  };
+  const negativeValidationErrorComparator = (method, rawComparator) =>
+    validationErrorComparatorLiterals(method, rawComparator).some(validationErrorLiteralIsNegative);
+  const negativeErrorStates = new Set([
+    '0',
+    'no',
+    'none',
+    'not',
+    'false',
+    'off',
+    'absent',
+    'absence',
+    'empty',
+    'free',
+    'missing',
+    'without',
+    'zero',
+  ]);
+  const positiveErrorIdentifier = (identifier) => {
+    const segments = identifier.toLowerCase().split(/[-_]+/).filter(Boolean);
+    return (
+      segments.some((segment) => segment === 'error' || segment === 'errors') &&
+      !segments.some((segment) => negativeErrorStates.has(segment))
     );
-  const failureErrors =
-    /^\s*(?:assert\w*|refute\w*)\b[^\r\n]*\berrors?\b/im.test(failureCase.body) ||
-    hasRenderedBodyAssertion(failureCase.body);
-  const successRedirect = /^\s*assert_redirected_to(?:\s+|\()/m.test(successCase.body);
-  const successMessage =
-    /^\s*(?:assert\w*|refute\w*)\b[^\r\n]*(?:\bflash\b|\bnotice\b)/im.test(successCase.body) ||
-    (/^\s*follow_redirect!(?:\s*|\(\s*\))$/m.test(successCase.body) &&
-      hasRenderedBodyAssertion(successCase.body));
-  return (
-    hasPost(failureCase.body) &&
-    hasPost(successCase.body) &&
-    failureResponse &&
-    failureErrors &&
-    successRedirect &&
-    successMessage
+  };
+  const negativeErrorIdentifier = (identifier) => {
+    const segments = identifier.toLowerCase().split(/[-_]+/).filter(Boolean);
+    return (
+      segments.some((segment) => segment === 'error' || segment === 'errors') &&
+      segments.some((segment) => negativeErrorStates.has(segment))
+    );
+  };
+  const selectorErrorSemantics = (selector) => {
+    let attribute = null;
+    const functionFrames = [];
+    let negationDepth = 0;
+    let positiveOutsideNegation = false;
+    let negativeStateOutsideNegation = false;
+    const isPositiveContext = () => negationDepth === 0 && functionFrames.every((frame) => frame === 'has');
+    for (let index = 0; index < selector.length; index += 1) {
+      const character = selector[index];
+      if (attribute?.quote !== null && attribute?.quote !== undefined) {
+        if (character === '\\') return null;
+        if (character === attribute.quote) attribute.quote = null;
+      } else if (character === '\\') {
+        return null;
+      } else if (attribute && (character === '"' || character === "'")) {
+        attribute.quote = character;
+      } else if (character === '[') {
+        if (attribute) return null;
+        attribute = { start: index + 1, quote: null, positiveContext: isPositiveContext() };
+      } else if (character === ']') {
+        if (!attribute) return null;
+        const parsed = selector
+          .slice(attribute.start, index)
+          .trim()
+          .match(/^([A-Za-z_][A-Za-z0-9_-]*)(?:\s*=\s*(?:"([^"\r\n]*)"|'([^'\r\n]*)'|([A-Za-z0-9_-]+)))?$/);
+        if (!parsed) return null;
+        if (attribute.positiveContext) {
+          const name = parsed[1].toLowerCase();
+          const value = parsed[2] ?? parsed[3] ?? parsed[4];
+          if (positiveErrorIdentifier(name)) positiveOutsideNegation = true;
+          if (negativeErrorIdentifier(name)) negativeStateOutsideNegation = true;
+          if (value !== undefined) {
+            const normalizedValue = value.toLowerCase();
+            if (name === 'class') {
+              if (normalizedValue.length > 256) return null;
+              const classTokens = normalizedValue.split(/[ \t]+/).filter(Boolean);
+              if (
+                classTokens.length === 0 ||
+                classTokens.length > 16 ||
+                classTokens.some((token) => !/^[a-z_][a-z0-9_-]{0,63}$/.test(token))
+              ) {
+                return null;
+              }
+              if (classTokens.some((token) => positiveErrorIdentifier(token))) positiveOutsideNegation = true;
+              if (classTokens.some((token) => negativeErrorIdentifier(token))) {
+                negativeStateOutsideNegation = true;
+              }
+            }
+            if (name === 'data-testid') {
+              if (positiveErrorIdentifier(normalizedValue)) positiveOutsideNegation = true;
+              if (negativeErrorIdentifier(normalizedValue)) negativeStateOutsideNegation = true;
+            }
+            if (
+              (positiveErrorIdentifier(name) && negativeErrorStates.has(normalizedValue)) ||
+              (name === 'aria-invalid' && normalizedValue === 'false')
+            ) {
+              negativeStateOutsideNegation = true;
+            }
+          }
+        }
+        attribute = null;
+      } else if (!attribute && character === ':') {
+        const pseudoMatch = selector.slice(index + 1).match(/^([A-Za-z_-][A-Za-z0-9_-]*)/);
+        if (!pseudoMatch) return null;
+        const name = pseudoMatch[1].toLowerCase();
+        let cursor = index + pseudoMatch[0].length + 1;
+        while (selector[cursor] === ' ' || selector[cursor] === '\t') cursor += 1;
+        if (selector[cursor] === '(') {
+          const negated = name === 'not';
+          if (negated && negationDepth > 0) return null;
+          let frame = 'opaque';
+          if (negated) frame = 'not';
+          else if (name === 'has') frame = 'has';
+          if (frame === 'has' && functionFrames.includes('has')) return null;
+          functionFrames.push(frame);
+          if (negated) negationDepth += 1;
+          index = cursor;
+        } else {
+          if (name === 'not') return null;
+          if (name === 'empty' && isPositiveContext()) {
+            negativeStateOutsideNegation = true;
+          }
+          index += pseudoMatch[0].length;
+        }
+      } else if (!attribute && character === '(') {
+        return null;
+      } else if (!attribute && character === ')') {
+        const frame = functionFrames.pop();
+        if (frame === undefined) return null;
+        if (frame === 'not') negationDepth -= 1;
+      } else if (!attribute && character === ',' && functionFrames.includes('has')) {
+        return null;
+      } else if (!attribute && (character === '{' || character === '}')) {
+        return null;
+      } else if (/[A-Za-z_]/.test(character)) {
+        const identifier = selector.slice(index).match(/^[A-Za-z_][A-Za-z0-9_-]*/)?.[0];
+        if (!identifier) return null;
+        if (!attribute && isPositiveContext() && positiveErrorIdentifier(identifier)) {
+          positiveOutsideNegation = true;
+        }
+        if (!attribute && isPositiveContext() && negativeErrorIdentifier(identifier)) {
+          negativeStateOutsideNegation = true;
+        }
+        index += identifier.length - 1;
+      }
+    }
+    return !attribute && functionFrames.length === 0
+      ? { positiveOutsideNegation, negativeStateOutsideNegation }
+      : null;
+  };
+  const splitSelectorBranches = (selector) => {
+    const branches = [];
+    let cursor = 0;
+    let attribute = false;
+    let quote = null;
+    let parentheses = 0;
+    for (let index = 0; index < selector.length; index += 1) {
+      const character = selector[index];
+      if (quote !== null) {
+        if (character === '\\') return null;
+        if (character === quote) quote = null;
+      } else if (attribute && (character === '"' || character === "'")) {
+        quote = character;
+      } else if (character === '\\' || character === '{' || character === '}') {
+        return null;
+      } else if (character === '[') {
+        if (attribute) return null;
+        attribute = true;
+      } else if (character === ']') {
+        if (!attribute) return null;
+        attribute = false;
+      } else if (!attribute && character === '(') {
+        parentheses += 1;
+      } else if (!attribute && character === ')') {
+        parentheses -= 1;
+        if (parentheses < 0) return null;
+      } else if (!attribute && parentheses === 0 && character === ',') {
+        branches.push(selector.slice(cursor, index).trim());
+        cursor = index + 1;
+      }
+    }
+    if (attribute || quote !== null || parentheses !== 0) return null;
+    branches.push(selector.slice(cursor).trim());
+    return branches.some((branch) => branch === '') ? null : branches;
+  };
+  const containsRubyCodeClosingParenthesis = (value) => {
+    let quote = null;
+    let regex = false;
+    let escaped = false;
+    for (const character of value) {
+      if (escaped) {
+        escaped = false;
+      } else if (character === '\\' && (quote !== null || regex)) {
+        escaped = true;
+      } else if (quote !== null) {
+        if (character === quote) quote = null;
+      } else if (regex) {
+        if (character === '/') regex = false;
+      } else if (character === '"' || character === "'") {
+        quote = character;
+      } else if (character === '/') {
+        regex = true;
+      } else if (character === ')') {
+        return true;
+      }
+    }
+    return quote !== null || regex || escaped;
+  };
+  const selectorStatementPositive = (statement) => {
+    const callMatch = statement.match(/^[ \t]*assert_(select|selector|dom)([ \t]+|\([ \t]*)/i);
+    if (!callMatch) return false;
+    const method = callMatch[1].toLowerCase() === 'dom' ? 'select' : callMatch[1].toLowerCase();
+    const openingQuote = statement[callMatch[0].length];
+    if (openingQuote !== '"' && openingQuote !== "'") return false;
+    let selector = '';
+    let selectorEnd = -1;
+    for (let index = callMatch[0].length + 1; index < statement.length; index += 1) {
+      const character = statement[index];
+      const codePoint = character.codePointAt(0);
+      if (codePoint <= 0x1f || codePoint === 0x7f) return false;
+      if (character === '\\') {
+        const escapedCharacter = statement[index + 1];
+        if (escapedCharacter !== openingQuote && escapedCharacter !== '\\') return false;
+        selector += escapedCharacter;
+        index += 1;
+      } else if (character === openingQuote) {
+        selectorEnd = index;
+        break;
+      } else {
+        if (character === '#' && /[{@$]/.test(statement[index + 1] ?? '')) return false;
+        selector += character;
+      }
+    }
+    if (selectorEnd < 0 || selector === '') return false;
+
+    const selectorBranches = splitSelectorBranches(selector);
+    const selectorSemantics = selectorBranches?.map(selectorErrorSemantics);
+    if (!selectorSemantics || selectorSemantics.some((semantics) => !semantics)) return false;
+    if (selectorSemantics.some((semantics) => semantics.negativeStateOutsideNegation)) return false;
+    const selectorIsPositive = selectorSemantics.every((semantics) => semantics.positiveOutsideNegation);
+
+    const parenthesized = callMatch[2].includes('(');
+    let remainder = statement
+      .slice(selectorEnd + 1)
+      .replace(/\s+do(?:\s*\|[^|\r\n]*\|)?\s*$/i, '')
+      .trim();
+    const braceBlock = remainder.match(
+      /^(.*\))[ \t]+\{[ \t]*(?:\|[A-Za-z_][A-Za-z0-9_]*(?:[ \t]*,[ \t]*[A-Za-z_][A-Za-z0-9_]*)*\|[ \t]*)?[^{}\r\n]*\}[ \t]*$/,
+    );
+    if (braceBlock) remainder = braceBlock[1].trim();
+    if (parenthesized) {
+      if (!remainder.endsWith(')')) return false;
+      remainder = remainder.slice(0, -1).trim();
+      if (remainder.endsWith(',')) remainder = remainder.slice(0, -1).trim();
+    } else if (containsRubyCodeClosingParenthesis(remainder)) {
+      return false;
+    }
+    if (remainder === '') return selectorIsPositive;
+    if (!remainder.startsWith(',')) return false;
+
+    const comparator = remainder.slice(1);
+    return (
+      positiveSelectorComparator(method, comparator) &&
+      !negativeValidationErrorComparator(method, comparator) &&
+      (selectorIsPositive || positiveValidationErrorComparator(method, comparator))
+    );
+  };
+  const delimiterState = (lines) => {
+    const frames = [];
+    let quote = null;
+    let regex = false;
+    let escaped = false;
+    for (const line of lines) {
+      const delimiterOnly = line.text.match(/^([)}])\s*,?\s*(?:do(?:\s*\|[^|\r\n]*\|)?)?$/);
+      for (const character of line.text) {
+        if (escaped) {
+          escaped = false;
+        } else if (character === '\\' && (quote !== null || regex)) {
+          escaped = true;
+        } else if (quote !== null) {
+          if (character === quote) quote = null;
+        } else if (regex) {
+          if (character === '/') regex = false;
+        } else if (character === '"' || character === "'") {
+          quote = character;
+        } else if (character === '/') {
+          regex = true;
+        } else if (character === '(' || character === '{') {
+          frames.push({ closer: character === '(' ? ')' : '}', indent: line.indent });
+        } else if (character === ')' || character === '}') {
+          const frame = frames.pop();
+          if (!frame || frame.closer !== character) return null;
+          if (delimiterOnly && line.indent !== frame.indent) return null;
+        }
+      }
+    }
+    return quote === null && !regex && !escaped ? frames : null;
+  };
+  const selectorStatements = (testCase) => {
+    const statements = [];
+    for (let index = 0; index < testCase.physicalLines.length; index += 1) {
+      const start = stripRubyTrailingComment(testCase.physicalLines[index]);
+      const startMatch = start?.match(
+        /^([ \t]*)(?:assert_(?:select|selector|dom)|assert_not_(?:select|selector|dom)|refute_(?:select|selector|dom))\b/,
+      );
+      if (startMatch) {
+        const startIndent = startMatch[1];
+        const collected = [{ text: start.trim(), indent: startIndent }];
+        let statement = collected[0].text;
+        let frames = delimiterState(collected);
+        let incomplete = statement.endsWith(',') || (frames && frames.length > 0);
+        for (let offset = 1; incomplete && offset < 8; offset += 1) {
+          const rawContinuation = testCase.physicalLines[index + offset];
+          if (rawContinuation === undefined) break;
+          const continuation = stripRubyTrailingComment(rawContinuation);
+          if (continuation === null || continuation.trim() === '') break;
+          const indent = continuation.match(/^([ \t]*)\S/)?.[1];
+          const delimiterOnly = /^[)}]\s*,?\s*(?:do(?:\s*\|[^|\r\n]*\|)?)?$/.test(continuation.trim());
+          if (indent === undefined || (!delimiterOnly && indent.length <= startIndent.length)) {
+            break;
+          }
+          collected.push({ text: continuation.trim(), indent });
+          statement = collected.map((line) => line.text).join(' ');
+          if (statement.length > 512) break;
+          frames = delimiterState(collected);
+          if (!frames) break;
+          incomplete = statement.endsWith(',') || frames.length > 0;
+        }
+        if (!incomplete && statement.length <= 512) statements.push(statement);
+      }
+    }
+    return statements;
+  };
+  const hasPositiveErrorSelector = (testCase) => selectorStatements(testCase).some(selectorStatementPositive);
+  const positiveNoticeSelectorStatement = (statement) => {
+    if (noticeLiteralIsNegative(statement)) return false;
+    const call = statement.match(
+      /^([ \t]*assert_(?:select|selector|dom)(?:[ \t]+|\([ \t]*))(["'])((?:(?!\2).)*)\2/,
+    );
+    if (!call || /#(?:\{|@|\$)/.test(call[3])) return false;
+    const errorSelector = call[3].replace(/([.#])([A-Za-z_][A-Za-z0-9_-]*)/g, (_identifier, sigil, name) => {
+      const errorName = name.replace(/(^|[-_])(?:flash|notice)(?=$|[-_])/gi, '$1errors');
+      return `${sigil}${errorName}`;
+    });
+    if (errorSelector === call[3]) return false;
+    return selectorStatementPositive(
+      `${call[1]}${call[2]}${errorSelector}${call[2]}${statement.slice(call[0].length)}`,
+    );
+  };
+  const hasPositiveNoticeSelector = (testCase) =>
+    selectorStatements(testCase).some(positiveNoticeSelectorStatement);
+  const postResponseScopes = (testCase) => {
+    const scopes = [];
+    let currentScope = null;
+    for (const physicalLine of testCase.physicalLines) {
+      const codeLine = stripRubyTrailingComment(physicalLine)?.trim() ?? '';
+      const request = codeLine.match(/^(delete|get|head|options|patch|post|put)(?:\s+|\()/);
+      if (request) {
+        if (currentScope !== null) scopes.push(currentScope);
+        currentScope = request[1] === 'post' ? [] : null;
+      }
+      if (currentScope !== null) currentScope.push(physicalLine);
+    }
+    if (currentScope !== null) scopes.push(currentScope);
+    return scopes.map((physicalLines) => ({ ...testCase, body: physicalLines.join('\n'), physicalLines }));
+  };
+  const hasPotentiallyInactiveEvidence = (testCase) =>
+    testCase.physicalLines.some((physicalLine) => {
+      const codeLine = maskRubyStringAndCommentContent(physicalLine);
+      const supportedCountDifference =
+        codeLine !== null &&
+        /^\s*assert_difference(?:\s+|\()\s*->\s*\{\s*[A-Z][A-Za-z0-9_:]*\.count\s*\}(?:\s*,\s*1)?\s*\)?\s+do\s*$/.test(
+          codeLine,
+        );
+      return (
+        codeLine === null ||
+        /\b(?:case|class|def|elsif|ensure|for|if|module|rescue|unless|until|when|while)\b/.test(codeLine) ||
+        (!supportedCountDifference && /->|(?:^|[; \t])(?:lambda|proc|Proc\.new)(?=$|[; \t({])/.test(codeLine))
+      );
+    });
+  const qualifiesFailure = (testCase) => {
+    if (hasPotentiallyInactiveEvidence(testCase)) return false;
+    return postResponseScopes(testCase).some((responseScope) => {
+      const nonSelectorBody = responseScope.body
+        .split(/\r?\n/)
+        .filter(
+          (line) =>
+            !/^\s*(?:assert_(?:(?:no|not)_)?(?:select|selector|dom)|refute_(?:select|selector|dom))\b/i.test(
+              line,
+            ),
+        )
+        .join('\n');
+      const response =
+        /^\s*assert_response(?:\s+|\()\s*(?::(?:unprocessable_entity|unprocessable_content)\b|422\b)/m.test(
+          responseScope.body,
+        );
+      const errors =
+        hasPositiveValueAssertion(
+          nonSelectorBody,
+          /(?:^|[^A-Za-z0-9_])@?(?:[A-Za-z_][A-Za-z0-9_]*\.errors?\b|response\.parsed_body\b[^\r\n]*\berrors?\b)/i,
+          false,
+          validationErrorLiteralIsNegative,
+        ) ||
+        hasPositiveErrorSelector(responseScope) ||
+        hasRenderedBodyAssertion(responseScope.body);
+      return response && errors;
+    });
+  };
+  const qualifiesSuccess = (testCase) => {
+    if (hasPotentiallyInactiveEvidence(testCase)) return false;
+    const successLines = testCase.body.split(/\r?\n/);
+    const resourceStemsForConstant = (constant) => {
+      const singular = constant
+        .split('::')
+        .at(-1)
+        .replace(/([A-Z]+)([A-Z][a-z])/g, '$1_$2')
+        .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+        .toLowerCase();
+      let plural = `${singular}s`;
+      if (/[^aeiou]y$/.test(singular)) plural = `${singular.slice(0, -1)}ies`;
+      else if (/(?:s|x|z|ch|sh)$/.test(singular)) plural = `${singular}es`;
+      return { plural, singular };
+    };
+    const staticPostRequest = (postStatement) => {
+      const requestPrefix = postStatement.match(/^\s*post(?:\s+|\(\s*)\s*[a-z][a-z0-9_]*_(?:path|url)\b/);
+      if (!requestPrefix) return false;
+      const parenthesized = /^\s*post\s*\(/.test(postStatement);
+      let argumentsTail = postStatement.slice(requestPrefix[0].length).trim();
+      if (parenthesized) {
+        if (!argumentsTail.endsWith(')')) return false;
+        argumentsTail = argumentsTail.slice(0, -1).trim();
+      }
+      if (argumentsTail === '') return true;
+      if (!argumentsTail.startsWith(',')) return false;
+      argumentsTail = argumentsTail.slice(1).trim();
+      const paramsPrefix = argumentsTail.match(/^params\s*:\s*/);
+      if (!paramsPrefix) return false;
+      const paramsHash = argumentsTail.slice(paramsPrefix[0].length).trim();
+      if (!paramsHash.startsWith('{')) return false;
+      let depth = 0;
+      let closingIndex = -1;
+      for (let index = 0; index < paramsHash.length; index += 1) {
+        if (paramsHash[index] === '{') depth += 1;
+        else if (paramsHash[index] === '}') {
+          depth -= 1;
+          if (depth < 0) return false;
+          if (depth === 0) {
+            closingIndex = index;
+            break;
+          }
+        }
+      }
+      if (closingIndex !== paramsHash.length - 1 || depth !== 0) return false;
+      const literalBody = paramsHash
+        .slice(1, -1)
+        .replace(/\b[A-Za-z_][A-Za-z0-9_]*\s*:/g, '')
+        .replace(/:[A-Za-z_][A-Za-z0-9_]*\b/g, '')
+        .replace(/\b(?:false|nil|true)\b/g, '')
+        .replace(/\b(?:0|[1-9][0-9]*)(?:\.[0-9]+)?\b/g, '');
+      return !/[^\s{},[\]:,+-]/.test(literalBody);
+    };
+    const createdRecord = successLines.some((line, index) => {
+      const start = line.match(
+        /^([ \t]*)assert_difference(?:\s+|\()\s*(?:"([A-Z][A-Za-z0-9_:]*)\.count"|'([A-Z][A-Za-z0-9_:]*)\.count'|->\s*\{\s*([A-Z][A-Za-z0-9_:]*)\.count\s*\})(?:\s*,\s*1)?\s*\)?\s+do\s*$/,
+      );
+      if (!start) return false;
+      const expectedResource = resourceStemsForConstant(start[2] ?? start[3] ?? start[4]);
+      const blockLines = [];
+      let closed = false;
+      for (let offset = 1; offset <= 32; offset += 1) {
+        const blockLine = successLines[index + offset];
+        if (blockLine === undefined) return false;
+        const closingIndent = blockLine.match(/^([ \t]*)end\s*$/)?.[1];
+        if (closingIndent === start[1]) {
+          closed = true;
+          break;
+        }
+        const contentIndent = blockLine.match(/^([ \t]*)\S/)?.[1];
+        if (contentIndent !== undefined && contentIndent.length <= start[1].length) return false;
+        blockLines.push(blockLine);
+      }
+      if (!closed) return false;
+      const contentLines = blockLines.filter((blockLine) => blockLine.trim() !== '');
+      if (contentLines.length === 0 || !/^\s*post(?:\s+|\()/.test(contentLines[0])) return false;
+      if (contentLines.some((blockLine) => /#(?:\{|@|\$)/.test(blockLine))) return false;
+      const postIndent = contentLines[0].match(/^([ \t]*)/)?.[1].length ?? 0;
+      for (let contentIndex = 1; contentIndex < contentLines.length; contentIndex += 1) {
+        const blockLine = contentLines[contentIndex];
+        const indent = blockLine.match(/^([ \t]*)/)?.[1].length ?? 0;
+        const finalClosingParenthesis =
+          contentIndex === contentLines.length - 1 && indent === postIndent && /^\s*\)\s*$/.test(blockLine);
+        if (indent <= postIndent && !finalClosingParenthesis) return false;
+      }
+      const postCodeLines = contentLines.map(maskRubyStringAndCommentContent);
+      if (postCodeLines.some((line) => line === null)) return false;
+      const postStatement = postCodeLines.join('\n');
+      if (!staticPostRequest(postStatement)) return false;
+      const postRoute = postStatement.match(/^\s*post(?:\s+|\(\s*)\s*([a-z][a-z0-9_]*)_(?:path|url)\b/)?.[1];
+      const matchingRoute =
+        postRoute !== undefined &&
+        (postRoute === expectedResource.plural || postRoute.endsWith(`_${expectedResource.plural}`));
+      const matchingParameter = new RegExp(`\\bparams\\s*:\\s*\\{\\s*${expectedResource.singular}\\s*:`).test(
+        postStatement,
+      );
+      return matchingRoute || matchingParameter;
+    });
+    const responseScopes = postResponseScopes(testCase);
+    return responseScopes.some((responseScope) => {
+      const redirect = /^\s*assert_redirected_to(?:\s+|\()/m.test(responseScope.body);
+      const message =
+        hasPositiveValueAssertion(
+          responseScope.body,
+          /(?:\bflash\b|\bnotice\b)/i,
+          true,
+          noticeLiteralIsNegative,
+        ) ||
+        hasPositiveNoticeSelector(responseScope) ||
+        (/^\s*follow_redirect!(?:\s*|\(\s*\))$/m.test(responseScope.body) &&
+          hasRenderedBodyAssertion(responseScope.body)) ||
+        (responseScopes.length === 1 && createdRecord);
+      return redirect && message;
+    });
+  };
+  return failureCandidates.some(
+    (failureCase) =>
+      qualifiesFailure(failureCase) &&
+      successCandidates.some((successCase) => successCase !== failureCase && qualifiesSuccess(successCase)),
   );
 };
 const formTests = artifacts.filter((artifact) => {
@@ -863,8 +2306,14 @@ const fullSuiteTest = (invocation) => {
     return railsTest && tokens.length === prefix.length + 1 && tokens.at(-1) === '-v';
   });
 };
+const hasSkippedRailsTests = (output) =>
+  output
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .some((line) => railsTestSummary.test(line) && /, [1-9][0-9]* skips?$/.test(line));
 const testCommandsFor = (matchedArtifacts) =>
   testCommands.filter((command) => {
+    if (hasSkippedRailsTests(command.output)) return false;
     return testEvidenceTargets(command).some((invocation) => {
       if (fullSuiteTest(invocation)) return true;
       return matchedArtifacts.some((artifact) => {
