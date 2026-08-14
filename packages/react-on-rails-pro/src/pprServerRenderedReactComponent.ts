@@ -133,11 +133,6 @@ const loadPPRApis = (): Promise<PPRApis> => {
   return pprApisPromise;
 };
 
-/** Test-only: clears the memoized PPR API modules so guard failures can be re-exercised. */
-export const resetPPRApisForTesting = () => {
-  pprApisPromise = undefined;
-};
-
 // ---------------------------------------------------------------------------
 // Shared per-render helpers
 // ---------------------------------------------------------------------------
@@ -247,7 +242,10 @@ const pprPrerenderRenderReactComponent = (
             'Do not call ReactDOMServer.renderToString() inside the render function.\n',
         );
 
-        writeChunk(reactRenderedElement);
+        // A pre-rendered string has nothing to postpone: report it as a completed fully-static
+        // prerender so Rails serves (and caches) it as a shell-only record instead of failing the
+        // PPR protocol check.
+        writeChunk(reactRenderedElement, { [PPR_PRERENDER_COMPLETE_CHUNK_KEY]: true });
         endStream();
         return;
       }
@@ -327,6 +325,11 @@ const pprPrerenderRenderReactComponent = (
 
         injectedStream.on('error', (error: Error) => {
           reportError(enrichWithCapturedRSCDiagnostics(convertToError(error)));
+          // A destroyed prelude stream never emits 'end', so close the output explicitly — the
+          // response ends without the trailing protocol chunk, which Rails treats as a failed
+          // prerender (no cache write) rather than hanging on an unterminated stream.
+          streamingTrackers.rscRequestTracker.clear();
+          endStream();
         });
 
         injectedStream.on('end', () => {
@@ -501,11 +504,10 @@ const pprResumeRenderReactComponent = (
         // the wire protocol's perspective every chunk is post-shell content.
         renderState.isShellReady = true;
 
+        // No consumer-abort early return here: onConsumerAbort below runs its handler immediately
+        // when the consumer is already gone, aborting the in-flight resume render.
         const rscClientManifestStylesheetHrefs =
           await rscClientManifestStylesheetHrefsFor(reactClientManifestFileName);
-        if (isConsumerAborted()) {
-          return;
-        }
         const injectedResumeStream = injectRSCPayload(
           renderingStream,
           streamingTrackers.rscRequestTracker,

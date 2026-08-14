@@ -1464,8 +1464,9 @@ module ReactOnRailsProHelper
 
     raise ReactOnRailsPro::Error,
           "PPR prerender for #{component_name} did not report completion metadata. " \
-          "Ensure the server bundle is built with a react-on-rails-pro package that supports PPR " \
-          "and that react and react-dom >= 19.2.7 < 20 are installed."
+          "Ensure the server bundle is built with a react-on-rails-pro package that supports PPR, " \
+          "that react and react-dom >= 19.2.7 < 20 are installed, and that the prerender stream " \
+          "was not terminated abnormally."
   end
 
   # Persists shell + PostponedState as ONE atomic record — there is never a state without its
