@@ -175,23 +175,30 @@ module ReactOnRails
         # - :html_streaming: Progressive SSR using renderToPipeableStream (non-blocking and rendering incrementally)
         # - :rsc_payload_streaming: Server Components serialized in React flight format
         #   (non-blocking and rendering incrementally).
+        # - :ppr_prerender: PPR prerender phase (Pro) — renders the static shell with
+        #   prerenderToNodeStream and reports the serialized PostponedState on chunk metadata
+        # - :ppr_resume: PPR resume phase (Pro) — resumes only the postponed Suspense boundaries
+        #   from a previously captured PostponedState via resumeToPipeableStream
         options.fetch(:render_mode, :sync)
       end
 
       def streaming?
         # Returns true if the component should be rendered incrementally
-        %i[html_streaming rsc_payload_streaming].include?(render_mode)
+        %i[html_streaming rsc_payload_streaming ppr_prerender ppr_resume].include?(render_mode)
       end
 
-      def rsc_payload_streaming?
-        # Returns true if the component should be rendered as a React Server Component
-        render_mode == :rsc_payload_streaming
-      end
+      # True when the component renders as a React Server Component payload
+      def rsc_payload_streaming? = render_mode == :rsc_payload_streaming
 
-      def html_streaming?
-        # Returns true if the component should be rendered incrementally
-        render_mode == :html_streaming
-      end
+      # True when the component renders as progressively streamed HTML
+      def html_streaming? = render_mode == :html_streaming
+
+      def ppr_prerender? = render_mode == :ppr_prerender
+
+      def ppr_resume? = render_mode == :ppr_resume
+
+      # True for either phase of a PPR (Partial Prerendering) render
+      def ppr? = ppr_prerender? || ppr_resume?
 
       def store_dependencies
         options[:store_dependencies]

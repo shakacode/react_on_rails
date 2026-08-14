@@ -1156,5 +1156,29 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
                            /must be a positive integer/)
       end
     end
+
+    describe ".ppr_settle_budget_ms" do
+      it "defaults to 500 ms" do
+        expect(ReactOnRailsPro.configuration.ppr_settle_budget_ms)
+          .to eq(ReactOnRailsPro::Configuration::DEFAULT_PPR_SETTLE_BUDGET_MS)
+        expect(ReactOnRailsPro::Configuration::DEFAULT_PPR_SETTLE_BUDGET_MS).to eq(500)
+      end
+
+      it "accepts positive integers" do
+        ReactOnRailsPro.configure do |config|
+          config.ppr_settle_budget_ms = 750
+        end
+
+        expect(ReactOnRailsPro.configuration.ppr_settle_budget_ms).to eq(750)
+      end
+
+      it "raises error for non-positive or non-integer values" do
+        [0, -1, 1.5, "500"].each do |invalid_value|
+          expect do
+            ReactOnRailsPro.configure { |config| config.ppr_settle_budget_ms = invalid_value }
+          end.to raise_error(ReactOnRailsPro::Error, /ppr_settle_budget_ms/)
+        end
+      end
+    end
   end
 end

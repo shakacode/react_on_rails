@@ -67,6 +67,8 @@ RSpec.describe ReactOnRailsPro::ServerRenderingJsCode do
           ReactOnRails::ReactComponent::RenderOptions,
           internal_option: async_props_block,
           streaming?: false,
+          ppr_prerender?: false,
+          ppr_resume?: false,
           dom_id: "TestComponent-0",
           trace: false
         )
@@ -103,6 +105,8 @@ RSpec.describe ReactOnRailsPro::ServerRenderingJsCode do
           ReactOnRails::ReactComponent::RenderOptions,
           internal_option: nil,
           streaming?: false,
+          ppr_prerender?: false,
+          ppr_resume?: false,
           dom_id: "TestComponent-0",
           trace: false
         )
@@ -138,6 +142,8 @@ RSpec.describe ReactOnRailsPro::ServerRenderingJsCode do
           ReactOnRails::ReactComponent::RenderOptions,
           internal_option: nil,
           streaming?: true,
+          ppr_prerender?: false,
+          ppr_resume?: false,
           dom_id: "TestComponent-0",
           trace: false
         )
@@ -183,6 +189,8 @@ RSpec.describe ReactOnRailsPro::ServerRenderingJsCode do
           internal_option: nil,
           streaming?: true,
           rsc_payload_streaming?: false,
+          ppr_prerender?: false,
+          ppr_resume?: false,
           dom_id: "TestComponent-0",
           trace: false
         )
@@ -266,6 +274,40 @@ RSpec.describe ReactOnRailsPro::ServerRenderingJsCode do
           .with(:renderer_artifact_snapshot, identities).twice
       end
 
+      it "keeps the per-bundle dispatch for PPR prerender renders (#4659 defect 3)" do
+        allow(render_options).to receive_messages(ppr_prerender?: true, streaming?: true)
+        allow(ReactOnRailsPro.configuration).to receive(:ppr_settle_budget_ms).and_return(500)
+
+        result = described_class.render(
+          props_string,
+          rails_context,
+          redux_stores,
+          react_component_name,
+          render_options
+        )
+
+        expect(result).to include(
+          "ReactOnRails.isRSCBundle ? 'serverRenderRSCReactComponent' : 'pprPrerenderServerRenderedReactComponent'"
+        )
+      end
+
+      it "keeps the per-bundle dispatch for PPR resume renders (#4659 defect 3)" do
+        allow(render_options).to receive_messages(ppr_resume?: true, streaming?: true)
+        allow(render_options).to receive(:internal_option).with(:ppr_postponed_state).and_return('{"step":1}')
+
+        result = described_class.render(
+          props_string,
+          rails_context,
+          redux_stores,
+          react_component_name,
+          render_options
+        )
+
+        expect(result).to include(
+          "ReactOnRails.isRSCBundle ? 'serverRenderRSCReactComponent' : 'pprResumeServerRenderedReactComponent'"
+        )
+      end
+
       it "uses stable pool identities in Rails test when development mode is disabled" do
         server_id = "rorp-v2-s-#{'c' * 64}"
         rsc_id = "rorp-v2-r-#{'d' * 64}"
@@ -293,6 +335,69 @@ RSpec.describe ReactOnRailsPro::ServerRenderingJsCode do
               ReactOnRailsPro::RendererArtifact::Identity.new(role: :rsc, id: rsc_id)
             ]
           )
+      end
+    end
+
+    context "when rendering PPR without RSC support" do
+      let(:render_options) do
+        instance_double(
+          ReactOnRails::ReactComponent::RenderOptions,
+          internal_option: nil,
+          streaming?: true,
+          ppr_prerender?: false,
+          ppr_resume?: false,
+          dom_id: "TestComponent-0",
+          trace: false
+        )
+      end
+
+      before do
+        allow(ReactOnRailsPro.configuration).to receive_messages(
+          enable_rsc_support: false,
+          throw_js_errors: false,
+          rendering_returns_promises: false,
+          ssr_pre_hook_js: nil,
+          ppr_settle_budget_ms: 500
+        )
+      end
+
+      def render_js
+        described_class.render(
+          props_string,
+          rails_context,
+          redux_stores,
+          react_component_name,
+          render_options
+        )
+      end
+
+      it "dispatches PPR prerender straight to the prerender render function" do
+        allow(render_options).to receive(:ppr_prerender?).and_return(true)
+
+        expect(render_js).to include("ReactOnRails['pprPrerenderServerRenderedReactComponent']")
+      end
+
+      it "injects the configured settle budget for PPR prerender renders" do
+        allow(render_options).to receive(:ppr_prerender?).and_return(true)
+        allow(ReactOnRailsPro.configuration).to receive(:ppr_settle_budget_ms).and_return(750)
+
+        expect(render_js).to include("railsContext.pprSettleBudgetMs = 750;")
+      end
+
+      it "dispatches PPR resume straight to the resume render function" do
+        allow(render_options).to receive(:ppr_resume?).and_return(true)
+        allow(render_options).to receive(:internal_option).with(:ppr_postponed_state).and_return('{"step":1}')
+
+        expect(render_js).to include("ReactOnRails['pprResumeServerRenderedReactComponent']")
+      end
+
+      # Wire-key pin: `railsContext.pprPostponedState` is the contract between the Rails helper
+      # and the Pro package's PPR resume render function. Renaming either side breaks resume.
+      it "injects the PostponedState under the pinned railsContext.pprPostponedState wire key" do
+        allow(render_options).to receive(:ppr_resume?).and_return(true)
+        allow(render_options).to receive(:internal_option).with(:ppr_postponed_state).and_return('{"step":1}')
+
+        expect(render_js).to include('railsContext.pprPostponedState = "{\"step\":1}";')
       end
     end
   end

@@ -112,34 +112,9 @@ module ReactOnRailsPro
       # @return [String] JavaScript code that will render the React component on the server
       def render(props_string, rails_context, redux_stores, react_component_name, render_options)
         rsc_support_enabled, artifacts = rendering_artifact_context(render_options)
-        render_function_name =
-          if rsc_support_enabled && render_options.streaming?
-            # Select appropriate function based on whether the rendering request is running on server or rsc bundle
-            # As the same rendering request is used to generate the rsc payload and SSR the component.
-            "ReactOnRails.isRSCBundle ? 'serverRenderRSCReactComponent' : 'streamServerRenderedReactComponent'"
-          elsif render_options.streaming?
-            PLAIN_STREAMING_RENDER_FUNCTION_NAME
-          else
-            "'serverRenderReactComponent'"
-          end
-        streaming_params = if rsc_support_enabled && render_options.streaming?
-                             config = ReactOnRailsPro.configuration
-                             react_client_manifest_file = config.react_client_manifest_file
-                             react_server_client_manifest_file = config.react_server_client_manifest_file
-                             <<-JS
-                                railsContext.reactClientManifestFileName = #{react_client_manifest_file.to_json};
-                                railsContext.reactServerClientManifestFileName = #{react_server_client_manifest_file.to_json};
-                             JS
-                           elsif render_options.streaming?
-                             # These keys are part of the streaming renderer contract, but non-RSC builds do not
-                             # produce RSC manifests. Empty names avoid a failed filesystem lookup on the shell path.
-                             <<-JS
-                                railsContext.reactClientManifestFileName = "";
-                                railsContext.reactServerClientManifestFileName = "";
-                             JS
-                           else
-                             ""
-                           end
+        render_function_name = resolve_render_function_name(render_options, rsc_support_enabled)
+        streaming_params = streaming_context_params_js(render_options, rsc_support_enabled)
+        ppr_params = ppr_context_params_js(render_options)
 
         # This function is called with specific componentName and props when generateRSCPayload is invoked
         # In that case, it replaces the empty () with ('componentName', props) in the rendering request
@@ -147,6 +122,7 @@ module ReactOnRailsPro
         (function(componentName = #{react_component_name.to_json}, props = undefined) {
           var railsContext = #{rails_context};
           #{streaming_params}
+          #{ppr_params}
           #{generate_rsc_payload_js_function(render_options, artifacts:)}
           #{ssr_pre_hook_js}
           #{redux_stores}
@@ -167,6 +143,75 @@ module ReactOnRailsPro
       end
 
       private
+
+      def resolve_render_function_name(render_options, rsc_support_enabled)
+        if render_options.ppr_prerender?
+          ppr_render_function_name("pprPrerenderServerRenderedReactComponent", rsc_support_enabled)
+        elsif render_options.ppr_resume?
+          ppr_render_function_name("pprResumeServerRenderedReactComponent", rsc_support_enabled)
+        elsif rsc_support_enabled && render_options.streaming?
+          # Select appropriate function based on whether the rendering request is running on server or rsc bundle
+          # As the same rendering request is used to generate the rsc payload and SSR the component.
+          "ReactOnRails.isRSCBundle ? 'serverRenderRSCReactComponent' : 'streamServerRenderedReactComponent'"
+        elsif render_options.streaming?
+          PLAIN_STREAMING_RENDER_FUNCTION_NAME
+        else
+          "'serverRenderReactComponent'"
+        end
+      end
+
+      # With RSC support enabled the same rendering request is re-executed on the RSC bundle to
+      # generate the flight payload (via generateRSCPayload/runOnOtherBundle), so PPR requests must
+      # keep the isRSCBundle branch — otherwise the RSC bundle would be asked to run a PPR render
+      # function it does not define (#4659 review defect 3).
+      def ppr_render_function_name(function_name, rsc_support_enabled)
+        return "'#{function_name}'" unless rsc_support_enabled
+
+        "ReactOnRails.isRSCBundle ? 'serverRenderRSCReactComponent' : '#{function_name}'"
+      end
+
+      def streaming_context_params_js(render_options, rsc_support_enabled)
+        if rsc_support_enabled && render_options.streaming?
+          config = ReactOnRailsPro.configuration
+          react_client_manifest_file = config.react_client_manifest_file
+          react_server_client_manifest_file = config.react_server_client_manifest_file
+          <<-JS
+            railsContext.reactClientManifestFileName = #{react_client_manifest_file.to_json};
+            railsContext.reactServerClientManifestFileName = #{react_server_client_manifest_file.to_json};
+          JS
+        elsif render_options.streaming?
+          # These keys are part of the streaming renderer contract, but non-RSC builds do not
+          # produce RSC manifests. Empty names avoid a failed filesystem lookup on the shell path.
+          <<-JS
+            railsContext.reactClientManifestFileName = "";
+            railsContext.reactServerClientManifestFileName = "";
+          JS
+        else
+          ""
+        end
+      end
+
+      # PPR context params travel on the railsContext:
+      # - :ppr_prerender carries the settle budget (config.ppr_settle_budget_ms) that bounds how
+      #   long the prerender waits before demoting pending Suspense boundaries to resume holes.
+      # - :ppr_resume carries the serialized PostponedState captured by the prerender phase.
+      #   `railsContext.pprPostponedState` is the pinned wire key of the PPR resume contract —
+      #   the Pro package reads exactly this key (see pprServerRenderedReactComponent.ts).
+      def ppr_context_params_js(render_options)
+        if render_options.ppr_prerender?
+          settle_budget_ms = ReactOnRailsPro.configuration.ppr_settle_budget_ms
+          <<-JS
+            railsContext.pprSettleBudgetMs = #{settle_budget_ms.to_json};
+          JS
+        elsif render_options.ppr_resume?
+          postponed_state = render_options.internal_option(:ppr_postponed_state)
+          <<-JS
+            railsContext.pprPostponedState = #{postponed_state.to_json};
+          JS
+        else
+          ""
+        end
+      end
 
       def rendering_artifact_context(render_options)
         [
