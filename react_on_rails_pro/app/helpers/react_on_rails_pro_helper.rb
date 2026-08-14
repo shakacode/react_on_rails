@@ -1346,8 +1346,9 @@ module ReactOnRailsProHelper
 
   # The full PPR cache key: the shared component base key (bundle digests — deploys invalidate
   # automatically) plus the helper namespace, the PPR storage schema version, the installed React
-  # version (React makes no cross-version PostponedState stability guarantee), and the caller's
-  # cache_key.
+  # version (React makes no cross-version PostponedState stability guarantee), the explicit DOM
+  # id (the identifierPrefix baked into the cached shell HTML and PostponedState — instances with
+  # different ids must not share a record), and the caller's cache_key.
   def ppr_cache_key(component_name, render_options)
     raw_cache_key = render_options[:cache_key]
     cache_key_value = raw_cache_key.respond_to?(:call) ? raw_cache_key.call : raw_cache_key
@@ -1359,6 +1360,7 @@ module ReactOnRailsProHelper
           "ppr_react_component",
           ReactOnRailsPro::Ppr::CACHE_SCHEMA_VERSION,
           ReactOnRailsPro::Ppr.react_version_cache_key,
+          render_options[:id],
           cache_key_value
         ],
         prerender: true

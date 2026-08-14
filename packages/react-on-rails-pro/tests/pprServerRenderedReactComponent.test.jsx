@@ -231,6 +231,28 @@ describe('pprServerRenderedReactComponent', () => {
     expect(trailingChunk[PPR_RENDER_ERRORED_CHUNK_KEY]).toBe(true);
   });
 
+  it('marks the prerender errored when app code rejects with its own AbortError before the settle abort', async () => {
+    // An AbortError-like rejection from app code (its own fetch controller) is a real render
+    // failure, not the settle abort — Rails must see pprRenderErrored and skip the cache write.
+    const AppAbortHole = () => Promise.reject(new DOMException('app fetch aborted', 'AbortError'));
+    const AppAbortShell = () => (
+      <div>
+        <h1>{SHELL_HEADER_TEXT}</h1>
+        <React.Suspense fallback={<div>{HOLE_FALLBACK_TEXT}</div>}>
+          <AppAbortHole />
+        </React.Suspense>
+      </div>
+    );
+    const { chunks, errors } = await collectStreamResult(
+      runPrerender({ component: AppAbortShell, componentName: 'AppAbortShell' }),
+    );
+
+    expect(errors).toHaveLength(0);
+    const trailingChunk = chunks[chunks.length - 1];
+    expect(trailingChunk[PPR_PRERENDER_COMPLETE_CHUNK_KEY]).toBe(true);
+    expect(trailingChunk[PPR_RENDER_ERRORED_CHUNK_KEY]).toBe(true);
+  });
+
   it('honors a caller-provided AbortSignal instead of the settle budget (CacheSignal seam)', async () => {
     // A 1 ms budget would postpone the 50 ms hole — but the caller's never-aborted signal wins,
     // so the prerender waits for the hole and produces a fully static result.

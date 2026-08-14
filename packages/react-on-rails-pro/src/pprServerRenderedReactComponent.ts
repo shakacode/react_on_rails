@@ -294,8 +294,11 @@ const pprPrerenderRenderReactComponent = (
             // signal's abort reason to onError for each demoted boundary; the default reason is
             // a DOMException named AbortError (NOT an instanceof Error, so this must be checked
             // on the raw value before convertToError renames it). A caller-provided signal with
-            // a custom reason is matched by identity.
-            if ((prerenderSignal.aborted && e === prerenderSignal.reason) || isAbortErrorLike(e)) {
+            // a custom reason is matched by identity. Suppress only after THIS prerender's
+            // signal has aborted: an AbortError-like rejection from app code (e.g. its own
+            // fetch controller) before the settle abort is a real render failure and must mark
+            // the prerender errored so Rails does not cache the broken shell.
+            if (prerenderSignal.aborted && (e === prerenderSignal.reason || isAbortErrorLike(e))) {
               return undefined;
             }
             const error = convertToError(e);

@@ -2278,8 +2278,8 @@ describe ReactOnRailsProHelper do
         written_chunks.dup
       end
 
-      def computed_ppr_cache_key
-        send(:ppr_cache_key, component_name, { cache_key: ["ppr-spec", component_name] })
+      def computed_ppr_cache_key(id: "#{component_name}-react-component-0")
+        send(:ppr_cache_key, component_name, { cache_key: ["ppr-spec", component_name], id: })
       end
 
       it "cold request writes ONE atomic paired record and streams each hole chunk exactly once" do
@@ -2332,6 +2332,28 @@ describe ReactOnRailsProHelper do
         # The first hole's content appears exactly once on the warm path too (defect 4 covers
         # BOTH cache paths).
         expect(warm_chunks.join.scan("First hole content").length).to eq(1)
+      end
+
+      it "keys the cache on the DOM id so instances with different ids do not share a shell" do
+        # The DOM id is the identifierPrefix baked into the cached shell/PostponedState, so a
+        # second instance with the same caller cache_key but a different explicit id must be a
+        # structural miss (its own prerender + paired record), not a warm hit on the first id's
+        # incompatible shell.
+        mock_ppr_responses(ppr_shell_chunks, ppr_resume_chunks, ppr_shell_chunks, ppr_resume_chunks)
+        other_id = "#{component_name}-react-component-other"
+        stub_render_with_ppr
+
+        run_stream
+        expect(chunks_read.count).to eq(ppr_shell_chunks.count + ppr_resume_chunks.count)
+
+        reset_stream_buffers
+        stub_render_with_ppr(id: other_id)
+        run_stream
+
+        # The prerender phase ran again for the new id instead of reusing the cached shell.
+        expect(chunks_read.count).to eq(ppr_shell_chunks.count + ppr_resume_chunks.count)
+        expect(Rails.cache.read(computed_ppr_cache_key)).not_to be_nil
+        expect(Rails.cache.read(computed_ppr_cache_key(id: other_id))).not_to be_nil
       end
 
       it "fully-static prerender succeeds, caches a shell-only record, and skips the resume phase" do
