@@ -138,9 +138,17 @@ module ReactOnRailsPro
 
       def resolve_render_function_name(render_options)
         if render_options.ppr_prerender?
-          "'pprPrerenderServerRenderedReactComponent'"
+          if ReactOnRailsPro.configuration.enable_rsc_support
+            "ReactOnRails.isRSCBundle ? 'serverRenderRSCReactComponent' : 'pprPrerenderServerRenderedReactComponent'"
+          else
+            "'pprPrerenderServerRenderedReactComponent'"
+          end
         elsif render_options.ppr_resume?
-          "'pprResumeServerRenderedReactComponent'"
+          if ReactOnRailsPro.configuration.enable_rsc_support
+            "ReactOnRails.isRSCBundle ? 'serverRenderRSCReactComponent' : 'pprResumeServerRenderedReactComponent'"
+          else
+            "'pprResumeServerRenderedReactComponent'"
+          end
         elsif ReactOnRailsPro.configuration.enable_rsc_support && render_options.streaming?
           "ReactOnRails.isRSCBundle ? 'serverRenderRSCReactComponent' : 'streamServerRenderedReactComponent'"
         else
