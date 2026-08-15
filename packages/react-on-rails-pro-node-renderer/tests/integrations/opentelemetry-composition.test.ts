@@ -97,14 +97,12 @@ describe('opentelemetry integration: composable init()', () => {
     const shutdownSpy = jest
       .spyOn(FreshNodeTracerProvider.prototype, 'shutdown')
       .mockResolvedValue(undefined);
-    const exporter = new InMemorySpanExporter();
     const errorReporter = await import('../../src/shared/errorReporter');
     const messageSpy = jest.spyOn(errorReporter, 'message').mockImplementation(() => undefined);
     const { init } = await import('../../src/integrations/opentelemetry');
 
     init({
       instrumentations: [customInstrumentation],
-      spanProcessor: new SimpleSpanProcessor(exporter),
     });
 
     expect(shutdownSpy).toHaveBeenCalledTimes(1);
@@ -113,6 +111,37 @@ describe('opentelemetry integration: composable init()', () => {
         '[OpenTelemetry] init failed: Error: custom instrumentation registration failed',
       ),
     );
+  });
+
+  test('a caller-supplied span processor is flushed instead of shut down when initialization fails', async () => {
+    const registerInstrumentations = jest.fn(() => {
+      throw new Error('custom instrumentation registration failed');
+    });
+    const customInstrumentation = { instrumentationName: 'broken' } as Instrumentation;
+
+    jest.doMock('@opentelemetry/instrumentation', () => ({ registerInstrumentations }));
+    jest.doMock('@opentelemetry/instrumentation-http', () => ({ HttpInstrumentation: jest.fn() }));
+    jest.doMock('@fastify/otel', () => ({ FastifyOtelInstrumentation: jest.fn() }));
+
+    const { NodeTracerProvider: FreshNodeTracerProvider } = await import('@opentelemetry/sdk-trace-node');
+    const shutdownSpy = jest
+      .spyOn(FreshNodeTracerProvider.prototype, 'shutdown')
+      .mockResolvedValue(undefined);
+    const forceFlushSpy = jest
+      .spyOn(FreshNodeTracerProvider.prototype, 'forceFlush')
+      .mockResolvedValue(undefined);
+    const spanProcessor = new SimpleSpanProcessor(new InMemorySpanExporter());
+    const errorReporter = await import('../../src/shared/errorReporter');
+    jest.spyOn(errorReporter, 'message').mockImplementation(() => undefined);
+    const { init } = await import('../../src/integrations/opentelemetry');
+
+    init({
+      instrumentations: [customInstrumentation],
+      spanProcessor,
+    });
+
+    expect(shutdownSpy).not.toHaveBeenCalled();
+    expect(forceFlushSpy).toHaveBeenCalledTimes(1);
   });
 
   test('resource detectors contribute attributes below explicit service-name configuration', async () => {

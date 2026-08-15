@@ -341,6 +341,11 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
   let unregisterFastifyConfig: (() => void) | undefined;
   let unregisterWorkerShutdownHook: (() => void) | undefined;
   let ownsOpenTelemetryGlobals = false;
+  const rendererOwnsSpanProcessor = opts.spanProcessor === undefined && opts.exporter === undefined;
+  const cleanupFailedProvider = (provider: NodeTracerProviderType) => {
+    const cleanup = rendererOwnsSpanProcessor ? provider.shutdown() : provider.forceFlush();
+    void cleanup.catch(() => undefined);
+  };
 
   try {
     /* eslint-disable @typescript-eslint/no-require-imports, global-require --
@@ -392,7 +397,7 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
     const acquiredTracerGlobal = loadedOtelApi.trace.setGlobalTracerProvider(provider);
     if (!acquiredTracerGlobal) {
       installedAdapters = resetInstalledTracingAdapters(installedAdapters);
-      void provider.shutdown().catch(() => undefined);
+      cleanupFailedProvider(provider);
       message(
         '[OpenTelemetry] init: another OpenTelemetry tracer provider is already registered globally; aborting.',
       );
@@ -480,7 +485,7 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
       ownsOpenTelemetryGlobals = false;
     }
     if (registeredProvider) {
-      void registeredProvider.shutdown().catch(() => undefined);
+      cleanupFailedProvider(registeredProvider);
     }
     installedAdapters = resetInstalledTracingAdapters(installedAdapters);
     message(`[OpenTelemetry] init failed: ${String(err)}`);
