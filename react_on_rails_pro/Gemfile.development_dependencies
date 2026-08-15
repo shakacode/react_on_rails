@@ -89,6 +89,7 @@ group :test do
   gem "equivalent-xml"
   gem "generator_spec"
   gem "launchy"
+  gem "opentelemetry-sdk", require: false
   gem "rspec_junit_formatter"
   gem "rspec-rails"
   gem "rspec-retry"

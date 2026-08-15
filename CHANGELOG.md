@@ -35,6 +35,11 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4869](https://github.com/shakacode/react_on_rails/pull/4869) by
   [sashakhar1](https://github.com/sashakhar1).
 
+- **[Pro]** **Node Renderer transport follow-ups now expose protocol errors and accurate Fastify modes**:
+  Rails retries continue for network disconnects and peer-reset HTTP/2 streams, while HTTP parser and framing errors
+  surface directly. Public `configureFastify` callbacks now reflect both HTTP/1.1 and HTTP/2 runtime modes, and a
+  real OpenTelemetry SDK compatibility check guards optional Rails tracing setup.
+
 - **[Pro]** **Bounded Node Renderer VM retention now avoids old/new RSC rebuild thrash during rolling deploys**:
   The default per-worker VM hard cap now retains four contexts, enough for the server and RSC bundles from one
   draining and one current revision. Successful bundle sets remain reusable through a configurable, timer-driven

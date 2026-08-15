@@ -614,13 +614,14 @@ export default function run(config: Partial<Config>) {
   const { http2: configuredHttp2, ...serverOptions } = fastifyServerOptions ?? {};
   const http2Enabled = configuredHttp2 ?? useHttp2;
   const serverOptionsForFastify: FastifyServerOptions<Http2Server> = serverOptions;
+  // Fastify overloads require a literal protocol flag, while this runtime setting produces either supported server.
   const app = fastify({
     http2: http2Enabled as true,
     bodyLimit: BODY_SIZE_LIMIT,
     logger:
       logHttpLevel !== 'silent' ? { name: 'RORP HTTP', level: logHttpLevel, ...sharedLoggerOptions } : false,
     ...serverOptionsForFastify,
-  });
+  }) as unknown as FastifyInstance;
 
   handleGracefulShutdown(app);
 

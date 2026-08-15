@@ -809,9 +809,7 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
       Errno::EPIPE,
       Errno::ETIMEDOUT,
       Protocol::HTTP::RefusedError,
-      [Protocol::HTTP1::ProtocolError, "protocol mismatch"],
-      [Protocol::HTTP2::Error, "connection closed"],
-      [Protocol::HTTP2::FrameSizeError, "protocol mismatch"]
+      [Protocol::HTTP2::Error, "Connection closed!"]
     ].each do |error_class, *args|
       it "wraps #{error_class} in a ConnectionError" do
         client = described_class.new(origin: "http://localhost:3800", pool_size: 1, connect_timeout: 1, read_timeout: 1)
@@ -820,6 +818,32 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
 
         expect { client.get("/render") }
           .to raise_error(ReactOnRailsPro::RendererHttpClient::ConnectionError)
+      end
+    end
+
+    it "wraps peer-reset HTTP/2 streams in a ConnectionError" do
+      client = described_class.new(origin: "http://localhost:3800", pool_size: 1, connect_timeout: 1, read_timeout: 1)
+      stream_error = Protocol::HTTP2::StreamError.new("Stream closed!", Protocol::HTTP2::Error::CANCEL)
+
+      allow(client).to receive(:with_client).and_raise(stream_error)
+
+      expect { client.get("/render") }
+        .to raise_error(ReactOnRailsPro::RendererHttpClient::ConnectionError, "Stream closed!")
+    end
+
+    [
+      [Protocol::HTTP1::ProtocolError, "protocol mismatch"],
+      [Protocol::HTTP2::Error, "unexpected HTTP/2 failure"],
+      [Protocol::HTTP2::FrameSizeError, "invalid frame size"],
+      [Protocol::HTTP2::StreamClosed, "invalid stream state"],
+      [Protocol::HTTP2::HeaderError, "invalid headers"]
+    ].each do |error_class, message|
+      it "does not wrap #{error_class} in a ConnectionError" do
+        client = described_class.new(origin: "http://localhost:3800", pool_size: 1, connect_timeout: 1, read_timeout: 1)
+
+        allow(client).to receive(:with_client).and_raise(error_class, message)
+
+        expect { client.get("/render") }.to raise_error(error_class, message)
       end
     end
 

@@ -15,7 +15,7 @@
 
 import type { FastifyInstance } from './types.js';
 
-// Keep the concrete signature for callback compatibility. The runtime server can use HTTP/1.1 or HTTP/2.
+// Keep a single callback signature for compatibility. The runtime server can use HTTP/1.1 or HTTP/2.
 export type FastifyConfigFunction = (app: FastifyInstance) => void;
 
 const fastifyConfigFunctions: FastifyConfigFunction[] = [];

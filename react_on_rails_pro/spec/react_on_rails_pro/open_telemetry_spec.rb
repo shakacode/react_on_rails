@@ -14,6 +14,7 @@
 # https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
 
 require_relative "spec_helper"
+require "open3"
 require "react_on_rails_pro/open_telemetry"
 require "react_on_rails_pro/renderer_http_client"
 require "react_on_rails_pro/stream_request"
@@ -227,6 +228,34 @@ RSpec.describe ReactOnRailsPro::OpenTelemetry do
       expect(captured_headers["traceparent"]).to be_nil
     ensure
       client&.close
+    end
+  end
+
+  context "with the real OpenTelemetry SDK" do
+    it "recognizes the API proxy before and after SDK registration" do
+      lib_path = File.expand_path("../../lib", __dir__)
+      script = <<~RUBY
+        require "opentelemetry/sdk"
+        require "react_on_rails_pro/open_telemetry"
+
+        if ReactOnRailsPro::OpenTelemetry.start_client_span(:post, "/render", parent_context: nil)
+          warn "expected the unconfigured API proxy to disable tracing"
+          exit 1
+        end
+
+        OpenTelemetry::SDK.configure
+        trace = ReactOnRailsPro::OpenTelemetry.start_client_span(:post, "/render", parent_context: nil)
+        unless trace.is_a?(ReactOnRailsPro::OpenTelemetry::ClientSpan)
+          warn "expected the configured API proxy to enable tracing"
+          exit 1
+        end
+
+        trace.within_context { nil }
+      RUBY
+
+      _stdout, stderr, status = Open3.capture3(RbConfig.ruby, "-I", lib_path, "-e", script)
+
+      expect(status).to be_success, stderr
     end
   end
 
