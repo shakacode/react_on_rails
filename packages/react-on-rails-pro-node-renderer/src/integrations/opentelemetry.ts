@@ -69,7 +69,8 @@ export interface OpenTelemetryInitOptions {
   /** Resource detectors whose attributes are merged below explicit resource configuration. */
   resourceDetectors?: ResourceDetector[];
   /** Additional instrumentations appended after the built-in HTTP and Fastify instrumentations.
-   *  A nonempty list registers all three groups and applies process-global module patches.
+   *  A nonempty list registers all three groups unless `fastify` is explicitly false, in which
+   *  case only the supplied instrumentations are registered.
    *  Registered instances are disabled if initialization fails or the renderer shuts down. */
   instrumentations?: Instrumentation[];
   /** Use the provider already registered through the OpenTelemetry API.
@@ -382,14 +383,13 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
   let unregisterFastifyConfig: (() => void) | undefined;
   let unregisterWorkerShutdownHook: (() => void) | undefined;
   let ownsOpenTelemetryGlobals = false;
-  // A caller-supplied processor or exporter remains caller-owned unless init succeeds.
-  // Shutting down the provider on failure would also shut down that supplied component.
-  const preserveCallerSuppliedTelemetryOnFailedInit =
-    opts.spanProcessor !== undefined || opts.exporter !== undefined;
+  // Only a caller-supplied processor remains caller-owned on failure. When only
+  // an exporter is supplied, init() creates and owns its wrapping processor.
+  const callerOwnsSpanProcessor = opts.spanProcessor !== undefined;
   const cleanupFailedProvider = (provider: NodeTracerProviderType) => {
     disableOpenTelemetryInstrumentations(createdInstrumentations);
 
-    if (preserveCallerSuppliedTelemetryOnFailedInit) {
+    if (callerOwnsSpanProcessor) {
       if (typeof provider.forceFlush === 'function') {
         void provider.forceFlush().catch(() => undefined);
       }
@@ -470,22 +470,27 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
     provider.register();
     configureOpenTelemetryDiagnostics(loadedOtelApi);
 
-    if (opts.fastify || (opts.instrumentations?.length ?? 0) > 0) {
+    const additionalInstrumentations = opts.instrumentations ?? [];
+    const registerBuiltInInstrumentations =
+      opts.fastify === true || (opts.fastify === undefined && additionalInstrumentations.length > 0);
+    if (registerBuiltInInstrumentations || additionalInstrumentations.length > 0) {
       /* eslint-disable @typescript-eslint/no-require-imports, global-require */
       const { registerInstrumentations } =
         require('@opentelemetry/instrumentation') as typeof import('@opentelemetry/instrumentation');
-      const { HttpInstrumentation } =
-        require('@opentelemetry/instrumentation-http') as typeof import('@opentelemetry/instrumentation-http');
-      // @fastify/otel uses `export = exported` so the require() returns the namespace
-      // object; the constructor lives on `.FastifyOtelInstrumentation` (also as `.default`).
-      const { FastifyOtelInstrumentation } = require('@fastify/otel') as typeof import('@fastify/otel');
+      if (registerBuiltInInstrumentations) {
+        const { HttpInstrumentation } =
+          require('@opentelemetry/instrumentation-http') as typeof import('@opentelemetry/instrumentation-http');
+        // @fastify/otel uses `export = exported` so the require() returns the namespace
+        // object; the constructor lives on `.FastifyOtelInstrumentation` (also as `.default`).
+        const { FastifyOtelInstrumentation } = require('@fastify/otel') as typeof import('@fastify/otel');
+        // HTTP stays first because Fastify instrumentation depends on it.
+        createdInstrumentations.push(new HttpInstrumentation());
+        createdInstrumentations.push(new FastifyOtelInstrumentation({ registerOnInitialization: true }));
+      }
       /* eslint-enable @typescript-eslint/no-require-imports, global-require */
       // Construct and retain each instance before registration so failed partial
       // registration can still unpatch every instrumentation that was created.
-      // HTTP stays first because Fastify instrumentation depends on it.
-      createdInstrumentations.push(new HttpInstrumentation());
-      createdInstrumentations.push(new FastifyOtelInstrumentation({ registerOnInitialization: true }));
-      createdInstrumentations.push(...(opts.instrumentations ?? []));
+      createdInstrumentations.push(...additionalInstrumentations);
       registerInstrumentations({
         instrumentations: createdInstrumentations,
         tracerProvider: provider,

@@ -55,7 +55,7 @@ describe('opentelemetry integration: composable init()', () => {
     otelDiag.disable();
   });
 
-  test('custom instrumentations are registered after the built-in HTTP and Fastify instrumentations', async () => {
+  test('custom instrumentations are registered after built-ins when fastify is not disabled', async () => {
     const registerInstrumentations = jest.fn();
     const httpInstrumentation = { instrumentationName: 'http' };
     const fastifyInstrumentation = { instrumentationName: 'fastify' };
@@ -81,6 +81,36 @@ describe('opentelemetry integration: composable init()', () => {
         instrumentations: [httpInstrumentation, fastifyInstrumentation, customInstrumentation],
       }),
     );
+  });
+
+  test('fastify false registers custom instrumentations without the built-ins', async () => {
+    const registerInstrumentations = jest.fn();
+    const customInstrumentation = {
+      instrumentationName: 'aws-sdk',
+      disable: jest.fn(),
+    } as unknown as Instrumentation;
+    const instrumentationFactory = jest.fn(() => ({ registerInstrumentations }));
+    const httpInstrumentationFactory = jest.fn(() => ({ HttpInstrumentation: jest.fn() }));
+    const fastifyInstrumentationFactory = jest.fn(() => ({ FastifyOtelInstrumentation: jest.fn() }));
+
+    jest.doMock('@opentelemetry/instrumentation', instrumentationFactory);
+    jest.doMock('@opentelemetry/instrumentation-http', httpInstrumentationFactory);
+    jest.doMock('@fastify/otel', fastifyInstrumentationFactory);
+
+    const exporter = new InMemorySpanExporter();
+    const { init } = await import('../../src/integrations/opentelemetry');
+
+    init({
+      fastify: false,
+      instrumentations: [customInstrumentation],
+      spanProcessor: new SimpleSpanProcessor(exporter),
+    });
+
+    expect(registerInstrumentations).toHaveBeenCalledWith(
+      expect.objectContaining({ instrumentations: [customInstrumentation] }),
+    );
+    expect(httpInstrumentationFactory).not.toHaveBeenCalled();
+    expect(fastifyInstrumentationFactory).not.toHaveBeenCalled();
   });
 
   test('the managed provider is shut down when instrumentation registration fails', async () => {
@@ -156,6 +186,41 @@ describe('opentelemetry integration: composable init()', () => {
         '[OpenTelemetry] init failed: Error: custom instrumentation registration failed',
       ),
     );
+  });
+
+  test('failed init shuts down the renderer-owned processor created for a supplied exporter', async () => {
+    const customInstrumentation = {
+      instrumentationName: 'broken',
+      disable: jest.fn(),
+    } as unknown as Instrumentation;
+    const registerInstrumentations = jest.fn(() => {
+      throw new Error('custom instrumentation registration failed');
+    });
+
+    jest.doMock('@opentelemetry/instrumentation', () => ({ registerInstrumentations }));
+    jest.doMock('@opentelemetry/instrumentation-http', () => ({
+      HttpInstrumentation: jest.fn(),
+    }));
+    jest.doMock('@fastify/otel', () => ({
+      FastifyOtelInstrumentation: jest.fn(),
+    }));
+
+    const { NodeTracerProvider: FreshNodeTracerProvider } = await import('@opentelemetry/sdk-trace-node');
+    const shutdownSpy = jest
+      .spyOn(FreshNodeTracerProvider.prototype, 'shutdown')
+      .mockResolvedValue(undefined);
+    const errorReporter = await import('../../src/shared/errorReporter');
+    jest.spyOn(errorReporter, 'message').mockImplementation(() => undefined);
+    const { init } = await import('../../src/integrations/opentelemetry');
+
+    init({
+      exporter: new InMemorySpanExporter(),
+      fastify: false,
+      instrumentations: [customInstrumentation],
+    });
+
+    expect(shutdownSpy).toHaveBeenCalledTimes(1);
+    expect(customInstrumentation.disable).toHaveBeenCalledTimes(1);
   });
 
   test('failed init disables instrumentations before flushing a caller-owned span processor', async () => {
@@ -445,41 +510,60 @@ describe('opentelemetry integration: composable init()', () => {
   });
 
   test('an existing global provider can emit renderer ror spans without loading a second SDK', async () => {
+    const originalServiceName = process.env.OTEL_SERVICE_NAME;
+    const originalResourceAttributes = process.env.OTEL_RESOURCE_ATTRIBUTES;
+    delete process.env.OTEL_SERVICE_NAME;
+    delete process.env.OTEL_RESOURCE_ATTRIBUTES;
     const exporter = new InMemorySpanExporter();
     const spanProcessor = new SimpleSpanProcessor(exporter);
     const existingProvider = new NodeTracerProvider({ spanProcessors: [spanProcessor] });
     existingProvider.register();
 
-    const rendererSdkFactory = jest.fn(() => {
-      throw new Error('renderer-managed SDK must not load');
-    });
-    jest.doMock('@opentelemetry/sdk-trace-node', rendererSdkFactory);
+    try {
+      const rendererSdkFactory = jest.fn(() => {
+        throw new Error('renderer-managed SDK must not load');
+      });
+      jest.doMock('@opentelemetry/sdk-trace-node', rendererSdkFactory);
 
-    const { init } = await import('../../src/integrations/opentelemetry');
-    const tracing = await import('../../src/shared/tracing');
+      const { init } = await import('../../src/integrations/opentelemetry');
+      const tracing = await import('../../src/shared/tracing');
 
-    init({
-      resourceAttributes: { 'service.name': '' },
-      tracing: true,
-      useExistingGlobalProvider: true,
-    });
+      init({
+        resourceAttributes: { 'service.name': '' },
+        tracing: true,
+        useExistingGlobalProvider: true,
+      });
 
-    await tracing.trace(
-      () => tracing.subSpan({ name: 'ror.vm.execute' }, async () => 'ok'),
-      tracing.startSsrRequestOptions({ renderingRequest: 'irrelevant' }),
-    );
-    await spanProcessor.forceFlush();
+      await tracing.trace(
+        () => tracing.subSpan({ name: 'ror.vm.execute' }, async () => 'ok'),
+        tracing.startSsrRequestOptions({ renderingRequest: 'irrelevant' }),
+      );
+      await spanProcessor.forceFlush();
 
-    const spans = exporter.getFinishedSpans();
-    const ssrSpan = spans.find((span) => span.name === 'ror.ssr.request');
-    const vmSpan = spans.find((span) => span.name === 'ror.vm.execute');
-    expect(ssrSpan).toBeDefined();
-    expect(vmSpan).toBeDefined();
-    expect(ssrSpan!.instrumentationScope.name).toBe('react-on-rails-pro-node-renderer');
-    expect(vmSpan!.parentSpanContext?.spanId).toBe(ssrSpan!.spanContext().spanId);
-    expect(rendererSdkFactory).not.toHaveBeenCalled();
-
-    await existingProvider.shutdown();
+      const spans = exporter.getFinishedSpans();
+      const ssrSpan = spans.find((span) => span.name === 'ror.ssr.request');
+      const vmSpan = spans.find((span) => span.name === 'ror.vm.execute');
+      expect(ssrSpan).toBeDefined();
+      expect(vmSpan).toBeDefined();
+      expect(ssrSpan!.instrumentationScope.name).toBe('react-on-rails-pro-node-renderer');
+      expect(vmSpan!.parentSpanContext?.spanId).toBe(ssrSpan!.spanContext().spanId);
+      expect(rendererSdkFactory).not.toHaveBeenCalled();
+    } finally {
+      try {
+        await existingProvider.shutdown();
+      } finally {
+        if (originalServiceName === undefined) {
+          delete process.env.OTEL_SERVICE_NAME;
+        } else {
+          process.env.OTEL_SERVICE_NAME = originalServiceName;
+        }
+        if (originalResourceAttributes === undefined) {
+          delete process.env.OTEL_RESOURCE_ATTRIBUTES;
+        } else {
+          process.env.OTEL_RESOURCE_ATTRIBUTES = originalResourceAttributes;
+        }
+      }
+    }
   });
 
   test('an empty instrumentation list does not load or register built-in instrumentations', async () => {
