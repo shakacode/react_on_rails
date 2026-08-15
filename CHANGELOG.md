@@ -310,6 +310,17 @@ pair`, returns invalid UTF-8, or silently mis-decodes the value. The parser now 
 
 #### Added
 
+- **[Pro]** **Node Renderer OpenTelemetry initialization now composes with application observability stacks**:
+  Applications can append custom instrumentations to the built-in HTTP and Fastify pair, merge resource-detector
+  attributes below explicit resource configuration, or opt in to preserving renderer `ror.*` spans through an
+  application-owned global provider. Empty service-name values from environment variables, options, and resource
+  attributes are treated as unset. Renderer-managed shutdown disables registered instrumentations and shuts down
+  provider components after successful initialization, while failed initialization preserves caller-supplied processors
+  and exporters.
+  Fixes [Issue 4867](https://github.com/shakacode/react_on_rails/issues/4867).
+  [PR 4878](https://github.com/shakacode/react_on_rails/pull/4878) by
+  [sashakhar1](https://github.com/sashakhar1).
+
 - **[Pro]** **HTTP/1.1 is now a supported Node Renderer transport for load balancers and HTTP/1.1-only probes**:
   Rails can opt out of forcing h2c for cleartext renderer URLs with
   `config.renderer_http_force_http2 = false`, paired with `fastifyServerOptions: { http2: false }` on the Node

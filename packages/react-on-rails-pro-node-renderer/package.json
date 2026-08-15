@@ -23,6 +23,7 @@
       "types": "./lib/worker.d.ts",
       "default": "./lib/worker.js"
     },
+    "./integrations/internal/*": null,
     "./integrations/*": {
       "types": "./lib/integrations/*.d.ts",
       "default": "./lib/integrations/*.js"
