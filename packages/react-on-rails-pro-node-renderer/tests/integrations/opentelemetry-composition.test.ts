@@ -19,6 +19,7 @@ import {
   diag as otelDiag,
   propagation as otelPropagation,
   trace as otelTrace,
+  type TracerProvider,
 } from '@opentelemetry/api';
 import type { Instrumentation } from '@opentelemetry/instrumentation';
 import type { ResourceDetector } from '@opentelemetry/resources';
@@ -113,24 +114,55 @@ describe('opentelemetry integration: composable init()', () => {
     );
   });
 
-  test('a caller-supplied span processor is flushed instead of shut down when initialization fails', async () => {
-    const registerInstrumentations = jest.fn(() => {
+  test('failed init disables instrumentations before flushing a caller-owned span processor', async () => {
+    let instrumentationEnabled = true;
+    let instrumentationTracerProvider: TracerProvider | undefined;
+    const httpInstrumentation = { disable: jest.fn() } as unknown as Instrumentation;
+    const fastifyInstrumentation = { disable: jest.fn() } as unknown as Instrumentation;
+    const customInstrumentation: Instrumentation & { emitSpan: () => void } = {
+      instrumentationName: 'broken',
+      instrumentationVersion: '1.0.0',
+      disable: jest.fn(() => {
+        instrumentationEnabled = false;
+      }),
+      enable: jest.fn(() => {
+        instrumentationEnabled = true;
+      }),
+      setTracerProvider: jest.fn((tracerProvider: TracerProvider) => {
+        instrumentationTracerProvider = tracerProvider;
+      }),
+      setMeterProvider: jest.fn(),
+      setConfig: jest.fn(),
+      getConfig: jest.fn(() => ({ enabled: instrumentationEnabled })),
+      emitSpan: () => {
+        if (instrumentationEnabled) {
+          instrumentationTracerProvider
+            ?.getTracer('failed-instrumentation')
+            .startSpan('post-failure.span')
+            .end();
+        }
+      },
+    };
+    const registerInstrumentations = jest.fn(({ tracerProvider }: { tracerProvider: TracerProvider }) => {
+      customInstrumentation.setTracerProvider(tracerProvider);
       throw new Error('custom instrumentation registration failed');
     });
-    const customInstrumentation = { instrumentationName: 'broken' } as Instrumentation;
 
     jest.doMock('@opentelemetry/instrumentation', () => ({ registerInstrumentations }));
-    jest.doMock('@opentelemetry/instrumentation-http', () => ({ HttpInstrumentation: jest.fn() }));
-    jest.doMock('@fastify/otel', () => ({ FastifyOtelInstrumentation: jest.fn() }));
+    jest.doMock('@opentelemetry/instrumentation-http', () => ({
+      HttpInstrumentation: jest.fn(() => httpInstrumentation),
+    }));
+    jest.doMock('@fastify/otel', () => ({
+      FastifyOtelInstrumentation: jest.fn(() => fastifyInstrumentation),
+    }));
 
     const { NodeTracerProvider: FreshNodeTracerProvider } = await import('@opentelemetry/sdk-trace-node');
     const shutdownSpy = jest
       .spyOn(FreshNodeTracerProvider.prototype, 'shutdown')
       .mockResolvedValue(undefined);
-    const forceFlushSpy = jest
-      .spyOn(FreshNodeTracerProvider.prototype, 'forceFlush')
-      .mockResolvedValue(undefined);
-    const spanProcessor = new SimpleSpanProcessor(new InMemorySpanExporter());
+    const forceFlushSpy = jest.spyOn(FreshNodeTracerProvider.prototype, 'forceFlush');
+    const exporter = new InMemorySpanExporter();
+    const spanProcessor = new SimpleSpanProcessor(exporter);
     const errorReporter = await import('../../src/shared/errorReporter');
     jest.spyOn(errorReporter, 'message').mockImplementation(() => undefined);
     const { init } = await import('../../src/integrations/opentelemetry');
@@ -142,6 +174,17 @@ describe('opentelemetry integration: composable init()', () => {
 
     expect(shutdownSpy).not.toHaveBeenCalled();
     expect(forceFlushSpy).toHaveBeenCalledTimes(1);
+    expect(httpInstrumentation.disable).toHaveBeenCalledTimes(1);
+    expect(fastifyInstrumentation.disable).toHaveBeenCalledTimes(1);
+    expect(customInstrumentation.disable).toHaveBeenCalledTimes(1);
+    expect(customInstrumentation.setTracerProvider).toHaveBeenCalledTimes(1);
+    expect(instrumentationTracerProvider).toBeDefined();
+
+    customInstrumentation.emitSpan();
+    await spanProcessor.forceFlush();
+
+    expect(exporter.getFinishedSpans()).toHaveLength(0);
+    await spanProcessor.shutdown();
   });
 
   test('resource detectors contribute attributes below explicit service-name configuration', async () => {

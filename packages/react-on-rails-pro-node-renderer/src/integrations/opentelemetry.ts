@@ -55,8 +55,7 @@ export interface OpenTelemetryInitOptions {
    *  can override the default service name. */
   serviceName?: string;
   /** Register HTTP + Fastify auto-instrumentation. Default: false.
-   *  OpenTelemetry module patches are process-global and cannot be rolled back;
-   *  if later init steps fail, patched modules remain installed with a no-op tracer. */
+   *  OpenTelemetry module patches are process-global while enabled. */
   fastify?: boolean;
   /** Wrap SSR work in spans via setupTracing + setupSubSpan. Default: false. */
   tracing?: boolean;
@@ -136,6 +135,16 @@ function disableOpenTelemetryGlobals(otelApi: typeof import('@opentelemetry/api'
   otelApi.context.disable();
   otelApi.propagation.disable();
   otelApi.diag.disable();
+}
+
+function disableInstrumentationsAfterFailedInit(instrumentations: Instrumentation[]): void {
+  for (const instrumentation of instrumentations) {
+    try {
+      instrumentation.disable();
+    } catch (error) {
+      log.warn({ error }, '[OpenTelemetry] instrumentation.disable() failed during init cleanup');
+    }
+  }
 }
 
 function resetInstalledTracingAdapters(
@@ -336,6 +345,7 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
   }
 
   let installedAdapters: InstalledTracingAdapters = { tracing: false, subSpan: false };
+  const createdInstrumentations: Instrumentation[] = [];
   let otelApi: typeof import('@opentelemetry/api') | undefined;
   let registeredProvider: NodeTracerProviderType | undefined;
   let unregisterFastifyConfig: (() => void) | undefined;
@@ -343,10 +353,13 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
   let ownsOpenTelemetryGlobals = false;
   const rendererOwnsSpanProcessor = opts.spanProcessor === undefined && opts.exporter === undefined;
   const cleanupFailedProvider = (provider: NodeTracerProviderType) => {
-    const cleanup =
-      rendererOwnsSpanProcessor || typeof provider.forceFlush !== 'function'
-        ? provider.shutdown()
-        : provider.forceFlush();
+    if (!rendererOwnsSpanProcessor && typeof provider.forceFlush === 'function') {
+      disableInstrumentationsAfterFailedInit(createdInstrumentations);
+      void provider.forceFlush().catch(() => undefined);
+      return;
+    }
+
+    const cleanup = provider.shutdown();
     void cleanup.catch(() => undefined);
   };
 
@@ -430,13 +443,14 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
       // object; the constructor lives on `.FastifyOtelInstrumentation` (also as `.default`).
       const { FastifyOtelInstrumentation } = require('@fastify/otel') as typeof import('@fastify/otel');
       /* eslint-enable @typescript-eslint/no-require-imports, global-require */
+      // Construct and retain each instance before registration so failed partial
+      // registration can still unpatch every instrumentation that was created.
+      // HTTP stays first because Fastify instrumentation depends on it.
+      createdInstrumentations.push(new HttpInstrumentation());
+      createdInstrumentations.push(new FastifyOtelInstrumentation({ registerOnInitialization: true }));
+      createdInstrumentations.push(...(opts.instrumentations ?? []));
       registerInstrumentations({
-        instrumentations: [
-          // HTTP first - Fastify instrumentation depends on it.
-          new HttpInstrumentation(),
-          new FastifyOtelInstrumentation({ registerOnInitialization: true }),
-          ...(opts.instrumentations ?? []),
-        ],
+        instrumentations: createdInstrumentations,
         tracerProvider: provider,
       });
     }
