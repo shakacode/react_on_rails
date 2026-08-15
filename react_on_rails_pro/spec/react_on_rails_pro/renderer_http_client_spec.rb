@@ -809,7 +809,7 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
       Errno::EPIPE,
       Errno::ETIMEDOUT,
       Protocol::HTTP::RefusedError,
-      [Protocol::HTTP2::Error, "Connection closed!"]
+      [Protocol::HTTP2::Error, "pooled HTTP/2 client closed"]
     ].each do |error_class, *args|
       it "wraps #{error_class} in a ConnectionError" do
         client = described_class.new(origin: "http://localhost:3800", pool_size: 1, connect_timeout: 1, read_timeout: 1)
@@ -831,9 +831,18 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
         .to raise_error(ReactOnRailsPro::RendererHttpClient::ConnectionError, "Stream closed!")
     end
 
+    it "wraps connection-level HTTP/2 GOAWAY errors in a ConnectionError" do
+      client = described_class.new(origin: "http://localhost:3800", pool_size: 1, connect_timeout: 1, read_timeout: 1)
+      goaway_error = Protocol::HTTP2::GoawayError.new("server shutting down", Protocol::HTTP2::Error::ENHANCE_YOUR_CALM)
+
+      allow(client).to receive(:with_client).and_raise(goaway_error)
+
+      expect { client.get("/render") }
+        .to raise_error(ReactOnRailsPro::RendererHttpClient::ConnectionError, "server shutting down")
+    end
+
     [
       [Protocol::HTTP1::ProtocolError, "protocol mismatch"],
-      [Protocol::HTTP2::Error, "unexpected HTTP/2 failure"],
       [Protocol::HTTP2::FrameSizeError, "invalid frame size"],
       [Protocol::HTTP2::StreamClosed, "invalid stream state"],
       [Protocol::HTTP2::HeaderError, "invalid headers"]

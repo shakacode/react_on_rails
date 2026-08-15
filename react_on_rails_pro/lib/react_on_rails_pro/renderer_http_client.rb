@@ -54,7 +54,6 @@ module ReactOnRailsPro
       Errno::ETIMEDOUT,
       Protocol::HTTP::RefusedError
     ].freeze
-    HTTP2_CONNECTION_CLOSED_MESSAGE = "Connection closed!"
 
     def self.transport_config_description
       "renderer_http_force_http2 = #{ReactOnRailsPro.configuration.renderer_http_force_http2}"
@@ -762,10 +761,12 @@ module ReactOnRailsPro
     end
 
     def retryable_http2_error?(error)
-      # async-http uses the bare Error only when a pooled client is already closed. Exact class checks keep parser and
-      # framing subclasses visible while retaining retries for peer-reset streams.
-      error.instance_of?(Protocol::HTTP2::StreamError) ||
-        (error.instance_of?(Protocol::HTTP2::Error) && error.message == HTTP2_CONNECTION_CLOSED_MESSAGE)
+      # async-http uses the bare Error for an already-closed pooled client. protocol-http2 uses exact StreamError and
+      # GoawayError instances for peer-driven stream and connection teardown. Exact checks keep parser and framing
+      # subclasses visible.
+      error.instance_of?(Protocol::HTTP2::Error) ||
+        error.instance_of?(Protocol::HTTP2::StreamError) ||
+        error.instance_of?(Protocol::HTTP2::GoawayError)
     end
 
     def execute_request_with_trace(method, path, request_body, stream:, response_handlers:, parent_context:)

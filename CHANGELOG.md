@@ -37,8 +37,9 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 - **[Pro]** **Node Renderer transport follow-ups now expose protocol errors and accurate Fastify modes**:
   Rails retries continue for network disconnects and peer-reset HTTP/2 streams, while HTTP parser and framing errors
-  surface directly. Public `configureFastify` callbacks now reflect both HTTP/1.1 and HTTP/2 runtime modes, and a
-  real OpenTelemetry SDK compatibility check guards optional Rails tracing setup.
+  surface directly. Public `configureFastify` callbacks and `fastifyServerOptions` now reflect both HTTP/1.1 and
+  HTTP/2 runtime modes. Compatibility coverage now exercises the existing optional tracing detection against the real
+  OpenTelemetry SDK.
 
 - **[Pro]** **Bounded Node Renderer VM retention now avoids old/new RSC rebuild thrash during rolling deploys**:
   The default per-worker VM hard cap now retains four contexts, enough for the server and RSC bundles from one

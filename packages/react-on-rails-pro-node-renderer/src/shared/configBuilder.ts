@@ -21,6 +21,7 @@
 import os from 'os';
 import path from 'path';
 import fs from 'fs';
+import * as http from 'node:http';
 import * as http2 from 'node:http2';
 import { FastifyServerOptions } from 'fastify';
 import { LevelWithSilent } from 'pino';
@@ -34,9 +35,16 @@ const DEFAULT_LOG_LEVEL = 'info';
 const { env } = process;
 const MAX_DEBUG_SNIPPET_LENGTH = 1000;
 
-export type RendererFastifyServerOptions = FastifyServerOptions<http2.Http2Server> & {
+type Http1FastifyServerOptions = FastifyServerOptions & { http2: false };
+type Http2FastifyServerOptions = FastifyServerOptions<http2.Http2Server> & { http2?: true };
+type RuntimeFastifyServerOptions = FastifyServerOptions<http.Server | http2.Http2Server> & {
   http2?: boolean;
 };
+
+export type RendererFastifyServerOptions =
+  | Http1FastifyServerOptions
+  | Http2FastifyServerOptions
+  | RuntimeFastifyServerOptions;
 
 /* Update ./docs/node-renderer/js-configuration.md when something here changes */
 // Node renderer configuration

@@ -15,6 +15,7 @@
 
 require_relative "spec_helper"
 require "open3"
+require "timeout"
 require "react_on_rails_pro/open_telemetry"
 require "react_on_rails_pro/renderer_http_client"
 require "react_on_rails_pro/stream_request"
@@ -253,9 +254,12 @@ RSpec.describe ReactOnRailsPro::OpenTelemetry do
         trace.within_context { nil }
       RUBY
 
-      _stdout, stderr, status = Open3.capture3(RbConfig.ruby, "-I", lib_path, "-e", script)
+      env = { "OTEL_SDK_DISABLED" => nil, "OTEL_TRACES_EXPORTER" => "none" }
+      stdout, stderr, status = Timeout.timeout(60) do
+        Open3.capture3(env, RbConfig.ruby, "-I", lib_path, "-e", script)
+      end
 
-      expect(status).to be_success, stderr
+      expect(status).to be_success, "stdout:\n#{stdout}\nstderr:\n#{stderr}"
     end
   end
 

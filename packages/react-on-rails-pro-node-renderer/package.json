@@ -137,7 +137,7 @@
     "clean": "rm -rf ./lib",
     "ci": "jest --ci --runInBand --reporters=default --reporters=jest-junit",
     "test": "jest tests",
-    "type-check": "tsc --noEmit --noErrorTruncation  --project src/tsconfig.json",
+    "type-check": "tsc --noEmit --noErrorTruncation --project src/tsconfig.json && tsc --noEmit --noErrorTruncation --project type-tests/tsconfig.json",
     "prepare": "[ -f lib/ReactOnRailsProNodeRenderer.js ] || (rm -rf ./lib && tsc --project src/tsconfig.json)",
     "prepublishOnly": "pnpm run build"
   },
