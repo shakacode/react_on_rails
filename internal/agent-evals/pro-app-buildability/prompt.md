@@ -41,6 +41,9 @@ echo "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"
 ```
 
 Prefer a bounded tail-only pipeline when no persistent log is needed.
+If `npm run build` needs a secret, use exactly
+`SECRET_KEY_BASE=$(bin/rails secret) npm run build` as the bounded pipeline target.
+Do not use `SECRET_KEY_BASE_DUMMY`, a literal secret, or another command substitution.
 Do not source a workspace or model-created shell file in a final proof invocation.
 Complete setup in an earlier command, and express any required non-sensitive environment
 assignments explicitly in the final proof invocation.

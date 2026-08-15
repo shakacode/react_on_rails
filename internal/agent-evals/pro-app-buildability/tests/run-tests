@@ -45,6 +45,11 @@ rg -Fq 'then echo it as the final executable line in that shell invocation.' \
   "$eval_dir/prompt.md"
 rg -Fq 'Prefer a bounded tail-only pipeline when no persistent log is needed.' \
   "$eval_dir/prompt.md"
+rg -Fq 'If `npm run build` needs a secret, use exactly' "$eval_dir/prompt.md"
+rg -Fq '`SECRET_KEY_BASE=$(bin/rails secret) npm run build` as the bounded pipeline target.' \
+  "$eval_dir/prompt.md"
+rg -Fq 'Do not use `SECRET_KEY_BASE_DUMMY`, a literal secret, or another command substitution.' \
+  "$eval_dir/prompt.md"
 rg -Fq 'Do not source a workspace or model-created shell file in a final proof invocation.' \
   "$eval_dir/prompt.md"
 rg -Fq 'Complete setup in an earlier command, and express any required non-sensitive environment' \
@@ -1423,17 +1428,24 @@ node --input-type=module -e \
    process.stdout.write(redactSensitiveValues(fs.readFileSync(input, "utf8")));' \
   "$eval_dir/bin/sensitive-values.mjs" "$tmp/runtime-generated-secret-expressions" \
   >"$tmp/runtime-generated-secret-expressions.js-safe"
-cmp "$tmp/runtime-generated-secret-expressions.perl-safe" \
-  "$tmp/runtime-generated-secret-expressions.js-safe"
 cat >"$tmp/runtime-generated-secret-expressions.expected" <<'EOF'
+SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>" npm run build > <LOCAL_PATH>/.ror-eval-state/prod-build.log 2>&1
+SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>"
+RAILS_ENV=production NODE_ENV=production SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>" npm run build
+	SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>" bin/rails assets:precompile
+SECRET_KEY_BASE="[REDACTED]" npm run build
+EOF
+cmp "$tmp/runtime-generated-secret-expressions.expected" \
+  "$tmp/runtime-generated-secret-expressions.perl-safe"
+cat >"$tmp/runtime-generated-secret-expressions.js-expected" <<'EOF'
 SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>" npm run build > <LOCAL_PATH>/.ror-eval-state/prod-build.log 2>&1
 SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>"
 RAILS_ENV=production NODE_ENV=production SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>" npm run build
 	SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>" bin/rails assets:precompile
 SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>" npm run build
 EOF
-cmp "$tmp/runtime-generated-secret-expressions.expected" \
-  "$tmp/runtime-generated-secret-expressions.perl-safe"
+cmp "$tmp/runtime-generated-secret-expressions.js-expected" \
+  "$tmp/runtime-generated-secret-expressions.js-safe"
 set +e
 "$eval_dir/bin/scan-sensitive-artifacts" \
   "$tmp/runtime-generated-secret-expressions.perl-safe" >/dev/null
@@ -5791,6 +5803,55 @@ node "$eval_dir/bin/derive-evidence.mjs" "$tmp/stable-phase-events.jsonl" \
   "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
 test "$(jq -r '.overall' "$tmp/stable-phase-output/rubric-results.json")" = pass
 
+runtime_secret_build_command=$'cd <LOCAL_PATH>/eval_app\nset -o pipefail\nSECRET_KEY_BASE="<GENERATED_AT_RUNTIME>" npm run build 2>&1 | tail -n 200\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"'
+runtime_secret_build_raw_command=$'cd <LOCAL_PATH>/eval_app\nset -o pipefail\nSECRET_KEY_BASE=$(bin/rails secret) npm run build 2>&1 | tail -n 200\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"'
+jq -cn --arg command "$runtime_secret_build_raw_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"Rspack compiled successfully\nROR_EVAL_BUILD_EXIT=0"}}' \
+  >"$tmp/runtime-secret-build-raw-events.jsonl"
+perl "$eval_dir/bin/sanitize-events.pl" --jsonl "$tmp/runtime-secret-build-raw-events.jsonl" \
+  >"$tmp/runtime-secret-build-events.jsonl"
+mkdir "$tmp/runtime-secret-build-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/runtime-secret-build-events.jsonl" \
+  "$tmp/claude-v8-form-workspace" "$tmp/runtime-secret-build-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+test "$(jq -r '.items[] | select(.id == "build.production") | .status' \
+  "$tmp/runtime-secret-build-output/rubric-results.json")" = pass
+
+jq -cn --arg command "$runtime_secret_build_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"Rspack compiled successfully\nROR_EVAL_BUILD_EXIT=0"}}' \
+  >"$tmp/runtime-secret-build-literal-events.jsonl"
+perl "$eval_dir/bin/sanitize-events.pl" --jsonl "$tmp/runtime-secret-build-literal-events.jsonl" \
+  >"$tmp/runtime-secret-build-literal-safe-events.jsonl"
+mkdir "$tmp/runtime-secret-build-literal-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/runtime-secret-build-literal-safe-events.jsonl" \
+  "$tmp/claude-v8-form-workspace" "$tmp/runtime-secret-build-literal-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+test "$(jq -r '.items[] | select(.id == "build.production") | .status' \
+  "$tmp/runtime-secret-build-literal-output/rubric-results.json")" = unknown
+
+runtime_secret_build_rejections=(
+  "${runtime_secret_build_command/SECRET_KEY_BASE=\"<GENERATED_AT_RUNTIME>\"/SECRET_KEY_BASE_DUMMY=\"<GENERATED_AT_RUNTIME>\"}"
+  "${runtime_secret_build_command/SECRET_KEY_BASE=\"<GENERATED_AT_RUNTIME>\"/SECRET_KEY_BASE=\"[REDACTED]\"}"
+  "${runtime_secret_build_command/SECRET_KEY_BASE=\"<GENERATED_AT_RUNTIME>\"/SECRET_KEY_BASE=\"<generated_at_runtime>\"}"
+  "${runtime_secret_build_command/SECRET_KEY_BASE=\"<GENERATED_AT_RUNTIME>\" npm run build/npm run build SECRET_KEY_BASE=\"<GENERATED_AT_RUNTIME>\"}"
+  $'set -o pipefail\nSECRET_KEY_BASE_DUMMY=[REDACTED]\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"'
+)
+runtime_secret_build_rejection_index=0
+for build_command in "${runtime_secret_build_rejections[@]}"; do
+  runtime_secret_build_rejection_index=$((runtime_secret_build_rejection_index + 1))
+  jq -cn --arg command "$build_command" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"Rspack compiled successfully\nROR_EVAL_BUILD_EXIT=0"}}' \
+    >"$tmp/runtime-secret-build-rejection-$runtime_secret_build_rejection_index-events.jsonl"
+  mkdir "$tmp/runtime-secret-build-rejection-$runtime_secret_build_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" \
+    "$tmp/runtime-secret-build-rejection-$runtime_secret_build_rejection_index-events.jsonl" \
+    "$tmp/claude-v8-form-workspace" \
+    "$tmp/runtime-secret-build-rejection-$runtime_secret_build_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "build.production") | .status' \
+    "$tmp/runtime-secret-build-rejection-$runtime_secret_build_rejection_index-output/rubric-results.json")" = unknown
+done
+
 assigned_status_scaffold_command=$'set -o pipefail\nnpx --yes create-react-on-rails-app eval_app --rsc --package-manager npm 2>&1 | tee <LOCAL_PATH>/scaffold.log | tail -c 4096\nROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT"'
 assigned_status_test_command=$'cd <LOCAL_PATH>/eval_app\nset -o pipefail\nRAILS_ENV=test bin/rails test 2>&1 | tail -100\nROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT"'
 assigned_status_build_command=$'cd <LOCAL_PATH>/eval_app\nrm -rf public/assets public/packs public/packs-test\nset -o pipefail\nenv RAILS_ENV=production NODE_ENV=production bin/rails assets:precompile 2>&1 | tail -n 200\nROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}\necho "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"'
@@ -7906,7 +7967,7 @@ for manifest_variant in missing one-env truncated; do
     printf '%020000d' 0 >>"$manifest"
     printf '%s\n' '"}' >>"$manifest"
   fi
-  for evidence_variant in stable-build no-pipefail-build stdout-only-build; do
+  for evidence_variant in stable-build runtime-secret-build no-pipefail-build stdout-only-build; do
     mkdir "$tmp/$evidence_variant-$manifest_variant-output"
     node "$eval_dir/bin/derive-evidence.mjs" "$tmp/$evidence_variant-events.jsonl" \
       "$tmp/stable-build-$manifest_variant-workspace" "$tmp/$evidence_variant-$manifest_variant-output" \
@@ -7955,6 +8016,63 @@ node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
 for row in form.validation tests.form; do
   test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
     "$tmp/fresh-claude-form-output/rubric-results.json")" = pass
+done
+
+cp -R "$tmp/fresh-claude-form-workspace" "$tmp/fresh-codex-response-alias-workspace"
+ruby -e '
+  path = ARGV.fetch(0)
+  content = File.read(path)
+  abort unless content.sub!(
+    %q{    assert_select "#error_explanation"},
+    %Q{    body = CGI.unescapeHTML(response.body)\n    Rails.logger.info("decoded body")\n\n    assert_includes body, "Email is invalid"},
+  )
+  File.write(path, content)
+' "$tmp/fresh-codex-response-alias-workspace/eval_app/test/controllers/subscribers_controller_test.rb"
+ruby -c \
+  "$tmp/fresh-codex-response-alias-workspace/eval_app/test/controllers/subscribers_controller_test.rb" \
+  >/dev/null
+mkdir "$tmp/fresh-codex-response-alias-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+  "$tmp/fresh-codex-response-alias-workspace" "$tmp/fresh-codex-response-alias-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/fresh-codex-response-alias-output/rubric-results.json")" = pass
+done
+
+fresh_codex_response_alias_rejections=(
+  $'    body = "Email is invalid"\n\n    assert_includes body, "Email is invalid"'
+  $'    body = CGI.unescapeHTML(other_response.body)\n\n    assert_includes body, "Email is invalid"'
+  $'    assert_includes body, "Email is invalid"\n\n    body = CGI.unescapeHTML(response.body)'
+  $'    body = CGI.unescapeHTML(response.body)\n    body = "Email is invalid"\n\n    assert_includes body, "Email is invalid"'
+  $'    body = CGI.unescapeHTML(response.body)\n    body << "Email is invalid"\n\n    assert_includes body, "Email is invalid"'
+  $'    body = CGI.unescapeHTML(response.body)\n\n    assert_includes body, expected_error'
+)
+fresh_codex_response_alias_rejection_index=0
+for replacement in "${fresh_codex_response_alias_rejections[@]}"; do
+  fresh_codex_response_alias_rejection_index=$((fresh_codex_response_alias_rejection_index + 1))
+  cp -R "$tmp/fresh-claude-form-workspace" \
+    "$tmp/fresh-codex-response-alias-rejection-$fresh_codex_response_alias_rejection_index-workspace"
+  ruby -e '
+    path, replacement = ARGV
+    content = File.read(path)
+    abort unless content.sub!(%q{    assert_select "#error_explanation"}, replacement)
+    File.write(path, content)
+  ' \
+    "$tmp/fresh-codex-response-alias-rejection-$fresh_codex_response_alias_rejection_index-workspace/eval_app/test/controllers/subscribers_controller_test.rb" \
+    "$replacement"
+  ruby -c \
+    "$tmp/fresh-codex-response-alias-rejection-$fresh_codex_response_alias_rejection_index-workspace/eval_app/test/controllers/subscribers_controller_test.rb" \
+    >/dev/null
+  mkdir "$tmp/fresh-codex-response-alias-rejection-$fresh_codex_response_alias_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/no-pipefail-test-events.jsonl" \
+    "$tmp/fresh-codex-response-alias-rejection-$fresh_codex_response_alias_rejection_index-workspace" \
+    "$tmp/fresh-codex-response-alias-rejection-$fresh_codex_response_alias_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/fresh-codex-response-alias-rejection-$fresh_codex_response_alias_rejection_index-output/rubric-results.json")" = unknown
+  done
 done
 
 jq -cn \

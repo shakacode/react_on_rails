@@ -24,6 +24,9 @@ sub credential_value {
 
 sub canonicalize_runtime_generated_secret {
   my ($value) = @_;
+  $value =~ s{(^|[ \t])SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>"(?=[ \t]|$)}{
+    "$1" . 'SECRET_KEY_BASE="[REDACTED]"'
+  }gme;
   $value =~ s{(^|[ \t])SECRET_KEY_BASE=\$\(bin/rails secret\)(?=[ \t]|$)}{
     "$1" . 'SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>"'
   }gme;

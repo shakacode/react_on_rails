@@ -366,6 +366,7 @@ const artifactCheckedProductionBuildTarget = (lines, output) => {
     ? 'npm run build'
     : null;
 };
+const runtimeGeneratedProductionBuildTarget = 'SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>" npm run build';
 const pipelineStatusProductionBuildTarget = (lines, output) => {
   if (
     lines.length !== 6 ||
@@ -407,15 +408,16 @@ const phaseStatusProductionBuildTarget = (lines, output) => {
   if (
     !proof ||
     (proof.target !== 'npm run build' &&
+      proof.target !== runtimeGeneratedProductionBuildTarget &&
       proof.target !== 'env RAILS_ENV=production NODE_ENV=production bin/rails assets:precompile')
   ) {
     return null;
   }
-  return proof.outputLines
+  const compiled = proof.outputLines
     .slice(0, -1)
-    .some((line) => /compiled|compilation (?:complete|successful)|built successfully/i.test(line))
-    ? proof.target
-    : null;
+    .some((line) => /compiled|compilation (?:complete|successful)|built successfully/i.test(line));
+  if (!compiled) return null;
+  return proof.target === runtimeGeneratedProductionBuildTarget ? 'npm run build' : proof.target;
 };
 const compoundShakapackerBuildTarget =
   '{ RAILS_ENV=production NODE_ENV=production bin/shakapacker-precompile-hook && SHAKAPACKER_SKIP_PRECOMPILE_HOOK=true RAILS_ENV=production NODE_ENV=production bin/shakapacker; }';
@@ -432,9 +434,7 @@ const relativeCdCompoundProductionBuildTarget = (lines, output, outputTruncated)
     : null;
 };
 const directRuntimeProductionBuildTarget = (lines) =>
-  lines.length === 1 && lines[0] === 'SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>" npm run build'
-    ? 'npm run build'
-    : null;
+  lines.length === 1 && lines[0] === runtimeGeneratedProductionBuildTarget ? 'npm run build' : null;
 const completedScaffoldOutput = (output) => {
   const lines = output.split(/\r?\n/).map((line) => line.trim());
   const created = lines.filter((line) => line === 'Created eval_app with React on Rails!');
@@ -2225,26 +2225,46 @@ const semanticFormIntegrationTest = (artifact, uncommentedRuby) => {
       );
       return match !== null && matchesSubject(match[1]);
     });
-  const hasRenderedBodyAssertion = (body) =>
-    body.split(/\r?\n/).some((line) => {
+  const hasRenderedBodyAssertion = (body) => {
+    let responseBodyAlias = null;
+    return body.split(/\r?\n/).some((line) => {
       const uncommentedLine = stripRubyTrailingComment(line);
       if (uncommentedLine === null) return false;
       const assertion = uncommentedLine.trim();
+      const aliasAssignment = assertion.match(
+        /^([a-z_][a-z0-9_]*)[ \t]*=[ \t]*CGI\.unescapeHTML\((?:@response|response)\.body\)$/,
+      );
+      if (aliasAssignment) {
+        const [, aliasName] = aliasAssignment;
+        responseBodyAlias = aliasName;
+        return false;
+      }
       const includesAssertion = positiveAssertIncludes(assertion);
       if (
         includesAssertion !== null &&
-        /^(?:@response|response)\.body$/.test(includesAssertion.subject) &&
+        (/^(?:@response|response)\.body$/.test(includesAssertion.subject) ||
+          includesAssertion.subject === responseBodyAlias) &&
         !validationErrorLiteralIsNegative(includesAssertion.member)
       ) {
         return true;
       }
       const matchAssertion = positiveAssertMatch(assertion);
-      return (
+      if (
         matchAssertion !== null &&
-        /^(?:@response|response)\.body$/.test(matchAssertion.subject) &&
+        (/^(?:@response|response)\.body$/.test(matchAssertion.subject) ||
+          matchAssertion.subject === responseBodyAlias) &&
         !validationErrorLiteralIsNegative(matchAssertion.pattern)
-      );
+      ) {
+        return true;
+      }
+      if (responseBodyAlias !== null) {
+        const aliasReference = new RegExp(`(?:^|[^A-Za-z0-9_])${responseBodyAlias}(?:$|[^A-Za-z0-9_])`);
+        const maskedAssertion = maskRubyStringAndCommentContent(assertion);
+        if (maskedAssertion === null || aliasReference.test(maskedAssertion)) responseBodyAlias = null;
+      }
+      return false;
     });
+  };
   const positiveValidationErrorComparator = (method, rawComparator) => {
     if (!positiveSelectorComparator(method, rawComparator)) return false;
     return validationErrorComparatorLiterals(method, rawComparator).some(
