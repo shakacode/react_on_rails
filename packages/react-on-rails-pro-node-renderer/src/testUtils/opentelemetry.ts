@@ -17,7 +17,7 @@ import {
   getOpenTelemetryTracerProvider,
   setOpenTelemetryTracerProvider,
 } from '../shared/opentelemetryState.js';
-import { setUsingExistingGlobalTracerProvider } from '../integrations/internal/opentelemetryState.js';
+import { setUsingExistingGlobalTracerProvider } from '../integrations/internal/opentelemetryExistingProviderState.js';
 import { resetSubSpan, resetTracing } from '../shared/tracing.js';
 import * as fastifyConfig from '../worker/fastifyConfig.js';
 import * as shutdownHooks from '../worker/shutdownHooks.js';

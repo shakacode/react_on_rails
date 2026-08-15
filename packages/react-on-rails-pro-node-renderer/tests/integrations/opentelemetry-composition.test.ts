@@ -106,6 +106,7 @@ describe('opentelemetry integration: composable init()', () => {
       instrumentationName: 'broken',
       disable: customDisable,
     } as unknown as Instrumentation;
+    const invalidInstrumentation = undefined as unknown as Instrumentation;
 
     jest.doMock('@opentelemetry/instrumentation', () => ({ registerInstrumentations }));
     jest.doMock('@opentelemetry/instrumentation-http', () => ({
@@ -126,7 +127,7 @@ describe('opentelemetry integration: composable init()', () => {
     const { init } = await import('../../src/integrations/opentelemetry');
 
     init({
-      instrumentations: [customInstrumentation],
+      instrumentations: [customInstrumentation, invalidInstrumentation],
     });
 
     expect(shutdownSpy).toHaveBeenCalledTimes(1);
@@ -137,7 +138,17 @@ describe('opentelemetry integration: composable init()', () => {
     expect(fastifyDisable.mock.invocationCallOrder[0]).toBeLessThan(shutdownSpy.mock.invocationCallOrder[0]!);
     expect(customDisable.mock.invocationCallOrder[0]).toBeLessThan(shutdownSpy.mock.invocationCallOrder[0]!);
     expect(warnSpy).toHaveBeenCalledWith(
-      { err: disableError, instrumentation: 'broken' },
+      {
+        err: { name: 'Error', message: 'custom instrumentation disable failed' },
+        instrumentation: 'broken',
+      },
+      '[OpenTelemetry] instrumentation.disable() failed during cleanup',
+    );
+    expect(warnSpy).toHaveBeenCalledWith(
+      {
+        err: { name: 'TypeError', message: expect.any(String) },
+        instrumentation: '<unknown>',
+      },
       '[OpenTelemetry] instrumentation.disable() failed during cleanup',
     );
     expect(messageSpy).toHaveBeenCalledWith(
@@ -374,7 +385,9 @@ describe('opentelemetry integration: composable init()', () => {
     delete process.env.OTEL_RESOURCE_ATTRIBUTES;
 
     try {
-      const thrownError = new Error('detector threw');
+      const thrownError = Object.assign(new Error('detector threw'), {
+        config: { headers: { Authorization: 'sensitive-test-token' } },
+      });
       const rejectedError = new Error('attribute rejected');
       const anonymousError = new Error('anonymous detector threw');
       const throwingDetector: ResourceDetector = {
@@ -403,15 +416,18 @@ describe('opentelemetry integration: composable init()', () => {
         'service.name': 'react-on-rails-pro-node-renderer',
       });
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ err: thrownError }),
+        { detector: 'Object', err: { name: 'Error', message: 'detector threw' } },
         expect.stringContaining('resource detector failed'),
       );
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ err: rejectedError }),
+        { detector: 'Object', err: { name: 'Error', message: 'attribute rejected' } },
         expect.stringContaining('resource detector failed'),
       );
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ detector: '<anonymous>', err: anonymousError }),
+        {
+          detector: '<anonymous>',
+          err: { name: 'Error', message: 'anonymous detector threw' },
+        },
         expect.stringContaining('resource detector failed'),
       );
     } finally {
@@ -529,6 +545,8 @@ describe('opentelemetry integration: composable init()', () => {
     const existingProvider = new NodeTracerProvider({ spanProcessors: [spanProcessor] });
     expect(otelTrace.setGlobalTracerProvider(existingProvider)).toBe(true);
 
+    const log = (await import('../../src/shared/log')).default;
+    const warnSpy = jest.spyOn(log, 'warn').mockImplementation(() => undefined);
     const errorReporter = await import('../../src/shared/errorReporter');
     const messageSpy = jest.spyOn(errorReporter, 'message').mockImplementation(() => undefined);
     const { init } = await import('../../src/integrations/opentelemetry');
@@ -541,7 +559,8 @@ describe('opentelemetry integration: composable init()', () => {
     );
     await spanProcessor.forceFlush();
 
-    expect(messageSpy).toHaveBeenCalledWith(expect.stringContaining('no working context manager'));
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('no working context manager'));
+    expect(messageSpy).not.toHaveBeenCalled();
     expect(exporter.getFinishedSpans()).toHaveLength(0);
     await existingProvider.shutdown();
   });

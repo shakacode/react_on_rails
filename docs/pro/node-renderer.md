@@ -392,6 +392,8 @@ await reactOnRailsProNodeRenderer().catch((e) => {
 > [!NOTE]
 > With `fastify: true` or a nonempty `instrumentations` list, OpenTelemetry patches modules process-wide. If a later init step fails, the renderer disables every registered instrumentation before cleaning up the provider. It also disables them during normal renderer-managed shutdown so they stop creating spans.
 
+After renderer-managed initialization succeeds, the renderer owns the provider lifecycle, including any supplied `spanProcessor` or `exporter`, and shuts those components down with the provider. Until initialization succeeds, supplied processors and exporters remain caller-owned: failed initialization force-flushes them when supported but does not shut them down.
+
 ### Add instrumentations and resource detectors
 
 Pass one or more additional OpenTelemetry instrumentations through `instrumentations`. The renderer appends them after its built-in `HttpInstrumentation` and `FastifyOtelInstrumentation` instances, so the custom list extends rather than replaces the renderer defaults. A nonempty list registers the full combined list even when `fastify` is not set separately and therefore requires `@opentelemetry/instrumentation`, `@opentelemetry/instrumentation-http`, and `@fastify/otel` to be installed. An empty list is inert and does not load or register the built-in instrumentations. Passing an instrumentation instance gives the renderer lifecycle ownership of its activation: the renderer disables that instance after failed initialization and during normal shutdown.
@@ -429,7 +431,7 @@ initOpenTelemetry({
 });
 ```
 
-The renderer verifies that a global tracer provider and a working context manager have been registered before it installs `setupTracing` and `setupSubSpan`, preserving the renderer's nested `ror.*` spans. Register the application SDK with `provider.register()` before calling renderer `init()`. Calling only `trace.setGlobalTracerProvider()` is insufficient because it does not install context propagation. If no provider is registered yet, `init()` logs the ordering problem without installing adapters. Register the provider, then call `init()` again to attach renderer tracing.
+The renderer verifies that a global tracer provider and a working context manager have been registered before it installs `setupTracing` and `setupSubSpan`, preserving the renderer's nested `ror.*` spans. Register the application SDK with `provider.register()` before calling renderer `init()`. Calling only `trace.setGlobalTracerProvider()` is insufficient because it does not install context propagation. If either prerequisite is unavailable, `init()` logs a retryable warning without installing adapters. Register the SDK, then call `init()` again to attach renderer tracing.
 
 The application continues to own exporters, processors, resources, instrumentations, propagators, flushing, and provider shutdown. Renderer-managed options such as `fastify`, `instrumentations`, `resourceDetectors`, `exporter`, `spanProcessor`, and `shutdownTimeoutMs` are ignored in this mode and produce a warning when supplied. Configure those features on the application-owned SDK before starting the renderer. In particular, register HTTP and Fastify instrumentation before the Fastify server loads so incoming `traceparent` context from Rails becomes the parent of the renderer's `ror.*` spans. The renderer does not add a shutdown hook for an external provider, so the host must flush and shut down its SDK during application shutdown.
 

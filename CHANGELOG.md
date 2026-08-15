@@ -306,7 +306,10 @@ pair`, returns invalid UTF-8, or silently mis-decodes the value. The parser now 
 - **[Pro]** **Node Renderer OpenTelemetry initialization now composes with application observability stacks**:
   Applications can append custom instrumentations to the built-in HTTP and Fastify pair, merge resource-detector
   attributes below explicit resource configuration, or opt in to preserving renderer `ror.*` spans through an
-  application-owned global provider. Empty `OTEL_SERVICE_NAME` and `serviceName` option values are treated as unset.
+  application-owned global provider. Empty service-name values from environment variables, options, and resource
+  attributes are treated as unset. Renderer-managed shutdown disables registered instrumentations and shuts down
+  provider components after successful initialization, while failed initialization preserves caller-supplied processors
+  and exporters.
   Fixes [Issue 4867](https://github.com/shakacode/react_on_rails/issues/4867).
   [PR 4878](https://github.com/shakacode/react_on_rails/pull/4878) by
   [sashakhar1](https://github.com/sashakhar1).

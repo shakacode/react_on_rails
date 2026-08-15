@@ -26,7 +26,7 @@ import { resolveResource, resolveServiceName } from './internal/opentelemetryCon
 import {
   isUsingExistingGlobalTracerProvider,
   setUsingExistingGlobalTracerProvider,
-} from './internal/opentelemetryState.js';
+} from './internal/opentelemetryExistingProviderState.js';
 import {
   getOpenTelemetryTracerProvider,
   log,
@@ -138,13 +138,25 @@ function disableOpenTelemetryGlobals(otelApi: typeof import('@opentelemetry/api'
   otelApi.diag.disable();
 }
 
+function summarizeError(error: unknown): { name: string; message: string } {
+  try {
+    return error instanceof Error
+      ? { name: error.name || 'Error', message: error.message }
+      : { name: 'NonError', message: String(error) };
+  } catch {
+    return { name: 'UnknownError', message: 'Error details unavailable' };
+  }
+}
+
 function disableOpenTelemetryInstrumentations(instrumentations: Instrumentation[]): void {
   for (const instrumentation of instrumentations) {
+    let instrumentationName = '<unknown>';
     try {
+      instrumentationName = instrumentation?.instrumentationName ?? '<unknown>';
       instrumentation.disable();
     } catch (error) {
       log.warn(
-        { err: error, instrumentation: instrumentation.instrumentationName },
+        { err: summarizeError(error), instrumentation: instrumentationName },
         '[OpenTelemetry] instrumentation.disable() failed during cleanup',
       );
     }
@@ -295,7 +307,7 @@ function initWithExistingGlobalProvider(opts: OpenTelemetryInitOptions): void {
       return;
     }
     if (!hasWorkingContextManager(otelApi)) {
-      message(
+      log.warn(
         '[OpenTelemetry] useExistingGlobalProvider: the global provider has no working context manager; ' +
           'register the application SDK with provider.register() before init(). No renderer spans were installed.',
       );
@@ -370,12 +382,17 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
   let unregisterFastifyConfig: (() => void) | undefined;
   let unregisterWorkerShutdownHook: (() => void) | undefined;
   let ownsOpenTelemetryGlobals = false;
-  const rendererOwnsSpanProcessor = opts.spanProcessor === undefined && opts.exporter === undefined;
+  // A caller-supplied processor or exporter remains caller-owned unless init succeeds.
+  // Shutting down the provider on failure would also shut down that supplied component.
+  const preserveCallerSuppliedTelemetryOnFailedInit =
+    opts.spanProcessor !== undefined || opts.exporter !== undefined;
   const cleanupFailedProvider = (provider: NodeTracerProviderType) => {
     disableOpenTelemetryInstrumentations(createdInstrumentations);
 
-    if (!rendererOwnsSpanProcessor && typeof provider.forceFlush === 'function') {
-      void provider.forceFlush().catch(() => undefined);
+    if (preserveCallerSuppliedTelemetryOnFailedInit) {
+      if (typeof provider.forceFlush === 'function') {
+        void provider.forceFlush().catch(() => undefined);
+      }
       return;
     }
 
@@ -400,7 +417,7 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
     const shutdownTimeoutMs = resolveShutdownTimeoutMs(opts);
     const { resource, serviceName } = resolveResource(opts, resources, ATTR_SERVICE_NAME, (detector, err) => {
       log.warn(
-        { detector: detector?.constructor?.name ?? '<anonymous>', err },
+        { detector: detector?.constructor?.name ?? '<anonymous>', err: summarizeError(err) },
         '[OpenTelemetry] resource detector failed; unavailable attributes are omitted',
       );
     });
