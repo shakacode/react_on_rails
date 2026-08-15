@@ -52,10 +52,7 @@ module ReactOnRailsPro
       Errno::ENETUNREACH,
       Errno::EPIPE,
       Errno::ETIMEDOUT,
-      Protocol::HTTP::RefusedError,
-      # A transport mismatch can surface while parsing the other protocol.
-      Protocol::HTTP1::ProtocolError,
-      Protocol::HTTP2::Error
+      Protocol::HTTP::RefusedError
     ].freeze
 
     def self.transport_config_description
@@ -757,6 +754,19 @@ module ReactOnRailsPro
       raise TimeoutError, e.message
     rescue *CONNECTION_ERRORS => e
       raise ConnectionError, e.message
+    rescue Protocol::HTTP2::Error => e
+      raise unless retryable_http2_error?(e)
+
+      raise ConnectionError, e.message
+    end
+
+    def retryable_http2_error?(error)
+      # async-http uses the bare Error for an already-closed pooled client. protocol-http2 uses exact StreamError and
+      # GoawayError instances for peer-driven stream and connection teardown. Exact checks keep parser and framing
+      # subclasses visible.
+      error.instance_of?(Protocol::HTTP2::Error) ||
+        error.instance_of?(Protocol::HTTP2::StreamError) ||
+        error.instance_of?(Protocol::HTTP2::GoawayError)
     end
 
     def execute_request_with_trace(method, path, request_body, stream:, response_handlers:, parent_context:)

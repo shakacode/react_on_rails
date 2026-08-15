@@ -280,6 +280,20 @@ GEM
       racc (~> 1.4)
     nokogiri (1.19.4-x86_64-linux-musl)
       racc (~> 1.4)
+    opentelemetry-api (1.11.0)
+      logger
+    opentelemetry-common (0.25.1)
+      opentelemetry-api (~> 1.0)
+    opentelemetry-registry (0.6.3)
+      opentelemetry-api (~> 1.1)
+    opentelemetry-sdk (1.13.0)
+      logger
+      opentelemetry-api (~> 1.1)
+      opentelemetry-common (~> 0.20)
+      opentelemetry-registry (~> 0.2)
+      opentelemetry-semantic_conventions
+    opentelemetry-semantic_conventions (1.43.0)
+      opentelemetry-api (~> 1.0)
     ostruct (0.6.3)
     package_json (0.2.0)
     pg (1.5.6)
@@ -529,6 +543,7 @@ DEPENDENCIES
   net-http
   net-imap
   net-smtp
+  opentelemetry-sdk
   ostruct
   pg
   prism-rails
