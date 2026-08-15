@@ -1418,6 +1418,7 @@ SECRET_KEY_BASE=$(bin/rails secret)
 RAILS_ENV=production NODE_ENV=production SECRET_KEY_BASE=$(bin/rails secret) npm run build
 	SECRET_KEY_BASE=$(bin/rails secret) bin/rails assets:precompile
 SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>" npm run build
+`SECRET_KEY_BASE=$(bin/rails secret) npm run build`
 EOF
 perl "$eval_dir/bin/sanitize-events.pl" "$tmp/runtime-generated-secret-expressions" \
   >"$tmp/runtime-generated-secret-expressions.perl-safe"
@@ -1434,6 +1435,7 @@ SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>"
 RAILS_ENV=production NODE_ENV=production SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>" npm run build
 	SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>" bin/rails assets:precompile
 SECRET_KEY_BASE="[REDACTED]" npm run build
+`SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>" npm run build`
 EOF
 cmp "$tmp/runtime-generated-secret-expressions.expected" \
   "$tmp/runtime-generated-secret-expressions.perl-safe"
@@ -1443,6 +1445,7 @@ SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>"
 RAILS_ENV=production NODE_ENV=production SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>" npm run build
 	SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>" bin/rails assets:precompile
 SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>" npm run build
+`SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>" npm run build`
 EOF
 cmp "$tmp/runtime-generated-secret-expressions.js-expected" \
   "$tmp/runtime-generated-secret-expressions.js-safe"
@@ -1452,6 +1455,11 @@ set +e
 runtime_generated_safe_scan_exit=$?
 set -e
 test "$runtime_generated_safe_scan_exit" = 1
+set +e
+"$eval_dir/bin/scan-sensitive-artifacts" "$eval_dir/prompt.md" >/dev/null
+runtime_generated_prompt_scan_exit=$?
+set -e
+test "$runtime_generated_prompt_scan_exit" = 1
 
 cat >"$tmp/runtime-generated-secret-near-misses" <<'EOF'
 SECRET_KEY_BASE=real-runtime-value npm run build
