@@ -69,7 +69,8 @@ export interface OpenTelemetryInitOptions {
   /** Resource detectors whose attributes are merged below explicit resource configuration. */
   resourceDetectors?: ResourceDetector[];
   /** Additional instrumentations appended after the built-in HTTP and Fastify instrumentations.
-   *  A nonempty list registers all three groups and applies process-global module patches. */
+   *  A nonempty list registers all three groups and applies process-global module patches.
+   *  Registered instances are disabled if initialization fails or the renderer shuts down. */
   instrumentations?: Instrumentation[];
   /** Use the provider already registered through the OpenTelemetry API.
    *  The host application retains ownership of SDK configuration and shutdown. */
@@ -137,12 +138,15 @@ function disableOpenTelemetryGlobals(otelApi: typeof import('@opentelemetry/api'
   otelApi.diag.disable();
 }
 
-function disableInstrumentationsAfterFailedInit(instrumentations: Instrumentation[]): void {
+function disableOpenTelemetryInstrumentations(instrumentations: Instrumentation[]): void {
   for (const instrumentation of instrumentations) {
     try {
       instrumentation.disable();
     } catch (error) {
-      log.warn({ error }, '[OpenTelemetry] instrumentation.disable() failed during init cleanup');
+      log.warn(
+        { err: error, instrumentation: instrumentation.instrumentationName },
+        '[OpenTelemetry] instrumentation.disable() failed during cleanup',
+      );
     }
   }
 }
@@ -240,6 +244,14 @@ function hasRegisteredGlobalTracerProvider(
   return provider.getDelegateTracer?.(tracerName) !== undefined;
 }
 
+function hasWorkingContextManager(otelApi: typeof import('@opentelemetry/api')): boolean {
+  const probeKey = otelApi.createContextKey('react-on-rails-pro-node-renderer.context-manager-probe');
+  const probeValue = {};
+  const probeContext = otelApi.context.active().setValue(probeKey, probeValue);
+
+  return otelApi.context.with(probeContext, () => otelApi.context.active().getValue(probeKey) === probeValue);
+}
+
 function warnAboutExistingProviderOptions(opts: OpenTelemetryInitOptions): void {
   const ignoredOptions = [
     opts.fastify ? 'fastify' : undefined,
@@ -276,9 +288,16 @@ function initWithExistingGlobalProvider(opts: OpenTelemetryInitOptions): void {
     /* eslint-enable @typescript-eslint/no-require-imports, global-require */
     const serviceName = resolveServiceName(opts, SERVICE_NAME_ATTRIBUTE);
     if (!hasRegisteredGlobalTracerProvider(otelApi, serviceName)) {
-      message(
+      log.warn(
         '[OpenTelemetry] useExistingGlobalProvider: no global tracer provider is registered; ' +
           'register the application SDK before init(). No renderer spans were installed.',
+      );
+      return;
+    }
+    if (!hasWorkingContextManager(otelApi)) {
+      message(
+        '[OpenTelemetry] useExistingGlobalProvider: the global provider has no working context manager; ' +
+          'register the application SDK with provider.register() before init(). No renderer spans were installed.',
       );
       return;
     }
@@ -353,8 +372,9 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
   let ownsOpenTelemetryGlobals = false;
   const rendererOwnsSpanProcessor = opts.spanProcessor === undefined && opts.exporter === undefined;
   const cleanupFailedProvider = (provider: NodeTracerProviderType) => {
+    disableOpenTelemetryInstrumentations(createdInstrumentations);
+
     if (!rendererOwnsSpanProcessor && typeof provider.forceFlush === 'function') {
-      disableInstrumentationsAfterFailedInit(createdInstrumentations);
       void provider.forceFlush().catch(() => undefined);
       return;
     }
@@ -463,6 +483,7 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
     const shutdownOpenTelemetry = () => {
       shutdownOpenTelemetryPromise ??= (async () => {
         try {
+          disableOpenTelemetryInstrumentations(createdInstrumentations);
           await shutdownProviderWithTimeout(provider, shutdownTimeoutMs);
           if (getOpenTelemetryTracerProvider() === provider) {
             setOpenTelemetryTracerProvider(null);

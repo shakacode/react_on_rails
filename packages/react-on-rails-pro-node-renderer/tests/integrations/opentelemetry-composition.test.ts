@@ -85,19 +85,42 @@ describe('opentelemetry integration: composable init()', () => {
 
   test('the managed provider is shut down when instrumentation registration fails', async () => {
     const registrationError = new Error('custom instrumentation registration failed');
+    const disableError = new Error('custom instrumentation disable failed');
     const registerInstrumentations = jest.fn(() => {
       throw registrationError;
     });
-    const customInstrumentation = { instrumentationName: 'broken' } as Instrumentation;
+    const httpDisable = jest.fn();
+    const fastifyDisable = jest.fn();
+    const customDisable = jest.fn(() => {
+      throw disableError;
+    });
+    const httpInstrumentation = {
+      instrumentationName: 'http',
+      disable: httpDisable,
+    } as unknown as Instrumentation;
+    const fastifyInstrumentation = {
+      instrumentationName: 'fastify',
+      disable: fastifyDisable,
+    } as unknown as Instrumentation;
+    const customInstrumentation = {
+      instrumentationName: 'broken',
+      disable: customDisable,
+    } as unknown as Instrumentation;
 
     jest.doMock('@opentelemetry/instrumentation', () => ({ registerInstrumentations }));
-    jest.doMock('@opentelemetry/instrumentation-http', () => ({ HttpInstrumentation: jest.fn() }));
-    jest.doMock('@fastify/otel', () => ({ FastifyOtelInstrumentation: jest.fn() }));
+    jest.doMock('@opentelemetry/instrumentation-http', () => ({
+      HttpInstrumentation: jest.fn(() => httpInstrumentation),
+    }));
+    jest.doMock('@fastify/otel', () => ({
+      FastifyOtelInstrumentation: jest.fn(() => fastifyInstrumentation),
+    }));
 
     const { NodeTracerProvider: FreshNodeTracerProvider } = await import('@opentelemetry/sdk-trace-node');
     const shutdownSpy = jest
       .spyOn(FreshNodeTracerProvider.prototype, 'shutdown')
       .mockResolvedValue(undefined);
+    const log = (await import('../../src/shared/log')).default;
+    const warnSpy = jest.spyOn(log, 'warn').mockImplementation(() => undefined);
     const errorReporter = await import('../../src/shared/errorReporter');
     const messageSpy = jest.spyOn(errorReporter, 'message').mockImplementation(() => undefined);
     const { init } = await import('../../src/integrations/opentelemetry');
@@ -107,6 +130,16 @@ describe('opentelemetry integration: composable init()', () => {
     });
 
     expect(shutdownSpy).toHaveBeenCalledTimes(1);
+    expect(httpDisable).toHaveBeenCalledTimes(1);
+    expect(fastifyDisable).toHaveBeenCalledTimes(1);
+    expect(customDisable).toHaveBeenCalledTimes(1);
+    expect(httpDisable.mock.invocationCallOrder[0]).toBeLessThan(shutdownSpy.mock.invocationCallOrder[0]!);
+    expect(fastifyDisable.mock.invocationCallOrder[0]).toBeLessThan(shutdownSpy.mock.invocationCallOrder[0]!);
+    expect(customDisable.mock.invocationCallOrder[0]).toBeLessThan(shutdownSpy.mock.invocationCallOrder[0]!);
+    expect(warnSpy).toHaveBeenCalledWith(
+      { err: disableError, instrumentation: 'broken' },
+      '[OpenTelemetry] instrumentation.disable() failed during cleanup',
+    );
     expect(messageSpy).toHaveBeenCalledWith(
       expect.stringContaining(
         '[OpenTelemetry] init failed: Error: custom instrumentation registration failed',
@@ -187,6 +220,57 @@ describe('opentelemetry integration: composable init()', () => {
     await spanProcessor.shutdown();
   });
 
+  test('normal shutdown disables instrumentations before shutting down the provider', async () => {
+    const registerInstrumentations = jest.fn();
+    const httpDisable = jest.fn();
+    const fastifyDisable = jest.fn();
+    const customDisable = jest.fn();
+    const httpInstrumentation = {
+      instrumentationName: 'http',
+      disable: httpDisable,
+    } as unknown as Instrumentation;
+    const fastifyInstrumentation = {
+      instrumentationName: 'fastify',
+      disable: fastifyDisable,
+    } as unknown as Instrumentation;
+    const customInstrumentation = {
+      instrumentationName: 'custom',
+      disable: customDisable,
+    } as unknown as Instrumentation;
+
+    jest.doMock('@opentelemetry/instrumentation', () => ({ registerInstrumentations }));
+    jest.doMock('@opentelemetry/instrumentation-http', () => ({
+      HttpInstrumentation: jest.fn(() => httpInstrumentation),
+    }));
+    jest.doMock('@fastify/otel', () => ({
+      FastifyOtelInstrumentation: jest.fn(() => fastifyInstrumentation),
+    }));
+
+    const { NodeTracerProvider: FreshNodeTracerProvider } = await import('@opentelemetry/sdk-trace-node');
+    const shutdownSpy = jest.spyOn(FreshNodeTracerProvider.prototype, 'shutdown');
+    const exporter = new InMemorySpanExporter();
+    const { init } = await import('../../src/integrations/opentelemetry');
+
+    init({
+      instrumentations: [customInstrumentation],
+      spanProcessor: new SimpleSpanProcessor(exporter),
+    });
+
+    const fastifyConfig = await import('../../src/worker/fastifyConfig');
+    const shutdownHooks: Array<() => Promise<void>> = [];
+    fastifyConfig.applyFastifyConfigFunctions({
+      addHook: jest.fn((_name: string, handler: () => Promise<void>) => shutdownHooks.push(handler)),
+    } as never);
+    await shutdownHooks[0]!();
+
+    expect(httpDisable).toHaveBeenCalledTimes(1);
+    expect(fastifyDisable).toHaveBeenCalledTimes(1);
+    expect(customDisable).toHaveBeenCalledTimes(1);
+    expect(httpDisable.mock.invocationCallOrder[0]).toBeLessThan(shutdownSpy.mock.invocationCallOrder[0]!);
+    expect(fastifyDisable.mock.invocationCallOrder[0]).toBeLessThan(shutdownSpy.mock.invocationCallOrder[0]!);
+    expect(customDisable.mock.invocationCallOrder[0]).toBeLessThan(shutdownSpy.mock.invocationCallOrder[0]!);
+  });
+
   test('resource detectors contribute attributes below explicit service-name configuration', async () => {
     const originalServiceName = process.env.OTEL_SERVICE_NAME;
     const originalResourceAttributes = process.env.OTEL_RESOURCE_ATTRIBUTES;
@@ -254,6 +338,18 @@ describe('opentelemetry integration: composable init()', () => {
         'service.name': 'configured-renderer',
       });
       await expect(captureResourceAttributes({ serviceName: '' })).resolves.toMatchObject({
+        'cloud.platform': 'aws_ecs',
+        'service.name': 'react-on-rails-pro-node-renderer',
+      });
+      await expect(
+        captureResourceAttributes({ resourceAttributes: { 'service.name': '' } }),
+      ).resolves.toMatchObject({
+        'cloud.platform': 'aws_ecs',
+        'service.name': 'react-on-rails-pro-node-renderer',
+      });
+
+      process.env.OTEL_RESOURCE_ATTRIBUTES = 'service.name=';
+      await expect(captureResourceAttributes({})).resolves.toMatchObject({
         'cloud.platform': 'aws_ecs',
         'service.name': 'react-on-rails-pro-node-renderer',
       });
@@ -347,6 +443,7 @@ describe('opentelemetry integration: composable init()', () => {
     const tracing = await import('../../src/shared/tracing');
 
     init({
+      resourceAttributes: { 'service.name': '' },
       tracing: true,
       useExistingGlobalProvider: true,
     });
@@ -362,6 +459,7 @@ describe('opentelemetry integration: composable init()', () => {
     const vmSpan = spans.find((span) => span.name === 'ror.vm.execute');
     expect(ssrSpan).toBeDefined();
     expect(vmSpan).toBeDefined();
+    expect(ssrSpan!.instrumentationScope.name).toBe('react-on-rails-pro-node-renderer');
     expect(vmSpan!.parentSpanContext?.spanId).toBe(ssrSpan!.spanContext().spanId);
     expect(rendererSdkFactory).not.toHaveBeenCalled();
 
@@ -397,13 +495,16 @@ describe('opentelemetry integration: composable init()', () => {
     });
     jest.doMock('@opentelemetry/sdk-trace-node', rendererSdkFactory);
 
+    const log = (await import('../../src/shared/log')).default;
+    const warnSpy = jest.spyOn(log, 'warn').mockImplementation(() => undefined);
     const errorReporter = await import('../../src/shared/errorReporter');
     const messageSpy = jest.spyOn(errorReporter, 'message').mockImplementation(() => undefined);
     const { init } = await import('../../src/integrations/opentelemetry');
     const tracing = await import('../../src/shared/tracing');
 
     init({ tracing: true, useExistingGlobalProvider: true });
-    expect(messageSpy).toHaveBeenCalledWith(expect.stringContaining('no global tracer provider'));
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('no global tracer provider'));
+    expect(messageSpy).not.toHaveBeenCalled();
 
     const existingProvider = new NodeTracerProvider({ spanProcessors: [spanProcessor] });
     existingProvider.register();
@@ -419,6 +520,29 @@ describe('opentelemetry integration: composable init()', () => {
       'ror.ssr.request',
     ]);
     expect(rendererSdkFactory).not.toHaveBeenCalled();
+    await existingProvider.shutdown();
+  });
+
+  test('existing-provider init requires a working context manager', async () => {
+    const exporter = new InMemorySpanExporter();
+    const spanProcessor = new SimpleSpanProcessor(exporter);
+    const existingProvider = new NodeTracerProvider({ spanProcessors: [spanProcessor] });
+    expect(otelTrace.setGlobalTracerProvider(existingProvider)).toBe(true);
+
+    const errorReporter = await import('../../src/shared/errorReporter');
+    const messageSpy = jest.spyOn(errorReporter, 'message').mockImplementation(() => undefined);
+    const { init } = await import('../../src/integrations/opentelemetry');
+    const tracing = await import('../../src/shared/tracing');
+
+    init({ tracing: true, useExistingGlobalProvider: true });
+    await tracing.trace(
+      () => tracing.subSpan({ name: 'ror.vm.execute' }, async () => 'ok'),
+      tracing.startSsrRequestOptions({ renderingRequest: 'irrelevant' }),
+    );
+    await spanProcessor.forceFlush();
+
+    expect(messageSpy).toHaveBeenCalledWith(expect.stringContaining('no working context manager'));
+    expect(exporter.getFinishedSpans()).toHaveLength(0);
     await existingProvider.shutdown();
   });
 

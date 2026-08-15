@@ -105,6 +105,13 @@ function resolveConfiguredServiceName(opts: OpenTelemetryResourceOptions): strin
   return process.env.OTEL_SERVICE_NAME || opts.serviceName || undefined;
 }
 
+function resolveResourceServiceName(
+  resourceAttributes: Record<string, string>,
+  serviceNameAttribute: string,
+): string | undefined {
+  return resourceAttributes[serviceNameAttribute] || undefined;
+}
+
 export function resolveServiceName(opts: OpenTelemetryResourceOptions, serviceNameAttribute: string): string {
   const resourceAttributes = {
     ...parseResourceAttributes(process.env.OTEL_RESOURCE_ATTRIBUTES),
@@ -112,7 +119,9 @@ export function resolveServiceName(opts: OpenTelemetryResourceOptions, serviceNa
   };
 
   return (
-    resolveConfiguredServiceName(opts) ?? resourceAttributes[serviceNameAttribute] ?? DEFAULT_SERVICE_NAME
+    resolveConfiguredServiceName(opts) ??
+    resolveResourceServiceName(resourceAttributes, serviceNameAttribute) ??
+    DEFAULT_SERVICE_NAME
   );
 }
 
@@ -128,14 +137,15 @@ export function resolveResource(
   };
   const configuredServiceName = resolveConfiguredServiceName(opts);
   const serviceName =
-    configuredServiceName ?? resourceAttributes[serviceNameAttribute] ?? DEFAULT_SERVICE_NAME;
+    configuredServiceName ??
+    resolveResourceServiceName(resourceAttributes, serviceNameAttribute) ??
+    DEFAULT_SERVICE_NAME;
 
   if (!opts.resourceDetectors?.length) {
     return {
       resource: resources.resourceFromAttributes({
-        [serviceNameAttribute]: serviceName,
         ...resourceAttributes,
-        ...(configuredServiceName ? { [serviceNameAttribute]: configuredServiceName } : {}),
+        [serviceNameAttribute]: serviceName,
       }),
       serviceName,
     };
@@ -147,9 +157,8 @@ export function resolveResource(
     ),
   });
   const configuredResource = resources.resourceFromAttributes({
-    [serviceNameAttribute]: serviceName,
     ...resourceAttributes,
-    ...(configuredServiceName ? { [serviceNameAttribute]: configuredServiceName } : {}),
+    [serviceNameAttribute]: serviceName,
   });
 
   return {
