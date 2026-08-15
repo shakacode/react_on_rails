@@ -15,8 +15,8 @@
 
 import type { FastifyInstance, Http1FastifyInstance, Http2FastifyInstance } from './types.js';
 
-// Contextual callbacks see both runtime modes. The concrete signatures preserve annotations for callers whose
-// renderer configuration selects HTTP/1.1 or HTTP/2 separately.
+// Unannotated callbacks are mode-safe. Concrete annotations are compatibility assertions that must match
+// fastifyServerOptions.http2.
 type RuntimeFastifyConfigFunction = (app: FastifyInstance) => void;
 export type FastifyConfigFunction =
   | ((app: Http1FastifyInstance) => void)
@@ -54,6 +54,8 @@ export const registerFastifyConfigFunction: RegisterFastifyConfigFunction = (
  * Public one-way registration API for custom entrypoints and integrations.
  * Internal callers use registerFastifyConfigFunction() when they need the
  * unregister callback during failed initialization or shutdown cleanup.
+ * Leave the callback parameter unannotated to handle either runtime mode. A
+ * protocol-specific annotation must match `fastifyServerOptions.http2`.
  */
 export const configureFastify: ConfigureFastify = (configFunction: FastifyConfigFunction) => {
   registerFastifyConfigFunction(configFunction);
