@@ -343,7 +343,10 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
   let ownsOpenTelemetryGlobals = false;
   const rendererOwnsSpanProcessor = opts.spanProcessor === undefined && opts.exporter === undefined;
   const cleanupFailedProvider = (provider: NodeTracerProviderType) => {
-    const cleanup = rendererOwnsSpanProcessor ? provider.shutdown() : provider.forceFlush();
+    const cleanup =
+      rendererOwnsSpanProcessor || typeof provider.forceFlush !== 'function'
+        ? provider.shutdown()
+        : provider.forceFlush();
     void cleanup.catch(() => undefined);
   };
 
