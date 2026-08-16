@@ -67,12 +67,10 @@ export const DEFAULT_PPR_SETTLE_BUDGET_MS = 500;
 const PPR_REQUIRED_REACT_DOM_RANGE = '>=19.2.7 <20';
 
 // ---------------------------------------------------------------------------
-// Lazy-loaded PPR APIs and the React version runtime guard
+// Registered PPR APIs and the React version runtime guard
 // ---------------------------------------------------------------------------
 
 type PPRApis = Pick<RegisteredPPRApis, 'prerenderToNodeStream' | 'resumeToPipeableStream'>;
-
-let pprApisPromise: Promise<PPRApis> | undefined;
 
 const pprConfigurationError = (reason: string) =>
   new Error(
@@ -111,66 +109,33 @@ const validatePPRApis = (
 };
 
 /**
- * Resolves `prerenderToNodeStream` / `resumeToPipeableStream` on first use and enforces the
- * runtime React version guard, raising a clear configuration error at the first PPR call rather
- * than a cryptic bundling/undefined-function crash.
- *
- * Primary source: the registry filled by `import 'react-on-rails-pro/pprSupport'` in the app's
- * server bundle entry — the only source guaranteed to be the SAME react-dom instance webpack
- * bundled (see pprApiRegistry.ts). Fallback: a native dynamic import kept out of the webpack
- * graph with `webpackIgnore`, for runtimes that execute the bundle where `import()` works and
- * resolves the app's own react-dom. The Node renderer's `vm` context supports neither dynamic
- * import nor same-instance host requires, so on the renderer the registry is the only path.
+ * Reads `prerenderToNodeStream` / `resumeToPipeableStream` from the registry filled by
+ * `import 'react-on-rails-pro/pprSupport'` in the app's server bundle entry — the only source
+ * guaranteed to be the SAME react-dom instance webpack bundled (see pprApiRegistry.ts) — and
+ * enforces the runtime React version guard, raising a clear configuration error at the first PPR
+ * call rather than a cryptic bundling/undefined-function crash. The registry is re-read on every
+ * call, so a registration landing after a failed earlier call (cold-start ordering) is picked up.
  */
-const loadPPRApisUncached = async (): Promise<PPRApis> => {
+const getValidatedPPRApis = (): PPRApis => {
   const registered = getRegisteredPPRApis();
-  if (registered) {
-    return validatePPRApis(
-      registered.prerenderToNodeStream,
-      registered.resumeToPipeableStream,
-      registered.version,
-    );
-  }
-
-  let staticModule: typeof import('react-dom/static.node');
-  let serverModule: typeof import('react-dom/server.node');
-  try {
-    staticModule = await import(/* webpackIgnore: true */ 'react-dom/static.node');
-    serverModule = await import(/* webpackIgnore: true */ 'react-dom/server.node');
-  } catch (importError) {
+  if (!registered) {
     throw pprConfigurationError(
-      `The PPR React APIs are not registered and could not be dynamically imported ` +
-        `(${convertToError(importError).message}). Add "import 'react-on-rails-pro/pprSupport';" ` +
+      `The PPR React APIs are not registered. Add "import 'react-on-rails-pro/pprSupport';" ` +
         `to your server bundle entry file to register them from your bundled react-dom.`,
     );
   }
-
-  // Older @types/react-dom builds may not declare resumeToPipeableStream; read it defensively so
-  // a mismatched install fails through the guard rather than a TypeError at the call site.
-  const { resumeToPipeableStream } = serverModule as Partial<Pick<PPRApis, 'resumeToPipeableStream'>>;
-  return validatePPRApis(staticModule.prerenderToNodeStream, resumeToPipeableStream, staticModule.version);
-};
-
-const loadPPRApis = (): Promise<PPRApis> => {
-  pprApisPromise ??= loadPPRApisUncached().catch((error: unknown) => {
-    // Never memoize a rejection: a transient first-call failure (e.g. cold-start ordering of the
-    // registry, or a flaky dynamic import) must not permanently disable PPR for this process.
-    pprApisPromise = undefined;
-    throw error;
-  });
-  return pprApisPromise;
+  return validatePPRApis(
+    registered.prerenderToNodeStream,
+    registered.resumeToPipeableStream,
+    registered.version,
+  );
 };
 
 // ---------------------------------------------------------------------------
 // Shared per-render helpers
 // ---------------------------------------------------------------------------
 
-type PPRRailsContextFields = {
-  pprSettleBudgetMs?: number;
-  pprPostponedState?: string;
-};
-
-const resolveSettleBudgetMs = (railsContext: PPRRailsContextFields): number => {
+const resolveSettleBudgetMs = (railsContext: { pprSettleBudgetMs?: number }): number => {
   const budget = railsContext.pprSettleBudgetMs;
   return typeof budget === 'number' && Number.isFinite(budget) && budget > 0
     ? budget
@@ -196,6 +161,15 @@ const rscClientManifestStylesheetHrefsFor = (reactClientManifestFileName: string
 // PPR prerender phase
 // ---------------------------------------------------------------------------
 
+export interface PPRPrerenderRenderParams extends RenderParams {
+  /**
+   * Caller-provided settle signal (the seam for the future CacheSignal-driven settle, plan D2/D-05).
+   * When present it wins over the `railsContext.pprSettleBudgetMs` timer: the prerender aborts when
+   * this signal aborts, demoting still-pending Suspense boundaries to resume-phase holes.
+   */
+  signal?: AbortSignal;
+}
+
 /**
  * Renders a React component with `prerenderToNodeStream` (Fizz prerender): the static shell with
  * Suspense fallbacks left in place for every boundary still pending when the settle signal aborts
@@ -215,7 +189,7 @@ const rscClientManifestStylesheetHrefsFor = (reactClientManifestFileName: string
  */
 const pprPrerenderRenderReactComponent = (
   reactRenderingResult: StreamableComponentResult,
-  options: RenderParams,
+  options: PPRPrerenderRenderParams,
   streamingTrackers: StreamingTrackers,
 ) => {
   const { name: componentName, throwJsErrors, domNodeId, railsContext } = options;
@@ -283,17 +257,16 @@ const pprPrerenderRenderReactComponent = (
         // Caller-provided signal wins (the future CacheSignal seam); otherwise arm the fixed
         // settle timer so prerenderToNodeStream captures still-pending Suspense boundaries as
         // PostponedState instead of waiting for them to resolve.
-        const providedSignal = (options as RenderParams & { signal?: AbortSignal }).signal;
         let prerenderSignal: AbortSignal;
-        if (providedSignal) {
-          prerenderSignal = providedSignal;
+        if (options.signal) {
+          prerenderSignal = options.signal;
         } else {
           const settleController = new AbortController();
           prerenderSignal = settleController.signal;
           settleTimeoutId = setTimeout(() => settleController.abort(), resolveSettleBudgetMs(railsContext));
         }
 
-        const { prerenderToNodeStream } = await loadPPRApis();
+        const { prerenderToNodeStream } = getValidatedPPRApis();
         const { prelude, postponed } = await prerenderToNodeStream(reactRenderedElement, {
           onError(e) {
             // The settle abort is the expected mechanism that demotes pending boundaries to
@@ -415,23 +388,13 @@ const pprPrerenderRenderReactComponent = (
 // PPR resume phase
 // ---------------------------------------------------------------------------
 
-export interface PPRResumeRenderParams extends RenderParams {
-  /**
-   * Serialized (JSON string) or already-parsed PostponedState. Normally Rails supplies it on the
-   * wire as `railsContext.pprPostponedState`; this option is the direct-call seam and wins when
-   * both are present.
-   */
-  postponedState?: PostponedState | string;
-}
-
 /**
  * Renders only the previously-postponed Suspense boundaries with `resumeToPipeableStream`.
  *
- * Requires the PostponedState produced by a prior prerender phase, delivered either as
- * `options.postponedState` or on the wire as `railsContext.pprPostponedState` (the pinned wire
- * key — Rails injects it into the rendering request for `:ppr_resume` renders). The output
- * contains only the dynamic hole content plus React's `$RC` reveal scripts; the static shell is
- * NOT re-rendered.
+ * Requires the PostponedState produced by a prior prerender phase, delivered as a JSON string on
+ * the wire as `railsContext.pprPostponedState` (the pinned wire key — Rails injects it into the
+ * rendering request for `:ppr_resume` renders). The output contains only the dynamic hole content
+ * plus React's `$RC` reveal scripts; the static shell is NOT re-rendered.
  *
  * Replay identity: the element tree must be structurally identical to the prerender phase's tree
  * (same bundle digest, same component structure); only data inside the postponed Suspense
@@ -439,7 +402,7 @@ export interface PPRResumeRenderParams extends RenderParams {
  */
 const pprResumeRenderReactComponent = (
   reactRenderingResult: StreamableComponentResult,
-  options: PPRResumeRenderParams,
+  options: RenderParams,
   streamingTrackers: StreamingTrackers,
 ) => {
   const { name: componentName, throwJsErrors, domNodeId, railsContext } = options;
@@ -500,20 +463,16 @@ const pprResumeRenderReactComponent = (
       }
 
       try {
-        const rawPostponedState =
-          options.postponedState ?? (railsContext as PPRRailsContextFields).pprPostponedState;
-        if (rawPostponedState == null) {
+        const rawPostponedState = railsContext.pprPostponedState;
+        if (typeof rawPostponedState !== 'string') {
           throw new Error(
             'PPR resume render did not receive a PostponedState. Rails must inject it as ' +
               'railsContext.pprPostponedState for :ppr_resume renders.',
           );
         }
-        const postponedState: PostponedState =
-          typeof rawPostponedState === 'string'
-            ? (JSON.parse(rawPostponedState) as PostponedState)
-            : rawPostponedState;
+        const postponedState = JSON.parse(rawPostponedState) as PostponedState;
 
-        const { resumeToPipeableStream } = await loadPPRApis();
+        const { resumeToPipeableStream } = getValidatedPPRApis();
         const renderingStream = await resumeToPipeableStream(reactRenderedElement, postponedState, {
           onError(e) {
             const error = convertToError(e);
@@ -592,8 +551,8 @@ const pprResumeRenderReactComponent = (
 // Public API — wrappers through the shared streamServerRenderedComponent harness
 // ---------------------------------------------------------------------------
 
-export const pprPrerenderServerRenderedReactComponent = (options: RenderParams): Readable =>
+export const pprPrerenderServerRenderedReactComponent = (options: PPRPrerenderRenderParams): Readable =>
   streamServerRenderedComponent(options, pprPrerenderRenderReactComponent, handleError);
 
-export const pprResumeServerRenderedReactComponent = (options: PPRResumeRenderParams): Readable =>
+export const pprResumeServerRenderedReactComponent = (options: RenderParams): Readable =>
   streamServerRenderedComponent(options, pprResumeRenderReactComponent, handleError);

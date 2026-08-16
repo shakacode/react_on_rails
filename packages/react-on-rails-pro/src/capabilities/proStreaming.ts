@@ -22,7 +22,7 @@ import streamServerRenderedReactComponent from '../streamServerRenderedReactComp
 import {
   pprPrerenderServerRenderedReactComponent,
   pprResumeServerRenderedReactComponent,
-  type PPRResumeRenderParams,
+  type PPRPrerenderRenderParams,
 } from '../pprServerRenderedReactComponent.ts';
 
 /**
@@ -38,10 +38,10 @@ export function createProStreamingCapability() {
     streamServerRenderedReactComponent(options: RenderParams): Readable {
       return streamServerRenderedReactComponent(options);
     },
-    pprPrerenderServerRenderedReactComponent(options: RenderParams): Readable {
+    pprPrerenderServerRenderedReactComponent(options: PPRPrerenderRenderParams): Readable {
       return pprPrerenderServerRenderedReactComponent(options);
     },
-    pprResumeServerRenderedReactComponent(options: PPRResumeRenderParams): Readable {
+    pprResumeServerRenderedReactComponent(options: RenderParams): Readable {
       return pprResumeServerRenderedReactComponent(options);
     },
   };

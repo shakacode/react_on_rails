@@ -28,6 +28,9 @@ import {
 import * as ComponentRegistry from '../src/ComponentRegistry.ts';
 import ReactOnRails from '../src/ReactOnRails.node.ts';
 import LengthPrefixedStreamParser from '../src/parseLengthPrefixedStream.ts';
+// Registers the PPR APIs from react-dom, exactly like an app's server bundle entry does — the
+// registry is the only source the renderers load from.
+import '../src/pprSupport.ts';
 
 jest.mock('../src/cache/manifestStylesheets.ts', () => ({
   getRSCClientManifestStylesheetHrefs: jest.fn().mockResolvedValue(new Set()),
@@ -298,22 +301,15 @@ describe('pprServerRenderedReactComponent', () => {
     expect(chunks.some((chunk) => chunk.hasErrors === true)).toBe(true);
   });
 
-  it('prefers PPR APIs registered by react-on-rails-pro/pprSupport over the dynamic-import fallback', async () => {
-    // Register APIs with a version below the supported floor in a fresh module registry: the
-    // resulting guard error names 19.2.0, which only the registered entry can produce (the
-    // dynamic-import fallback would load the real react-dom 19.2.7 and succeed).
+  it('raises a configuration error naming the pprSupport import when the PPR APIs are not registered', async () => {
+    // A fresh module registry has an empty pprApiRegistry — the state of a server bundle whose
+    // entry is missing the `import 'react-on-rails-pro/pprSupport'` side-effect import.
     jest.resetModules();
     try {
       const { pprPrerenderServerRenderedReactComponent: freshPprPrerender } = await import(
         '../src/pprServerRenderedReactComponent.ts'
       );
-      const { registerPPRApis } = await import('../src/pprApiRegistry.ts');
       const freshComponentRegistry = await import('../src/ComponentRegistry.ts');
-      registerPPRApis({
-        prerenderToNodeStream: jest.fn(),
-        resumeToPipeableStream: jest.fn(),
-        version: '19.2.0',
-      });
       freshComponentRegistry.register({ PprShellWithHole });
 
       const renderResult = freshPprPrerender({
@@ -327,14 +323,14 @@ describe('pprServerRenderedReactComponent', () => {
       const { errors } = await collectStreamResult(renderResult);
 
       expect(errors).toHaveLength(1);
-      expect(errors[0].message).toContain('19.2.0');
+      expect(errors[0].message).toContain("import 'react-on-rails-pro/pprSupport';");
       expect(errors[0].message).toContain('>=19.2.7 <20');
     } finally {
       jest.resetModules();
     }
   });
 
-  it('retries loading the PPR APIs after a failed first call instead of memoizing the rejection', async () => {
+  it('picks up PPR APIs registered after a failed first call (registry re-read per call)', async () => {
     jest.resetModules();
     try {
       const { pprPrerenderServerRenderedReactComponent: freshPprPrerender } = await import(
@@ -368,8 +364,8 @@ describe('pprServerRenderedReactComponent', () => {
       expect(first.errors).toHaveLength(1);
       expect(first.errors[0].message).toContain('19.2.0');
 
-      // Second call: valid APIs are registered now — a memoized rejection would ignore them and
-      // permanently disable PPR for the process.
+      // Second call: valid APIs are registered now — a cached failure would ignore them and
+      // permanently disable PPR for the process (cold-start ordering of the registry).
       registerPPRApis({
         prerenderToNodeStream: staticModule.prerenderToNodeStream,
         resumeToPipeableStream: serverModule.resumeToPipeableStream,
@@ -408,11 +404,13 @@ describe('pprServerRenderedReactComponent', () => {
     }));
 
     try {
-      // Re-import the renderer and its component registry inside the reset module registry so
-      // the lazy `import('react-dom/static.node')` resolves to the version-19.1.0 mock.
+      // Re-import the renderer, pprSupport, and the component registry inside the reset module
+      // registry so pprSupport registers the version-19.1.0 mock — the state of an app whose
+      // server bundle carries a react-dom below the supported floor.
       const { pprPrerenderServerRenderedReactComponent: pprPrerenderWithOldReact } = await import(
         '../src/pprServerRenderedReactComponent.ts'
       );
+      await import('../src/pprSupport.ts');
       const freshComponentRegistry = await import('../src/ComponentRegistry.ts');
       freshComponentRegistry.register({ PprShellWithHole });
 

@@ -684,15 +684,16 @@ export interface ReactOnRailsInternal extends ReactOnRails {
   /**
    * Used by server rendering by Rails — PPR prerender phase (experimental, Pro only).
    * Streams the static shell with Suspense fallbacks, then a trailing chunk whose metadata
-   * carries the serialized PostponedState.
+   * carries the serialized PostponedState. An optional caller-provided `signal` overrides the
+   * settle-budget timer (the CacheSignal seam).
    */
-  pprPrerenderServerRenderedReactComponent(options: RenderParams): Readable;
+  pprPrerenderServerRenderedReactComponent(options: RenderParams & { signal?: AbortSignal }): Readable;
   /**
    * Used by server rendering by Rails — PPR resume phase (experimental, Pro only).
    * Renders only the previously-postponed Suspense boundaries from
-   * `railsContext.pprPostponedState` (or an explicit `postponedState` option).
+   * `railsContext.pprPostponedState`.
    */
-  pprResumeServerRenderedReactComponent(options: RenderParams & { postponedState?: unknown }): Readable;
+  pprResumeServerRenderedReactComponent(options: RenderParams): Readable;
   /**
    * Generates RSC payload, used by Rails
    */
