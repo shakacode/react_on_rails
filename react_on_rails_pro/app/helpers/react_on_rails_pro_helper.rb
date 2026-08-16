@@ -1465,12 +1465,16 @@ module ReactOnRailsProHelper
 
   # A prerender response with neither the completion metadata nor an error signal means the
   # server bundle does not speak the PPR protocol — surface that as a configuration error rather
-  # than caching a shell with no way to tell whether it is complete.
+  # than caching a shell with no way to tell whether it is complete. The message names both sides'
+  # expectations so version-skew (old renderer ↔ new Rails) is diagnosable (#4890).
   def ppr_check_prerender_protocol!(component_name, prerender_complete, had_render_error)
     return if prerender_complete || had_render_error
 
     raise ReactOnRailsPro::Error,
-          "PPR prerender for #{component_name} did not report completion metadata. " \
+          "PPR prerender for #{component_name} did not report completion metadata " \
+          "(expected chunk metadata key '#{ReactOnRailsPro::Ppr::PRERENDER_COMPLETE_CHUNK_KEY}'). " \
+          "Rails (react_on_rails_pro v#{ReactOnRailsPro::VERSION}) requires the renderer to emit " \
+          "a trailing protocol chunk with PPR metadata. " \
           "Ensure the server bundle is built with a react-on-rails-pro package that supports PPR, " \
           "that react and react-dom >= 19.2.7 < 20 are installed, and that the prerender stream " \
           "was not terminated abnormally."
