@@ -39,6 +39,7 @@ import streamServerRenderedReactComponent from '../src/streamServerRenderedReact
 import * as ComponentRegistry from '../src/ComponentRegistry.ts';
 import ReactOnRails from '../src/ReactOnRails.node.ts';
 import LengthPrefixedStreamParser from '../src/parseLengthPrefixedStream.ts';
+import { toLengthPrefixedEnvelope } from './testUtils.ts';
 
 const INCOMPLETE_LENGTH_PREFIXED_STREAM_WARNING = '[react_on_rails] Incomplete length-prefixed stream';
 
@@ -58,14 +59,7 @@ type RailsContextWithRSCPayloadStream = typeof testingRailsContext & {
   ) => Promise<AsyncIterable<Buffer>>;
 };
 
-const toLengthPrefixedPayload = (content: string): Buffer => {
-  const contentBuffer = Buffer.from(content, 'utf8');
-  const metadata = JSON.stringify({ consoleReplayScript: '', hasErrors: false, isShellReady: true });
-  return Buffer.concat([
-    Buffer.from(`${metadata}\t${contentBuffer.length.toString(16).padStart(8, '0')}\n`, 'utf8'),
-    contentBuffer,
-  ]);
-};
+const toLengthPrefixedPayload = (content: string): Buffer => toLengthPrefixedEnvelope(content);
 
 const expectRSCPayloadPushScript = (html: string) => {
   expect(html).toMatch(/REACT_ON_RAILS_RSC_PAYLOADS[^<]*\.push\(/);

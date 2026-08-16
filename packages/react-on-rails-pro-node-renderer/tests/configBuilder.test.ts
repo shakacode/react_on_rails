@@ -13,6 +13,8 @@
  * https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
+import type { Config } from '../src/shared/configBuilder';
+
 describe('configBuilder', () => {
   const envVarsToRestore = [
     'RENDERER_HOST',
@@ -25,6 +27,9 @@ describe('configBuilder', () => {
     'RENDERER_ENABLE_HEALTH_ENDPOINTS',
     'RENDERER_SUPPORT_MODULES',
     'RENDERER_WORKERS_COUNT',
+    'MAX_VM_POOL_SIZE',
+    'VM_POOL_ROLLOUT_DRAIN_TIMEOUT',
+    'RENDERER_CURRENT_GENERATION_MANIFEST',
   ] as const;
   const savedEnvValues = Object.fromEntries(envVarsToRestore.map((key) => [key, process.env[key]]));
 
@@ -72,6 +77,13 @@ describe('configBuilder', () => {
     const logPayload = info.mock.calls[0][0] as Record<string, unknown>;
     return logPayload['ENV values used for settings'] as Record<string, unknown>;
   }
+
+  it.each([true, false])('accepts and preserves an explicit Fastify http2=%s setting', (http2) => {
+    const transportConfig = { fastifyServerOptions: { http2 } } satisfies Partial<Config>;
+    const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+    expect(buildConfig(transportConfig).fastifyServerOptions).toEqual({ http2 });
+  });
 
   it('marks RENDERER_HOST as env-provided when host is omitted from user config', () => {
     process.env.RENDERER_HOST = '0.0.0.0';
@@ -131,6 +143,159 @@ describe('configBuilder', () => {
     const envValues = envValuesUsedForRenderedConfig({ licenseToken: 'configured-license-token' });
 
     expect(envValues.REACT_ON_RAILS_PRO_LICENSE).toBe(false);
+  });
+
+  describe('rolling-deploy VM pool configuration', () => {
+    it('reads the revision-scoped current generation manifest path from ENV', () => {
+      process.env.RENDERER_CURRENT_GENERATION_MANIFEST =
+        '/app/.node-renderer-bundles/.current-generations/rorp-generation-v1-current.json';
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      expect(buildConfig().currentGenerationManifestPath).toBe(
+        process.env.RENDERER_CURRENT_GENERATION_MANIFEST,
+      );
+    });
+
+    it('defaults to capacity for one draining and one current RSC generation', () => {
+      delete process.env.MAX_VM_POOL_SIZE;
+      delete process.env.VM_POOL_ROLLOUT_DRAIN_TIMEOUT;
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      expect(buildConfig()).toMatchObject({
+        maxVMPoolSize: 4,
+        vmPoolRolloutDrainTimeout: 60,
+      });
+    });
+
+    it('reads the hard cap and drain timeout from ENV', () => {
+      process.env.MAX_VM_POOL_SIZE = '6';
+      process.env.VM_POOL_ROLLOUT_DRAIN_TIMEOUT = '45.5';
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      expect(buildConfig()).toMatchObject({
+        maxVMPoolSize: 6,
+        vmPoolRolloutDrainTimeout: 45.5,
+      });
+    });
+
+    it('reads a drain timeout set after the config module is imported', () => {
+      delete process.env.VM_POOL_ROLLOUT_DRAIN_TIMEOUT;
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      process.env.VM_POOL_ROLLOUT_DRAIN_TIMEOUT = '37.5';
+
+      expect(buildConfig().vmPoolRolloutDrainTimeout).toBe(37.5);
+    });
+
+    it('reads a VM pool cap set after the config module is imported', () => {
+      delete process.env.MAX_VM_POOL_SIZE;
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      process.env.MAX_VM_POOL_SIZE = '6';
+
+      expect(buildConfig().maxVMPoolSize).toBe(6);
+    });
+
+    it.each(['', 'abc', '0', '-1', '2.5'])(
+      'rejects invalid MAX_VM_POOL_SIZE=%p from ENV',
+      (maxVMPoolSize) => {
+        process.env.MAX_VM_POOL_SIZE = maxVMPoolSize;
+        const processExit = mockProcessExit();
+        const { buildConfig, error } = loadConfigBuilderWithMockedLogger();
+
+        expect(() => buildConfig()).toThrow('process.exit: 1');
+        expect(error).toHaveBeenCalledWith('maxVMPoolSize must be a positive integer');
+        expect(processExit).toHaveBeenCalledWith(1);
+      },
+    );
+
+    it('preserves explicit VM pool configuration precedence over invalid ENV', () => {
+      process.env.MAX_VM_POOL_SIZE = 'abc';
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      expect(buildConfig({ maxVMPoolSize: 8 }).maxVMPoolSize).toBe(8);
+    });
+
+    it('prefers explicit configuration over ENV', () => {
+      process.env.MAX_VM_POOL_SIZE = '6';
+      process.env.VM_POOL_ROLLOUT_DRAIN_TIMEOUT = '45';
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      expect(buildConfig({ maxVMPoolSize: 8, vmPoolRolloutDrainTimeout: 90 })).toMatchObject({
+        maxVMPoolSize: 8,
+        vmPoolRolloutDrainTimeout: 90,
+      });
+    });
+
+    it('coerces env-derived string values passed through user configuration', () => {
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      expect(
+        buildConfig({
+          maxVMPoolSize: '6' as unknown as number,
+          vmPoolRolloutDrainTimeout: '45.5' as unknown as number,
+        }),
+      ).toMatchObject({
+        maxVMPoolSize: 6,
+        vmPoolRolloutDrainTimeout: 45.5,
+      });
+    });
+
+    it.each([
+      ['maxVMPoolSize', true, 'maxVMPoolSize must be a positive integer'],
+      ['maxVMPoolSize', [4], 'maxVMPoolSize must be a positive integer'],
+      ['vmPoolRolloutDrainTimeout', true, 'vmPoolRolloutDrainTimeout must be a positive number of seconds'],
+      ['vmPoolRolloutDrainTimeout', [45.5], 'vmPoolRolloutDrainTimeout must be a positive number of seconds'],
+    ])('rejects nonnumeric runtime %s=%p', (setting, value, expectedError) => {
+      const processExit = mockProcessExit();
+      const { buildConfig, error } = loadConfigBuilderWithMockedLogger();
+
+      expect(() => buildConfig({ [setting]: value } as never)).toThrow('process.exit: 1');
+      expect(error).toHaveBeenCalledWith(expectedError);
+      expect(processExit).toHaveBeenCalledWith(1);
+    });
+
+    it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])(
+      'rejects an invalid rollout drain timeout of %p',
+      (vmPoolRolloutDrainTimeout) => {
+        const processExit = mockProcessExit();
+        const { buildConfig, error } = loadConfigBuilderWithMockedLogger();
+
+        expect(() => buildConfig({ vmPoolRolloutDrainTimeout })).toThrow('process.exit: 1');
+        expect(error).toHaveBeenCalledWith('vmPoolRolloutDrainTimeout must be a positive number of seconds');
+        expect(processExit).toHaveBeenCalledWith(1);
+      },
+    );
+
+    it.each(['', '45s', 'abc', '0', '-1', 'NaN', 'Infinity'])(
+      'rejects invalid VM_POOL_ROLLOUT_DRAIN_TIMEOUT=%p from ENV',
+      (vmPoolRolloutDrainTimeout) => {
+        process.env.VM_POOL_ROLLOUT_DRAIN_TIMEOUT = vmPoolRolloutDrainTimeout;
+        const processExit = mockProcessExit();
+        const { buildConfig, error } = loadConfigBuilderWithMockedLogger();
+
+        expect(() => buildConfig()).toThrow('process.exit: 1');
+        expect(error).toHaveBeenCalledWith('vmPoolRolloutDrainTimeout must be a positive number of seconds');
+        expect(processExit).toHaveBeenCalledWith(1);
+      },
+    );
+
+    it('reports only effective rollout ENV settings in sanitized config metadata', () => {
+      process.env.MAX_VM_POOL_SIZE = '6';
+      process.env.VM_POOL_ROLLOUT_DRAIN_TIMEOUT = '45';
+
+      const envValues = envValuesUsedForRenderedConfig(
+        {} as {
+          host?: string;
+          licenseToken?: string;
+        },
+      );
+
+      expect(envValues).toMatchObject({
+        MAX_VM_POOL_SIZE: '6',
+        VM_POOL_ROLLOUT_DRAIN_TIMEOUT: '45',
+      });
+    });
   });
 
   it('reports the effective license ENV as masked', () => {

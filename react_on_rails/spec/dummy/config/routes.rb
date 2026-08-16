@@ -48,6 +48,8 @@ Rails.application.routes.draw do
   get "turbo_frame_tag_hello_world" => "pages#turbo_frame_tag_hello_world"
   post "turbo_stream_send_hello_world" => "pages#turbo_stream_send_hello_world"
   get "manual_render_test" => "pages#manual_render_test"
+  get "async_component_shared_store" => "pages#async_component_shared_store"
+  get "async_component_shared_store_island" => "pages#async_component_shared_store_island"
   get "root_error_callbacks" => "pages#root_error_callbacks"
   get "hydration_scheduling" => "pages#hydration_scheduling"
 

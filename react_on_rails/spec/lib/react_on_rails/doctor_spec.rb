@@ -14,6 +14,12 @@ RSpec.describe ReactOnRails::Doctor do
     File.write("node_modules/#{name}/package.json", JSON.generate(package_json))
   end
 
+  def require_node_runtime!
+    return if ReactOnRails::Utils.command_available?("node")
+
+    skip "Node.js is required for this JavaScript runtime proof"
+  end
+
   describe "#initialize" do
     it "initializes with default options" do
       expect(doctor).to be_instance_of(described_class)
@@ -243,6 +249,7 @@ RSpec.describe ReactOnRails::Doctor do
           testing_setup
           development_environment
           react_on_rails_pro_setup
+          node_renderer_rollout_capacity
           react_server_components
         ]
       )
@@ -265,7 +272,7 @@ RSpec.describe ReactOnRails::Doctor do
       expect(checks_by_id["react_on_rails_versions"]["status"]).to eq("warn")
       expect(checks_by_id["rails_integration"]["status"]).to eq("pass")
       expect(report["status"]).to eq("fail")
-      expect(report["summary"]).to eq("pass" => 11, "warn" => 1, "fail" => 1)
+      expect(report["summary"]).to eq("pass" => 12, "warn" => 1, "fail" => 1)
       expect(report["checks"].map { |check| check["status"] }.uniq).to all(match(/\A(pass|warn|fail)\z/))
     end
 
@@ -3425,6 +3432,25 @@ RSpec.describe ReactOnRails::Doctor do
     end
   end
 
+  describe "#doctor_app_root" do
+    it "prefers Rails.root when it becomes available after a cwd fallback" do
+      Dir.mktmpdir do |cwd_root|
+        Dir.mktmpdir do |rails_root|
+          current_rails_root = nil
+          allow(Rails).to receive(:root) { current_rails_root }
+
+          Dir.chdir(cwd_root) do
+            cwd_fallback = File.expand_path(Dir.pwd)
+            expect(doctor.send(:doctor_app_root)).to eq(cwd_fallback)
+
+            current_rails_root = Pathname.new(rails_root)
+            expect(doctor.send(:doctor_app_root)).to eq(rails_root)
+          end
+        end
+      end
+    end
+  end
+
   # ── Pro Setup Checks ──────────────────────────────────────────────
   # ReactOnRailsPro class may not be loaded in the test environment (Pro is optional),
   # so we must use unverified doubles for stub_const.
@@ -3499,6 +3525,3045 @@ RSpec.describe ReactOnRails::Doctor do
         warning_messages = checker.messages.select { |m| m[:type] == :warning }
         expect(warning_messages.any? { |m| m[:content].include?("config load failed") }).to be true
       end
+    end
+  end
+
+  describe "NodeRenderer rollout capacity checks" do
+    let(:doctor) { described_class.new(verbose: false, fix: false) }
+    let(:checker) { doctor.instance_variable_get(:@checker) }
+    let(:renderer_url) { "http://localhost:3800" }
+    let(:enable_rsc_support) { true }
+    let(:pro_config) do
+      double(
+        "ProConfig",
+        server_renderer: "NodeRenderer",
+        renderer_url:,
+        enable_rsc_support:
+      )
+    end
+
+    def write_node_renderer_script(path, source)
+      canonical_binding =
+        "const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');"
+      source = "#{canonical_binding}\n#{source}" unless source.include?("react-on-rails-pro-node-renderer")
+      File.write(path, source)
+    end
+
+    def wait_for_published_child_pid(path)
+      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 2
+      loop do
+        contents = File.read(path) if File.file?(path)
+        return contents.to_i if contents&.match?(/\A[1-9]\d*\n\z/)
+
+        deadline_reached = Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
+        raise "syntax-check child pid was not published" if deadline_reached
+
+        sleep 0.01
+      end
+    end
+
+    around do |example|
+      previous_max_vm_pool_size = ENV.fetch("MAX_VM_POOL_SIZE", nil)
+      ENV.delete("MAX_VM_POOL_SIZE")
+      Dir.mktmpdir do |tmpdir|
+        Dir.chdir(tmpdir) do
+          FileUtils.mkdir_p("renderer")
+          example.run
+        end
+      end
+    ensure
+      if previous_max_vm_pool_size
+        ENV["MAX_VM_POOL_SIZE"] = previous_max_vm_pool_size
+      else
+        ENV.delete("MAX_VM_POOL_SIZE")
+      end
+    end
+
+    before do
+      allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+      allow(doctor).to receive(:ensure_rails_environment_loaded).and_return(true)
+      stub_const("ReactOnRailsPro", double("ReactOnRailsPro", configuration: pro_config))
+    end
+
+    it "reports observed insufficient capacity with the per-worker formula" do
+      write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 3 });")
+
+      doctor.send(:check_node_renderer_rollout_capacity)
+
+      expect(checker.messages).to include(
+        hash_including(
+          type: :info,
+          content: a_string_including(
+            "generations=2",
+            "contexts_per_generation=2",
+            "required_capacity=4 per worker"
+          )
+        ),
+        hash_including(
+          type: :warning,
+          content: a_string_including(
+            "insufficient",
+            "evidence=observed",
+            "configured=3",
+            "required=4",
+            "topology=loopback_endpoint",
+            "scope=configuration_not_live_process"
+          )
+        )
+      )
+    end
+
+    it "passes observed capacity that covers an RSC rollout" do
+      write_node_renderer_script(
+        "renderer/node-renderer.js",
+        "reactOnRailsProNodeRenderer({ rendererUrl: 'http://localhost', maxVMPoolSize: 4, " \
+        "currentGenerationManifestPath: '/app/.node-renderer-bundles/.current-generations/" \
+        "rorp-generation-v1-#{'a' * 64}.json' });"
+      )
+
+      doctor.send(:check_node_renderer_rollout_capacity)
+
+      expect(checker.messages).to include(
+        hash_including(
+          type: :success,
+          content: a_string_including(
+            "sufficient",
+            "evidence=observed",
+            "configured=4",
+            "required=4",
+            "current_generation_declaration=observed"
+          )
+        )
+      )
+    end
+
+    [
+      "/app/.node-renderer-bundles/.current-generations/current.json",
+      ".node-renderer-bundles/.current-generations/rorp-generation-v1-#{'a' * 64}.json",
+      ""
+    ].each do |declaration_path|
+      it "does not observe unsupported current-generation declaration path #{declaration_path.inspect}" do
+        write_node_renderer_script(
+          "renderer/node-renderer.js",
+          "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4, " \
+          "currentGenerationManifestPath: #{declaration_path.to_json} });"
+        )
+
+        doctor.send(:check_node_renderer_rollout_capacity)
+
+        expect(checker.messages).to include(
+          hash_including(
+            type: :warning,
+            content: a_string_including("current_generation_declaration=unverified")
+          )
+        )
+        expect(checker.messages).not_to include(
+          hash_including(type: :success, content: a_string_including("Declared-current"))
+        )
+      end
+    end
+
+    it "does not claim a declared-current warm pass when capacity is observed but the declaration is not" do
+      write_node_renderer_script(
+        "renderer/node-renderer.js",
+        "reactOnRailsProNodeRenderer({ rendererUrl: 'http://localhost', maxVMPoolSize: 4 });"
+      )
+
+      doctor.send(:check_node_renderer_rollout_capacity)
+
+      expect(checker.messages).to include(
+        hash_including(
+          type: :warning,
+          content: a_string_including(
+            "capacity is sufficient but declared-current prewarm is unverified",
+            "configured=4",
+            "required=4",
+            "current_generation_declaration=unverified"
+          )
+        )
+      )
+      expect(checker.messages).to include(
+        hash_including(type: :success, content: a_string_including("VM pool rollout capacity is sufficient"))
+      )
+      expect(checker.messages).not_to include(
+        hash_including(type: :success, content: a_string_including("Declared-current"))
+      )
+    end
+
+    it "validates the complete renderer script delimiters once for multiple candidate calls" do
+      content = "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });\n" \
+                "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      allow(doctor).to receive(:node_renderer_delimiter_stack).and_call_original
+
+      doctor.send(:node_renderer_single_reachable_call, content)
+
+      expect(doctor).to have_received(:node_renderer_delimiter_stack).with(content).once
+    end
+
+    it "fails closed before reachability analysis when candidate calls exceed the bounded limit" do
+      content = Array.new(33, "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });").join("\n")
+      expect(doctor).not_to receive(:node_renderer_call_reachability_proven?)
+
+      call = doctor.send(:node_renderer_single_reachable_call, content)
+
+      expect(call).to be_nil
+    end
+
+    it "syntax-checks without executing launcher code or inherited Node hooks" do
+      launcher_marker = File.join(Dir.pwd, "launcher-executed")
+      hook_marker = File.join(Dir.pwd, "node-options-hook-executed")
+      hook_path = File.join(Dir.pwd, "node-options-hook.cjs")
+      File.write(hook_path, "require('fs').writeFileSync(#{hook_marker.to_json}, 'executed');")
+      original_node_options = ENV.fetch("NODE_OPTIONS", nil)
+      ENV["NODE_OPTIONS"] = "--require=#{hook_path}"
+      write_node_renderer_script(
+        "renderer/node-renderer.js",
+        "require('fs').writeFileSync(#{launcher_marker.to_json}, 'executed');\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4, " \
+        "currentGenerationManifestPath: '/app/.node-renderer-bundles/.current-generations/" \
+        "rorp-generation-v1-#{'a' * 64}.json' });"
+      )
+
+      doctor.send(:check_node_renderer_rollout_capacity)
+
+      expect(checker.messages).to include(
+        hash_including(
+          type: :success,
+          content: a_string_including("evidence=observed", "configured=4")
+        )
+      )
+      expect(File).not_to exist(launcher_marker)
+      expect(File).not_to exist(hook_marker)
+    ensure
+      if original_node_options
+        ENV["NODE_OPTIONS"] = original_node_options
+      else
+        ENV.delete("NODE_OPTIONS")
+      end
+    end
+
+    it "fails closed when Node cannot prove launcher syntax" do
+      write_node_renderer_script(
+        "renderer/node-renderer.js",
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      )
+      allow(Process).to receive(:spawn).and_raise(Errno::ENOENT)
+
+      doctor.send(:check_node_renderer_rollout_capacity)
+
+      expect(checker.messages).to include(
+        hash_including(
+          type: :warning,
+          content: a_string_including(
+            "evidence=unverified",
+            "reason=renderer_javascript_syntax_not_proven"
+          )
+        )
+      )
+      expect(checker.messages).not_to include(hash_including(type: :success))
+    end
+
+    it "terminates and reaps a stalled Node syntax check" do
+      fake_bin = File.join(Dir.pwd, "fake-bin")
+      fake_node = File.join(fake_bin, "node")
+      FileUtils.mkdir_p(fake_bin)
+      File.write(
+        fake_node,
+        <<~SH
+          #!/bin/sh
+          sleep 1
+        SH
+      )
+      File.chmod(0o755, fake_node)
+      allow(doctor).to receive(:node_renderer_syntax_check_command).and_return([fake_node])
+      spawned_pid = nil
+      allow(Process).to receive(:spawn).and_wrap_original do |original, *arguments|
+        spawned_pid = original.call(*arguments)
+      end
+      detached_waiter = nil
+      allow(Process).to receive(:detach).and_wrap_original do |original, pid|
+        detached_waiter = original.call(pid)
+      end
+      stub_const("ReactOnRails::Doctor::NODE_RENDERER_SYNTAX_CHECK_TIMEOUT_SECONDS", 0.1)
+      stub_const("ReactOnRails::Doctor::NODE_RENDERER_SYNTAX_CHECK_TERMINATION_GRACE_SECONDS", 0.1)
+      write_node_renderer_script(
+        "renderer/node-renderer.js",
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      )
+
+      started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      doctor.send(:check_node_renderer_rollout_capacity)
+      elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at
+
+      expect(elapsed).to be < 0.75
+      expect(checker.messages).to include(
+        hash_including(
+          type: :warning,
+          content: a_string_including(
+            "evidence=unverified",
+            "reason=renderer_javascript_syntax_not_proven"
+          )
+        )
+      )
+      expect(spawned_pid).not_to be_nil
+      expect(detached_waiter).not_to be_nil
+      expect(detached_waiter.join(2)).not_to be_nil
+      expect { Process.kill(0, spawned_pid) }.to raise_error(Errno::ESRCH)
+    end
+
+    it "terminates a stalled Node syntax check process group after its leader exits" do
+      fake_bin = File.join(Dir.pwd, "fake-bin")
+      fake_node = File.join(fake_bin, "node")
+      child_pid_path = File.join(Dir.pwd, "syntax-check-child-pid")
+      FileUtils.mkdir_p(fake_bin)
+      File.write(
+        fake_node,
+        <<~SH
+          #!/bin/sh
+          (trap '' TERM; while :; do sleep 1; done) &
+          echo $! > #{child_pid_path}
+          wait
+        SH
+      )
+      File.chmod(0o755, fake_node)
+      allow(doctor).to receive(:node_renderer_syntax_check_command).and_return([fake_node])
+      spawned_pid = nil
+      allow(Process).to receive(:spawn).and_wrap_original do |original, *arguments|
+        spawned_pid = original.call(*arguments)
+      end
+      stub_const("ReactOnRails::Doctor::NODE_RENDERER_SYNTAX_CHECK_TIMEOUT_SECONDS", 0.5)
+      stub_const("ReactOnRails::Doctor::NODE_RENDERER_SYNTAX_CHECK_TERMINATION_GRACE_SECONDS", 0.1)
+      write_node_renderer_script(
+        "renderer/node-renderer.js",
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      )
+
+      doctor.send(:check_node_renderer_rollout_capacity)
+
+      child_pid = wait_for_published_child_pid(child_pid_path)
+      expect(spawned_pid).not_to be_nil
+      expect { Process.kill(0, spawned_pid) }.to raise_error(Errno::ESRCH)
+      expect { Process.kill(0, child_pid) }.to raise_error(Errno::ESRCH)
+    ensure
+      begin
+        Process.kill("KILL", -spawned_pid) if spawned_pid
+      rescue Errno::ESRCH
+        nil
+      end
+    end
+
+    it "does not require ActiveSupport status predicates during syntax-check cleanup" do
+      core_status = Class.new(BasicObject) do
+        def nil?
+          false
+        end
+      end.new
+      allow(doctor).to receive(:signal_node_renderer_syntax_check)
+      allow(doctor).to receive(:node_renderer_syntax_check_process_group_alive?).and_return(false)
+      allow(Process).to receive(:wait2).and_return([1234, core_status])
+
+      expect { doctor.send(:terminate_node_renderer_syntax_check, 1234) }.not_to raise_error
+    end
+
+    it "keeps the process-group leader unreaped until group signaling is complete" do
+      events = []
+      waiter = instance_double(Thread, join: nil)
+      allow(doctor).to receive(:signal_node_renderer_syntax_check) { events << :signal }
+      allow(doctor).to receive(:node_renderer_syntax_check_process_group_alive?) do
+        events << :group_probe
+        false
+      end
+      allow(Process).to receive(:detach) do
+        events << :reap
+        waiter
+      end
+
+      doctor.send(:terminate_node_renderer_syntax_check, 1234)
+
+      expect(events.index(:group_probe)).to be < events.index(:reap)
+    end
+
+    it "detaches instead of blocking when bounded syntax-check reaping cannot finish" do
+      allow(doctor).to receive(:signal_node_renderer_syntax_check)
+      allow(doctor).to receive(:node_renderer_syntax_check_process_group_alive?).and_return(false)
+      allow(Process).to receive(:wait).and_raise("blocking wait was attempted")
+      waiter = instance_double(Thread, join: nil)
+      allow(Process).to receive(:detach).and_return(waiter)
+      stub_const("ReactOnRails::Doctor::NODE_RENDERER_SYNTAX_CHECK_TERMINATION_GRACE_SECONDS", 0)
+
+      expect { doctor.send(:terminate_node_renderer_syntax_check, 1234) }.not_to raise_error
+      expect(Process).not_to have_received(:wait)
+      expect(Process).to have_received(:detach).with(1234)
+      expect(waiter).to have_received(:join).with(0)
+    end
+
+    it "does not signal an unsignalable syntax-check process group after an EPERM probe" do
+      allow(doctor).to receive(:signal_node_renderer_syntax_check)
+      allow(Process).to receive(:kill).with(0, -1234).and_raise(Errno::EPERM)
+      allow(Process).to receive(:getpgid).with(1234).and_return(1234)
+      waiter = instance_double(Thread, join: nil)
+      allow(Process).to receive(:detach).and_return(waiter)
+      stub_const("ReactOnRails::Doctor::NODE_RENDERER_SYNTAX_CHECK_TERMINATION_GRACE_SECONDS", 0)
+
+      doctor.send(:terminate_node_renderer_syntax_check, 1234)
+
+      expect(doctor).to have_received(:signal_node_renderer_syntax_check).once.with("TERM", 1234)
+      expect(waiter).to have_received(:join).with(0)
+    end
+
+    it "continues group cleanup after EPERM when a competing waiter already reaped the leader" do
+      allow(doctor).to receive(:signal_node_renderer_syntax_check)
+      allow(Process).to receive(:kill).with(0, -1234).and_raise(Errno::EPERM)
+      allow(Process).to receive(:getpgid).with(1234).and_raise(Errno::ESRCH)
+      allow(Process).to receive(:detach).and_raise(Errno::ECHILD)
+      stub_const("ReactOnRails::Doctor::NODE_RENDERER_SYNTAX_CHECK_TERMINATION_GRACE_SECONDS", 0)
+
+      doctor.send(:terminate_node_renderer_syntax_check, 1234)
+
+      expect(doctor).to have_received(:signal_node_renderer_syntax_check).with("TERM", 1234).ordered
+      expect(doctor).to have_received(:signal_node_renderer_syntax_check).with("KILL", 1234).ordered
+    end
+
+    it "continues process-group cleanup after a competing waiter reaps the group leader" do
+      fake_node = File.join(Dir.pwd, "competing-waiter-node")
+      child_pid_path = File.join(Dir.pwd, "competing-waiter-child-pid")
+      File.write(
+        fake_node,
+        <<~SH
+          #!/bin/sh
+          (trap '' TERM; while :; do sleep 1; done) &
+          echo $! > #{child_pid_path}
+          wait
+        SH
+      )
+      File.chmod(0o755, fake_node)
+      leader_pid = Process.spawn(fake_node, out: File::NULL, err: File::NULL, pgroup: true)
+      child_pid = wait_for_published_child_pid(child_pid_path)
+      reaper = Thread.new { Process.wait(leader_pid) }
+      allow(doctor).to receive(:signal_node_renderer_syntax_check) do |signal, pid|
+        Process.kill(signal, -pid)
+        reaper.join if signal == "TERM"
+      end
+      stub_const("ReactOnRails::Doctor::NODE_RENDERER_SYNTAX_CHECK_TERMINATION_GRACE_SECONDS", 0.1)
+
+      doctor.send(:terminate_node_renderer_syntax_check, leader_pid)
+
+      expect(reaper).not_to be_alive
+      expect { Process.kill(0, child_pid) }.to raise_error(Errno::ESRCH)
+      expect { Process.kill(0, -leader_pid) }.to raise_error(Errno::ESRCH)
+    ensure
+      begin
+        Process.kill("KILL", -leader_pid) if leader_pid && leader_pid > 1 && leader_pid != Process.getpgrp
+      rescue Errno::ESRCH
+        nil
+      end
+      reaper&.join(1)
+    end
+
+    it "fails closed when a bare renderer call has no canonical package binding" do
+      File.write("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });")
+
+      doctor.send(:check_node_renderer_rollout_capacity)
+
+      expect(checker.messages).to include(
+        hash_including(
+          type: :warning,
+          content: a_string_including(
+            "evidence=unverified",
+            "reason=renderer_configuration_binding_not_proven"
+          )
+        )
+      )
+      expect(checker.messages).not_to include(hash_including(type: :success))
+    end
+
+    [
+      [
+        "a package binding scoped to an earlier block",
+        "{\nconst { reactOnRailsProNodeRenderer } = " \
+        "require('react-on-rails-pro-node-renderer');\n}\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a CommonJS package binding declared after the call",
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });\n" \
+        "const { reactOnRailsProNodeRenderer } = " \
+        "require('react-on-rails-pro-node-renderer');"
+      ],
+      [
+        "a CommonJS require function rebound before the package binding",
+        "require = eval(\"(_specifier) => ({ reactOnRailsProNodeRenderer: (_config) => undefined })\");\n" \
+        "const { reactOnRailsProNodeRenderer } = " \
+        "require('react-on-rails-pro-node-renderer');\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a CommonJS require function rebound through direct eval",
+        "eval(\"require = (_specifier) => ({ reactOnRailsProNodeRenderer: (_config) => undefined })\");\n" \
+        "const { reactOnRailsProNodeRenderer } = " \
+        "require('react-on-rails-pro-node-renderer');\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a CommonJS require function rebound through destructuring assignment",
+        "const holder = { loader: require };\n" \
+        "({ loader: require } = holder);\n" \
+        "const { reactOnRailsProNodeRenderer } = " \
+        "require('react-on-rails-pro-node-renderer');\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a CommonJS require function rebound through array assignment",
+        "const holder = [require];\n" \
+        "[require] = holder;\n" \
+        "const { reactOnRailsProNodeRenderer } = " \
+        "require('react-on-rails-pro-node-renderer');\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a CommonJS require assignment separated by a block comment",
+        "const replacement = require;\n" \
+        "require /* gap */ = replacement;\n" \
+        "const { reactOnRailsProNodeRenderer } = " \
+        "require('react-on-rails-pro-node-renderer');\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a CommonJS require function rebound through the wrapper arguments object",
+        "arguments[1] = Object;\n" \
+        "const { reactOnRailsProNodeRenderer } = " \
+        "require('react-on-rails-pro-node-renderer');\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a CommonJS require function declaration hoisted from after the renderer call",
+        "const { reactOnRailsProNodeRenderer } = " \
+        "require('react-on-rails-pro-node-renderer');\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });\n" \
+        "function require(_specifier) { return Object.create(null); }"
+      ],
+      [
+        "a duplicate local name hidden in another CommonJS destructuring specifier",
+        "const { foo: reactOnRailsProNodeRenderer, reactOnRailsProNodeRenderer } = " \
+        "require('react-on-rails-pro-node-renderer');\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });",
+        "renderer_configuration_binding_not_proven",
+        true
+      ],
+      [
+        "a syntax-invalid member-expression binding collision",
+        "const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');\n" \
+        "const obj.reactOnRailsProNodeRenderer = shim;\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });",
+        "renderer_javascript_syntax_invalid",
+        true
+      ],
+      [
+        "a syntax-invalid private-identifier binding collision",
+        "const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');\n" \
+        "const #reactOnRailsProNodeRenderer = shim;\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });",
+        "renderer_javascript_syntax_invalid",
+        true
+      ],
+      [
+        "a syntax-invalid hexadecimal identifier escape collision",
+        "const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');\n" \
+        "const \\x72eactOnRailsProNodeRenderer = shim;\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });",
+        "renderer_javascript_syntax_invalid",
+        true
+      ],
+      [
+        "a CommonJS package binding lookalike inside a quoted string",
+        'const help = "; const { reactOnRailsProNodeRenderer } = ' \
+        "require('react-on-rails-pro-node-renderer');\";\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "an ESM package binding lookalike inside a quoted string",
+        'const help = "; import { reactOnRailsProNodeRenderer } from ' \
+        "'react-on-rails-pro-node-renderer';\";\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a CommonJS package binding lookalike inside an unterminated double-quoted string",
+        'const help = "; const { reactOnRailsProNodeRenderer } = ' \
+        "require('react-on-rails-pro-node-renderer');\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });",
+        "ambiguous_javascript_configuration",
+        true
+      ],
+      [
+        "an ESM package binding lookalike inside an unterminated double-quoted string",
+        'const help = "; import { reactOnRailsProNodeRenderer } from ' \
+        "'react-on-rails-pro-node-renderer';\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });",
+        "ambiguous_javascript_configuration",
+        true
+      ],
+      [
+        "a CommonJS package binding lookalike inside an unterminated single-quoted string",
+        "const help = '; const { reactOnRailsProNodeRenderer } = " \
+        'require("react-on-rails-pro-node-renderer");' \
+        "\nreactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });",
+        "ambiguous_javascript_configuration",
+        true
+      ],
+      [
+        "an ESM package binding lookalike inside an unterminated single-quoted string",
+        "const help = '; import { reactOnRailsProNodeRenderer } from " \
+        '"react-on-rails-pro-node-renderer";' \
+        "\nreactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });",
+        "ambiguous_javascript_configuration",
+        true
+      ]
+    ].each do |description, source, expected_reason, node_syntax_error|
+      expected_reason ||= "renderer_configuration_binding_not_proven"
+
+      it "requires proven binding scope for #{description}" do
+        File.write("renderer/node-renderer.js", source)
+
+        doctor.send(:check_node_renderer_rollout_capacity)
+
+        expect(checker.messages).to include(
+          hash_including(
+            type: :warning,
+            content: a_string_including(
+              "evidence=unverified",
+              "reason=#{expected_reason}"
+            )
+          )
+        )
+        expect(checker.messages).not_to include(hash_including(type: :success))
+      end
+
+      it "emits unverified JSON when provenance resembles #{description}" do
+        File.write("renderer/node-renderer.js", source)
+        json_doctor = described_class.new(format: :json, only: "node_renderer_rollout_capacity")
+        allow(json_doctor).to receive(:ensure_rails_environment_loaded).and_return(true)
+        allow(json_doctor).to receive(:exit)
+        output = []
+        allow(json_doctor).to receive(:puts) { |argument| output << argument.to_s }
+
+        json_doctor.run_diagnosis
+
+        check = JSON.parse(output.join("\n")).fetch("checks").first
+        expect(check).to include(
+          "id" => "node_renderer_rollout_capacity",
+          "status" => "warn",
+          "message" => a_string_including(
+            "evidence=unverified",
+            "reason=#{expected_reason}"
+          )
+        )
+        expect(check.fetch("details")).not_to include(hash_including("level" => "success"))
+      end
+
+      next unless node_syntax_error
+
+      it "proves malformed source fails Node parsing for #{description}" do
+        require_node_runtime!
+
+        _stdout, stderr, status = Open3.capture3("node", "--eval", source)
+
+        expect(status).not_to be_success
+        expect(stderr).to include("SyntaxError")
+      end
+    end
+
+    [
+      [
+        "an unrelated double-quoted string value",
+        'reactOnRailsProNodeRenderer({ label: "safe", maxVMPoolSize: 4 });'
+      ],
+      [
+        "an unrelated single-quoted string value",
+        "reactOnRailsProNodeRenderer({ label: 'safe', maxVMPoolSize: 4 });"
+      ],
+      [
+        "a directly quoted capacity key",
+        'reactOnRailsProNodeRenderer({ label: "safe", "maxVMPoolSize": 4 });'
+      ],
+      [
+        "a punctuation boundary and whitespace/newline before invocation",
+        <<~JS
+          const renderer = (
+            reactOnRailsProNodeRenderer
+            (
+              { maxVMPoolSize: 4 }
+            )
+          );
+        JS
+      ],
+      [
+        "new text in strings, comments, and regular expressions",
+        "const label = 'new';\n" \
+        "// new\n" \
+        "const matcher = /new/;\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a void context",
+        "void (reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 }));"
+      ],
+      [
+        "a direct call used as an outer constructor argument",
+        "class Factory {}\n" \
+        "new Factory(reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 }));"
+      ],
+      [
+        "a byte-zero call followed by a trailing constructor decoy",
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });\n" \
+        "class Factory {}\nnew Factory();"
+      ],
+      [
+        "a byte-zero parenthesized call followed by a trailing constructor decoy",
+        "(reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 }));\n" \
+        "class Factory {}\nnew Factory();"
+      ],
+      [
+        "a CommonJS package binding",
+        "const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "an ESM package binding",
+        "import { reactOnRailsProNodeRenderer } from 'react-on-rails-pro-node-renderer';\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a multi-specifier CommonJS package binding",
+        "const { renderToPipeableStream, reactOnRailsProNodeRenderer, version: packageVersion } = " \
+        "require('react-on-rails-pro-node-renderer');\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a multi-specifier ESM package binding",
+        "import { renderToPipeableStream, reactOnRailsProNodeRenderer, version as packageVersion } from " \
+        "'react-on-rails-pro-node-renderer';\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a quoted global renderer-property decoy",
+        "const helpText = \"globalThis['reactOnRailsProNodeRenderer'] = shim\";\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a quoted Unicode-escaped global renderer-property decoy",
+        "const helpText = \"glob\\u0061lThis.reactOnRailsProNodeRenderer = shim\";\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a commented Unicode-escaped global renderer-property decoy",
+        "// glob\\u0061lThis.reactOnRailsProNodeRenderer = shim\n" \
+        "/* glob\\u0061l.reactOnRailsProNodeRenderer = shim */\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a Unicode-escaped comment decoy ending with carriage return",
+        "// glob\\u0061lThis.reactOnRailsProNodeRenderer = shim\r" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a Unicode-escaped comment decoy ending with a line separator",
+        "// glob\\u0061lThis.reactOnRailsProNodeRenderer = shim\u2028" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a Unicode-escaped comment decoy ending with a paragraph separator",
+        "// glob\\u0061lThis.reactOnRailsProNodeRenderer = shim\u2029" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ]
+    ].each do |description, source|
+      it "observes a direct inline literal with #{description}" do
+        write_node_renderer_script("renderer/node-renderer.js", source)
+
+        doctor.send(:check_node_renderer_rollout_capacity)
+
+        expect(checker.messages).to include(
+          hash_including(
+            type: :success,
+            content: a_string_including("evidence=observed", "configured=4", "required=4")
+          )
+        )
+      end
+
+      it "emits observed JSON evidence for a direct inline literal with #{description}" do
+        write_node_renderer_script("renderer/node-renderer.js", source)
+        json_doctor = described_class.new(format: :json, only: "node_renderer_rollout_capacity")
+        allow(json_doctor).to receive(:ensure_rails_environment_loaded).and_return(true)
+        allow(json_doctor).to receive(:exit)
+        output = []
+        allow(json_doctor).to receive(:puts) { |argument| output << argument.to_s }
+
+        json_doctor.run_diagnosis
+
+        check = JSON.parse(output.join("\n")).fetch("checks").first
+        expect(check).to include(
+          "id" => "node_renderer_rollout_capacity",
+          "status" => "warn",
+          "message" => a_string_including("current_generation_declaration=unverified")
+        )
+        expect(check.fetch("details")).to include(
+          hash_including(
+            "level" => "success",
+            "content" => a_string_including("evidence=observed", "configured=4", "required=4")
+          ),
+          hash_including(
+            "level" => "warning",
+            "content" => a_string_including("current_generation_declaration=unverified")
+          )
+        )
+      end
+    end
+
+    it "ignores real line and block comments around a direct inline literal" do
+      write_node_renderer_script(
+        "renderer/node-renderer.js",
+        "// reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });\n" \
+        "reactOnRailsProNodeRenderer({\n" \
+        "/* maxVMPoolSize: 2 */\n" \
+        "maxVMPoolSize: 4 // maxVMPoolSize: 2\n" \
+        "});"
+      )
+
+      doctor.send(:check_node_renderer_rollout_capacity)
+
+      expect(checker.messages).to include(
+        hash_including(
+          type: :success,
+          content: a_string_including("evidence=observed", "configured=4", "required=4")
+        )
+      )
+    end
+
+    it "proves Node rejects a constructor invocation of an arrow-function renderer" do
+      require_node_runtime!
+      source = <<~JS
+        const reactOnRailsProNodeRenderer = () => undefined;
+        new reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });
+      JS
+
+      _stdout, stderr, status = Open3.capture3("node", "--eval", source)
+
+      expect(status).not_to be_success
+      expect(stderr).to include("TypeError", "reactOnRailsProNodeRenderer is not a constructor")
+    end
+
+    [
+      [
+        "a constructor of a renderer call",
+        "new (reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 }));"
+      ],
+      [
+        "a comment-separated constructor of a renderer call",
+        "new /* constructor */ ( reactOnRailsProNodeRenderer ( { maxVMPoolSize: 4 } ) );"
+      ]
+    ].each do |description, invocation|
+      it "proves Node rejects #{description}" do
+        require_node_runtime!
+        source = <<~JS
+          const reactOnRailsProNodeRenderer = () => undefined;
+          #{invocation}
+        JS
+
+        _stdout, stderr, status = Open3.capture3("node", "--eval", source)
+
+        expect(status).not_to be_success
+        expect(stderr).to include("TypeError", "is not a constructor")
+      end
+    end
+
+    it "proves JavaScript config spread invokes a leading getter before reading capacity" do
+      require_node_runtime!
+      source = <<~JS
+        let getterCalls = 0;
+        const userConfig = {
+          get runtimeProbe() {
+            getterCalls += 1;
+            Reflect.set(this, "maxVM" + "PoolSize", 2);
+            return true;
+          },
+          maxVMPoolSize: 4
+        };
+        const resolvedConfig = { ...userConfig };
+        process.stdout.write(JSON.stringify({ getterCalls, maxVMPoolSize: resolvedConfig.maxVMPoolSize }));
+      JS
+
+      stdout, stderr, status = Open3.capture3("node", "--eval", source)
+
+      expect(status).to be_success, stderr
+      expect(JSON.parse(stdout)).to eq("getterCalls" => 1, "maxVMPoolSize" => 2)
+    end
+
+    it "keeps non-accessor method syntax eligible for direct inline observation" do
+      write_node_renderer_script(
+        "renderer/node-renderer.js",
+        "reactOnRailsProNodeRenderer({\n" \
+        "get() { return 1; },\n" \
+        "set(value) { return value; },\n" \
+        "async refresh() { return 2; },\n" \
+        "*values() { yield 2; },\n" \
+        "async *entries() { yield 2; },\n" \
+        "maxVMPoolSize: 4\n" \
+        "});"
+      )
+
+      doctor.send(:check_node_renderer_rollout_capacity)
+
+      expect(checker.messages).to include(
+        hash_including(
+          type: :success,
+          content: a_string_including("evidence=observed", "configured=4", "required=4")
+        )
+      )
+    end
+
+    it "does not misclassify a fractional JavaScript value as an observed integer" do
+      write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4.5 });")
+
+      doctor.send(:check_node_renderer_rollout_capacity)
+
+      expect(checker.messages).to include(
+        hash_including(
+          type: :warning,
+          content: a_string_including("evidence=unverified", "reason=dynamic_javascript_configuration")
+        )
+      )
+    end
+
+    it "does not infer the package default from a loopback endpoint and canonical script alone" do
+      write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ workersCount: 2 });")
+
+      doctor.send(:check_node_renderer_rollout_capacity)
+
+      expect(checker.messages).to include(
+        hash_including(
+          type: :warning,
+          content: a_string_including(
+            "evidence=unverified",
+            "topology=loopback_endpoint",
+            "reason=package_default_not_proven"
+          )
+        )
+      )
+      expect(checker.messages).not_to include(hash_including(type: :success))
+    end
+
+    it "parses a quoted JavaScript object property instead of falling through to package defaults" do
+      write_node_renderer_script("renderer/node-renderer.js", 'reactOnRailsProNodeRenderer({ "maxVMPoolSize": 2 });')
+
+      doctor.send(:check_node_renderer_rollout_capacity)
+
+      expect(checker.messages).to include(
+        hash_including(
+          type: :warning,
+          content: a_string_including(
+            "insufficient",
+            "evidence=observed",
+            "configured=2",
+            "required=4"
+          )
+        )
+      )
+    end
+
+    it "fails closed for an assignment form the static scanner does not parse" do
+      write_node_renderer_script(
+        "renderer/node-renderer.js",
+        "const config = { workersCount: 2 };\nconfig.maxVMPoolSize = 2;\nreactOnRailsProNodeRenderer(config);"
+      )
+
+      doctor.send(:check_node_renderer_rollout_capacity)
+
+      expect(checker.messages).to include(
+        hash_including(
+          type: :warning,
+          content: a_string_including(
+            "evidence=unverified",
+            "reason=renderer_configuration_binding_not_proven"
+          )
+        )
+      )
+      expect(checker.messages).not_to include(hash_including(type: :success))
+    end
+
+    it "does not treat an unrelated file-wide literal as renderer configuration" do
+      write_node_renderer_script(
+        "renderer/node-renderer.js",
+        "const unrelated = { maxVMPoolSize: 8 };\n" \
+        "reactOnRailsProNodeRenderer({ workersCount: 2 });"
+      )
+
+      doctor.send(:check_node_renderer_rollout_capacity)
+
+      expect(checker.messages).to include(
+        hash_including(
+          type: :warning,
+          content: a_string_including(
+            "evidence=unverified",
+            "reason=renderer_configuration_binding_not_proven"
+          )
+        )
+      )
+      expect(checker.messages).not_to include(
+        hash_including(type: :success, content: a_string_including("configured=8"))
+      )
+    end
+
+    it "emits JSON guidance for the renderer script selected by an active direct Procfile launcher" do
+      FileUtils.mkdir_p("client")
+      write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });")
+      write_node_renderer_script("client/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
+      File.write("Procfile.production", "node-renderer: node client/node-renderer.js\n")
+      json_doctor = described_class.new(format: :json, only: "node_renderer_rollout_capacity")
+      allow(json_doctor).to receive(:ensure_rails_environment_loaded).and_return(true)
+      allow(json_doctor).to receive(:exit)
+      output = []
+      allow(json_doctor).to receive(:puts) { |argument| output << argument.to_s }
+
+      json_doctor.run_diagnosis
+
+      check = JSON.parse(output.join("\n")).fetch("checks").first
+      expect(check).to include(
+        "id" => "node_renderer_rollout_capacity",
+        "status" => "warn"
+      )
+      guidance = check.fetch("details").find do |detail|
+        detail["level"] == "info" && detail["content"].include?("Set MAX_VM_POOL_SIZE")
+      end
+      expect(guidance.fetch("content")).to include("client/node-renderer.js")
+      expect(guidance.fetch("content")).not_to include("renderer/node-renderer.js")
+    end
+
+    it "fails closed for a top-level literal on a named object passed to the renderer" do
+      write_node_renderer_script(
+        "renderer/node-renderer.js",
+        "const config = { nested: { value: 1 }, maxVMPoolSize: 4 };\n" \
+        "reactOnRailsProNodeRenderer(config);"
+      )
+
+      doctor.send(:check_node_renderer_rollout_capacity)
+
+      expect(checker.messages).to include(
+        hash_including(
+          type: :warning,
+          content: a_string_including(
+            "evidence=unverified",
+            "reason=renderer_configuration_binding_not_proven"
+          )
+        )
+      )
+      expect(checker.messages).not_to include(hash_including(type: :success))
+    end
+
+    it "fails closed for a locally rebound renderer identifier" do
+      write_node_renderer_script(
+        "renderer/node-renderer.js",
+        "var reactOnRailsProNodeRenderer = console.log;\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      )
+
+      doctor.send(:check_node_renderer_rollout_capacity)
+
+      expect(checker.messages).to include(
+        hash_including(type: :warning, content: a_string_including("evidence=unverified"))
+      )
+      expect(checker.messages).not_to include(hash_including(type: :success))
+    end
+
+    [
+      [
+        "a non-package destructuring binding",
+        "const { reactOnRailsProNodeRenderer } = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "an array-destructured local declaration",
+        "const [reactOnRailsProNodeRenderer] = getRenderers();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a nested array-destructured local declaration",
+        "const [[reactOnRailsProNodeRenderer]] = getNestedRenderers();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a defaulted array-destructured local declaration",
+        "const [reactOnRailsProNodeRenderer = getDefaultRenderer()] = getRenderers();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a wrong-export CommonJS alias",
+        "const { otherRenderer: reactOnRailsProNodeRenderer } = " \
+        "require('react-on-rails-pro-node-renderer');\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a wrong-export ESM alias",
+        "import { otherRenderer as reactOnRailsProNodeRenderer } from " \
+        "'react-on-rails-pro-node-renderer';\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a CommonJS package binding from the default export",
+        "const { reactOnRailsProNodeRenderer } = " \
+        "require('react-on-rails-pro-node-renderer').default;\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a CommonJS package binding from an invoked export",
+        "const { reactOnRailsProNodeRenderer } = " \
+        "require('react-on-rails-pro-node-renderer')();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a globalThis renderer assignment",
+        "globalThis.reactOnRailsProNodeRenderer = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a globalThis renderer prefix update",
+        "++globalThis.reactOnRailsProNodeRenderer;\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a bracketed globalThis renderer assignment",
+        "globalThis['reactOnRailsProNodeRenderer'] = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a Node global renderer compound assignment",
+        "global.reactOnRailsProNodeRenderer ||= getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a Unicode-escaped globalThis renderer assignment",
+        "glob\\u0061lThis.reactOnRailsProNodeRenderer = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a leading-Unicode-escaped globalThis renderer assignment",
+        "\\u0067lobalThis.reactOnRailsProNodeRenderer = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a braced-Unicode-escaped globalThis renderer assignment",
+        "\\u{67}lobalThis.reactOnRailsProNodeRenderer = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a fully Unicode-escaped globalThis renderer assignment",
+        "\\u0067\\u006c\\u006f\\u0062\\u0061\\u006cThis." \
+        "reactOnRailsProNodeRenderer = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a Unicode-escaped Node global renderer assignment",
+        "glob\\u0061l.reactOnRailsProNodeRenderer = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "an escaped-punctuation invalid identifier",
+        "shim\\u002eglobalThis.reactOnRailsProNodeRenderer = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "an out-of-range Unicode escape",
+        "glob\\u{110000}alThis.reactOnRailsProNodeRenderer = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a surrogate Unicode escape",
+        "glob\\u{D800}alThis.reactOnRailsProNodeRenderer = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a non-hex Unicode escape",
+        "glob\\u{zz}alThis.reactOnRailsProNodeRenderer = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a short Unicode escape",
+        "glob\\u061lThis.reactOnRailsProNodeRenderer = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "an empty Unicode escape",
+        "glob\\u{}alThis.reactOnRailsProNodeRenderer = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "an unrelated global-object reference",
+        "globalThis.fetch = globalThis.fetch;\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "an aliased global-object mutation",
+        "const rendererGlobal = globalThis;\n" \
+        "rendererGlobal[getRendererKey()] = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "an object-destructuring assignment target",
+        "({ reactOnRailsProNodeRenderer } = getRendererShim());\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "an array-destructuring assignment target",
+        "[reactOnRailsProNodeRenderer] = getRenderers();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a later renderer reassignment",
+        "const { reactOnRailsProNodeRenderer } = " \
+        "require('react-on-rails-pro-node-renderer');\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });\n" \
+        "reactOnRailsProNodeRenderer = console.log;"
+      ],
+      [
+        "a later renderer update",
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });\nreactOnRailsProNodeRenderer++;"
+      ],
+      [
+        "a post-declaration Object.assign override",
+        "const config = { maxVMPoolSize: 4 };\n" \
+        "Object.assign(config, getRuntimeConfig());\n" \
+        "reactOnRailsProNodeRenderer(config);"
+      ],
+      [
+        "a computed object property",
+        "const key = getRuntimeKey();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4, [key]: 2 });"
+      ],
+      [
+        "a direct call passed through an earlier function declaration",
+        "function renew(value) { return value; }\n" \
+        "renew (reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 }));"
+      ],
+      [
+        "a direct call passed through an earlier object method",
+        "const wrapper = { new(value) { return value; } };\n" \
+        "wrapper.new(reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 }));"
+      ],
+      [
+        "an unreachable braced direct-call decoy before a dynamic aliased renderer call",
+        "const startRenderer = reactOnRailsProNodeRenderer;\n" \
+        "if (false) { reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 }); }\n" \
+        "startRenderer(JSON.parse(process.env.RENDERER_CONFIG));"
+      ],
+      [
+        "a short-circuited direct-call decoy before a dynamic aliased renderer call",
+        "const startRenderer = reactOnRailsProNodeRenderer;\n" \
+        "false && reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });\n" \
+        "startRenderer(JSON.parse(process.env.RENDERER_CONFIG));"
+      ],
+      [
+        "an unbraced conditional direct-call decoy",
+        "if (false) reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a ternary direct-call decoy",
+        "false ? reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 }) : undefined;"
+      ],
+      [
+        "a direct call after a top-level throw",
+        "throw new Error('renderer disabled');\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a direct call in an unused array-destructuring default",
+        "const startRenderer = reactOnRailsProNodeRenderer;\n" \
+        "const [unused = reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 })] = [true];\n" \
+        "startRenderer(JSON.parse(process.env.RENDERER_CONFIG));"
+      ],
+      [
+        "a direct call in an unused arrow-parameter default",
+        "const startRenderer = reactOnRailsProNodeRenderer;\n" \
+        "const chooseRenderer = (value = reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 })) => value;\n" \
+        "chooseRenderer(true);\n" \
+        "startRenderer(JSON.parse(process.env.RENDERER_CONFIG));"
+      ],
+      [
+        "a direct call after an unmatched opening parenthesis",
+        "(reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a direct call after an unmatched opening bracket",
+        "[reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a direct call inside an uninvoked arrow function",
+        "const startRenderer = () => reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a direct call inside a return context",
+        "function startRenderer() {\n" \
+        "return (reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 }));\n" \
+        "}\nstartRenderer();"
+      ],
+      [
+        "a direct call inside an await context",
+        "async function startRenderer() {\n" \
+        "await (reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 }));\n" \
+        "}\nstartRenderer();"
+      ],
+      [
+        "a direct member-call decoy before a dynamic aliased renderer call",
+        "const startRenderer = reactOnRailsProNodeRenderer;\n" \
+        "shim.reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });\n" \
+        "const runtimeConfig = JSON.parse(process.env.RENDERER_CONFIG);\n" \
+        "startRenderer(runtimeConfig);"
+      ],
+      [
+        "an optional-chain member-call decoy before a dynamic aliased renderer call",
+        "const startRenderer = reactOnRailsProNodeRenderer;\n" \
+        "shim?.reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });\n" \
+        "const runtimeConfig = JSON.parse(process.env.RENDERER_CONFIG);\n" \
+        "startRenderer(runtimeConfig);"
+      ],
+      [
+        "a chained member-call decoy before a dynamic aliased renderer call",
+        "const startRenderer = reactOnRailsProNodeRenderer;\n" \
+        "getShim().reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });\n" \
+        "const runtimeConfig = JSON.parse(process.env.RENDERER_CONFIG);\n" \
+        "startRenderer(runtimeConfig);"
+      ],
+      [
+        "a dollar-prefixed identifier decoy before a dynamic aliased renderer call",
+        "const startRenderer = reactOnRailsProNodeRenderer;\n" \
+        "$reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });\n" \
+        "const runtimeConfig = JSON.parse(process.env.RENDERER_CONFIG);\n" \
+        "startRenderer(runtimeConfig);"
+      ],
+      [
+        "a Unicode-prefixed identifier decoy before a dynamic aliased renderer call",
+        "const startRenderer = reactOnRailsProNodeRenderer;\n" \
+        "éreactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });\n" \
+        "const runtimeConfig = JSON.parse(process.env.RENDERER_CONFIG);\n" \
+        "startRenderer(runtimeConfig);"
+      ],
+      [
+        "an optional-call decoy before a dynamic aliased renderer call",
+        "const startRenderer = reactOnRailsProNodeRenderer;\n" \
+        "reactOnRailsProNodeRenderer?.({ maxVMPoolSize: 8 });\n" \
+        "const runtimeConfig = JSON.parse(process.env.RENDERER_CONFIG);\n" \
+        "startRenderer(runtimeConfig);"
+      ],
+      [
+        "a constructor invocation",
+        "new reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a constructor invocation separated by a real block comment",
+        "new/* constructor */reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a constructor invocation separated by a newline",
+        "new\nreactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a parenthesized constructor target",
+        "new (reactOnRailsProNodeRenderer)({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a constructor of a parenthesized renderer call",
+        "new (reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 }));"
+      ],
+      [
+        "a comment-separated constructor of a parenthesized renderer call",
+        "new /* constructor */ ( reactOnRailsProNodeRenderer ( { maxVMPoolSize: 4 } ) );"
+      ],
+      [
+        "a constructor of a renderer call inside nested parentheses",
+        "new (((reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 }))));"
+      ],
+      [
+        "a comment-separated constructor of a renderer call inside multiline nested parentheses",
+        "new /* constructor */ (\n" \
+        "( /* nested */ reactOnRailsProNodeRenderer\n" \
+        "( { maxVMPoolSize: 4 } ) )\n" \
+        ");"
+      ],
+      [
+        "an optional constructor invocation",
+        "new reactOnRailsProNodeRenderer?.({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a function declaration name before a dynamic aliased renderer call",
+        "function reactOnRailsProNodeRenderer(config = { maxVMPoolSize: 8 }) {}\n" \
+        "const startRenderer = getRendererStarter();\n" \
+        "startRenderer(JSON.parse(process.env.RENDERER_CONFIG));"
+      ],
+      [
+        "a class method name before a dynamic aliased renderer call",
+        "class Shim {\n" \
+        "reactOnRailsProNodeRenderer(config = { maxVMPoolSize: 8 }) {}\n" \
+        "}\nconst startRenderer = getRendererStarter();\n" \
+        "startRenderer(JSON.parse(process.env.RENDERER_CONFIG));"
+      ],
+      [
+        "a double-quoted call decoy before a dynamic aliased renderer call",
+        "const startRenderer = reactOnRailsProNodeRenderer;\n" \
+        'const helpText = "reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 })";' \
+        "\nconst runtimeConfig = JSON.parse(process.env.RENDERER_CONFIG);\n" \
+        "startRenderer(runtimeConfig);"
+      ],
+      [
+        "a single-quoted call decoy before a dynamic aliased renderer call",
+        "const startRenderer = reactOnRailsProNodeRenderer;\n" \
+        "const helpText = 'reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 })';\n" \
+        "const runtimeConfig = JSON.parse(process.env.RENDERER_CONFIG);\n" \
+        "startRenderer(runtimeConfig);"
+      ],
+      [
+        "a call decoy inside escaped double quotes",
+        "const startRenderer = reactOnRailsProNodeRenderer;\n" \
+        'const helpText = "Use \"reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 })\"";' \
+        "\nconst runtimeConfig = JSON.parse(process.env.RENDERER_CONFIG);\n" \
+        "startRenderer(runtimeConfig);"
+      ],
+      [
+        "a call decoy inside escaped single quotes",
+        "const startRenderer = reactOnRailsProNodeRenderer;\n" \
+        "const helpText = 'Use \\'reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 })\\'';\n" \
+        "const runtimeConfig = JSON.parse(process.env.RENDERER_CONFIG);\n" \
+        "startRenderer(runtimeConfig);"
+      ],
+      [
+        "a template-literal call decoy before a dynamic aliased renderer call",
+        "const startRenderer = reactOnRailsProNodeRenderer;\n" \
+        "const helpText = `reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 })`;\n" \
+        "const runtimeConfig = JSON.parse(process.env.RENDERER_CONFIG);\n" \
+        "startRenderer(runtimeConfig);"
+      ],
+      [
+        "a nested template-literal call decoy before a dynamic aliased renderer call",
+        "const startRenderer = reactOnRailsProNodeRenderer;\n" \
+        "const helpText = `${`reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 })`}`;\n" \
+        "const runtimeConfig = JSON.parse(process.env.RENDERER_CONFIG);\n" \
+        "startRenderer(runtimeConfig);"
+      ],
+      [
+        "an otherwise static renderer call in a template-bearing script",
+        "const helpText = `safe`;\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a regular-expression call lookalike before a dynamic aliased renderer call",
+        "const startRenderer = reactOnRailsProNodeRenderer;\n" \
+        "const helpPattern = /reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 })/;\n" \
+        "const runtimeConfig = JSON.parse(process.env.RENDERER_CONFIG);\n" \
+        "startRenderer(runtimeConfig);"
+      ],
+      [
+        "line and block comment call lookalikes before a dynamic aliased renderer call",
+        "const startRenderer = reactOnRailsProNodeRenderer;\n" \
+        "// reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });\n" \
+        "/* reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 }); */\n" \
+        "const runtimeConfig = JSON.parse(process.env.RENDERER_CONFIG);\n" \
+        "startRenderer(runtimeConfig);"
+      ],
+      [
+        "a mutable alias",
+        "const config = { maxVMPoolSize: 4 };\n" \
+        "const alias = config;\n" \
+        "Object.assign(alias, getRuntimeConfig());\n" \
+        "reactOnRailsProNodeRenderer(config);"
+      ],
+      [
+        "a spread override source",
+        "reactOnRailsProNodeRenderer({ ...getRuntimeConfig(), maxVMPoolSize: 4 });"
+      ],
+      [
+        "a computed getter",
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4, get [key]() { return 2; } });"
+      ],
+      [
+        "an ordinary getter whose spread side effect changes capacity",
+        "reactOnRailsProNodeRenderer({ get runtimeProbe() { " \
+        "Reflect.set(this, 'maxVM' + 'PoolSize', 2); return true; }, maxVMPoolSize: 4 });"
+      ],
+      [
+        "an ordinary setter on an unrelated property",
+        "reactOnRailsProNodeRenderer({ set runtimeProbe(value) { consume(value); }, maxVMPoolSize: 4 });"
+      ],
+      [
+        "a getter with a quoted property name",
+        'reactOnRailsProNodeRenderer({ get "runtime probe"() { return true; }, maxVMPoolSize: 4 });'
+      ],
+      [
+        "a setter with a quoted property name",
+        "reactOnRailsProNodeRenderer({ set 'runtime probe'(value) { consume(value); }, maxVMPoolSize: 4 });"
+      ],
+      [
+        "a getter with an escaped quoted property name",
+        'reactOnRailsProNodeRenderer({ get "runtime\u0020probe"() { return true; }, maxVMPoolSize: 4 });'
+      ],
+      [
+        "a quoted getter with comment separators in a file containing template syntax",
+        'reactOnRailsProNodeRenderer({ get/* accessor */"runtime probe"/* params */() { return true; }, ' \
+        "note: `safe`, maxVMPoolSize: 4 });"
+      ],
+      [
+        "a computed setter",
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4, set [key](value) { consume(value); } });"
+      ],
+      [
+        "an async computed method",
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4, async [key]() { return 2; } });"
+      ],
+      [
+        "a computed generator method",
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4, *[key]() { yield 2; } });"
+      ],
+      [
+        "an async computed generator method",
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4, async *[key]() { yield 2; } });"
+      ],
+      [
+        "an escaped identifier property",
+        'reactOnRailsProNodeRenderer({ maxVMPoolSize: 4, \u006daxVMPoolSize: 2 });'
+      ],
+      [
+        "a braced escaped identifier property",
+        'reactOnRailsProNodeRenderer({ maxVMPoolSize: 4, \u{6d}axVMPoolSize: 2 });'
+      ],
+      [
+        "a hex-escaped string property",
+        'reactOnRailsProNodeRenderer({ maxVMPoolSize: 4, "\x6daxVMPoolSize": 2 });'
+      ],
+      [
+        "a Unicode-escaped string property",
+        'reactOnRailsProNodeRenderer({ maxVMPoolSize: 4, "\u006daxVMPoolSize": 2 });'
+      ],
+      [
+        "an escaped compositional alias",
+        'const config={maxVMPoolSize:4}; const alias=c\u006fnfig; ' \
+        "Object.assign(alias,getRuntimeConfig()); reactOnRailsProNodeRenderer(config);"
+      ],
+      [
+        "a braced escaped compositional alias",
+        'const config={maxVMPoolSize:4}; const alias=c\u{6f}nfig; ' \
+        "Object.assign(alias,getRuntimeConfig()); reactOnRailsProNodeRenderer(config);"
+      ],
+      [
+        "block-comment delimiters in double-quoted strings",
+        'reactOnRailsProNodeRenderer({ maxVMPoolSize: 4, decoyOpen: "/*", ' \
+        '[getRuntimeKey()]: 2, decoyClose: "*/" });'
+      ],
+      [
+        "block-comment delimiters in single-quoted strings",
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4, decoyOpen: '/*', " \
+        "[getRuntimeKey()]: 2, decoyClose: '*/' });"
+      ],
+      [
+        "block-comment delimiters in template strings",
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4, decoyOpen: `/*`, " \
+        "[getRuntimeKey()]: 2, decoyClose: `*/` });"
+      ],
+      [
+        "block-comment delimiters in nested template strings",
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4, decoyOpen: `${`/*`}`, " \
+        "[getRuntimeKey()]: 2, decoyClose: `${`*/`}` });"
+      ],
+      [
+        "a block-comment delimiter after an escaped string quote",
+        'reactOnRailsProNodeRenderer({ maxVMPoolSize: 4, decoyOpen: "\"/*", ' \
+        '[getRuntimeKey()]: 2, decoyClose: "*/" });'
+      ]
+    ].each do |description, source|
+      it "fails closed for #{description}" do
+        write_node_renderer_script("renderer/node-renderer.js", source)
+
+        doctor.send(:check_node_renderer_rollout_capacity)
+
+        expect(checker.messages).to include(
+          hash_including(type: :warning, content: a_string_including("evidence=unverified"))
+        )
+        expect(checker.messages).not_to include(hash_including(type: :success))
+      end
+    end
+
+    [
+      [
+        "a post-declaration Object.assign override",
+        "const config = { maxVMPoolSize: 4 };\n" \
+        "Object.assign(config, getRuntimeConfig());\n" \
+        "reactOnRailsProNodeRenderer(config);"
+      ],
+      [
+        "a computed object property",
+        "const key = getRuntimeKey();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4, [key]: 2 });"
+      ],
+      [
+        "a direct call passed through an earlier function declaration",
+        "function renew(value) { return value; }\n" \
+        "renew (reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 }));"
+      ],
+      [
+        "a direct call passed through an earlier object method",
+        "const wrapper = { new(value) { return value; } };\n" \
+        "wrapper.new(reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 }));"
+      ],
+      [
+        "an unreachable braced direct-call decoy before a dynamic aliased renderer call",
+        "const startRenderer = reactOnRailsProNodeRenderer;\n" \
+        "if (false) { reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 }); }\n" \
+        "startRenderer(JSON.parse(process.env.RENDERER_CONFIG));"
+      ],
+      [
+        "a short-circuited direct-call decoy before a dynamic aliased renderer call",
+        "const startRenderer = reactOnRailsProNodeRenderer;\n" \
+        "false && reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });\n" \
+        "startRenderer(JSON.parse(process.env.RENDERER_CONFIG));"
+      ],
+      [
+        "an unbraced conditional direct-call decoy",
+        "if (false) reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a ternary direct-call decoy",
+        "false ? reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 }) : undefined;"
+      ],
+      [
+        "a direct call after a top-level throw",
+        "throw new Error('renderer disabled');\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a direct call in an unused array-destructuring default",
+        "const startRenderer = reactOnRailsProNodeRenderer;\n" \
+        "const [unused = reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 })] = [true];\n" \
+        "startRenderer(JSON.parse(process.env.RENDERER_CONFIG));"
+      ],
+      [
+        "a direct call in an unused arrow-parameter default",
+        "const startRenderer = reactOnRailsProNodeRenderer;\n" \
+        "const chooseRenderer = (value = reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 })) => value;\n" \
+        "chooseRenderer(true);\n" \
+        "startRenderer(JSON.parse(process.env.RENDERER_CONFIG));"
+      ],
+      [
+        "a direct call after an unmatched opening parenthesis",
+        "(reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a direct call after an unmatched opening bracket",
+        "[reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a direct call inside an uninvoked arrow function",
+        "const startRenderer = () => reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a direct call inside a return context",
+        "function startRenderer() {\n" \
+        "return (reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 }));\n" \
+        "}\nstartRenderer();"
+      ],
+      [
+        "a direct call inside an await context",
+        "async function startRenderer() {\n" \
+        "await (reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 }));\n" \
+        "}\nstartRenderer();"
+      ],
+      [
+        "a computed getter",
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4, get [key]() { return 2; } });"
+      ],
+      [
+        "an ordinary getter whose spread side effect changes capacity",
+        "reactOnRailsProNodeRenderer({ get runtimeProbe() { " \
+        "Reflect.set(this, 'maxVM' + 'PoolSize', 2); return true; }, maxVMPoolSize: 4 });"
+      ],
+      [
+        "an ordinary setter on an unrelated property",
+        "reactOnRailsProNodeRenderer({ set runtimeProbe(value) { consume(value); }, maxVMPoolSize: 4 });"
+      ],
+      [
+        "a getter with a quoted property name",
+        'reactOnRailsProNodeRenderer({ get "runtime probe"() { return true; }, maxVMPoolSize: 4 });'
+      ],
+      [
+        "a quoted getter with comment separators in a file containing template syntax",
+        'reactOnRailsProNodeRenderer({ get/* accessor */"runtime probe"/* params */() { return true; }, ' \
+        "note: `safe`, maxVMPoolSize: 4 });"
+      ],
+      [
+        "an escaped identifier property",
+        'reactOnRailsProNodeRenderer({ maxVMPoolSize: 4, \u006daxVMPoolSize: 2 });'
+      ],
+      [
+        "a named object literal",
+        "const config = { maxVMPoolSize: 4 };\nreactOnRailsProNodeRenderer(config);"
+      ],
+      [
+        "a locally rebound renderer identifier",
+        "var reactOnRailsProNodeRenderer = console.log;\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "an array-destructured local declaration",
+        "const [reactOnRailsProNodeRenderer] = getRenderers();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a nested array-destructured local declaration",
+        "const [[reactOnRailsProNodeRenderer]] = getNestedRenderers();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a defaulted array-destructured local declaration",
+        "const [reactOnRailsProNodeRenderer = getDefaultRenderer()] = getRenderers();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a wrong-export CommonJS alias",
+        "const { otherRenderer: reactOnRailsProNodeRenderer } = " \
+        "require('react-on-rails-pro-node-renderer');\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a wrong-export ESM alias",
+        "import { otherRenderer as reactOnRailsProNodeRenderer } from " \
+        "'react-on-rails-pro-node-renderer';\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a CommonJS package binding from the default export",
+        "const { reactOnRailsProNodeRenderer } = " \
+        "require('react-on-rails-pro-node-renderer').default;\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a CommonJS package binding from an invoked export",
+        "const { reactOnRailsProNodeRenderer } = " \
+        "require('react-on-rails-pro-node-renderer')();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a globalThis renderer assignment",
+        "globalThis.reactOnRailsProNodeRenderer = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a globalThis renderer prefix update",
+        "++globalThis.reactOnRailsProNodeRenderer;\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a bracketed globalThis renderer assignment",
+        "globalThis['reactOnRailsProNodeRenderer'] = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a Node global renderer compound assignment",
+        "global.reactOnRailsProNodeRenderer ||= getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a Unicode-escaped globalThis renderer assignment",
+        "glob\\u0061lThis.reactOnRailsProNodeRenderer = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a leading-Unicode-escaped globalThis renderer assignment",
+        "\\u0067lobalThis.reactOnRailsProNodeRenderer = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a braced-Unicode-escaped globalThis renderer assignment",
+        "\\u{67}lobalThis.reactOnRailsProNodeRenderer = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a fully Unicode-escaped globalThis renderer assignment",
+        "\\u0067\\u006c\\u006f\\u0062\\u0061\\u006cThis." \
+        "reactOnRailsProNodeRenderer = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a Unicode-escaped Node global renderer assignment",
+        "glob\\u0061l.reactOnRailsProNodeRenderer = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "an escaped-punctuation invalid identifier",
+        "shim\\u002eglobalThis.reactOnRailsProNodeRenderer = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "an out-of-range Unicode escape",
+        "glob\\u{110000}alThis.reactOnRailsProNodeRenderer = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a surrogate Unicode escape",
+        "glob\\u{D800}alThis.reactOnRailsProNodeRenderer = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a non-hex Unicode escape",
+        "glob\\u{zz}alThis.reactOnRailsProNodeRenderer = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a short Unicode escape",
+        "glob\\u061lThis.reactOnRailsProNodeRenderer = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "an empty Unicode escape",
+        "glob\\u{}alThis.reactOnRailsProNodeRenderer = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "an unrelated global-object reference",
+        "globalThis.fetch = globalThis.fetch;\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "an aliased global-object mutation",
+        "const rendererGlobal = globalThis;\n" \
+        "rendererGlobal[getRendererKey()] = getRendererShim();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "an object-destructuring assignment target",
+        "({ reactOnRailsProNodeRenderer } = getRendererShim());\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "an array-destructuring assignment target",
+        "[reactOnRailsProNodeRenderer] = getRenderers();\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a direct member-call decoy before a dynamic aliased renderer call",
+        "const startRenderer = reactOnRailsProNodeRenderer;\n" \
+        "shim.reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });\n" \
+        "const runtimeConfig = JSON.parse(process.env.RENDERER_CONFIG);\n" \
+        "startRenderer(runtimeConfig);"
+      ],
+      [
+        "an optional-chain member-call decoy before a dynamic aliased renderer call",
+        "const startRenderer = reactOnRailsProNodeRenderer;\n" \
+        "shim?.reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });\n" \
+        "const runtimeConfig = JSON.parse(process.env.RENDERER_CONFIG);\n" \
+        "startRenderer(runtimeConfig);"
+      ],
+      [
+        "a chained member-call decoy before a dynamic aliased renderer call",
+        "const startRenderer = reactOnRailsProNodeRenderer;\n" \
+        "getShim().reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });\n" \
+        "const runtimeConfig = JSON.parse(process.env.RENDERER_CONFIG);\n" \
+        "startRenderer(runtimeConfig);"
+      ],
+      [
+        "a dollar-prefixed identifier decoy before a dynamic aliased renderer call",
+        "const startRenderer = reactOnRailsProNodeRenderer;\n" \
+        "$reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });\n" \
+        "const runtimeConfig = JSON.parse(process.env.RENDERER_CONFIG);\n" \
+        "startRenderer(runtimeConfig);"
+      ],
+      [
+        "a Unicode-prefixed identifier decoy before a dynamic aliased renderer call",
+        "const startRenderer = reactOnRailsProNodeRenderer;\n" \
+        "éreactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });\n" \
+        "const runtimeConfig = JSON.parse(process.env.RENDERER_CONFIG);\n" \
+        "startRenderer(runtimeConfig);"
+      ],
+      [
+        "an optional-call decoy before a dynamic aliased renderer call",
+        "const startRenderer = reactOnRailsProNodeRenderer;\n" \
+        "reactOnRailsProNodeRenderer?.({ maxVMPoolSize: 8 });\n" \
+        "const runtimeConfig = JSON.parse(process.env.RENDERER_CONFIG);\n" \
+        "startRenderer(runtimeConfig);"
+      ],
+      [
+        "a constructor invocation",
+        "new reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a constructor invocation separated by a real block comment",
+        "new/* constructor */reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a constructor invocation separated by a newline",
+        "new\nreactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a parenthesized constructor target",
+        "new (reactOnRailsProNodeRenderer)({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a constructor of a parenthesized renderer call",
+        "new (reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 }));"
+      ],
+      [
+        "a comment-separated constructor of a parenthesized renderer call",
+        "new /* constructor */ ( reactOnRailsProNodeRenderer ( { maxVMPoolSize: 4 } ) );"
+      ],
+      [
+        "a constructor of a renderer call inside nested parentheses",
+        "new (((reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 }))));"
+      ],
+      [
+        "a comment-separated constructor of a renderer call inside multiline nested parentheses",
+        "new /* constructor */ (\n" \
+        "( /* nested */ reactOnRailsProNodeRenderer\n" \
+        "( { maxVMPoolSize: 4 } ) )\n" \
+        ");"
+      ],
+      [
+        "an optional constructor invocation",
+        "new reactOnRailsProNodeRenderer?.({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a function declaration name before a dynamic aliased renderer call",
+        "function reactOnRailsProNodeRenderer(config = { maxVMPoolSize: 8 }) {}\n" \
+        "const startRenderer = getRendererStarter();\n" \
+        "startRenderer(JSON.parse(process.env.RENDERER_CONFIG));"
+      ],
+      [
+        "a class method name before a dynamic aliased renderer call",
+        "class Shim {\n" \
+        "reactOnRailsProNodeRenderer(config = { maxVMPoolSize: 8 }) {}\n" \
+        "}\nconst startRenderer = getRendererStarter();\n" \
+        "startRenderer(JSON.parse(process.env.RENDERER_CONFIG));"
+      ],
+      [
+        "a double-quoted call decoy before a dynamic aliased renderer call",
+        "const startRenderer = reactOnRailsProNodeRenderer;\n" \
+        'const helpText = "reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 })";' \
+        "\nconst runtimeConfig = JSON.parse(process.env.RENDERER_CONFIG);\n" \
+        "startRenderer(runtimeConfig);"
+      ],
+      [
+        "a single-quoted call decoy before a dynamic aliased renderer call",
+        "const startRenderer = reactOnRailsProNodeRenderer;\n" \
+        "const helpText = 'reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 })';\n" \
+        "const runtimeConfig = JSON.parse(process.env.RENDERER_CONFIG);\n" \
+        "startRenderer(runtimeConfig);"
+      ],
+      [
+        "a call decoy inside escaped double quotes",
+        "const startRenderer = reactOnRailsProNodeRenderer;\n" \
+        'const helpText = "Use \"reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 })\"";' \
+        "\nconst runtimeConfig = JSON.parse(process.env.RENDERER_CONFIG);\n" \
+        "startRenderer(runtimeConfig);"
+      ],
+      [
+        "a call decoy inside escaped single quotes",
+        "const startRenderer = reactOnRailsProNodeRenderer;\n" \
+        "const helpText = 'Use \\'reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 })\\'';\n" \
+        "const runtimeConfig = JSON.parse(process.env.RENDERER_CONFIG);\n" \
+        "startRenderer(runtimeConfig);"
+      ],
+      [
+        "a template-literal call decoy before a dynamic aliased renderer call",
+        "const startRenderer = reactOnRailsProNodeRenderer;\n" \
+        "const helpText = `reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 })`;\n" \
+        "const runtimeConfig = JSON.parse(process.env.RENDERER_CONFIG);\n" \
+        "startRenderer(runtimeConfig);"
+      ],
+      [
+        "a nested template-literal call decoy before a dynamic aliased renderer call",
+        "const startRenderer = reactOnRailsProNodeRenderer;\n" \
+        "const helpText = `${`reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 })`}`;\n" \
+        "const runtimeConfig = JSON.parse(process.env.RENDERER_CONFIG);\n" \
+        "startRenderer(runtimeConfig);"
+      ],
+      [
+        "an otherwise static renderer call in a template-bearing script",
+        "const helpText = `safe`;\n" \
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });"
+      ],
+      [
+        "a regular-expression call lookalike before a dynamic aliased renderer call",
+        "const startRenderer = reactOnRailsProNodeRenderer;\n" \
+        "const helpPattern = /reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 })/;\n" \
+        "const runtimeConfig = JSON.parse(process.env.RENDERER_CONFIG);\n" \
+        "startRenderer(runtimeConfig);"
+      ],
+      [
+        "line and block comment call lookalikes before a dynamic aliased renderer call",
+        "const startRenderer = reactOnRailsProNodeRenderer;\n" \
+        "// reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });\n" \
+        "/* reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 }); */\n" \
+        "const runtimeConfig = JSON.parse(process.env.RENDERER_CONFIG);\n" \
+        "startRenderer(runtimeConfig);"
+      ],
+      [
+        "an escaped compositional alias",
+        'const config={maxVMPoolSize:4}; const alias=c\u006fnfig; ' \
+        "Object.assign(alias,getRuntimeConfig()); reactOnRailsProNodeRenderer(config);"
+      ],
+      [
+        "a braced escaped compositional alias",
+        'const config={maxVMPoolSize:4}; const alias=c\u{6f}nfig; ' \
+        "Object.assign(alias,getRuntimeConfig()); reactOnRailsProNodeRenderer(config);"
+      ],
+      [
+        "block-comment delimiters in double-quoted strings",
+        'reactOnRailsProNodeRenderer({ maxVMPoolSize: 4, decoyOpen: "/*", ' \
+        '[getRuntimeKey()]: 2, decoyClose: "*/" });'
+      ],
+      [
+        "block-comment delimiters in nested template strings",
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4, decoyOpen: `${`/*`}`, " \
+        "[getRuntimeKey()]: 2, decoyClose: `${`*/`}` });"
+      ]
+    ].each do |description, source|
+      it "emits unverified JSON evidence for #{description}" do
+        write_node_renderer_script("renderer/node-renderer.js", source)
+        json_doctor = described_class.new(format: :json, only: "node_renderer_rollout_capacity")
+        allow(json_doctor).to receive(:ensure_rails_environment_loaded).and_return(true)
+        allow(json_doctor).to receive(:exit)
+        output = []
+        allow(json_doctor).to receive(:puts) { |argument| output << argument.to_s }
+
+        json_doctor.run_diagnosis
+
+        check = JSON.parse(output.join("\n")).fetch("checks").first
+        expect(check).to include(
+          "id" => "node_renderer_rollout_capacity",
+          "status" => "warn",
+          "message" => a_string_including("evidence=unverified")
+        )
+        expect(check.fetch("details")).not_to include(
+          hash_including("level" => "success", "content" => a_string_including("capacity is sufficient"))
+        )
+      end
+    end
+
+    it "selects the renderer script named by an active direct Procfile launcher" do
+      FileUtils.mkdir_p("client")
+      write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });")
+      write_node_renderer_script("client/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
+      File.write("Procfile.production", "node-renderer: node client/node-renderer.js\n")
+
+      doctor.send(:check_node_renderer_rollout_capacity)
+
+      expect(checker.messages).to include(
+        hash_including(
+          type: :warning,
+          content: a_string_including("evidence=observed", "configured=2", "required=4")
+        )
+      )
+      expect(checker.messages).not_to include(
+        hash_including(type: :success, content: a_string_including("configured=8"))
+      )
+      guidance = checker.messages.find do |message|
+        message[:type] == :info && message[:content].include?("Set MAX_VM_POOL_SIZE")
+      end
+      expect(guidance.fetch(:content)).to include("client/node-renderer.js")
+      expect(guidance.fetch(:content)).not_to include("renderer/node-renderer.js")
+    end
+
+    it "fails closed when an unproven active launcher references another canonical renderer script" do
+      FileUtils.mkdir_p("client")
+      write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });")
+      write_node_renderer_script("client/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
+      File.write(
+        "Procfile.production",
+        "renderer: node renderer/node-renderer.js\nclient: env FOO=1 node client/node-renderer.js\n"
+      )
+
+      doctor.send(:check_node_renderer_rollout_capacity)
+
+      expect(checker.messages).to include(
+        hash_including(
+          type: :warning,
+          content: a_string_including(
+            "evidence=unverified",
+            "reason=renderer_script_selection_not_proven"
+          )
+        )
+      )
+      expect(checker.messages).not_to include(hash_including(type: :success))
+    end
+
+    [
+      ["an echoed command", "node-renderer: echo node renderer/node-renderer.js"],
+      ["an unreachable shell command", "node-renderer: false && node renderer/node-renderer.js"],
+      ["a double-quoted mention", 'node-renderer: "node renderer/node-renderer.js"'],
+      ["a single-quoted mention", "node-renderer: 'node renderer/node-renderer.js'"],
+      ["an unlabeled command", "MAX_VM_POOL_SIZE=8 node renderer/node-renderer.js"],
+      ["a command with trailing arguments", "node-renderer: node renderer/node-renderer.js --inspect"],
+      ["an absolute script path", "node-renderer: node /renderer/node-renderer.js"],
+      [
+        "renderer-first multiple references",
+        "node-renderer: echo node renderer/node-renderer.js && exec node client/node-renderer.js"
+      ],
+      [
+        "client-first multiple references",
+        "node-renderer: echo node client/node-renderer.js && exec node renderer/node-renderer.js"
+      ]
+    ].each do |description, launcher_line|
+      it "does not prove renderer selection from #{description}" do
+        FileUtils.mkdir_p("client")
+        write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });")
+        write_node_renderer_script("client/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
+        File.write("Procfile.production", "#{launcher_line}\n")
+
+        doctor.send(:check_node_renderer_rollout_capacity)
+
+        expect(checker.messages).to include(
+          hash_including(
+            type: :warning,
+            content: a_string_including(
+              "evidence=unverified",
+              "reason=renderer_script_selection_not_proven"
+            )
+          )
+        )
+        expect(checker.messages).not_to include(hash_including(type: :success))
+      end
+
+      it "emits unverified JSON for #{description}" do
+        FileUtils.mkdir_p("client")
+        write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });")
+        write_node_renderer_script("client/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
+        File.write("Procfile.production", "#{launcher_line}\n")
+        json_doctor = described_class.new(format: :json, only: "node_renderer_rollout_capacity")
+        allow(json_doctor).to receive(:ensure_rails_environment_loaded).and_return(true)
+        allow(json_doctor).to receive(:exit)
+        output = []
+        allow(json_doctor).to receive(:puts) { |argument| output << argument.to_s }
+
+        json_doctor.run_diagnosis
+
+        check = JSON.parse(output.join("\n")).fetch("checks").first
+        expect(check).to include(
+          "id" => "node_renderer_rollout_capacity",
+          "status" => "warn",
+          "message" => a_string_including(
+            "evidence=unverified",
+            "reason=renderer_script_selection_not_proven"
+          )
+        )
+        expect(check.fetch("details")).not_to include(
+          hash_including("level" => "success", "content" => a_string_including("capacity is sufficient"))
+        )
+      end
+    end
+
+    %w[.bak #suffix -other /other].each do |suffix|
+      it "does not select a canonical renderer script from a #{suffix} token suffix" do
+        FileUtils.mkdir_p("client")
+        write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });")
+        write_node_renderer_script("client/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
+        File.write("Procfile.production", "node-renderer: node renderer/node-renderer.js#{suffix}\n")
+
+        doctor.send(:check_node_renderer_rollout_capacity)
+
+        expect(checker.messages).to include(
+          hash_including(
+            type: :warning,
+            content: a_string_including(
+              "evidence=unverified",
+              "reason=renderer_script_selection_not_proven"
+            )
+          )
+        )
+        expect(checker.messages).not_to include(hash_including(type: :success))
+      end
+
+      it "emits unverified JSON for a canonical renderer path with a #{suffix} token suffix" do
+        FileUtils.mkdir_p("client")
+        write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });")
+        write_node_renderer_script("client/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
+        File.write("Procfile.production", "node-renderer: node renderer/node-renderer.js#{suffix}\n")
+        json_doctor = described_class.new(format: :json, only: "node_renderer_rollout_capacity")
+        allow(json_doctor).to receive(:ensure_rails_environment_loaded).and_return(true)
+        allow(json_doctor).to receive(:exit)
+        output = []
+        allow(json_doctor).to receive(:puts) { |argument| output << argument.to_s }
+
+        json_doctor.run_diagnosis
+
+        check = JSON.parse(output.join("\n")).fetch("checks").first
+        expect(check).to include(
+          "id" => "node_renderer_rollout_capacity",
+          "status" => "warn",
+          "message" => a_string_including(
+            "evidence=unverified",
+            "reason=renderer_script_selection_not_proven"
+          )
+        )
+        expect(check.fetch("details")).not_to include(
+          hash_including("level" => "success", "content" => a_string_including("capacity is sufficient"))
+        )
+      end
+    end
+
+    it "emits unverified JSON when one launcher line references both canonical renderer scripts" do
+      FileUtils.mkdir_p("client")
+      write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });")
+      write_node_renderer_script("client/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
+      File.write(
+        "Procfile.production",
+        "node-renderer: echo node renderer/node-renderer.js && exec node client/node-renderer.js\n"
+      )
+      json_doctor = described_class.new(format: :json, only: "node_renderer_rollout_capacity")
+      allow(json_doctor).to receive(:ensure_rails_environment_loaded).and_return(true)
+      allow(json_doctor).to receive(:exit)
+      output = []
+      allow(json_doctor).to receive(:puts) { |argument| output << argument.to_s }
+
+      json_doctor.run_diagnosis
+
+      check = JSON.parse(output.join("\n")).fetch("checks").first
+      expect(check).to include(
+        "id" => "node_renderer_rollout_capacity",
+        "status" => "warn",
+        "message" => a_string_including(
+          "evidence=unverified",
+          "reason=renderer_script_selection_not_proven"
+        )
+      )
+      expect(check.fetch("details")).not_to include(
+        hash_including("level" => "success", "content" => a_string_including("capacity is sufficient"))
+      )
+    end
+
+    it "fails closed when separate valid process lines select different canonical scripts" do
+      FileUtils.mkdir_p("client")
+      write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });")
+      write_node_renderer_script("client/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
+      File.write(
+        "Procfile.production",
+        "renderer-a: node renderer/node-renderer.js\nrenderer-b: node client/node-renderer.js\n"
+      )
+
+      doctor.send(:check_node_renderer_rollout_capacity)
+
+      expect(checker.messages).to include(
+        hash_including(
+          type: :warning,
+          content: a_string_including(
+            "evidence=unverified",
+            "reason=renderer_script_selection_not_proven"
+          )
+        )
+      )
+      expect(checker.messages).not_to include(hash_including(type: :success))
+    end
+
+    it "fails closed when both renderer scripts exist and no active launcher proves selection" do
+      FileUtils.mkdir_p("client")
+      write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });")
+      write_node_renderer_script("client/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
+      File.write("Procfile.production", "# node-renderer: node client/node-renderer.js\n")
+
+      doctor.send(:check_node_renderer_rollout_capacity)
+
+      expect(checker.messages).to include(
+        hash_including(
+          type: :warning,
+          content: a_string_including(
+            "evidence=unverified",
+            "reason=renderer_script_selection_not_proven"
+          )
+        )
+      )
+      expect(checker.messages).not_to include(hash_including(type: :success))
+    end
+
+    it "does not treat a Rails-process ENV value as observed renderer state for a loopback sidecar" do
+      ENV["MAX_VM_POOL_SIZE"] = "8"
+      write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ workersCount: 2 });")
+
+      doctor.send(:check_node_renderer_rollout_capacity)
+
+      expect(checker.messages).to include(
+        hash_including(
+          type: :info,
+          content: a_string_including(
+            "topology=loopback_endpoint",
+            "does not prove",
+            "process environment",
+            "deploy lifecycle"
+          )
+        ),
+        hash_including(
+          type: :warning,
+          content: a_string_including(
+            "evidence=unverified",
+            "topology=loopback_endpoint",
+            "reason=renderer_process_environment_not_proven"
+          )
+        )
+      )
+      expect(checker.messages).not_to include(
+        hash_including(type: :success, content: a_string_including("configured=8"))
+      )
+    end
+
+    it "uses a static inline launcher assignment ahead of the Doctor process ENV" do
+      ENV["MAX_VM_POOL_SIZE"] = "4"
+      write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ workersCount: 2 });")
+      File.write(
+        "Procfile.production",
+        "node-renderer: MAX_VM_POOL_SIZE=2 node renderer/node-renderer.js"
+      )
+
+      doctor.send(:check_node_renderer_rollout_capacity)
+
+      expect(checker.messages).to include(
+        hash_including(
+          type: :warning,
+          content: a_string_including(
+            "insufficient",
+            "evidence=observed",
+            "configured=2",
+            "required=4",
+            "source=selected_launcher_static_assignment"
+          )
+        )
+      )
+      expect(checker.messages).not_to include(
+        hash_including(type: :success, content: a_string_including("configured=4"))
+      )
+    end
+
+    it "fails closed for launcher capacity and a declared current generation when renderer syntax is invalid" do
+      write_node_renderer_script(
+        "renderer/node-renderer.js",
+        "reactOnRailsProNodeRenderer({ currentGenerationManifestPath: " \
+        "'/app/.node-renderer-bundles/.current-generations/rorp-generation-v1-#{'a' * 64}.json' });\n" \
+        "const broken ="
+      )
+      File.write(
+        "Procfile.production",
+        "node-renderer: MAX_VM_POOL_SIZE=4 node renderer/node-renderer.js\n"
+      )
+
+      doctor.send(:check_node_renderer_rollout_capacity)
+
+      expect(checker.messages).to include(
+        hash_including(
+          type: :warning,
+          content: a_string_including(
+            "evidence=unverified",
+            "reason=renderer_javascript_syntax_invalid"
+          )
+        )
+      )
+      expect(checker.messages).to include(
+        hash_including(
+          type: :info,
+          content: a_string_including(
+            "Fix JavaScript syntax in renderer/node-renderer.js",
+            "rerun Doctor"
+          )
+        )
+      )
+      expect(checker.messages).not_to include(
+        hash_including(type: :success, content: a_string_including("Declared-current"))
+      )
+    end
+
+    it "does not treat declaration-looking text in a template literal as observed" do
+      write_node_renderer_script(
+        "renderer/node-renderer.js",
+        "reactOnRailsProNodeRenderer({ banner: `, currentGenerationManifestPath: " \
+        "'/app/.node-renderer-bundles/.current-generations/rorp-generation-v1-#{'a' * 64}.json',` });"
+      )
+      File.write(
+        "Procfile.production",
+        "node-renderer: MAX_VM_POOL_SIZE=4 node renderer/node-renderer.js\n"
+      )
+
+      active_content = doctor.send(
+        :node_renderer_active_config_content,
+        File.read("renderer/node-renderer.js")
+      )
+      evidence = doctor.send(
+        :node_renderer_launcher_vm_pool_assignment_evidence,
+        "renderer/node-renderer.js"
+      )
+      evidence[:current_generation_declaration] = doctor.send(
+        :node_renderer_current_generation_declaration_evidence,
+        active_content
+      )
+      doctor.send(:report_node_renderer_capacity_evidence, evidence, 4, :loopback_endpoint)
+
+      expect(checker.messages).to include(
+        hash_including(
+          type: :warning,
+          content: a_string_including(
+            "capacity is sufficient but declared-current prewarm is unverified",
+            "evidence=observed",
+            "source=selected_launcher_static_assignment",
+            "current_generation_declaration=unverified"
+          )
+        )
+      )
+      expect(checker.messages).not_to include(
+        hash_including(type: :success, content: a_string_including("Declared-current"))
+      )
+    end
+
+    it "fails closed when separate valid process lines assign conflicting capacities" do
+      write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ workersCount: 2 });")
+      File.write(
+        "Procfile.production",
+        "renderer-a: MAX_VM_POOL_SIZE=8 node renderer/node-renderer.js\n" \
+        "renderer-b: MAX_VM_POOL_SIZE=2 node renderer/node-renderer.js\n"
+      )
+
+      doctor.send(:check_node_renderer_rollout_capacity)
+
+      expect(checker.messages).to include(
+        hash_including(
+          type: :warning,
+          content: a_string_including(
+            "evidence=unverified",
+            "reason=dynamic_or_ambiguous_launcher_vm_pool_assignment"
+          )
+        )
+      )
+      expect(checker.messages).not_to include(hash_including(type: :success))
+    end
+
+    it "observes matching assignments across separate valid process lines" do
+      write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ workersCount: 2 });")
+      File.write(
+        "Procfile.production",
+        "renderer-a: MAX_VM_POOL_SIZE=2 node renderer/node-renderer.js\n" \
+        "renderer-b: MAX_VM_POOL_SIZE=2 node renderer/node-renderer.js\n"
+      )
+
+      doctor.send(:check_node_renderer_rollout_capacity)
+
+      expect(checker.messages).to include(
+        hash_including(
+          type: :warning,
+          content: a_string_including(
+            "insufficient",
+            "evidence=observed",
+            "configured=2",
+            "source=selected_launcher_static_assignment"
+          )
+        )
+      )
+    end
+
+    it "accepts a directly scoped literal launcher assignment with a Procfile label and varied whitespace" do
+      write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ workersCount: 2 });")
+      File.write(
+        "Procfile.production",
+        "node-renderer:\tMAX_VM_POOL_SIZE=2\t\tnode\t\t./renderer/node-renderer.js # direct launcher\n"
+      )
+
+      doctor.send(:check_node_renderer_rollout_capacity)
+
+      expect(checker.messages).to include(
+        hash_including(
+          type: :warning,
+          content: a_string_including(
+            "insufficient",
+            "evidence=observed",
+            "configured=2",
+            "source=selected_launcher_static_assignment"
+          )
+        )
+      )
+    end
+
+    [
+      "node-renderer: echo MAX_VM_POOL_SIZE=8 && node renderer/node-renderer.js",
+      "node-renderer: MAX_VM_POOL_SIZE=8 node prep.js && node renderer/node-renderer.js"
+    ].each do |launcher_line|
+      it "does not attribute an earlier shell assignment to the selected renderer invocation" do
+        ENV["MAX_VM_POOL_SIZE"] = "2"
+        write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ workersCount: 2 });")
+        File.write("Procfile.production", "#{launcher_line}\n")
+
+        doctor.send(:check_node_renderer_rollout_capacity)
+
+        expect(checker.messages).to include(
+          hash_including(
+            type: :warning,
+            content: a_string_including(
+              "evidence=unverified",
+              "reason=dynamic_or_ambiguous_launcher_vm_pool_assignment"
+            )
+          )
+        )
+        expect(checker.messages).not_to include(hash_including(type: :success))
+      end
+
+      it "emits unverified JSON for an earlier shell assignment outside the selected renderer invocation" do
+        ENV["MAX_VM_POOL_SIZE"] = "2"
+        write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ workersCount: 2 });")
+        File.write("Procfile.production", "#{launcher_line}\n")
+        json_doctor = described_class.new(format: :json, only: "node_renderer_rollout_capacity")
+        allow(json_doctor).to receive(:ensure_rails_environment_loaded).and_return(true)
+        allow(json_doctor).to receive(:exit)
+        output = []
+        allow(json_doctor).to receive(:puts) { |argument| output << argument.to_s }
+
+        json_doctor.run_diagnosis
+
+        check = JSON.parse(output.join("\n")).fetch("checks").first
+        expect(check).to include(
+          "id" => "node_renderer_rollout_capacity",
+          "status" => "warn",
+          "message" => a_string_including(
+            "evidence=unverified",
+            "reason=dynamic_or_ambiguous_launcher_vm_pool_assignment"
+          )
+        )
+        expect(check.fetch("details")).not_to include(
+          hash_including("level" => "success", "content" => a_string_including("capacity is sufficient"))
+        )
+      end
+    end
+
+    it "fails closed when one launcher line invokes the selected script more than once" do
+      write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ workersCount: 2 });")
+      File.write(
+        "Procfile.production",
+        "node-renderer: MAX_VM_POOL_SIZE=8 node renderer/node-renderer.js && " \
+        "MAX_VM_POOL_SIZE=2 exec node renderer/node-renderer.js"
+      )
+
+      doctor.send(:check_node_renderer_rollout_capacity)
+
+      expect(checker.messages).to include(
+        hash_including(
+          type: :warning,
+          content: a_string_including(
+            "evidence=unverified",
+            "reason=dynamic_or_ambiguous_launcher_vm_pool_assignment"
+          )
+        )
+      )
+      expect(checker.messages).not_to include(hash_including(type: :success))
+    end
+
+    it "fails closed when the selected launcher computes MAX_VM_POOL_SIZE dynamically" do
+      ENV["MAX_VM_POOL_SIZE"] = "4"
+      write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ workersCount: 2 });")
+      File.write(
+        "Procfile.production",
+        "node-renderer: MAX_VM_POOL_SIZE=${MAX_VM_POOL_SIZE:-4} node renderer/node-renderer.js"
+      )
+
+      doctor.send(:check_node_renderer_rollout_capacity)
+
+      expect(checker.messages).to include(
+        hash_including(
+          type: :warning,
+          content: a_string_including(
+            "evidence=unverified",
+            "reason=dynamic_or_ambiguous_launcher_vm_pool_assignment"
+          )
+        )
+      )
+      expect(checker.messages).not_to include(hash_including(type: :success))
+    end
+
+    it "warns instead of passing when JavaScript computes the capacity dynamically" do
+      write_node_renderer_script(
+        "renderer/node-renderer.js",
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: Number(process.env.MAX_VM_POOL_SIZE) });"
+      )
+
+      doctor.send(:check_node_renderer_rollout_capacity)
+
+      expect(checker.messages).to include(
+        hash_including(
+          type: :warning,
+          content: a_string_including(
+            "evidence=unverified",
+            "reason=dynamic_javascript_configuration",
+            "does not query the live renderer process"
+          )
+        )
+      )
+    end
+
+    context "with a separate renderer workload" do
+      let(:renderer_url) { "https://renderer.internal.example:3800" }
+
+      it "warns even when the local canonical script has a sufficient literal" do
+        write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });")
+
+        doctor.send(:check_node_renderer_rollout_capacity)
+
+        expect(checker.messages).to include(
+          hash_including(
+            type: :warning,
+            content: a_string_including(
+              "evidence=unverified",
+              "topology=separate",
+              "reason=separate_renderer_workload"
+            )
+          )
+        )
+        expect(checker.messages.map { |message| message[:content] }.join("\n")).not_to include(renderer_url)
+      end
+    end
+
+    context "with a bracketed IPv6 loopback endpoint" do
+      let(:renderer_url) { "http://[::1]:3800" }
+
+      it "normalizes the URI host before classifying topology" do
+        write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });")
+
+        doctor.send(:check_node_renderer_rollout_capacity)
+
+        expect(checker.messages).to include(
+          hash_including(
+            type: :success,
+            content: a_string_including(
+              "evidence=observed",
+              "configured=4",
+              "topology=loopback_endpoint"
+            )
+          )
+        )
+      end
+    end
+
+    context "with RSC disabled" do
+      let(:enable_rsc_support) { false }
+
+      it "requires one server context for each overlapping generation" do
+        write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
+
+        doctor.send(:check_node_renderer_rollout_capacity)
+
+        expect(checker.messages).to include(
+          hash_including(
+            type: :info,
+            content: a_string_including("contexts_per_generation=1", "required_capacity=2")
+          ),
+          hash_including(
+            type: :success,
+            content: a_string_including("configured=2", "required=2")
+          )
+        )
+      end
+    end
+
+    it "ignores partial-boot runtime RSC state when the Rails environment did not load" do
+      allow(doctor).to receive(:ensure_rails_environment_loaded).and_return(false)
+      FileUtils.mkdir_p("config/initializers")
+      File.write(
+        "config/initializers/react_on_rails_pro.rb",
+        "config.server_renderer = \"NodeRenderer\"\n# config.enable_rsc_support = false\n"
+      )
+      write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 4 });")
+      allow(pro_config).to receive(:enable_rsc_support).and_return(false)
+
+      doctor.send(:check_node_renderer_rollout_capacity)
+
+      expect(checker.messages).to include(
+        hash_including(
+          type: :info,
+          content: a_string_including(
+            "contexts_per_generation=2",
+            "required_capacity=4",
+            "RSC evidence=unverified_conservative_enabled"
+          )
+        )
+      )
+      expect(checker.messages).not_to include(
+        hash_including(type: :info, content: a_string_including("contexts_per_generation=1"))
+      )
+    end
+
+    it "keeps oversized initializer RSC evidence conservative after a failed Rails boot" do
+      allow(doctor).to receive(:ensure_rails_environment_loaded).and_return(false)
+      FileUtils.mkdir_p("config/initializers")
+      prefix =
+        "config.enable_rsc_support = false\n" \
+        "config.server_renderer = \"NodeRenderer\"\n" \
+        "#"
+      padding = "x" * (described_class::NODE_RENDERER_CONFIG_MAX_BYTES - prefix.bytesize)
+      File.write(
+        "config/initializers/react_on_rails_pro.rb",
+        "#{prefix}#{padding}\nconfig.enable_rsc_support = true\n"
+      )
+      write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
+
+      doctor.send(:check_node_renderer_rollout_capacity)
+
+      expect(checker.messages).to include(
+        hash_including(
+          type: :info,
+          content: a_string_including(
+            "contexts_per_generation=2",
+            "required_capacity=4",
+            "RSC evidence=unverified_conservative_enabled"
+          )
+        ),
+        hash_including(
+          type: :warning,
+          content: a_string_including("insufficient", "configured=2", "required=4")
+        )
+      )
+      expect(checker.messages).not_to include(hash_including(type: :success))
+    end
+
+    it "emits conservative JSON evidence for an oversized initializer after a failed Rails boot" do
+      FileUtils.mkdir_p("config/initializers")
+      prefix =
+        "config.enable_rsc_support = false\n" \
+        "config.server_renderer = \"NodeRenderer\"\n" \
+        "#"
+      padding = "x" * (described_class::NODE_RENDERER_CONFIG_MAX_BYTES - prefix.bytesize)
+      File.write(
+        "config/initializers/react_on_rails_pro.rb",
+        "#{prefix}#{padding}\nconfig.enable_rsc_support = true\n"
+      )
+      write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
+      json_doctor = described_class.new(format: :json, only: "node_renderer_rollout_capacity")
+      allow(json_doctor).to receive(:ensure_rails_environment_loaded).and_return(false)
+      allow(json_doctor).to receive(:exit)
+      output = []
+      allow(json_doctor).to receive(:puts) { |argument| output << argument.to_s }
+
+      json_doctor.run_diagnosis
+
+      check = JSON.parse(output.join("\n")).fetch("checks").first
+      expect(check).to include(
+        "id" => "node_renderer_rollout_capacity",
+        "status" => "warn"
+      )
+      expect(check.fetch("details")).to include(
+        hash_including(
+          "level" => "info",
+          "content" => a_string_including(
+            "contexts_per_generation=2",
+            "required_capacity=4",
+            "RSC evidence=unverified_conservative_enabled"
+          )
+        ),
+        hash_including(
+          "level" => "warning",
+          "content" => a_string_including("insufficient", "configured=2", "required=4")
+        )
+      )
+    end
+
+    [
+      [
+        "an uncalled instance method",
+        <<~RUBY
+          def configure_rsc(config)
+            config.enable_rsc_support = false
+          end
+        RUBY
+      ],
+      [
+        "an uncalled singleton method",
+        <<~RUBY
+          def self.configure_rsc(config)
+            config.enable_rsc_support = false
+          end
+        RUBY
+      ],
+      [
+        "a block",
+        <<~RUBY
+          configs.each do |config|
+            config.enable_rsc_support = false
+          end
+        RUBY
+      ],
+      [
+        "a lambda",
+        <<~RUBY
+          configure_rsc = ->(config) { config.enable_rsc_support = false }
+        RUBY
+      ],
+      [
+        "a ternary branch",
+        <<~RUBY
+          enabled ? (config.enable_rsc_support = false) : nil
+        RUBY
+      ],
+      [
+        "a short-circuit expression",
+        <<~RUBY
+          enabled && (config.enable_rsc_support = false)
+        RUBY
+      ],
+      [
+        "a defined? query",
+        <<~RUBY
+          defined?(config.enable_rsc_support = false)
+        RUBY
+      ],
+      [
+        "a safe-navigation assignment",
+        <<~RUBY
+          config = nil
+          config&.enable_rsc_support = false
+        RUBY
+      ],
+      [
+        "an unbound top-level receiver",
+        <<~RUBY
+          config = Object.new
+          config.enable_rsc_support = false
+        RUBY
+      ],
+      [
+        "a class body",
+        <<~RUBY
+          class Setup
+            config.enable_rsc_support = false
+          end
+        RUBY
+      ],
+      [
+        "a module body",
+        <<~RUBY
+          module Setup
+            config.enable_rsc_support = false
+          end
+        RUBY
+      ]
+    ].each do |description, dynamic_source|
+      it "keeps RSC evidence in #{description} conservative after a failed Rails boot" do
+        allow(doctor).to receive(:ensure_rails_environment_loaded).and_return(false)
+        FileUtils.mkdir_p("config/initializers")
+        File.write(
+          "config/initializers/react_on_rails_pro.rb",
+          "config.server_renderer = \"NodeRenderer\"\n#{dynamic_source}"
+        )
+        write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
+
+        doctor.send(:check_node_renderer_rollout_capacity)
+
+        expect(checker.messages).to include(
+          hash_including(
+            type: :info,
+            content: a_string_including(
+              "contexts_per_generation=2",
+              "required_capacity=4",
+              "RSC evidence=unverified_conservative_enabled"
+            )
+          ),
+          hash_including(
+            type: :warning,
+            content: a_string_including("insufficient", "configured=2", "required=4")
+          )
+        )
+        expect(checker.messages).not_to include(hash_including(type: :success))
+      end
+    end
+
+    it "emits conservative JSON evidence for an assignment inside defined? after a failed Rails boot" do
+      FileUtils.mkdir_p("config/initializers")
+      File.write(
+        "config/initializers/react_on_rails_pro.rb",
+        <<~RUBY
+          config.server_renderer = "NodeRenderer"
+          defined?(config.enable_rsc_support = false)
+        RUBY
+      )
+      write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
+      json_doctor = described_class.new(format: :json, only: "node_renderer_rollout_capacity")
+      allow(json_doctor).to receive(:ensure_rails_environment_loaded).and_return(false)
+      allow(json_doctor).to receive(:exit)
+      output = []
+      allow(json_doctor).to receive(:puts) { |argument| output << argument.to_s }
+
+      json_doctor.run_diagnosis
+
+      check = JSON.parse(output.join("\n")).fetch("checks").first
+      expect(check).to include(
+        "id" => "node_renderer_rollout_capacity",
+        "status" => "warn"
+      )
+      expect(check.fetch("details")).to include(
+        hash_including(
+          "level" => "info",
+          "content" => a_string_including(
+            "contexts_per_generation=2",
+            "required_capacity=4",
+            "RSC evidence=unverified_conservative_enabled"
+          )
+        ),
+        hash_including(
+          "level" => "warning",
+          "content" => a_string_including("insufficient", "configured=2", "required=4")
+        )
+      )
+    end
+
+    it "keeps a leading top-level initializer RSC assignment conservative after a failed Rails boot" do
+      allow(doctor).to receive(:ensure_rails_environment_loaded).and_return(false)
+      FileUtils.mkdir_p("config/initializers")
+      File.write(
+        "config/initializers/react_on_rails_pro.rb",
+        <<~RUBY
+          config.enable_rsc_support = false
+          config.server_renderer = "NodeRenderer"
+        RUBY
+      )
+      write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
+      allow(pro_config).to receive(:enable_rsc_support).and_return(true)
+
+      doctor.send(:check_node_renderer_rollout_capacity)
+
+      expect(checker.messages).to include(
+        hash_including(
+          type: :info,
+          content: a_string_including(
+            "contexts_per_generation=2",
+            "required_capacity=4",
+            "RSC evidence=unverified_conservative_enabled"
+          )
+        ),
+        hash_including(
+          type: :warning,
+          content: a_string_including("insufficient", "configured=2", "required=4")
+        )
+      )
+      expect(checker.messages).not_to include(hash_including(type: :success))
+    end
+
+    it "keeps conflicting top-level initializer RSC evidence conservative after a failed Rails boot" do
+      allow(doctor).to receive(:ensure_rails_environment_loaded).and_return(false)
+      FileUtils.mkdir_p("config/initializers")
+      File.write(
+        "config/initializers/react_on_rails_pro.rb",
+        <<~RUBY
+          config.enable_rsc_support = false
+          config.server_renderer = "NodeRenderer"
+          config.enable_rsc_support = true
+        RUBY
+      )
+      write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
+
+      doctor.send(:check_node_renderer_rollout_capacity)
+
+      expect(checker.messages).to include(
+        hash_including(
+          type: :info,
+          content: a_string_including(
+            "contexts_per_generation=2",
+            "required_capacity=4",
+            "RSC evidence=unverified_conservative_enabled"
+          )
+        )
+      )
+      expect(checker.messages).not_to include(
+        hash_including(type: :info, content: a_string_including("RSC evidence=inferred_enabled"))
+      )
+    end
+
+    it "keeps conditional conflicting initializer RSC evidence conservative after a failed Rails boot" do
+      allow(doctor).to receive(:ensure_rails_environment_loaded).and_return(false)
+      FileUtils.mkdir_p("config/initializers")
+      File.write(
+        "config/initializers/react_on_rails_pro.rb",
+        <<~RUBY
+          config.server_renderer = "NodeRenderer"
+          if Rails.env.test?
+            config.enable_rsc_support = false
+          else
+            config.enable_rsc_support = true
+          end
+        RUBY
+      )
+      write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
+      allow(pro_config).to receive(:enable_rsc_support).and_return(false)
+
+      doctor.send(:check_node_renderer_rollout_capacity)
+
+      expect(checker.messages).to include(
+        hash_including(
+          type: :info,
+          content: a_string_including(
+            "contexts_per_generation=2",
+            "required_capacity=4",
+            "RSC evidence=unverified_conservative_enabled"
+          )
+        ),
+        hash_including(
+          type: :warning,
+          content: a_string_including("insufficient", "configured=2", "required=4")
+        )
+      )
+      expect(checker.messages).not_to include(hash_including(type: :success))
+    end
+
+    it "resolves rollout inputs from Rails.root when invoked from an application subdirectory" do
+      app_root = Pathname.new(Dir.pwd)
+      allow(Rails).to receive(:root).and_return(app_root)
+      allow(doctor).to receive(:ensure_rails_environment_loaded).and_call_original
+      FileUtils.mkdir_p("config/initializers")
+      File.write("config/environment.rb", 'raise "boot blocked for fallback coverage"')
+      File.write(
+        "config/initializers/react_on_rails_pro.rb",
+        <<~RUBY
+          config.server_renderer = "NodeRenderer"
+          config.enable_rsc_support = true
+        RUBY
+      )
+      FileUtils.mkdir_p("client")
+      write_node_renderer_script("renderer/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 8 });")
+      write_node_renderer_script("client/node-renderer.js", "reactOnRailsProNodeRenderer({ maxVMPoolSize: 2 });")
+      File.write("Procfile.production", "node-renderer: node client/node-renderer.js\n")
+      FileUtils.mkdir_p("tmp/doctor")
+
+      Dir.chdir("tmp/doctor") { doctor.send(:check_node_renderer_rollout_capacity) }
+
+      expect(checker.messages).to include(
+        hash_including(type: :warning, content: a_string_including("boot blocked for fallback coverage")),
+        hash_including(
+          type: :info,
+          content: a_string_including(
+            "contexts_per_generation=2",
+            "required_capacity=4",
+            "RSC evidence=unverified_conservative_enabled"
+          )
+        ),
+        hash_including(
+          type: :warning,
+          content: a_string_including("evidence=observed", "configured=2", "required=4")
+        )
+      )
+      expect(checker.messages).not_to include(
+        hash_including(type: :info, content: a_string_including("not applicable"))
+      )
+    end
+
+    it "emits the unverified evidence state in the stable JSON check" do
+      write_node_renderer_script(
+        "renderer/node-renderer.js",
+        "reactOnRailsProNodeRenderer({ maxVMPoolSize: Number(process.env.MAX_VM_POOL_SIZE) });"
+      )
+      json_doctor = described_class.new(format: :json, only: "node_renderer_rollout_capacity")
+      allow(json_doctor).to receive(:ensure_rails_environment_loaded).and_return(true)
+      allow(json_doctor).to receive(:exit)
+      output = []
+      allow(json_doctor).to receive(:puts) { |argument| output << argument.to_s }
+
+      json_doctor.run_diagnosis
+
+      check = JSON.parse(output.join("\n")).fetch("checks").first
+      expect(check).to include(
+        "id" => "node_renderer_rollout_capacity",
+        "status" => "warn",
+        "message" => a_string_including("evidence=unverified")
+      )
+      expect(check.fetch("details")).to include(
+        hash_including("level" => "warning", "content" => a_string_including("does not query the live renderer"))
+      )
     end
   end
 

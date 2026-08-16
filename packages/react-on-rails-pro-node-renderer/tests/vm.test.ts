@@ -29,8 +29,18 @@ import {
   BUNDLE_TIMESTAMP,
   vmBundlePath,
 } from './helper';
-import { buildExecutionContext, hasVMContextForBundle, resetVM } from '../src/worker/vm';
+import {
+  buildExecutionContext,
+  getVMPoolDiagnostics,
+  hasVMContextForBundle,
+  isDeclaredCurrentGenerationReady,
+  prewarmDeclaredBundleGeneration,
+  resetVM,
+  setVMPoolClockForTest,
+  type VMPoolClock,
+} from '../src/worker/vm';
 import { getConfig } from '../src/shared/configBuilder';
+import log from '../src/shared/log';
 import { isErrorRenderResult } from '../src/shared/utils';
 import * as errorReporter from '../src/shared/errorReporter';
 
@@ -692,6 +702,544 @@ describe('buildVM and runInVM', () => {
       expect(runCodeInVM1).toBe('function');
       expect(runCodeInVM2).toBe('function');
       expect(runCodeInVM3).toBe('function');
+    });
+  });
+
+  describe('rolling-deploy VM retention', () => {
+    const createRolloutBundle = (generation: string, role: string) => {
+      const fixtureBundlePath = path.resolve(__dirname, './fixtures/bundle.js');
+      const bundlePath = path.resolve(serverBundleCachePath(testName), generation, `${role}.js`);
+      fs.mkdirSync(path.dirname(bundlePath), { recursive: true });
+      fs.copyFileSync(fixtureBundlePath, bundlePath);
+      return bundlePath;
+    };
+
+    const rolloutBundlePaths = () => {
+      return {
+        oldGeneration: [
+          createRolloutBundle('old-generation', 'server'),
+          createRolloutBundle('old-generation', 'rsc'),
+        ],
+        newGeneration: [
+          createRolloutBundle('new-generation', 'server'),
+          createRolloutBundle('new-generation', 'rsc'),
+        ],
+      };
+    };
+
+    const createTestVMPoolClock = () => {
+      let currentTime = 0;
+      let scheduledCalls = 0;
+      const scheduled = new Map<ReturnType<typeof setTimeout>, { callback: () => void; dueAt: number }>();
+      const clock: VMPoolClock = {
+        now: () => currentTime,
+        schedule: (callback, delay) => {
+          scheduledCalls += 1;
+          const timer = { unref: jest.fn() } as unknown as ReturnType<typeof setTimeout>;
+          scheduled.set(timer, { callback, dueAt: currentTime + delay });
+          return timer;
+        },
+        cancel: (timer) => {
+          scheduled.delete(timer);
+        },
+      };
+
+      return {
+        clock,
+        advanceBy: (milliseconds: number) => {
+          currentTime += milliseconds;
+          let nextTimer = Array.from(scheduled.entries())
+            .filter(([, entry]) => entry.dueAt <= currentTime)
+            .sort(([, entryA], [, entryB]) => entryA.dueAt - entryB.dueAt)[0];
+          while (nextTimer) {
+            const [timer, entry] = nextTimer;
+            scheduled.delete(timer);
+            entry.callback();
+            nextTimer = Array.from(scheduled.entries())
+              .filter(([, candidate]) => candidate.dueAt <= currentTime)
+              .sort(([, entryA], [, entryB]) => entryA.dueAt - entryB.dueAt)[0];
+          }
+        },
+        pendingTimers: () => scheduled.size,
+        scheduledCalls: () => scheduledCalls,
+      };
+    };
+
+    beforeEach(async () => {
+      await resetForTest(testName);
+      getConfig().supportModules = true;
+    });
+
+    afterEach(async () => {
+      await resetForTest(testName);
+      jest.restoreAllMocks();
+    });
+
+    test('reuses old and new server plus RSC contexts while rollout requests alternate', async () => {
+      const { oldGeneration, newGeneration } = rolloutBundlePaths();
+      const testClock = createTestVMPoolClock();
+      setVMPoolClockForTest(testClock.clock);
+      const oldExecutionContext = await buildExecutionContext(oldGeneration, /* buildVmsIfNeeded */ true);
+      const originalOldContexts = oldGeneration.map((bundlePath) =>
+        oldExecutionContext.getVMContext(bundlePath),
+      );
+      oldExecutionContext.release();
+      const newExecutionContext = await buildExecutionContext(newGeneration, /* buildVmsIfNeeded */ true);
+      const originalNewContexts = newGeneration.map((bundlePath) =>
+        newExecutionContext.getVMContext(bundlePath),
+      );
+      newExecutionContext.release();
+
+      for (let requestNumber = 0; requestNumber < 6; requestNumber += 1) {
+        const bundlePaths = requestNumber % 2 === 0 ? oldGeneration : newGeneration;
+        // eslint-disable-next-line no-await-in-loop -- Alternation is the rollout behavior under test.
+        const executionContext = await buildExecutionContext(bundlePaths, /* buildVmsIfNeeded */ true);
+        const originalContexts = bundlePaths === oldGeneration ? originalOldContexts : originalNewContexts;
+
+        bundlePaths.forEach((bundlePath, bundleIndex) => {
+          expect(executionContext.getVMContext(bundlePath)).toBe(originalContexts[bundleIndex]);
+        });
+        executionContext.release();
+      }
+
+      [...oldGeneration, ...newGeneration].forEach((bundlePath) => {
+        expect(hasVMContextForBundle(bundlePath)).toBe(true);
+      });
+      expect(testClock.pendingTimers()).toBe(1);
+      expect(testClock.scheduledCalls()).toBe(1);
+    });
+
+    test('pins a prewarmed declared current generation across an arbitrarily long old-only gap', async () => {
+      const { oldGeneration, newGeneration } = rolloutBundlePaths();
+      const testClock = createTestVMPoolClock();
+      setVMPoolClockForTest(testClock.clock);
+
+      const prewarmedCurrent = await prewarmDeclaredBundleGeneration(newGeneration);
+      const originalCurrentContexts = newGeneration.map((bundlePath) =>
+        prewarmedCurrent.getVMContext(bundlePath),
+      );
+      prewarmedCurrent.release();
+
+      const oldExecutionContext = await buildExecutionContext(oldGeneration, /* buildVmsIfNeeded */ true);
+      oldExecutionContext.release();
+      testClock.advanceBy(getConfig().vmPoolRolloutDrainTimeout * 1000 + 1);
+
+      oldGeneration.forEach((bundlePath) => {
+        expect(hasVMContextForBundle(bundlePath)).toBe(false);
+      });
+      newGeneration.forEach((bundlePath) => {
+        expect(hasVMContextForBundle(bundlePath)).toBe(true);
+      });
+
+      const buildsBeforeFirstCurrentRequest = getVMPoolDiagnostics().contextsBuilt;
+      const firstCurrentRequest = await buildExecutionContext(newGeneration, /* buildVmsIfNeeded */ false);
+      newGeneration.forEach((bundlePath, bundleIndex) => {
+        expect(firstCurrentRequest.getVMContext(bundlePath)).toBe(originalCurrentContexts[bundleIndex]);
+      });
+      firstCurrentRequest.release();
+      expect(getVMPoolDiagnostics().contextsBuilt).toBe(buildsBeforeFirstCurrentRequest);
+    });
+
+    test('keeps the hard cap absolute and prefers declared current contexts under old-request pressure', async () => {
+      const { oldGeneration, newGeneration } = rolloutBundlePaths();
+      getConfig().maxVMPoolSize = newGeneration.length;
+
+      const prewarmedCurrent = await prewarmDeclaredBundleGeneration(newGeneration);
+      prewarmedCurrent.release();
+
+      const activeOldRequest = await buildExecutionContext(oldGeneration, /* buildVmsIfNeeded */ true);
+      expect(await activeOldRequest.runInVM('1 + 1', oldGeneration[0])).toBe('2');
+
+      expect(getVMPoolDiagnostics()).toMatchObject({
+        retainedContexts: newGeneration.length,
+        declaredCurrentContexts: newGeneration.length,
+        declaredCurrentContextsRequired: newGeneration.length,
+        declaredCurrentGenerationReady: true,
+      });
+      newGeneration.forEach((bundlePath) => expect(hasVMContextForBundle(bundlePath)).toBe(true));
+      oldGeneration.forEach((bundlePath) => expect(hasVMContextForBundle(bundlePath)).toBe(false));
+
+      // The returned execution context remains safe until the in-flight request releases it,
+      // even though pressure prevented its draining generation from entering the shared pool.
+      expect(activeOldRequest.getVMContext(oldGeneration[0])).toBeDefined();
+      activeOldRequest.release();
+    });
+
+    test('rejects startup when the hard cap cannot hold the declared current set', async () => {
+      const { newGeneration } = rolloutBundlePaths();
+      getConfig().maxVMPoolSize = newGeneration.length - 1;
+
+      await expect(prewarmDeclaredBundleGeneration(newGeneration)).rejects.toThrow(
+        'requires 2 VM contexts, but maxVMPoolSize is 1',
+      );
+      expect(getVMPoolDiagnostics()).toMatchObject({
+        retainedContexts: 0,
+        declaredCurrentContextsRequired: 0,
+        declaredCurrentGenerationReady: false,
+      });
+    });
+
+    test('makes readiness follow complete declared-set membership after a runtime cap decrease', async () => {
+      const { newGeneration } = rolloutBundlePaths();
+      getConfig().maxVMPoolSize = 2;
+
+      const prewarmedCurrent = await prewarmDeclaredBundleGeneration(newGeneration);
+      prewarmedCurrent.release();
+      expect(isDeclaredCurrentGenerationReady()).toBe(true);
+
+      getConfig().maxVMPoolSize = 1;
+      const cachedCurrentRequest = await buildExecutionContext(
+        [newGeneration[0]],
+        /* buildVmsIfNeeded */ false,
+      );
+
+      expect(getVMPoolDiagnostics()).toMatchObject({
+        retainedContexts: 1,
+        declaredCurrentContexts: 1,
+        declaredCurrentContextsRequired: 2,
+        declaredCurrentGenerationReady: false,
+      });
+      expect(isDeclaredCurrentGenerationReady()).toBe(false);
+
+      getConfig().maxVMPoolSize = 2;
+      const evictedCurrentBundle = newGeneration.find((bundlePath) => !hasVMContextForBundle(bundlePath));
+      expect(evictedCurrentBundle).toBeDefined();
+      const rebuiltCurrentRequest = await buildExecutionContext(
+        [evictedCurrentBundle!],
+        /* buildVmsIfNeeded */ true,
+      );
+
+      expect(getVMPoolDiagnostics()).toMatchObject({
+        retainedContexts: 2,
+        declaredCurrentContexts: 2,
+        declaredCurrentContextsRequired: 2,
+        declaredCurrentGenerationReady: true,
+      });
+      expect(isDeclaredCurrentGenerationReady()).toBe(true);
+
+      cachedCurrentRequest.release();
+      rebuiltCurrentRequest.release();
+    });
+
+    test('retires a drained generation without removing the current generation', async () => {
+      const { oldGeneration, newGeneration } = rolloutBundlePaths();
+      const testClock = createTestVMPoolClock();
+      setVMPoolClockForTest(testClock.clock);
+
+      await buildExecutionContext(oldGeneration, /* buildVmsIfNeeded */ true);
+      await buildExecutionContext(newGeneration, /* buildVmsIfNeeded */ true);
+      testClock.advanceBy(getConfig().vmPoolRolloutDrainTimeout * 1000 + 1);
+
+      oldGeneration.forEach((bundlePath) => {
+        expect(hasVMContextForBundle(bundlePath)).toBe(false);
+      });
+      newGeneration.forEach((bundlePath) => {
+        expect(hasVMContextForBundle(bundlePath)).toBe(true);
+      });
+    });
+
+    test('does not let a failed bundle set alter generation retirement state', async () => {
+      const { oldGeneration, newGeneration } = rolloutBundlePaths();
+      const testClock = createTestVMPoolClock();
+      setVMPoolClockForTest(testClock.clock);
+
+      await buildExecutionContext(oldGeneration, /* buildVmsIfNeeded */ true);
+      await buildExecutionContext(newGeneration, /* buildVmsIfNeeded */ true);
+      const diagnosticsBeforeFailure = getVMPoolDiagnostics();
+      const missingBundle = path.resolve(serverBundleCachePath(testName), 'failed-generation', 'missing.js');
+
+      await expect(buildExecutionContext([missingBundle], /* buildVmsIfNeeded */ false)).rejects.toThrow(
+        'VMContext not found',
+      );
+
+      expect(getVMPoolDiagnostics()).toEqual(diagnosticsBeforeFailure);
+      expect(testClock.pendingTimers()).toBe(1);
+
+      testClock.advanceBy(getConfig().vmPoolRolloutDrainTimeout * 1000 + 1);
+
+      oldGeneration.forEach((bundlePath) => {
+        expect(hasVMContextForBundle(bundlePath)).toBe(false);
+      });
+      newGeneration.forEach((bundlePath) => {
+        expect(hasVMContextForBundle(bundlePath)).toBe(true);
+      });
+    });
+
+    test('bounds recovery to one rebuild when the last overlap request belongs to the old set', async () => {
+      const { oldGeneration, newGeneration } = rolloutBundlePaths();
+      const testClock = createTestVMPoolClock();
+      setVMPoolClockForTest(testClock.clock);
+
+      await buildExecutionContext(oldGeneration, /* buildVmsIfNeeded */ true);
+      const initialNewExecutionContext = await buildExecutionContext(
+        newGeneration,
+        /* buildVmsIfNeeded */ true,
+      );
+      const initialNewContexts = newGeneration.map((bundlePath) =>
+        initialNewExecutionContext.getVMContext(bundlePath),
+      );
+      initialNewExecutionContext.release();
+
+      const finalOverlapExecutionContext = await buildExecutionContext(
+        oldGeneration,
+        /* buildVmsIfNeeded */ true,
+      );
+      finalOverlapExecutionContext.release();
+      testClock.advanceBy(getConfig().vmPoolRolloutDrainTimeout * 1000 + 1);
+
+      newGeneration.forEach((bundlePath) => {
+        expect(hasVMContextForBundle(bundlePath)).toBe(false);
+      });
+      oldGeneration.forEach((bundlePath) => {
+        expect(hasVMContextForBundle(bundlePath)).toBe(true);
+      });
+
+      const resumedNewExecutionContext = await buildExecutionContext(
+        newGeneration,
+        /* buildVmsIfNeeded */ true,
+      );
+      const rebuiltNewContexts = newGeneration.map((bundlePath) =>
+        resumedNewExecutionContext.getVMContext(bundlePath),
+      );
+      resumedNewExecutionContext.release();
+      const repeatedNewExecutionContext = await buildExecutionContext(
+        newGeneration,
+        /* buildVmsIfNeeded */ true,
+      );
+
+      rebuiltNewContexts.forEach((rebuiltContext, bundleIndex) => {
+        expect(rebuiltContext).not.toBe(initialNewContexts[bundleIndex]);
+        expect(repeatedNewExecutionContext.getVMContext(newGeneration[bundleIndex])).toBe(rebuiltContext);
+      });
+      repeatedNewExecutionContext.release();
+      expect(getVMPoolDiagnostics()).toMatchObject({
+        contextsBuilt: 6,
+        hardLimitEvictions: 0,
+      });
+
+      // Once the successfully resumed set is observed, the old set becomes
+      // eligible immediately because its drain window already elapsed.
+      testClock.advanceBy(1);
+      oldGeneration.forEach((bundlePath) => {
+        expect(hasVMContextForBundle(bundlePath)).toBe(false);
+      });
+      newGeneration.forEach((bundlePath) => {
+        expect(hasVMContextForBundle(bundlePath)).toBe(true);
+      });
+    });
+
+    test('retains a shared bundle while any live generation still references it', async () => {
+      const sharedBundle = createRolloutBundle('shared-generation', 'shared');
+      const oldOnlyBundle = createRolloutBundle('old-generation', 'old-only');
+      const newOnlyBundle = createRolloutBundle('new-generation', 'new-only');
+      const testClock = createTestVMPoolClock();
+      setVMPoolClockForTest(testClock.clock);
+
+      await buildExecutionContext([sharedBundle, oldOnlyBundle], /* buildVmsIfNeeded */ true);
+      await buildExecutionContext([sharedBundle, newOnlyBundle], /* buildVmsIfNeeded */ true);
+      testClock.advanceBy(getConfig().vmPoolRolloutDrainTimeout * 1000 + 1);
+
+      expect(hasVMContextForBundle(oldOnlyBundle)).toBe(false);
+      expect(hasVMContextForBundle(sharedBundle)).toBe(true);
+      expect(hasVMContextForBundle(newOnlyBundle)).toBe(true);
+    });
+
+    test('keeps an explicit maxVMPoolSize of 2 absolute during rollout', async () => {
+      const { oldGeneration, newGeneration } = rolloutBundlePaths();
+      getConfig().maxVMPoolSize = 2;
+
+      await buildExecutionContext(oldGeneration, /* buildVmsIfNeeded */ true);
+      await buildExecutionContext(newGeneration, /* buildVmsIfNeeded */ true);
+
+      expect(getVMPoolDiagnostics().retainedContexts).toBe(2);
+      expect([...oldGeneration, ...newGeneration].filter(hasVMContextForBundle)).toHaveLength(2);
+    });
+
+    test('identifies each bundle removed by hard-limit eviction', async () => {
+      getConfig().maxVMPoolSize = 1;
+      const firstBundle = createRolloutBundle('diagnostic-generation-1', 'server');
+      const secondBundle = createRolloutBundle('diagnostic-generation-2', 'server');
+      const debugSpy = jest.spyOn(log, 'debug').mockImplementation(() => undefined);
+      const warningSpy = jest.spyOn(log, 'warn').mockImplementation(() => undefined);
+
+      await buildExecutionContext([firstBundle], /* buildVmsIfNeeded */ true);
+      await buildExecutionContext([secondBundle], /* buildVmsIfNeeded */ true);
+
+      expect(debugSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: 'vm_pool_context_evicted',
+          bundlePath: firstBundle,
+          reason: 'hard_limit',
+          retainedContexts: 0,
+          maxVMPoolSize: 1,
+        }),
+        'Removed VM context from the pool',
+      );
+      expect(warningSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: 'vm_pool_hard_limit_eviction',
+          evictedBundlePath: firstBundle,
+          admittedBundlePath: secondBundle,
+        }),
+        expect.any(String),
+      );
+    });
+
+    test('never reports an over-cap pool when the configured cap decreases before admission', async () => {
+      getConfig().maxVMPoolSize = 4;
+      const existingBundles = Array.from({ length: 4 }, (_unused, index) =>
+        createRolloutBundle(`mutable-cap-generation-${index}`, 'server'),
+      );
+      const activeExecutionContexts = [];
+      for (const bundlePath of existingBundles) {
+        // eslint-disable-next-line no-await-in-loop -- Ordered admissions establish the pre-change pool.
+        activeExecutionContexts.push(
+          // eslint-disable-next-line no-await-in-loop -- Each context must remain active across eviction.
+          await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true),
+        );
+      }
+      expect(getVMPoolDiagnostics().retainedContexts).toBe(4);
+
+      getConfig().maxVMPoolSize = 1;
+      const admittedBundle = createRolloutBundle('mutable-cap-generation-4', 'server');
+      const observedRetainedCounts: number[] = [];
+      const observePoolSize = (payload: unknown) => {
+        if (
+          typeof payload === 'object' &&
+          payload !== null &&
+          'retainedContexts' in payload &&
+          typeof payload.retainedContexts === 'number'
+        ) {
+          observedRetainedCounts.push(payload.retainedContexts, getVMPoolDiagnostics().retainedContexts);
+        }
+      };
+      const debugSpy = jest.spyOn(log, 'debug').mockImplementation(observePoolSize);
+      const warningSpy = jest.spyOn(log, 'warn').mockImplementation(observePoolSize);
+
+      const admittedExecutionContext = await buildExecutionContext(
+        [admittedBundle],
+        /* buildVmsIfNeeded */ true,
+      );
+
+      expect(observedRetainedCounts.length).toBeGreaterThan(0);
+      expect(Math.max(...observedRetainedCounts)).toBeLessThanOrEqual(1);
+      expect(getVMPoolDiagnostics()).toMatchObject({
+        retainedContexts: 1,
+        hardLimitEvictions: 4,
+      });
+      const evictedPaths = debugSpy.mock.calls
+        .map(([payload]) => payload)
+        .filter(
+          (payload): payload is { event: string; bundlePath: string } =>
+            typeof payload === 'object' &&
+            payload !== null &&
+            'event' in payload &&
+            payload.event === 'vm_pool_context_evicted' &&
+            'bundlePath' in payload &&
+            typeof payload.bundlePath === 'string',
+        )
+        .map(({ bundlePath }) => bundlePath);
+      expect(evictedPaths).toEqual(expect.arrayContaining(existingBundles));
+      expect(warningSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: 'vm_pool_hard_limit_eviction',
+          evictedBundlePath: expect.stringMatching(/mutable-cap-generation-/),
+          admittedBundlePath: admittedBundle,
+          retainedContexts: 1,
+          maxVMPoolSize: 1,
+        }),
+        expect.any(String),
+      );
+
+      await Promise.all(
+        activeExecutionContexts.map((executionContext, index) =>
+          executionContext.runInVM('1 + 1', existingBundles[index]),
+        ),
+      ).then((results) => expect(results).toEqual(['2', '2', '2', '2']));
+      expect(await admittedExecutionContext.runInVM('1 + 1', admittedBundle)).toBe('2');
+
+      activeExecutionContexts.forEach((executionContext) => executionContext.release());
+      admittedExecutionContext.release();
+    });
+
+    test('rate-limits hard-limit pressure warnings while retaining cumulative counters', async () => {
+      const testClock = createTestVMPoolClock();
+      setVMPoolClockForTest(testClock.clock);
+      getConfig().maxVMPoolSize = 1;
+      const warningSpy = jest.spyOn(log, 'warn').mockImplementation(() => undefined);
+
+      for (let generation = 0; generation < 4; generation += 1) {
+        const bundlePath = createRolloutBundle(`pressure-generation-${generation}`, 'server');
+        // eslint-disable-next-line no-await-in-loop -- Ordered builds exercise repeated hard-limit pressure.
+        await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+      }
+
+      expect(getVMPoolDiagnostics().hardLimitEvictions).toBe(3);
+      expect(
+        warningSpy.mock.calls.filter(
+          ([payload]) =>
+            typeof payload === 'object' &&
+            payload !== null &&
+            'event' in payload &&
+            payload.event === 'vm_pool_hard_limit_eviction',
+        ),
+      ).toHaveLength(1);
+
+      testClock.advanceBy(30_001);
+      const nextBundle = createRolloutBundle('pressure-generation-after-interval', 'server');
+      await buildExecutionContext([nextBundle], /* buildVmsIfNeeded */ true);
+
+      expect(getVMPoolDiagnostics().hardLimitEvictions).toBe(4);
+      expect(
+        warningSpy.mock.calls.filter(
+          ([payload]) =>
+            typeof payload === 'object' &&
+            payload !== null &&
+            'event' in payload &&
+            payload.event === 'vm_pool_hard_limit_eviction',
+        ),
+      ).toHaveLength(2);
+    });
+
+    test('bounds generation metadata by the hard context cap and cancels cleanup on reset', async () => {
+      const testClock = createTestVMPoolClock();
+      setVMPoolClockForTest(testClock.clock);
+      const { maxVMPoolSize } = getConfig();
+
+      for (let generation = 0; generation < maxVMPoolSize + 2; generation += 1) {
+        const bundlePath = createRolloutBundle(`generation-${generation}`, 'server');
+        // eslint-disable-next-line no-await-in-loop -- Ordered observations exercise deterministic trimming.
+        await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+      }
+
+      expect(getVMPoolDiagnostics()).toMatchObject({
+        retainedContexts: maxVMPoolSize,
+        trackedGenerations: maxVMPoolSize,
+      });
+      expect(testClock.pendingTimers()).toBe(1);
+
+      resetVM();
+
+      expect(testClock.pendingTimers()).toBe(0);
+      expect(getVMPoolDiagnostics()).toMatchObject({
+        retainedContexts: 0,
+        trackedGenerations: 0,
+      });
+    });
+
+    test('keeps an active ExecutionContext usable after its pooled generation retires', async () => {
+      const oldBundle = createRolloutBundle('old-generation', 'server');
+      const newBundle = createRolloutBundle('new-generation', 'server');
+      const testClock = createTestVMPoolClock();
+      setVMPoolClockForTest(testClock.clock);
+      const oldExecutionContext = await buildExecutionContext([oldBundle], /* buildVmsIfNeeded */ true);
+      await buildExecutionContext([newBundle], /* buildVmsIfNeeded */ true);
+
+      testClock.advanceBy(getConfig().vmPoolRolloutDrainTimeout * 1000 + 1);
+
+      expect(hasVMContextForBundle(oldBundle)).toBe(false);
+      await expect(oldExecutionContext.runInVM('1 + 1', oldBundle)).resolves.toBe('2');
+      oldExecutionContext.release();
     });
   });
 

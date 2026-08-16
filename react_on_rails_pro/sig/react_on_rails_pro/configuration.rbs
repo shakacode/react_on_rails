@@ -26,6 +26,7 @@ module ReactOnRailsPro
     DEFAULT_RENDERER_HTTP_POOL_TIMEOUT: Integer
     DEFAULT_RENDERER_HTTP_POOL_WARN_TIMEOUT: Float
     DEFAULT_RENDERER_HTTP_KEEP_ALIVE_TIMEOUT: Integer
+    DEFAULT_RENDERER_HTTP_FORCE_HTTP2: bool
     DEFAULT_SSR_TIMEOUT: Integer
     DEFAULT_PRERENDER_CACHING: bool
     DEFAULT_TRACING: bool
@@ -87,6 +88,7 @@ module ReactOnRailsPro
     attr_accessor react_client_manifest_file: String?
     attr_accessor react_server_client_manifest_file: String?
     attr_accessor renderer_http_keep_alive_timeout: Numeric?
+    attr_accessor renderer_http_force_http2: bool
     attr_accessor concurrent_component_streaming_buffer_size: Integer
     attr_accessor cache_tag_index_expires_in: Numeric | ActiveSupport::Duration
     attr_accessor cache_tag_index_max_keys: Integer
@@ -102,6 +104,7 @@ module ReactOnRailsPro
       ?renderer_http_pool_timeout: Integer?,
       ?renderer_http_pool_warn_timeout: Float?,
       ?renderer_http_keep_alive_timeout: Numeric?,
+      ?renderer_http_force_http2: bool,
       ?tracing: bool?,
       ?dependency_globs: Array[String]?,
       ?excluded_dependency_globs: Array[String]?,
