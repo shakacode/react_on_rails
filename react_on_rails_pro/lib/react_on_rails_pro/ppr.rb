@@ -90,13 +90,15 @@ module ReactOnRailsPro
       end
 
       # SHA-256 checksum over the shell HTML and PostponedState. Used inside the cached envelope
-      # to detect truncation or corruption that slipped past the cache store. A type tag ("S:" for
-      # a string state, "N" for nil) prevents ambiguity between a nil state (fully static page)
-      # and an empty-string state; the null byte separators prevent collisions between
-      # (shell="a", state="b") and (shell="a\x00...", state="").
+      # to detect truncation or corruption that slipped past the cache store. The digest input is
+      # `"<bytesize>:<shell>\x00<state_segment>"` where `<bytesize>` is the decimal byte-length of
+      # `shell_html`. The length prefix pins the boundary between shell and state so that a shell
+      # containing `\x00` cannot slide the boundary and collide with a different (shell, state) pair.
+      # The state segment uses a type tag ("S:" for a string, "N" for nil) to prevent ambiguity
+      # between a nil state (fully static page) and an empty-string state.
       def compute_checksum(shell_html, postponed_state)
         state_segment = postponed_state.nil? ? "N" : "S:#{postponed_state}"
-        Digest::SHA256.hexdigest("#{shell_html}\x00#{state_segment}")
+        Digest::SHA256.hexdigest("#{shell_html.bytesize}:#{shell_html}\x00#{state_segment}")
       end
 
       def instrument_static_shell(component_name:, cache_hit:)

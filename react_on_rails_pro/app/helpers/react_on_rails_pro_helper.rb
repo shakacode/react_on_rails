@@ -1682,7 +1682,8 @@ module ReactOnRailsProHelper
     Rails.cache.delete(cache_key, cache_write_options)
     ReactOnRailsPro::Ppr.instrument_degraded_pre_flush(component_name:, error:)
     Rails.logger.warn do
-      "[ReactOnRailsPro] PPR pre-flush degradation for #{component_name}: #{error.class}: #{error.message}. " \
+      safe_msg = ppr_sanitize_for_log(error.message)
+      "[ReactOnRailsPro] PPR pre-flush degradation for #{component_name}: #{error.class}: #{safe_msg}. " \
         "Evicted #{cache_key.inspect} and falling back to full SSR."
     end
   rescue StandardError => e
@@ -1702,13 +1703,21 @@ module ReactOnRailsProHelper
     end
     ReactOnRailsPro::Ppr.instrument_degraded_post_flush(component_name:, error:)
     Rails.logger.warn do
-      "[ReactOnRailsPro] PPR post-flush degradation for #{component_name}: #{error.class}: #{error.message}. " \
+      safe_msg = ppr_sanitize_for_log(error.message)
+      "[ReactOnRailsPro] PPR post-flush degradation for #{component_name}: #{error.class}: #{safe_msg}. " \
         "Stream terminated; entry evicted. Next request will prerender cleanly."
     end
   rescue StandardError => e
     Rails.logger.debug do
       "[ReactOnRailsPro] PPR post-flush degradation handler failed: #{e.class}: #{e.message}"
     end
+  end
+
+  # Sanitizes a string for safe interpolation into log messages. Strips newlines (which could
+  # inject fake log lines) and truncates to a reasonable length (preventing oversized log entries
+  # from error messages that dump full payloads).
+  def ppr_sanitize_for_log(value, max_length: 1024)
+    value.to_s.tr("\n\r", " ")[0, max_length]
   end
 
   # Async version of fetch_react_component. Handles cache lookup synchronously,
