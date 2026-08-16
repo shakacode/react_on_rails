@@ -45,6 +45,36 @@ describe ReactOnRails::ReactComponent::RenderOptions do
     end.not_to raise_error
   end
 
+  describe "#render_mode" do
+    it "defaults to :sync with no streaming or PPR predicates set" do
+      opts = described_class.new(**the_attrs)
+
+      expect(opts.render_mode).to eq(:sync)
+      expect(opts.streaming?).to be(false)
+      expect(opts.ppr?).to be(false)
+    end
+
+    it "treats :ppr_prerender as a streaming PPR mode" do
+      opts = described_class.new(**the_attrs(options: { render_mode: :ppr_prerender }))
+
+      expect(opts.streaming?).to be(true)
+      expect(opts.ppr_prerender?).to be(true)
+      expect(opts.ppr_resume?).to be(false)
+      expect(opts.ppr?).to be(true)
+      expect(opts.html_streaming?).to be(false)
+      expect(opts.rsc_payload_streaming?).to be(false)
+    end
+
+    it "treats :ppr_resume as a streaming PPR mode" do
+      opts = described_class.new(**the_attrs(options: { render_mode: :ppr_resume }))
+
+      expect(opts.streaming?).to be(true)
+      expect(opts.ppr_prerender?).to be(false)
+      expect(opts.ppr_resume?).to be(true)
+      expect(opts.ppr?).to be(true)
+    end
+  end
+
   describe "#props" do
     context "without props" do
       it "returns empty hash" do
