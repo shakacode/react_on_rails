@@ -75,6 +75,24 @@ const PprFullyStatic = () => (
   </div>
 );
 
+// Regression component for the in-band flaw (#4890): user content deliberately contains the
+// EXACT bytes of the old #4659 prototype delimiter. The metadata-based protocol must transport
+// the PostponedState correctly regardless of what the rendered HTML contains.
+// dangerouslySetInnerHTML bypasses React's escaping so the literal <!--PPR_POSTPONED_STATE-->
+// comment lands in the HTML output — the strongest possible regression for an in-band scanner.
+const PprMarkerInContent = (props) => (
+  <div>
+    <h1>{SHELL_HEADER_TEXT}</h1>
+    <div
+      dangerouslySetInnerHTML={{ __html: '<!--PPR_POSTPONED_STATE-->{"fake":"not real PostponedState"}' }}
+    />
+    <p>PPR_POSTPONED_STATE</p>
+    <React.Suspense fallback={<div>{HOLE_FALLBACK_TEXT}</div>}>
+      <DelayedHole {...props} />
+    </React.Suspense>
+  </div>
+);
+
 describe('pprServerRenderedReactComponent', () => {
   const testingRailsContext = {
     serverSideRSCPayloadParameters: {},
@@ -206,6 +224,39 @@ describe('pprServerRenderedReactComponent', () => {
 
     // The in-band delimiter of the #4659 prototype must not exist anywhere in the output.
     expect(html).not.toContain('PPR_POSTPONED_STATE');
+  });
+
+  it('round-trips correctly when rendered HTML contains the old in-band marker text (#4890 regression)', async () => {
+    // A component whose output contains the literal old delimiter text must not confuse the
+    // metadata-based protocol. This is the classic in-band signaling flaw: if the protocol
+    // scanned HTML for a marker, user content containing that marker would break the split.
+    const { chunks, errors } = await collectStreamResult(
+      runPrerender({ component: PprMarkerInContent, componentName: 'PprMarkerInContent' }),
+    );
+    const html = chunks.map((chunk) => chunk.html).join('');
+
+    expect(errors).toHaveLength(0);
+    // The marker text IS in the HTML — it's user content, not a protocol artifact.
+    expect(html).toContain('PPR_POSTPONED_STATE');
+    expect(html).toContain('<!--PPR_POSTPONED_STATE-->');
+
+    // The trailing protocol chunk still carries valid metadata — unaffected by the content.
+    const trailingChunk = chunks[chunks.length - 1];
+    expect(trailingChunk[PPR_PRERENDER_COMPLETE_CHUNK_KEY]).toBe(true);
+    expect(trailingChunk[PPR_RENDER_ERRORED_CHUNK_KEY]).toBeUndefined();
+    const postponedStateJson = trailingChunk[PPR_POSTPONED_STATE_CHUNK_KEY];
+    expect(typeof postponedStateJson).toBe('string');
+    const postponedState = JSON.parse(postponedStateJson);
+    expect(typeof postponedState).toBe('object');
+    expect(postponedState).not.toBeNull();
+
+    // The PostponedState round-trips through resume — the marker in content didn't corrupt it.
+    const { chunks: resumeChunks, errors: resumeErrors } = await collectStreamResult(
+      runResume({ component: PprMarkerInContent, componentName: 'PprMarkerInContent', postponedStateJson }),
+    );
+    expect(resumeErrors).toHaveLength(0);
+    const resumeHtml = resumeChunks.map((chunk) => chunk.html).join('');
+    expect(resumeHtml).toContain(HOLE_CONTENT_MARKER);
   });
 
   it('treats a fully static prerender (postponed === null) as a success with no PostponedState (D-04)', async () => {
