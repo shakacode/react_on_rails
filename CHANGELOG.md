@@ -26,6 +26,20 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **On-demand renders initialize only the island's declared store dependencies**:
+  `reactOnRailsComponentLoaded` walked every store element on the page even when asked to render a
+  single component, so an unrelated store element whose generator was not registered (e.g. its
+  bundle had not loaded yet) aborted the requested render, and unrelated new stores were hydrated
+  as a side effect. It now reads the `data-store-dependencies` attribute the `react_component`
+  helper already emits (defaulted to the stores registered in the request, or set explicitly with
+  the `store_dependencies` option) and initializes exactly those stores, matching the Pro
+  renderer's dependency gating; a declared dependency that cannot initialize is logged without
+  aborting the render. Markup without the attribute keeps the previous initialize-every-store
+  behavior, and `reactOnRailsPageLoaded`/full page loads are unchanged. Completes
+  [Issue 4862](https://github.com/shakacode/react_on_rails/issues/4862).
+  [PR 4870](https://github.com/shakacode/react_on_rails/pull/4870) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 - **[Pro]** **Rails requests to the Node Renderer once again continue OpenTelemetry traces**: The async-http transport
   now creates a CLIENT span and injects W3C trace context for regular and streaming renders, incremental async-props
   renders, raw-render requests, and asset uploads when the Rails application has configured the OpenTelemetry SDK.
