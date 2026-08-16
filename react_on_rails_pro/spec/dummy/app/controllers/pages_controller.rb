@@ -147,6 +147,15 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     stream_view_containing_react_components(template: "/pages/rsc_fouc_probe")
   end
 
+  # React 19.2 <Activity> inside a streamed RSC tree (issue #3883, Phase 2a).
+  # artificial_delay slows the hidden tab's server component so E2E can prove
+  # visible-tab interactivity while the hidden row is still streaming; clamped
+  # so a crafted query param cannot pin the streaming connection.
+  def activity_rsc_tabs
+    @artificial_delay = params[:artificial_delay].to_i.clamp(0, 8_000)
+    stream_view_containing_react_components(template: "/pages/activity_rsc_tabs")
+  end
+
   def client_side_fouc_probe
     render "/pages/client_side_fouc_probe"
   end

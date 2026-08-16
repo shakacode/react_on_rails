@@ -6936,6 +6936,17 @@ When a boundary goes `hidden`, React runs all effect cleanups in that subtree (a
 - **Timers and intervals**: cleared on hide; restart on show.
 - **Analytics "view" events fired from effects**: they will fire again each time the boundary becomes visible.
 
+## Activity inside RSC / streamed server trees (Pro)
+
+On React on Rails Pro's React Server Components path (`stream_react_component`), `<Activity>` works — with a few RSC-specific rules, verified by the Pro dummy app's tests:
+
+- **Host `<Activity>` in a client component.** The `react-server` build of React (used by the RSC bundle) does not export `Activity`; a server component importing it fails with "Element type is invalid ... got: undefined". Put the boundaries in a `'use client'` component and pass server-rendered content in as props.
+- **Hidden is not free on the server.** Flight executes hidden server components eagerly — their data fetching runs and their output ships in the embedded RSC payload bytes, even though the rendered HTML omits them.
+- **Hidden content is omitted from the streamed HTML** (visible boundaries are wrapped in `<!--&-->` / `<!--/&-->` markers), so the SEO/no-JS caveats above apply on this path too.
+- **Revealing a hidden tab needs no network request** — React renders it from the RSC payload already embedded in the page.
+
+Full guide: [React 19.2 `<Activity>` Inside Streamed RSC Trees](../../pro/react-server-components/activity-inside-rsc.md).
+
 ## Turbo / Turbolinks caveat (important)
 
 **`<Activity>` cannot preserve state across Turbo (or Turbolinks) page visits.** State preservation only works **within a persistent React root**. On a Turbo Drive navigation, Turbo replaces the document `<body>`; React on Rails unmounts your components on the page-change events and mounts fresh ones on the new page. Every `<Activity>` boundary — hidden or visible — is destroyed with its root, and all React state is gone.
@@ -6953,6 +6964,8 @@ The React on Rails dummy app contains a complete, tested example:
 - CSR page: `/client_side_activity` (`prerender: false`)
 - SSR page: `/server_side_activity` (`prerender: true`)
 - Tests: `react_on_rails/spec/dummy/spec/requests/activity_component_spec.rb` (server HTML shape) and `react_on_rails/spec/dummy/spec/system/activity_spec.rb` (state preservation + hydration in a real browser)
+
+For the RSC/streaming path, the Pro dummy app has its own example (`/activity_rsc_tabs` with `RSCActivityTabsPage`) — see the [Pro guide](../../pro/react-server-components/activity-inside-rsc.md#working-example).
 
 ## References
 
