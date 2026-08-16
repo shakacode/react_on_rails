@@ -1574,6 +1574,7 @@ describe ReactOnRailsHelper do
         internal_option: nil,
         store_dependencies: nil,
         html_streaming?: false,
+        ppr?: false,
         auto_load_bundle: false
       )
     end
