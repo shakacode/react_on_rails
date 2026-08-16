@@ -59,6 +59,13 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
   before_action :initialize_shared_store, only: %i[client_side_hello_world_shared_store_controller
                                                    server_side_hello_world_shared_store_controller]
 
+  # The stale-store probe page (issue #4861) opts out of the strict per-request-nonce CSP:
+  # after a Turbolinks soft navigation the document keeps the first page's policy, so the
+  # next page's nonced inline scripts (including this app's own immediate-hydration scripts)
+  # would be blocked. That interaction is orthogonal to the store-registry behavior the page
+  # exists to probe.
+  content_security_policy false, only: :stale_store_probe
+
   # Used for testing streamed html pages
   # Capybara doesn't support streaming, so we need to navigate to an empty page first
   # and then make an XHR request to the desired page
@@ -405,6 +412,20 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
   # Each component delays 1 second - sequential would take ~10s, concurrent takes ~1s
   def async_components_demo
     render "/pages/pro/async_components_demo"
+  end
+
+  # Probe page for the stale hydrated-store regression after a Turbolinks/Turbo soft
+  # navigation (issue #4861). Two variants of the same page (?variant=one|two) declare a
+  # DEFERRED SharedReduxStore whose props embed the variant, so each soft navigation between
+  # them is a page whose store data differs from the previous page's. See the view and
+  # e2e-tests/stale_store_after_navigation.spec.ts.
+  def stale_store_probe
+    @variant = params[:variant] == "two" ? "two" : "one"
+    @stale_store_probe_props = {
+      helloWorldData: {
+        name: "variant-#{@variant}"
+      }
+    }
   end
 
   # See files in spec/dummy/app/views/pages
