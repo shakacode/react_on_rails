@@ -18,7 +18,7 @@ module ReactOnRails
                                                 "data-hydrate-on" =>
                                                   hydrate_on_data_attribute_value(render_options),
                                                 "data-ssr-identifier-prefix" =>
-                                                  (render_options.html_streaming? ? render_options.dom_id : nil),
+                                                  ssr_identifier_prefix_data_attribute_value(render_options),
                                                 "data-store-dependencies" =>
                                                   render_options.store_dependencies&.to_json,
                                                 "data-generated-stylesheet-hrefs" =>
@@ -39,6 +39,16 @@ module ReactOnRails
                  end
 
       spec_tag.html_safe
+    end
+
+    # Streamed HTML renders (progressive streaming and both PPR phases) pass the dom_id as React's
+    # identifierPrefix on the server, so the client must hydrate with the same prefix. PPR resume
+    # inherits the prerender phase's prefix through the PostponedState, and the cached shell was
+    # rendered with it, so both PPR phases advertise it too.
+    def ssr_identifier_prefix_data_attribute_value(render_options)
+      return unless render_options.html_streaming? || render_options.ppr?
+
+      render_options.dom_id
     end
 
     def hydrate_on_data_attribute_value(render_options)

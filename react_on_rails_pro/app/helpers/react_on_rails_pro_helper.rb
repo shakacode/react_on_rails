@@ -430,6 +430,86 @@ module ReactOnRailsProHelper
     end
   end
 
+  # EXPERIMENTAL: Renders a React component with PPR (Partial Prerendering) — a two-phase render
+  # that serves a cached static shell instantly and streams the dynamic Suspense boundaries fresh
+  # on every request.
+  #
+  # 1. **Prerender phase** (cache miss, once per cache key): the component renders with
+  #    React's `prerenderToNodeStream` under the settle budget (`config.ppr_settle_budget_ms`).
+  #    Suspense boundaries still pending at the budget become "holes"; the shell HTML and the
+  #    serialized PostponedState are written to `Rails.cache` as ONE atomic paired record. The
+  #    shell is served and the resume phase streams the holes in the same request.
+  # 2. **Resume phase** (every request with a cached shell): the cached shell is served
+  #    immediately (no prerender), then React's `resumeToPipeableStream` streams only the
+  #    postponed boundaries — rendered with THIS request's fresh props.
+  #
+  # A prerender that finishes with no postponed boundaries (a fully static page) is a success:
+  # a shell-only record is cached, warm requests serve it with no resume phase, and the
+  # `ppr.static_shell` counter (ActiveSupport::Notifications) is incremented.
+  #
+  # Requires `stream_view_containing_react_components` in the controller action (same contract as
+  # stream_react_component) and React/react-dom >= 19.2.7 < 20 in the server bundle. The server
+  # bundle entry must also register React's PPR APIs from its own bundled react-dom:
+  #
+  #   // in your server bundle entry file
+  #   import 'react-on-rails-pro/pprSupport';
+  #
+  # **Replay-identity constraint** (React requirement for resume): the resume phase must rebuild a
+  # tree structurally identical to the one the cached shell was prerendered from —
+  # - the same bundle digest must serve both phases (the digest is part of the cache key, so
+  #   deploys invalidate automatically);
+  # - props that change the component tree structure outside Suspense boundaries are forbidden to
+  #   vary for a given +cache_key+ — only data rendered inside the postponed Suspense boundaries
+  #   may differ between requests;
+  # - the DOM id must be stable across phases, so `random_dom_id` is disabled unless you pass a
+  #   stable `id:` yourself. Pass an explicit `id:` when rendering multiple PPR instances of the
+  #   same component on one page.
+  #
+  # Options (same contract as cached_stream_react_component unless noted):
+  # 1. Pass the props as a block. It is evaluated on EVERY request (cold and warm) because the
+  #    resume phase always renders with fresh props.
+  # 2. cache_key: (required) String or Array (or Proc returning either). The full cache key also
+  #    includes the bundle digests, the React version, and a PPR schema version, so those never
+  #    need to be part of your key.
+  # 3. cache_tags: (optional) revalidation tags registered with the tag index —
+  #    `ReactOnRailsPro.revalidate_tag(tag)` evicts the paired shell record.
+  # 4. cache_options: (optional) Rails.cache write options only (:expires_in, :compress,
+  #    :race_condition_ttl). Tag revalidation is best-effort, so also set
+  #    `cache_options: { expires_in: ... }` to bound staleness.
+  # 5. :if / :unless conditional caching is not supported — PPR without a cache would prerender
+  #    on every request; use stream_react_component for uncached streaming.
+  #
+  # @example
+  #   <%= ppr_react_component("ProductPage",
+  #     cache_key: ["product", @product.id],
+  #     cache_tags: ["product:#{@product.id}"],
+  #     cache_options: { expires_in: 10.minutes }
+  #   ) do
+  #     { product: @product.to_props }
+  #   end %>
+  def ppr_react_component(component_name, raw_options = {}, &block)
+    ReactOnRailsPro::Utils.with_trace(component_name) do
+      check_caching_options!(raw_options, block)
+      check_ppr_options!(raw_options)
+      ensure_streaming_view_context!("ppr_react_component")
+
+      render_options = options_with_auto_load_bundle(raw_options)
+      # Replay identity: the resume phase and the client hydration must use the dom_id the cached
+      # shell was prerendered with, so a per-request random dom id can never be correct here.
+      render_options[:random_dom_id] = false unless render_options.key?(:id)
+
+      cache_key = ppr_cache_key(component_name, render_options)
+      raw_cache_options = render_options[:cache_options] || {}
+      cached_entry = ppr_read_cache_entry(cache_key, raw_cache_options)
+
+      if cached_entry
+        ppr_cache_hit(component_name, render_options, cached_entry, &block)
+      else
+        ppr_cache_miss(component_name, render_options, cache_key, raw_cache_options, &block)
+      end
+    end
+  end
+
   if defined?(ScoutApm)
     include ScoutApm::Tracer
     instrument_method :cached_react_component, type: "ReactOnRails", name: "cached_react_component"
@@ -445,6 +525,7 @@ module ReactOnRailsProHelper
       type: "ReactOnRails",
       name: "cached_static_rsc_component"
     )
+    instrument_method :ppr_react_component, type: "ReactOnRails", name: "ppr_react_component"
   end
 
   private
@@ -1242,6 +1323,246 @@ module ReactOnRailsProHelper
     return if raw_options.key?(:cache_key)
 
     raise ReactOnRailsPro::Error, "Option 'cache_key' is required for React on Rails caching"
+  end
+
+  # ---------------------------------------------------------------------------
+  # PPR (Partial Prerendering) internals — see ppr_react_component
+  # ---------------------------------------------------------------------------
+
+  def ensure_streaming_view_context!(helper_name)
+    return unless @async_barrier.nil?
+
+    raise ReactOnRails::Error,
+          "#{helper_name} requires the view to be rendered with stream_view_containing_react_components"
+  end
+
+  def check_ppr_options!(raw_options)
+    return unless raw_options.key?(:if) || raw_options.key?(:unless)
+
+    raise ReactOnRailsPro::Error,
+          "ppr_react_component does not support conditional caching (:if/:unless) — PPR without " \
+          "a cache would prerender on every request. Use stream_react_component for uncached streaming."
+  end
+
+  # The full PPR cache key: the shared component base key (bundle digests — deploys invalidate
+  # automatically) plus the helper namespace, the PPR storage schema version, the installed React
+  # version (React makes no cross-version PostponedState stability guarantee), the explicit DOM
+  # id (the identifierPrefix baked into the cached shell HTML and PostponedState — instances with
+  # different ids must not share a record), and the caller's cache_key.
+  def ppr_cache_key(component_name, render_options)
+    raw_cache_key = render_options[:cache_key]
+    cache_key_value = raw_cache_key.respond_to?(:call) ? raw_cache_key.call : raw_cache_key
+
+    ReactOnRailsPro::Cache.react_component_cache_key(
+      component_name,
+      render_options.merge(
+        cache_key: [
+          "ppr_react_component",
+          ReactOnRailsPro::Ppr::CACHE_SCHEMA_VERSION,
+          ReactOnRailsPro::Ppr.react_version_cache_key,
+          render_options[:id],
+          cache_key_value
+        ],
+        prerender: true
+      )
+    )
+  end
+
+  # A cache read error is treated as a miss: log and fall through to the prerender phase.
+  def ppr_read_cache_entry(cache_key, raw_cache_options)
+    cache_write_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
+    entry = Rails.cache.read(cache_key, cache_write_options)
+    ppr_valid_cache_entry?(entry) ? entry : nil
+  rescue StandardError => e
+    Rails.logger.warn("[ReactOnRailsPro] PPR cache read failed (treating as miss): #{e.class}: #{e.message}")
+    nil
+  end
+
+  # The paired record is one Hash: "shell_html" always present; "postponed_state" present only
+  # when the page has dynamic holes (a shell-only record is a fully static page). String keys —
+  # the record must survive non-Marshal cache serializers (e.g. JSON), which have no Symbol type.
+  # A malformed record is treated as a miss and re-prerendered.
+  def ppr_valid_cache_entry?(entry)
+    entry.is_a?(Hash) && entry["shell_html"].is_a?(String) &&
+      (entry["postponed_state"].nil? || entry["postponed_state"].is_a?(String))
+  end
+
+  # Cold path: evaluate props, prerender the shell, persist the paired record, serve the shell,
+  # and stream the holes via the resume phase in this same request.
+  def ppr_cache_miss(component_name, render_options, cache_key, raw_cache_options)
+    props = yield
+    options = render_options.merge(props:, prerender: true, skip_prerender_cache: true)
+
+    prerender_result = ppr_prerender(component_name, options)
+    ppr_write_cache_entry(prerender_result, cache_key, raw_cache_options, render_options)
+
+    ppr_serve_shell(component_name, options, prerender_result, cache_hit: false)
+  end
+
+  # Warm path: serve the cached shell instantly (no prerender request) and resume the dynamic
+  # holes with THIS request's fresh props. The component specification tag is regenerated per
+  # request so client hydration receives the fresh props; only the raw prerendered shell HTML and
+  # PostponedState are cached.
+  def ppr_cache_hit(component_name, render_options, cached_entry)
+    props = yield
+    options = render_options.merge(props:, prerender: true, skip_prerender_cache: true)
+
+    prerender_result = ppr_hit_prerender_result(component_name, options, cached_entry)
+
+    ppr_serve_shell(component_name, options, prerender_result, cache_hit: true)
+  end
+
+  # Builds the warm path's per-request render context (render options + component specification
+  # tag) without any SSR request.
+  def ppr_hit_prerender_result(component_name, options, cached_entry)
+    render_options = create_render_options(component_name, options.merge(render_mode: :ppr_prerender))
+    load_pack_for_generated_component(component_name, render_options)
+
+    {
+      shell_html: cached_entry["shell_html"],
+      postponed_state: cached_entry["postponed_state"],
+      console_script: "",
+      render_options:,
+      tag: generate_component_script(render_options)
+    }
+  end
+
+  # Prerender phase: run the :ppr_prerender render and consume the whole response before serving
+  # anything. Shell HTML arrives as normal chunks; the trailing protocol chunk carries the
+  # serialized PostponedState and the completion/error flags on chunk metadata (the chunk keys in
+  # ReactOnRailsPro::Ppr) — there is no in-band delimiter inside the user-controlled HTML.
+  def ppr_prerender(component_name, options)
+    prerender_options = options.merge(render_mode: :ppr_prerender)
+    internal_result = internal_react_component(component_name, prerender_options)
+
+    shell_html = +""
+    console_scripts = []
+    postponed_state = nil
+    had_render_error = false
+    prerender_complete = false
+
+    internal_result[:result].each_chunk do |chunk|
+      had_render_error ||= chunk["hasErrors"] == true ||
+                           chunk[ReactOnRailsPro::Ppr::RENDER_ERRORED_CHUNK_KEY] == true
+      prerender_complete ||= chunk[ReactOnRailsPro::Ppr::PRERENDER_COMPLETE_CHUNK_KEY] == true
+      chunk_postponed_state = chunk[ReactOnRailsPro::Ppr::POSTPONED_STATE_CHUNK_KEY]
+      postponed_state = chunk_postponed_state if chunk_postponed_state.is_a?(String)
+      shell_html << (chunk["html"] || "")
+      console_scripts << chunk["consoleReplayScript"] if chunk["consoleReplayScript"].present?
+    end
+
+    ppr_check_prerender_protocol!(component_name, prerender_complete, had_render_error)
+
+    {
+      shell_html:,
+      postponed_state:,
+      had_render_error:,
+      console_script: console_scripts.join("\n"),
+      render_options: internal_result[:render_options],
+      tag: internal_result[:tag]
+    }
+  end
+
+  # A prerender response with neither the completion metadata nor an error signal means the
+  # server bundle does not speak the PPR protocol — surface that as a configuration error rather
+  # than caching a shell with no way to tell whether it is complete.
+  def ppr_check_prerender_protocol!(component_name, prerender_complete, had_render_error)
+    return if prerender_complete || had_render_error
+
+    raise ReactOnRailsPro::Error,
+          "PPR prerender for #{component_name} did not report completion metadata. " \
+          "Ensure the server bundle is built with a react-on-rails-pro package that supports PPR, " \
+          "that react and react-dom >= 19.2.7 < 20 are installed, and that the prerender stream " \
+          "was not terminated abnormally."
+  end
+
+  # Persists shell + PostponedState as ONE atomic record — there is never a state without its
+  # shell, and mixing generations is impossible. The write is skipped entirely when the prerender
+  # reported a rendering error: a shell prerendered from a partially failed tree must never be
+  # persisted and served to later visitors (the #4581 class of bug).
+  def ppr_write_cache_entry(prerender_result, cache_key, raw_cache_options, render_options)
+    if prerender_result[:had_render_error]
+      Rails.logger.warn do
+        "[ReactOnRailsPro] Skipping PPR cache write for #{cache_key.inspect}: " \
+          "the prerender reported a rendering error."
+      end
+      return
+    end
+    return if ReactOnRailsPro::Cache.cache_write_expired?(raw_cache_options)
+
+    cache_write_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
+    normalized_cache_tags = ReactOnRailsPro::Cache.normalize_tags(render_options[:cache_tags])
+    Rails.cache.write(
+      cache_key,
+      { "shell_html" => prerender_result[:shell_html], "postponed_state" => prerender_result[:postponed_state] },
+      cache_write_options
+    )
+    ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_write_options)
+  end
+
+  # Serves the shell as the helper's synchronous return value (wrapped in the component div with
+  # the spec tag and rails context, exactly like a streamed first chunk) and, when the page has
+  # dynamic holes, starts the resume phase that streams them. A shell with no PostponedState is a
+  # fully static page: SUCCESS with no resume request, counted by the ppr.static_shell counter —
+  # unless the prerender reported a render error, which is a failed render, not a static page.
+  def ppr_serve_shell(component_name, options, prerender_result, cache_hit:)
+    shell_result = build_react_component_result_for_server_rendered_string(
+      server_rendered_html: prerender_result[:shell_html],
+      component_specification_tag: prerender_result[:tag],
+      console_script: prerender_result[:console_script],
+      render_options: prerender_result[:render_options]
+    )
+
+    postponed_state = prerender_result[:postponed_state]
+    if postponed_state.present?
+      ppr_enqueue_resume_stream(component_name, options, postponed_state)
+    elsif !prerender_result[:had_render_error]
+      ReactOnRailsPro::Ppr.instrument_static_shell(component_name:, cache_hit:)
+    end
+
+    shell_result
+  end
+
+  # Streams the resume phase into the page's output queue. Unlike consumer_stream_async, EVERY
+  # chunk (including the first) is enqueued by the same task: the shell is this helper's
+  # synchronous return value, so nothing from the resume stream may be returned synchronously —
+  # the previous design routed the first chunk through a promise and re-enqueued it from the
+  # calling fiber, which dropped or reordered the first hole's content (#4659 review defect 4).
+  # Resume errors raise out of the barrier task and surface at @async_barrier.wait, matching the
+  # post-shell error semantics of streamed components.
+  def ppr_enqueue_resume_stream(component_name, options, postponed_state)
+    renderer_server_timing_collector = ReactOnRailsPro::Stream.renderer_server_timing_collector
+
+    @async_barrier.async do
+      ReactOnRailsPro::Stream.with_renderer_server_timing_collector(renderer_server_timing_collector) do
+        resume_stream = ppr_resume_stream(component_name, options, postponed_state)
+        resume_stream.each_chunk do |chunk|
+          # Client disconnected — stop streaming; the entry is already cached.
+          break if response.stream.closed?
+
+          @main_output_queue.enqueue(chunk)
+        end
+      end
+    rescue Async::Queue::ClosedError
+      # Queue closed due to error/disconnect in another component — stop enqueuing.
+    end
+  end
+
+  # Resume phase render: streams only the postponed Suspense boundaries, rendered from fresh
+  # props. The PostponedState travels to the renderer through the rendering request as
+  # railsContext.pprPostponedState (the pinned wire key — see ServerRenderingJsCode). Chunks are
+  # composed like non-first streamed chunks: no component div or spec tag, since the shell already
+  # carries both.
+  def ppr_resume_stream(component_name, options, postponed_state)
+    resume_options = options.merge(render_mode: :ppr_resume, ppr_postponed_state: postponed_state)
+    result = internal_react_component(component_name, resume_options)
+    render_opts = result[:render_options]
+    result[:result].transform do |chunk_json_result|
+      console_script = chunk_json_result["consoleReplayScript"]
+      result_console_script = render_opts.replay_console ? wrap_console_script_with_nonce(console_script) : ""
+      compose_react_component_html_with_spec_and_console("", chunk_json_result["html"] || "",
+                                                         result_console_script)
+    end
   end
 
   # Async version of fetch_react_component. Handles cache lookup synchronously,

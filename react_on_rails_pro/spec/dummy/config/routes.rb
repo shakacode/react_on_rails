@@ -55,6 +55,7 @@ Rails.application.routes.draw do
       as: :stream_async_components_for_testing
   get "cached_stream_async_components_for_testing" => "pages#cached_stream_async_components_for_testing",
       as: :cached_stream_async_components_for_testing
+  get "ppr_page_for_testing" => "pages#ppr_page_for_testing", as: :ppr_page_for_testing
   get "test_incremental_rendering" => "pages#test_incremental_rendering", as: :test_incremental_rendering
   get "lazy_props_for_testing" => "pages#lazy_props_for_testing", as: :lazy_props_for_testing
   get "lazy_props_redis_for_testing" => "pages#lazy_props_redis_for_testing",

@@ -15,7 +15,11 @@
 
 const { resolve } = require('path');
 
-const rootNodeModules = resolve(__dirname, '..', '..', '..', '..', '..', 'node_modules');
+// This app's own React resolution (~19.2.7 per package.json). The aliases below dedupe React
+// across the pnpm workspace symlinks; they must point at THIS app's copy, not the workspace
+// root's (the root pins an older React line for OSS-package tests, while the Pro dummy's
+// RSC/PPR features require the react-on-rails-rsc 19.2.x pairing: react/react-dom >= 19.2.7).
+const dummyNodeModules = resolve(__dirname, '..', '..', 'node_modules');
 
 module.exports = {
   resolve: {
@@ -23,12 +27,12 @@ module.exports = {
       Assets: resolve(__dirname, '..', '..', 'client', 'app', 'assets'),
       // Ensure a single copy of React across the pnpm workspace to prevent
       // "Invalid hook call" errors from duplicate React instances during SSR
-      react: resolve(rootNodeModules, 'react'),
-      'react/jsx-runtime': resolve(rootNodeModules, 'react', 'jsx-runtime'),
-      'react/jsx-dev-runtime': resolve(rootNodeModules, 'react', 'jsx-dev-runtime'),
-      'react-dom': resolve(rootNodeModules, 'react-dom'),
-      'react-dom/client': resolve(rootNodeModules, 'react-dom', 'client'),
-      'react-dom/server': resolve(rootNodeModules, 'react-dom', 'server'),
+      react: resolve(dummyNodeModules, 'react'),
+      'react/jsx-runtime': resolve(dummyNodeModules, 'react', 'jsx-runtime'),
+      'react/jsx-dev-runtime': resolve(dummyNodeModules, 'react', 'jsx-dev-runtime'),
+      'react-dom': resolve(dummyNodeModules, 'react-dom'),
+      'react-dom/client': resolve(dummyNodeModules, 'react-dom', 'client'),
+      'react-dom/server': resolve(dummyNodeModules, 'react-dom', 'server'),
       'react-on-rails-pro$': resolve(__dirname, '..', '..', 'client', 'app', 'strictModeReactOnRailsPro.js'),
       'react-on-rails-pro/client$': resolve(
         __dirname,

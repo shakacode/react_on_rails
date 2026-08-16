@@ -2180,6 +2180,321 @@ describe ReactOnRailsProHelper do
       end
     end
 
+    describe "#ppr_react_component", :caching do # rubocop:disable RSpec/MultipleMemoizedHelpers
+      let(:mocked_stream) { instance_double(ActionController::Live::Buffer) }
+      let(:written_chunks) { [] }
+      let(:ppr_postponed_state_json) { '{"nextSegmentId":1,"rootFormatContext":{"insertionMode":2}}' }
+      let(:ppr_shell_chunks) do
+        [
+          { html: '<div>PPR shell<!--$?--><template id="B:0"></template>' \
+                  "<div>Loading PPR hole...</div><!--/$--></div>",
+            consoleReplayScript: "", hasErrors: false, isShellReady: true },
+          { html: "", consoleReplayScript: "", hasErrors: false, isShellReady: true,
+            pprPrerenderComplete: true, pprPostponedState: ppr_postponed_state_json }
+        ]
+      end
+      let(:ppr_static_shell_chunks) do
+        [
+          { html: "<div>Fully static PPR shell</div>", consoleReplayScript: "",
+            hasErrors: false, isShellReady: true },
+          { html: "", consoleReplayScript: "", hasErrors: false, isShellReady: true,
+            pprPrerenderComplete: true }
+        ]
+      end
+      let(:ppr_resume_chunks) do
+        [
+          { html: '<div hidden id="S:0">First hole content</div>', consoleReplayScript: "",
+            hasErrors: false, isShellReady: true },
+          { html: '<script>$RC("B:0","S:0")</script>', consoleReplayScript: "",
+            hasErrors: false, isShellReady: true }
+        ]
+      end
+
+      around do |example|
+        Rails.cache.clear
+        Sync { example.run }
+      ensure
+        Rails.cache.clear
+      end
+
+      before do
+        written_chunks.clear
+        allow(mocked_stream).to receive(:write) { |chunk| written_chunks << chunk }
+        allow(mocked_stream).to receive(:close)
+        allow(mocked_stream).to receive(:closed?).and_return(false)
+        mocked_response = instance_double(ActionDispatch::Response)
+        allow(mocked_response).to receive(:stream).and_return(mocked_stream)
+        allow(self).to receive(:response).and_return(mocked_response)
+      end
+
+      # Queues one mocked renderer HTTP response per argument, in request order. A PPR cold
+      # request issues two renderer requests (prerender, then resume); a warm request issues one
+      # (resume only) — any request beyond the queued responses fails the test loudly.
+      def mock_ppr_responses(*responses)
+        install_renderer_http_client_mock("http://localhost:3800")
+        clear_stream_mocks
+        stub_pro_bundle_hashes
+        chunks_read.clear
+
+        responses.each do |response_chunks|
+          mock_streaming_response(test_server_render_url_pattern, 200) do |yielder|
+            response_chunks.each do |chunk|
+              chunks_read << chunk
+              yielder.call(to_length_prefixed(chunk))
+            end
+          end
+        end
+      end
+
+      def stub_render_with_ppr(**opts, &props_block)
+        props_block ||= -> { props }
+        allow(self).to receive(:render_to_string) do
+          render_result = ppr_react_component(
+            component_name,
+            cache_key: ["ppr-spec", component_name],
+            id: "#{component_name}-react-component-0",
+            trace: true,
+            cache_options: { expires_in: 60 },
+            **opts,
+            &props_block
+          )
+          <<-HTML
+            <div>
+              <h1>Header Rendered In View</h1>
+              #{render_result}
+            </div>
+          HTML
+        end
+      end
+
+      def reset_stream_buffers
+        written_chunks.clear
+        chunks_read.clear
+        @rendered_rails_context = nil
+      end
+
+      def run_stream
+        stream_view_containing_react_components(template: template_path)
+        written_chunks.dup
+      end
+
+      def computed_ppr_cache_key(id: "#{component_name}-react-component-0")
+        send(:ppr_cache_key, component_name, { cache_key: ["ppr-spec", component_name], id: })
+      end
+
+      it "cold request writes ONE atomic paired record and streams each hole chunk exactly once" do
+        mock_ppr_responses(ppr_shell_chunks, ppr_resume_chunks)
+        stub_render_with_ppr
+
+        all_chunks = run_stream
+        combined = all_chunks.join
+
+        # Both phases hit the renderer: prerender first, resume second.
+        expect(chunks_read.count).to eq(ppr_shell_chunks.count + ppr_resume_chunks.count)
+        # The shell is part of the synchronous template chunk, wrapped in the component div with
+        # the spec tag; the resume chunks stream afterwards.
+        expect(all_chunks.first).to include("PPR shell")
+        expect(all_chunks.first).to include("js-react-on-rails-component")
+        # The first hole's content appears exactly once — it is neither dropped nor duplicated
+        # by the resume streaming path (#4659 review defect 4).
+        expect(combined.scan("First hole content").length).to eq(1)
+        expect(combined.scan("$RC(").length).to eq(1)
+
+        # Shell + PostponedState are stored as one atomic paired record, holding the RAW shell
+        # (no per-request spec tag or rails context baked in).
+        cached_entry = Rails.cache.read(computed_ppr_cache_key)
+        expect(cached_entry).to eq(
+          "shell_html" => ppr_shell_chunks.first[:html],
+          "postponed_state" => ppr_postponed_state_json
+        )
+      end
+
+      it "warm request serves the cached shell with no prerender and resumes with fresh props" do
+        mock_ppr_responses(ppr_shell_chunks, ppr_resume_chunks, ppr_resume_chunks)
+        props_evaluations = 0
+        stub_render_with_ppr do
+          props_evaluations += 1
+          props.merge(requestId: props_evaluations)
+        end
+
+        run_stream
+        expect(chunks_read.count).to eq(ppr_shell_chunks.count + ppr_resume_chunks.count)
+
+        reset_stream_buffers
+        warm_chunks = run_stream
+
+        # Only the resume request hit the renderer — the shell came from cache.
+        expect(chunks_read.count).to eq(ppr_resume_chunks.count)
+        expect(warm_chunks.first).to include("PPR shell")
+        # The props block ran again and the fresh client props are in this request's spec tag.
+        expect(props_evaluations).to eq(2)
+        expect(warm_chunks.first).to include("\"requestId\":2")
+        # The first hole's content appears exactly once on the warm path too (defect 4 covers
+        # BOTH cache paths).
+        expect(warm_chunks.join.scan("First hole content").length).to eq(1)
+      end
+
+      it "keys the cache on the DOM id so instances with different ids do not share a shell" do
+        # The DOM id is the identifierPrefix baked into the cached shell/PostponedState, so a
+        # second instance with the same caller cache_key but a different explicit id must be a
+        # structural miss (its own prerender + paired record), not a warm hit on the first id's
+        # incompatible shell.
+        mock_ppr_responses(ppr_shell_chunks, ppr_resume_chunks, ppr_shell_chunks, ppr_resume_chunks)
+        other_id = "#{component_name}-react-component-other"
+        stub_render_with_ppr
+
+        run_stream
+        expect(chunks_read.count).to eq(ppr_shell_chunks.count + ppr_resume_chunks.count)
+
+        reset_stream_buffers
+        stub_render_with_ppr(id: other_id)
+        run_stream
+
+        # The prerender phase ran again for the new id instead of reusing the cached shell.
+        expect(chunks_read.count).to eq(ppr_shell_chunks.count + ppr_resume_chunks.count)
+        expect(Rails.cache.read(computed_ppr_cache_key)).not_to be_nil
+        expect(Rails.cache.read(computed_ppr_cache_key(id: other_id))).not_to be_nil
+      end
+
+      it "fully-static prerender succeeds, caches a shell-only record, and skips the resume phase" do
+        # Exactly ONE renderer response is queued: any resume request would fail loudly as an
+        # unmocked request. (#4659 review defect 1 made this path a deterministic 500.)
+        mock_ppr_responses(ppr_static_shell_chunks)
+        static_shell_events = []
+        subscription = ActiveSupport::Notifications.subscribe(
+          ReactOnRailsPro::Ppr::STATIC_SHELL_NOTIFICATION
+        ) { |event| static_shell_events << event }
+        stub_render_with_ppr
+
+        begin
+          cold_chunks = run_stream
+          expect(cold_chunks.join).to include("Fully static PPR shell")
+          expect(cold_chunks.join).not_to include("$RC(")
+          expect(chunks_read.count).to eq(ppr_static_shell_chunks.count)
+          expect(Rails.cache.read(computed_ppr_cache_key)).to eq(
+            "shell_html" => ppr_static_shell_chunks.first[:html],
+            "postponed_state" => nil
+          )
+
+          # Warm request: served entirely from cache — NO renderer request at all.
+          reset_stream_buffers
+          warm_chunks = run_stream
+          expect(chunks_read.count).to eq(0)
+          expect(warm_chunks.join).to include("Fully static PPR shell")
+
+          # The ppr.static_shell counter fired for both serves.
+          expect(static_shell_events.length).to eq(2)
+          expect(static_shell_events.map { |event| event.payload[:cache_hit] }).to eq([false, true])
+        ensure
+          ActiveSupport::Notifications.unsubscribe(subscription)
+        end
+      end
+
+      it "revalidate_tag evicts the paired shell record and the next request re-prerenders" do
+        mock_ppr_responses(ppr_shell_chunks, ppr_resume_chunks, ppr_shell_chunks, ppr_resume_chunks)
+        stub_render_with_ppr(cache_tags: ["ppr-tag"])
+
+        run_stream
+        expect(chunks_read.count).to eq(ppr_shell_chunks.count + ppr_resume_chunks.count)
+
+        expect(ReactOnRailsPro.revalidate_tag("ppr-tag")).to eq(1)
+        expect(Rails.cache.read(computed_ppr_cache_key)).to be_nil
+
+        # Structural miss: the prerender phase runs again.
+        reset_stream_buffers
+        run_stream
+        expect(chunks_read.count).to eq(ppr_shell_chunks.count + ppr_resume_chunks.count)
+      end
+
+      it "does not cache a prerender that reported a rendering error" do
+        error_shell_chunks = [
+          { html: "<div>PPR shell from a partially failed tree</div>", consoleReplayScript: "",
+            hasErrors: true, isShellReady: true },
+          { html: "", consoleReplayScript: "", hasErrors: false, isShellReady: true,
+            pprPrerenderComplete: true, pprRenderErrored: true,
+            pprPostponedState: ppr_postponed_state_json }
+        ]
+        mock_ppr_responses(error_shell_chunks, ppr_resume_chunks, error_shell_chunks, ppr_resume_chunks)
+        stub_render_with_ppr
+
+        run_stream
+        # The stream completed (this request still serves its own render) ...
+        expect(chunks_read.count).to eq(error_shell_chunks.count + ppr_resume_chunks.count)
+        # ... but the error-containing shell was never persisted (the #4581 class of bug).
+        expect(Rails.cache.read(computed_ppr_cache_key)).to be_nil
+        expect(cache_data).to be_empty
+
+        # The next request prerenders again instead of serving a cached broken shell.
+        reset_stream_buffers
+        run_stream
+        expect(chunks_read.count).to eq(error_shell_chunks.count + ppr_resume_chunks.count)
+      end
+
+      it "does not count a fully-failed prerender as a static shell" do
+        # had_render_error with no PostponedState is a failed render, not a fully-static page:
+        # the ppr.static_shell counter must not fire and nothing may be cached.
+        failed_static_chunks = [
+          { html: "", consoleReplayScript: "", hasErrors: true, isShellReady: true },
+          { html: "", consoleReplayScript: "", hasErrors: false, isShellReady: true,
+            pprPrerenderComplete: true, pprRenderErrored: true }
+        ]
+        mock_ppr_responses(failed_static_chunks)
+        static_shell_events = []
+        subscription = ActiveSupport::Notifications.subscribe(
+          ReactOnRailsPro::Ppr::STATIC_SHELL_NOTIFICATION
+        ) { |event| static_shell_events << event }
+        stub_render_with_ppr
+
+        begin
+          run_stream
+          expect(chunks_read.count).to eq(failed_static_chunks.count)
+          expect(static_shell_events).to be_empty
+          expect(Rails.cache.read(computed_ppr_cache_key)).to be_nil
+        ensure
+          ActiveSupport::Notifications.unsubscribe(subscription)
+        end
+      end
+
+      it "raises a configuration error when the prerender response lacks the PPR protocol metadata" do
+        legacy_chunks = [
+          { html: "<div>Shell from a bundle without PPR support</div>", consoleReplayScript: "",
+            hasErrors: false, isShellReady: true }
+        ]
+        mock_ppr_responses(legacy_chunks)
+        stub_render_with_ppr
+
+        expect { run_stream }.to raise_error(
+          ReactOnRailsPro::Error, /did not report completion metadata/
+        )
+        expect(Rails.cache.read(computed_ppr_cache_key)).to be_nil
+      end
+
+      it "requires a cache_key" do
+        expect do
+          ppr_react_component(component_name) { props }
+        end.to raise_error(ReactOnRailsPro::Error, /cache_key/)
+      end
+
+      it "requires props to be passed as a block" do
+        expect do
+          ppr_react_component(component_name, cache_key: "ppr-key", props: { a: 1 })
+        end.to raise_error(ReactOnRailsPro::Error, /Pass 'props' as a block/)
+      end
+
+      it "rejects conditional caching options" do
+        expect do
+          ppr_react_component(component_name, cache_key: "ppr-key", if: false) { props }
+        end.to raise_error(ReactOnRailsPro::Error, /does not support conditional caching/)
+      end
+
+      it "requires a streaming view context" do
+        @async_barrier = nil
+        expect do
+          ppr_react_component(component_name, cache_key: "ppr-key") { props }
+        end.to raise_error(ReactOnRails::Error, /stream_view_containing_react_components/)
+      end
+    end
+
     describe "#fetch_cache_entry", :caching do
       around do |example|
         Rails.cache.clear

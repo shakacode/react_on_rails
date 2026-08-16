@@ -57,7 +57,8 @@ module ReactOnRailsPro
       react_server_client_manifest_file: Configuration::DEFAULT_REACT_SERVER_CLIENT_MANIFEST_FILE,
       concurrent_component_streaming_buffer_size: Configuration::DEFAULT_CONCURRENT_COMPONENT_STREAMING_BUFFER_SIZE,
       cache_tag_index_expires_in: Configuration::DEFAULT_CACHE_TAG_INDEX_EXPIRES_IN,
-      cache_tag_index_max_keys: Configuration::DEFAULT_CACHE_TAG_INDEX_MAX_KEYS
+      cache_tag_index_max_keys: Configuration::DEFAULT_CACHE_TAG_INDEX_MAX_KEYS,
+      ppr_settle_budget_ms: Configuration::DEFAULT_PPR_SETTLE_BUDGET_MS
     )
   end
 
@@ -105,6 +106,11 @@ module ReactOnRailsPro
     # Maximum cache-entry keys recorded per tag; the oldest keys are dropped
     # (with a warning) beyond this, and drop out of tag revalidation.
     DEFAULT_CACHE_TAG_INDEX_MAX_KEYS = 5_000
+    # PPR settle budget: how long (in milliseconds) a :ppr_prerender render waits before aborting
+    # the prerender and demoting still-pending Suspense boundaries to resume-phase holes.
+    # Keep aligned with DEFAULT_PPR_SETTLE_BUDGET_MS in
+    # packages/react-on-rails-pro/src/pprServerRenderedReactComponent.ts.
+    DEFAULT_PPR_SETTLE_BUDGET_MS = 500
     ROLLING_DEPLOY_UPLOAD_POSITIONAL_PARAMS = %i[req opt rest].freeze
     ROLLING_DEPLOY_UPLOAD_KEYWORD_PARAMS = %i[key keyreq].freeze
     ROLLING_DEPLOY_UPLOAD_ALL_KEYWORD_PARAMS = %i[keyrest].freeze
@@ -124,7 +130,7 @@ module ReactOnRailsPro
 
     attr_reader :concurrent_component_streaming_buffer_size, :renderer_http_keep_alive_timeout,
                 :renderer_http_pool_size, :cache_tag_index_expires_in, :cache_tag_index_max_keys,
-                :rsc_payload_authorizer
+                :rsc_payload_authorizer, :ppr_settle_budget_ms
 
     # Sets how long tag->key index entries live (see Cache::TagIndex).
     #
@@ -198,6 +204,27 @@ module ReactOnRailsPro
       @renderer_http_keep_alive_timeout = value
     end
 
+    # Sets the PPR settle budget (in milliseconds) for `ppr_react_component` prerender renders.
+    #
+    # Settle contract (PPR plan of record, D2): the prerender phase renders the component tree and
+    # aborts after this budget; every Suspense boundary still pending at the abort is captured in
+    # the PostponedState and becomes a resume-phase hole. Data that must be part of the cached
+    # static shell has to be explicitly awaited before this budget elapses (or resolve within a
+    # microtask); real I/O that is neither is silently demoted to a hole rather than detected.
+    # The prerender render-tree work stays separable from abort-and-collect: callers of the JS API
+    # can pass their own AbortSignal instead of this timer (the seam for the future
+    # CacheSignal-driven settle).
+    #
+    # @param value [Integer] A positive integer number of milliseconds (default 500)
+    # @raise [ReactOnRailsPro::Error] if value is not a positive integer
+    def ppr_settle_budget_ms=(value)
+      unless value.is_a?(Integer) && value.positive?
+        raise ReactOnRailsPro::Error,
+              "config.ppr_settle_budget_ms must be a positive integer number of milliseconds"
+      end
+      @ppr_settle_budget_ms = value
+    end
+
     def rsc_payload_authorizer=(value)
       unless value.nil? || value.respond_to?(:call)
         raise ReactOnRailsPro::Error, "config.rsc_payload_authorizer must be nil or respond to #call"
@@ -229,7 +256,8 @@ module ReactOnRailsPro
                    react_server_client_manifest_file: nil,
                    concurrent_component_streaming_buffer_size: DEFAULT_CONCURRENT_COMPONENT_STREAMING_BUFFER_SIZE,
                    cache_tag_index_expires_in: DEFAULT_CACHE_TAG_INDEX_EXPIRES_IN,
-                   cache_tag_index_max_keys: DEFAULT_CACHE_TAG_INDEX_MAX_KEYS)
+                   cache_tag_index_max_keys: DEFAULT_CACHE_TAG_INDEX_MAX_KEYS,
+                   ppr_settle_budget_ms: DEFAULT_PPR_SETTLE_BUDGET_MS)
       self.renderer_url = renderer_url
       self.renderer_password = renderer_password
       self.license_token = license_token
@@ -268,6 +296,7 @@ module ReactOnRailsPro
       self.concurrent_component_streaming_buffer_size = concurrent_component_streaming_buffer_size
       self.cache_tag_index_expires_in = cache_tag_index_expires_in
       self.cache_tag_index_max_keys = cache_tag_index_max_keys
+      self.ppr_settle_budget_ms = ppr_settle_budget_ms
     end
 
     def setup_config_values

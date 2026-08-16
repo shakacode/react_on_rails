@@ -139,6 +139,10 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     stream_view_containing_react_components(template: "/pages/cached_stream_async_components_for_testing")
   end
 
+  def ppr_page_for_testing
+    stream_view_containing_react_components(template: "/pages/ppr_page_for_testing")
+  end
+
   def rsc_echo_props
     stream_view_containing_react_components(template: "/pages/rsc_echo_props")
   end

@@ -49,6 +49,7 @@ module ReactOnRailsPro
     DEFAULT_CONCURRENT_COMPONENT_STREAMING_BUFFER_SIZE: Integer
     DEFAULT_CACHE_TAG_INDEX_EXPIRES_IN: Integer
     DEFAULT_CACHE_TAG_INDEX_MAX_KEYS: Integer
+    DEFAULT_PPR_SETTLE_BUDGET_MS: Integer
     ROLLING_DEPLOY_TOKEN_MIN_LENGTH: Integer
     ROLLING_DEPLOY_UPLOAD_POSITIONAL_PARAMS: Array[Symbol]
     ROLLING_DEPLOY_UPLOAD_KEYWORD_PARAMS: Array[Symbol]
@@ -90,6 +91,7 @@ module ReactOnRailsPro
     attr_accessor concurrent_component_streaming_buffer_size: Integer
     attr_accessor cache_tag_index_expires_in: Numeric | ActiveSupport::Duration
     attr_accessor cache_tag_index_max_keys: Integer
+    attr_accessor ppr_settle_budget_ms: Integer
 
     def initialize: (
       ?renderer_url: String?,
@@ -126,7 +128,8 @@ module ReactOnRailsPro
       ?react_server_client_manifest_file: String?,
       ?concurrent_component_streaming_buffer_size: Integer,
       ?cache_tag_index_expires_in: Numeric | ActiveSupport::Duration,
-      ?cache_tag_index_max_keys: Integer
+      ?cache_tag_index_max_keys: Integer,
+      ?ppr_settle_budget_ms: Integer
     ) -> void
 
     def setup_config_values: () -> void

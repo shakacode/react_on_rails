@@ -57,6 +57,12 @@ export type RailsContext = {
       serverSideRSCPayloadParameters?: unknown;
       reactClientManifestFileName?: string;
       reactServerClientManifestFileName?: string;
+      // Injected by React on Rails Pro for PPR (Partial Prerendering) renders, not by
+      // helper.rb#rails_context: the settle budget for :ppr_prerender renders and the serialized
+      // PostponedState (JSON string) for :ppr_resume renders. The `pprPostponedState` key is the
+      // pinned wire contract between the Rails helper and the Pro renderer.
+      pprSettleBudgetMs?: number;
+      pprPostponedState?: string;
       getRSCPayloadStream: (componentName: string, props: unknown) => Promise<NodeJS.ReadableStream>;
     }
 );
@@ -675,6 +681,19 @@ export interface ReactOnRailsInternal extends ReactOnRails {
    * Used by server rendering by Rails
    */
   streamServerRenderedReactComponent(options: RenderParams): Readable;
+  /**
+   * Used by server rendering by Rails — PPR prerender phase (experimental, Pro only).
+   * Streams the static shell with Suspense fallbacks, then a trailing chunk whose metadata
+   * carries the serialized PostponedState. An optional caller-provided `signal` overrides the
+   * settle-budget timer (the CacheSignal seam).
+   */
+  pprPrerenderServerRenderedReactComponent(options: RenderParams & { signal?: AbortSignal }): Readable;
+  /**
+   * Used by server rendering by Rails — PPR resume phase (experimental, Pro only).
+   * Renders only the previously-postponed Suspense boundaries from
+   * `railsContext.pprPostponedState`.
+   */
+  pprResumeServerRenderedReactComponent(options: RenderParams): Readable;
   /**
    * Generates RSC payload, used by Rails
    */
