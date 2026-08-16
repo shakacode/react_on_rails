@@ -2464,7 +2464,8 @@ describe ReactOnRailsProHelper do
         stub_render_with_ppr
 
         expect { run_stream }.to raise_error(
-          ReactOnRailsPro::Error, /did not report completion metadata/
+          ReactOnRailsPro::Error,
+          /did not report completion metadata.*pprPrerenderComplete.*react_on_rails_pro v/
         )
         expect(Rails.cache.read(computed_ppr_cache_key)).to be_nil
       end
