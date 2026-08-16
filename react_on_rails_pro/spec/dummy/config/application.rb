@@ -25,6 +25,10 @@ Bundler.require(*Rails.groups)
 # See: https://github.com/shakacode/react_on_rails/issues/2283
 require_relative "../lib/streaming_race_simulator"
 
+# Experimental capture middleware for issue #4770 (section manifest work).
+# Inert unless STREAM_TEE_DIR is set and the request includes stream_tee=1.
+require_relative "../lib/middleware/stream_tee"
+
 module Dummy
   class Application < Rails::Application
     # Settings in config/environments/* take precedence over those specified here.
@@ -37,5 +41,9 @@ module Dummy
     # StreamingRaceSimulator must be added AFTER Rack::Deflater so it processes
     # the uncompressed response. Activated by adding ?simulate_race=true to URLs.
     config.middleware.use StreamingRaceSimulator
+
+    # StreamTee captures app-level body writes (before socket coalescing) for the
+    # issue #4770 capture experiments. Inert without STREAM_TEE_DIR + stream_tee=1.
+    config.middleware.use Middleware::StreamTee
   end
 end
