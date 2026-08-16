@@ -2463,9 +2463,10 @@ describe ReactOnRailsProHelper do
         mock_ppr_responses(legacy_chunks)
         stub_render_with_ppr
 
+        version_pattern = Regexp.escape(ReactOnRailsPro::VERSION)
         expect { run_stream }.to raise_error(
           ReactOnRailsPro::Error,
-          /did not report completion metadata.*pprPrerenderComplete.*react_on_rails_pro v/
+          /did not report completion metadata.*pprPrerenderComplete.*react_on_rails_pro v#{version_pattern}/
         )
         expect(Rails.cache.read(computed_ppr_cache_key)).to be_nil
       end
