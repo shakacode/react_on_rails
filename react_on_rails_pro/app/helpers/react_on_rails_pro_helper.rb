@@ -500,7 +500,7 @@ module ReactOnRailsProHelper
 
       cache_key = ppr_cache_key(component_name, render_options)
       raw_cache_options = render_options[:cache_options] || {}
-      cached_entry = ppr_read_cache_entry(cache_key, raw_cache_options)
+      cached_entry = ppr_read_cache_entry(cache_key, raw_cache_options, component_name)
 
       if cached_entry
         ppr_cache_hit_with_fallback(
@@ -1373,7 +1373,7 @@ module ReactOnRailsProHelper
   # Reads and validates the PPR cache envelope. Returns the validated envelope Hash on a good
   # hit, nil on miss, and nil (with eviction + instrumentation) on a corrupt or stale entry.
   # A cache read error is treated as a miss: log and fall through to the prerender phase.
-  def ppr_read_cache_entry(cache_key, raw_cache_options)
+  def ppr_read_cache_entry(cache_key, raw_cache_options, component_name = "unknown")
     cache_write_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
     entry = Rails.cache.read(cache_key, cache_write_options)
     return nil if entry.nil?
@@ -1381,7 +1381,7 @@ module ReactOnRailsProHelper
     if ppr_valid_cache_envelope?(entry)
       entry
     else
-      ppr_evict_invalid_entry(cache_key, cache_write_options, entry)
+      ppr_evict_invalid_entry(cache_key, cache_write_options, entry, component_name)
       nil
     end
   rescue StandardError => e
@@ -1413,10 +1413,10 @@ module ReactOnRailsProHelper
   # Evicts a corrupt or stale PPR cache entry and instruments the eviction so operators can
   # monitor cache-health (issue #4891 Layer 2). Called when an entry is present but fails
   # envelope validation — never for a clean miss.
-  def ppr_evict_invalid_entry(cache_key, cache_write_options, entry)
+  def ppr_evict_invalid_entry(cache_key, cache_write_options, entry, component_name = "unknown")
     Rails.cache.delete(cache_key, cache_write_options)
     reason = ppr_invalid_entry_reason(entry)
-    ReactOnRailsPro::Ppr.instrument_evict_invalid(component_name: "unknown", reason:)
+    ReactOnRailsPro::Ppr.instrument_evict_invalid(component_name:, reason:)
     Rails.logger.warn do
       "[ReactOnRailsPro] PPR cache entry evicted (#{reason}): #{cache_key.inspect}"
     end
@@ -1460,20 +1460,32 @@ module ReactOnRailsProHelper
   # Pre-flush fallback wrapper (issue #4891 Layer 3a). The cache-hit path runs BEFORE the shell
   # is committed to the HTTP response — if anything raises here, the response is still virgin and
   # we can evict the suspect entry + fall through to a full streaming SSR (cache-miss path).
+  #
+  # Props are evaluated OUTSIDE the degradation guard so a transient request-local failure
+  # (e.g. database timeout during props generation) does not evict a valid shared cache entry
+  # and does not double-evaluate the props block via the cache-miss fallback.
   def ppr_cache_hit_with_fallback(component_name, render_options, cached_entry,
-                                  cache_key, raw_cache_options, &)
-    ppr_cache_hit(component_name, render_options, cached_entry, cache_key, raw_cache_options, &)
-  rescue StandardError => e
-    ppr_handle_pre_flush_degradation(component_name, cache_key, raw_cache_options, e)
-    ppr_cache_miss(component_name, render_options, cache_key, raw_cache_options, &)
+                                  cache_key, raw_cache_options)
+    props = yield
+
+    begin
+      ppr_cache_hit(component_name, render_options, cached_entry,
+                    cache_key:, raw_cache_options:, props:)
+    rescue StandardError => e
+      ppr_handle_pre_flush_degradation(component_name, cache_key, raw_cache_options, e)
+      ppr_cache_miss(component_name, render_options, cache_key, raw_cache_options) { props }
+    end
   end
 
   # Warm path: serve the cached shell instantly (no prerender request) and resume the dynamic
   # holes with THIS request's fresh props. The component specification tag is regenerated per
   # request so client hydration receives the fresh props; only the raw prerendered shell HTML and
   # PostponedState are cached.
-  def ppr_cache_hit(component_name, render_options, cached_entry, cache_key, raw_cache_options)
-    props = yield
+  #
+  # Props are passed as a pre-evaluated value (not a block) so the pre-flush fallback wrapper
+  # can evaluate them once and reuse them in the cache-miss fallback without double evaluation.
+  def ppr_cache_hit(component_name, render_options, cached_entry,
+                    cache_key:, raw_cache_options:, props:)
     options = render_options.merge(props:, prerender: true, skip_prerender_cache: true)
 
     prerender_result = ppr_hit_prerender_result(component_name, options, cached_entry)

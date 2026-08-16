@@ -2568,9 +2568,10 @@ describe ReactOnRailsProHelper do
           expect(chunks_read.count).to eq(ppr_shell_chunks.count + ppr_resume_chunks.count)
           expect(warm_chunks.join).to include("PPR shell")
 
-          # The eviction counter fired.
+          # The eviction counter fired with the component name (not "unknown").
           expect(evict_events.length).to eq(1)
           expect(evict_events.first.payload[:reason]).to eq("checksum_mismatch")
+          expect(evict_events.first.payload[:component_name]).to eq(component_name)
         ensure
           ActiveSupport::Notifications.unsubscribe(subscription)
         end
