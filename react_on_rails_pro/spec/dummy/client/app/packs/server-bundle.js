@@ -19,6 +19,10 @@ import '../generated/server-bundle-generated';
 import ReactOnRails from 'react-on-rails-pro';
 import StreamedUseId from '../components/StreamedUseId';
 
+// Registers React's PPR APIs (prerenderToNodeStream/resumeToPipeableStream) from this bundle's
+// react-dom so ppr_react_component works. Requires react and react-dom >= 19.2.7 < 20.
+import 'react-on-rails-pro/pprSupport';
+
 // SelectiveHydrationDemo is registered as a server component via generated/SelectiveHydrationDemo.js
 // Do NOT register it here - it would conflict with RSC registration
 
