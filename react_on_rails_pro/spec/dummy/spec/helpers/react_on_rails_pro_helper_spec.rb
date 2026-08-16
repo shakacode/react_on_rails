@@ -2300,12 +2300,15 @@ describe ReactOnRailsProHelper do
         expect(combined.scan("First hole content").length).to eq(1)
         expect(combined.scan("$RC(").length).to eq(1)
 
-        # Shell + PostponedState are stored as one atomic paired record, holding the RAW shell
-        # (no per-request spec tag or rails context baked in).
+        # Shell + PostponedState are stored as a versioned envelope holding the RAW shell
+        # (no per-request spec tag or rails context baked in), schema/react version, and checksum.
         cached_entry = Rails.cache.read(computed_ppr_cache_key)
-        expect(cached_entry).to eq(
-          "shell_html" => ppr_shell_chunks.first[:html],
-          "postponed_state" => ppr_postponed_state_json
+        expect(cached_entry["schema"]).to eq(ReactOnRailsPro::Ppr::PPR_ENVELOPE_SCHEMA)
+        expect(cached_entry["react"]).to eq(ReactOnRailsPro::Ppr.react_version_cache_key)
+        expect(cached_entry["shell_html"]).to eq(ppr_shell_chunks.first[:html])
+        expect(cached_entry["postponed_state"]).to eq(ppr_postponed_state_json)
+        expect(cached_entry["checksum"]).to eq(
+          ReactOnRailsPro::Ppr.compute_checksum(ppr_shell_chunks.first[:html], ppr_postponed_state_json)
         )
       end
 
@@ -2371,9 +2374,12 @@ describe ReactOnRailsProHelper do
           expect(cold_chunks.join).to include("Fully static PPR shell")
           expect(cold_chunks.join).not_to include("$RC(")
           expect(chunks_read.count).to eq(ppr_static_shell_chunks.count)
-          expect(Rails.cache.read(computed_ppr_cache_key)).to eq(
-            "shell_html" => ppr_static_shell_chunks.first[:html],
-            "postponed_state" => nil
+          cached = Rails.cache.read(computed_ppr_cache_key)
+          expect(cached["schema"]).to eq(ReactOnRailsPro::Ppr::PPR_ENVELOPE_SCHEMA)
+          expect(cached["shell_html"]).to eq(ppr_static_shell_chunks.first[:html])
+          expect(cached["postponed_state"]).to be_nil
+          expect(cached["checksum"]).to eq(
+            ReactOnRailsPro::Ppr.compute_checksum(ppr_static_shell_chunks.first[:html], nil)
           )
 
           # Warm request: served entirely from cache — NO renderer request at all.
@@ -2494,6 +2500,215 @@ describe ReactOnRailsProHelper do
         expect do
           ppr_react_component(component_name, cache_key: "ppr-key") { props }
         end.to raise_error(ReactOnRails::Error, /stream_view_containing_react_components/)
+      end
+
+      # --- Issue #4891: versioned envelope, validation, and graceful degradation ---
+
+      it "cold write produces a versioned envelope with schema, react, checksum" do
+        mock_ppr_responses(ppr_shell_chunks, ppr_resume_chunks)
+        stub_render_with_ppr
+
+        run_stream
+
+        cached = Rails.cache.read(computed_ppr_cache_key)
+        expect(cached).to be_a(Hash)
+        expect(cached["schema"]).to eq(ReactOnRailsPro::Ppr::PPR_ENVELOPE_SCHEMA)
+        expect(cached["react"]).to eq(ReactOnRailsPro::Ppr.react_version_cache_key)
+        expect(cached["shell_html"]).to eq(ppr_shell_chunks.first[:html])
+        expect(cached["postponed_state"]).to eq(ppr_postponed_state_json)
+        expect(cached["checksum"]).to eq(
+          ReactOnRailsPro::Ppr.compute_checksum(
+            ppr_shell_chunks.first[:html], ppr_postponed_state_json
+          )
+        )
+      end
+
+      it "static shell produces a valid envelope with postponed_state nil and a correct checksum" do
+        mock_ppr_responses(ppr_static_shell_chunks)
+        stub_render_with_ppr
+
+        run_stream
+
+        cached = Rails.cache.read(computed_ppr_cache_key)
+        expect(cached["schema"]).to eq(ReactOnRailsPro::Ppr::PPR_ENVELOPE_SCHEMA)
+        expect(cached["postponed_state"]).to be_nil
+        expect(cached["checksum"]).to eq(
+          ReactOnRailsPro::Ppr.compute_checksum(ppr_static_shell_chunks.first[:html], nil)
+        )
+
+        # Warm hit still works with nil PostponedState
+        reset_stream_buffers
+        warm_chunks = run_stream
+        expect(warm_chunks.join).to include("Fully static PPR shell")
+        expect(chunks_read.count).to eq(0)
+      end
+
+      it "evicts a corrupted entry (byte-flipped checksum) and re-prerenders" do
+        # Cold request: write a valid envelope
+        mock_ppr_responses(ppr_shell_chunks, ppr_resume_chunks, ppr_shell_chunks, ppr_resume_chunks)
+        stub_render_with_ppr
+        run_stream
+
+        # Corrupt the checksum in the cached entry
+        cache_key = computed_ppr_cache_key
+        corrupted = Rails.cache.read(cache_key)
+        corrupted["checksum"] = "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+        Rails.cache.write(cache_key, corrupted)
+
+        evict_events = []
+        subscription = ActiveSupport::Notifications.subscribe(
+          ReactOnRailsPro::Ppr::EVICT_INVALID_NOTIFICATION
+        ) { |event| evict_events << event }
+
+        begin
+          reset_stream_buffers
+          warm_chunks = run_stream
+
+          # Treated as a miss: the prerender phase ran again.
+          expect(chunks_read.count).to eq(ppr_shell_chunks.count + ppr_resume_chunks.count)
+          expect(warm_chunks.join).to include("PPR shell")
+
+          # The eviction counter fired.
+          expect(evict_events.length).to eq(1)
+          expect(evict_events.first.payload[:reason]).to eq("checksum_mismatch")
+        ensure
+          ActiveSupport::Notifications.unsubscribe(subscription)
+        end
+      end
+
+      it "evicts an entry with an unknown schema version and re-prerenders" do
+        mock_ppr_responses(ppr_shell_chunks, ppr_resume_chunks, ppr_shell_chunks, ppr_resume_chunks)
+        stub_render_with_ppr
+        run_stream
+
+        # Tamper with the schema version
+        cache_key = computed_ppr_cache_key
+        tampered = Rails.cache.read(cache_key)
+        tampered["schema"] = 999
+        Rails.cache.write(cache_key, tampered)
+
+        evict_events = []
+        subscription = ActiveSupport::Notifications.subscribe(
+          ReactOnRailsPro::Ppr::EVICT_INVALID_NOTIFICATION
+        ) { |event| evict_events << event }
+
+        begin
+          reset_stream_buffers
+          run_stream
+          expect(chunks_read.count).to eq(ppr_shell_chunks.count + ppr_resume_chunks.count)
+          expect(evict_events.length).to eq(1)
+          expect(evict_events.first.payload[:reason]).to eq("unknown_schema")
+        ensure
+          ActiveSupport::Notifications.unsubscribe(subscription)
+        end
+      end
+
+      it "evicts an entry whose react version mismatches the current install (belt-and-suspenders)" do
+        mock_ppr_responses(ppr_shell_chunks, ppr_resume_chunks, ppr_shell_chunks, ppr_resume_chunks)
+        stub_render_with_ppr
+        run_stream
+
+        # Tamper with the react version in the envelope (simulates a React upgrade that bypasses
+        # the cache key — belt-and-suspenders for the Layer 1 key)
+        cache_key = computed_ppr_cache_key
+        tampered = Rails.cache.read(cache_key)
+        tampered["react"] = "react-99.0.0"
+        Rails.cache.write(cache_key, tampered)
+
+        evict_events = []
+        subscription = ActiveSupport::Notifications.subscribe(
+          ReactOnRailsPro::Ppr::EVICT_INVALID_NOTIFICATION
+        ) { |event| evict_events << event }
+
+        begin
+          reset_stream_buffers
+          run_stream
+          expect(chunks_read.count).to eq(ppr_shell_chunks.count + ppr_resume_chunks.count)
+          expect(evict_events.length).to eq(1)
+          expect(evict_events.first.payload[:reason]).to eq("react_version_mismatch")
+        ensure
+          ActiveSupport::Notifications.unsubscribe(subscription)
+        end
+      end
+
+      it "pre-flush fallback: cache-hit error evicts, instruments, and falls back to full SSR" do
+        # Cold request: write a valid envelope
+        mock_ppr_responses(ppr_shell_chunks, ppr_resume_chunks, ppr_shell_chunks, ppr_resume_chunks)
+        stub_render_with_ppr
+        run_stream
+
+        # Force the cache-hit path to blow up BEFORE the shell is committed
+        allow(self).to receive(:ppr_hit_prerender_result).and_raise(
+          RuntimeError, "deliberate pre-flush test failure"
+        )
+
+        pre_flush_events = []
+        subscription = ActiveSupport::Notifications.subscribe(
+          ReactOnRailsPro::Ppr::DEGRADED_PRE_FLUSH_NOTIFICATION
+        ) { |event| pre_flush_events << event }
+
+        begin
+          reset_stream_buffers
+          warm_chunks = run_stream
+
+          # Fell back to full SSR (cache miss path): prerender + resume both ran.
+          expect(chunks_read.count).to eq(ppr_shell_chunks.count + ppr_resume_chunks.count)
+          expect(warm_chunks.join).to include("PPR shell")
+
+          # The degradation counter fired.
+          expect(pre_flush_events.length).to eq(1)
+          expect(pre_flush_events.first.payload[:error]).to include("deliberate pre-flush test failure")
+
+          # The fallback's cache-miss path wrote a fresh envelope (the old entry was evicted
+          # first, then the fresh prerender wrote a new one). Verify the new entry is valid.
+          fresh_entry = Rails.cache.read(computed_ppr_cache_key)
+          expect(fresh_entry["schema"]).to eq(ReactOnRailsPro::Ppr::PPR_ENVELOPE_SCHEMA)
+          expect(fresh_entry["shell_html"]).to be_a(String)
+        ensure
+          ActiveSupport::Notifications.unsubscribe(subscription)
+        end
+      end
+
+      it "post-flush fallback: resume error terminates stream, evicts entry, no second document" do
+        # Cold request: write a valid envelope
+        mock_ppr_responses(ppr_shell_chunks, ppr_resume_chunks)
+        stub_render_with_ppr
+        run_stream
+
+        # Warm request: mock the resume response to raise
+        mock_ppr_responses([])
+        # Override the mock to raise when the resume stream is consumed
+        allow(self).to receive(:ppr_resume_stream).and_raise(
+          RuntimeError, "deliberate post-flush test failure"
+        )
+
+        post_flush_events = []
+        subscription = ActiveSupport::Notifications.subscribe(
+          ReactOnRailsPro::Ppr::DEGRADED_POST_FLUSH_NOTIFICATION
+        ) { |event| post_flush_events << event }
+
+        begin
+          reset_stream_buffers
+          warm_chunks = run_stream
+
+          # The shell was served from cache (it is part of the initial template chunk).
+          expect(warm_chunks.first).to include("PPR shell")
+
+          # No second document — exactly one shell in the response.
+          combined = warm_chunks.join
+          expect(combined.scan("PPR shell").length).to eq(1)
+          # No $RC reveal scripts (the resume never completed).
+          expect(combined).not_to include("$RC(")
+
+          # The degradation counter fired.
+          expect(post_flush_events.length).to eq(1)
+          expect(post_flush_events.first.payload[:error]).to include("deliberate post-flush test failure")
+
+          # The cache entry was evicted so the next request prerenders cleanly.
+          expect(Rails.cache.read(computed_ppr_cache_key)).to be_nil
+        ensure
+          ActiveSupport::Notifications.unsubscribe(subscription)
+        end
       end
     end
 

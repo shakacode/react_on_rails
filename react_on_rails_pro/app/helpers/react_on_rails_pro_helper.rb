@@ -503,7 +503,9 @@ module ReactOnRailsProHelper
       cached_entry = ppr_read_cache_entry(cache_key, raw_cache_options)
 
       if cached_entry
-        ppr_cache_hit(component_name, render_options, cached_entry, &block)
+        ppr_cache_hit_with_fallback(
+          component_name, render_options, cached_entry, cache_key, raw_cache_options, &block
+        )
       else
         ppr_cache_miss(component_name, render_options, cache_key, raw_cache_options, &block)
       end
@@ -1368,23 +1370,78 @@ module ReactOnRailsProHelper
     )
   end
 
+  # Reads and validates the PPR cache envelope. Returns the validated envelope Hash on a good
+  # hit, nil on miss, and nil (with eviction + instrumentation) on a corrupt or stale entry.
   # A cache read error is treated as a miss: log and fall through to the prerender phase.
   def ppr_read_cache_entry(cache_key, raw_cache_options)
     cache_write_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
     entry = Rails.cache.read(cache_key, cache_write_options)
-    ppr_valid_cache_entry?(entry) ? entry : nil
+    return nil if entry.nil?
+
+    if ppr_valid_cache_envelope?(entry)
+      entry
+    else
+      ppr_evict_invalid_entry(cache_key, cache_write_options, entry)
+      nil
+    end
   rescue StandardError => e
     Rails.logger.warn("[ReactOnRailsPro] PPR cache read failed (treating as miss): #{e.class}: #{e.message}")
     nil
   end
 
-  # The paired record is one Hash: "shell_html" always present; "postponed_state" present only
-  # when the page has dynamic holes (a shell-only record is a fully static page). String keys —
-  # the record must survive non-Marshal cache serializers (e.g. JSON), which have no Symbol type.
-  # A malformed record is treated as a miss and re-prerendered.
-  def ppr_valid_cache_entry?(entry)
-    entry.is_a?(Hash) && entry["shell_html"].is_a?(String) &&
-      (entry["postponed_state"].nil? || entry["postponed_state"].is_a?(String))
+  # Validates the versioned cache envelope (issue #4891 Layer 2). The envelope wraps the cached
+  # shell + PostponedState with schema version, React version, and a SHA-256 checksum. String
+  # keys — the record must survive non-Marshal cache serializers (e.g. JSON).
+  #
+  # A valid envelope is a Hash with:
+  # - "schema" == PPR_ENVELOPE_SCHEMA (known format version)
+  # - "react"  == current react_version_cache_key (belt-and-suspenders with the cache key)
+  # - "shell_html" is a String
+  # - "postponed_state" is nil (fully static) or a String (dynamic holes)
+  # - "checksum" matches the recomputed SHA-256 over shell_html + postponed_state
+  def ppr_valid_cache_envelope?(entry)
+    return false unless entry.is_a?(Hash)
+    return false unless entry["schema"] == ReactOnRailsPro::Ppr::PPR_ENVELOPE_SCHEMA
+    return false unless entry["shell_html"].is_a?(String)
+    return false unless entry["postponed_state"].nil? || entry["postponed_state"].is_a?(String)
+    return false unless entry["react"] == ReactOnRailsPro::Ppr.react_version_cache_key
+
+    expected = ReactOnRailsPro::Ppr.compute_checksum(entry["shell_html"], entry["postponed_state"])
+    entry["checksum"] == expected
+  end
+
+  # Evicts a corrupt or stale PPR cache entry and instruments the eviction so operators can
+  # monitor cache-health (issue #4891 Layer 2). Called when an entry is present but fails
+  # envelope validation — never for a clean miss.
+  def ppr_evict_invalid_entry(cache_key, cache_write_options, entry)
+    Rails.cache.delete(cache_key, cache_write_options)
+    reason = ppr_invalid_entry_reason(entry)
+    ReactOnRailsPro::Ppr.instrument_evict_invalid(component_name: "unknown", reason:)
+    Rails.logger.warn do
+      "[ReactOnRailsPro] PPR cache entry evicted (#{reason}): #{cache_key.inspect}"
+    end
+  rescue StandardError => e
+    # Eviction instrumentation must not mask the original miss path.
+    Rails.logger.debug do
+      "[ReactOnRailsPro] PPR eviction instrumentation failed: #{e.class}: #{e.message}"
+    end
+  end
+
+  # Returns a diagnostic reason string for why the envelope validation failed. Used in
+  # instrumentation payloads and log messages.
+  def ppr_invalid_entry_reason(entry)
+    return "malformed" unless entry.is_a?(Hash)
+
+    schema = entry["schema"]
+    return "unknown_schema" if schema.nil? || schema != ReactOnRailsPro::Ppr::PPR_ENVELOPE_SCHEMA
+
+    return "malformed" unless entry["shell_html"].is_a?(String)
+    return "malformed" unless entry["postponed_state"].nil? || entry["postponed_state"].is_a?(String)
+
+    react = entry["react"]
+    return "react_version_mismatch" unless react == ReactOnRailsPro::Ppr.react_version_cache_key
+
+    "checksum_mismatch"
   end
 
   # Cold path: evaluate props, prerender the shell, persist the paired record, serve the shell,
@@ -1396,20 +1453,33 @@ module ReactOnRailsProHelper
     prerender_result = ppr_prerender(component_name, options)
     ppr_write_cache_entry(prerender_result, cache_key, raw_cache_options, render_options)
 
-    ppr_serve_shell(component_name, options, prerender_result, cache_hit: false)
+    ppr_serve_shell(component_name, options, prerender_result,
+                    cache_hit: false, cache_key:, raw_cache_options:)
+  end
+
+  # Pre-flush fallback wrapper (issue #4891 Layer 3a). The cache-hit path runs BEFORE the shell
+  # is committed to the HTTP response — if anything raises here, the response is still virgin and
+  # we can evict the suspect entry + fall through to a full streaming SSR (cache-miss path).
+  def ppr_cache_hit_with_fallback(component_name, render_options, cached_entry,
+                                  cache_key, raw_cache_options, &)
+    ppr_cache_hit(component_name, render_options, cached_entry, cache_key, raw_cache_options, &)
+  rescue StandardError => e
+    ppr_handle_pre_flush_degradation(component_name, cache_key, raw_cache_options, e)
+    ppr_cache_miss(component_name, render_options, cache_key, raw_cache_options, &)
   end
 
   # Warm path: serve the cached shell instantly (no prerender request) and resume the dynamic
   # holes with THIS request's fresh props. The component specification tag is regenerated per
   # request so client hydration receives the fresh props; only the raw prerendered shell HTML and
   # PostponedState are cached.
-  def ppr_cache_hit(component_name, render_options, cached_entry)
+  def ppr_cache_hit(component_name, render_options, cached_entry, cache_key, raw_cache_options)
     props = yield
     options = render_options.merge(props:, prerender: true, skip_prerender_cache: true)
 
     prerender_result = ppr_hit_prerender_result(component_name, options, cached_entry)
 
-    ppr_serve_shell(component_name, options, prerender_result, cache_hit: true)
+    ppr_serve_shell(component_name, options, prerender_result,
+                    cache_hit: true, cache_key:, raw_cache_options:)
   end
 
   # Builds the warm path's per-request render context (render options + component specification
@@ -1480,8 +1550,9 @@ module ReactOnRailsProHelper
           "was not terminated abnormally."
   end
 
-  # Persists shell + PostponedState as ONE atomic record — there is never a state without its
-  # shell, and mixing generations is impossible. The write is skipped entirely when the prerender
+  # Persists shell + PostponedState as a versioned envelope — schema version, React version,
+  # content, and a SHA-256 checksum over shell + state. There is never a state without its shell,
+  # and mixing generations is impossible. The write is skipped entirely when the prerender
   # reported a rendering error: a shell prerendered from a partially failed tree must never be
   # persisted and served to later visitors (the #4581 class of bug).
   def ppr_write_cache_entry(prerender_result, cache_key, raw_cache_options, render_options)
@@ -1494,13 +1565,19 @@ module ReactOnRailsProHelper
     end
     return if ReactOnRailsPro::Cache.cache_write_expired?(raw_cache_options)
 
+    shell_html = prerender_result[:shell_html]
+    postponed_state = prerender_result[:postponed_state]
+    envelope = {
+      "schema" => ReactOnRailsPro::Ppr::PPR_ENVELOPE_SCHEMA,
+      "react" => ReactOnRailsPro::Ppr.react_version_cache_key,
+      "shell_html" => shell_html,
+      "postponed_state" => postponed_state,
+      "checksum" => ReactOnRailsPro::Ppr.compute_checksum(shell_html, postponed_state)
+    }
+
     cache_write_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
     normalized_cache_tags = ReactOnRailsPro::Cache.normalize_tags(render_options[:cache_tags])
-    Rails.cache.write(
-      cache_key,
-      { "shell_html" => prerender_result[:shell_html], "postponed_state" => prerender_result[:postponed_state] },
-      cache_write_options
-    )
+    Rails.cache.write(cache_key, envelope, cache_write_options)
     ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_write_options)
   end
 
@@ -1509,7 +1586,11 @@ module ReactOnRailsProHelper
   # dynamic holes, starts the resume phase that streams them. A shell with no PostponedState is a
   # fully static page: SUCCESS with no resume request, counted by the ppr.static_shell counter —
   # unless the prerender reported a render error, which is a failed render, not a static page.
-  def ppr_serve_shell(component_name, options, prerender_result, cache_hit:)
+  #
+  # cache_key and raw_cache_options are threaded through to ppr_enqueue_resume_stream so the
+  # post-flush degradation handler (Layer 3b) can evict the entry on resume failure.
+  def ppr_serve_shell(component_name, options, prerender_result, cache_hit:,
+                      cache_key: nil, raw_cache_options: nil)
     shell_result = build_react_component_result_for_server_rendered_string(
       server_rendered_html: prerender_result[:shell_html],
       component_specification_tag: prerender_result[:tag],
@@ -1519,7 +1600,8 @@ module ReactOnRailsProHelper
 
     postponed_state = prerender_result[:postponed_state]
     if postponed_state.present?
-      ppr_enqueue_resume_stream(component_name, options, postponed_state)
+      ppr_enqueue_resume_stream(component_name, options, postponed_state,
+                                cache_key:, raw_cache_options:)
     elsif !prerender_result[:had_render_error]
       ReactOnRailsPro::Ppr.instrument_static_shell(component_name:, cache_hit:)
     end
@@ -1532,9 +1614,14 @@ module ReactOnRailsProHelper
   # synchronous return value, so nothing from the resume stream may be returned synchronously —
   # the previous design routed the first chunk through a promise and re-enqueued it from the
   # calling fiber, which dropped or reordered the first hole's content (#4659 review defect 4).
-  # Resume errors raise out of the barrier task and surface at @async_barrier.wait, matching the
-  # post-shell error semantics of streamed components.
-  def ppr_enqueue_resume_stream(component_name, options, postponed_state)
+  #
+  # Post-flush degradation (issue #4891 Layer 3b): if the resume phase raises after the shell has
+  # already been committed to the HTTP response, the error is caught here — the cache entry is
+  # evicted so the next request prerenders cleanly, and the stream terminates without appending a
+  # second document. The error does NOT re-raise: the user sees a truncated page that heals on
+  # reload, never a 500 caused by the PPR cache.
+  def ppr_enqueue_resume_stream(component_name, options, postponed_state,
+                                cache_key: nil, raw_cache_options: nil)
     renderer_server_timing_collector = ReactOnRailsPro::Stream.renderer_server_timing_collector
 
     @async_barrier.async do
@@ -1549,6 +1636,11 @@ module ReactOnRailsProHelper
       end
     rescue Async::Queue::ClosedError
       # Queue closed due to error/disconnect in another component — stop enqueuing.
+    rescue StandardError => e
+      # Post-flush: the shell already left the building — we cannot start over.
+      # Evict the entry so the next request gets a fresh prerender, but do NOT
+      # re-raise — that would surface as a 500 or append a second document.
+      ppr_handle_post_flush_degradation(component_name, cache_key, raw_cache_options, e)
     end
   end
 
@@ -1566,6 +1658,44 @@ module ReactOnRailsProHelper
       result_console_script = render_opts.replay_console ? wrap_console_script_with_nonce(console_script) : ""
       compose_react_component_html_with_spec_and_console("", chunk_json_result["html"] || "",
                                                          result_console_script)
+    end
+  end
+
+  # Pre-flush degradation handler (issue #4891 Layer 3a). Called when the cache-hit path raises
+  # before the shell has been committed to the HTTP response. Evicts the entry so the next request
+  # does not hit the same failure, instruments the event, and returns — the caller falls through
+  # to a full cache-miss prerender. Must not raise.
+  def ppr_handle_pre_flush_degradation(component_name, cache_key, raw_cache_options, error)
+    cache_write_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
+    Rails.cache.delete(cache_key, cache_write_options)
+    ReactOnRailsPro::Ppr.instrument_degraded_pre_flush(component_name:, error:)
+    Rails.logger.warn do
+      "[ReactOnRailsPro] PPR pre-flush degradation for #{component_name}: #{error.class}: #{error.message}. " \
+        "Evicted #{cache_key.inspect} and falling back to full SSR."
+    end
+  rescue StandardError => e
+    Rails.logger.debug do
+      "[ReactOnRailsPro] PPR pre-flush degradation handler failed: #{e.class}: #{e.message}"
+    end
+  end
+
+  # Post-flush degradation handler (issue #4891 Layer 3b). Called when the resume phase raises
+  # after the shell has already been written to the HTTP response. Evicts the cache entry so the
+  # next request prerenders cleanly — but does NOT re-raise, because the response is committed
+  # and a second document would produce Frankenstein HTML.
+  def ppr_handle_post_flush_degradation(component_name, cache_key, raw_cache_options, error)
+    if cache_key
+      cache_write_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
+      Rails.cache.delete(cache_key, cache_write_options)
+    end
+    ReactOnRailsPro::Ppr.instrument_degraded_post_flush(component_name:, error:)
+    Rails.logger.warn do
+      "[ReactOnRailsPro] PPR post-flush degradation for #{component_name}: #{error.class}: #{error.message}. " \
+        "Stream terminated; entry evicted. Next request will prerender cleanly."
+    end
+  rescue StandardError => e
+    Rails.logger.debug do
+      "[ReactOnRailsPro] PPR post-flush degradation handler failed: #{e.class}: #{e.message}"
     end
   end
 
