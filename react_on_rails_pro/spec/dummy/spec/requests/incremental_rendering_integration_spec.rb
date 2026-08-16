@@ -46,7 +46,7 @@ describe "Incremental Rendering Integration", :integration do
   before do
     # WebMock's async-http adapter intercepts every request and reads the entire
     # request body to build a signature (build_request_signature calls request.read).
-    # For bidirectional HTTP/2 streams, the request body is a Writable that is filled
+    # For bidirectional renderer streams, the request body is a Writable that is filled
     # concurrently — reading it eagerly deadlocks. Disable the adapter so requests
     # go straight to the real async-http client.
     WebMock::HttpLibAdapters::AsyncHttpClientAdapter.disable!

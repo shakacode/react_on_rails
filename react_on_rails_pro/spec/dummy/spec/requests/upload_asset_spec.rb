@@ -34,6 +34,7 @@ describe "Upload asset" do
                                         renderer_http_pool_timeout: 5,
                                         renderer_http_pool_warn_timeout: 0.25,
                                         renderer_http_keep_alive_timeout: 30,
+                                        renderer_http_force_http2: true,
                                         renderer_request_retry_limit: 5,
                                         ssr_timeout: 5,
                                         assets_to_copy: [

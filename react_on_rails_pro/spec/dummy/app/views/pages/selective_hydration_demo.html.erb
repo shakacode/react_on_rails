@@ -23,12 +23,17 @@ https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE
       section_delays = []
     end
   end
+  # Optional prop overrides so capture/verify experiments can exercise adversarial
+  # content (markup-like strings, unicode, huge payloads) through the real pipeline.
+  article_title = params[:article_title].presence || "Understanding Selective Hydration in React"
+  article_content = params[:article_content].presence ||
+    "Selective hydration allows React to hydrate parts of your page independently, improving time-to-interactive."
 %>
 <%= stream_react_component("SelectiveHydrationDemo",
     props: {
       siteName: "TechBlog",
-      articleTitle: "Understanding Selective Hydration in React",
-      articleContent: "Selective hydration allows React to hydrate parts of your page independently, improving time-to-interactive.",
+      articleTitle: article_title,
+      articleContent: article_content,
       categories: ["React", "Rails", "JavaScript", "Ruby", "TypeScript"],
       sectionDelays: section_delays
     },

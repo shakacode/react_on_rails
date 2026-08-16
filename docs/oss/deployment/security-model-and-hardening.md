@@ -135,11 +135,12 @@ disclosure if you expose the port publicly — one more reason never to do so.
   `packages/react-on-rails-pro-node-renderer/src/shared/configBuilder.ts`). Setting `RENDERER_HOST=0.0.0.0`
   is needed for containerized deployments; if you do, network access control must come from your
   infrastructure (security groups, network policies, private VPC subnets).
-- The renderer listens for **cleartext HTTP/2 (h2c)** and does not terminate TLS itself (see the server
-  construction in `run()` in `worker.ts`). The shared password travels in the request body. Treat the
+- The renderer listens for **cleartext HTTP/2 (h2c)** by default, or cleartext HTTP/1.1 when
+  `fastifyServerOptions.http2` is `false`, and does not terminate TLS itself (see the server construction in `run()` in
+  `worker.ts`). The shared password travels in the request body. Treat the
   Rails-to-renderer link as plaintext: keep it on a private network, or place TLS-terminating
   infrastructure in front of the renderer and use an `https://` value for `config.renderer_url` on the
-  Rails side.
+  Rails side. See [Choosing h2c or HTTP/1.1](../building-features/node-renderer/health-checks.md#choosing-h2c-or-http11).
 - **Never expose the renderer port to the public internet.** There is no rate limiting, no TLS, and the
   authenticated surface is "execute JavaScript".
 
@@ -207,8 +208,9 @@ Every item below maps to a configuration option or behavior verified in this rep
 2. **Keep the renderer on a private network.** Default bind is `localhost`; if you set
    `RENDERER_HOST=0.0.0.0` for containers, restrict ingress to your Rails app servers and your health
    checker.
-3. **Treat the link as plaintext.** The renderer speaks cleartext h2c; use a private network or external
-   TLS termination, and prefer an `https://` `config.renderer_url` when a TLS hop exists.
+3. **Treat the link as plaintext.** The renderer speaks cleartext h2c by default or cleartext HTTP/1.1 when configured;
+   use a private network or external TLS termination, and prefer an `https://` `config.renderer_url` when a TLS hop
+   exists. See [Choosing h2c or HTTP/1.1](../building-features/node-renderer/health-checks.md#choosing-h2c-or-http11).
 4. **Run the renderer as an unprivileged OS user / minimal container, with resource limits.** The
    bundle typically runs with host `require` (see above), so the renderer process's OS privileges and
    resource ceiling are the effective blast radius. Set `--max-old-space-size` on the Node process and

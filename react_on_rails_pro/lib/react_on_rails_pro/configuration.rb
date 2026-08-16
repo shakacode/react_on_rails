@@ -31,6 +31,7 @@ module ReactOnRailsPro
       renderer_http_pool_timeout: Configuration::DEFAULT_RENDERER_HTTP_POOL_TIMEOUT,
       renderer_http_pool_warn_timeout: Configuration::DEFAULT_RENDERER_HTTP_POOL_WARN_TIMEOUT,
       renderer_http_keep_alive_timeout: Configuration::DEFAULT_RENDERER_HTTP_KEEP_ALIVE_TIMEOUT,
+      renderer_http_force_http2: Configuration::DEFAULT_RENDERER_HTTP_FORCE_HTTP2,
       renderer_password: nil,
       license_token: nil,
       tracing: Configuration::DEFAULT_TRACING,
@@ -65,14 +66,16 @@ module ReactOnRailsPro
     DEFAULT_RENDERER_URL = "http://localhost:3800"
     DEFAULT_RENDERER_METHOD = "ExecJS"
     DEFAULT_RENDERER_FALLBACK_EXEC_JS = true
-    # Maximum concurrent HTTP/2 streams per persistent client. When Fiber.scheduler is available,
-    # clients are reused across requests within the same scheduler, making this limit effective.
-    # Without a scheduler, clients are per-request and this limits streams on that single request.
+    # Maximum concurrent renderer connections per persistent client. With HTTP/1.1, each connection serves one
+    # request at a time, so this is also the request-concurrency cap for a client shared by a long-lived scheduler.
+    # Without a Fiber.scheduler, streaming renders use an ephemeral client and non-streaming renders use a persistent
+    # per-thread client; this bounds connections within each of those clients.
     DEFAULT_RENDERER_HTTP_POOL_SIZE = 10
     # TCP connect timeout. Request and response processing are still bounded by ssr_timeout.
     DEFAULT_RENDERER_HTTP_POOL_TIMEOUT = 5
     DEFAULT_RENDERER_HTTP_POOL_WARN_TIMEOUT = 0.25
     DEFAULT_RENDERER_HTTP_KEEP_ALIVE_TIMEOUT = 30
+    DEFAULT_RENDERER_HTTP_FORCE_HTTP2 = true
     DEFAULT_SSR_TIMEOUT = 5
     DEFAULT_PRERENDER_CACHING = false
     DEFAULT_TRACING = false
@@ -123,8 +126,8 @@ module ReactOnRailsPro
                   :react_server_client_manifest_file
 
     attr_reader :concurrent_component_streaming_buffer_size, :renderer_http_keep_alive_timeout,
-                :renderer_http_pool_size, :cache_tag_index_expires_in, :cache_tag_index_max_keys,
-                :rsc_payload_authorizer
+                :renderer_http_pool_size, :renderer_http_force_http2, :cache_tag_index_expires_in,
+                :cache_tag_index_max_keys, :rsc_payload_authorizer
 
     # Sets how long tag->key index entries live (see Cache::TagIndex).
     #
@@ -168,11 +171,12 @@ module ReactOnRailsPro
       @concurrent_component_streaming_buffer_size = value
     end
 
-    # Sets the maximum concurrent HTTP/2 streams per persistent client.
+    # Sets the maximum concurrent renderer connections per persistent client.
     #
     # When Fiber.scheduler is available (e.g., inside Sync {} blocks), HTTP clients are
     # reused across requests within the same scheduler context, making this limit effective
-    # for connection pooling. Without a scheduler, clients are created per-request.
+    # for connection pooling. Without a Fiber.scheduler, streaming renders use an ephemeral
+    # client and non-streaming renders use a persistent per-thread client.
     #
     # @param value [Integer, nil] A positive integer or nil (uses default)
     # @raise [ReactOnRailsPro::Error] if value is not a positive integer or nil
@@ -198,6 +202,21 @@ module ReactOnRailsPro
       @renderer_http_keep_alive_timeout = value
     end
 
+    # Sets whether cleartext renderer connections force HTTP/2 prior knowledge (h2c).
+    #
+    # Set this to false only when the Node Renderer is also configured for HTTP/1.1. Direct HTTP/1.1 connections can
+    # stream in both directions, but async props are not supported through request-buffering or half-duplex proxies.
+    #
+    # @param value [Boolean] true to force h2c for http URLs, false to use HTTP/1.1
+    # @raise [ReactOnRailsPro::Error] if value is not true or false
+    def renderer_http_force_http2=(value)
+      unless [true, false].include?(value)
+        raise ReactOnRailsPro::Error, "config.renderer_http_force_http2 must be true or false"
+      end
+
+      @renderer_http_force_http2 = value
+    end
+
     def rsc_payload_authorizer=(value)
       unless value.nil? || value.respond_to?(:call)
         raise ReactOnRailsPro::Error, "config.rsc_payload_authorizer must be nil or respond to #call"
@@ -216,6 +235,7 @@ module ReactOnRailsPro
                    renderer_use_fallback_exec_js: nil, prerender_caching: nil,
                    renderer_http_pool_size: nil, renderer_http_pool_timeout: nil,
                    renderer_http_pool_warn_timeout: nil, renderer_http_keep_alive_timeout: nil,
+                   renderer_http_force_http2: DEFAULT_RENDERER_HTTP_FORCE_HTTP2,
                    tracing: nil,
                    dependency_globs: nil, excluded_dependency_globs: nil, rendering_returns_promises: nil,
                    remote_bundle_cache_adapter: nil, rolling_deploy_adapter: nil,
@@ -241,6 +261,7 @@ module ReactOnRailsPro
       self.renderer_http_pool_warn_timeout = renderer_http_pool_warn_timeout
       # Initial assignment applies the default constructor value; warn only when users set this deprecated config.
       assign_initial_renderer_http_keep_alive_timeout(renderer_http_keep_alive_timeout)
+      self.renderer_http_force_http2 = renderer_http_force_http2
       self.tracing = tracing
       self.rendering_returns_promises = server_renderer == "NodeRenderer" ? rendering_returns_promises : false
       self.dependency_globs = dependency_globs

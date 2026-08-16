@@ -21,6 +21,7 @@ export type StartupListenErrorHandlerOptions = {
   err: Error;
   host: string;
   port: number;
+  stage?: WorkerStartupFailureMessage['stage'];
   isWorker?: boolean;
   send?: NodeJS.Process['send'];
   exit?: NodeJS.Process['exit'];
@@ -30,6 +31,7 @@ export function handleStartupListenError({
   err,
   host,
   port,
+  stage = 'listen',
   isWorker = cluster.isWorker,
   send,
   exit,
@@ -48,7 +50,7 @@ export function handleStartupListenError({
 
     const startupFailure: WorkerStartupFailureMessage = {
       type: WORKER_STARTUP_FAILURE,
-      stage: 'listen',
+      stage,
       code: (err as NodeJS.ErrnoException).code,
       errno: (err as NodeJS.ErrnoException).errno,
       syscall: (err as NodeJS.ErrnoException).syscall,

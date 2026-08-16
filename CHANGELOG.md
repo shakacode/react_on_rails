@@ -26,19 +26,6 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
-- **`reactOnRailsComponentLoaded` no longer resets already-hydrated Redux stores**: Rendering a
-  component on demand (e.g. for asynchronously fetched HTML) re-ran every store generator on the
-  page from the original server props, discarding all Redux state accumulated since page load and
-  leaving previously mounted components bound to a stale store instance while new renders and
-  `getStore()` calls saw a fresh one — divergent shared state under a single store name. Stores
-  that are already hydrated are now skipped (new stores arriving with injected fragments still
-  hydrate), and hydrated stores are cleared on Turbo/Turbolinks page unload so navigation still
-  re-initializes them with the new page's props. Store generators now run once per store per page
-  lifetime. Fixes [Issue 4572](https://github.com/shakacode/react_on_rails/issues/4572) and
-  [Issue 4862](https://github.com/shakacode/react_on_rails/issues/4862).
-  [PR 4591](https://github.com/shakacode/react_on_rails/pull/4591) by
-  [AbanoubGhadban](https://github.com/AbanoubGhadban).
-
 - **On-demand renders initialize only the island's declared store dependencies**:
   `reactOnRailsComponentLoaded` walked every store element on the page even when asked to render a
   single component, so an unrelated store element whose generator was not registered (e.g. its
@@ -52,6 +39,39 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [Issue 4862](https://github.com/shakacode/react_on_rails/issues/4862).
   [PR 4870](https://github.com/shakacode/react_on_rails/pull/4870) by
   [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
+- **[Pro]** **Rails requests to the Node Renderer once again continue OpenTelemetry traces**: The async-http transport
+  now creates a CLIENT span and injects W3C trace context for regular and streaming renders, incremental async-props
+  renders, raw-render requests, and asset uploads when the Rails application has configured the OpenTelemetry SDK.
+  OpenTelemetry remains optional, and spans record only the HTTP method, normalized request path, response status, and
+  request/response byte sizes. Fixes
+  [Issue 4866](https://github.com/shakacode/react_on_rails/issues/4866).
+  [PR 4869](https://github.com/shakacode/react_on_rails/pull/4869) by
+  [sashakhar1](https://github.com/sashakhar1).
+
+- **[Pro]** **Node Renderer transport follow-ups now expose protocol errors and accurate Fastify modes**:
+  Rails retries continue for network disconnects and peer-reset HTTP/2 streams, while HTTP parser and framing errors
+  surface directly. Public `configureFastify` callbacks and `fastifyServerOptions` now reflect both HTTP/1.1 and
+  HTTP/2 runtime modes.
+  [PR 4893](https://github.com/shakacode/react_on_rails/pull/4893) by
+  [sashakhar1](https://github.com/sashakhar1).
+
+- **[Pro]** **Bounded Node Renderer VM retention now avoids old/new RSC rebuild thrash during rolling deploys**:
+  The default per-worker VM hard cap now retains four contexts, enough for the server and RSC bundles from one
+  draining and one current revision. Successful bundle sets remain reusable through a configurable, timer-driven
+  drain window, while inactive contexts, generation metadata, and pressure logs stay bounded. Pre-seeding now emits
+  an immutable revision-scoped current-generation declaration; each configured renderer worker validates and compiles
+  that complete server/RSC set before listening, pins it across old-only traffic gaps, and reports ready only after the
+  compile barrier. Symlink-mode cache paths reuse the validated immutable snapshot VM identity without rebuilding on
+  the first request. Doctor now requires valid renderer JavaScript before launcher-derived capacity can prove a warm
+  pass, and reports observed/unverified declaration evidence rather than claiming success from invalid syntax,
+  loopback, or Rails-process configuration. **Upgrade memory impact:** the
+  default `maxVMPoolSize` doubles from 2 to 4 per worker, and total VM retention scales with renderer workers and
+  replicas, so operators should re-check deployment memory requests and limits. Invalid `MAX_VM_POOL_SIZE` values
+  that previously fell back to the default now fail fast during renderer startup. Fixes
+  [Issue 4810](https://github.com/shakacode/react_on_rails/issues/4810).
+  [PR 4811](https://github.com/shakacode/react_on_rails/pull/4811) by
+  [justin808](https://github.com/justin808).
 
 - **Routine startup diagnostics no longer appear in default `INFO` logs**: Successful package validation, valid
   Pro license checks, non-production missing-license notices, and Node renderer connection setup now log at `DEBUG`
@@ -303,6 +323,26 @@ pair`, returns invalid UTF-8, or silently mis-decodes the value. The parser now 
   [justin808](https://github.com/justin808).
 
 #### Added
+
+- **[Pro]** **Node Renderer OpenTelemetry initialization now composes with application observability stacks**:
+  Applications can append custom instrumentations to the built-in HTTP and Fastify pair, merge resource-detector
+  attributes below explicit resource configuration, or opt in to preserving renderer `ror.*` spans through an
+  application-owned global provider. Empty service-name values from environment variables, options, and resource
+  attributes are treated as unset. Renderer-managed shutdown disables registered instrumentations and shuts down
+  provider components after successful initialization, while failed initialization preserves caller-supplied processors
+  and exporters.
+  Fixes [Issue 4867](https://github.com/shakacode/react_on_rails/issues/4867).
+  [PR 4878](https://github.com/shakacode/react_on_rails/pull/4878) by
+  [sashakhar1](https://github.com/sashakhar1).
+
+- **[Pro]** **HTTP/1.1 is now a supported Node Renderer transport for load balancers and HTTP/1.1-only probes**:
+  Rails can opt out of forcing h2c for cleartext renderer URLs with
+  `config.renderer_http_force_http2 = false`, paired with `fastifyServerOptions: { http2: false }` on the Node
+  Renderer. Regular rendering and response streaming continue to work. Async props require full-duplex behavior across
+  every hop, so request-buffering or half-duplex HTTP/1.1 intermediaries remain unsupported. Fixes
+  [Issue 4868](https://github.com/shakacode/react_on_rails/issues/4868).
+  [PR 4887](https://github.com/shakacode/react_on_rails/pull/4887) by
+  [sashakhar1](https://github.com/sashakhar1).
 
 - **Version-matched agent skills and bundled docs**: The `react_on_rails` gem and
   `react-on-rails` npm package now ship install/upgrade, React Server Components adoption,

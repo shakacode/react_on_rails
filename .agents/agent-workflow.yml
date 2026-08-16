@@ -1,6 +1,8 @@
 # Non-command agent-workflow configuration for portable shared skills.
 # Commands live as scripts in .agents/bin/ (see .agents/bin/README.md).
 base_branch: main
+merge_submission:
+  mode: merge_queue_only
 hosted_ci_trigger: "+ci-* PR-comment commands (+ci-status, +ci-run-hosted, +ci-force-full, +ci-stop-hosted, +ci-stop-full, +ci-skip-hosted [reason], +ci-help); labels ready-for-hosted-ci and force-full-hosted-ci; human helper bin/request-hosted-ci. Decision rules in the Review Workflow PR CI Labels section."
 ci_change_detector: "script/ci-changes-detector origin/main (or .agents/bin/ci-detect with an optional base ref) to inspect optimized suite routing."
 ci_parity_environment: "No dedicated act/local runner image; use bin/ci-local and script/ci-changes-detector origin/main for routing, then reproduce CI-only failures from the exact .github/workflows/** job (runs-on image, matrix, services, commands); record gaps as UNKNOWN."

@@ -50,10 +50,29 @@ disableHttp2();
 
 describe('opentelemetry integration: init()', () => {
   let exporter: InMemorySpanExporter;
+  let originalServiceName: string | undefined;
+  let originalResourceAttributes: string | undefined;
 
   beforeEach(async () => {
+    originalServiceName = process.env.OTEL_SERVICE_NAME;
+    originalResourceAttributes = process.env.OTEL_RESOURCE_ATTRIBUTES;
+    delete process.env.OTEL_SERVICE_NAME;
+    delete process.env.OTEL_RESOURCE_ATTRIBUTES;
     exporter = new InMemorySpanExporter();
     await resetOpenTelemetryForTest();
+  });
+
+  afterEach(() => {
+    if (originalServiceName === undefined) {
+      delete process.env.OTEL_SERVICE_NAME;
+    } else {
+      process.env.OTEL_SERVICE_NAME = originalServiceName;
+    }
+    if (originalResourceAttributes === undefined) {
+      delete process.env.OTEL_RESOURCE_ATTRIBUTES;
+    } else {
+      process.env.OTEL_RESOURCE_ATTRIBUTES = originalResourceAttributes;
+    }
   });
 
   afterAll(async () => {
