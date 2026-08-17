@@ -414,7 +414,9 @@ describe ReactOnRailsPro::RollingDeployAdapters::Http do
 
       failures = [
         ReactOnRailsPro::Error.new("bundle body exceeded compressed body cap"),
-        Zlib::GzipFile::Error.new("not in gzip format")
+        ReactOnRailsPro::Error.new(
+          "Rolling-deploy tarball is not a valid gzip stream: Zlib::GzipFile::Error: not in gzip format"
+        )
       ]
       failures.each do |failure|
         attempts = []
@@ -430,7 +432,7 @@ describe ReactOnRailsPro::RollingDeployAdapters::Http do
         expect(result[:bundle]).to eq(good_bundle)
         expect(attempts).to eq([first, second])
         expect(Rails.logger).to have_received(:warn).with(
-          /candidate #{Regexp.escape(first)} failed: #{failure.class}/
+          /candidate #{Regexp.escape(first)} failed: #{failure.class}: #{Regexp.escape(failure.message)}/
         )
       end
     end
