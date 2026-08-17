@@ -71,6 +71,12 @@ module ReactOnRails
     SERVER_BUNDLE_SOURCE_EXTENSIONS = %w[.js .jsx .ts .tsx .mjs .cjs].freeze
     CUSTOM_LAUNCHER_INDICATOR_FILES = %w[dev].freeze
     RAILS_SERVER_COMMAND_REGEX = %r{\b(?:(?:bin/)?rails\s+(?:server|s)|puma|unicorn|rackup|passenger\s+start)\b}
+    ERB_OUTPUT_EXPRESSION_PATTERN = /<%=\s*(?<expression>.*?)%>/m
+    STATIC_REACT_COMPONENT_CALL_PATTERN = /
+      \Areact_component\s*(?:\(\s*)?
+      (?<quote>["'])(?<name>[A-Za-z0-9_:]+)\k<quote>
+      (?<arguments>.*)\z
+    /mx
 
     # Deprecated-renderer-cache scan (used by check_deprecated_renderer_cache_task):
     # look for references to the old pre_stage_bundle_for_node_renderer task in
@@ -1260,10 +1266,59 @@ module ReactOnRails
           checker.add_info("  ℹ️  #{layout_name}: has stylesheet_pack_tag")
         elsif has_javascript
           checker.add_info("  ℹ️  #{layout_name}: has javascript_pack_tag")
+          check_unflushed_auto_loaded_component_css(layout_name, content)
         else
           checker.add_info("  ℹ️  #{layout_name}: no pack tags found")
         end
       end
+    end
+
+    def check_unflushed_auto_loaded_component_css(layout_name, content)
+      return unless erb_output_helper?(content, "javascript_pack_tag")
+
+      auto_loaded_component_names(content).each do |component_name|
+        entrypoint = "generated/#{component_name}"
+        stylesheet_assets = shakapacker_manifest_data&.dig("entrypoints", entrypoint, "assets", "css")
+        next unless stylesheet_assets.is_a?(Array) && stylesheet_assets.any? && stylesheet_assets.all?(String)
+
+        checker.add_warning(
+          "⚠️  #{layout_name}: auto-loaded component entrypoint #{entrypoint} emits CSS " \
+          "(#{stylesheet_assets.join(', ')}), but this React layout flushes javascript_pack_tag without " \
+          "stylesheet_pack_tag"
+        )
+      end
+    end
+
+    def erb_output_helper?(content, helper_name)
+      content.scan(ERB_OUTPUT_EXPRESSION_PATTERN).any? do |(expression)|
+        expression.match?(/\A#{Regexp.escape(helper_name)}(?:\s|\()/)
+      end
+    end
+
+    def auto_loaded_component_names(content)
+      content.scan(ERB_OUTPUT_EXPRESSION_PATTERN).filter_map do |(expression)|
+        match = expression.match(STATIC_REACT_COMPONENT_CALL_PATTERN)
+        next unless match && statically_auto_loaded_component?(match[:arguments])
+
+        match[:name].camelize
+      end.uniq
+    end
+
+    def statically_auto_loaded_component?(arguments)
+      return true if arguments.match?(/\A\s*,\s*auto_load_bundle:\s*true\s*\)?\s*\z/)
+      return false unless arguments.match?(/\A\s*\)?\s*\z/)
+
+      react_on_rails_runtime_configuration&.auto_load_bundle == true
+    end
+
+    def shakapacker_manifest_data
+      return @shakapacker_manifest_data if defined?(@shakapacker_manifest_data)
+
+      require "shakapacker"
+      manifest_path = ::Shakapacker.config.manifest_path
+      @shakapacker_manifest_data = JSON.parse(manifest_path.read) if manifest_path&.file?
+    rescue LoadError, StandardError
+      @shakapacker_manifest_data = nil
     end
 
     # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity

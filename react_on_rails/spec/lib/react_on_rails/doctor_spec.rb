@@ -1182,12 +1182,84 @@ RSpec.describe ReactOnRails::Doctor do
 
   describe "#check_layout_files" do
     let(:checker) { doctor.instance_variable_get(:@checker) }
+    let(:manifest_directory) { Dir.mktmpdir }
+    let(:manifest_path) { Pathname.new(manifest_directory).join("manifest.json") }
+
+    after { FileUtils.remove_entry(manifest_directory) }
 
     def stub_layouts(layouts)
+      allow(File).to receive(:read).and_call_original
       allow(Dir).to receive(:glob).with("app/views/layouts/**/*.erb").and_return(layouts.keys)
       layouts.each do |path, content|
         allow(File).to receive(:exist?).with(path).and_return(true)
         allow(File).to receive(:read).with(path).and_return(content)
+      end
+    end
+
+    def stub_manifest_stylesheets(entrypoint, stylesheets)
+      File.write(
+        manifest_path,
+        JSON.generate(
+          "entrypoints" => {
+            entrypoint => { "assets" => { "js" => ["/packs/#{entrypoint}.js"], "css" => stylesheets } }
+          }
+        )
+      )
+      shakapacker_config = instance_double(Shakapacker::Configuration, manifest_path:)
+      allow(Shakapacker).to receive(:config).and_return(shakapacker_config)
+    end
+
+    context "when a component-level auto-loaded entrypoint emits CSS that the React layout does not flush" do
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        stub_layouts(
+          "app/views/layouts/application.html.erb" => <<~ERB
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= javascript_pack_tag %>
+          ERB
+        )
+      end
+
+      it "warns once and names the generated entrypoint and emitted stylesheet asset" do
+        doctor.send(:check_layout_files)
+
+        warning_messages = checker.messages.select { |message| message[:type] == :warning }
+        expect(warning_messages).to contain_exactly(
+          hash_including(
+            content: a_string_including(
+              "generated/StyledComponent",
+              "/packs/generated/StyledComponent-a1b2c3.css"
+            )
+          )
+        )
+      end
+    end
+
+    context "when globally enabled auto_load_bundle loads component CSS that the React layout does not flush" do
+      before do
+        runtime_config = instance_double(ReactOnRails::Configuration, auto_load_bundle: true)
+        allow(doctor).to receive(:react_on_rails_runtime_configuration).and_return(runtime_config)
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        stub_layouts(
+          "app/views/layouts/application.html.erb" => <<~ERB
+            <%= react_component("StyledComponent") %>
+            <%= javascript_pack_tag %>
+          ERB
+        )
+      end
+
+      it "warns once and names the generated entrypoint and emitted stylesheet asset" do
+        doctor.send(:check_layout_files)
+
+        warning_messages = checker.messages.select { |message| message[:type] == :warning }
+        expect(warning_messages).to contain_exactly(
+          hash_including(
+            content: a_string_including(
+              "generated/StyledComponent",
+              "/packs/generated/StyledComponent-a1b2c3.css"
+            )
+          )
+        )
       end
     end
 
@@ -1210,8 +1282,12 @@ RSpec.describe ReactOnRails::Doctor do
 
     context "when a layout is JavaScript-pack only" do
       before do
+        stub_manifest_stylesheets("generated/PlainComponent", [])
         stub_layouts(
-          "app/views/layouts/application.html.erb" => %(<%= javascript_pack_tag "application" %>)
+          "app/views/layouts/application.html.erb" => <<~ERB
+            <%= react_component("PlainComponent", auto_load_bundle: true) %>
+            <%= javascript_pack_tag "application" %>
+          ERB
         )
       end
 
