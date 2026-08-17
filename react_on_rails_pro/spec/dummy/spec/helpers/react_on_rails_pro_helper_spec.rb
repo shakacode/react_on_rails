@@ -2827,15 +2827,10 @@ describe ReactOnRailsProHelper do
         end
       end
 
-      # Issue #4896 Part A: the concurrent-miss race spec. N threads prerender the same cache
-      # key simultaneously. Each thread stamps its render with a unique nonce. The stored
-      # envelope must carry the same nonce in both shell_html and postponed_state — proving
-      # that last-writer-wins produces a matched pair, never shell_A + state_B.
-      #
-      # This test exercises Rails.cache.write directly (no renderer stub needed) because the
-      # contract under test is that a single envelope Hash written atomically can never produce
-      # a mixed-generation entry. The per-thread envelope construction mirrors
-      # ppr_write_cache_entry exactly.
+      # Issue #4896 Part A: the concurrent-miss race spec. N threads call the production
+      # ppr_write_cache_entry method simultaneously with nonce-stamped prerender results.
+      # The stored envelope must carry the same nonce in both shell_html and postponed_state —
+      # proving that last-writer-wins produces a matched pair, never shell_A + state_B.
       it "concurrent misses always produce a consistent paired entry (race spec)" do
         cache_key = "ppr-race-spec-#{SecureRandom.hex(4)}"
         thread_count = 5
@@ -2844,17 +2839,14 @@ describe ReactOnRailsProHelper do
         threads = Array.new(thread_count) do |i|
           Thread.new do
             nonce = "nonce-#{i}-#{SecureRandom.hex(4)}"
-            shell_html = "<div>PPR shell #{nonce}</div>"
-            state_json = %({"nonce":"#{nonce}","nextSegmentId":1})
-            envelope = {
-              "schema" => ReactOnRailsPro::Ppr::PPR_ENVELOPE_SCHEMA,
-              "react" => ReactOnRailsPro::Ppr.react_version_cache_key,
-              "shell_html" => shell_html,
-              "postponed_state" => state_json,
-              "checksum" => ReactOnRailsPro::Ppr.compute_checksum(shell_html, state_json)
+            prerender_result = {
+              had_render_error: false,
+              shell_html: "<div>PPR shell #{nonce}</div>",
+              postponed_state: %({"nonce":"#{nonce}","nextSegmentId":1})
             }
             barrier.wait # Synchronize so all threads write as close to simultaneously as possible
-            Rails.cache.write(cache_key, envelope, expires_in: 60)
+            send(:ppr_write_cache_entry, component_name, prerender_result,
+                 cache_key, { expires_in: 60 }, {})
           end
         end
         threads.each(&:join)
@@ -2871,6 +2863,86 @@ describe ReactOnRailsProHelper do
         expect(cached["checksum"]).to eq(
           ReactOnRailsPro::Ppr.compute_checksum(cached["shell_html"], cached["postponed_state"])
         )
+      end
+
+      # Issue #4896 Part C: tag-registration failure rolls back the envelope so revalidate_tag
+      # cannot silently miss it. The cache must be empty after the failure and the request must
+      # still complete (non-fatal).
+      it "tag-registration failure rolls back the envelope (no orphaned entries)" do
+        mock_ppr_responses(ppr_shell_chunks, ppr_resume_chunks, ppr_shell_chunks, ppr_resume_chunks)
+        stub_render_with_ppr(cache_tags: ["ppr-tag"])
+
+        # Let the cache write succeed, then blow up on tag registration.
+        allow(ReactOnRailsPro::Cache).to receive(:register_normalized_tags).and_raise(
+          RuntimeError, "deliberate tag-registration failure"
+        )
+
+        refused_events = []
+        subscription = ActiveSupport::Notifications.subscribe(
+          ReactOnRailsPro::Ppr::CACHE_WRITE_REFUSED_NOTIFICATION
+        ) { |event| refused_events << event }
+
+        begin
+          # The request still completes — the write failure is non-fatal.
+          chunks = run_stream
+          expect(chunks.join).to include("PPR shell")
+
+          # The envelope was rolled back — cache is empty, not orphaned.
+          cache_key = computed_ppr_cache_key
+          expect(Rails.cache.read(cache_key)).to be_nil
+
+          expect(refused_events.length).to eq(1)
+          expect(refused_events.first.payload[:reason]).to eq("store_error")
+
+          # Next request re-prerenders (nothing was cached).
+          reset_stream_buffers
+          allow(ReactOnRailsPro::Cache).to receive(:register_normalized_tags).and_call_original
+          run_stream
+          expect(chunks_read.count).to eq(ppr_shell_chunks.count + ppr_resume_chunks.count)
+        ensure
+          ActiveSupport::Notifications.unsubscribe(subscription)
+        end
+      end
+
+      # Issue #4896: a cache backend that signals failure by returning false (instead of raising)
+      # must not proceed to tag registration or emit the write-success event.
+      it "falsy cache write return triggers store_error refusal without tag registration" do
+        mock_ppr_responses(ppr_shell_chunks, ppr_resume_chunks, ppr_shell_chunks, ppr_resume_chunks)
+        stub_render_with_ppr(cache_tags: ["ppr-tag"])
+
+        allow(Rails.cache).to receive(:write).and_return(false)
+        allow(ReactOnRailsPro::Cache).to receive(:register_normalized_tags)
+
+        refused_events = []
+        write_events = []
+        refused_sub = ActiveSupport::Notifications.subscribe(
+          ReactOnRailsPro::Ppr::CACHE_WRITE_REFUSED_NOTIFICATION
+        ) { |event| refused_events << event }
+        write_sub = ActiveSupport::Notifications.subscribe(
+          ReactOnRailsPro::Ppr::CACHE_WRITE_NOTIFICATION
+        ) { |event| write_events << event }
+
+        begin
+          chunks = run_stream
+          expect(chunks.join).to include("PPR shell")
+
+          # Refused with store_error, no success event.
+          expect(refused_events.length).to eq(1)
+          expect(refused_events.first.payload[:reason]).to eq("store_error")
+          expect(write_events).to be_empty
+
+          # Tag registration was never called — no orphaned tag-index entries.
+          expect(ReactOnRailsPro::Cache).not_to have_received(:register_normalized_tags)
+
+          # Next request re-prerenders.
+          reset_stream_buffers
+          allow(Rails.cache).to receive(:write).and_call_original
+          run_stream
+          expect(chunks_read.count).to eq(ppr_shell_chunks.count + ppr_resume_chunks.count)
+        ensure
+          ActiveSupport::Notifications.unsubscribe(refused_sub)
+          ActiveSupport::Notifications.unsubscribe(write_sub)
+        end
       end
 
       # Issue #4896 Part B: error-in-boundary spec. A component inside <Suspense> throws during
