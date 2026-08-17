@@ -310,6 +310,10 @@ describe "Manual client hydration", :js do
     within("form") do
       click_on "refresh"
     end
+    # Wait for the async XHR response to replace the container content and dispatch
+    # hydration. Without this, Capybara can grab a stale DOM reference from the initial
+    # page load that innerHTML removes when the async response arrives.
+    expect(page).to have_css("#component-container[data-refreshed]", wait: 5)
     within("#HelloWorldRehydratable-react-component-1") do
       find("input").set "Should update"
       within("h3") do
