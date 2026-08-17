@@ -18,3 +18,7 @@ container.innerHTML = "<%= escape_javascript(render partial: 'xhr_refresh_partia
 var event = document.createEvent('Event');
 event.initEvent('hydrate', true, true);
 document.dispatchEvent(event);
+
+// Signal that the XHR response has been applied and hydration dispatched.
+// Tests wait for this attribute before interacting with the refreshed DOM.
+container.setAttribute('data-refreshed', 'true');
