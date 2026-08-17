@@ -121,7 +121,7 @@ module ReactOnRailsPro
         ActiveSupport::Notifications.instrument(
           DEGRADED_PRE_FLUSH_NOTIFICATION,
           component_name:,
-          error: error.message
+          error: safe_error_summary(error)
         )
       end
 
@@ -129,11 +129,18 @@ module ReactOnRailsPro
         ActiveSupport::Notifications.instrument(
           DEGRADED_POST_FLUSH_NOTIFICATION,
           component_name:,
-          error: error.message
+          error: safe_error_summary(error)
         )
       end
 
       private
+
+      # Bounded, newline-stripped summary of an error for AS::Notifications payloads.
+      # PrerenderError#message can include renderer console output with request-derived values;
+      # truncating prevents PII from propagating through APM/logging subscribers.
+      def safe_error_summary(error)
+        error.message.to_s.tr("\n\r", " ")[0, 256]
+      end
 
       def detect_react_version_cache_key
         package_json_path = react_dom_package_json_path
