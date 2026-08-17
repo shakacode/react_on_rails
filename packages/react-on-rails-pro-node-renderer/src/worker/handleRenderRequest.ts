@@ -322,44 +322,36 @@ export async function handleRenderRequest({
     // Start before the first VM lookup so cache-hit and cache-miss timings cover
     // the same request span, including bundle upload on first deploy.
     const rendererServerTimingStartedAtMs = performance.now();
-    try {
-      const executionContext = await subSpan(
-        {
-          name: 'ror.bundle.build_execution_context',
-          attributes: {
-            'bundle.timestamp': String(bundleTimestamp),
-            'bundle.paths.count': allBundleFilePaths.length,
-            'cache.strategy': 'cache-first',
-          },
+    const cachedExecutionContext = await subSpan(
+      {
+        name: 'ror.bundle.build_execution_context',
+        attributes: {
+          'bundle.timestamp': String(bundleTimestamp),
+          'bundle.paths.count': allBundleFilePaths.length,
+          'cache.strategy': 'cache-first',
         },
-        async () => {
-          try {
-            return await buildExecutionContext(allBundleFilePaths, /* buildVmsIfNeeded */ false);
-          } catch (error) {
-            // Keep an ordinary cache miss from crossing the tracing boundary.
-            if (error instanceof VMContextNotFoundError) {
-              return undefined;
-            }
-            throw error;
+      },
+      async () => {
+        try {
+          return await buildExecutionContext(allBundleFilePaths, /* buildVmsIfNeeded */ false);
+        } catch (error) {
+          // Keep an ordinary cache miss from crossing the tracing boundary.
+          if (error instanceof VMContextNotFoundError) {
+            return undefined;
           }
-        },
+          throw error;
+        }
+      },
+    );
+    if (cachedExecutionContext) {
+      return await prepareResponseWithServerTiming(
+        renderingRequest,
+        bundleTimestamp,
+        entryBundleFilePath,
+        cachedExecutionContext,
+        rendererServerTimingStartedAtMs,
+        rscStreamObservability,
       );
-      if (executionContext) {
-        return await prepareResponseWithServerTiming(
-          renderingRequest,
-          bundleTimestamp,
-          entryBundleFilePath,
-          executionContext,
-          rendererServerTimingStartedAtMs,
-          rscStreamObservability,
-        );
-      }
-    } catch (e) {
-      // Ignore VMContextNotFoundError, it means the bundle does not exist.
-      // The following code will handle this case.
-      if (!(e instanceof VMContextNotFoundError)) {
-        throw e;
-      }
     }
 
     // If gem has posted updated bundle:

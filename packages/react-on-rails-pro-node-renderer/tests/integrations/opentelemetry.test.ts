@@ -507,7 +507,7 @@ describe('opentelemetry integration: end-to-end render request', () => {
     );
 
     expect(cacheMissProbeSpan).toBeDefined();
-    expect(cacheMissProbeSpan!.attributes['cache.strategy']).toBe('cache-first');
+    expect(cacheMissProbeSpan!.status.code).not.toBe(2);
     expect(cacheMissProbeSpan!.attributes).not.toHaveProperty('cache.hit');
     expect(cacheMissBuildSpan).toBeDefined();
     expect(cacheMissBuildSpan!.attributes).not.toHaveProperty('cache.hit');
