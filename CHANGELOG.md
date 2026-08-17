@@ -26,6 +26,13 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **Expected Node Renderer cold starts no longer emit OpenTelemetry error spans**: The
+  `ror.bundle.build_execution_context` cache-first probe previously ended with status ERROR when a worker had not
+  compiled a bundle's VM context yet, even though the normal cache-miss path then rendered successfully. The probe
+  now treats that expected miss as normal control flow while preserving error spans for genuine failures.
+  [PR 4908](https://github.com/shakacode/react_on_rails/pull/4908) by
+  [sashakhar1](https://github.com/sashakhar1).
+
 - **[Pro]** **Hydrated Redux stores no longer leak across Turbo/Turbolinks navigations**: The hydrated-store
   registry is now cleared on client-side page unload (soft navigation), alongside the existing component
   teardown. Previously a leftover entry from the previous page made `getOrWaitForStore` resolve immediately
