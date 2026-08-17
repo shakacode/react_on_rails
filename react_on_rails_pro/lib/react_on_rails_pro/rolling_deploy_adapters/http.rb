@@ -175,7 +175,8 @@ module ReactOnRailsPro
               result = download_from_origin(candidate[:base], bundle_hash, dir:, deadline:)
             rescue StandardError => e
               Rails.logger.warn(
-                "#{LOG_PREFIX} candidate #{candidate[:base]} failed: #{e.class}: #{e.message}; trying next origin."
+                "#{LOG_PREFIX} candidate #{candidate[:base]} failed: #{e.class}: #{e.message}; " \
+                "continuing with remaining candidates while time allows."
               )
               next
             end
