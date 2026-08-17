@@ -332,16 +332,28 @@ export async function handleRenderRequest({
             'cache.strategy': 'cache-first',
           },
         },
-        () => buildExecutionContext(allBundleFilePaths, /* buildVmsIfNeeded */ false),
+        async () => {
+          try {
+            return await buildExecutionContext(allBundleFilePaths, /* buildVmsIfNeeded */ false);
+          } catch (error) {
+            // Keep an ordinary cache miss from crossing the tracing boundary.
+            if (error instanceof VMContextNotFoundError) {
+              return undefined;
+            }
+            throw error;
+          }
+        },
       );
-      return await prepareResponseWithServerTiming(
-        renderingRequest,
-        bundleTimestamp,
-        entryBundleFilePath,
-        executionContext,
-        rendererServerTimingStartedAtMs,
-        rscStreamObservability,
-      );
+      if (executionContext) {
+        return await prepareResponseWithServerTiming(
+          renderingRequest,
+          bundleTimestamp,
+          entryBundleFilePath,
+          executionContext,
+          rendererServerTimingStartedAtMs,
+          rscStreamObservability,
+        );
+      }
     } catch (e) {
       // Ignore VMContextNotFoundError, it means the bundle does not exist.
       // The following code will handle this case.
