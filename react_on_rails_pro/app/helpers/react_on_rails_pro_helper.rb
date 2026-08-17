@@ -1590,27 +1590,52 @@ module ReactOnRailsProHelper
       return
     end
 
-    shell_html = prerender_result[:shell_html]
-    postponed_state = prerender_result[:postponed_state]
-    envelope = {
-      "schema" => ReactOnRailsPro::Ppr::PPR_ENVELOPE_SCHEMA,
-      "react" => ReactOnRailsPro::Ppr.react_version_cache_key,
-      "shell_html" => shell_html,
-      "postponed_state" => postponed_state,
-      "checksum" => ReactOnRailsPro::Ppr.compute_checksum(shell_html, postponed_state)
-    }
-
-    cache_write_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
-    normalized_cache_tags = ReactOnRailsPro::Cache.normalize_tags(render_options[:cache_tags])
-    Rails.cache.write(cache_key, envelope, cache_write_options)
-    ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_write_options)
-    ReactOnRailsPro::Ppr.instrument_cache_write(component_name:, cache_key:)
+    envelope = ppr_build_envelope(prerender_result)
+    ppr_persist_envelope(component_name, envelope, cache_key, raw_cache_options, render_options)
   rescue StandardError => e
     Rails.logger.warn do
       "[ReactOnRailsPro] PPR cache write failed (non-fatal, this request still serves): " \
         "#{e.class}: #{e.message}"
     end
     ReactOnRailsPro::Ppr.instrument_cache_write_refused(component_name:, reason: "store_error")
+  end
+
+  # Builds the versioned cache envelope from a prerender result. The envelope holds both
+  # shell_html and postponed_state in a single Hash — there is never a state without its
+  # shell, and mixing generations is impossible (issue #4896 Part A).
+  def ppr_build_envelope(prerender_result)
+    shell_html = prerender_result[:shell_html]
+    postponed_state = prerender_result[:postponed_state]
+    {
+      "schema" => ReactOnRailsPro::Ppr::PPR_ENVELOPE_SCHEMA,
+      "react" => ReactOnRailsPro::Ppr.react_version_cache_key,
+      "shell_html" => shell_html,
+      "postponed_state" => postponed_state,
+      "checksum" => ReactOnRailsPro::Ppr.compute_checksum(shell_html, postponed_state)
+    }
+  end
+
+  # Writes the envelope and registers cache tags atomically: if the write fails (falsy return
+  # or exception), nothing is persisted. If the write succeeds but tag registration raises,
+  # the orphaned envelope is deleted before the exception propagates — so revalidate_tag
+  # cannot silently miss it (issue #4896 Part C).
+  def ppr_persist_envelope(component_name, envelope, cache_key, raw_cache_options, render_options)
+    cache_write_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
+    normalized_cache_tags = ReactOnRailsPro::Cache.normalize_tags(render_options[:cache_tags])
+
+    unless Rails.cache.write(cache_key, envelope, cache_write_options)
+      ReactOnRailsPro::Ppr.instrument_cache_write_refused(component_name:, reason: "store_error")
+      return
+    end
+
+    begin
+      ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_write_options)
+    rescue StandardError
+      Rails.cache.delete(cache_key, cache_write_options)
+      raise
+    end
+
+    ReactOnRailsPro::Ppr.instrument_cache_write(component_name:, cache_key:)
   end
 
   # Serves the shell as the helper's synchronous return value (wrapped in the component div with
