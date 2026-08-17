@@ -1386,6 +1386,7 @@ module ReactOnRailsProHelper
     end
   rescue StandardError => e
     Rails.logger.warn("[ReactOnRailsPro] PPR cache read failed (treating as miss): #{e.class}: #{e.message}")
+    ppr_instrument_non_fatal(component_name, :read_error, e)
     nil
   end
 
@@ -1451,7 +1452,7 @@ module ReactOnRailsProHelper
     options = render_options.merge(props:, prerender: true, skip_prerender_cache: true)
 
     prerender_result = ppr_prerender(component_name, options)
-    ppr_write_cache_entry(prerender_result, cache_key, raw_cache_options, render_options)
+    ppr_write_cache_entry(component_name, prerender_result, cache_key, raw_cache_options, render_options)
 
     ppr_serve_shell(component_name, options, prerender_result,
                     cache_hit: false, cache_key:, raw_cache_options:)
@@ -1564,33 +1565,108 @@ module ReactOnRailsProHelper
 
   # Persists shell + PostponedState as a versioned envelope — schema version, React version,
   # content, and a SHA-256 checksum over shell + state. There is never a state without its shell,
-  # and mixing generations is impossible. The write is skipped entirely when the prerender
-  # reported a rendering error: a shell prerendered from a partially failed tree must never be
-  # persisted and served to later visitors (the #4581 class of bug).
-  def ppr_write_cache_entry(prerender_result, cache_key, raw_cache_options, render_options)
+  # and mixing generations is impossible (issue #4896 Part A).
+  #
+  # The write is skipped entirely when the prerender reported a rendering error: a shell
+  # prerendered from a partially failed tree must never be persisted and served to later
+  # visitors (the #4581 class of bug — issue #4896 Part B).
+  #
+  # Cache-store errors during the write are non-fatal: the current request already served its
+  # own streamed render, so losing the cache entry only means the next visitor re-prerenders
+  # instead of hitting the cache. The `ppr.cache.write_refused` counter fires with
+  # reason "store_error" (issue #4896 write matrix row 5).
+  def ppr_write_cache_entry(component_name, prerender_result, cache_key, raw_cache_options, render_options)
     if prerender_result[:had_render_error]
       Rails.logger.warn do
         "[ReactOnRailsPro] Skipping PPR cache write for #{cache_key.inspect}: " \
           "the prerender reported a rendering error."
       end
+      ppr_instrument_non_fatal(component_name, :write_refused, "render_error")
       return
     end
-    return if ReactOnRailsPro::Cache.cache_write_expired?(raw_cache_options)
 
+    if ReactOnRailsPro::Cache.cache_write_expired?(raw_cache_options)
+      ppr_instrument_non_fatal(component_name, :write_refused, "expired")
+      return
+    end
+
+    # Tag normalization and option computation raise configuration errors (e.g. blank/unsupported/
+    # unpersisted tags from TagIndex.normalize_tags) that must propagate — they are NOT non-fatal
+    # I/O failures. Keep them outside the begin/rescue that makes cache I/O non-fatal.
+    cache_write_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
+    normalized_cache_tags = ReactOnRailsPro::Cache.normalize_tags(render_options[:cache_tags])
+    envelope = ppr_build_envelope(prerender_result)
+
+    begin
+      ppr_persist_envelope(component_name, envelope, cache_key, cache_write_options, normalized_cache_tags)
+    rescue StandardError => e
+      Rails.logger.warn do
+        "[ReactOnRailsPro] PPR cache write failed (non-fatal, this request still serves): " \
+          "#{e.class}: #{e.message}"
+      end
+      ppr_instrument_non_fatal(component_name, :write_refused, "store_error")
+    end
+  end
+
+  # Emits a PPR instrumentation event without allowing a subscriber error to propagate.
+  # Used in code paths that must remain non-fatal (cache read fallback, cache write skip).
+  def ppr_instrument_non_fatal(component_name, event, detail)
+    case event
+    when :write
+      ReactOnRailsPro::Ppr.instrument_cache_write(component_name:, cache_key: detail)
+    when :write_refused
+      ReactOnRailsPro::Ppr.instrument_cache_write_refused(component_name:, reason: detail)
+    when :read_error
+      ReactOnRailsPro::Ppr.instrument_cache_read_error(component_name:, error: detail)
+    end
+  rescue StandardError
+    nil # subscriber errors must not break non-fatal cache paths
+  end
+
+  # Builds the versioned cache envelope from a prerender result. The envelope holds both
+  # shell_html and postponed_state in a single Hash — there is never a state without its
+  # shell, and mixing generations is impossible (issue #4896 Part A).
+  def ppr_build_envelope(prerender_result)
     shell_html = prerender_result[:shell_html]
     postponed_state = prerender_result[:postponed_state]
-    envelope = {
+    {
       "schema" => ReactOnRailsPro::Ppr::PPR_ENVELOPE_SCHEMA,
       "react" => ReactOnRailsPro::Ppr.react_version_cache_key,
       "shell_html" => shell_html,
       "postponed_state" => postponed_state,
       "checksum" => ReactOnRailsPro::Ppr.compute_checksum(shell_html, postponed_state)
     }
+  end
 
-    cache_write_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
-    normalized_cache_tags = ReactOnRailsPro::Cache.normalize_tags(render_options[:cache_tags])
-    Rails.cache.write(cache_key, envelope, cache_write_options)
-    ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_write_options)
+  # Writes the envelope and registers cache tags. If the write fails (falsy return or exception),
+  # nothing is persisted. If tag registration raises after a successful write, the envelope
+  # remains cached without tag-index entries — it still serves correctly and expires via TTL,
+  # but revalidate_tag cannot evict it early. We intentionally do NOT delete the orphaned entry:
+  # a non-atomic read/delete would risk removing a concurrent writer's valid envelope, which is
+  # worse than a tag-orphan that expires naturally (issue #4896 Part C).
+  #
+  # Accepts pre-computed cache_write_options and normalized_cache_tags so configuration errors
+  # (e.g. blank/unsupported tags) propagate from the caller rather than being silently caught
+  # by the non-fatal rescue in ppr_write_cache_entry.
+  def ppr_persist_envelope(component_name, envelope, cache_key, cache_write_options, normalized_cache_tags)
+    unless Rails.cache.write(cache_key, envelope, cache_write_options)
+      ppr_instrument_non_fatal(component_name, :write_refused, "store_error")
+      return
+    end
+
+    # The envelope is now persisted. Tag registration and the write-success event both run
+    # regardless of which one raises — the write event reflects the persisted state (accurate
+    # counter) and tag registration is never skipped by a subscriber error. All instrument
+    # calls are routed through the non-fatal wrapper so subscriber errors cannot escape into
+    # the caller's rescue and produce contradictory counters.
+    tag_error = nil
+    begin
+      ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_write_options)
+    rescue StandardError => e
+      tag_error = e
+    end
+    ppr_instrument_non_fatal(component_name, :write, cache_key)
+    raise tag_error if tag_error
   end
 
   # Serves the shell as the helper's synchronous return value (wrapped in the component div with
