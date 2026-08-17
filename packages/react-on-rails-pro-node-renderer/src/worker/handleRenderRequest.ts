@@ -328,6 +328,7 @@ export async function handleRenderRequest({
         attributes: {
           'bundle.timestamp': String(bundleTimestamp),
           'bundle.paths.count': allBundleFilePaths.length,
+          // This labels probe intent, not whether the lookup hits or misses.
           'cache.strategy': 'cache-first',
         },
       },
@@ -335,7 +336,7 @@ export async function handleRenderRequest({
         try {
           return await buildExecutionContext(allBundleFilePaths, /* buildVmsIfNeeded */ false);
         } catch (error) {
-          // Keep an ordinary cache miss from crossing the tracing boundary.
+          // A missing VM is expected here; bundle validation below handles absent bundles.
           if (error instanceof VMContextNotFoundError) {
             return undefined;
           }
