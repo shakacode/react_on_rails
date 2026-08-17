@@ -407,6 +407,34 @@ describe ReactOnRailsPro::RollingDeployAdapters::Http do
       expect(Rails.logger).to have_received(:warn).with(/payload identity mismatch/)
     end
 
+    it "continues to the next origin when a candidate raises during download or extraction" do
+      good_bundle = File.join(directory, "failover-good.js")
+      File.write(good_bundle, "failover good bundle")
+      expected = ReactOnRailsPro::RendererArtifact.new(role: :server, bundle: good_bundle, companions: {})
+
+      failures = [
+        ReactOnRailsPro::Error.new("bundle body exceeded compressed body cap"),
+        Zlib::GzipFile::Error.new("not in gzip format")
+      ]
+      failures.each do |failure|
+        attempts = []
+        allow(described_class).to receive(:download_from_origin) do |base, _bundle_hash, **_options|
+          attempts << base
+          raise failure if base == first
+
+          { bundle: good_bundle, assets: [] }
+        end
+
+        result = described_class.fetch(expected.id)
+
+        expect(result[:bundle]).to eq(good_bundle)
+        expect(attempts).to eq([first, second])
+        expect(Rails.logger).to have_received(:warn).with(
+          /candidate #{Regexp.escape(first)} failed: #{failure.class}/
+        )
+      end
+    end
+
     it "does not reuse discovery provenance from an origin that is no longer configured" do
       v2_id = "rorp-v2-s-#{'a' * 64}"
       described_class.instance_variable_set(
