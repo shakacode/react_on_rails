@@ -1504,6 +1504,7 @@ module ReactOnRailsProHelper
     {
       shell_html: cached_entry["shell_html"],
       postponed_state: cached_entry["postponed_state"],
+      asset_manifest: cached_entry["assets"],
       console_script: "",
       render_options:,
       tag: generate_component_script(render_options)
@@ -1517,33 +1518,44 @@ module ReactOnRailsProHelper
   def ppr_prerender(component_name, options)
     prerender_options = options.merge(render_mode: :ppr_prerender)
     internal_result = internal_react_component(component_name, prerender_options)
+    parsed = ppr_parse_prerender_chunks(internal_result[:result])
 
+    ppr_check_prerender_protocol!(component_name, parsed[:prerender_complete], parsed[:had_render_error])
+
+    {
+      shell_html: parsed[:shell_html],
+      postponed_state: parsed[:postponed_state],
+      asset_manifest: parsed[:asset_manifest],
+      had_render_error: parsed[:had_render_error],
+      console_script: parsed[:console_scripts].join("\n"),
+      render_options: internal_result[:render_options],
+      tag: internal_result[:tag]
+    }
+  end
+
+  # Consumes the chunked prerender response and extracts shell HTML, PostponedState, asset
+  # manifest, error flags, and console scripts from the metadata-based protocol.
+  def ppr_parse_prerender_chunks(chunked_result)
     shell_html = +""
     console_scripts = []
     postponed_state = nil
+    asset_manifest = nil
     had_render_error = false
     prerender_complete = false
 
-    internal_result[:result].each_chunk do |chunk|
+    chunked_result.each_chunk do |chunk|
       had_render_error ||= chunk["hasErrors"] == true ||
                            chunk[ReactOnRailsPro::Ppr::RENDER_ERRORED_CHUNK_KEY] == true
       prerender_complete ||= chunk[ReactOnRailsPro::Ppr::PRERENDER_COMPLETE_CHUNK_KEY] == true
       chunk_postponed_state = chunk[ReactOnRailsPro::Ppr::POSTPONED_STATE_CHUNK_KEY]
       postponed_state = chunk_postponed_state if chunk_postponed_state.is_a?(String)
+      chunk_asset_manifest = chunk[ReactOnRailsPro::Ppr::ASSET_MANIFEST_CHUNK_KEY]
+      asset_manifest = chunk_asset_manifest if chunk_asset_manifest.is_a?(String)
       shell_html << (chunk["html"] || "")
       console_scripts << chunk["consoleReplayScript"] if chunk["consoleReplayScript"].present?
     end
 
-    ppr_check_prerender_protocol!(component_name, prerender_complete, had_render_error)
-
-    {
-      shell_html:,
-      postponed_state:,
-      had_render_error:,
-      console_script: console_scripts.join("\n"),
-      render_options: internal_result[:render_options],
-      tag: internal_result[:tag]
-    }
+    { shell_html:, console_scripts:, postponed_state:, asset_manifest:, had_render_error:, prerender_complete: }
   end
 
   # A prerender response with neither the completion metadata nor an error signal means the
@@ -1626,16 +1638,27 @@ module ReactOnRailsProHelper
   # Builds the versioned cache envelope from a prerender result. The envelope holds both
   # shell_html and postponed_state in a single Hash — there is never a state without its
   # shell, and mixing generations is impossible (issue #4896 Part A).
+  #
+  # The optional "assets" field carries the CSS hrefs and init-script keys emitted during
+  # the prerender. The resume pass uses it to suppress duplicate CSS links and init scripts
+  # that the cached shell already declared (issue #4897 — PPR CSS/asset coordination).
+  # It is NOT included in the checksum: assets are metadata about the shell, derived from
+  # the same prerender pass. A missing assets field (e.g. from an older renderer) is a
+  # graceful degradation — the resume operates without dedup, which is the current behavior.
   def ppr_build_envelope(prerender_result)
     shell_html = prerender_result[:shell_html]
     postponed_state = prerender_result[:postponed_state]
-    {
+    envelope = {
       "schema" => ReactOnRailsPro::Ppr::PPR_ENVELOPE_SCHEMA,
       "react" => ReactOnRailsPro::Ppr.react_version_cache_key,
       "shell_html" => shell_html,
       "postponed_state" => postponed_state,
       "checksum" => ReactOnRailsPro::Ppr.compute_checksum(shell_html, postponed_state)
     }
+    # Asset manifest is optional — nil when the renderer does not emit it (graceful degradation).
+    asset_manifest = prerender_result[:asset_manifest]
+    envelope["assets"] = asset_manifest if asset_manifest.is_a?(String)
+    envelope
   end
 
   # Writes the envelope and registers cache tags. If the write fails (falsy return or exception),
@@ -1689,7 +1712,8 @@ module ReactOnRailsProHelper
     postponed_state = prerender_result[:postponed_state]
     if postponed_state.present?
       ppr_enqueue_resume_stream(component_name, options, postponed_state,
-                                cache_key:, raw_cache_options:)
+                                cache_key:, raw_cache_options:,
+                                asset_manifest: prerender_result[:asset_manifest])
     elsif !prerender_result[:had_render_error]
       ReactOnRailsPro::Ppr.instrument_static_shell(component_name:, cache_hit:)
     end
@@ -1709,12 +1733,13 @@ module ReactOnRailsProHelper
   # second document. The error does NOT re-raise: the user sees a truncated page that heals on
   # reload, never a 500 caused by the PPR cache.
   def ppr_enqueue_resume_stream(component_name, options, postponed_state,
-                                cache_key: nil, raw_cache_options: nil)
+                                cache_key: nil, raw_cache_options: nil, asset_manifest: nil)
     renderer_server_timing_collector = ReactOnRailsPro::Stream.renderer_server_timing_collector
 
     @async_barrier.async do
       ReactOnRailsPro::Stream.with_renderer_server_timing_collector(renderer_server_timing_collector) do
-        resume_stream = ppr_resume_stream(component_name, options, postponed_state)
+        resume_stream = ppr_resume_stream(component_name, options, postponed_state,
+                                          asset_manifest:)
         resume_stream.each_chunk do |chunk|
           # Client disconnected — stop streaming; the entry is already cached.
           break if response.stream.closed?
@@ -1737,8 +1762,12 @@ module ReactOnRailsProHelper
   # railsContext.pprPostponedState (the pinned wire key — see ServerRenderingJsCode). Chunks are
   # composed like non-first streamed chunks: no component div or spec tag, since the shell already
   # carries both.
-  def ppr_resume_stream(component_name, options, postponed_state)
-    resume_options = options.merge(render_mode: :ppr_resume, ppr_postponed_state: postponed_state)
+  def ppr_resume_stream(component_name, options, postponed_state, asset_manifest: nil)
+    resume_options = options.merge(
+      render_mode: :ppr_resume,
+      ppr_postponed_state: postponed_state,
+      ppr_shell_assets: asset_manifest
+    )
     result = internal_react_component(component_name, resume_options)
     render_opts = result[:render_options]
     result[:result].transform do |chunk_json_result|
