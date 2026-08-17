@@ -2352,6 +2352,119 @@ describe('injectRSCPayload', () => {
     expect(resultStr).toContain('nonce="abc123"');
   });
 
+  it('fires onAssetsEmitted callback with captured stylesheet hrefs and init-script keys', async () => {
+    const mockRSC = createMockRSCStream(['{"test": "data"}']);
+    const mockHTML = createMockHTMLStream(['<html><body><div>Hello</div></body></html>']);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    let capturedManifest: { stylesheetHrefs: string[]; initScriptKeys: string[] } | null = null;
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId, undefined, {
+      rscClientChunkStylesheetHrefsByChunkName: new Map(),
+      onAssetsEmitted: (manifest) => {
+        capturedManifest = manifest;
+      },
+    });
+
+    await collectStreamData(result);
+
+    expect(capturedManifest).not.toBeNull();
+    expect(Array.isArray(capturedManifest!.stylesheetHrefs)).toBe(true);
+    expect(Array.isArray(capturedManifest!.initScriptKeys)).toBe(true);
+    // The test component generates an RSC payload, so at least one init-script key is captured.
+    expect(capturedManifest!.initScriptKeys.length).toBeGreaterThan(0);
+  });
+
+  it('suppresses duplicate init scripts when shellAssetManifest is provided', async () => {
+    // Step 1: capture the manifest from a normal render
+    const mockRSC1 = createMockRSCStream(['{"test": "data"}']);
+    const mockHTML1 = createMockHTMLStream(['<html><body><div>Shell</div></body></html>']);
+    const { rscRequestTracker: tracker1, domNodeId } = setupTest(mockRSC1);
+
+    let shellManifest: { stylesheetHrefs: string[]; initScriptKeys: string[] } | null = null;
+    const result1 = injectRSCPayload(mockHTML1, tracker1, domNodeId, undefined, {
+      rscClientChunkStylesheetHrefsByChunkName: new Map(),
+      onAssetsEmitted: (manifest) => {
+        shellManifest = manifest;
+      },
+    });
+    const shellOutput = await collectStreamData(result1);
+
+    expect(shellManifest).not.toBeNull();
+    expect(shellManifest!.initScriptKeys.length).toBeGreaterThan(0);
+    // Shell should contain the init script
+    expect(shellOutput).toContain('REACT_ON_RAILS_RSC_PAYLOADS');
+
+    // Step 2: render with shellAssetManifest — init scripts for the same keys should be suppressed
+    const mockRSC2 = createMockRSCStream(['{"test": "resume data"}']);
+    const mockHTML2 = createMockHTMLStream(['<div>Resume</div>']);
+    const { rscRequestTracker: tracker2 } = setupTest(mockRSC2);
+
+    const result2 = injectRSCPayload(mockHTML2, tracker2, domNodeId, undefined, {
+      rscClientChunkStylesheetHrefsByChunkName: new Map(),
+      shellAssetManifest: shellManifest!,
+    });
+    const resumeOutput = await collectStreamData(result2);
+
+    // The resume should NOT contain the init script (suppressed by manifest)
+    expect(resumeOutput).not.toContain(expectedInitializationScript);
+    // But it should still contain the payload push script (the data itself is new)
+    expect(resumeOutput).toContain(expectedPayloadPushScript('{"test": "resume data"}'));
+  });
+
+  it('suppresses duplicate stylesheet links when shellAssetManifest provides pre-emitted hrefs', async () => {
+    const cssHref = '/css/client1-abc123.css';
+    const chunkStylesheets = new Map([['client1', [cssHref]]]);
+
+    // Simulate a Flight payload that references client1 chunk
+    const mockRSC = createMockRSCStream(['"client1","js/client1-abc123.chunk.js"']);
+    const mockHTML = createMockHTMLStream(['<div>Resume</div>']);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId, undefined, {
+      rscClientChunkStylesheetHrefsByChunkName: chunkStylesheets,
+      // Pre-seed with the same href — simulates "the shell already declared this CSS"
+      shellAssetManifest: {
+        stylesheetHrefs: [cssHref],
+        initScriptKeys: [],
+      },
+    });
+    const output = await collectStreamData(result);
+
+    // The stylesheet link should NOT be emitted (pre-seeded in the dedup set)
+    expect(output).not.toContain(`href="${cssHref}"`);
+    expect(output).not.toContain('data-precedence="rsc-css"');
+  });
+
+  it('emits hole-only CSS links when shellAssetManifest does not include them', async () => {
+    const shellCssHref = '/css/client1-shell.css';
+    const holeCssHref = '/css/client2-hole-only.css';
+    const chunkStylesheets = new Map([
+      ['client1', [shellCssHref]],
+      ['client2', [holeCssHref]],
+    ]);
+
+    // Flight payload references only client2 (hole-only component)
+    const mockRSC = createMockRSCStream(['"client2","js/client2-abc123.chunk.js"']);
+    const mockHTML = createMockHTMLStream(['<div>Resume Hole Content</div>']);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId, undefined, {
+      rscClientChunkStylesheetHrefsByChunkName: chunkStylesheets,
+      shellAssetManifest: {
+        // Shell had client1's CSS, NOT client2's
+        stylesheetHrefs: [shellCssHref],
+        initScriptKeys: [],
+      },
+    });
+    const output = await collectStreamData(result);
+
+    // Hole-only CSS (client2) SHOULD be emitted — it's new
+    expect(output).toContain(`href="${holeCssHref}"`);
+    expect(output).toContain('data-precedence="rsc-css"');
+    // Shell CSS (client1) should NOT be re-emitted
+    expect(output).not.toContain(`href="${shellCssHref}"`);
+  });
+
   it('adds valid nonce attribute to opt-in observability mark script tags', async () => {
     const mockRSC = createMockRSCStream(['{"test": "data"}']);
     const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);

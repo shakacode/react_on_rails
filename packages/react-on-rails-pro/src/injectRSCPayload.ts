@@ -139,6 +139,18 @@ type LoadableStats = {
 };
 
 type RSCClientChunkStylesheetHrefsByChunkName = Map<string, string[]>;
+
+/**
+ * Asset state captured during a PPR prerender and stored in the cache envelope.
+ * The resume pass uses this to suppress duplicate CSS links and init scripts
+ * that the cached shell already declared.
+ */
+export type PPRShellAssetManifest = {
+  /** CSS hrefs emitted as <link> tags in the shell's output. */
+  stylesheetHrefs: string[];
+  /** RSC payload keys whose init scripts were emitted in the shell. */
+  initScriptKeys: string[];
+};
 type RSCClientChunkStylesheetHrefsLoadState =
   | {
       status: 'success';
@@ -1608,6 +1620,18 @@ type InjectRSCPayloadOptions = {
   rscClientChunkStylesheetHrefsByChunkName?: RSCClientChunkStylesheetHrefsByChunkName;
   rscStreamObservability?: boolean;
   railsEnv?: string;
+  /**
+   * PPR resume: assets already declared in the cached shell. Pre-seeds dedup sets so
+   * duplicate stylesheet links and init scripts are suppressed. New hole-only assets
+   * are still emitted and gated ahead of their reveals by the existing
+   * deferredRevealHtmlBuffer machinery.
+   */
+  shellAssetManifest?: PPRShellAssetManifest;
+  /**
+   * PPR prerender: callback invoked when the stream ends with the final asset state.
+   * Called after the last flush so all CSS hrefs and init script keys are finalized.
+   */
+  onAssetsEmitted?: (manifest: PPRShellAssetManifest) => void;
 };
 
 /**
@@ -1648,12 +1672,19 @@ export default function injectRSCPayload(
     rscClientChunkStylesheetHrefsByChunkName = loadRSCClientChunkStylesheetHrefsByChunkName(),
     rscStreamObservability = false,
     railsEnv,
+    shellAssetManifest,
+    onAssetsEmitted,
   } = options;
   const sanitizedNonce = sanitizeNonce(cspNonce);
   const htmlStream = new PassThrough();
   const resultStream = new PassThrough();
   let rscPromise: Promise<void> | null = null;
-  const emittedRSCClientStylesheetHrefs = new Set<string>();
+  // PPR: pre-seed the stylesheet dedup set from the cached shell's asset manifest so the resume
+  // pass suppresses CSS links the page already has. New hole-only CSS is still emitted normally.
+  const emittedRSCClientStylesheetHrefs = new Set<string>(shellAssetManifest?.stylesheetHrefs);
+  // PPR: track which RSC payload init scripts have been emitted. Pre-seeded from the shell
+  // manifest so the resume pass does not re-initialize arrays the cached shell already declared.
+  const emittedInitScriptKeys = new Set<string>(shellAssetManifest?.initScriptKeys);
   const shouldInferRSCClientStylesheets = rscClientChunkStylesheetHrefsByChunkName.size > 0;
   let pendingRSCClientStylesheetInferenceStreams = 0;
 
@@ -1891,6 +1922,14 @@ export default function injectRSCPayload(
       flushFallbackTimeout = null;
     }
     flush();
+    // PPR: fire asset capture callback after the final flush so all CSS hrefs and init script
+    // keys are finalized. The prerender uses this to store the manifest in the cache envelope.
+    if (onAssetsEmitted) {
+      onAssetsEmitted({
+        stylesheetHrefs: Array.from(emittedRSCClientStylesheetHrefs),
+        initScriptKeys: Array.from(emittedInitScriptKeys),
+      });
+    }
     if (!resultStream.writableEnded) {
       resultStream.end();
     }
@@ -1988,8 +2027,15 @@ export default function injectRSCPayload(
         // The initialization script clears stale diagnostics, then creates:
         // (self.REACT_ON_RAILS_RSC_PAYLOADS||={})[cacheKey]||=[]
         // This creates a global array that the client-side RSCProvider monitors for new chunks.
-        const initializationScript = createRSCPayloadInitializationScript(rscPayloadKey, sanitizedNonce);
-        rscInitializationBuffers.push(Buffer.from(initializationScript));
+        //
+        // PPR: skip if the cached shell already emitted this key's init script. The shell's
+        // `||=[]` created the array; re-emitting it is safe (||= is a no-op on existing arrays)
+        // but wastes bytes and the `delete` prefix would clear the shell's diagnostics.
+        if (!emittedInitScriptKeys.has(rscPayloadKey)) {
+          const initializationScript = createRSCPayloadInitializationScript(rscPayloadKey, sanitizedNonce);
+          rscInitializationBuffers.push(Buffer.from(initializationScript));
+          emittedInitScriptKeys.add(rscPayloadKey);
+        }
         let inferenceTimeout: NodeJS.Timeout | undefined;
         let hasResolvedRSCClientStylesheetInferenceForStream = !shouldInferRSCClientStylesheets;
         const resolveRSCClientStylesheetInferenceForStream = () => {

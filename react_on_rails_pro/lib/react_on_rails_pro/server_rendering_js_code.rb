@@ -205,9 +205,13 @@ module ReactOnRailsPro
           JS
         elsif render_options.ppr_resume?
           postponed_state = render_options.internal_option(:ppr_postponed_state)
-          <<-JS
-            railsContext.pprPostponedState = #{postponed_state.to_json};
-          JS
+          shell_assets = render_options.internal_option(:ppr_shell_assets)
+          js = +"railsContext.pprPostponedState = #{postponed_state.to_json};\n"
+          # PPR asset manifest: the CSS hrefs and init-script keys the cached shell emitted.
+          # The resume renderer uses this to suppress duplicate CSS links and init scripts
+          # (issue #4897 — PPR CSS/asset coordination). Gracefully omitted when absent.
+          js << "railsContext.pprShellAssets = #{shell_assets};\n" if shell_assets.is_a?(String)
+          js
         else
           ""
         end
