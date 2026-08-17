@@ -1386,7 +1386,13 @@ module ReactOnRailsProHelper
     end
   rescue StandardError => e
     Rails.logger.warn("[ReactOnRailsPro] PPR cache read failed (treating as miss): #{e.class}: #{e.message}")
-    ReactOnRailsPro::Ppr.instrument_cache_read_error(component_name:, error: e)
+    # Contained so a failing notification subscriber cannot escape this rescue and break the
+    # non-fatal cache-read fallback contract.
+    begin
+      ReactOnRailsPro::Ppr.instrument_cache_read_error(component_name:, error: e)
+    rescue StandardError
+      nil # subscriber errors must not break the cache-read fallback
+    end
     nil
   end
 
@@ -1639,10 +1645,10 @@ module ReactOnRailsProHelper
       return
     end
 
-    # Record persistence success immediately — the envelope is cached and will serve future
-    # requests regardless of whether tag registration succeeds below.
-    ReactOnRailsPro::Ppr.instrument_cache_write(component_name:, cache_key:)
+    # Tag registration runs first so a subscriber error in the write-success event below cannot
+    # skip indexing and leave the envelope invisible to revalidate_tag.
     ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_write_options)
+    ReactOnRailsPro::Ppr.instrument_cache_write(component_name:, cache_key:)
   end
 
   # Serves the shell as the helper's synchronous return value (wrapped in the component div with

@@ -173,7 +173,7 @@ module ReactOnRailsPro
         ActiveSupport::Notifications.instrument(
           CACHE_READ_ERROR_NOTIFICATION,
           component_name:,
-          error: error.message
+          error: safe_error_summary(error)
         )
       end
 
