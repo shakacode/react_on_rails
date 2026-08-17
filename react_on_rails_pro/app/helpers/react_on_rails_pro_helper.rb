@@ -1386,13 +1386,7 @@ module ReactOnRailsProHelper
     end
   rescue StandardError => e
     Rails.logger.warn("[ReactOnRailsPro] PPR cache read failed (treating as miss): #{e.class}: #{e.message}")
-    # Contained so a failing notification subscriber cannot escape this rescue and break the
-    # non-fatal cache-read fallback contract.
-    begin
-      ReactOnRailsPro::Ppr.instrument_cache_read_error(component_name:, error: e)
-    rescue StandardError
-      nil # subscriber errors must not break the cache-read fallback
-    end
+    ppr_instrument_non_fatal(component_name, :read_error, e)
     nil
   end
 
@@ -1587,12 +1581,12 @@ module ReactOnRailsProHelper
         "[ReactOnRailsPro] Skipping PPR cache write for #{cache_key.inspect}: " \
           "the prerender reported a rendering error."
       end
-      ReactOnRailsPro::Ppr.instrument_cache_write_refused(component_name:, reason: "render_error")
+      ppr_instrument_non_fatal(component_name, :write_refused, "render_error")
       return
     end
 
     if ReactOnRailsPro::Cache.cache_write_expired?(raw_cache_options)
-      ReactOnRailsPro::Ppr.instrument_cache_write_refused(component_name:, reason: "expired")
+      ppr_instrument_non_fatal(component_name, :write_refused, "expired")
       return
     end
 
@@ -1610,8 +1604,21 @@ module ReactOnRailsProHelper
         "[ReactOnRailsPro] PPR cache write failed (non-fatal, this request still serves): " \
           "#{e.class}: #{e.message}"
       end
-      ReactOnRailsPro::Ppr.instrument_cache_write_refused(component_name:, reason: "store_error")
+      ppr_instrument_non_fatal(component_name, :write_refused, "store_error")
     end
+  end
+
+  # Emits a PPR instrumentation event without allowing a subscriber error to propagate.
+  # Used in code paths that must remain non-fatal (cache read fallback, cache write skip).
+  def ppr_instrument_non_fatal(component_name, event, detail)
+    case event
+    when :write_refused
+      ReactOnRailsPro::Ppr.instrument_cache_write_refused(component_name:, reason: detail)
+    when :read_error
+      ReactOnRailsPro::Ppr.instrument_cache_read_error(component_name:, error: detail)
+    end
+  rescue StandardError
+    nil # subscriber errors must not break non-fatal cache paths
   end
 
   # Builds the versioned cache envelope from a prerender result. The envelope holds both
@@ -1645,10 +1652,17 @@ module ReactOnRailsProHelper
       return
     end
 
-    # Tag registration runs first so a subscriber error in the write-success event below cannot
-    # skip indexing and leave the envelope invisible to revalidate_tag.
-    ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_write_options)
+    # The envelope is now persisted. Tag registration and the write-success event both run
+    # regardless of which one raises — the write event reflects the persisted state (accurate
+    # counter) and tag registration is never skipped by a subscriber error.
+    tag_error = nil
+    begin
+      ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_write_options)
+    rescue StandardError => e
+      tag_error = e
+    end
     ReactOnRailsPro::Ppr.instrument_cache_write(component_name:, cache_key:)
+    raise tag_error if tag_error
   end
 
   # Serves the shell as the helper's synchronous return value (wrapped in the component div with
