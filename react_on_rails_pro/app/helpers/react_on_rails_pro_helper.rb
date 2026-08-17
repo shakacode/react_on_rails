@@ -1590,20 +1590,22 @@ module ReactOnRailsProHelper
       return
     end
 
-    # Normalize tags and compute write options OUTSIDE the rescue scope so configuration errors
-    # (e.g. blank/unsupported/unpersisted tags) propagate to the caller instead of being
-    # silently swallowed as "store_error". Only actual cache I/O failures are non-fatal.
+    # Tag normalization and option computation raise configuration errors (e.g. blank/unsupported/
+    # unpersisted tags from TagIndex.normalize_tags) that must propagate — they are NOT non-fatal
+    # I/O failures. Keep them outside the begin/rescue that makes cache I/O non-fatal.
     cache_write_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
     normalized_cache_tags = ReactOnRailsPro::Cache.normalize_tags(render_options[:cache_tags])
     envelope = ppr_build_envelope(prerender_result)
 
-    ppr_persist_envelope(component_name, envelope, cache_key, cache_write_options, normalized_cache_tags)
-  rescue StandardError => e
-    Rails.logger.warn do
-      "[ReactOnRailsPro] PPR cache write failed (non-fatal, this request still serves): " \
-        "#{e.class}: #{e.message}"
+    begin
+      ppr_persist_envelope(component_name, envelope, cache_key, cache_write_options, normalized_cache_tags)
+    rescue StandardError => e
+      Rails.logger.warn do
+        "[ReactOnRailsPro] PPR cache write failed (non-fatal, this request still serves): " \
+          "#{e.class}: #{e.message}"
+      end
+      ReactOnRailsPro::Ppr.instrument_cache_write_refused(component_name:, reason: "store_error")
     end
-    ReactOnRailsPro::Ppr.instrument_cache_write_refused(component_name:, reason: "store_error")
   end
 
   # Builds the versioned cache envelope from a prerender result. The envelope holds both
@@ -1621,10 +1623,12 @@ module ReactOnRailsProHelper
     }
   end
 
-  # Writes the envelope and registers cache tags: if the write fails (falsy return or exception),
-  # nothing is persisted. If the write succeeds but tag registration raises, the orphaned
-  # envelope is deleted ONLY when it is still the same envelope we wrote (checksum-guarded) —
-  # a concurrent writer's newer successful entry is never removed (issue #4896 Part C).
+  # Writes the envelope and registers cache tags. If the write fails (falsy return or exception),
+  # nothing is persisted. If tag registration raises after a successful write, the envelope
+  # remains cached without tag-index entries — it still serves correctly and expires via TTL,
+  # but revalidate_tag cannot evict it early. We intentionally do NOT delete the orphaned entry:
+  # a non-atomic read/delete would risk removing a concurrent writer's valid envelope, which is
+  # worse than a tag-orphan that expires naturally (issue #4896 Part C).
   #
   # Accepts pre-computed cache_write_options and normalized_cache_tags so configuration errors
   # (e.g. blank/unsupported tags) propagate from the caller rather than being silently caught
@@ -1635,19 +1639,7 @@ module ReactOnRailsProHelper
       return
     end
 
-    begin
-      ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_write_options)
-    rescue StandardError
-      # Only delete the entry if it is still ours — a concurrent writer may have already
-      # overwritten with a valid envelope + tags. Compare checksums to avoid removing a
-      # newer successful write.
-      current = Rails.cache.read(cache_key, cache_write_options)
-      if current.is_a?(Hash) && current["checksum"] == envelope["checksum"]
-        Rails.cache.delete(cache_key, cache_write_options)
-      end
-      raise
-    end
-
+    ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_write_options)
     ReactOnRailsPro::Ppr.instrument_cache_write(component_name:, cache_key:)
   end
 

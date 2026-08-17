@@ -2865,11 +2865,12 @@ describe ReactOnRailsProHelper do
         )
       end
 
-      # Issue #4896 Part C: tag-registration failure rolls back the envelope so revalidate_tag
-      # cannot silently miss it. The cache must be empty after the failure and the request must
-      # still complete (non-fatal).
-      it "tag-registration failure rolls back the envelope (no orphaned entries)" do
-        mock_ppr_responses(ppr_shell_chunks, ppr_resume_chunks, ppr_shell_chunks, ppr_resume_chunks)
+      # Issue #4896 Part C: tag-registration failure is non-fatal. The envelope stays cached
+      # (it still serves correctly and expires via TTL) but is not indexed for tag-based
+      # eviction. We intentionally do NOT delete the orphaned entry because a non-atomic
+      # delete would risk removing a concurrent writer's valid envelope.
+      it "tag-registration failure is non-fatal (envelope stays cached, request completes)" do
+        mock_ppr_responses(ppr_shell_chunks, ppr_resume_chunks)
         stub_render_with_ppr(cache_tags: ["ppr-tag"])
 
         # Let the cache write succeed, then blow up on tag registration.
@@ -2883,22 +2884,16 @@ describe ReactOnRailsProHelper do
         ) { |event| refused_events << event }
 
         begin
-          # The request still completes — the write failure is non-fatal.
+          # The request still completes — the tag-registration failure is non-fatal.
           chunks = run_stream
           expect(chunks.join).to include("PPR shell")
 
-          # The envelope was rolled back — cache is empty, not orphaned.
+          # The envelope stays cached (serves correctly via TTL) — no deletion attempt.
           cache_key = computed_ppr_cache_key
-          expect(Rails.cache.read(cache_key)).to be_nil
+          expect(Rails.cache.read(cache_key)).to be_a(Hash)
 
           expect(refused_events.length).to eq(1)
           expect(refused_events.first.payload[:reason]).to eq("store_error")
-
-          # Next request re-prerenders (nothing was cached).
-          reset_stream_buffers
-          allow(ReactOnRailsPro::Cache).to receive(:register_normalized_tags).and_call_original
-          run_stream
-          expect(chunks_read.count).to eq(ppr_shell_chunks.count + ppr_resume_chunks.count)
         ensure
           ActiveSupport::Notifications.unsubscribe(subscription)
         end
