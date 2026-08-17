@@ -65,6 +65,26 @@ module ReactOnRailsPro
     # Payload: :component_name, :error
     DEGRADED_POST_FLUSH_NOTIFICATION = "ppr.resume.degraded_post_flush.react_on_rails_pro"
 
+    # Instrumentation events for the cache write path (issue #4896):
+    #
+    # ppr.cache.write — a shell + PostponedState envelope was successfully persisted to the
+    # cache store. This is the `ppr.cache.write` counter: subscribe and count events.
+    # Payload: :component_name, :cache_key
+    CACHE_WRITE_NOTIFICATION = "ppr.cache.write.react_on_rails_pro"
+
+    # ppr.cache.write_refused — the cache write was intentionally skipped because the prerender
+    # reported a rendering error, the cache options expired between render start and write, or
+    # the cache store itself raised during the write attempt. A refused write is non-fatal: the
+    # current request still serves its own streamed render; only caching for future requests is
+    # lost.
+    # Payload: :component_name, :reason ("render_error" | "expired" | "store_error")
+    CACHE_WRITE_REFUSED_NOTIFICATION = "ppr.cache.write_refused.react_on_rails_pro"
+
+    # ppr.cache.read_error — the cache store raised during a cache read. The error is swallowed
+    # and the request falls through to a cache-miss prerender. Non-fatal.
+    # Payload: :component_name, :error
+    CACHE_READ_ERROR_NOTIFICATION = "ppr.cache.read_error.react_on_rails_pro"
+
     # Cache-key term when the installed React version cannot be determined. The bundle digest in
     # the base cache key still invalidates PPR entries on any rebuild (which a React upgrade
     # requires), so this fallback only weakens defense-in-depth, not correctness.
@@ -130,6 +150,30 @@ module ReactOnRailsPro
           DEGRADED_POST_FLUSH_NOTIFICATION,
           component_name:,
           error: safe_error_summary(error)
+        )
+      end
+
+      def instrument_cache_write(component_name:, cache_key:)
+        ActiveSupport::Notifications.instrument(
+          CACHE_WRITE_NOTIFICATION,
+          component_name:,
+          cache_key:
+        )
+      end
+
+      def instrument_cache_write_refused(component_name:, reason:)
+        ActiveSupport::Notifications.instrument(
+          CACHE_WRITE_REFUSED_NOTIFICATION,
+          component_name:,
+          reason:
+        )
+      end
+
+      def instrument_cache_read_error(component_name:, error:)
+        ActiveSupport::Notifications.instrument(
+          CACHE_READ_ERROR_NOTIFICATION,
+          component_name:,
+          error: error.message
         )
       end
 

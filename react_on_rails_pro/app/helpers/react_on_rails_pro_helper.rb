@@ -1386,6 +1386,7 @@ module ReactOnRailsProHelper
     end
   rescue StandardError => e
     Rails.logger.warn("[ReactOnRailsPro] PPR cache read failed (treating as miss): #{e.class}: #{e.message}")
+    ReactOnRailsPro::Ppr.instrument_cache_read_error(component_name:, error: e)
     nil
   end
 
@@ -1451,7 +1452,7 @@ module ReactOnRailsProHelper
     options = render_options.merge(props:, prerender: true, skip_prerender_cache: true)
 
     prerender_result = ppr_prerender(component_name, options)
-    ppr_write_cache_entry(prerender_result, cache_key, raw_cache_options, render_options)
+    ppr_write_cache_entry(component_name, prerender_result, cache_key, raw_cache_options, render_options)
 
     ppr_serve_shell(component_name, options, prerender_result,
                     cache_hit: false, cache_key:, raw_cache_options:)
@@ -1564,18 +1565,30 @@ module ReactOnRailsProHelper
 
   # Persists shell + PostponedState as a versioned envelope — schema version, React version,
   # content, and a SHA-256 checksum over shell + state. There is never a state without its shell,
-  # and mixing generations is impossible. The write is skipped entirely when the prerender
-  # reported a rendering error: a shell prerendered from a partially failed tree must never be
-  # persisted and served to later visitors (the #4581 class of bug).
-  def ppr_write_cache_entry(prerender_result, cache_key, raw_cache_options, render_options)
+  # and mixing generations is impossible (issue #4896 Part A).
+  #
+  # The write is skipped entirely when the prerender reported a rendering error: a shell
+  # prerendered from a partially failed tree must never be persisted and served to later
+  # visitors (the #4581 class of bug — issue #4896 Part B).
+  #
+  # Cache-store errors during the write are non-fatal: the current request already served its
+  # own streamed render, so losing the cache entry only means the next visitor re-prerenders
+  # instead of hitting the cache. The `ppr.cache.write_refused` counter fires with
+  # reason "store_error" (issue #4896 write matrix row 5).
+  def ppr_write_cache_entry(component_name, prerender_result, cache_key, raw_cache_options, render_options)
     if prerender_result[:had_render_error]
       Rails.logger.warn do
         "[ReactOnRailsPro] Skipping PPR cache write for #{cache_key.inspect}: " \
           "the prerender reported a rendering error."
       end
+      ReactOnRailsPro::Ppr.instrument_cache_write_refused(component_name:, reason: "render_error")
       return
     end
-    return if ReactOnRailsPro::Cache.cache_write_expired?(raw_cache_options)
+
+    if ReactOnRailsPro::Cache.cache_write_expired?(raw_cache_options)
+      ReactOnRailsPro::Ppr.instrument_cache_write_refused(component_name:, reason: "expired")
+      return
+    end
 
     shell_html = prerender_result[:shell_html]
     postponed_state = prerender_result[:postponed_state]
@@ -1591,6 +1604,13 @@ module ReactOnRailsProHelper
     normalized_cache_tags = ReactOnRailsPro::Cache.normalize_tags(render_options[:cache_tags])
     Rails.cache.write(cache_key, envelope, cache_write_options)
     ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_write_options)
+    ReactOnRailsPro::Ppr.instrument_cache_write(component_name:, cache_key:)
+  rescue StandardError => e
+    Rails.logger.warn do
+      "[ReactOnRailsPro] PPR cache write failed (non-fatal, this request still serves): " \
+        "#{e.class}: #{e.message}"
+    end
+    ReactOnRailsPro::Ppr.instrument_cache_write_refused(component_name:, reason: "store_error")
   end
 
   # Serves the shell as the helper's synchronous return value (wrapped in the component div with

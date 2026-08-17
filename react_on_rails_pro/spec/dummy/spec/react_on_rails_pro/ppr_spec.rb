@@ -190,4 +190,78 @@ describe ReactOnRailsPro::Ppr do
       expect(events.first.payload).to include(component_name: "TestComponent", error: "resume exploded")
     end
   end
+
+  # --- Issue #4896: cache write path instrumentation ---
+
+  describe ".instrument_cache_write" do
+    it "emits the ppr.cache.write notification with component_name and cache_key" do
+      events = []
+      subscription = ActiveSupport::Notifications.subscribe(
+        described_class::CACHE_WRITE_NOTIFICATION
+      ) { |event| events << event }
+
+      begin
+        described_class.instrument_cache_write(
+          component_name: "PprPageForTesting",
+          cache_key: "ppr:test-key"
+        )
+      ensure
+        ActiveSupport::Notifications.unsubscribe(subscription)
+      end
+
+      expect(events.length).to eq(1)
+      expect(events.first.payload).to include(
+        component_name: "PprPageForTesting",
+        cache_key: "ppr:test-key"
+      )
+    end
+  end
+
+  describe ".instrument_cache_write_refused" do
+    it "emits the ppr.cache.write_refused notification with component_name and reason" do
+      events = []
+      subscription = ActiveSupport::Notifications.subscribe(
+        described_class::CACHE_WRITE_REFUSED_NOTIFICATION
+      ) { |event| events << event }
+
+      begin
+        described_class.instrument_cache_write_refused(
+          component_name: "TestComponent",
+          reason: "render_error"
+        )
+      ensure
+        ActiveSupport::Notifications.unsubscribe(subscription)
+      end
+
+      expect(events.length).to eq(1)
+      expect(events.first.payload).to include(
+        component_name: "TestComponent",
+        reason: "render_error"
+      )
+    end
+  end
+
+  describe ".instrument_cache_read_error" do
+    it "emits the ppr.cache.read_error notification with component_name and error message" do
+      events = []
+      subscription = ActiveSupport::Notifications.subscribe(
+        described_class::CACHE_READ_ERROR_NOTIFICATION
+      ) { |event| events << event }
+
+      begin
+        described_class.instrument_cache_read_error(
+          component_name: "TestComponent",
+          error: RuntimeError.new("Redis connection refused")
+        )
+      ensure
+        ActiveSupport::Notifications.unsubscribe(subscription)
+      end
+
+      expect(events.length).to eq(1)
+      expect(events.first.payload).to include(
+        component_name: "TestComponent",
+        error: "Redis connection refused"
+      )
+    end
+  end
 end
