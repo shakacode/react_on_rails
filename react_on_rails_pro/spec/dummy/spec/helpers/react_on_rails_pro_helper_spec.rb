@@ -2869,6 +2869,9 @@ describe ReactOnRailsProHelper do
       # (it still serves correctly and expires via TTL) but is not indexed for tag-based
       # eviction. We intentionally do NOT delete the orphaned entry because a non-atomic
       # delete would risk removing a concurrent writer's valid envelope.
+      #
+      # The write-success counter fires (the envelope IS persisted) and the write-refused
+      # counter fires for the tag-registration failure — both are accurate.
       it "tag-registration failure is non-fatal (envelope stays cached, request completes)" do
         mock_ppr_responses(ppr_shell_chunks, ppr_resume_chunks)
         stub_render_with_ppr(cache_tags: ["ppr-tag"])
@@ -2878,8 +2881,12 @@ describe ReactOnRailsProHelper do
           RuntimeError, "deliberate tag-registration failure"
         )
 
+        write_events = []
         refused_events = []
-        subscription = ActiveSupport::Notifications.subscribe(
+        write_sub = ActiveSupport::Notifications.subscribe(
+          ReactOnRailsPro::Ppr::CACHE_WRITE_NOTIFICATION
+        ) { |event| write_events << event }
+        refused_sub = ActiveSupport::Notifications.subscribe(
           ReactOnRailsPro::Ppr::CACHE_WRITE_REFUSED_NOTIFICATION
         ) { |event| refused_events << event }
 
@@ -2892,10 +2899,14 @@ describe ReactOnRailsProHelper do
           cache_key = computed_ppr_cache_key
           expect(Rails.cache.read(cache_key)).to be_a(Hash)
 
+          # The write-success counter fired (the envelope IS persisted).
+          expect(write_events.length).to eq(1)
+          # The write-refused counter fired for the tag-registration I/O failure.
           expect(refused_events.length).to eq(1)
           expect(refused_events.first.payload[:reason]).to eq("store_error")
         ensure
-          ActiveSupport::Notifications.unsubscribe(subscription)
+          ActiveSupport::Notifications.unsubscribe(write_sub)
+          ActiveSupport::Notifications.unsubscribe(refused_sub)
         end
       end
 

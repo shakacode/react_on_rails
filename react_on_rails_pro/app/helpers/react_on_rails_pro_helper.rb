@@ -1639,8 +1639,10 @@ module ReactOnRailsProHelper
       return
     end
 
-    ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_write_options)
+    # Record persistence success immediately — the envelope is cached and will serve future
+    # requests regardless of whether tag registration succeeds below.
     ReactOnRailsPro::Ppr.instrument_cache_write(component_name:, cache_key:)
+    ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_write_options)
   end
 
   # Serves the shell as the helper's synchronous return value (wrapped in the component div with
