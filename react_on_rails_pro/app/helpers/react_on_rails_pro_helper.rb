@@ -1612,6 +1612,8 @@ module ReactOnRailsProHelper
   # Used in code paths that must remain non-fatal (cache read fallback, cache write skip).
   def ppr_instrument_non_fatal(component_name, event, detail)
     case event
+    when :write
+      ReactOnRailsPro::Ppr.instrument_cache_write(component_name:, cache_key: detail)
     when :write_refused
       ReactOnRailsPro::Ppr.instrument_cache_write_refused(component_name:, reason: detail)
     when :read_error
@@ -1648,20 +1650,22 @@ module ReactOnRailsProHelper
   # by the non-fatal rescue in ppr_write_cache_entry.
   def ppr_persist_envelope(component_name, envelope, cache_key, cache_write_options, normalized_cache_tags)
     unless Rails.cache.write(cache_key, envelope, cache_write_options)
-      ReactOnRailsPro::Ppr.instrument_cache_write_refused(component_name:, reason: "store_error")
+      ppr_instrument_non_fatal(component_name, :write_refused, "store_error")
       return
     end
 
     # The envelope is now persisted. Tag registration and the write-success event both run
     # regardless of which one raises — the write event reflects the persisted state (accurate
-    # counter) and tag registration is never skipped by a subscriber error.
+    # counter) and tag registration is never skipped by a subscriber error. All instrument
+    # calls are routed through the non-fatal wrapper so subscriber errors cannot escape into
+    # the caller's rescue and produce contradictory counters.
     tag_error = nil
     begin
       ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_write_options)
     rescue StandardError => e
       tag_error = e
     end
-    ReactOnRailsPro::Ppr.instrument_cache_write(component_name:, cache_key:)
+    ppr_instrument_non_fatal(component_name, :write, cache_key)
     raise tag_error if tag_error
   end
 
