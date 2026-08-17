@@ -15,9 +15,18 @@
 
 import '../assets/styles/application.css';
 
+import Rails from '@rails/ujs';
 import ReactOnRails from 'react-on-rails-pro';
 import Turbolinks from 'turbolinks';
 import SharedReduxStore from '../stores/SharedReduxStore';
+
+// Start rails-ujs so `remote: true` forms submit via XHR instead of a native
+// full-page navigation (the manual rehydration demo at /xhr_refresh depends on
+// this to fetch and execute xhr_refresh.js.erb). Guard against double-start:
+// Rails.start() throws if UJS is already loaded on this page.
+if (!window._rails_loaded) {
+  Rails.start();
+}
 
 const urlParams = new URLSearchParams(window.location.search);
 const enableTurbolinks = urlParams.get('enableTurbolinks') === 'true';

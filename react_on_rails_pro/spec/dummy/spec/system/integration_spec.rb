@@ -307,13 +307,27 @@ describe "Manual client hydration", :js do
   before { visit "/xhr_refresh" }
 
   it "HelloWorldRehydratable onChange should trigger" do
+    # Readiness gate: prove the initial hydration has committed and the component's
+    # document-level "hydrate" listener is attached (componentDidMount) before clicking
+    # refresh. Otherwise the click can beat hydration and the refreshed markup would
+    # never rehydrate.
+    within("#HelloWorldRehydratable-react-component-1") do
+      find("input").set "Hydration check"
+      within("h3") do
+        expect(page).to have_content "Hydration check"
+      end
+    end
     within("form") do
       click_on "refresh"
     end
-    # Wait for the async XHR response to replace the container content and dispatch
-    # hydration. Without this, Capybara can grab a stale DOM reference from the initial
-    # page load that innerHTML removes when the async response arrives.
+    # Wait for the XHR response to run: it replaces the container content, dispatches
+    # the "hydrate" event, and then flags the container. Without this, Capybara can
+    # grab a DOM reference that the innerHTML replacement is about to invalidate.
     expect(page).to have_css("#component-container[data-refreshed]", wait: 5)
+    # Wait for the remounted component to commit: componentDidMount sets data-hydrated
+    # on the fresh mount container (the attribute was wiped with the old node), which
+    # proves the onChange handler is attached again.
+    expect(page).to have_css("#HelloWorldRehydratable-react-component-1[data-hydrated]", wait: 5)
     within("#HelloWorldRehydratable-react-component-1") do
       find("input").set "Should update"
       within("h3") do

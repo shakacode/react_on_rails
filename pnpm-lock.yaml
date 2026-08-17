@@ -650,6 +650,9 @@ importers:
       '@loadable/webpack-plugin':
         specifier: ^5.15.2
         version: 5.15.2(webpack@5.104.1)
+      '@rails/ujs':
+        specifier: 7.1.3-4
+        version: 7.1.3-4
       '@rspack/cli':
         specifier: ~2.0.0
         version: 2.0.5(@rspack/core@2.0.5)(@rspack/dev-server@2.1.0(@rspack/core@2.0.5)(selfsigned@5.5.0))
@@ -3135,6 +3138,9 @@ packages:
 
   '@rails/actioncable@8.1.200':
     resolution: {integrity: sha512-on0DSb7AFUkq1ocxivDNQhhGW/RQpY91zvRVyyaEWP4gOOZWy33P/UyxjQk74IENWNrTqs8+zOGHwTjiiFruRw==}
+
+  '@rails/ujs@7.1.3-4':
+    resolution: {integrity: sha512-z0ckI5jrAJfImcObjMT1RBz2IxH6I5q6ZTMFex6AfxSQKZuuL8JxAXvg2CvBuodGCxKvybFVolDyMHXlBLeYAA==}
 
   '@redis/bloom@5.10.0':
     resolution: {integrity: sha512-doIF37ob+l47n0rkpRNgU8n4iacBlKM9xLiP1LtTZTvz8TloJB8qx/MgvhMhKdYG+CvCY2aPBnN2706izFn/4A==}
@@ -12976,6 +12982,8 @@ snapshots:
       - supports-color
 
   '@rails/actioncable@8.1.200': {}
+
+  '@rails/ujs@7.1.3-4': {}
 
   '@redis/bloom@5.10.0(@redis/client@5.10.0)':
     dependencies:
