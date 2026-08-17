@@ -398,6 +398,11 @@ This affects render, streaming render, and asset upload requests.
 Before upgrading:
 
 - Run Ruby 3.3 or newer. The `async-http` dependency requires Ruby 3.3+.
+- Audit Rails console detection that calls `Rails.const_defined?(:Console)`. The `console` gem arrives through Pro's
+  `async` dependency, which was already present in Pro 16.x, and defines top-level `::Console`. Pro 17 loads `async` on
+  the ordinary render path, while Pro 16 loaded it only for streaming or async rendering, so the default lookup inherits
+  through `Object` and silently returns `true` outside a Rails console. Use `Rails.const_defined?(:Console, false)` to
+  set `inherit: false`.
 - Remove direct application assumptions about HTTPX-specific response or error classes in Pro renderer request paths.
 - Treat `config.ssr_timeout` as a per-read socket timeout. With the async-http client, this is applied as the
   read timeout on each renderer socket. It no longer wraps the entire request as a single task-level timeout.
