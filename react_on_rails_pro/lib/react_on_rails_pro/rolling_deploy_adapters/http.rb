@@ -171,7 +171,14 @@ module ReactOnRailsPro
 
             FileUtils.rm_rf(dir)
             FileUtils.mkdir_p(dir)
-            result = download_from_origin(candidate[:base], bundle_hash, dir:, deadline:)
+            begin
+              result = download_from_origin(candidate[:base], bundle_hash, dir:, deadline:)
+            rescue StandardError => e
+              Rails.logger.warn(
+                "#{LOG_PREFIX} candidate #{candidate[:base]} failed: #{e.class}: #{e.message}; trying next origin."
+              )
+              next
+            end
             next unless result
             next unless acceptable_payload?(candidate, result, bundle_hash)
 
