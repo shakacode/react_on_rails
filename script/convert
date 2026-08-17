@@ -132,6 +132,7 @@ end
 # so exclude RSC/streaming/client tests that need React.use or testing-library helpers.
 minimum_pro_non_rsc_ignored_tests = %w[
   RSC
+  ppr
   stream
   registerServerComponent
   serverRenderReactComponent
