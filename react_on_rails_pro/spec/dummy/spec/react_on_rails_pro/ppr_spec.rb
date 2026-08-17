@@ -76,6 +76,43 @@ describe ReactOnRailsPro::Ppr do
     end
   end
 
+  describe ".compute_checksum" do
+    it "returns a consistent SHA-256 hex digest for the same inputs" do
+      shell = "<div>shell</div>"
+      state = '{"nextSegmentId":1}'
+      checksum1 = described_class.compute_checksum(shell, state)
+      checksum2 = described_class.compute_checksum(shell, state)
+
+      expect(checksum1).to eq(checksum2)
+      expect(checksum1).to match(/\A[a-f0-9]{64}\z/)
+    end
+
+    it "differs when the shell HTML changes" do
+      state = '{"nextSegmentId":1}'
+      checksum_a = described_class.compute_checksum("<div>a</div>", state)
+      checksum_b = described_class.compute_checksum("<div>b</div>", state)
+
+      expect(checksum_a).not_to eq(checksum_b)
+    end
+
+    it "differs when the postponed state changes" do
+      shell = "<div>shell</div>"
+      checksum_a = described_class.compute_checksum(shell, '{"id":1}')
+      checksum_b = described_class.compute_checksum(shell, '{"id":2}')
+
+      expect(checksum_a).not_to eq(checksum_b)
+    end
+
+    it "handles nil postponed_state (fully static page)" do
+      shell = "<div>static</div>"
+      checksum = described_class.compute_checksum(shell, nil)
+
+      expect(checksum).to match(/\A[a-f0-9]{64}\z/)
+      # nil and "" must produce different checksums (the null separator prevents ambiguity)
+      expect(checksum).not_to eq(described_class.compute_checksum(shell, ""))
+    end
+  end
+
   describe ".instrument_static_shell" do
     it "emits the ppr.static_shell counter notification with its payload" do
       events = []
@@ -91,6 +128,66 @@ describe ReactOnRailsPro::Ppr do
 
       expect(events.length).to eq(1)
       expect(events.first.payload).to include(component_name: "PprPageForTesting", cache_hit: true)
+    end
+  end
+
+  describe ".instrument_evict_invalid" do
+    it "emits the ppr.cache.evict_invalid notification with component_name and reason" do
+      events = []
+      subscription = ActiveSupport::Notifications.subscribe(
+        described_class::EVICT_INVALID_NOTIFICATION
+      ) { |event| events << event }
+
+      begin
+        described_class.instrument_evict_invalid(component_name: "TestComponent", reason: "checksum_mismatch")
+      ensure
+        ActiveSupport::Notifications.unsubscribe(subscription)
+      end
+
+      expect(events.length).to eq(1)
+      expect(events.first.payload).to include(component_name: "TestComponent", reason: "checksum_mismatch")
+    end
+  end
+
+  describe ".instrument_degraded_pre_flush" do
+    it "emits the ppr.resume.degraded_pre_flush notification with the error message" do
+      events = []
+      subscription = ActiveSupport::Notifications.subscribe(
+        described_class::DEGRADED_PRE_FLUSH_NOTIFICATION
+      ) { |event| events << event }
+
+      begin
+        described_class.instrument_degraded_pre_flush(
+          component_name: "TestComponent",
+          error: RuntimeError.new("test failure")
+        )
+      ensure
+        ActiveSupport::Notifications.unsubscribe(subscription)
+      end
+
+      expect(events.length).to eq(1)
+      expect(events.first.payload).to include(component_name: "TestComponent", error: "test failure")
+    end
+  end
+
+  describe ".instrument_degraded_post_flush" do
+    it "emits the ppr.resume.degraded_post_flush notification with the error message" do
+      events = []
+      subscription = ActiveSupport::Notifications.subscribe(
+        described_class::DEGRADED_POST_FLUSH_NOTIFICATION
+      ) { |event| events << event }
+
+      begin
+        described_class.instrument_degraded_post_flush(
+          component_name: "TestComponent",
+          error: RuntimeError.new("resume exploded")
+        )
+      ensure
+        ActiveSupport::Notifications.unsubscribe(subscription)
+      end
+
+      expect(events.length).to eq(1)
+      expect(events.first.payload).to include(component_name: "TestComponent", error: "resume exploded")
     end
   end
 end

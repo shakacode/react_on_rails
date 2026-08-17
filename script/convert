@@ -136,6 +136,7 @@ minimum_pro_non_rsc_ignored_tests = %w[
   RSC
   [.]rsc[.]test[.]
   rscSsrSynchrony
+  ppr
   stream
   registerServerComponent
   serverRenderReactComponent
