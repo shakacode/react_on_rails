@@ -60,12 +60,12 @@ describe('incremental render NDJSON endpoint', () => {
     };
   };
 
-  const createHttpRequest = (bundleTimestamp: string, pathSuffix = 'abc123') => {
+  const createHttpRequest = (bundleTimestamp: string) => {
     const { host, port } = getServerAddress();
     const req = http.request({
       hostname: host,
       port,
-      path: `/bundles/${bundleTimestamp}/incremental-render/${pathSuffix}`,
+      path: `/bundles/${bundleTimestamp}/incremental-render`,
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-ndjson',

@@ -73,7 +73,7 @@ module ReactOnRailsPro
 
           if async_props_block
             # Use incremental rendering when async props block is provided
-            path = prepare_incremental_render_path(js_code, render_options)
+            path = prepare_incremental_render_path(render_options)
             push_props = render_options.internal_option(:push_props)
             # Pull mode is enabled whenever push_props is set, including [] for pure pull.
             # nil means push-only mode with no bidirectional prop-request channel.
@@ -93,7 +93,7 @@ module ReactOnRailsPro
             )
           else
             # Use standard streaming when no async props block
-            path = prepare_render_path(js_code, render_options)
+            path = prepare_render_path(render_options)
             request_options = { is_rsc_payload:, rsc_stream_observability: }
             request_options[:artifacts] = artifacts if artifacts
             ReactOnRailsPro::Request.render_code_as_stream(
@@ -105,7 +105,7 @@ module ReactOnRailsPro
         end
 
         def eval_js(js_code, render_options, send_bundle: false)
-          path = prepare_render_path(js_code, render_options)
+          path = prepare_render_path(render_options)
 
           request_options = { bundle_role: bundle_role_for(render_options) }
           artifacts = renderer_artifact_snapshot(render_options)
@@ -151,15 +151,12 @@ module ReactOnRailsPro
         end
         private :volatile_artifact_ids?
 
-        def prepare_render_path(js_code, render_options)
-          # TODO: Remove the request_digest. See https://github.com/shakacode/react_on_rails_pro/issues/119
-          # From the request path
-          # path = "/bundles/#{@bundle_hash}/render"
-          build_render_path(js_code, render_options, "render")
+        def prepare_render_path(render_options)
+          build_render_path(render_options, "render")
         end
 
-        def prepare_incremental_render_path(js_code, render_options)
-          build_render_path(js_code, render_options, "incremental-render")
+        def prepare_incremental_render_path(render_options)
+          build_render_path(render_options, "incremental-render")
         end
 
         private
@@ -182,17 +179,14 @@ module ReactOnRailsPro
           end
         end
 
-        def build_render_path(js_code, render_options, endpoint)
-          ReactOnRailsPro::ServerRenderingPool::ProRendering
-            .set_request_digest_on_render_options(js_code, render_options)
-
+        def build_render_path(render_options, endpoint)
           rsc_support_enabled = ReactOnRailsPro.configuration.enable_rsc_support
           is_rendering_rsc_payload = rsc_support_enabled && render_options.rsc_payload_streaming?
           bundle_role = is_rendering_rsc_payload ? :rsc : :server
           artifact = artifact_for_role(renderer_artifact_snapshot(render_options), bundle_role)
           bundle_hash = artifact&.id || (is_rendering_rsc_payload ? rsc_bundle_hash : server_bundle_hash)
 
-          "/bundles/#{bundle_hash}/#{endpoint}/#{render_options.request_digest}"
+          "/bundles/#{bundle_hash}/#{endpoint}"
         end
 
         def fallback_exec_js(js_code, render_options, error)

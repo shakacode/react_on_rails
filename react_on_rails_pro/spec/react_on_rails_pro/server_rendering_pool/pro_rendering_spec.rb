@@ -199,6 +199,14 @@ RSpec.describe ReactOnRailsPro::ServerRenderingPool::ProRendering do
         expect(pool).to have_received(:exec_server_render_js).with(js_code, render_options).once
         expect(cache_store.fetch_calls).to be_empty
       end
+
+      it "does not compute the request digest (MD5 is cache-only)" do
+        render_options = build_render_options
+
+        described_class.exec_server_render_js(js_code, render_options)
+
+        expect(render_options.request_digest).to be_nil
+      end
     end
 
     context "when skip_prerender_cache is set" do

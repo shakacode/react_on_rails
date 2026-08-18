@@ -577,7 +577,7 @@ describe('opentelemetry integration: end-to-end render request', () => {
 
       const res = await app
         .inject()
-        .post(`/bundles/${BUNDLE_TIMESTAMP}/incremental-render/d41d8cd98f00b204e9800998ecf8427e`)
+        .post(`/bundles/${BUNDLE_TIMESTAMP}/incremental-render`)
         .payload(firstChunk)
         .headers({
           'Content-Type': 'application/x-ndjson',

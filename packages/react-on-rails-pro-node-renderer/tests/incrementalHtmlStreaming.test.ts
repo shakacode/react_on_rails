@@ -41,12 +41,12 @@ afterAll(async () => {
 
 jest.spyOn(errorReporter, 'message').mockImplementation(jest.fn());
 
-const createHttpRequest = (bundleTimestamp: string = SERVER_BUNDLE_TIMESTAMP, pathSuffix = 'abc123') => {
+const createHttpRequest = (bundleTimestamp: string = SERVER_BUNDLE_TIMESTAMP) => {
   const appUrl = getAppUrl(app);
   const client = http2.connect(appUrl);
   const request = client.request({
     ':method': 'POST',
-    ':path': `/bundles/${bundleTimestamp}/incremental-render/${pathSuffix}`,
+    ':path': `/bundles/${bundleTimestamp}/incremental-render`,
     'content-type': 'application/x-ndjson',
   });
   request.setEncoding('utf8');
@@ -203,7 +203,7 @@ describe('concurrent incremental HTML streaming', () => {
 
     // Start all requests
     for (let i = 0; i < numRequests; i += 1) {
-      const { request, close } = createHttpRequest(RSC_BUNDLE_TIMESTAMP, `concurrent-test-${i}`);
+      const { request, close } = createHttpRequest(RSC_BUNDLE_TIMESTAMP);
       request.write(`${JSON.stringify(createInitialObject())}\n`);
       requests.push({ request, close, id: i });
     }

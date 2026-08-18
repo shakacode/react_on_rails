@@ -52,7 +52,7 @@ module ReactOnRailsPro
 
       describe ".eval_js" do
         let(:render_options) { instance_double(ReactOnRails::ReactComponent::RenderOptions) }
-        let(:render_path) { "/bundles/123/render/abc" }
+        let(:render_path) { "/bundles/123/render" }
         let(:response_body) { 'Invalid "renderingRequest" field in render request.' }
         let(:response) do
           instance_double(ReactOnRailsPro::RendererHttpClient::Response,
@@ -116,7 +116,7 @@ module ReactOnRailsPro
 
       describe ".exec_server_render_js error classification" do
         let(:js_code) { "console.log('x')" }
-        let(:render_path) { "/bundles/123/render/abc" }
+        let(:render_path) { "/bundles/123/render" }
         let(:render_options) do
           instance_double(
             ReactOnRails::ReactComponent::RenderOptions,
@@ -183,22 +183,19 @@ module ReactOnRailsPro
         let(:render_options) do
           instance_double(
             ReactOnRails::ReactComponent::RenderOptions,
-            request_digest: "abc123",
             rsc_payload_streaming?: false
           )
         end
 
         before do
-          allow(ReactOnRailsPro::ServerRenderingPool::ProRendering)
-            .to receive(:set_request_digest_on_render_options)
           allow(ReactOnRailsPro.configuration).to receive(:enable_rsc_support).and_return(false)
           allow(described_class).to receive_messages(server_bundle_hash: "server123", rsc_bundle_hash: "rsc456")
         end
 
         it "returns path with incremental-render endpoint" do
-          path = described_class.prepare_incremental_render_path(js_code, render_options)
+          path = described_class.prepare_incremental_render_path(render_options)
 
-          expect(path).to eq("/bundles/server123/incremental-render/abc123")
+          expect(path).to eq("/bundles/server123/incremental-render")
         end
 
         context "when RSC support is enabled and rendering RSC payload" do
@@ -211,9 +208,9 @@ module ReactOnRailsPro
           end
 
           it "uses RSC bundle hash instead of server bundle hash" do
-            path = described_class.prepare_incremental_render_path(js_code, render_options)
+            path = described_class.prepare_incremental_render_path(render_options)
 
-            expect(path).to eq("/bundles/rsc456/incremental-render/abc123")
+            expect(path).to eq("/bundles/rsc456/incremental-render")
           end
 
           it "uses the operation snapshot RSC ID instead of rereading a volatile pool ID" do
@@ -222,9 +219,9 @@ module ReactOnRailsPro
               .with(:renderer_artifact_snapshot)
               .and_return([rsc_artifact])
 
-            path = described_class.prepare_incremental_render_path(js_code, render_options)
+            path = described_class.prepare_incremental_render_path(render_options)
 
-            expect(path).to eq("/bundles/rsc-snapshot/incremental-render/abc123")
+            expect(path).to eq("/bundles/rsc-snapshot/incremental-render")
           end
         end
       end
@@ -233,8 +230,6 @@ module ReactOnRailsPro
         let(:js_code) { "console.log('test');" }
 
         before do
-          allow(ReactOnRailsPro::ServerRenderingPool::ProRendering)
-            .to receive(:set_request_digest_on_render_options)
           allow(ReactOnRailsPro.configuration).to receive(:enable_rsc_support).and_return(false)
           allow(described_class).to receive_messages(server_bundle_hash: "server123", rsc_bundle_hash: "rsc456")
         end
@@ -253,16 +248,16 @@ module ReactOnRailsPro
           end
 
           it "calls prepare_incremental_render_path and render_code_with_incremental_updates" do
-            expected_path = "/bundles/server123/incremental-render/abc123"
+            expected_path = "/bundles/server123/incremental-render"
             allow(described_class).to receive(:prepare_incremental_render_path)
-              .with(js_code, render_options)
+              .with(render_options)
               .and_return(expected_path)
             allow(ReactOnRailsPro::Request).to receive(:render_code_with_incremental_updates)
 
             described_class.eval_streaming_js(js_code, render_options)
 
             expect(described_class).to have_received(:prepare_incremental_render_path)
-              .with(js_code, render_options)
+              .with(render_options)
             expect(ReactOnRailsPro::Request).to have_received(:render_code_with_incremental_updates)
               .with(
                 expected_path,
@@ -276,10 +271,10 @@ module ReactOnRailsPro
           end
 
           it "enables pull mode when push_props is provided" do
-            expected_path = "/bundles/server123/incremental-render/abc123"
+            expected_path = "/bundles/server123/incremental-render"
             allow(render_options).to receive(:internal_option).with(:push_props).and_return([])
             allow(described_class).to receive(:prepare_incremental_render_path)
-              .with(js_code, render_options)
+              .with(render_options)
               .and_return(expected_path)
             allow(ReactOnRailsPro::Request).to receive(:render_code_with_incremental_updates)
 
@@ -307,16 +302,16 @@ module ReactOnRailsPro
           end
 
           it "calls prepare_render_path and render_code_as_stream" do
-            expected_path = "/bundles/server123/render/abc123"
+            expected_path = "/bundles/server123/render"
             allow(described_class).to receive(:prepare_render_path)
-              .with(js_code, render_options)
+              .with(render_options)
               .and_return(expected_path)
             allow(ReactOnRailsPro::Request).to receive(:render_code_as_stream)
 
             described_class.eval_streaming_js(js_code, render_options)
 
             expect(described_class).to have_received(:prepare_render_path)
-              .with(js_code, render_options)
+              .with(render_options)
             expect(ReactOnRailsPro::Request).to have_received(:render_code_as_stream)
               .with(expected_path, js_code, is_rsc_payload: false, rsc_stream_observability: false)
           end

@@ -201,21 +201,13 @@ module ReactOnRailsPro
       def upload_assets(artifacts: nil)
         Rails.logger.info { "[ReactOnRailsPro] Uploading assets" }
         artifacts = resolve_upload_artifacts(artifacts, action_description: "uploading assets")
-        target_bundles = artifacts.map(&:id)
+        bundle_hashes = artifacts.map(&:id)
 
         # Artifact IDs already bind every bundle and companion byte. Keying the
         # single-flight upload by those IDs avoids re-reading live paths after
         # the operation-scoped snapshot was constructed.
-        with_asset_upload_single_flight(upload_assets_single_flight_key(target_bundles, [])) do
+        with_asset_upload_single_flight(upload_assets_single_flight_key(bundle_hashes, [])) do
           form = form_with_assets_and_bundle(artifacts:)
-          # TODO: targetBundles is only kept for backward compatibility with older node renderers
-          # (protocol 2.0.0) that require it. The new node renderer derives target directories from
-          # the bundle_<hash> form keys and ignores this field. Remove at the next breaking version.
-          # Note: it's not mandatory to keep this until then — users are expected to upgrade the
-          # node renderer and react_on_rails gem to the same version together — but it's an easy
-          # backward compatibility safeguard.
-          form["targetBundles"] = target_bundles
-
           perform_request("/upload-assets", form:)
         end
       end
@@ -498,7 +490,7 @@ module ReactOnRailsPro
       end
 
       def retarget_render_path(path, artifacts, role)
-        match = path.match(%r{\A/bundles/[^/]+/(?<endpoint>render|incremental-render)/})
+        match = path.match(%r{\A/bundles/[^/]+/(?<endpoint>render|incremental-render)\z})
         return path unless match
 
         artifact = artifact_for_role(artifacts, role)
@@ -558,11 +550,11 @@ module ReactOnRailsPro
         Array(artifacts).find { |artifact| artifact.role == role }
       end
 
-      def upload_assets_single_flight_key(target_bundles, assets_to_copy)
+      def upload_assets_single_flight_key(bundle_hashes, assets_to_copy)
         [
           "bundles",
-          Array(target_bundles).length.to_s,
-          *Array(target_bundles).map(&:to_s),
+          Array(bundle_hashes).length.to_s,
+          *Array(bundle_hashes).map(&:to_s),
           "assets",
           assets_to_copy.length.to_s,
           *assets_to_copy.map { |asset_path| upload_asset_fingerprint(asset_path) }
