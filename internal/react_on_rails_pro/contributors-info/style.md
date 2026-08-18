@@ -32,7 +32,7 @@ Follow these style guidelines per the linter configuration. Basically, lint your
 ### Sass Coding Standards
 
 - [Sass Guidelines](http://sass-guidelin.es/) by [Hugo Giraudel](http://hugogiraudel.com/)
-- [GitHub Primer design system](https://primer.style/)
+- [GitHub Primer CSS](https://github.com/primer/css)
 
 # Git Usage
 
