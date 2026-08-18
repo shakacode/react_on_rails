@@ -34,7 +34,9 @@ RSpec.describe "Activity inside a streamed RSC tree", :server_rendering do
   # Some earlier cache setup specs remove `.node-renderer-bundles` after staging
   # assets. The renderer can retain its bundle VM in memory while the manifest
   # files are gone, so the first RSC render after the deletion needs to stage
-  # assets again before reading react-server-client-manifest.json from disk.
+  # assets again before reading react-server-client-manifest.json from disk. This
+  # file sorts first among the streamed RSC request specs in RSpec's defined
+  # order, so it restores the state that later RSC specs inherit.
   before { ReactOnRailsPro::Request.upload_assets }
 
   it "renders the visible Activity boundary into HTML and keeps the hidden one payload-only" do
