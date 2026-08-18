@@ -31,7 +31,7 @@ Follow these style guidelines per the linter configuration. Basically, lint your
 ### Sass Coding Standards
 
 - [Sass Guidelines](https://sass-guidelin.es/) by Kitty Giraudel
-- [GitHub Primer CSS](https://github.com/primer/css)
+- [GitHub Primer CSS](https://github.com/primer/css) - reference implementation for GitHub's CSS conventions
 
 ## Git Usage
 
