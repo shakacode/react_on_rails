@@ -31,6 +31,16 @@ require "rails_helper"
 # IMPORTANT: like the other streamed RSC request specs, this requires the Pro
 # node renderer on :3800 (cd react_on_rails_pro/spec/dummy && pnpm run node-renderer).
 RSpec.describe "Activity inside a streamed RSC tree", :server_rendering do
+  # Stage the RSC manifests on the renderer before rendering. A bundle that an
+  # earlier non-RSC spec already staged does not carry
+  # react-server-client-manifest.json, and the gem does not re-upload assets for
+  # a bundle it considers present, so the RSC render fails with ENOENT on that
+  # manifest and the streamed subtree never reaches the HTML. Specs run in
+  # defined order and this file sorts first in spec/requests, so without this
+  # upload the example depends on whether something else happened to upload the
+  # manifests first - which is exactly how it used to fail intermittently.
+  before { ReactOnRailsPro::Request.upload_assets }
+
   it "renders the visible Activity boundary into HTML and keeps the hidden one payload-only" do
     get "/activity_rsc_tabs"
 
