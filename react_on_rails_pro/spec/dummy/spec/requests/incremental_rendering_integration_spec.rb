@@ -139,10 +139,8 @@ describe "Incremental Rendering Integration", :integration do
       # Upload bundles first
       ReactOnRailsPro::Request.upload_assets
 
-      # Construct the render path: /bundles/:bundleTimestamp/render/:renderRequestDigest
       js_code = "ReactOnRails.dummy"
-      request_digest = Digest::MD5.hexdigest(js_code)
-      render_path = "/bundles/#{server_bundle_hash}/render/#{request_digest}"
+      render_path = "/bundles/#{server_bundle_hash}/render"
 
       # Render using the fixture bundle
       response = ReactOnRailsPro::Request.render_code(render_path, js_code, false)
@@ -159,8 +157,7 @@ describe "Incremental Rendering Integration", :integration do
 
       # Construct the incremental render path
       js_code = "ReactOnRails.getStreamValues()"
-      request_digest = Digest::MD5.hexdigest(js_code)
-      render_path = "/bundles/#{server_bundle_hash}/incremental-render/#{request_digest}"
+      render_path = "/bundles/#{server_bundle_hash}/incremental-render"
 
       # Perform incremental rendering with stream updates
       stream = ReactOnRailsPro::Request.render_code_with_incremental_updates(
@@ -192,8 +189,7 @@ describe "Incremental Rendering Integration", :integration do
 
       # Construct the incremental render path
       js_code = "ReactOnRails.getStreamValues()"
-      request_digest = Digest::MD5.hexdigest(js_code)
-      render_path = "/bundles/#{server_bundle_hash}/incremental-render/#{request_digest}"
+      render_path = "/bundles/#{server_bundle_hash}/incremental-render"
 
       # Use Async::Queue instead of Async::Condition — Queue buffers signals so they
       # are never lost if the consumer hasn't called dequeue yet. Condition#signal is
@@ -278,8 +274,7 @@ describe "Incremental Rendering Integration", :integration do
         ReactOnRailsPro::Request.upload_assets
 
         js_code = "ReactOnRails.getStreamValues()"
-        request_digest = Digest::MD5.hexdigest(js_code)
-        render_path = "/bundles/#{server_bundle_hash}/incremental-render/#{request_digest}"
+        render_path = "/bundles/#{server_bundle_hash}/incremental-render"
 
         Timeout.timeout(10) do
           stream = ReactOnRailsPro::Request.render_code_with_incremental_updates(
@@ -312,8 +307,7 @@ describe "Incremental Rendering Integration", :integration do
         ReactOnRailsPro::Request.upload_assets
 
         js_code = "ReactOnRails.getStreamValues()"
-        request_digest = Digest::MD5.hexdigest(js_code)
-        render_path = "/bundles/#{server_bundle_hash}/incremental-render/#{request_digest}"
+        render_path = "/bundles/#{server_bundle_hash}/incremental-render"
 
         Timeout.timeout(10) do
           stream = ReactOnRailsPro::Request.render_code_with_incremental_updates(
@@ -338,8 +332,7 @@ describe "Incremental Rendering Integration", :integration do
         ReactOnRailsPro::Request.upload_assets
 
         js_code = "this is not valid javascript @@!#$%"
-        request_digest = Digest::MD5.hexdigest(js_code)
-        render_path = "/bundles/#{server_bundle_hash}/incremental-render/#{request_digest}"
+        render_path = "/bundles/#{server_bundle_hash}/incremental-render"
 
         Timeout.timeout(10) do
           stream = ReactOnRailsPro::Request.render_code_with_incremental_updates(
@@ -404,8 +397,7 @@ describe "Incremental Rendering Integration", :integration do
 
         # Do NOT call upload_assets — the bundle isn't on the renderer yet
         js_code = "ReactOnRails.getStreamValues()"
-        request_digest = Digest::MD5.hexdigest(js_code)
-        render_path = "/bundles/#{unique_hash}/incremental-render/#{request_digest}"
+        render_path = "/bundles/#{unique_hash}/incremental-render"
 
         Timeout.timeout(10) do
           stream = ReactOnRailsPro::Request.render_code_with_incremental_updates(
@@ -451,8 +443,7 @@ describe "Incremental Rendering Integration", :integration do
         allow(ReactOnRailsPro::Request).to receive(:upload_assets)
 
         js_code = "ReactOnRails.getStreamValues()"
-        request_digest = Digest::MD5.hexdigest(js_code)
-        render_path = "/bundles/#{always_missing_hash}/incremental-render/#{request_digest}"
+        render_path = "/bundles/#{always_missing_hash}/incremental-render"
 
         Timeout.timeout(10) do
           stream = ReactOnRailsPro::Request.render_code_with_incremental_updates(
@@ -473,8 +464,7 @@ describe "Incremental Rendering Integration", :integration do
         ReactOnRailsPro::Request.upload_assets
 
         js_code = "ReactOnRails.getStreamValues()"
-        request_digest = Digest::MD5.hexdigest(js_code)
-        render_path = "/bundles/#{server_bundle_hash}/incremental-render/#{request_digest}"
+        render_path = "/bundles/#{server_bundle_hash}/incremental-render"
 
         # Generate a payload larger than default HTTP/2 frame size (16KB)
         large_value = "X" * 20_000
@@ -499,8 +489,7 @@ describe "Incremental Rendering Integration", :integration do
         ReactOnRailsPro::Request.upload_assets
 
         js_code = "ReactOnRails.getStreamValues()"
-        request_digest = Digest::MD5.hexdigest(js_code)
-        render_path = "/bundles/#{server_bundle_hash}/incremental-render/#{request_digest}"
+        render_path = "/bundles/#{server_bundle_hash}/incremental-render"
 
         values = Array.new(3) { |i| "PAYLOAD_#{i}_#{'Y' * 18_000}" }
 
@@ -526,8 +515,7 @@ describe "Incremental Rendering Integration", :integration do
         ReactOnRailsPro::Request.upload_assets
 
         js_code = "ReactOnRails.getStreamValues()"
-        request_digest = Digest::MD5.hexdigest(js_code)
-        render_path = "/bundles/#{server_bundle_hash}/incremental-render/#{request_digest}"
+        render_path = "/bundles/#{server_bundle_hash}/incremental-render"
 
         results = Array.new(3)
 
@@ -566,7 +554,7 @@ describe "Incremental Rendering Integration", :integration do
     context "when error scenarios repeat without connection reset" do
       let(:js_code) { "ReactOnRails.getStreamValues()" }
       let(:render_path) do
-        "/bundles/#{server_bundle_hash}/incremental-render/#{Digest::MD5.hexdigest(js_code)}"
+        "/bundles/#{server_bundle_hash}/incremental-render"
       end
 
       def perform_successful_stream_request
@@ -665,8 +653,7 @@ describe "Incremental Rendering Integration", :integration do
         Timeout.timeout(30) do
           10.times do |i|
             invalid_js = "not valid js @@#{i}"
-            digest = Digest::MD5.hexdigest(invalid_js)
-            path = "/bundles/#{server_bundle_hash}/incremental-render/#{digest}"
+            path = "/bundles/#{server_bundle_hash}/incremental-render"
 
             stream = ReactOnRailsPro::Request.render_code_with_incremental_updates(
               path,
@@ -704,8 +691,7 @@ describe "Incremental Rendering Integration", :integration do
           # Trigger invalid rendering request errors
           3.times do |i|
             invalid_js = "syntax error @@#{i}"
-            digest = Digest::MD5.hexdigest(invalid_js)
-            path = "/bundles/#{server_bundle_hash}/incremental-render/#{digest}"
+            path = "/bundles/#{server_bundle_hash}/incremental-render"
 
             stream = ReactOnRailsPro::Request.render_code_with_incremental_updates(
               path,

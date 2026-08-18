@@ -111,7 +111,7 @@ end
 # Returns true/false/nil (nil means couldn't determine)
 # rubocop:disable Style/ReturnNilInPredicateMethodDefinition
 def rsc_bundle?(bundle_timestamp)
-  url = render_url(bundle_timestamp, "rsc_check")
+  url = render_url(bundle_timestamp)
   body = render_body("ReactOnRails.isRSCBundle")
 
   # Use curl with h2c since Net::HTTP doesn't support HTTP/2
@@ -159,9 +159,9 @@ def categorize_bundles(bundles)
   [rsc_bundle, non_rsc_bundle]
 end
 
-# Build render URL for a bundle and render name
-def render_url(bundle_timestamp, render_name)
-  "http://#{BASE_URL}/bundles/#{bundle_timestamp}/render/#{render_name}"
+# Build render URL for a bundle
+def render_url(bundle_timestamp)
+  "http://#{BASE_URL}/bundles/#{bundle_timestamp}/render"
 end
 
 # Build request body for a rendering request
@@ -370,7 +370,7 @@ def run_vegeta_benchmark(test_case, bundle_timestamp, shard_count: LOAD_GENERATO
 
   puts "\n===> Vegeta h2c: #{name}"
 
-  target_url = render_url(bundle_timestamp, name)
+  target_url = render_url(bundle_timestamp)
   body = render_body(request)
 
   # Create temp files for Vegeta

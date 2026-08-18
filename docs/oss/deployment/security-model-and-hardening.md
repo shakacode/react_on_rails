@@ -113,13 +113,13 @@ them to render components. This is its purpose, not a flaw — but it has a dire
 Concretely, the worker exposes these HTTP endpoints
 (`packages/react-on-rails-pro-node-renderer/src/worker.ts`):
 
-| Endpoint                                                                 | Auth                                                     | Purpose                                                     |
-| ------------------------------------------------------------------------ | -------------------------------------------------------- | ----------------------------------------------------------- |
-| `POST /bundles/:bundleTimestamp/render/:renderRequestDigest`             | password (via `performRequestPrechecks`)                 | Evaluate a rendering request; may also carry bundle uploads |
-| `POST /bundles/:bundleTimestamp/incremental-render/:renderRequestDigest` | password (via `performRequestPrechecks`)                 | Streaming/incremental rendering                             |
-| `POST /upload-assets`                                                    | password (via `performRequestPrechecks`)                 | Upload server bundles and assets                            |
-| `POST /asset-exists`                                                     | password (via `authenticate`, no protocol-version check) | Check whether an uploaded asset exists                      |
-| `GET /info`                                                              | **none**                                                 | Returns `node_version` and `renderer_version`               |
+| Endpoint                                            | Auth                                                     | Purpose                                                     |
+| --------------------------------------------------- | -------------------------------------------------------- | ----------------------------------------------------------- |
+| `POST /bundles/:bundleTimestamp/render`             | password (via `performRequestPrechecks`)                 | Evaluate a rendering request; may also carry bundle uploads |
+| `POST /bundles/:bundleTimestamp/incremental-render` | password (via `performRequestPrechecks`)                 | Streaming/incremental rendering                             |
+| `POST /upload-assets`                               | password (via `performRequestPrechecks`)                 | Upload server bundles and assets                            |
+| `POST /asset-exists`                                | password (via `authenticate`, no protocol-version check) | Check whether an uploaded asset exists                      |
+| `GET /info`                                         | **none**                                                 | Returns `node_version` and `renderer_version`               |
 
 Note for reviewers: unlike the other authenticated endpoints, `/asset-exists` calls `authenticate`
 directly rather than through `performRequestPrechecks`, so it skips the protocol-version check — a

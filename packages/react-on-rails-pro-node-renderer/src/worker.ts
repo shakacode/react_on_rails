@@ -761,14 +761,11 @@ export default function run(config: Partial<Config>) {
     done(null, payload);
   });
 
-  // See https://github.com/shakacode/react_on_rails_pro/issues/119 for why
-  // the digest is part of the request URL. Yes, it's not used here, but the
-  // server logs might show it to distinguish different requests.
   app.post<{
     Body: WithBodyArrayField<Record<string, unknown>, 'dependencyBundleTimestamps'>;
     // Can't infer from the route like Express can
-    Params: { bundleTimestamp: string; renderRequestDigest: string };
-  }>('/bundles/:bundleTimestamp/render/:renderRequestDigest', async (req, res) => {
+    Params: { bundleTimestamp: string };
+  }>('/bundles/:bundleTimestamp/render', async (req, res) => {
     if (req.uploadAuthenticationError) {
       await setResponse(req.uploadAuthenticationError, res);
       return;
@@ -866,8 +863,8 @@ export default function run(config: Partial<Config>) {
 
   // Streaming NDJSON incremental render endpoint
   app.post<{
-    Params: { bundleTimestamp: string; renderRequestDigest: string };
-  }>('/bundles/:bundleTimestamp/incremental-render/:renderRequestDigest', async (req, res) => {
+    Params: { bundleTimestamp: string };
+  }>('/bundles/:bundleTimestamp/incremental-render', async (req, res) => {
     const { bundleTimestamp } = req.params;
 
     // Stream parser state

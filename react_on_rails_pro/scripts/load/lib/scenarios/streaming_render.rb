@@ -14,13 +14,12 @@
 # https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
 
 require_relative "base"
-require "digest"
 
 module RendererHarness
   module Scenarios
     # Scenario that performs a server-side render via the streaming HTTP transport.
     #
-    # The render endpoint /bundles/:hash/render/:digest is the same endpoint used by
+    # The render endpoint /bundles/:hash/render is the same endpoint used by
     # standard_render, but the HTTP request is made with stream: true so the response
     # body is read chunk-by-chunk. This measures streaming-transport overhead vs.
     # buffered transport (standard_render).
@@ -34,8 +33,7 @@ module RendererHarness
       def perform_request
         js = render_component_js
         bundle_hash = server_bundle_hash
-        digest = Digest::MD5.hexdigest(js)
-        path = "/bundles/#{bundle_hash}/render/#{digest}"
+        path = "/bundles/#{bundle_hash}/render"
 
         measure do
           bytes_in = 0

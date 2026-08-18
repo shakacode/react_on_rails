@@ -14,20 +14,18 @@
 # https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
 
 require_relative "base"
-require "digest"
 
 module RendererHarness
   module Scenarios
     # Scenario that performs a single synchronous server-side render via the node renderer.
     #
     # Uses HelloWorld (registered via auto-load in the dummy app's server-bundle).
-    # Path format: /bundles/:bundleTimestamp/render/:renderRequestDigest
+    # Path format: /bundles/:bundleTimestamp/render
     class StandardRender < Base
       def perform_request
         js = render_component_js
         bundle_hash = server_bundle_hash
-        digest = Digest::MD5.hexdigest(js)
-        path = "/bundles/#{bundle_hash}/render/#{digest}"
+        path = "/bundles/#{bundle_hash}/render"
 
         measure do
           response = ReactOnRailsPro::Request.render_code(path, js, false)

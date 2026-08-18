@@ -123,7 +123,7 @@ describe('worker', () => {
     expect(configureFastify).toEqual(expect.any(Function));
   });
 
-  test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest when bundle is provided and did not yet exist', async () => {
+  test('POST /bundles/:bundleTimestamp/render when bundle is provided and did not yet exist', async () => {
     const app = createWorker();
 
     const form = formAutoContent({
@@ -137,7 +137,7 @@ describe('worker', () => {
     });
     const res = await app
       .inject()
-      .post(`/bundles/${BUNDLE_TIMESTAMP}/render/d41d8cd98f00b204e9800998ecf8427e`)
+      .post(`/bundles/${BUNDLE_TIMESTAMP}/render`)
       .payload(form.payload)
       .headers(form.headers)
       .end();
@@ -149,7 +149,55 @@ describe('worker', () => {
     expect(fs.existsSync(assetPathOther(testName, String(BUNDLE_TIMESTAMP)))).toBe(true);
   });
 
-  test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest rejects unsafe uploaded asset filenames', async () => {
+  test('old /render/<digest> route returns 404', async () => {
+    const app = createWorker();
+    const form = formAutoContent({
+      gemVersion,
+      protocolVersion,
+      railsEnv,
+      renderingRequest: 'ReactOnRails.dummy',
+    });
+    const res = await app
+      .inject()
+      .post(`/bundles/${BUNDLE_TIMESTAMP}/render/d41d8cd98f00b204e9800998ecf8427e`)
+      .payload(form.payload)
+      .headers(form.headers)
+      .end();
+    expect(res.statusCode).toBe(404);
+  });
+
+  test('old /incremental-render/<digest> route returns 404', async () => {
+    const app = createWorker();
+    const res = await app
+      .inject()
+      .post(`/bundles/${BUNDLE_TIMESTAMP}/incremental-render/d41d8cd98f00b204e9800998ecf8427e`)
+      .payload(
+        `${JSON.stringify({ gemVersion, protocolVersion, password: 'my_password', railsEnv, renderingRequest: 'ReactOnRails.dummy' })}\n`,
+      )
+      .headers({ 'Content-Type': 'application/x-ndjson' })
+      .end();
+    expect(res.statusCode).toBe(404);
+  });
+
+  test('protocol version 2.0.0 is rejected with 412 on render', async () => {
+    const app = createWorker();
+    const form = formAutoContent({
+      gemVersion,
+      protocolVersion: '2.0.0',
+      railsEnv,
+      renderingRequest: 'ReactOnRails.dummy',
+    });
+    const res = await app
+      .inject()
+      .post(`/bundles/${BUNDLE_TIMESTAMP}/render`)
+      .payload(form.payload)
+      .headers(form.headers)
+      .end();
+    expect(res.statusCode).toBe(412);
+    expect(res.payload).toContain('does not match installed renderer protocol 3.0.0');
+  });
+
+  test('POST /bundles/:bundleTimestamp/render rejects unsafe uploaded asset filenames', async () => {
     const app = createWorker();
     const httpErrorLogSpy = jest.spyOn(app.log, 'error');
 
@@ -171,7 +219,7 @@ describe('worker', () => {
 
       const res = await app
         .inject()
-        .post(`/bundles/${BUNDLE_TIMESTAMP}/render/d41d8cd98f00b204e9800998ecf8427e`)
+        .post(`/bundles/${BUNDLE_TIMESTAMP}/render`)
         .payload(form.getBuffer())
         .headers(form.getHeaders())
         .end();
@@ -185,7 +233,7 @@ describe('worker', () => {
     }
   });
 
-  test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest', async () => {
+  test('POST /bundles/:bundleTimestamp/render', async () => {
     const app = createWorker();
 
     const form = formAutoContent({
@@ -200,7 +248,7 @@ describe('worker', () => {
     });
     const res = await app
       .inject()
-      .post(`/bundles/${BUNDLE_TIMESTAMP}/render/d41d8cd98f00b204e9800998ecf8427e`)
+      .post(`/bundles/${BUNDLE_TIMESTAMP}/render`)
       .payload(form.payload)
       .headers(form.headers)
       .end();
@@ -221,7 +269,7 @@ describe('worker', () => {
 
     const res = await app
       .inject()
-      .post(`/bundles/${BUNDLE_TIMESTAMP}/render/d41d8cd98f00b204e9800998ecf8427e`)
+      .post(`/bundles/${BUNDLE_TIMESTAMP}/render`)
       .headers({
         'content-type': 'application/vnd.react-on-rails.render-request+javascript',
         authorization: 'Bearer my_password',
@@ -243,7 +291,7 @@ describe('worker', () => {
 
     const res = await app
       .inject()
-      .post(`/bundles/${BUNDLE_TIMESTAMP}/render/d41d8cd98f00b204e9800998ecf8427e`)
+      .post(`/bundles/${BUNDLE_TIMESTAMP}/render`)
       .headers({
         'content-type': 'application/vnd.react-on-rails.render-request+javascript',
         'x-react-on-rails-pro-protocol-version': protocolVersion,
@@ -261,7 +309,7 @@ describe('worker', () => {
 
     const res = await app
       .inject()
-      .post(`/bundles/${BUNDLE_TIMESTAMP}/render/d41d8cd98f00b204e9800998ecf8427e`)
+      .post(`/bundles/${BUNDLE_TIMESTAMP}/render`)
       .headers({
         'content-type': 'application/vnd.react-on-rails.render-request+javascript',
         authorization: 'Bearer wrong_password',
@@ -280,7 +328,7 @@ describe('worker', () => {
 
     const res = await app
       .inject()
-      .post(`/bundles/${BUNDLE_TIMESTAMP}/render/d41d8cd98f00b204e9800998ecf8427e`)
+      .post(`/bundles/${BUNDLE_TIMESTAMP}/render`)
       .headers({
         'content-type': 'application/vnd.react-on-rails.render-request+javascript',
         'x-react-on-rails-pro-protocol-version': protocolVersion,
@@ -299,7 +347,7 @@ describe('worker', () => {
 
     const res = await app
       .inject()
-      .post(`/bundles/${BUNDLE_TIMESTAMP}/render/d41d8cd98f00b204e9800998ecf8427e`)
+      .post(`/bundles/${BUNDLE_TIMESTAMP}/render`)
       .headers({ 'content-type': 'application/vnd.react-on-rails.render-request+javascript' })
       .payload('ReactOnRails.dummy')
       .end();
@@ -314,7 +362,7 @@ describe('worker', () => {
 
     const res = await app
       .inject()
-      .post(`/bundles/${BUNDLE_TIMESTAMP}/render/d41d8cd98f00b204e9800998ecf8427e`)
+      .post(`/bundles/${BUNDLE_TIMESTAMP}/render`)
       .headers({ 'content-type': 'application/x-www-form-urlencoded' })
       .payload(
         querystring.stringify({
@@ -331,14 +379,14 @@ describe('worker', () => {
     expect(res.payload).toBe('{"html":"Dummy Object"}');
   });
 
-  test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest returns actionable error when renderingRequest is missing', async () => {
+  test('POST /bundles/:bundleTimestamp/render returns actionable error when renderingRequest is missing', async () => {
     const app = worker({
       serverBundleCachePath: serverBundleCachePathForTest(),
     });
 
     const res = await app
       .inject()
-      .post(`/bundles/${BUNDLE_TIMESTAMP}/render/d41d8cd98f00b204e9800998ecf8427e`)
+      .post(`/bundles/${BUNDLE_TIMESTAMP}/render`)
       .payload({
         gemVersion,
         protocolVersion,
@@ -353,7 +401,7 @@ describe('worker', () => {
     expect(res.payload).toContain('Likely causes: request body truncation');
   });
 
-  test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest does not notify errorReporter for malformed renderingRequest', async () => {
+  test('POST /bundles/:bundleTimestamp/render does not notify errorReporter for malformed renderingRequest', async () => {
     const reportMessageSpy = jest.spyOn(errorReporter, 'message').mockImplementation(jest.fn());
 
     try {
@@ -363,7 +411,7 @@ describe('worker', () => {
 
       const res = await app
         .inject()
-        .post(`/bundles/${BUNDLE_TIMESTAMP}/render/d41d8cd98f00b204e9800998ecf8427e`)
+        .post(`/bundles/${BUNDLE_TIMESTAMP}/render`)
         .payload({
           gemVersion,
           protocolVersion,
@@ -378,14 +426,14 @@ describe('worker', () => {
     }
   });
 
-  test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest returns actionable error when renderingRequest is null', async () => {
+  test('POST /bundles/:bundleTimestamp/render returns actionable error when renderingRequest is null', async () => {
     const app = worker({
       serverBundleCachePath: serverBundleCachePathForTest(),
     });
 
     const res = await app
       .inject()
-      .post(`/bundles/${BUNDLE_TIMESTAMP}/render/d41d8cd98f00b204e9800998ecf8427e`)
+      .post(`/bundles/${BUNDLE_TIMESTAMP}/render`)
       .payload({
         gemVersion,
         protocolVersion,
@@ -400,14 +448,14 @@ describe('worker', () => {
     expect(res.payload).toContain('Likely causes: request body truncation');
   });
 
-  test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest treats null rscStreamObservability as absent', async () => {
+  test('POST /bundles/:bundleTimestamp/render treats null rscStreamObservability as absent', async () => {
     const app = worker({
       serverBundleCachePath: serverBundleCachePathForTest(),
     });
 
     const res = await app
       .inject()
-      .post(`/bundles/${BUNDLE_TIMESTAMP}/render/d41d8cd98f00b204e9800998ecf8427e`)
+      .post(`/bundles/${BUNDLE_TIMESTAMP}/render`)
       .payload({
         gemVersion,
         protocolVersion,
@@ -421,14 +469,14 @@ describe('worker', () => {
     expect(res.payload).toContain('No bundle uploaded');
   });
 
-  test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest returns actionable error when renderingRequest is empty string', async () => {
+  test('POST /bundles/:bundleTimestamp/render returns actionable error when renderingRequest is empty string', async () => {
     const app = worker({
       serverBundleCachePath: serverBundleCachePathForTest(),
     });
 
     const res = await app
       .inject()
-      .post(`/bundles/${BUNDLE_TIMESTAMP}/render/d41d8cd98f00b204e9800998ecf8427e`)
+      .post(`/bundles/${BUNDLE_TIMESTAMP}/render`)
       .payload({
         gemVersion,
         protocolVersion,
@@ -443,14 +491,14 @@ describe('worker', () => {
     expect(res.payload).toContain('Likely causes: request body truncation');
   });
 
-  test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest returns actionable error when renderingRequest is an array', async () => {
+  test('POST /bundles/:bundleTimestamp/render returns actionable error when renderingRequest is an array', async () => {
     const app = worker({
       serverBundleCachePath: serverBundleCachePathForTest(),
     });
 
     const res = await app
       .inject()
-      .post(`/bundles/${BUNDLE_TIMESTAMP}/render/d41d8cd98f00b204e9800998ecf8427e`)
+      .post(`/bundles/${BUNDLE_TIMESTAMP}/render`)
       .payload({
         gemVersion,
         protocolVersion,
@@ -466,14 +514,14 @@ describe('worker', () => {
     expect(res.payload).toContain('Likely causes: request body truncation');
   });
 
-  test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest filters sensitive body keys case-insensitively in invalid renderingRequest diagnostics', async () => {
+  test('POST /bundles/:bundleTimestamp/render filters sensitive body keys case-insensitively in invalid renderingRequest diagnostics', async () => {
     const app = worker({
       serverBundleCachePath: serverBundleCachePathForTest(),
     });
 
     const res = await app
       .inject()
-      .post(`/bundles/${BUNDLE_TIMESTAMP}/render/d41d8cd98f00b204e9800998ecf8427e`)
+      .post(`/bundles/${BUNDLE_TIMESTAMP}/render`)
       .payload({
         gemVersion,
         protocolVersion,
@@ -501,7 +549,7 @@ describe('worker', () => {
     expect(res.payload).toContain('safeField');
   });
 
-  test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest reports unexpected handleRenderRequest failures once', async () => {
+  test('POST /bundles/:bundleTimestamp/render reports unexpected handleRenderRequest failures once', async () => {
     const buildExecutionContextSpy = jest
       .spyOn(vm, 'buildExecutionContext')
       .mockRejectedValueOnce(new Error('Injected buildExecutionContext failure'));
@@ -522,7 +570,7 @@ describe('worker', () => {
 
       const res = await app
         .inject()
-        .post(`/bundles/${BUNDLE_TIMESTAMP}/render/d41d8cd98f00b204e9800998ecf8427e`)
+        .post(`/bundles/${BUNDLE_TIMESTAMP}/render`)
         .payload(form.payload)
         .headers(form.headers)
         .end();
@@ -543,8 +591,7 @@ describe('worker', () => {
   });
 
   test(
-    'POST /bundles/:bundleTimestamp/render/:renderRequestDigest ' +
-      'when password is required but no password was provided',
+    'POST /bundles/:bundleTimestamp/render ' + 'when password is required but no password was provided',
     async () => {
       await createVmBundleForTest();
 
@@ -554,7 +601,7 @@ describe('worker', () => {
 
       const res = await app
         .inject()
-        .post('/bundles/1495063024898/render/d41d8cd98f00b204e9800998ecf8427e')
+        .post('/bundles/1495063024898/render')
         .payload({
           renderingRequest: 'ReactOnRails.dummy',
           password: undefined,
@@ -586,7 +633,7 @@ describe('worker', () => {
 
     const res = await app
       .inject()
-      .post('/bundles/1495063024898/render/d41d8cd98f00b204e9800998ecf8427e')
+      .post('/bundles/1495063024898/render')
       .payload(form.getBuffer())
       .headers(form.getHeaders())
       .end();
@@ -597,8 +644,7 @@ describe('worker', () => {
   });
 
   test(
-    'POST /bundles/:bundleTimestamp/render/:renderRequestDigest ' +
-      'when password is required but wrong password was provided',
+    'POST /bundles/:bundleTimestamp/render ' + 'when password is required but wrong password was provided',
     async () => {
       await createVmBundleForTest();
 
@@ -608,7 +654,7 @@ describe('worker', () => {
 
       const res = await app
         .inject()
-        .post('/bundles/1495063024898/render/d41d8cd98f00b204e9800998ecf8427e')
+        .post('/bundles/1495063024898/render')
         .payload({
           renderingRequest: 'ReactOnRails.dummy',
           password: 'wrong',
@@ -623,8 +669,7 @@ describe('worker', () => {
   );
 
   test(
-    'POST /bundles/:bundleTimestamp/render/:renderRequestDigest ' +
-      'when password is required and correct password was provided',
+    'POST /bundles/:bundleTimestamp/render ' + 'when password is required and correct password was provided',
     async () => {
       await createVmBundleForTest();
 
@@ -634,7 +679,7 @@ describe('worker', () => {
 
       const res = await app
         .inject()
-        .post('/bundles/1495063024898/render/d41d8cd98f00b204e9800998ecf8427e')
+        .post('/bundles/1495063024898/render')
         .payload({
           renderingRequest: 'ReactOnRails.dummy',
           password: 'my_password',
@@ -650,23 +695,19 @@ describe('worker', () => {
   );
 
   test(
-    'POST /bundles/:bundleTimestamp/render/:renderRequestDigest ' +
-      'when password is not required and no password was provided',
+    'POST /bundles/:bundleTimestamp/render ' + 'when password is not required and no password was provided',
     async () => {
       await createVmBundleForTest();
 
       const app = createWorker();
 
-      const res = await app
-        .inject()
-        .post('/bundles/1495063024898/render/d41d8cd98f00b204e9800998ecf8427e')
-        .payload({
-          renderingRequest: 'ReactOnRails.dummy',
-          password: undefined,
-          gemVersion,
-          protocolVersion,
-          railsEnv,
-        });
+      const res = await app.inject().post('/bundles/1495063024898/render').payload({
+        renderingRequest: 'ReactOnRails.dummy',
+        password: undefined,
+        gemVersion,
+        protocolVersion,
+        railsEnv,
+      });
       expect(res.headers['cache-control']).toBe('public, max-age=31536000');
       expect(res.statusCode).toBe(200);
       expect(res.payload).toBe('{"html":"Dummy Object"}');
@@ -951,7 +992,7 @@ describe('worker', () => {
     }
   });
 
-  test('post /upload-assets ignores targetBundles when bundle_<hash> fields are present (backward compat)', async () => {
+  test('post /upload-assets derives targets from bundle_<hash> fields', async () => {
     const bundleHash = 'compat-bundle-hash';
 
     const app = worker({
@@ -959,15 +1000,12 @@ describe('worker', () => {
       password: 'my_password',
     });
 
-    // Simulates the Ruby client sending both bundle_<hash> (new) and targetBundles (legacy).
-    // The endpoint should derive targets from bundle_<hash> and ignore targetBundles.
     const form = formAutoContent({
       gemVersion,
       protocolVersion,
       railsEnv,
       password: 'my_password',
       [`bundle_${bundleHash}`]: createReadStream(getFixtureBundle()),
-      targetBundles: [bundleHash],
       asset1: createReadStream(getFixtureAsset()),
     });
     const res = await app.inject().post(`/upload-assets`).payload(form.payload).headers(form.headers).end();
@@ -1008,15 +1046,12 @@ describe('worker', () => {
 
       const app = createWorker();
 
-      const res = await app
-        .inject()
-        .post('/bundles/1495063024898/render/d41d8cd98f00b204e9800998ecf8427e')
-        .payload({
-          renderingRequest: 'ReactOnRails.dummy',
-          gemVersion: packageJson.version,
-          protocolVersion,
-          railsEnv: 'development',
-        });
+      const res = await app.inject().post('/bundles/1495063024898/render').payload({
+        renderingRequest: 'ReactOnRails.dummy',
+        gemVersion: packageJson.version,
+        protocolVersion,
+        railsEnv: 'development',
+      });
 
       expect(res.statusCode).toBe(200);
       expect(res.payload).toBe('{"html":"Dummy Object"}');
@@ -1029,7 +1064,7 @@ describe('worker', () => {
 
       const res = await app
         .inject()
-        .post('/bundles/1495063024898/render/d41d8cd98f00b204e9800998ecf8427e')
+        .post('/bundles/1495063024898/render')
         .payload({
           renderingRequest: 'ReactOnRails.dummy',
           gemVersion: '999.0.0',
@@ -1049,15 +1084,12 @@ describe('worker', () => {
 
       const app = createWorker();
 
-      const res = await app
-        .inject()
-        .post('/bundles/1495063024898/render/d41d8cd98f00b204e9800998ecf8427e')
-        .payload({
-          renderingRequest: 'ReactOnRails.dummy',
-          gemVersion: '999.0.0',
-          protocolVersion,
-          railsEnv: 'production',
-        });
+      const res = await app.inject().post('/bundles/1495063024898/render').payload({
+        renderingRequest: 'ReactOnRails.dummy',
+        gemVersion: '999.0.0',
+        protocolVersion,
+        railsEnv: 'production',
+      });
 
       expect(res.statusCode).toBe(200);
       expect(res.payload).toBe('{"html":"Dummy Object"}');
@@ -1073,15 +1105,12 @@ describe('worker', () => {
       // Let's create a version with .rc. that normalizes to the package version
       const gemVersionWithDot = packageJson.version.replace(/-([a-z]+)/, '.$1');
 
-      const res = await app
-        .inject()
-        .post('/bundles/1495063024898/render/d41d8cd98f00b204e9800998ecf8427e')
-        .payload({
-          renderingRequest: 'ReactOnRails.dummy',
-          gemVersion: gemVersionWithDot,
-          protocolVersion,
-          railsEnv: 'development',
-        });
+      const res = await app.inject().post('/bundles/1495063024898/render').payload({
+        renderingRequest: 'ReactOnRails.dummy',
+        gemVersion: gemVersionWithDot,
+        protocolVersion,
+        railsEnv: 'development',
+      });
 
       expect(res.statusCode).toBe(200);
       expect(res.payload).toBe('{"html":"Dummy Object"}');
@@ -1094,15 +1123,12 @@ describe('worker', () => {
 
       const gemVersionUpperCase = packageJson.version.toUpperCase();
 
-      const res = await app
-        .inject()
-        .post('/bundles/1495063024898/render/d41d8cd98f00b204e9800998ecf8427e')
-        .payload({
-          renderingRequest: 'ReactOnRails.dummy',
-          gemVersion: gemVersionUpperCase,
-          protocolVersion,
-          railsEnv: 'development',
-        });
+      const res = await app.inject().post('/bundles/1495063024898/render').payload({
+        renderingRequest: 'ReactOnRails.dummy',
+        gemVersion: gemVersionUpperCase,
+        protocolVersion,
+        railsEnv: 'development',
+      });
 
       expect(res.statusCode).toBe(200);
       expect(res.payload).toBe('{"html":"Dummy Object"}');
@@ -1115,15 +1141,12 @@ describe('worker', () => {
 
       const gemVersionWithWhitespace = `  ${packageJson.version}  `;
 
-      const res = await app
-        .inject()
-        .post('/bundles/1495063024898/render/d41d8cd98f00b204e9800998ecf8427e')
-        .payload({
-          renderingRequest: 'ReactOnRails.dummy',
-          gemVersion: gemVersionWithWhitespace,
-          protocolVersion,
-          railsEnv: 'development',
-        });
+      const res = await app.inject().post('/bundles/1495063024898/render').payload({
+        renderingRequest: 'ReactOnRails.dummy',
+        gemVersion: gemVersionWithWhitespace,
+        protocolVersion,
+        railsEnv: 'development',
+      });
 
       expect(res.statusCode).toBe(200);
       expect(res.payload).toBe('{"html":"Dummy Object"}');
@@ -1142,7 +1165,6 @@ describe('worker', () => {
       gemVersion,
       protocolVersion,
       password: 'my_password',
-      targetBundles: [bundleHash, secondaryBundleHash],
       [`bundle_${bundleHash}`]: createReadStream(getFixtureBundle()),
       [`bundle_${secondaryBundleHash}`]: createReadStream(getFixtureSecondaryBundle()),
       asset1: createReadStream(getFixtureAsset()),
@@ -1200,7 +1222,6 @@ describe('worker', () => {
       gemVersion,
       protocolVersion,
       password: 'my_password',
-      targetBundles: [bundleHash],
       [`bundle_${bundleHash}`]: createReadStream(getFixtureBundle()),
     });
 
@@ -1286,7 +1307,6 @@ describe('worker', () => {
       gemVersion,
       protocolVersion,
       password: 'my_password',
-      targetBundles: [bundleHash],
       [`bundle_${bundleHash}`]: createReadStream(getFixtureBundle()),
     });
 
@@ -1317,7 +1337,6 @@ describe('worker', () => {
       gemVersion,
       protocolVersion,
       password: 'my_password',
-      targetBundles: [bundleHash],
       [`bundle_${bundleHash}`]: createReadStream(getFixtureSecondaryBundle()), // Different content
     });
 
@@ -1356,7 +1375,7 @@ describe('worker', () => {
     expect(secondBundleSize).toBe(62); // Size of getFixtureBundle(), not getFixtureSecondaryBundle()
   });
 
-  test('post /upload-assets places bundles in their own hash directories (targetBundles is ignored)', async () => {
+  test('post /upload-assets places bundles in their own hash directories', async () => {
     const bundleHash = 'actual-bundle-hash';
     const targetBundleHash = 'target-bundle-hash'; // Different from actual bundle hash
 
@@ -1368,7 +1387,6 @@ describe('worker', () => {
       gemVersion,
       protocolVersion,
       password: 'my_password',
-      targetBundles: [targetBundleHash], // Ignored by the endpoint — only bundle_<hash> fields matter
       [`bundle_${bundleHash}`]: createReadStream(getFixtureBundle()), // Bundle with its own hash
     });
 
@@ -1381,7 +1399,6 @@ describe('worker', () => {
     const bundleFilePath = path.join(actualBundleDir, `${bundleHash}.js`);
     expect(fs.existsSync(bundleFilePath)).toBe(true);
 
-    // targetBundles is not used by the endpoint, so no directory is created for it
     const targetBundleDir = path.join(serverBundleCachePathForTest(), targetBundleHash);
     expect(fs.existsSync(targetBundleDir)).toBe(false);
 
@@ -1412,7 +1429,6 @@ describe('worker', () => {
         gemVersion,
         protocolVersion,
         password,
-        targetBundles: [String(bundleTimestamp)],
         [`bundle_${bundleTimestamp}`]: createReadStream(getFixtureBundle()),
       });
 
@@ -1436,7 +1452,6 @@ describe('worker', () => {
         gemVersion,
         protocolVersion,
         password,
-        targetBundles: bundleTimestamps.map(String),
         [`bundle_${bundleTimestamps[0]}`]: createReadStream(getFixtureBundle()),
         [`bundle_${bundleTimestamps[1]}`]: createReadStream(getFixtureSecondaryBundle()),
       });
@@ -1457,13 +1472,12 @@ describe('worker', () => {
     const callIncrementalRender = async (
       app: ReturnType<typeof worker>,
       bundleTimestamp: number,
-      renderRequestDigest: string,
       payload: Record<string, unknown>,
       expectedStatus = 200,
     ) => {
       const res = await app
         .inject()
-        .post(`/bundles/${bundleTimestamp}/incremental-render/${renderRequestDigest}`)
+        .post(`/bundles/${bundleTimestamp}/incremental-render`)
         .payload(createNDJSONPayload(payload))
         .headers({
           'Content-Type': 'application/x-ndjson',
@@ -1486,12 +1500,7 @@ describe('worker', () => {
         dependencyBundleTimestamps: [String(BUNDLE_TIMESTAMP)],
       };
 
-      const res = await callIncrementalRender(
-        app,
-        BUNDLE_TIMESTAMP,
-        'd41d8cd98f00b204e9800998ecf8427e',
-        payload,
-      );
+      const res = await callIncrementalRender(app, BUNDLE_TIMESTAMP, payload);
 
       expect(res.headers['cache-control']).toBe('public, max-age=31536000');
       expect(res.payload).toBe('{"html":"Dummy Object"}');
@@ -1515,12 +1524,7 @@ describe('worker', () => {
         dependencyBundleTimestamps: [String(BUNDLE_TIMESTAMP), String(SECONDARY_BUNDLE_TIMESTAMP)],
       };
 
-      const res = await callIncrementalRender(
-        app,
-        BUNDLE_TIMESTAMP,
-        'd41d8cd98f00b204e9800998ecf8427e',
-        payload,
-      );
+      const res = await callIncrementalRender(app, BUNDLE_TIMESTAMP, payload);
 
       expect(res.headers['cache-control']).toBe('public, max-age=31536000');
       expect(res.payload).toBe(
@@ -1539,13 +1543,7 @@ describe('worker', () => {
         dependencyBundleTimestamps: [String(BUNDLE_TIMESTAMP)],
       };
 
-      const res = await callIncrementalRender(
-        app,
-        BUNDLE_TIMESTAMP,
-        'd41d8cd98f00b204e9800998ecf8427e',
-        payload,
-        410,
-      );
+      const res = await callIncrementalRender(app, BUNDLE_TIMESTAMP, payload, 410);
 
       expect(res.payload).toContain('No bundle uploaded');
     });
@@ -1556,7 +1554,7 @@ describe('worker', () => {
 
       const res = await app
         .inject()
-        .post(`/bundles/${BUNDLE_TIMESTAMP}/incremental-render/d41d8cd98f00b204e9800998ecf8427e`)
+        .post(`/bundles/${BUNDLE_TIMESTAMP}/incremental-render`)
         .payload('invalid json\n')
         .headers({
           'Content-Type': 'application/x-ndjson',
@@ -1579,13 +1577,7 @@ describe('worker', () => {
         dependencyBundleTimestamps: [String(BUNDLE_TIMESTAMP)],
       };
 
-      const res = await callIncrementalRender(
-        app,
-        BUNDLE_TIMESTAMP,
-        'd41d8cd98f00b204e9800998ecf8427e',
-        incompletePayload,
-        400,
-      );
+      const res = await callIncrementalRender(app, BUNDLE_TIMESTAMP, incompletePayload, 400);
 
       expect(res.payload).toContain('Invalid first incremental render request chunk received');
     });
@@ -1606,13 +1598,7 @@ describe('worker', () => {
           dependencyBundleTimestamps: [String(BUNDLE_TIMESTAMP)],
         };
 
-        const res = await callIncrementalRender(
-          app,
-          BUNDLE_TIMESTAMP,
-          'd41d8cd98f00b204e9800998ecf8427e',
-          incompletePayload,
-          400,
-        );
+        const res = await callIncrementalRender(app, BUNDLE_TIMESTAMP, incompletePayload, 400);
 
         expect(res.payload).toContain('Invalid first incremental render request chunk received');
         expect(reportMessageSpy).toHaveBeenCalledWith(
@@ -1636,13 +1622,7 @@ describe('worker', () => {
         dependencyBundleTimestamps: [String(BUNDLE_TIMESTAMP)],
       };
 
-      const res = await callIncrementalRender(
-        app,
-        BUNDLE_TIMESTAMP,
-        'd41d8cd98f00b204e9800998ecf8427e',
-        payload,
-        401,
-      );
+      const res = await callIncrementalRender(app, BUNDLE_TIMESTAMP, payload, 401);
 
       expect(res.payload).toBe('Wrong password');
     });
@@ -1659,13 +1639,7 @@ describe('worker', () => {
         dependencyBundleTimestamps: [String(BUNDLE_TIMESTAMP)],
       };
 
-      const res = await callIncrementalRender(
-        app,
-        BUNDLE_TIMESTAMP,
-        'd41d8cd98f00b204e9800998ecf8427e',
-        payload,
-        401,
-      );
+      const res = await callIncrementalRender(app, BUNDLE_TIMESTAMP, payload, 401);
 
       expect(res.payload).toBe('Wrong password');
     });
@@ -1682,12 +1656,7 @@ describe('worker', () => {
         dependencyBundleTimestamps: [String(BUNDLE_TIMESTAMP)],
       };
 
-      const res = await callIncrementalRender(
-        app,
-        BUNDLE_TIMESTAMP,
-        'd41d8cd98f00b204e9800998ecf8427e',
-        payload,
-      );
+      const res = await callIncrementalRender(app, BUNDLE_TIMESTAMP, payload);
 
       expect(res.statusCode).toBe(200);
       expect(res.headers['cache-control']).toBe('public, max-age=31536000');
@@ -1701,7 +1670,6 @@ describe('worker', () => {
       const uploadForm = formAutoContent({
         gemVersion,
         password: 'my_password',
-        targetBundles: [String(BUNDLE_TIMESTAMP)],
         [`bundle_${BUNDLE_TIMESTAMP}`]: createReadStream(getFixtureBundle()),
       });
 
@@ -1721,13 +1689,7 @@ describe('worker', () => {
         dependencyBundleTimestamps: [String(BUNDLE_TIMESTAMP)],
       };
 
-      const res = await callIncrementalRender(
-        app,
-        BUNDLE_TIMESTAMP,
-        'd41d8cd98f00b204e9800998ecf8427e',
-        payload,
-        412,
-      );
+      const res = await callIncrementalRender(app, BUNDLE_TIMESTAMP, payload, 412);
 
       expect(res.payload).toContain('Unsupported renderer protocol version MISSING');
       expect(res.payload).not.toContain('my_password');
@@ -1743,13 +1705,7 @@ describe('worker', () => {
         dependencyBundleTimestamps: [String(BUNDLE_TIMESTAMP)],
       };
 
-      const res = await callIncrementalRender(
-        app,
-        BUNDLE_TIMESTAMP,
-        'd41d8cd98f00b204e9800998ecf8427e',
-        payload,
-        412,
-      );
+      const res = await callIncrementalRender(app, BUNDLE_TIMESTAMP, payload, 412);
 
       expect(res.payload).toContain('Unsupported renderer protocol version MISSING');
       expect(res.payload).not.toContain('super_secret_password_value');
@@ -1767,12 +1723,7 @@ describe('worker', () => {
         dependencyBundleTimestamps: [String(BUNDLE_TIMESTAMP)],
       };
 
-      const res = await callIncrementalRender(
-        app,
-        BUNDLE_TIMESTAMP,
-        'd41d8cd98f00b204e9800998ecf8427e',
-        payload,
-      );
+      const res = await callIncrementalRender(app, BUNDLE_TIMESTAMP, payload);
 
       expect(res.headers['cache-control']).toBe('public, max-age=31536000');
       expect(res.payload).toBe('{"html":"Dummy Object"}');
@@ -1808,7 +1759,7 @@ describe('worker', () => {
 
       const res = await app
         .inject()
-        .post(`/bundles/${BUNDLE_TIMESTAMP}/incremental-render/d41d8cd98f00b204e9800998ecf8427e`)
+        .post(`/bundles/${BUNDLE_TIMESTAMP}/incremental-render`)
         .payload(multiChunkPayload)
         .headers({
           'Content-Type': 'application/x-ndjson',
@@ -1856,7 +1807,7 @@ describe('worker', () => {
 
         const responsePromise = app
           .inject()
-          .post(`/bundles/${BUNDLE_TIMESTAMP}/incremental-render/d41d8cd98f00b204e9800998ecf8427e`)
+          .post(`/bundles/${BUNDLE_TIMESTAMP}/incremental-render`)
           .payload(createNDJSONPayload(payload))
           .headers({
             'Content-Type': 'application/x-ndjson',
@@ -1925,7 +1876,7 @@ describe('worker', () => {
 
         const responsePromise = app
           .inject()
-          .post(`/bundles/${BUNDLE_TIMESTAMP}/incremental-render/d41d8cd98f00b204e9800998ecf8427e`)
+          .post(`/bundles/${BUNDLE_TIMESTAMP}/incremental-render`)
           .payload(requestStream)
           .headers({
             'Content-Type': 'application/x-ndjson',
@@ -1999,7 +1950,7 @@ describe('worker', () => {
 
         const responsePromise = app
           .inject()
-          .post(`/bundles/${BUNDLE_TIMESTAMP}/incremental-render/d41d8cd98f00b204e9800998ecf8427e`)
+          .post(`/bundles/${BUNDLE_TIMESTAMP}/incremental-render`)
           .payload(requestStream)
           .headers({
             'Content-Type': 'application/x-ndjson',
@@ -2104,7 +2055,7 @@ describe('worker', () => {
 
           const responsePromise = app
             .inject()
-            .post(`/bundles/${BUNDLE_TIMESTAMP}/incremental-render/d41d8cd98f00b204e9800998ecf8427e`)
+            .post(`/bundles/${BUNDLE_TIMESTAMP}/incremental-render`)
             .payload(requestStream)
             .headers({
               'Content-Type': 'application/x-ndjson',
@@ -2215,7 +2166,7 @@ describe('worker', () => {
 
           const responsePromise = app
             .inject()
-            .post(`/bundles/${BUNDLE_TIMESTAMP}/incremental-render/d41d8cd98f00b204e9800998ecf8427e`)
+            .post(`/bundles/${BUNDLE_TIMESTAMP}/incremental-render`)
             .payload(requestStream)
             .headers({
               'Content-Type': 'application/x-ndjson',
@@ -2320,7 +2271,7 @@ describe('worker', () => {
 
           const responsePromise = app
             .inject()
-            .post(`/bundles/${BUNDLE_TIMESTAMP}/incremental-render/d41d8cd98f00b204e9800998ecf8427e`)
+            .post(`/bundles/${BUNDLE_TIMESTAMP}/incremental-render`)
             .payload(requestStream)
             .headers({
               'Content-Type': 'application/x-ndjson',

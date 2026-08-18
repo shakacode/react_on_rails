@@ -50,7 +50,7 @@ const renderWithBundle = async (app: ReturnType<typeof createWorker>) => {
   });
   return app
     .inject()
-    .post(`/bundles/${BUNDLE_TIMESTAMP}/render/d41d8cd98f00b204e9800998ecf8427e`)
+    .post(`/bundles/${BUNDLE_TIMESTAMP}/render`)
     .payload(form.payload)
     .headers(form.headers)
     .end();

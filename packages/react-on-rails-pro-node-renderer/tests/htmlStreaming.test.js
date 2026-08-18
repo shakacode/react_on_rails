@@ -109,7 +109,7 @@ const makeRequest = async (options = {}) => {
   const client = http2.connect(`http://localhost:${port}`);
   const request = client.request({
     ':method': 'POST',
-    ':path': `/bundles/${SERVER_BUNDLE_TIMESTAMP}/render/454a82526211afdb215352755d36032c`,
+    ':path': `/bundles/${SERVER_BUNDLE_TIMESTAMP}/render`,
     'content-type': `multipart/form-data; boundary=${form.getBoundary()}`,
   });
   request.setEncoding('utf8');

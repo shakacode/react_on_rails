@@ -31,11 +31,6 @@ module ReactOnRailsPro
 
         def exec_server_render_js(js_code, render_options)
           ::ReactOnRailsPro::Utils.with_trace(render_options.react_component_name) do
-            # See https://github.com/shakacode/react_on_rails_pro/issues/119 for why
-            # the digest is on the render options.
-            # TODO: the request digest should be removed unless prerender caching is used
-            set_request_digest_on_render_options(js_code, render_options)
-
             # Cache non-streaming immediately. For streaming, optionally cache via write-through.
             if cache_enabled_for?(render_options)
               render_with_cache(js_code, render_options)
@@ -45,8 +40,8 @@ module ReactOnRailsPro
           end
         end
 
-        # See https://github.com/shakacode/react_on_rails_pro/issues/119 for why
-        # the digest is on the render options.
+        # Computes an MD5 digest of the JS code for use as a prerender cache key.
+        # Only called when prerender caching is enabled.
         def set_request_digest_on_render_options(js_code, render_options)
           return unless render_options.request_digest.blank?
 

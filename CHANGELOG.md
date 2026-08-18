@@ -24,6 +24,19 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Changed
+
+- **[Pro] BREAKING: Protocol version bumped to 3.0.0 — removes two wire-protocol legacies**:
+  The `targetBundles` field is no longer sent on `/upload-assets` requests; the node renderer now derives bundle
+  directories from `bundle_<hash>` form keys on that endpoint (the pattern already used by `/render`).
+  `/asset-exists` still uses the `targetBundles` array — it sends bundle hashes, not files, so an explicit array
+  is the right JSON idiom. The `renderRequestDigest` URL segment has been removed from render and
+  incremental-render routes, and the MD5 digest is now computed only when prerender caching is enabled (previously
+  computed on every render). The gem and node renderer must be upgraded together.
+  [Issue 4873](https://github.com/shakacode/react_on_rails/issues/4873).
+  [PR 4875](https://github.com/shakacode/react_on_rails/pull/4875) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 #### Fixed
 
 - **[Pro]** **RSC render-error details are no longer sent to the browser on the fetched payload path**:
