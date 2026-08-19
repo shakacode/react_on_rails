@@ -21,6 +21,7 @@ import { fileURLToPath } from 'node:url';
 import { assertReactServerEntryFiles, resolveRuntimeReactVersion } from './check-react-server-resolution.mjs';
 
 const scriptPath = fileURLToPath(new URL('./check-react-server-resolution.mjs', import.meta.url));
+const jestConfigUrl = new URL('../jest.config.js', import.meta.url).href;
 const reactMajorVersion = Number.parseInt(resolveRuntimeReactVersion(), 10);
 
 test('validates the installed runtime under the react-server condition', () => {
@@ -55,4 +56,40 @@ test('rejects a missing mapped server entry with its path', () => {
       assertReactServerEntryFiles({ 'React react-server': '/missing/react.react-server.js' }, () => false),
     /React server test setup failed: the React react-server entry is missing.*react[.]react-server[.]js/,
   );
+});
+
+test('keeps condition-sensitive React DOM subpaths on react-server entries', () => {
+  if (!(reactMajorVersion >= 19)) return;
+
+  const result = spawnSync(
+    process.execPath,
+    [
+      '--input-type=module',
+      '--eval',
+      `const { default: config } = await import(${JSON.stringify(jestConfigUrl)});` +
+        'process.stdout.write(JSON.stringify(config.moduleNameMapper));',
+    ],
+    {
+      encoding: 'utf8',
+      env: { ...process.env, NODE_CONDITIONS: 'react-server' },
+    },
+  );
+
+  assert.equal(result.status, 0, result.stderr);
+  const mapper = JSON.parse(result.stdout);
+  assert.match(mapper['^react-dom/client$'], /client[.]react-server[.]js$/);
+  assert.match(mapper['^react-dom/profiling$'], /profiling[.]react-server[.]js$/);
+  assert.match(mapper['^react-dom/server(\\..+)?$'], /server[.]react-server[.]js$/);
+  assert.match(mapper['^react-dom/static(\\..+)?$'], /static[.]react-server[.]js$/);
+
+  const mapperPatterns = Object.keys(mapper);
+  const catchAllIndex = mapperPatterns.indexOf('^react-dom/(.*)$');
+  for (const pattern of [
+    '^react-dom/client$',
+    '^react-dom/profiling$',
+    '^react-dom/server(\\..+)?$',
+    '^react-dom/static(\\..+)?$',
+  ]) {
+    assert.ok(mapperPatterns.indexOf(pattern) < catchAllIndex);
+  }
 });
