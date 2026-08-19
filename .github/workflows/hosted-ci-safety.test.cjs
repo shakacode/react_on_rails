@@ -39,6 +39,17 @@ function extractRunScript(workflow, stepName) {
   return scriptLines.join('\n');
 }
 
+function extractJob(workflow, jobName) {
+  const lines = workflow.split('\n');
+  const jobIndex = lines.findIndex((line) => line === `  ${jobName}:`);
+  assert.notEqual(jobIndex, -1, `workflow is missing the ${jobName} job`);
+
+  const nextJobIndex = lines.findIndex(
+    (line, index) => index > jobIndex && /^ {2}[a-zA-Z0-9_-]+:$/.test(line),
+  );
+  return lines.slice(jobIndex, nextJobIndex === -1 ? undefined : nextJobIndex).join('\n');
+}
+
 function runGemMatrix(script, { full, generators }) {
   const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'gem-tests-matrix-'));
   const outputPath = path.join(temporaryDirectory, 'github-output');
@@ -72,6 +83,8 @@ const hostedSelectorsAction = read('.github/actions/hosted-ci-selectors/action.y
 const ciCommandsWorkflow = read('.github/workflows/ci-commands.yml');
 const claudeWorkflow = read('.github/workflows/claude.yml');
 const shakaperfReleaseGateWorkflow = read('.github/workflows/shakaperf-release-gates.yml');
+const proIntegrationWorkflow = read('.github/workflows/pro-integration-tests.yml');
+const waitForH2cServiceAction = read('.github/actions/wait-for-h2c-service/action.yml');
 const rspackViteDxWorkflow = read('.github/workflows/rspack-vite-dx.yml');
 const gemTestsWorkflow = read('.github/workflows/gem-tests.yml');
 const hostedWorkflowFiles = [
@@ -312,6 +325,57 @@ assertDoesNotMatch(
   'generator subshards do not split shared setup by leaf-example hash',
   gemRspecScript,
   /Digest::SHA256\.hexdigest\(id\)\.to_i\(16\) % shard_count/,
+);
+
+const proNodeRendererJobs = [
+  'rspec-dummy-app-node-renderer',
+  'dummy-app-node-renderer-e2e-tests',
+  'dummy-app-rspack-rsc-runtime-gate',
+];
+for (const jobName of proNodeRendererJobs) {
+  const job = extractJob(proIntegrationWorkflow, jobName);
+  assertMatches(
+    `${jobName} waits for h2c readiness before its tests`,
+    job,
+    /pnpm run node-renderer &[\s\S]*uses: \.\/\.github\/actions\/wait-for-h2c-service[\s\S]*- name: (?:Run RSpec tests|Install Playwright dependencies)/,
+  );
+  assertMatches(`${jobName} checks the renderer info path`, job, /path: \/info/);
+  assertMatches(
+    `${jobName} checks the renderer IPv4 authority`,
+    job,
+    /authority: http:\/\/127\.0\.0\.1:3800/,
+  );
+}
+assert.equal(
+  [...proIntegrationWorkflow.matchAll(/pnpm run node-renderer &/g)].length,
+  proNodeRendererJobs.length,
+  'the complete set of Pro node renderer jobs should be covered by the readiness assertions',
+);
+assert.equal(
+  [...proIntegrationWorkflow.matchAll(/uses: \.\/\.github\/actions\/wait-for-h2c-service/g)].length,
+  proNodeRendererJobs.length,
+  'every Pro node renderer job should use the shared h2c readiness action exactly once',
+);
+assertDoesNotMatch(
+  'Pro integration workflow has no inline h2c helper',
+  proIntegrationWorkflow,
+  /wait_for_h2c_service\(\)/,
+);
+assertMatches('shared h2c action uses Node HTTP/2', waitForH2cServiceAction, /require\('node:http2'\)/);
+assertMatches(
+  'shared h2c action accepts successful responses',
+  waitForH2cServiceAction,
+  /status >= 200 && status < 300/,
+);
+assertMatches(
+  'shared h2c action keeps the 300 second timeout',
+  waitForH2cServiceAction,
+  /timeout-seconds:[\s\S]*default: '300'/,
+);
+assertDoesNotMatch(
+  'shared h2c action avoids a plain curl probe',
+  waitForH2cServiceAction,
+  /curl [^\n]*http:\/\/127\.0\.0\.1:3800\/info/,
 );
 
 assertMatches('ShakaPerf renderer h2c probe', shakaperfReleaseGateWorkflow, /require\('node:http2'\)/);
