@@ -136,8 +136,8 @@ JSON
 {
   "name": "react-on-rails-pro",
   "scripts": {
-    "test:non-rsc": "jest tests --testPathIgnorePatterns=\"tests/.*(RSC|stream).*\"",
-    "test:rsc": "jest tests/*.rsc.test.*"
+    "test:non-rsc": "jest tests --testPathIgnorePatterns=\"tests/.*(\\\\.rsc\\\\.test\\\\.|streamServerRenderedReactComponent|streamBackpressure|rscSsrSynchrony|injectRSCPayload|parseLengthPrefixedStream|SuspenseHydration|registerServerComponent).*\"",
+    "test:rsc": "NODE_CONDITIONS=react-server node scripts/run-react19-jest.mjs --require-react-server tests/*.rsc.test.*"
   },
   "dependencies": {
     "react": "19.2.0",

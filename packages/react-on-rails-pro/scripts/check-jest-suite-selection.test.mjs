@@ -18,21 +18,24 @@ import test from 'node:test';
 
 import checkJestSuiteSelection from './check-jest-suite-selection.mjs';
 
-test('skips suite-selection discovery when React 18 intentionally excludes React 19 tests', () => {
+test('runs misplaced-test discovery but skips the orphan check on React 18', () => {
   const messages = [];
-  let discoveryCalls = 0;
+  const discoveryCalls = [];
   const compatibleTest = '/workspace/tests/compatible.test.ts';
 
   checkJestSuiteSelection({
     reactVersion: '18.3.1',
-    runPnpm: () => {
-      discoveryCalls += 1;
+    runPnpm: (args) => {
+      discoveryCalls.push(args);
       return [compatibleTest];
     },
     log: (message) => messages.push(message),
   });
 
-  assert.equal(discoveryCalls, 2);
+  assert.deepEqual(discoveryCalls, [
+    ['exec', 'jest', '--listTests', 'tests'],
+    ['run', '--silent', 'test:non-rsc', '--listTests'],
+  ]);
   assert.deepEqual(messages, ['Jest suite-selection check skipped (requires React 19+, found 18.3.1)']);
 });
 
@@ -47,6 +50,20 @@ test('rejects lowercase RSC tests from the React 18-compatible suite', () => {
         log: () => {},
       }),
     /React 19-only tests selected by the React 18-compatible test:non-rsc suite:\n.*cacheSignalAbort[.]rsc[.]test[.]tsx/,
+  );
+});
+
+test('rejects rscSsrSynchrony siblings from the React 18-compatible suite', () => {
+  const rscTest = '/workspace/tests/rscSsrSynchronyCold.e2e.test.tsx';
+
+  assert.throws(
+    () =>
+      checkJestSuiteSelection({
+        reactVersion: '18.3.1',
+        runPnpm: () => [rscTest],
+        log: () => {},
+      }),
+    /React 19-only tests selected by the React 18-compatible test:non-rsc suite:\n.*rscSsrSynchronyCold/,
   );
 });
 

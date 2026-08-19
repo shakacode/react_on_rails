@@ -46,14 +46,33 @@ const sameFile = (left, right) => {
   }
 };
 
-export const resolveReactServerDependencies = (fromUrl = import.meta.url) => {
+const resolveRuntimePackages = (fromUrl) => {
   const sourceRequire = createRequire(fromUrl);
   const reactOnRailsRscPackage = sourceRequire.resolve('react-on-rails-rsc/package.json');
   const reactOnRailsRscRequire = createRequire(reactOnRailsRscPackage);
   const reactServerDomWebpackPackage = reactOnRailsRscRequire.resolve(
     'react-server-dom-webpack/package.json',
   );
-  const runtimeRequire = createRequire(reactServerDomWebpackPackage);
+
+  return {
+    reactOnRailsRscPackage,
+    reactServerDomWebpackPackage,
+    runtimeRequire: createRequire(reactServerDomWebpackPackage),
+  };
+};
+
+export const resolveRuntimeReactVersion = (fromUrl = import.meta.url) => {
+  try {
+    const { runtimeRequire } = resolveRuntimePackages(fromUrl);
+    return runtimeRequire('react/package.json').version;
+  } catch {
+    return null;
+  }
+};
+
+export const resolveReactServerDependencies = (fromUrl = import.meta.url) => {
+  const { reactOnRailsRscPackage, reactServerDomWebpackPackage, runtimeRequire } =
+    resolveRuntimePackages(fromUrl);
   const reactPackage = runtimeRequire.resolve('react/package.json');
   const reactDomPackage = runtimeRequire.resolve('react-dom/package.json');
   const reactPackageRoot = path.dirname(reactPackage);
@@ -72,7 +91,8 @@ export const resolveReactServerDependencies = (fromUrl = import.meta.url) => {
     reactDom: runtimeRequire('react-dom/package.json').version,
     reactServerDomWebpack: runtimeRequire('react-server-dom-webpack/package.json').version,
   };
-  if (new Set(Object.values(versions)).size !== 1) {
+  const minorVersions = Object.values(versions).map((version) => version.split('.').slice(0, 2).join('.'));
+  if (new Set(minorVersions).size !== 1) {
     throw resolutionError(
       `react, react-dom, and react-server-dom-webpack resolve incompatible versions: ${JSON.stringify(versions)}`,
     );
@@ -80,7 +100,9 @@ export const resolveReactServerDependencies = (fromUrl = import.meta.url) => {
 
   return {
     entries,
+    reactDomPackageRoot,
     reactOnRailsRscPackage,
+    reactPackageRoot,
     reactServerDomWebpackPackage,
     runtimeRequire,
     versions,

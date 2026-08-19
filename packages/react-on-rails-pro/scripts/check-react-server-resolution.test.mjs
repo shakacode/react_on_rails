@@ -15,15 +15,13 @@
 
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { createRequire } from 'node:module';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { assertReactServerEntryFiles } from './check-react-server-resolution.mjs';
+import { assertReactServerEntryFiles, resolveRuntimeReactVersion } from './check-react-server-resolution.mjs';
 
 const scriptPath = fileURLToPath(new URL('./check-react-server-resolution.mjs', import.meta.url));
-const require = createRequire(import.meta.url);
-const reactMajorVersion = Number.parseInt(require('react/package.json').version, 10);
+const reactMajorVersion = Number.parseInt(resolveRuntimeReactVersion(), 10);
 
 test('validates the installed runtime under the react-server condition', () => {
   const result = spawnSync(process.execPath, ['--conditions', 'react-server', scriptPath], {

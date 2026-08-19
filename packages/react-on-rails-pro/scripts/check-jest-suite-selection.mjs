@@ -22,7 +22,7 @@ const scriptPath = fileURLToPath(import.meta.url);
 const packageRoot = path.resolve(path.dirname(scriptPath), '..');
 const require = createRequire(import.meta.url);
 const isReactServerOnlyTest = (testPath) =>
-  testPath.includes('.rsc.test.') || path.basename(testPath) === 'rscSsrSynchrony.e2e.test.tsx';
+  testPath.includes('.rsc.test.') || path.basename(testPath).startsWith('rscSsrSynchrony');
 
 const runPnpmCommand = (args) =>
   execFileSync('pnpm', args, {

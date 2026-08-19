@@ -18,6 +18,9 @@ import { fileURLToPath } from 'node:url';
 
 const versionCheck = fileURLToPath(new URL('./check-react-version.cjs', import.meta.url));
 const versionResult = spawnSync(process.execPath, [versionCheck], { stdio: 'inherit' });
+const requireReactServerFlag = '--require-react-server';
+const jestArgs = process.argv.slice(2).filter((argument) => argument !== requireReactServerFlag);
+const needsReactServerPreflight = process.argv.includes(requireReactServerFlag);
 
 if (versionResult.error) throw versionResult.error;
 if (versionResult.status === 0) {
@@ -25,16 +28,21 @@ if (versionResult.status === 0) {
 } else if (versionResult.status !== 1) {
   process.exitCode = versionResult.status ?? 1;
 } else {
-  const resolutionCheck = fileURLToPath(new URL('./check-react-server-resolution.mjs', import.meta.url));
-  const preflight = spawnSync(process.execPath, ['--conditions', 'react-server', resolutionCheck], {
-    stdio: ['ignore', 'ignore', 'inherit'],
-  });
+  let preflightStatus = 0;
+  if (needsReactServerPreflight) {
+    const resolutionCheck = fileURLToPath(new URL('./check-react-server-resolution.mjs', import.meta.url));
+    const preflight = spawnSync(process.execPath, ['--conditions', 'react-server', resolutionCheck], {
+      stdio: ['ignore', 'ignore', 'inherit'],
+    });
 
-  if (preflight.error) throw preflight.error;
-  if (preflight.status !== 0) {
-    process.exitCode = preflight.status ?? 1;
+    if (preflight.error) throw preflight.error;
+    preflightStatus = preflight.status ?? 1;
+  }
+
+  if (preflightStatus !== 0) {
+    process.exitCode = preflightStatus;
   } else {
-    const jest = spawnSync('jest', process.argv.slice(2), { stdio: 'inherit' });
+    const jest = spawnSync('jest', jestArgs, { stdio: 'inherit' });
     if (jest.error) throw jest.error;
     process.exitCode = jest.status ?? 1;
   }

@@ -34,8 +34,9 @@ def gsub_file_content(path, old_content, new_content)
   end
 
   content = File.binread(path)
-  content.gsub!(old_content, new_content)
+  changed = content.gsub!(old_content, new_content)
   File.binwrite(path, content)
+  !changed.nil?
 end
 
 def update_json_file(path)
@@ -150,10 +151,12 @@ minimum_pro_non_rsc_script = [
   ').*\"",'
 ].join
 
-gsub_file_content(
+unless gsub_file_content(
   "../packages/react-on-rails-pro/package.json",
   /"test:non-rsc": "(?:\\"|[^"])*",/,
   minimum_pro_non_rsc_script
 )
+  abort "Failed to update the React on Rails Pro test:non-rsc script"
+end
 # test:rsc script now automatically detects React version and skips on React 18
 # No override needed - the script checks React version and exits cleanly if < 19

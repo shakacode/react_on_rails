@@ -30,9 +30,8 @@ const isReactServerEnv = (process.env.NODE_CONDITIONS ?? '')
 // manager swaps) instead of hardcoding `../../node_modules/react`.
 const reactPackageRoot = path.dirname(require.resolve('react/package.json'));
 const reactDomPackageRoot = path.dirname(require.resolve('react-dom/package.json'));
-const reactServerDependencies = isReactServerEnv
-  ? resolveReactServerDependencies(import.meta.url)
-  : undefined;
+const reactServerDependencies =
+  isReactServerEnv && nodeVersion >= 18 ? resolveReactServerDependencies(import.meta.url) : undefined;
 
 // Package-specific Jest configuration
 // Inherits from root jest.config.mjs and adds package-specific settings
@@ -70,6 +69,8 @@ export default {
             '^react/jsx-runtime$': reactServerDependencies.entries['React JSX react-server'],
             '^react/jsx-dev-runtime$': reactServerDependencies.entries['React JSX dev react-server'],
             '^react-dom$': reactServerDependencies.entries['React DOM react-server'],
+            '^react/(.*)$': `${reactServerDependencies.reactPackageRoot}/$1`,
+            '^react-dom/(.*)$': `${reactServerDependencies.reactDomPackageRoot}/$1`,
           }
         : {
             '^react$': reactPackageRoot,
