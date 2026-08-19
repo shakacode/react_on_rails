@@ -64,6 +64,11 @@ https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE
     <%= javascript_pack_tag('client-bundle', 'data-turbo-track': 'reload', async: true) %>
   <% end %>
   <%= csrf_meta_tags %>
+  <%# Exposes the per-request CSP nonce as <meta name="csp-nonce"> for rails-ujs:
+      it stamps the nonce onto the <script> element it injects to execute JS (SJR)
+      responses (e.g. pages/xhr_refresh.js.erb). Without it, the strict script-src
+      nonce policy in config/initializers/content_security_policy.rb blocks them. %>
+  <%= csp_meta_tag %>
 </head>
 <body class="app-body bg-white">
 <div class="app-shell flex flex-row h-screen w-screen">
