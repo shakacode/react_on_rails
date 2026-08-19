@@ -9,12 +9,18 @@ inputs:
     description: Request path used for the readiness probe.
     required: true
   authority:
-    description: HTTP/2 cleartext authority, including scheme and port.
+    description: >-
+      Single HTTP/2 cleartext authority, including scheme and port. Keep the service bind,
+      client URL, and this authority pinned to the same IPv4 endpoint.
     required: true
   timeout-seconds:
     description: Maximum number of seconds to wait for readiness.
     required: false
     default: '300'
+  log-path:
+    description: Optional service log path to include in timeout diagnostics.
+    required: false
+    default: ''
 
 runs:
   using: composite
@@ -25,8 +31,27 @@ runs:
         SERVICE_AUTHORITY: ${{ inputs.authority }}
         SERVICE_NAME: ${{ inputs.service-name }}
         SERVICE_PATH: ${{ inputs.path }}
+        SERVICE_LOG_PATH: ${{ inputs.log-path }}
         SERVICE_TIMEOUT_SECONDS: ${{ inputs.timeout-seconds }}
       run: |
+        case "$SERVICE_TIMEOUT_SECONDS" in
+          ''|*[!0-9]*)
+            echo "::error::timeout-seconds must be a positive integer"
+            exit 1
+            ;;
+        esac
+        if [ "$SERVICE_TIMEOUT_SECONDS" -eq 0 ]; then
+          echo "::error::timeout-seconds must be a positive integer"
+          exit 1
+        fi
+        case "$SERVICE_PATH" in
+          /*) ;;
+          *)
+            echo "::error::path must start with /"
+            exit 1
+            ;;
+        esac
+
         timeout="$SERVICE_TIMEOUT_SECONDS"
         start=$SECONDS
 
@@ -119,6 +144,10 @@ runs:
         });
         request.end();
         NODE
+            if [ -n "$SERVICE_LOG_PATH" ] && [ -f "$SERVICE_LOG_PATH" ]; then
+              echo "Last 200 lines from $SERVICE_LOG_PATH:"
+              tail -n 200 "$SERVICE_LOG_PATH" || true
+            fi
             echo "::endgroup::"
             exit 1
           fi

@@ -211,8 +211,11 @@ jobs:
       needs.detect-changes.outputs.should_run_hosted_ci == 'true' &&
       needs.detect-changes.outputs.run_pro_dummy_tests == 'true'
     runs-on: ubuntu-22.04
+    timeout-minutes: 30
     env:
       REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
+      REACT_RENDERER_URL: http://127.0.0.1:3800
+      RENDERER_HOST: 127.0.0.1
     # Redis backs streamed RSC fixtures covered by the request specs.
     services:
       redis:
@@ -320,7 +323,7 @@ jobs:
       - name: Run Pro Node renderer in background
         run: |
           cd spec/dummy
-          pnpm run node-renderer &
+          pnpm run node-renderer > "$RUNNER_TEMP/node-renderer.log" 2>&1 &
 
       - name: Run Rails server in background
         run: |
@@ -347,6 +350,7 @@ jobs:
           service-name: Node renderer
           path: /info
           authority: http://127.0.0.1:3800
+          log-path: ${{ runner.temp }}/node-renderer.log
 
       - name: Run RSpec tests for Pro dummy app
         run: |
@@ -402,8 +406,11 @@ jobs:
       needs.detect-changes.outputs.should_run_hosted_ci == 'true' &&
       needs.detect-changes.outputs.run_pro_dummy_tests == 'true'
     runs-on: ubuntu-22.04
+    timeout-minutes: 30
     env:
       REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
+      REACT_RENDERER_URL: http://127.0.0.1:3800
+      RENDERER_HOST: 127.0.0.1
     # Redis service container
     services:
       redis:
@@ -511,7 +518,7 @@ jobs:
       - name: Run Pro Node renderer in background
         run: |
           cd spec/dummy
-          pnpm run node-renderer &
+          pnpm run node-renderer > "$RUNNER_TEMP/node-renderer.log" 2>&1 &
 
       - name: Run Rails server in background
         run: |
@@ -538,6 +545,7 @@ jobs:
           service-name: Node renderer
           path: /info
           authority: http://127.0.0.1:3800
+          log-path: ${{ runner.temp }}/node-renderer.log
 
       - name: Install Playwright dependencies
         run: cd spec/dummy && npx playwright install --with-deps
@@ -669,7 +677,7 @@ jobs:
       - name: Run Pro Node renderer in background
         run: |
           cd spec/dummy
-          pnpm run node-renderer &
+          pnpm run node-renderer > "$RUNNER_TEMP/node-renderer.log" 2>&1 &
 
       - name: Run Rails server in background
         run: |
@@ -706,14 +714,13 @@ jobs:
           # to read while the renderer can continue booting during the Rails poll.
           wait_for_service "Rails server" "http://127.0.0.1:3000/empty"
 
-      # Single IPv4 authority is intentional: RENDERER_HOST binds h2c to
-      # 127.0.0.1. Add ::1 here only if the renderer binding changes.
       - name: Wait for Pro Node renderer to start
         uses: ./.github/actions/wait-for-h2c-service
         with:
           service-name: Node renderer
           path: /info
           authority: http://127.0.0.1:3800
+          log-path: ${{ runner.temp }}/node-renderer.log
 
       - name: Install Playwright dependencies
         run: cd spec/dummy && npx playwright install --with-deps
