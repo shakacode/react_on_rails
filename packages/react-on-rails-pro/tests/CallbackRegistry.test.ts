@@ -18,15 +18,19 @@ type CallbackRegistryConstructor = typeof import('../src/CallbackRegistry.ts').d
 type IsPageUnloadRegistryError = typeof import('../src/CallbackRegistry.ts').isPageUnloadRegistryError;
 
 describe('CallbackRegistry', () => {
+  let mockPageLoadedCallbacks: PageLifecycleCallback[];
   let mockPageUnloadedCallbacks: PageLifecycleCallback[];
   let CallbackRegistry: CallbackRegistryConstructor;
   let isPageUnloadRegistryError: IsPageUnloadRegistryError;
 
   beforeEach(() => {
     jest.resetModules();
+    mockPageLoadedCallbacks = [];
     mockPageUnloadedCallbacks = [];
     jest.doMock('react-on-rails/pageLifecycle', () => ({
-      onPageLoaded: jest.fn(),
+      onPageLoaded: jest.fn((callback: PageLifecycleCallback) => {
+        mockPageLoadedCallbacks.push(callback);
+      }),
       onPageUnloaded: jest.fn((callback: PageLifecycleCallback) => {
         mockPageUnloadedCallbacks.push(callback);
       }),
@@ -41,6 +45,8 @@ describe('CallbackRegistry', () => {
 
   afterEach(() => {
     jest.dontMock('react-on-rails/pageLifecycle');
+    jest.useRealTimers();
+    document.body.innerHTML = '';
   });
 
   it('rejects pending waiters on page unload', async () => {
@@ -64,5 +70,49 @@ describe('CallbackRegistry', () => {
       message: expect.stringContaining('Could not find component registered with name DeferredComponent.'),
     });
     expect(isPageUnloadRegistryError(rejection)).toBe(true);
+  });
+
+  // Issue #4861's fix (StoreRegistry.clearHydratedStoresKeepingWaiters) deliberately leaves
+  // waiter/timeout lifecycle to this registry's own page-unload handling. That makes the
+  // handler's timed-out reset part of the fix's contract: if a registry timed out on page A
+  // and the unload did NOT re-arm it, then on every later soft-navigation page set() would
+  // stop resolving waiters and getOrWaitForItem would fast-fail — permanently broken gates.
+  it('re-arms a timed-out registry on page unload so the next page can wait and resolve', async () => {
+    jest.useFakeTimers();
+    // componentRegistryTimeout is read from the railsContext DOM element when the
+    // page-loaded callback arms the timeout.
+    const railsContext = document.createElement('div');
+    railsContext.id = 'js-react-on-rails-context';
+    railsContext.textContent = JSON.stringify({
+      componentRegistryTimeout: 5,
+      serverSide: false,
+      rorPro: true,
+    });
+    document.body.appendChild(railsContext);
+
+    const registry = new CallbackRegistry<string>('hydrated store');
+
+    // Page A: a wait that times out.
+    const pageAWait = registry.getOrWaitForItem('MissingOnPageA');
+    expect(mockPageLoadedCallbacks).toHaveLength(1);
+    mockPageLoadedCallbacks.forEach((callback) => {
+      void callback();
+    });
+    jest.advanceTimersByTime(5);
+    await expect(pageAWait).rejects.toThrow(
+      /Could not find hydrated store registered with name MissingOnPageA/,
+    );
+
+    // Soft navigation away from page A.
+    expect(mockPageUnloadedCallbacks).toHaveLength(1);
+    mockPageUnloadedCallbacks.forEach((callback) => {
+      void callback();
+    });
+
+    // Page B: a fresh wait must stay pending (not fast-fail with the timed-out state) and
+    // resolve once its item registers.
+    const pageBWait = registry.getOrWaitForItem('PageBItem');
+    registry.set('PageBItem', 'page-b-item');
+    await expect(pageBWait).resolves.toBe('page-b-item');
   });
 });

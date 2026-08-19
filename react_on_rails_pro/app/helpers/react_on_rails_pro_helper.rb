@@ -18,6 +18,7 @@
 # 2. Keep all #{some_var} fully to the left so that all indentation is done evenly in that var
 
 require "react_on_rails/helper"
+require "react_on_rails_pro/open_telemetry"
 require "async/promise"
 require "digest"
 require "json"
@@ -396,8 +397,11 @@ module ReactOnRailsProHelper
             "Include ReactOnRailsPro::AsyncRendering in your controller and call enable_async_react_rendering."
     end
 
+    parent_context = ReactOnRailsPro::OpenTelemetry.capture_context
     task = @react_on_rails_async_barrier.async do
-      react_component(component_name, options)
+      ReactOnRailsPro::OpenTelemetry.with_context(parent_context) do
+        react_component(component_name, options)
+      end
     end
 
     ReactOnRailsPro::AsyncValue.new(task:)
@@ -1165,14 +1169,17 @@ module ReactOnRailsProHelper
     initial_result = normalize_cached_pro_attribution(cached_chunks.first)
 
     # Enqueue remaining chunks asynchronously
+    parent_context = ReactOnRailsPro::OpenTelemetry.capture_context
     @async_barrier.async do |task|
-      task.yield
+      ReactOnRailsPro::OpenTelemetry.with_context(parent_context) do
+        task.yield
 
-      cached_chunks.each_with_index do |chunk, index|
-        next if index.zero?
-        break if response.stream.closed?
+        cached_chunks.each_with_index do |chunk, index|
+          next if index.zero?
+          break if response.stream.closed?
 
-        @main_output_queue.enqueue(normalize_cached_pro_attribution(chunk))
+          @main_output_queue.enqueue(normalize_cached_pro_attribution(chunk))
+        end
       end
     rescue Async::Queue::ClosedError
       # Queue closed due to error/disconnect in another component — stop enqueuing
@@ -1286,8 +1293,11 @@ module ReactOnRailsProHelper
   def render_async_react_component_uncached(component_name, raw_options, &)
     options = prepare_async_render_options(raw_options, &)
 
+    parent_context = ReactOnRailsPro::OpenTelemetry.capture_context
     task = @react_on_rails_async_barrier.async do
-      react_component(component_name, options)
+      ReactOnRailsPro::OpenTelemetry.with_context(parent_context) do
+        react_component(component_name, options)
+      end
     end
 
     ReactOnRailsPro::AsyncValue.new(task:)
@@ -1304,14 +1314,17 @@ module ReactOnRailsProHelper
     normalized_cache_tags = ReactOnRailsPro::Cache.normalize_tags(raw_options[:cache_tags])
     options = prepare_async_render_options(raw_options, &)
 
+    parent_context = ReactOnRailsPro::OpenTelemetry.capture_context
     task = @react_on_rails_async_barrier.async do
-      result = react_component(component_name, options)
-      unless ReactOnRailsPro::Cache.cache_write_expired?(raw_cache_options)
-        cache_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
-        Rails.cache.write(cache_key, result, cache_options)
-        ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_options)
+      ReactOnRailsPro::OpenTelemetry.with_context(parent_context) do
+        result = react_component(component_name, options)
+        unless ReactOnRailsPro::Cache.cache_write_expired?(raw_cache_options)
+          cache_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
+          Rails.cache.write(cache_key, result, cache_options)
+          ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_options)
+        end
+        result
       end
-      result
     end
 
     ReactOnRailsPro::AsyncValue.new(task:)
@@ -1336,13 +1349,16 @@ module ReactOnRailsProHelper
     first_chunk_promise = Async::Promise.new
     all_chunks = [] if on_complete # Only collect if callback provided
     renderer_server_timing_collector = ReactOnRailsPro::Stream.renderer_server_timing_collector
+    parent_context = ReactOnRailsPro::OpenTelemetry.capture_context
 
     # Start an async task on the barrier to stream all chunks
     @async_barrier.async do
-      ReactOnRailsPro::Stream.with_renderer_server_timing_collector(renderer_server_timing_collector) do
-        stream = yield
-        fully_consumed = process_stream_chunks(stream, first_chunk_promise, all_chunks)
-        on_complete&.call(all_chunks) if fully_consumed
+      ReactOnRailsPro::OpenTelemetry.with_context(parent_context) do
+        ReactOnRailsPro::Stream.with_renderer_server_timing_collector(renderer_server_timing_collector) do
+          stream = yield
+          fully_consumed = process_stream_chunks(stream, first_chunk_promise, all_chunks)
+          on_complete&.call(all_chunks) if fully_consumed
+        end
       end
     rescue StandardError => e
       # Propagate the error to the calling fiber via the promise.

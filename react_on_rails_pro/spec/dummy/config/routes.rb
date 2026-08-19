@@ -72,6 +72,7 @@ Rails.application.routes.draw do
   get "rsc_posts_page_over_redis" => "pages#rsc_posts_page_over_redis", as: :rsc_posts_page_over_redis
   get "rsc_echo_props" => "pages#rsc_echo_props", as: :rsc_echo_props
   get "rsc_fouc_probe" => "pages#rsc_fouc_probe", as: :rsc_fouc_probe
+  get "activity_rsc_tabs" => "pages#activity_rsc_tabs", as: :activity_rsc_tabs
   get "client_side_fouc_probe" => "pages#client_side_fouc_probe", as: :client_side_fouc_probe
   get "async_on_server_sync_on_client" => "pages#async_on_server_sync_on_client", as: :async_on_server_sync_on_client
   get "async_on_server_sync_on_client_client_render" => "pages#async_on_server_sync_on_client_client_render",
@@ -123,6 +124,7 @@ Rails.application.routes.draw do
   get "pure_component" => "pages#pure_component"
   get "css_modules_images_fonts_example" => "pages#css_modules_images_fonts_example"
   get "turbolinks_cache_disabled" => "pages#turbolinks_cache_disabled"
+  get "stale_store_probe" => "pages#stale_store_probe"
   get "rendered_html" => "pages#rendered_html"
   get "xhr_refresh" => "pages#xhr_refresh"
   get "react_helmet" => "pages#react_helmet"

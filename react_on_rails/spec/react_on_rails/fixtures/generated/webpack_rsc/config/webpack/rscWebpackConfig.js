@@ -1,0 +1,206 @@
+// React Server Components webpack configuration
+// This creates the RSC bundle based on the server webpack config
+// See: https://reactonrails.com/docs/pro/react-server-components/
+
+const { existsSync, statSync } = require('fs');
+const { basename, dirname, isAbsolute, relative, resolve } = require('path');
+const { config } = require('shakapacker');
+const serverWebpackModule = require('./serverWebpackConfig');
+
+const rscReferenceDiscoveryPlugin = () => {
+  try {
+    return require('react-on-rails-rsc/RSCReferenceDiscoveryPlugin').RSCReferenceDiscoveryPlugin;
+  } catch (error) {
+    throw new Error(
+      `Missing react-on-rails-rsc/RSCReferenceDiscoveryPlugin. ` +
+        `Install react-on-rails-rsc with RSCReferenceDiscoveryPlugin support ` +
+        `(check package.json for the required peer range) before running ` +
+        `bin/shakapacker-precompile-hook. ${error.message}`,
+    );
+  }
+};
+
+// Backward compatibility:
+// - New Pro config exports: { default: configureServer, extractLoader }
+// - Legacy config exports: module.exports = configureServer
+const serverWebpackConfig = serverWebpackModule.default || serverWebpackModule;
+const reactPackageRoot = dirname(require.resolve('react/package.json'));
+// React 19+ ships these react-server entry files alongside the standard entries.
+const resolveReactServerEntry = (entryFilename) => {
+  const entryPath = resolve(reactPackageRoot, entryFilename);
+  if (!existsSync(entryPath)) {
+    throw new Error(
+      `Expected React server entry "${entryFilename}" at "${entryPath}". ` +
+        'React package layout changed; update the RSC webpack aliases.',
+    );
+  }
+  return entryPath;
+};
+const extractLoader =
+  serverWebpackModule.extractLoader ||
+  ((rule, loaderName) => {
+    if (!Array.isArray(rule.use)) return null;
+    return rule.use.find((item) => {
+      const testValue = typeof item === 'string' ? item : item.loader;
+      return testValue && testValue.includes(loaderName);
+    });
+  });
+
+const configureRsc = () => {
+  // Pass true to skip the RSC manifest plugin - RSC bundle doesn't need it
+  const rscConfig = serverWebpackConfig(true);
+  const discoveryBuild = process.env.RSC_REFERENCE_DISCOVERY_BUILD === 'true';
+  // Shakapacker uses "/" to mean entrypoints live directly under source_path.
+  // Keep that sentinel relative so path.resolve does not escape to the filesystem root.
+  const sourceEntryPath = config.source_entry_path === '/' ? '' : config.source_entry_path;
+
+  const defaultServerComponentRegistrationEntry = resolve(
+    config.source_path,
+    sourceEntryPath,
+    '../generated/server-component-registration-entry.js',
+  );
+  const expectedServerComponentRegistrationEntry = 'server-component-registration-entry.js';
+  const excludedRegistrationEntryPathComponents = [
+    '.git',
+    'log',
+    'node_modules',
+    'public',
+    'spec',
+    'test',
+    'tmp',
+    'vendor',
+  ];
+  const registrationEntryPathComponents = (entryPath) => {
+    const rootRelativePath = relative(process.cwd(), entryPath);
+    const scopedPath =
+      rootRelativePath &&
+      rootRelativePath !== '..' &&
+      !rootRelativePath.startsWith('../') &&
+      !rootRelativePath.startsWith('..\\') &&
+      !isAbsolute(rootRelativePath)
+        ? rootRelativePath
+        : entryPath;
+
+    return scopedPath.split(/[\\/]+/).filter(Boolean);
+  };
+  const validServerComponentRegistrationEntry = (entryPath) => {
+    if (basename(entryPath) !== expectedServerComponentRegistrationEntry) return false;
+    if (
+      registrationEntryPathComponents(entryPath).some((component) =>
+        excludedRegistrationEntryPathComponents.includes(component),
+      )
+    ) {
+      return false;
+    }
+
+    try {
+      return statSync(entryPath).isFile();
+    } catch {
+      return false;
+    }
+  };
+  const serverComponentRegistrationEntry = (() => {
+    const configuredRegistrationEntry = process.env.REACT_ON_RAILS_RSC_REGISTRATION_ENTRY_PATH;
+    if (configuredRegistrationEntry) {
+      const configuredEntry = resolve(configuredRegistrationEntry);
+      if (validServerComponentRegistrationEntry(configuredEntry)) return configuredEntry;
+    }
+
+    return defaultServerComponentRegistrationEntry;
+  })();
+
+  if (discoveryBuild) {
+    if (!existsSync(serverComponentRegistrationEntry)) {
+      throw new Error(
+        `Missing server component registration entry: ${serverComponentRegistrationEntry}. ` +
+          `Run bin/shakapacker-precompile-hook before bin/shakapacker.`,
+      );
+    }
+
+    rscConfig.entry = {
+      'rsc-reference-discovery': serverComponentRegistrationEntry,
+    };
+  } else {
+    // Update the entry name to be `rsc-bundle` instead of `server-bundle`
+    rscConfig.entry = {
+      'rsc-bundle': rscConfig.entry['server-bundle'],
+    };
+  }
+
+  // Add the RSC WebpackLoader to the JS rule's loader chain.
+  // This loader replaces 'use client' files with registerClientReference proxies in the RSC bundle.
+  // Webpack loaders execute right-to-left, so appending makes the RSC loader run first (before babel/swc).
+  const { rules } = rscConfig.module;
+  rules.forEach((rule) => {
+    if (typeof rule.use === 'function') {
+      // SWC transpiler defines rule.use as a function: use: ({resource}) => getSwcLoaderConfig(resource)
+      // Wrap it to append the RSC WebpackLoader to the returned loader(s).
+      const originalUse = rule.use;
+      // Must use `function` (not arrow) so `.call(this, data)` forwards webpack's context.
+      rule.use = function rscLoaderWrapper(data) {
+        const result = originalUse.call(this, data);
+        const resultArray = Array.isArray(result) ? result : result ? [result] : [];
+        const resolvedRule = { use: resultArray };
+        const jsLoader =
+          extractLoader(resolvedRule, 'babel-loader') || extractLoader(resolvedRule, 'swc-loader');
+        if (jsLoader) {
+          return [...resultArray, { loader: 'react-on-rails-rsc/WebpackLoader' }];
+        }
+        return result;
+      };
+    } else if (Array.isArray(rule.use)) {
+      // Babel transpiler defines rule.use as a static array
+      const jsLoader = extractLoader(rule, 'babel-loader') || extractLoader(rule, 'swc-loader');
+      if (jsLoader) {
+        rule.use.push({
+          loader: 'react-on-rails-rsc/WebpackLoader',
+        });
+      }
+    }
+  });
+
+  // Add the `react-server` condition to the resolve config.
+  // This condition is used by React and React on Rails to identify RSC bundles.
+  // The `...` tells webpack to retain the default conditions (e.g., `node` for server target).
+  const rscAliases = { ...(rscConfig.resolve?.alias || {}) };
+  delete rscAliases.react;
+  delete rscAliases['react$'];
+  delete rscAliases['react/jsx-runtime'];
+  delete rscAliases['react/jsx-runtime$'];
+  delete rscAliases['react/jsx-dev-runtime'];
+  delete rscAliases['react/jsx-dev-runtime$'];
+  delete rscAliases['react-dom/server'];
+  delete rscAliases['react-dom/server$'];
+
+  rscConfig.resolve = {
+    ...rscConfig.resolve,
+    conditionNames: ['react-server', '...'],
+    alias: {
+      ...rscAliases,
+      // Canonicalize RSC-bundle React imports to one React server package instance.
+      // Without these aliases, symlinked/hoisted packages can bundle one React copy
+      // for react-on-rails-rsc and another for app Server Components. React.cache()
+      // then sees no active RSC dispatcher and silently skips request-local dedupe.
+      react$: resolveReactServerEntry('react.react-server.js'),
+      'react/jsx-runtime$': resolveReactServerEntry('jsx-runtime.react-server.js'),
+      'react/jsx-dev-runtime$': resolveReactServerEntry('jsx-dev-runtime.react-server.js'),
+      // Ignore react-dom/server in RSC bundle - it's not needed for RSC payload generation.
+      // Not removing it will cause a runtime error.
+      // Prefix-match false covers both exact and subpath imports; no $-variant is needed.
+      'react-dom/server': false,
+    },
+  };
+
+  if (discoveryBuild) {
+    rscConfig.output.filename = 'rsc-reference-discovery.js';
+    const RSCReferenceDiscoveryPlugin = rscReferenceDiscoveryPlugin();
+    rscConfig.plugins.push(new RSCReferenceDiscoveryPlugin());
+  } else {
+    // Update the output bundle name to be `rsc-bundle.js` instead of `server-bundle.js`
+    rscConfig.output.filename = 'rsc-bundle.js';
+  }
+
+  return rscConfig;
+};
+
+module.exports = configureRsc;

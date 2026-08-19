@@ -26,12 +26,116 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **Expected Node Renderer cold starts no longer emit OpenTelemetry error spans**: The
+  `ror.bundle.build_execution_context` cache-first probe previously ended with status ERROR when a worker had not
+  compiled a bundle's VM context yet, even though the normal cache-miss path then rendered successfully. The probe
+  now treats that expected miss as normal control flow while preserving error spans for genuine failures.
+  [PR 4908](https://github.com/shakacode/react_on_rails/pull/4908) by
+  [sashakhar1](https://github.com/sashakhar1).
+
+- **[Pro]** **Hydrated Redux stores no longer leak across Turbo/Turbolinks navigations**: The hydrated-store
+  registry is now cleared on client-side page unload (soft navigation), alongside the existing component
+  teardown. Previously a leftover entry from the previous page made `getOrWaitForStore` resolve immediately
+  with the previous page's store, silently defeating the `store_dependencies` hydration gate — most visibly
+  with deferred stores (`redux_store(..., defer: true)`), where a mid-page component could render the
+  previous page's Redux state instead of waiting for its own page's hydration data. Registered store
+  generators are unaffected and persist across navigations. Note for apps that relied on a store surviving a
+  soft navigation without re-rendering its hydration data: each page using a store must now render its own
+  `redux_store` call (the documented model). Fixes
+  [Issue 4861](https://github.com/shakacode/react_on_rails/issues/4861).
+  [PR 4871](https://github.com/shakacode/react_on_rails/pull/4871) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
+- **On-demand renders initialize only the island's declared store dependencies**:
+  `reactOnRailsComponentLoaded` walked every store element on the page even when asked to render a
+  single component, so an unrelated store element whose generator was not registered (e.g. its
+  bundle had not loaded yet) aborted the requested render, and unrelated new stores were hydrated
+  as a side effect. It now reads the `data-store-dependencies` attribute the `react_component`
+  helper already emits (defaulted to the stores registered in the request, or set explicitly with
+  the `store_dependencies` option) and initializes exactly those stores, matching the Pro
+  renderer's dependency gating; a declared dependency that cannot initialize is logged without
+  aborting the render. Markup without the attribute keeps the previous initialize-every-store
+  behavior, and `reactOnRailsPageLoaded`/full page loads are unchanged. Completes
+  [Issue 4862](https://github.com/shakacode/react_on_rails/issues/4862).
+  [PR 4870](https://github.com/shakacode/react_on_rails/pull/4870) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
+- **[Pro]** **Rails requests to the Node Renderer once again continue OpenTelemetry traces**: The async-http transport
+  now creates a CLIENT span and injects W3C trace context for regular and streaming renders, incremental async-props
+  renders, raw-render requests, and asset uploads when the Rails application has configured the OpenTelemetry SDK.
+  OpenTelemetry remains optional, and spans record only the HTTP method, normalized request path, response status, and
+  request/response byte sizes. Fixes
+  [Issue 4866](https://github.com/shakacode/react_on_rails/issues/4866).
+  [PR 4869](https://github.com/shakacode/react_on_rails/pull/4869) by
+  [sashakhar1](https://github.com/sashakhar1).
+
+- **[Pro]** **Node Renderer transport follow-ups now expose protocol errors and accurate Fastify modes**:
+  Rails retries continue for network disconnects and peer-reset HTTP/2 streams, while HTTP parser and framing errors
+  surface directly. Public `configureFastify` callbacks and `fastifyServerOptions` now reflect both HTTP/1.1 and
+  HTTP/2 runtime modes.
+  [PR 4893](https://github.com/shakacode/react_on_rails/pull/4893) by
+  [sashakhar1](https://github.com/sashakhar1).
+
+- **[Pro]** **Bounded Node Renderer VM retention now avoids old/new RSC rebuild thrash during rolling deploys**:
+  The default per-worker VM hard cap now retains four contexts, enough for the server and RSC bundles from one
+  draining and one current revision. Successful bundle sets remain reusable through a configurable, timer-driven
+  drain window, while inactive contexts, generation metadata, and pressure logs stay bounded. Pre-seeding now emits
+  an immutable revision-scoped current-generation declaration; each configured renderer worker validates and compiles
+  that complete server/RSC set before listening, pins it across old-only traffic gaps, and reports ready only after the
+  compile barrier. Symlink-mode cache paths reuse the validated immutable snapshot VM identity without rebuilding on
+  the first request. Doctor now requires valid renderer JavaScript before launcher-derived capacity can prove a warm
+  pass, and reports observed/unverified declaration evidence rather than claiming success from invalid syntax,
+  loopback, or Rails-process configuration. **Upgrade memory impact:** the
+  default `maxVMPoolSize` doubles from 2 to 4 per worker, and total VM retention scales with renderer workers and
+  replicas, so operators should re-check deployment memory requests and limits. Invalid `MAX_VM_POOL_SIZE` values
+  that previously fell back to the default now fail fast during renderer startup. Fixes
+  [Issue 4810](https://github.com/shakacode/react_on_rails/issues/4810).
+  [PR 4811](https://github.com/shakacode/react_on_rails/pull/4811) by
+  [justin808](https://github.com/justin808).
+
+- **Routine startup diagnostics no longer appear in default `INFO` logs**: Successful package validation, valid
+  Pro license checks, non-production missing-license notices, and Node renderer connection setup now log at `DEBUG`
+  instead of `INFO`. Package validation still runs, while expired or invalid configured licenses remain visible outside
+  production, and production license warnings and renderer failures remain actionable. Fixes
+  [Issue 4848](https://github.com/shakacode/react_on_rails/issues/4848).
+  [PR 4849](https://github.com/shakacode/react_on_rails/pull/4849) by
+  [Justin Gordon](https://github.com/justin808).
+
 - **Generated server webpack configs no longer include an unused `merge` import or stale comments**:
   `commonWebpackConfig` already clones the shared client configuration, so the generated server configuration
   stays lint-clean without changing its runtime behavior. Fixes
   [Issue 4791](https://github.com/shakacode/react_on_rails/issues/4791).
   [PR 4840](https://github.com/shakacode/react_on_rails/pull/4840) by
   [ihabadham](https://github.com/ihabadham).
+
+- **Release retries now durably reuse maintainer-verified ShakaPerf evidence**: `rake release` can bind an
+  existing successful run to the canonical release tracker with `RELEASE_SHAKAPERF_RUN`, then re-fetch and
+  re-verify the exact SHA or machine-proven runtime-equivalent evidence on later invocations instead of
+  dispatching duplicate performance runs. Tracker trust is bound to the exact
+  `Release gate: react_on_rails X.Y.Z` stable-base title, explicit selectors take precedence over automatic
+  accepted-RC reuse, and persisted accelerated retries cannot silently consume a selector. Automatic reuse
+  falls back to normal discovery only for authoritative natural invalidation such as stale or missing evidence,
+  a failed/cancelled live run, or proven runtime divergence; indeterminate API or Git failures, detector errors,
+  and record mutations remain blocking. Raw REST-selected runs now preserve their creation timestamp through
+  strict-final verification. Before either a live release or dry run can reach registry checks, confirmation,
+  mutation, tagging, or publication, the task also verifies the frozen pnpm install state, the repository-pinned
+  pnpm version, and lifecycle-enabled builds of all four npm release packages before creating a release checkout,
+  pulling, authenticating, or reading any remote release state. The successful check is bound to the exact commit;
+  when a live `git pull --rebase` advances `HEAD`, the task rebuilds and rebinds readiness before resolving the release
+  version or continuing. npm publication now retries only explicit OTP challenges and context-qualified transient
+  network/HTTP failures; successful lifecycle/tool banners no longer mask those diagnostics, while authentication,
+  actual lifecycle failures, registry rejection, incidental numeric diagnostics, and unknown failures stop immediately
+  with OTP values redacted. Saved ShakaPerf evidence also recognizes GitHub CLI's exact
+  `no valid artifacts found to download` diagnostic as authoritative absence while preserving observation failures as
+  blocking. Stable releases also support
+  an append-only, tracker-bound schema-v2 observation waiver bound to the exact run attempt and canonical
+  repository/workflow/event/branch identity. Legacy schema-v1 waiver markers remain readable audit history but cannot
+  authorize publication. The waiver does not
+  claim the run succeeded or bypass any other release gate; the tracker, waiver, and exact run are revalidated
+  before remote tag push and package publication, and a rerun attempt blocks both boundaries. Fixes
+  [Issue 4812](https://github.com/shakacode/react_on_rails/issues/4812).
+  [PR 4833](https://github.com/shakacode/react_on_rails/pull/4833) by
+  [justin808](https://github.com/justin808).
 
 - **[Pro]** **RSC render-error details no longer reach browser-facing payloads in production-like
   environments**: Fetched RSC payload metadata now uses a fail-closed allowlist that exposes only the
@@ -240,6 +344,26 @@ pair`, returns invalid UTF-8, or silently mis-decodes the value. The parser now 
   [justin808](https://github.com/justin808).
 
 #### Added
+
+- **[Pro]** **Node Renderer OpenTelemetry initialization now composes with application observability stacks**:
+  Applications can append custom instrumentations to the built-in HTTP and Fastify pair, merge resource-detector
+  attributes below explicit resource configuration, or opt in to preserving renderer `ror.*` spans through an
+  application-owned global provider. Empty service-name values from environment variables, options, and resource
+  attributes are treated as unset. Renderer-managed shutdown disables registered instrumentations and shuts down
+  provider components after successful initialization, while failed initialization preserves caller-supplied processors
+  and exporters.
+  Fixes [Issue 4867](https://github.com/shakacode/react_on_rails/issues/4867).
+  [PR 4878](https://github.com/shakacode/react_on_rails/pull/4878) by
+  [sashakhar1](https://github.com/sashakhar1).
+
+- **[Pro]** **HTTP/1.1 is now a supported Node Renderer transport for load balancers and HTTP/1.1-only probes**:
+  Rails can opt out of forcing h2c for cleartext renderer URLs with
+  `config.renderer_http_force_http2 = false`, paired with `fastifyServerOptions: { http2: false }` on the Node
+  Renderer. Regular rendering and response streaming continue to work. Async props require full-duplex behavior across
+  every hop, so request-buffering or half-duplex HTTP/1.1 intermediaries remain unsupported. Fixes
+  [Issue 4868](https://github.com/shakacode/react_on_rails/issues/4868).
+  [PR 4887](https://github.com/shakacode/react_on_rails/pull/4887) by
+  [sashakhar1](https://github.com/sashakhar1).
 
 - **Version-matched agent skills and bundled docs**: The `react_on_rails` gem and
   `react-on-rails` npm package now ship install/upgrade, React Server Components adoption,

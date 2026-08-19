@@ -329,7 +329,9 @@ const config = {
   supportModules: true,
 
   // workersCount defaults to the number of CPUs minus 1
-  workersCount: Number(env.NODE_RENDERER_CONCURRENCY || 3),
+  // RENDERER_WORKERS_COUNT is the canonical name since v16.5.0.
+  // NODE_RENDERER_CONCURRENCY is still supported as a fallback.
+  workersCount: Number(env.RENDERER_WORKERS_COUNT || env.NODE_RENDERER_CONCURRENCY || 3),
 
   // Optional: Automatic worker restarting (for memory leak mitigation)
   // allWorkersRestartInterval: 15, // minutes between restarting all workers

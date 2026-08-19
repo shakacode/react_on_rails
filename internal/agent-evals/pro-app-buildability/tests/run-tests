@@ -6,7 +6,633 @@ eval_dir="$root/internal/agent-evals/pro-app-buildability"
 tmp="$(mktemp -d "${TMPDIR:-/tmp}/ror-eval-tests.XXXXXX")"
 trap 'rm -rf "$tmp"' EXIT INT TERM
 
+timeout_command="$(command -v timeout || command -v gtimeout)"
+exec 9<"$eval_dir/README.md"
+IFS=: read -r fixture_kind fixture_mode fixture_size \
+  <<<"$("$eval_dir/bin/file-descriptor-metadata" 9)"
+test "$fixture_kind" = regular
+test "$fixture_mode" = "0$("$eval_dir/bin/file-permission-mode" "$eval_dir/README.md")"
+test "$fixture_size" = "$(wc -c <"$eval_dir/README.md" | tr -d ' ')"
+test "$(head -c 1 <&9)" = '#'
+exec 9<&-
+mkdir "$tmp/forced-timeout-agents"
+for fake_agent in codex claude; do
+  printf '%s\n' '#!/bin/sh' 'trap "" TERM' 'while :; do :; done' \
+    >"$tmp/forced-timeout-agents/$fake_agent"
+  chmod 700 "$tmp/forced-timeout-agents/$fake_agent"
+  set +e
+  "$eval_dir/bin/run-with-timeout" "$timeout_command" 1 1 \
+    "$tmp/$fake_agent-forced-timeout-error" "$tmp/forced-timeout-agents/$fake_agent" \
+    >"$tmp/$fake_agent-forced-timeout-output"
+  forced_timeout_exit=$?
+  set -e
+  test "$forced_timeout_exit" = 124
+  rg -Fq "timeout: sending signal KILL to command '" \
+    "$tmp/$fake_agent-forced-timeout-error"
+  test ! -e "$tmp/$fake_agent-forced-timeout-error.timeout"
+  test ! -e "$tmp/$fake_agent-forced-timeout-error.shell"
+done
+printf '%s\n' '#!/bin/sh' \
+  'printf "%s\n" "timeout: sending signal KILL to command '\''spoofed'\''" >&2' \
+  'kill -KILL $$' >"$tmp/forced-timeout-agents/unrelated-sigkill"
+chmod 700 "$tmp/forced-timeout-agents/unrelated-sigkill"
+set +e
+"$eval_dir/bin/run-with-timeout" "$timeout_command" 5 5 "$tmp/unrelated-sigkill-error" \
+  "$tmp/forced-timeout-agents/unrelated-sigkill" >"$tmp/unrelated-sigkill-output"
+unrelated_sigkill_exit=$?
+set -e
+test "$unrelated_sigkill_exit" = 137
+rg -Fq "timeout: sending signal KILL to command 'spoofed'" "$tmp/unrelated-sigkill-error"
+test ! -e "$tmp/unrelated-sigkill-error.timeout"
+test ! -e "$tmp/unrelated-sigkill-error.shell"
+
 node "$eval_dir/bin/validate-json.mjs" --schemas-only
+claude_agent_report_schema="$("$eval_dir/bin/build-claude-agent-report-schema")"
+jq -e 'has("$schema") | not' <<<"$claude_agent_report_schema" >/dev/null
+jq -e --argjson compatible "$claude_agent_report_schema" \
+  'has("$schema") and del(."$schema") == $compatible' \
+  "$eval_dir/schemas/agent-report.schema.json" >/dev/null
+historical_run="$eval_dir/runs/2026-07-12-codex-gpt-5.4-final21-network-off"
+node "$eval_dir/bin/validate-json.mjs" "$historical_run" >/dev/null
+"$eval_dir/bin/validate-run-pair" "$historical_run/run.json" \
+  "$historical_run/invocation.json"
+timeout_grace_run="$tmp/timeout-kill-grace"
+cp -R "$historical_run" "$timeout_grace_run"
+jq '.timeout_kill_grace_seconds = 10 |
+  .maximum_agent_call_wall_clock_seconds += 20' \
+  "$historical_run/invocation.json" >"$timeout_grace_run/invocation.json"
+jq '.runner.timeout_kill_grace_seconds = 10 |
+  .runner.maximum_agent_call_wall_clock_seconds += 20' \
+  "$historical_run/run.json" >"$timeout_grace_run/run.json"
+node "$eval_dir/bin/validate-json.mjs" "$timeout_grace_run" >/dev/null
+"$eval_dir/bin/validate-run-pair" "$timeout_grace_run/run.json" \
+  "$timeout_grace_run/invocation.json"
+jq '.runner.timeout_kill_grace_seconds = 9' "$timeout_grace_run/run.json" \
+  >"$tmp/mismatched-timeout-grace-run.json"
+if "$eval_dir/bin/validate-run-pair" "$tmp/mismatched-timeout-grace-run.json" \
+  "$timeout_grace_run/invocation.json" 2>"$tmp/mismatched-timeout-grace-error"; then
+  echo "run/invocation validator accepted mismatched timeout kill grace" >&2
+  exit 1
+fi
+rg -q 'run/invocation security or agent identity disagrees' \
+  "$tmp/mismatched-timeout-grace-error"
+missing_dependency_root="$tmp/missing-validator-dependencies"
+set +e
+EVAL_HARNESS_DEPENDENCY_ROOT="$missing_dependency_root" \
+  "$eval_dir/bin/validate-run" "$historical_run" \
+  >"$tmp/missing-validator-dependencies-output" \
+  2>"$tmp/missing-validator-dependencies-error"
+missing_dependencies_exit=$?
+set -e
+test "$missing_dependencies_exit" = 69
+rg -Fq "pnpm --dir $missing_dependency_root install" \
+  "$tmp/missing-validator-dependencies-error"
+"$eval_dir/bin/validate-evidence-entries" "$historical_run"
+invalid_entries_run="$tmp/invalid-evidence-entries"
+cp -R "$historical_run" "$invalid_entries_run"
+mkdir "$invalid_entries_run/agent-created-directory"
+if "$eval_dir/bin/validate-evidence-entries" "$invalid_entries_run" \
+  2>"$tmp/invalid-evidence-entries-error"; then
+  echo "evidence entry validation accepted an unexpected directory" >&2
+  exit 1
+fi
+rg -q 'evidence top-level entries mismatch' "$tmp/invalid-evidence-entries-error"
+
+mkdir "$tmp/fake-proc" "$tmp/fake-proc/1"
+: >"$tmp/fake-proc/1/status"
+if EVAL_PROC_ROOT="$tmp/fake-proc" \
+  "$eval_dir/bin/assert-agent-call-contained" "$tmp/absent-agent-output" \
+  2>"$tmp/inactive-proc-override-error"; then
+  echo "agent containment ignored a test-only override outside test mode" >&2
+  exit 1
+fi
+rg -q 'process overrides require explicit test mode' "$tmp/inactive-proc-override-error"
+if EVAL_ISOLATED_PID_NAMESPACE=1 EVAL_PROC_ROOT="$tmp/fake-proc" EVAL_RUNNER_PID=1 \
+  "$eval_dir/bin/assert-agent-call-contained" "$tmp/absent-agent-output" \
+  2>"$tmp/unauthorized-proc-override-error"; then
+  echo "agent containment accepted test-only process overrides without test mode" >&2
+  exit 1
+fi
+rg -q 'process overrides require explicit test mode' "$tmp/unauthorized-proc-override-error"
+EVAL_AGENT_CONTAINMENT_TEST_MODE=1 EVAL_ISOLATED_PID_NAMESPACE=1 \
+  EVAL_PROC_ROOT="$tmp/fake-proc" EVAL_RUNNER_PID=1 \
+  "$eval_dir/bin/assert-agent-call-contained" "$tmp/absent-agent-output"
+mkdir "$tmp/fake-proc/42"
+: >"$tmp/fake-proc/42/status"
+if EVAL_AGENT_CONTAINMENT_TEST_MODE=1 EVAL_ISOLATED_PID_NAMESPACE=1 \
+  EVAL_PROC_ROOT="$tmp/fake-proc" EVAL_RUNNER_PID=1 \
+  "$eval_dir/bin/assert-agent-call-contained" "$tmp/absent-agent-output" \
+  2>"$tmp/lingering-agent-error"; then
+  echo "agent containment accepted a lingering process" >&2
+  exit 1
+fi
+rg -q 'agent process remains' "$tmp/lingering-agent-error"
+rm -r "$tmp/fake-proc/42"
+mkdir "$tmp/fake-proc/2"
+if EVAL_AGENT_CONTAINMENT_TEST_MODE=1 EVAL_ISOLATED_PID_NAMESPACE=1 \
+  EVAL_PROC_ROOT="$tmp/fake-proc" EVAL_RUNNER_PID=1 \
+  "$eval_dir/bin/assert-agent-call-contained" "$tmp/absent-agent-output" \
+  2>"$tmp/empty-process-dir-error"; then
+  echo "agent containment accepted an empty process directory" >&2
+  exit 1
+fi
+rg -q 'process directory is empty' "$tmp/empty-process-dir-error"
+rm -r "$tmp/fake-proc/2"
+mkdir "$tmp/injected-agent-output"
+if "$eval_dir/bin/assert-agent-call-contained" "$tmp/injected-agent-output" \
+  2>"$tmp/injected-agent-output-error"; then
+  echo "agent containment accepted a pre-created output" >&2
+  exit 1
+fi
+rg -q 'agent created the evidence output' "$tmp/injected-agent-output-error"
+
+for boundary_case in attested-codex unattested-codex unattested-claude; do
+  boundary_run="$tmp/missing-boundary-$boundary_case"
+  cp -R "$historical_run" "$boundary_run"
+  if [[ "$boundary_case" == attested-codex ]]; then
+    jq '. + {agent:"codex"} |
+      .isolated_host_attestation = true |
+      .sandbox_network_access = true |
+      .sandbox = "isolated-host-attested"' \
+      "$boundary_run/invocation.json" >"$tmp/boundary-invocation.json"
+    jq '.agent.name = "codex" |
+      .runner.isolated_host_attestation = true |
+      .runner.sandbox_network_access = true |
+      del(.runner.execution_boundary)' \
+      "$boundary_run/run.json" >"$tmp/boundary-run.json"
+  elif [[ "$boundary_case" == unattested-codex ]]; then
+    jq '. + {agent:"codex", auth_source:"none"} |
+      .isolated_host_attestation = false |
+      .sandbox_network_access = false |
+      .sandbox = "workspace-write"' \
+      "$boundary_run/invocation.json" >"$tmp/boundary-invocation.json"
+    jq '.agent.name = "codex" |
+      .security.auth_source = "none" |
+      .runner.isolated_host_attestation = false |
+      .runner.sandbox_network_access = false |
+      del(.runner.execution_boundary)' \
+      "$boundary_run/run.json" >"$tmp/boundary-run.json"
+  else
+    jq '. + {agent:"claude"} |
+      .command = "claude -p" |
+      .isolated_host_attestation = false |
+      .sandbox_network_access = false |
+      .sandbox = "claude-permission-gated"' \
+      "$boundary_run/invocation.json" >"$tmp/boundary-invocation.json"
+    jq '.agent.name = "claude" |
+      .runner.isolated_host_attestation = false |
+      .runner.sandbox_network_access = false |
+      del(.runner.execution_boundary)' \
+      "$boundary_run/run.json" >"$tmp/boundary-run.json"
+  fi
+  mv "$tmp/boundary-invocation.json" "$boundary_run/invocation.json"
+  mv "$tmp/boundary-run.json" "$boundary_run/run.json"
+  set +e
+  node "$eval_dir/bin/validate-json.mjs" "$boundary_run" \
+    >"$tmp/missing-boundary-$boundary_case-output" \
+    2>"$tmp/missing-boundary-$boundary_case-error"
+  missing_boundary_exit=$?
+  set -e
+  test "$missing_boundary_exit" = 1
+  rg -q "must have required property 'execution_boundary'" \
+    "$tmp/missing-boundary-$boundary_case-error"
+
+  set +e
+  "$eval_dir/bin/validate-run-pair" "$boundary_run/run.json" \
+    "$boundary_run/invocation.json" \
+    >"$tmp/missing-boundary-pair-$boundary_case-output" \
+    2>"$tmp/missing-boundary-pair-$boundary_case-error"
+  missing_boundary_pair_exit=$?
+  set -e
+  test "$missing_boundary_pair_exit" = 1
+  rg -q 'run/invocation security or agent identity disagrees' \
+    "$tmp/missing-boundary-pair-$boundary_case-error"
+done
+eval_dir_mode="$("$eval_dir/bin/file-permission-mode" "$eval_dir")"
+[[ "$eval_dir_mode" =~ ^[0-7]{3,4}$ ]]
+
+(cd "$eval_dir" && node --input-type=module - <<'NODE'
+import fs from 'node:fs';
+import Ajv2020 from 'ajv/dist/2020.js';
+import addFormats from 'ajv-formats';
+
+const ajv = new Ajv2020({ allErrors: true, strict: true });
+addFormats(ajv);
+const load = (path) => JSON.parse(fs.readFileSync(path, 'utf8'));
+const invocationValidate = ajv.compile(load('schemas/invocation.schema.json'));
+const runValidate = ajv.compile(load('schemas/run.schema.json'));
+const fixtureDir = 'runs/2026-07-12-codex-gpt-5.4-final21-network-off';
+const invocation = load(`${fixtureDir}/invocation.json`);
+const nonattestedCodexInvocation = {
+  ...invocation,
+  agent: 'codex',
+  auth_material_available: false,
+  auth_source: 'none',
+  isolated_host_attestation: false,
+  sandbox: 'workspace-write',
+};
+if (!invocationValidate(nonattestedCodexInvocation)) {
+  throw new Error(ajv.errorsText(invocationValidate.errors));
+}
+nonattestedCodexInvocation.sandbox = 'isolated-host-attested';
+if (invocationValidate(nonattestedCodexInvocation)) {
+  throw new Error('non-attested Codex invocation escaped workspace-write');
+}
+const legacyClaudeCommand = { ...invocation, command: 'claude -p' };
+delete legacyClaudeCommand.agent;
+if (invocationValidate(legacyClaudeCommand)) {
+  throw new Error('legacy invocation without agent accepted a Claude command');
+}
+Object.assign(invocation, {
+  agent: 'codex',
+  auth_material_available: true,
+  auth_source: 'operator-attested-file-broker',
+  isolated_host_attestation: false,
+});
+if (invocationValidate(invocation)) throw new Error('unattested invocation accepted auth material');
+invocation.isolated_host_attestation = true;
+if (invocationValidate(invocation)) {
+  throw new Error('attested Codex invocation claimed unavailable inner workspace sandbox');
+}
+invocation.sandbox = 'isolated-host-attested';
+if (!invocationValidate(invocation)) throw new Error(ajv.errorsText(invocationValidate.errors));
+Object.assign(invocation, { agent: 'claude', command: 'claude -p', sandbox: 'workspace-write' });
+if (invocationValidate(invocation)) throw new Error('Claude invocation claimed Codex workspace sandbox');
+invocation.sandbox = 'isolated-host-attested';
+if (!invocationValidate(invocation)) throw new Error(ajv.errorsText(invocationValidate.errors));
+
+const run = load(`${fixtureDir}/run.json`);
+const nonattestedCodexRun = structuredClone(run);
+Object.assign(nonattestedCodexRun.security, { auth_material_available: false, auth_source: 'none' });
+Object.assign(nonattestedCodexRun.runner, {
+  isolated_host_attestation: false,
+  execution_boundary: 'workspace-write',
+});
+if (!runValidate(nonattestedCodexRun)) throw new Error(ajv.errorsText(runValidate.errors));
+nonattestedCodexRun.runner.execution_boundary = 'isolated-host-attested';
+if (runValidate(nonattestedCodexRun)) throw new Error('non-attested Codex run escaped workspace-write');
+Object.assign(run.security, {
+  auth_material_available: true,
+  auth_source: 'operator-attested-file-broker',
+});
+run.runner.isolated_host_attestation = false;
+if (runValidate(run)) throw new Error('unattested run accepted auth material');
+run.runner.isolated_host_attestation = true;
+if (runValidate(run)) throw new Error('attested Codex run claimed unavailable inner workspace sandbox');
+run.runner.execution_boundary = 'isolated-host-attested';
+if (!runValidate(run)) throw new Error(ajv.errorsText(runValidate.errors));
+
+const attestedClaudeRun = structuredClone(run);
+attestedClaudeRun.agent.name = 'claude';
+attestedClaudeRun.runner.execution_boundary = 'claude-permission-gated';
+if (runValidate(attestedClaudeRun)) {
+  throw new Error('attested Claude run claimed its non-attested permission boundary');
+}
+attestedClaudeRun.runner.execution_boundary = 'isolated-host-attested';
+if (!runValidate(attestedClaudeRun)) throw new Error(ajv.errorsText(runValidate.errors));
+
+const nonattestedClaudeRun = structuredClone(attestedClaudeRun);
+Object.assign(nonattestedClaudeRun.security, { auth_material_available: false, auth_source: 'none' });
+Object.assign(nonattestedClaudeRun.runner, {
+  isolated_host_attestation: false,
+  execution_boundary: 'workspace-write',
+});
+if (runValidate(nonattestedClaudeRun)) {
+  throw new Error('non-attested Claude run claimed the Codex workspace boundary');
+}
+nonattestedClaudeRun.runner.execution_boundary = 'claude-permission-gated';
+if (!runValidate(nonattestedClaudeRun)) throw new Error(ajv.errorsText(runValidate.errors));
+NODE
+)
+
+mkdir "$tmp/credential-output"
+printf '%s' 'test-model-credential-with-embedded-byte-check' >"$tmp/model-credential"
+printf '\001' >"$tmp/one-byte-model-credential"
+head -c 131073 /dev/zero >"$tmp/credential-output/large-nonmatching-artifact.bin"
+"$eval_dir/bin/assert-credential-absent" "$tmp/credential-output" \
+  "$tmp/one-byte-model-credential"
+rg -Fq '$carry = $carry_length == 0 ? ""' "$eval_dir/bin/assert-credential-absent"
+printf '%s' 'prefix:test-model-credential-with-embedded-byte-check:suffix' \
+  >"$tmp/credential-output/embedded.txt"
+if "$eval_dir/bin/assert-credential-absent" "$tmp/credential-output" "$tmp/model-credential" \
+  2>"$tmp/embedded-credential-error"; then
+  echo "embedded credential bytes were accepted in run output" >&2
+  exit 1
+fi
+rg -q 'credential bytes found in run output' "$tmp/embedded-credential-error"
+
+# The runner must scan with the originally brokered bytes even if the agent
+# rotates or replaces its writable credential store during execution.
+printf '%s' 'original-credential-snapshot-value' >"$tmp/credential-output/rotated.txt"
+printf '%s' 'rotated-credential-store-value' >"$tmp/model-credential"
+if printf '%s' 'original-credential-snapshot-value' |
+  "$eval_dir/bin/assert-credential-absent" "$tmp/credential-output" - \
+    2>"$tmp/immutable-credential-snapshot-error"; then
+  echo "immutable credential snapshot leak was accepted in run output" >&2
+  exit 1
+fi
+rg -q 'credential bytes found in run output' "$tmp/immutable-credential-snapshot-error"
+: >"$tmp/credential-output/rotated.txt"
+
+printf '%s' 'prefix:rotated-credential-store-value:suffix' >"$tmp/credential-output/rotated.txt"
+if printf '%s' 'original-credential-snapshot-value' |
+  "$eval_dir/bin/assert-brokered-credential-absent" codex "$tmp/credential-output" \
+    "$tmp/model-credential" 2>"$tmp/rotated-credential-error"; then
+  echo "rotated Codex credential leak was accepted in run output" >&2
+  exit 1
+fi
+rg -q 'credential bytes found in run output' "$tmp/rotated-credential-error"
+if rg -Fq 'rotated-credential-store-value' "$tmp/rotated-credential-error" ||
+  rg -Fq 'original-credential-snapshot-value' "$tmp/rotated-credential-error"; then
+  echo "rotated credential scan exposed credential bytes" >&2
+  exit 1
+fi
+: >"$tmp/credential-output/rotated.txt"
+
+printf '%s' safe >"$tmp/symlink-target"
+ln -s "$tmp/symlink-target" "$tmp/credential-output/dependency-link"
+if printf '%s' 'unrelated-credential-value' |
+  "$eval_dir/bin/assert-credential-absent" "$tmp/credential-output" - \
+    2>"$tmp/rejected-symlink-error"; then
+  echo "strict credential scan accepted a run-output symlink" >&2
+  exit 1
+fi
+rg -q 'symbolic link' "$tmp/rejected-symlink-error"
+printf '%s' 'unrelated-credential-value' |
+  "$eval_dir/bin/assert-credential-absent" "$tmp/credential-output" - --skip-symlinks
+unlink "$tmp/credential-output/dependency-link"
+
+ln -s "$tmp/credential-output" "$tmp/credential-output-link"
+set +e
+printf '%s' 'unrelated-root-symlink-credential' |
+  "$eval_dir/bin/assert-credential-absent" "$tmp/credential-output-link" - --skip-symlinks \
+    2>"$tmp/root-symlink-scan-error"
+root_symlink_scan_exit=$?
+set -e
+test "$root_symlink_scan_exit" = 2
+rg -q 'credential absence scan failed closed' "$tmp/root-symlink-scan-error"
+if rg -Fq "$tmp/credential-output-link" "$tmp/root-symlink-scan-error"; then
+  echo "credential scan exposed its root path" >&2
+  exit 1
+fi
+
+mkdir "$tmp/credential-output/unreadable-directory"
+chmod 000 "$tmp/credential-output/unreadable-directory"
+set +e
+printf '%s' 'unrelated-unreadable-directory-credential' |
+  "$eval_dir/bin/assert-credential-absent" "$tmp/credential-output" - --skip-symlinks \
+    2>"$tmp/unreadable-directory-scan-error"
+unreadable_directory_scan_exit=$?
+set -e
+chmod 700 "$tmp/credential-output/unreadable-directory"
+test "$unreadable_directory_scan_exit" = 2
+rg -q 'credential absence scan failed closed' "$tmp/unreadable-directory-scan-error"
+if rg -Fq 'unrelated-unreadable-directory-credential' "$tmp/unreadable-directory-scan-error" ||
+  rg -Fq "$tmp/credential-output/unreadable-directory" "$tmp/unreadable-directory-scan-error"; then
+  echo "credential scan exposed credential or artifact path on read failure" >&2
+  exit 1
+fi
+
+path_credential='synthetic-relative-path-credential'
+mkdir "$tmp/credential-output/prefix-$path_credential-suffix"
+set +e
+printf '%s' "$path_credential" |
+  "$eval_dir/bin/assert-credential-absent" "$tmp/credential-output" - --skip-symlinks \
+    2>"$tmp/relative-path-credential-error"
+relative_path_scan_exit=$?
+set -e
+rmdir "$tmp/credential-output/prefix-$path_credential-suffix"
+test "$relative_path_scan_exit" = 1
+rg -q 'credential bytes found in run output' "$tmp/relative-path-credential-error"
+if rg -Fq "$path_credential" "$tmp/relative-path-credential-error" ||
+  rg -Fq "$tmp/credential-output" "$tmp/relative-path-credential-error"; then
+  echo "credential path scan exposed credential or artifact path" >&2
+  exit 1
+fi
+
+for newline_mode in newline no-newline; do
+  claude_helper_dir="$tmp/claude-helper-$newline_mode"
+  mkdir "$claude_helper_dir"
+  claude_credential="$claude_helper_dir/model-credential"
+  if [[ "$newline_mode" == newline ]]; then
+    printf '%s\n' 'synthetic-claude-key-effective-bytes' >"$claude_credential"
+  else
+    printf '%s' 'synthetic-claude-key-effective-bytes' >"$claude_credential"
+  fi
+  "$eval_dir/bin/canonicalize-model-credential" claude "$claude_credential"
+  test "$(wc -c <"$claude_credential" | tr -d ' ')" = 36
+  test "$(cat "$claude_credential")" = 'synthetic-claude-key-effective-bytes'
+  "$eval_dir/bin/build-claude-credential-helper" "$claude_helper_dir/credential-helper"
+  mkdir "$claude_helper_dir/tmp"
+  TMPDIR="$claude_helper_dir/tmp" /bin/sh -c \
+    '/bin/sh "$TMPDIR/../credential-helper"' >"$claude_helper_dir/helper-output"
+  cmp "$claude_credential" "$claude_helper_dir/helper-output"
+  printf '%s' 'prefix:synthetic-claude-key-effective-bytes:suffix' \
+    >"$tmp/credential-output/claude-$newline_mode.txt"
+  if "$eval_dir/bin/assert-credential-absent" "$tmp/credential-output" "$claude_credential" \
+    2>"$tmp/claude-$newline_mode-leak-error"; then
+    echo "effective Claude key bytes were accepted for $newline_mode input" >&2
+    exit 1
+  fi
+  rg -q 'credential bytes found in run output' "$tmp/claude-$newline_mode-leak-error"
+  : >"$tmp/credential-output/claude-$newline_mode.txt"
+done
+
+printf 'synthetic-claude-prefix\0synthetic-claude-suffix' >"$tmp/claude-nul-credential"
+set +e
+"$eval_dir/bin/canonicalize-model-credential" claude "$tmp/claude-nul-credential" \
+  >"$tmp/claude-nul-output" 2>"$tmp/claude-nul-error"
+claude_nul_exit=$?
+set -e
+test "$claude_nul_exit" = 65
+if rg -aFq 'synthetic-claude-prefix' "$tmp/claude-nul-output" "$tmp/claude-nul-error" ||
+  rg -aFq 'synthetic-claude-suffix' "$tmp/claude-nul-output" "$tmp/claude-nul-error"; then
+  echo "Claude credential rejection exposed credential bytes" >&2
+  exit 1
+fi
+
+printf 'synthetic-claude-prefix\tsynthetic-claude-suffix' >"$tmp/claude-control-credential"
+set +e
+"$eval_dir/bin/canonicalize-model-credential" claude "$tmp/claude-control-credential" \
+  >"$tmp/claude-control-output" 2>"$tmp/claude-control-error"
+claude_control_exit=$?
+set -e
+test "$claude_control_exit" = 65
+if rg -aFq 'synthetic-claude-prefix' "$tmp/claude-control-output" "$tmp/claude-control-error" ||
+  rg -aFq 'synthetic-claude-suffix' "$tmp/claude-control-output" "$tmp/claude-control-error"; then
+  echo "Claude credential control-byte rejection exposed credential bytes" >&2
+  exit 1
+fi
+
+printf '%s\n' \
+  '{"tokens":{"access_token":"synthetic-codex-access-token-value","refresh_token":"synthetic-codex-refresh-token-value"},"account":{"label":"not-sensitive-metadata"}}' \
+  >"$tmp/synthetic-codex-auth.json"
+printf '%s' 'prefix:synthetic-codex-access-token-value:suffix' \
+  >"$tmp/credential-output/codex-token-leak.txt"
+if "$eval_dir/bin/assert-credential-absent" \
+  "$tmp/credential-output" "$tmp/synthetic-codex-auth.json" \
+  2>"$tmp/codex-token-leak-error"; then
+  echo "Codex JSON token leaf embedded in output was accepted" >&2
+  exit 1
+fi
+rg -q 'credential bytes found in run output' "$tmp/codex-token-leak-error"
+: >"$tmp/credential-output/codex-token-leak.txt"
+
+mkdir "$tmp/unattested-workspace"
+if "$eval_dir/bin/run-eval" --agent codex --model test-model --timeout 10 \
+  --workspace "$tmp/unattested-workspace" --output "$tmp/unattested-output" \
+  --model-credential-file "$tmp/model-credential" 2>"$tmp/unattested-credential-error"; then
+  echo "model credential was accepted without isolated-host attestation" >&2
+  exit 1
+fi
+rg -q 'model credentials require --ack-disposable-secret-free-host' \
+  "$tmp/unattested-credential-error"
+
+printf '%s\n' \
+  '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"tool-1","name":"Bash","input":{"command":"npm view create-react-on-rails-app version --json"}}]}}' \
+  '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"tool-1","content":"1.0.0","is_error":false}]}}' \
+  '{"type":"result","subtype":"success","structured_output":{"status":"passed","summary":"done","commands":[],"checks":[],"friction":[],"human_interventions":0,"blockers":[]}}' \
+  >"$tmp/claude-events.jsonl"
+node "$eval_dir/bin/normalize-claude-events.mjs" \
+  "$tmp/claude-events.jsonl" "$tmp/claude-events.normalized.jsonl"
+test "$(jq -r 'select(.item.type == "command_execution") | .item.command' \
+  "$tmp/claude-events.normalized.jsonl")" = 'npm view create-react-on-rails-app version --json'
+test "$(jq -r 'select(.item.type == "agent_message") | .item.text | fromjson | .status' \
+  "$tmp/claude-events.normalized.jsonl")" = passed
+printf '%s\n' \
+  '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"interrupted-tool","name":"Bash","input":{"command":"long-running-command"}}]}}' \
+  '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"interrupted-tool","content":"interrupted output","is_error":false}]},"tool_use_result":{"stdout":"interrupted output","stderr":"","interrupted":true}}' \
+  >"$tmp/interrupted-claude-events.jsonl"
+node "$eval_dir/bin/normalize-claude-events.mjs" \
+  "$tmp/interrupted-claude-events.jsonl" "$tmp/interrupted-claude-events.normalized.jsonl" 0
+interrupted_command_result="$(jq -r '.item | [.command,.exit_code,.status] | @tsv' \
+  "$tmp/interrupted-claude-events.normalized.jsonl")"
+if [[ "$interrupted_command_result" != $'long-running-command\t130\tfailed' ]]; then
+  echo "interrupted Claude Bash result normalized as completed success" >&2
+  exit 1
+fi
+printf '%s\n' \
+  '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"background-tool","name":"Bash","input":{"command":"background-command"}}]}}' \
+  '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"background-tool","content":"Command running in background","is_error":false}]},"tool_use_result":{"status":"running","background_task_id":"task-1"}}' \
+  >"$tmp/background-claude-events.jsonl"
+node "$eval_dir/bin/normalize-claude-events.mjs" \
+  "$tmp/background-claude-events.jsonl" "$tmp/background-claude-events.normalized.jsonl" 0
+background_command_result="$(jq -r '.item | [.command,.exit_code,.status] | @tsv' \
+  "$tmp/background-claude-events.normalized.jsonl")"
+if [[ "$background_command_result" != $'background-command\t\tincomplete' ]]; then
+  echo "background Claude Bash result normalized as completed success" >&2
+  exit 1
+fi
+printf '%s\n' \
+  '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"timed-out-tool","name":"Bash","input":{"command":"timed-out-command"}}]}}' \
+  '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"timed-out-tool","content":"timed out","is_error":false}]},"tool_use_result":{"timed_out":true}}' \
+  >"$tmp/timed-out-claude-events.jsonl"
+node "$eval_dir/bin/normalize-claude-events.mjs" \
+  "$tmp/timed-out-claude-events.jsonl" "$tmp/timed-out-claude-events.normalized.jsonl" 0
+timed_out_command_result="$(jq -r '.item | [.command,.exit_code,.status] | @tsv' \
+  "$tmp/timed-out-claude-events.normalized.jsonl")"
+if [[ "$timed_out_command_result" != $'timed-out-command\t124\tfailed' ]]; then
+  echo "timed-out Claude Bash result normalized as completed success" >&2
+  exit 1
+fi
+printf '%s\n' \
+  '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"structured-timeout","name":"StructuredOutput","input":{"status":"completed","summary":"must not survive timeout","commands":[],"checks":[],"friction":[],"human_interventions":0,"blockers":[]}}]}}' \
+  >"$tmp/structured-timeout-claude-events.jsonl"
+node "$eval_dir/bin/normalize-claude-events.mjs" \
+  "$tmp/structured-timeout-claude-events.jsonl" \
+  "$tmp/structured-timeout-claude-events.normalized.jsonl" 124
+if jq -s -e 'any(.[]; .item.type == "agent_message")' \
+  "$tmp/structured-timeout-claude-events.normalized.jsonl" >/dev/null; then
+  echo "timeout Claude invocation promoted StructuredOutput to a completed report" >&2
+  exit 1
+fi
+printf '%s\n' \
+  '{"type":"result","subtype":"success","structured_output":{"status":"completed","summary":"must not survive failure","commands":[],"checks":[],"friction":[],"human_interventions":0,"blockers":[]}}' \
+  >"$tmp/result-failure-claude-events.jsonl"
+node "$eval_dir/bin/normalize-claude-events.mjs" \
+  "$tmp/result-failure-claude-events.jsonl" \
+  "$tmp/result-failure-claude-events.normalized.jsonl" 1
+if jq -s -e 'any(.[]; .item.type == "agent_message")' \
+  "$tmp/result-failure-claude-events.normalized.jsonl" >/dev/null; then
+  echo "failed Claude invocation promoted a success result to a completed report" >&2
+  exit 1
+fi
+printf '%s\n' \
+  '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"pending-tool","name":"Bash","input":{"command":"sleep 999"}}]}}' \
+  >"$tmp/pending-claude-events.jsonl"
+if node "$eval_dir/bin/normalize-claude-events.mjs" \
+  "$tmp/pending-claude-events.jsonl" "$tmp/pending-claude-events.rejected.jsonl" \
+  2>"$tmp/pending-claude-events-error"; then
+  echo "non-timeout Claude transcript accepted an incomplete Bash tool call" >&2
+  exit 1
+fi
+rg -q 'incomplete Bash tool calls' "$tmp/pending-claude-events-error"
+node "$eval_dir/bin/normalize-claude-events.mjs" \
+  "$tmp/pending-claude-events.jsonl" "$tmp/pending-claude-events.timeout.jsonl" 124
+[[ "$(jq -r '.item | [.command,.exit_code,.status,.aggregated_output] | @tsv' \
+  "$tmp/pending-claude-events.timeout.jsonl")" == $'sleep 999\t124\tfailed\t' ]]
+node "$eval_dir/bin/normalize-claude-events.mjs" \
+  "$tmp/pending-claude-events.jsonl" "$tmp/pending-claude-events.forced-timeout.jsonl" \
+  124
+[[ "$(jq -r '.item | [.command,.exit_code,.status,.aggregated_output] | @tsv' \
+  "$tmp/pending-claude-events.forced-timeout.jsonl")" == $'sleep 999\t124\tfailed\t' ]]
+printf '%s\n' 'not-json' >"$tmp/malformed-claude-events.jsonl"
+if node "$eval_dir/bin/normalize-claude-events.mjs" \
+  "$tmp/malformed-claude-events.jsonl" "$tmp/malformed-claude-events.normalized.jsonl" \
+  2>"$tmp/malformed-claude-events-error"; then
+  echo "malformed Claude stream-json event was accepted" >&2
+  exit 1
+fi
+rg -q 'malformed event' "$tmp/malformed-claude-events-error"
+if node "$eval_dir/bin/normalize-claude-events.mjs" \
+  "$tmp/malformed-claude-events.jsonl" "$tmp/malformed-timeout-claude-events.normalized.jsonl" 124 \
+  2>"$tmp/malformed-timeout-claude-events-error"; then
+  echo "timeout mode accepted a complete malformed Claude event" >&2
+  exit 1
+fi
+rg -q 'malformed event' "$tmp/malformed-timeout-claude-events-error"
+printf '%s' '{"type":"assistant","message":' >"$tmp/truncated-timeout-claude-events.jsonl"
+node "$eval_dir/bin/normalize-claude-events.mjs" \
+  "$tmp/truncated-timeout-claude-events.jsonl" \
+  "$tmp/truncated-timeout-claude-events.normalized.jsonl" 124
+test ! -s "$tmp/truncated-timeout-claude-events.normalized.jsonl"
+node "$eval_dir/bin/normalize-claude-events.mjs" \
+  "$tmp/truncated-timeout-claude-events.jsonl" \
+  "$tmp/truncated-forced-timeout-claude-events.normalized.jsonl" \
+  124
+test ! -s "$tmp/truncated-forced-timeout-claude-events.normalized.jsonl"
+dd if=/dev/zero of="$tmp/oversized-claude-events.jsonl" bs=1 count=0 seek=67108865 \
+  2>/dev/null
+if node "$eval_dir/bin/normalize-claude-events.mjs" \
+  "$tmp/oversized-claude-events.jsonl" "$tmp/oversized-claude-events.normalized.jsonl" \
+  2>"$tmp/oversized-claude-events-error"; then
+  echo "oversized Claude transcript was accepted" >&2
+  exit 1
+fi
+test ! -e "$tmp/oversized-claude-events.normalized.jsonl"
+rg -q 'exceeds 67108864-byte normalization limit' "$tmp/oversized-claude-events-error"
+if node "$eval_dir/bin/normalize-claude-events.mjs" \
+  "$tmp/truncated-timeout-claude-events.jsonl" \
+  "$tmp/truncated-nontimeout-claude-events.normalized.jsonl" 1 \
+  2>"$tmp/truncated-nontimeout-claude-events-error"; then
+  echo "non-timeout mode accepted a truncated final Claude event" >&2
+  exit 1
+fi
+rg -q 'malformed event' "$tmp/truncated-nontimeout-claude-events-error"
+printf '%s' $'not-json\n ' >"$tmp/malformed-before-blank-tail.jsonl"
+if node "$eval_dir/bin/normalize-claude-events.mjs" \
+  "$tmp/malformed-before-blank-tail.jsonl" "$tmp/malformed-before-blank-tail.normalized.jsonl" 124 \
+  2>"$tmp/malformed-before-blank-tail-error"; then
+  echo "timeout mode accepted a complete malformed event before a blank tail" >&2
+  exit 1
+fi
+rg -q 'malformed event' "$tmp/malformed-before-blank-tail-error"
+printf '%s\n' '{"type":"result","subtype":"success","result":"{\"status\":\"partial\"}"}' \
+  >"$tmp/valid-prefix-truncated-tail.jsonl"
+printf '%s' '{"type":"assistant","message":' >>"$tmp/valid-prefix-truncated-tail.jsonl"
+node "$eval_dir/bin/normalize-claude-events.mjs" \
+  "$tmp/valid-prefix-truncated-tail.jsonl" "$tmp/valid-prefix-truncated-tail.normalized.jsonl" 124
+test ! -s "$tmp/valid-prefix-truncated-tail.normalized.jsonl"
 
 printf '%s\n' 'authorization: super-sensitive-value' 'authorization: Bearer multi-word-secret' \
   'SECRET_KEY_BASE=base-secret-value-123' 'AWS_SECRET_ACCESS_KEY=aws-secret-value-456' \
@@ -222,18 +848,35 @@ rg -q '^umask 077$' "$eval_dir/bin/run-eval"
 rg -q '^trap cleanup EXIT$' "$eval_dir/bin/run-eval"
 rg -q "^trap 'exit 130' INT TERM$" "$eval_dir/bin/run-eval"
 rg -q 'minimal_env=\(env -i' "$eval_dir/bin/run-eval"
-rg -q "shell_environment_policy.inherit='?\\\"none\\\"'?" "$eval_dir/bin/run-eval"
-rg -q 'sandbox_workspace_write.network_access=\$sandbox_network_access' "$eval_dir/bin/run-eval"
+rg -Fq 'shell_environment_policy.inherit="none"' "$eval_dir/bin/run-eval"
+rg -Fq 'agent_args+=(--dangerously-bypass-approvals-and-sandbox)' "$eval_dir/bin/run-eval"
+rg -Fq 'agent_args+=(--sandbox workspace-write)' "$eval_dir/bin/run-eval"
+rg -Fq 'execution_boundary="isolated-host-attested"' "$eval_dir/bin/run-eval"
 rg -q '^isolated_host_attestation=false$' "$eval_dir/bin/run-eval"
 rg -q -- '--ack-disposable-secret-free-host' "$eval_dir/bin/run-eval"
-rg -Fq 'maximum_agent_call_wall_clock_seconds=$((probe_timeout_seconds + timeout_seconds))' \
+rg -Fq '[--model-credential-stdin]' "$eval_dir/bin/run-eval"
+rg -Fq 'timeout_kill_grace_seconds=10' "$eval_dir/bin/run-eval"
+rg -Fq '"$eval_dir/bin/run-with-timeout" "$timeout_command"' "$eval_dir/bin/run-eval"
+rg -Fq -- '--verbose --kill-after "$kill_grace" "$duration"' \
+  "$eval_dir/bin/run-with-timeout"
+rg -Fq 'maximum_agent_call_wall_clock_seconds=$((probe_timeout_seconds + timeout_seconds +' \
   "$eval_dir/bin/run-eval"
+rg -Fq 'timeout_kill_grace_seconds:$timeout_kill_grace' "$eval_dir/bin/run-eval"
 rg -q 'scaffold_timeout_seconds:\$scaffold_timeout' "$eval_dir/bin/run-eval"
 rg -q 'maximum_agent_call_wall_clock_seconds:\$maximum_agent_wall_clock' "$eval_dir/bin/run-eval"
 rg -q 'invocation timeout budget mismatch' "$eval_dir/bin/validate-run"
 rg -q 'run/invocation timeout budgets disagree' "$eval_dir/bin/validate-run"
+rg -q 'run/invocation security or agent identity disagrees' "$eval_dir/bin/validate-run-pair"
 rg -q 'cli_auth_credentials_store=.?file' "$eval_dir/bin/run-eval"
-rg -q 'auth_material_available:false' "$eval_dir/bin/run-eval"
+rg -q 'auth_material_available:\$auth_material_available' "$eval_dir/bin/run-eval"
+rg -q 'auth_source:\$auth_source' "$eval_dir/bin/run-eval"
+rg -Fq -- '--arg run_id "$run_id"' "$eval_dir/bin/run-eval"
+rg -q -- '--model-credential-file' "$eval_dir/bin/run-eval"
+rg -q 'agent_args=.*-p --bare' "$eval_dir/bin/run-eval"
+rg -Fq -- "--mcp-config '{\"mcpServers\":{}}'" "$eval_dir/bin/run-eval"
+rg -q 'apiKeyHelper:\$helper' "$eval_dir/bin/run-eval"
+rg -Fq "credential_helper_command='/bin/sh \"\$TMPDIR/../credential-helper\"'" \
+  "$eval_dir/bin/run-eval"
 rg -q 'node npm perl pnpm' "$eval_dir/bin/run-eval"
 rg -q 'CODEX_HOME=\$private_dir/codex-home' "$eval_dir/bin/run-eval"
 rg -q 'rubygems_probe_command="gem search --remote --exact '\''\^rails\$'\''"' "$eval_dir/bin/run-eval"
@@ -250,6 +893,311 @@ if rg -q 'cp .*auth|install .*auth' "$eval_dir/bin/run-eval"; then
   echo "runner must not copy authentication into the sandbox filesystem" >&2
   exit 1
 fi
+test "$(rg -Fn 'shasum -a 256 "$file"; done <"$checksum_files" >SHA256SUMS' \
+  "$eval_dir/bin/run-eval" | cut -d: -f1)" -lt \
+  "$(rg -Fn 'assert_credential_absent "$output"' "$eval_dir/bin/run-eval" | cut -d: -f1)"
+rg -Fq 'assert_credential_absent "$workspace"' "$eval_dir/bin/run-eval"
+rg -Fq 'assert_credential_absent "$workspace" --skip-symlinks' "$eval_dir/bin/run-eval"
+rg -Fq 'credential_snapshot=' "$eval_dir/bin/run-eval"
+rg -Fq 'assert-brokered-credential-absent' "$eval_dir/bin/run-eval"
+rg -Fq 'assert_credential_absent' "$eval_dir/bin/run-eval"
+rg -q '^output_publishable=false$' "$eval_dir/bin/run-eval"
+rg -Fq '[[ "$output_publishable" == false && ( -e "$output" || -L "$output" ) ]]' \
+  "$eval_dir/bin/run-eval"
+test "$(rg -Fn 'assert_credential_absent "$output"' "$eval_dir/bin/run-eval" | cut -d: -f1)" -lt \
+  "$(rg -n '^output_publishable=true$' "$eval_dir/bin/run-eval" | cut -d: -f1)"
+test "$(rg -n '^evidence_dir=' "$eval_dir/bin/run-eval" | cut -d: -f1)" -gt \
+  "$(rg -Fn 'run_agent "$eval_dir/prompt.md"' "$eval_dir/bin/run-eval" | cut -d: -f1)"
+test "$(rg -Fc '"$eval_dir/bin/assert-agent-call-contained" "$output"' \
+  "$eval_dir/bin/run-eval")" -eq 3
+rg -Fq 'npm config set cache "$npm_cache" --location=user' "$eval_dir/bin/prepare-agent-state"
+rg -Fq '"BUNDLE_PATH" => ARGV.fetch(1)' "$eval_dir/bin/prepare-agent-state"
+rg -Fq '"--install-dir", ARGV.fetch(1), "--bindir", ARGV.fetch(2)' \
+  "$eval_dir/bin/prepare-agent-state"
+rg -Fq 'agent_state_dir="$workspace/.ror-eval-state"' "$eval_dir/bin/run-eval"
+if rg -Fq 'mktemp -d "$(dirname "$workspace")/.ror-eval-npm-cache.' "$eval_dir/bin/run-eval"; then
+  echo "npm cache escaped the writable workspace" >&2
+  exit 1
+fi
+rg -Fq '"$eval_dir/bin" "$eval_dir/isolated-host" "$eval_dir/schemas"' \
+  "$eval_dir/bin/run-eval"
+
+agent_state_safe_path="$(SAFE_PATH_SOURCE="$PATH" BASH_ENV=/dev/null \
+  "$eval_dir/bin/build-safe-path" env node npm ruby sh)"
+mkdir "$tmp/prepared-runner-home" "$tmp/prepared-agent-home"
+agent_state_path="$("$eval_dir/bin/prepare-agent-state" \
+  "$tmp/prepared-agent-state" "$tmp/prepared-runner-home" "$tmp/prepared-agent-home" \
+  "$agent_state_safe_path")"
+prepared_agent_home="$tmp/prepared-agent-home"
+prepared_bundle_path="$(realpath "$tmp")/prepared-agent-state/bundle"
+prepared_gem_install_dir="$(realpath "$tmp")/prepared-agent-state/gems"
+prepared_gem_bin_dir="$(realpath "$tmp")/prepared-agent-state/gem-bin"
+prepared_gem_user_dir="$(env -i PATH="$agent_state_path" HOME="$prepared_agent_home" \
+  TMPDIR="$tmp" LANG=C LC_ALL=C SHELL=/bin/sh CODEX_EVAL=1 \
+  ruby -e 'require "rubygems"; print Gem.user_dir')"
+case "$prepared_gem_user_dir/" in
+  "$prepared_agent_home"/*) ;;
+  *) echo "RubyGems user directory escaped private HOME" >&2; exit 1 ;;
+esac
+test -L "$prepared_gem_user_dir"
+test "$(realpath "$prepared_gem_user_dir")" = "$prepared_gem_install_dir"
+case ":$agent_state_path:" in
+  *":$prepared_gem_bin_dir:"*) ;;
+  *) echo "RubyGems executable directory missing from safe PATH" >&2; exit 1 ;;
+esac
+prepared_bundle_actual="$(env -i PATH="$agent_state_path" HOME="$prepared_agent_home" \
+  TMPDIR="$tmp" LANG=C LC_ALL=C SHELL=/bin/sh CODEX_EVAL=1 \
+  ruby -rbundler -e 'print Bundler.bundle_path')"
+case "$prepared_bundle_actual/" in
+  "$prepared_bundle_path"/*) ;;
+  *) echo "Bundler path escaped prepared agent state" >&2; exit 1 ;;
+esac
+test -w "$prepared_bundle_actual"
+test "$(env -i PATH="$agent_state_path" HOME="$prepared_agent_home" \
+  TMPDIR="$tmp" LANG=C LC_ALL=C SHELL=/bin/sh CODEX_EVAL=1 npm config get cache)" = \
+  "$(realpath "$tmp")/prepared-agent-state/npm-cache"
+
+isolated_host="$eval_dir/isolated-host"
+bash -n "$isolated_host/run-in-container"
+test -x "$isolated_host/run-in-container"
+test -x "$isolated_host/smoke-runtime"
+rg -Fq 'codex exec --help' "$isolated_host/smoke-runtime"
+rg -Fq 'claude --version' "$isolated_host/smoke-runtime"
+rg -Fq 'build-claude-agent-report-schema' "$isolated_host/smoke-runtime"
+rg -Fq 'CODEX_EVAL' "$isolated_host/smoke-runtime"
+rg -Fq 'http.createServer' "$isolated_host/smoke-runtime"
+rg -Fq 'Claude did not attempt the loopback endpoint' "$isolated_host/smoke-runtime"
+rg -Fq "'^POST /v1/messages([?].*)? brokered_auth=yes$'" "$isolated_host/smoke-runtime"
+if rg -Fq '127.0.0.1:9' "$isolated_host/smoke-runtime"; then
+  echo "Claude schema smoke still relies on an unobserved closed endpoint" >&2
+  exit 1
+fi
+rg -Fq -- '--mount "type=bind,source=$root,target=/repo,readonly"' \
+  "$isolated_host/run-in-container"
+rg -Fq -- '--mount "type=bind,source=$staging_parent,target=/evidence"' \
+  "$isolated_host/run-in-container"
+rg -Fq -- '--read-only' "$isolated_host/run-in-container"
+rg -Fq -- '--cap-drop ALL' "$isolated_host/run-in-container"
+rg -Fq -- '--pids-limit 4096' "$isolated_host/run-in-container"
+rg -Fq -- '--security-opt no-new-privileges' "$isolated_host/run-in-container"
+rg -Fq -- '--model-credential-stdin' "$isolated_host/run-in-container"
+rg -Fq -- '<&"$model_credential_fd"' "$isolated_host/run-in-container"
+test "$(rg -Fc -- '<"$credential_real"' "$isolated_host/run-in-container")" = 1
+rg -Fq -- 'exec 9<"$credential_real"' "$isolated_host/run-in-container"
+if rg -Fq -- 'cp "$model_credential_file"' "$eval_dir/bin/run-eval"; then
+  echo "runner reopened the credential path after validation" >&2
+  exit 1
+fi
+rg -Fq -- 'uid=$host_uid,gid=$host_gid' "$isolated_host/run-in-container"
+rg -Fq -- 'source=$git_common_dir,target=$git_common_dir,readonly' \
+  "$isolated_host/run-in-container"
+rg -Fq -- 'EVAL_HARNESS_DEPENDENCY_ROOT=/opt/pro-app-buildability' \
+  "$isolated_host/run-in-container"
+rg -Fq -- 'EVAL_ISOLATED_PID_NAMESPACE=1' "$isolated_host/run-in-container"
+rg -Fq -- 'EVAL_AGENT_CONTAINMENT_TEST_MODE=0' "$isolated_host/run-in-container"
+rg -Fq 'No React on Rails Pro license token is required for evaluation, development, or CI.' \
+  "$isolated_host/README.md"
+rg -Uq 'Do not provision a\s+Pro license token in this harness\.' "$isolated_host/README.md"
+rg -Fxq 'FROM node:22-bookworm@sha256:0557ac14e0d45d02ed563067b82856ca5e7aa3437fa28d98d4350ea9c3d9494a AS node_runtime' \
+  "$isolated_host/Dockerfile"
+rg -Fxq 'FROM ruby:3.4-bookworm@sha256:56e0c9fdbf64d090e45072d32f0d3be7f2e392e733444f7d176a50881e6c325a' \
+  "$isolated_host/Dockerfile"
+rg -Fq -- 'pnpm --dir /opt/pro-app-buildability install --frozen-lockfile --ignore-workspace' \
+  "$isolated_host/Dockerfile"
+rg -Fq -- "createRequire(path.join(dependencyRoot, 'package.json'))" \
+  "$eval_dir/bin/validate-json.mjs"
+if rg -q 'operator-model-credential|source=\$credential_real' "$isolated_host/run-in-container"; then
+  echo "isolated host must stream the credential instead of mounting it" >&2
+  exit 1
+fi
+if rg -q 'ANTHROPIC_API_KEY|OPENAI_API_KEY|REACT_ON_RAILS_PRO_LICENSE' \
+  "$isolated_host/Dockerfile" "$isolated_host/run-in-container"; then
+  echo "isolated host must not place credentials or licenses in build args or environment" >&2
+  exit 1
+fi
+if rg -Fq '/usr/local/bundle:rw' "$isolated_host/run-in-container"; then
+  echo "isolated host retained a writable system Bundler mount" >&2
+  exit 1
+fi
+
+mkdir "$tmp/wrapper-repo" "$tmp/fake-bin" "$tmp/wrapper-output-parent"
+git -C "$tmp/wrapper-repo" init --quiet
+printf '%s\n' tracked >"$tmp/wrapper-repo/tracked"
+git -C "$tmp/wrapper-repo" add tracked
+git -C "$tmp/wrapper-repo" -c user.name=Eval -c user.email=eval@example.test \
+  commit --quiet -m fixture
+printf '%s' 'wrapper-test-model-credential' >"$tmp/wrapper-model-credential"
+chmod 600 "$tmp/wrapper-model-credential"
+wrapper_model_credential_sha="$(shasum -a 256 "$tmp/wrapper-model-credential" | awk '{print $1}')"
+# The generated fake expands these variables when the wrapper invokes it.
+# shellcheck disable=SC2016
+printf '%s\n' '#!/bin/sh' 'set -eu' \
+  'printf "%s\n" "$@" >"$FAKE_DOCKER_ARGS"' \
+  'for argument do' \
+  '  case "$argument" in' \
+  '    type=bind,source=*,target=/evidence) evidence=${argument#type=bind,source=}; evidence=${evidence%,target=/evidence} ;;' \
+  '  esac' \
+  'done' \
+  'if [ -n "${FAKE_DOCKER_REPLACE_CREDENTIAL:-}" ]; then' \
+  '  printf "%s" replacement-model-credential >"$FAKE_DOCKER_REPLACE_CREDENTIAL.replacement"' \
+  '  chmod 600 "$FAKE_DOCKER_REPLACE_CREDENTIAL.replacement"' \
+  '  mv "$FAKE_DOCKER_REPLACE_CREDENTIAL.replacement" "$FAKE_DOCKER_REPLACE_CREDENTIAL"' \
+  'fi' \
+  'printf "%s" "$evidence" >"$FAKE_DOCKER_EVIDENCE"' \
+  'mkdir "$evidence/run"' \
+  'for artifact in SHA256SUMS agent-report.json artifact-evidence.json command-evidence.json invocation.json prompt.md rubric-results.json rubric.md run.json runner-diagnostics.json sandbox-network-probe.json scenario.md workspace-status.txt; do' \
+  '  : >"$evidence/run/$artifact"' \
+  'done' \
+  'case "$FAKE_DOCKER_MODE" in' \
+  '  success) ;;' \
+  '  fail) exit 42 ;;' \
+  '  sibling) printf "%s" unexpected >"$evidence/unexpected" ;;' \
+  '  nested) mkdir "$evidence/run/agent-created-directory" ;;' \
+  'esac' \
+  'shasum -a 256 | awk '\''{print $1}'\'' >"$FAKE_DOCKER_STDIN_SHA"' \
+  >"$tmp/fake-bin/docker"
+chmod +x "$tmp/fake-bin/docker"
+(cd "$tmp/wrapper-repo" && \
+  PATH="$tmp/fake-bin:$PATH" \
+  FAKE_DOCKER_ARGS="$tmp/fake-docker-args" \
+  FAKE_DOCKER_EVIDENCE="$tmp/fake-docker-evidence" \
+  FAKE_DOCKER_MODE=success \
+  FAKE_DOCKER_REPLACE_CREDENTIAL="$tmp/wrapper-model-credential" \
+  FAKE_DOCKER_STDIN_SHA="$tmp/fake-docker-stdin-sha" \
+  "$isolated_host/run-in-container" \
+    --agent claude --model test-model --timeout 10 \
+    --model-credential-file "$tmp/wrapper-model-credential" \
+    --output "$tmp/wrapper-output-parent/requested-run-id")
+test -d "$tmp/wrapper-output-parent/requested-run-id"
+test ! -e "$(cat "$tmp/fake-docker-evidence")"
+if [[ "$(dirname "$(cat "$tmp/fake-docker-evidence")")" != \
+  "$(realpath "$tmp/wrapper-output-parent")" ]]; then
+  echo "wrapper staging directory was outside the destination parent" >&2
+  exit 1
+fi
+test "$(cat "$tmp/fake-docker-stdin-sha")" = "$wrapper_model_credential_sha"
+test "$(cat "$tmp/wrapper-model-credential")" = replacement-model-credential
+rg -Fxq -- '--model-credential-stdin' "$tmp/fake-docker-args"
+test "$(awk '$0 == "--pids-limit" { getline; print; exit }' "$tmp/fake-docker-args")" = 4096
+test "$(awk '$0 == "--env" { getline; if ($0 == "EVAL_AGENT_CONTAINMENT_TEST_MODE=0") { print; exit } }' \
+  "$tmp/fake-docker-args")" = EVAL_AGENT_CONTAINMENT_TEST_MODE=0
+test "$(awk '$0 == "--run-id" { getline; print; exit }' "$tmp/fake-docker-args")" = \
+  requested-run-id
+rg -Fxq -- '/run/eval-private:rw,noexec,nosuid,nodev,mode=0700,uid='"$(id -u)"',gid='"$(id -g)" \
+  "$tmp/fake-docker-args"
+if rg -Fq "$tmp/wrapper-model-credential" "$tmp/fake-docker-args"; then
+  echo "wrapper exposed the host credential path to the container command" >&2
+  exit 1
+fi
+
+if (cd "$tmp/wrapper-repo" && PATH="$tmp/fake-bin:$PATH" \
+  "$isolated_host/run-in-container" \
+    --agent claude --model test-model --timeout 10 \
+    --model-credential-file "$tmp/wrapper-model-credential" \
+    --output "$tmp/wrapper-output-parent/invalid run id") \
+  2>"$tmp/wrapper-invalid-run-id-error"; then
+  echo "wrapper accepted an invalid run identifier" >&2
+  exit 1
+fi
+rg -q 'output basename must match' "$tmp/wrapper-invalid-run-id-error"
+
+set +e
+(cd "$tmp/wrapper-repo" && \
+  PATH="$tmp/fake-bin:$PATH" \
+  FAKE_DOCKER_ARGS="$tmp/fake-docker-fail-args" \
+  FAKE_DOCKER_EVIDENCE="$tmp/fake-docker-fail-evidence" \
+  FAKE_DOCKER_MODE=fail \
+  FAKE_DOCKER_STDIN_SHA="$tmp/fake-docker-fail-stdin-sha" \
+  "$isolated_host/run-in-container" \
+    --agent claude --model test-model --timeout 10 \
+    --model-credential-file "$tmp/wrapper-model-credential" \
+    --output "$tmp/wrapper-output-parent/failed-run")
+wrapper_fail_exit=$?
+set -e
+test "$wrapper_fail_exit" = 42
+test ! -e "$tmp/wrapper-output-parent/failed-run"
+test ! -e "$(cat "$tmp/fake-docker-fail-evidence")"
+
+mkdir "$tmp/wrapper-output-parent/locked-run.lock"
+if (cd "$tmp/wrapper-repo" && PATH="$tmp/fake-bin:$PATH" \
+  "$isolated_host/run-in-container" \
+    --agent claude --model test-model --timeout 10 \
+    --model-credential-file "$tmp/wrapper-model-credential" \
+    --output "$tmp/wrapper-output-parent/locked-run") \
+  2>"$tmp/wrapper-output-lock-error"; then
+  echo "wrapper ignored an existing destination lock" >&2
+  exit 1
+fi
+rg -q 'another publisher holds the output lock' "$tmp/wrapper-output-lock-error"
+rmdir "$tmp/wrapper-output-parent/locked-run.lock"
+
+if (cd "$tmp/wrapper-repo" && \
+  PATH="$tmp/fake-bin:$PATH" \
+  FAKE_DOCKER_ARGS="$tmp/fake-docker-sibling-args" \
+  FAKE_DOCKER_EVIDENCE="$tmp/fake-docker-sibling-evidence" \
+  FAKE_DOCKER_MODE=sibling \
+  FAKE_DOCKER_STDIN_SHA="$tmp/fake-docker-sibling-stdin-sha" \
+  "$isolated_host/run-in-container" \
+    --agent claude --model test-model --timeout 10 \
+    --model-credential-file "$tmp/wrapper-model-credential" \
+    --output "$tmp/wrapper-output-parent/sibling-run") 2>"$tmp/wrapper-sibling-error"; then
+  echo "wrapper accepted an unexpected evidence staging sibling" >&2
+  exit 1
+fi
+test ! -e "$tmp/wrapper-output-parent/sibling-run"
+test ! -e "$(cat "$tmp/fake-docker-sibling-evidence")"
+rg -q 'unexpected staged evidence' "$tmp/wrapper-sibling-error"
+
+if (cd "$tmp/wrapper-repo" && \
+  PATH="$tmp/fake-bin:$PATH" \
+  FAKE_DOCKER_ARGS="$tmp/fake-docker-nested-args" \
+  FAKE_DOCKER_EVIDENCE="$tmp/fake-docker-nested-evidence" \
+  FAKE_DOCKER_MODE=nested \
+  FAKE_DOCKER_STDIN_SHA="$tmp/fake-docker-nested-stdin-sha" \
+  "$isolated_host/run-in-container" \
+    --agent claude --model test-model --timeout 10 \
+    --model-credential-file "$tmp/wrapper-model-credential" \
+    --output "$tmp/wrapper-output-parent/nested-run") 2>"$tmp/wrapper-nested-error"; then
+  echo "wrapper accepted an unexpected directory inside staged evidence" >&2
+  exit 1
+fi
+test ! -e "$tmp/wrapper-output-parent/nested-run"
+test ! -e "$(cat "$tmp/fake-docker-nested-evidence")"
+rg -q 'evidence top-level entries mismatch' "$tmp/wrapper-nested-error"
+
+printf '%s' 'repo-contained-credential' >"$tmp/wrapper-repo/model-credential"
+chmod 600 "$tmp/wrapper-repo/model-credential"
+if (cd "$tmp/wrapper-repo" && PATH="$tmp/fake-bin:$PATH" \
+  "$isolated_host/run-in-container" \
+    --agent claude --model test-model --timeout 10 \
+    --model-credential-file "$tmp/wrapper-repo/model-credential" \
+    --output "$tmp/wrapper-output-parent/repo-credential-run") \
+  2>"$tmp/wrapper-repo-credential-error"; then
+  echo "wrapper accepted a credential inside the mounted repository" >&2
+  exit 1
+fi
+rg -q 'outside the repository' "$tmp/wrapper-repo-credential-error"
+
+mkdir "$tmp/wrapper-main"
+git -C "$tmp/wrapper-main" init --quiet
+printf '%s\n' tracked >"$tmp/wrapper-main/tracked"
+git -C "$tmp/wrapper-main" add tracked
+git -C "$tmp/wrapper-main" -c user.name=Eval -c user.email=eval@example.test \
+  commit --quiet -m fixture
+git -C "$tmp/wrapper-main" worktree add --quiet -b linked-fixture "$tmp/wrapper-linked"
+git_common_credential="$tmp/wrapper-main/.git/model-credential"
+printf '%s' 'git-common-contained-credential' >"$git_common_credential"
+chmod 600 "$git_common_credential"
+if (cd "$tmp/wrapper-linked" && PATH="$tmp/fake-bin:$PATH" \
+  "$isolated_host/run-in-container" \
+    --agent claude --model test-model --timeout 10 \
+    --model-credential-file "$git_common_credential" \
+    --output "$tmp/wrapper-output-parent/git-credential-run") \
+  2>"$tmp/wrapper-git-credential-error"; then
+  echo "wrapper accepted a credential inside external Git metadata" >&2
+  exit 1
+fi
+rg -q 'outside Git metadata' "$tmp/wrapper-git-credential-error"
 
 printf '%013000d' 0 >"$tmp/long-stderr"
 "$eval_dir/bin/build-runner-diagnostics" "$tmp/long-stderr" "$tmp/long-diagnostics.json"
@@ -277,6 +1225,11 @@ resolved_path="$(SAFE_PATH_SOURCE="$test_path" BASH_ENV=/dev/null PATH="$test_pa
 env -i PATH="$resolved_path" /bin/sh -c 'command -v user-tool >/dev/null'
 test "$(realpath "$(env -i PATH="$resolved_path" /bin/sh -c 'command -v node')")" = \
   "$(realpath "$tmp/user-bin/node")"
+if [[ "$(uname -s)" == Linux ]]; then
+  test ! -d /opt/homebrew/bin
+  SAFE_PATH_SOURCE="$test_path" BASH_ENV=/dev/null PATH="$test_path" \
+    "$eval_dir/bin/build-safe-path" user-tool node sh >/dev/null
+fi
 
 mise_node="$(SAFE_PATH_SOURCE="$PATH" BASH_ENV=/dev/null \
   "$eval_dir/bin/build-safe-path" --resolve node)"
@@ -319,6 +1272,17 @@ if "$eval_dir/bin/run-eval" --agent codex --model test-model --timeout 10 \
   exit 1
 fi
 rg -q 'workspace must be outside the repository' "$tmp/nested-error"
+
+ln -s "$root" "$tmp/repository-link"
+if (cd "$tmp/repository-link" && \
+  "$tmp/repository-link/internal/agent-evals/pro-app-buildability/bin/run-eval" \
+    --agent codex --model test-model --timeout 10 \
+    --workspace "$root/nested-eval-workspace" --output "$tmp/symlinked-root-output") \
+  2>"$tmp/symlinked-root-error"; then
+  echo "symlinked repository path bypassed workspace containment" >&2
+  exit 1
+fi
+rg -q 'workspace must be outside the repository' "$tmp/symlinked-root-error"
 
 printf '%s\n' \
   '{"schema_version":"1.0","sandbox_network_access":true,"limits":{"max_bytes":1048576,"max_events":5000,"observed_bytes":1,"observed_events":1,"exceeded":false,"reason":null},"npm":{"attempts":[{"command_id":"command-1","exit_code":1}],"status":"pass"},"rubygems":{"attempts":[],"status":"fail"},"overall":"pass"}' \

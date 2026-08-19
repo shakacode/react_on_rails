@@ -13,6 +13,8 @@
 # For licensing terms:
 # https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
 
+require_relative "../open_telemetry"
+
 module ReactOnRailsPro
   # AsyncRendering enables concurrent rendering of multiple React components.
   # When enabled, async_react_component calls will execute their HTTP requests
@@ -54,14 +56,17 @@ module ReactOnRailsPro
     def wrap_in_async_react_context
       require "async"
       require "async/barrier"
+      parent_context = ReactOnRailsPro::OpenTelemetry.capture_context
 
       Sync do
-        @react_on_rails_async_barrier = Async::Barrier.new
-        yield
-        check_for_unresolved_async_components
-      ensure
-        @react_on_rails_async_barrier&.stop
-        @react_on_rails_async_barrier = nil
+        ReactOnRailsPro::OpenTelemetry.with_context(parent_context) do
+          @react_on_rails_async_barrier = Async::Barrier.new
+          yield
+          check_for_unresolved_async_components
+        ensure
+          @react_on_rails_async_barrier&.stop
+          @react_on_rails_async_barrier = nil
+        end
       end
     end
 
