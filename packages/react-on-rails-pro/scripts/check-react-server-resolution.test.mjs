@@ -15,20 +15,28 @@
 
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { assertReactServerEntryFiles } from './check-react-server-resolution.mjs';
 
 const scriptPath = fileURLToPath(new URL('./check-react-server-resolution.mjs', import.meta.url));
+const require = createRequire(import.meta.url);
+const reactMajorVersion = Number.parseInt(require('react/package.json').version, 10);
 
-test('accepts the matching React server runtime under the react-server condition', () => {
+test('validates the installed runtime under the react-server condition', () => {
   const result = spawnSync(process.execPath, ['--conditions', 'react-server', scriptPath], {
     encoding: 'utf8',
   });
 
-  assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /React server resolution verified/);
+  if (reactMajorVersion >= 19) {
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /React server resolution verified/);
+  } else {
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /React server test setup failed: the React react-server entry is missing/);
+  }
 });
 
 test('rejects the client runtime with a direct export-condition error', () => {
@@ -36,7 +44,11 @@ test('rejects the client runtime with a direct export-condition error', () => {
 
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /React server test setup failed/);
-  assert.match(result.stderr, /"react-server" export condition did not select React's server entry/);
+  if (reactMajorVersion >= 19) {
+    assert.match(result.stderr, /"react-server" export condition did not select React's server entry/);
+  } else {
+    assert.match(result.stderr, /the React react-server entry is missing/);
+  }
 });
 
 test('rejects a missing mapped server entry with its path', () => {
