@@ -362,6 +362,14 @@ jobs:
             --out ~/rspec/rspec.xml \
             --format documentation
 
+      - name: Store Pro Node renderer log
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pro-rspec-node-renderer-log
+          path: ${{ runner.temp }}/node-renderer.log
+          if-no-files-found: ignore
+
       - name: Store test results
         uses: actions/upload-artifact@v4
         if: always()
@@ -553,6 +561,14 @@ jobs:
       - name: Run Playwright E2E tests for Pro dummy app
         run: cd spec/dummy && pnpm e2e-test
 
+      - name: Store Pro Node renderer log
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pro-playwright-node-renderer-log
+          path: ${{ runner.temp }}/node-renderer.log
+          if-no-files-found: ignore
+
       - name: Store test results
         uses: actions/upload-artifact@v4
         if: always()
@@ -727,6 +743,14 @@ jobs:
 
       - name: Run RSC Playwright E2E tests for Pro dummy app
         run: cd spec/dummy && pnpm e2e-test:rsc
+
+      - name: Store Pro Node renderer log
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pro-rspack-rsc-runtime-node-renderer-log
+          path: ${{ runner.temp }}/node-renderer.log
+          if-no-files-found: ignore
 
       - name: Store test results
         uses: actions/upload-artifact@v4

@@ -382,6 +382,11 @@ for (const jobName of proNodeRendererJobs) {
     readinessStep,
     /(?:^|\n)\s+(?:continue-on-error|if|timeout-seconds):/,
   );
+  assertMatches(
+    `${jobName} always preserves the renderer log`,
+    job,
+    /- name: Store Pro Node renderer log[\s\S]*uses: actions\/upload-artifact@v4[\s\S]*if: always\(\)[\s\S]*path: \$\{\{ runner\.temp \}\}\/node-renderer\.log[\s\S]*if-no-files-found: ignore/,
+  );
 }
 assert.equal(
   [...proIntegrationWorkflow.matchAll(/pnpm run node-renderer\b/g)].length,
