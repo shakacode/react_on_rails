@@ -45,6 +45,20 @@ assert_json_key_present() {
   return 1
 }
 
+assert_script_includes() {
+  local json_file="$1"
+  local script_name="$2"
+  local expected="$3"
+
+  if ruby -rjson -e 'abort unless JSON.parse(File.read(ARGV[0])).dig("scripts", ARGV[1]).include?(ARGV[2])' \
+    "$json_file" "$script_name" "$expected"; then
+    return 0
+  fi
+
+  fail "expected $script_name to include $expected"
+  return 1
+}
+
 run_test() {
   local test_fn="$1"
   CURRENT_TEST="$test_fn"
@@ -122,7 +136,8 @@ JSON
 {
   "name": "react-on-rails-pro",
   "scripts": {
-    "test:non-rsc": "jest tests --testPathIgnorePatterns=\"tests/.*(RSC|stream).*\""
+    "test:non-rsc": "jest tests --testPathIgnorePatterns=\"tests/.*(RSC|stream).*\"",
+    "test:rsc": "jest tests/*.rsc.test.*"
   },
   "dependencies": {
     "react": "19.2.0",
@@ -189,7 +204,17 @@ test_strips_react_19_only_workspace_overrides() {
   assert_json_key_present package.json "sentry-testkit>express"
 }
 
+test_excludes_lowercase_rsc_suites_from_minimum_tests() {
+  write_fixture
+
+  ruby script/convert
+
+  assert_script_includes packages/react-on-rails-pro/package.json "test:non-rsc" "[.]rsc[.]test[.]"
+  assert_script_includes packages/react-on-rails-pro/package.json "test:non-rsc" "rscSsrSynchrony"
+}
+
 run_test test_strips_react_19_only_workspace_overrides
+run_test test_excludes_lowercase_rsc_suites_from_minimum_tests
 
 if [ "$TESTS_FAILED" -eq 0 ]; then
   echo "PASS: $TESTS_RUN tests"

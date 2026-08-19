@@ -16,6 +16,7 @@
 import { createRequire } from 'module';
 import path from 'path';
 import rootConfig from '../../jest.config.base.js';
+import { resolveReactServerDependencies } from './scripts/check-react-server-resolution.mjs';
 
 const require = createRequire(import.meta.url);
 const nodeVersion = parseInt(process.version.slice(1), 10);
@@ -29,6 +30,9 @@ const isReactServerEnv = (process.env.NODE_CONDITIONS ?? '')
 // manager swaps) instead of hardcoding `../../node_modules/react`.
 const reactPackageRoot = path.dirname(require.resolve('react/package.json'));
 const reactDomPackageRoot = path.dirname(require.resolve('react-dom/package.json'));
+const reactServerDependencies = isReactServerEnv
+  ? resolveReactServerDependencies(import.meta.url)
+  : undefined;
 
 // Package-specific Jest configuration
 // Inherits from root jest.config.mjs and adds package-specific settings
@@ -60,11 +64,12 @@ export default {
         }
       : isReactServerEnv
         ? {
-            // React 19 exposes react-server entry points as *.react-server.js.
-            // If React changes this layout, verify with a failing RSC test.
-            '^react$': `${reactPackageRoot}/react.react-server.js`,
-            '^react/jsx-runtime$': `${reactPackageRoot}/jsx-runtime.react-server.js`,
-            '^react/jsx-dev-runtime$': `${reactPackageRoot}/jsx-dev-runtime.react-server.js`,
+            // Resolve every RSC import through react-server-dom-webpack's peer dependency
+            // chain so Jest loads one validated server runtime even when pnpm hoists copies.
+            '^react$': reactServerDependencies.entries['React react-server'],
+            '^react/jsx-runtime$': reactServerDependencies.entries['React JSX react-server'],
+            '^react/jsx-dev-runtime$': reactServerDependencies.entries['React JSX dev react-server'],
+            '^react-dom$': reactServerDependencies.entries['React DOM react-server'],
           }
         : {
             '^react$': reactPackageRoot,

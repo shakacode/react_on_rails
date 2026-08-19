@@ -21,18 +21,33 @@ import checkJestSuiteSelection from './check-jest-suite-selection.mjs';
 test('skips suite-selection discovery when React 18 intentionally excludes React 19 tests', () => {
   const messages = [];
   let discoveryCalls = 0;
+  const compatibleTest = '/workspace/tests/compatible.test.ts';
 
   checkJestSuiteSelection({
     reactVersion: '18.3.1',
     runPnpm: () => {
       discoveryCalls += 1;
-      return [];
+      return [compatibleTest];
     },
     log: (message) => messages.push(message),
   });
 
-  assert.equal(discoveryCalls, 0);
+  assert.equal(discoveryCalls, 2);
   assert.deepEqual(messages, ['Jest suite-selection check skipped (requires React 19+, found 18.3.1)']);
+});
+
+test('rejects lowercase RSC tests from the React 18-compatible suite', () => {
+  const rscTest = '/workspace/tests/cacheSignalAbort.rsc.test.tsx';
+
+  assert.throws(
+    () =>
+      checkJestSuiteSelection({
+        reactVersion: '18.3.1',
+        runPnpm: () => [rscTest],
+        log: () => {},
+      }),
+    /React 19-only tests selected by the React 18-compatible test:non-rsc suite:\n.*cacheSignalAbort[.]rsc[.]test[.]tsx/,
+  );
 });
 
 test('reports an unselected Jest test when React 19 runs the complete suite', () => {

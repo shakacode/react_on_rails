@@ -132,6 +132,8 @@ end
 # so exclude RSC/streaming/client tests that need React.use or testing-library helpers.
 minimum_pro_non_rsc_ignored_tests = %w[
   RSC
+  [.]rsc[.]test[.]
+  rscSsrSynchrony
   stream
   registerServerComponent
   serverRenderReactComponent
