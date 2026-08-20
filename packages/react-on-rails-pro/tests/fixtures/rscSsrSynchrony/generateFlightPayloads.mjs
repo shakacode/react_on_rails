@@ -47,10 +47,13 @@
  * React trees, exactly as the production RSC bundle does.
  */
 
-import { createElement as h, Suspense } from 'react';
 import { Writable } from 'stream';
-import { buildServerRenderer } from 'react-on-rails-rsc/server.node';
-import { registerClientReference } from 'react-on-rails-rsc/server';
+import { loadReactServerRuntime } from '../../../scripts/check-react-server-resolution.mjs';
+
+const { React } = loadReactServerRuntime(import.meta.url);
+const { createElement: h, Suspense } = React;
+const { buildServerRenderer } = await import('react-on-rails-rsc/server.node');
+const { registerClientReference } = await import('react-on-rails-rsc/server');
 
 // Module key + browser module id for the client reference. The consuming test builds the
 // matching react-client / react-server-client manifests from the values echoed in the
