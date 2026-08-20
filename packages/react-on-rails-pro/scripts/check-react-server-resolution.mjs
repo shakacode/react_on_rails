@@ -78,6 +78,10 @@ export const resolveReactServerDependencies = (fromUrl = import.meta.url) => {
     'React JSX react-server': path.join(reactPackageRoot, 'jsx-runtime.react-server.js'),
     'React JSX dev react-server': path.join(reactPackageRoot, 'jsx-dev-runtime.react-server.js'),
     'React DOM react-server': path.join(reactDomPackageRoot, 'react-dom.react-server.js'),
+    'React DOM client react-server': path.join(reactDomPackageRoot, 'client.react-server.js'),
+    'React DOM profiling react-server': path.join(reactDomPackageRoot, 'profiling.react-server.js'),
+    'React DOM server react-server': path.join(reactDomPackageRoot, 'server.react-server.js'),
+    'React DOM static react-server': path.join(reactDomPackageRoot, 'static.react-server.js'),
   };
 
   assertReactServerEntryFiles(entries);

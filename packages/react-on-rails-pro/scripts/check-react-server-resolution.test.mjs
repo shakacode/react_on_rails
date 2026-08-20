@@ -15,10 +15,15 @@
 
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { basename } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { assertReactServerEntryFiles, resolveRuntimeReactVersion } from './check-react-server-resolution.mjs';
+import {
+  assertReactServerEntryFiles,
+  resolveReactServerDependencies,
+  resolveRuntimeReactVersion,
+} from './check-react-server-resolution.mjs';
 
 const scriptPath = fileURLToPath(new URL('./check-react-server-resolution.mjs', import.meta.url));
 const jestConfigUrl = new URL('../jest.config.js', import.meta.url).href;
@@ -77,19 +82,38 @@ test('keeps condition-sensitive React DOM subpaths on react-server entries', () 
 
   assert.equal(result.status, 0, result.stderr);
   const mapper = JSON.parse(result.stdout);
-  assert.match(mapper['^react-dom/client$'], /client[.]react-server[.]js$/);
-  assert.match(mapper['^react-dom/profiling$'], /profiling[.]react-server[.]js$/);
-  assert.match(mapper['^react-dom/server(\\..+)?$'], /server[.]react-server[.]js$/);
-  assert.match(mapper['^react-dom/static(\\..+)?$'], /static[.]react-server[.]js$/);
-
-  const mapperPatterns = Object.keys(mapper);
-  const catchAllIndex = mapperPatterns.indexOf('^react-dom/(.*)$');
+  const { entries } = resolveReactServerDependencies(jestConfigUrl);
   for (const pattern of [
     '^react-dom/client$',
     '^react-dom/profiling$',
     '^react-dom/server(\\..+)?$',
     '^react-dom/static(\\..+)?$',
   ]) {
-    assert.ok(mapperPatterns.indexOf(pattern) < catchAllIndex);
+    assert.ok(Object.hasOwn(mapper, pattern), `jest.config.js is missing ${pattern}`);
+  }
+
+  assert.equal(mapper['^react-dom/client$'], entries['React DOM client react-server']);
+  assert.equal(basename(mapper['^react-dom/client$']), 'client.react-server.js');
+  assert.equal(basename(mapper['^react-dom/profiling$']), 'profiling.react-server.js');
+  assert.equal(basename(mapper['^react-dom/server(\\..+)?$']), 'server.react-server.js');
+  assert.equal(basename(mapper['^react-dom/static(\\..+)?$']), 'static.react-server.js');
+  assert.equal(mapper['^react-dom/profiling$'], entries['React DOM profiling react-server']);
+  assert.equal(mapper['^react-dom/server(\\..+)?$'], entries['React DOM server react-server']);
+  assert.equal(mapper['^react-dom/static(\\..+)?$'], entries['React DOM static react-server']);
+
+  const mapperPatterns = Object.keys(mapper);
+  const catchAllIndex = mapperPatterns.indexOf('^react-dom/(.*)$');
+  assert.ok(catchAllIndex >= 0, 'react-dom catch-all mapping is missing');
+  for (const pattern of [
+    '^react-dom/client$',
+    '^react-dom/profiling$',
+    '^react-dom/server(\\..+)?$',
+    '^react-dom/static(\\..+)?$',
+  ]) {
+    const mappingIndex = mapperPatterns.indexOf(pattern);
+    assert.ok(
+      mappingIndex >= 0 && mappingIndex < catchAllIndex,
+      `${pattern} must precede the react-dom catch-all`,
+    );
   }
 });
