@@ -62,12 +62,8 @@ const resolveRuntimePackages = (fromUrl) => {
 };
 
 export const resolveRuntimeReactVersion = (fromUrl = import.meta.url) => {
-  try {
-    const { runtimeRequire } = resolveRuntimePackages(fromUrl);
-    return runtimeRequire('react/package.json').version;
-  } catch {
-    return null;
-  }
+  const { runtimeRequire } = resolveRuntimePackages(fromUrl);
+  return runtimeRequire('react/package.json').version;
 };
 
 export const resolveReactServerDependencies = (fromUrl = import.meta.url) => {

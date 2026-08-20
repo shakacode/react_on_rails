@@ -42,7 +42,7 @@ if (versionResult.status === 0) {
   if (preflightStatus !== 0) {
     process.exitCode = preflightStatus;
   } else {
-    const jest = spawnSync('jest', jestArgs, { stdio: 'inherit' });
+    const jest = spawnSync('pnpm', ['exec', 'jest', ...jestArgs], { stdio: 'inherit' });
     if (jest.error) throw jest.error;
     process.exitCode = jest.status ?? 1;
   }
