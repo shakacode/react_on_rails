@@ -70,10 +70,10 @@ export default {
             '^react/jsx-dev-runtime$': reactServerDependencies.entries['React JSX dev react-server'],
             '^react-dom$': reactServerDependencies.entries['React DOM react-server'],
             '^react/(.*)$': `${reactServerDependencies.reactPackageRoot}/$1`,
-            '^react-dom/client$': `${reactServerDependencies.reactDomPackageRoot}/client.react-server.js`,
-            '^react-dom/profiling$': `${reactServerDependencies.reactDomPackageRoot}/profiling.react-server.js`,
-            '^react-dom/server(\\..+)?$': `${reactServerDependencies.reactDomPackageRoot}/server.react-server.js`,
-            '^react-dom/static(\\..+)?$': `${reactServerDependencies.reactDomPackageRoot}/static.react-server.js`,
+            '^react-dom/client$': reactServerDependencies.entries['React DOM client react-server'],
+            '^react-dom/profiling$': reactServerDependencies.entries['React DOM profiling react-server'],
+            '^react-dom/server(\\..+)?$': reactServerDependencies.entries['React DOM server react-server'],
+            '^react-dom/static(\\..+)?$': reactServerDependencies.entries['React DOM static react-server'],
             '^react-dom/(.*)$': `${reactServerDependencies.reactDomPackageRoot}/$1`,
           }
         : {
