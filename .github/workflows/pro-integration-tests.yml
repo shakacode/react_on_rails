@@ -211,8 +211,11 @@ jobs:
       needs.detect-changes.outputs.should_run_hosted_ci == 'true' &&
       needs.detect-changes.outputs.run_pro_dummy_tests == 'true'
     runs-on: ubuntu-22.04
+    timeout-minutes: 30
     env:
       REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
+      REACT_RENDERER_URL: http://127.0.0.1:3800
+      RENDERER_HOST: 127.0.0.1
     # Redis backs streamed RSC fixtures covered by the request specs.
     services:
       redis:
@@ -320,7 +323,7 @@ jobs:
       - name: Run Pro Node renderer in background
         run: |
           cd spec/dummy
-          pnpm run node-renderer &
+          pnpm run node-renderer > "$RUNNER_TEMP/node-renderer.log" 2>&1 &
 
       - name: Run Rails server in background
         run: |
@@ -341,6 +344,14 @@ jobs:
           done
           echo "Rails server started after ${elapsed}s"
 
+      - name: Wait for Pro Node renderer to start
+        uses: ./.github/actions/wait-for-h2c-service
+        with:
+          service-name: Node renderer
+          path: /info
+          authority: http://127.0.0.1:3800
+          log-path: ${{ runner.temp }}/node-renderer.log
+
       - name: Run RSpec tests for Pro dummy app
         run: |
           cd spec/dummy
@@ -350,6 +361,14 @@ jobs:
             --format RspecJunitFormatter \
             --out ~/rspec/rspec.xml \
             --format documentation
+
+      - name: Store Pro Node renderer log
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pro-rspec-node-renderer-log
+          path: ${{ runner.temp }}/node-renderer.log
+          if-no-files-found: ignore
 
       - name: Store test results
         uses: actions/upload-artifact@v4
@@ -395,8 +414,11 @@ jobs:
       needs.detect-changes.outputs.should_run_hosted_ci == 'true' &&
       needs.detect-changes.outputs.run_pro_dummy_tests == 'true'
     runs-on: ubuntu-22.04
+    timeout-minutes: 30
     env:
       REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
+      REACT_RENDERER_URL: http://127.0.0.1:3800
+      RENDERER_HOST: 127.0.0.1
     # Redis service container
     services:
       redis:
@@ -504,7 +526,7 @@ jobs:
       - name: Run Pro Node renderer in background
         run: |
           cd spec/dummy
-          pnpm run node-renderer &
+          pnpm run node-renderer > "$RUNNER_TEMP/node-renderer.log" 2>&1 &
 
       - name: Run Rails server in background
         run: |
@@ -525,11 +547,27 @@ jobs:
           done
           echo "Rails server started after ${elapsed}s"
 
+      - name: Wait for Pro Node renderer to start
+        uses: ./.github/actions/wait-for-h2c-service
+        with:
+          service-name: Node renderer
+          path: /info
+          authority: http://127.0.0.1:3800
+          log-path: ${{ runner.temp }}/node-renderer.log
+
       - name: Install Playwright dependencies
         run: cd spec/dummy && npx playwright install --with-deps
 
       - name: Run Playwright E2E tests for Pro dummy app
         run: cd spec/dummy && pnpm e2e-test
+
+      - name: Store Pro Node renderer log
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pro-playwright-node-renderer-log
+          path: ${{ runner.temp }}/node-renderer.log
+          if-no-files-found: ignore
 
       - name: Store test results
         uses: actions/upload-artifact@v4
@@ -655,14 +693,14 @@ jobs:
       - name: Run Pro Node renderer in background
         run: |
           cd spec/dummy
-          pnpm run node-renderer &
+          pnpm run node-renderer > "$RUNNER_TEMP/node-renderer.log" 2>&1 &
 
       - name: Run Rails server in background
         run: |
           cd spec/dummy
           RAILS_ENV="test" bundle exec rails server &
 
-      - name: Wait for Rails server and Node renderer to start
+      - name: Wait for Rails server to start
         run: |
           wait_for_service() {
             name="$1"
@@ -688,124 +726,31 @@ jobs:
             done
           }
 
-          wait_for_h2c_service() {
-            name="$1"
-            path="$2"
-            shift 2
-            timeout=300
-            start=$SECONDS
-
-            while true; do
-              for authority in "$@"; do
-                if node - "$authority" "$path" <<'NODE'
-          const http2 = require('node:http2');
-
-          const [authority, path] = process.argv.slice(2);
-          const client = http2.connect(authority);
-          const request = client.request({ ':method': 'GET', ':path': path });
-          let status;
-          let timeout;
-          let completed = false;
-
-          const finish = (exitCode, destroyClient = false) => {
-            if (completed) return;
-            completed = true;
-            clearTimeout(timeout);
-            if (destroyClient) {
-              client.destroy();
-            } else {
-              client.close();
-            }
-            process.exit(exitCode);
-          };
-
-          const fail = () => finish(1, true);
-
-          client.on('error', fail);
-          request.on('error', fail);
-          request.on('response', (headers) => {
-            status = headers[':status'];
-          });
-          request.on('data', () => {});
-          request.on('end', () => {
-            finish(status >= 200 && status < 300 ? 0 : 1);
-          });
-          request.end();
-          timeout = setTimeout(fail, 10000);
-          NODE
-                then
-                  elapsed=$((SECONDS - start))
-                  echo "${name} started at ${authority}${path} after ${elapsed}s"
-                  return 0
-                fi
-              done
-
-              sleep 1
-              elapsed=$((SECONDS - start))
-              if [ $elapsed -ge $timeout ]; then
-                echo "Timeout waiting for ${name} to start after ${timeout}s"
-                echo "::group::${name} h2c readiness diagnostics"
-                for authority in "$@"; do
-                  echo "GET ${authority}${path}"
-                  node - "$authority" "$path" <<'NODE' || true
-          const http2 = require('node:http2');
-
-          const [authority, path] = process.argv.slice(2);
-          const client = http2.connect(authority);
-          let body = '';
-          const timeout = setTimeout(() => {
-            console.error('diagnostic timeout without response');
-            client.destroy();
-            process.exit(1);
-          }, 5000);
-
-          const finish = (exitCode) => {
-            clearTimeout(timeout);
-            client.close();
-            process.exit(exitCode);
-          };
-
-          client.on('error', (error) => {
-            console.error(`connect error: ${error.message}`);
-            finish(1);
-          });
-          const request = client.request({ ':method': 'GET', ':path': path });
-          request.on('response', (headers) => {
-            console.log(`response headers: ${JSON.stringify(headers)}`);
-          });
-          request.on('data', (chunk) => {
-            body += chunk.toString();
-            body = body.slice(0, 500);
-          });
-          request.on('end', () => {
-            if (body) console.log(`response body: ${body}`);
-            finish(0);
-          });
-          request.on('error', (error) => {
-            console.error(`request error: ${error.message}`);
-            finish(1);
-          });
-          request.end();
-          NODE
-                done
-                echo "::endgroup::"
-                exit 1
-              fi
-            done
-          }
-
           # Both processes are already running; sequential waits keep the logs easier
           # to read while the renderer can continue booting during the Rails poll.
           wait_for_service "Rails server" "http://127.0.0.1:3000/empty"
-          # Single IPv4 authority is intentional: RENDERER_HOST binds h2c to
-          # 127.0.0.1. Add ::1 here only if the renderer binding changes.
-          wait_for_h2c_service "Node renderer" "/info" "http://127.0.0.1:3800"
+
+      - name: Wait for Pro Node renderer to start
+        uses: ./.github/actions/wait-for-h2c-service
+        with:
+          service-name: Node renderer
+          path: /info
+          authority: http://127.0.0.1:3800
+          log-path: ${{ runner.temp }}/node-renderer.log
 
       - name: Install Playwright dependencies
         run: cd spec/dummy && npx playwright install --with-deps
 
       - name: Run RSC Playwright E2E tests for Pro dummy app
         run: cd spec/dummy && pnpm e2e-test:rsc
+
+      - name: Store Pro Node renderer log
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pro-rspack-rsc-runtime-node-renderer-log
+          path: ${{ runner.temp }}/node-renderer.log
+          if-no-files-found: ignore
 
       - name: Store test results
         uses: actions/upload-artifact@v4
