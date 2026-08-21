@@ -89,7 +89,11 @@ function extractAuthSecFlightStream(body) {
       if (!skipBlankSeparators()) return;
       const newlineIndex = buffer.indexOf(0x0a);
       const header = decoder.decode(buffer.subarray(0, newlineIndex));
-      const tabIndex = header.lastIndexOf('\t');
+      // First tab splits `<metadata JSON>\t<hex length>`, matching the canonical parser
+      // (parseLengthPrefixedStream.ts). A literal 0x09 never appears inside the metadata
+      // JSON — `JSON.stringify` escapes tabs as the two chars `\t` — so `indexOf` is safe
+      // and stays consistent with the implementation this file mirrors.
+      const tabIndex = header.indexOf('\t');
       if (tabIndex === -1) {
         throw new Error('Malformed length-prefixed RSC frame header');
       }

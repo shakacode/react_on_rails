@@ -105,21 +105,6 @@ RSpec.describe "AuthSec server functions endpoint (spike for issue #4874)" do
       expect(authorization_context).to eq(%w[AuthsecServerFunctionsController AuthSecServerFunctionsPage])
     end
 
-    it "invokes the configured authorizer exactly once even though two layers consult it" do
-      authsec_login("alice")
-      calls = 0
-      ReactOnRailsPro.configuration.rsc_payload_authorizer = lambda do |_controller, _component_name|
-        calls += 1
-        true
-      end
-
-      call_server_function(action: "authsec/whoami")
-
-      # The controller pre-check memoizes the decision for the request, so a side-effectful
-      # or rate-limiting authorizer is charged once, not twice (pre-check + rsc_payload).
-      expect(calls).to eq(1)
-    end
-
     # P1 regression guard: executor mode must be unreachable from the generic,
     # unauthenticated `GET /rsc_payload/:component_name` route, which renders
     # attacker-controlled `params[:props]` straight into the component. Without the
@@ -312,7 +297,10 @@ RSpec.describe "AuthSec server functions endpoint (spike for issue #4874)" do
   describe "live round trips (environment-gated: require the node renderer)" do
     before do
       unless authsec_renderer_available?
-        skip "Node renderer not reachable at #{ReactOnRailsPro.configuration.renderer_url} — " \
+        # Don't interpolate the full renderer_url: a deployment can carry credentials or
+        # signed routing tokens in its path/query, and a skip reason lands in CI logs.
+        # A masked host:port is enough to diagnose an outage.
+        skip "Node renderer not reachable at #{masked_renderer_endpoint} — " \
              "start it with `pnpm run node-renderer` (after `pnpm run build:test`) to run " \
              "the live round-trip probes."
       end
@@ -323,6 +311,14 @@ RSpec.describe "AuthSec server functions endpoint (spike for issue #4874)" do
       Socket.tcp(uri.host, uri.port, connect_timeout: 1) { true }
     rescue StandardError
       false
+    end
+
+    # host:port only — never the path, query, or userinfo of the configured renderer_url.
+    def masked_renderer_endpoint
+      uri = URI.parse(ReactOnRailsPro.configuration.renderer_url)
+      "#{uri.host}:#{uri.port}"
+    rescue StandardError
+      "the configured renderer_url"
     end
 
     # Concatenated flight payload bodies from the length-prefixed NDJSON response —
@@ -348,6 +344,24 @@ RSpec.describe "AuthSec server functions endpoint (spike for issue #4874)" do
       expect(payload).to include('"identitySource":"rails-session"')
       # Opaque-manifest dispatch: no registerServerReference file:// module ids on the wire.
       expect(payload).not_to include("file://")
+    end
+
+    it "invokes the configured authorizer exactly once even though two layers consult it" do
+      authsec_login("alice")
+      calls = 0
+      ReactOnRailsPro.configuration.rsc_payload_authorizer = lambda do |_controller, _component_name|
+        calls += 1
+        true
+      end
+
+      # A `true` authorizer proceeds all the way into `rsc_payload` + the streaming
+      # renderer, so this lives in the environment-gated live group. The controller
+      # pre-check memoizes the decision for the request, so a side-effectful or
+      # rate-limiting authorizer is charged once, not twice (pre-check + rsc_payload).
+      call_server_function(action: "authsec/whoami")
+
+      expect(response).to have_http_status(:ok)
+      expect(calls).to eq(1)
     end
 
     it "ignores a forged identity smuggled inside the encoded arguments" do

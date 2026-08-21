@@ -96,9 +96,16 @@ class AuthsecServerFunctionsController < ApplicationController
 
   # Spike-only login: binds one of the fixed AUTHSEC_SPIKE_USERS to the Rails session and
   # issues the signed bound-note token used by probe (d). CSRF-protected like any Rails
-  # form POST. Production login must additionally rotate the session (reset_session) and
-  # refresh the client's CSRF token; that is session-fixation hygiene orthogonal to the
-  # server-function probes, so the spike documents it instead of implementing it.
+  # form POST.
+  #
+  # DELIBERATELY credential-free: POSTing {"user":"admin"} with a valid CSRF token is
+  # enough to obtain the admin session. This spike's subject is "identity cannot be forged
+  # via server-function ARGUMENTS" (probe a) — i.e. a function trusts the session, not the
+  # client's encoded args — NOT how the session was established. Do not read this endpoint
+  # as an authentication model: obtaining any of the three identities is unauthenticated by
+  # design, so a real app must replace it with genuine authentication (Devise/Warden/etc.).
+  # Production login must also rotate the session (reset_session) and refresh the client's
+  # CSRF token (session-fixation hygiene) — orthogonal to the server-function probes.
   def update_session
     requested_user = params[:user].to_s
     if requested_user.empty?
