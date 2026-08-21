@@ -385,6 +385,13 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     render "/pages/pro/console_logs_in_async_server"
   end
 
+  # AuthSec spike for issue #4874 (Server Functions RFC): RSC page hosting the
+  # authentication & security probe panel. Execution goes through the guarded
+  # AuthsecServerFunctionsController#execute endpoint, not this page.
+  def authsec_server_functions
+    stream_view_containing_react_components(template: "/pages/authsec_server_functions")
+  end
+
   # React 19 native metadata examples (no react-helmet)
   def native_metadata
     render "/pages/native_metadata"
