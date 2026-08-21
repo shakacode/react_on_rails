@@ -54,6 +54,13 @@
 class AuthsecServerFunctionsController < ApplicationController
   include ReactOnRailsPro::RSCPayloadRenderer
 
+  # The registered RSC component that runs server functions in "executor mode". It is only
+  # meant to be reachable through this controller's guarded #execute action. PagesController
+  # (which backs the generic, unauthenticated `GET /rsc_payload/:component_name` route)
+  # refuses this exact component so executor mode cannot be reached without these guards —
+  # see PagesController#rsc_payload_authorized?.
+  EXECUTOR_COMPONENT_NAME = "AuthSecServerFunctionsPage"
+
   # Minimal deterministic spike-only "auth stack": the session names one of these fixed
   # users. A real app would plug in Devise/Warden etc.; the probes only need a stable
   # authenticated identity with roles.
@@ -164,6 +171,19 @@ class AuthsecServerFunctionsController < ApplicationController
     render_authsec_error("AUTHSEC_FORBIDDEN", :forbidden)
   end
 
+  # Memoize the authorization decision for the duration of the request so the configured
+  # authorizer is invoked exactly once even though both this controller's pre-check and
+  # RSCPayloadRenderer#rsc_payload consult it. Without this, a side-effectful authorizer
+  # (e.g. rate limiting) would be charged twice, and one that flips between calls could
+  # pass the pre-check but then trip the concern's bodyless `head :forbidden`, defeating
+  # the constant-body contract. Keyed by component_name, which is fixed server-side here.
+  def rsc_payload_authorized?(component_name)
+    @authsec_payload_authorized ||= {}
+    return @authsec_payload_authorized[component_name] if @authsec_payload_authorized.key?(component_name)
+
+    @authsec_payload_authorized[component_name] = super
+  end
+
   def verify_authsec_bound_note
     @authsec_bound_note = verified_authsec_bound_note
     case @authsec_bound_note
@@ -245,7 +265,7 @@ class AuthsecServerFunctionsController < ApplicationController
 
   # Fixed server-side; never taken from the request.
   def rsc_payload_component_name
-    "AuthSecServerFunctionsPage"
+    EXECUTOR_COMPONENT_NAME
   end
 
   def rsc_payload_component_props

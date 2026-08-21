@@ -104,6 +104,43 @@ RSpec.describe "AuthSec server functions endpoint (spike for issue #4874)" do
       expect_constant_rejection("AUTHSEC_FORBIDDEN", :forbidden)
       expect(authorization_context).to eq(%w[AuthsecServerFunctionsController AuthSecServerFunctionsPage])
     end
+
+    it "invokes the configured authorizer exactly once even though two layers consult it" do
+      authsec_login("alice")
+      calls = 0
+      ReactOnRailsPro.configuration.rsc_payload_authorizer = lambda do |_controller, _component_name|
+        calls += 1
+        true
+      end
+
+      call_server_function(action: "authsec/whoami")
+
+      # The controller pre-check memoizes the decision for the request, so a side-effectful
+      # or rate-limiting authorizer is charged once, not twice (pre-check + rsc_payload).
+      expect(calls).to eq(1)
+    end
+
+    # P1 regression guard: executor mode must be unreachable from the generic,
+    # unauthenticated `GET /rsc_payload/:component_name` route, which renders
+    # attacker-controlled `params[:props]` straight into the component. Without the
+    # PagesController#rsc_payload_authorized? refusal, an anonymous caller could forge an
+    # admin `currentUser` and reach the admin server function with none of this endpoint's
+    # guards — forging the identity the spike claims is un-forgeable.
+    it "refuses AuthSecServerFunctionsPage on the generic unauthenticated rsc_payload route" do
+      forged_props = {
+        "authsecActionCall" => {
+          "actionName" => "authsec/admin_secret",
+          "encodedReply" => "[]",
+          "currentUser" => { "username" => "attacker", "role" => "admin" }
+        }
+      }
+
+      get "/rsc_payload/AuthSecServerFunctionsPage", params: { props: forged_props.to_json }
+
+      expect(response).to have_http_status(:forbidden)
+      expect(response.body).not_to include("authsec-spike-admin-only-value")
+      expect(response.body).not_to include("authsecActionResult")
+    end
   end
 
   describe "CSRF (probe b)" do
