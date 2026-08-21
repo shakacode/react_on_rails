@@ -385,6 +385,13 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     render "/pages/pro/console_logs_in_async_server"
   end
 
+  # AuthSec spike for issue #4874 (Server Functions RFC): RSC page hosting the
+  # authentication & security probe panel. Execution goes through the guarded
+  # AuthsecServerFunctionsController#execute endpoint, not this page.
+  def authsec_server_functions
+    stream_view_containing_react_components(template: "/pages/authsec_server_functions")
+  end
+
   # React 19 native metadata examples (no react-helmet)
   def native_metadata
     render "/pages/native_metadata"
@@ -434,6 +441,29 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
   helper_method :read_async_props_from_redis, :read_lazy_props_from_redis
 
   private
+
+  # AuthSec spike (issue #4874) — hardening the generic RSC payload route.
+  #
+  # `rsc_payload_route controller: "pages"` exposes an UNAUTHENTICATED
+  # `GET /rsc_payload/:component_name` that renders `params[:props]` straight into the
+  # component's props. `AuthSecServerFunctionsPage` runs in "executor mode" whenever it
+  # receives an `authsecActionCall` prop, so without this guard an attacker could request
+  # that component through the generic route with a forged admin `currentUser` and reach
+  # the admin / sealed-note server functions with NONE of the guarded POST endpoint's
+  # CSRF, session, role, or bound-note checks — forging the very identity the spike claims
+  # is un-forgeable. The executor is only legitimately reachable through
+  # AuthsecServerFunctionsController#execute (a separate controller that does not inherit
+  # this override), so deny it on the generic route. Props are attacker-controlled here,
+  # so this must live at the Rails routing layer, not in the component.
+  #
+  # Kept below `private` to match the visibility of the method it overrides
+  # (RSCPayloadRenderer#rsc_payload_authorized? is private) so it can never be exposed as a
+  # controller action.
+  def rsc_payload_authorized?(component_name)
+    return false if component_name == AuthsecServerFunctionsController::EXECUTOR_COMPONENT_NAME
+
+    super
+  end
 
   def posts_page_posts_count
     value = params[:posts_count]

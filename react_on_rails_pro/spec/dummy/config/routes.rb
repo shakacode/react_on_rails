@@ -138,6 +138,13 @@ Rails.application.routes.draw do
   get "selective_hydration_demo" => "pages#selective_hydration_demo", as: :selective_hydration_demo
   get "selective_hydration_cached" => "pages#selective_hydration_cached", as: :selective_hydration_cached
 
+  # AuthSec spike for issue #4874 (Server Functions RFC): authentication & security probes.
+  get "authsec_server_functions" => "pages#authsec_server_functions", as: :authsec_server_functions
+  post "authsec_server_functions/session" => "authsec_server_functions#update_session",
+       as: :authsec_server_functions_session
+  post "authsec_server_functions/call" => "authsec_server_functions#execute",
+       as: :authsec_server_functions_call
+
   # API Routes
   namespace :api do
     resources :posts do
