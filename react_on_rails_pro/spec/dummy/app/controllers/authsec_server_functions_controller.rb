@@ -54,6 +54,13 @@
 class AuthsecServerFunctionsController < ApplicationController
   include ReactOnRailsPro::RSCPayloadRenderer
 
+  # Defense in depth: this entire spike controller only exists for #4874 evidence, and
+  # #update_session is a deliberately credential-free login that grants a real admin
+  # session. spec/dummy is sometimes spun up outside CI for manual/demo poking, so refuse
+  # every action unless we're in test or development — it must never become an admin
+  # backdoor if the dummy app is ever exposed in another environment.
+  before_action :ensure_authsec_spike_enabled
+
   # The registered RSC component that runs server functions in "executor mode". It is only
   # meant to be reachable through this controller's guarded #execute action. PagesController
   # (which backs the generic, unauthenticated `GET /rsc_payload/:component_name` route)
@@ -136,6 +143,14 @@ class AuthsecServerFunctionsController < ApplicationController
   end
 
   private
+
+  # Hard environment gate (see the before_action rationale): the credential-free login
+  # must never be reachable outside test/development.
+  def ensure_authsec_spike_enabled
+    return if Rails.env.test? || Rails.env.development?
+
+    head :not_found
+  end
 
   # --- guards (each renders a constant-body error and returns false to halt) ---
 

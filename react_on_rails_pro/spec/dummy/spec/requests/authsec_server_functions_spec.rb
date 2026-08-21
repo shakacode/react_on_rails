@@ -88,6 +88,19 @@ RSpec.describe "AuthSec server functions endpoint (spike for issue #4874)" do
       expect_constant_rejection("AUTHSEC_UNKNOWN_USER", :unprocessable_entity)
     end
 
+    it "is hard-disabled outside test/development so the credential-free login can't be a backdoor" do
+      # Defense in depth: the whole spike controller (including the credential-free login
+      # that grants a real admin session) must 404 if the dummy app is ever spun up in
+      # another environment.
+      allow(Rails).to receive(:env).and_return(ActiveSupport::StringInquirer.new("production"))
+
+      post "/authsec_server_functions/session", params: { user: "admin" }
+      expect(response).to have_http_status(:not_found)
+
+      call_server_function(action: "authsec/whoami")
+      expect(response).to have_http_status(:not_found)
+    end
+
     it "is additionally gated by the existing rsc_payload_authorizer config hook" do
       authsec_login("admin")
       authorization_context = nil
