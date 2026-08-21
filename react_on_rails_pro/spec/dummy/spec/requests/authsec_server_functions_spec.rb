@@ -28,9 +28,11 @@ RSpec.describe "AuthSec server functions endpoint (spike for issue #4874)" do
   around do |example|
     config = ReactOnRailsPro.configuration
     original_authorizer = config.rsc_payload_authorizer
-    example.run
-  ensure
-    config.rsc_payload_authorizer = original_authorizer
+    begin
+      example.run
+    ensure
+      config.rsc_payload_authorizer = original_authorizer
+    end
   end
 
   def call_server_function(action: nil, body: "[]", bound_token: nil, extra_headers: {})
@@ -96,7 +98,10 @@ RSpec.describe "AuthSec server functions endpoint (spike for issue #4874)" do
 
       call_server_function(action: "authsec/whoami")
 
-      expect(response).to have_http_status(:forbidden)
+      # The endpoint pre-checks the same authorizer and emits its CONSTANT JSON body,
+      # rather than falling through to RSCPayloadRenderer#rsc_payload's bodyless
+      # `head :forbidden` — so the redaction contract (probe e) holds on this path too.
+      expect_constant_rejection("AUTHSEC_FORBIDDEN", :forbidden)
       expect(authorization_context).to eq(%w[AuthsecServerFunctionsController AuthSecServerFunctionsPage])
     end
   end
@@ -181,8 +186,20 @@ RSpec.describe "AuthSec server functions endpoint (spike for issue #4874)" do
       expect_constant_rejection("AUTHSEC_UNKNOWN_ACTION", :not_found)
     end
 
-    it "rejects an oversized action id" do
-      call_server_function(action: "authsec/#{'a' * 300}")
+    it "rejects an over-cap action id via the byte-size cap, before the allow-list is consulted" do
+      authsec_login("alice")
+      max_bytes = AuthsecServerFunctionsController::MAX_AUTHSEC_ACTION_NAME_BYTES
+      over_cap_id = "authsec/#{'a' * max_bytes}" # 8 + max_bytes bytes, strictly over the cap
+      # Register the over-cap id in the allow-list so a plain hash-miss can no longer
+      # explain the rejection: if the cap short-circuits BEFORE the lookup, this is still
+      # rejected; if the cap regressed, the lookup would find the key and the call would
+      # proceed to authz instead. That makes this test specific to the cap, not the miss.
+      stubbed_allow_list = AuthsecServerFunctionsController::AUTHSEC_ALLOWED_ACTIONS.merge(
+        over_cap_id => { "roles" => %w[member admin] }.freeze
+      ).freeze
+      stub_const("AuthsecServerFunctionsController::AUTHSEC_ALLOWED_ACTIONS", stubbed_allow_list)
+
+      call_server_function(action: over_cap_id)
 
       expect_constant_rejection("AUTHSEC_UNKNOWN_ACTION", :not_found)
     end
@@ -360,15 +377,47 @@ RSpec.describe "AuthSec server functions endpoint (spike for issue #4874)" do
       expect(payload).not_to include("db_password")
     end
 
-    it "redacts argument-decode failures for malformed encoded-reply bytes" do
+    it "redacts argument-decode failures: constant code, no parse-error message or stack" do
       authsec_login("alice")
 
       call_server_function(action: "authsec/whoami", body: "this-is-not-flight-data")
 
       payload = flight_payload
-      expect(payload).to include("AUTHSEC_ACTION_FAILED")
+      # The decode-failure result carries only a constant code + correlation ref — never
+      # the parse error, whose message/stack can embed the client's raw bytes. (Input-arg
+      # confidentiality against the dev-only Flight debug-info channel is a separate,
+      # documented finding — see the next example.)
+      expect(payload).to include("AUTHSEC_DECODE_FAILED")
+      expect(payload).to include("errorRef")
       expect(payload).not_to include("SyntaxError")
       expect(payload).not_to include("Unexpected token")
+    end
+
+    # Documents a genuine RFC-Q2 finding surfaced by this spike, distinct from the
+    # error-message redaction above: in a DEVELOPMENT build React Flight serializes each
+    # Server Component's debug info — INCLUDING its props — into the stream (production RSC
+    # strips it). The executor receives server-derived identity, the signature-verified
+    # bound note, and the raw client bytes as PROPS, so a dev build echoes all three back
+    # through that debug channel. This is exactly why a faithful implementation must not
+    # pass confidential bound values as plain props — it reinforces probe (d)'s "encrypt
+    # bound values, don't merely sign them" caveat.
+    it "EXPOSES executor props via React's development Flight debug-info channel (documented gap)" do
+      login = authsec_login("alice")
+      marker = "AUTHSEC-ARG-SECRET-#{SecureRandom.hex(4)}"
+      call_server_function(
+        action: "authsec/read_sealed_note",
+        body: "[\"#{marker}\"]",
+        bound_token: login.fetch("boundNoteToken")
+      )
+
+      full = flight_payload
+      # The client-visible RESULT is correct and scoped...
+      expect(full).to include("Sealed note for alice")
+      # ...but the dev debug-info rows still echo the executor's props verbatim, including
+      # the server-derived identity and the client's raw argument bytes.
+      expect(full).to include('"env":"Server"')
+      expect(full).to include(marker)
+      expect(full).to include("currentUser")
     end
   end
 end

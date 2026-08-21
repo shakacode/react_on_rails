@@ -114,6 +114,7 @@ class AuthsecServerFunctionsController < ApplicationController
     return unless authenticate_authsec_caller
     return unless resolve_authsec_action
     return unless authorize_authsec_action
+    return unless authorize_authsec_payload_renderer
     return unless verify_authsec_bound_note
     return unless enforce_authsec_size_caps
 
@@ -148,6 +149,17 @@ class AuthsecServerFunctionsController < ApplicationController
 
   def authorize_authsec_action
     return true if @authsec_policy.fetch("roles").include?(@authsec_role)
+
+    render_authsec_error("AUTHSEC_FORBIDDEN", :forbidden)
+  end
+
+  # The host's `rsc_payload_authorizer` config hook ALSO gates this endpoint, because
+  # execution reuses RSCPayloadRenderer#rsc_payload. That concern denies with a bodyless
+  # `head :forbidden`, which would break this endpoint's constant-JSON-body contract, so
+  # pre-check the same authorizer here and emit the fixed error body instead. rsc_payload
+  # re-checks it too (defense in depth); this guard only makes the denial body constant.
+  def authorize_authsec_payload_renderer
+    return true if rsc_payload_authorized?(rsc_payload_component_name)
 
     render_authsec_error("AUTHSEC_FORBIDDEN", :forbidden)
   end

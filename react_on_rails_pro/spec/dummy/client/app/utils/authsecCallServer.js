@@ -65,24 +65,42 @@ function extractAuthSecFlightStream(body) {
     buffer = next;
   };
 
+  // A header line that is empty or all-CR is a blank separator, not a real frame — the
+  // Rails template adds a bare `\n` (or `\r\n`) after the first rendered chunk. Mirrors
+  // `isBlankSeparatorLine` in packages/react-on-rails-pro/src/parseLengthPrefixedStream.ts
+  // (0x0d = CR half of a CRLF ending), so a CRLF separator doesn't get mis-read as a
+  // header with a lone `\r`.
+  const isBlankSeparatorLine = (bytes) => bytes.length === 0 || bytes.every((byte) => byte === 0x0d);
+
+  // Drop any leading blank separator lines (bare `\n`, or `\r\n` — the Rails template adds
+  // one after the first rendered chunk) so the next `indexOf(0x0a)` lands on a real frame
+  // header. Returns false when the buffer holds only a partial (unterminated) blank line.
+  const skipBlankSeparators = () => {
+    for (;;) {
+      const newlineIndex = buffer.indexOf(0x0a);
+      if (newlineIndex === -1) return false;
+      if (!isBlankSeparatorLine(buffer.subarray(0, newlineIndex))) return true;
+      buffer = buffer.subarray(newlineIndex + 1).slice();
+    }
+  };
+
   const drainFrames = (controller) => {
     for (;;) {
-      // Frames may be separated by bare newlines (the Rails template adds one after the
-      // first rendered chunk); skip them before parsing the next frame header.
-      let skip = 0;
-      while (skip < buffer.length && buffer[skip] === 0x0a) skip += 1;
-      if (skip > 0) buffer = buffer.subarray(skip).slice();
+      if (!skipBlankSeparators()) return;
       const newlineIndex = buffer.indexOf(0x0a);
-      if (newlineIndex === -1) return;
       const header = decoder.decode(buffer.subarray(0, newlineIndex));
       const tabIndex = header.lastIndexOf('\t');
       if (tabIndex === -1) {
         throw new Error('Malformed length-prefixed RSC frame header');
       }
-      const contentLength = parseInt(header.slice(tabIndex + 1), 16);
-      if (Number.isNaN(contentLength)) {
+      // Validate the FULL hex field before parsing: `parseInt` alone stops at the first
+      // non-hex byte, so a corrupt field like "1az" would silently become 0x1a and
+      // misalign every subsequent frame. Mirrors the canonical parser's `/^[0-9a-fA-F]+$/`.
+      const lengthHex = header.slice(tabIndex + 1);
+      if (!/^[0-9a-fA-F]+$/.test(lengthHex)) {
         throw new Error('Malformed RSC frame content length');
       }
+      const contentLength = parseInt(lengthHex, 16);
       if (buffer.length < newlineIndex + 1 + contentLength) return;
       const metadata = JSON.parse(header.slice(0, tabIndex));
       if (metadata && metadata.hasErrors) {
@@ -109,6 +127,16 @@ function extractAuthSecFlightStream(body) {
             drainFrames(controller);
           }
           if (done) {
+            // Surface a truncated stream instead of closing silently: a proxy timeout,
+            // dropped connection, or renderer crash mid-frame leaves an incomplete frame
+            // buffered, and swallowing it would show an empty/partial result as if the
+            // call had succeeded. All-blank (empty/CR) leftovers are just separator
+            // fragments and are fine. Mirrors the canonical parser's `flush()` warn.
+            if (buffer.length > 0 && !isBlankSeparatorLine(buffer)) {
+              console.warn(
+                `[AuthSec spike] Incomplete length-prefixed stream: ${buffer.length} bytes remaining`,
+              );
+            }
             controller.close();
             return undefined;
           }

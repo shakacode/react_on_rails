@@ -86,6 +86,12 @@ async function executeAuthSecServerFunction({ actionName, encodedReply, currentU
     return { authsecActionError: { code: 'AUTHSEC_UNKNOWN_ACTION' } };
   }
 
+  // Decode the client-controlled bytes in their own guarded step. A `decodeReply`
+  // rejection's message/stack can embed an excerpt of the raw request body, so it is NOT
+  // safe to log verbatim — that would persist client args/PII to the renderer log even
+  // though the browser response is redacted (probe e). Log only the error CLASS NAME
+  // (author-controlled, never request bytes) plus the correlation ref.
+  let args;
   try {
     // Dynamic import on purpose (same seam as #4876): `react-on-rails-rsc/server` throws
     // at load time outside the `react-server` condition, and this file is also bundled
@@ -96,7 +102,18 @@ async function executeAuthSecServerFunction({ actionName, encodedReply, currentU
     // for the simple string encoding. A shipped implementation adds undici's FormData
     // to the VM globals instead.
     const formDataShim = new Map([['0', String(encodedReply)]]);
-    const args = await decodeReply(formDataShim);
+    args = await decodeReply(formDataShim);
+  } catch (error) {
+    const errorRef = Math.random().toString(36).slice(2, 10);
+    const errorClass = error instanceof Error ? error.constructor.name : typeof error;
+    // No message/stack: they may contain the client's raw encoded bytes.
+    logAuthSecServerSide(
+      `[AuthSec spike][ref ${errorRef}] argument decode failed for ${actionName} (${errorClass})`,
+    );
+    return { authsecActionError: { code: 'AUTHSEC_DECODE_FAILED', errorRef } };
+  }
+
+  try {
     const context = Object.freeze({
       // Server-derived identity from the Rails session — the client's encoded arguments
       // cannot influence it (probe a).
@@ -108,8 +125,9 @@ async function executeAuthSecServerFunction({ actionName, encodedReply, currentU
     return { authsecActionResult: returnValue };
   } catch (error) {
     // Probe (e): redact. Generic code + correlation ref to the client; full detail only
-    // to the renderer's stderr. `actionName` is safe to log here — reaching this branch
-    // requires it to be a static allow-list key.
+    // to the renderer's stderr. This branch is an EXECUTION error from an allow-listed
+    // server function (author-controlled code), so its stack is safe to log server-side;
+    // `actionName` is likewise a static allow-list key.
     const errorRef = Math.random().toString(36).slice(2, 10);
     const detail = error instanceof Error ? error.stack || error.message : String(error);
     logAuthSecServerSide(`[AuthSec spike][ref ${errorRef}] server function ${actionName} failed: ${detail}`);
