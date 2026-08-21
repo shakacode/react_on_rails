@@ -124,13 +124,19 @@ async function executeAuthSecServerFunction({ actionName, encodedReply, currentU
     const returnValue = await serverFunction(context, ...(Array.isArray(args) ? args : []));
     return { authsecActionResult: returnValue };
   } catch (error) {
-    // Probe (e): redact. Generic code + correlation ref to the client; full detail only
-    // to the renderer's stderr. This branch is an EXECUTION error from an allow-listed
-    // server function (author-controlled code), so its stack is safe to log server-side;
-    // `actionName` is likewise a static allow-list key.
+    // Probe (e): redact. The client gets only a generic code + correlation ref. A server
+    // function's exception message/stack can itself carry secrets or PII (this spike's
+    // `authsecRaiseServerError` deliberately embeds `db_password=hunter2`), so we do NOT
+    // persist the raw detail even to the renderer's own log — only the correlation ref and
+    // a SAFE classification (the error's class name, which is author-controlled, never
+    // request- or secret-derived). A production app that wants full server-side detail
+    // must route it through its own audited, access-controlled logging with redaction —
+    // not model secret-logging here. `actionName` is a static allow-list key, safe to log.
     const errorRef = Math.random().toString(36).slice(2, 10);
-    const detail = error instanceof Error ? error.stack || error.message : String(error);
-    logAuthSecServerSide(`[AuthSec spike][ref ${errorRef}] server function ${actionName} failed: ${detail}`);
+    const errorClass = error instanceof Error ? error.constructor.name : typeof error;
+    logAuthSecServerSide(
+      `[AuthSec spike][ref ${errorRef}] server function ${actionName} failed (${errorClass})`,
+    );
     return { authsecActionError: { code: 'AUTHSEC_ACTION_FAILED', errorRef } };
   }
 }

@@ -421,8 +421,11 @@ RSpec.describe "AuthSec server functions endpoint (spike for issue #4874)" do
       payload = flight_payload
       expect(payload).to include("AUTHSEC_ACTION_FAILED")
       expect(payload).to include("errorRef")
-      # The sensitive detail stays server-side (renderer stderr), unlike #4876, which
-      # returned error.message verbatim to the client.
+      # The client sees only the constant code + correlation ref — never the exception
+      # message or stack (unlike #4876, which returned error.message verbatim). The
+      # executor also no longer persists the raw detail to the renderer log; it records
+      # only the correlation ref + error class (see AuthSecServerFunctionsPage.server.jsx),
+      # because a function's own exception can carry secrets/PII.
       expect(payload).not_to include("hunter2")
       expect(payload).not_to include("AUTHSEC_SENSITIVE_INTERNAL")
       expect(payload).not_to include("db_password")
