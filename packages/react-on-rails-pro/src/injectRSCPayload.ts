@@ -130,6 +130,7 @@ const LOADABLE_STATS_FILE_NAME = 'loadable-stats.json';
 const LOADABLE_STATS_INITIAL_READ_RETRY_DELAY_MS = 100;
 const LOADABLE_STATS_MAX_READ_RETRY_DELAY_MS = 30_000;
 const LOADABLE_STATS_UNEXPECTED_WARNING_INTERVAL_MS = LOADABLE_STATS_MAX_READ_RETRY_DELAY_MS;
+const LOADABLE_STATS_MISSING_DIAGNOSTIC_CONTEXT_KEY = '__reactOnRailsProReportMissingLoadableStats';
 const RSC_CLIENT_STYLESHEET_INFERENCE_TIMEOUT_MS = 100;
 const STACK_FILE_LOCATION = /\(?((?:file:\/\/\/.+)|(?:\/.+)|(?:[A-Za-z]:[\\/].+)):\d+:\d+\)?\s*$/;
 
@@ -170,8 +171,16 @@ function isFileNotFoundError(error: unknown) {
   return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT';
 }
 
+function reportMissingLoadableStats(loadableStatsPath: string) {
+  const hostDiagnostic = Reflect.get(globalThis, LOADABLE_STATS_MISSING_DIAGNOSTIC_CONTEXT_KEY) as unknown;
+  if (typeof hostDiagnostic === 'function') hostDiagnostic(loadableStatsPath);
+}
+
 function warnIfUnexpectedLoadableStatsFailure(error: unknown, loadableStatsPath: string) {
-  if (isFileNotFoundError(error)) return;
+  if (isFileNotFoundError(error)) {
+    reportMissingLoadableStats(loadableStatsPath);
+    return;
+  }
 
   const warningKey = `${loadableStatsPath}\n${error instanceof Error ? `${error.name}:${error.message}` : String(error)}`;
   const nowMs = rscClientChunkStylesheetHrefsRetryClockMs();

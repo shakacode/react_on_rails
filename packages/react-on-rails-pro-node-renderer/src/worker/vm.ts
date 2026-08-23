@@ -60,6 +60,19 @@ import {
 import type { CurrentGenerationBundlePathAlias } from './currentGenerationManifest.js';
 
 const readFileAsync = promisify(fs.readFile);
+const LOADABLE_STATS_MISSING_DIAGNOSTIC_CONTEXT_KEY = '__reactOnRailsProReportMissingLoadableStats';
+// This is process-scoped diagnostic state, not request data: every VM context
+// shares the same host callback and only the first missing-stats event logs.
+let hasReportedMissingLoadableStats = false;
+
+function reportMissingLoadableStats(loadableStatsPath: unknown) {
+  if (hasReportedMissingLoadableStats || typeof loadableStatsPath !== 'string') return;
+
+  hasReportedMissingLoadableStats = true;
+  log.info(
+    `React on Rails Pro could not find ${loadableStatsPath}; RSC stylesheet inference is falling back to streamed preload tags and will retry. Verify that loadable-stats.json is emitted to the server bundle directory.`,
+  );
+}
 
 // Length of the `Module.wrap` prefix that is prepended to the first line of a
 // wrapped bundle. Needed to correct first-line stack-frame columns before
@@ -619,6 +632,7 @@ async function buildVM(filePath: string): Promise<VMContext> {
       // TS/JS sources. Only resolves positions for registered bundle paths.
       const contextObject = {
         sharedConsoleHistory,
+        [LOADABLE_STATS_MISSING_DIAGNOSTIC_CONTEXT_KEY]: reportMissingLoadableStats,
         [SOURCE_MAP_LOOKUP_ATTEMPT_CONTEXT_KEY]: createSourceMapLookupAttempt,
         [SOURCE_MAP_RESOLVER_CONTEXT_KEY]: (
           fileName: unknown,
@@ -1147,6 +1161,7 @@ export function resetVM() {
   vmPoolActivity.hardLimitEvictions = 0;
   vmPoolActivity.drainedContextRetirements = 0;
   lastPressureWarningAt = undefined;
+  hasReportedMissingLoadableStats = false;
   vmPoolClock = defaultVMPoolClock;
   activeSourceMapRequestCounts.clear();
   evictedSourceMapRegistrations.clear();
