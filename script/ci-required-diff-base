@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Selects the required-gate diff base and runs changed-file detection.
+# Test: bash script/ci-required-diff-base-test.bash
 
 set -eo pipefail
 

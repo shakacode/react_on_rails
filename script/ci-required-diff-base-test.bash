@@ -20,6 +20,7 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 DIFF_BASE_SCRIPT="$REPO_ROOT/script/ci-required-diff-base"
+WORKFLOW="$REPO_ROOT/.github/workflows/ci-required.yml"
 
 TESTS_RUN=0
 TESTS_FAILED=0
@@ -78,6 +79,37 @@ if [ ! -x "$DIFF_BASE_SCRIPT" ]; then
   echo "FAIL: executable diff-base script not found at $DIFF_BASE_SCRIPT" >&2
   exit 1
 fi
+
+test_workflow_wiring() {
+  local wiring_output
+
+  TESTS_RUN=$((TESTS_RUN + 1))
+  echo "-> workflow delegates changed-file detection to the helper"
+
+  if ! wiring_output="$(ruby -ryaml - "$WORKFLOW" 2>&1 <<'RUBY'
+workflow = YAML.safe_load_file(ARGV.fetch(0), permitted_classes: [], aliases: false)
+steps = workflow.fetch("jobs").fetch("required-pr-gate").fetch("steps")
+matching_steps = steps.select { |step| step["name"] == "Run changed-files detector" }
+
+abort "expected exactly one Run changed-files detector step, found #{matching_steps.length}" unless matching_steps.length == 1
+
+step = matching_steps.fetch(0)
+expected_env = {
+  "PULL_REQUEST_BASE_SHA" => %q(${{ github.event.inputs.pull_request_base_sha || '' }}),
+  "PULL_REQUEST_HEAD_SHA" => %q(${{ github.event.pull_request.head.sha || '' }}),
+  "EVENT_BASE_REF" => %q(${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before || 'origin/main' }}),
+}
+
+abort "expected id=changes, got #{step['id'].inspect}" unless step["id"] == "changes"
+abort "expected run=script/ci-required-diff-base, got #{step['run'].inspect}" unless step["run"] == "script/ci-required-diff-base"
+abort "helper env bindings changed: #{step['env'].inspect}" unless step["env"] == expected_env
+RUBY
+  )"; then
+    fail "workflow wiring: $wiring_output"
+  fi
+}
+
+test_workflow_wiring
 
 git init -q "$REPO"
 mkdir -p "$REPO/script"
