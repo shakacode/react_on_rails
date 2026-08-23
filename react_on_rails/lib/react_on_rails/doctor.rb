@@ -3,6 +3,7 @@
 require "json"
 require "erb"
 require "open3"
+require "ripper"
 require "stringio"
 require "tempfile"
 require "timeout"
@@ -71,12 +72,10 @@ module ReactOnRails
     SERVER_BUNDLE_SOURCE_EXTENSIONS = %w[.js .jsx .ts .tsx .mjs .cjs].freeze
     CUSTOM_LAUNCHER_INDICATOR_FILES = %w[dev].freeze
     RAILS_SERVER_COMMAND_REGEX = %r{\b(?:(?:bin/)?rails\s+(?:server|s)|puma|unicorn|rackup|passenger\s+start)\b}
+    TEMPLATE_ERB_COMMENT_PATTERN = /<%#.*?%>/m
+    TEMPLATE_HTML_COMMENT_PATTERN = /<!--.*?-->/m
     ERB_OUTPUT_EXPRESSION_PATTERN = /<%=\s*(?<expression>.*?)%>/m
-    STATIC_REACT_COMPONENT_CALL_PATTERN = /
-      \Areact_component\s*(?:\(\s*)?
-      (?<quote>["'])(?<name>[A-Za-z0-9_:]+)\k<quote>
-      (?<arguments>.*)\z
-    /mx
+    REACT_ON_RAILS_INITIALIZER_PATH = "config/initializers/react_on_rails.rb"
 
     # Deprecated-renderer-cache scan (used by check_deprecated_renderer_cache_task):
     # look for references to the old pre_stage_bundle_for_node_renderer task in
@@ -1250,11 +1249,11 @@ module ReactOnRails
       layout_files.each do |layout_file|
         next unless File.exist?(layout_file)
 
-        content = File.read(layout_file)
-        has_stylesheet = content.include?("stylesheet_pack_tag")
-        has_javascript = content.include?("javascript_pack_tag")
+        content = uncommented_template_content(File.read(layout_file))
+        has_stylesheet = erb_output_helper?(content, "stylesheet_pack_tag")
+        has_javascript = erb_output_helper?(content, "javascript_pack_tag")
 
-        layout_name = File.basename(layout_file, ".html.erb")
+        layout_name = layout_file.delete_prefix("app/views/layouts/").delete_suffix(".html.erb")
 
         # Report detected pack helpers informationally. A JavaScript-only entrypoint
         # (no emitted CSS), a CSS-only pack, or a hybrid layout that loads CSS via
@@ -1276,10 +1275,11 @@ module ReactOnRails
     def check_unflushed_auto_loaded_component_css(layout_name, content)
       return unless erb_output_helper?(content, "javascript_pack_tag")
 
-      auto_loaded_component_names(content).each do |component_name|
+      component_names = auto_loaded_component_names(content)
+      component_names.concat(auto_loaded_component_names_from_implicit_views(layout_name)).uniq.each do |component_name|
         entrypoint = "generated/#{component_name}"
-        stylesheet_assets = shakapacker_manifest_data&.dig("entrypoints", entrypoint, "assets", "css")
-        next unless stylesheet_assets.is_a?(Array) && stylesheet_assets.any? && stylesheet_assets.all?(String)
+        stylesheet_assets = static_stylesheet_assets(entrypoint)
+        next unless stylesheet_assets
 
         checker.add_warning(
           "⚠️  #{layout_name}: auto-loaded component entrypoint #{entrypoint} emits CSS " \
@@ -1289,26 +1289,337 @@ module ReactOnRails
       end
     end
 
+    def static_stylesheet_assets(entrypoint)
+      stylesheet_assets = shakapacker_manifest_data&.dig("entrypoints", entrypoint, "assets", "css")
+      return unless stylesheet_assets.is_a?(Array) && stylesheet_assets.any?
+      return unless stylesheet_assets.all? { |asset| asset.is_a?(String) && !asset.empty? }
+
+      stylesheet_assets
+    end
+
+    def auto_loaded_component_names_from_implicit_views(layout_name)
+      Dir.glob("app/controllers/**/*_controller.rb").flat_map do |controller_file|
+        implicit_view_paths_for_layout(controller_file, layout_name).flat_map do |view_path|
+          next [] unless File.exist?(view_path)
+
+          auto_loaded_component_names(uncommented_template_content(File.read(view_path)))
+        end
+      rescue StandardError
+        []
+      end
+    rescue StandardError
+      []
+    end
+
+    def implicit_view_paths_for_layout(controller_file, layout_name)
+      statements = statically_associated_controller_statements(controller_file, layout_name)
+      return [] unless statements
+
+      view_directory = controller_file.delete_prefix("app/controllers/").delete_suffix("_controller.rb")
+      static_public_implicit_action_names(statements).map do |action_name|
+        "app/views/#{view_directory}/#{action_name}.html.erb"
+      end
+    rescue StandardError
+      []
+    end
+
+    def statically_associated_controller_statements(controller_file, layout_name)
+      return unless File.exist?(controller_file)
+
+      controller = static_controller_class(controller_file)
+      statements = static_body_statements(controller[3]) if controller
+      return unless statements
+
+      layout_declarations = statements.filter_map { |statement| static_layout_declaration(statement) }
+      statements if layout_declarations == [layout_name] && ast_method_call_count(controller, "layout") == 1
+    end
+
+    def static_public_implicit_action_names(statements)
+      visibility = :public
+      action_visibilities = {}
+
+      statements.each do |statement|
+        declaration = static_visibility_declaration(statement)
+        if declaration
+          declared_visibility, method_names = declaration
+          visibility = declared_visibility if method_names.empty?
+          method_names.each { |method_name| action_visibilities[method_name] = declared_visibility }
+        elsif (action_name = static_implicit_action_name(statement))
+          action_visibilities[action_name] = visibility
+        end
+      end
+
+      action_visibilities.filter_map { |action_name, action_visibility| action_name if action_visibility == :public }
+    end
+
+    def static_visibility_declaration(node)
+      visibility = %w[public protected private].find { |name| ast_method_call_count(node, name) == 1 }
+      return unless visibility
+
+      method_names = static_visibility_method_names(node, visibility)
+      [visibility.to_sym, method_names] if method_names
+    end
+
+    def static_visibility_method_names(node, visibility)
+      return [] if ast_node?(node, :vcall) && token_named?(node[1], visibility)
+
+      arguments = static_argument_values(static_call_arguments(node, visibility))
+      return unless arguments
+
+      method_names = arguments.map { |argument| static_symbol_value(argument) }
+      method_names if method_names.all?
+    end
+
+    def static_symbol_value(node)
+      symbol = node[1] if ast_node?(node, :symbol_literal)
+      token = symbol[1] if ast_node?(symbol, :symbol)
+      token[1] if token_type?(token, :@ident)
+    end
+
+    def static_controller_class(controller_file)
+      statements = ripper_statements(File.read(controller_file))
+      return unless statements.one?
+
+      controller = statements.first
+      return unless ast_node?(controller, :class)
+
+      relative_name = controller_file.delete_prefix("app/controllers/").delete_suffix("_controller.rb")
+      expected_name = "#{relative_name.split('/').map(&:camelize).join('::')}Controller"
+      controller if static_constant_name(controller[1]) == expected_name
+    end
+
+    def static_constant_name(node)
+      return unless node.is_a?(Array)
+
+      case node.first
+      when :const_ref, :top_const_ref
+        static_constant_token_value(node[1])
+      when :const_path_ref
+        namespace = static_constant_name(node[1])
+        constant = static_constant_token_value(node[2])
+        "#{namespace}::#{constant}" if namespace && constant
+      end
+    end
+
+    def static_constant_token_value(node)
+      node[1] if ast_node?(node, :@const)
+    end
+
+    def static_layout_declaration(node)
+      arguments = static_argument_values(static_call_arguments(node, "layout"))
+      return unless arguments&.one?
+
+      static_string_value(arguments.first)
+    end
+
+    def static_implicit_action_name(node)
+      return unless ast_node?(node, :def) && token_type?(node[1], :@ident)
+      return unless empty_method_parameters?(node[2])
+      return if ast_method_call_count(node[3], "render").positive?
+      return if ast_method_call_count(node[3], "layout").positive?
+
+      node[1][1]
+    end
+
+    def empty_method_parameters?(node)
+      ast_node?(node, :params) && node.drop(1).all?(&:nil?)
+    end
+
+    def static_body_statements(node)
+      statements = node[1] if ast_node?(node, :bodystmt)
+      statements if statements.is_a?(Array)
+    end
+
+    def ast_method_call_count(node, method_name)
+      return 0 unless node.is_a?(Array)
+
+      count =
+        case node.first
+        when :command, :fcall, :vcall
+          token_named?(node[1], method_name) ? 1 : 0
+        when :call, :command_call
+          token_named?(node[3], method_name) ? 1 : 0
+        else
+          0
+        end
+      children = node.first.is_a?(Symbol) ? node.drop(1) : node
+      count + children.sum { |child| ast_method_call_count(child, method_name) }
+    end
+
     def erb_output_helper?(content, helper_name)
       content.scan(ERB_OUTPUT_EXPRESSION_PATTERN).any? do |(expression)|
         expression.match?(/\A#{Regexp.escape(helper_name)}(?:\s|\()/)
       end
     end
 
+    def uncommented_template_content(content)
+      content.gsub(TEMPLATE_HTML_COMMENT_PATTERN, "").gsub(TEMPLATE_ERB_COMMENT_PATTERN, "")
+    end
+
     def auto_loaded_component_names(content)
       content.scan(ERB_OUTPUT_EXPRESSION_PATTERN).filter_map do |(expression)|
-        match = expression.match(STATIC_REACT_COMPONENT_CALL_PATTERN)
-        next unless match && statically_auto_loaded_component?(match[:arguments])
+        arguments = static_react_component_arguments(expression)
+        next unless arguments && statically_auto_loaded_component?(arguments)
 
-        match[:name].camelize
+        static_string_value(arguments.first)&.camelize
       end.uniq
     end
 
     def statically_auto_loaded_component?(arguments)
-      return true if arguments.match?(/\A\s*,\s*auto_load_bundle:\s*true\s*\)?\s*\z/)
-      return false unless arguments.match?(/\A\s*\)?\s*\z/)
+      component_option = top_level_boolean_keyword(arguments.drop(1), "auto_load_bundle")
+      return component_option == true unless component_option == :omitted
 
-      react_on_rails_runtime_configuration&.auto_load_bundle == true
+      static_global_auto_load_bundle == true
+    end
+
+    def static_react_component_arguments(expression)
+      statements = ripper_statements(expression)
+      return unless statements.one?
+
+      arguments = static_argument_values(static_call_arguments(statements.first, "react_component"))
+      component_name = static_string_value(arguments.first) if arguments&.any?
+      arguments if component_name&.match?(/\A[A-Za-z0-9_:]+\z/)
+    end
+
+    def ripper_statements(source)
+      program = Ripper.sexp(source)
+      statements = program[1] if ast_node?(program, :program)
+      statements.is_a?(Array) ? statements : []
+    end
+
+    def static_call_arguments(node, method_name)
+      return node[2] if ast_node?(node, :command) && token_named?(node[1], method_name)
+      return unless ast_node?(node, :method_add_arg) && fcall_named?(node[1], method_name)
+
+      argument_parentheses = node[2]
+      argument_parentheses[1] if ast_node?(argument_parentheses, :arg_paren)
+    end
+
+    def static_argument_values(node)
+      return unless ast_node?(node, :args_add_block) && node[2] == false
+
+      node[1] if node[1].is_a?(Array)
+    end
+
+    def ast_node?(node, type)
+      node.is_a?(Array) && node.first == type
+    end
+
+    def token_type?(node, type)
+      ast_node?(node, type) && node[1].is_a?(String)
+    end
+
+    def fcall_named?(node, name)
+      ast_node?(node, :fcall) && token_named?(node[1], name)
+    end
+
+    def token_named?(node, name)
+      token_type?(node, :@ident) && node[1] == name
+    end
+
+    def static_string_value(node)
+      return unless ast_node?(node, :string_literal)
+
+      content = node[1]
+      return unless ast_node?(content, :string_content)
+
+      parts = content.drop(1)
+      return unless parts.all? { |part| token_type?(part, :@tstring_content) }
+
+      parts.map { |part| part[1] }.join
+    end
+
+    def top_level_boolean_keyword(arguments, keyword)
+      associations = static_hash_associations(arguments.last)
+      return :omitted unless associations
+
+      matches = associations.select do |association|
+        static_label_association?(association, "#{keyword}:")
+      end
+      return :omitted if matches.empty?
+      return unless matches.one?
+
+      static_boolean_value(matches.first[2])
+    end
+
+    def static_hash_associations(node)
+      return node[1] if ast_node?(node, :bare_assoc_hash)
+      return unless ast_node?(node, :hash)
+
+      association_list = node[1]
+      association_list[1] if ast_node?(association_list, :assoclist_from_args)
+    end
+
+    def static_label_association?(node, label)
+      ast_node?(node, :assoc_new) && ast_node?(node[1], :@label) && node[1][1] == label
+    end
+
+    def static_global_auto_load_bundle
+      return @static_global_auto_load_bundle if defined?(@static_global_auto_load_bundle)
+      return (@static_global_auto_load_bundle = nil) unless File.exist?(REACT_ON_RAILS_INITIALIZER_PATH)
+
+      source = File.read(REACT_ON_RAILS_INITIALIZER_PATH)
+      @static_global_auto_load_bundle = static_configured_boolean(source, "auto_load_bundle")
+    rescue StandardError
+      @static_global_auto_load_bundle = nil
+    end
+
+    def static_configured_boolean(source, setting_name)
+      configure_blocks = ripper_statements(source).select { |statement| react_on_rails_configure_block?(statement) }
+      return unless configure_blocks.one?
+
+      configure_block = configure_blocks.first
+      config_name = configure_block_parameter_name(configure_block)
+      statements = static_body_statements(configure_block.dig(2, 2))
+      return unless config_name && statements
+
+      assignments = statements.select do |statement|
+        config_assignment?(statement, config_name, setting_name)
+      end
+      static_boolean_value(assignments.first[2]) if assignments.one?
+    end
+
+    def configure_block_parameter_name(node)
+      block_var = node.dig(2, 1)
+      parameters = block_var[1] if ast_node?(block_var, :block_var)
+      required = parameters[1] if ast_node?(parameters, :params)
+      required.first[1] if required&.one? && token_type?(required.first, :@ident)
+    end
+
+    def react_on_rails_configure_block?(node)
+      return false unless ast_node?(node, :method_add_block)
+
+      call = node[1]
+      block = node[2]
+      ast_node?(call, :call) && static_constant_reference(call[1]) == "ReactOnRails" &&
+        token_named?(call[3], "configure") && ast_node?(block, :do_block)
+    end
+
+    def static_constant_reference(node)
+      static_constant_token_value(node[1]) if ast_node?(node, :var_ref)
+    end
+
+    def config_assignment?(node, config_name, setting_name)
+      return false unless ast_node?(node, :assign)
+
+      field = node[1]
+      ast_node?(field, :field) && static_identifier_reference(field[1]) == config_name &&
+        token_named?(field[3], setting_name)
+    end
+
+    def static_identifier_reference(node)
+      token = node[1] if ast_node?(node, :var_ref)
+      token[1] if token_type?(token, :@ident)
+    end
+
+    def static_boolean_value(node)
+      return unless ast_node?(node, :var_ref)
+
+      keyword = node[1]
+      return true if token_type?(keyword, :@kw) && keyword[1] == "true"
+      return false if token_type?(keyword, :@kw) && keyword[1] == "false"
+
+      nil
     end
 
     def shakapacker_manifest_data

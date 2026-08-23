@@ -1188,12 +1188,33 @@ RSpec.describe ReactOnRails::Doctor do
     after { FileUtils.remove_entry(manifest_directory) }
 
     def stub_layouts(layouts)
+      allow(Dir).to receive(:glob).and_call_original
+      allow(File).to receive(:exist?).and_call_original
       allow(File).to receive(:read).and_call_original
       allow(Dir).to receive(:glob).with("app/views/layouts/**/*.erb").and_return(layouts.keys)
-      layouts.each do |path, content|
+      stub_file_contents(layouts)
+    end
+
+    def stub_controllers_and_views(controllers:, views:)
+      allow(Dir).to receive(:glob).with("app/controllers/**/*_controller.rb").and_return(controllers.keys)
+      stub_file_contents(controllers.merge(views))
+    end
+
+    def stub_file_contents(files)
+      files.each do |path, content|
         allow(File).to receive(:exist?).with(path).and_return(true)
         allow(File).to receive(:read).with(path).and_return(content)
       end
+    end
+
+    def stub_generated_controller_flow(controller:, view:)
+      stub_layouts(
+        "app/views/layouts/react_on_rails_default.html.erb" => "<%= javascript_pack_tag %>\n"
+      )
+      stub_controllers_and_views(
+        controllers: { "app/controllers/hello_world_controller.rb" => controller },
+        views: { "app/views/hello_world/index.html.erb" => view }
+      )
     end
 
     def stub_manifest_stylesheets(entrypoint, stylesheets)
@@ -1209,12 +1230,28 @@ RSpec.describe ReactOnRails::Doctor do
       allow(Shakapacker).to receive(:config).and_return(shakapacker_config)
     end
 
+    def stub_global_auto_load_bundle(value)
+      stub_react_on_rails_initializer(<<~RUBY)
+        ReactOnRails.configure do |config|
+          config.auto_load_bundle = #{value}
+        end
+      RUBY
+    end
+
+    def stub_react_on_rails_initializer(content)
+      initializer_path = "config/initializers/react_on_rails.rb"
+      allow(File).to receive(:exist?).with(initializer_path).and_return(true)
+      allow(File).to receive(:read).with(initializer_path).and_return(content)
+    end
+
     context "when a component-level auto-loaded entrypoint emits CSS that the React layout does not flush" do
       before do
         stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
         stub_layouts(
           "app/views/layouts/application.html.erb" => <<~ERB
-            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= react_component("StyledComponent", props: { card: { title: "Hello" } }, prerender: false, auto_load_bundle: true) %>
+            <%# stylesheet_pack_tag %>
+            <!-- <%= stylesheet_pack_tag %> -->
             <%= javascript_pack_tag %>
           ERB
         )
@@ -1237,15 +1274,14 @@ RSpec.describe ReactOnRails::Doctor do
 
     context "when globally enabled auto_load_bundle loads component CSS that the React layout does not flush" do
       before do
-        runtime_config = instance_double(ReactOnRails::Configuration, auto_load_bundle: true)
-        allow(doctor).to receive(:react_on_rails_runtime_configuration).and_return(runtime_config)
         stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
         stub_layouts(
           "app/views/layouts/application.html.erb" => <<~ERB
-            <%= react_component("StyledComponent") %>
+            <%= react_component("StyledComponent", props: @props, prerender: false) %>
             <%= javascript_pack_tag %>
           ERB
         )
+        stub_global_auto_load_bundle(true)
       end
 
       it "warns once and names the generated entrypoint and emitted stylesheet asset" do
@@ -1260,6 +1296,413 @@ RSpec.describe ReactOnRails::Doctor do
             )
           )
         )
+      end
+    end
+
+    context "when component-level auto_load_bundle is explicitly false while the global setting is true" do
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        stub_layouts(
+          "app/views/layouts/application.html.erb" => <<~ERB
+            <%= react_component("StyledComponent", props: @props, auto_load_bundle: false) %>
+            <%= javascript_pack_tag %>
+          ERB
+        )
+        stub_global_auto_load_bundle(true)
+      end
+
+      it "honors the component-level opt-out" do
+        doctor.send(:check_layout_files)
+
+        expect(checker.warnings?).to be(false)
+      end
+    end
+
+    context "when the global auto_load_bundle setting is dynamic" do
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        stub_layouts(
+          "app/views/layouts/application.html.erb" => <<~ERB
+            <%= react_component("StyledComponent", props: @props) %>
+            <%= javascript_pack_tag %>
+          ERB
+        )
+        stub_react_on_rails_initializer(<<~RUBY)
+          ReactOnRails.configure do |config|
+            config.auto_load_bundle = Rails.env.development?
+          end
+        RUBY
+      end
+
+      it "fails closed instead of inferring that auto-loading is enabled" do
+        doctor.send(:check_layout_files)
+
+        expect(checker.warnings?).to be(false)
+      end
+    end
+
+    context "when auto_load_bundle appears only inside component props" do
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        stub_layouts(
+          "app/views/layouts/application.html.erb" => <<~ERB
+            <%= react_component("StyledComponent", props: { auto_load_bundle: true }) %>
+            <%= javascript_pack_tag %>
+          ERB
+        )
+      end
+
+      it "does not mistake the nested key for the helper option" do
+        doctor.send(:check_layout_files)
+
+        expect(checker.warnings?).to be(false)
+      end
+    end
+
+    context "when the auto-loaded component name is dynamic" do
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        stub_layouts(
+          "app/views/layouts/application.html.erb" => <<~ERB
+            <%= react_component(component_name, auto_load_bundle: true) %>
+            <%= javascript_pack_tag %>
+          ERB
+        )
+      end
+
+      it "fails closed" do
+        doctor.send(:check_layout_files)
+
+        expect(checker.warnings?).to be(false)
+      end
+    end
+
+    context "when auto-loaded component calls appear only in template comments" do
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        stub_layouts(
+          "app/views/layouts/application.html.erb" => <<~ERB
+            <%# react_component("StyledComponent", auto_load_bundle: true) %>
+            <!-- <%= react_component("StyledComponent", auto_load_bundle: true) %> -->
+            <%= javascript_pack_tag %>
+          ERB
+        )
+      end
+
+      it "does not treat commented calls as rendered components" do
+        doctor.send(:check_layout_files)
+
+        expect(checker.warnings?).to be(false)
+      end
+    end
+
+    context "when the JavaScript flush helper appears only in template comments" do
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        stub_layouts(
+          "app/views/layouts/application.html.erb" => <<~ERB
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%# javascript_pack_tag %>
+            <!-- <%= javascript_pack_tag %> -->
+          ERB
+        )
+      end
+
+      it "does not treat a commented helper as an active flush" do
+        doctor.send(:check_layout_files)
+
+        expect(checker.warnings?).to be(false)
+      end
+    end
+
+    context "when the component's React layout actively flushes both pack queues" do
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        stub_layouts(
+          "app/views/layouts/application.html.erb" => <<~ERB
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= stylesheet_pack_tag %>
+            <%= javascript_pack_tag %>
+          ERB
+        )
+      end
+
+      it "does not warn" do
+        doctor.send(:check_layout_files)
+
+        expect(checker.warnings?).to be(false)
+      end
+    end
+
+    context "when a generated controller's implicit view uses its named React layout" do
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        stub_generated_controller_flow(
+          controller: <<~RUBY,
+            class HelloWorldController < ApplicationController
+              layout "react_on_rails_default"
+
+              def index
+              end
+            end
+          RUBY
+          view: <<~ERB
+            <%= react_component("StyledComponent", props: @props, prerender: false) %>
+          ERB
+        )
+        stub_global_auto_load_bundle(true)
+      end
+
+      it "warns with the generated entrypoint and emitted stylesheet asset" do
+        doctor.send(:check_layout_files)
+
+        expect(checker.messages).to include(
+          hash_including(
+            type: :warning,
+            content: a_string_including(
+              "react_on_rails_default",
+              "generated/StyledComponent",
+              "/packs/generated/StyledComponent-a1b2c3.css"
+            )
+          )
+        )
+      end
+    end
+
+    context "when the controller's literal layout declaration is conditional" do
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        stub_generated_controller_flow(
+          controller: <<~RUBY,
+            class HelloWorldController < ApplicationController
+              layout "react_on_rails_default" if Rails.env.development?
+
+              def index
+              end
+            end
+          RUBY
+          view: '<%= react_component("StyledComponent", auto_load_bundle: true) %>'
+        )
+      end
+
+      it "does not infer a view-to-layout association" do
+        doctor.send(:check_layout_files)
+
+        expect(checker.warnings?).to be(false)
+      end
+    end
+
+    context "when the controller layout is selected dynamically" do
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        stub_generated_controller_flow(
+          controller: <<~RUBY,
+            class HelloWorldController < ApplicationController
+              layout -> { "react_on_rails_default" }
+
+              def index
+              end
+            end
+          RUBY
+          view: '<%= react_component("StyledComponent", auto_load_bundle: true) %>'
+        )
+      end
+
+      it "does not infer a view-to-layout association" do
+        doctor.send(:check_layout_files)
+
+        expect(checker.warnings?).to be(false)
+      end
+    end
+
+    context "when the controller may inherit its layout" do
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        stub_generated_controller_flow(
+          controller: <<~RUBY,
+            class HelloWorldController < ApplicationController
+              def index
+              end
+            end
+          RUBY
+          view: '<%= react_component("StyledComponent", auto_load_bundle: true) %>'
+        )
+      end
+
+      it "does not assume which layout renders the view" do
+        doctor.send(:check_layout_files)
+
+        expect(checker.warnings?).to be(false)
+      end
+    end
+
+    context "when the action explicitly renders with a layout override" do
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        stub_generated_controller_flow(
+          controller: <<~RUBY,
+            class HelloWorldController < ApplicationController
+              layout "react_on_rails_default"
+
+              def index
+                render :index, layout: "application"
+              end
+            end
+          RUBY
+          view: '<%= react_component("StyledComponent", auto_load_bundle: true) %>'
+        )
+      end
+
+      it "does not associate the implicit view with the controller layout" do
+        doctor.send(:check_layout_files)
+
+        expect(checker.warnings?).to be(false)
+      end
+    end
+
+    context "when the component call appears only in a partial" do
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        stub_layouts(
+          "app/views/layouts/react_on_rails_default.html.erb" => "<%= javascript_pack_tag %>\n"
+        )
+        stub_controllers_and_views(
+          controllers: {
+            "app/controllers/hello_world_controller.rb" => <<~RUBY
+              class HelloWorldController < ApplicationController
+                layout "react_on_rails_default"
+
+                def index
+                end
+              end
+            RUBY
+          },
+          views: {
+            "app/views/hello_world/_card.html.erb" =>
+              '<%= react_component("StyledComponent", auto_load_bundle: true) %>'
+          }
+        )
+      end
+
+      it "does not infer that the partial renders through the named layout" do
+        doctor.send(:check_layout_files)
+
+        expect(checker.warnings?).to be(false)
+      end
+    end
+
+    context "when the controller class cannot be associated with its path" do
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        stub_generated_controller_flow(
+          controller: <<~RUBY,
+            class OtherController < ApplicationController
+              layout "react_on_rails_default"
+
+              def index
+              end
+            end
+          RUBY
+          view: '<%= react_component("StyledComponent", auto_load_bundle: true) %>'
+        )
+      end
+
+      it "fails closed" do
+        doctor.send(:check_layout_files)
+
+        expect(checker.warnings?).to be(false)
+      end
+    end
+
+    context "when a controller's basename-only layout does not name a nested layout" do
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        stub_layouts(
+          "app/views/layouts/admin/foo.html.erb" => "<%= javascript_pack_tag %>\n"
+        )
+        stub_controllers_and_views(
+          controllers: {
+            "app/controllers/hello_world_controller.rb" => <<~RUBY
+              class HelloWorldController < ApplicationController
+                layout "foo"
+
+                def index
+                end
+              end
+            RUBY
+          },
+          views: {
+            "app/views/hello_world/index.html.erb" =>
+              '<%= react_component("StyledComponent", auto_load_bundle: true) %>'
+          }
+        )
+      end
+
+      it "does not associate the view with the nested layout" do
+        doctor.send(:check_layout_files)
+
+        expect(checker.warnings?).to be(false)
+      end
+    end
+
+    context "when a controller names the exact nested layout path" do
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        stub_layouts(
+          "app/views/layouts/admin/foo.html.erb" => "<%= javascript_pack_tag %>\n"
+        )
+        stub_controllers_and_views(
+          controllers: {
+            "app/controllers/hello_world_controller.rb" => <<~RUBY
+              class HelloWorldController < ApplicationController
+                layout "admin/foo"
+
+                def index
+                end
+              end
+            RUBY
+          },
+          views: {
+            "app/views/hello_world/index.html.erb" =>
+              '<%= react_component("StyledComponent", auto_load_bundle: true) %>'
+          }
+        )
+      end
+
+      it "warns for the exact controller-view-layout association" do
+        doctor.send(:check_layout_files)
+
+        expect(checker.messages).to include(
+          hash_including(
+            type: :warning,
+            content: a_string_including("admin/foo", "generated/StyledComponent")
+          )
+        )
+      end
+    end
+
+    context "when the matching controller method is private" do
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        stub_generated_controller_flow(
+          controller: <<~RUBY,
+            class HelloWorldController < ApplicationController
+              layout "react_on_rails_default"
+
+              private
+
+              def index
+              end
+            end
+          RUBY
+          view: '<%= react_component("StyledComponent", auto_load_bundle: true) %>'
+        )
+      end
+
+      it "does not treat the method as a controller action" do
+        doctor.send(:check_layout_files)
+
+        expect(checker.warnings?).to be(false)
       end
     end
 
@@ -1293,6 +1736,45 @@ RSpec.describe ReactOnRails::Doctor do
 
       it "does not emit a symmetry warning" do
         doctor.send(:check_layout_files)
+        expect(checker.warnings?).to be(false)
+      end
+    end
+
+    context "when the manifest CSS list contains only an empty asset string" do
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", [""])
+        stub_layouts(
+          "app/views/layouts/application.html.erb" => <<~ERB
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= javascript_pack_tag %>
+          ERB
+        )
+      end
+
+      it "does not claim that the entrypoint emits CSS" do
+        doctor.send(:check_layout_files)
+
+        expect(checker.warnings?).to be(false)
+      end
+    end
+
+    context "when the manifest CSS list contains a malformed asset value" do
+      before do
+        stub_manifest_stylesheets(
+          "generated/StyledComponent",
+          ["/packs/generated/StyledComponent-a1b2c3.css", nil]
+        )
+        stub_layouts(
+          "app/views/layouts/application.html.erb" => <<~ERB
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= javascript_pack_tag %>
+          ERB
+        )
+      end
+
+      it "fails closed" do
+        doctor.send(:check_layout_files)
+
         expect(checker.warnings?).to be(false)
       end
     end
