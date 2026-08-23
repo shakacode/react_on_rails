@@ -25,18 +25,22 @@ const truncate = (value, limit) => {
 const { events, limits: eventLimits } = readBoundedEvents(eventsPath);
 
 const commands = [];
+const classificationCommandText = new WeakMap();
 for (const event of events) {
   const item = event?.item;
   if (event?.type === 'item.completed' && item?.type === 'command_execution') {
     const output = truncate(item.aggregated_output ?? item.output ?? '', MAX_OUTPUT);
-    commands.push({
+    const classifiedCommand = sanitize(normalizeCommand(item.command) || 'UNKNOWN');
+    const command = {
       id: `command-${commands.length + 1}`,
-      command: sanitize(normalizeCommand(item.command) || 'UNKNOWN'),
+      command: classifiedCommand.replaceAll('<EVAL_WORKSPACE>', '<LOCAL_PATH>'),
       exit_code: Number.isInteger(item.exit_code) ? item.exit_code : null,
       status: String(item.status ?? 'unknown'),
       output: output.value,
       output_truncated: output.truncated,
-    });
+    };
+    classificationCommandText.set(command, classifiedCommand);
+    commands.push(command);
   }
 }
 const commandEvidence = { schema_version: '1.0', limits: eventLimits, commands };
@@ -218,6 +222,11 @@ const scaffoldRetrySetupLines = [
 const stripScaffoldRetrySetupPrefix = (lines) =>
   scaffoldRetrySetupLines.every((line, index) => lines[index] === line)
     ? lines.slice(scaffoldRetrySetupLines.length)
+    : null;
+const workspaceRelativeScaffoldRetrySetupLines = ['cd <EVAL_WORKSPACE>', 'rm -rf eval_app'];
+const stripWorkspaceRelativeScaffoldRetrySetupPrefix = (lines) =>
+  workspaceRelativeScaffoldRetrySetupLines.every((line, index) => lines[index] === line)
+    ? lines.slice(workspaceRelativeScaffoldRetrySetupLines.length)
     : null;
 const immediatePhaseStatusTarget = (
   lines,
@@ -529,8 +538,14 @@ const pipefailPipelineTargets = (lines, pipelineMatcher = (line) => line.match(b
   });
 const installEvidenceTargets = (command) => {
   const rawLines = topLevelShellLines(command.command);
+  const workspaceBoundRawLines = topLevelShellLines(
+    classificationCommandText.get(command) ?? command.command,
+  );
   const lines = stripSanitizedSetupPrefix(rawLines);
-  const phaseLines = stripScaffoldRetrySetupPrefix(rawLines) ?? stripSanitizedPhaseSetupPrefix(rawLines);
+  const phaseLines =
+    stripScaffoldRetrySetupPrefix(rawLines) ??
+    stripWorkspaceRelativeScaffoldRetrySetupPrefix(workspaceBoundRawLines) ??
+    stripSanitizedPhaseSetupPrefix(rawLines);
   const outputIsUsable =
     !command.output_truncated && !command.output.includes('[normalized-output-truncated]');
   const pipefailTargets = outputIsUsable

@@ -197,27 +197,45 @@ sub scalar_is_string {
   return defined($value) && !ref($value) && (svref_2object(\$value)->FLAGS & SVf_POK);
 }
 
+sub mark_exact_workspace_path {
+  my ($value) = @_;
+  my @parts = split /(https?:\/\/[^\s"']+)/i, $value;
+  for my $part (@parts) {
+    next if $part =~ /^https?:\/\//i;
+    # A model-authored placeholder is not runner identity evidence. Demote it
+    # before minting the marker that only the exact runner workspace can receive.
+    $part =~ s/<EVAL_WORKSPACE>/<LOCAL_PATH>/g;
+    my $workspace = $ENV{EVAL_WORKSPACE};
+    if (defined $workspace && length($workspace)) {
+      $part =~ s/\Q$workspace\E(?=$|[\/\s"',;:)\]}])/<EVAL_WORKSPACE>/g;
+    }
+  }
+  return join '', @parts;
+}
+
 sub sanitize_json_value {
-  my ($value, $sensitive) = @_;
+  my ($value, $sensitive, $command_value) = @_;
   my $type = ref($value);
   if ($type eq 'HASH') {
     return '[REDACTED]' if $sensitive;
     my %safe;
     for my $key (keys %$value) {
-      $safe{$key} = sanitize_json_value($value->{$key}, sensitive_name($key));
+      my $child_sensitive = sensitive_name($key);
+      my $child_command_value = $command_value || $key eq 'command';
+      $safe{$key} = sanitize_json_value($value->{$key}, $child_sensitive, $child_command_value);
     }
     return \%safe;
   }
   if ($type eq 'ARRAY') {
     return '[REDACTED]' if $sensitive;
-    return [map { sanitize_json_value($_, 0) } @$value];
+    return [map { sanitize_json_value($_, 0, $command_value) } @$value];
   }
   return $value if $type eq 'JSON::PP::Boolean' || !defined($value);
   die "unexpected JSON value type\n" if length($type);
 
   my $is_string = scalar_is_string($value);
   return '[REDACTED]' if $sensitive && credential_value($value);
-  return $is_string ? sanitize_text($value) : $value;
+  return $is_string ? sanitize_text($command_value ? mark_exact_workspace_path($value) : $value) : $value;
 }
 
 sub sanitize_jsonl {
@@ -246,7 +264,7 @@ sub sanitize_jsonl {
       print STDERR 'JSONL event at line ' . ($index + 1) . " is not an object\n";
       exit 65;
     }
-    push @safe_lines, $json->encode(sanitize_json_value($event, 0));
+    push @safe_lines, $json->encode(sanitize_json_value($event, 0, 0));
   }
   return join('', map { "$_\n" } @safe_lines);
 }
