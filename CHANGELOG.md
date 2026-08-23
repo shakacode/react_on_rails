@@ -24,6 +24,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+### [17.1.0.rc.0] - 2026-08-23
+
 #### Fixed
 
 - **[Pro]** **Expected Node Renderer cold starts no longer emit OpenTelemetry error spans**: The
@@ -3186,7 +3188,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.0.1...main
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.1.0.rc.0...main
+[17.1.0.rc.0]: https://github.com/shakacode/react_on_rails/compare/v17.0.1...v17.1.0.rc.0
 [17.0.1]: https://github.com/shakacode/react_on_rails/compare/v17.0.0...v17.0.1
 [17.0.0]: https://github.com/shakacode/react_on_rails/compare/v16.6.0...v17.0.0
 [16.6.0]: https://github.com/shakacode/react_on_rails/compare/v16.5.1...v16.6.0
