@@ -1290,11 +1290,23 @@ module ReactOnRails
     end
 
     def static_stylesheet_assets(entrypoint)
-      stylesheet_assets = shakapacker_manifest_data&.dig("entrypoints", entrypoint, "assets", "css")
+      assets = static_manifest_assets(entrypoint)
+      stylesheet_assets = assets["css"] if assets.is_a?(Hash)
       return unless stylesheet_assets.is_a?(Array) && stylesheet_assets.any?
       return unless stylesheet_assets.all? { |asset| asset.is_a?(String) && !asset.empty? }
 
       stylesheet_assets
+    end
+
+    def static_manifest_assets(entrypoint)
+      manifest = shakapacker_manifest_data
+      return unless manifest.is_a?(Hash)
+
+      entrypoints = manifest["entrypoints"]
+      return unless entrypoints.is_a?(Hash)
+
+      entrypoint_data = entrypoints[entrypoint]
+      entrypoint_data["assets"] if entrypoint_data.is_a?(Hash)
     end
 
     def auto_loaded_component_names_from_implicit_views(layout_name)
@@ -1339,17 +1351,26 @@ module ReactOnRails
       action_visibilities = {}
 
       statements.each do |statement|
-        declaration = static_visibility_declaration(statement)
-        if declaration
-          declared_visibility, method_names = declaration
-          visibility = declared_visibility if method_names.empty?
-          method_names.each { |method_name| action_visibilities[method_name] = declared_visibility }
-        elsif (action_name = static_implicit_action_name(statement))
-          action_visibilities[action_name] = visibility
-        end
+        visibility = static_visibility_after_statement(statement, visibility, action_visibilities)
+        return [] unless visibility
       end
 
       action_visibilities.filter_map { |action_name, action_visibility| action_name if action_visibility == :public }
+    end
+
+    def static_visibility_after_statement(statement, visibility, action_visibilities)
+      declaration = static_visibility_declaration(statement)
+      return if declaration == :unresolved
+
+      unless declaration
+        action_name = static_implicit_action_name(statement)
+        action_visibilities[action_name] = visibility if action_name
+        return visibility
+      end
+
+      declared_visibility, method_names = declaration
+      method_names.each { |method_name| action_visibilities[method_name] = declared_visibility }
+      method_names.empty? ? declared_visibility : visibility
     end
 
     def static_visibility_declaration(node)
@@ -1357,7 +1378,7 @@ module ReactOnRails
       return unless visibility
 
       method_names = static_visibility_method_names(node, visibility)
-      [visibility.to_sym, method_names] if method_names
+      method_names ? [visibility.to_sym, method_names] : :unresolved
     end
 
     def static_visibility_method_names(node, visibility)
@@ -1366,8 +1387,12 @@ module ReactOnRails
       arguments = static_argument_values(static_call_arguments(node, visibility))
       return unless arguments
 
-      method_names = arguments.map { |argument| static_symbol_value(argument) }
+      method_names = arguments.map { |argument| static_method_name_value(argument) }
       method_names if method_names.all?
+    end
+
+    def static_method_name_value(node)
+      static_symbol_value(node) || static_string_value(node)
     end
 
     def static_symbol_value(node)
@@ -1382,6 +1407,7 @@ module ReactOnRails
 
       controller = statements.first
       return unless ast_node?(controller, :class)
+      return unless static_constant_reference(controller[2]) == "ApplicationController"
 
       relative_name = controller_file.delete_prefix("app/controllers/").delete_suffix("_controller.rb")
       expected_name = "#{relative_name.split('/').map(&:camelize).join('::')}Controller"
@@ -1448,7 +1474,9 @@ module ReactOnRails
 
     def erb_output_helper?(content, helper_name)
       content.scan(ERB_OUTPUT_EXPRESSION_PATTERN).any? do |(expression)|
-        expression.match?(/\A#{Regexp.escape(helper_name)}(?:\s|\()/)
+        ripper_statements(expression).any? do |statement|
+          ast_method_call_count(statement, helper_name).positive?
+        end
       end
     end
 
@@ -1532,6 +1560,7 @@ module ReactOnRails
     def top_level_boolean_keyword(arguments, keyword)
       associations = static_hash_associations(arguments.last)
       return :omitted unless associations
+      return unless associations.all? { |association| static_label_association?(association) }
 
       matches = associations.select do |association|
         static_label_association?(association, "#{keyword}:")
@@ -1550,8 +1579,10 @@ module ReactOnRails
       association_list[1] if ast_node?(association_list, :assoclist_from_args)
     end
 
-    def static_label_association?(node, label)
-      ast_node?(node, :assoc_new) && ast_node?(node[1], :@label) && node[1][1] == label
+    def static_label_association?(node, label = nil)
+      return false unless ast_node?(node, :assoc_new) && ast_node?(node[1], :@label)
+
+      label.nil? || node[1][1] == label
     end
 
     def static_global_auto_load_bundle
@@ -1573,10 +1604,18 @@ module ReactOnRails
       statements = static_body_statements(configure_block.dig(2, 2))
       return unless config_name && statements
 
-      assignments = statements.select do |statement|
-        config_assignment?(statement, config_name, setting_name)
-      end
+      assignments = static_config_assignments(statements, config_name, setting_name)
       static_boolean_value(assignments.first[2]) if assignments.one?
+    end
+
+    def static_config_assignments(node, config_name, setting_name)
+      return [] unless node.is_a?(Array)
+
+      assignments = config_assignment?(node, config_name, setting_name) ? [node] : []
+      children = node.first.is_a?(Symbol) ? node.drop(1) : node
+      assignments + children.flat_map do |child|
+        static_config_assignments(child, config_name, setting_name)
+      end
     end
 
     def configure_block_parameter_name(node)
