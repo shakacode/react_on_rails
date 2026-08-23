@@ -266,6 +266,30 @@ assert_rc 0 "merge_group"
 assert_contains "$LAST_OUTPUT" "Diff base: $OLD_MAIN (source: event payload)" "merge_group"
 assert_not_contains "$LAST_OUTPUT" "source: PR merge commit first parent" "merge_group"
 
+# Exercise the helper's guarded changed-file listing directly. The shim delegates
+# every other git invocation, including merge-base, to the captured real binary.
+REAL_GIT="$(command -v git)"
+GIT_SHIM_DIR="$WORKDIR/git-shim"
+mkdir -p "$GIT_SHIM_DIR"
+cat > "$GIT_SHIM_DIR/git" <<'SHIM'
+#!/usr/bin/env bash
+if [ "${1:-}" = "diff" ] && [ "${2:-}" = "--name-only" ]; then
+  exit 1
+fi
+exec "${REAL_GIT:?}" "$@"
+SHIM
+chmod +x "$GIT_SHIM_DIR/git"
+
+BASH_ENV=/dev/null \
+  PATH="$GIT_SHIM_DIR:$PATH" \
+  REAL_GIT="$REAL_GIT" \
+  run_case "changed-file listing failure names the diff refs" \
+  "$MERGE_REF" merge_group "" "" "$OLD_MAIN"
+assert_rc 1 "changed-file listing failure"
+assert_contains "$LAST_OUTPUT" \
+  "::error::git diff failed for $OLD_MAIN..HEAD while listing changed files." \
+  "changed-file listing failure"
+
 # Regression guard for the truncation pipe. Under pipefail an early-closing reader
 # makes git exit 141 and takes the whole required gate down with it.
 run_case "large changed-file list does not abort the step" \
