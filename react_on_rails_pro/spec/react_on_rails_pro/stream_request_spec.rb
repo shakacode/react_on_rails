@@ -23,7 +23,11 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
   let(:retry_limit) { 2 }
 
   before do
-    config = instance_double(ReactOnRailsPro::Configuration, renderer_request_retry_limit: retry_limit)
+    config = instance_double(
+      ReactOnRailsPro::Configuration,
+      renderer_request_retry_limit: retry_limit,
+      renderer_http_force_http2: true
+    )
     allow(ReactOnRailsPro).to receive(:configuration).and_return(config)
   end
 
@@ -424,7 +428,10 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
 
       expect { stream.each_chunk(&:itself) }.to raise_error(
         ReactOnRailsPro::Error,
-        /Time out error while server side render streaming a component/
+        a_string_including(
+          "Time out error while server side render streaming a component",
+          "renderer_http_force_http2 = true"
+        )
       )
       expect(call_count).to eq(retry_limit + 1)
     end
@@ -440,7 +447,10 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
 
       expect { stream.each_chunk(&:itself) }.to raise_error(
         ReactOnRailsPro::Error,
-        /Connection error while server side render streaming a component/
+        a_string_including(
+          "Connection error while server side render streaming a component",
+          "renderer_http_force_http2 = true"
+        )
       )
       expect(call_count).to eq(retry_limit + 1)
     end
@@ -672,7 +682,11 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
 
     it "clears retry status before transport failures" do
       allow(ReactOnRailsPro).to receive(:configuration).and_return(
-        instance_double(ReactOnRailsPro::Configuration, renderer_request_retry_limit: 0)
+        instance_double(
+          ReactOnRailsPro::Configuration,
+          renderer_request_retry_limit: 0,
+          renderer_http_force_http2: true
+        )
       )
       call_count = 0
 

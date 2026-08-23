@@ -31,7 +31,11 @@ if (enableTurbolinks) {
 
 ReactOnRails.setOptions({
   traceTurbolinks: true,
-  turbo: enableTurbolinks,
+  // Deliberately NOT setting `turbo: true` here: this dummy uses Turbolinks 5 (started above),
+  // which React on Rails detects via `window.Turbolinks`. The `turbo` option is only for
+  // @hotwired/turbo; setting it while Turbolinks is running makes React on Rails listen for
+  // `turbo:*` events that Turbolinks never fires, silently disabling the page load/unload
+  // lifecycle (component unmounting and per-page state cleanup on navigation).
 });
 
 ReactOnRails.registerStoreGenerators({

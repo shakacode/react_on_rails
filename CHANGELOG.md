@@ -26,6 +26,56 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **Expected Node Renderer cold starts no longer emit OpenTelemetry error spans**: The
+  `ror.bundle.build_execution_context` cache-first probe previously ended with status ERROR when a worker had not
+  compiled a bundle's VM context yet, even though the normal cache-miss path then rendered successfully. The probe
+  now treats that expected miss as normal control flow while preserving error spans for genuine failures.
+  [PR 4908](https://github.com/shakacode/react_on_rails/pull/4908) by
+  [sashakhar1](https://github.com/sashakhar1).
+
+- **[Pro]** **Hydrated Redux stores no longer leak across Turbo/Turbolinks navigations**: The hydrated-store
+  registry is now cleared on client-side page unload (soft navigation), alongside the existing component
+  teardown. Previously a leftover entry from the previous page made `getOrWaitForStore` resolve immediately
+  with the previous page's store, silently defeating the `store_dependencies` hydration gate — most visibly
+  with deferred stores (`redux_store(..., defer: true)`), where a mid-page component could render the
+  previous page's Redux state instead of waiting for its own page's hydration data. Registered store
+  generators are unaffected and persist across navigations. Note for apps that relied on a store surviving a
+  soft navigation without re-rendering its hydration data: each page using a store must now render its own
+  `redux_store` call (the documented model). Fixes
+  [Issue 4861](https://github.com/shakacode/react_on_rails/issues/4861).
+  [PR 4871](https://github.com/shakacode/react_on_rails/pull/4871) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
+- **On-demand renders initialize only the island's declared store dependencies**:
+  `reactOnRailsComponentLoaded` walked every store element on the page even when asked to render a
+  single component, so an unrelated store element whose generator was not registered (e.g. its
+  bundle had not loaded yet) aborted the requested render, and unrelated new stores were hydrated
+  as a side effect. It now reads the `data-store-dependencies` attribute the `react_component`
+  helper already emits (defaulted to the stores registered in the request, or set explicitly with
+  the `store_dependencies` option) and initializes exactly those stores, matching the Pro
+  renderer's dependency gating; a declared dependency that cannot initialize is logged without
+  aborting the render. Markup without the attribute keeps the previous initialize-every-store
+  behavior, and `reactOnRailsPageLoaded`/full page loads are unchanged. Completes
+  [Issue 4862](https://github.com/shakacode/react_on_rails/issues/4862).
+  [PR 4870](https://github.com/shakacode/react_on_rails/pull/4870) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
+- **[Pro]** **Rails requests to the Node Renderer once again continue OpenTelemetry traces**: The async-http transport
+  now creates a CLIENT span and injects W3C trace context for regular and streaming renders, incremental async-props
+  renders, raw-render requests, and asset uploads when the Rails application has configured the OpenTelemetry SDK.
+  OpenTelemetry remains optional, and spans record only the HTTP method, normalized request path, response status, and
+  request/response byte sizes. Fixes
+  [Issue 4866](https://github.com/shakacode/react_on_rails/issues/4866).
+  [PR 4869](https://github.com/shakacode/react_on_rails/pull/4869) by
+  [sashakhar1](https://github.com/sashakhar1).
+
+- **[Pro]** **Node Renderer transport follow-ups now expose protocol errors and accurate Fastify modes**:
+  Rails retries continue for network disconnects and peer-reset HTTP/2 streams, while HTTP parser and framing errors
+  surface directly. Public `configureFastify` callbacks and `fastifyServerOptions` now reflect both HTTP/1.1 and
+  HTTP/2 runtime modes.
+  [PR 4893](https://github.com/shakacode/react_on_rails/pull/4893) by
+  [sashakhar1](https://github.com/sashakhar1).
+
 - **[Pro]** **Bounded Node Renderer VM retention now avoids old/new RSC rebuild thrash during rolling deploys**:
   The default per-worker VM hard cap now retains four contexts, enough for the server and RSC bundles from one
   draining and one current revision. Successful bundle sets remain reusable through a configurable, timer-driven
@@ -293,6 +343,26 @@ pair`, returns invalid UTF-8, or silently mis-decodes the value. The parser now 
   [justin808](https://github.com/justin808).
 
 #### Added
+
+- **[Pro]** **Node Renderer OpenTelemetry initialization now composes with application observability stacks**:
+  Applications can append custom instrumentations to the built-in HTTP and Fastify pair, merge resource-detector
+  attributes below explicit resource configuration, or opt in to preserving renderer `ror.*` spans through an
+  application-owned global provider. Empty service-name values from environment variables, options, and resource
+  attributes are treated as unset. Renderer-managed shutdown disables registered instrumentations and shuts down
+  provider components after successful initialization, while failed initialization preserves caller-supplied processors
+  and exporters.
+  Fixes [Issue 4867](https://github.com/shakacode/react_on_rails/issues/4867).
+  [PR 4878](https://github.com/shakacode/react_on_rails/pull/4878) by
+  [sashakhar1](https://github.com/sashakhar1).
+
+- **[Pro]** **HTTP/1.1 is now a supported Node Renderer transport for load balancers and HTTP/1.1-only probes**:
+  Rails can opt out of forcing h2c for cleartext renderer URLs with
+  `config.renderer_http_force_http2 = false`, paired with `fastifyServerOptions: { http2: false }` on the Node
+  Renderer. Regular rendering and response streaming continue to work. Async props require full-duplex behavior across
+  every hop, so request-buffering or half-duplex HTTP/1.1 intermediaries remain unsupported. Fixes
+  [Issue 4868](https://github.com/shakacode/react_on_rails/issues/4868).
+  [PR 4887](https://github.com/shakacode/react_on_rails/pull/4887) by
+  [sashakhar1](https://github.com/sashakhar1).
 
 - **Version-matched agent skills and bundled docs**: The `react_on_rails` gem and
   `react-on-rails` npm package now ship install/upgrade, React Server Components adoption,

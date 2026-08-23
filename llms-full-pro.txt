@@ -1303,7 +1303,9 @@ const config = {
   supportModules: true,
 
   // workersCount defaults to the number of CPUs minus 1
-  workersCount: Number(env.NODE_RENDERER_CONCURRENCY || 3),
+  // RENDERER_WORKERS_COUNT is the canonical name since v16.5.0.
+  // NODE_RENDERER_CONCURRENCY is still supported as a fallback.
+  workersCount: Number(env.RENDERER_WORKERS_COUNT || env.NODE_RENDERER_CONCURRENCY || 3),
 
   // Optional: Automatic worker restarting (for memory leak mitigation)
   // allWorkersRestartInterval: 15, // minutes between restarting all workers
@@ -2108,7 +2110,7 @@ This is the recommended answer to "my component needs Rails data during render":
 > [!NOTE]
 > A Server Component _can_ `fetch` a Rails API directly, but the renderer's VM has no `fetch`, `Headers`, `Request`, or `Response` by default — you must bundle an HTTP client or inject them via `additionalContext`. That call leaves the active Rails controller request and must re-establish or explicitly forward auth, tenancy, caching, and tracing context through the API endpoint. `'use server'` Server Actions are **not** supported (the renderer has no DB/session/cookie access). Prefer props / async props. See [RSC data fetching patterns](../oss/migrating/rsc-data-fetching.md).
 
-Under the hood, Rails opens a bidirectional HTTP/2 NDJSON stream to the renderer and feeds props in as it resolves them. Each update runs in that request's isolated `sharedExecutionContext` and resolves a Promise, which lets React flush the corresponding HTML back to Rails for forwarding to the browser:
+Under the hood, Rails opens a bidirectional NDJSON stream to the renderer over h2c by default, or direct HTTP/1.1 when both sides are configured for it, and feeds props in as it resolves them. Each update runs in that request's isolated `sharedExecutionContext` and resolves a Promise, which lets React flush the corresponding HTML back to Rails for forwarding to the browser:
 
 [Diagram: Sequence diagram across three lanes — Browser, Rails, and the Node Renderer. The browser asks for a page, Rails starts the page with placeholders, the renderer returns an HTML shell with loading states, and the browser shows the shell. Then a loop runs for each slow data value: Rails sends the value, the renderer returns the HTML for that section, and the browser replaces the loading state.]
 
@@ -3838,6 +3840,40 @@ Keep build-time seeding too; the layers are complementary:
 > [!IMPORTANT]
 > Gate renderer start and readiness on the boot seed **completing, not succeeding**. A failed seed must degrade to the 410 fallback rather than wedge the deploy; the task already warns and continues on fetch failures.
 
+## Pre-seeding declares and prewarms the new renderer revision
+
+The adapter and `pre_seed_renderer_cache` populate the renderer's **disk cache** with old and new bundle files plus companion manifests, so requests avoid `410 Gone`, upload, and retry. The seed also emits a content-addressed declaration containing only the new revision's server artifact and optional RSC artifact. Configure the new renderer revision with the exact emitted path:
+
+```bash
+RENDERER_CURRENT_GENERATION_MANIFEST=/app/.node-renderer-bundles/.current-generations/rorp-generation-v1-<digest>.json
+```
+
+Each cluster worker validates that immutable declaration and its artifact roots, compiles the complete declared set, and pins it as current before listening. In supported `MODE=symlink` deployments, it compiles the validated immutable snapshot target and aliases the renderer-facing cache path to that same VM identity in memory, so the first request is a hit without request-time `realpath` work. Do not use a shared mutable `current` file or symlink: old and new workload revisions can race to rewrite a shared volume.
+
+Keep the declared current contexts plus draining request generations resident during the overlap with:
+
+```text
+maxVMPoolSize >= simultaneous bundle generations × contexts per generation
+```
+
+SSR-only has one context per generation. RSC has two: server plus RSC. The common old/new RSC rollout therefore needs `2 × 2 = 4` contexts per worker, which is the default. `maxVMPoolSize` is always a hard cap on pooled contexts; setting it to `2` during that four-context overlap causes least-recently-used eviction and can recreate the old/new rebuild loop even when every file was pre-seeded successfully.
+
+Inactive nonmatching bundle sets drain after `vmPoolRolloutDrainTimeout` (60 seconds by default). The declared current set remains pinned across an arbitrarily long old-only request gap; old traffic cannot demote it. The cleanup timer runs without waiting for another request, and shared paths stay pooled while referenced. The hard cap bounds pooled contexts and prefers declared current contexts, but an in-flight old request can keep an unpooled execution context and source-map registration alive until release, so transient memory also requires concurrency headroom.
+
+If `maxVMPoolSize` cannot hold the complete declared set, startup fails before the worker listens and `/ready` cannot pass. Additional draining contexts may be used by active requests without entering the shared pool, but the absolute pooled-context cap is never exceeded.
+
+The fleet-wide pooled-context upper bound is:
+
+```text
+overlapping renderer replicas × effective workers per replica × maxVMPoolSize
+```
+
+Include old replicas and rollout surge in the replica count. Use one effective worker for `workersCount: 0`. Size each renderer replica's memory request and limit from its worker/pooled-context count plus measured process, V8 heap, bundle-buffer, and safety overhead, including source maps and evicted execution contexts held by concurrent in-flight requests; multiply the per-replica request by overlapping replicas for total cluster capacity.
+
+The built-in `/ready` signal means the answering worker's complete declared current set is compiled when `RENDERER_CURRENT_GENERATION_MANIFEST` is configured. Application-owned, authenticated Rails smoke requests remain valuable end-to-end checks, but are not needed to target every worker for VM compilation. Without a configured declaration, the backward-compatible behavior remains request-driven and `/ready` means only that some VM exists.
+
+For configuration details, pressure log events, and topology-specific minimums, see [Sizing and draining the VM pool](../oss/building-features/node-renderer/js-configuration.md#sizing-and-draining-the-vm-pool) and [Rollout VM capacity and memory tradeoff](../oss/building-features/node-renderer/container-deployment.md#rollout-vm-capacity-and-memory-tradeoff).
+
 ## Deploy the renderer before Rails
 
 **This ordering requirement applies only when the renderer is a _separate workload_ from Rails** — Option 3 in [Container deployment](../oss/building-features/node-renderer/container-deployment.md#architecture-options). If Rails and the renderer share one workload — a single container or sidecar containers (Options 1–2) — they deploy on one atomic lifecycle. A Ruby-capable startup step can run the [boot seed](#promotion-deploys-need-a-release-time-boot-seed) before Node serves traffic.
@@ -3859,8 +3895,9 @@ Rails and the Node Renderer are **separate workloads** with independent deploy l
 Make the ordering explicit in your pipeline rather than relying on timing:
 
 1. Deploy/promote the **Node Renderer** workload (new image, cache pre-seeded during its build).
-2. Wait until its new revision is **live and healthy** — readiness passing and all new renderer instances up.
-3. Only then deploy/promote the **Rails** workload.
+2. Keep it on private service networking with renderer password authentication.
+3. Wait until its new revision is **live and healthy** — readiness passing and all new renderer instances up.
+4. Only then deploy/promote the **Rails** workload; use a non-public candidate smoke gate for SSR/RSC when available.
 
 The invariant to enforce is **renderer-ready-before-Rails-live**: gate the Rails workload's release on the renderer workload's release completing (sequence them as separate steps in your deploy pipeline), and/or tune the renderer's readiness probe and Rails' startup so Rails does not accept traffic until the renderer reports ready. Prefer a readiness gate over a fixed sleep — it tracks actual state. The exact wiring depends on your deploy tooling.
 
@@ -3875,8 +3912,10 @@ This ordering is also what makes the [boot seed](#promotion-deploys-need-a-relea
 - ⚠️ Empty-list returns (often indicates the upload side has never run on a prior deploy).
 - ℹ️ The resolved renderer cache dir and how many bundle-hash subdirectories are present.
 - ℹ️ Whether `PREVIOUS_BUNDLE_HASHES` env override is set.
+- ✅/⚠️ The conservative old/new VM-cap formula per worker, including RSC context count.
+- ℹ️ Whether both capacity and the current-generation declaration are `observed` or `unverified`; separate workloads and ambiguous loopback sidecars stay unverified rather than producing a false warm pass.
 
-Doctor never calls `fetch` or `upload` — those have side effects.
+Doctor never calls `fetch` or `upload` and does not query the live Node Renderer process — those have side effects or would require a new privileged diagnostics channel.
 
 ## Need your own artifact store?
 
@@ -8876,6 +8915,132 @@ Selective hydration is a powerful feature that allows React to become interactiv
 Now that you understand how to use selective hydration in React Server Components, you can proceed to the next article: [How React Server Components Work](how-react-server-components-work.md) to learn about the technical details and underlying mechanisms of React Server Components.
 
 ================================================================================
+PAGE: https://reactonrails.com/docs/pro/react-server-components/activity-inside-rsc
+SOURCE: docs/pro/react-server-components/activity-inside-rsc.md
+================================================================================
+
+# React 19.2 `<Activity>` Inside Streamed RSC Trees
+
+React 19.2's [`<Activity>`](https://react.dev/reference/react/Activity) lets you hide part of the UI without unmounting it — hidden subtrees keep their state and DOM (`display: none`) while their effects are deactivated and their updates deferred to idle time. The [OSS guide](../../oss/building-features/react-19-activity.md) covers the basics with `react_component`; this page covers what changes when `<Activity>` boundaries live inside a **streamed React Server Component tree** (`stream_react_component`).
+
+Everything here is verified by the Pro dummy app's working example and tests — see [Working example](#working-example).
+
+## The one rule: host `<Activity>` in a client component
+
+The `react-server` condition build of React — the one your RSC bundle resolves — **does not export `Activity`**. A server component that does `import { Activity } from 'react'` gets `undefined` and the render fails with:
+
+```text
+Element type is invalid: expected a string (for built-in components) or a
+class/function (for composite components) but got: undefined.
+```
+
+Instead, put the `<Activity>` boundaries in a `'use client'` component and pass server-rendered content into them as props:
+
+```jsx
+// ActivityTabsClient.jsx — client component
+'use client';
+
+import React, { Activity, useState } from 'react';
+
+export default function ActivityTabsClient({ profileContent, draftsContent }) {
+  const [activeTab, setActiveTab] = useState('profile');
+  const content = { profile: profileContent, drafts: draftsContent };
+
+  return (
+    <>
+      {/* tab buttons ... */}
+      {['profile', 'drafts'].map((tab) => (
+        <Activity key={tab} mode={tab === activeTab ? 'visible' : 'hidden'}>
+          <div>{content[tab]}</div>
+        </Activity>
+      ))}
+    </>
+  );
+}
+```
+
+```jsx
+// RSCActivityTabsPage.jsx — server component (no directive)
+import React, { Suspense } from 'react';
+import ActivityTabsClient from './ActivityTabsClient';
+import ProfileServerContent from './ProfileServerContent';
+import SlowDraftsServerContent from './SlowDraftsServerContent';
+
+export default function RSCActivityTabsPage() {
+  return (
+    <ActivityTabsClient
+      profileContent={<ProfileServerContent />}
+      draftsContent={
+        <Suspense fallback={<p>Loading drafts…</p>}>
+          <SlowDraftsServerContent />
+        </Suspense>
+      }
+    />
+  );
+}
+```
+
+This is the standard server-content-through-client-component pattern (see [RSC Inside Client Components](./inside-client-components.md)). Note that in this pattern the `<Activity>` element never crosses the RSC (Flight) boundary at all: `ActivityTabsClient` travels as a client reference, and the `<Activity>` boundaries are constructed inside its own render during SSR and hydration — only the server-rendered content props cross the boundary. React on Rails needs no configuration for any of this.
+
+## Hidden is not free on the server
+
+"Hidden" is a client-rendering concept. The Flight render on the Node renderer executes **all** server components eagerly, hidden or not:
+
+- Data fetching inside a hidden tab's server components runs on every request that renders the page.
+- The hidden content's output ships in the RSC payload bytes embedded in the page.
+- Client components referenced inside hidden boundaries still emit their module references, so the browser preloads their chunks — that's the "pre-render likely-next content" benefit, but it's bandwidth you should budget.
+
+Wrap slow hidden content in `<Suspense>` (in the server tree, as above) so it streams in a later chunk instead of delaying the shell.
+
+## Hidden content is omitted from the rendered HTML
+
+During SSR of the RSC tree, React's streaming renderer:
+
+- wraps **visible** Activity content in `<!--&-->` / `<!--/&-->` comment markers (the Activity analog of Suspense's `<!--$-->` markers), and
+- emits **no HTML at all** for `mode="hidden"` boundaries.
+
+Consequences:
+
+- Hidden content is invisible to SEO and no-JS users. Put anything that must be in the initial HTML in a visible boundary.
+- Hidden content **is** present in the page's bytes — inside the embedded RSC payload scripts (`REACT_ON_RAILS_RSC_PAYLOADS`) — just not in the rendered DOM. Search engines index neither.
+- After hydration, React mounts hidden subtrees client-side at background priority, with no hydration mismatch.
+
+## Revealing a hidden tab needs no network request
+
+React on Rails embeds the full RSC payload into the page as it streams. When the user reveals a hidden boundary, React renders it from that already-delivered payload — flipping `mode` to `visible` issues **no** `/rsc_payload/` request. If the hidden content's server row hasn't streamed in yet (slow data), the user sees its `<Suspense>` fallback until the row lands — still from the same open stream.
+
+## Selective hydration bonus
+
+Like Suspense boundaries, Activity boundaries divide the tree into independently hydratable units. With [async script loading](./selective-hydration-in-streamed-components.md) (the default on Shakapacker ≥ 8.2), the visible tab's buttons become interactive while a slow hidden tab's content is still streaming — hidden trees never compete with urgent hydration work.
+
+> [!NOTE]
+> One browser caveat, unrelated to React: WebKit (Safari) defers executing scripts — including the client bundle — until a streamed document finishes parsing, so mid-stream interactivity only materializes in Chromium/Firefox. The page still hydrates and works normally in Safari once the stream completes.
+
+## Effects and Turbo caveats
+
+The [OSS guide's gotchas](../../oss/building-features/react-19-activity.md) apply unchanged on the RSC path:
+
+- Effects in hidden subtrees are deactivated (cleanups run) and re-run on reveal — sockets, timers, and analytics "view" events behave accordingly.
+- `<Activity>` preserves state only within a persistent React root. Turbo Drive page visits tear the root down; Activity does not help across them.
+
+## Working example
+
+The Pro dummy app contains a complete, tested example:
+
+- Page (server component): `react_on_rails_pro/spec/dummy/client/app/ror-auto-load-components/RSCActivityTabsPage.jsx`
+- Client host + probes: `react_on_rails_pro/spec/dummy/client/app/components/ActivityRSC/`
+- Route: `/activity_rsc_tabs` (optionally `?artificial_delay=5000` to slow the hidden tab's server content)
+- Streamed-HTML shape: `react_on_rails_pro/spec/dummy/spec/requests/activity_rsc_spec.rb`
+- Browser behavior (reveal without refetch, state preservation, selective hydration): `react_on_rails_pro/spec/dummy/e2e-tests/activity_rsc.spec.ts`
+
+## References
+
+- [React docs: `<Activity>`](https://react.dev/reference/react/Activity)
+- [React 19.2 release post](https://react.dev/blog/2025/10/01/react-19-2)
+- [React 19.2 `<Activity>` with React on Rails (OSS guide)](../../oss/building-features/react-19-activity.md)
+- [Selective Hydration in React Server Components](./selective-hydration-in-streamed-components.md)
+
+================================================================================
 PAGE: https://reactonrails.com/docs/pro/react-server-components/client-reference-diagnostics
 SOURCE: docs/pro/react-server-components/client-reference-diagnostics.md
 ================================================================================
@@ -11532,13 +11697,6 @@ SSR Streaming sends HTML to the browser in chunks as it’s generated, enabling 
 - **30% faster** full‑page load times at Hulu by combining streaming SSR with Server Components [[3]]
 - Popular libraries like styled‑components v3.1.0 have introduced streaming SSR support as the next generation of React app rendering [[4]]
 
-## 📊 Core Web Vitals & TTI Improvements
-
-- **60% faster** Time to Interactive on Meta’s developer portal after adopting RSC (from 3.5 s to \~1.4 s) [[5]]
-- **45% quicker** First Contentful Paint in the same migration [[5]]
-- **50% lower** server response time with Server Components [[5]]
-- **15% improvement** in Core Web Vitals and **23% reduction** in Time to First Byte at Airbnb after RSC migration [[5]]
-
 > **React on Rails note:** These performance benefits carry over to React on Rails Pro. In React on Rails, data delivery is prop-based — Rails controllers handle database queries, authentication, and caching, then pass data to components as [props](../../oss/migrating/rsc-data-fetching.md#data-fetching-in-react-on-rails-pro). Components do not fetch data directly. See [RSC Migration: Data Fetching Patterns](../../oss/migrating/rsc-data-fetching.md).
 
 ---
@@ -11560,11 +11718,9 @@ Let’s make your apps faster—together.
 2. GeekyAnts.com case study: 52% code reduction, Lighthouse 50→90+ ([geekyants.com][2])
 3. Hulu—30% faster full‑page loads with streaming SSR + RSC ([questlab.pro][3])
 4. styled‑components v3.1.0: introduced streaming SSR support as the next generation of React rendering. ([medium.com][4])
-5. QuestLab: Meta’s RSC migration—30% JS reduction, 60% faster TTI, 45% faster FCP, 50% lower server response ([questlab.pro][5])
 
 [1]: https://frigade.com/blog/bundle-size-reduction-with-rsc-and-frigade
 [2]: https://geekyants.com/en-gb/blog/boosting-performance-with-nextjs-and-react-server-components-a-geekyantscom-case-study
 [3]: https://www.compilenrun.com/docs/framework/nextjs/nextjs-ecosystem/nextjs-case-studies/#case-study-3-hulus-streaming-platform
 [4]: https://medium.com/styled-components/v3-1-0-such-perf-wow-many-streams-c45c434dbd03
-[5]: https://web.archive.org/web/20250908030148/https://questlab.pro/blog-posts/web-development/wd-pl-2024-articleId912i1h212818
 

@@ -13,6 +13,8 @@
  * https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
+import type { Config } from '../src/shared/configBuilder';
+
 describe('configBuilder', () => {
   const envVarsToRestore = [
     'RENDERER_HOST',
@@ -75,6 +77,13 @@ describe('configBuilder', () => {
     const logPayload = info.mock.calls[0][0] as Record<string, unknown>;
     return logPayload['ENV values used for settings'] as Record<string, unknown>;
   }
+
+  it.each([true, false])('accepts and preserves an explicit Fastify http2=%s setting', (http2) => {
+    const transportConfig = { fastifyServerOptions: { http2 } } satisfies Partial<Config>;
+    const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+    expect(buildConfig(transportConfig).fastifyServerOptions).toEqual({ http2 });
+  });
 
   it('marks RENDERER_HOST as env-provided when host is omitted from user config', () => {
     process.env.RENDERER_HOST = '0.0.0.0';

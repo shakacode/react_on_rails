@@ -23,7 +23,8 @@ import cluster from 'cluster';
 import { randomUUID } from 'crypto';
 import { rm } from 'fs/promises';
 import { Readable, Transform } from 'stream';
-import fastify from 'fastify';
+import fastify, { type FastifyServerOptions } from 'fastify';
+import type { Http2Server } from 'http2';
 import fastifyFormbody from '@fastify/formbody';
 import fastifyMultipart, { type MultipartFile } from '@fastify/multipart';
 import log, { sharedLoggerOptions } from './shared/log.js';
@@ -610,16 +611,22 @@ export default function run(config: Partial<Config>) {
     currentGenerationManifestPath,
   } = getConfig();
 
-  // The renderer uses cleartext HTTP/2 (h2c). Node's `allowHTTP1` option only
-  // applies to TLS servers (http2.createSecureServer), so it cannot enable
-  // HTTP/1.1 Kubernetes httpGet probes on this listener.
-  const app = fastify({
-    http2: useHttp2 as true,
+  const { http2: configuredHttp2, ...serverOptions } = fastifyServerOptions ?? {};
+  const http2Enabled = configuredHttp2 ?? useHttp2;
+  const commonServerOptions = {
     bodyLimit: BODY_SIZE_LIMIT,
     logger:
       logHttpLevel !== 'silent' ? { name: 'RORP HTTP', level: logHttpLevel, ...sharedLoggerOptions } : false,
-    ...fastifyServerOptions,
-  });
+    ...serverOptions,
+  };
+  const app = (
+    http2Enabled
+      ? fastify<Http2Server>({
+          ...(commonServerOptions as FastifyServerOptions<Http2Server>),
+          http2: true,
+        })
+      : fastify(commonServerOptions as FastifyServerOptions)
+  ) as FastifyInstance;
 
   handleGracefulShutdown(app);
 
@@ -1476,13 +1483,12 @@ export default function run(config: Partial<Config>) {
   });
 
   // Built-in, opt-in probe endpoints (enableHealthEndpoints config option).
-  // Like /info, they are plain GET routes outside the authenticated render and
-  // asset endpoints: orchestrator probes cannot carry the renderer password.
-  // Both intentionally return status-only bodies — no versions, paths, or
-  // license details — so leaving them reachable exposes nothing sensitive.
-  // NOTE: this listener speaks cleartext HTTP/2 (h2c), so HTTP/1.1-only probes
-  // (e.g. Kubernetes httpGet) cannot reach these routes. Use tcpSocket or exec
-  // probes (`curl --http2-prior-knowledge`). See
+  // They are plain GET routes outside the authenticated render and asset
+  // endpoints because orchestrator probes cannot carry the renderer password.
+  // Unlike /info above, both return status-only bodies with no version details.
+  // The listener uses cleartext HTTP/2 (h2c) by default. With
+  // fastifyServerOptions.http2 set to false, ordinary HTTP/1.1 probes can reach
+  // these routes. See
   // docs/oss/building-features/node-renderer/health-checks.md.
   if (enableHealthEndpoints) {
     // Liveness: 200 whenever this process can answer — i.e. the event loop is
