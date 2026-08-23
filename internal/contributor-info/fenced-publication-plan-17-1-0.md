@@ -33,10 +33,12 @@ precisely and compensated as far as a supervised run allows:
   `require_live_release_line_lease` immediately before invocation.
 - Dual renewal per the runbook: heartbeat refreshed **every 5 minutes** (TTL 900) and the claim itself renewed **at least hourly** with the bounded
   `claim` command, both by one background loop for the entire run.
-- Two interactive OTP prompts act as mid-run manual fences: before entering
-  the npm OTP (W4 boundary) and before entering the RubyGems OTP (W8
-  boundary), the operator re-runs `require_live_release_line_lease` in a
-  second shell and types the code only on a pass. Both prompt positions are
+- Interactive OTP prompts act as mid-run manual fences: before entering the
+  npm OTP (W4 boundary) and before EVERY RubyGems OTP prompt - the initial
+  W8-boundary prompt and any replacement prompt `publish_gem_with_retry`
+  issues when the TOTP window expires between the two gem pushes - the
+  operator re-runs `require_live_release_line_lease` in a second shell and
+  types the code only on a pass. Both prompt positions are
   verified against `release.rake` (npm: first publish challenge; RubyGems:
   `resolve_rubygems_otp_for_publish` immediately before the gem pushes).
 - Fail-closed watchdog: the renewal loop runs in a second shell and records
@@ -107,10 +109,11 @@ Blast-radius note: the npm dist-tag for `17.1.0-rc.0` resolves to `rc`
 are prereleases; RubyGems does not surface them as the default version.
 
 OTP model: one npm OTP is requested at the W4 boundary and reused across
-W4-W7; the RubyGems OTP is prompted at the W8 boundary and reused for W8-W9
-(a fresh prompt appears if the TOTP window expires between gems). Auth
-failures abort; only OTP challenges and qualified transient network errors
-retry.
+W4-W7; the RubyGems OTP is prompted at the W8 boundary and reused for W8-W9,
+with a replacement prompt if the TOTP window expires between gems. Every OTP
+prompt, including a replacement, is a lease fence: re-verify before typing.
+Auth failures abort; only OTP challenges and qualified transient network
+errors retry.
 
 ## Reconciliation model
 
@@ -132,8 +135,22 @@ remote at the current head. Therefore:
 - **Verification failure after an apparently successful run:** treat as a
   mid-W4-W9 crash; resume through the task.
 
-Re-run rule: the resume MUST use the same branch, same head, and a live lease
-(P11) re-verified immediately before invocation, same as the first attempt.
+Re-run rule: the resume MUST use the same branch and a live lease (P11)
+re-verified immediately before invocation. "Same head" changes meaning after
+W1, so record two SHAs during the first attempt: `BASE_SHA` (the approved
+pre-W1 tip that P3/P5 pinned and the ShakaPerf evidence binds to) and
+`BUMP_SHA` (the tip immediately after W1). Resume-mode preconditions replace
+P3/P5/P13:
+
+- the branch tip equals `BUMP_SHA`, and
+  `git diff --name-only BASE_SHA..BUMP_SHA` shows only version and lockfile
+  files (the bump commit and nothing else); abort if anything more moved;
+- CI and ShakaPerf evidence remain anchored to `BASE_SHA`: the release task's
+  own non-runtime walk-back skips a version-only tip back to the last
+  runtime-bearing commit, which is `BASE_SHA`, so no new CI run or evidence
+  re-pin is required for the resume;
+- the dry run (P13) is NOT re-run against `BUMP_SHA`; the original P13 result
+  for `BASE_SHA` stands.
 
 ## Post-run verification matrix (hard assertions; all must pass before the lease is released)
 
