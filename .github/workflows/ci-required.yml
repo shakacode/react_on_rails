@@ -87,6 +87,7 @@ jobs:
             bin/ci-rerun-failures \
             bin/request-hosted-ci \
             script/ci-changes-detector \
+            script/ci-required-diff-base \
             script/ci-required-diff-base-test.bash \
             script/ci-required-hosted-gate
           do
@@ -133,107 +134,7 @@ jobs:
           # the newlines rather than fold them (the continuation lines are more
           # indented than the first).
           EVENT_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before || 'origin/main' }}
-        run: |
-          # For pull_request events actions/checkout resolves refs/pull/<n>/merge,
-          # so HEAD is the PR head merged into the CURRENT base tip. By contrast
-          # github.event.pull_request.base.sha is only refreshed when the PR is
-          # opened or synchronized, so on a branch that has not been pushed for a
-          # while it lags HEAD's own base parent. Diffing from that stale SHA folds
-          # every base-branch commit in between into the changed-file set, which is
-          # how a docs-only PR gets classified as a generator change and is then
-          # told to spend a hosted CI run it does not need (#4756).
-          #
-          # The merge commit's FIRST PARENT is the base commit the merge was
-          # actually computed against, so it is the only base that yields this PR's
-          # own diff. It is also always present locally (it is a parent of HEAD), so
-          # it cannot fall outside the shallow fetch window. bundle-size.yml derives
-          # its size baseline from the same first parent for the same reason.
-          base_ref="${EVENT_BASE_REF}"
-          base_source="event payload"
-
-          if [ -n "${PULL_REQUEST_BASE_SHA}" ]; then
-            base_ref="${PULL_REQUEST_BASE_SHA}"
-            base_source="workflow_dispatch input"
-          elif [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
-            parent_line="$(git rev-list --parents -n 1 HEAD 2>/dev/null || true)"
-            read -ra parents <<< "$parent_line"
-            # parents[0] = HEAD, [1] = first parent (base side), [2] = second parent (PR head)
-            if [ "${#parents[@]}" -eq 3 ]; then
-              if [ -n "${PULL_REQUEST_HEAD_SHA}" ] && [ "${parents[2]}" != "${PULL_REQUEST_HEAD_SHA}" ]; then
-                # Fail closed: this is the one state where no base can save us.
-                #
-                # Mind the direction of the error. A stale base only ADDS
-                # base-branch commits to the diff, over-selecting suites and
-                # wasting runner minutes, which is survivable. Missing changes is
-                # not: run_generators can come back false and this required gate
-                # can pass without the hosted run those changes needed.
-                #
-                # When the merge ref is stale, HEAD's TREE does not contain the
-                # current head's changes at all, so every base is diffed against a
-                # tree that is already missing them. Choosing a wider base cannot
-                # recover a file that is not in HEAD. The only honest outcomes are
-                # to classify the reported head instead (a network fetch plus a
-                # tree that no longer matches the rest of this job) or to refuse to
-                # classify. A required gate should refuse.
-                #
-                # This is a genuinely different situation from the single-parent
-                # branch below, which continues with a warning. There, HEAD is the
-                # real PR head, so a wide base still yields a complete diff. Here it
-                # does not. The condition is a race against GitHub recomputing
-                # refs/pull/<n>/merge, so a re-run clears it.
-                echo "::error::Checked-out merge commit's second parent (${parents[2]}) is not the PR head reported by this event (${PULL_REQUEST_HEAD_SHA}). GitHub's merge ref is stale, so HEAD's tree cannot contain the current head's changes and no diff base can produce a trustworthy classification. Re-run this job so GitHub recomputes refs/pull/<n>/merge, or push to the branch again."
-                exit 1
-              fi
-
-              base_ref="${parents[1]}"
-              base_source="PR merge commit first parent"
-            else
-              # bundle-size.yml hard-fails on an unexpected merge structure. This gate
-              # runs on every PR, so it warns instead: a new hard-fail path here would
-              # block more PRs than the misclassification it guards against. The
-              # changed-file list printed below makes a widened diff obvious anyway.
-              echo "::warning::HEAD is not the expected two-parent PR merge commit, so the changed-file classification is computed from ${base_ref} and may include base-branch drift. If this PR is routed to suites it does not touch, rebase it on its base branch."
-            fi
-          fi
-
-          echo "Diff base: ${base_ref} (source: ${base_source})"
-
-          script/ci-changes-detector "$base_ref"
-
-          # Show the exact file set behind the classification above so a widened
-          # diff is visible at a glance. The detector has already fetched and
-          # deepened as needed, so these calls add no network work.
-          if diff_base="$(git merge-base "$base_ref" HEAD 2>/dev/null)"; then
-            # Capture the whole stream before truncating. Piping git diff straight
-            # into `head -50` lets head close the read end once it has its 50
-            # lines; git then takes SIGPIPE and exits 141, and because Actions runs
-            # run: steps under `bash --noprofile --norc -eo pipefail`, pipefail
-            # promotes that 141 to the pipeline's status and set -e fails this
-            # required gate. It would fire on large diffs, meaning the widened-diff
-            # case this output exists to expose. sed is used rather than head
-            # because sed reads its input to the end, so nothing can close the
-            # pipe early.
-            # The || guard is for the diagnostic, not for control flow. `set -e`
-            # DOES abort on a failed command substitution in a plain assignment
-            # (the masking people remember applies to declaration assignments such
-            # as `local x=$(false)`, not to this one), so the step would fail here
-            # either way. Without the guard it fails with a bare non-zero exit and
-            # git's own stderr; with it, the log names which refs the diff was
-            # between. Keep it for that message, not because the failure would
-            # otherwise pass unnoticed.
-            changed_files="$(git diff --name-only "$diff_base" HEAD)" || {
-              echo "::error::git diff failed for ${diff_base}..HEAD while listing changed files."
-              exit 1
-            }
-
-            if [ -z "$changed_files" ]; then
-              echo "Changed files the classification was computed from: none"
-            else
-              changed_total="$(printf '%s\n' "$changed_files" | wc -l | tr -d ' ')"
-              echo "Changed files the classification was computed from (${changed_total} total, showing up to 50):"
-              printf '%s\n' "$changed_files" | sed -n '1,50p'
-            fi
-          fi
+        run: script/ci-required-diff-base
 
       - name: Enforce hosted CI for generator changes
         env:

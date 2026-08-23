@@ -1,14 +1,11 @@
 #!/usr/bin/env bash
-# Test harness for the diff-base selection in the "Run changed-files detector"
-# step of .github/workflows/ci-required.yml.
+# Test harness for script/ci-required-diff-base.
 #
 # Run: bash script/ci-required-diff-base-test.bash
 # CI invokes it from the "Run CI gate tests" step of the same workflow.
 #
-# The step body is extracted from the committed workflow with a YAML parser and
-# executed against a synthetic repository, so the logic under test is exactly the
-# logic that ships. That matters because this branching decides which suites run
-# for every PR, and it lives inline in YAML rather than in script/.
+# The real script is executed against a synthetic repository, so the logic under
+# test is exactly the logic that ships.
 #
 # script/ci-changes-detector is stubbed here. Its own behavior is covered by
 # script/ci-changes-detector-test.bash; what this harness pins down is which base
@@ -22,6 +19,7 @@ set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+DIFF_BASE_SCRIPT="$REPO_ROOT/script/ci-required-diff-base"
 WORKFLOW="$REPO_ROOT/.github/workflows/ci-required.yml"
 
 TESTS_RUN=0
@@ -75,21 +73,43 @@ cleanup() {
 }
 trap cleanup EXIT
 
-STEP="$WORKDIR/step.sh"
 REPO="$WORKDIR/repo"
 
-# Extract the step body. A rename of the step name is a real breakage of this
-# harness, so fail loudly rather than silently testing nothing.
-if ! ruby -ryaml -e '
-  workflow = YAML.safe_load_file(ARGV[0], permitted_classes: [], aliases: false)
-  steps = workflow.fetch("jobs").fetch("required-pr-gate").fetch("steps")
-  step = steps.find { |candidate| candidate["name"] == "Run changed-files detector" }
-  abort "step \"Run changed-files detector\" not found in #{ARGV[0]}" if step.nil?
-  File.write(ARGV[1], step.fetch("run"))
-' "$WORKFLOW" "$STEP"; then
-  echo "FAIL: could not extract the step body from $WORKFLOW" >&2
+if [ ! -x "$DIFF_BASE_SCRIPT" ]; then
+  echo "FAIL: executable diff-base script not found at $DIFF_BASE_SCRIPT" >&2
   exit 1
 fi
+
+test_workflow_wiring() {
+  local wiring_output
+
+  TESTS_RUN=$((TESTS_RUN + 1))
+  echo "-> workflow delegates changed-file detection to the helper"
+
+  if ! wiring_output="$(ruby -ryaml - "$WORKFLOW" 2>&1 <<'RUBY'
+workflow = YAML.safe_load_file(ARGV.fetch(0), permitted_classes: [], aliases: false)
+steps = workflow.fetch("jobs").fetch("required-pr-gate").fetch("steps")
+matching_steps = steps.select { |step| step["name"] == "Run changed-files detector" }
+
+abort "expected exactly one Run changed-files detector step, found #{matching_steps.length}" unless matching_steps.length == 1
+
+step = matching_steps.fetch(0)
+expected_env = {
+  "PULL_REQUEST_BASE_SHA" => %q(${{ github.event.inputs.pull_request_base_sha || '' }}),
+  "PULL_REQUEST_HEAD_SHA" => %q(${{ github.event.pull_request.head.sha || '' }}),
+  "EVENT_BASE_REF" => %q(${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before || 'origin/main' }}),
+}
+
+abort "expected id=changes, got #{step['id'].inspect}" unless step["id"] == "changes"
+abort "expected run=script/ci-required-diff-base, got #{step['run'].inspect}" unless step["run"] == "script/ci-required-diff-base"
+abort "helper env bindings changed: #{step['env'].inspect}" unless step["env"] == expected_env
+RUBY
+  )"; then
+    fail "workflow wiring: $wiring_output"
+  fi
+}
+
+test_workflow_wiring
 
 git init -q "$REPO"
 mkdir -p "$REPO/script"
@@ -184,7 +204,7 @@ run_case() {
       PULL_REQUEST_BASE_SHA="$dispatch_base_sha" \
       PULL_REQUEST_HEAD_SHA="$pr_head_sha" \
       EVENT_BASE_REF="$event_base_ref" \
-      bash --noprofile --norc -eo pipefail "$STEP" 2>&1
+      bash --noprofile --norc -eo pipefail "$DIFF_BASE_SCRIPT" 2>&1
   )"
   LAST_RC=$?
 }
@@ -246,6 +266,30 @@ assert_rc 0 "merge_group"
 assert_contains "$LAST_OUTPUT" "Diff base: $OLD_MAIN (source: event payload)" "merge_group"
 assert_not_contains "$LAST_OUTPUT" "source: PR merge commit first parent" "merge_group"
 
+# Exercise the helper's guarded changed-file listing directly. The shim delegates
+# every other git invocation, including merge-base, to the captured real binary.
+REAL_GIT="$(command -v git)"
+GIT_SHIM_DIR="$WORKDIR/git-shim"
+mkdir -p "$GIT_SHIM_DIR"
+cat > "$GIT_SHIM_DIR/git" <<'SHIM'
+#!/usr/bin/env bash
+if [ "${1:-}" = "diff" ] && [ "${2:-}" = "--name-only" ]; then
+  exit 1
+fi
+exec "${REAL_GIT:?}" "$@"
+SHIM
+chmod +x "$GIT_SHIM_DIR/git"
+
+BASH_ENV=/dev/null \
+  PATH="$GIT_SHIM_DIR:$PATH" \
+  REAL_GIT="$REAL_GIT" \
+  run_case "changed-file listing failure names the diff refs" \
+  "$MERGE_REF" merge_group "" "" "$OLD_MAIN"
+assert_rc 1 "changed-file listing failure"
+assert_contains "$LAST_OUTPUT" \
+  "::error::git diff failed for $OLD_MAIN..HEAD while listing changed files." \
+  "changed-file listing failure"
+
 # Regression guard for the truncation pipe. Under pipefail an early-closing reader
 # makes git exit 141 and takes the whole required gate down with it.
 run_case "large changed-file list does not abort the step" \
@@ -257,18 +301,6 @@ printed_files="$(printf '%s\n' "$LAST_OUTPUT" | grep -c "bigdir/${long_name}-")"
 if [ "$printed_files" -ne 50 ]; then
   fail "large changed-file list: expected 50 printed paths, got $printed_files"
 fi
-
-# NOT COVERED HERE: the `|| { echo ::error::; exit 1; }` guard on the
-# changed_files assignment. Exercising it needs a git that fails only on
-# `diff --name-only`, and injecting one via PATH does not survive into the child
-# shell in every developer environment, so a case for it would pass or fail for
-# reasons unrelated to the guard.
-#
-# The stakes are lower than they look: `set -e` aborts on a failed command
-# substitution in a plain assignment on its own, so the guard supplies a better
-# message rather than the only failure. Tracked with the extraction work in
-# #4824, where the logic moves into script/ and the guard becomes directly
-# callable.
 
 echo
 if [ "$TESTS_FAILED" -ne 0 ]; then
