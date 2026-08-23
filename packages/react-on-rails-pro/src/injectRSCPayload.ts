@@ -130,7 +130,12 @@ const LOADABLE_STATS_FILE_NAME = 'loadable-stats.json';
 const LOADABLE_STATS_INITIAL_READ_RETRY_DELAY_MS = 100;
 const LOADABLE_STATS_MAX_READ_RETRY_DELAY_MS = 30_000;
 const LOADABLE_STATS_UNEXPECTED_WARNING_INTERVAL_MS = LOADABLE_STATS_MAX_READ_RETRY_DELAY_MS;
+// The Node Renderer injects the host callback under this VM-global key. Keep its test probes in
+// packages/react-on-rails-pro-node-renderer/tests/vm.test.ts and
+// packages/react-on-rails-pro/tests/loadClientChunkStylesheetHrefs.test.ts in sync too.
+// MIRROR VALUES OF: packages/react-on-rails-pro-node-renderer/src/worker/vm.ts
 const LOADABLE_STATS_MISSING_DIAGNOSTIC_CONTEXT_KEY = '__reactOnRailsProReportMissingLoadableStats';
+// MIRROR VALUES END
 const RSC_CLIENT_STYLESHEET_INFERENCE_TIMEOUT_MS = 100;
 const STACK_FILE_LOCATION = /\(?((?:file:\/\/\/.+)|(?:\/.+)|(?:[A-Za-z]:[\\/].+)):\d+:\d+\)?\s*$/;
 

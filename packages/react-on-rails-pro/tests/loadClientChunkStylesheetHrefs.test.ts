@@ -72,6 +72,8 @@ const renderWithDefaultStylesheetInference = async (
 const missingLoadableStatsError = () =>
   Object.assign(new Error('loadable-stats.json not copied yet'), { code: 'ENOENT' });
 
+// Test probe for the cross-package contract defined in ../src/injectRSCPayload.ts and
+// packages/react-on-rails-pro-node-renderer/src/worker/vm.ts; keep the Node Renderer test probe in sync.
 const LOADABLE_STATS_MISSING_DIAGNOSTIC_CONTEXT_KEY = '__reactOnRailsProReportMissingLoadableStats';
 
 describe('loadRSCClientChunkStylesheetHrefsByChunkName', () => {

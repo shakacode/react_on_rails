@@ -60,7 +60,12 @@ import {
 import type { CurrentGenerationBundlePathAlias } from './currentGenerationManifest.js';
 
 const readFileAsync = promisify(fs.readFile);
+// The Pro package resolves the host callback through this VM-global key. Keep its test probes in
+// packages/react-on-rails-pro-node-renderer/tests/vm.test.ts and
+// packages/react-on-rails-pro/tests/loadClientChunkStylesheetHrefs.test.ts in sync too.
+// MIRROR VALUES OF: packages/react-on-rails-pro/src/injectRSCPayload.ts
 const LOADABLE_STATS_MISSING_DIAGNOSTIC_CONTEXT_KEY = '__reactOnRailsProReportMissingLoadableStats';
+// MIRROR VALUES END
 // This is process-scoped diagnostic state, not request data: every VM context
 // shares the same host callback and only the first missing-stats event logs.
 let hasReportedMissingLoadableStats = false;
@@ -632,7 +637,6 @@ async function buildVM(filePath: string): Promise<VMContext> {
       // TS/JS sources. Only resolves positions for registered bundle paths.
       const contextObject = {
         sharedConsoleHistory,
-        [LOADABLE_STATS_MISSING_DIAGNOSTIC_CONTEXT_KEY]: reportMissingLoadableStats,
         [SOURCE_MAP_LOOKUP_ATTEMPT_CONTEXT_KEY]: createSourceMapLookupAttempt,
         [SOURCE_MAP_RESOLVER_CONTEXT_KEY]: (
           fileName: unknown,
@@ -679,6 +683,14 @@ async function buildVM(filePath: string): Promise<VMContext> {
       if (additionalContextIsObject) {
         extendContext(contextObject, additionalContext);
       }
+      // Install this after every context extension so application configuration
+      // and bundle code cannot redirect the server path into replayed VM console history.
+      Object.defineProperty(contextObject, LOADABLE_STATS_MISSING_DIAGNOSTIC_CONTEXT_KEY, {
+        configurable: false,
+        enumerable: false,
+        value: reportMissingLoadableStats,
+        writable: false,
+      });
       const context = vm.createContext(contextObject);
 
       // Create explicit reference to global context, just in case (some libs can use it):
