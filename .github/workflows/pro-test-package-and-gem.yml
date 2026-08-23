@@ -463,7 +463,13 @@ jobs:
           echo "Bundler version: "; bundle --version
 
       - name: Run RSpec tests for Pro package
-        run: bundle exec rspec spec/react_on_rails_pro
+        run: |
+          mkdir -p ~/rspec log
+          set -o pipefail
+          bundle exec rspec spec/react_on_rails_pro \
+            --format progress \
+            --format RspecJunitFormatter \
+            --out ~/rspec/rspec.xml 2>&1 | tee log/test.log
 
       - name: Store test results
         uses: actions/upload-artifact@v4
