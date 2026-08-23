@@ -1256,6 +1256,7 @@ RSpec.describe ReactOnRails::Doctor do
             <%= react_component("StyledComponent", props: { card: { title: "Hello" } }, prerender: false, auto_load_bundle: true) %>
             <%# stylesheet_pack_tag %>
             <!-- <%= stylesheet_pack_tag %> -->
+            <p>stylesheet_pack_tag is not configured here</p>
             <%= javascript_pack_tag %>
           ERB
         )
@@ -1460,6 +1461,47 @@ RSpec.describe ReactOnRails::Doctor do
 
           ReactOnRails.configure do |config|
             config.auto_load_bundle = true
+          end
+        RUBY
+      ],
+      [
+        "the configure block variable is passed to an unresolved method",
+        <<~RUBY
+          ReactOnRails.configure do |config|
+            config.auto_load_bundle = true
+            mutate(config)
+          end
+        RUBY
+      ],
+      [
+        "the setting is overridden through send",
+        <<~RUBY
+          ReactOnRails.configure do |config|
+            config.auto_load_bundle = true
+            config.send(:auto_load_bundle=, false)
+          end
+        RUBY
+      ],
+      [
+        "the setting is overridden through public_send",
+        <<~RUBY
+          ReactOnRails.configure do |config|
+            config.auto_load_bundle = true
+            config.public_send(:auto_load_bundle=, false)
+          end
+        RUBY
+      ],
+      [
+        "a conditional configure block follows the direct configure block",
+        <<~RUBY
+          ReactOnRails.configure do |config|
+            config.auto_load_bundle = true
+          end
+
+          if enable_override?
+            ReactOnRails.configure do |config|
+              config.auto_load_bundle = false
+            end
           end
         RUBY
       ]
@@ -1675,6 +1717,33 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    {
+      "public_send with the helper name" => '<%= public_send("stylesheet_pack_tag") %>',
+      "a method alias invoked later" => <<~ERB
+        <% css_pack = method(:stylesheet_pack_tag) %>
+        <%= css_pack.call %>
+      ERB
+    }.each do |description, stylesheet_template|
+      context "when the stylesheet helper is referenced through #{description}" do
+        before do
+          stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+          stub_layouts(
+            "app/views/layouts/application.html.erb" => <<~ERB
+              <%= react_component("StyledComponent", auto_load_bundle: true) %>
+              #{stylesheet_template}
+              <%= javascript_pack_tag %>
+            ERB
+          )
+        end
+
+        it "fails the missing-CSS proof closed on the active ambiguous reference" do
+          doctor.send(:check_layout_files)
+
+          expect(checker.warnings?).to be(false)
+        end
+      end
+    end
+
     context "when the component's React layout actively flushes both pack queues" do
       before do
         stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
@@ -1749,6 +1818,34 @@ RSpec.describe ReactOnRails::Doctor do
             )
           )
         )
+      end
+    end
+
+    context "when the generated controller's implicit view flushes the auto-loaded component CSS" do
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        stub_generated_controller_flow(
+          controller: <<~RUBY,
+            class HelloWorldController < ApplicationController
+              layout "react_on_rails_default"
+
+              def index
+                @hello_world_props = { name: "Stranger", items: [1, true] }
+              end
+            end
+          RUBY
+          view: <<~ERB
+            <%= react_component("StyledComponent", props: @hello_world_props, prerender: true) %>
+            <%= stylesheet_pack_tag %>
+          ERB
+        )
+        stub_global_auto_load_bundle(true)
+      end
+
+      it "does not report the selected view's flushed CSS as missing" do
+        doctor.send(:check_layout_files)
+
+        expect(checker.warnings?).to be(false)
       end
     end
 

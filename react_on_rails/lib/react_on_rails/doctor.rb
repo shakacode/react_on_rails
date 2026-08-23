@@ -74,6 +74,7 @@ module ReactOnRails
     RAILS_SERVER_COMMAND_REGEX = %r{\b(?:(?:bin/)?rails\s+(?:server|s)|puma|unicorn|rackup|passenger\s+start)\b}
     TEMPLATE_ERB_COMMENT_PATTERN = /<%#.*?%>/m
     TEMPLATE_HTML_COMMENT_PATTERN = /<!--.*?-->/m
+    ERB_EXPRESSION_PATTERN = /<%(?![#%])=?\s*(?<expression>.*?)%>/m
     ERB_OUTPUT_EXPRESSION_PATTERN = /<%=\s*(?<expression>.*?)%>/m
     REACT_ON_RAILS_INITIALIZER_PATH = "config/initializers/react_on_rails.rb"
 
@@ -1291,7 +1292,7 @@ module ReactOnRails
 
     def stylesheet_pack_helper_evidence?(content)
       erb_output_helper?(content, "stylesheet_pack_tag") ||
-        erb_output_helper_mentioned?(content, "stylesheet_pack_tag")
+        erb_helper_mentioned?(content, "stylesheet_pack_tag")
     end
 
     def static_stylesheet_assets(entrypoint)
@@ -1319,7 +1320,10 @@ module ReactOnRails
         implicit_view_paths_for_layout(controller_file, layout_name).flat_map do |view_path|
           next [] unless File.exist?(view_path)
 
-          auto_loaded_component_names(uncommented_template_content(File.read(view_path)))
+          view_content = uncommented_template_content(File.read(view_path))
+          next [] if stylesheet_pack_helper_evidence?(view_content)
+
+          auto_loaded_component_names(view_content)
         end
       rescue StandardError
         []
@@ -1434,9 +1438,9 @@ module ReactOnRails
       end
     end
 
-    def erb_output_helper_mentioned?(content, helper_name)
-      content.scan(ERB_OUTPUT_EXPRESSION_PATTERN).any? do |(expression)|
-        Ripper.lex(expression).any? { |(_position, event, token)| event == :on_ident && token == helper_name }
+    def erb_helper_mentioned?(content, helper_name)
+      content.scan(ERB_EXPRESSION_PATTERN).any? do |(expression)|
+        Ripper.lex(expression).any? { |(_position, _event, token)| token == helper_name }
       end
     end
 
@@ -1620,18 +1624,46 @@ module ReactOnRails
     end
 
     def static_configured_boolean(source, setting_name)
-      configure_blocks = ripper_statements(source).select { |statement| react_on_rails_configure_block?(statement) }
-      return unless configure_blocks.one?
+      configure_block = unique_top_level_configure_block(source)
+      return unless configure_block
 
-      configure_block = configure_blocks.first
       config_name = configure_block_parameter_name(configure_block)
       block_body = configure_block.dig(2, 2)
-      statements = static_body_statements(block_body)
-      return unless config_name && statements
+      direct_assignments = static_direct_config_assignments(block_body, config_name)
+      return unless direct_assignments
       return unless ast_identifier_count(block_body, setting_name) == 1
 
-      assignments = statements.select { |statement| config_assignment?(statement, config_name, setting_name) }
+      assignments = direct_assignments.select do |statement|
+        config_assignment?(statement, config_name, setting_name)
+      end
       static_boolean_value(assignments.first[2]) if assignments.one?
+    end
+
+    def unique_top_level_configure_block(source)
+      source_statements = ripper_statements(source)
+      configure_blocks = source_statements.select { |statement| react_on_rails_configure_block?(statement) }
+      return unless configure_blocks.one?
+      return unless react_on_rails_configure_block_count(source_statements) == 1
+
+      configure_blocks.first
+    end
+
+    def static_direct_config_assignments(block_body, config_name)
+      statements = static_body_statements(block_body)
+      return unless config_name && statements
+
+      direct_assignments = statements.select { |statement| direct_config_assignment?(statement, config_name) }
+      return unless ast_identifier_count(block_body, config_name) == direct_assignments.length
+
+      direct_assignments
+    end
+
+    def react_on_rails_configure_block_count(node)
+      return 0 unless node.is_a?(Array)
+
+      count = react_on_rails_configure_block?(node) ? 1 : 0
+      children = node.first.is_a?(Symbol) ? node.drop(1) : node
+      count + children.sum { |child| react_on_rails_configure_block_count(child) }
     end
 
     def ast_identifier_count(node, identifier)
@@ -1663,11 +1695,17 @@ module ReactOnRails
     end
 
     def config_assignment?(node, config_name, setting_name)
+      return false unless direct_config_assignment?(node, config_name)
+
+      field = node[1]
+      token_named?(field[3], setting_name)
+    end
+
+    def direct_config_assignment?(node, config_name)
       return false unless ast_node?(node, :assign)
 
       field = node[1]
-      ast_node?(field, :field) && static_identifier_reference(field[1]) == config_name &&
-        token_named?(field[3], setting_name)
+      ast_node?(field, :field) && static_identifier_reference(field[1]) == config_name
     end
 
     def static_identifier_reference(node)
