@@ -1255,7 +1255,9 @@ RSpec.describe ReactOnRails::Doctor do
           "app/views/layouts/application.html.erb" => <<~ERB
             <%= react_component("StyledComponent", props: { card: { title: "Hello" } }, prerender: false, auto_load_bundle: true) %>
             <%# stylesheet_pack_tag %>
+            <%# public_send("stylesheet_" + "pack_tag") %>
             <!-- <%= stylesheet_pack_tag %> -->
+            <!-- <%= public_send(pack_helper_name) %> -->
             <p>stylesheet_pack_tag is not configured here</p>
             <%= javascript_pack_tag %>
           ERB
@@ -1758,6 +1760,32 @@ RSpec.describe ReactOnRails::Doctor do
         end
 
         it "fails the missing-CSS proof closed on the active ambiguous reference" do
+          doctor.send(:check_layout_files)
+
+          expect(checker.warnings?).to be(false)
+        end
+      end
+    end
+
+    {
+      "a concatenated public_send name" => '<%= public_send("stylesheet_" + "pack_tag") %>',
+      "a variable send name" => "<%= send(pack_helper_name) %>",
+      "a variable __send__ name" => "<%= __send__(pack_helper_name) %>",
+      "a variable method name" => "<%= method(pack_helper_name).call %>"
+    }.each do |description, stylesheet_template|
+      context "when the stylesheet helper may be dispatched through #{description}" do
+        before do
+          stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+          stub_layouts(
+            "app/views/layouts/application.html.erb" => <<~ERB
+              <%= react_component("StyledComponent", auto_load_bundle: true) %>
+              #{stylesheet_template}
+              <%= javascript_pack_tag %>
+            ERB
+          )
+        end
+
+        it "fails the missing-CSS proof closed on active reflective dispatch" do
           doctor.send(:check_layout_files)
 
           expect(checker.warnings?).to be(false)

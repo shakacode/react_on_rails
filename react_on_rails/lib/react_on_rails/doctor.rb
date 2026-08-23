@@ -76,6 +76,7 @@ module ReactOnRails
     TEMPLATE_HTML_COMMENT_PATTERN = /<!--.*?-->/m
     ERB_EXPRESSION_PATTERN = /<%(?![#%])=?\s*(?<expression>.*?)%>/m
     ERB_OUTPUT_EXPRESSION_PATTERN = /<%=\s*(?<expression>.*?)%>/m
+    REFLECTIVE_HELPER_DISPATCH_METHODS = %w[send public_send __send__ method].freeze
     REACT_ON_RAILS_INITIALIZER_PATH = "config/initializers/react_on_rails.rb"
 
     # Deprecated-renderer-cache scan (used by check_deprecated_renderer_cache_task):
@@ -1440,8 +1441,27 @@ module ReactOnRails
 
     def erb_helper_mentioned?(content, helper_name)
       content.scan(ERB_EXPRESSION_PATTERN).any? do |(expression)|
-        Ripper.lex(expression).any? { |(_position, _event, token)| token == helper_name }
+        Ripper.lex(expression).any? { |(_position, _event, token)| token == helper_name } ||
+          reflective_helper_dispatch?(ripper_statements(expression))
       end
+    end
+
+    def reflective_helper_dispatch?(node)
+      return false unless node.is_a?(Array)
+      return true if reflective_helper_dispatch_call?(node)
+
+      children = node.first.is_a?(Symbol) ? node.drop(1) : node
+      children.any? { |child| reflective_helper_dispatch?(child) }
+    end
+
+    def reflective_helper_dispatch_call?(node)
+      method_token = case node.first
+                     when :vcall, :fcall, :command
+                       node[1]
+                     when :call
+                       node[3]
+                     end
+      token_type?(method_token, :@ident) && REFLECTIVE_HELPER_DISPATCH_METHODS.include?(method_token[1])
     end
 
     def direct_unqualified_helper_call?(node, helper_name)
