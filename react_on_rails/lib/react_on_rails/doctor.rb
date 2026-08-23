@@ -1250,7 +1250,7 @@ module ReactOnRails
         next unless File.exist?(layout_file)
 
         content = uncommented_template_content(File.read(layout_file))
-        has_stylesheet = erb_output_helper?(content, "stylesheet_pack_tag")
+        has_stylesheet = stylesheet_pack_helper_evidence?(content)
         has_javascript = erb_output_helper?(content, "javascript_pack_tag")
 
         layout_name = layout_file.delete_prefix("app/views/layouts/").delete_suffix(".html.erb")
@@ -1289,6 +1289,11 @@ module ReactOnRails
       end
     end
 
+    def stylesheet_pack_helper_evidence?(content)
+      erb_output_helper?(content, "stylesheet_pack_tag") ||
+        erb_output_helper_mentioned?(content, "stylesheet_pack_tag")
+    end
+
     def static_stylesheet_assets(entrypoint)
       assets = static_manifest_assets(entrypoint)
       stylesheet_assets = assets["css"] if assets.is_a?(Hash)
@@ -1324,81 +1329,34 @@ module ReactOnRails
     end
 
     def implicit_view_paths_for_layout(controller_file, layout_name)
-      statements = statically_associated_controller_statements(controller_file, layout_name)
-      return [] unless statements
+      action_names = statically_associated_action_names(controller_file, layout_name)
+      return [] unless action_names
 
       view_directory = controller_file.delete_prefix("app/controllers/").delete_suffix("_controller.rb")
-      static_public_implicit_action_names(statements).map do |action_name|
+      action_names.map do |action_name|
         "app/views/#{view_directory}/#{action_name}.html.erb"
       end
     rescue StandardError
       []
     end
 
-    def statically_associated_controller_statements(controller_file, layout_name)
+    def statically_associated_action_names(controller_file, layout_name)
       return unless File.exist?(controller_file)
 
       controller = static_controller_class(controller_file)
       statements = static_body_statements(controller[3]) if controller
       return unless statements
 
-      layout_declarations = statements.filter_map { |statement| static_layout_declaration(statement) }
-      statements if layout_declarations == [layout_name] && ast_method_call_count(controller, "layout") == 1
+      layouts = statements.filter_map { |statement| static_layout_declaration(statement) }
+      action_names = statements.filter_map { |statement| static_generated_action_name(statement) }
+      return unless exact_generated_controller_statements?(statements, layouts, action_names, layout_name)
+
+      action_names
     end
 
-    def static_public_implicit_action_names(statements)
-      visibility = :public
-      action_visibilities = {}
-
-      statements.each do |statement|
-        visibility = static_visibility_after_statement(statement, visibility, action_visibilities)
-        return [] unless visibility
-      end
-
-      action_visibilities.filter_map { |action_name, action_visibility| action_name if action_visibility == :public }
-    end
-
-    def static_visibility_after_statement(statement, visibility, action_visibilities)
-      declaration = static_visibility_declaration(statement)
-      return if declaration == :unresolved
-
-      unless declaration
-        action_name = static_implicit_action_name(statement)
-        action_visibilities[action_name] = visibility if action_name
-        return visibility
-      end
-
-      declared_visibility, method_names = declaration
-      method_names.each { |method_name| action_visibilities[method_name] = declared_visibility }
-      method_names.empty? ? declared_visibility : visibility
-    end
-
-    def static_visibility_declaration(node)
-      visibility = %w[public protected private].find { |name| ast_method_call_count(node, name) == 1 }
-      return unless visibility
-
-      method_names = static_visibility_method_names(node, visibility)
-      method_names ? [visibility.to_sym, method_names] : :unresolved
-    end
-
-    def static_visibility_method_names(node, visibility)
-      return [] if ast_node?(node, :vcall) && token_named?(node[1], visibility)
-
-      arguments = static_argument_values(static_call_arguments(node, visibility))
-      return unless arguments
-
-      method_names = arguments.map { |argument| static_method_name_value(argument) }
-      method_names if method_names.all?
-    end
-
-    def static_method_name_value(node)
-      static_symbol_value(node) || static_string_value(node)
-    end
-
-    def static_symbol_value(node)
-      symbol = node[1] if ast_node?(node, :symbol_literal)
-      token = symbol[1] if ast_node?(symbol, :symbol)
-      token[1] if token_type?(token, :@ident)
+    def exact_generated_controller_statements?(statements, layouts, action_names, layout_name)
+      layouts == [layout_name] && action_names.one? &&
+        statements.length == layouts.length + action_names.length
     end
 
     def static_controller_class(controller_file)
@@ -1438,13 +1396,26 @@ module ReactOnRails
       static_string_value(arguments.first)
     end
 
-    def static_implicit_action_name(node)
+    def static_generated_action_name(node)
       return unless ast_node?(node, :def) && token_type?(node[1], :@ident)
       return unless empty_method_parameters?(node[2])
-      return if ast_method_call_count(node[3], "render").positive?
-      return if ast_method_call_count(node[3], "layout").positive?
+      return unless static_generated_action_body?(node[3])
 
       node[1][1]
+    end
+
+    def static_generated_action_body?(node)
+      return false unless ast_node?(node, :bodystmt) && node.drop(2).all?(&:nil?)
+
+      statements = static_body_statements(node)
+      statements&.all? { |statement| ast_node?(statement, :void_stmt) || static_ivar_assignment?(statement) }
+    end
+
+    def static_ivar_assignment?(node)
+      return false unless ast_node?(node, :assign)
+
+      field = node[1]
+      ast_node?(field, :var_field) && token_type?(field[1], :@ivar) && static_data_value?(node[2])
     end
 
     def empty_method_parameters?(node)
@@ -1456,28 +1427,23 @@ module ReactOnRails
       statements if statements.is_a?(Array)
     end
 
-    def ast_method_call_count(node, method_name)
-      return 0 unless node.is_a?(Array)
-
-      count =
-        case node.first
-        when :command, :fcall, :vcall
-          token_named?(node[1], method_name) ? 1 : 0
-        when :call, :command_call
-          token_named?(node[3], method_name) ? 1 : 0
-        else
-          0
-        end
-      children = node.first.is_a?(Symbol) ? node.drop(1) : node
-      count + children.sum { |child| ast_method_call_count(child, method_name) }
-    end
-
     def erb_output_helper?(content, helper_name)
       content.scan(ERB_OUTPUT_EXPRESSION_PATTERN).any? do |(expression)|
-        ripper_statements(expression).any? do |statement|
-          ast_method_call_count(statement, helper_name).positive?
-        end
+        statements = ripper_statements(expression)
+        statements.one? && direct_unqualified_helper_call?(statements.first, helper_name)
       end
+    end
+
+    def erb_output_helper_mentioned?(content, helper_name)
+      content.scan(ERB_OUTPUT_EXPRESSION_PATTERN).any? do |(expression)|
+        Ripper.lex(expression).any? { |(_position, event, token)| event == :on_ident && token == helper_name }
+      end
+    end
+
+    def direct_unqualified_helper_call?(node, helper_name)
+      return token_named?(node[1], helper_name) if ast_node?(node, :vcall) || ast_node?(node, :command)
+
+      ast_node?(node, :method_add_arg) && fcall_named?(node[1], helper_name)
     end
 
     def uncommented_template_content(content)
@@ -1494,7 +1460,11 @@ module ReactOnRails
     end
 
     def statically_auto_loaded_component?(arguments)
-      component_option = top_level_boolean_keyword(arguments.drop(1), "auto_load_bundle")
+      options = static_component_options(arguments.drop(1))
+      return false unless options
+      return static_global_auto_load_bundle == true if options == :omitted
+
+      component_option = static_boolean_keyword(options, "auto_load_bundle")
       return component_option == true unless component_option == :omitted
 
       static_global_auto_load_bundle == true
@@ -1557,11 +1527,7 @@ module ReactOnRails
       parts.map { |part| part[1] }.join
     end
 
-    def top_level_boolean_keyword(arguments, keyword)
-      associations = static_hash_associations(arguments.last)
-      return :omitted unless associations
-      return unless associations.all? { |association| static_label_association?(association) }
-
+    def static_boolean_keyword(associations, keyword)
       matches = associations.select do |association|
         static_label_association?(association, "#{keyword}:")
       end
@@ -1571,11 +1537,69 @@ module ReactOnRails
       static_boolean_value(matches.first[2])
     end
 
+    def static_component_options(arguments)
+      return :omitted if arguments.empty?
+      return unless arguments.one?
+
+      associations = static_hash_associations(arguments.first)
+      associations if associations&.all? { |association| static_data_association?(association) }
+    end
+
+    def static_data_association?(node)
+      static_label_association?(node) && static_data_value?(node[2])
+    end
+
+    def static_data_value?(node)
+      return true if static_scalar_value?(node)
+
+      case node&.first
+      when :array
+        static_data_array?(node[1])
+      when :hash
+        static_data_hash?(node)
+      when :symbol_literal
+        static_symbol_literal?(node)
+      when :unary
+        static_numeric_unary_literal?(node)
+      else
+        false
+      end
+    end
+
+    def static_data_array?(values)
+      values.nil? || (values.is_a?(Array) && values.all? { |value| static_data_value?(value) })
+    end
+
+    def static_data_hash?(node)
+      associations = static_hash_associations(node)
+      associations&.all? { |association| static_data_association?(association) }
+    end
+
+    def static_symbol_literal?(node)
+      symbol = node[1] if ast_node?(node, :symbol_literal)
+      token = symbol[1] if ast_node?(symbol, :symbol)
+      token_type?(token, :@ident) || token_type?(token, :@op)
+    end
+
+    def static_numeric_unary_literal?(node)
+      %i[+@ -@].include?(node[1]) && (token_type?(node[2], :@int) || token_type?(node[2], :@float))
+    end
+
+    def static_scalar_value?(node)
+      return true unless static_string_value(node).nil?
+      return true if token_type?(node, :@int) || token_type?(node, :@float)
+
+      token = node[1] if ast_node?(node, :var_ref)
+      token_type?(token, :@ivar) || (token_type?(token, :@kw) && %w[true false nil].include?(token[1]))
+    end
+
     def static_hash_associations(node)
       return node[1] if ast_node?(node, :bare_assoc_hash)
       return unless ast_node?(node, :hash)
 
       association_list = node[1]
+      return [] unless association_list
+
       association_list[1] if ast_node?(association_list, :assoclist_from_args)
     end
 
@@ -1601,21 +1625,21 @@ module ReactOnRails
 
       configure_block = configure_blocks.first
       config_name = configure_block_parameter_name(configure_block)
-      statements = static_body_statements(configure_block.dig(2, 2))
+      block_body = configure_block.dig(2, 2)
+      statements = static_body_statements(block_body)
       return unless config_name && statements
+      return unless ast_identifier_count(block_body, setting_name) == 1
 
-      assignments = static_config_assignments(statements, config_name, setting_name)
+      assignments = statements.select { |statement| config_assignment?(statement, config_name, setting_name) }
       static_boolean_value(assignments.first[2]) if assignments.one?
     end
 
-    def static_config_assignments(node, config_name, setting_name)
-      return [] unless node.is_a?(Array)
+    def ast_identifier_count(node, identifier)
+      return 0 unless node.is_a?(Array)
 
-      assignments = config_assignment?(node, config_name, setting_name) ? [node] : []
+      count = token_named?(node, identifier) ? 1 : 0
       children = node.first.is_a?(Symbol) ? node.drop(1) : node
-      assignments + children.flat_map do |child|
-        static_config_assignments(child, config_name, setting_name)
-      end
+      count + children.sum { |child| ast_identifier_count(child, identifier) }
     end
 
     def configure_block_parameter_name(node)

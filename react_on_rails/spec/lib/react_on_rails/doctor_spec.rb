@@ -1340,6 +1340,33 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    {
+      "a dynamic options variable" => 'react_component("StyledComponent", options)',
+      "a scalar options argument" => 'react_component("StyledComponent", 42)',
+      "a method call as an option value" => 'react_component("StyledComponent", props: build_props)',
+      "a hash-rocket option" => 'react_component("StyledComponent", { "auto_load_bundle" => true })',
+      "a dynamic option key" => 'react_component("StyledComponent", { option_key => true })'
+    }.each do |description, component_call|
+      context "when #{description} is passed to react_component" do
+        before do
+          stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+          stub_layouts(
+            "app/views/layouts/application.html.erb" => <<~ERB
+              <%= #{component_call} %>
+              <%= javascript_pack_tag %>
+            ERB
+          )
+          stub_global_auto_load_bundle(true)
+        end
+
+        it "fails closed for an unresolved component options shape" do
+          doctor.send(:check_layout_files)
+
+          expect(checker.warnings?).to be(false)
+        end
+      end
+    end
+
     context "when the global auto_load_bundle setting is dynamic" do
       before do
         stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
@@ -1386,6 +1413,99 @@ RSpec.describe ReactOnRails::Doctor do
         doctor.send(:check_layout_files)
 
         expect(checker.warnings?).to be(false)
+      end
+    end
+
+    [
+      [
+        "the only setting write has a conditional modifier",
+        <<~RUBY
+          ReactOnRails.configure do |config|
+            config.auto_load_bundle = true if enable_auto_load_bundle?
+          end
+        RUBY
+      ],
+      [
+        "the setting write is deferred through a callback",
+        <<~RUBY
+          ReactOnRails.configure do |config|
+            callback { config.auto_load_bundle = true }
+          end
+        RUBY
+      ],
+      [
+        "a deferred setting reference follows the direct write",
+        <<~RUBY
+          ReactOnRails.configure do |config|
+            config.auto_load_bundle = true
+            callback { config.auto_load_bundle }
+          end
+        RUBY
+      ],
+      [
+        "the setting is assigned twice directly",
+        <<~RUBY
+          ReactOnRails.configure do |config|
+            config.auto_load_bundle = true
+            config.auto_load_bundle = true
+          end
+        RUBY
+      ],
+      [
+        "two top-level configure blocks assign the setting",
+        <<~RUBY
+          ReactOnRails.configure do |config|
+            config.auto_load_bundle = true
+          end
+
+          ReactOnRails.configure do |config|
+            config.auto_load_bundle = true
+          end
+        RUBY
+      ]
+    ].each do |description, initializer|
+      context "when #{description}" do
+        before do
+          stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+          stub_layouts(
+            "app/views/layouts/application.html.erb" => <<~ERB
+              <%= react_component("StyledComponent") %>
+              <%= javascript_pack_tag %>
+            ERB
+          )
+          stub_react_on_rails_initializer(initializer)
+        end
+
+        it "fails closed for an unresolved initializer shape" do
+          doctor.send(:check_layout_files)
+
+          expect(checker.warnings?).to be(false)
+        end
+      end
+    end
+
+    context "when unrelated direct initializer assignments surround the static setting" do
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        stub_layouts(
+          "app/views/layouts/application.html.erb" => <<~ERB
+            <%= react_component("StyledComponent") %>
+            <%= javascript_pack_tag %>
+          ERB
+        )
+        stub_react_on_rails_initializer(<<~RUBY)
+          ReactOnRails.configure do |config|
+            config.logging_on_server = false
+            config.auto_load_bundle = true
+            config.prerender_caching = false
+          end
+        RUBY
+      end
+
+      it "still proves the direct global setting" do
+        doctor.send(:check_layout_files)
+
+        expect(checker.warnings?).to be(true)
       end
     end
 
@@ -1484,6 +1604,77 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    {
+      "a false conditional modifier" => "javascript_pack_tag if false",
+      "an arbitrary receiver" => "object.javascript_pack_tag",
+      "a defined check" => "defined?(javascript_pack_tag)",
+      "a short-circuited boolean expression" => "true || javascript_pack_tag",
+      "a local-variable assignment" => "pack_tag = javascript_pack_tag"
+    }.each do |description, javascript_expression|
+      context "when the JavaScript helper appears through #{description}" do
+        before do
+          stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+          stub_layouts(
+            "app/views/layouts/application.html.erb" => <<~ERB
+              <%= react_component("StyledComponent", auto_load_bundle: true) %>
+              <%= #{javascript_expression} %>
+              <%= pack_tag if defined?(pack_tag) %>
+            ERB
+          )
+        end
+
+        it "does not treat ambiguous JavaScript syntax as an active flush" do
+          doctor.send(:check_layout_files)
+
+          expect(checker.warnings?).to be(false)
+        end
+      end
+    end
+
+    context "when a stylesheet helper result flows through a local variable" do
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        stub_layouts(
+          "app/views/layouts/application.html.erb" => <<~ERB
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= css_tag = stylesheet_pack_tag %>
+            <%= css_tag %>
+            <%= javascript_pack_tag %>
+          ERB
+        )
+      end
+
+      it "fails the missing-CSS proof closed" do
+        doctor.send(:check_layout_files)
+
+        expect(checker.warnings?).to be(false)
+      end
+    end
+
+    {
+      "a false conditional" => "stylesheet_pack_tag if false",
+      "an arbitrary receiver" => "object.stylesheet_pack_tag"
+    }.each do |description, stylesheet_expression|
+      context "when the stylesheet helper appears through #{description}" do
+        before do
+          stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+          stub_layouts(
+            "app/views/layouts/application.html.erb" => <<~ERB
+              <%= react_component("StyledComponent", auto_load_bundle: true) %>
+              <%= #{stylesheet_expression} %>
+              <%= javascript_pack_tag %>
+            ERB
+          )
+        end
+
+        it "fails the missing-CSS proof closed on ambiguous stylesheet syntax" do
+          doctor.send(:check_layout_files)
+
+          expect(checker.warnings?).to be(false)
+        end
+      end
+    end
+
     context "when the component's React layout actively flushes both pack queues" do
       before do
         stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
@@ -1534,11 +1725,12 @@ RSpec.describe ReactOnRails::Doctor do
               layout "react_on_rails_default"
 
               def index
+                @hello_world_props = { name: "Stranger", items: [1, true] }
               end
             end
           RUBY
           view: <<~ERB
-            <%= react_component("StyledComponent", props: @props, prerender: false) %>
+            <%= react_component("StyledComponent", props: @hello_world_props, prerender: true) %>
           ERB
         )
         stub_global_auto_load_bundle(true)
@@ -1648,6 +1840,144 @@ RSpec.describe ReactOnRails::Doctor do
         doctor.send(:check_layout_files)
 
         expect(checker.warnings?).to be(false)
+      end
+    end
+
+    [
+      [
+        "the action is redefined",
+        <<~RUBY
+          class HelloWorldController < ApplicationController
+            layout "react_on_rails_default"
+
+            def index
+              @hello_world_props = { name: "First" }
+            end
+
+            def index
+              @hello_world_props = { name: "Second" }
+            end
+          end
+        RUBY
+      ],
+      [
+        "the action body calls a method",
+        <<~RUBY
+          class HelloWorldController < ApplicationController
+            layout "react_on_rails_default"
+
+            def index
+              @hello_world_props = build_props
+            end
+          end
+        RUBY
+      ],
+      [
+        "the action body contains control flow",
+        <<~RUBY
+          class HelloWorldController < ApplicationController
+            layout "react_on_rails_default"
+
+            def index
+              if condition
+                @hello_world_props = { name: "Conditional" }
+              end
+            end
+          end
+        RUBY
+      ],
+      [
+        "remove_method invalidates the action",
+        <<~RUBY
+          class HelloWorldController < ApplicationController
+            layout "react_on_rails_default"
+
+            def index
+            end
+
+            remove_method :index
+          end
+        RUBY
+      ],
+      [
+        "send changes the action visibility",
+        <<~RUBY
+          class HelloWorldController < ApplicationController
+            layout "react_on_rails_default"
+
+            def index
+            end
+
+            send(:private, "index")
+          end
+        RUBY
+      ],
+      [
+        "send performs an explicit render",
+        <<~RUBY
+          class HelloWorldController < ApplicationController
+            layout "react_on_rails_default"
+
+            def index
+              send(:render, :other)
+            end
+          end
+        RUBY
+      ],
+      [
+        "the action is parameterized",
+        <<~RUBY
+          class HelloWorldController < ApplicationController
+            layout "react_on_rails_default"
+
+            def index(id)
+              @hello_world_props = { id: id }
+            end
+          end
+        RUBY
+      ],
+      [
+        "unknown top-level reflection follows the action",
+        <<~RUBY
+          class HelloWorldController < ApplicationController
+            layout "react_on_rails_default"
+
+            def index
+            end
+
+            define_method(:other) { index }
+          end
+        RUBY
+      ],
+      [
+        "a second distinct action is declared",
+        <<~RUBY
+          class HelloWorldController < ApplicationController
+            layout "react_on_rails_default"
+
+            def index
+            end
+
+            def other
+            end
+          end
+        RUBY
+      ]
+    ].each do |description, controller_source|
+      context "when #{description}" do
+        before do
+          stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+          stub_generated_controller_flow(
+            controller: controller_source,
+            view: '<%= react_component("StyledComponent", auto_load_bundle: true) %>'
+          )
+        end
+
+        it "fails closed under the exact generated controller grammar" do
+          doctor.send(:check_layout_files)
+
+          expect(checker.warnings?).to be(false)
+        end
       end
     end
 
