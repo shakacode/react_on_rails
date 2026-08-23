@@ -68,7 +68,7 @@ const redactCredentialsInWebUrls = (value) =>
 
 const canonicalizeRuntimeGeneratedSecret = (value) =>
   String(value).replace(
-    /(^|[ \t`])SECRET_KEY_BASE=\$\(bin\/rails secret\)(?=[ \t]|$)/gm,
+    /(^|[ \t`]|^\/(?:usr\/)?bin\/(?:zsh|bash|sh) -lc ')SECRET_KEY_BASE=\$\(bin\/rails secret\)(?=[ \t]|$)/gm,
     '$1SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>"',
   );
 
