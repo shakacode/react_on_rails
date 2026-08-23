@@ -42,9 +42,12 @@ precisely and compensated as far as a supervised run allows:
   verified against `release.rake` (npm: first publish challenge; RubyGems:
   `resolve_rubygems_otp_for_publish` immediately before the gem pushes).
 - Fail-closed watchdog: the renewal loop runs in a second shell and records
-  the `rake` PID at invocation. On any failed heartbeat or claim renewal it
-  sends `SIGINT` to that PID immediately - the same signal as an operator
-  Ctrl-C. Termination at any point, including mid-write, is recoverable by
+  the `rake` process group at invocation
+  (`RAKE_PGID=$(ps -o pgid= -p <rake pid> | tr -d ' ')`; an interactive
+  foreground job is its own group). On any failed heartbeat or claim renewal
+  it signals the WHOLE group - `kill -INT -- -"$RAKE_PGID"` - matching what a
+  terminal Ctrl-C does; signalling only the Ruby PID would let an in-flight
+  `git`/`pnpm`/`gem` child finish its outward write after lease loss. Termination at any point, including mid-write, is recoverable by
   design (see reconciliation model: a single interrupted write either landed
   or did not, and the resume path covers both). Lease loss therefore stops
   the helper within one renewal interval instead of letting it run on.
@@ -70,21 +73,21 @@ defeat this; do not provision one.
 
 ## Preconditions (verify all, in this order, on the day)
 
-| #   | Precondition                                      | Verify with                                                                                                                                                                                                                                                                                        |
-| --- | ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| P1  | Fresh shell, no legacy selectors                  | `unset AGENT_COORD_BACKEND AGENT_COORD_REF AGENT_COORD_STATE_ROOT AGENT_COORD_STATUS_STATE_ROOT`, then `set -a; . ~/.config/agent-coord/env; set +a`                                                                                                                                               |
-| P2  | Coordination backend reachable                    | `agent-coord doctor --json`: backend `http`, status `ok` (lightweight probe per AGENTS.md; `--deep` is for audit sweeps, not preflight)                                                                                                                                                            |
-| P3  | `release/17.1.0` tip is the intended head         | `git ls-remote origin release/17.1.0` = `0f405eeef...` (re-pin on approval day if the branch moved; any move re-runs CI and the gate)                                                                                                                                                              |
-| P4  | CHANGELOG stamped `### [17.1.0.rc.0]` at that tip | `git show origin/release/17.1.0:CHANGELOG.md \| grep -m1 '### \[17.1.0.rc.0\]'`                                                                                                                                                                                                                    |
-| P5  | Full CI green on the exact tip                    | `gh run list --branch release/17.1.0 --json headSha,conclusion` - all workflows `success` on the tip SHA                                                                                                                                                                                           |
-| P6  | ShakaPerf evidence and tracker exported           | `export RELEASE_SHAKAPERF_RUN=32630294983 RELEASE_TRACKER=4842` (the run selector aborts without `RELEASE_TRACKER`; verified in `release.rake`)                                                                                                                                                    |
-| P7  | Publish ownership on all six packages             | `pnpm owner ls <pkg>` x4 contains `sasha_shakacode`; `gem owner <gem>` x2 contains `sasha@shakacode.com`                                                                                                                                                                                           |
-| P8  | Local registry auth                               | `npm whoami` = `sasha_shakacode` (no pnpm equivalent exists; this is the one npm-CLI exception); RubyGems key in `~/.local/share/gem/credentials` with `push_rubygem`                                                                                                                              |
-| P9  | Pre-run dist-tag snapshot                         | `for p in react-on-rails react-on-rails-pro react-on-rails-pro-node-renderer create-react-on-rails-app; do printf '%s %s\n' "$p" "$(pnpm view "$p" dist-tags.latest)"; done > /tmp/rc0-latest-before.txt` - one `<package> <version>` line each, the exact format the verification matrix consumes |
-| P10 | Local/remote tag parity                           | `comm -23 <(git tag -l \| sort) <(git ls-remote --tags origin \| awk '{print $2}' \| sed 's\|refs/tags/\|\|;s\|\^{}$\|\|' \| sort -u)` prints nothing - W3 runs `git push --tags`, which pushes EVERY local-only tag, so parity confines it to exactly the release tag                             |
-| P11 | Release-line lease held and live                  | runbook claim procedure (fresh UUID) + `require_live_release_line_lease` passes immediately before invocation                                                                                                                                                                                      |
-| P12 | Watchdog loop running (dual renewal + kill)       | second shell: every 300s heartbeat, hourly claim renewal, and on any failure `kill -INT <rake pid>`; the rake PID is recorded the moment the task starts                                                                                                                                           |
-| P13 | Dry run passes on the same head                   | `bundle exec rake "release[17.1.0.rc.0,true]"` completes with the expected file list                                                                                                                                                                                                               |
+| #   | Precondition                                      | Verify with                                                                                                                                                                                                                                                                                                                                                       |
+| --- | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P1  | Fresh shell, no legacy selectors                  | `unset AGENT_COORD_BACKEND AGENT_COORD_REF AGENT_COORD_STATE_ROOT AGENT_COORD_STATUS_STATE_ROOT`, then `set -a; . ~/.config/agent-coord/env; set +a`                                                                                                                                                                                                              |
+| P2  | Coordination backend reachable                    | `agent-coord doctor --json`: backend `http`, status `ok` (lightweight probe per AGENTS.md; `--deep` is for audit sweeps, not preflight)                                                                                                                                                                                                                           |
+| P3  | Remote tip AND local checkout pinned              | `git ls-remote origin release/17.1.0` = `0f405eeef...` AND, in the invoking checkout, `git rev-parse HEAD` equals that same SHA with `git status --porcelain` empty - the task runs `git pull --rebase` then `git push`, so an unpushed local commit would ride into W1 unapproved (re-pin on approval day if the branch moved; any move re-runs CI and the gate) |
+| P4  | CHANGELOG stamped `### [17.1.0.rc.0]` at that tip | `git show origin/release/17.1.0:CHANGELOG.md \| grep -m1 '### \[17.1.0.rc.0\]'`                                                                                                                                                                                                                                                                                   |
+| P5  | Full CI green on the exact tip                    | `gh run list --branch release/17.1.0 --json headSha,conclusion` - all workflows `success` on the tip SHA                                                                                                                                                                                                                                                          |
+| P6  | ShakaPerf evidence and tracker exported           | `export RELEASE_SHAKAPERF_RUN=32630294983 RELEASE_TRACKER=4842` (the run selector aborts without `RELEASE_TRACKER`; verified in `release.rake`)                                                                                                                                                                                                                   |
+| P7  | Publish ownership on all six packages             | `pnpm owner ls <pkg>` x4 contains `sasha_shakacode`; `gem owner <gem>` x2 contains `sasha@shakacode.com`                                                                                                                                                                                                                                                          |
+| P8  | Local registry auth                               | `npm whoami` = `sasha_shakacode` (no pnpm equivalent exists; this is the one npm-CLI exception); RubyGems key in `~/.local/share/gem/credentials` with `push_rubygem`                                                                                                                                                                                             |
+| P9  | Pre-run dist-tag snapshot                         | `for p in react-on-rails react-on-rails-pro react-on-rails-pro-node-renderer create-react-on-rails-app; do printf '%s %s\n' "$p" "$(pnpm view "$p" dist-tags.latest)"; done > /tmp/rc0-latest-before.txt` - one `<package> <version>` line each, the exact format the verification matrix consumes                                                                |
+| P10 | Local/remote tag parity                           | `comm -23 <(git tag -l \| sort) <(git ls-remote --tags origin \| awk '{print $2}' \| sed 's\|refs/tags/\|\|;s\|\^{}$\|\|' \| sort -u)` prints nothing - W3 runs `git push --tags`, which pushes EVERY local-only tag, so parity confines it to exactly the release tag                                                                                            |
+| P11 | Release-line lease held and live                  | runbook claim procedure (fresh UUID) + `require_live_release_line_lease` passes immediately before invocation                                                                                                                                                                                                                                                     |
+| P12 | Watchdog loop running (dual renewal + kill)       | second shell: every 300s heartbeat, hourly claim renewal, and on any failure `kill -INT <rake pid>`; the rake PID is recorded the moment the task starts                                                                                                                                                                                                          |
+| P13 | Dry run passes on the same head                   | `bundle exec rake "release[17.1.0.rc.0,true]"` completes with the expected file list                                                                                                                                                                                                                                                                              |
 
 ## The outward-write ledger
 
@@ -142,9 +145,14 @@ pre-W1 tip that P3/P5 pinned and the ShakaPerf evidence binds to) and
 `BUMP_SHA` (the tip immediately after W1). Resume-mode preconditions replace
 P3/P5/P13:
 
-- the branch tip equals `BUMP_SHA`, and
-  `git diff --name-only BASE_SHA..BUMP_SHA` shows only version and lockfile
-  files (the bump commit and nothing else); abort if anything more moved;
+- the branch tip equals `BUMP_SHA`, `git merge-base --is-ancestor BASE_SHA
+BUMP_SHA` holds, and `git rev-list --count BASE_SHA..BUMP_SHA` equals 1 -
+  exactly the bump commit, a descendant, nothing else;
+- `git diff --name-only BASE_SHA..BUMP_SHA` shows only version and lockfile
+  files, AND the operator reads the full `git show BUMP_SHA` and confirms
+  every hunk is a version-string change before resuming - the name-only check
+  alone cannot prove content, so this eyes-on review is mandatory, and any
+  unexpected hunk is an abort;
 - CI and ShakaPerf evidence remain anchored to `BASE_SHA`: the release task's
   own non-runtime walk-back skips a version-only tip back to the last
   runtime-bearing commit, which is `BASE_SHA`, so no new CI run or evidence
