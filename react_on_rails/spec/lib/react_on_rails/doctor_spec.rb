@@ -1504,6 +1504,27 @@ RSpec.describe ReactOnRails::Doctor do
             end
           end
         RUBY
+      ],
+      [
+        "a reflective configure call follows the direct configure block",
+        <<~RUBY
+          ReactOnRails.configure do |config|
+            config.auto_load_bundle = true
+          end
+
+          ReactOnRails.public_send(:configure) do |other|
+            other.auto_load_bundle = false
+          end
+        RUBY
+      ],
+      [
+        "non-assignment code follows the direct setting assignment",
+        <<~RUBY
+          ReactOnRails.configure do |config|
+            config.auto_load_bundle = true
+            eval("config.auto_load_bundle = false")
+          end
+        RUBY
       ]
     ].each do |description, initializer|
       context "when #{description}" do

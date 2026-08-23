@@ -1641,29 +1641,19 @@ module ReactOnRails
 
     def unique_top_level_configure_block(source)
       source_statements = ripper_statements(source)
-      configure_blocks = source_statements.select { |statement| react_on_rails_configure_block?(statement) }
-      return unless configure_blocks.one?
-      return unless react_on_rails_configure_block_count(source_statements) == 1
+      return unless source_statements.one?
 
-      configure_blocks.first
+      configure_block = source_statements.first
+      configure_block if react_on_rails_configure_block?(configure_block)
     end
 
     def static_direct_config_assignments(block_body, config_name)
       statements = static_body_statements(block_body)
       return unless config_name && statements
+      return unless statements.all? { |statement| direct_config_assignment?(statement, config_name) }
+      return unless ast_identifier_count(block_body, config_name) == statements.length
 
-      direct_assignments = statements.select { |statement| direct_config_assignment?(statement, config_name) }
-      return unless ast_identifier_count(block_body, config_name) == direct_assignments.length
-
-      direct_assignments
-    end
-
-    def react_on_rails_configure_block_count(node)
-      return 0 unless node.is_a?(Array)
-
-      count = react_on_rails_configure_block?(node) ? 1 : 0
-      children = node.first.is_a?(Symbol) ? node.drop(1) : node
-      count + children.sum { |child| react_on_rails_configure_block_count(child) }
+      statements
     end
 
     def ast_identifier_count(node, identifier)
