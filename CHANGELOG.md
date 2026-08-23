@@ -26,6 +26,13 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **Surfaced missing RSC loadable stats in Node Renderer logs**: The first missing
+  `loadable-stats.json` read now emits an actionable `INFO` diagnostic per renderer process while
+  preserving fallback and retry behavior without replaying the server path to the browser. Fixes
+  [Issue 4731](https://github.com/shakacode/react_on_rails/issues/4731).
+  [PR 4918](https://github.com/shakacode/react_on_rails/pull/4918) by
+  [justin808](https://github.com/justin808).
+
 - **[Pro]** **Expected Node Renderer cold starts no longer emit OpenTelemetry error spans**: The
   `ror.bundle.build_execution_context` cache-first probe previously ended with status ERROR when a worker had not
   compiled a bundle's VM context yet, even though the normal cache-miss path then rendered successfully. The probe

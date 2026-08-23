@@ -60,6 +60,24 @@ import {
 import type { CurrentGenerationBundlePathAlias } from './currentGenerationManifest.js';
 
 const readFileAsync = promisify(fs.readFile);
+// The Pro package resolves the host callback through this VM-global key. Keep its test probes in
+// packages/react-on-rails-pro-node-renderer/tests/vm.test.ts and
+// packages/react-on-rails-pro/tests/loadClientChunkStylesheetHrefs.test.ts in sync too.
+// MIRROR VALUES OF: packages/react-on-rails-pro/src/injectRSCPayload.ts
+const LOADABLE_STATS_MISSING_DIAGNOSTIC_CONTEXT_KEY = '__reactOnRailsProReportMissingLoadableStats';
+// MIRROR VALUES END
+// This is process-scoped diagnostic state, not request data: every VM context
+// shares the same host callback and only the first missing-stats event logs.
+let hasReportedMissingLoadableStats = false;
+
+function reportMissingLoadableStats(loadableStatsPath: unknown) {
+  if (hasReportedMissingLoadableStats || typeof loadableStatsPath !== 'string') return;
+
+  hasReportedMissingLoadableStats = true;
+  log.info(
+    `React on Rails Pro could not find ${loadableStatsPath}; RSC stylesheet inference is falling back to streamed preload tags and will retry. Verify that loadable-stats.json is emitted to the server bundle directory.`,
+  );
+}
 
 // Length of the `Module.wrap` prefix that is prepended to the first line of a
 // wrapped bundle. Needed to correct first-line stack-frame columns before
@@ -665,6 +683,14 @@ async function buildVM(filePath: string): Promise<VMContext> {
       if (additionalContextIsObject) {
         extendContext(contextObject, additionalContext);
       }
+      // Install this after every context extension so application configuration
+      // and bundle code cannot redirect the server path into replayed VM console history.
+      Object.defineProperty(contextObject, LOADABLE_STATS_MISSING_DIAGNOSTIC_CONTEXT_KEY, {
+        configurable: false,
+        enumerable: false,
+        value: reportMissingLoadableStats,
+        writable: false,
+      });
       const context = vm.createContext(contextObject);
 
       // Create explicit reference to global context, just in case (some libs can use it):
@@ -1147,6 +1173,7 @@ export function resetVM() {
   vmPoolActivity.hardLimitEvictions = 0;
   vmPoolActivity.drainedContextRetirements = 0;
   lastPressureWarningAt = undefined;
+  hasReportedMissingLoadableStats = false;
   vmPoolClock = defaultVMPoolClock;
   activeSourceMapRequestCounts.clear();
   evictedSourceMapRegistrations.clear();

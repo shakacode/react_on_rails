@@ -20,7 +20,9 @@ import { Readable } from 'stream';
 import { types as utilTypes } from 'util';
 import {
   uploadedBundlePath,
+  uploadedSecondaryBundlePath,
   createUploadedBundle,
+  createUploadedSecondaryBundle,
   readRenderingRequest,
   createVmBundle,
   mkdirAsync,
@@ -46,8 +48,13 @@ import * as errorReporter from '../src/shared/errorReporter';
 
 const testName = 'vm';
 const uploadedBundlePathForTest = () => uploadedBundlePath(testName);
+const uploadedSecondaryBundlePathForTest = () => uploadedSecondaryBundlePath(testName);
 const createUploadedBundleForTest = () => createUploadedBundle(testName);
+const createUploadedSecondaryBundleForTest = () => createUploadedSecondaryBundle(testName);
 const createVmBundleForTest = () => createVmBundle(testName);
+// Test probe for the cross-package contract defined in src/worker/vm.ts and
+// packages/react-on-rails-pro/src/injectRSCPayload.ts; keep the corresponding Pro test probe in sync.
+const LOADABLE_STATS_MISSING_DIAGNOSTIC_CONTEXT_KEY = '__reactOnRailsProReportMissingLoadableStats';
 
 describe('buildVM and runInVM', () => {
   beforeEach(async () => {
@@ -102,6 +109,137 @@ describe('buildVM and runInVM', () => {
 
       result = await runInVM('typeof performance.now === "function"', uploadedBundlePathForTest());
       expect(result).toBe('true');
+    });
+  });
+
+  describe('host diagnostics', () => {
+    test('protects the missing-stats diagnostic from context and bundle overrides', async () => {
+      getConfig().supportModules = false;
+      const additionalContextDiagnostic = jest.fn(() => {
+        throw new Error('additionalContext diagnostic should not run');
+      });
+      getConfig().additionalContext = {
+        [LOADABLE_STATS_MISSING_DIAGNOSTIC_CONTEXT_KEY]: additionalContextDiagnostic,
+      };
+      const infoSpy = jest.spyOn(log, 'info').mockImplementation(() => undefined);
+      await createUploadedBundleForTest();
+      const executionContext = await buildExecutionContext(
+        [uploadedBundlePathForTest()],
+        /* buildVmsIfNeeded */ true,
+      );
+      const missingLoadableStatsPath = '/srv/app/public/packs/loadable-stats.json';
+
+      expect(
+        await executionContext.runInVM(
+          `(() => {
+            const descriptor = Object.getOwnPropertyDescriptor(
+              globalThis,
+              ${JSON.stringify(LOADABLE_STATS_MISSING_DIAGNOSTIC_CONTEXT_KEY)},
+            );
+            const replaced = Reflect.set(
+              globalThis,
+              ${JSON.stringify(LOADABLE_STATS_MISSING_DIAGNOSTIC_CONTEXT_KEY)},
+              (value) => console.info(value),
+            );
+            return {
+              configurable: descriptor.configurable,
+              enumerable: descriptor.enumerable,
+              replaced,
+              writable: descriptor.writable,
+            };
+          })()`,
+          uploadedBundlePathForTest(),
+        ),
+      ).toBe(JSON.stringify({ configurable: false, enumerable: false, replaced: false, writable: false }));
+
+      expect(
+        await executionContext.runInVM(
+          `(() => {
+            ${LOADABLE_STATS_MISSING_DIAGNOSTIC_CONTEXT_KEY}(${JSON.stringify(missingLoadableStatsPath)});
+            return 'fallback-continues';
+          })()`,
+          uploadedBundlePathForTest(),
+        ),
+      ).toBe('fallback-continues');
+
+      expect(additionalContextDiagnostic).not.toHaveBeenCalled();
+      expect(infoSpy).toHaveBeenCalledWith(expect.stringContaining(missingLoadableStatsPath));
+      expect(
+        executionContext.getVMContext(uploadedBundlePathForTest()).sharedConsoleHistory.getConsoleHistory(),
+      ).toEqual([]);
+    });
+
+    test('reports missing loadable-stats at the default log level without console replay', async () => {
+      getConfig().supportModules = false;
+      const infoSpy = jest.spyOn(log, 'info').mockImplementation(() => undefined);
+      await createUploadedBundleForTest();
+      const executionContext = await buildExecutionContext(
+        [uploadedBundlePathForTest()],
+        /* buildVmsIfNeeded */ true,
+      );
+      const missingLoadableStatsPath = '/srv/app/public/packs/loadable-stats.json';
+
+      expect(
+        await executionContext.runInVM(
+          `typeof ${LOADABLE_STATS_MISSING_DIAGNOSTIC_CONTEXT_KEY}`,
+          uploadedBundlePathForTest(),
+        ),
+      ).toBe('function');
+      await executionContext.runInVM(
+        `${LOADABLE_STATS_MISSING_DIAGNOSTIC_CONTEXT_KEY}(${JSON.stringify(missingLoadableStatsPath)})`,
+        uploadedBundlePathForTest(),
+      );
+
+      expect(infoSpy).toHaveBeenCalledWith(expect.stringContaining(missingLoadableStatsPath));
+      expect(infoSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Verify that loadable-stats.json is emitted to the server bundle directory'),
+      );
+      expect(
+        executionContext.getVMContext(uploadedBundlePathForTest()).sharedConsoleHistory.getConsoleHistory(),
+      ).toEqual([]);
+    });
+
+    test('reports only once across VM contexts until resetVM restores test isolation', async () => {
+      getConfig().supportModules = false;
+      const infoSpy = jest.spyOn(log, 'info').mockImplementation(() => undefined);
+      await Promise.all([createUploadedBundleForTest(), createUploadedSecondaryBundleForTest()]);
+      const firstExecutionContext = await buildExecutionContext(
+        [uploadedBundlePathForTest()],
+        /* buildVmsIfNeeded */ true,
+      );
+      const secondExecutionContext = await buildExecutionContext(
+        [uploadedSecondaryBundlePathForTest()],
+        /* buildVmsIfNeeded */ true,
+      );
+      const invokeDiagnostic = (bundlePath: string) =>
+        `${LOADABLE_STATS_MISSING_DIAGNOSTIC_CONTEXT_KEY}(${JSON.stringify(`${bundlePath}/loadable-stats.json`)})`;
+
+      await firstExecutionContext.runInVM(
+        invokeDiagnostic(uploadedBundlePathForTest()),
+        uploadedBundlePathForTest(),
+      );
+      await firstExecutionContext.runInVM(
+        invokeDiagnostic(uploadedBundlePathForTest()),
+        uploadedBundlePathForTest(),
+      );
+      await secondExecutionContext.runInVM(
+        invokeDiagnostic(uploadedSecondaryBundlePathForTest()),
+        uploadedSecondaryBundlePathForTest(),
+      );
+
+      expect(infoSpy).toHaveBeenCalledTimes(1);
+
+      resetVM();
+      const resetExecutionContext = await buildExecutionContext(
+        [uploadedBundlePathForTest()],
+        /* buildVmsIfNeeded */ true,
+      );
+      await resetExecutionContext.runInVM(
+        invokeDiagnostic(uploadedBundlePathForTest()),
+        uploadedBundlePathForTest(),
+      );
+
+      expect(infoSpy).toHaveBeenCalledTimes(2);
     });
   });
 
