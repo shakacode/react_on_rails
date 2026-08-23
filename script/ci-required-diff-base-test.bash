@@ -1,14 +1,11 @@
 #!/usr/bin/env bash
-# Test harness for the diff-base selection in the "Run changed-files detector"
-# step of .github/workflows/ci-required.yml.
+# Test harness for script/ci-required-diff-base.
 #
 # Run: bash script/ci-required-diff-base-test.bash
 # CI invokes it from the "Run CI gate tests" step of the same workflow.
 #
-# The step body is extracted from the committed workflow with a YAML parser and
-# executed against a synthetic repository, so the logic under test is exactly the
-# logic that ships. That matters because this branching decides which suites run
-# for every PR, and it lives inline in YAML rather than in script/.
+# The real script is executed against a synthetic repository, so the logic under
+# test is exactly the logic that ships.
 #
 # script/ci-changes-detector is stubbed here. Its own behavior is covered by
 # script/ci-changes-detector-test.bash; what this harness pins down is which base
@@ -22,7 +19,7 @@ set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-WORKFLOW="$REPO_ROOT/.github/workflows/ci-required.yml"
+DIFF_BASE_SCRIPT="$REPO_ROOT/script/ci-required-diff-base"
 
 TESTS_RUN=0
 TESTS_FAILED=0
@@ -75,19 +72,10 @@ cleanup() {
 }
 trap cleanup EXIT
 
-STEP="$WORKDIR/step.sh"
 REPO="$WORKDIR/repo"
 
-# Extract the step body. A rename of the step name is a real breakage of this
-# harness, so fail loudly rather than silently testing nothing.
-if ! ruby -ryaml -e '
-  workflow = YAML.safe_load_file(ARGV[0], permitted_classes: [], aliases: false)
-  steps = workflow.fetch("jobs").fetch("required-pr-gate").fetch("steps")
-  step = steps.find { |candidate| candidate["name"] == "Run changed-files detector" }
-  abort "step \"Run changed-files detector\" not found in #{ARGV[0]}" if step.nil?
-  File.write(ARGV[1], step.fetch("run"))
-' "$WORKFLOW" "$STEP"; then
-  echo "FAIL: could not extract the step body from $WORKFLOW" >&2
+if [ ! -x "$DIFF_BASE_SCRIPT" ]; then
+  echo "FAIL: executable diff-base script not found at $DIFF_BASE_SCRIPT" >&2
   exit 1
 fi
 
@@ -184,7 +172,7 @@ run_case() {
       PULL_REQUEST_BASE_SHA="$dispatch_base_sha" \
       PULL_REQUEST_HEAD_SHA="$pr_head_sha" \
       EVENT_BASE_REF="$event_base_ref" \
-      bash --noprofile --norc -eo pipefail "$STEP" 2>&1
+      bash --noprofile --norc -eo pipefail "$DIFF_BASE_SCRIPT" 2>&1
   )"
   LAST_RC=$?
 }
@@ -257,18 +245,6 @@ printed_files="$(printf '%s\n' "$LAST_OUTPUT" | grep -c "bigdir/${long_name}-")"
 if [ "$printed_files" -ne 50 ]; then
   fail "large changed-file list: expected 50 printed paths, got $printed_files"
 fi
-
-# NOT COVERED HERE: the `|| { echo ::error::; exit 1; }` guard on the
-# changed_files assignment. Exercising it needs a git that fails only on
-# `diff --name-only`, and injecting one via PATH does not survive into the child
-# shell in every developer environment, so a case for it would pass or fail for
-# reasons unrelated to the guard.
-#
-# The stakes are lower than they look: `set -e` aborts on a failed command
-# substitution in a plain assignment on its own, so the guard supplies a better
-# message rather than the only failure. Tracked with the extraction work in
-# #4824, where the logic moves into script/ and the guard becomes directly
-# callable.
 
 echo
 if [ "$TESTS_FAILED" -ne 0 ]; then
