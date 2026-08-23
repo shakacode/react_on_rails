@@ -31,17 +31,21 @@ precisely and compensated as far as a supervised run allows:
 - One operator, one fresh UUID coordinator identity, one claim on
   `release-line:17.1.0` acquired via the runbook procedure, verified with
   `require_live_release_line_lease` immediately before invocation.
-- Heartbeat refreshed **every 5 minutes** (the runbook's own floor; TTL 900)
-  by a background loop for the entire run.
+- Dual renewal per the runbook: heartbeat refreshed **every 5 minutes** (TTL 900) and the claim itself renewed **at least hourly** with the bounded
+  `claim` command, both by one background loop for the entire run.
 - Two interactive OTP prompts act as mid-run manual fences: before entering
   the npm OTP (W4 boundary) and before entering the RubyGems OTP (W8
   boundary), the operator re-runs `require_live_release_line_lease` in a
   second shell and types the code only on a pass. Both prompt positions are
   verified against `release.rake` (npm: first publish challenge; RubyGems:
   `resolve_rubygems_otp_for_publish` immediately before the gem pushes).
-- Fail-closed heartbeat rule: if any refresh fails or the loop dies, the
-  operator interrupts the task before the next OTP entry. Interruption
-  between writes is recoverable by design (see reconciliation model).
+- Fail-closed watchdog: the renewal loop runs in a second shell and records
+  the `rake` PID at invocation. On any failed heartbeat or claim renewal it
+  sends `SIGINT` to that PID immediately - the same signal as an operator
+  Ctrl-C. Termination at any point, including mid-write, is recoverable by
+  design (see reconciliation model: a single interrupted write either landed
+  or did not, and the resume path covers both). Lease loss therefore stops
+  the helper within one renewal interval instead of letting it run on.
 
 **Residual unfenced windows (the exception being approved):**
 
@@ -51,46 +55,52 @@ precisely and compensated as far as a supervised run allows:
 - R3: W8 through W9 (two gem pushes) after the RubyGems OTP is entered.
 - R4: W10 (GitHub release) after W9.
 
-Within these windows a lease loss would not stop the helper. The compensating
-control is organizational: the only other credentialed writer on this backend
-is the approving maintainer, and approval of this plan includes not writing to
-`release-line:17.1.0` during the announced execution window. A second
-credential provisioned mid-window would defeat this; do not provision one.
+Within these windows there is no interactive pause, so ownership is not
+re-checked between consecutive writes; the watchdog bounds a lease loss to
+one renewal interval (at most 5 minutes) rather than eliminating the window.
+If the watchdog itself dies, that residual case is covered only by the
+organizational control below and by A4 - it is an accepted exception, not a
+fail-closed guarantee. The organizational control: the only other
+credentialed writer on this backend is the approving maintainer, and approval
+of this plan includes not writing to `release-line:17.1.0` during the
+announced execution window. A second credential provisioned mid-window would
+defeat this; do not provision one.
 
 ## Preconditions (verify all, in this order, on the day)
 
-| #   | Precondition                                      | Verify with                                                                                                                                                           |
-| --- | ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| P1  | Fresh shell, no legacy selectors                  | `unset AGENT_COORD_BACKEND AGENT_COORD_REF AGENT_COORD_STATE_ROOT AGENT_COORD_STATUS_STATE_ROOT`, then `set -a; . ~/.config/agent-coord/env; set +a`                  |
-| P2  | Coordination backend reachable                    | `agent-coord doctor --json`: backend `http`, status `ok` (lightweight probe per AGENTS.md; `--deep` is for audit sweeps, not preflight)                               |
-| P3  | `release/17.1.0` tip is the intended head         | `git ls-remote origin release/17.1.0` = `0f405eeef...` (re-pin on approval day if the branch moved; any move re-runs CI and the gate)                                 |
-| P4  | CHANGELOG stamped `### [17.1.0.rc.0]` at that tip | `git show origin/release/17.1.0:CHANGELOG.md \| grep -m1 '### \[17.1.0.rc.0\]'`                                                                                       |
-| P5  | Full CI green on the exact tip                    | `gh run list --branch release/17.1.0 --json headSha,conclusion` - all workflows `success` on the tip SHA                                                              |
-| P6  | ShakaPerf evidence and tracker exported           | `export RELEASE_SHAKAPERF_RUN=32630294983 RELEASE_TRACKER=4842` (the run selector aborts without `RELEASE_TRACKER`; verified in `release.rake`)                       |
-| P7  | Publish ownership on all six packages             | `pnpm owner ls <pkg>` x4 contains `sasha_shakacode`; `gem owner <gem>` x2 contains `sasha@shakacode.com`                                                              |
-| P8  | Local registry auth                               | `npm whoami` = `sasha_shakacode` (no pnpm equivalent exists; this is the one npm-CLI exception); RubyGems key in `~/.local/share/gem/credentials` with `push_rubygem` |
-| P9  | Pre-run dist-tag snapshot                         | for each of the four npm packages: record `pnpm view <pkg> dist-tags.latest` to `/tmp/rc0-latest-before.txt` (asserted unchanged post-run)                            |
-| P10 | Release-line lease held and live                  | runbook claim procedure (fresh UUID) + `require_live_release_line_lease` passes immediately before invocation                                                         |
-| P11 | Background heartbeater running, 5-minute cadence  | refresh loop every 300s, TTL 900; loop failure triggers the fail-closed rule above                                                                                    |
-| P12 | Dry run passes on the same head                   | `bundle exec rake "release[17.1.0.rc.0,true]"` completes with the expected file list                                                                                  |
+| #   | Precondition                                      | Verify with                                                                                                                                                                                                                                                                                        |
+| --- | ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P1  | Fresh shell, no legacy selectors                  | `unset AGENT_COORD_BACKEND AGENT_COORD_REF AGENT_COORD_STATE_ROOT AGENT_COORD_STATUS_STATE_ROOT`, then `set -a; . ~/.config/agent-coord/env; set +a`                                                                                                                                               |
+| P2  | Coordination backend reachable                    | `agent-coord doctor --json`: backend `http`, status `ok` (lightweight probe per AGENTS.md; `--deep` is for audit sweeps, not preflight)                                                                                                                                                            |
+| P3  | `release/17.1.0` tip is the intended head         | `git ls-remote origin release/17.1.0` = `0f405eeef...` (re-pin on approval day if the branch moved; any move re-runs CI and the gate)                                                                                                                                                              |
+| P4  | CHANGELOG stamped `### [17.1.0.rc.0]` at that tip | `git show origin/release/17.1.0:CHANGELOG.md \| grep -m1 '### \[17.1.0.rc.0\]'`                                                                                                                                                                                                                    |
+| P5  | Full CI green on the exact tip                    | `gh run list --branch release/17.1.0 --json headSha,conclusion` - all workflows `success` on the tip SHA                                                                                                                                                                                           |
+| P6  | ShakaPerf evidence and tracker exported           | `export RELEASE_SHAKAPERF_RUN=32630294983 RELEASE_TRACKER=4842` (the run selector aborts without `RELEASE_TRACKER`; verified in `release.rake`)                                                                                                                                                    |
+| P7  | Publish ownership on all six packages             | `pnpm owner ls <pkg>` x4 contains `sasha_shakacode`; `gem owner <gem>` x2 contains `sasha@shakacode.com`                                                                                                                                                                                           |
+| P8  | Local registry auth                               | `npm whoami` = `sasha_shakacode` (no pnpm equivalent exists; this is the one npm-CLI exception); RubyGems key in `~/.local/share/gem/credentials` with `push_rubygem`                                                                                                                              |
+| P9  | Pre-run dist-tag snapshot                         | `for p in react-on-rails react-on-rails-pro react-on-rails-pro-node-renderer create-react-on-rails-app; do printf '%s %s\n' "$p" "$(pnpm view "$p" dist-tags.latest)"; done > /tmp/rc0-latest-before.txt` - one `<package> <version>` line each, the exact format the verification matrix consumes |
+| P10 | Local/remote tag parity                           | `comm -23 <(git tag -l \| sort) <(git ls-remote --tags origin \| awk '{print $2}' \| sed 's\|refs/tags/\|\|;s\|\^{}$\|\|' \| sort -u)` prints nothing - W3 runs `git push --tags`, which pushes EVERY local-only tag, so parity confines it to exactly the release tag                             |
+| P11 | Release-line lease held and live                  | runbook claim procedure (fresh UUID) + `require_live_release_line_lease` passes immediately before invocation                                                                                                                                                                                      |
+| P12 | Watchdog loop running (dual renewal + kill)       | second shell: every 300s heartbeat, hourly claim renewal, and on any failure `kill -INT <rake pid>`; the rake PID is recorded the moment the task starts                                                                                                                                           |
+| P13 | Dry run passes on the same head                   | `bundle exec rake "release[17.1.0.rc.0,true]"` completes with the expected file list                                                                                                                                                                                                               |
 
 ## The outward-write ledger
 
 `rake release` performs, in order (anchored to `release.rake` as of
 2026-08-23; re-anchor if the file changes):
 
-| W   | Write                                                      | Where                                                               | Idempotent on re-run?                                                                                       |
-| --- | ---------------------------------------------------------- | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| W1  | version-bump commit push to `release/17.1.0`               | `git push` (~10093)                                                 | yes - "No version changes to commit" path skips a done bump                                                 |
-| W2  | evidence comment on tracker issue #4842                    | `post_release_tracker_comment!` via the ShakaPerf gate verification | re-run posts a duplicate comment; harmless, note it in the announcement                                     |
-| W3  | tag `v17.1.0.rc.0` push                                    | `git push --tags` (~5393), behind tag-authorization and guards      | guarded - a matching tag at head is retry-safe; a tag at the WRONG sha aborts (see A2)                      |
-| W4  | npm publish `react-on-rails@17.1.0-rc.0`                   | `publish_npm_with_retry`                                            | yes, once W3 exists (tag-at-head flips `idempotent_publish_retry`)                                          |
-| W5  | npm publish `react-on-rails-pro@17.1.0-rc.0`               | same                                                                | same                                                                                                        |
-| W6  | npm publish `react-on-rails-pro-node-renderer@17.1.0-rc.0` | same                                                                | same                                                                                                        |
-| W7  | npm publish `create-react-on-rails-app@17.1.0-rc.0`        | same                                                                | same                                                                                                        |
-| W8  | gem push `react_on_rails 17.1.0.rc.0`                      | `publish_gem_with_retry`                                            | same                                                                                                        |
-| W9  | gem push `react_on_rails_pro 17.1.0.rc.0`                  | same                                                                | same                                                                                                        |
-| W10 | GitHub release for `v17.1.0.rc.0` from CHANGELOG           | `sync_github_release_after_publish`                                 | yes - `rake "sync_github_release[17.1.0.rc.0]"` is standalone and documented for already-published versions |
+| W   | Write                                                      | Where                                                               | Idempotent on re-run?                                                                                                                                                      |
+| --- | ---------------------------------------------------------- | ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| W1  | version-bump commit push to `release/17.1.0`               | `git push` (~10093)                                                 | yes - "No version changes to commit" path skips a done bump                                                                                                                |
+| W2  | evidence comment on tracker issue #4842                    | `post_release_tracker_comment!` via the ShakaPerf gate verification | re-run posts a duplicate comment; harmless, note it in the announcement                                                                                                    |
+| W3  | tag `v17.1.0.rc.0` push                                    | `git push --tags` (~5393), behind tag-authorization and guards      | guarded - a matching tag at head is retry-safe; a tag at the WRONG sha aborts (see A2). `--tags` pushes every local tag, so P10 parity is what confines W3 to this one tag |
+| W4  | npm publish `react-on-rails@17.1.0-rc.0`                   | `publish_npm_with_retry`                                            | yes, once W3 exists (tag-at-head flips `idempotent_publish_retry`)                                                                                                         |
+| W5  | npm publish `react-on-rails-pro@17.1.0-rc.0`               | same                                                                | same                                                                                                                                                                       |
+| W6  | npm publish `react-on-rails-pro-node-renderer@17.1.0-rc.0` | same                                                                | same                                                                                                                                                                       |
+| W7  | npm publish `create-react-on-rails-app@17.1.0-rc.0`        | same                                                                | same                                                                                                                                                                       |
+| W8  | gem push `react_on_rails 17.1.0.rc.0`                      | `publish_gem_with_retry`                                            | same                                                                                                                                                                       |
+| W9  | gem push `react_on_rails_pro 17.1.0.rc.0`                  | same                                                                | same                                                                                                                                                                       |
+| W10 | GitHub release for `v17.1.0.rc.0` from CHANGELOG           | `sync_github_release_after_publish`                                 | yes - `rake "sync_github_release[17.1.0.rc.0]"` is standalone and documented for already-published versions                                                                |
 
 Blast-radius note: the npm dist-tag for `17.1.0-rc.0` resolves to `rc`
 (`npm_dist_tag_for_version`), so no rc publication moves `latest`. The gems
@@ -123,7 +133,7 @@ remote at the current head. Therefore:
   mid-W4-W9 crash; resume through the task.
 
 Re-run rule: the resume MUST use the same branch, same head, and a live lease
-(P10) re-verified immediately before invocation, same as the first attempt.
+(P11) re-verified immediately before invocation, same as the first attempt.
 
 ## Post-run verification matrix (hard assertions; all must pass before the lease is released)
 
@@ -157,10 +167,11 @@ announce (tracker #4842, Leslie, forward-port per runbook step 3).
   than the candidate. Never delete or move a pushed tag.
 - **A3:** `require_live_release_line_lease` fails at any fence (pre-invocation
   or either OTP boundary) and one heartbeat refresh does not restore it.
-- **A4:** the heartbeater dies or misses a refresh and the run has passed the
-  last OTP boundary (no remaining safe interrupt point): let the task finish,
-  then treat the whole run as unverified and go straight to the verification
-  matrix; do not start any other release-line write.
+- **A4:** the watchdog itself dies or fails to deliver the kill while the
+  task is past the last OTP boundary: let the task finish, treat the whole
+  run as unverified, go straight to the verification matrix, and start no
+  other release-line write. This is the one residual case the plan cannot
+  fail-close; it is part of the approved exception.
 - **A5:** any gate (CI status, ShakaPerf boundary, authorization digest)
   aborts inside the task. Overrides (`override_ci_status` etc.) are out of
   scope for this plan and require a separate maintainer decision.
