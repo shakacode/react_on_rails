@@ -1306,6 +1306,72 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when react_component_hash auto-loads CSS from its documented assignment form" do
+      before do
+        stub_manifest_stylesheets("generated/HelmetComponent", ["/packs/generated/HelmetComponent-a1b2c3.css"])
+        stub_layouts(
+          "app/views/layouts/application.html.erb" => <<~ERB
+            <% helmet_data = react_component_hash("HelmetComponent", props: @props, auto_load_bundle: true) %>
+            <%= helmet_data["componentHtml"] %>
+            <%= javascript_pack_tag %>
+          ERB
+        )
+      end
+
+      it "warns for the statically proven hash component entrypoint" do
+        doctor.send(:check_layout_files)
+
+        expect(checker.messages).to include(
+          hash_including(
+            type: :warning,
+            content: a_string_including(
+              "generated/HelmetComponent",
+              "/packs/generated/HelmetComponent-a1b2c3.css"
+            )
+          )
+        )
+      end
+    end
+
+    context "when react_component_hash is a direct output helper call" do
+      before do
+        stub_manifest_stylesheets("generated/HelmetComponent", ["/packs/generated/HelmetComponent-a1b2c3.css"])
+        stub_layouts(
+          "app/views/layouts/application.html.erb" => <<~ERB
+            <%= react_component_hash("HelmetComponent", auto_load_bundle: true) %>
+            <%= javascript_pack_tag %>
+          ERB
+        )
+      end
+
+      it "warns for the exact direct helper AST" do
+        doctor.send(:check_layout_files)
+
+        expect(checker.messages).to include(
+          hash_including(type: :warning, content: a_string_including("generated/HelmetComponent"))
+        )
+      end
+    end
+
+    context "when react_component_hash appears only as data or a dynamic dispatch target" do
+      before do
+        stub_manifest_stylesheets("generated/HelmetComponent", ["/packs/generated/HelmetComponent-a1b2c3.css"])
+        stub_layouts(
+          "app/views/layouts/application.html.erb" => <<~ERB
+            <% helper_name = "react_component_hash" %>
+            <%= public_send(helper_name, "HelmetComponent", auto_load_bundle: true) %>
+            <%= javascript_pack_tag %>
+          ERB
+        )
+      end
+
+      it "does not infer a component from helper-name text" do
+        doctor.send(:check_layout_files)
+
+        expect(checker.warnings?).to be(false)
+      end
+    end
+
     context "when component-level auto_load_bundle is explicitly false while the global setting is true" do
       before do
         stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
@@ -1574,6 +1640,31 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when another generated configure assignment has a dynamic RHS" do
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        stub_layouts(
+          "app/views/layouts/application.html.erb" => <<~ERB
+            <%= react_component("StyledComponent") %>
+            <%= javascript_pack_tag %>
+          ERB
+        )
+        stub_react_on_rails_initializer(<<~RUBY)
+          ReactOnRails.configure do |config|
+            config.server_bundle_js_file = resolve_server_bundle
+            config.auto_load_bundle = true
+            config.components_subdirectory = "ror_components"
+          end
+        RUBY
+      end
+
+      it "fails closed instead of evaluating the block as static configuration" do
+        doctor.send(:check_layout_files)
+
+        expect(checker.warnings?).to be(false)
+      end
+    end
+
     context "when auto_load_bundle appears only inside component props" do
       before do
         stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
@@ -1604,6 +1695,26 @@ RSpec.describe ReactOnRails::Doctor do
       end
 
       it "fails closed" do
+        doctor.send(:check_layout_files)
+
+        expect(checker.warnings?).to be(false)
+      end
+    end
+
+    context "when separate ERB control tags make the component conditional" do
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        stub_layouts(
+          "app/views/layouts/application.html.erb" => <<~ERB
+            <% if show_component? %>
+              <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <% end %>
+            <%= javascript_pack_tag %>
+          ERB
+        )
+      end
+
+      it "fails closed instead of inferring that the component is reachable" do
         doctor.send(:check_layout_files)
 
         expect(checker.warnings?).to be(false)
@@ -1669,12 +1780,33 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when javascript_pack_tag is nested in an eagerly evaluated helper argument" do
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        stub_layouts(
+          "app/views/layouts/application.html.erb" => <<~ERB
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= safe_join([javascript_pack_tag]) %>
+          ERB
+        )
+      end
+
+      it "recognizes the nested JavaScript call as a proven flush" do
+        doctor.send(:check_layout_files)
+
+        expect(checker.messages).to include(
+          hash_including(type: :warning, content: a_string_including("generated/StyledComponent"))
+        )
+      end
+    end
+
     {
       "a false conditional modifier" => "javascript_pack_tag if false",
       "an arbitrary receiver" => "object.javascript_pack_tag",
       "a defined check" => "defined?(javascript_pack_tag)",
       "a short-circuited boolean expression" => "true || javascript_pack_tag",
-      "a local-variable assignment" => "pack_tag = javascript_pack_tag"
+      "a local-variable assignment" => "pack_tag = javascript_pack_tag",
+      "dynamic reflective dispatch" => "public_send(pack_helper_name)"
     }.each do |description, javascript_expression|
       context "when the JavaScript helper appears through #{description}" do
         before do
@@ -1764,6 +1896,29 @@ RSpec.describe ReactOnRails::Doctor do
 
           expect(checker.warnings?).to be(false)
         end
+      end
+    end
+
+    context "when helper-name data and unrelated reflection do not call the stylesheet helper" do
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        stub_layouts(
+          "app/views/layouts/application.html.erb" => <<~ERB
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <% helper_name = "stylesheet_pack_tag" %>
+            <% helper_symbol = :stylesheet_pack_tag %>
+            <%= public_send(:content_tag, :div, helper_name) %>
+            <%= javascript_pack_tag %>
+          ERB
+        )
+      end
+
+      it "warns because static data and an unrelated call are not CSS flush evidence" do
+        doctor.send(:check_layout_files)
+
+        expect(checker.messages).to include(
+          hash_including(type: :warning, content: a_string_including("generated/StyledComponent"))
+        )
       end
     end
 
@@ -2398,6 +2553,38 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when the manifest CSS list uses Shakapacker SRI asset objects" do
+      before do
+        stub_manifest_stylesheets(
+          "generated/StyledComponent",
+          [
+            { "src" => "/packs/generated/StyledComponent-a1b2c3.css", "integrity" => "sha384-first" },
+            { "src" => "/packs/generated/StyledComponent-d4e5f6.css", "integrity" => "sha384-second" }
+          ]
+        )
+        stub_layouts(
+          "app/views/layouts/application.html.erb" => <<~ERB
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= javascript_pack_tag %>
+          ERB
+        )
+      end
+
+      it "warns with the normalized stylesheet asset paths" do
+        doctor.send(:check_layout_files)
+
+        expect(checker.messages).to include(
+          hash_including(
+            type: :warning,
+            content: a_string_including(
+              "/packs/generated/StyledComponent-a1b2c3.css",
+              "/packs/generated/StyledComponent-d4e5f6.css"
+            )
+          )
+        )
+      end
+    end
+
     context "when the manifest CSS list contains a malformed asset value" do
       before do
         stub_manifest_stylesheets(
@@ -2416,6 +2603,33 @@ RSpec.describe ReactOnRails::Doctor do
         doctor.send(:check_layout_files)
 
         expect(checker.warnings?).to be(false)
+      end
+    end
+
+    {
+      "an SRI object with an empty src" => [{ "src" => "", "integrity" => "sha384-empty" }],
+      "an SRI object without src" => [{ "integrity" => "sha384-missing" }],
+      "a valid SRI object mixed with a malformed entry" => [
+        { "src" => "/packs/generated/StyledComponent-a1b2c3.css", "integrity" => "sha384-valid" },
+        { "src" => nil, "integrity" => "sha384-invalid" }
+      ]
+    }.each do |description, stylesheets|
+      context "when the manifest CSS list contains #{description}" do
+        before do
+          stub_manifest_stylesheets("generated/StyledComponent", stylesheets)
+          stub_layouts(
+            "app/views/layouts/application.html.erb" => <<~ERB
+              <%= react_component("StyledComponent", auto_load_bundle: true) %>
+              <%= javascript_pack_tag %>
+            ERB
+          )
+        end
+
+        it "fails closed for the entire stylesheet list" do
+          doctor.send(:check_layout_files)
+
+          expect(checker.warnings?).to be(false)
+        end
       end
     end
 
