@@ -1305,24 +1305,25 @@ module ReactOnRails
     end
 
     def stylesheet_pack_ambiguity_evidence?(content)
-      stylesheet_pack_output_ambiguity_evidence?(content) ||
+      ignored_bare_local = "stylesheet_pack_tag" if erb_local_binding?(content, "stylesheet_pack_tag")
+      stylesheet_pack_output_ambiguity_evidence?(content, ignored_bare_local:) ||
         content.scan(ERB_NON_OUTPUT_EXPRESSION_PATTERN).any? do |(expression)|
           statements = ripper_statements(expression)
           next false if statements.one? &&
                         discarded_top_level_helper_call?(statements.first, "stylesheet_pack_tag")
 
-          statements.any? { |statement| helper_call_context_evidence?(statement, "stylesheet_pack_tag") }
+          statements.any? do |statement|
+            helper_call_context_evidence?(statement, "stylesheet_pack_tag", ignored_bare_local:)
+          end
         end
     end
 
-    def stylesheet_pack_output_ambiguity_evidence?(content)
-      unqualified_call_ambiguous = erb_local_binding?(content, "stylesheet_pack_tag")
+    def stylesheet_pack_output_ambiguity_evidence?(content, ignored_bare_local: nil)
       content.scan(ERB_OUTPUT_EXPRESSION_PATTERN).any? do |(expression)|
         statements = ripper_statements(expression)
-        next false if unqualified_call_ambiguous && statements.one? &&
-                      direct_unqualified_helper_call?(statements.first, "stylesheet_pack_tag")
-
-        statements.any? { |statement| helper_call_context_evidence?(statement, "stylesheet_pack_tag") }
+        statements.any? do |statement|
+          helper_call_context_evidence?(statement, "stylesheet_pack_tag", ignored_bare_local:)
+        end
       end
     end
 
@@ -1498,8 +1499,9 @@ module ReactOnRails
     def emitted_top_level_helper_call?(node, helper_name, unqualified_call_ambiguous: false)
       return true if direct_self_helper_call?(node, helper_name)
       return true if parenthesized_self_javascript_helper_call?(node, helper_name)
+      return false if unqualified_call_ambiguous && bare_unqualified_helper_vcall?(node, helper_name)
 
-      !unqualified_call_ambiguous && direct_unqualified_helper_call?(node, helper_name)
+      direct_unqualified_helper_call?(node, helper_name)
     end
 
     def erb_local_binding?(content, local_name)
@@ -1510,11 +1512,17 @@ module ReactOnRails
 
     def source_proven_local_binding?(node, local_name)
       return false unless node.is_a?(Array)
+      return source_proven_local_binding?(node[1], local_name) if ast_node?(node, :method_add_block)
+      return false if nested_local_binding_scope?(node)
       return true if local_variable_field_named?(node, local_name)
       return true if required_parameter_named?(node, local_name)
 
       children = node.first.is_a?(Symbol) ? node.drop(1) : node
       children.any? { |child| source_proven_local_binding?(child, local_name) }
+    end
+
+    def nested_local_binding_scope?(node)
+      %i[brace_block do_block lambda def defs].any? { |type| ast_node?(node, type) }
     end
 
     def local_variable_field_named?(node, local_name)
@@ -1551,13 +1559,14 @@ module ReactOnRails
       end
     end
 
-    def helper_call_context_evidence?(node, helper_name)
+    def helper_call_context_evidence?(node, helper_name, ignored_bare_local: nil)
       return false unless node.is_a?(Array)
+      return false if ignored_bare_local == helper_name && bare_unqualified_helper_vcall?(node, helper_name)
       return true if helper_call_node?(node, helper_name)
       return true if reflective_helper_dispatch_may_call?(node, helper_name)
 
       children = node.first.is_a?(Symbol) ? node.drop(1) : node
-      children.any? { |child| helper_call_context_evidence?(child, helper_name) }
+      children.any? { |child| helper_call_context_evidence?(child, helper_name, ignored_bare_local:) }
     end
 
     def helper_call_node?(node, helper_name)
@@ -1613,6 +1622,10 @@ module ReactOnRails
       return token_named?(node[1], helper_name) if ast_node?(node, :vcall) || ast_node?(node, :command)
 
       ast_node?(node, :method_add_arg) && fcall_named?(node[1], helper_name)
+    end
+
+    def bare_unqualified_helper_vcall?(node, helper_name)
+      ast_node?(node, :vcall) && token_named?(node[1], helper_name)
     end
 
     def discarded_top_level_helper_call?(node, helper_name)

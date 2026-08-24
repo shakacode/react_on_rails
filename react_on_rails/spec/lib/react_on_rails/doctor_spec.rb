@@ -2229,6 +2229,196 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when nested Ruby scopes use pack-helper local names" do
+      let(:scoped_binding_expressions) do
+        {
+          "block_parameter" => "values.each { |%<helper>s| %<helper>s }",
+          "block_local" => "values.each { |; %<helper>s| %<helper>s = 'shadow' }",
+          "block_assignment" => "values.each { %<helper>s = 'shadow' }",
+          "lambda_parameter" => "->(%<helper>s) { %<helper>s }",
+          "lambda_assignment" => "-> { %<helper>s = 'shadow' }"
+        }
+      end
+
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        pack_types = %w[stylesheet javascript]
+        layouts = scoped_binding_expressions.each_with_object({}) do |(scope_name, expression), result|
+          pack_types.each do |pack_type|
+            helper_name = "#{pack_type}_pack_tag"
+            javascript_flush = "<%= javascript_pack_tag %>" if pack_type == "stylesheet"
+            result["app/views/layouts/#{pack_type}_#{scope_name}.html.erb"] = <<~ERB
+              <%= #{format(expression, helper: helper_name)} %>
+              <%= react_component("StyledComponent", auto_load_bundle: true) %>
+              <%= #{helper_name} %>
+              #{javascript_flush}
+            ERB
+          end
+        end
+        layouts["app/views/layouts/stylesheet_nested_def.html.erb"] = <<~ERB
+          <% def scoped_helper(stylesheet_pack_tag); stylesheet_pack_tag = 'shadow'; end %>
+          <%= react_component("StyledComponent", auto_load_bundle: true) %>
+          <%= stylesheet_pack_tag %>
+          <%= javascript_pack_tag %>
+        ERB
+        layouts["app/views/layouts/javascript_nested_def.html.erb"] = <<~ERB
+          <% def scoped_helper(javascript_pack_tag); javascript_pack_tag = 'shadow'; end %>
+          <%= react_component("StyledComponent", auto_load_bundle: true) %>
+          <%= javascript_pack_tag %>
+        ERB
+        stub_layouts(layouts)
+      end
+
+      it "does not let nested-scope bindings shadow later template helper calls" do
+        doctor.send(:check_layout_files)
+
+        expected_warnings = scoped_binding_expressions.keys.map do |scope_name|
+          hash_including(content: a_string_including("javascript_#{scope_name}", "generated/StyledComponent"))
+        end
+        expected_css_info = scoped_binding_expressions.keys.map do |scope_name|
+          hash_including(
+            type: :info,
+            content: "  ✅ stylesheet_#{scope_name}: has both stylesheet_pack_tag and javascript_pack_tag"
+          )
+        end
+        expected_css_info << hash_including(
+          type: :info,
+          content: "  ✅ stylesheet_nested_def: has both stylesheet_pack_tag and javascript_pack_tag"
+        )
+
+        warning_messages = checker.messages.select { |message| message[:type] == :warning }
+        expect(warning_messages).to match_array(expected_warnings)
+        expect(checker.messages).to include(*expected_css_info)
+        expect(
+          doctor.send(
+            :erb_local_binding?,
+            "<% def scoped_helper(stylesheet_pack_tag); stylesheet_pack_tag = 'shadow'; end %>",
+            "stylesheet_pack_tag"
+          )
+        ).to be(false)
+        expect(
+          doctor.send(
+            :erb_local_binding?,
+            "<% def scoped_helper(javascript_pack_tag); javascript_pack_tag = 'shadow'; end %>",
+            "javascript_pack_tag"
+          )
+        ).to be(false)
+      end
+    end
+
+    context "when template-scope bindings coexist with explicit and nested helper syntax" do
+      let(:template_binding_expressions) do
+        {
+          "top_level" => "%<helper>s = 'shadow'",
+          "conditional" => "%<helper>s = 'shadow' if condition",
+          "for" => "for %<helper>s in values; nil; end",
+          "block_receiver" => "(%<helper>s = values).each {}"
+        }
+      end
+
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        bound_layout = lambda do |helper_name:, evidence:, javascript_flush: false, binding_expression: nil|
+          binding_expression ||= "#{helper_name} = 'shadow'"
+          flush = "<%= javascript_pack_tag %>" if javascript_flush
+          <<~ERB
+            <%= #{binding_expression} %>
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= #{evidence} %>
+            #{flush}
+          ERB
+        end
+
+        layouts = {
+          "app/views/layouts/css_nested_content_for.html.erb" => bound_layout.call(
+            helper_name: "stylesheet_pack_tag", evidence: "content_for(:head, stylesheet_pack_tag)",
+            javascript_flush: true
+          ),
+          "app/views/layouts/css_nested_array.html.erb" => bound_layout.call(
+            helper_name: "stylesheet_pack_tag", evidence: "[stylesheet_pack_tag]", javascript_flush: true
+          ),
+          "app/views/layouts/js_nested_content_for.html.erb" => bound_layout.call(
+            helper_name: "javascript_pack_tag", evidence: "content_for(:head, javascript_pack_tag)"
+          ),
+          "app/views/layouts/js_nested_array.html.erb" => bound_layout.call(
+            helper_name: "javascript_pack_tag", evidence: "[javascript_pack_tag]"
+          ),
+          "app/views/layouts/css_empty_parens.html.erb" => bound_layout.call(
+            helper_name: "stylesheet_pack_tag", evidence: "stylesheet_pack_tag()", javascript_flush: true
+          ),
+          "app/views/layouts/css_named_parens.html.erb" => bound_layout.call(
+            helper_name: "stylesheet_pack_tag", evidence: 'stylesheet_pack_tag("application")',
+            javascript_flush: true
+          ),
+          "app/views/layouts/css_command.html.erb" => bound_layout.call(
+            helper_name: "stylesheet_pack_tag", evidence: 'stylesheet_pack_tag "application"',
+            javascript_flush: true
+          ),
+          "app/views/layouts/css_exact_self.html.erb" => bound_layout.call(
+            helper_name: "stylesheet_pack_tag", evidence: "self.stylesheet_pack_tag", javascript_flush: true
+          ),
+          "app/views/layouts/js_empty_parens.html.erb" => bound_layout.call(
+            helper_name: "javascript_pack_tag", evidence: "javascript_pack_tag()"
+          ),
+          "app/views/layouts/js_named_parens.html.erb" => bound_layout.call(
+            helper_name: "javascript_pack_tag", evidence: 'javascript_pack_tag("application")'
+          ),
+          "app/views/layouts/js_command.html.erb" => bound_layout.call(
+            helper_name: "javascript_pack_tag", evidence: 'javascript_pack_tag "application"'
+          ),
+          "app/views/layouts/js_exact_self.html.erb" => bound_layout.call(
+            helper_name: "javascript_pack_tag", evidence: "self.javascript_pack_tag"
+          ),
+          "app/views/layouts/css_dynamic_reflection.html.erb" => bound_layout.call(
+            helper_name: "stylesheet_pack_tag", evidence: "public_send(pack_helper_name)",
+            javascript_flush: true,
+            binding_expression: "stylesheet_pack_tag = 'shadow'; pack_helper_name = :stylesheet_pack_tag"
+          ),
+          "app/views/layouts/js_dynamic_reflection.html.erb" => bound_layout.call(
+            helper_name: "javascript_pack_tag", evidence: "public_send(pack_helper_name)",
+            binding_expression: "javascript_pack_tag = 'shadow'; pack_helper_name = :javascript_pack_tag"
+          )
+        }
+        template_binding_expressions.each do |binding_name, binding_expression|
+          layouts["app/views/layouts/css_#{binding_name}_binding.html.erb"] = bound_layout.call(
+            helper_name: "stylesheet_pack_tag", evidence: "stylesheet_pack_tag", javascript_flush: true,
+            binding_expression: format(binding_expression, helper: "stylesheet_pack_tag")
+          )
+          layouts["app/views/layouts/js_#{binding_name}_binding.html.erb"] = bound_layout.call(
+            helper_name: "javascript_pack_tag", evidence: "javascript_pack_tag",
+            binding_expression: format(binding_expression, helper: "javascript_pack_tag")
+          )
+        end
+        stub_layouts(layouts)
+      end
+
+      it "ignores only bound bare vcalls while preserving explicit and ambiguous evidence" do
+        doctor.send(:check_layout_files)
+
+        warning_layouts = %w[
+          css_nested_content_for css_nested_array
+          js_empty_parens js_named_parens js_command js_exact_self
+          css_top_level_binding css_conditional_binding css_for_binding css_block_receiver_binding
+        ]
+        expected_warnings = warning_layouts.map do |layout_name|
+          hash_including(content: a_string_including(layout_name, "generated/StyledComponent"))
+        end
+        css_evidence_layouts = %w[
+          css_empty_parens css_named_parens css_command css_exact_self css_dynamic_reflection
+        ]
+        expected_css_info = css_evidence_layouts.map do |layout_name|
+          hash_including(
+            type: :info,
+            content: "  ✅ #{layout_name}: has both stylesheet_pack_tag and javascript_pack_tag"
+          )
+        end
+
+        warning_messages = checker.messages.select { |message| message[:type] == :warning }
+        expect(warning_messages).to match_array(expected_warnings)
+        expect(checker.messages).to include(*expected_css_info)
+      end
+    end
+
     context "when active ERB may bind the JavaScript helper name as a local" do
       before do
         stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
@@ -2258,7 +2448,7 @@ RSpec.describe ReactOnRails::Doctor do
             <%= javascript_pack_tag %>
             <% javascript_pack_tag = "shadow" %>
           ERB
-          "app/views/layouts/block_local.html.erb" => <<~ERB,
+          "app/views/layouts/block_parameter.html.erb" => <<~ERB,
             <% ["shadow"].each { |javascript_pack_tag| nil } %>
             <%= react_component("StyledComponent", auto_load_bundle: true) %>
             <%= javascript_pack_tag %>
@@ -2306,7 +2496,8 @@ RSpec.describe ReactOnRails::Doctor do
           hash_including(content: a_string_including("unrelated_local", "generated/StyledComponent")),
           hash_including(content: a_string_including("ivar_decoy", "generated/StyledComponent")),
           hash_including(content: a_string_including("string_decoy", "generated/StyledComponent")),
-          hash_including(content: a_string_including("comment_decoy", "generated/StyledComponent"))
+          hash_including(content: a_string_including("comment_decoy", "generated/StyledComponent")),
+          hash_including(content: a_string_including("block_parameter", "generated/StyledComponent"))
         )
       end
     end
