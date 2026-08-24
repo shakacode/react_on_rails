@@ -200,6 +200,7 @@ run_dummy=false
 run_gem_generator_specs=false
 run_release_supervisor_tests=false
 run_generators=false
+run_js=false
 run_pro_tests=false
 case "${CI_LOCAL_FIXTURE_SELECTION:?}" in
   core_ruby)
@@ -210,6 +211,10 @@ case "${CI_LOCAL_FIXTURE_SELECTION:?}" in
   release_supervisor) run_release_supervisor_tests=true ;;
   dummy) run_dummy=true ;;
   pro_tests) run_pro_tests=true ;;
+  js_and_pro_tests)
+    run_js=true
+    run_pro_tests=true
+    ;;
   # Consumer-contract fixture: the current detector never emits this one-sided
   # combination, but ci-local must not couple two independent JSON fields.
   generated_examples) run_generators=true ;;
@@ -226,7 +231,7 @@ cat <<JSON
   "docs_only": false,
   "run_lint": false,
   "run_ruby_tests": $run_ruby,
-  "run_js_tests": false,
+  "run_js_tests": $run_js,
   "run_dummy_tests": $run_dummy,
   "run_gem_generator_specs": $run_gem_generator_specs,
   "run_release_supervisor_tests": $run_release_supervisor_tests,
@@ -621,6 +626,24 @@ test_ci_local_pro_tests_use_hosted_workspace_command_from_root() {
     *$'pnpm-cwd\t'"$fixture_root"$'\t--filter\treact-on-rails-pro\ttest'*$'bundle\texec\trspec'*) ;;
     *) fail "Pro workspace tests must precede the preserved Pro RSpec lane: $commands" ;;
   esac
+}
+
+test_ci_local_combined_js_and_pro_selection_runs_pro_js_once() {
+  setup_ci_local_repo
+  mkdir -p react_on_rails_pro/node_modules react_on_rails_pro/vendor/bundle
+  : > react_on_rails_pro/Gemfile
+
+  local output commands fixture_root pro_js_count
+  fixture_root="$(pwd -P)"
+  export CI_LOCAL_FIXTURE_SELECTION=js_and_pro_tests
+  if ! output="$(ci_local_output --changed 2>&1)"; then
+    fail "ci-local combined JS and Pro fixture failed: $output"
+    return 1
+  fi
+  commands="$(cat ci-local-commands.log)"
+  pro_js_count="$(grep -Fc $'pnpm-cwd\t'"$fixture_root"$'\t--filter\treact-on-rails-pro\ttest' <<<"$commands")"
+  [ "$pro_js_count" = 1 ] || fail "combined JS and Pro selection ran Pro JS $pro_js_count times"
+  assert_contains "$commands" $'bundle\texec\trspec' "combined JS and Pro command log"
 }
 
 detector_output() {
@@ -2046,6 +2069,7 @@ run_test test_ci_local_json_runs_release_supervisor_selector
 run_test test_ci_local_text_fallback_runs_release_supervisor_selector
 run_test test_ci_local_all_runs_release_supervisor_harness
 run_test test_ci_local_pro_tests_use_hosted_workspace_command_from_root
+run_test test_ci_local_combined_js_and_pro_selection_runs_pro_js_once
 run_test test_ci_infrastructure_only_change_runs_tests_but_skips_benchmarks
 run_test test_suite_workflow_file_runs_its_tests_but_no_benchmark
 run_test test_gem_tests_workflow_change_keeps_generator_specs_fail_closed

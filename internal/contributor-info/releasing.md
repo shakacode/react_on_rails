@@ -251,17 +251,18 @@ On a later invocation, set `RELEASE_TRACKER` without `RELEASE_SHAKAPERF_RUN`. Th
 unedited machine comments, re-fetches the saved run and artifact, and re-runs the same checks. Exact-SHA
 evidence is preferred. Existing machine-verified runtime-equivalence remains supported because the stored
 candidate is bound to the live run while the schema-v2 runtime fingerprint is compared with the current
-release commit. Output names both the tracker URL and reused run URL. A retry with
-`RELEASE_TRACKER=<issue>` reads only that issue's comments through the issue-specific endpoint; it cannot
-prove that another tracker has no matching record. For a known-tracker recovery, use the fenced invocation:
+release commit. Output names both the tracker URL and reused run URL. Candidate history is always read through the
+authoritative repository issue-comments endpoint, bounded from one second before the candidate commit timestamp.
+When `RELEASE_TRACKER=<issue>` is present, that issue is the expected canonical tracker, but the repository-wide read
+still proves that no conflicting tracker contains a matching candidate record. For a known-tracker recovery, use the
+fenced invocation:
 
 ```bash
 RELEASE_TRACKER=<issue> script/release VERSION
 ```
 
-Repository-wide bounded discovery occurs only when `RELEASE_TRACKER` is omitted. Use that broader route only
-when proving absence across trackers is required; it can fail closed as `UNKNOWN` at the configured page or
-marker bound, so it is not the recovery fallback for a known tracker.
+The repository-wide candidate-bounded read applies with or without `RELEASE_TRACKER`. It fails closed as `UNKNOWN` at
+the configured page or marker bound, or when the candidate commit timestamp cannot be established.
 
 Only automatic association reuse may discard naturally invalid evidence and continue through normal discovery.
 That recovery is limited to authoritative staleness, a 404-proven missing run or artifact, GitHub CLI's exact

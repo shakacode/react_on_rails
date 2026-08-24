@@ -499,7 +499,9 @@ if [ "$RUN_PRO_TESTS" = true ]; then
     echo -e "${YELLOW}Skipping React on Rails Pro tests in --fast mode${NC}"
     echo ""
   elif ensure_pro_dependencies; then
-    run_job_argv "React on Rails Pro JS Tests" run_pro_js_tests
+    if [ "$RUN_JS" != true ]; then
+      run_job_argv "React on Rails Pro JS Tests" run_pro_js_tests
+    fi
     run_job "React on Rails Pro RSpec" "cd react_on_rails_pro && bundle_command \"$PRO_GEMFILE\" bundle exec rspec"
   fi
 fi

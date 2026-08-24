@@ -8447,7 +8447,7 @@ RSpec.describe "release.rake helper methods" do
       )
     end
 
-    it "scopes unflagged same-candidate retry discovery to the selected tracker" do
+    it "requires unflagged same-candidate retry history to match the selected tracker" do
       selected_authorization = authorization.merge("release_tracker" => 4842)
       allow(self).to receive_messages(
         local_release_tag_exists?: false,
@@ -8463,8 +8463,7 @@ RSpec.describe "release.rake helper methods" do
       expect(self).to have_received(:fetch_repository_accelerated_rc_records_for_candidate!).with(
         repo_slug: "shakacode/react_on_rails",
         target_version: "17.0.0.rc.10",
-        candidate_sha: "f" * 40,
-        tracker: 4842
+        candidate_sha: "f" * 40
       )
     end
 
@@ -8644,8 +8643,7 @@ RSpec.describe "release.rake helper methods" do
       expect(self).to have_received(:fetch_repository_accelerated_rc_records_for_candidate!).with(
         repo_slug: "shakacode/react_on_rails",
         target_version: "17.0.0.rc.10",
-        candidate_sha: "f" * 40,
-        tracker: 3823
+        candidate_sha: "f" * 40
       )
     end
 
@@ -8711,8 +8709,7 @@ RSpec.describe "release.rake helper methods" do
       expect(self).to have_received(:fetch_repository_accelerated_rc_records_for_candidate!).with(
         repo_slug: "shakacode/react_on_rails",
         target_version: "17.0.0.rc.10",
-        candidate_sha: "f" * 40,
-        tracker: 3823
+        candidate_sha: "f" * 40
       )
     end
   end
@@ -8843,6 +8840,11 @@ RSpec.describe "release.rake helper methods" do
   end
 
   describe "accelerated RC tracker records" do
+    before do
+      allow(self).to receive(:accelerated_rc_candidate_comment_lower_bound!)
+        .and_return("2026-07-14T12:00:00Z")
+    end
+
     let(:accelerated_rc_options) do
       {
         target_gem_version: "17.0.0.rc.10",
@@ -9001,7 +9003,7 @@ RSpec.describe "release.rake helper methods" do
       expect(record).to include(
         "status" => "publication-authorized",
         "recorded_at" => "2026-07-14T13:30:00Z",
-        "required_follow_up" => /complete immutable publication/i
+        "required_follow_up" => %r{script/release --reconcile-accelerated-rc 17\.0\.0\.rc\.10}
       )
       expect(validate_accelerated_rc_tracker_record!(record)).to eq(record)
     end
@@ -9024,7 +9026,7 @@ RSpec.describe "release.rake helper methods" do
         "target_version" => "17.0.0.rc.10",
         "candidate_sha" => "f" * 40,
         "recorded_at" => "2026-07-14T14:00:00Z",
-        "required_follow_up" => /reconcile_accelerated_rc/
+        "required_follow_up" => %r{script/release --reconcile-accelerated-rc 17\.0\.0\.rc\.10}
       )
       expect(authorized_record["status"]).to eq("publication-authorized")
     end
@@ -9271,13 +9273,13 @@ RSpec.describe "release.rake helper methods" do
         "Exactly 1,000 retained machine-marker comments are allowed, and a short 250th page completes discovery"
       )
       expect(normalized_guide).to include(
-        "A retry with `RELEASE_TRACKER=<issue>` reads only that issue's comments through the issue-specific endpoint"
+        "Candidate history is always read through the authoritative repository issue-comments endpoint"
       )
       expect(normalized_guide).to include(
-        "it cannot prove that another tracker has no matching record"
+        "the repository-wide read still proves that no conflicting tracker contains a matching candidate record"
       )
       expect(normalized_guide).to include(
-        "Repository-wide bounded discovery occurs only when `RELEASE_TRACKER` is omitted"
+        "The repository-wide candidate-bounded read applies with or without `RELEASE_TRACKER`"
       )
       expect(guide).to include(
         "RELEASE_FINAL_SHAKAPERF_WAIVER_REASON=\"GitHub REST observer exhausted its quota\" \\\nscript/release 17.0.1"
@@ -9982,7 +9984,8 @@ RSpec.describe "release.rake helper methods" do
       allow(self).to receive(:capture_gh_output)
         .with(
           "api",
-          "repos/shakacode/react_on_rails/issues/comments?per_page=100&sort=created&direction=asc&page=1"
+          "repos/shakacode/react_on_rails/issues/comments?per_page=100&sort=created&direction=asc&page=1" \
+          "&since=2026-07-14T11%3A59%3A59Z"
         ).and_return([JSON.generate([comment]), success])
       allow(self).to receive(:capture_gh_output)
         .with(
@@ -9997,6 +10000,24 @@ RSpec.describe "release.rake helper methods" do
           candidate_sha: "f" * 40
         )
       ).to eq([authorization])
+    end
+
+    it "bounds trackerless repository discovery to the candidate commit timestamp" do
+      allow(self).to receive_messages(
+        fetch_repository_issue_comments_for_accelerated_rc_retry!: [],
+        accelerated_rc_candidate_comment_lower_bound!: "2026-07-14T12:00:00Z"
+      )
+
+      expect(
+        fetch_repository_accelerated_rc_records_for_candidate!(
+          repo_slug: "shakacode/react_on_rails",
+          target_version: "17.0.0.rc.10",
+          candidate_sha: "f" * 40
+        )
+      ).to eq([])
+      expect(self).to have_received(:fetch_repository_issue_comments_for_accelerated_rc_retry!).with(
+        repo_slug: "shakacode/react_on_rails", since: "2026-07-14T11:59:59Z"
+      )
     end
 
     it "caches eligibility for repeated repository-discovered markers on the same tracker" do
@@ -12182,6 +12203,35 @@ RSpec.describe "release.rake helper methods" do
           ), name
         end
       end
+    end
+
+    it "accepts the legacy reconciliation instruction on an otherwise canonical publication" do
+      authorization = build_accelerated_rc_publication_record(
+        options: accelerated_rc_options,
+        candidate_sha: "f" * 40,
+        runtime_tree_fingerprint: "a" * 64,
+        release_branch: "release/17.0.0",
+        ci_snapshot: accelerated_rc_ci_snapshot,
+        shakaperf: accelerated_rc_shakaperf_snapshot,
+        approved_by: "justin808",
+        recorded_at: Time.utc(2026, 7, 14, 13, 30)
+      )
+      canonical_publication = accelerated_rc_published_record(
+        authorized_record: authorization,
+        recorded_at: Time.utc(2026, 7, 14, 14)
+      )
+      legacy_publication = canonical_publication.merge(
+        "required_follow_up" => "Run release:reconcile_accelerated_rc before promoting this RC to final."
+      )
+
+      expect(
+        accelerated_rc_publication_completion_equivalent?(legacy_publication, canonical_publication)
+      ).to be(true)
+      expect(
+        accelerated_rc_publication_completion_equivalent?(
+          legacy_publication.merge("required_follow_up" => "Skip reconciliation"), canonical_publication
+        )
+      ).to be(false)
     end
 
     it "treats every distinct valid authorization digest as conflicting" do

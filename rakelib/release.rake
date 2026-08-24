@@ -102,6 +102,9 @@ ACCELERATED_RC_RECORD_IDENTITY_FIELDS = %w[status target_version candidate_sha].
 ACCELERATED_RC_PENDING_STATUSES = %w[publication-authorized published-awaiting-gates].freeze
 ACCELERATED_RC_TERMINAL_STATUSES = %w[candidate-accepted candidate-rejected].freeze
 ACCELERATED_RC_RECORD_STATUSES = (ACCELERATED_RC_PENDING_STATUSES + ACCELERATED_RC_TERMINAL_STATUSES).freeze
+ACCELERATED_RC_LEGACY_PUBLICATION_FOLLOW_UP =
+  "Run release:reconcile_accelerated_rc before promoting this RC to final."
+ACCELERATED_RC_PUBLICATION_FOLLOW_UP_CANONICAL_VALUE = "reconcile-accelerated-rc-before-final"
 ACCELERATED_RC_REQUIRED_EVIDENCE = %w[demo_fleet behavioral artifacts].freeze
 ACCELERATED_RC_RECORD_FIELDS = %w[
   schema_version status target_version candidate_sha runtime_tree_fingerprint release_branch release_tracker ci
@@ -4333,10 +4336,9 @@ def fetch_accelerated_rc_tracker_records!(repo_slug:, tracker:)
   records
 end
 
-def fetch_repository_accelerated_rc_records_for_candidate!(repo_slug:, target_version:, candidate_sha:, tracker: nil)
-  candidate_commit_time = accelerated_rc_candidate_comment_lower_bound!(repo_slug:, candidate_sha:) if tracker
-  candidate_comment_since = (shakaperf_release_gate_time(candidate_commit_time) - 1).utc.iso8601 if
-    candidate_commit_time
+def fetch_repository_accelerated_rc_records_for_candidate!(repo_slug:, target_version:, candidate_sha:)
+  candidate_commit_time = accelerated_rc_candidate_comment_lower_bound!(repo_slug:, candidate_sha:)
+  candidate_comment_since = (shakaperf_release_gate_time(candidate_commit_time) - 1).utc.iso8601
   comments = fetch_repository_issue_comments_for_accelerated_rc_retry!(
     repo_slug:, since: candidate_comment_since
   )
@@ -4358,7 +4360,7 @@ def fetch_repository_accelerated_rc_records_for_candidate!(repo_slug:, target_ve
   end
 
   candidate_records = accelerated_rc_records_for_candidate(records, target_version:, candidate_sha:)
-  validate_accelerated_rc_candidate_record_times!(candidate_records, candidate_commit_time) if candidate_commit_time
+  validate_accelerated_rc_candidate_record_times!(candidate_records, candidate_commit_time)
   candidate_records
 end
 
@@ -4391,13 +4393,7 @@ def validated_repository_accelerated_rc_candidate_history!(
   repo_slug:, target_version:, candidate_sha:, expected_tracker: nil,
   selected_authorization: nil, allow_empty: false
 )
-  records = if expected_tracker
-              fetch_repository_accelerated_rc_records_for_candidate!(
-                repo_slug:, target_version:, candidate_sha:, tracker: expected_tracker
-              )
-            else
-              fetch_repository_accelerated_rc_records_for_candidate!(repo_slug:, target_version:, candidate_sha:)
-            end
+  records = fetch_repository_accelerated_rc_records_for_candidate!(repo_slug:, target_version:, candidate_sha:)
   if records.empty?
     return { records:, tracker: nil, chain: nil } if allow_empty
 
@@ -5633,7 +5629,9 @@ def build_accelerated_rc_publication_record(options:, candidate_sha:, runtime_tr
     "reason" => options.fetch(:reason),
     "approved_by" => approved_by,
     "recorded_at" => recorded_at.iso8601,
-    "required_follow_up" => "Complete immutable publication, then run release:reconcile_accelerated_rc before final.",
+    "required_follow_up" => "Complete immutable publication, then run " \
+                            "script/release --reconcile-accelerated-rc #{options.fetch(:target_gem_version)} " \
+                            "before final.",
     "evidence" => {}
   }
 end
@@ -5879,7 +5877,8 @@ def accelerated_rc_published_record(authorized_record:, recorded_at:, approved_b
     "status" => "published-awaiting-gates",
     "approved_by" => approved_by,
     "recorded_at" => recorded_at.iso8601,
-    "required_follow_up" => "Run release:reconcile_accelerated_rc before promoting this RC to final."
+    "required_follow_up" => "Run script/release --reconcile-accelerated-rc " \
+                            "#{authorized_record.fetch('target_version')} before promoting this RC to final."
   )
 end
 
@@ -5920,8 +5919,20 @@ end
 
 def accelerated_rc_publication_completion_equivalent?(existing, expected)
   retry_variant_fields = %w[approved_by recorded_at]
-  canonical_accelerated_rc_value(existing.except(*retry_variant_fields)) ==
-    canonical_accelerated_rc_value(expected.except(*retry_variant_fields))
+  normalize = lambda do |record|
+    comparable = record.except(*retry_variant_fields)
+    supported_follow_ups = [
+      ACCELERATED_RC_LEGACY_PUBLICATION_FOLLOW_UP,
+      "Run script/release --reconcile-accelerated-rc #{record['target_version']} " \
+      "before promoting this RC to final."
+    ]
+    if supported_follow_ups.include?(comparable["required_follow_up"])
+      comparable["required_follow_up"] = ACCELERATED_RC_PUBLICATION_FOLLOW_UP_CANONICAL_VALUE
+    end
+    canonical_accelerated_rc_value(comparable)
+  end
+
+  normalize.call(existing) == normalize.call(expected)
 end
 
 def validated_accelerated_rc_publication_set!(candidate_records, authorization, require_publication: false)
