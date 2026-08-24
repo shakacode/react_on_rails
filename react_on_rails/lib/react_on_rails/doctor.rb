@@ -74,8 +74,8 @@ module ReactOnRails
     RAILS_SERVER_COMMAND_REGEX = %r{\b(?:(?:bin/)?rails\s+(?:server|s)|puma|unicorn|rackup|passenger\s+start)\b}
     TEMPLATE_ERB_COMMENT_PATTERN = /<%#.*?%>/m
     TEMPLATE_HTML_COMMENT_PATTERN = /<!--.*?-->/m
-    ERB_EXPRESSION_PATTERN = /<%(?![#%])=?\s*(?<expression>.*?)-?%>/m
-    ERB_OUTPUT_EXPRESSION_PATTERN = /<%=\s*(?<expression>.*?)-?%>/m
+    ERB_EXPRESSION_PATTERN = /<%(?![#%])={0,2}\s*(?<expression>.*?)-?%>/m
+    ERB_OUTPUT_EXPRESSION_PATTERN = /<%={1,2}\s*(?<expression>.*?)-?%>/m
     ERB_NON_OUTPUT_EXPRESSION_PATTERN = /<%(?![#%=])\s*(?<expression>.*?)-?%>/m
     ERB_CONTROL_FLOW_KEYWORDS = %w[
       begin case do else elsif end ensure for if rescue return then unless until when while
@@ -1571,7 +1571,15 @@ module ReactOnRails
         static_argument_values(argument_parentheses[1])
       elsif ast_node?(node, :command) && reflective_dispatch_call?(node)
         static_argument_values(node[2])
+      elsif exact_self_reflective_command_call?(node)
+        static_argument_values(node[4])
       end
+    end
+
+    def exact_self_reflective_command_call?(node)
+      return false unless ast_node?(node, :command_call)
+
+      REFLECTIVE_HELPER_DISPATCH_METHODS.any? { |method_name| direct_self_helper_call?(node, method_name) }
     end
 
     def reflective_dispatch_call?(node)

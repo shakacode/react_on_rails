@@ -1316,6 +1316,43 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when valid raw-output ERB tags wrap component and pack helpers" do
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        stub_layouts(
+          "app/views/layouts/raw_missing.html.erb" => <<~ERB,
+            <%== react_component("StyledComponent", auto_load_bundle: true) %>
+            <%== javascript_pack_tag %>
+          ERB
+          "app/views/layouts/raw_flushed.html.erb" => <<~ERB,
+            <%== react_component("StyledComponent", auto_load_bundle: true) %>
+            <%== stylesheet_pack_tag %>
+            <%== javascript_pack_tag %>
+          ERB
+          "app/views/layouts/raw_decoys.html.erb" => <<~ERB
+            <%%== react_component("StyledComponent", auto_load_bundle: true) %>
+            <%%== javascript_pack_tag %>
+            <!-- <%== react_component("StyledComponent", auto_load_bundle: true) %> -->
+            <!-- <%== stylesheet_pack_tag %> -->
+            <!-- <%== javascript_pack_tag %> -->
+          ERB
+        )
+      end
+
+      it "uses one output grammar while excluding escaped and commented raw tags" do
+        doctor.send(:check_layout_files)
+
+        warning_messages = checker.messages.select { |message| message[:type] == :warning }
+        expect(warning_messages).to contain_exactly(
+          hash_including(content: a_string_including("raw_missing", "generated/StyledComponent"))
+        )
+        expect(checker.messages).to include(
+          hash_including(type: :info, content: "  ✅ raw_flushed: has both stylesheet_pack_tag and javascript_pack_tag"),
+          hash_including(type: :info, content: "  ℹ️  raw_decoys: no pack tags found")
+        )
+      end
+    end
+
     context "when a template uses an ISO-8859-1 coding header and source bytes" do
       before do
         stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
@@ -2243,6 +2280,39 @@ RSpec.describe ReactOnRails::Doctor do
 
         expect(checker.messages).to include(
           hash_including(type: :warning, content: a_string_including("generated/StyledComponent"))
+        )
+      end
+    end
+
+    context "when public_send command syntax uses the exact self receiver" do
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        stub_layouts(
+          "app/views/layouts/static_dispatch.html.erb" => <<~ERB,
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= self.public_send :stylesheet_pack_tag %>
+            <%= javascript_pack_tag %>
+          ERB
+          "app/views/layouts/dynamic_dispatch.html.erb" => <<~ERB,
+            <% helper_name = :stylesheet_pack_tag %>
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= self.public_send helper_name %>
+            <%= javascript_pack_tag %>
+          ERB
+          "app/views/layouts/unrelated_dispatch.html.erb" => <<~ERB
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= self.public_send :content_tag, :div %>
+            <%= javascript_pack_tag %>
+          ERB
+        )
+      end
+
+      it "fails closed for static or dynamic helper dispatch but not an unrelated static method" do
+        doctor.send(:check_layout_files)
+
+        warning_messages = checker.messages.select { |message| message[:type] == :warning }
+        expect(warning_messages).to contain_exactly(
+          hash_including(content: a_string_including("unrelated_dispatch", "generated/StyledComponent"))
         )
       end
     end
