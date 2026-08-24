@@ -1289,8 +1289,8 @@ RSpec.describe ReactOnRails::Doctor do
             <%= react_component("StyledComponent", props: { card: { title: "Hello" } }, prerender: false, auto_load_bundle: true) %>
             <%# stylesheet_pack_tag %>
             <%# public_send("stylesheet_" + "pack_tag") %>
-            <!-- <%= stylesheet_pack_tag %> -->
-            <!-- <%= public_send(pack_helper_name) %> -->
+            <!-- stylesheet_pack_tag -->
+            <!-- <%%= public_send(pack_helper_name) %> -->
             <p>stylesheet_pack_tag is not configured here</p>
             <%= javascript_pack_tag %>
           ERB
@@ -2047,6 +2047,63 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when HTML comments contain executable ERB" do
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        stub_layouts(
+          "app/views/layouts/commented_binding.html.erb" => <<~ERB,
+            <!-- <% stylesheet_pack_tag = "shadow" %> -->
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= javascript_pack_tag %>
+          ERB
+          "app/views/layouts/erb_comment.html.erb" => <<~ERB,
+            <%# stylesheet_pack_tag = "shadow" %>
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= javascript_pack_tag %>
+          ERB
+          "app/views/layouts/pure_html_comment.html.erb" => <<~ERB,
+            <!-- stylesheet_pack_tag = "shadow" -->
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= javascript_pack_tag %>
+          ERB
+          "app/views/layouts/escaped_erb.html.erb" => <<~ERB,
+            <!-- <%% stylesheet_pack_tag = "shadow" %> -->
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= javascript_pack_tag %>
+          ERB
+          "app/views/layouts/commented_css_output.html.erb" => <<~ERB,
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <!-- <%= stylesheet_pack_tag %> -->
+            <%= javascript_pack_tag %>
+          ERB
+          "app/views/layouts/commented_js_output.html.erb" => <<~ERB,
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <!-- <%= javascript_pack_tag %> -->
+          ERB
+          "app/views/layouts/overlapping_comment.html.erb" => <<~ERB
+            <!<!-- spacer -->-- <% stylesheet_pack_tag = "shadow" %> -->
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= javascript_pack_tag %>
+          ERB
+        )
+      end
+
+      it "fails the targeted proof closed without treating browser-comment output as active" do
+        doctor.send(:check_layout_files)
+
+        warning_messages = checker.messages.select { |message| message[:type] == :warning }
+        expect(warning_messages).to contain_exactly(
+          hash_including(content: a_string_including("erb_comment", "generated/StyledComponent")),
+          hash_including(content: a_string_including("pure_html_comment", "generated/StyledComponent")),
+          hash_including(content: a_string_including("escaped_erb", "generated/StyledComponent"))
+        )
+        expect(checker.messages).to include(
+          hash_including(type: :info, content: "  ℹ️  commented_css_output: has javascript_pack_tag"),
+          hash_including(type: :info, content: "  ℹ️  commented_js_output: no pack tags found")
+        )
+      end
+    end
+
     context "when the JavaScript flush helper appears only in template comments" do
       before do
         stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
@@ -2233,7 +2290,6 @@ RSpec.describe ReactOnRails::Doctor do
           ERB
           "app/views/layouts/comment_decoy.html.erb" => <<~ERB
             <%# javascript_pack_tag = "shadow" %>
-            <!-- <% javascript_pack_tag = "shadow" %> -->
             <%= react_component("StyledComponent", auto_load_bundle: true) %>
             <%= javascript_pack_tag %>
           ERB
@@ -2362,6 +2418,35 @@ RSpec.describe ReactOnRails::Doctor do
         doctor.send(:check_layout_files)
 
         expect(checker.warnings?).to be(false)
+      end
+    end
+
+    context "when active ERB binds the stylesheet helper name as a local" do
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        stub_layouts(
+          "app/views/layouts/shadowed.html.erb" => <<~ERB,
+            <% stylesheet_pack_tag = "shadow" %>
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= stylesheet_pack_tag %>
+            <%= javascript_pack_tag %>
+          ERB
+          "app/views/layouts/exact_self.html.erb" => <<~ERB
+            <% stylesheet_pack_tag = "shadow" %>
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= self.stylesheet_pack_tag %>
+            <%= javascript_pack_tag %>
+          ERB
+        )
+      end
+
+      it "does not treat a shadowed bare call as CSS but preserves exact-self evidence" do
+        doctor.send(:check_layout_files)
+
+        expect(checker.messages).to include(
+          hash_including(type: :warning, content: a_string_including("shadowed", "generated/StyledComponent")),
+          hash_including(type: :info, content: "  ✅ exact_self: has both stylesheet_pack_tag and javascript_pack_tag")
+        )
       end
     end
 

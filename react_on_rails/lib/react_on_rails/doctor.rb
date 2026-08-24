@@ -72,6 +72,7 @@ module ReactOnRails
     SERVER_BUNDLE_SOURCE_EXTENSIONS = %w[.js .jsx .ts .tsx .mjs .cjs].freeze
     CUSTOM_LAUNCHER_INDICATOR_FILES = %w[dev].freeze
     RAILS_SERVER_COMMAND_REGEX = %r{\b(?:(?:bin/)?rails\s+(?:server|s)|puma|unicorn|rackup|passenger\s+start)\b}
+    TEMPLATE_HTML_COMMENT_PATTERN = /<!--.*?-->/m
     TEMPLATE_COMMENT_PATTERN = /<!--.*?-->|<%#.*?%>/m
     ERB_EXPRESSION_PATTERN = /<%(?![#%])={0,2}\s*(?<expression>.*?)-?%>/m
     ERB_OUTPUT_EXPRESSION_PATTERN = /<%={1,2}\s*(?<expression>.*?)-?%>/m
@@ -1254,7 +1255,9 @@ module ReactOnRails
       layout_files.each do |layout_file|
         next unless File.exist?(layout_file)
 
-        content = uncommented_template_content(File.read(layout_file))
+        template_content = File.read(layout_file)
+        ambiguous_commented_erb = html_comment_with_executable_erb?(template_content)
+        content = uncommented_template_content(template_content)
         has_stylesheet = stylesheet_pack_helper_evidence?(content)
         has_javascript = erb_output_helper?(content, "javascript_pack_tag")
 
@@ -1270,14 +1273,15 @@ module ReactOnRails
           checker.add_info("  ℹ️  #{layout_name}: has stylesheet_pack_tag")
         elsif has_javascript
           checker.add_info("  ℹ️  #{layout_name}: has javascript_pack_tag")
-          check_unflushed_auto_loaded_component_css(layout_name, content)
+          check_unflushed_auto_loaded_component_css(layout_name, content, ambiguous_commented_erb:)
         else
           checker.add_info("  ℹ️  #{layout_name}: no pack tags found")
         end
       end
     end
 
-    def check_unflushed_auto_loaded_component_css(layout_name, content)
+    def check_unflushed_auto_loaded_component_css(layout_name, content, ambiguous_commented_erb: false)
+      return if ambiguous_commented_erb
       return unless erb_output_helper?(content, "javascript_pack_tag")
       return if erb_helper_mentioned?(content, "render")
 
@@ -1301,7 +1305,7 @@ module ReactOnRails
     end
 
     def stylesheet_pack_ambiguity_evidence?(content)
-      helper_call_context_in_expressions?(content.scan(ERB_OUTPUT_EXPRESSION_PATTERN), "stylesheet_pack_tag") ||
+      stylesheet_pack_output_ambiguity_evidence?(content) ||
         content.scan(ERB_NON_OUTPUT_EXPRESSION_PATTERN).any? do |(expression)|
           statements = ripper_statements(expression)
           next false if statements.one? &&
@@ -1309,6 +1313,17 @@ module ReactOnRails
 
           statements.any? { |statement| helper_call_context_evidence?(statement, "stylesheet_pack_tag") }
         end
+    end
+
+    def stylesheet_pack_output_ambiguity_evidence?(content)
+      unqualified_call_ambiguous = erb_local_binding?(content, "stylesheet_pack_tag")
+      content.scan(ERB_OUTPUT_EXPRESSION_PATTERN).any? do |(expression)|
+        statements = ripper_statements(expression)
+        next false if unqualified_call_ambiguous && statements.one? &&
+                      direct_unqualified_helper_call?(statements.first, "stylesheet_pack_tag")
+
+        statements.any? { |statement| helper_call_context_evidence?(statement, "stylesheet_pack_tag") }
+      end
     end
 
     def static_stylesheet_assets(entrypoint)
@@ -1346,19 +1361,26 @@ module ReactOnRails
     def auto_loaded_component_names_from_implicit_views(layout_name)
       Dir.glob("app/controllers/**/*_controller.rb").flat_map do |controller_file|
         implicit_view_paths_for_layout(controller_file, layout_name).flat_map do |view_path|
-          next [] unless File.exist?(view_path)
-
-          view_content = uncommented_template_content(File.read(view_path))
-          next [] if stylesheet_pack_helper_evidence?(view_content)
-          next [] if erb_helper_mentioned?(view_content, "render")
-
-          auto_loaded_component_names(view_content)
+          auto_loaded_component_names_from_implicit_view(view_path)
         end
       rescue StandardError
         []
       end
     rescue StandardError
       []
+    end
+
+    def auto_loaded_component_names_from_implicit_view(view_path)
+      return [] unless File.exist?(view_path)
+
+      template_content = File.read(view_path)
+      return [] if html_comment_with_executable_erb?(template_content)
+
+      view_content = uncommented_template_content(template_content)
+      return [] if stylesheet_pack_helper_evidence?(view_content)
+      return [] if erb_helper_mentioned?(view_content, "render")
+
+      auto_loaded_component_names(view_content)
     end
 
     def implicit_view_paths_for_layout(controller_file, layout_name)
@@ -1461,8 +1483,7 @@ module ReactOnRails
     end
 
     def erb_output_helper?(content, helper_name)
-      unqualified_call_ambiguous = helper_name == "javascript_pack_tag" &&
-                                   erb_local_binding?(content, helper_name)
+      unqualified_call_ambiguous = erb_local_binding?(content, helper_name)
 
       content.scan(ERB_OUTPUT_EXPRESSION_PATTERN).any? do |(expression)|
         statements = ripper_statements(expression)
@@ -1611,6 +1632,22 @@ module ReactOnRails
       end
     rescue EncodingError
       ""
+    end
+
+    def html_comment_with_executable_erb?(content)
+      utf8_content = content.encode(Encoding::UTF_8, invalid: :replace, undef: :replace)
+      loop do
+        return true if utf8_content.scan(TEMPLATE_HTML_COMMENT_PATTERN).any? do |comment|
+          comment.match?(ERB_EXPRESSION_PATTERN)
+        end
+
+        uncommented_content = utf8_content.gsub(TEMPLATE_COMMENT_PATTERN, "")
+        return false if uncommented_content == utf8_content
+
+        utf8_content = uncommented_content
+      end
+    rescue EncodingError
+      true
     end
 
     def auto_loaded_component_names(content)
