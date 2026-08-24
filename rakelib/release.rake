@@ -4334,9 +4334,11 @@ def fetch_accelerated_rc_tracker_records!(repo_slug:, tracker:)
 end
 
 def fetch_repository_accelerated_rc_records_for_candidate!(repo_slug:, target_version:, candidate_sha:, tracker: nil)
-  candidate_comment_lower_bound = accelerated_rc_candidate_comment_lower_bound!(repo_slug:, candidate_sha:) if tracker
+  candidate_commit_time = accelerated_rc_candidate_comment_lower_bound!(repo_slug:, candidate_sha:) if tracker
+  candidate_comment_since = (shakaperf_release_gate_time(candidate_commit_time) - 1).utc.iso8601 if
+    candidate_commit_time
   comments = fetch_repository_issue_comments_for_accelerated_rc_retry!(
-    repo_slug:, since: candidate_comment_lower_bound
+    repo_slug:, since: candidate_comment_since
   )
   marker_comments = comments.select do |comment|
     next false unless accelerated_rc_machine_marker_comment?(comment)
@@ -4356,8 +4358,7 @@ def fetch_repository_accelerated_rc_records_for_candidate!(repo_slug:, target_ve
   end
 
   candidate_records = accelerated_rc_records_for_candidate(records, target_version:, candidate_sha:)
-  validate_accelerated_rc_candidate_record_times!(candidate_records, candidate_comment_lower_bound) if
-    candidate_comment_lower_bound
+  validate_accelerated_rc_candidate_record_times!(candidate_records, candidate_commit_time) if candidate_commit_time
   candidate_records
 end
 

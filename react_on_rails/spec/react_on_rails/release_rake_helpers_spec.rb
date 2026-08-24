@@ -8489,6 +8489,9 @@ RSpec.describe "release.rake helper methods" do
       expect do
         resolve_unflagged_accelerated_retry(tracker: "4842")
       end.to raise_error(SystemExit, /different release tracker/i)
+      expect(self).to have_received(:fetch_repository_issue_comments_for_accelerated_rc_retry!).with(
+        repo_slug: "shakacode/react_on_rails", since: "2026-07-14T11:59:59Z"
+      )
     end
 
     it "fails closed when the candidate commit timestamp is in the future" do
