@@ -9346,6 +9346,21 @@ RSpec.describe "release.rake helper methods" do
       )
     end
 
+    it "keeps canonical agent policy aligned with the supervised live release boundary" do
+      agent_policy = File.read(File.expand_path("../../../AGENTS.md", __dir__))
+      normalized_policy = agent_policy.gsub(/\s+/, " ")
+
+      expect(normalized_policy).to include(
+        "Live RC publication and reconciliation must use the repository-owned `script/release VERSION` wrapper"
+      )
+      expect(normalized_policy).to include(
+        "Live compound promotion is supported only through the same repository-owned `script/release X.Y.Z`"
+      )
+      expect(normalized_policy).to include(
+        "Direct live Rake invocation remains **BLOCKED**"
+      )
+    end
+
     it "rejects a closed release tracker" do
       expect do
         validate_release_tracker_issue!(
