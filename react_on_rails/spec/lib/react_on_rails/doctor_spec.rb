@@ -1328,6 +1328,26 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when react_component auto-loads CSS from a direct non-output local assignment" do
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        stub_layouts(
+          "app/views/layouts/application.html.erb" => <<~ERB
+            <% component_html = react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= javascript_pack_tag %>
+          ERB
+        )
+      end
+
+      it "warns because invoking the exact helper eagerly queues the component bundle" do
+        doctor.send(:check_layout_files)
+
+        expect(checker.messages).to include(
+          hash_including(type: :warning, content: a_string_including("generated/StyledComponent"))
+        )
+      end
+    end
+
     context "when react_component_hash auto-loads CSS from its documented assignment form" do
       before do
         stub_manifest_stylesheets("generated/HelmetComponent", ["/packs/generated/HelmetComponent-a1b2c3.css"])

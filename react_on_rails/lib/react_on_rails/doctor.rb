@@ -1590,10 +1590,10 @@ module ReactOnRails
 
     def auto_loaded_component_arguments(content)
       expressions = content.scan(ERB_OUTPUT_EXPRESSION_PATTERN).map(&:first)
-      hash_assignments = content.scan(ERB_NON_OUTPUT_EXPRESSION_PATTERN).map(&:first)
+      assignments = content.scan(ERB_NON_OUTPUT_EXPRESSION_PATTERN).map(&:first)
       component_arguments = expressions.filter_map { |expression| static_react_component_arguments(expression) }
       component_arguments.concat(
-        hash_assignments.filter_map { |expression| static_react_component_hash_assignment_arguments(expression) }
+        assignments.filter_map { |expression| static_react_component_assignment_arguments(expression) }
       )
     end
 
@@ -1627,7 +1627,7 @@ module ReactOnRails
       end.first
     end
 
-    def static_react_component_hash_assignment_arguments(expression)
+    def static_react_component_assignment_arguments(expression)
       statements = ripper_statements(expression)
       return unless statements.one?
 
@@ -1637,7 +1637,9 @@ module ReactOnRails
       field = assignment[1]
       return unless ast_node?(field, :var_field) && token_type?(field[1], :@ident)
 
-      static_named_component_arguments(assignment[2], "react_component_hash")
+      %w[react_component react_component_hash].filter_map do |helper_name|
+        static_named_component_arguments(assignment[2], helper_name)
+      end.first
     end
 
     def static_named_component_arguments(node, helper_name)
