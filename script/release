@@ -26,7 +26,14 @@ class ReleaseSupervisor
 
   Identity = Data.define(:agent_id, :instance_id, :machine_id)
   ReleaseScope = Data.define(:version, :base_version, :repo, :target, :branch)
-  ReleasePipes = Data.define(:liveness_reader, :liveness_writer, :ready_reader, :ready_writer)
+  ReleasePipes = Data.define(
+    :liveness_reader,
+    :liveness_writer,
+    :death_reader,
+    :death_writer,
+    :ready_reader,
+    :ready_writer
+  )
 
   class UsageError < StandardError; end
   class SupervisorError < StandardError; end
@@ -235,6 +242,7 @@ class ReleaseSupervisor
     child_pid = nil
     pgid = nil
     liveness_writer = nil
+    death_writer = nil
     previous_signal_handlers = install_signal_handlers
     enable_descendant_reaping!
     verify_existing_lease!(scope, identity, coordination_timeout:, termination_grace:)
@@ -242,7 +250,7 @@ class ReleaseSupervisor
       raise ReleaseLeaseGuard::LeaseError, "release lease heartbeat failed"
     end
 
-    child_pid, pgid, liveness_writer = spawn_release_group(
+    child_pid, pgid, liveness_writer, death_writer = spawn_release_group(
       scope, identity, handshake_timeout:, termination_grace:
     )
     @stdout.puts "Release process group #{pgid} started."
@@ -264,6 +272,7 @@ class ReleaseSupervisor
     raise
   ensure
     liveness_writer&.close unless liveness_writer&.closed?
+    death_writer&.close unless death_writer&.closed?
     restore_signal_handlers(previous_signal_handlers) if previous_signal_handlers
   end
 
@@ -339,6 +348,7 @@ class ReleaseSupervisor
     child_pid = nil
     child_pid = fork_release_child(scope, identity, pipes)
     pipes.liveness_reader.close
+    pipes.death_reader.close
     pipes.ready_writer.close
     pgid = read_child_process_group!(
       pipes.ready_reader,
@@ -346,7 +356,7 @@ class ReleaseSupervisor
       timeout: handshake_timeout,
       termination_grace:
     )
-    [child_pid, pgid, pipes.liveness_writer]
+    [child_pid, pgid, pipes.liveness_writer, pipes.death_writer]
   rescue StandardError
     begin
       close_release_pipes(pipes)
@@ -360,12 +370,16 @@ class ReleaseSupervisor
 
   def release_pipes
     liveness_pipe = IO.pipe
+    death_pipe = IO.pipe
     ready_pipe = IO.pipe
     liveness_pipe.first.close_on_exec = false
     liveness_pipe.last.close_on_exec = true
+    death_pipe.last.close_on_exec = true
     ReleasePipes.new(
       liveness_reader: liveness_pipe.first,
       liveness_writer: liveness_pipe.last,
+      death_reader: death_pipe.first,
+      death_writer: death_pipe.last,
       ready_reader: ready_pipe.first,
       ready_writer: ready_pipe.last
     )
@@ -375,9 +389,12 @@ class ReleaseSupervisor
     Process.fork do
       reset_child_signal_handlers
       pipes.liveness_writer.close
+      pipes.death_writer.close
       pipes.ready_reader.close
       Process.setpgid(0, 0)
       pgid = Process.getpgrp
+      fork_supervisor_death_watch(pipes, pgid)
+      pipes.death_reader.close
       contract = contract_for(
         scope,
         identity,
@@ -394,6 +411,20 @@ class ReleaseSupervisor
     rescue StandardError
       @stderr.puts "ERROR: unable to start the supervised release command"
       exit! 127
+    end
+  end
+
+  def fork_supervisor_death_watch(pipes, pgid)
+    Process.fork do
+      reset_child_signal_handlers
+      close_io(pipes.liveness_reader)
+      close_io(pipes.ready_writer)
+      pipes.death_reader.read
+      Process.kill("KILL", -pgid)
+    rescue StandardError
+      Process.kill("KILL", -pgid)
+    ensure
+      exit! 1
     end
   end
 
@@ -414,7 +445,14 @@ class ReleaseSupervisor
   def close_release_pipes(pipes)
     return unless pipes
 
-    [pipes.liveness_reader, pipes.liveness_writer, pipes.ready_reader, pipes.ready_writer].each do |io|
+    [
+      pipes.liveness_reader,
+      pipes.liveness_writer,
+      pipes.death_reader,
+      pipes.death_writer,
+      pipes.ready_reader,
+      pipes.ready_writer
+    ].each do |io|
       close_io(io)
     end
   end

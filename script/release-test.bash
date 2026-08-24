@@ -430,6 +430,15 @@ wait_for_process_exit() {
   return 1
 }
 
+wait_for_group_exit() {
+  group_id="$1"
+  for _attempt in $(seq 1 100); do
+    ! kill -0 -- "-${group_id}" 2>/dev/null && return 0
+    sleep 0.05
+  done
+  return 1
+}
+
 assert_group_dead() {
   group_id="$1"
   case "${group_id}" in
@@ -838,5 +847,30 @@ assert_contains "${bundle_log}" "termination:signal"
 assert_no_coordination_mutation
 assert_secret_absent
 pass "signals report and terminate the exact release process group"
+
+if supervisor_case_enabled supervisor-death; then
+  setup_case supervisor-death
+  export FAKE_BUNDLE_MODE=hold
+  (
+    cd "${fake_repo}"
+    exec "${release_script}" 17.1.0.rc.0
+  ) >"${output_log}" 2>&1 &
+  wrapper_pid=$!
+  for _attempt in $(seq 1 100); do
+    test -s "${bundle_log}" && break
+    sleep 0.05
+  done
+  test -s "${bundle_log}" || fail "supervisor-death case never started the release group"
+  process_group="$(awk -F: '/^bundle:/ { print $3; exit }' "${bundle_log}")"
+  kill -KILL "${wrapper_pid}"
+  wait "${wrapper_pid}" 2>/dev/null || true
+  if ! wait_for_group_exit "${process_group}"; then
+    kill -KILL -- "-${process_group}" 2>/dev/null || true
+    fail "release process group survived supervisor SIGKILL"
+  fi
+  assert_no_coordination_mutation
+  assert_secret_absent
+  pass "supervisor death immediately kills the release process group"
+fi
 
 printf '1..%d\n' "${tests_run}"

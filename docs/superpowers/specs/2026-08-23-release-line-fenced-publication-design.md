@@ -95,9 +95,10 @@ The wrapper will:
    command it spawns.
 3. Maintain the heartbeat at an interval below the runbook's five-minute
    maximum.
-4. Maintain a private liveness channel into the helper. Loss of the supervisor
-   closes the channel; the helper then terminates its process group before any
-   further release work.
+4. Maintain a private liveness channel into the helper plus an independent
+   parent-death channel watched by a process in the release group. Loss of the
+   supervisor closes both channels; the death watch immediately kills the full
+   group, including an outward command already in progress.
 5. On lease refresh failure, terminate the process group and exit nonzero.
 6. On normal completion or interruption, stop heartbeat activity, terminate any
    remaining children, and report the exact process group that must be proven

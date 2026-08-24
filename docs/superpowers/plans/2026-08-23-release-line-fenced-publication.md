@@ -4,7 +4,7 @@
 
 **Goal:** Make the prepared 17.1.0.rc.0 candidate pass exact-head validation and publish only through a lifetime-bound, per-write-fenced release entry point.
 
-**Architecture:** Narrow same-candidate retry discovery to an explicitly selected tracker, make packed Pro compatibility resolve both local tarballs without registry availability, and replace the placeholder script/release with a Ruby supervisor. The supervisor owns a private liveness pipe and release process group; a focused lease guard validates that contract and performs authoritative agent-coord checks immediately before every outward write.
+**Architecture:** Narrow same-candidate retry discovery to an explicitly selected tracker, make packed Pro compatibility resolve both local tarballs without registry availability, and replace the placeholder script/release with a Ruby supervisor. The supervisor owns a private liveness pipe, an independent parent-death pipe, and a release process group; a focused lease guard validates that contract and performs authoritative agent-coord checks immediately before every outward write, while the death watch kills the group if the supervisor disappears.
 
 **Tech Stack:** Ruby, Rake, RSpec, Bash, Node.js ESM, pnpm, node:test, GitHub CLI, agent-coord HTTP backend.
 
