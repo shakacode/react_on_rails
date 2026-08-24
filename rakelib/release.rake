@@ -8713,10 +8713,10 @@ end
 
 def release_compound_live_boundary_guidance
   <<~GUIDANCE.chomp
-    Live compound release remains BLOCKED by operational and agent policy until the repository-owned
-    lifetime/per-write lease wrapper exists. This is not runtime enforcement: the release tasks remain
-    technically callable in live mode. Direct live invocation outside the individually guarded procedure in
-    internal/contributor-info/release-train-runbook.md violates repository policy.
+    Live release uses only `script/release VERSION`, which requires the existing matching release-line
+    lease and performs fresh authoritative fences before every outward write. Direct live Rake is refused
+    without its private supervisor contract; use `bundle exec rake "release[VERSION,true]"` only to preview.
+    See internal/contributor-info/release-train-runbook.md for the claim, identity, and recovery procedure.
   GUIDANCE
 end
 
@@ -8920,10 +8920,10 @@ end
 
 def github_release_sync_preview_guidance(version:)
   <<~GUIDANCE.chomp
-    Live GitHub release recovery remains BLOCKED by operational and agent policy until the repository-owned
-    lifetime/per-write lease wrapper exists. This is not runtime enforcement: sync_github_release remains
-    technically callable in live mode. Direct live invocation outside the individually guarded procedure in
-    internal/contributor-info/release-train-runbook.md violates repository policy.
+    Direct live sync_github_release is refused without the private release supervisor contract. For a
+    fenced idempotent create or edit, use `script/release #{version}` after verifying its existing matching
+    lease and exact artifact evidence; do not invoke this task live directly.
+    See internal/contributor-info/release-train-runbook.md for the recovery procedure.
     Preview the idempotent GitHub-only sync step with:
       bundle exec rake "sync_github_release[#{version},true]"
   GUIDANCE
@@ -9704,10 +9704,11 @@ Retry safety: Never drop the version argument when previewing recovery from an i
 Preview the exact version, for example `bundle exec rake \"release[16.2.0.rc.1,true]\"`. An argument-less
 command from a prerelease checkout fails closed instead of inferring promotion to the stable version.
 
-Live compound release remains BLOCKED by operational and agent policy until the repository-owned
-lifetime/per-write lease wrapper exists. This is not runtime enforcement: the release tasks remain
-technically callable in live mode. Direct live invocation outside the individually guarded procedure in
-internal/contributor-info/release-train-runbook.md violates repository policy.
+Live release entry point: `script/release VERSION`. It requires an existing matching
+release-line claim and supervises this task with fresh authoritative per-write lease fences.
+Direct live `bundle exec rake release[...]` is refused without that private wrapper contract;
+use Rake directly only with `dry_run=true`. See internal/contributor-info/release-train-runbook.md
+for claim acquisition, identity, recovery, and the supervised reconciliation path.
 
 This will update and release:
   PUBLIC (npmjs.org + rubygems.org):
@@ -9774,6 +9775,9 @@ Environment variables:
   GEM_RELEASE_MAX_RETRIES=<n>  # Positive base-10 integer max retry attempts (default: 3)
 
 Examples:
+  script/release 16.2.0.rc.1                  # Only supported live publication path
+  script/release --dry-run 16.2.0.rc.1        # Preview without coordination
+  script/release --reconcile-accelerated-rc 16.2.0.rc.1 # Supervised accelerated-RC reconciliation
   rake \"release[,true]\"                       # Preview auto-detected version
   rake \"release[patch,true]\"                  # Preview patch bump (16.1.1 → 16.1.2)
   rake \"release[minor,true]\"                  # Preview minor bump (16.1.1 → 16.2.0)
@@ -10369,10 +10373,9 @@ end
 
 desc("Creates or updates a GitHub release from CHANGELOG.md for an already-published version.
 
-Live GitHub release recovery remains BLOCKED by operational and agent policy until the repository-owned
-lifetime/per-write lease wrapper exists. This is not runtime enforcement: sync_github_release remains
-technically callable in live mode. Direct live invocation outside the individually guarded procedure in
-internal/contributor-info/release-train-runbook.md violates repository policy. Preview only.
+Direct live sync_github_release is refused without the private release supervisor contract. Preview this
+task directly; for a fenced idempotent create or edit, use `script/release VERSION` after verifying its
+existing matching lease and exact artifact evidence. See internal/contributor-info/release-train-runbook.md.
 
 Arguments:
 1st argument: Gem version in RubyGems format (required), e.g. 16.4.0 or 16.4.0.rc.1
@@ -10488,10 +10491,9 @@ release CI gate evaluates the branch tip and a just-pushed branch has no checks 
 the branch and cutting rc.0 must be two steps with a CI run between them. After CI runs on the new
 branch tip, preview rc.0 with `bundle exec rake \"release[17.0.0.rc.0,true]\"`.
 
-Live compound release remains BLOCKED by operational and agent policy until the repository-owned
-lifetime/per-write lease wrapper exists. This is not runtime enforcement: release:start remains technically
-callable in live mode. Direct live invocation outside the individually guarded procedure in
-internal/contributor-info/release-train-runbook.md violates repository policy.
+Live release:start remains **BLOCKED**: it does not yet have the publication wrapper's lifetime/per-write
+contract. Use its dry run and the separately fenced branch-creation procedure in
+internal/contributor-info/release-train-runbook.md; `script/release` starts only after the release branch exists.
 
 Arguments:
 1st argument: Release line base version X.Y.Z (optional). When omitted, derived from the top

@@ -94,7 +94,7 @@ BENCH_PRO_NODE_RENDERER_CHANGED=false
 
 is_release_tooling_path() {
   case "$1" in
-    rakelib/release.rake|script/release-forward-port|script/release-forward-port-test.bash|script/release-finish|script/release-finish-test.bash)
+    rakelib/release.rake|rakelib/release_lease_guard.rb|script/release|script/release-test.bash|script/release-forward-port|script/release-forward-port-test.bash|script/release-finish|script/release-finish-test.bash)
       return 0
       ;;
     *)
@@ -105,10 +105,10 @@ is_release_tooling_path() {
 
 release_tooling_heredoc_language() {
   case "$1" in
-    rakelib/release.rake|script/release-forward-port|script/release-finish)
+    rakelib/release.rake|rakelib/release_lease_guard.rb|script/release|script/release-forward-port|script/release-finish)
       printf '%s\n' "ruby"
       ;;
-    script/release-forward-port-test.bash|script/release-finish-test.bash)
+    script/release-test.bash|script/release-forward-port-test.bash|script/release-finish-test.bash)
       printf '%s\n' "bash"
       ;;
     *)
@@ -480,11 +480,8 @@ while IFS= read -r file; do
   # core/Pro spec-only changes. It must run before the script/* CI-infra arm
   # (which would otherwise swallow script/release-*). Sets no BENCH_* flag:
   # release tooling is never shipped in the gem and cannot move runtime
-  # performance. NOTE: the bare `script/release` stub (a 3-line
-  # `echo "See rake -D release"`) is intentionally NOT included in
-  # is_release_tooling_path — it has no release-spec coverage, so it stays in the
-  # script/* CI-infra arm rather than claiming a test suite that does not
-  # exercise it.
+  # performance. `script/release` and its guard/test are included because the
+  # release specs and supervisor integration harness exercise their contract.
   if is_release_tooling_path "$file"; then
     DOCS_ONLY=false
     if source_file_comment_only_change "$file"; then

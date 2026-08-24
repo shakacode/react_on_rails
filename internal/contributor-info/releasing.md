@@ -10,21 +10,16 @@ RC to final, and close out the release branch, see
 behavioral release verification lanes, see [RC Testing Plan](rc-testing-plan.md)
 and [Release Verification Runbook](release-verification-runbook.md).
 
-> **Execution boundary:** This page is a mechanical reference, not a live-release
-> procedure. Until a repository-owned wrapper binds a compound helper to the
-> release-line lease for its whole lifetime and fences every outward operation,
-> use `bundle exec rake release`, `script/release-finish`, and other compound
-> release helpers only in dry-run or preview mode. All release-mutating examples
-> on this page are therefore previews. For a live cut or reconciliation, follow
-> the individually guarded commands in the
-> [Release-Train Runbook](release-train-runbook.md#serialize-every-release-line-write).
-> **BLOCKED** is an operational and agent policy stop, not runtime enforcement:
-> these tasks remain technically callable in live mode, but direct live
-> invocation outside that individually guarded procedure violates release
-> policy.
-> Interrupted or partial-publication recovery is currently blocked; preserve
-> the evidence and follow the dispositions in
-> [Partial-publication recovery](release-train-runbook.md#partial-publication-recovery).
+> **Execution boundary:** Live publication and accelerated-RC reconciliation use
+> only `script/release VERSION` (or
+> `script/release --reconcile-accelerated-rc VERSION`). The supervisor requires an already-active matching
+> `release-line:X.Y.Z` claim under a fresh process UUID, maintains its heartbeat,
+> and proves that each outward write still has the same live claim. It does not
+> claim, take over, or automatically release the lease. Direct live
+> `bundle exec rake release[...]` is refused; use Rake directly only with `dry_run=true`.
+> For claim acquisition, identity variables, handoff, and partial-publication
+> recovery, follow the [Release-Train
+> Runbook](release-train-runbook.md#serialize-every-release-line-write).
 
 ## Testing the Gem before Release from a Rails App
 
@@ -72,8 +67,8 @@ React on Rails RC. Follow the ordered dependency-promotion gate in the
 
 If a stable target lacks this section, the release task aborts before confirmation, tagging, or publication.
 For a prerelease, the task warns and skips the GitHub release. After adding the section, preview the idempotent update
-with the dry-run form `sync_github_release[X.Y.Z,true]`; live GitHub release creation or editing remains **BLOCKED** as
-documented in [Partial-publication recovery](release-train-runbook.md#partial-publication-recovery).
+with the dry-run form `sync_github_release[X.Y.Z,true]`; for a live recovery, use the exact version through
+`script/release VERSION` as documented in [Partial-publication recovery](release-train-runbook.md#partial-publication-recovery).
 
 #### Why changelog comes BEFORE the release
 
@@ -115,9 +110,9 @@ bundle exec rake "release[16.2.0,true,true]"
 
 > **Retry safety:** Never drop the version argument when resuming an interrupted release. Retry the
 > exact prerelease version; preview it with `bundle exec rake "release[17.0.0.rc.10,true]"`, then use
-> the blocked-state dispositions in
-> [Partial-publication recovery](release-train-runbook.md#partial-publication-recovery). There is no
-> safe live retry until the required fencing exists. From a prerelease
+> the recovery procedure in
+> [Partial-publication recovery](release-train-runbook.md#partial-publication-recovery). Live retry is
+> only `script/release 17.0.0.rc.10` after its existing matching claim and exact evidence are verified. From a prerelease
 > checkout, an argument-less release fails closed unless the changelog advances the same release line
 > to a newer prerelease. Stable promotion must use an explicit stable version and a matching non-empty
 > changelog section.
@@ -229,7 +224,7 @@ bundle exec rake "release[17.0.1,true]"
 ```
 
 This preview validates the target and tracker inputs but does not fetch or persist the selected run. Live
-association remains blocked until the repository-owned release wrapper described in the execution boundary exists.
+association uses the repository-owned `script/release VERSION` wrapper described in the execution boundary.
 
 This selector is not a waiver. Before appending anything, the task fetches the run and its schema-v2
 artifact from GitHub and verifies repository, workflow, branch, target version, run ID and attempt,
@@ -706,8 +701,9 @@ The task automatically converts Ruby gem format to npm semver format:
 
 1. When prompted for **npm OTP**, enter your 2FA code from your authenticator app
 2. When prompted for **RubyGems OTP**, enter your 2FA code
-3. If using `rake release` with no version, confirm the version detected from CHANGELOG.md. A stable checkout
-   may derive a patch candidate, but publication remains blocked until that version has a matching non-empty section.
+3. Invoke the live release with an explicit version through `script/release VERSION`; direct live Rake is refused.
+   A stable checkout may derive a patch candidate in a dry run, but publication still requires a matching non-empty
+   changelog section.
 4. The script will automatically commit and push version bumps
 5. The script will automatically create a GitHub release (if CHANGELOG.md section exists)
 
@@ -729,9 +725,10 @@ The task automatically converts Ruby gem format to npm semver format:
    Run `$update-changelog 16.5.0` (using the already-released version) to analyze
    commits, write entries, and automatically open a PR. Use
    `$react-on-rails-update-changelog` instead when the catch-up PR must target
-   `release/X.Y.Z`. After the PR merges, preview the GitHub release update. The
-   `sync_github_release` command below is preview-only; live GitHub release creation or editing remains
-   **BLOCKED** as documented in
+   `release/X.Y.Z`. After the PR merges, preview the GitHub release update. Keep
+   `sync_github_release` preview-only; if the matching published release needs a live
+   idempotent GitHub update, resume through `script/release VERSION` under its existing
+   fenced lease as documented in
    [Partial-publication recovery](release-train-runbook.md#partial-publication-recovery):
 
    ```bash
@@ -750,7 +747,8 @@ The task automatically converts Ruby gem format to npm semver format:
 ### Syncing GitHub Releases Manually
 
 If the automatic GitHub release creation was skipped (e.g., CHANGELOG.md section was missing during release),
-preview the recovery after updating the changelog. The live path is blocked, as documented in
+preview the recovery after updating the changelog. Direct live `sync_github_release` remains refused;
+the fenced recovery path is `script/release VERSION`, as documented in
 [Partial-publication recovery](release-train-runbook.md#partial-publication-recovery):
 
 1. Update `CHANGELOG.md` with the published version section
@@ -767,8 +765,8 @@ bundle exec rake "sync_github_release[16.5.0.rc.1,true]"
 
 `sync_github_release` reads release notes from the matching `CHANGELOG.md` section, applies the same size preparation
 as the main release task, and creates or updates the GitHub release for the corresponding tag. It is the idempotent
-recovery behavior when package publication succeeded but the final GitHub step failed. Its live GitHub create/edit
-boundary remains unfenced, so the commands above are preview-only until the required wrapper exists.
+recovery behavior when package publication succeeded but the final GitHub step failed. Preview it directly; for a
+live create or edit, `script/release VERSION` supplies the required supervised per-write fence.
 
 ### Pre-Release Checklist
 
@@ -891,10 +889,9 @@ If the release fails partway through (e.g., during NPM publish):
    - NPM: `npm view react-on-rails@X.Y.Z`
    - RubyGems: `gem list react_on_rails -r -a`
 3. Record the exact branch tip, local and remote tag identity, published artifact set, and helper output.
-4. Follow the blocked-state dispositions in
-   [Partial-publication recovery](release-train-runbook.md#partial-publication-recovery). Current live recovery paths
-   are blocked until the required fencing exists. If lease state or any remote/artifact identity is `UNKNOWN`, remain
-   stopped.
+4. Follow [Partial-publication recovery](release-train-runbook.md#partial-publication-recovery). Resume only through
+   `script/release VERSION` after the required claim, supervisor, and artifact evidence are all exact; if lease state
+   or any remote/artifact identity is `UNKNOWN`, remain stopped.
 
 ## Version History
 

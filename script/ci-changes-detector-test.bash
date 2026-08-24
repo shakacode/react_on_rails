@@ -1024,7 +1024,7 @@ test_benchmark_comment_only_change_is_non_runtime_but_keeps_lint() {
 # this arm existed, rakelib/release.rake hit the uncategorized catch-all and set
 # run_generators=true.
 #
-# All five release-tooling paths share one contract, asserted identically via
+# All eight release-tooling paths share one contract, asserted identically via
 # this helper so a one-character typo in any pattern can't silently fall through
 # to the generator-sensitive script/* CI-infra arm.
 assert_release_tooling_contract() {
@@ -1058,6 +1058,13 @@ test_release_rake_change_runs_ruby_tests_and_lint_without_generators() {
   assert_release_tooling_contract "$(detector_output)" "release rake output"
 }
 
+test_release_lease_guard_change_runs_ruby_tests_and_lint_without_generators() {
+  setup_repo
+  write_file_change "rakelib/release_lease_guard.rb" "module ReleaseLeaseGuard; end"
+
+  assert_release_tooling_contract "$(detector_output)" "release lease guard output"
+}
+
 # The release helper scripts under script/ must be caught by the release-tooling
 # arm, not the broad script/* CI-infrastructure arm (which would set
 # run_generators=true and force hosted CI). Same contract as release.rake.
@@ -1066,6 +1073,20 @@ test_release_finish_script_change_runs_ruby_tests_and_lint_without_generators() 
   write_file_change "script/release-finish" "#!/usr/bin/env bash"
 
   assert_release_tooling_contract "$(detector_output)" "release-finish output"
+}
+
+test_release_script_change_runs_ruby_tests_and_lint_without_generators() {
+  setup_repo
+  write_file_change "script/release" "#!/usr/bin/env ruby"
+
+  assert_release_tooling_contract "$(detector_output)" "release wrapper output"
+}
+
+test_release_script_test_change_runs_ruby_tests_and_lint_without_generators() {
+  setup_repo
+  write_file_change "script/release-test.bash" "#!/usr/bin/env bash"
+
+  assert_release_tooling_contract "$(detector_output)" "release wrapper test output"
 }
 
 # Per-path coverage for the remaining three release-tooling globs. Without these,
@@ -1511,7 +1532,10 @@ test_empty_diff_skips_everything() {
 
 run_test test_empty_diff_skips_everything
 run_test test_release_rake_change_runs_ruby_tests_and_lint_without_generators
+run_test test_release_lease_guard_change_runs_ruby_tests_and_lint_without_generators
 run_test test_release_finish_script_change_runs_ruby_tests_and_lint_without_generators
+run_test test_release_script_change_runs_ruby_tests_and_lint_without_generators
+run_test test_release_script_test_change_runs_ruby_tests_and_lint_without_generators
 run_test test_release_forward_port_script_change_runs_ruby_tests_and_lint_without_generators
 run_test test_release_forward_port_test_change_runs_ruby_tests_and_lint_without_generators
 run_test test_release_finish_test_change_runs_ruby_tests_and_lint_without_generators

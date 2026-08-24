@@ -254,23 +254,39 @@ transition-only heartbeat is insufficient. If either refresh fails, stop all
 release-line writes until `acquire_release_line_lease` succeeds and the live
 assertion passes again.
 
-Treat a helper that performs several outward operations, such as
-`script/release-finish` or `bundle exec rake release`, as one compound writer.
-Those helpers do not embed the coordination client and cannot check ownership
-at each outward-operation boundary. A separate supervisor is insufficient: it
-can be killed while its helper remains alive, after which a replacement could
-take the lease and race the orphan. Until a repository-owned wrapper binds the
-whole helper process group to the supervisor's lifetime and checks ownership at
-each outward operation, use these helpers only in dry-run mode. For a live
-release, stop and use the runbook's individual commands, with
-`require_live_release_line_lease` immediately before each outward write. If an
-individual command cannot expose that boundary, stop rather than run it as an
-uncontrolled compound writer.
+`script/release VERSION` is the sole supported live entry point for the
+compound publication task. It requires an already-active
+`release-line:X.Y.Z` claim for the current branch under the fresh, per-process
+`RELEASE_COORDINATOR_ID` / `RELEASE_COORDINATOR_INSTANCE_ID` and the stable
+`AGENT_COORD_MACHINE_ID`. The wrapper starts the helper in a dedicated process
+group, maintains a heartbeat below the five-minute maximum, and supplies a
+private liveness channel. Immediately before every outward write, the helper
+performs a new authoritative targeted status read and verifies the exact claim,
+identity, branch, heartbeat, supervisor, and process group.
 
-Here and elsewhere in this runbook, **BLOCKED** is an operational and agent
-policy stop, not runtime enforcement. The compound tasks remain technically
-callable in live mode; direct live invocation outside the individually guarded
-procedure violates release policy.
+Do not invoke live `bundle exec rake "release[...]"`, `sync_github_release`,
+or `release:reconcile_accelerated_rc` directly. They fail closed without the
+private wrapper contract; setting environment variables is not a substitute.
+Direct Rake is supported only for dry runs. The wrapper never acquires, takes
+over, or automatically releases a claim. If it stops, prove its printed process
+group and children are dead before an operator records a handoff or intentionally
+releases/acquires the line with a fresh UUID identity.
+
+```bash
+# On release/17.0.0, after the existing claim and heartbeat have been verified:
+script/release 17.0.0.rc.0
+
+# Dry runs need no coordination identity or claim:
+script/release --dry-run 17.0.0.rc.0
+
+# Reconcile a previously accelerated RC under the same supervised contract:
+RELEASE_TRACKER=4842 script/release --reconcile-accelerated-rc 17.0.0.rc.0
+```
+
+`release:start`, `script/release-finish`, and release-line branch management are
+not publication-wrapper entry points. Keep their live compound forms **BLOCKED**
+until they receive the same lifetime/per-write contract; use their dry runs and
+the separately fenced runbook steps only.
 
 Immediately before each write or merge, rerun `require_live_release_line_lease`
 in the shell where the functions above are defined. It is a fail-closed
@@ -319,30 +335,29 @@ mutation.
 
 #### Partial-publication recovery
 
-If a compound release stops after any outward write, stop the helper and keep
-the release-line lease live. Preserve the exact local and remote branch tips,
+If a compound release stops after any outward write, stop the helper and preserve
+the release-line lease state. Preserve the exact local and remote branch tips,
 local and remote tag identity, the complete six-package registry artifact set,
 and the helper command and output. Do not delete or move tags, reset or
-force-push the release branch, rerun the compound release, overwrite published
-artifacts, or ad-lib manual publication.
+force-push the release branch, rerun direct or unfenced publication, overwrite
+published artifacts, or ad-lib manual publication. If the prior supervisor has
+stopped, prove its process group and children are dead before an operator
+intentionally releases/acquires the claim under a fresh identity.
 
-- **The tag exists and zero immutable packages were published.** Live recovery
-  is **BLOCKED** pending the repository-owned process-group/per-write fencing
-  wrapper or an explicit maintainer-approved fully fenced reconciliation plan.
+- **The tag exists and zero immutable packages were published.** After recording
+  exact evidence, resume only with `script/release VERSION`; do not call live
+  Rake directly or alter the tag.
 - **All six immutable packages were published, but GitHub release creation or
-  update failed.** `sync_github_release` remains idempotent in behavior, but its
-  live GitHub create/edit boundary is unfenced. Preview only with the dry-run
-  form `sync_github_release[X.Y.Z,true]`; live recovery is **BLOCKED** pending
-  the repository-owned process-group/per-write fencing wrapper or an explicit
-  maintainer-approved fully fenced reconciliation plan.
-- **Only a subset of the six immutable packages was published.** Live recovery
-  is **BLOCKED** pending the repository-owned process-group/per-write fencing
-  wrapper or an explicit maintainer-approved fully fenced reconciliation plan.
+  update failed.** Preview `sync_github_release[X.Y.Z,true]`, then use
+  `script/release VERSION` for the fenced, idempotent live create/edit.
+- **Only a subset of the six immutable packages was published.** Stop and record
+  the exact artifact set; resume only through `script/release VERSION`, whose
+  read-only probes preserve immutable versions and whose every retry is fenced.
 
 If the lease, branch, tag, registry, or helper evidence is missing,
 contradictory, or `UNKNOWN`, remain stopped. A maintainer-approved plan must
-identify and fence every remaining outward write; approval alone does not make
-an unfenced command safe.
+identify every remaining outward write; approval alone does not make an
+unfenced command safe.
 
 ### 1. Cut the RC onto `release/X.Y.Z`
 
@@ -366,8 +381,8 @@ bundle exec rake "release:start[${RELEASE_VERSION},true]"   # dry-run only; no b
 ```
 
 Live `release:start` is an unfenced compound helper: it fetches, creates, and
-pushes the branch after only an outer lease check. Do not run it until the
-wrapper contract above is implemented. With no version argument the helper
+pushes the branch after only an outer lease check. Do not run it live until
+`release:start` itself receives the lifetime/per-write contract. With no version argument the helper
 derives the release line from the top `### [X.Y.Z.rc.N]` CHANGELOG.md header.
 Pass the **stable base** (`17.0.0`), never `17.0.0.rc.0` — the rc index lives in
 the changelog, not the branch name.
@@ -387,22 +402,19 @@ git push \
 
 **Step 1b — cut rc.0 from the branch.** After at least one CI run finishes on the `release/17.0.0` tip,
 ensure the rc changelog header is present (`$react-on-rails-update-changelog rc`
-targeting the branch). The bare release command reads the version from CHANGELOG.md, so you do **not**
-pass `17.0.0.rc.0`. It is currently an unfenced compound writer: preview and prepare the cut, but stop
-before live execution until the wrapper contract above is implemented.
+targeting the branch). Use the explicit candidate through the supervised wrapper;
+do not invoke bare live Rake.
 
 ```bash
 # On release/17.0.0, with CHANGELOG.md stamped ### [17.0.0.rc.0]:
 require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
-# BLOCKED: bundle exec rake release would bump, tag, and publish without per-write lease fences.
+script/release 17.0.0.rc.0
 ```
 
-**Forgot to start the line first?** The release task's existing behavior, once the compound-writer
-wrapper exists, is: if you run `bundle exec rake release` for an rc while still on
-`main` and `release/X.Y.Z` does not exist yet, the release task **offers to start the release line for
-you** (`Start the 17.0.0 release line now? [y/N]`); accepting runs the same `release:start` logic and
-stops before tagging. If `release/X.Y.Z` already exists, the task stops and tells you to
-`git checkout release/X.Y.Z` and re-run — this guards against tagging an rc off a drifted `main`.
+**Forgot to start the line first?** `script/release` deliberately requires the matching
+`release/X.Y.Z` checkout and does not create a release branch. Stop, complete Step 1a,
+wait for CI on the new branch tip, then run the wrapper from that branch. This guards
+against tagging an RC from a drifted `main`.
 
 > **The release task's CI gate evaluates the branch you release from.** `rakelib/release.rake` runs
 > `validate_main_ci_status!`, which now fetches and evaluates the tip of the branch the release is cut
@@ -432,7 +444,7 @@ Per-release-branch concurrency cancels an obsolete in-progress run when a newer 
 candidate is dispatched; the newest branch candidate is authoritative, so a failed or cancelled newer
 run never causes fallback to an older success.
 
-When `bundle exec rake release[...]` later pushes the version-bump commit, it first watches the latest
+When `script/release VERSION` later pushes the version-bump commit, it first watches the latest
 prepared-candidate pre-run if that run is still active. A failed or otherwise non-reusable exact-head run
 does not prevent the task from considering the latest pre-run. The task reuses completed pre-run evidence
 only when all of these checks succeed:
@@ -1176,12 +1188,12 @@ it runs `git fetch`, asserts you are on `release/X.Y.Z` with a clean tree, verif
 accepted RC tag (`git diff --stat vX.Y.Z.rc.N` is empty), prompts you to collapse the rc CHANGELOG, then
 asks for explicit confirmation before running `bundle exec rake release[X.Y.Z]`. It wraps — does not
 replace — the rake promotion guards (`stable_release_branch_allowed?`,
-`ensure_release_branch_promotes_tagged_rc!`). Because normal mode is an unfenced compound writer, use
-only `--dry-run` until the wrapper contract above is implemented:
+`ensure_release_branch_promotes_tagged_rc!`). Because `release-finish` normal mode does not have the
+publication wrapper's lifetime/per-write contract, use only `--dry-run`:
 
 ```bash
 script/release-finish promote "${RELEASE_VERSION}" --dry-run   # checks current remote state; performs no release writes
-# BLOCKED: do not run normal mode without the repository-owned lifetime/fencing wrapper.
+# BLOCKED: do not run release-finish normal mode until it receives a lifetime/per-write contract.
 ```
 
 By default it resolves the highest `v17.0.0.rc.N` tag as the accepted RC; pass `--rc-tag v17.0.0.rc.3`
@@ -1204,7 +1216,7 @@ git rev-parse HEAD            # confirm it equals the tag of the good RC
 git diff --stat "${ACCEPTED_RC_TAG}"  # expect: empty (no drift since the good RC)
 ```
 
-Collapse the RC CHANGELOG sections into the final section, then stop at the fenced-publication gap.
+Collapse the RC CHANGELOG sections into the final section, then publish only through the fenced wrapper.
 Do not manually bump the
 React on Rails gem/npm product-version files; the release task owns that coordinated change. The
 CHANGELOG edit plus the task-generated version metadata is the only difference between the good RC
@@ -1213,7 +1225,7 @@ and the final:
 ```bash
 # $react-on-rails-update-changelog release   (collapses rc sections into ### [17.0.0])
 require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
-# BLOCKED: bundle exec rake "release[17.0.0]" would bump, tag, and publish without per-write lease fences.
+script/release "${RELEASE_VERSION}"
 ```
 
 > **Run the stable promotion from `release/X.Y.Z` itself.** `rakelib/release.rake` allows a stable
@@ -1281,14 +1293,14 @@ stable version-bump, merge, or rollback item that was inspected and intentionall
 PR. For a legacy authoritative changelog PR without embedded source-SHA provenance, also pass
 `--ack-final-changelog-source <current-source-changelog-sha>`. Because the helper cannot refresh the
 canonical coordination lease immediately before each remote transaction, normal mode remains blocked
-until the repository-owned lifetime/per-write wrapper exists. Preview with `--dry-run`:
+until `release-finish` itself receives the lifetime/per-write contract. Preview with `--dry-run`:
 
 ```bash
 git fetch origin
 git checkout main
 git pull --rebase
 script/release-finish close-out "${RELEASE_VERSION}" --dry-run   # prints commands + the real forward-port plan
-# BLOCKED: do not run normal mode without the repository-owned lifetime/per-write lease wrapper.
+# BLOCKED: do not run normal mode until release-finish receives a lifetime/per-write contract.
 # If either check is incomplete, land the PRs from step 3 and rerun the preview.
 ```
 

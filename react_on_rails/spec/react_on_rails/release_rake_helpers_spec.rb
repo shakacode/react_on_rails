@@ -698,7 +698,7 @@ RSpec.describe "release.rake helper methods" do
       )
     end
 
-    it "reports only preview-safe GitHub recovery guidance when publication fails" do
+    it "routes GitHub recovery through the fenced release wrapper when publication fails" do
       release_context = {
         notes: "#### Fixed\n\n- Release fix",
         prerelease: false,
@@ -717,7 +717,8 @@ RSpec.describe "release.rake helper methods" do
         )
       end.to raise_error(SystemExit) { |error|
         expect(error.message).to include(
-          "Live GitHub release recovery remains BLOCKED",
+          "Direct live sync_github_release is refused",
+          "script/release 17.0.0",
           'bundle exec rake "sync_github_release[17.0.0,true]"',
           "internal/contributor-info/release-train-runbook.md"
         )
@@ -727,7 +728,7 @@ RSpec.describe "release.rake helper methods" do
   end
 
   describe "#sync_github_release_after_publish" do
-    it "reports only preview-safe guidance when the changelog section is missing" do
+    it "routes missing-changelog recovery through the fenced release wrapper" do
       allow(self).to receive(:extract_changelog_section)
         .with(changelog_path: "/tmp/repo/CHANGELOG.md", version: "17.0.0")
         .and_return(nil)
@@ -737,50 +738,54 @@ RSpec.describe "release.rake helper methods" do
         sync_github_release_after_publish(monorepo_root: "/tmp/repo", gem_version: "17.0.0", dry_run: false)
       end
 
-      expect(output).to match(
-        /Skipping GitHub release.*Live GitHub release recovery remains BLOCKED.*sync_github_release\[17\.0\.0,true\]/m
+      expect(output).to include(
+        "Skipping GitHub release",
+        "Direct live sync_github_release is refused",
+        "script/release 17.0.0",
+        "sync_github_release[17.0.0,true]"
       )
       expect(output).not_to match(/sync_github_release\[17\.0\.0\]"/)
     end
   end
 
   describe "#report_release_dry_run_follow_up" do
-    it "points only to another preview instead of an unfenced live release" do
+    it "points to the fenced release wrapper and a preview" do
       output = capture_stdout do
         report_release_dry_run_follow_up(version: "17.0.0")
       end
 
       expect(output).to include(
-        "Live compound release remains BLOCKED",
+        "Live release uses only `script/release VERSION`",
         'bundle exec rake "release[17.0.0,true]"',
         "release-train-runbook.md"
       )
-      expect(output).not_to match(/To actually release|bundle exec rake "release\[17\.0\.0\]"/)
+      expect(output).to include("Direct live Rake is refused")
+      expect(output).not_to match(/bundle exec rake "release\[17\.0\.0\]"/)
     end
   end
 
-  describe "preview-only compound release guidance" do
+  describe "fenced compound release guidance" do
     let(:release_runbook) { "internal/contributor-info/release-train-runbook.md" }
 
-    it "states exactly that the live boundary is policy, not runtime enforcement" do
+    it "states the wrapper boundary and direct-Rake refusal" do
       expect(release_compound_live_boundary_guidance).to eq(<<~GUIDANCE.chomp)
-        Live compound release remains BLOCKED by operational and agent policy until the repository-owned
-        lifetime/per-write lease wrapper exists. This is not runtime enforcement: the release tasks remain
-        technically callable in live mode. Direct live invocation outside the individually guarded procedure in
-        internal/contributor-info/release-train-runbook.md violates repository policy.
+        Live release uses only `script/release VERSION`, which requires the existing matching release-line
+        lease and performs fresh authoritative fences before every outward write. Direct live Rake is refused
+        without its private supervisor contract; use `bundle exec rake "release[VERSION,true]"` only to preview.
+        See internal/contributor-info/release-train-runbook.md for the claim, identity, and recovery procedure.
       GUIDANCE
 
       expect(github_release_sync_preview_guidance(version: "17.0.0")).to eq(<<~GUIDANCE.chomp)
-        Live GitHub release recovery remains BLOCKED by operational and agent policy until the repository-owned
-        lifetime/per-write lease wrapper exists. This is not runtime enforcement: sync_github_release remains
-        technically callable in live mode. Direct live invocation outside the individually guarded procedure in
-        internal/contributor-info/release-train-runbook.md violates repository policy.
+        Direct live sync_github_release is refused without the private release supervisor contract. For a
+        fenced idempotent create or edit, use `script/release 17.0.0` after verifying its existing matching
+        lease and exact artifact evidence; do not invoke this task live directly.
+        See internal/contributor-info/release-train-runbook.md for the recovery procedure.
         Preview the idempotent GitHub-only sync step with:
           bundle exec rake "sync_github_release[17.0.0,true]"
       GUIDANCE
     end
 
-    it "keeps release retry guidance in preview mode" do
+    it "keeps previews separate from the fenced live retry path" do
       allow(self).to receive(:extract_changelog_section)
         .with(changelog_path: "/tmp/repo/CHANGELOG.md", version: "17.0.0")
         .and_return(nil)
@@ -789,7 +794,7 @@ RSpec.describe "release.rake helper methods" do
         confirm_release!(version: "17.0.0", monorepo_root: "/tmp/repo")
       end.to raise_error(SystemExit) { |error|
         expect(error.message).to include(
-          "Live compound release remains BLOCKED",
+          "Live release uses only `script/release VERSION`",
           'bundle exec rake "release[17.0.0,true]"',
           release_runbook
         )
@@ -801,7 +806,7 @@ RSpec.describe "release.rake helper methods" do
         current_version: "17.0.0.rc.10"
       )
       expect(retry_message).to include(
-        "Live compound release remains BLOCKED",
+        "Live release uses only `script/release VERSION`",
         'bundle exec rake "release[17.0.0.rc.10,true]"',
         'bundle exec rake "release[17.0.0,true]"',
         release_runbook
@@ -812,7 +817,7 @@ RSpec.describe "release.rake helper methods" do
       )
     end
 
-    it "keeps CI retry and override guidance in preview mode" do
+    it "keeps CI previews separate from the fenced live path" do
       placeholder_instruction =
         "Replace VERSION with the exact requested version or the exact CHANGELOG.md version " \
         "before running this preview."
@@ -824,7 +829,7 @@ RSpec.describe "release.rake helper methods" do
           'RELEASE_CI_STATUS_OVERRIDE=true bundle exec rake "release[VERSION,true]"',
           'bundle exec rake "release[VERSION,true,false,true]"',
           placeholder_instruction,
-          "Live compound release remains BLOCKED",
+          "Live release uses only `script/release VERSION`",
           release_runbook
         )
         expect(error.message).to include("Preserve the failure evidence", "do not rerun or revert")
@@ -839,7 +844,7 @@ RSpec.describe "release.rake helper methods" do
           'RELEASE_CI_STATUS_OVERRIDE=true bundle exec rake "release[VERSION,true]"',
           'bundle exec rake "release[VERSION,true,false,true]"',
           placeholder_instruction,
-          "Live compound release remains BLOCKED",
+          "Live release uses only `script/release VERSION`",
           release_runbook
         )
         expect(guidance).not_to include(
@@ -856,7 +861,7 @@ RSpec.describe "release.rake helper methods" do
       )
     end
 
-    it "keeps release-line follow-up guidance in preview mode" do
+    it "keeps release-line previews separate from the fenced live path" do
       placeholder_instruction =
         "Replace VERSION with the exact requested version or the exact CHANGELOG.md version " \
         "before running this preview."
@@ -868,7 +873,7 @@ RSpec.describe "release.rake helper methods" do
         expect(guidance).to include(
           'bundle exec rake "release[VERSION,true]"',
           placeholder_instruction,
-          "Live compound release remains BLOCKED",
+          "Live release uses only `script/release VERSION`",
           release_runbook
         )
         expect(guidance).not_to include('bundle exec rake "release[17.0.0.rc.0,true]"')
@@ -15462,21 +15467,24 @@ RSpec.describe "release.rake helper methods" do
   end
 
   describe "release task help" do
-    it "advertises only preview commands while live compound release is blocked" do
+    it "documents the fenced wrapper while direct live rake remains refused" do
       rakefile = File.read(File.expand_path("../../../rakelib/release.rake", __dir__))
       release_help = rakefile.match(/desc\("(.*?)"\)\ntask :release/m)[1]
       sync_help = rakefile.match(/desc\("Creates or updates a GitHub release(.*?)"\)\ntask :sync_github_release/m)[1]
       start_help = rakefile.match(/desc\("Start a release line(.*?)"\)\n  task :start/m)[1]
 
-      expect([release_help, start_help]).to all(
-        include("Live compound release remains BLOCKED", "internal/contributor-info/release-train-runbook.md")
+      expect(release_help).to include(
+        "script/release VERSION",
+        "Direct live `bundle exec rake release[...]` is refused"
       )
       expect(sync_help).to include(
-        "Live GitHub release recovery remains BLOCKED",
+        "Direct live sync_github_release is refused",
+        "script/release VERSION",
         "internal/contributor-info/release-train-runbook.md"
       )
+      expect(start_help).to include("BLOCKED", "internal/contributor-info/release-train-runbook.md")
 
-      release_commands = release_help.lines.grep(/rake (?:\\?"?)release(?:\[|\\?"?$)/)
+      release_commands = release_help.lines.grep(/^\s*rake (?:\\?"?)release(?:\[|\\?"?$)/)
       sync_commands = sync_help.lines.grep(/rake \\"sync_github_release\[/)
       start_commands = start_help.lines.grep(/rake (?:\\?")?release:start/)
 
