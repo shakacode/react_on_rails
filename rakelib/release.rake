@@ -93,6 +93,7 @@ ACCELERATED_RC_TAG_PROVENANCE_MARKER = "react-on-rails-accelerated-rc-provenance
 ACCELERATED_RC_REPOSITORY_COMMENT_PAGE_SIZE = 100
 ACCELERATED_RC_REPOSITORY_COMMENT_MAX_PAGES = 250
 ACCELERATED_RC_REPOSITORY_MARKER_COMMENT_LIMIT = 1_000
+ACCELERATED_RC_CANDIDATE_SEARCH_ISSUE_LIMIT = 100
 ACCELERATED_RC_CANONICAL_TARGET_PATTERN =
   /\A(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.rc\.(?:0|[1-9]\d*)\z/
 ACCELERATED_RC_CANONICAL_TARGET_CASE_INSENSITIVE_PATTERN =
@@ -4334,7 +4335,14 @@ def fetch_accelerated_rc_tracker_records!(repo_slug:, tracker:)
 end
 
 def fetch_repository_accelerated_rc_records_for_candidate!(repo_slug:, target_version:, candidate_sha:, tracker: nil)
-  comments = fetch_repository_issue_comments_for_accelerated_rc_retry!(repo_slug:, tracker:)
+  comments = if tracker
+               issue_numbers = fetch_repository_accelerated_rc_candidate_issue_numbers!(repo_slug:, candidate_sha:)
+               ([tracker] + issue_numbers).uniq.flat_map do |issue_number|
+                 fetch_repository_issue_comments_for_accelerated_rc_retry!(repo_slug:, tracker: issue_number)
+               end
+             else
+               fetch_repository_issue_comments_for_accelerated_rc_retry!(repo_slug:)
+             end
   marker_comments = comments.select do |comment|
     next false unless accelerated_rc_machine_marker_comment?(comment)
 
@@ -4353,6 +4361,54 @@ def fetch_repository_accelerated_rc_records_for_candidate!(repo_slug:, target_ve
   end
 
   accelerated_rc_records_for_candidate(records, target_version:, candidate_sha:)
+end
+
+def fetch_repository_accelerated_rc_candidate_issue_numbers!(repo_slug:, candidate_sha:)
+  query = "repo:#{repo_slug} #{candidate_sha} in:comments"
+  output, status = capture_gh_output(
+    "api", "-X", "GET", "search/issues", "-f", "q=#{query}",
+    "-f", "per_page=#{ACCELERATED_RC_CANDIDATE_SEARCH_ISSUE_LIMIT}"
+  )
+  abort "❌ Unable to search repository comments for exact-candidate accelerated RC history.\n\n#{output}" unless
+    status.success?
+
+  response = JSON.parse(output)
+  unless valid_accelerated_rc_candidate_search_response?(response, repo_slug:)
+    abort "❌ Exact-candidate accelerated RC history search was incomplete or malformed; durable history is unknown."
+  end
+
+  issue_numbers = response.fetch("items").map { |item| item.fetch("number") }
+  if issue_numbers.uniq.length != issue_numbers.length
+    abort "❌ Exact-candidate accelerated RC history search returned duplicate issues; durable history is unknown."
+  end
+
+  issue_numbers
+rescue JSON::ParserError => e
+  abort "❌ Exact-candidate accelerated RC history search returned invalid JSON: #{e.message}"
+end
+
+def valid_accelerated_rc_candidate_search_response?(response, repo_slug:)
+  return false unless response.is_a?(Hash) && response["incomplete_results"] == false
+
+  items = response["items"]
+  total_count = response["total_count"]
+  valid_accelerated_rc_candidate_search_count?(total_count, items) &&
+    items.all? { |item| valid_accelerated_rc_candidate_search_item?(item, repo_slug:) }
+end
+
+def valid_accelerated_rc_candidate_search_count?(total_count, items)
+  total_count.is_a?(Integer) && total_count >= 0 && items.is_a?(Array) &&
+    items.length == total_count && items.length <= ACCELERATED_RC_CANDIDATE_SEARCH_ISSUE_LIMIT
+end
+
+def valid_accelerated_rc_candidate_search_item?(item, repo_slug:)
+  return false unless item.is_a?(Hash) && item["number"].is_a?(Integer) && item["number"].positive?
+
+  number = item.fetch("number")
+  %W[
+    https://github.com/#{repo_slug}/issues/#{number}
+    https://github.com/#{repo_slug}/pull/#{number}
+  ].include?(item["html_url"])
 end
 
 def validated_repository_accelerated_rc_candidate_history!(

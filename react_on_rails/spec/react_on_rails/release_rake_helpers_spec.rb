@@ -8468,6 +8468,29 @@ RSpec.describe "release.rake helper methods" do
       )
     end
 
+    it "rejects a selected tracker when repository discovery finds the candidate on another tracker" do
+      comment = accelerated_rc_test_issue_comment(
+        id: 1,
+        body: accelerated_rc_tracker_comment(authorization),
+        user: { "login" => "justin808" }
+      )
+      allow(self).to receive(:fetch_repository_accelerated_rc_candidate_issue_numbers!)
+        .with(repo_slug: "shakacode/react_on_rails", candidate_sha: "f" * 40)
+        .and_return([3823])
+      allow(self).to receive(:fetch_repository_issue_comments_for_accelerated_rc_retry!) do |tracker:, **|
+        tracker == 3823 ? [comment] : []
+      end
+      allow(self).to receive_messages(
+        local_release_tag_exists?: false,
+        accelerated_rc_repository_comment_permission!: "maintain",
+        fetch_release_tracker_issue!: {}
+      )
+
+      expect do
+        resolve_unflagged_accelerated_retry(tracker: "4842")
+      end.to raise_error(SystemExit, /different release tracker/i)
+    end
+
     it "preserves an ordinary retry when the selected tracker is empty" do
       allow(self).to receive_messages(
         local_release_tag_exists?: true,
