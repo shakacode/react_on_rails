@@ -2983,6 +2983,64 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when an implicit view's named layout has separate ERB control flow around pack helpers" do
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        stub_layouts(
+          "app/views/layouts/conditional_javascript.html.erb" => <<~ERB,
+            <% if false %>
+              <%= javascript_pack_tag %>
+            <% end %>
+          ERB
+          "app/views/layouts/conditional_stylesheet.html.erb" => <<~ERB
+            <% if false %>
+              <%= stylesheet_pack_tag %>
+            <% end %>
+            <%= javascript_pack_tag %>
+          ERB
+        )
+        stub_controllers_and_views(
+          controllers: {
+            "app/controllers/hello_world_controller.rb" => <<~RUBY,
+              class HelloWorldController < ApplicationController
+                layout "conditional_javascript"
+
+                def index
+                end
+              end
+            RUBY
+            "app/controllers/marketing_controller.rb" => <<~RUBY
+              class MarketingController < ApplicationController
+                layout "conditional_stylesheet"
+
+                def index
+                end
+              end
+            RUBY
+          },
+          views: {
+            "app/views/hello_world/index.html.erb" =>
+              '<%= react_component("StyledComponent", auto_load_bundle: true) %>',
+            "app/views/marketing/index.html.erb" =>
+              '<%= react_component("StyledComponent", auto_load_bundle: true) %>'
+          }
+        )
+      end
+
+      it "fails the targeted proof closed without changing informational helper analysis" do
+        doctor.send(:check_layout_files)
+
+        expect(checker.warnings?).to be(false)
+        expect(checker.messages).to include(
+          hash_including(type: :info, content: "  ℹ️  conditional_javascript: has javascript_pack_tag"),
+          hash_including(
+            type: :info,
+            content: "  ✅ conditional_stylesheet: has both stylesheet_pack_tag and javascript_pack_tag"
+          )
+        )
+      end
+    end
+
     context "when a generated controller's implicit component view renders an uninspected partial" do
       before do
         stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])

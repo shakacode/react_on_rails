@@ -1282,6 +1282,7 @@ module ReactOnRails
 
     def check_unflushed_auto_loaded_component_css(layout_name, content, ambiguous_commented_erb: false)
       return if ambiguous_commented_erb
+      return if separate_erb_control_flow?(content)
       return unless erb_output_helper?(content, "javascript_pack_tag")
       return if erb_helper_mentioned?(content, "render")
 
