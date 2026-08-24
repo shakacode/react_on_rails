@@ -2227,6 +2227,61 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when exact-self stylesheet calls appear in non-output ERB" do
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        stub_layouts(
+          "app/views/layouts/discarded_bare.html.erb" => <<~ERB,
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <% self.stylesheet_pack_tag %>
+            <%= javascript_pack_tag %>
+          ERB
+          "app/views/layouts/discarded_parenthesized.html.erb" => <<~ERB,
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <% self.stylesheet_pack_tag() %>
+            <%= javascript_pack_tag %>
+          ERB
+          "app/views/layouts/discarded_command.html.erb" => <<~ERB,
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <% self.stylesheet_pack_tag "application" %>
+            <%= javascript_pack_tag %>
+          ERB
+          "app/views/layouts/discarded_named_args.html.erb" => <<~ERB,
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <% self.stylesheet_pack_tag(media: "all") %>
+            <%= javascript_pack_tag %>
+          ERB
+          "app/views/layouts/emitted.html.erb" => <<~ERB,
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= self.stylesheet_pack_tag %>
+            <%= javascript_pack_tag %>
+          ERB
+          "app/views/layouts/nested.html.erb" => <<~ERB,
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <% safe_join([self.stylesheet_pack_tag]) %>
+            <%= javascript_pack_tag %>
+          ERB
+          "app/views/layouts/reflective.html.erb" => <<~ERB
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <% self.public_send(:stylesheet_pack_tag) %>
+            <%= javascript_pack_tag %>
+          ERB
+        )
+      end
+
+      it "warns only when a proven top-level helper result is discarded" do
+        doctor.send(:check_layout_files)
+
+        warning_messages = checker.messages.select { |message| message[:type] == :warning }
+        expect(warning_messages).to contain_exactly(
+          hash_including(content: a_string_including("discarded_bare", "generated/StyledComponent")),
+          hash_including(content: a_string_including("discarded_parenthesized", "generated/StyledComponent")),
+          hash_including(content: a_string_including("discarded_command", "generated/StyledComponent")),
+          hash_including(content: a_string_including("discarded_named_args", "generated/StyledComponent"))
+        )
+      end
+    end
+
     {
       "a false conditional" => "stylesheet_pack_tag if false",
       "an arbitrary receiver" => "object.stylesheet_pack_tag"

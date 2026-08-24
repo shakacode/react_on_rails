@@ -1304,7 +1304,8 @@ module ReactOnRails
       helper_call_context_in_expressions?(content.scan(ERB_OUTPUT_EXPRESSION_PATTERN), "stylesheet_pack_tag") ||
         content.scan(ERB_NON_OUTPUT_EXPRESSION_PATTERN).any? do |(expression)|
           statements = ripper_statements(expression)
-          next false if statements.one? && direct_unqualified_helper_call?(statements.first, "stylesheet_pack_tag")
+          next false if statements.one? &&
+                        discarded_top_level_helper_call?(statements.first, "stylesheet_pack_tag")
 
           statements.any? { |statement| helper_call_context_evidence?(statement, "stylesheet_pack_tag") }
         end
@@ -1600,6 +1601,13 @@ module ReactOnRails
       return token_named?(node[1], helper_name) if ast_node?(node, :vcall) || ast_node?(node, :command)
 
       ast_node?(node, :method_add_arg) && fcall_named?(node[1], helper_name)
+    end
+
+    def discarded_top_level_helper_call?(node, helper_name)
+      return true if direct_unqualified_helper_call?(node, helper_name)
+      return true if direct_self_helper_call?(node, helper_name)
+
+      ast_node?(node, :method_add_arg) && direct_self_helper_call?(node[1], helper_name)
     end
 
     def uncommented_template_content(content)
