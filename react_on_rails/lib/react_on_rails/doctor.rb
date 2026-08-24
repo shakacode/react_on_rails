@@ -1571,15 +1571,16 @@ module ReactOnRails
         static_argument_values(argument_parentheses[1])
       elsif ast_node?(node, :command) && reflective_dispatch_call?(node)
         static_argument_values(node[2])
-      elsif exact_self_reflective_command_call?(node)
+      elsif reflective_command_call?(node)
         static_argument_values(node[4])
       end
     end
 
-    def exact_self_reflective_command_call?(node)
+    def reflective_command_call?(node)
       return false unless ast_node?(node, :command_call)
 
-      REFLECTIVE_HELPER_DISPATCH_METHODS.any? { |method_name| direct_self_helper_call?(node, method_name) }
+      method_token = node[3]
+      token_type?(method_token, :@ident) && REFLECTIVE_HELPER_DISPATCH_METHODS.include?(method_token[1])
     end
 
     def reflective_dispatch_call?(node)

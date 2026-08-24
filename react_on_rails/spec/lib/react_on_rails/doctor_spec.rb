@@ -2317,6 +2317,39 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when public_send command syntax uses an arbitrary receiver" do
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        stub_layouts(
+          "app/views/layouts/static_dispatch.html.erb" => <<~ERB,
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= object.public_send :stylesheet_pack_tag %>
+            <%= javascript_pack_tag %>
+          ERB
+          "app/views/layouts/dynamic_dispatch.html.erb" => <<~ERB,
+            <% helper_name = :stylesheet_pack_tag %>
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= object.public_send helper_name %>
+            <%= javascript_pack_tag %>
+          ERB
+          "app/views/layouts/unrelated_dispatch.html.erb" => <<~ERB
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= object.public_send :content_tag, :div %>
+            <%= javascript_pack_tag %>
+          ERB
+        )
+      end
+
+      it "fails closed for static or dynamic helper dispatch but not an unrelated static method" do
+        doctor.send(:check_layout_files)
+
+        warning_messages = checker.messages.select { |message| message[:type] == :warning }
+        expect(warning_messages).to contain_exactly(
+          hash_including(content: a_string_including("unrelated_dispatch", "generated/StyledComponent"))
+        )
+      end
+    end
+
     {
       "a concatenated public_send name" => '<%= public_send("stylesheet_" + "pack_tag") %>',
       "a variable send name" => "<%= send(pack_helper_name) %>",
