@@ -1469,7 +1469,7 @@ module ReactOnRails
 
     def eagerly_evaluated_unqualified_helper_call?(node, helper_name)
       return true if direct_unqualified_helper_call?(node, helper_name)
-      return true if direct_self_helper_call?(node, helper_name)
+      return true if eagerly_evaluated_self_helper_call?(node, helper_name)
       return eager_helper_call_in_method_arguments?(node, helper_name) if ast_node?(node, :method_add_arg)
       return eager_helper_call_in_arguments?(node[2], helper_name) if ast_node?(node, :command)
       return eager_helper_call_in_array?(node, helper_name) if ast_node?(node, :array)
@@ -1479,12 +1479,24 @@ module ReactOnRails
       false
     end
 
+    def eagerly_evaluated_self_helper_call?(node, helper_name)
+      direct_self_helper_call?(node, helper_name) || parenthesized_self_javascript_helper_call?(node, helper_name)
+    end
+
     def direct_self_helper_call?(node, helper_name)
       return false unless ast_node?(node, :call) || ast_node?(node, :command_call)
 
       receiver = node[1]
       self_token = receiver[1] if ast_node?(receiver, :var_ref)
       token_type?(self_token, :@kw) && self_token[1] == "self" && token_named?(node[3], helper_name)
+    end
+
+    def parenthesized_self_javascript_helper_call?(node, helper_name)
+      return false unless helper_name == "javascript_pack_tag" && ast_node?(node, :method_add_arg)
+
+      argument_parentheses = node[2]
+      ast_node?(argument_parentheses, :arg_paren) && argument_parentheses[1].nil? &&
+        direct_self_helper_call?(node[1], helper_name)
     end
 
     def eager_helper_call_in_method_arguments?(node, helper_name)
@@ -1655,9 +1667,28 @@ module ReactOnRails
     end
 
     def static_named_component_arguments(node, helper_name)
-      arguments = static_argument_values(static_call_arguments(node, helper_name))
+      node = static_self_component_hash_call(node) || node if helper_name == "react_component_hash"
+      call_arguments = static_call_arguments(node, helper_name) || static_self_call_arguments(node, helper_name)
+      arguments = static_argument_values(call_arguments)
       component_name = static_string_value(arguments.first) if arguments&.any?
       arguments if component_name&.match?(/\A[A-Za-z0-9_:]+\z/)
+    end
+
+    def static_self_call_arguments(node, helper_name)
+      return unless ast_node?(node, :method_add_arg) && direct_self_helper_call?(node[1], helper_name)
+
+      argument_parentheses = node[2]
+      argument_parentheses[1] if ast_node?(argument_parentheses, :arg_paren)
+    end
+
+    def static_self_component_hash_call(node)
+      return unless ast_node?(node, :aref)
+
+      call = node[1]
+      return unless ast_node?(call, :method_add_arg) && direct_self_helper_call?(call[1], "react_component_hash")
+
+      access_arguments = static_argument_values(node[2])
+      call if access_arguments&.one? && static_string_value(access_arguments.first) == "componentHtml"
     end
 
     def ripper_statements(source)

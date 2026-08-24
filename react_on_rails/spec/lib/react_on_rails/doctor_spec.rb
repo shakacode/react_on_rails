@@ -1386,6 +1386,44 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when react_component is called through the proven self receiver" do
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        stub_layouts(
+          "app/views/layouts/application.html.erb" => <<~ERB
+            <%= self.react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= javascript_pack_tag %>
+          ERB
+        )
+      end
+
+      it "warns for the exact self helper AST" do
+        doctor.send(:check_layout_files)
+
+        expect(checker.messages).to include(
+          hash_including(type: :warning, content: a_string_including("generated/StyledComponent"))
+        )
+      end
+    end
+
+    context "when react_component is called through an arbitrary receiver" do
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        stub_layouts(
+          "app/views/layouts/application.html.erb" => <<~ERB
+            <%= object.react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= javascript_pack_tag %>
+          ERB
+        )
+      end
+
+      it "does not infer a component from the receiver's method name" do
+        doctor.send(:check_layout_files)
+
+        expect(checker.warnings?).to be(false)
+      end
+    end
+
     context "when react_component auto-loads CSS from a direct non-output local assignment" do
       before do
         stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
@@ -1450,6 +1488,48 @@ RSpec.describe ReactOnRails::Doctor do
         expect(checker.messages).to include(
           hash_including(type: :warning, content: a_string_including("generated/HelmetComponent"))
         )
+      end
+    end
+
+    context "when react_component_hash is called through self before direct componentHtml access" do
+      before do
+        stub_manifest_stylesheets("generated/HelmetComponent", ["/packs/generated/HelmetComponent-a1b2c3.css"])
+        stub_layouts(
+          "app/views/layouts/application.html.erb" => <<~ERB
+            <%= self.react_component_hash("HelmetComponent", auto_load_bundle: true)["componentHtml"] %>
+            <%= javascript_pack_tag %>
+          ERB
+        )
+      end
+
+      it "warns for the exact self hash-helper and access AST" do
+        doctor.send(:check_layout_files)
+
+        expect(checker.messages).to include(
+          hash_including(type: :warning, content: a_string_including("generated/HelmetComponent"))
+        )
+      end
+    end
+
+    context "when react_component_hash uses an arbitrary receiver or dynamic result access" do
+      before do
+        stub_manifest_stylesheets("generated/HelmetComponent", ["/packs/generated/HelmetComponent-a1b2c3.css"])
+        stub_layouts(
+          "app/views/layouts/arbitrary_receiver.html.erb" => <<~ERB,
+            <%= object.react_component_hash("HelmetComponent", auto_load_bundle: true)["componentHtml"] %>
+            <%= javascript_pack_tag %>
+          ERB
+          "app/views/layouts/dynamic_access.html.erb" => <<~ERB
+            <%= self.react_component_hash("HelmetComponent", auto_load_bundle: true)[component_key] %>
+            <%= javascript_pack_tag %>
+          ERB
+        )
+      end
+
+      it "does not infer a component outside the exact self hash-helper and access AST" do
+        doctor.send(:check_layout_files)
+
+        expect(checker.warnings?).to be(false)
       end
     end
 
@@ -1959,9 +2039,30 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when parenthesized javascript_pack_tag is called through the proven self receiver" do
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        stub_layouts(
+          "app/views/layouts/application.html.erb" => <<~ERB
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= self.javascript_pack_tag() %>
+          ERB
+        )
+      end
+
+      it "recognizes the parenthesized self call as a proven JavaScript flush" do
+        doctor.send(:check_layout_files)
+
+        expect(checker.messages).to include(
+          hash_including(type: :warning, content: a_string_including("generated/StyledComponent"))
+        )
+      end
+    end
+
     {
       "a false conditional modifier" => "javascript_pack_tag if false",
       "an arbitrary receiver" => "object.javascript_pack_tag",
+      "a parenthesized arbitrary receiver" => "object.javascript_pack_tag()",
       "a defined check" => "defined?(javascript_pack_tag)",
       "a short-circuited boolean expression" => "true || javascript_pack_tag",
       "a local-variable assignment" => "pack_tag = javascript_pack_tag",
