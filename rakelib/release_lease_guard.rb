@@ -142,6 +142,8 @@ module ReleaseLeaseGuard
       raise LeaseError, "release lease guard is not active" unless active?
       return true if @dry_run
 
+      # This is a fresh point-in-time pre-write fence. It does not asynchronously
+      # interrupt an outward command that is already running if the supervisor dies.
       verify_private_contract!
       verify_lease!
       verify_private_contract!

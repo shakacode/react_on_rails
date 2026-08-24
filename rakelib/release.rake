@@ -10491,8 +10491,8 @@ release CI gate evaluates the branch tip and a just-pushed branch has no checks 
 the branch and cutting rc.0 must be two steps with a CI run between them. After CI runs on the new
 branch tip, preview rc.0 with `bundle exec rake \"release[17.0.0.rc.0,true]\"`.
 
-Live release:start remains **BLOCKED**: it does not yet have the publication wrapper's lifetime/per-write
-contract. Use its dry run and the separately fenced branch-creation procedure in
+Live release:start remains **policy-blocked**, not runtime-enforced: it is still technically callable
+without the publication wrapper's lifetime/per-write contract. Use its dry run and the separately fenced procedure in
 internal/contributor-info/release-train-runbook.md; `script/release` starts only after the release branch exists.
 
 Arguments:

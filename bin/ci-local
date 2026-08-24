@@ -461,7 +461,7 @@ if [ "$RUN_GEM_GENERATOR_SPECS" = true ]; then
     echo ""
   else
     run_job "RSpec (Gem Generators)" \
-      "cd react_on_rails && bundle_command \"$OSS_GEMFILE\" bundle exec rspec spec/react_on_rails/generators"
+      "cd react_on_rails && bundle_command \"$OSS_GEMFILE\" bundle exec rake run_rspec:gem_generators"
   fi
 fi
 

@@ -275,6 +275,12 @@ private liveness channel. Immediately before every outward write, the helper
 performs a new authoritative targeted status read and verifies the exact claim,
 identity, branch, heartbeat, supervisor, and process group.
 
+That fence is a point-in-time pre-write check. If the supervisor dies after a
+publish subprocess has started, the fence does not asynchronously interrupt
+that already-running command; the next write fence fails closed. The dedicated
+process group makes the full command tree identifiable and terminable during
+the wrapper's supervised shutdown and before any operator handoff.
+
 Do not invoke live `bundle exec rake "release[...]"`, `sync_github_release`,
 or `release:reconcile_accelerated_rc` directly. They fail closed without the
 private wrapper contract; setting environment variables is not a substitute.

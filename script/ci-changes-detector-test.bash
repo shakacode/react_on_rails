@@ -336,7 +336,7 @@ test_ci_local_fast_mode_keeps_generator_specs_out_of_unit_job() {
     $'bundle\texec\trake\trun_rspec:gem_unit' \
     "ci-local command log"
   case "$commands" in
-    *$'bundle\texec\trspec\tspec/react_on_rails/generators'*|\
+    *$'bundle\texec\trake\trun_rspec:gem_generators'*|\
     *$'bundle\texec\trake\trun_rspec:shakapacker_examples'*|\
     *$'pnpm\trun\tbuild:test'*|\
     *$'bundle\texec\trake\trun_rspec:dummy'*)
@@ -448,7 +448,7 @@ test_ci_local_preserves_independent_generator_selectors() {
     "core-Ruby command log"
   assert_contains \
     "$core_ruby_commands" \
-    $'bundle\texec\trspec\tspec/react_on_rails/generators' \
+    $'bundle\texec\trake\trun_rspec:gem_generators' \
     "core-Ruby command log"
   case "$core_ruby_commands" in
     *$'bundle\texec\trake\trun_rspec:shakapacker_examples'*|\
@@ -468,7 +468,7 @@ test_ci_local_preserves_independent_generator_selectors() {
     $'bundle\texec\trake\trun_rspec:shakapacker_examples' \
     "generated-example command log"
   case "$generated_example_commands" in
-    *$'bundle\texec\trspec\tspec/react_on_rails/generators'*|\
+    *$'bundle\texec\trake\trun_rspec:gem_generators'*|\
     *$'bundle\texec\trake\trun_rspec:gem_unit'*)
       fail "generated example app selector must not select either gem RSpec shard"
       ;;
@@ -486,7 +486,7 @@ test_ci_local_preserves_independent_generator_selectors() {
     "generator-change command log"
   assert_contains \
     "$generator_change_commands" \
-    $'bundle\texec\trspec\tspec/react_on_rails/generators' \
+    $'bundle\texec\trake\trun_rspec:gem_generators' \
     "generator-change command log"
   assert_contains \
     "$generator_change_commands" \
@@ -501,7 +501,7 @@ assert_ci_local_gem_generator_only_commands() {
   assert_contains "$commands" $'bundle\tcheck' "$context"
   assert_contains \
     "$commands" \
-    $'bundle\texec\trspec\tspec/react_on_rails/generators' \
+    $'bundle\texec\trake\trun_rspec:gem_generators' \
     "$context"
   case "$commands" in
     *$'bundle\texec\trake\trun_rspec:gem_unit'*|\
