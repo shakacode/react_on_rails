@@ -528,6 +528,7 @@ module ReactOnRails
       check_shakapacker_configuration_details
       check_react_on_rails_configuration_details
       check_server_bundle_prerender_consistency
+      check_layout_files
     end
 
     def check_bin_dev_launcher
@@ -1241,7 +1242,6 @@ module ReactOnRails
         )
       end
 
-      check_layout_files
       check_server_rendering_engine
     end
 
@@ -1462,7 +1462,7 @@ module ReactOnRails
 
     def erb_output_helper?(content, helper_name)
       unqualified_call_ambiguous = helper_name == "javascript_pack_tag" &&
-                                   non_output_erb_local_binding?(content, helper_name)
+                                   erb_local_binding?(content, helper_name)
 
       content.scan(ERB_OUTPUT_EXPRESSION_PATTERN).any? do |(expression)|
         statements = ripper_statements(expression)
@@ -1481,8 +1481,8 @@ module ReactOnRails
       !unqualified_call_ambiguous && direct_unqualified_helper_call?(node, helper_name)
     end
 
-    def non_output_erb_local_binding?(content, local_name)
-      content.scan(ERB_NON_OUTPUT_EXPRESSION_PATTERN).any? do |(expression)|
+    def erb_local_binding?(content, local_name)
+      content.scan(ERB_EXPRESSION_PATTERN).any? do |(expression)|
         ripper_statements(expression).any? { |statement| source_proven_local_binding?(statement, local_name) }
       end
     end

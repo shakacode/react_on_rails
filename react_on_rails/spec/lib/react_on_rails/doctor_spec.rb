@@ -343,6 +343,39 @@ RSpec.describe ReactOnRails::Doctor do
       expect(checks["environment_prerequisites"]["fix_command"]).to be_nil
     end
 
+    it "routes layout warnings to configuration analysis with layout remediation" do
+      routing_doctor = described_class.new(format: :json)
+      checker = routing_doctor.instance_variable_get(:@checker)
+      routed_methods = %i[check_key_files check_configuration_details]
+      described_class::CHECK_SECTIONS.each do |section|
+        next if routed_methods.include?(section[:method])
+
+        allow(routing_doctor).to receive(section[:method])
+      end
+
+      allow(File).to receive(:exist?).and_return(true)
+      allow(routing_doctor).to receive_messages(
+        resolved_webpack_config_path: "config/webpack",
+        check_server_rendering_engine: nil,
+        check_shakapacker_configuration_details: nil,
+        check_react_on_rails_configuration_details: nil,
+        check_server_bundle_prerender_consistency: nil
+      )
+      expect(routing_doctor).to receive(:check_layout_files).once do
+        checker.add_warning("Auto-loaded component CSS is not flushed")
+      end
+
+      checks = run_and_parse_json(routing_doctor)["checks"].to_h { |check| [check["id"], check] }
+
+      expect(checks["key_configuration_files"]["status"]).to eq("pass")
+      expect(checks["configuration_analysis"]).to include(
+        "status" => "warn",
+        "message" => "Auto-loaded component CSS is not flushed"
+      )
+      expect(checks["configuration_analysis"].dig("remediation", "files")).to include("app/views/layouts")
+      expect(checks["configuration_analysis"].dig("remediation", "prompt")).to include("app/views/layouts")
+    end
+
     it "keeps checks and remediation output deterministic" do
       messages = { "testing_setup" => [{ type: :warning, content: "No test helper" }] }
       first_doctor = described_class.new(format: :json)
@@ -2139,7 +2172,7 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
-    context "when non-output ERB may bind the JavaScript helper name as a local" do
+    context "when active ERB may bind the JavaScript helper name as a local" do
       before do
         stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
         stub_layouts(
@@ -2150,6 +2183,16 @@ RSpec.describe ReactOnRails::Doctor do
           ERB
           "app/views/layouts/shadow_conditional.html.erb" => <<~ERB,
             <% javascript_pack_tag = "shadow" if condition %>
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= javascript_pack_tag %>
+          ERB
+          "app/views/layouts/output_shadow.html.erb" => <<~ERB,
+            <%= javascript_pack_tag = "shadow" %>
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= javascript_pack_tag %>
+          ERB
+          "app/views/layouts/raw_output_shadow.html.erb" => <<~ERB,
+            <%== javascript_pack_tag = "shadow" %>
             <%= react_component("StyledComponent", auto_load_bundle: true) %>
             <%= javascript_pack_tag %>
           ERB
@@ -2165,6 +2208,11 @@ RSpec.describe ReactOnRails::Doctor do
           ERB
           "app/views/layouts/exact_self_after_shadow.html.erb" => <<~ERB,
             <% javascript_pack_tag = "shadow" %>
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= self.javascript_pack_tag %>
+          ERB
+          "app/views/layouts/exact_self_after_output_shadow.html.erb" => <<~ERB,
+            <%= javascript_pack_tag = "shadow" %>
             <%= react_component("StyledComponent", auto_load_bundle: true) %>
             <%= self.javascript_pack_tag %>
           ERB
@@ -2198,6 +2246,7 @@ RSpec.describe ReactOnRails::Doctor do
         warning_messages = checker.messages.select { |message| message[:type] == :warning }
         expect(warning_messages).to contain_exactly(
           hash_including(content: a_string_including("exact_self_after_shadow", "generated/StyledComponent")),
+          hash_including(content: a_string_including("exact_self_after_output_shadow", "generated/StyledComponent")),
           hash_including(content: a_string_including("unrelated_local", "generated/StyledComponent")),
           hash_including(content: a_string_including("ivar_decoy", "generated/StyledComponent")),
           hash_including(content: a_string_including("string_decoy", "generated/StyledComponent")),
