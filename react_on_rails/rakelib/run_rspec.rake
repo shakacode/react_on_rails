@@ -57,6 +57,13 @@ namespace :run_rspec do
                  env_vars: rbs_runtime_env_vars)
   end
 
+  desc "Run gem unit specs without generator specs"
+  task :gem_unit do
+    run_tests_in("",
+                 rspec_args: "#{File.join('spec', 'react_on_rails')} --exclude-pattern '**/generators/**'",
+                 env_vars: rbs_runtime_env_vars)
+  end
+
   desc "Runs dummy rspec with turbolinks"
   task dummy: ["dummy_apps:dummy_app"] do
     run_tests_in(spec_dummy_dir,

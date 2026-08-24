@@ -430,10 +430,10 @@ fi
 if [ "$RUN_RUBY" = true ]; then
   if [ "$FAST_MODE" = true ]; then
     run_job "RSpec (Gem Unit - Fast)" \
-      "cd react_on_rails && bundle_command \"$OSS_GEMFILE\" bundle exec rspec spec/react_on_rails --exclude-pattern \"**/generators/**\""
+      "cd react_on_rails && bundle_command \"$OSS_GEMFILE\" bundle exec rake run_rspec:gem_unit"
   else
     run_job "RSpec (Gem Unit)" \
-      "cd react_on_rails && bundle_command \"$OSS_GEMFILE\" bundle exec rspec spec/react_on_rails --exclude-pattern \"**/generators/**\""
+      "cd react_on_rails && bundle_command \"$OSS_GEMFILE\" bundle exec rake run_rspec:gem_unit"
   fi
 fi
 

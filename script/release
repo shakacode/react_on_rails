@@ -13,9 +13,8 @@ require_relative "../rakelib/release_lease_guard"
 # own the exact release-line lease under a process-unique identity.
 # rubocop:disable Metrics/ClassLength
 class ReleaseSupervisor
-  VERSION_PATTERN = /\A(?<base>(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*))
-                     (?:\.(?:test|beta|alpha|rc|pre)\.(?:0|[1-9]\d*))?\z/ix
-  REPOSITORY = "shakacode/react_on_rails"
+  VERSION_PATTERN = ReleaseLeaseGuard::RELEASE_VERSION_PATTERN
+  REPOSITORY = ReleaseLeaseGuard::REPOSITORY
   HEARTBEAT_INTERVAL = 60.0
   HEARTBEAT_TTL = 900
   COORDINATION_TIMEOUT = 20.0
@@ -517,29 +516,7 @@ class ReleaseSupervisor
   end
 
   def stop_unverified_child(child_pid, grace:)
-    signal_unverified_child("TERM", child_pid)
-    return if reap_child_until(child_pid, monotonic_time + grace)
-
-    signal_unverified_child("KILL", child_pid)
-    return if reap_child_until(child_pid, monotonic_time + grace)
-
-    raise SupervisorError, "release child did not terminate after KILL"
-  end
-
-  def signal_unverified_child(signal, child_pid)
-    signal_group(signal, child_pid)
-    Process.kill(signal, child_pid)
-  rescue Errno::ESRCH
-    nil
-  end
-
-  def reap_child_until(child_pid, deadline)
-    loop do
-      return true if reap_child_nonblocking(child_pid)
-      return false if monotonic_time >= deadline
-
-      sleep POLL_INTERVAL
-    end
+    terminate_group(child_pid, child_pid:, grace:, signal_direct_child: true)
   end
 
   def contract_for(scope, identity, liveness_fd:, parent_pid:, pgid:)
@@ -573,13 +550,17 @@ class ReleaseSupervisor
     writer.close unless writer.closed?
   end
 
-  def terminate_group(pgid, child_pid:, grace:)
-    signal_group("TERM", pgid)
+  def terminate_group(pgid, child_pid:, grace:, signal_direct_child: false)
+    signal_termination_target("TERM", pgid, child_pid:, signal_direct_child:)
     child_reaped = child_pid.nil?
-    child_reaped, group_alive = wait_for_group_exit(pgid, child_pid:, child_reaped:, grace:)
-    if group_alive
-      signal_group("KILL", pgid)
-      child_reaped, = wait_for_group_exit(pgid, child_pid:, child_reaped:, grace:)
+    child_reaped, group_alive = wait_for_group_exit(
+      pgid, child_pid:, child_reaped:, grace:, require_child_exit: signal_direct_child
+    )
+    if group_alive || (signal_direct_child && !child_reaped)
+      signal_termination_target("KILL", pgid, child_pid:, signal_direct_child:)
+      child_reaped, = wait_for_group_exit(
+        pgid, child_pid:, child_reaped:, grace:, require_child_exit: signal_direct_child
+      )
     end
     child_reaped = reap_group_once(pgid, child_pid:, child_reaped:)
     raise SupervisorError, "release child did not terminate after KILL" unless child_reaped
@@ -588,14 +569,29 @@ class ReleaseSupervisor
     raise SupervisorError, "release process group #{pgid} did not terminate after KILL"
   end
 
-  def wait_for_group_exit(pgid, child_pid:, child_reaped:, grace:)
+  def signal_termination_target(signal, pgid, child_pid:, signal_direct_child:)
+    signal_group(signal, pgid)
+    signal_child(signal, child_pid) if signal_direct_child
+  end
+
+  def signal_child(signal, child_pid)
+    Process.kill(signal, child_pid)
+  rescue Errno::ESRCH
+    nil
+  end
+
+  def wait_for_group_exit(pgid, child_pid:, child_reaped:, grace:, require_child_exit: false)
     deadline = monotonic_time + grace
-    while group_alive?(pgid) && monotonic_time < deadline
+    while termination_target_alive?(pgid, child_reaped:, require_child_exit:) && monotonic_time < deadline
       child_reaped = reap_group_once(pgid, child_pid:, child_reaped:)
       sleep POLL_INTERVAL
     end
     child_reaped = reap_group_once(pgid, child_pid:, child_reaped:)
     [child_reaped, group_alive?(pgid)]
+  end
+
+  def termination_target_alive?(pgid, child_reaped:, require_child_exit:)
+    group_alive?(pgid) || (require_child_exit && !child_reaped)
   end
 
   def reap_group_once(pgid, child_pid:, child_reaped:)

@@ -333,7 +333,7 @@ test_ci_local_fast_mode_keeps_generator_specs_out_of_unit_job() {
   commands="$(cat ci-local-commands.log)"
   assert_contains \
     "$commands" \
-    $'bundle\texec\trspec\tspec/react_on_rails\t--exclude-pattern\t**/generators/**' \
+    $'bundle\texec\trake\trun_rspec:gem_unit' \
     "ci-local command log"
   case "$commands" in
     *$'bundle\texec\trspec\tspec/react_on_rails/generators'*|\
@@ -444,7 +444,7 @@ test_ci_local_preserves_independent_generator_selectors() {
   core_ruby_commands="$(cat ci-local-commands.log)"
   assert_contains \
     "$core_ruby_commands" \
-    $'bundle\texec\trspec\tspec/react_on_rails\t--exclude-pattern\t**/generators/**' \
+    $'bundle\texec\trake\trun_rspec:gem_unit' \
     "core-Ruby command log"
   assert_contains \
     "$core_ruby_commands" \
@@ -452,8 +452,8 @@ test_ci_local_preserves_independent_generator_selectors() {
     "core-Ruby command log"
   case "$core_ruby_commands" in
     *$'bundle\texec\trake\trun_rspec:shakapacker_examples'*|\
-    *$'bundle\texec\trake\trun_rspec:gem'*)
-      fail "core Ruby must not select generated example app tests or the unfenced unit task"
+    *$'bundle\texec\trake\trun_rspec:gem\t'*)
+      fail "core Ruby must not select generated example app tests or the unsharded gem task"
       ;;
   esac
 
@@ -469,7 +469,7 @@ test_ci_local_preserves_independent_generator_selectors() {
     "generated-example command log"
   case "$generated_example_commands" in
     *$'bundle\texec\trspec\tspec/react_on_rails/generators'*|\
-    *$'bundle\texec\trspec\tspec/react_on_rails\t--exclude-pattern'*)
+    *$'bundle\texec\trake\trun_rspec:gem_unit'*)
       fail "generated example app selector must not select either gem RSpec shard"
       ;;
   esac
@@ -482,7 +482,7 @@ test_ci_local_preserves_independent_generator_selectors() {
   generator_change_commands="$(cat ci-local-commands.log)"
   assert_contains \
     "$generator_change_commands" \
-    $'bundle\texec\trspec\tspec/react_on_rails\t--exclude-pattern\t**/generators/**' \
+    $'bundle\texec\trake\trun_rspec:gem_unit' \
     "generator-change command log"
   assert_contains \
     "$generator_change_commands" \
@@ -504,8 +504,8 @@ assert_ci_local_gem_generator_only_commands() {
     $'bundle\texec\trspec\tspec/react_on_rails/generators' \
     "$context"
   case "$commands" in
-    *$'bundle\texec\trspec\tspec/react_on_rails\t--exclude-pattern'*|\
-    *$'bundle\texec\trake\trun_rspec:gem'*|\
+    *$'bundle\texec\trake\trun_rspec:gem_unit'*|\
+    *$'bundle\texec\trake\trun_rspec:gem\t'*|\
     *$'bundle\texec\trake\trun_rspec:shakapacker_examples'*)
       fail "$context: gem-generator-only selection ran an unselected Ruby job"
       ;;

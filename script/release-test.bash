@@ -297,8 +297,62 @@ end
 exit SubreaperFailureTestSupervisor.new(ARGV).run
 SUBREAPER_FAILURE_HARNESS
 
+  cat >"${fake_bin}/release-unverified-child-harness" <<'UNVERIFIED_CHILD_HARNESS'
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+load ENV.fetch("TEST_RELEASE_SCRIPT")
+
+class UnverifiedChildTestSupervisor < ReleaseSupervisor
+  def run
+    ready_reader, ready_writer = IO.pipe
+    child_pid = fork do
+      ready_reader.close
+      Signal.trap("TERM", "IGNORE")
+      ready_writer.puts(Process.getpgrp)
+      ready_writer.close
+      sleep 30
+    end
+    ready_writer.close
+    inherited_pgid = Integer(ready_reader.gets, 10)
+    raise "fixture child unexpectedly established its own process group" if inherited_pgid == child_pid
+
+    stop_unverified_child(child_pid, grace: 0.1)
+    begin
+      Process.waitpid(child_pid, Process::WNOHANG)
+      raise "unverified child was not reaped"
+    rescue Errno::ECHILD
+      child_pid = nil
+      0
+    end
+  ensure
+    ready_reader&.close
+    ready_writer&.close unless ready_writer&.closed?
+    if child_pid
+      begin
+        Process.kill("KILL", child_pid)
+      rescue Errno::ESRCH
+        nil
+      end
+      begin
+        Process.waitpid(child_pid)
+      rescue Errno::ECHILD
+        nil
+      end
+    end
+  end
+
+  private
+
+  public :stop_unverified_child
+end
+
+exit UnverifiedChildTestSupervisor.new([]).run
+UNVERIFIED_CHILD_HARNESS
+
   chmod +x "${fake_bin}/agent-coord" "${fake_bin}/bundle" "${fake_bin}/release-handshake-harness" \
-    "${fake_bin}/release-exception-harness" "${fake_bin}/release-subreaper-failure-harness"
+    "${fake_bin}/release-exception-harness" "${fake_bin}/release-subreaper-failure-harness" \
+    "${fake_bin}/release-unverified-child-harness"
 
   export PATH="${fake_bin}:${PATH}"
   export TEST_COORD_LOG="${coord_log}"
@@ -353,6 +407,10 @@ run_subreaper_failure_release() {
     cd "${fake_repo}"
     "${fake_bin}/release-subreaper-failure-harness" "$@"
   ) >"${output_log}" 2>&1
+}
+
+run_unverified_child_harness() {
+  "${fake_bin}/release-unverified-child-harness" >"${output_log}" 2>&1
 }
 
 handshake_case_enabled() {
@@ -499,6 +557,13 @@ assert_empty "${bundle_log}"
 assert_contains "${output_log}" "injected descendant reaping failure"
 assert_secret_absent
 pass "live mode enables descendant reaping before any subprocess"
+
+if supervisor_case_enabled unverified-child; then
+  setup_case unverified-child-before-process-group
+  run_unverified_child_harness || fail "unverified child termination harness failed"
+  assert_secret_absent
+  pass "pre-process-group TERM-resistant child is killed and reaped"
+fi
 
 setup_case stable-main-live
 git -C "${fake_repo}" switch -q -c main
