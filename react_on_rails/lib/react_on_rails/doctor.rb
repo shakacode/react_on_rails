@@ -80,7 +80,7 @@ module ReactOnRails
     ERB_CONTROL_FLOW_KEYWORDS = %w[
       begin case do else elsif end ensure for if rescue then unless until when while
     ].freeze
-    REFLECTIVE_HELPER_DISPATCH_METHODS = %w[send public_send __send__ method].freeze
+    REFLECTIVE_HELPER_DISPATCH_METHODS = %w[send public_send __send__ method public_method].freeze
     REACT_ON_RAILS_INITIALIZER_PATH = "config/initializers/react_on_rails.rb"
 
     # Deprecated-renderer-cache scan (used by check_deprecated_renderer_cache_task):
@@ -1280,6 +1280,7 @@ module ReactOnRails
 
     def check_unflushed_auto_loaded_component_css(layout_name, content)
       return unless erb_output_helper?(content, "javascript_pack_tag")
+      return if erb_helper_mentioned?(content, "render")
 
       component_names = auto_loaded_component_names(content)
       component_names.concat(auto_loaded_component_names_from_implicit_views(layout_name)).uniq.each do |component_name|
@@ -1297,7 +1298,17 @@ module ReactOnRails
 
     def stylesheet_pack_helper_evidence?(content)
       erb_output_helper?(content, "stylesheet_pack_tag") ||
-        erb_helper_mentioned?(content, "stylesheet_pack_tag")
+        stylesheet_pack_ambiguity_evidence?(content)
+    end
+
+    def stylesheet_pack_ambiguity_evidence?(content)
+      helper_call_context_in_expressions?(content.scan(ERB_OUTPUT_EXPRESSION_PATTERN), "stylesheet_pack_tag") ||
+        content.scan(ERB_NON_OUTPUT_EXPRESSION_PATTERN).any? do |(expression)|
+          statements = ripper_statements(expression)
+          next false if statements.one? && direct_unqualified_helper_call?(statements.first, "stylesheet_pack_tag")
+
+          statements.any? { |statement| helper_call_context_evidence?(statement, "stylesheet_pack_tag") }
+        end
     end
 
     def static_stylesheet_assets(entrypoint)
@@ -1498,7 +1509,11 @@ module ReactOnRails
     end
 
     def erb_helper_mentioned?(content, helper_name)
-      content.scan(ERB_EXPRESSION_PATTERN).any? do |(expression)|
+      helper_call_context_in_expressions?(content.scan(ERB_EXPRESSION_PATTERN), helper_name)
+    end
+
+    def helper_call_context_in_expressions?(expressions, helper_name)
+      expressions.any? do |(expression)|
         ripper_statements(expression).any? { |statement| helper_call_context_evidence?(statement, helper_name) }
       end
     end

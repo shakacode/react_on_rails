@@ -1279,6 +1279,28 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when a component-bearing layout renders an uninspected static partial" do
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        stub_layouts(
+          "app/views/layouts/application.html.erb" => <<~ERB
+            <%= render "shared/navigation" %>
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= javascript_pack_tag %>
+          ERB
+        )
+      end
+
+      it "keeps the layout info but fails the targeted missing-CSS proof closed" do
+        doctor.send(:check_layout_files)
+
+        expect(checker.warnings?).to be(false)
+        expect(checker.messages).to include(
+          hash_including(type: :info, content: "  ℹ️  application: has javascript_pack_tag")
+        )
+      end
+    end
+
     context "when globally enabled auto_load_bundle loads component CSS that the React layout does not flush" do
       before do
         stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
@@ -1868,6 +1890,27 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when a direct non-output stylesheet helper result is discarded" do
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        stub_layouts(
+          "app/views/layouts/application.html.erb" => <<~ERB
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <% stylesheet_pack_tag %>
+            <%= javascript_pack_tag %>
+          ERB
+        )
+      end
+
+      it "warns because the discarded helper result cannot flush CSS" do
+        doctor.send(:check_layout_files)
+
+        expect(checker.messages).to include(
+          hash_including(type: :warning, content: a_string_including("generated/StyledComponent"))
+        )
+      end
+    end
+
     {
       "a false conditional" => "stylesheet_pack_tag if false",
       "an arbitrary receiver" => "object.stylesheet_pack_tag"
@@ -1894,10 +1937,11 @@ RSpec.describe ReactOnRails::Doctor do
 
     {
       "public_send with the helper name" => '<%= public_send("stylesheet_pack_tag") %>',
-      "a method alias invoked later" => <<~ERB
+      "a method alias invoked later" => <<~ERB,
         <% css_pack = method(:stylesheet_pack_tag) %>
         <%= css_pack.call %>
       ERB
+      "a public method alias invoked inline" => "<%= public_method(:stylesheet_pack_tag).call %>"
     }.each do |description, stylesheet_template|
       context "when the stylesheet helper is referenced through #{description}" do
         before do
