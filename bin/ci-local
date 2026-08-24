@@ -195,6 +195,7 @@ if [ "$RUN_ALL" = false ]; then
       RUN_RUBY=$(echo "$DETECTOR_JSON" | jq -r '.run_ruby_tests // false')
       RUN_JS=$(echo "$DETECTOR_JSON" | jq -r '.run_js_tests // false')
       RUN_DUMMY=$(echo "$DETECTOR_JSON" | jq -r '.run_dummy_tests // false')
+      RUN_GEM_GENERATOR_SPECS=$(echo "$DETECTOR_JSON" | jq -r '.run_gem_generator_specs // false')
       RUN_GENERATORS=$(echo "$DETECTOR_JSON" | jq -r '.run_generators // false')
       RUN_PRO_LINT=$(echo "$DETECTOR_JSON" | jq -r '.run_pro_lint // false')
       RUN_PRO_TESTS=$(echo "$DETECTOR_JSON" | jq -r '.run_pro_tests // false')
@@ -228,6 +229,7 @@ if [ "$RUN_ALL" = false ]; then
       RUN_RUBY=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ RSpec gem tests" && echo true || echo false)
       RUN_JS=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ JS unit tests" && echo true || echo false)
       RUN_DUMMY=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ Dummy app integration tests" && echo true || echo false)
+      RUN_GEM_GENERATOR_SPECS=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ RSpec gem generator specs" && echo true || echo false)
       RUN_GENERATORS=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ Generator tests" && echo true || echo false)
       RUN_PRO_LINT=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ React on Rails Pro Lint" && echo true || echo false)
       RUN_PRO_TESTS=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ React on Rails Pro tests" && echo true || echo false)
@@ -252,6 +254,7 @@ if [ "$RUN_ALL" = false ]; then
     RUN_RUBY=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ RSpec gem tests" && echo true || echo false)
     RUN_JS=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ JS unit tests" && echo true || echo false)
     RUN_DUMMY=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ Dummy app integration tests" && echo true || echo false)
+    RUN_GEM_GENERATOR_SPECS=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ RSpec gem generator specs" && echo true || echo false)
     RUN_GENERATORS=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ Generator tests" && echo true || echo false)
     RUN_PRO_LINT=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ React on Rails Pro Lint" && echo true || echo false)
     RUN_PRO_TESTS=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ React on Rails Pro tests" && echo true || echo false)
@@ -263,6 +266,7 @@ else
   RUN_RUBY=true
   RUN_JS=true
   RUN_DUMMY=true
+  RUN_GEM_GENERATOR_SPECS=true
   RUN_GENERATORS=true
   RUN_PRO_LINT=true
   RUN_PRO_TESTS=true
@@ -348,7 +352,8 @@ fi
 # gives contributors a complete failure report from a single local run.
 run_job_argv "Docs Sidebar Check" script/check-docs-sidebar "$BASE_REF" || true
 
-if [ "$RUN_RUBY" = true ] || [ "$RUN_DUMMY" = true ] || [ "$RUN_GENERATORS" = true ]; then
+if [ "$RUN_RUBY" = true ] || [ "$RUN_DUMMY" = true ] ||
+  [ "$RUN_GEM_GENERATOR_SPECS" = true ] || [ "$RUN_GENERATORS" = true ]; then
   ensure_oss_dependencies
 fi
 
@@ -404,14 +409,23 @@ if [ "$RUN_DUMMY" = true ]; then
   fi
 fi
 
-# Run generator tests
-if [ "$RUN_GENERATORS" = true ]; then
+# Run the hosted generator RSpec shard independently from generated examples.
+if [ "$RUN_GEM_GENERATOR_SPECS" = true ]; then
   if [ "$FAST_MODE" = true ]; then
-    echo -e "${YELLOW}Skipping generator tests in --fast mode (they are slow)${NC}"
+    echo -e "${YELLOW}Skipping gem generator specs in --fast mode (they are slow)${NC}"
     echo ""
   else
     run_job "RSpec (Gem Generators)" \
       "cd react_on_rails && bundle_command \"$OSS_GEMFILE\" bundle exec rspec spec/react_on_rails/generators"
+  fi
+fi
+
+# Generated example apps are a separate detector category from gem specs.
+if [ "$RUN_GENERATORS" = true ]; then
+  if [ "$FAST_MODE" = true ]; then
+    echo -e "${YELLOW}Skipping generated example app tests in --fast mode (they are slow)${NC}"
+    echo ""
+  else
     run_job "Generated Example App Tests" \
       "cd react_on_rails && bundle_command \"$OSS_GEMFILE\" bundle exec rake run_rspec:shakapacker_examples"
   fi

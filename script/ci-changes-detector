@@ -1001,6 +1001,7 @@ RUN_PRO_NODE_RENDERER_BENCHMARKS=$BENCH_PRO_NODE_RENDERER_CHANGED
 
 [ "$RUN_LINT" = true ] && echo "  ✓ Lint (Ruby + JS)"
 [ "$RUN_RUBY_TESTS" = true ] && echo "  ✓ RSpec gem tests"
+[ "$RUN_GEM_GENERATOR_SPECS" = true ] && echo "  ✓ RSpec gem generator specs"
 [ "$RUN_RELEASE_SUPERVISOR_TESTS" = true ] && echo "  ✓ Release supervisor integration tests"
 [ "$RUN_JS_TESTS" = true ] && echo "  ✓ JS unit tests"
 [ "$RUN_DUMMY_TESTS" = true ] && echo "  ✓ Dummy app integration tests"

@@ -195,10 +195,21 @@ BASH
 set -euo pipefail
 
 run_ruby=false
+run_gem_generator_specs=false
 run_generators=false
 case "${CI_LOCAL_FIXTURE_SELECTION:?}" in
-  ruby) run_ruby=true ;;
-  generators) run_generators=true ;;
+  core_ruby)
+    run_ruby=true
+    run_gem_generator_specs=true
+    ;;
+  # Consumer-contract fixture: the current detector never emits this one-sided
+  # combination, but ci-local must not couple two independent JSON fields.
+  generated_examples) run_generators=true ;;
+  generator_change)
+    run_ruby=true
+    run_gem_generator_specs=true
+    run_generators=true
+    ;;
   *) exit 2 ;;
 esac
 
@@ -209,6 +220,7 @@ cat <<JSON
   "run_ruby_tests": $run_ruby,
   "run_js_tests": false,
   "run_dummy_tests": false,
+  "run_gem_generator_specs": $run_gem_generator_specs,
   "run_generators": $run_generators,
   "run_pro_lint": false,
   "run_pro_tests": false
@@ -217,6 +229,9 @@ JSON
 
 if [ "$run_ruby" = true ]; then
   echo "  ✓ RSpec gem tests"
+fi
+if [ "$run_gem_generator_specs" = true ]; then
+  echo "  ✓ RSpec gem generator specs"
 fi
 if [ "$run_generators" = true ]; then
   echo "  ✓ Generator tests"
@@ -293,47 +308,94 @@ test_ci_local_fast_mode_keeps_generator_specs_out_of_unit_job() {
       fail "ci-local command log: --fast must skip both generator jobs"
       ;;
   esac
+  assert_contains "$output" "Skipping gem generator specs in --fast mode" "ci-local fast output"
+  assert_contains "$output" "Skipping generated example app tests in --fast mode" "ci-local fast output"
 }
 
-test_ci_local_keeps_ruby_and_generator_selectors_isolated() {
+test_ci_local_preserves_independent_generator_selectors() {
   setup_ci_local_repo
 
-  local output ruby_commands generator_commands
-  export CI_LOCAL_FIXTURE_SELECTION=ruby
+  local output core_ruby_commands generated_example_commands generator_change_commands
+  export CI_LOCAL_FIXTURE_SELECTION=core_ruby
   if ! output="$(ci_local_output --changed 2>&1)"; then
-    fail "ci-local Ruby-selector fixture failed: $output"
+    fail "ci-local core-Ruby fixture failed: $output"
     return 1
   fi
-  ruby_commands="$(cat ci-local-commands.log)"
+  core_ruby_commands="$(cat ci-local-commands.log)"
   assert_contains \
-    "$ruby_commands" \
+    "$core_ruby_commands" \
     $'bundle\texec\trspec\tspec/react_on_rails\t--exclude-pattern\t**/generators/**' \
-    "Ruby-selector command log"
-  case "$ruby_commands" in
-    *$'bundle\texec\trspec\tspec/react_on_rails/generators'*|\
+    "core-Ruby command log"
+  assert_contains \
+    "$core_ruby_commands" \
+    $'bundle\texec\trspec\tspec/react_on_rails/generators' \
+    "core-Ruby command log"
+  case "$core_ruby_commands" in
     *$'bundle\texec\trake\trun_rspec:shakapacker_examples'*|\
     *$'bundle\texec\trake\trun_rspec:gem'*)
-      fail "Ruby selector must run only the hosted-equivalent unit job"
+      fail "core Ruby must not select generated example app tests or the unfenced unit task"
       ;;
   esac
 
-  export CI_LOCAL_FIXTURE_SELECTION=generators
+  export CI_LOCAL_FIXTURE_SELECTION=generated_examples
   if ! output="$(ci_local_output --changed 2>&1)"; then
-    fail "ci-local generator-selector fixture failed: $output"
+    fail "ci-local generated-example fixture failed: $output"
     return 1
   fi
-  generator_commands="$(cat ci-local-commands.log)"
+  generated_example_commands="$(cat ci-local-commands.log)"
   assert_contains \
-    "$generator_commands" \
-    $'bundle\texec\trspec\tspec/react_on_rails/generators' \
-    "generator-selector command log"
-  assert_contains \
-    "$generator_commands" \
+    "$generated_example_commands" \
     $'bundle\texec\trake\trun_rspec:shakapacker_examples' \
-    "generator-selector command log"
-  case "$generator_commands" in
+    "generated-example command log"
+  case "$generated_example_commands" in
+    *$'bundle\texec\trspec\tspec/react_on_rails/generators'*|\
     *$'bundle\texec\trspec\tspec/react_on_rails\t--exclude-pattern'*)
-      fail "generator selector must not run the Ruby unit job"
+      fail "generated example app selector must not select either gem RSpec shard"
+      ;;
+  esac
+
+  export CI_LOCAL_FIXTURE_SELECTION=generator_change
+  if ! output="$(ci_local_output --changed 2>&1)"; then
+    fail "ci-local generator-change fixture failed: $output"
+    return 1
+  fi
+  generator_change_commands="$(cat ci-local-commands.log)"
+  assert_contains \
+    "$generator_change_commands" \
+    $'bundle\texec\trspec\tspec/react_on_rails\t--exclude-pattern\t**/generators/**' \
+    "generator-change command log"
+  assert_contains \
+    "$generator_change_commands" \
+    $'bundle\texec\trspec\tspec/react_on_rails/generators' \
+    "generator-change command log"
+  assert_contains \
+    "$generator_change_commands" \
+    $'bundle\texec\trake\trun_rspec:shakapacker_examples' \
+    "generator-change command log"
+}
+
+test_ci_local_text_fallback_preserves_gem_generator_selector() {
+  setup_ci_local_repo
+  cat > test-bin/jq <<'BASH'
+#!/usr/bin/env bash
+exit 1
+BASH
+  chmod +x test-bin/jq
+
+  local output commands
+  export CI_LOCAL_FIXTURE_SELECTION=core_ruby
+  if ! output="$(ci_local_output --changed 2>&1)"; then
+    fail "ci-local text-fallback fixture failed: $output"
+    return 1
+  fi
+  commands="$(cat ci-local-commands.log)"
+  assert_contains \
+    "$commands" \
+    $'bundle\texec\trspec\tspec/react_on_rails/generators' \
+    "text-fallback command log"
+  case "$commands" in
+    *$'bundle\texec\trake\trun_rspec:shakapacker_examples'*)
+      fail "text fallback must not conflate gem generator specs with generated examples"
       ;;
   esac
 }
@@ -1082,6 +1144,7 @@ assert_generator_spec_support_change_routes_generator_shard() {
   out="$(detector_output)"
   assert_contains "$out" '"run_ruby_tests": true' "$file output"
   assert_contains "$out" '"run_gem_generator_specs": true' "$file output"
+  assert_contains "$out" '"run_generators": false' "$file output"
 }
 
 test_generator_spec_helper_change_routes_generator_shard() {
@@ -1138,6 +1201,7 @@ test_core_ruby_changes_request_e2e() {
   local out
   out="$(detector_output)"
   assert_contains "$out" '"run_gem_generator_specs": true' "core ruby output"
+  assert_contains "$out" '"run_generators": false' "core ruby output"
   assert_contains "$out" '"run_dummy_tests": true' "core ruby output"
   assert_contains "$out" '"run_e2e_tests": true' "core ruby output"
 }
@@ -1745,7 +1809,8 @@ run_test test_agent_bin_change_runs_ci_infrastructure_without_benchmarks
 run_test test_agent_bin_markdown_change_is_non_runtime_only
 run_test test_agent_workflow_config_change_runs_ci_infrastructure_without_benchmarks
 run_test test_ci_local_fast_mode_keeps_generator_specs_out_of_unit_job
-run_test test_ci_local_keeps_ruby_and_generator_selectors_isolated
+run_test test_ci_local_preserves_independent_generator_selectors
+run_test test_ci_local_text_fallback_preserves_gem_generator_selector
 run_test test_ci_infrastructure_only_change_runs_tests_but_skips_benchmarks
 run_test test_suite_workflow_file_runs_its_tests_but_no_benchmark
 run_test test_gem_tests_workflow_change_keeps_generator_specs_fail_closed
