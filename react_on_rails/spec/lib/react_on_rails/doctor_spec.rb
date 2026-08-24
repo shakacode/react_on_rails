@@ -1429,6 +1429,34 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when a parent layout composes its React output through a layout partial" do
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        stub_layouts(
+          "app/views/layouts/application.html.erb" => <<~ERB,
+            <%= stylesheet_pack_tag %>
+            <%= render "layouts/react" %>
+          ERB
+          "app/views/layouts/_react.html.erb" => <<~ERB
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= javascript_pack_tag %>
+          ERB
+        )
+      end
+
+      it "analyzes the parent but does not treat its partial as an independent layout" do
+        doctor.send(:check_layout_files)
+
+        expect(checker.warnings?).to be(false)
+        expect(checker.messages).to include(
+          hash_including(type: :info, content: "  ℹ️  application: has stylesheet_pack_tag")
+        )
+        expect(checker.messages).not_to include(
+          hash_including(content: a_string_including("_react"))
+        )
+      end
+    end
+
     context "when globally enabled auto_load_bundle loads component CSS that the React layout does not flush" do
       before do
         stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])

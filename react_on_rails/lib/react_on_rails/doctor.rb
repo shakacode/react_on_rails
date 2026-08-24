@@ -1253,7 +1253,7 @@ module ReactOnRails
       checker.add_info("\n📄 Layout Files Analysis:")
 
       layout_files.each do |layout_file|
-        next unless File.exist?(layout_file)
+        next unless analyzable_layout_file?(layout_file)
 
         template_content = File.read(layout_file)
         ambiguous_commented_erb = html_comment_with_executable_erb?(template_content)
@@ -1278,6 +1278,10 @@ module ReactOnRails
           checker.add_info("  ℹ️  #{layout_name}: no pack tags found")
         end
       end
+    end
+
+    def analyzable_layout_file?(layout_file)
+      !File.basename(layout_file).start_with?("_") && File.exist?(layout_file)
     end
 
     def check_unflushed_auto_loaded_component_css(layout_name, content, ambiguous_commented_erb: false)
