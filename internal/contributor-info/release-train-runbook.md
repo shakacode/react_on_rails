@@ -362,19 +362,18 @@ published artifacts, or ad-lib manual publication. If the prior supervisor has
 stopped, prove its process group and children are dead before an operator
 intentionally releases/acquires the claim under a fresh identity.
 
-For a known tracker, retry with that exact issue so recovery reads the
-issue-specific comment endpoint instead of attempting repository-wide bounded
-discovery:
+For a known tracker, retry with that exact issue:
 
 ```bash
 RELEASE_TRACKER=<issue> script/release VERSION
 ```
 
-This selected-tracker read validates the recorded chain on that issue; it does
-not prove that a matching record is absent from every other tracker. Omit
-`RELEASE_TRACKER` only when repository-wide bounded discovery is required to
-prove absence, and remain stopped if that broader read reaches an unknown,
-bounded-page result.
+The supplied tracker is the expected canonical tracker, not a discovery scope.
+Recovery reads the authoritative repository issue-comments endpoint from the
+candidate commit timestamp forward, validates every matching trusted record,
+and rejects a candidate bound to any other tracker. The candidate timestamp and
+bounded page/marker limits fail closed when complete durable history cannot be
+proved; GitHub issue search is not a completeness oracle.
 
 - **The tag exists and zero immutable packages were published.** After recording
   exact evidence, resume only with `RELEASE_TRACKER=<issue> script/release VERSION`

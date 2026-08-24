@@ -6,10 +6,9 @@ The first `17.1.0.rc.0` attempt pushed the generated version commit
 `8e4358cfdc811d57d76fd70dbb5ff8c90913dc57` and then stopped before creating a
 tag or publishing any package. Three independent defects prevent a safe retry:
 
-1. A normal same-candidate retry scans repository-wide issue comments looking
-   for a prior accelerated-RC authorization. The bounded scan fails once a
-   repository has more historical comments than its fixed page limit, even when
-   the operator supplied the canonical release tracker.
+1. A normal same-candidate retry scans all historical repository issue comments
+   looking for a prior accelerated-RC authorization. The bounded scan fails once
+   a repository has more historical comments than its fixed page limit.
 2. The packed Pro compatibility smoke installs locally packed OSS and Pro
    tarballs, but pnpm still resolves the Pro tarball's exact `react-on-rails`
    dependency from npm. Exact-head CI therefore cannot pass until the version
@@ -27,8 +26,8 @@ release branch currently points at the recoverable version commit above.
 
 - Preserve the prepared `17.1.0.rc.0` version and changelog instead of resetting
   or force-pushing the release branch.
-- Make ordinary same-candidate retry discovery bounded by the explicitly
-  selected release tracker.
+- Bound authoritative repository-wide same-candidate discovery from the
+  candidate commit timestamp without trusting eventually indexed issue search.
 - Make exact-head packed-package CI independent of whether the candidate has
   already been published.
 - Provide one repository-owned live-release entry point that maintains a live
@@ -49,20 +48,16 @@ release branch currently points at the recoverable version commit above.
 
 ## Design
 
-### Tracker-scoped same-candidate discovery
+### Candidate-bounded authoritative same-candidate discovery
 
-`resolve_accelerated_rc_options_for_release!` will pass an explicitly supplied
-`RELEASE_TRACKER` into same-candidate history discovery even when accelerated
-mode was not requested. Discovery will read the selected issue's comments via
-`repos/:owner/:repo/issues/:tracker/comments`, retain the existing pagination,
-schema, authorship, append-only, and conflicting-record validation, and accept
-only records whose embedded tracker equals the selected issue.
-
-If no tracker is supplied, the current repository-wide fail-closed discovery
-remains. If the selected tracker contains a persisted accelerated authorization
-for the candidate, the retry must resume that authorization; selecting a tracker
-cannot convert an accelerated retry into an ordinary release. A mismatched or
-invalid tracker remains an abort.
+`resolve_accelerated_rc_options_for_release!` passes an explicitly supplied
+`RELEASE_TRACKER` as the expected canonical tracker. Discovery obtains the
+candidate commit timestamp, then reads the authoritative repository issue-comment
+endpoint from that time forward. It retains bounded pagination, schema,
+authorship, append-only, and conflicting-record validation across every tracker.
+Candidate timestamps in the future, records predating the candidate, incomplete
+bounded enumeration, and any tracker mismatch fail closed. GitHub issue search
+may lag new comments and is not used to prove absence.
 
 ### Registry-independent packed compatibility
 

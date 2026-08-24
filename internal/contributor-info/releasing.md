@@ -391,10 +391,10 @@ creating the tag or publishing any package. After all six immutable npm and Ruby
 confirmed, it immediately appends `published-awaiting-gates` before fallible GitHub-release synchronization
 or other post-publish work. Partial package publication never appends that transition; once every package
 is published, a later GitHub-release sync failure still leaves the candidate durably awaiting reconciliation.
-At that completion boundary, the task first proves that the selected tracker is still eligible and that its
-bounded issue-specific history has one canonical authorization with no absorbing rejection. It repeats that
-selected-tracker proof after append or idempotent reuse. This does not prove that another tracker has no matching
-record; repository-wide bounded discovery is used only when `RELEASE_TRACKER` is omitted.
+At that completion boundary, the task first proves that the selected tracker is still eligible and that bounded,
+authoritative repository comment history from the candidate commit forward has one canonical authorization with no
+absorbing rejection. It repeats that proof after append or idempotent reuse and rejects matching records on any other
+tracker. GitHub issue search is eventually indexed and therefore is never used as the completeness oracle.
 If all six artifacts became public but that completion append was interrupted, the reconciliation task can
 recover the missing transition before it evaluates the deferred gates. Recovery requires the canonical
 authorization-only selected-tracker history, the exact remote annotated RC tag object, its peeled candidate SHA and
@@ -415,8 +415,8 @@ commit proof; an active different-SHA run cannot be authorized, persisted, reuse
 publication boundary. An active status paired with any non-null conclusion is contradictory evidence and
 blocks. Failed, missing, malformed, stale, API-unknown, or otherwise non-deferable evidence also blocks the
 retry. Every same-version-and-SHA retry discovers durable history first. When `RELEASE_TRACKER` is supplied,
-that is the selected issue's history only; its canonical authorization chain controls the retry, and explicit
-tracker, reason, and options must match that
+it identifies the expected canonical issue while authoritative repository issue-comment enumeration still checks the
+candidate across trackers. Its canonical authorization chain controls the retry, and explicit tracker, reason, and options must match that
 authorization exactly, and a rejected or conflicting chain remains blocking. The task never refreshes or
 creates a conflicting authorization. A history-free explicit attempt may create its first authorization only
 when the exact RC tag does not exist. An existing ordinary lightweight RC tag can be retried unflagged through
@@ -429,10 +429,10 @@ may continue.
 Exact-head CI snapshots sort non-success checks canonically by name, state, and URL before persistence and
 comparison. API enumeration-order changes therefore do not require another confirmation or block a publication
 boundary, while any real check identity, state, URL, duplicate, or conflicting-entry change remains material.
-Before accepting, reusing, or appending that authorization, the task loads the selected tracker's trusted
-issue comments for the exact version and SHA and requires one canonical chain. It repeats that selected-tracker
-proof after posting and immediately before tag handling. It does not detect a concurrently appended record on
-another tracker; repository-wide bounded discovery occurs only when `RELEASE_TRACKER` is omitted. Before tag
+Before accepting, reusing, or appending that authorization, the task loads trusted repository issue comments updated
+since the candidate commit for the exact version and SHA and requires one canonical chain on the expected tracker. It
+repeats that repository-wide proof after posting and immediately before tag handling. Candidate commit time in the
+future, history recorded before that commit, malformed chronology, or a bounded page/marker limit blocks. Before tag
 handling, immediately
 before tag push, and again after tag push before package publication, accelerated RCs also refresh exact-head
 CI and the recorded ShakaPerf run. A newly failed, missing, malformed, or unknown gate blocks; pending evidence
@@ -514,10 +514,9 @@ final promotion require at least one canonical `published-awaiting-gates` transi
 be ordered authorization, publication completion, then terminal state, with parseable monotonic timestamps.
 Exact authorization duplicates and the narrowly permitted publication/terminal retry variants remain
 idempotent only within their phase; pending transitions after terminal state are invalid.
-Reconciliation performs bounded selected-tracker exact-version-and-SHA validation against the canonical
+Reconciliation performs bounded authoritative repository exact-version-and-SHA validation against the canonical
 authorization before reporting existing terminal state or appending a new terminal transition, then repeats
-that validation after the append helper re-fetches the selected tracker. It is not a repository-wide absence
-proof.
+that validation after the append helper re-fetches durable history.
 
 Reconcile the record after the deferred gates and all downstream RC testing finish. The live
 reconciliation command is intentionally omitted here; run it only from the guarded release coordinator

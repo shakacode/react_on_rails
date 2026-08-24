@@ -8468,17 +8468,17 @@ RSpec.describe "release.rake helper methods" do
       )
     end
 
-    it "rejects a selected tracker when repository discovery finds the candidate on another tracker" do
+    it "rejects another tracker even while issue search has not indexed its candidate comment" do
       comment = accelerated_rc_test_issue_comment(
         id: 1,
         body: accelerated_rc_tracker_comment(authorization),
         user: { "login" => "justin808" }
       )
-      allow(self).to receive(:fetch_repository_accelerated_rc_candidate_issue_numbers!)
+      allow(self).to receive(:accelerated_rc_candidate_comment_lower_bound!)
         .with(repo_slug: "shakacode/react_on_rails", candidate_sha: "f" * 40)
-        .and_return([3823])
-      allow(self).to receive(:fetch_repository_issue_comments_for_accelerated_rc_retry!) do |tracker:, **|
-        tracker == 3823 ? [comment] : []
+        .and_return("2026-07-14T12:00:00Z")
+      allow(self).to receive(:fetch_repository_issue_comments_for_accelerated_rc_retry!) do |tracker: nil, **|
+        tracker.nil? ? [comment] : []
       end
       allow(self).to receive_messages(
         local_release_tag_exists?: false,
@@ -8489,6 +8489,37 @@ RSpec.describe "release.rake helper methods" do
       expect do
         resolve_unflagged_accelerated_retry(tracker: "4842")
       end.to raise_error(SystemExit, /different release tracker/i)
+    end
+
+    it "fails closed when the candidate commit timestamp is in the future" do
+      success = instance_double(Process::Status, success?: true)
+      allow(self).to receive(:capture_gh_output).and_return(["2999-01-01T00:00:00Z\n", success])
+
+      expect do
+        accelerated_rc_candidate_comment_lower_bound!(
+          repo_slug: "shakacode/react_on_rails", candidate_sha: "f" * 40
+        )
+      end.to raise_error(SystemExit, /candidate commit time.*future.*history is unknown/i)
+    end
+
+    it "loads the candidate commit timestamp as the authoritative comment lower bound" do
+      success = instance_double(Process::Status, success?: true)
+      allow(self).to receive(:capture_gh_output).and_return(["2026-07-14T12:00:00Z\n", success])
+
+      expect(
+        accelerated_rc_candidate_comment_lower_bound!(
+          repo_slug: "shakacode/react_on_rails", candidate_sha: "f" * 40
+        )
+      ).to eq("2026-07-14T12:00:00Z")
+      expect(self).to have_received(:capture_gh_output).with(
+        "api", "repos/shakacode/react_on_rails/commits/#{'f' * 40}", "--jq", ".commit.committer.date"
+      )
+    end
+
+    it "rejects candidate history recorded before the candidate commit" do
+      expect do
+        validate_accelerated_rc_candidate_record_times!([authorization], "2026-07-14T13:31:00Z")
+      end.to raise_error(SystemExit, /history predates the candidate commit/i)
     end
 
     it "preserves an ordinary retry when the selected tracker is empty" do
@@ -9672,6 +9703,17 @@ RSpec.describe "release.rake helper methods" do
       expect(
         fetch_repository_issue_comments_for_accelerated_rc_retry!(repo_slug: "shakacode/react_on_rails")
       ).to eq([marker_comment])
+    end
+
+    it "binds bounded repository discovery to the candidate commit timestamp" do
+      expect(
+        accelerated_rc_comment_page_endpoint(
+          repo_slug: "shakacode/react_on_rails", tracker: nil, page: 1, since: "2026-07-14T12:00:00Z"
+        )
+      ).to eq(
+        "repos/shakacode/react_on_rails/issues/comments?per_page=100&sort=created&direction=asc&page=1" \
+        "&since=2026-07-14T12%3A00%3A00Z"
+      )
     end
 
     it "allows a safely structured markerless repository comment whose author was deleted" do

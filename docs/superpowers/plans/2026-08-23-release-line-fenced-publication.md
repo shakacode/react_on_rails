@@ -4,7 +4,7 @@
 
 **Goal:** Make the prepared 17.1.0.rc.0 candidate pass exact-head validation and publish only through a lifetime-bound, per-write-fenced release entry point.
 
-**Architecture:** Narrow same-candidate retry discovery to an explicitly selected tracker, make packed Pro compatibility resolve both local tarballs without registry availability, and replace the placeholder script/release with a Ruby supervisor. The supervisor owns a private liveness pipe, an independent parent-death pipe, and a release process group; a focused lease guard validates that contract and performs authoritative agent-coord checks immediately before every outward write, while the death watch kills the group if the supervisor disappears.
+**Architecture:** Bound authoritative repository-wide same-candidate retry discovery from the candidate commit timestamp, make packed Pro compatibility resolve both local tarballs without registry availability, and replace the placeholder script/release with a Ruby supervisor. The supervisor owns a private liveness pipe, an independent parent-death pipe, and a release process group; a focused lease guard validates that contract and performs authoritative agent-coord checks immediately before every outward write, while the death watch kills the group if the supervisor disappears.
 
 **Tech Stack:** Ruby, Rake, RSpec, Bash, Node.js ESM, pnpm, node:test, GitHub CLI, agent-coord HTTP backend.
 
@@ -21,7 +21,7 @@
 
 ---
 
-### Task 1: Scope same-candidate retry discovery to the selected tracker
+### Task 1: Bound authoritative same-candidate discovery from the candidate
 
 **Files:**
 
@@ -31,11 +31,11 @@
 **Interfaces:**
 
 - Consumes: tracker: on resolve_accelerated_rc_options_for_release!.
-- Produces: tracker-aware candidate history discovery; nil retains repository discovery.
+- Produces: candidate-time-bounded repository discovery with an expected canonical tracker.
 
 - [ ] **Step 1: Write failing selected-tracker specs**
 
-Pass tracker: "4842" for an unflagged same-candidate retry and expect candidate discovery with tracker: 4842. Assert an empty selected tracker preserves ordinary retry, a selected tracker containing the existing authorization resumes accelerated mode, and a record bound to another tracker aborts.
+Pass tracker: "4842" for an unflagged same-candidate retry. Reproduce GitHub search-index lag by returning no search result while the authoritative repository comments endpoint already contains an exact-candidate authorization on tracker 3823; expect the retry to abort.
 
 - [ ] **Step 2: Run and verify RED**
 
@@ -43,11 +43,11 @@ Pass tracker: "4842" for an unflagged same-candidate retry and expect candidate 
 (cd react_on_rails && bundle exec rspec spec/react_on_rails/release_rake_helpers_spec.rb   --example "resolve_accelerated_rc_options_for_release")
 ```
 
-Expected: failure because candidate discovery does not accept tracker:.
+Expected: failure because selected-tracker discovery misses the unindexed record on tracker 3823.
 
 - [ ] **Step 3: Implement tracker-aware discovery**
 
-Change fetch_repository_issue_comments_for_accelerated_rc_retry! to accept tracker: nil and delegate to fetch_bounded_accelerated_rc_marker_comments! with that tracker. Normalize an explicit tracker to a positive integer, pass it through same-candidate authorization/history helpers, and validate trusted records against the selected issue. Preserve repository-wide discovery when tracker is nil.
+Read the candidate commit timestamp through the GitHub commits API, reject malformed or future timestamps, and enumerate the authoritative repository issue-comments endpoint with that lower bound. Preserve bounded pagination and marker limits, reject candidate records predating the bound, and treat the supplied tracker only as the expected canonical tracker. Do not use eventually indexed issue search as an absence proof.
 
 - [ ] **Step 4: Run focused and pagination specs**
 
@@ -55,7 +55,7 @@ Change fetch_repository_issue_comments_for_accelerated_rc_retry! to accept track
 (cd react_on_rails && bundle exec rspec spec/react_on_rails/release_rake_helpers_spec.rb   --example "resolve_accelerated_rc_options_for_release"   --example "bounded selected and repository discovery"   --example "page bound")
 ```
 
-Expected: GREEN; selected discovery calls issues/4842/comments.
+Expected: GREEN; selected discovery calls repository issue comments with the encoded candidate timestamp and rejects cross-tracker history.
 
 - [ ] **Step 5: Commit**
 
