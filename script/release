@@ -483,7 +483,7 @@ class ReleaseSupervisor
       )
       status = wait_for_coordination(child_pid, monotonic_time + timeout)
     ensure
-      terminate_group(child_pid, child_pid:, grace: termination_grace) if child_pid && !status
+      terminate_group(child_pid, child_pid:, grace: termination_grace) if child_pid
     end
     stdout_file.rewind
     [stdout_file.read, status]

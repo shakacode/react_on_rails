@@ -92,6 +92,12 @@ case "${command_name}" in
     test ! -f "${TEST_STATUS_COUNT_FILE}" || count="$(cat "${TEST_STATUS_COUNT_FILE}")"
     count=$((count + 1))
     printf '%s\n' "${count}" >"${TEST_STATUS_COUNT_FILE}"
+    if test "${FAKE_SUCCESS_STATUS_DESCENDANT:-0}" = 1 && test "${count}" = 1; then
+      process_group="$(ps -o pgid= -p "$$" | tr -d ' ')"
+      printf '%s:%s\n' "$$" "${process_group}" >"${TEST_COORDINATION_PROCESS_LOG}"
+      sh -c 'trap "" TERM INT HUP; exec sleep 30' &
+      printf '%s\n' "$!" >"${TEST_COORDINATION_DESCENDANT_LOG}"
+    fi
     if test -n "${FAKE_STALL_STATUS_AFTER:-}" && test "${count}" -gt "${FAKE_STALL_STATUS_AFTER}"; then
       process_group="$(ps -o pgid= -p "$$" | tr -d ' ')"
       printf '%s:%s\n' "$$" "${process_group}" >"${TEST_COORDINATION_PROCESS_LOG}"
@@ -375,7 +381,7 @@ UNVERIFIED_CHILD_HARNESS
   export REACT_ON_RAILS_RELEASE_HEARTBEAT_INTERVAL="0.1"
   export REACT_ON_RAILS_RELEASE_TERMINATION_GRACE="0.5"
   unset FAKE_STATUS_FAIL FAKE_STATUS_AFTER_FIRST FAKE_FAIL_HEARTBEAT_AFTER FAKE_STALL_HEARTBEAT_AFTER
-  unset FAKE_STALL_STATUS_AFTER
+  unset FAKE_STALL_STATUS_AFTER FAKE_SUCCESS_STATUS_DESCENDANT
   unset FAKE_BUNDLE_MODE FAKE_HANDSHAKE_MODE FAKE_EXCEPTION_MODE
   unset FAKE_HANDSHAKE_IGNORE_TERM
   unset REACT_ON_RAILS_RELEASE_COORDINATION_TIMEOUT
@@ -593,6 +599,18 @@ assert_contains "${bundle_log}" 'args|exec|rake|release:reconcile_accelerated_rc
 assert_no_coordination_mutation
 assert_secret_absent
 pass "accelerated RC reconciliation uses the supervised release contract"
+
+setup_case successful-coordination-descendant-cleanup
+export FAKE_SUCCESS_STATUS_DESCENDANT=1
+FAKE_BUNDLE_MODE=success run_release 17.1.0.rc.0 || fail "release with successful coordination child failed"
+test -s "${coordination_descendant_log}" || fail "successful coordination child did not fork its test descendant"
+coordination_descendant="$(cat "${coordination_descendant_log}")"
+if kill -0 "${coordination_descendant}" 2>/dev/null; then
+  kill -KILL "${coordination_descendant}" 2>/dev/null || true
+  fail "successful coordination descendant survived command completion"
+fi
+assert_secret_absent
+pass "successful coordination commands clean up descendants before continuing"
 
 if supervisor_case_enabled fence-status-signal; then
   setup_case signal-during-fence-status
