@@ -43,7 +43,7 @@ class ReleaseSupervisor
 
   def run
     scope = parse_scope!
-    verify_branch!(scope.branch)
+    verify_branch!(scope)
     return run_dry(scope.version) if @options.fetch(:dry_run)
 
     identity = release_identity!
@@ -116,23 +116,33 @@ class ReleaseSupervisor
     end
 
     base_version = version_match[:base]
+    branch = current_branch!
     ReleaseScope.new(
       version: version.dup.freeze,
       base_version: base_version.freeze,
       repo: REPOSITORY,
       target: "release-line:#{base_version}".freeze,
-      branch: "release/#{base_version}".freeze
+      branch: branch.freeze
     ).freeze
   end
 
-  def verify_branch!(expected_branch)
+  def current_branch!
     stdout, _stderr, status = Open3.capture3("git", "branch", "--show-current")
     current_branch = stdout.strip
-    return if status.success? && current_branch == expected_branch
+    return current_branch if status.success? && !current_branch.empty?
 
-    raise UsageError, "release must run from branch #{expected_branch}"
+    raise UsageError, "release must run from a Git checkout on a named branch"
   rescue Errno::ENOENT
-    raise UsageError, "release must run from a Git checkout on branch #{expected_branch}"
+    raise UsageError, "release must run from a Git checkout on a named branch"
+  end
+
+  def verify_branch!(scope)
+    expected_release_branch = "release/#{scope.base_version}"
+    stable_main = scope.version == scope.base_version && scope.branch == "main" &&
+                  !@options.fetch(:reconcile_accelerated_rc)
+    return if scope.branch == expected_release_branch || stable_main
+
+    raise UsageError, "release must run from branch #{expected_release_branch}"
   end
 
   def release_identity!
@@ -538,6 +548,7 @@ class ReleaseSupervisor
       "pgid" => pgid,
       "repo" => scope.repo,
       "target" => scope.target,
+      "release_version" => scope.version,
       "branch" => scope.branch,
       "agent_id" => identity.agent_id,
       "instance_id" => identity.instance_id,

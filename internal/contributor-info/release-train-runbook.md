@@ -151,7 +151,7 @@ mutation. The bounded status and claim operations fail closed on timeout,
 `UNKNOWN`, or `CLAIM_REFUSED`:
 
 ```bash
-if [ "${RELEASE_VERSION+x}" = x ] || [ "${RELEASE_LINE_TARGET+x}" = x ]; then
+if [ "${RELEASE_VERSION+x}" = x ] || [ "${RELEASE_LINE_TARGET+x}" = x ] || [ "${RELEASE_BRANCH+x}" = x ]; then
   echo "canonical release variables are already set; start a fresh shell before acquiring a release-line lease" >&2
   return 1 2>/dev/null || exit 1
 fi
@@ -161,8 +161,13 @@ if [[ ! "${RELEASE_VERSION}" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]
   return 1 2>/dev/null || exit 1
 fi
 RELEASE_LINE_TARGET="release-line:${RELEASE_VERSION}"
-readonly RELEASE_VERSION RELEASE_LINE_TARGET
-export RELEASE_VERSION RELEASE_LINE_TARGET
+RELEASE_BRANCH="${RELEASE_BRANCH_INPUT:-release/${RELEASE_VERSION}}"
+if [ "${RELEASE_BRANCH}" != "main" ] && [ "${RELEASE_BRANCH}" != "release/${RELEASE_VERSION}" ]; then
+  echo "release branch must be main or release/${RELEASE_VERSION}; stop" >&2
+  return 1 2>/dev/null || exit 1
+fi
+readonly RELEASE_VERSION RELEASE_LINE_TARGET RELEASE_BRANCH
+export RELEASE_VERSION RELEASE_LINE_TARGET RELEASE_BRANCH
 RELEASE_COORDINATOR_INSTANCE_ID="$(
   ruby -rsecurerandom -e 'print SecureRandom.uuid'
 )" || {
@@ -184,7 +189,7 @@ heartbeat_release_line_lease() {
     --instance-id "${RELEASE_COORDINATOR_INSTANCE_ID}" \
     --repo shakacode/react_on_rails \
     --target "${RELEASE_LINE_TARGET}" \
-    --branch "release/${RELEASE_VERSION}" \
+    --branch "${RELEASE_BRANCH}" \
     --phase release-write-serialization \
     --status in_progress \
     --ttl 900
@@ -200,15 +205,18 @@ require_live_release_line_lease() {
     --arg holder "${RELEASE_COORDINATOR_ID}" \
     --arg instance "${RELEASE_COORDINATOR_INSTANCE_ID}" \
     --arg target "shakacode/react_on_rails#${RELEASE_LINE_TARGET}" \
+    --arg branch "${RELEASE_BRANCH}" \
     '(.claims | length == 1) and
      (.claims[0].status == "active") and
      (.claims[0].agent_id == $holder) and
      (.claims[0].instance_id == $instance) and
+     (.claims[0].branch == $branch) and
      (.claims[0].expires_at != "UNKNOWN") and
      ((.claims[0].expires_at | fromdateiso8601) > now) and
      (.heartbeats | length == 1) and
      (.heartbeats[0].agent_id == $holder) and
      (.heartbeats[0].instance_id == $instance) and
+     (.heartbeats[0].branch == $branch) and
      (.heartbeats[0].target == $target) and
      (.heartbeats[0].liveness == "live")' \
     >/dev/null <<<"${lease_json}"
@@ -223,7 +231,7 @@ acquire_release_line_lease() {
     --instance-id "${RELEASE_COORDINATOR_INSTANCE_ID}" \
     --repo shakacode/react_on_rails \
     --target "${RELEASE_LINE_TARGET}" \
-    --branch "release/${RELEASE_VERSION}" \
+    --branch "${RELEASE_BRANCH}" \
     --ttl 14400 || return 1
   heartbeat_release_line_lease || return 1
   require_live_release_line_lease
@@ -238,10 +246,13 @@ fi
 ```
 
 Set `RELEASE_VERSION_INPUT` only in a fresh shell. The bootstrap refuses to run
-when `RELEASE_VERSION` or `RELEASE_LINE_TARGET` already exists, including when
+when `RELEASE_VERSION`, `RELEASE_LINE_TARGET`, or `RELEASE_BRANCH` already exists, including when
 it is pasted again into a stale interactive shell. After validation,
-`RELEASE_VERSION` and `RELEASE_LINE_TARGET` are the canonical, readonly lease
-identity for this shell lifecycle. Do not reassign either variable. Later
+`RELEASE_VERSION`, `RELEASE_LINE_TARGET`, and `RELEASE_BRANCH` are the canonical, readonly lease
+identity for this shell lifecycle. Do not reassign them. `RELEASE_BRANCH` defaults to the matching
+`release/X.Y.Z` branch used by the release train. For an ordinary stable publication that intentionally
+runs from `main`, start a fresh shell with `RELEASE_BRANCH_INPUT=main`; do not use `main` for an RC or
+accelerated-RC reconciliation. Later
 backport, synchronous-closeout, and selective-closeout inputs use their own
 names and must equal `RELEASE_VERSION` before any GitHub or Git mutation.
 

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "json"
+require "tmpdir"
 require "time"
 require_relative "spec_helper"
 require_relative "../../../rakelib/release_lease_guard"
@@ -75,6 +76,7 @@ RSpec.describe ReleaseLeaseGuard do
       "pgid" => pgid,
       "repo" => repo,
       "target" => target,
+      "release_version" => "17.1.0.rc.0",
       "branch" => branch,
       "agent_id" => agent_id,
       "instance_id" => instance_id,
@@ -102,6 +104,52 @@ RSpec.describe ReleaseLeaseGuard do
     changed
   end
 
+  it "bounds and reaps a stalled default status subprocess without exposing diagnostics" do
+    stub_const("ReleaseLeaseGuard::AgentCoordStatusReader::TIMEOUT_SECONDS", 0.7)
+    stub_const("ReleaseLeaseGuard::AgentCoordStatusReader::TERMINATION_GRACE_SECONDS", 0.1)
+    stub_const("ReleaseLeaseGuard::AgentCoordStatusReader::POLL_INTERVAL_SECONDS", 0.01)
+
+    Dir.mktmpdir("release-lease-guard-status") do |directory|
+      pid_file = File.join(directory, "agent-coord.pid")
+      executable = File.join(directory, "agent-coord")
+      File.write(
+        executable,
+        <<~RUBY
+          #!#{RbConfig.ruby}
+          File.write(ENV.fetch("TEST_AGENT_COORD_PID_FILE"), Process.pid.to_s)
+          warn "fake backend diagnostic: #{ENV.fetch('AGENT_COORD_API_TOKEN')}"
+          Signal.trap("TERM", "IGNORE")
+          sleep 4
+        RUBY
+      )
+      File.chmod(0o755, executable)
+
+      previous_path = ENV.fetch("PATH")
+      previous_pid_file = ENV.fetch("TEST_AGENT_COORD_PID_FILE", nil)
+      previous_token = ENV.fetch("AGENT_COORD_API_TOKEN", nil)
+      ENV["PATH"] = "#{directory}:#{previous_path}"
+      ENV["TEST_AGENT_COORD_PID_FILE"] = pid_file
+      ENV["AGENT_COORD_API_TOKEN"] = "coord-secret-must-never-appear"
+      started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+
+      expect do
+        expect do
+          described_class::AgentCoordStatusReader.new.call(repo:, target:)
+        end.to raise_error(described_class::LeaseError, "release lease status is unavailable")
+      end.to output("").to_stdout.and output("").to_stderr
+
+      elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at
+      stalled_pid = Integer(File.read(pid_file), 10)
+      expect(elapsed).to be < 1.5
+      expect { Process.kill(0, stalled_pid) }.to raise_error(Errno::ESRCH)
+      expect { Process.waitpid(stalled_pid, Process::WNOHANG) }.to raise_error(Errno::ECHILD)
+    ensure
+      ENV["PATH"] = previous_path
+      ENV["TEST_AGENT_COORD_PID_FILE"] = previous_pid_file
+      ENV["AGENT_COORD_API_TOKEN"] = previous_token
+    end
+  end
+
   it "refuses direct live activation without a wrapper contract" do
     expect do
       described_class.activate!(
@@ -122,6 +170,30 @@ RSpec.describe ReleaseLeaseGuard do
 
     expect(status_reads).to eq([[repo, target]])
     expect(described_class).to be_active
+  end
+
+  it "accepts a stable release from main when the target base and live lease branch match" do
+    payload = changed_status("claims", 0, "branch", value: "main")
+    payload.fetch("heartbeats").first["branch"] = "main"
+
+    expect(
+      activate_live(
+        contract_overrides: { "release_version" => "17.1.0", "branch" => "main" },
+        payload:
+      )
+    ).to be(true)
+  end
+
+  it "rejects a prerelease contract on main" do
+    expect do
+      activate_live(contract_overrides: { "branch" => "main" })
+    end.to raise_error(described_class::LeaseError, /wrapper contract is invalid/)
+  end
+
+  it "rejects a release version outside the contract target base" do
+    expect do
+      activate_live(contract_overrides: { "release_version" => "17.2.0.rc.0" })
+    end.to raise_error(described_class::LeaseError, /wrapper contract is invalid/)
   end
 
   it "performs a fresh authoritative read for every fence" do

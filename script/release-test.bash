@@ -58,6 +58,7 @@ setup_case() {
   status_count_file="${case_dir}/status-count"
   handshake_log="${case_dir}/handshake.log"
   coordination_process_log="${case_dir}/coordination-process.log"
+  coordination_descendant_log="${case_dir}/coordination-descendant.log"
   exception_group_log="${case_dir}/exception-group.log"
 
   mkdir -p "${fake_bin}" "${fake_repo}"
@@ -91,6 +92,14 @@ case "${command_name}" in
     test ! -f "${TEST_STATUS_COUNT_FILE}" || count="$(cat "${TEST_STATUS_COUNT_FILE}")"
     count=$((count + 1))
     printf '%s\n' "${count}" >"${TEST_STATUS_COUNT_FILE}"
+    if test -n "${FAKE_STALL_STATUS_AFTER:-}" && test "${count}" -gt "${FAKE_STALL_STATUS_AFTER}"; then
+      process_group="$(ps -o pgid= -p "$$" | tr -d ' ')"
+      printf '%s:%s\n' "$$" "${process_group}" >"${TEST_COORDINATION_PROCESS_LOG}"
+      trap '' TERM INT HUP
+      sh -c 'trap "" TERM INT HUP; exec sleep 30' &
+      printf '%s\n' "$!" >"${TEST_COORDINATION_DESCENDANT_LOG}"
+      wait
+    fi
     claim_status="active"
     claim_agent_id="${RELEASE_COORDINATOR_ID}"
     claim_instance_id="${RELEASE_COORDINATOR_INSTANCE_ID}"
@@ -189,6 +198,12 @@ case "${FAKE_BUNDLE_MODE:-success}" in
       sleep 0.1
     done
     ;;
+  guard)
+    exec ruby -e '
+      require ENV.fetch("TEST_RELEASE_GUARD")
+      ReleaseLeaseGuard.activate!(dry_run: false)
+    '
+    ;;
   *)
     exit 95
     ;;
@@ -275,8 +290,10 @@ EXCEPTION_HARNESS
   export TEST_STATUS_COUNT_FILE="${status_count_file}"
   export TEST_HANDSHAKE_LOG="${handshake_log}"
   export TEST_COORDINATION_PROCESS_LOG="${coordination_process_log}"
+  export TEST_COORDINATION_DESCENDANT_LOG="${coordination_descendant_log}"
   export TEST_EXCEPTION_GROUP_LOG="${exception_group_log}"
   export TEST_RELEASE_SCRIPT="${release_script}"
+  export TEST_RELEASE_GUARD="${repo_root}/rakelib/release_lease_guard"
   export TEST_REPO="shakacode/react_on_rails"
   export TEST_TARGET="release-line:17.1.0"
   export TEST_BRANCH="release/17.1.0"
@@ -287,6 +304,7 @@ EXCEPTION_HARNESS
   export REACT_ON_RAILS_RELEASE_HEARTBEAT_INTERVAL="0.1"
   export REACT_ON_RAILS_RELEASE_TERMINATION_GRACE="0.5"
   unset FAKE_STATUS_FAIL FAKE_STATUS_AFTER_FIRST FAKE_FAIL_HEARTBEAT_AFTER FAKE_STALL_HEARTBEAT_AFTER
+  unset FAKE_STALL_STATUS_AFTER
   unset FAKE_BUNDLE_MODE FAKE_HANDSHAKE_MODE FAKE_EXCEPTION_MODE
   unset FAKE_HANDSHAKE_IGNORE_TERM
   unset REACT_ON_RAILS_RELEASE_COORDINATION_TIMEOUT
@@ -372,6 +390,15 @@ assert_contains "${bundle_log}" 'args|exec|rake|release[17.1.0.rc.0,true]'
 assert_contains "${bundle_log}" 'contract:'
 pass "dry-run needs no identity or coordination"
 
+setup_case stable-main-dry-run
+git -C "${fake_repo}" switch -q -c main
+unset RELEASE_COORDINATOR_ID RELEASE_COORDINATOR_INSTANCE_ID AGENT_COORD_MACHINE_ID AGENT_COORD_API_TOKEN
+run_release --dry-run 17.1.0 || fail "stable main dry-run failed"
+assert_empty "${coord_log}"
+assert_contains "${bundle_log}" 'args|exec|rake|release[17.1.0,true]'
+assert_contains "${bundle_log}" 'contract:'
+pass "stable main dry-run uses the documented release path"
+
 setup_case missing-identity
 unset RELEASE_COORDINATOR_INSTANCE_ID
 if run_release 17.1.0.rc.0; then
@@ -394,6 +421,35 @@ assert_contains "${output_log}" "release/17.1.0"
 assert_secret_absent
 pass "live mode requires the matching release branch"
 
+setup_case prerelease-feature-branch
+git -C "${fake_repo}" switch -q -c feature/release-test
+if run_release --dry-run 17.1.0.rc.0; then
+  fail "prerelease dry-run accepted a feature branch"
+fi
+assert_empty "${coord_log}"
+assert_empty "${bundle_log}"
+assert_contains "${output_log}" "release/17.1.0"
+pass "prerelease mode rejects feature branches"
+
+setup_case mismatched-release-branch
+if run_release --dry-run 17.2.0; then
+  fail "stable dry-run accepted a mismatched release branch"
+fi
+assert_empty "${coord_log}"
+assert_empty "${bundle_log}"
+assert_contains "${output_log}" "release/17.2.0"
+pass "stable mode rejects mismatched release branches"
+
+setup_case reconciliation-main
+git -C "${fake_repo}" switch -q -c main
+if run_release --reconcile-accelerated-rc 17.1.0; then
+  fail "accelerated reconciliation accepted stable main"
+fi
+assert_empty "${coord_log}"
+assert_empty "${bundle_log}"
+assert_contains "${output_log}" "release/17.1.0"
+pass "accelerated reconciliation remains release-branch-only"
+
 setup_case matching-state
 FAKE_BUNDLE_MODE=success run_release 17.1.0.rc.0 || fail "matching live release failed"
 assert_contains "${bundle_log}" 'args|exec|rake|release[17.1.0.rc.0]'
@@ -402,12 +458,25 @@ test "${group_count}" = 1 || fail "release processes did not share one process g
 assert_contains "${coord_log}" 'heartbeat|--agent-id|release-17.1.0-test-instance|--instance-id|test-instance'
 assert_contains "${coord_log}" '|--repo|shakacode/react_on_rails|--target|release-line:17.1.0'
 assert_contains "${coord_log}" '|--branch|release/17.1.0|'
+assert_contains "${bundle_log}" '"release_version":"17.1.0.rc.0"'
 assert_contains "${coord_log}" '|machine=test-machine'
 process_group="$(awk -F: '/^bundle:/ { print $3; exit }' "${bundle_log}")"
 assert_contains "${output_log}" "process group ${process_group}"
 assert_no_coordination_mutation
 assert_secret_absent
 pass "matching state runs one identity-bound process group"
+
+setup_case stable-main-live
+git -C "${fake_repo}" switch -q -c main
+export TEST_BRANCH="main"
+FAKE_BUNDLE_MODE=success run_release 17.1.0 || fail "stable main live release failed"
+assert_contains "${bundle_log}" 'args|exec|rake|release[17.1.0]'
+assert_contains "${coord_log}" '|--repo|shakacode/react_on_rails|--target|release-line:17.1.0'
+assert_contains "${coord_log}" '|--branch|main|'
+assert_contains "${bundle_log}" '"release_version":"17.1.0"'
+assert_no_coordination_mutation
+assert_secret_absent
+pass "stable main live release binds the lease to main"
 
 setup_case reconciliation
 FAKE_BUNDLE_MODE=success run_release --reconcile-accelerated-rc 17.1.0.rc.0 || \
@@ -416,6 +485,44 @@ assert_contains "${bundle_log}" 'args|exec|rake|release:reconcile_accelerated_rc
 assert_no_coordination_mutation
 assert_secret_absent
 pass "accelerated RC reconciliation uses the supervised release contract"
+
+if supervisor_case_enabled fence-status-signal; then
+  setup_case signal-during-fence-status
+  export FAKE_STALL_STATUS_AFTER=1
+  export FAKE_BUNDLE_MODE=guard
+  export REACT_ON_RAILS_RELEASE_HEARTBEAT_INTERVAL=5
+  (
+    cd "${fake_repo}"
+    exec "${release_script}" 17.1.0.rc.0
+  ) >"${output_log}" 2>&1 &
+  wrapper_pid=$!
+  for _attempt in $(seq 1 100); do
+    test -s "${coordination_descendant_log}" && break
+    sleep 0.05
+  done
+  test -s "${coordination_descendant_log}" || fail "stalled fence status process never started"
+  kill -TERM "${wrapper_pid}"
+  if ! wait_for_process_exit "${wrapper_pid}"; then
+    cleanup_stalled_wrapper "${wrapper_pid}"
+    fail "signal during a stalled fence status read did not stop the wrapper"
+  fi
+  if wait "${wrapper_pid}"; then
+    fail "signal during a stalled fence status read exited successfully"
+  fi
+  coordination_id="$(cut -d: -f1 "${coordination_process_log}")"
+  coordination_group="$(cut -d: -f2 "${coordination_process_log}")"
+  coordination_descendant="$(cat "${coordination_descendant_log}")"
+  release_group="$(awk -F: '/^bundle:/ { print $3; exit }' "${bundle_log}")"
+  test "${coordination_group}" = "${release_group}" || \
+    fail "fence status process escaped the supervised release group"
+  assert_group_dead "${release_group}"
+  ! kill -0 "${coordination_id}" 2>/dev/null || fail "fence status process survived wrapper termination"
+  ! kill -0 "${coordination_descendant}" 2>/dev/null || fail "fence status descendant survived wrapper termination"
+  assert_contains "${output_log}" "signal TERM"
+  assert_no_coordination_mutation
+  assert_secret_absent
+  pass "supervisor termination cleans up a stalled fence status process and descendants"
+fi
 
 if supervisor_case_enabled heartbeat-timeout; then
   setup_case stalled-heartbeat-timeout

@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require "json"
-require "open3"
+require "tempfile"
 require "time"
 
 # Fences live release writes to the release-line lease established by
@@ -12,8 +12,10 @@ module ReleaseLeaseGuard
   CONTRACT_VERSION = 1
   REPOSITORY = "shakacode/react_on_rails"
   RELEASE_TARGET_PATTERN = /\Arelease-line:(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)\z/
+  RELEASE_VERSION_PATTERN = /\A(?<base>(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*))
+                            (?:\.(?:test|beta|alpha|rc|pre)\.(?:0|[1-9]\d*))?\z/ix
   CONTRACT_KEYS = %w[
-    version liveness_fd parent_pid pgid repo target branch agent_id instance_id machine_id
+    version release_version liveness_fd parent_pid pgid repo target branch agent_id instance_id machine_id
   ].freeze
   IDENTITY_FIELDS = %w[agent_id instance_id machine_id].freeze
 
@@ -25,6 +27,7 @@ module ReleaseLeaseGuard
     :pgid,
     :repo,
     :target,
+    :release_version,
     :branch,
     :agent_id,
     :instance_id,
@@ -42,15 +45,70 @@ module ReleaseLeaseGuard
   end
 
   class AgentCoordStatusReader
+    TIMEOUT_SECONDS = 20.0
+    TERMINATION_GRACE_SECONDS = 5.0
+    POLL_INTERVAL_SECONDS = 0.05
+
     def call(repo:, target:)
-      stdout, _stderr, status = Open3.capture3(
-        "agent-coord", "status", "--repo", repo, "--target", target, "--json"
+      stdout_file = Tempfile.new("react-on-rails-release-status-stdout")
+      stderr_file = Tempfile.new("react-on-rails-release-status-stderr")
+      child_pid = Process.spawn(
+        "agent-coord", "status", "--repo", repo, "--target", target, "--json",
+        out: stdout_file, err: stderr_file
       )
+      status = wait_for_child(child_pid, monotonic_time + TIMEOUT_SECONDS)
+      unless status
+        terminate_child(child_pid)
+        child_pid = nil
+        raise LeaseError, "release lease status is unavailable"
+      end
       raise LeaseError, "release lease status is unavailable" unless status.success?
 
-      JSON.parse(stdout)
+      stdout_file.rewind
+      JSON.parse(stdout_file.read)
     rescue JSON::ParserError, SystemCallError
       raise LeaseError, "release lease status is unavailable"
+    ensure
+      terminate_child(child_pid) if child_pid && !status
+      stdout_file&.close!
+      stderr_file&.close!
+    end
+
+    private
+
+    def wait_for_child(child_pid, deadline)
+      loop do
+        waited = Process.waitpid2(child_pid, Process::WNOHANG)
+        return waited[1] if waited
+
+        remaining = deadline - monotonic_time
+        return nil unless remaining.positive?
+
+        sleep([POLL_INTERVAL_SECONDS, remaining].min)
+      end
+    rescue Errno::ECHILD
+      nil
+    end
+
+    def terminate_child(child_pid)
+      deadline = monotonic_time + TERMINATION_GRACE_SECONDS
+      signal_child("TERM", child_pid)
+      status = wait_for_child(child_pid, deadline)
+      return status if status
+
+      deadline = monotonic_time + TERMINATION_GRACE_SECONDS
+      signal_child("KILL", child_pid)
+      wait_for_child(child_pid, deadline)
+    end
+
+    def signal_child(signal, child_pid)
+      Process.kill(signal, child_pid)
+    rescue Errno::ESRCH
+      nil
+    end
+
+    def monotonic_time
+      Process.clock_gettime(Process::CLOCK_MONOTONIC)
     end
   end
 
@@ -250,6 +308,7 @@ module ReleaseLeaseGuard
         pgid: attributes.fetch("pgid"),
         repo: attributes.fetch("repo").dup.freeze,
         target: attributes.fetch("target").dup.freeze,
+        release_version: attributes.fetch("release_version").dup.freeze,
         branch: attributes.fetch("branch").dup.freeze,
         agent_id: attributes.fetch("agent_id").dup.freeze,
         instance_id: attributes.fetch("instance_id").dup.freeze,
@@ -279,12 +338,23 @@ module ReleaseLeaseGuard
     end
 
     def validate_contract_release_scope!(attributes)
-      target_match = RELEASE_TARGET_PATTERN.match(attributes["target"].to_s)
-      release_version = target_match&.captures&.join(".")
-      return if attributes["repo"] == REPOSITORY && release_version &&
-                attributes["branch"] == "release/#{release_version}"
+      return if contract_release_scope_valid?(attributes)
 
       raise LeaseError, "live release wrapper contract is invalid"
+    end
+
+    def contract_release_scope_valid?(attributes)
+      target_match = RELEASE_TARGET_PATTERN.match(attributes["target"].to_s)
+      target_base = target_match&.captures&.join(".")
+      release_version = attributes["release_version"].to_s
+      release_match = RELEASE_VERSION_PATTERN.match(release_version)
+      return false unless attributes["repo"] == REPOSITORY && target_base && release_match&.[](:base) == target_base
+
+      contract_release_branch_allowed?(attributes["branch"], target_base, release_version)
+    end
+
+    def contract_release_branch_allowed?(branch, target_base, release_version)
+      branch == "release/#{target_base}" || (branch == "main" && release_version == target_base)
     end
 
     def validate_contract_identity!(attributes)

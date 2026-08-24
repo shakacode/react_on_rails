@@ -21,6 +21,11 @@ and [Release Verification Runbook](release-verification-runbook.md).
 > recovery, follow the [Release-Train
 > Runbook](release-train-runbook.md#serialize-every-release-line-write).
 
+The lease branch must equal the checkout used for publication. The runbook bootstrap defaults
+`RELEASE_BRANCH` to the matching `release/X.Y.Z` train branch. For the documented ordinary stable
+release from `main`, start a fresh coordinator shell with `RELEASE_BRANCH_INPUT=main`; prereleases and
+accelerated-RC reconciliation remain restricted to the matching release branch.
+
 ## Testing the Gem before Release from a Rails App
 
 See [Contributing](https://github.com/shakacode/react_on_rails/blob/main/CONTRIBUTING.md)
