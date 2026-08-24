@@ -183,6 +183,7 @@ setup_ci_local_repo() {
   chmod +x bin/ci-local
   : > Gemfile
   : > react_on_rails/Gemfile
+  : > react_on_rails/spec/dummy/Gemfile
 
   cat > script/check-docs-sidebar <<'BASH'
 #!/usr/bin/env bash
@@ -195,6 +196,7 @@ BASH
 set -euo pipefail
 
 run_ruby=false
+run_dummy=false
 run_gem_generator_specs=false
 run_generators=false
 case "${CI_LOCAL_FIXTURE_SELECTION:?}" in
@@ -203,6 +205,7 @@ case "${CI_LOCAL_FIXTURE_SELECTION:?}" in
     run_gem_generator_specs=true
     ;;
   gem_generator_specs) run_gem_generator_specs=true ;;
+  dummy) run_dummy=true ;;
   # Consumer-contract fixture: the current detector never emits this one-sided
   # combination, but ci-local must not couple two independent JSON fields.
   generated_examples) run_generators=true ;;
@@ -220,7 +223,7 @@ cat <<JSON
   "run_lint": false,
   "run_ruby_tests": $run_ruby,
   "run_js_tests": false,
-  "run_dummy_tests": false,
+  "run_dummy_tests": $run_dummy,
   "run_gem_generator_specs": $run_gem_generator_specs,
   "run_generators": $run_generators,
   "run_pro_lint": false,
@@ -230,6 +233,9 @@ JSON
 
 if [ "$run_ruby" = true ]; then
   echo "  ✓ RSpec gem tests"
+fi
+if [ "$run_dummy" = true ]; then
+  echo "  ✓ Dummy app integration tests"
 fi
 if [ "$run_gem_generator_specs" = true ]; then
   echo "  ✓ RSpec gem generator specs"
@@ -264,6 +270,9 @@ BASH
   printf '\t%s' "$@"
   printf '\n'
 } >> "$CI_LOCAL_COMMAND_LOG"
+if [ "${CI_LOCAL_FAIL_DUMMY_BUILD:-false}" = true ] && [ "$*" = "run build:test" ]; then
+  exit 42
+fi
 exit 0
 BASH
   chmod +x test-bin/pnpm
@@ -305,12 +314,57 @@ test_ci_local_fast_mode_keeps_generator_specs_out_of_unit_job() {
     "ci-local command log"
   case "$commands" in
     *$'bundle\texec\trspec\tspec/react_on_rails/generators'*|\
-    *$'bundle\texec\trake\trun_rspec:shakapacker_examples'*)
-      fail "ci-local command log: --fast must skip both generator jobs"
+    *$'bundle\texec\trake\trun_rspec:shakapacker_examples'*|\
+    *$'pnpm\trun\tbuild:test'*|\
+    *$'bundle\texec\trake\trun_rspec:dummy'*)
+      fail "ci-local command log: --fast must skip dummy and generator jobs"
       ;;
   esac
+  assert_contains "$output" "Skipping dummy app tests in --fast mode" "ci-local fast output"
   assert_contains "$output" "Skipping gem generator specs in --fast mode" "ci-local fast output"
   assert_contains "$output" "Skipping generated example app tests in --fast mode" "ci-local fast output"
+}
+
+test_ci_local_builds_dummy_assets_before_rspec_with_dependencies_present() {
+  setup_ci_local_repo
+
+  [ -d react_on_rails/spec/dummy/node_modules ] || fail "fixture must start with dummy node_modules present"
+  [ ! -e react_on_rails/spec/dummy/public/webpack/test/manifest.json ] ||
+    fail "fixture must start without a dummy test manifest"
+
+  local output commands
+  export CI_LOCAL_FIXTURE_SELECTION=dummy
+  if ! output="$(ci_local_output --changed 2>&1)"; then
+    fail "ci-local dummy fixture failed: $output"
+    return 1
+  fi
+  commands="$(cat ci-local-commands.log)"
+  assert_contains "$commands" $'pnpm\trun\tbuild:test' "dummy command log"
+  assert_contains "$commands" $'bundle\texec\trake\trun_rspec:dummy' "dummy command log"
+  case "$commands" in
+    *$'pnpm\trun\tbuild:test'*$'bundle\texec\trake\trun_rspec:dummy'*) ;;
+    *) fail "dummy command log: bundle build must precede integration RSpec: $commands" ;;
+  esac
+}
+
+test_ci_local_records_dummy_build_failure_and_skips_rspec() {
+  setup_ci_local_repo
+
+  local output commands
+  export CI_LOCAL_FIXTURE_SELECTION=dummy
+  export CI_LOCAL_FAIL_DUMMY_BUILD=true
+  if output="$(ci_local_output --changed 2>&1)"; then
+    fail "ci-local must fail when dummy bundle preparation fails: $output"
+    return 1
+  fi
+  commands="$(cat ci-local-commands.log)"
+  assert_contains "$commands" $'pnpm\trun\tbuild:test' "failed dummy-build command log"
+  assert_contains "$output" "Dummy App Test Bundles failed" "failed dummy-build output"
+  case "$commands" in
+    *$'bundle\texec\trake\trun_rspec:dummy'*)
+      fail "dummy integration RSpec must not run after bundle preparation fails"
+      ;;
+  esac
 }
 
 test_ci_local_preserves_independent_generator_selectors() {
@@ -1833,6 +1887,8 @@ run_test test_agent_bin_change_runs_ci_infrastructure_without_benchmarks
 run_test test_agent_bin_markdown_change_is_non_runtime_only
 run_test test_agent_workflow_config_change_runs_ci_infrastructure_without_benchmarks
 run_test test_ci_local_fast_mode_keeps_generator_specs_out_of_unit_job
+run_test test_ci_local_builds_dummy_assets_before_rspec_with_dependencies_present
+run_test test_ci_local_records_dummy_build_failure_and_skips_rspec
 run_test test_ci_local_preserves_independent_generator_selectors
 run_test test_ci_local_json_preserves_gem_generator_only_selector
 run_test test_ci_local_text_fallback_preserves_gem_generator_only_selector

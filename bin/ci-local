@@ -63,6 +63,7 @@ echo ""
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 ROOT_GEMFILE="$ROOT_DIR/Gemfile"
 OSS_GEMFILE="$ROOT_DIR/react_on_rails/Gemfile"
+OSS_DUMMY_GEMFILE="$ROOT_DIR/react_on_rails/spec/dummy/Gemfile"
 PRO_GEMFILE="$ROOT_DIR/react_on_rails_pro/Gemfile"
 PRO_DUMMY_GEMFILE="$ROOT_DIR/react_on_rails_pro/spec/dummy/Gemfile"
 cd "$ROOT_DIR"
@@ -394,17 +395,15 @@ if [ "$RUN_DUMMY" = true ]; then
     echo -e "${YELLOW}Skipping dummy app tests in --fast mode${NC}"
     echo ""
   else
-    # Build dummy app if needed
-    if [ ! -d "react_on_rails/spec/dummy/node_modules" ]; then
-      echo -e "${YELLOW}Setting up dummy app...${NC}"
-      if ! (cd react_on_rails/spec/dummy && pnpm install); then
-        echo -e "${YELLOW}⚠ Dummy app setup failed, skipping dummy app tests${NC}"
-        echo ""
-      else
-        run_job "Dummy App Integration Tests" "cd react_on_rails && bundle_command \"$OSS_GEMFILE\" bundle exec rake run_rspec:dummy"
-      fi
+    # Always rebuild immediately before RSpec: installed dependencies do not
+    # prove that the generated test manifest exists or matches this checkout.
+    if run_job "Dummy App Test Bundles" \
+      "cd react_on_rails/spec/dummy && (bundle_command \"$OSS_DUMMY_GEMFILE\" bundle check >/dev/null 2>&1 || bundle_command \"$OSS_DUMMY_GEMFILE\" bundle install) && bundle_command \"$OSS_DUMMY_GEMFILE\" pnpm run build:test"; then
+      run_job "Dummy App Integration Tests" \
+        "cd react_on_rails && bundle_command \"$OSS_GEMFILE\" bundle exec rake run_rspec:dummy"
     else
-      run_job "Dummy App Integration Tests" "cd react_on_rails && bundle_command \"$OSS_GEMFILE\" bundle exec rake run_rspec:dummy"
+      echo -e "${YELLOW}Skipping dummy app integration tests because test bundle preparation failed${NC}"
+      echo ""
     fi
   fi
 fi
