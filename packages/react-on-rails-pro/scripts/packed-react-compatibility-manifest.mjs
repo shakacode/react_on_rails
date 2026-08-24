@@ -13,12 +13,7 @@
  * https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
-export const buildPackedCompatibilityManifest = ({
-  packageManager,
-  reactVersion,
-  coreArtifact,
-  proArtifact,
-}) => ({
+const buildPackedCompatibilityManifest = ({ packageManager, reactVersion, coreArtifact, proArtifact }) => ({
   name: `react-on-rails-pro-react-${reactVersion}-smoke`,
   private: true,
   version: '1.0.0',
@@ -36,3 +31,5 @@ export const buildPackedCompatibilityManifest = ({
     },
   },
 });
+
+export default buildPackedCompatibilityManifest;

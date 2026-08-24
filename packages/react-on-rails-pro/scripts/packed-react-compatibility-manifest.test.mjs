@@ -15,7 +15,7 @@
 
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildPackedCompatibilityManifest } from './packed-react-compatibility-manifest.mjs';
+import buildPackedCompatibilityManifest from './packed-react-compatibility-manifest.mjs';
 
 test('builds an isolated packed compatibility consumer manifest', () => {
   const manifest = buildPackedCompatibilityManifest({

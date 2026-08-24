@@ -21,7 +21,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import compatibilityCases from './packed-react-compatibility-cases.mjs';
-import { buildPackedCompatibilityManifest } from './packed-react-compatibility-manifest.mjs';
+import buildPackedCompatibilityManifest from './packed-react-compatibility-manifest.mjs';
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const proPackageDirectory = path.resolve(scriptDirectory, '..');
