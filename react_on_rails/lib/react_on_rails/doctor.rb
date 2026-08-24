@@ -1495,8 +1495,7 @@ module ReactOnRails
       return false unless helper_name == "javascript_pack_tag" && ast_node?(node, :method_add_arg)
 
       argument_parentheses = node[2]
-      ast_node?(argument_parentheses, :arg_paren) && argument_parentheses[1].nil? &&
-        direct_self_helper_call?(node[1], helper_name)
+      ast_node?(argument_parentheses, :arg_paren) && direct_self_helper_call?(node[1], helper_name)
     end
 
     def eager_helper_call_in_method_arguments?(node, helper_name)

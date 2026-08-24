@@ -2059,10 +2059,31 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when named javascript_pack_tag is called through the proven self receiver" do
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        stub_layouts(
+          "app/views/layouts/application.html.erb" => <<~ERB
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= self.javascript_pack_tag("application") %>
+          ERB
+        )
+      end
+
+      it "recognizes the exact self call with arguments as a proven JavaScript flush" do
+        doctor.send(:check_layout_files)
+
+        expect(checker.messages).to include(
+          hash_including(type: :warning, content: a_string_including("generated/StyledComponent"))
+        )
+      end
+    end
+
     {
       "a false conditional modifier" => "javascript_pack_tag if false",
       "an arbitrary receiver" => "object.javascript_pack_tag",
       "a parenthesized arbitrary receiver" => "object.javascript_pack_tag()",
+      "a named parenthesized arbitrary receiver" => 'object.javascript_pack_tag("application")',
       "a defined check" => "defined?(javascript_pack_tag)",
       "a short-circuited boolean expression" => "true || javascript_pack_tag",
       "a local-variable assignment" => "pack_tag = javascript_pack_tag",
