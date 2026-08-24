@@ -72,8 +72,7 @@ module ReactOnRails
     SERVER_BUNDLE_SOURCE_EXTENSIONS = %w[.js .jsx .ts .tsx .mjs .cjs].freeze
     CUSTOM_LAUNCHER_INDICATOR_FILES = %w[dev].freeze
     RAILS_SERVER_COMMAND_REGEX = %r{\b(?:(?:bin/)?rails\s+(?:server|s)|puma|unicorn|rackup|passenger\s+start)\b}
-    TEMPLATE_ERB_COMMENT_PATTERN = /<%#.*?%>/m
-    TEMPLATE_HTML_COMMENT_PATTERN = /<!--.*?-->/m
+    TEMPLATE_COMMENT_PATTERN = /<!--.*?-->|<%#.*?%>/m
     ERB_EXPRESSION_PATTERN = /<%(?![#%])={0,2}\s*(?<expression>.*?)-?%>/m
     ERB_OUTPUT_EXPRESSION_PATTERN = /<%={1,2}\s*(?<expression>.*?)-?%>/m
     ERB_NON_OUTPUT_EXPRESSION_PATTERN = /<%(?![#%=])\s*(?<expression>.*?)-?%>/m
@@ -1605,7 +1604,12 @@ module ReactOnRails
 
     def uncommented_template_content(content)
       utf8_content = content.encode(Encoding::UTF_8, invalid: :replace, undef: :replace)
-      utf8_content.gsub(TEMPLATE_HTML_COMMENT_PATTERN, "").gsub(TEMPLATE_ERB_COMMENT_PATTERN, "")
+      loop do
+        uncommented_content = utf8_content.gsub(TEMPLATE_COMMENT_PATTERN, "")
+        return uncommented_content if uncommented_content == utf8_content
+
+        utf8_content = uncommented_content
+      end
     rescue EncodingError
       ""
     end

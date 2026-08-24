@@ -1996,6 +1996,24 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when removing one HTML comment exposes an overlapping outer comment" do
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        stub_layouts(
+          "app/views/layouts/application.html.erb" => <<~ERB
+            <!<!-- spacer -->-- <%= react_component("StyledComponent", auto_load_bundle: true) %> -->
+            <%= javascript_pack_tag %>
+          ERB
+        )
+      end
+
+      it "removes comments to a fixed point before scanning component evidence" do
+        doctor.send(:check_layout_files)
+
+        expect(checker.warnings?).to be(false)
+      end
+    end
+
     context "when the JavaScript flush helper appears only in template comments" do
       before do
         stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
