@@ -900,6 +900,7 @@ test_rspec_only_changes_do_not_request_e2e() {
   local out
   out="$(detector_output)"
   assert_contains "$out" '"run_ruby_tests": true' "rspec-only output"
+  assert_contains "$out" '"run_release_supervisor_tests": false' "rspec-only output"
   assert_contains "$out" '"run_gem_generator_specs": false' "rspec-only output"
   assert_contains "$out" '"run_dummy_tests": false' "rspec-only output"
   assert_contains "$out" '"run_e2e_tests": false' "rspec-only output"
@@ -1037,6 +1038,11 @@ assert_release_tooling_contract() {
   assert_contains "$out" '"run_lint": true' "$label"
   # Release specs run (release_rake_helpers_spec / release_forward_port_script_spec).
   assert_contains "$out" '"run_ruby_tests": true' "$label"
+  # The supervised wrapper has a separate 13-case integration harness. This
+  # selector is consumed by gem-tests.yml, which runs it once on the latest
+  # unit leg instead of assuming the RSpec suite exercises the shell process
+  # and per-write-fence contract.
+  assert_contains "$out" '"run_release_supervisor_tests": true' "$label"
   # Primary goal: NOT generator-sensitive, so required-pr-gate won't force hosted CI.
   assert_contains "$out" '"run_generators": false' "$label"
   assert_contains "$out" '"run_gem_generator_specs": false' "$label"

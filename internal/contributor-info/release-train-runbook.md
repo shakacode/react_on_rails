@@ -344,15 +344,32 @@ published artifacts, or ad-lib manual publication. If the prior supervisor has
 stopped, prove its process group and children are dead before an operator
 intentionally releases/acquires the claim under a fresh identity.
 
+For a known tracker, retry with that exact issue so recovery reads the
+issue-specific comment endpoint instead of attempting repository-wide bounded
+discovery:
+
+```bash
+RELEASE_TRACKER=<issue> script/release VERSION
+```
+
+This selected-tracker read validates the recorded chain on that issue; it does
+not prove that a matching record is absent from every other tracker. Omit
+`RELEASE_TRACKER` only when repository-wide bounded discovery is required to
+prove absence, and remain stopped if that broader read reaches an unknown,
+bounded-page result.
+
 - **The tag exists and zero immutable packages were published.** After recording
-  exact evidence, resume only with `script/release VERSION`; do not call live
-  Rake directly or alter the tag.
+  exact evidence, resume only with `RELEASE_TRACKER=<issue> script/release VERSION`
+  when the tracker is known; do not call live Rake directly or alter the tag.
 - **All six immutable packages were published, but GitHub release creation or
   update failed.** Preview `sync_github_release[X.Y.Z,true]`, then use
-  `script/release VERSION` for the fenced, idempotent live create/edit.
+  `RELEASE_TRACKER=<issue> script/release VERSION` for the fenced, idempotent
+  live create/edit when the tracker is known.
 - **Only a subset of the six immutable packages was published.** Stop and record
-  the exact artifact set; resume only through `script/release VERSION`, whose
-  read-only probes preserve immutable versions and whose every retry is fenced.
+  the exact artifact set; resume only through
+  `RELEASE_TRACKER=<issue> script/release VERSION` when the tracker is known,
+  whose read-only probes preserve immutable versions and whose every retry is
+  fenced.
 
 If the lease, branch, tag, registry, or helper evidence is missing,
 contradictory, or `UNKNOWN`, remain stopped. A maintainer-approved plan must

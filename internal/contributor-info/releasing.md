@@ -246,7 +246,17 @@ On a later invocation, set `RELEASE_TRACKER` without `RELEASE_SHAKAPERF_RUN`. Th
 unedited machine comments, re-fetches the saved run and artifact, and re-runs the same checks. Exact-SHA
 evidence is preferred. Existing machine-verified runtime-equivalence remains supported because the stored
 candidate is bound to the live run while the schema-v2 runtime fingerprint is compared with the current
-release commit. Output names both the tracker URL and reused run URL.
+release commit. Output names both the tracker URL and reused run URL. A retry with
+`RELEASE_TRACKER=<issue>` reads only that issue's comments through the issue-specific endpoint; it cannot
+prove that another tracker has no matching record. For a known-tracker recovery, use the fenced invocation:
+
+```bash
+RELEASE_TRACKER=<issue> script/release VERSION
+```
+
+Repository-wide bounded discovery occurs only when `RELEASE_TRACKER` is omitted. Use that broader route only
+when proving absence across trackers is required; it can fail closed as `UNKNOWN` at the configured page or
+marker bound, so it is not the recovery fallback for a known tracker.
 
 Only automatic association reuse may discard naturally invalid evidence and continue through normal discovery.
 That recovery is limited to authoritative staleness, a 404-proven missing run or artifact, GitHub CLI's exact
@@ -276,7 +286,7 @@ stable-only escape hatch:
 ```bash
 RELEASE_TRACKER=4806 \
 RELEASE_FINAL_SHAKAPERF_WAIVER_REASON="GitHub REST observer exhausted its quota" \
-bundle exec rake "release[17.0.1]"
+script/release 17.0.1
 ```
 
 The task writes and re-fetches an append-only schema-v2 `gate_observation_failed` waiver bound to the exact tracker,
@@ -376,16 +386,16 @@ creating the tag or publishing any package. After all six immutable npm and Ruby
 confirmed, it immediately appends `published-awaiting-gates` before fallible GitHub-release synchronization
 or other post-publish work. Partial package publication never appends that transition; once every package
 is published, a later GitHub-release sync failure still leaves the candidate durably awaiting reconciliation.
-At that completion boundary, the task first proves that the tracker is still eligible and that bounded
-repository-wide history has one canonical tracker and authorization with no absorbing rejection. It repeats
-that repository-wide proof after append or idempotent reuse, so a concurrent cross-tracker or terminal conflict
-cannot be reported as a successful completion.
+At that completion boundary, the task first proves that the selected tracker is still eligible and that its
+bounded issue-specific history has one canonical authorization with no absorbing rejection. It repeats that
+selected-tracker proof after append or idempotent reuse. This does not prove that another tracker has no matching
+record; repository-wide bounded discovery is used only when `RELEASE_TRACKER` is omitted.
 If all six artifacts became public but that completion append was interrupted, the reconciliation task can
 recover the missing transition before it evaluates the deferred gates. Recovery requires the canonical
-authorization-only repository history, the exact remote annotated RC tag object, its peeled candidate SHA and
+authorization-only selected-tracker history, the exact remote annotated RC tag object, its peeled candidate SHA and
 authorization provenance, and exact registry metadata for all four npm packages and both RubyGems. It
 revalidates the complete remote tag-object/candidate identity after the registry reads and then uses the normal
-repository-wide completion append. Partial, mismatched, malformed, ambiguous,
+selected-tracker completion append. Partial, mismatched, malformed, ambiguous,
 or unavailable registry/tag/history evidence blocks, and a GitHub outage still blocks durable recovery; there
 is no offline or unaudited completion bypass.
 Retries reuse the same candidate without appending duplicate status records. Accelerated RCs use an annotated
@@ -399,9 +409,9 @@ already be completed successfully and pass the live artifact, runtime-tree, ance
 commit proof; an active different-SHA run cannot be authorized, persisted, reused, or carried across a
 publication boundary. An active status paired with any non-null conclusion is contradictory evidence and
 blocks. Failed, missing, malformed, stale, API-unknown, or otherwise non-deferable evidence also blocks the
-retry. Every same-version-and-SHA retry discovers durable repository history first,
-whether or not it explicitly supplies `RELEASE_ACCELERATED_RC`. If history exists, the unique tracker and
-canonical authorization chain control the retry; explicit tracker, reason, and options must match that
+retry. Every same-version-and-SHA retry discovers durable history first. When `RELEASE_TRACKER` is supplied,
+that is the selected issue's history only; its canonical authorization chain controls the retry, and explicit
+tracker, reason, and options must match that
 authorization exactly, and a rejected or conflicting chain remains blocking. The task never refreshes or
 creates a conflicting authorization. A history-free explicit attempt may create its first authorization only
 when the exact RC tag does not exist. An existing ordinary lightweight RC tag can be retried unflagged through
@@ -414,10 +424,11 @@ may continue.
 Exact-head CI snapshots sort non-success checks canonically by name, state, and URL before persistence and
 comparison. API enumeration-order changes therefore do not require another confirmation or block a publication
 boundary, while any real check identity, state, URL, duplicate, or conflicting-entry change remains material.
-Before accepting, reusing, or appending that authorization, the task loads every trusted repository issue
-comment for the exact version and SHA and requires one tracker with one canonical chain. It repeats that
-repository-wide proof after posting and immediately before tag handling, so an authorization or rejection
-that appears concurrently on another tracker blocks immutable publication. Before tag handling, immediately
+Before accepting, reusing, or appending that authorization, the task loads the selected tracker's trusted
+issue comments for the exact version and SHA and requires one canonical chain. It repeats that selected-tracker
+proof after posting and immediately before tag handling. It does not detect a concurrently appended record on
+another tracker; repository-wide bounded discovery occurs only when `RELEASE_TRACKER` is omitted. Before tag
+handling, immediately
 before tag push, and again after tag push before package publication, accelerated RCs also refresh exact-head
 CI and the recorded ShakaPerf run. A newly failed, missing, malformed, or unknown gate blocks; pending evidence
 must still exactly match the confirmed authorization, and pending ShakaPerf must name the immutable RC candidate,
@@ -498,9 +509,10 @@ final promotion require at least one canonical `published-awaiting-gates` transi
 be ordered authorization, publication completion, then terminal state, with parseable monotonic timestamps.
 Exact authorization duplicates and the narrowly permitted publication/terminal retry variants remain
 idempotent only within their phase; pending transitions after terminal state are invalid.
-Reconciliation performs bounded repository-wide exact-version-and-SHA validation against the selected
-tracker and canonical authorization before reporting existing terminal state or appending a new terminal
-transition, then repeats that validation after the append helper re-fetches the selected tracker.
+Reconciliation performs bounded selected-tracker exact-version-and-SHA validation against the canonical
+authorization before reporting existing terminal state or appending a new terminal transition, then repeats
+that validation after the append helper re-fetches the selected tracker. It is not a repository-wide absence
+proof.
 
 Reconcile the record after the deferred gates and all downstream RC testing finish. The live
 reconciliation command is intentionally omitted here; run it only from the guarded release coordinator
@@ -541,8 +553,9 @@ record must bind to the exact remote RC tag SHA and be complete. A provenance-be
 also use the literal canonical ref `v<target_version>` with lowercase dotted `.rc.` spelling; a dashed or
 case-varied alias is rejected even when it points at the same annotated object. Dashed-tag compatibility is
 limited to ordinary RCs for which complete discovery proves there is no accelerated provenance or history.
-Final promotion repeats repository-wide exact-version-and-SHA discovery and rejects any record on a tracker
-other than the one selected by the canonical tag provenance. The final tip must be that SHA or
+Final promotion re-fetches the selected tracker's exact-version-and-SHA chain identified by the canonical tag
+provenance. This selected-tracker read does not prove that another tracker has no matching record. The final tip
+must be that SHA or
 mechanically runtime-equivalent through the existing metadata-only promotion rules. Runtime
 equivalence is checked again after the final version-bump commit. The task first proves that the immutable
 accepted RC still exactly matches its recorded runtime fingerprint. When the final SHA differs, the canonical
@@ -556,7 +569,7 @@ refreshed and re-verified against the final tip when automatic reuse applies. An
 `RELEASE_SHAKAPERF_RUN` instead bypasses that reuse and must pass and persist through the strict final selector
 path; otherwise the normal strict final ShakaPerf gate runs only for a still-runtime-equivalent finalization.
 After that gate completes, the task re-fetches the live
-remote RC tag, repository-wide canonical tracker chain, and exact accepted-RC CI immediately before stable
+remote RC tag, selected-tracker canonical chain, and exact accepted-RC CI immediately before stable
 tagging and publication. The re-fetched accepted record must differ from the originally gated record only by its
 permitted retry timestamp. Local `HEAD` must still equal the validated final candidate, and the stable tag
 is created and verified against that explicit SHA rather than implicit moving `HEAD`. Deletion, mutation,
@@ -575,9 +588,9 @@ that same captured object and candidate; deletion, movement, replacement by anot
 lightweight tag, lost provenance, or an unclassifiable tag blocks. This source-tag check is additional to the live
 stable-tag peeled-SHA validation. For
 accelerated RC publication and accelerated-RC
-final promotion, both boundaries also re-fetch all trusted repository history for the exact RC candidate
-and require the same unique tracker and canonical, retry-equivalent authorization/terminal chain. A new
-rejection, tracker conflict, chain mutation, missing record, or unknown repository read aborts before the
+final promotion, both boundaries also re-fetch the selected tracker's trusted history for the exact RC candidate
+and require the same canonical, retry-equivalent authorization/terminal chain. A new rejection, chain mutation,
+missing record, or unknown selected-tracker read aborts before the
 next irreversible step. Accelerated final promotion also carries the exact refreshed RC CI snapshot and the
 exact ShakaPerf identity that passed the final gate, whether reused from the accepted RC or produced by a new
 strict final run. The carried boundary context names that mode explicitly: reused evidence must exactly match the

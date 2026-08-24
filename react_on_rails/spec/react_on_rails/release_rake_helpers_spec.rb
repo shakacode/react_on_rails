@@ -9212,6 +9212,26 @@ RSpec.describe "release.rake helper methods" do
         "Exactly 1,000 retained machine-marker comments are allowed, and a short 250th page completes discovery"
       )
       expect(normalized_guide).to include(
+        "A retry with `RELEASE_TRACKER=<issue>` reads only that issue's comments through the issue-specific endpoint"
+      )
+      expect(normalized_guide).to include(
+        "it cannot prove that another tracker has no matching record"
+      )
+      expect(normalized_guide).to include(
+        "Repository-wide bounded discovery occurs only when `RELEASE_TRACKER` is omitted"
+      )
+      expect(guide).to include(
+        "RELEASE_FINAL_SHAKAPERF_WAIVER_REASON=\"GitHub REST observer exhausted its quota\" \\\nscript/release 17.0.1"
+      )
+      expect(guide).not_to include('bundle exec rake "release[17.0.1]"')
+      historical_design = File.read(
+        File.expand_path("../../../docs/superpowers/specs/2026-05-25-main-ci-release-guard-design.md", __dir__)
+      )
+      expect(historical_design).to include(
+        "RELEASE_CI_STATUS_OVERRIDE=true script/release 16.2.0"
+      )
+      expect(historical_design).not_to include('bundle exec rake "release[16.2.0,false,false,true]"')
+      expect(normalized_guide).to include(
         "exceeding 1,000 markers or requiring a 251st page blocks as unknown"
       )
       expect(normalized_guide).to include(

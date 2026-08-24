@@ -79,6 +79,7 @@ PRO_NODE_RENDERER_CHANGED=false
 UNCATEGORIZED_CHANGED=false
 CI_INFRA_CHANGED=false
 RELEASE_TOOLING_CHANGED=false
+RUN_RELEASE_SUPERVISOR_TESTS=false
 SOURCE_COMMENT_ONLY_CHANGED=false
 PRO_SOURCE_COMMENT_ONLY_CHANGED=false
 # Benchmark relevance, tracked separately from the test-selection flags above.
@@ -463,12 +464,12 @@ while IFS= read -r file; do
   # otherwise an empty diff would fall into the catch-all below and trigger every job.
   [ -z "$file" ] && continue
 
-  # Release tooling (rake release tasks + their helper scripts). The ONLY
-  # automated coverage for these paths is the release rspec suite
-  # (react_on_rails/spec/react_on_rails/release_rake_helpers_spec.rb and
-  # release_forward_port_script_spec.rb), so route them to RSPEC_CHANGED (runs
-  # those specs) plus RELEASE_TOOLING_CHANGED (runs rubocop) rather than the
-  # CI-infrastructure arm below. That arm's catch-all-equivalent behavior set
+# Release tooling (rake release tasks + their helper scripts) needs the release
+# RSpec suite (react_on_rails/spec/react_on_rails/release_rake_helpers_spec.rb
+# and release_forward_port_script_spec.rb) *and* the 13-case supervised wrapper
+# integration harness (script/release-test.bash). Route it to RSPEC_CHANGED,
+# RELEASE_TOOLING_CHANGED, and the dedicated harness selector rather than the
+# CI-infrastructure arm below. That arm's catch-all-equivalent behavior set
   # RUN_GENERATORS=true, which makes required-pr-gate force the full hosted
   # matrix (Generator/Playwright/Integration/JS) — none of which exercise
   # release tooling (see script/ci-required-hosted-gate). This branch is
@@ -489,6 +490,7 @@ while IFS= read -r file; do
     else
       RSPEC_CHANGED=true
       RELEASE_TOOLING_CHANGED=true
+      RUN_RELEASE_SUPERVISOR_TESTS=true
     fi
     continue
   fi
@@ -999,6 +1001,7 @@ RUN_PRO_NODE_RENDERER_BENCHMARKS=$BENCH_PRO_NODE_RENDERER_CHANGED
 
 [ "$RUN_LINT" = true ] && echo "  ✓ Lint (Ruby + JS)"
 [ "$RUN_RUBY_TESTS" = true ] && echo "  ✓ RSpec gem tests"
+[ "$RUN_RELEASE_SUPERVISOR_TESTS" = true ] && echo "  ✓ Release supervisor integration tests"
 [ "$RUN_JS_TESTS" = true ] && echo "  ✓ JS unit tests"
 [ "$RUN_DUMMY_TESTS" = true ] && echo "  ✓ Dummy app integration tests"
 [ "$RUN_GENERATORS" = true ] && echo "  ✓ Generator tests"
@@ -1018,6 +1021,7 @@ if [ -n "${GITHUB_OUTPUT:-}" ]; then
     echo "non_runtime_only=$NON_RUNTIME_ONLY"
     echo "run_lint=$RUN_LINT"
     echo "run_ruby_tests=$RUN_RUBY_TESTS"
+    echo "run_release_supervisor_tests=$RUN_RELEASE_SUPERVISOR_TESTS"
     echo "run_gem_generator_specs=$RUN_GEM_GENERATOR_SPECS"
     echo "run_js_tests=$RUN_JS_TESTS"
     echo "run_dummy_tests=$RUN_DUMMY_TESTS"
@@ -1042,6 +1046,7 @@ if [ "${CI_JSON_OUTPUT:-}" = "1" ]; then
   "non_runtime_only": $NON_RUNTIME_ONLY,
   "run_lint": $RUN_LINT,
   "run_ruby_tests": $RUN_RUBY_TESTS,
+  "run_release_supervisor_tests": $RUN_RELEASE_SUPERVISOR_TESTS,
   "run_gem_generator_specs": $RUN_GEM_GENERATOR_SPECS,
   "run_js_tests": $RUN_JS_TESTS,
   "run_dummy_tests": $RUN_DUMMY_TESTS,
