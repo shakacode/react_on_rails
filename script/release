@@ -5,6 +5,7 @@ require "json"
 require "io/wait"
 require "open3"
 require "optparse"
+require "tempfile"
 require_relative "../rakelib/release_lease_guard"
 
 # The sole supported live entry point for the release publication Rake tasks. It does not
@@ -17,6 +18,7 @@ class ReleaseSupervisor
   REPOSITORY = "shakacode/react_on_rails"
   HEARTBEAT_INTERVAL = 60.0
   HEARTBEAT_TTL = 900
+  COORDINATION_TIMEOUT = 20.0
   TERMINATION_GRACE = 5.0
   HANDSHAKE_TIMEOUT = 5.0
   POLL_INTERVAL = 0.05
@@ -54,10 +56,18 @@ class ReleaseSupervisor
     handshake_timeout = bounded_interval!(
       "REACT_ON_RAILS_RELEASE_HANDSHAKE_TIMEOUT", HANDSHAKE_TIMEOUT, maximum: HANDSHAKE_TIMEOUT
     )
-    verify_existing_lease!(scope, identity)
-    raise ReleaseLeaseGuard::LeaseError, "release lease heartbeat failed" unless heartbeat!(scope, identity)
+    coordination_timeout = bounded_interval!(
+      "REACT_ON_RAILS_RELEASE_COORDINATION_TIMEOUT", COORDINATION_TIMEOUT, maximum: HEARTBEAT_INTERVAL
+    )
 
-    supervise_release(scope, identity, heartbeat_interval:, termination_grace:, handshake_timeout:)
+    supervise_release(
+      scope,
+      identity,
+      heartbeat_interval:,
+      termination_grace:,
+      handshake_timeout:,
+      coordination_timeout:
+    )
   rescue OptionParser::ParseError, UsageError, SupervisorError, ReleaseLeaseGuard::LeaseError => e
     @stderr.puts "ERROR: #{e.message}"
     @stderr.puts @parser if e.is_a?(OptionParser::ParseError) || e.is_a?(UsageError)
@@ -162,7 +172,7 @@ class ReleaseSupervisor
   # Reuse the guard's exact status semantics for the wrapper's preflight. This
   # temporary channel is local to the supervisor; the child receives a fresh
   # channel and a contract bound to its dedicated process group.
-  def verify_existing_lease!(scope, identity)
+  def verify_existing_lease!(scope, identity, coordination_timeout:, termination_grace:)
     reader, writer = IO.pipe
     contract = contract_for(
       scope,
@@ -174,16 +184,25 @@ class ReleaseSupervisor
     ReleaseLeaseGuard.activate!(
       dry_run: false,
       env: { ReleaseLeaseGuard::CONTRACT_ENV => JSON.generate(contract) },
-      liveness_io: reader
+      liveness_io: reader,
+      status_reader: lambda do |repo:, target:|
+        stdout, status = run_agent_coord(
+          "status", "--repo", repo, "--target", target, "--json",
+          timeout: coordination_timeout,
+          termination_grace:
+        )
+        raise ReleaseLeaseGuard::LeaseError, "release lease status is unavailable" unless status&.success?
+
+        stdout
+      end
     )
   ensure
     reader&.close unless reader&.closed?
     writer&.close unless writer&.closed?
   end
 
-  def heartbeat!(scope, identity)
-    _stdout, _stderr, status = Open3.capture3(
-      "agent-coord",
+  def heartbeat!(scope, identity, coordination_timeout:, termination_grace:)
+    _stdout, status = run_agent_coord(
       "heartbeat",
       "--agent-id", identity.agent_id,
       "--instance-id", identity.instance_id,
@@ -192,15 +211,26 @@ class ReleaseSupervisor
       "--branch", scope.branch,
       "--phase", "release-write-serialization",
       "--status", "in_progress",
-      "--ttl", HEARTBEAT_TTL.to_s
+      "--ttl", HEARTBEAT_TTL.to_s,
+      timeout: coordination_timeout,
+      termination_grace:
     )
-    status.success?
+    status&.success? || false
   rescue SystemCallError
     false
   end
 
-  def supervise_release(scope, identity, heartbeat_interval:, termination_grace:, handshake_timeout:)
+  def supervise_release(scope, identity, heartbeat_interval:, termination_grace:, handshake_timeout:,
+                        coordination_timeout:)
+    child_pid = nil
+    pgid = nil
+    liveness_writer = nil
     previous_signal_handlers = install_signal_handlers
+    verify_existing_lease!(scope, identity, coordination_timeout:, termination_grace:)
+    unless heartbeat!(scope, identity, coordination_timeout:, termination_grace:)
+      raise ReleaseLeaseGuard::LeaseError, "release lease heartbeat failed"
+    end
+
     child_pid, pgid, liveness_writer = spawn_release_group(
       scope, identity, handshake_timeout:, termination_grace:
     )
@@ -215,15 +245,19 @@ class ReleaseSupervisor
       liveness_writer:,
       next_heartbeat:,
       heartbeat_interval:,
-      termination_grace:
+      termination_grace:,
+      coordination_timeout:
     )
+  rescue StandardError
+    cleanup_failed_release(pgid, child_pid, liveness_writer, termination_grace)
+    raise
   ensure
     liveness_writer&.close unless liveness_writer&.closed?
     restore_signal_handlers(previous_signal_handlers) if previous_signal_handlers
   end
 
   def supervise_loop(scope, identity, child_pid:, pgid:, liveness_writer:, next_heartbeat:, heartbeat_interval:,
-                     termination_grace:)
+                     termination_grace:, coordination_timeout:)
     loop do
       return interrupt_release(pgid, child_pid, liveness_writer, termination_grace) if @received_signal
 
@@ -232,7 +266,9 @@ class ReleaseSupervisor
 
       now = monotonic_time
       if now >= next_heartbeat
-        return lose_lease(pgid, child_pid, liveness_writer, termination_grace) unless refresh_lease?(scope, identity)
+        lease_live = refresh_lease?(scope, identity, coordination_timeout:, termination_grace:)
+        return interrupt_release(pgid, child_pid, liveness_writer, termination_grace) if @received_signal
+        return lose_lease(pgid, child_pid, liveness_writer, termination_grace) unless lease_live
 
         next_heartbeat = now + heartbeat_interval
       end
@@ -246,10 +282,11 @@ class ReleaseSupervisor
     1
   end
 
-  def refresh_lease?(scope, identity)
-    return false unless heartbeat!(scope, identity)
+  def refresh_lease?(scope, identity, coordination_timeout:, termination_grace:)
+    return false unless heartbeat!(scope, identity, coordination_timeout:, termination_grace:)
+    return false if @received_signal
 
-    verify_existing_lease!(scope, identity)
+    verify_existing_lease!(scope, identity, coordination_timeout:, termination_grace:)
     true
   rescue ReleaseLeaseGuard::LeaseError
     false
@@ -288,6 +325,7 @@ class ReleaseSupervisor
 
   def spawn_release_group(scope, identity, handshake_timeout:, termination_grace:)
     pipes = release_pipes
+    child_pid = nil
     child_pid = fork_release_child(scope, identity, pipes)
     pipes.liveness_reader.close
     pipes.ready_writer.close
@@ -299,7 +337,11 @@ class ReleaseSupervisor
     )
     [child_pid, pgid, pipes.liveness_writer]
   rescue StandardError
-    close_release_pipes(pipes)
+    begin
+      close_release_pipes(pipes)
+    ensure
+      stop_unverified_child(child_pid, grace: termination_grace) if child_pid
+    end
     raise
   ensure
     close_io(pipes&.ready_reader)
@@ -368,6 +410,47 @@ class ReleaseSupervisor
 
   def close_io(io)
     io&.close unless io&.closed?
+  end
+
+  def cleanup_failed_release(pgid, child_pid, liveness_writer, termination_grace)
+    close_liveness(liveness_writer) if liveness_writer
+  ensure
+    if pgid && child_pid
+      terminate_group(pgid, child_pid:, grace: termination_grace)
+      report_group_handoff(pgid)
+    end
+  end
+
+  def run_agent_coord(*, timeout:, termination_grace:)
+    return ["", nil] if @received_signal
+
+    stdout_file = Tempfile.new("react-on-rails-release-coordination-stdout")
+    stderr_file = Tempfile.new("react-on-rails-release-coordination-stderr")
+    child_pid = nil
+    status = nil
+    begin
+      child_pid = Process.spawn(
+        "agent-coord", *, out: stdout_file, err: stderr_file, pgroup: true
+      )
+      status = wait_for_coordination(child_pid, monotonic_time + timeout)
+    ensure
+      terminate_group(child_pid, child_pid:, grace: termination_grace) if child_pid && !status
+    end
+    stdout_file.rewind
+    [stdout_file.read, status]
+  ensure
+    stdout_file&.close!
+    stderr_file&.close!
+  end
+
+  def wait_for_coordination(child_pid, deadline)
+    loop do
+      waited = Process.waitpid2(child_pid, Process::WNOHANG)
+      return waited[1] if waited
+      return nil if @received_signal || monotonic_time >= deadline
+
+      sleep POLL_INTERVAL
+    end
   end
 
   def read_child_process_group!(ready_reader, child_pid, timeout:, termination_grace:)

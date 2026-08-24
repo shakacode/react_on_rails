@@ -57,6 +57,8 @@ setup_case() {
   heartbeat_count_file="${case_dir}/heartbeat-count"
   status_count_file="${case_dir}/status-count"
   handshake_log="${case_dir}/handshake.log"
+  coordination_process_log="${case_dir}/coordination-process.log"
+  exception_group_log="${case_dir}/exception-group.log"
 
   mkdir -p "${fake_bin}" "${fake_repo}"
   : >"${coord_log}"
@@ -123,6 +125,12 @@ case "${command_name}" in
     test ! -f "${TEST_HEARTBEAT_COUNT_FILE}" || count="$(cat "${TEST_HEARTBEAT_COUNT_FILE}")"
     count=$((count + 1))
     printf '%s\n' "${count}" >"${TEST_HEARTBEAT_COUNT_FILE}"
+    if test -n "${FAKE_STALL_HEARTBEAT_AFTER:-}" && test "${count}" -gt "${FAKE_STALL_HEARTBEAT_AFTER}"; then
+      process_group="$(ps -o pgid= -p "$$" | tr -d ' ')"
+      printf '%s:%s\n' "$$" "${process_group}" >"${TEST_COORDINATION_PROCESS_LOG}"
+      trap '' TERM INT HUP
+      exec sleep 30
+    fi
     if test -n "${FAKE_FAIL_HEARTBEAT_AFTER:-}" && test "${count}" -gt "${FAKE_FAIL_HEARTBEAT_AFTER}"; then
       exit 92
     fi
@@ -219,7 +227,46 @@ end
 exit HandshakeTestSupervisor.new(ARGV).run
 HANDSHAKE_HARNESS
 
-  chmod +x "${fake_bin}/agent-coord" "${fake_bin}/bundle" "${fake_bin}/release-handshake-harness"
+  cat >"${fake_bin}/release-exception-harness" <<'EXCEPTION_HARNESS'
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+load ENV.fetch("TEST_RELEASE_SCRIPT")
+
+class FailingReleaseOutput
+  def puts(*)
+    raise Errno::EPIPE
+  end
+end
+
+class ExceptionTestSupervisor < ReleaseSupervisor
+  def initialize(argv)
+    stdout = ENV.fetch("FAKE_EXCEPTION_MODE") == "after-spawn" ? FailingReleaseOutput.new : $stdout
+    super(argv, stdout:)
+  end
+
+  private
+
+  def spawn_release_group(...)
+    result = super
+    File.write(ENV.fetch("TEST_EXCEPTION_GROUP_LOG"), "#{result.fetch(1)}\n")
+    result
+  end
+
+  def read_child_process_group!(...)
+    pgid = super
+    return pgid unless ENV.fetch("FAKE_EXCEPTION_MODE") == "after-handshake"
+
+    File.write(ENV.fetch("TEST_EXCEPTION_GROUP_LOG"), "#{pgid}\n")
+    raise SupervisorError, "injected failure after process-group handshake"
+  end
+end
+
+exit ExceptionTestSupervisor.new(ARGV).run
+EXCEPTION_HARNESS
+
+  chmod +x "${fake_bin}/agent-coord" "${fake_bin}/bundle" "${fake_bin}/release-handshake-harness" \
+    "${fake_bin}/release-exception-harness"
 
   export PATH="${fake_bin}:${PATH}"
   export TEST_COORD_LOG="${coord_log}"
@@ -227,6 +274,8 @@ HANDSHAKE_HARNESS
   export TEST_HEARTBEAT_COUNT_FILE="${heartbeat_count_file}"
   export TEST_STATUS_COUNT_FILE="${status_count_file}"
   export TEST_HANDSHAKE_LOG="${handshake_log}"
+  export TEST_COORDINATION_PROCESS_LOG="${coordination_process_log}"
+  export TEST_EXCEPTION_GROUP_LOG="${exception_group_log}"
   export TEST_RELEASE_SCRIPT="${release_script}"
   export TEST_REPO="shakacode/react_on_rails"
   export TEST_TARGET="release-line:17.1.0"
@@ -237,8 +286,10 @@ HANDSHAKE_HARNESS
   export AGENT_COORD_API_TOKEN="${fake_secret}"
   export REACT_ON_RAILS_RELEASE_HEARTBEAT_INTERVAL="0.1"
   export REACT_ON_RAILS_RELEASE_TERMINATION_GRACE="0.5"
-  unset FAKE_STATUS_FAIL FAKE_STATUS_AFTER_FIRST FAKE_FAIL_HEARTBEAT_AFTER FAKE_BUNDLE_MODE FAKE_HANDSHAKE_MODE
+  unset FAKE_STATUS_FAIL FAKE_STATUS_AFTER_FIRST FAKE_FAIL_HEARTBEAT_AFTER FAKE_STALL_HEARTBEAT_AFTER
+  unset FAKE_BUNDLE_MODE FAKE_HANDSHAKE_MODE FAKE_EXCEPTION_MODE
   unset FAKE_HANDSHAKE_IGNORE_TERM
+  unset REACT_ON_RAILS_RELEASE_COORDINATION_TIMEOUT
 }
 
 run_release() {
@@ -255,8 +306,19 @@ run_handshake_release() {
   ) >"${output_log}" 2>&1
 }
 
+run_exception_release() {
+  (
+    cd "${fake_repo}"
+    "${fake_bin}/release-exception-harness" "$@"
+  ) >"${output_log}" 2>&1
+}
+
 handshake_case_enabled() {
   test "${RELEASE_TEST_HANDSHAKE_CASE:-all}" = all || test "${RELEASE_TEST_HANDSHAKE_CASE}" = "$1"
+}
+
+supervisor_case_enabled() {
+  test "${RELEASE_TEST_SUPERVISOR_CASE:-all}" = all || test "${RELEASE_TEST_SUPERVISOR_CASE}" = "$1"
 }
 
 wait_for_process_exit() {
@@ -277,6 +339,18 @@ assert_group_dead() {
     kill -KILL -- "-${group_id}" 2>/dev/null || true
     fail "process group ${group_id} survived wrapper shutdown"
   fi
+}
+
+cleanup_stalled_wrapper() {
+  wrapper_id="$1"
+  coordination_id="$(cut -d: -f1 "${coordination_process_log}" 2>/dev/null || true)"
+  test -z "${coordination_id}" || kill -KILL "${coordination_id}" 2>/dev/null || true
+  if ! wait_for_process_exit "${wrapper_id}"; then
+    kill -KILL "${wrapper_id}" 2>/dev/null || true
+  fi
+  wait "${wrapper_id}" 2>/dev/null || true
+  release_group="$(awk -F: '/^bundle:/ { print $3; exit }' "${bundle_log}")"
+  test -z "${release_group}" || kill -KILL -- "-${release_group}" 2>/dev/null || true
 }
 
 assert_no_coordination_mutation() {
@@ -342,6 +416,89 @@ assert_contains "${bundle_log}" 'args|exec|rake|release:reconcile_accelerated_rc
 assert_no_coordination_mutation
 assert_secret_absent
 pass "accelerated RC reconciliation uses the supervised release contract"
+
+if supervisor_case_enabled heartbeat-timeout; then
+  setup_case stalled-heartbeat-timeout
+  export FAKE_STALL_HEARTBEAT_AFTER=1
+  export FAKE_BUNDLE_MODE=hold
+  export REACT_ON_RAILS_RELEASE_COORDINATION_TIMEOUT=0.2
+  (
+    cd "${fake_repo}"
+    exec "${release_script}" 17.1.0.rc.0
+  ) >"${output_log}" 2>&1 &
+  wrapper_pid=$!
+  for _attempt in $(seq 1 100); do
+    test -s "${coordination_process_log}" && break
+    sleep 0.05
+  done
+  test -s "${coordination_process_log}" || fail "stalled heartbeat never started"
+  if ! wait_for_process_exit "${wrapper_pid}"; then
+    cleanup_stalled_wrapper "${wrapper_pid}"
+    fail "stalled heartbeat did not stop the release within its coordination timeout"
+  fi
+  if wait "${wrapper_pid}"; then
+    fail "release with a stalled heartbeat exited successfully"
+  fi
+  coordination_id="$(cut -d: -f1 "${coordination_process_log}")"
+  process_group="$(awk -F: '/^bundle:/ { print $3; exit }' "${bundle_log}")"
+  assert_group_dead "${process_group}"
+  ! kill -0 "${coordination_id}" 2>/dev/null || fail "stalled heartbeat process survived timeout"
+  assert_contains "${output_log}" "Release lease refresh failed"
+  assert_contains "${bundle_log}" "liveness:eof"
+  assert_no_coordination_mutation
+  assert_secret_absent
+  pass "stalled heartbeat is bounded and terminates the release group"
+fi
+
+if supervisor_case_enabled heartbeat-signal; then
+  setup_case signal-during-heartbeat
+  export FAKE_STALL_HEARTBEAT_AFTER=1
+  export FAKE_BUNDLE_MODE=hold
+  export REACT_ON_RAILS_RELEASE_COORDINATION_TIMEOUT=5
+  (
+    cd "${fake_repo}"
+    exec "${release_script}" 17.1.0.rc.0
+  ) >"${output_log}" 2>&1 &
+  wrapper_pid=$!
+  for _attempt in $(seq 1 100); do
+    test -s "${coordination_process_log}" && break
+    sleep 0.05
+  done
+  test -s "${coordination_process_log}" || fail "heartbeat never stalled before signal"
+  kill -TERM "${wrapper_pid}"
+  if ! wait_for_process_exit "${wrapper_pid}"; then
+    cleanup_stalled_wrapper "${wrapper_pid}"
+    fail "signal during heartbeat did not stop the wrapper"
+  fi
+  if wait "${wrapper_pid}"; then
+    fail "signal during heartbeat exited successfully"
+  fi
+  coordination_id="$(cut -d: -f1 "${coordination_process_log}")"
+  process_group="$(awk -F: '/^bundle:/ { print $3; exit }' "${bundle_log}")"
+  assert_group_dead "${process_group}"
+  ! kill -0 "${coordination_id}" 2>/dev/null || fail "heartbeat process survived wrapper signal"
+  assert_contains "${output_log}" "signal TERM"
+  assert_contains "${bundle_log}" "liveness:eof"
+  assert_no_coordination_mutation
+  assert_secret_absent
+  pass "signal during heartbeat terminates coordination and release groups"
+fi
+
+for exception_mode in after-spawn after-handshake; do
+  if supervisor_case_enabled "exception-${exception_mode}"; then
+    setup_case "exception-${exception_mode}"
+    export FAKE_EXCEPTION_MODE="${exception_mode}"
+    export FAKE_BUNDLE_MODE=hold
+    if run_exception_release 17.1.0.rc.0; then
+      fail "${exception_mode} supervisor exception exited successfully"
+    fi
+    process_group="$(cat "${exception_group_log}")"
+    assert_group_dead "${process_group}"
+    assert_no_coordination_mutation
+    assert_secret_absent
+    pass "${exception_mode} supervisor exception terminates the release group"
+  fi
+done
 
 setup_case lease-failure
 export FAKE_FAIL_HEARTBEAT_AFTER=1
