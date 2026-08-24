@@ -8393,12 +8393,12 @@ RSpec.describe "release.rake helper methods" do
       )
     end
 
-    def resolve_unflagged_accelerated_retry(allow_ci_override: false)
+    def resolve_unflagged_accelerated_retry(tracker: nil, allow_ci_override: false)
       resolve_accelerated_rc_options_for_release!(
         requested: false,
         explicit_version_input: "17.0.0.rc.10",
         target_gem_version: "17.0.0.rc.10",
-        tracker: nil,
+        tracker:,
         reason: nil,
         allow_ci_override:,
         repo_slug: "shakacode/react_on_rails",
@@ -8435,6 +8435,49 @@ RSpec.describe "release.rake helper methods" do
         tracker: 3823,
         reason: authorization.fetch("reason")
       )
+    end
+
+    it "scopes unflagged same-candidate retry discovery to the selected tracker" do
+      selected_authorization = authorization.merge("release_tracker" => 4842)
+      allow(self).to receive_messages(
+        local_release_tag_exists?: false,
+        fetch_repository_accelerated_rc_records_for_candidate!: [selected_authorization],
+        fetch_release_tracker_issue!: {}
+      )
+
+      expect(resolve_unflagged_accelerated_retry(tracker: "4842")).to include(
+        target_gem_version: "17.0.0.rc.10",
+        tracker: 4842,
+        reason: selected_authorization.fetch("reason")
+      )
+      expect(self).to have_received(:fetch_repository_accelerated_rc_records_for_candidate!).with(
+        repo_slug: "shakacode/react_on_rails",
+        target_version: "17.0.0.rc.10",
+        candidate_sha: "f" * 40,
+        tracker: 4842
+      )
+    end
+
+    it "preserves an ordinary retry when the selected tracker is empty" do
+      allow(self).to receive_messages(
+        local_release_tag_exists?: true,
+        accelerated_rc_tag_provenance_for_tag!: nil,
+        fetch_repository_accelerated_rc_records_for_candidate!: []
+      )
+
+      expect(resolve_unflagged_accelerated_retry(tracker: "")).to be_nil
+    end
+
+    it "rejects selected-tracker retry history bound to another tracker" do
+      allow(self).to receive_messages(
+        local_release_tag_exists?: false,
+        fetch_repository_accelerated_rc_records_for_candidate!: [authorization.merge("release_tracker" => 3823)],
+        fetch_release_tracker_issue!: {}
+      )
+
+      expect do
+        resolve_unflagged_accelerated_retry(tracker: "4842")
+      end.to raise_error(SystemExit, /different release tracker/i)
     end
 
     it "resumes an annotated accelerated-tag retry when accelerated variables are omitted" do
@@ -8511,7 +8554,7 @@ RSpec.describe "release.rake helper methods" do
       aggregate_failures do
         expect do
           resolve_flagged_accelerated_retry(tracker: 3824)
-        end.to raise_error(SystemExit, /explicit accelerated RC retry.*canonical authorization/i)
+        end.to raise_error(SystemExit, /different release tracker/i)
         expect do
           resolve_flagged_accelerated_retry(reason: "A different retry reason")
         end.to raise_error(SystemExit, /explicit accelerated RC retry.*canonical authorization/i)
@@ -8534,7 +8577,8 @@ RSpec.describe "release.rake helper methods" do
       expect(self).to have_received(:fetch_repository_accelerated_rc_records_for_candidate!).with(
         repo_slug: "shakacode/react_on_rails",
         target_version: "17.0.0.rc.10",
-        candidate_sha: "f" * 40
+        candidate_sha: "f" * 40,
+        tracker: 3823
       )
     end
 
@@ -8600,7 +8644,8 @@ RSpec.describe "release.rake helper methods" do
       expect(self).to have_received(:fetch_repository_accelerated_rc_records_for_candidate!).with(
         repo_slug: "shakacode/react_on_rails",
         target_version: "17.0.0.rc.10",
-        candidate_sha: "f" * 40
+        candidate_sha: "f" * 40,
+        tracker: 3823
       )
     end
   end

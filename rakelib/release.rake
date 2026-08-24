@@ -4031,14 +4031,18 @@ def resolve_accelerated_rc_options_for_release!(requested:, explicit_version_inp
                          current_checkout_version == target_gem_version
   return requested_options unless same_candidate_retry
 
+  selected_tracker = normalize_accelerated_rc_retry_tracker(tracker)
+
   unless candidate_sha.to_s.match?(/\A[0-9a-f]{40}\z/)
     abort "❌ Accelerated RC same-candidate retry discovery requires the exact current candidate SHA."
   end
 
-  authorization = accelerated_rc_authorization_for_same_candidate_retry!(
+  authorization_args = {
     repo_slug:, monorepo_root:, target_version: target_gem_version, candidate_sha:,
     accelerated_requested: !requested_options.nil?
-  )
+  }
+  authorization_args[:tracker] = selected_tracker if selected_tracker
+  authorization = accelerated_rc_authorization_for_same_candidate_retry!(**authorization_args)
   return requested_options unless authorization
 
   validate_explicit_accelerated_rc_retry_options!(requested_options, authorization) if requested_options
@@ -4054,6 +4058,14 @@ def resolve_accelerated_rc_options_for_release!(requested:, explicit_version_inp
     reason: authorization.fetch("reason"),
     allow_ci_override: false
   }
+end
+
+def normalize_accelerated_rc_retry_tracker(tracker)
+  normalized_tracker = tracker.to_s.strip
+  return nil if normalized_tracker.empty?
+  return normalized_tracker.to_i if normalized_tracker.match?(/\A[1-9]\d*\z/)
+
+  abort "❌ Accelerated RC same-candidate retry tracker must be a positive issue number."
 end
 
 def validate_explicit_accelerated_rc_retry_options!(requested_options, authorization)
@@ -4300,8 +4312,8 @@ def fetch_accelerated_rc_tracker_records!(repo_slug:, tracker:)
   records
 end
 
-def fetch_repository_accelerated_rc_records_for_candidate!(repo_slug:, target_version:, candidate_sha:)
-  comments = fetch_repository_issue_comments_for_accelerated_rc_retry!(repo_slug:)
+def fetch_repository_accelerated_rc_records_for_candidate!(repo_slug:, target_version:, candidate_sha:, tracker: nil)
+  comments = fetch_repository_issue_comments_for_accelerated_rc_retry!(repo_slug:, tracker:)
   marker_comments = comments.select do |comment|
     next false unless accelerated_rc_machine_marker_comment?(comment)
 
@@ -4326,7 +4338,13 @@ def validated_repository_accelerated_rc_candidate_history!(
   repo_slug:, target_version:, candidate_sha:, expected_tracker: nil,
   selected_authorization: nil, allow_empty: false
 )
-  records = fetch_repository_accelerated_rc_records_for_candidate!(repo_slug:, target_version:, candidate_sha:)
+  records = if expected_tracker
+              fetch_repository_accelerated_rc_records_for_candidate!(
+                repo_slug:, target_version:, candidate_sha:, tracker: expected_tracker
+              )
+            else
+              fetch_repository_accelerated_rc_records_for_candidate!(repo_slug:, target_version:, candidate_sha:)
+            end
   if records.empty?
     return { records:, tracker: nil, chain: nil } if allow_empty
 
@@ -4489,8 +4507,8 @@ def fetch_bounded_accelerated_rc_marker_comments!(repo_slug:, tracker: nil)
   abort "❌ Bounded #{source} issue-comment page limit was reached; durable retry history is unknown."
 end
 
-def fetch_repository_issue_comments_for_accelerated_rc_retry!(repo_slug:)
-  fetch_bounded_accelerated_rc_marker_comments!(repo_slug:)
+def fetch_repository_issue_comments_for_accelerated_rc_retry!(repo_slug:, tracker: nil)
+  fetch_bounded_accelerated_rc_marker_comments!(repo_slug:, tracker:)
 end
 
 def trusted_accelerated_rc_records_from_repository_comment!(
@@ -5431,12 +5449,12 @@ def accelerated_rc_records_for_candidate(records, target_version:, candidate_sha
 end
 
 def accelerated_rc_authorization_for_same_candidate_retry!(
-  repo_slug:, monorepo_root:, target_version:, candidate_sha:, accelerated_requested:
+  repo_slug:, monorepo_root:, target_version:, candidate_sha:, accelerated_requested:, tracker: nil
 )
   tag = "v#{target_version}"
   tag_exists = local_release_tag_exists?(monorepo_root:, tag:)
   history = validated_repository_accelerated_rc_candidate_history!(
-    repo_slug:, target_version:, candidate_sha:, allow_empty: true
+    repo_slug:, target_version:, candidate_sha:, expected_tracker: tracker, allow_empty: true
   )
   candidate_records = history.fetch(:records)
   if candidate_records.empty?
