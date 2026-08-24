@@ -7,6 +7,7 @@ set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DETECTOR="$SCRIPT_DIR/ci-changes-detector"
+CI_LOCAL="$SCRIPT_DIR/../bin/ci-local"
 
 TESTS_RUN=0
 TESTS_FAILED=0
@@ -169,6 +170,172 @@ RUBY
 
   git add .
   git commit -m "initial fixture" >/dev/null
+}
+
+setup_ci_local_repo() {
+  git init -b main >/dev/null
+  git config user.email test@example.com
+  git config user.name "CI Local Test"
+
+  mkdir -p bin script test-bin node_modules vendor/bundle
+  mkdir -p react_on_rails/spec/dummy/node_modules
+  cp "$CI_LOCAL" bin/ci-local
+  chmod +x bin/ci-local
+  : > Gemfile
+  : > react_on_rails/Gemfile
+
+  cat > script/check-docs-sidebar <<'BASH'
+#!/usr/bin/env bash
+exit 0
+BASH
+  chmod +x script/check-docs-sidebar
+
+  cat > script/ci-changes-detector <<'BASH'
+#!/usr/bin/env bash
+set -euo pipefail
+
+run_ruby=false
+run_generators=false
+case "${CI_LOCAL_FIXTURE_SELECTION:?}" in
+  ruby) run_ruby=true ;;
+  generators) run_generators=true ;;
+  *) exit 2 ;;
+esac
+
+cat <<JSON
+{
+  "docs_only": false,
+  "run_lint": false,
+  "run_ruby_tests": $run_ruby,
+  "run_js_tests": false,
+  "run_dummy_tests": false,
+  "run_generators": $run_generators,
+  "run_pro_lint": false,
+  "run_pro_tests": false
+}
+JSON
+
+if [ "$run_ruby" = true ]; then
+  echo "  ✓ RSpec gem tests"
+fi
+if [ "$run_generators" = true ]; then
+  echo "  ✓ Generator tests"
+fi
+BASH
+  chmod +x script/ci-changes-detector
+
+  cat > test-bin/gh <<'BASH'
+#!/usr/bin/env bash
+exit 1
+BASH
+  chmod +x test-bin/gh
+
+  cat > test-bin/bundle <<'BASH'
+#!/usr/bin/env bash
+{
+  printf 'bundle'
+  printf '\t%s' "$@"
+  printf '\n'
+} >> "$CI_LOCAL_COMMAND_LOG"
+exit 0
+BASH
+  chmod +x test-bin/bundle
+
+  cat > test-bin/pnpm <<'BASH'
+#!/usr/bin/env bash
+{
+  printf 'pnpm'
+  printf '\t%s' "$@"
+  printf '\n'
+} >> "$CI_LOCAL_COMMAND_LOG"
+exit 0
+BASH
+  chmod +x test-bin/pnpm
+
+  git add .
+  git commit -m "ci-local fixture" >/dev/null
+}
+
+ci_local_output() {
+  local command_log="$PWD/ci-local-commands.log"
+  : > "$command_log"
+  CI_LOCAL_COMMAND_LOG="$command_log"
+  PATH="$PWD/test-bin:$PATH"
+  BASH_ENV=/dev/null
+  export BASH_ENV CI_LOCAL_COMMAND_LOG PATH
+  hash -r
+  if [ "$(command -v bundle)" != "$PWD/test-bin/bundle" ]; then
+    printf 'fixture bundle resolution mismatch: expected %s, got %s\n' \
+      "$PWD/test-bin/bundle" "$(command -v bundle)" >&2
+    return 1
+  fi
+  bin/ci-local "$@"
+}
+
+test_ci_local_fast_mode_keeps_generator_specs_out_of_unit_job() {
+  setup_ci_local_repo
+
+  local output
+  if ! output="$(ci_local_output --all --fast 2>&1)"; then
+    fail "ci-local fixture failed: $output"
+    return 1
+  fi
+
+  local commands
+  commands="$(cat ci-local-commands.log)"
+  assert_contains \
+    "$commands" \
+    $'bundle\texec\trspec\tspec/react_on_rails\t--exclude-pattern\t**/generators/**' \
+    "ci-local command log"
+  case "$commands" in
+    *$'bundle\texec\trspec\tspec/react_on_rails/generators'*|\
+    *$'bundle\texec\trake\trun_rspec:shakapacker_examples'*)
+      fail "ci-local command log: --fast must skip both generator jobs"
+      ;;
+  esac
+}
+
+test_ci_local_keeps_ruby_and_generator_selectors_isolated() {
+  setup_ci_local_repo
+
+  local output ruby_commands generator_commands
+  export CI_LOCAL_FIXTURE_SELECTION=ruby
+  if ! output="$(ci_local_output --changed 2>&1)"; then
+    fail "ci-local Ruby-selector fixture failed: $output"
+    return 1
+  fi
+  ruby_commands="$(cat ci-local-commands.log)"
+  assert_contains \
+    "$ruby_commands" \
+    $'bundle\texec\trspec\tspec/react_on_rails\t--exclude-pattern\t**/generators/**' \
+    "Ruby-selector command log"
+  case "$ruby_commands" in
+    *$'bundle\texec\trspec\tspec/react_on_rails/generators'*|\
+    *$'bundle\texec\trake\trun_rspec:shakapacker_examples'*|\
+    *$'bundle\texec\trake\trun_rspec:gem'*)
+      fail "Ruby selector must run only the hosted-equivalent unit job"
+      ;;
+  esac
+
+  export CI_LOCAL_FIXTURE_SELECTION=generators
+  if ! output="$(ci_local_output --changed 2>&1)"; then
+    fail "ci-local generator-selector fixture failed: $output"
+    return 1
+  fi
+  generator_commands="$(cat ci-local-commands.log)"
+  assert_contains \
+    "$generator_commands" \
+    $'bundle\texec\trspec\tspec/react_on_rails/generators' \
+    "generator-selector command log"
+  assert_contains \
+    "$generator_commands" \
+    $'bundle\texec\trake\trun_rspec:shakapacker_examples' \
+    "generator-selector command log"
+  case "$generator_commands" in
+    *$'bundle\texec\trspec\tspec/react_on_rails\t--exclude-pattern'*)
+      fail "generator selector must not run the Ruby unit job"
+      ;;
+  esac
 }
 
 detector_output() {
@@ -1577,6 +1744,8 @@ run_test test_agent_tooling_changes_are_non_runtime_only
 run_test test_agent_bin_change_runs_ci_infrastructure_without_benchmarks
 run_test test_agent_bin_markdown_change_is_non_runtime_only
 run_test test_agent_workflow_config_change_runs_ci_infrastructure_without_benchmarks
+run_test test_ci_local_fast_mode_keeps_generator_specs_out_of_unit_job
+run_test test_ci_local_keeps_ruby_and_generator_selectors_isolated
 run_test test_ci_infrastructure_only_change_runs_tests_but_skips_benchmarks
 run_test test_suite_workflow_file_runs_its_tests_but_no_benchmark
 run_test test_gem_tests_workflow_change_keeps_generator_specs_fail_closed
