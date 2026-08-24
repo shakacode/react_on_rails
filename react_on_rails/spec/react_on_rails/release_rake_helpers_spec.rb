@@ -307,10 +307,12 @@ RSpec.describe "release.rake helper methods" do
   end
 
   before do
-    next if Object.instance_variable_defined?(:@release_rake_helpers_loaded)
-
-    load File.expand_path("../../../rakelib/release.rake", __dir__)
-    Object.instance_variable_set(:@release_rake_helpers_loaded, true)
+    unless Object.instance_variable_defined?(:@release_rake_helpers_loaded)
+      load File.expand_path("../../../rakelib/release.rake", __dir__)
+      Object.instance_variable_set(:@release_rake_helpers_loaded, true)
+    end
+    allow(self).to receive(:release_write_fence!) if respond_to?(:release_write_fence!, true)
+    allow(self).to receive(:activate_release_lease_guard!) if respond_to?(:activate_release_lease_guard!, true)
   end
 
   describe "#parse_release_tag_to_gem_version" do
@@ -939,9 +941,10 @@ RSpec.describe "release.rake helper methods" do
   end
 
   describe "#run_release_preflight_checks!" do
-    it "checks both npm and GitHub auth before a real release" do
-      expect(self).to receive(:verify_npm_auth)
-      expect(self).to receive(:verify_gh_auth).with(monorepo_root: "/tmp/repo")
+    it "activates the release guard before both authentication checks for a real release" do
+      expect(self).to receive(:activate_release_lease_guard!).with(dry_run: false).ordered
+      expect(self).to receive(:verify_npm_auth).ordered
+      expect(self).to receive(:verify_gh_auth).with(monorepo_root: "/tmp/repo").ordered
 
       run_release_preflight_checks!(monorepo_root: "/tmp/repo", dry_run: false)
     end
@@ -16587,6 +16590,7 @@ RSpec.describe "release.rake helper methods" do
         preflight_registry_publish_conflicts!: nil,
         confirm_release!: nil,
         sh_in_dir_for_release: nil,
+        release_write_fence!: nil,
         unbundled_sh_in_dir_for_release: nil,
         current_git_sha!: "f" * 40,
         authorize_accelerated_rc_publication!: authorization,
@@ -23499,6 +23503,322 @@ RSpec.describe "release.rake helper methods" do
       expect do
         resolve_release_start_base_version("", monorepo_root: "/tmp/repo")
       end.to raise_error(SystemExit, /Could not determine which release line to start/)
+    end
+  end
+
+  describe "outward write fencing" do
+    it "fences the version commit push immediately before the outward write" do
+      expect(self).to receive(:release_write_fence!).with("push version commit").ordered
+      expect(self).to receive(:sh_in_dir_for_release)
+        .with("/tmp/repo", "LEFTHOOK=0 git push")
+        .ordered
+
+      push_release_version_commit!("/tmp/repo")
+    end
+
+    it "fences a ShakaPerf dispatch immediately before the outward write" do
+      success = instance_double(Process::Status, success?: true)
+      expect(self).to receive(:release_write_fence!).with("dispatch ShakaPerf release gate").ordered
+      expect(self).to receive(:capture_gh_output)
+        .with(
+          "workflow", "run", SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE,
+          "--repo", "shakacode/react_on_rails",
+          "--ref", "release/17.1.0",
+          "-f", "target_version=17.1.0.rc.0",
+          "-f", "candidate_sha=#{'f' * 40}"
+        )
+        .ordered
+        .and_return(["", success])
+
+      dispatch_shakaperf_release_gate_workflow!(
+        repo_slug: "shakacode/react_on_rails",
+        ref: "release/17.1.0",
+        target_version: "17.1.0.rc.0",
+        candidate_sha: "f" * 40
+      )
+    end
+
+    it "fences ShakaPerf evidence and accelerated tracker comments immediately before each outward write" do
+      success = instance_double(Process::Status, success?: true)
+      comments = [
+        "<!-- #{SHAKAPERF_RELEASE_TRACKER_ASSOCIATION_MARKER} -->",
+        "<!-- #{ACCELERATED_RC_RECORD_MARKER} -->"
+      ]
+
+      comments.each do |body|
+        expect(self).to receive(:release_write_fence!).with("post release tracker comment").ordered
+        expect(self).to receive(:capture_gh_output)
+          .with(
+            "issue", "comment", "4842", "--repo", "shakacode/react_on_rails",
+            "--body-file", a_string_ending_with(".md")
+          )
+          .ordered
+          .and_return(["", success])
+
+        post_release_tracker_comment!(repo_slug: "shakacode/react_on_rails", tracker: 4842, body:)
+      end
+    end
+
+    it "fences the tag push immediately before the outward write" do
+      candidate_sha = "f" * 40
+      allow(self).to receive_messages(
+        system: true,
+        validate_release_tag_candidate_sha!: candidate_sha,
+        validate_release_candidate_publication_boundary!: candidate_sha,
+        validate_accelerated_tag_publication_boundary!: nil,
+        validate_remote_release_tag_candidate_sha!: candidate_sha
+      )
+      expect(self).to receive(:release_write_fence!).with("push release tag v17.1.0.rc.0").ordered
+      expect(self).to receive(:sh_in_dir_for_release)
+        .with("/tmp/repo", "LEFTHOOK=0 git push --tags")
+        .ordered
+
+      push_release_tag_for_candidate!(
+        monorepo_root: "/tmp/repo",
+        tag: "v17.1.0.rc.0",
+        candidate_sha:
+      )
+    end
+
+    %w[
+      react-on-rails
+      react-on-rails-pro
+      react-on-rails-pro-node-renderer
+      create-react-on-rails-app
+    ].each do |package_name|
+      it "fences the named npm #{package_name} attempt immediately before its outward write" do
+        Dir.mktmpdir do |dir|
+          package_ref = "#{package_name}@17.1.0-rc.0"
+          File.write(
+            File.join(dir, "package.json"),
+            JSON.generate("name" => package_name, "version" => "17.1.0-rc.0")
+          )
+          success = instance_double(Process::Status, success?: true)
+          expect(self).to receive(:npm_package_already_published?)
+            .with(package_name, "17.1.0-rc.0")
+            .ordered
+            .and_return(false)
+          expect(self).to receive(:release_write_fence!)
+            .with("publish npm #{package_ref} attempt 1")
+            .ordered
+          expect(Open3).to receive(:capture2e)
+            .with("pnpm", "publish", chdir: dir)
+            .ordered
+            .and_return(["published\n", success])
+          expect(self).to receive(:verify_npm_package_published!)
+            .with(package_name, "17.1.0-rc.0")
+
+          publish_npm_with_retry(dir, package_ref, max_retries: 1)
+        end
+      end
+    end
+
+    %w[react_on_rails react_on_rails_pro].each do |gem_name|
+      it "fences the named RubyGem #{gem_name} attempt immediately before its outward write" do
+        expect(self).to receive(:release_write_fence!)
+          .with("publish RubyGem #{gem_name} attempt 1")
+          .ordered
+        expect(self).to receive(:sh_args_in_dir_for_release)
+          .with("/tmp/gem", "gem", "release", env: nil)
+          .ordered
+
+        publish_gem_with_retry("/tmp/gem", gem_name, max_retries: 1)
+      end
+    end
+
+    it "fences GitHub release create and edit immediately before each outward write" do
+      release_context = {
+        notes: "#### Fixed\n\n- Release fix",
+        prerelease: true,
+        tag: "v17.1.0.rc.0",
+        title: "v17.1.0.rc.0"
+      }
+      allow(self).to receive(:ensure_git_tag_exists!)
+      allow(self).to receive(:github_repo_slug).with("/tmp/repo").and_return("shakacode/react_on_rails")
+      expect(self).to receive(:system)
+        .with(
+          "gh", "release", "view", "v17.1.0.rc.0", "--repo", "shakacode/react_on_rails",
+          chdir: "/tmp/repo", out: File::NULL, err: File::NULL
+        )
+        .ordered
+        .and_return(false)
+      expect(self).to receive(:release_write_fence!)
+        .with("create GitHub release v17.1.0.rc.0")
+        .ordered
+      expect(self).to receive(:system)
+        .with(
+          "gh", "release", "create", "v17.1.0.rc.0", "--repo", "shakacode/react_on_rails",
+          "--verify-tag", "--title", "v17.1.0.rc.0", "--notes-file", a_string_ending_with(".md"),
+          "--prerelease", chdir: "/tmp/repo"
+        )
+        .ordered
+        .and_return(true)
+      expect(self).to receive(:system)
+        .with(
+          "gh", "release", "view", "v17.1.0.rc.0", "--repo", "shakacode/react_on_rails",
+          chdir: "/tmp/repo", out: File::NULL, err: File::NULL
+        )
+        .ordered
+        .and_return(true)
+      expect(self).to receive(:release_write_fence!)
+        .with("edit GitHub release v17.1.0.rc.0")
+        .ordered
+      expect(self).to receive(:system)
+        .with(
+          "gh", "release", "edit", "v17.1.0.rc.0", "--repo", "shakacode/react_on_rails",
+          "--title", "v17.1.0.rc.0", "--notes-file", a_string_ending_with(".md"),
+          "--prerelease=true", chdir: "/tmp/repo"
+        )
+        .ordered
+        .and_return(true)
+
+      2.times do
+        publish_or_update_github_release(monorepo_root: "/tmp/repo", release_context:, dry_run: false)
+      end
+    end
+
+    it "leaves registry visibility checks unfenced when no outward write is needed" do
+      allow(self).to receive(:npm_package_already_published?)
+        .with("react-on-rails", "17.1.0-rc.0")
+        .and_return(true)
+      allow(self).to receive(:rubygem_version_published?)
+        .with("react_on_rails", "17.1.0.rc.0")
+        .and_return(true)
+      expect(self).not_to receive(:release_write_fence!)
+      expect(Open3).not_to receive(:capture2e)
+      expect(self).not_to receive(:sh_args_in_dir_for_release)
+
+      publish_npm_with_retry(
+        "/tmp/npm",
+        "react-on-rails@17.1.0-rc.0",
+        idempotent_retry: true,
+        max_retries: 1
+      )
+      publish_gem_with_retry(
+        "/tmp/gem",
+        "react_on_rails",
+        published_version: "17.1.0.rc.0",
+        idempotent_retry: true,
+        max_retries: 1
+      )
+    end
+  end
+
+  describe "direct live release guard" do
+    let(:release_task) { Rake::Task["release"] }
+    let(:task_receiver) { release_task.actions.first.binding.receiver }
+    let(:success_status) { instance_double(Process::Status, success?: true) }
+
+    after { release_task.reenable }
+
+    it "refuses direct live Rake invocation before authentication or any outward mutation" do
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", "/tmp/repo", "rev-parse", "--abbrev-ref", "HEAD")
+        .and_return(["release/17.1.0\n", success_status])
+      allow(ReactOnRails::GitUtils).to receive(:uncommitted_changes?)
+      allow(task_receiver).to receive(:with_release_checkout) { |**_, &block| block.call("/tmp/repo") }
+      allow(task_receiver).to receive_messages(
+        current_monorepo_root: "/tmp/repo",
+        current_npm_release_readiness_sha!: "f" * 40,
+        validate_npm_release_readiness!: nil,
+        refresh_npm_release_readiness_after_pull!: "f" * 40,
+        verbose: nil,
+        sh_in_dir_for_release: nil
+      )
+      allow(ENV).to receive(:fetch).and_call_original
+      allow(ENV).to receive(:fetch).with("NPM_OTP", nil).and_return(nil)
+      allow(ENV).to receive(:fetch).with("RUBYGEMS_OTP", nil).and_return(nil)
+      expect(ReleaseLeaseGuard).to receive(:activate!)
+        .with(dry_run: false)
+        .and_raise(ReleaseLeaseGuard::LeaseError, "live release wrapper contract is required")
+      expect(task_receiver).not_to receive(:verify_npm_auth)
+      expect(task_receiver).not_to receive(:verify_gh_auth)
+      expect(task_receiver).not_to receive(:release_write_fence!)
+
+      expect do
+        release_task.invoke("17.1.0.rc.0", false, true, false)
+      end.to raise_error(SystemExit, %r{script/release.*wrapper contract is required}m)
+    end
+
+    it "keeps a direct dry run guard-free and coordination-free" do
+      expect(ReleaseLeaseGuard).not_to receive(:activate!)
+      expect(ReleaseLeaseGuard).not_to receive(:fence!)
+      expect(self).not_to receive(:verify_npm_auth)
+      expect(self).not_to receive(:verify_gh_auth)
+
+      run_release_preflight_checks!(monorepo_root: "/tmp/repo", dry_run: true)
+    end
+  end
+
+  describe "publish retry outward write fencing" do
+    it "uses a fresh fence for each npm publish retry attempt" do
+      Dir.mktmpdir do |dir|
+        File.write(
+          File.join(dir, "package.json"),
+          JSON.generate("name" => "react-on-rails", "version" => "17.1.0-rc.0")
+        )
+        failure = instance_double(Process::Status, success?: false)
+        success = instance_double(Process::Status, success?: true)
+        expect(self).to receive(:npm_package_already_published?)
+          .with("react-on-rails", "17.1.0-rc.0")
+          .ordered
+          .and_return(false)
+        expect(self).to receive(:release_write_fence!)
+          .with("publish npm react-on-rails@17.1.0-rc.0 attempt 1")
+          .ordered
+        expect(Open3).to receive(:capture2e)
+          .with("pnpm", "publish", "--otp", "987654", chdir: dir)
+          .ordered
+          .and_return(["npm ERR! code E503\n", failure])
+        expect(self).to receive(:npm_package_already_published?)
+          .with("react-on-rails", "17.1.0-rc.0")
+          .ordered
+          .and_return(false)
+        expect(self).to receive(:sleep).with(1).ordered
+        expect(self).to receive(:release_write_fence!)
+          .with("publish npm react-on-rails@17.1.0-rc.0 attempt 2")
+          .ordered
+        expect(Open3).to receive(:capture2e)
+          .with("pnpm", "publish", "--otp", "987654", chdir: dir)
+          .ordered
+          .and_return(["published\n", success])
+        expect(self).to receive(:verify_npm_package_published!)
+          .with("react-on-rails", "17.1.0-rc.0")
+
+        publish_npm_with_retry(
+          dir,
+          "react-on-rails@17.1.0-rc.0",
+          otp: "987654",
+          max_retries: 2
+        )
+      end
+    end
+
+    it "uses a fresh fence for each RubyGem publish retry attempt" do
+      first_failure = RuntimeError.new("temporary RubyGems failure")
+      expect(self).to receive(:release_write_fence!)
+        .with("publish RubyGem react_on_rails attempt 1")
+        .ordered
+      expect(self).to receive(:sh_args_in_dir_for_release)
+        .with("/tmp/gem", "gem", "release", env: { "GEM_HOST_OTP_CODE" => "987654" })
+        .ordered
+        .and_raise(first_failure)
+      expect(self).to receive(:prompt_for_otp).with("RubyGems").ordered.and_return("123456")
+      expect(self).to receive(:release_write_fence!)
+        .with("publish RubyGem react_on_rails attempt 2")
+        .ordered
+      expect(self).to receive(:sh_args_in_dir_for_release)
+        .with("/tmp/gem", "gem", "release", env: { "GEM_HOST_OTP_CODE" => "123456" })
+        .ordered
+
+      expect(
+        publish_gem_with_retry(
+          "/tmp/gem",
+          "react_on_rails",
+          otp: "987654",
+          max_retries: 2
+        )
+      ).to eq("123456")
     end
   end
 end

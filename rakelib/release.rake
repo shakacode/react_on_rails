@@ -13,6 +13,7 @@ require "tempfile"
 require "time"
 require "tmpdir"
 require "uri"
+require_relative "release_lease_guard"
 require_relative "task_helpers"
 require_relative "../react_on_rails/lib/react_on_rails/version_syntax_converter"
 require_relative "../react_on_rails/lib/react_on_rails/git_utils"
@@ -317,6 +318,20 @@ def release_truthy?(value)
   [true, "true", "yes", 1, "1", "t"].include?(value.instance_of?(String) ? value.downcase : value)
 end
 
+def activate_release_lease_guard!(dry_run:)
+  return if dry_run
+
+  ReleaseLeaseGuard.activate!(dry_run: false)
+rescue ReleaseLeaseGuard::LeaseError => e
+  abort "❌ Live release requires the supervised `script/release` wrapper: #{e.message}"
+end
+
+def release_write_fence!(operation)
+  ReleaseLeaseGuard.fence!
+rescue ReleaseLeaseGuard::LeaseError => e
+  abort "❌ Release lease fence failed before #{operation}: #{e.message}"
+end
+
 def release_paths(monorepo_root)
   {
     monorepo_root:,
@@ -334,6 +349,11 @@ def sh_in_dir_for_release(dir, *shell_commands)
       sh(shell_command.strip)
     end
   end
+end
+
+def push_release_version_commit!(release_root)
+  release_write_fence!("push version commit")
+  sh_in_dir_for_release(release_root, "LEFTHOOK=0 git push")
 end
 
 def sh_args_in_dir_for_release(dir, *command_args, env: nil)
@@ -2511,6 +2531,7 @@ def print_shakaperf_release_gate_notice(ref:, head_sha:)
 end
 
 def dispatch_shakaperf_release_gate_workflow!(repo_slug:, ref:, target_version:, candidate_sha:)
+  release_write_fence!("dispatch ShakaPerf release gate")
   output, status = capture_gh_output(
     "workflow", "run", SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE,
     "--repo", repo_slug,
@@ -3050,6 +3071,7 @@ def run_release_preflight_checks!(monorepo_root:, dry_run:)
   # `dry_run: true` and surfaces the warning operators need to see.
   return if dry_run
 
+  activate_release_lease_guard!(dry_run: false)
   puts "\n#{'=' * 80}"
   puts "PRE-FLIGHT CHECKS"
   puts "=" * 80
@@ -4648,6 +4670,7 @@ def post_release_tracker_comment!(repo_slug:, tracker:, body:)
   Tempfile.create(["accelerated-rc-record", ".md"]) do |file|
     file.write(body)
     file.flush
+    release_write_fence!("post release tracker comment")
     output, status = capture_gh_output(
       "issue", "comment", tracker.to_s, "--repo", repo_slug, "--body-file", file.path
     )
@@ -5408,6 +5431,7 @@ def push_release_tag_for_candidate!(monorepo_root:, tag:, candidate_sha:, accele
     monorepo_root:, tag:, candidate_sha:, phase: "git tag push"
   )
   validate_ordinary_shakaperf_boundary!(monorepo_root:, contexts: shakaperf_contexts, phase: "git tag push")
+  release_write_fence!("push release tag #{tag}")
   sh_in_dir_for_release(monorepo_root, "LEFTHOOK=0 git push --tags")
   validate_accelerated_tag_publication_phase!(
     monorepo_root:, record: boundary_record, final_promotion_context: accelerated_final_promotion_context,
@@ -8939,6 +8963,7 @@ def publish_or_update_github_release(monorepo_root:, release_context:, dry_run:)
                       end
 
     puts "Publishing GitHub release #{release_context[:tag]}#{release_context[:prerelease] ? ' (prerelease)' : ''}"
+    release_write_fence!("#{release_command.fetch(2)} GitHub release #{release_context[:tag]}")
     success = system(*release_command, chdir: monorepo_root)
     abort_github_release_publish_failure!(release_context[:tag]) unless success
   end
@@ -9297,6 +9322,7 @@ def publish_gem_with_retry(dir, gem_name, otp: nil, published_version: nil, idem
       # because `gem release` (gem-release gem) doesn't support --otp,
       # but the underlying `gem push` reads OTP from this env var
       gem_release_env = current_otp ? { "GEM_HOST_OTP_CODE" => current_otp } : nil
+      release_write_fence!("publish RubyGem #{gem_name} attempt #{retry_count + 1}")
       sh_args_in_dir_for_release(dir, "gem", "release", env: gem_release_env)
       success = true
     # Rake's sh method raises RuntimeError (not Gem exceptions) when commands fail
@@ -9574,9 +9600,10 @@ def npm_publish_local_lifecycle_failure?(text)
   end || text.each_line.any? { |line| line.match?(/\berror\s+TS\d+\b/i) }
 end
 
-def run_npm_publish_attempt!(dir:, publish_args:, otp:)
+def run_npm_publish_attempt!(dir:, package_name:, attempt:, publish_args:, otp:)
   command_args = ["pnpm", "publish", *publish_args]
   command_args += ["--otp", otp] if otp
+  release_write_fence!("publish npm #{package_name} attempt #{attempt}")
   output, status = Open3.capture2e(*command_args, chdir: dir)
   return if status.success?
 
@@ -9637,7 +9664,7 @@ def publish_npm_with_retry(dir, package_name, base_args: [], otp: nil, idempoten
     attempt += 1
     begin
       with_publishable_package_json(dir, npm_package_version) do
-        run_npm_publish_attempt!(dir:, publish_args:, otp: current_otp)
+        run_npm_publish_attempt!(dir:, package_name:, attempt:, publish_args:, otp: current_otp)
       end
       verify_npm_package_published!(npm_package_name, npm_package_version)
       return current_otp
@@ -10107,7 +10134,7 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
       end
 
       # Push the version-bump commit first so the workflow_dispatch run can be matched by headSha.
-      sh_in_dir_for_release(release_root, "LEFTHOOK=0 git push")
+      push_release_version_commit!(release_root)
       release_candidate_sha = current_git_sha!(release_root)
       validated_release_candidate_sha = release_candidate_sha
       tag_name = "v#{actual_gem_version}"
@@ -10367,6 +10394,7 @@ task :sync_github_release, %i[gem_version dry_run] do |_t, args|
           "rake \"sync_github_release[16.4.0,true]\" or rake \"sync_github_release[16.4.0.rc.1,true]\""
   end
   validate_requested_version_input!(requested_gem_version)
+  activate_release_lease_guard!(dry_run: is_dry_run)
 
   puts "ℹ️ sync_github_release reads local committed CHANGELOG.md; " \
        "run `git pull --rebase` first for latest remote notes."
