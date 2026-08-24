@@ -274,13 +274,13 @@ releases/acquires the line with a fresh UUID identity.
 
 ```bash
 # On release/17.0.0, after the existing claim and heartbeat have been verified:
-script/release 17.0.0.rc.0
+script/release "${RELEASE_VERSION}.rc.0"
 
 # Dry runs need no coordination identity or claim:
-script/release --dry-run 17.0.0.rc.0
+script/release --dry-run "${RELEASE_VERSION}.rc.0"
 
 # Reconcile a previously accelerated RC under the same supervised contract:
-RELEASE_TRACKER=4842 script/release --reconcile-accelerated-rc 17.0.0.rc.0
+RELEASE_TRACKER=4842 script/release --reconcile-accelerated-rc "${RELEASE_VERSION}.rc.0"
 ```
 
 `release:start`, `script/release-finish`, and release-line branch management are
@@ -425,7 +425,7 @@ do not invoke bare live Rake.
 ```bash
 # On release/17.0.0, with CHANGELOG.md stamped ### [17.0.0.rc.0]:
 require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
-script/release 17.0.0.rc.0
+script/release "${RELEASE_VERSION}.rc.0"
 ```
 
 **Forgot to start the line first?** `script/release` deliberately requires the matching
