@@ -1350,6 +1350,7 @@ module ReactOnRails
 
           view_content = uncommented_template_content(File.read(view_path))
           next [] if stylesheet_pack_helper_evidence?(view_content)
+          next [] if erb_helper_mentioned?(view_content, "render")
 
           auto_loaded_component_names(view_content)
         end

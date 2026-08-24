@@ -2089,6 +2089,36 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when a generated controller's implicit component view renders an uninspected partial" do
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        stub_generated_controller_flow(
+          controller: <<~RUBY,
+            class HelloWorldController < ApplicationController
+              layout "react_on_rails_default"
+
+              def index
+                @hello_world_props = { name: "Stranger", items: [1, true] }
+              end
+            end
+          RUBY
+          view: <<~ERB
+            <%= react_component("StyledComponent", props: @hello_world_props, auto_load_bundle: true) %>
+            <%= render "shared/packs" %>
+          ERB
+        )
+      end
+
+      it "fails the implicit-view missing-CSS proof closed without resolving the partial" do
+        doctor.send(:check_layout_files)
+
+        expect(checker.warnings?).to be(false)
+        expect(checker.messages).to include(
+          hash_including(type: :info, content: "  ℹ️  react_on_rails_default: has javascript_pack_tag")
+        )
+      end
+    end
+
     context "when the generated controller's implicit view flushes the auto-loaded component CSS" do
       before do
         stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
