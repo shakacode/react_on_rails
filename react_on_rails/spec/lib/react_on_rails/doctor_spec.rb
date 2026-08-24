@@ -1279,6 +1279,64 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when valid ERB closing-trim markers are used around pack helpers" do
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        stub_layouts(
+          "app/views/layouts/trimmed_missing.html.erb" => <<~ERB,
+            <%= react_component("StyledComponent", auto_load_bundle: true) -%>
+            <%= javascript_pack_tag -%>
+          ERB
+          "app/views/layouts/trimmed_flushed.html.erb" => <<~ERB,
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= stylesheet_pack_tag -%>
+            <%= javascript_pack_tag %>
+          ERB
+          "app/views/layouts/trimmed_assigned.html.erb" => <<~ERB
+            <% component_html = react_component("StyledComponent", auto_load_bundle: true) -%>
+            <%= javascript_pack_tag %>
+          ERB
+        )
+      end
+
+      it "normalizes trim markers before proving component and pack-helper calls" do
+        doctor.send(:check_layout_files)
+
+        warning_messages = checker.messages.select { |message| message[:type] == :warning }
+        expect(warning_messages).to contain_exactly(
+          hash_including(content: a_string_including("trimmed_missing", "generated/StyledComponent")),
+          hash_including(content: a_string_including("trimmed_assigned", "generated/StyledComponent"))
+        )
+        expect(checker.messages).to include(
+          hash_including(
+            type: :info,
+            content: "  ✅ trimmed_flushed: has both stylesheet_pack_tag and javascript_pack_tag"
+          )
+        )
+      end
+    end
+
+    context "when a template uses an ISO-8859-1 coding header and source bytes" do
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        encoded_layout = <<~ERB.encode(Encoding::ISO_8859_1).force_encoding(Encoding::UTF_8)
+          # encoding: ISO-8859-1
+          <p>Café</p>
+          <%= react_component("StyledComponent", auto_load_bundle: true) %>
+          <%= javascript_pack_tag %>
+        ERB
+        stub_layouts("app/views/layouts/application.html.erb" => encoded_layout)
+      end
+
+      it "preserves static helper evidence without aborting on non-UTF-8 bytes" do
+        doctor.send(:check_layout_files)
+
+        expect(checker.messages).to include(
+          hash_including(type: :warning, content: a_string_including("generated/StyledComponent"))
+        )
+      end
+    end
+
     context "when a component-bearing layout renders an uninspected static partial" do
       before do
         stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
@@ -1783,6 +1841,25 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when a separate ERB return makes the component unreachable" do
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        stub_layouts(
+          "app/views/layouts/application.html.erb" => <<~ERB
+            <% return %>
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= javascript_pack_tag %>
+          ERB
+        )
+      end
+
+      it "fails closed instead of inferring that the component is reachable" do
+        doctor.send(:check_layout_files)
+
+        expect(checker.warnings?).to be(false)
+      end
+    end
+
     context "when auto-loaded component calls appear only in template comments" do
       before do
         stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
@@ -1862,6 +1939,26 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when javascript_pack_tag is called through the proven self receiver" do
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        stub_layouts(
+          "app/views/layouts/application.html.erb" => <<~ERB
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= self.javascript_pack_tag %>
+          ERB
+        )
+      end
+
+      it "recognizes the self call as a proven JavaScript flush" do
+        doctor.send(:check_layout_files)
+
+        expect(checker.messages).to include(
+          hash_including(type: :warning, content: a_string_including("generated/StyledComponent"))
+        )
+      end
+    end
+
     {
       "a false conditional modifier" => "javascript_pack_tag if false",
       "an arbitrary receiver" => "object.javascript_pack_tag",
@@ -1907,6 +2004,28 @@ RSpec.describe ReactOnRails::Doctor do
         doctor.send(:check_layout_files)
 
         expect(checker.warnings?).to be(false)
+      end
+    end
+
+    context "when stylesheet_pack_tag is a command call through the proven self receiver" do
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        stub_layouts(
+          "app/views/layouts/application.html.erb" => <<~ERB
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= self.stylesheet_pack_tag "application" %>
+            <%= javascript_pack_tag %>
+          ERB
+        )
+      end
+
+      it "recognizes the self command call as a proven stylesheet flush" do
+        doctor.send(:check_layout_files)
+
+        expect(checker.warnings?).to be(false)
+        expect(checker.messages).to include(
+          hash_including(type: :info, content: "  ✅ application: has both stylesheet_pack_tag and javascript_pack_tag")
+        )
       end
     end
 

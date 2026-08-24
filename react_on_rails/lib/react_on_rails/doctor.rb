@@ -74,11 +74,11 @@ module ReactOnRails
     RAILS_SERVER_COMMAND_REGEX = %r{\b(?:(?:bin/)?rails\s+(?:server|s)|puma|unicorn|rackup|passenger\s+start)\b}
     TEMPLATE_ERB_COMMENT_PATTERN = /<%#.*?%>/m
     TEMPLATE_HTML_COMMENT_PATTERN = /<!--.*?-->/m
-    ERB_EXPRESSION_PATTERN = /<%(?![#%])=?\s*(?<expression>.*?)%>/m
-    ERB_OUTPUT_EXPRESSION_PATTERN = /<%=\s*(?<expression>.*?)%>/m
-    ERB_NON_OUTPUT_EXPRESSION_PATTERN = /<%(?![#%=])\s*(?<expression>.*?)%>/m
+    ERB_EXPRESSION_PATTERN = /<%(?![#%])=?\s*(?<expression>.*?)-?%>/m
+    ERB_OUTPUT_EXPRESSION_PATTERN = /<%=\s*(?<expression>.*?)-?%>/m
+    ERB_NON_OUTPUT_EXPRESSION_PATTERN = /<%(?![#%=])\s*(?<expression>.*?)-?%>/m
     ERB_CONTROL_FLOW_KEYWORDS = %w[
-      begin case do else elsif end ensure for if rescue then unless until when while
+      begin case do else elsif end ensure for if rescue return then unless until when while
     ].freeze
     REFLECTIVE_HELPER_DISPATCH_METHODS = %w[send public_send __send__ method public_method].freeze
     REACT_ON_RAILS_INITIALIZER_PATH = "config/initializers/react_on_rails.rb"
@@ -1469,6 +1469,7 @@ module ReactOnRails
 
     def eagerly_evaluated_unqualified_helper_call?(node, helper_name)
       return true if direct_unqualified_helper_call?(node, helper_name)
+      return true if direct_self_helper_call?(node, helper_name)
       return eager_helper_call_in_method_arguments?(node, helper_name) if ast_node?(node, :method_add_arg)
       return eager_helper_call_in_arguments?(node[2], helper_name) if ast_node?(node, :command)
       return eager_helper_call_in_array?(node, helper_name) if ast_node?(node, :array)
@@ -1476,6 +1477,14 @@ module ReactOnRails
                                                               ast_node?(node, :bare_assoc_hash)
 
       false
+    end
+
+    def direct_self_helper_call?(node, helper_name)
+      return false unless ast_node?(node, :call) || ast_node?(node, :command_call)
+
+      receiver = node[1]
+      self_token = receiver[1] if ast_node?(receiver, :var_ref)
+      token_type?(self_token, :@kw) && self_token[1] == "self" && token_named?(node[3], helper_name)
     end
 
     def eager_helper_call_in_method_arguments?(node, helper_name)
@@ -1575,7 +1584,10 @@ module ReactOnRails
     end
 
     def uncommented_template_content(content)
-      content.gsub(TEMPLATE_HTML_COMMENT_PATTERN, "").gsub(TEMPLATE_ERB_COMMENT_PATTERN, "")
+      utf8_content = content.encode(Encoding::UTF_8, invalid: :replace, undef: :replace)
+      utf8_content.gsub(TEMPLATE_HTML_COMMENT_PATTERN, "").gsub(TEMPLATE_ERB_COMMENT_PATTERN, "")
+    rescue EncodingError
+      ""
     end
 
     def auto_loaded_component_names(content)
