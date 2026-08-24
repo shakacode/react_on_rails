@@ -99,6 +99,11 @@ The wrapper will:
    remaining children, and report the exact process group that must be proven
    dead before handoff. It will not automatically release the train-wide claim.
 
+On Linux, the supervisor also uses subreaper support to adopt and reap orphaned
+descendants. macOS has no subreaper equivalent, so launchd reaps orphans there;
+the dedicated process-group kill and `kill(0, -pgid)` absence check are the
+authoritative handoff proof on both platforms.
+
 The helper will validate that the wrapper contract belongs to its own parent and
 process group. A forged environment variable without the live private channel
 will fail closed.

@@ -279,8 +279,12 @@ That fence is a point-in-time pre-write ownership check. An independent death
 watch holds a second private pipe and immediately kills the dedicated release
 process group if the supervisor disappears, including while a publish
 subprocess is already running. During ordinary supervised shutdown, the wrapper
-terminates and reaps that same process group before closing the death-watch
-channel or allowing an operator handoff.
+terminates that same process group and proves it absent before closing the
+death-watch channel or allowing an operator handoff. On Linux, subreaper support
+also lets the supervisor adopt and reap orphaned descendants. macOS has no
+subreaper equivalent, so launchd reaps orphans there; the wrapper's dedicated
+process-group kill and `kill(0, -pgid)` absence check remain the authoritative
+handoff proof on both platforms.
 
 Do not invoke live `bundle exec rake "release[...]"`, `sync_github_release`,
 or `release:reconcile_accelerated_rc` directly. They fail closed without the

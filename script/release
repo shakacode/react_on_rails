@@ -422,7 +422,7 @@ class ReleaseSupervisor
       pipes.death_reader.read
       Process.kill("KILL", -pgid)
     rescue StandardError
-      Process.kill("KILL", -pgid)
+      nil
     ensure
       exit! 1
     end

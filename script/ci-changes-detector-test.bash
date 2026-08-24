@@ -653,6 +653,7 @@ test_docs_changes_are_non_runtime_only() {
   assert_contains "$out" '"non_runtime_only": true' "docs output"
   assert_contains "$out" '"run_lint": false' "docs output"
   assert_contains "$out" '"run_gem_generator_specs": false' "docs output"
+  assert_contains "$out" '"run_release_supervisor_tests": false' "docs output"
 }
 
 # Regression for PR #3597: an internal docs/planning YAML (e.g.
@@ -904,6 +905,7 @@ test_ci_infrastructure_only_change_runs_tests_but_skips_benchmarks() {
   # Tests still run to validate the CI change (script/ forces the full suite,
   # pro-integration-tests.yml independently requests pro dummy tests) ...
   assert_contains "$out" '"run_ruby_tests": true' "ci infra output"
+  assert_contains "$out" '"run_release_supervisor_tests": true' "ci infra output"
   assert_contains "$out" '"run_pro_dummy_tests": true' "ci infra output"
   assert_contains "$out" '"run_pro_node_renderer_tests": true' "ci infra output"
   # ... but every benchmark suite is off.
@@ -996,6 +998,7 @@ test_uncategorized_file_runs_tests_but_skips_benchmarks() {
   # Full test suite still runs (the safety the catch-all is there for).
   assert_contains "$out" '"run_ruby_tests": true' "uncategorized output"
   assert_contains "$out" '"run_gem_generator_specs": true' "uncategorized output"
+  assert_contains "$out" '"run_release_supervisor_tests": true' "uncategorized output"
   assert_contains "$out" '"run_pro_tests": true' "uncategorized output"
   # ... but no benchmark suite.
   assert_contains "$out" '"run_core_benchmarks": false' "uncategorized output"

@@ -795,6 +795,7 @@ if [ "$DOCS_ONLY" = true ]; then
     "run_lint:false"
     "run_ruby_tests:false"
     "run_gem_generator_specs:false"
+    "run_release_supervisor_tests:false"
     "run_js_tests:false"
     "run_dummy_tests:false"
     "run_generators:false"
@@ -965,6 +966,7 @@ fi
 if [ "$CI_INFRA_CHANGED" = true ]; then
   RUN_LINT=true
   RUN_RUBY_TESTS=true
+  RUN_RELEASE_SUPERVISOR_TESTS=true
   RUN_JS_TESTS=true
   RUN_DUMMY_TESTS=true
   RUN_GENERATORS=true
@@ -979,6 +981,7 @@ fi
 if [ "$UNCATEGORIZED_CHANGED" = true ]; then
   RUN_LINT=true
   RUN_RUBY_TESTS=true
+  RUN_RELEASE_SUPERVISOR_TESTS=true
   RUN_JS_TESTS=true
   RUN_DUMMY_TESTS=true
   RUN_GENERATORS=true
