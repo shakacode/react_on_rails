@@ -335,6 +335,14 @@ assert_no_coordination_mutation
 assert_secret_absent
 pass "matching state runs one identity-bound process group"
 
+setup_case reconciliation
+FAKE_BUNDLE_MODE=success run_release --reconcile-accelerated-rc 17.1.0.rc.0 || \
+  fail "supervised accelerated RC reconciliation failed"
+assert_contains "${bundle_log}" 'args|exec|rake|release:reconcile_accelerated_rc[17.1.0.rc.0]'
+assert_no_coordination_mutation
+assert_secret_absent
+pass "accelerated RC reconciliation uses the supervised release contract"
+
 setup_case lease-failure
 export FAKE_FAIL_HEARTBEAT_AFTER=1
 export FAKE_BUNDLE_MODE=hold

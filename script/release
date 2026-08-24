@@ -7,7 +7,7 @@ require "open3"
 require "optparse"
 require_relative "../rakelib/release_lease_guard"
 
-# The sole supported live entry point for the release Rake task. It does not
+# The sole supported live entry point for the release publication Rake tasks. It does not
 # acquire, take over, or release a coordination claim: the caller must already
 # own the exact release-line lease under a process-unique identity.
 # rubocop:disable Metrics/ClassLength
@@ -34,7 +34,7 @@ class ReleaseSupervisor
     @env = env
     @stdout = stdout
     @stderr = stderr
-    @options = { dry_run: false }
+    @options = { dry_run: false, reconcile_accelerated_rc: false }
     @parser = build_parser
     @received_signal = nil
   end
@@ -71,9 +71,15 @@ class ReleaseSupervisor
 
   def build_parser
     OptionParser.new do |parser|
-      parser.banner = "Usage: script/release [--dry-run] VERSION"
+      parser.banner = "Usage: script/release [--dry-run | --reconcile-accelerated-rc] VERSION"
       parser.on("--dry-run", "Run bundle exec rake release[VERSION,true] without coordination") do
         @options[:dry_run] = true
+      end
+      parser.on(
+        "--reconcile-accelerated-rc",
+        "Run release:reconcile_accelerated_rc[VERSION] under the live release contract"
+      ) do
+        @options[:reconcile_accelerated_rc] = true
       end
       parser.on("-h", "--help", "Show this help") do
         @stdout.puts parser
@@ -85,6 +91,10 @@ class ReleaseSupervisor
   def parse_scope!
     argv = @argv.dup
     @parser.parse!(argv)
+    if @options.fetch(:dry_run) && @options.fetch(:reconcile_accelerated_rc)
+      raise UsageError, "--dry-run and --reconcile-accelerated-rc cannot be combined"
+    end
+
     version = argv.shift
     raise UsageError, "an explicit release VERSION is required" if version.nil? || version.empty?
     raise UsageError, "too many arguments: #{argv.join(' ')}" unless argv.empty?
@@ -326,12 +336,18 @@ class ReleaseSupervisor
       pipes.ready_writer.close
       exec(
         { ReleaseLeaseGuard::CONTRACT_ENV => JSON.generate(contract) },
-        "bundle", "exec", "rake", "release[#{scope.version}]"
+        "bundle", "exec", "rake", supervised_rake_task(scope.version)
       )
     rescue StandardError
       @stderr.puts "ERROR: unable to start the supervised release command"
       exit! 127
     end
+  end
+
+  def supervised_rake_task(version)
+    return "release:reconcile_accelerated_rc[#{version}]" if @options.fetch(:reconcile_accelerated_rc)
+
+    "release[#{version}]"
   end
 
   def reset_child_signal_handlers

@@ -3071,7 +3071,6 @@ def run_release_preflight_checks!(monorepo_root:, dry_run:)
   # `dry_run: true` and surfaces the warning operators need to see.
   return if dry_run
 
-  activate_release_lease_guard!(dry_run: false)
   puts "\n#{'=' * 80}"
   puts "PRE-FLIGHT CHECKS"
   puts "=" * 80
@@ -9793,6 +9792,7 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
   args_hash = args.to_hash
 
   is_dry_run = release_truthy?(args_hash[:dry_run])
+  activate_release_lease_guard!(dry_run: is_dry_run)
   is_verbose = ENV["VERBOSE"] == "1"
   allow_version_policy_override = version_policy_override_enabled?(args_hash[:override_version_policy])
   npm_otp = ENV.fetch("NPM_OTP", nil)
@@ -10309,8 +10309,7 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
           approved_by: accelerated_approver
         )
         puts "⚠️ RC published with gates still reconciling. Before final promotion, run:"
-        puts "  RELEASE_TRACKER=#{tracker} bundle exec rake " \
-             "\"release:reconcile_accelerated_rc[#{actual_gem_version}]\""
+        puts "  RELEASE_TRACKER=#{tracker} script/release --reconcile-accelerated-rc #{actual_gem_version}"
       end
     end
   end
@@ -10455,6 +10454,7 @@ namespace :release do
   desc("Reconcile an accelerated RC's deferred gates and record an accepted or rejected tracker state.")
   task :reconcile_accelerated_rc, [:version] do |_t, args|
     monorepo_root = current_monorepo_root
+    activate_release_lease_guard!(dry_run: false)
     target_version = args[:version].to_s.strip
     abort "❌ Accelerated RC reconciliation requires an explicit RC version." if target_version.empty?
     validate_canonical_accelerated_rc_target!(target_version)

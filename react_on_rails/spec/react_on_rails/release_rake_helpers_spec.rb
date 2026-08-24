@@ -313,6 +313,7 @@ RSpec.describe "release.rake helper methods" do
     end
     allow(self).to receive(:release_write_fence!) if respond_to?(:release_write_fence!, true)
     allow(self).to receive(:activate_release_lease_guard!) if respond_to?(:activate_release_lease_guard!, true)
+    allow(ReleaseLeaseGuard).to receive(:activate!) if defined?(ReleaseLeaseGuard)
   end
 
   describe "#parse_release_tag_to_gem_version" do
@@ -941,8 +942,7 @@ RSpec.describe "release.rake helper methods" do
   end
 
   describe "#run_release_preflight_checks!" do
-    it "activates the release guard before both authentication checks for a real release" do
-      expect(self).to receive(:activate_release_lease_guard!).with(dry_run: false).ordered
+    it "runs both authentication checks for a real release" do
       expect(self).to receive(:verify_npm_auth).ordered
       expect(self).to receive(:verify_gh_auth).with(monorepo_root: "/tmp/repo").ordered
 
@@ -23711,26 +23711,17 @@ RSpec.describe "release.rake helper methods" do
 
     after { release_task.reenable }
 
-    it "refuses direct live Rake invocation before authentication or any outward mutation" do
-      allow(Open3).to receive(:capture2e)
-        .with("git", "-C", "/tmp/repo", "rev-parse", "--abbrev-ref", "HEAD")
-        .and_return(["release/17.1.0\n", success_status])
-      allow(ReactOnRails::GitUtils).to receive(:uncommitted_changes?)
-      allow(task_receiver).to receive(:with_release_checkout) { |**_, &block| block.call("/tmp/repo") }
-      allow(task_receiver).to receive_messages(
-        current_monorepo_root: "/tmp/repo",
-        current_npm_release_readiness_sha!: "f" * 40,
-        validate_npm_release_readiness!: nil,
-        refresh_npm_release_readiness_after_pull!: "f" * 40,
-        verbose: nil,
-        sh_in_dir_for_release: nil
-      )
-      allow(ENV).to receive(:fetch).and_call_original
-      allow(ENV).to receive(:fetch).with("NPM_OTP", nil).and_return(nil)
-      allow(ENV).to receive(:fetch).with("RUBYGEMS_OTP", nil).and_return(nil)
+    it "refuses direct live Rake invocation before build, pull, authentication, or mutation" do
+      allow(task_receiver).to receive(:current_monorepo_root).and_return("/tmp/repo")
       expect(ReleaseLeaseGuard).to receive(:activate!)
         .with(dry_run: false)
         .and_raise(ReleaseLeaseGuard::LeaseError, "live release wrapper contract is required")
+      expect(Open3).not_to receive(:capture2e)
+      expect(ReactOnRails::GitUtils).not_to receive(:uncommitted_changes?)
+      expect(task_receiver).not_to receive(:current_npm_release_readiness_sha!)
+      expect(task_receiver).not_to receive(:validate_npm_release_readiness!)
+      expect(task_receiver).not_to receive(:with_release_checkout)
+      expect(task_receiver).not_to receive(:sh_in_dir_for_release)
       expect(task_receiver).not_to receive(:verify_npm_auth)
       expect(task_receiver).not_to receive(:verify_gh_auth)
       expect(task_receiver).not_to receive(:release_write_fence!)
@@ -23743,10 +23734,69 @@ RSpec.describe "release.rake helper methods" do
     it "keeps a direct dry run guard-free and coordination-free" do
       expect(ReleaseLeaseGuard).not_to receive(:activate!)
       expect(ReleaseLeaseGuard).not_to receive(:fence!)
-      expect(self).not_to receive(:verify_npm_auth)
-      expect(self).not_to receive(:verify_gh_auth)
 
-      run_release_preflight_checks!(monorepo_root: "/tmp/repo", dry_run: true)
+      activate_release_lease_guard!(dry_run: true)
+    end
+  end
+
+  describe "accelerated RC reconciliation task guard" do
+    let(:reconciliation_task) { Rake::Task["release:reconcile_accelerated_rc"] }
+    let(:task_receiver) { reconciliation_task.actions.first.binding.receiver }
+    let(:success_status) { instance_double(Process::Status, success?: true) }
+
+    after { reconciliation_task.reenable }
+
+    it "uses the supervised contract and fences the terminal tracker write" do
+      authorization, publication, accepted = accelerated_rc_test_accepted_history
+      tracker_reads = 0
+      repository_reads = 0
+      allow(task_receiver).to receive_messages(
+        current_monorepo_root: "/tmp/repo",
+        github_repo_slug: "shakacode/react_on_rails",
+        fetch_release_tracker_issue!: nil,
+        current_release_approver!: "justin808",
+        fetch_accelerated_rc_ci_snapshot!: accepted.fetch("ci"),
+        accelerated_rc_shakaperf_snapshot!: accepted.fetch("shakaperf")
+      )
+      allow(task_receiver).to receive(:fetch_accelerated_rc_tracker_records!) do
+        tracker_reads += 1
+        tracker_reads < 3 ? [authorization, publication] : [authorization, publication, accepted]
+      end
+      allow(task_receiver).to receive(:fetch_repository_accelerated_rc_records_for_candidate!) do
+        repository_reads += 1
+        repository_reads == 1 ? [authorization, publication] : [authorization, publication, accepted]
+      end
+      allow(Time).to receive(:now).and_return(Time.utc(2026, 7, 14, 15))
+      allow(ENV).to receive(:fetch).and_call_original
+      allow(ENV).to receive(:fetch).with("RELEASE_TRACKER", nil).and_return("3823")
+      allow(ENV).to receive(:fetch)
+        .with("RELEASE_ACCELERATED_RC_RECONCILIATION_REASON", nil)
+        .and_return("All required evidence passed")
+      {
+        "RELEASE_DEMO_FLEET_EVIDENCE_URL" => "https://github.com/demo-fleet",
+        "RELEASE_BEHAVIORAL_EVIDENCE_URL" => "https://github.com/behavioral",
+        "RELEASE_ARTIFACT_EVIDENCE_URL" => "https://github.com/artifacts"
+      }.each do |name, value|
+        allow(ENV).to receive(:fetch).with(name, nil).and_return(value)
+      end
+
+      expect(ReleaseLeaseGuard).to receive(:activate!).with(dry_run: false).ordered
+      expect(task_receiver).to receive(:verify_gh_auth).with(monorepo_root: "/tmp/repo").ordered
+      expect(ReleaseLeaseGuard).to receive(:fence!).ordered
+      expect(task_receiver).to receive(:capture_gh_output)
+        .with(
+          "issue", "comment", "3823", "--repo", "shakacode/react_on_rails",
+          "--body-file", a_string_ending_with(".md")
+        )
+        .ordered do |*arguments|
+          body_path = arguments.last
+          expect(File.read(body_path)).to include(ACCELERATED_RC_RECORD_MARKER, "candidate-accepted")
+          ["", success_status]
+        end
+
+      expect do
+        reconciliation_task.invoke("17.0.0.rc.10")
+      end.to output(/candidate accepted/i).to_stdout
     end
   end
 
