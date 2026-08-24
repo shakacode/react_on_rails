@@ -234,6 +234,7 @@ assertMatches(
   hostedSelectorsAction,
   /shouldUseFullMatrix = [\s\S]*isTrustedReleaseTarget/,
 );
+const verifiedDiffBaseHelperCommand = /^[ \t]*script\/ci-required-diff-base[ \t]*$/m;
 for (const workflowFile of hostedWorkflowFiles) {
   const workflow = read(`.github/workflows/${workflowFile}`);
   const detectChangesJob = extractJob(workflow, 'detect-changes');
@@ -245,7 +246,21 @@ for (const workflowFile of hostedWorkflowFiles) {
     /uses: \.\/\.github\/actions\/hosted-ci-selectors/,
   );
   assertMatches(`${workflowFile} hosted gate`, workflow, /should_run_hosted_ci/);
-  assertMatches(`${workflowFile} verified diff-base helper`, detectorStep, /script\/ci-required-diff-base/);
+  assertMatches(`${workflowFile} verified diff-base helper`, detectorStep, verifiedDiffBaseHelperCommand);
+  const commentOnlyDetectorStep = detectorStep.replace(
+    /^([ \t]*)script\/ci-required-diff-base[ \t]*$/m,
+    '$1# script/ci-required-diff-base',
+  );
+  assert.notEqual(
+    commentOnlyDetectorStep,
+    detectorStep,
+    `${workflowFile} comment-only helper mutation did not replace the command`,
+  );
+  assertDoesNotMatch(
+    `${workflowFile} comment-only diff-base helper`,
+    commentOnlyDetectorStep,
+    verifiedDiffBaseHelperCommand,
+  );
   assertMatches(
     `${workflowFile} dispatch base SHA helper input`,
     detectorStep,
