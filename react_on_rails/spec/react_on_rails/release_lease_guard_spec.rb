@@ -225,6 +225,27 @@ RSpec.describe ReleaseLeaseGuard do
       .to raise_error(described_class::LeaseError, /supervisor liveness channel is closed/)
   end
 
+  it "fails closed if the supervisor channel closes during the authoritative status read" do
+    reads = 0
+    closing_reader = lambda do |repo:, target:|
+      status_reads << [repo, target]
+      reads += 1
+      liveness.fetch(:writer).close if reads == 2
+      status_payload
+    end
+    described_class.activate!(
+      dry_run: false,
+      env: { described_class::CONTRACT_ENV => JSON.generate(contract) },
+      status_reader: closing_reader,
+      clock: -> { now },
+      process_adapter:,
+      liveness_io: liveness.fetch(:reader)
+    )
+
+    expect { described_class.fence! }
+      .to raise_error(described_class::LeaseError, /supervisor liveness channel is closed/)
+  end
+
   it "activates dry-run mode without identity, a wrapper contract, or coordination reads" do
     reader = ->(**) { raise "coordination must not be read in dry-run mode" }
 

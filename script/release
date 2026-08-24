@@ -2,6 +2,7 @@
 # frozen_string_literal: true
 
 require "json"
+require "io/wait"
 require "open3"
 require "optparse"
 require_relative "../rakelib/release_lease_guard"
@@ -17,6 +18,7 @@ class ReleaseSupervisor
   HEARTBEAT_INTERVAL = 60.0
   HEARTBEAT_TTL = 900
   TERMINATION_GRACE = 5.0
+  HANDSHAKE_TIMEOUT = 5.0
   POLL_INTERVAL = 0.05
   SIGNALS = %w[INT TERM HUP].freeze
 
@@ -49,14 +51,17 @@ class ReleaseSupervisor
     termination_grace = bounded_interval!(
       "REACT_ON_RAILS_RELEASE_TERMINATION_GRACE", TERMINATION_GRACE, maximum: TERMINATION_GRACE
     )
+    handshake_timeout = bounded_interval!(
+      "REACT_ON_RAILS_RELEASE_HANDSHAKE_TIMEOUT", HANDSHAKE_TIMEOUT, maximum: HANDSHAKE_TIMEOUT
+    )
     verify_existing_lease!(scope, identity)
     raise ReleaseLeaseGuard::LeaseError, "release lease heartbeat failed" unless heartbeat!(scope, identity)
 
-    supervise_release(scope, identity, heartbeat_interval:, termination_grace:)
+    supervise_release(scope, identity, heartbeat_interval:, termination_grace:, handshake_timeout:)
   rescue OptionParser::ParseError, UsageError, SupervisorError, ReleaseLeaseGuard::LeaseError => e
     @stderr.puts "ERROR: #{e.message}"
     @stderr.puts @parser if e.is_a?(OptionParser::ParseError) || e.is_a?(UsageError)
-    1
+    @received_signal ? 128 + Signal.list.fetch(@received_signal) : 1
   rescue SystemCallError
     @stderr.puts "ERROR: release supervisor process operation failed"
     1
@@ -184,9 +189,11 @@ class ReleaseSupervisor
     false
   end
 
-  def supervise_release(scope, identity, heartbeat_interval:, termination_grace:)
+  def supervise_release(scope, identity, heartbeat_interval:, termination_grace:, handshake_timeout:)
     previous_signal_handlers = install_signal_handlers
-    child_pid, pgid, liveness_writer = spawn_release_group(scope, identity)
+    child_pid, pgid, liveness_writer = spawn_release_group(
+      scope, identity, handshake_timeout:, termination_grace:
+    )
     @stdout.puts "Release process group #{pgid} started."
     next_heartbeat = monotonic_time + heartbeat_interval
 
@@ -215,7 +222,7 @@ class ReleaseSupervisor
 
       now = monotonic_time
       if now >= next_heartbeat
-        return lose_lease(pgid, child_pid, liveness_writer, termination_grace) unless heartbeat!(scope, identity)
+        return lose_lease(pgid, child_pid, liveness_writer, termination_grace) unless refresh_lease?(scope, identity)
 
         next_heartbeat = now + heartbeat_interval
       end
@@ -227,6 +234,15 @@ class ReleaseSupervisor
     close_liveness(liveness_writer)
     report_group_handoff(pgid)
     1
+  end
+
+  def refresh_lease?(scope, identity)
+    return false unless heartbeat!(scope, identity)
+
+    verify_existing_lease!(scope, identity)
+    true
+  rescue ReleaseLeaseGuard::LeaseError
+    false
   end
 
   def interrupt_release(pgid, child_pid, liveness_writer, termination_grace)
@@ -254,18 +270,23 @@ class ReleaseSupervisor
 
   def lose_lease(pgid, child_pid, liveness_writer, termination_grace)
     close_liveness(liveness_writer)
-    @stderr.puts "Release lease heartbeat failed; closed liveness channel and terminating process group #{pgid}."
+    @stderr.puts "Release lease refresh failed; closed liveness channel and terminating process group #{pgid}."
     terminate_group(pgid, child_pid:, grace: termination_grace)
     report_group_handoff(pgid)
     1
   end
 
-  def spawn_release_group(scope, identity)
+  def spawn_release_group(scope, identity, handshake_timeout:, termination_grace:)
     pipes = release_pipes
     child_pid = fork_release_child(scope, identity, pipes)
     pipes.liveness_reader.close
     pipes.ready_writer.close
-    pgid = read_child_process_group!(pipes.ready_reader, child_pid)
+    pgid = read_child_process_group!(
+      pipes.ready_reader,
+      child_pid,
+      timeout: handshake_timeout,
+      termination_grace:
+    )
     [child_pid, pgid, pipes.liveness_writer]
   rescue StandardError
     close_release_pipes(pipes)
@@ -289,6 +310,7 @@ class ReleaseSupervisor
 
   def fork_release_child(scope, identity, pipes)
     Process.fork do
+      reset_child_signal_handlers
       pipes.liveness_writer.close
       pipes.ready_reader.close
       Process.setpgid(0, 0)
@@ -300,7 +322,7 @@ class ReleaseSupervisor
         parent_pid: Process.ppid,
         pgid:
       )
-      pipes.ready_writer.puts(pgid)
+      announce_process_group(pipes.ready_writer, pgid)
       pipes.ready_writer.close
       exec(
         { ReleaseLeaseGuard::CONTRACT_ENV => JSON.generate(contract) },
@@ -310,6 +332,14 @@ class ReleaseSupervisor
       @stderr.puts "ERROR: unable to start the supervised release command"
       exit! 127
     end
+  end
+
+  def reset_child_signal_handlers
+    SIGNALS.each { |signal| Signal.trap(signal, "DEFAULT") }
+  end
+
+  def announce_process_group(writer, pgid)
+    writer.puts(pgid)
   end
 
   def close_release_pipes(pipes)
@@ -324,25 +354,81 @@ class ReleaseSupervisor
     io&.close unless io&.closed?
   end
 
-  def read_child_process_group!(ready_reader, child_pid)
-    raw_pgid = ready_reader.gets&.strip
-    pgid = Integer(raw_pgid, 10)
-    return pgid if pgid == child_pid
+  def read_child_process_group!(ready_reader, child_pid, timeout:, termination_grace:)
+    deadline = monotonic_time + timeout
+    buffer = +""
+    loop do
+      if @received_signal
+        abort_handshake!(
+          child_pid,
+          termination_grace,
+          "release interrupted by signal #{@received_signal} while establishing release process group"
+        )
+      end
+      remaining = deadline - monotonic_time
+      if remaining <= 0
+        abort_handshake!(child_pid, termination_grace, "timed out while establishing release process group")
+      end
 
-    stop_unverified_child(child_pid)
-    raise SupervisorError, "release child did not establish its dedicated process group"
-  rescue ArgumentError, TypeError
-    stop_unverified_child(child_pid)
-    raise SupervisorError, "release child did not report its process group"
+      readable = ready_reader.wait_readable([POLL_INTERVAL, remaining].min)
+      next unless readable
+
+      chunk = ready_reader.read_nonblock(64, exception: false)
+      next if chunk == :wait_readable
+
+      return validate_child_process_group!(buffer, child_pid, termination_grace) if chunk.nil?
+
+      buffer << chunk
+      return validate_child_process_group!(buffer.lines.first, child_pid, termination_grace) if buffer.include?("\n")
+
+      if buffer.bytesize >= 64
+        abort_handshake!(child_pid, termination_grace, "release child did not report its process group")
+      end
+    end
   end
 
-  def stop_unverified_child(child_pid)
-    signal_group("TERM", child_pid)
-    Process.kill("TERM", child_pid)
+  def validate_child_process_group!(raw_pgid, child_pid, termination_grace)
+    pgid = Integer(raw_pgid&.strip, 10)
+    return pgid if pgid == child_pid
+
+    abort_handshake!(
+      child_pid,
+      termination_grace,
+      "release child did not establish its dedicated process group"
+    )
+  rescue ArgumentError, TypeError
+    abort_handshake!(child_pid, termination_grace, "release child did not report its process group")
+  end
+
+  def abort_handshake!(child_pid, termination_grace, message)
+    stop_unverified_child(child_pid, grace: termination_grace)
+    raise SupervisorError, message
+  end
+
+  def stop_unverified_child(child_pid, grace:)
+    signal_unverified_child("TERM", child_pid)
+    return if reap_child_until(child_pid, monotonic_time + grace)
+
+    signal_unverified_child("KILL", child_pid)
+    return if reap_child_until(child_pid, monotonic_time + grace)
+
+    raise SupervisorError, "release child did not terminate after KILL"
+  end
+
+  def signal_unverified_child(signal, child_pid)
+    signal_group(signal, child_pid)
+    Process.kill(signal, child_pid)
   rescue Errno::ESRCH
     nil
-  ensure
-    reap_child(child_pid)
+  end
+
+  def reap_child_until(child_pid, deadline)
+    loop do
+      return true if reap_child_nonblocking(child_pid)
+      return false if monotonic_time >= deadline
+
+      sleep POLL_INTERVAL
+    end
   end
 
   def contract_for(scope, identity, liveness_fd:, parent_pid:, pgid:)

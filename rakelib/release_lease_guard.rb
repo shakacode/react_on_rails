@@ -73,6 +73,7 @@ module ReleaseLeaseGuard
 
       verify_private_contract!
       verify_lease!
+      verify_private_contract!
       @active = true
     rescue StandardError
       @active = false
@@ -85,6 +86,7 @@ module ReleaseLeaseGuard
 
       verify_private_contract!
       verify_lease!
+      verify_private_contract!
       true
     end
 
