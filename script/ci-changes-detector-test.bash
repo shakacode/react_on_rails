@@ -199,6 +199,7 @@ run_ruby=false
 run_dummy=false
 run_gem_generator_specs=false
 run_generators=false
+run_pro_tests=false
 case "${CI_LOCAL_FIXTURE_SELECTION:?}" in
   core_ruby)
     run_ruby=true
@@ -206,6 +207,7 @@ case "${CI_LOCAL_FIXTURE_SELECTION:?}" in
     ;;
   gem_generator_specs) run_gem_generator_specs=true ;;
   dummy) run_dummy=true ;;
+  pro_tests) run_pro_tests=true ;;
   # Consumer-contract fixture: the current detector never emits this one-sided
   # combination, but ci-local must not couple two independent JSON fields.
   generated_examples) run_generators=true ;;
@@ -227,7 +229,7 @@ cat <<JSON
   "run_gem_generator_specs": $run_gem_generator_specs,
   "run_generators": $run_generators,
   "run_pro_lint": false,
-  "run_pro_tests": false
+  "run_pro_tests": $run_pro_tests
 }
 JSON
 
@@ -242,6 +244,9 @@ if [ "$run_gem_generator_specs" = true ]; then
 fi
 if [ "$run_generators" = true ]; then
   echo "  ✓ Generator tests"
+fi
+if [ "$run_pro_tests" = true ]; then
+  echo "  ✓ React on Rails Pro tests"
 fi
 BASH
   chmod +x script/ci-changes-detector
@@ -267,6 +272,9 @@ BASH
 #!/usr/bin/env bash
 {
   printf 'pnpm'
+  printf '\t%s' "$@"
+  printf '\n'
+  printf 'pnpm-cwd\t%s' "$PWD"
   printf '\t%s' "$@"
   printf '\n'
 } >> "$CI_LOCAL_COMMAND_LOG"
@@ -521,6 +529,35 @@ BASH
   fi
   commands="$(cat ci-local-commands.log)"
   assert_ci_local_gem_generator_only_commands "$commands" "text-fallback gem-generator-only command log"
+}
+
+test_ci_local_pro_tests_use_hosted_workspace_command_from_root() {
+  setup_ci_local_repo
+  mkdir -p react_on_rails_pro/node_modules react_on_rails_pro/vendor/bundle
+  : > react_on_rails_pro/Gemfile
+
+  local output commands fixture_root
+  fixture_root="$(pwd -P)"
+  export CI_LOCAL_FIXTURE_SELECTION=pro_tests
+  if ! output="$(ci_local_output --changed 2>&1)"; then
+    fail "ci-local Pro-tests-only fixture failed: $output"
+    return 1
+  fi
+  commands="$(cat ci-local-commands.log)"
+  assert_contains \
+    "$commands" \
+    $'pnpm-cwd\t'"$fixture_root"$'\t--filter\treact-on-rails-pro\ttest' \
+    "Pro-tests-only command log"
+  assert_contains "$commands" $'bundle\texec\trspec' "Pro-tests-only command log"
+  case "$commands" in
+    *$'pnpm-cwd\t'"$fixture_root/react_on_rails_pro"$'\trun\tnps\ttest'*)
+      fail "Pro tests must not use the unresolvable package-local nps command"
+      ;;
+  esac
+  case "$commands" in
+    *$'pnpm-cwd\t'"$fixture_root"$'\t--filter\treact-on-rails-pro\ttest'*$'bundle\texec\trspec'*) ;;
+    *) fail "Pro workspace tests must precede the preserved Pro RSpec lane: $commands" ;;
+  esac
 }
 
 detector_output() {
@@ -1939,6 +1976,7 @@ run_test test_ci_local_records_dummy_build_failure_and_skips_rspec
 run_test test_ci_local_preserves_independent_generator_selectors
 run_test test_ci_local_json_preserves_gem_generator_only_selector
 run_test test_ci_local_text_fallback_preserves_gem_generator_only_selector
+run_test test_ci_local_pro_tests_use_hosted_workspace_command_from_root
 run_test test_ci_infrastructure_only_change_runs_tests_but_skips_benchmarks
 run_test test_suite_workflow_file_runs_its_tests_but_no_benchmark
 run_test test_gem_tests_workflow_change_keeps_generator_specs_fail_closed

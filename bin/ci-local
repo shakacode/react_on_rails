@@ -359,6 +359,14 @@ run_oss_dummy_rspec() {
   )
 }
 
+# shellcheck disable=SC2329 # Passed by name to run_job_argv below.
+run_pro_js_tests() {
+  (
+    cd "$ROOT_DIR" || return 1
+    pnpm --filter react-on-rails-pro test
+  )
+}
+
 # Ensure dependencies are installed
 if [ ! -d "node_modules" ] || [ ! -d "vendor/bundle" ]; then
   echo -e "${YELLOW}Installing dependencies...${NC}"
@@ -400,7 +408,7 @@ if [ "$RUN_JS" = true ]; then
   run_job "Package Build" "pnpm run build"
   ensure_pro_dummy_test_bundles
   run_job "React on Rails JS Unit Tests" "pnpm --filter react-on-rails test"
-  run_job "React on Rails Pro JS Unit Tests" "pnpm --filter react-on-rails-pro test"
+  run_job_argv "React on Rails Pro JS Unit Tests" run_pro_js_tests
   run_job "Create React on Rails App JS Unit Tests" "pnpm --filter create-react-on-rails-app test"
   run_job "React on Rails Pro Node Renderer JS Tests" "pnpm --filter react-on-rails-pro-node-renderer run ci"
 fi
@@ -478,7 +486,7 @@ if [ "$RUN_PRO_TESTS" = true ]; then
     echo -e "${YELLOW}Skipping React on Rails Pro tests in --fast mode${NC}"
     echo ""
   elif ensure_pro_dependencies; then
-    run_job "React on Rails Pro JS Tests" "cd react_on_rails_pro && pnpm run nps test"
+    run_job_argv "React on Rails Pro JS Tests" run_pro_js_tests
     run_job "React on Rails Pro RSpec" "cd react_on_rails_pro && bundle_command \"$PRO_GEMFILE\" bundle exec rspec"
   fi
 fi
