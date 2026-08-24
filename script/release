@@ -416,16 +416,18 @@ class ReleaseSupervisor
 
   def fork_supervisor_death_watch(pipes, pgid)
     Process.fork do
-      reset_child_signal_handlers
+      install_death_watch_signal_handlers
       close_io(pipes.liveness_reader)
       close_io(pipes.ready_writer)
       pipes.death_reader.read
-      Process.kill("KILL", -pgid)
-    rescue StandardError
-      nil
     ensure
+      signal_group("KILL", pgid)
       exit! 1
     end
+  end
+
+  def install_death_watch_signal_handlers
+    SIGNALS.each { |signal| Signal.trap(signal) { exit! 1 } }
   end
 
   def supervised_rake_task(version)

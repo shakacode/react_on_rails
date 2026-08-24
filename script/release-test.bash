@@ -866,6 +866,66 @@ assert_no_coordination_mutation
 assert_secret_absent
 pass "signals report and terminate the exact release process group"
 
+if supervisor_case_enabled death-watch-reader-error; then
+  if ! RELEASE_SCRIPT="${release_script}" ruby <<'RUBY'
+load ENV.fetch("RELEASE_SCRIPT")
+
+ready_reader, ready_writer = IO.pipe
+release_pid = Process.fork do
+  ready_reader.close
+  Process.setpgid(0, 0)
+  ready_writer.write("1")
+  ready_writer.close
+  sleep 30
+end
+ready_writer.close
+ready_reader.read(1)
+ready_reader.close
+
+liveness_reader, liveness_writer = IO.pipe
+death_reader, death_writer = IO.pipe
+ready_reader, ready_writer = IO.pipe
+death_reader.close
+pipes = ReleaseSupervisor::ReleasePipes.new(
+  liveness_reader:,
+  liveness_writer:,
+  death_reader:,
+  death_writer:,
+  ready_reader:,
+  ready_writer:
+)
+
+supervisor = ReleaseSupervisor.new([])
+watcher_pid = supervisor.send(:fork_supervisor_death_watch, pipes, release_pid)
+Process.waitpid(watcher_pid)
+
+release_reaped = 100.times.any? do
+  break true if Process.waitpid(release_pid, Process::WNOHANG)
+
+  sleep 0.01
+  false
+end
+unless release_reaped
+  warn "release process group survived a death-watch reader error"
+  Process.kill("KILL", -release_pid)
+  Process.waitpid(release_pid)
+  exit 1
+end
+
+begin
+  Process.kill(0, -release_pid)
+  warn "release process group survived a death-watch reader error"
+  exit 1
+rescue Errno::ESRCH
+  nil
+end
+RUBY
+  then
+    fail "death-watch reader error did not kill the release process group"
+  fi
+  pass "death-watch reader errors still kill the release process group"
+fi
+
 if supervisor_case_enabled supervisor-death; then
   setup_case supervisor-death
   export FAKE_BUNDLE_MODE=hold
