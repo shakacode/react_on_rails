@@ -198,6 +198,7 @@ set -euo pipefail
 run_ruby=false
 run_dummy=false
 run_gem_generator_specs=false
+run_release_supervisor_tests=false
 run_generators=false
 run_pro_tests=false
 case "${CI_LOCAL_FIXTURE_SELECTION:?}" in
@@ -206,6 +207,7 @@ case "${CI_LOCAL_FIXTURE_SELECTION:?}" in
     run_gem_generator_specs=true
     ;;
   gem_generator_specs) run_gem_generator_specs=true ;;
+  release_supervisor) run_release_supervisor_tests=true ;;
   dummy) run_dummy=true ;;
   pro_tests) run_pro_tests=true ;;
   # Consumer-contract fixture: the current detector never emits this one-sided
@@ -227,6 +229,7 @@ cat <<JSON
   "run_js_tests": false,
   "run_dummy_tests": $run_dummy,
   "run_gem_generator_specs": $run_gem_generator_specs,
+  "run_release_supervisor_tests": $run_release_supervisor_tests,
   "run_generators": $run_generators,
   "run_pro_lint": false,
   "run_pro_tests": $run_pro_tests
@@ -242,6 +245,9 @@ fi
 if [ "$run_gem_generator_specs" = true ]; then
   echo "  ✓ RSpec gem generator specs"
 fi
+if [ "$run_release_supervisor_tests" = true ]; then
+  echo "  ✓ Release supervisor integration tests"
+fi
 if [ "$run_generators" = true ]; then
   echo "  ✓ Generator tests"
 fi
@@ -250,6 +256,12 @@ if [ "$run_pro_tests" = true ]; then
 fi
 BASH
   chmod +x script/ci-changes-detector
+
+  cat > script/release-test.bash <<'BASH'
+#!/usr/bin/env bash
+printf 'release-supervisor-test\n' >> "$CI_LOCAL_COMMAND_LOG"
+BASH
+  chmod +x script/release-test.bash
 
   cat > test-bin/gh <<'BASH'
 #!/usr/bin/env bash
@@ -511,6 +523,57 @@ test_ci_local_json_preserves_gem_generator_only_selector() {
   fi
   commands="$(cat ci-local-commands.log)"
   assert_ci_local_gem_generator_only_commands "$commands" "JSON gem-generator-only command log"
+}
+
+assert_ci_local_release_supervisor_selected() {
+  local commands="$1"
+  local context="$2"
+
+  assert_contains "$commands" "release-supervisor-test" "$context"
+}
+
+test_ci_local_json_runs_release_supervisor_selector() {
+  setup_ci_local_repo
+
+  local output commands
+  export CI_LOCAL_FIXTURE_SELECTION=release_supervisor
+  if ! output="$(ci_local_output --changed 2>&1)"; then
+    fail "ci-local JSON release-supervisor fixture failed: $output"
+    return 1
+  fi
+  commands="$(cat ci-local-commands.log)"
+  assert_ci_local_release_supervisor_selected "$commands" "JSON release-supervisor command log"
+}
+
+test_ci_local_text_fallback_runs_release_supervisor_selector() {
+  setup_ci_local_repo
+  cat > test-bin/jq <<'BASH'
+#!/usr/bin/env bash
+exit 1
+BASH
+  chmod +x test-bin/jq
+
+  local output commands
+  export CI_LOCAL_FIXTURE_SELECTION=release_supervisor
+  if ! output="$(ci_local_output --changed 2>&1)"; then
+    fail "ci-local text release-supervisor fixture failed: $output"
+    return 1
+  fi
+  commands="$(cat ci-local-commands.log)"
+  assert_ci_local_release_supervisor_selected "$commands" "text release-supervisor command log"
+}
+
+test_ci_local_all_runs_release_supervisor_harness() {
+  setup_ci_local_repo
+
+  local output commands
+  export CI_LOCAL_FIXTURE_SELECTION=core_ruby
+  if ! output="$(ci_local_output --all --fast 2>&1)"; then
+    fail "ci-local all release-supervisor fixture failed: $output"
+    return 1
+  fi
+  commands="$(cat ci-local-commands.log)"
+  assert_ci_local_release_supervisor_selected "$commands" "all-mode release-supervisor command log"
 }
 
 test_ci_local_text_fallback_preserves_gem_generator_only_selector() {
@@ -1976,6 +2039,9 @@ run_test test_ci_local_records_dummy_build_failure_and_skips_rspec
 run_test test_ci_local_preserves_independent_generator_selectors
 run_test test_ci_local_json_preserves_gem_generator_only_selector
 run_test test_ci_local_text_fallback_preserves_gem_generator_only_selector
+run_test test_ci_local_json_runs_release_supervisor_selector
+run_test test_ci_local_text_fallback_runs_release_supervisor_selector
+run_test test_ci_local_all_runs_release_supervisor_harness
 run_test test_ci_local_pro_tests_use_hosted_workspace_command_from_root
 run_test test_ci_infrastructure_only_change_runs_tests_but_skips_benchmarks
 run_test test_suite_workflow_file_runs_its_tests_but_no_benchmark

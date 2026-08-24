@@ -118,6 +118,7 @@ bundle_command() {
 FAILED_JOBS=()
 OSS_DEPS_READY=false
 PRO_DEPS_READY=false
+RUN_RELEASE_SUPERVISOR_TESTS=false
 
 # Internal implementation: runs a shell command string via the shell, so
 # compound commands (e.g. "cd X && make") work. Prefer the argv-based helper
@@ -197,6 +198,7 @@ if [ "$RUN_ALL" = false ]; then
       RUN_JS=$(echo "$DETECTOR_JSON" | jq -r '.run_js_tests // false')
       RUN_DUMMY=$(echo "$DETECTOR_JSON" | jq -r '.run_dummy_tests // false')
       RUN_GEM_GENERATOR_SPECS=$(echo "$DETECTOR_JSON" | jq -r '.run_gem_generator_specs // false')
+      RUN_RELEASE_SUPERVISOR_TESTS=$(echo "$DETECTOR_JSON" | jq -r '.run_release_supervisor_tests // false')
       RUN_GENERATORS=$(echo "$DETECTOR_JSON" | jq -r '.run_generators // false')
       RUN_PRO_LINT=$(echo "$DETECTOR_JSON" | jq -r '.run_pro_lint // false')
       RUN_PRO_TESTS=$(echo "$DETECTOR_JSON" | jq -r '.run_pro_tests // false')
@@ -231,6 +233,9 @@ if [ "$RUN_ALL" = false ]; then
       RUN_JS=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ JS unit tests" && echo true || echo false)
       RUN_DUMMY=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ Dummy app integration tests" && echo true || echo false)
       RUN_GEM_GENERATOR_SPECS=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ RSpec gem generator specs" && echo true || echo false)
+      RUN_RELEASE_SUPERVISOR_TESTS=$(
+        echo "$DETECTOR_OUTPUT" | grep -q "✓ Release supervisor integration tests" && echo true || echo false
+      )
       RUN_GENERATORS=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ Generator tests" && echo true || echo false)
       RUN_PRO_LINT=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ React on Rails Pro Lint" && echo true || echo false)
       RUN_PRO_TESTS=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ React on Rails Pro tests" && echo true || echo false)
@@ -256,6 +261,9 @@ if [ "$RUN_ALL" = false ]; then
     RUN_JS=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ JS unit tests" && echo true || echo false)
     RUN_DUMMY=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ Dummy app integration tests" && echo true || echo false)
     RUN_GEM_GENERATOR_SPECS=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ RSpec gem generator specs" && echo true || echo false)
+    RUN_RELEASE_SUPERVISOR_TESTS=$(
+      echo "$DETECTOR_OUTPUT" | grep -q "✓ Release supervisor integration tests" && echo true || echo false
+    )
     RUN_GENERATORS=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ Generator tests" && echo true || echo false)
     RUN_PRO_LINT=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ React on Rails Pro Lint" && echo true || echo false)
     RUN_PRO_TESTS=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ React on Rails Pro tests" && echo true || echo false)
@@ -268,6 +276,7 @@ else
   RUN_JS=true
   RUN_DUMMY=true
   RUN_GEM_GENERATOR_SPECS=true
+  RUN_RELEASE_SUPERVISOR_TESTS=true
   RUN_GENERATORS=true
   RUN_PRO_LINT=true
   RUN_PRO_TESTS=true
@@ -387,6 +396,10 @@ fi
 # others are inside `if "$RUN_X" = true` gates), so adding the guard here
 # gives contributors a complete failure report from a single local run.
 run_job_argv "Docs Sidebar Check" script/check-docs-sidebar "$BASE_REF" || true
+
+if [ "$RUN_RELEASE_SUPERVISOR_TESTS" = true ]; then
+  run_job_argv "Release Supervisor Integration Tests" bash script/release-test.bash
+fi
 
 if [ "$RUN_RUBY" = true ] || [ "$RUN_DUMMY" = true ] ||
   [ "$RUN_GEM_GENERATOR_SPECS" = true ] || [ "$RUN_GENERATORS" = true ]; then

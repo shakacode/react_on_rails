@@ -579,8 +579,19 @@ class ReleaseSupervisor
       child_reaped ||= reap_child_nonblocking(child_pid)
       sleep POLL_INTERVAL
     end
-    signal_group("KILL", pgid) if group_alive?(pgid)
-    reap_child(child_pid) unless child_reaped
+    if group_alive?(pgid)
+      signal_group("KILL", pgid)
+      kill_deadline = monotonic_time + grace
+      while group_alive?(pgid) && monotonic_time < kill_deadline
+        child_reaped ||= reap_child_nonblocking(child_pid)
+        sleep POLL_INTERVAL
+      end
+    end
+    child_reaped ||= reap_child_nonblocking(child_pid) if child_pid
+    raise SupervisorError, "release child did not terminate after KILL" unless child_reaped
+    return unless group_alive?(pgid)
+
+    raise SupervisorError, "release process group #{pgid} did not terminate after KILL"
   end
 
   def group_alive?(pgid)

@@ -5192,10 +5192,12 @@ RSpec.describe "release.rake helper methods" do
           "BUNDLE_LOCKFILE" => File.join(monorepo_root, "react_on_rails", "Gemfile.lock"),
           "BUNDLE_FROZEN" => "true"
         }
-        stdout, stderr, status = Open3.capture3(
-          package_bundle_environment,
-          "bundle", "exec", "ruby", stdin_data: root_probe, chdir: monorepo_root
-        )
+        stdout, stderr, status = Bundler.with_unbundled_env do
+          Open3.capture3(
+            package_bundle_environment,
+            "bundle", "exec", "ruby", stdin_data: root_probe, chdir: monorepo_root
+          )
+        end
         result_line = stdout.lines.find { |line| line.start_with?("ROOT_RAKE_RESULT=") }
 
         expect(unavailable_status).not_to be_success

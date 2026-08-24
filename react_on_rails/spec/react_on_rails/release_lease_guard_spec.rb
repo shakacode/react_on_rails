@@ -117,7 +117,7 @@ RSpec.describe ReleaseLeaseGuard do
         <<~RUBY
           #!#{RbConfig.ruby}
           File.write(ENV.fetch("TEST_AGENT_COORD_PID_FILE"), Process.pid.to_s)
-          warn "fake backend diagnostic: #{ENV.fetch('AGENT_COORD_API_TOKEN')}"
+          warn "fake backend diagnostic: \#{ENV.fetch('AGENT_COORD_API_TOKEN')}"
           Signal.trap("TERM", "IGNORE")
           sleep 4
         RUBY
