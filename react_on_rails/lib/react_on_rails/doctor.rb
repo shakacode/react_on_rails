@@ -1461,26 +1461,48 @@ module ReactOnRails
     end
 
     def erb_output_helper?(content, helper_name)
+      unqualified_call_ambiguous = helper_name == "javascript_pack_tag" &&
+                                   non_output_erb_local_binding?(content, helper_name)
+
       content.scan(ERB_OUTPUT_EXPRESSION_PATTERN).any? do |(expression)|
         statements = ripper_statements(expression)
-        statements.one? && eagerly_evaluated_unqualified_helper_call?(statements.first, helper_name)
+        statements.one? && emitted_top_level_helper_call?(
+          statements.first,
+          helper_name,
+          unqualified_call_ambiguous:
+        )
       end
     end
 
-    def eagerly_evaluated_unqualified_helper_call?(node, helper_name)
-      return true if direct_unqualified_helper_call?(node, helper_name)
-      return true if eagerly_evaluated_self_helper_call?(node, helper_name)
-      return eager_helper_call_in_method_arguments?(node, helper_name) if ast_node?(node, :method_add_arg)
-      return eager_helper_call_in_arguments?(node[2], helper_name) if ast_node?(node, :command)
-      return eager_helper_call_in_array?(node, helper_name) if ast_node?(node, :array)
-      return eager_helper_call_in_hash?(node, helper_name) if ast_node?(node, :hash) ||
-                                                              ast_node?(node, :bare_assoc_hash)
+    def emitted_top_level_helper_call?(node, helper_name, unqualified_call_ambiguous: false)
+      return true if direct_self_helper_call?(node, helper_name)
+      return true if parenthesized_self_javascript_helper_call?(node, helper_name)
 
-      false
+      !unqualified_call_ambiguous && direct_unqualified_helper_call?(node, helper_name)
     end
 
-    def eagerly_evaluated_self_helper_call?(node, helper_name)
-      direct_self_helper_call?(node, helper_name) || parenthesized_self_javascript_helper_call?(node, helper_name)
+    def non_output_erb_local_binding?(content, local_name)
+      content.scan(ERB_NON_OUTPUT_EXPRESSION_PATTERN).any? do |(expression)|
+        ripper_statements(expression).any? { |statement| source_proven_local_binding?(statement, local_name) }
+      end
+    end
+
+    def source_proven_local_binding?(node, local_name)
+      return false unless node.is_a?(Array)
+      return true if local_variable_field_named?(node, local_name)
+      return true if required_parameter_named?(node, local_name)
+
+      children = node.first.is_a?(Symbol) ? node.drop(1) : node
+      children.any? { |child| source_proven_local_binding?(child, local_name) }
+    end
+
+    def local_variable_field_named?(node, local_name)
+      ast_node?(node, :var_field) && token_named?(node[1], local_name)
+    end
+
+    def required_parameter_named?(node, local_name)
+      ast_node?(node, :params) && node[1].is_a?(Array) &&
+        node[1].any? { |parameter| token_named?(parameter, local_name) }
     end
 
     def direct_self_helper_call?(node, helper_name)
@@ -1496,37 +1518,6 @@ module ReactOnRails
 
       argument_parentheses = node[2]
       ast_node?(argument_parentheses, :arg_paren) && direct_self_helper_call?(node[1], helper_name)
-    end
-
-    def eager_helper_call_in_method_arguments?(node, helper_name)
-      return false unless ast_node?(node[1], :fcall)
-
-      argument_parentheses = node[2]
-      return false unless ast_node?(argument_parentheses, :arg_paren)
-
-      eager_helper_call_in_arguments?(argument_parentheses[1], helper_name)
-    end
-
-    def eager_helper_call_in_array?(node, helper_name)
-      values = node[1]
-      return false unless values.is_a?(Array)
-
-      values.any? do |value|
-        eagerly_evaluated_unqualified_helper_call?(value, helper_name)
-      end
-    end
-
-    def eager_helper_call_in_hash?(node, helper_name)
-      associations = static_hash_associations(node)
-      associations&.any? do |association|
-        ast_node?(association, :assoc_new) &&
-          eagerly_evaluated_unqualified_helper_call?(association[2], helper_name)
-      end
-    end
-
-    def eager_helper_call_in_arguments?(node, helper_name)
-      arguments = static_argument_values(node)
-      arguments&.any? { |argument| eagerly_evaluated_unqualified_helper_call?(argument, helper_name) }
     end
 
     def erb_helper_mentioned?(content, helper_name)

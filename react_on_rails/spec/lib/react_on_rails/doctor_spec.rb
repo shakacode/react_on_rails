@@ -2054,22 +2054,154 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
-    context "when javascript_pack_tag is nested in an eagerly evaluated helper argument" do
+    context "when JavaScript helper output is direct or nested" do
       before do
         stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
         stub_layouts(
-          "app/views/layouts/application.html.erb" => <<~ERB
+          "app/views/layouts/direct.html.erb" => <<~ERB,
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= javascript_pack_tag %>
+          ERB
+          "app/views/layouts/direct_named.html.erb" => <<~ERB,
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= javascript_pack_tag "application" %>
+          ERB
+          "app/views/layouts/direct_parenthesized.html.erb" => <<~ERB,
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= javascript_pack_tag("application") %>
+          ERB
+          "app/views/layouts/exact_self.html.erb" => <<~ERB,
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= self.javascript_pack_tag %>
+          ERB
+          "app/views/layouts/exact_self_parenthesized.html.erb" => <<~ERB,
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= self.javascript_pack_tag() %>
+          ERB
+          "app/views/layouts/exact_self_named.html.erb" => <<~ERB,
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= self.javascript_pack_tag("application") %>
+          ERB
+          "app/views/layouts/safe_join.html.erb" => <<~ERB,
             <%= react_component("StyledComponent", auto_load_bundle: true) %>
             <%= safe_join([javascript_pack_tag]) %>
+          ERB
+          "app/views/layouts/content_for.html.erb" => <<~ERB,
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <% content_for :head do %>
+              <%= javascript_pack_tag %>
+            <% end %>
+          ERB
+          "app/views/layouts/discarded.html.erb" => <<~ERB,
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <% javascript_pack_tag %>
+          ERB
+          "app/views/layouts/generic_wrapper.html.erb" => <<~ERB,
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= content_tag(:div, javascript_pack_tag) %>
+          ERB
+          "app/views/layouts/array.html.erb" => <<~ERB,
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= [javascript_pack_tag] %>
+          ERB
+          "app/views/layouts/hash.html.erb" => <<~ERB,
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= { pack: javascript_pack_tag } %>
+          ERB
+          "app/views/layouts/nested_self.html.erb" => <<~ERB,
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= safe_join([self.javascript_pack_tag]) %>
+          ERB
+          "app/views/layouts/reflective.html.erb" => <<~ERB,
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= public_send(:javascript_pack_tag) %>
+          ERB
+          "app/views/layouts/dynamic.html.erb" => <<~ERB
+            <% pack_helper_name = :javascript_pack_tag %>
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= safe_join([public_send(pack_helper_name)]) %>
           ERB
         )
       end
 
-      it "recognizes the nested JavaScript call as a proven flush" do
+      it "proves response emission only for top-level direct helper calls" do
         doctor.send(:check_layout_files)
 
-        expect(checker.messages).to include(
-          hash_including(type: :warning, content: a_string_including("generated/StyledComponent"))
+        warning_messages = checker.messages.select { |message| message[:type] == :warning }
+        expect(warning_messages).to contain_exactly(
+          hash_including(content: a_string_including("direct", "generated/StyledComponent")),
+          hash_including(content: a_string_including("direct_named", "generated/StyledComponent")),
+          hash_including(content: a_string_including("direct_parenthesized", "generated/StyledComponent")),
+          hash_including(content: a_string_including("exact_self", "generated/StyledComponent")),
+          hash_including(content: a_string_including("exact_self_parenthesized", "generated/StyledComponent")),
+          hash_including(content: a_string_including("exact_self_named", "generated/StyledComponent"))
+        )
+      end
+    end
+
+    context "when non-output ERB may bind the JavaScript helper name as a local" do
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        stub_layouts(
+          "app/views/layouts/shadow_before.html.erb" => <<~ERB,
+            <% javascript_pack_tag = "shadow" %>
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= javascript_pack_tag %>
+          ERB
+          "app/views/layouts/shadow_conditional.html.erb" => <<~ERB,
+            <% javascript_pack_tag = "shadow" if condition %>
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= javascript_pack_tag %>
+          ERB
+          "app/views/layouts/shadow_after.html.erb" => <<~ERB,
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= javascript_pack_tag %>
+            <% javascript_pack_tag = "shadow" %>
+          ERB
+          "app/views/layouts/block_local.html.erb" => <<~ERB,
+            <% ["shadow"].each { |javascript_pack_tag| nil } %>
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= javascript_pack_tag %>
+          ERB
+          "app/views/layouts/exact_self_after_shadow.html.erb" => <<~ERB,
+            <% javascript_pack_tag = "shadow" %>
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= self.javascript_pack_tag %>
+          ERB
+          "app/views/layouts/unrelated_local.html.erb" => <<~ERB,
+            <% other_pack_tag = "javascript_pack_tag" %>
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= javascript_pack_tag %>
+          ERB
+          "app/views/layouts/ivar_decoy.html.erb" => <<~ERB,
+            <% @javascript_pack_tag = "shadow" %>
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= javascript_pack_tag %>
+          ERB
+          "app/views/layouts/string_decoy.html.erb" => <<~ERB,
+            <% label = "javascript_pack_tag = shadow" %>
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= javascript_pack_tag %>
+          ERB
+          "app/views/layouts/comment_decoy.html.erb" => <<~ERB
+            <%# javascript_pack_tag = "shadow" %>
+            <!-- <% javascript_pack_tag = "shadow" %> -->
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= javascript_pack_tag %>
+          ERB
+        )
+      end
+
+      it "fails bare calls closed but preserves exact-self and non-binding evidence" do
+        doctor.send(:check_layout_files)
+
+        warning_messages = checker.messages.select { |message| message[:type] == :warning }
+        expect(warning_messages).to contain_exactly(
+          hash_including(content: a_string_including("exact_self_after_shadow", "generated/StyledComponent")),
+          hash_including(content: a_string_including("unrelated_local", "generated/StyledComponent")),
+          hash_including(content: a_string_including("ivar_decoy", "generated/StyledComponent")),
+          hash_including(content: a_string_including("string_decoy", "generated/StyledComponent")),
+          hash_including(content: a_string_including("comment_decoy", "generated/StyledComponent"))
         )
       end
     end
