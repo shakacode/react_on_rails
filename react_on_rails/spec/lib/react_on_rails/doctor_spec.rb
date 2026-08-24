@@ -1721,6 +1721,26 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when short-circuit punctuation spans separate ERB tags around a component" do
+      before do
+        stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
+        stub_layouts(
+          "app/views/layouts/application.html.erb" => <<~ERB
+            <% false && ( %>
+              <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <% ) %>
+            <%= javascript_pack_tag %>
+          ERB
+        )
+      end
+
+      it "fails closed because the component's reachability is unresolved" do
+        doctor.send(:check_layout_files)
+
+        expect(checker.warnings?).to be(false)
+      end
+    end
+
     context "when auto-loaded component calls appear only in template comments" do
       before do
         stub_manifest_stylesheets("generated/StyledComponent", ["/packs/generated/StyledComponent-a1b2c3.css"])
@@ -2582,6 +2602,30 @@ RSpec.describe ReactOnRails::Doctor do
             )
           )
         )
+      end
+    end
+
+    context "when the manifest CSS list mixes legacy strings and valid SRI asset objects" do
+      before do
+        stub_manifest_stylesheets(
+          "generated/StyledComponent",
+          [
+            "/packs/generated/StyledComponent-a1b2c3.css",
+            { "src" => "/packs/generated/StyledComponent-d4e5f6.css", "integrity" => "sha384-second" }
+          ]
+        )
+        stub_layouts(
+          "app/views/layouts/application.html.erb" => <<~ERB
+            <%= react_component("StyledComponent", auto_load_bundle: true) %>
+            <%= javascript_pack_tag %>
+          ERB
+        )
+      end
+
+      it "fails closed for the heterogeneous stylesheet schema" do
+        doctor.send(:check_layout_files)
+
+        expect(checker.warnings?).to be(false)
       end
     end
 

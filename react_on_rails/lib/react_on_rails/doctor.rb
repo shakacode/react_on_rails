@@ -1304,11 +1304,16 @@ module ReactOnRails
       assets = static_manifest_assets(entrypoint)
       stylesheet_assets = assets["css"] if assets.is_a?(Hash)
       return unless stylesheet_assets.is_a?(Array) && stylesheet_assets.any?
+      return unless homogeneous_manifest_css_schema?(stylesheet_assets)
 
       normalized_assets = stylesheet_assets.map { |asset| static_manifest_asset_path(asset) }
       return if normalized_assets.any?(&:nil?)
 
       normalized_assets
+    end
+
+    def homogeneous_manifest_css_schema?(assets)
+      assets.all?(String) || assets.all?(Hash)
     end
 
     def static_manifest_asset_path(asset)
@@ -1578,6 +1583,8 @@ module ReactOnRails
 
     def separate_erb_control_flow?(content)
       content.scan(ERB_NON_OUTPUT_EXPRESSION_PATTERN).any? do |(expression)|
+        next true unless Ripper.sexp(expression)
+
         Ripper.lex(expression).any? do |(_position, event, token)|
           event == :on_kw && ERB_CONTROL_FLOW_KEYWORDS.include?(token)
         end
