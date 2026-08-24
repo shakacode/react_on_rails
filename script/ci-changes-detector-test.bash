@@ -270,6 +270,9 @@ BASH
   printf '\t%s' "$@"
   printf '\n'
 } >> "$CI_LOCAL_COMMAND_LOG"
+if [ "$*" = "install" ]; then
+  printf 'pnpm-install-pwd\t%s\n' "$PWD" >> "$CI_LOCAL_COMMAND_LOG"
+fi
 if [ "${CI_LOCAL_FAIL_DUMMY_BUILD:-false}" = true ] && [ "$*" = "run build:test" ]; then
   exit 42
 fi
@@ -345,6 +348,48 @@ test_ci_local_builds_dummy_assets_before_rspec_with_dependencies_present() {
     *$'pnpm\trun\tbuild:test'*$'bundle\texec\trake\trun_rspec:dummy'*) ;;
     *) fail "dummy command log: bundle build must precede integration RSpec: $commands" ;;
   esac
+}
+
+test_ci_local_installs_missing_dummy_node_modules_before_build_and_rspec() {
+  setup_ci_local_repo
+  rm -rf react_on_rails/spec/dummy/node_modules
+
+  local output commands fixture_root
+  fixture_root="$(pwd -P)"
+  export CI_LOCAL_FIXTURE_SELECTION=dummy
+  if ! output="$(ci_local_output --changed 2>&1)"; then
+    fail "ci-local missing dummy dependencies fixture failed: $output"
+    return 1
+  fi
+  commands="$(cat ci-local-commands.log)"
+  assert_contains \
+    "$commands" \
+    $'pnpm-install-pwd\t'"$fixture_root/react_on_rails/spec/dummy" \
+    "dummy install working directory"
+  case "$commands" in
+    *$'pnpm\tinstall'*$'pnpm\trun\tbuild:test'*$'bundle\texec\trake\trun_rspec:dummy'*) ;;
+    *) fail "dummy command log: install, build, and RSpec must run in order: $commands" ;;
+  esac
+}
+
+test_ci_local_dummy_paths_are_not_reparsed_as_shell_code() {
+  # shellcheck disable=SC2016 # Literal command substitution is the attack fixture.
+  local checkout='checkout space $(touch ci-local-eval-injection)'
+  mkdir "$checkout"
+  cd "$checkout"
+  setup_ci_local_repo
+
+  local output commands
+  export CI_LOCAL_FIXTURE_SELECTION=dummy
+  if ! output="$(ci_local_output --changed 2>&1)"; then
+    fail "ci-local shell-sensitive checkout fixture failed: $output"
+    return 1
+  fi
+  commands="$(cat ci-local-commands.log)"
+  [ ! -e react_on_rails/spec/dummy/ci-local-eval-injection ] ||
+    fail "dummy Gemfile path was reparsed as shell code"
+  assert_contains "$commands" $'pnpm\trun\tbuild:test' "shell-sensitive dummy command log"
+  assert_contains "$commands" $'bundle\texec\trake\trun_rspec:dummy' "shell-sensitive dummy command log"
 }
 
 test_ci_local_records_dummy_build_failure_and_skips_rspec() {
@@ -1888,6 +1933,8 @@ run_test test_agent_bin_markdown_change_is_non_runtime_only
 run_test test_agent_workflow_config_change_runs_ci_infrastructure_without_benchmarks
 run_test test_ci_local_fast_mode_keeps_generator_specs_out_of_unit_job
 run_test test_ci_local_builds_dummy_assets_before_rspec_with_dependencies_present
+run_test test_ci_local_installs_missing_dummy_node_modules_before_build_and_rspec
+run_test test_ci_local_dummy_paths_are_not_reparsed_as_shell_code
 run_test test_ci_local_records_dummy_build_failure_and_skips_rspec
 run_test test_ci_local_preserves_independent_generator_selectors
 run_test test_ci_local_json_preserves_gem_generator_only_selector

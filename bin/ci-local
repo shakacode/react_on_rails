@@ -332,6 +332,33 @@ ensure_oss_dependencies() {
   OSS_DEPS_READY=true
 }
 
+# shellcheck disable=SC2329 # Passed by name to run_job_argv below.
+prepare_oss_dummy_test_bundles() {
+  (
+    local dummy_dir="$ROOT_DIR/react_on_rails/spec/dummy"
+    cd "$dummy_dir" || return 1
+
+    if [ ! -d node_modules ]; then
+      echo -e "${YELLOW}Setting up dummy app JavaScript dependencies...${NC}"
+      bundle_command "$OSS_DUMMY_GEMFILE" pnpm install || return 1
+    fi
+
+    if ! bundle_command "$OSS_DUMMY_GEMFILE" bundle check >/dev/null 2>&1; then
+      bundle_command "$OSS_DUMMY_GEMFILE" bundle install || return 1
+    fi
+
+    bundle_command "$OSS_DUMMY_GEMFILE" pnpm run build:test
+  )
+}
+
+# shellcheck disable=SC2329 # Passed by name to run_job_argv below.
+run_oss_dummy_rspec() {
+  (
+    cd "$ROOT_DIR/react_on_rails" || return 1
+    bundle_command "$OSS_GEMFILE" bundle exec rake run_rspec:dummy
+  )
+}
+
 # Ensure dependencies are installed
 if [ ! -d "node_modules" ] || [ ! -d "vendor/bundle" ]; then
   echo -e "${YELLOW}Installing dependencies...${NC}"
@@ -397,10 +424,8 @@ if [ "$RUN_DUMMY" = true ]; then
   else
     # Always rebuild immediately before RSpec: installed dependencies do not
     # prove that the generated test manifest exists or matches this checkout.
-    if run_job "Dummy App Test Bundles" \
-      "cd react_on_rails/spec/dummy && (bundle_command \"$OSS_DUMMY_GEMFILE\" bundle check >/dev/null 2>&1 || bundle_command \"$OSS_DUMMY_GEMFILE\" bundle install) && bundle_command \"$OSS_DUMMY_GEMFILE\" pnpm run build:test"; then
-      run_job "Dummy App Integration Tests" \
-        "cd react_on_rails && bundle_command \"$OSS_GEMFILE\" bundle exec rake run_rspec:dummy"
+    if run_job_argv "Dummy App Test Bundles" prepare_oss_dummy_test_bundles; then
+      run_job_argv "Dummy App Integration Tests" run_oss_dummy_rspec
     else
       echo -e "${YELLOW}Skipping dummy app integration tests because test bundle preparation failed${NC}"
       echo ""
