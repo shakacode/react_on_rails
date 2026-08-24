@@ -15504,7 +15504,7 @@ RSpec.describe "release.rake helper methods" do
         "script/release VERSION",
         "internal/contributor-info/release-train-runbook.md"
       )
-      expect(start_help).to include("BLOCKED", "internal/contributor-info/release-train-runbook.md")
+      expect(start_help).to include("policy-blocked", "internal/contributor-info/release-train-runbook.md")
 
       release_commands = release_help.lines.grep(/^\s*rake (?:\\?"?)release(?:\[|\\?"?$)/)
       sync_commands = sync_help.lines.grep(/rake \\"sync_github_release\[/)
