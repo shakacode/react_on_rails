@@ -202,6 +202,7 @@ case "${CI_LOCAL_FIXTURE_SELECTION:?}" in
     run_ruby=true
     run_gem_generator_specs=true
     ;;
+  gem_generator_specs) run_gem_generator_specs=true ;;
   # Consumer-contract fixture: the current detector never emits this one-sided
   # combination, but ci-local must not couple two independent JSON fields.
   generated_examples) run_generators=true ;;
@@ -374,7 +375,38 @@ test_ci_local_preserves_independent_generator_selectors() {
     "generator-change command log"
 }
 
-test_ci_local_text_fallback_preserves_gem_generator_selector() {
+assert_ci_local_gem_generator_only_commands() {
+  local commands="$1"
+  local context="$2"
+
+  assert_contains "$commands" $'bundle\tcheck' "$context"
+  assert_contains \
+    "$commands" \
+    $'bundle\texec\trspec\tspec/react_on_rails/generators' \
+    "$context"
+  case "$commands" in
+    *$'bundle\texec\trspec\tspec/react_on_rails\t--exclude-pattern'*|\
+    *$'bundle\texec\trake\trun_rspec:gem'*|\
+    *$'bundle\texec\trake\trun_rspec:shakapacker_examples'*)
+      fail "$context: gem-generator-only selection ran an unselected Ruby job"
+      ;;
+  esac
+}
+
+test_ci_local_json_preserves_gem_generator_only_selector() {
+  setup_ci_local_repo
+
+  local output commands
+  export CI_LOCAL_FIXTURE_SELECTION=gem_generator_specs
+  if ! output="$(ci_local_output --changed 2>&1)"; then
+    fail "ci-local JSON gem-generator-only fixture failed: $output"
+    return 1
+  fi
+  commands="$(cat ci-local-commands.log)"
+  assert_ci_local_gem_generator_only_commands "$commands" "JSON gem-generator-only command log"
+}
+
+test_ci_local_text_fallback_preserves_gem_generator_only_selector() {
   setup_ci_local_repo
   cat > test-bin/jq <<'BASH'
 #!/usr/bin/env bash
@@ -383,21 +415,13 @@ BASH
   chmod +x test-bin/jq
 
   local output commands
-  export CI_LOCAL_FIXTURE_SELECTION=core_ruby
+  export CI_LOCAL_FIXTURE_SELECTION=gem_generator_specs
   if ! output="$(ci_local_output --changed 2>&1)"; then
-    fail "ci-local text-fallback fixture failed: $output"
+    fail "ci-local text-fallback gem-generator-only fixture failed: $output"
     return 1
   fi
   commands="$(cat ci-local-commands.log)"
-  assert_contains \
-    "$commands" \
-    $'bundle\texec\trspec\tspec/react_on_rails/generators' \
-    "text-fallback command log"
-  case "$commands" in
-    *$'bundle\texec\trake\trun_rspec:shakapacker_examples'*)
-      fail "text fallback must not conflate gem generator specs with generated examples"
-      ;;
-  esac
+  assert_ci_local_gem_generator_only_commands "$commands" "text-fallback gem-generator-only command log"
 }
 
 detector_output() {
@@ -1810,7 +1834,8 @@ run_test test_agent_bin_markdown_change_is_non_runtime_only
 run_test test_agent_workflow_config_change_runs_ci_infrastructure_without_benchmarks
 run_test test_ci_local_fast_mode_keeps_generator_specs_out_of_unit_job
 run_test test_ci_local_preserves_independent_generator_selectors
-run_test test_ci_local_text_fallback_preserves_gem_generator_selector
+run_test test_ci_local_json_preserves_gem_generator_only_selector
+run_test test_ci_local_text_fallback_preserves_gem_generator_only_selector
 run_test test_ci_infrastructure_only_change_runs_tests_but_skips_benchmarks
 run_test test_suite_workflow_file_runs_its_tests_but_no_benchmark
 run_test test_gem_tests_workflow_change_keeps_generator_specs_fail_closed
