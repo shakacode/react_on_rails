@@ -280,8 +280,25 @@ end
 exit ExceptionTestSupervisor.new(ARGV).run
 EXCEPTION_HARNESS
 
+  cat >"${fake_bin}/release-subreaper-failure-harness" <<'SUBREAPER_FAILURE_HARNESS'
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+load ENV.fetch("TEST_RELEASE_SCRIPT")
+
+class SubreaperFailureTestSupervisor < ReleaseSupervisor
+  private
+
+  def enable_descendant_reaping!
+    raise SupervisorError, "injected descendant reaping failure"
+  end
+end
+
+exit SubreaperFailureTestSupervisor.new(ARGV).run
+SUBREAPER_FAILURE_HARNESS
+
   chmod +x "${fake_bin}/agent-coord" "${fake_bin}/bundle" "${fake_bin}/release-handshake-harness" \
-    "${fake_bin}/release-exception-harness"
+    "${fake_bin}/release-exception-harness" "${fake_bin}/release-subreaper-failure-harness"
 
   export PATH="${fake_bin}:${PATH}"
   export TEST_COORD_LOG="${coord_log}"
@@ -328,6 +345,13 @@ run_exception_release() {
   (
     cd "${fake_repo}"
     "${fake_bin}/release-exception-harness" "$@"
+  ) >"${output_log}" 2>&1
+}
+
+run_subreaper_failure_release() {
+  (
+    cd "${fake_repo}"
+    "${fake_bin}/release-subreaper-failure-harness" "$@"
   ) >"${output_log}" 2>&1
 }
 
@@ -465,6 +489,16 @@ assert_contains "${output_log}" "process group ${process_group}"
 assert_no_coordination_mutation
 assert_secret_absent
 pass "matching state runs one identity-bound process group"
+
+setup_case descendant-reaping-unavailable
+if run_subreaper_failure_release 17.1.0.rc.0; then
+  fail "live release continued without descendant reaping"
+fi
+assert_empty "${coord_log}"
+assert_empty "${bundle_log}"
+assert_contains "${output_log}" "injected descendant reaping failure"
+assert_secret_absent
+pass "live mode enables descendant reaping before any subprocess"
 
 setup_case stable-main-live
 git -C "${fake_repo}" switch -q -c main

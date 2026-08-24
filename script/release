@@ -23,6 +23,7 @@ class ReleaseSupervisor
   HANDSHAKE_TIMEOUT = 5.0
   POLL_INTERVAL = 0.05
   SIGNALS = %w[INT TERM HUP].freeze
+  PR_SET_CHILD_SUBREAPER = 36
 
   Identity = Data.define(:agent_id, :instance_id, :machine_id)
   ReleaseScope = Data.define(:version, :base_version, :repo, :target, :branch)
@@ -236,6 +237,7 @@ class ReleaseSupervisor
     pgid = nil
     liveness_writer = nil
     previous_signal_handlers = install_signal_handlers
+    enable_descendant_reaping!
     verify_existing_lease!(scope, identity, coordination_timeout:, termination_grace:)
     unless heartbeat!(scope, identity, coordination_timeout:, termination_grace:)
       raise ReleaseLeaseGuard::LeaseError, "release lease heartbeat failed"
@@ -573,25 +575,54 @@ class ReleaseSupervisor
 
   def terminate_group(pgid, child_pid:, grace:)
     signal_group("TERM", pgid)
-    deadline = monotonic_time + grace
     child_reaped = child_pid.nil?
-    while group_alive?(pgid) && monotonic_time < deadline
-      child_reaped ||= reap_child_nonblocking(child_pid)
-      sleep POLL_INTERVAL
-    end
-    if group_alive?(pgid)
+    child_reaped, group_alive = wait_for_group_exit(pgid, child_pid:, child_reaped:, grace:)
+    if group_alive
       signal_group("KILL", pgid)
-      kill_deadline = monotonic_time + grace
-      while group_alive?(pgid) && monotonic_time < kill_deadline
-        child_reaped ||= reap_child_nonblocking(child_pid)
-        sleep POLL_INTERVAL
-      end
+      child_reaped, = wait_for_group_exit(pgid, child_pid:, child_reaped:, grace:)
     end
-    child_reaped ||= reap_child_nonblocking(child_pid) if child_pid
+    child_reaped = reap_group_once(pgid, child_pid:, child_reaped:)
     raise SupervisorError, "release child did not terminate after KILL" unless child_reaped
     return unless group_alive?(pgid)
 
     raise SupervisorError, "release process group #{pgid} did not terminate after KILL"
+  end
+
+  def wait_for_group_exit(pgid, child_pid:, child_reaped:, grace:)
+    deadline = monotonic_time + grace
+    while group_alive?(pgid) && monotonic_time < deadline
+      child_reaped = reap_group_once(pgid, child_pid:, child_reaped:)
+      sleep POLL_INTERVAL
+    end
+    child_reaped = reap_group_once(pgid, child_pid:, child_reaped:)
+    [child_reaped, group_alive?(pgid)]
+  end
+
+  def reap_group_once(pgid, child_pid:, child_reaped:)
+    directly_reaped = child_pid && reap_child_nonblocking(child_pid)
+    group_reaped = reap_group_children_nonblocking(pgid)
+    child_reaped || directly_reaped || group_reaped.include?(child_pid)
+  end
+
+  def enable_descendant_reaping!
+    return unless RUBY_PLATFORM.include?("linux")
+
+    begin
+      require "fiddle"
+    rescue LoadError
+      raise SupervisorError, "could not enable release descendant reaping"
+    end
+    prctl = Fiddle::Function.new(
+      Fiddle::Handle::DEFAULT["prctl"],
+      [Fiddle::TYPE_INT, Fiddle::TYPE_LONG, Fiddle::TYPE_LONG, Fiddle::TYPE_LONG, Fiddle::TYPE_LONG],
+      Fiddle::TYPE_INT
+    )
+    return if prctl.call(PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0).zero?
+
+    errno = Fiddle.last_error
+    raise SupervisorError, "could not enable release descendant reaping (errno #{errno})"
+  rescue Fiddle::DLError
+    raise SupervisorError, "could not enable release descendant reaping"
   end
 
   def group_alive?(pgid)
@@ -613,6 +644,19 @@ class ReleaseSupervisor
     Process.waitpid(child_pid, Process::WNOHANG) == child_pid
   rescue Errno::ECHILD
     true
+  end
+
+  def reap_group_children_nonblocking(pgid)
+    reaped = []
+    loop do
+      waited_pid = Process.waitpid(-pgid, Process::WNOHANG)
+      break unless waited_pid
+
+      reaped << waited_pid
+    end
+    reaped
+  rescue Errno::ECHILD
+    reaped
   end
 
   def reap_child(child_pid)
