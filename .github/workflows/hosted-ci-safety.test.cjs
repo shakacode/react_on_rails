@@ -236,6 +236,8 @@ assertMatches(
 );
 for (const workflowFile of hostedWorkflowFiles) {
   const workflow = read(`.github/workflows/${workflowFile}`);
+  const detectChangesJob = extractJob(workflow, 'detect-changes');
+  const detectorStep = extractStep(detectChangesJob, 'Detect relevant changes');
   assertMatches(`${workflowFile} pull-request trigger`, workflow, /\n\s{2}pull_request:/);
   assertMatches(
     `${workflowFile} hosted selector`,
@@ -243,6 +245,27 @@ for (const workflowFile of hostedWorkflowFiles) {
     /uses: \.\/\.github\/actions\/hosted-ci-selectors/,
   );
   assertMatches(`${workflowFile} hosted gate`, workflow, /should_run_hosted_ci/);
+  assertMatches(`${workflowFile} verified diff-base helper`, detectorStep, /script\/ci-required-diff-base/);
+  assertMatches(
+    `${workflowFile} dispatch base SHA helper input`,
+    detectorStep,
+    /PULL_REQUEST_BASE_SHA: \$\{\{ inputs\.pull_request_base_sha \|\| '' \}\}/,
+  );
+  assertMatches(
+    `${workflowFile} pull-request head SHA helper input`,
+    detectorStep,
+    /PULL_REQUEST_HEAD_SHA: \$\{\{ github\.event\.pull_request\.head\.sha \|\| '' \}\}/,
+  );
+  assertMatches(
+    `${workflowFile} event base helper input`,
+    detectorStep,
+    /EVENT_BASE_REF: \$\{\{ github\.event\.pull_request\.base\.sha \|\| github\.event\.merge_group\.base_sha \|\| github\.event\.before \|\| 'origin\/main' \}\}/,
+  );
+  assertDoesNotMatch(
+    `${workflowFile} direct changed-files detector wiring`,
+    detectorStep,
+    /script\/ci-changes-detector/,
+  );
 }
 
 assertMatches(
