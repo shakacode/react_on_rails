@@ -251,6 +251,14 @@ case "${command_name}" in
           ;;
       esac
     fi
+    if test "${count}" -gt "${FAKE_STATUS_CHANGE_AFTER:-1}" &&
+      test "${FAKE_STATUS_CHANGE_AFTER_CHILD_START:-0}" = 1; then
+      for _attempt in $(seq 1 200); do
+        grep -q '^bundle:' "${TEST_BUNDLE_LOG}" 2>/dev/null && break
+        sleep 0.05
+      done
+      grep -q '^bundle:' "${TEST_BUNDLE_LOG}" 2>/dev/null || exit 91
+    fi
     if test "${count}" -gt "${FAKE_STATUS_CHANGE_AFTER:-1}"; then
       case "${FAKE_STATUS_AFTER_FIRST:-active}" in
         released) claim_status="released" ;;
@@ -587,7 +595,8 @@ UNVERIFIED_CHILD_HARNESS
   unset AGENT_COORD_BACKEND AGENT_COORD_REF AGENT_COORD_STATE_ROOT AGENT_COORD_STATUS_STATE_ROOT
   export REACT_ON_RAILS_RELEASE_HEARTBEAT_INTERVAL="0.1"
   export REACT_ON_RAILS_RELEASE_TERMINATION_GRACE="0.5"
-  unset FAKE_STATUS_FAIL FAKE_STATUS_AFTER_FIRST FAKE_STATUS_CHANGE_AFTER FAKE_PREFLIGHT_STATUS_MODE
+  unset FAKE_STATUS_FAIL FAKE_STATUS_AFTER_FIRST FAKE_STATUS_CHANGE_AFTER FAKE_STATUS_CHANGE_AFTER_CHILD_START
+  unset FAKE_PREFLIGHT_STATUS_MODE
   unset FAKE_FAIL_HEARTBEAT_AFTER FAKE_STALL_HEARTBEAT_AFTER
   unset FAKE_STALL_STATUS_AFTER FAKE_SUCCESS_STATUS_DESCENDANT
   unset FAKE_RELEASE_FAIL FAKE_CLAIM_FAIL FAKE_STALL_CLAIM_AFTER_CREATE FAKE_ATOMIC_CLAIM_MODE
@@ -1421,6 +1430,7 @@ for claim_loss in released replaced expired; do
   setup_case "claim-${claim_loss}"
   export FAKE_STATUS_AFTER_FIRST="${claim_loss}"
   export FAKE_STATUS_CHANGE_AFTER=2
+  export FAKE_STATUS_CHANGE_AFTER_CHILD_START=1
   export FAKE_FAIL_HEARTBEAT_AFTER=4
   export FAKE_BUNDLE_MODE=hold
   export REACT_ON_RAILS_RELEASE_HEARTBEAT_INTERVAL=0.5
