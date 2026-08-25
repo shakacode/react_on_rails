@@ -746,6 +746,40 @@ RSpec.describe "release.rake helper methods" do
       )
       expect(output).not_to match(/sync_github_release\[17\.0\.0\]"/)
     end
+
+    it "verifies the exact non-draft release after a live GitHub sync" do
+      release_context = { tag: "v17.0.0" }
+      allow(self).to receive_messages(
+        extract_changelog_section: "#### Fixed\n\n- Release fix",
+        prepare_github_release_context: release_context
+      )
+      allow(self).to receive(:verify_gh_auth)
+      allow(self).to receive(:publish_or_update_github_release)
+      allow(self).to receive(:github_release_complete?).and_return(true)
+
+      expect do
+        sync_github_release_after_publish(monorepo_root: "/tmp/repo", gem_version: "17.0.0", dry_run: false)
+      end.not_to raise_error
+      expect(self).to have_received(:github_release_complete?)
+        .with(monorepo_root: "/tmp/repo", version: "17.0.0")
+    end
+
+    it "refuses completion when a successful GitHub edit leaves the release draft or stale" do
+      release_context = { tag: "v17.0.0" }
+      allow(self).to receive_messages(
+        extract_changelog_section: "#### Fixed\n\n- Release fix",
+        prepare_github_release_context: release_context
+      )
+      allow(self).to receive(:verify_gh_auth)
+      allow(self).to receive(:publish_or_update_github_release)
+      allow(self).to receive(:github_release_complete?)
+        .with(monorepo_root: "/tmp/repo", version: "17.0.0")
+        .and_return(false)
+
+      expect do
+        sync_github_release_after_publish(monorepo_root: "/tmp/repo", gem_version: "17.0.0", dry_run: false)
+      end.to raise_error(SystemExit, /Failed to publish GitHub release v17\.0\.0/)
+    end
   end
 
   describe "#report_release_dry_run_follow_up" do

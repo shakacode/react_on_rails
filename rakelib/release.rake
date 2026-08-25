@@ -9059,6 +9059,9 @@ def sync_github_release_after_publish(monorepo_root:, gem_version:, dry_run:)
   verify_gh_auth(monorepo_root:)
   release_context = prepare_github_release_context(monorepo_root:, gem_version:)
   publish_or_update_github_release(monorepo_root:, release_context:, dry_run:)
+  return if dry_run || github_release_complete?(monorepo_root:, version: gem_version)
+
+  abort_github_release_publish_failure!(release_context.fetch(:tag))
 end
 
 def with_release_checkout(monorepo_root:, dry_run:)
