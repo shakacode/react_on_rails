@@ -111,6 +111,13 @@ done
 if test "${renew_mode}" = 1; then
   case "${FAKE_ATOMIC_RENEW_MODE:-success}" in
     refused) exit 3 ;;
+    refused-after-child-start)
+      for _attempt in $(seq 1 200); do
+        grep -q '^bundle:' "${TEST_BUNDLE_LOG}" 2>/dev/null && exit 3
+        sleep 0.01
+      done
+      exit 91
+      ;;
     unavailable) exit 91 ;;
   esac
 fi
@@ -336,6 +343,7 @@ FAKE_COORD
 #!/usr/bin/env bash
 set -euo pipefail
 
+test -z "${FAKE_BUNDLE_START_DELAY:-}" || sleep "${FAKE_BUNDLE_START_DELAY}"
 process_group="$(ps -o pgid= -p "$$" | tr -d ' ')"
 {
   printf 'bundle:%s:%s\n' "$$" "${process_group}"
@@ -585,7 +593,7 @@ UNVERIFIED_CHILD_HARNESS
   unset FAKE_RELEASE_FAIL FAKE_CLAIM_FAIL FAKE_STALL_CLAIM_AFTER_CREATE FAKE_ATOMIC_CLAIM_MODE
   unset FAKE_ATOMIC_RENEW_MODE
   unset FAKE_DOCTOR_FAIL FAKE_DOCTOR_BACKEND FAKE_DOCTOR_PAYLOAD
-  unset FAKE_BUNDLE_MODE FAKE_HANDSHAKE_MODE FAKE_EXCEPTION_MODE
+  unset FAKE_BUNDLE_MODE FAKE_BUNDLE_START_DELAY FAKE_HANDSHAKE_MODE FAKE_EXCEPTION_MODE
   unset FAKE_HANDSHAKE_IGNORE_TERM
   unset REACT_ON_RAILS_RELEASE_COORDINATION_TIMEOUT
   unset REACT_ON_RAILS_RELEASE_CLAIM_RENEWAL_INTERVAL
@@ -1351,7 +1359,8 @@ pass "managed release renews its exact claim during long-running work"
 setup_case managed-claim-renewal-failure
 unset RELEASE_COORDINATOR_ID RELEASE_COORDINATOR_INSTANCE_ID
 export FAKE_BUNDLE_MODE=hold
-export FAKE_ATOMIC_RENEW_MODE=refused
+export FAKE_BUNDLE_START_DELAY=0.5
+export FAKE_ATOMIC_RENEW_MODE=refused-after-child-start
 export REACT_ON_RAILS_RELEASE_CLAIM_RENEWAL_INTERVAL=0.2
 if run_release; then
   fail "managed release stayed live after atomic claim renewal refusal"
