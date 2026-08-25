@@ -9996,6 +9996,14 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
     version_converter = ReactOnRails::VersionSyntaxConverter.new
     resolved_target_npm_version = version_converter.rubygem_to_npm(resolved_target_gem_version)
     is_prerelease = release_prerelease_version?(resolved_target_gem_version)
+    unless is_dry_run
+      abort_if_fully_published_release!(
+        monorepo_root: release_root,
+        gem_version: resolved_target_gem_version,
+        npm_version: resolved_target_npm_version,
+        idempotent_retry: current_checkout_version == resolved_target_gem_version
+      )
+    end
     shakaperf_run_selector = normalized_optional_release_value(ENV.fetch("RELEASE_SHAKAPERF_RUN", nil))
     shakaperf_waiver_reason = normalized_optional_release_value(
       ENV.fetch("RELEASE_FINAL_SHAKAPERF_WAIVER_REASON", nil)
@@ -10178,12 +10186,6 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
 
     unless is_dry_run
       preflight_registry_publish_conflicts!(
-        gem_version: resolved_target_gem_version,
-        npm_version: resolved_target_npm_version,
-        idempotent_retry: idempotent_publish_retry
-      )
-      abort_if_fully_published_release!(
-        monorepo_root: release_root,
         gem_version: resolved_target_gem_version,
         npm_version: resolved_target_npm_version,
         idempotent_retry: idempotent_publish_retry

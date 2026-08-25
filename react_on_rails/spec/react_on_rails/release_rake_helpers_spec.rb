@@ -7342,6 +7342,50 @@ RSpec.describe "release.rake helper methods" do
     end
   end
 
+  describe "release task fully-published guidance" do
+    let(:release_task) { Rake::Task["release"] }
+    let(:task_receiver) { release_task.actions.first.binding.receiver }
+    let(:success_status) { instance_double(Process::Status, success?: true) }
+
+    after { release_task.reenable }
+
+    it "guides an advanced-head retry to the next changelog section before exact-head tag gating" do
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", "/tmp/repo", "rev-parse", "--abbrev-ref", "HEAD")
+        .and_return(["release/17.1.0\n", success_status])
+      allow(ReactOnRails::GitUtils).to receive(:uncommitted_changes?)
+      allow(task_receiver).to receive(:with_release_checkout) { |**_, &block| block.call("/tmp/repo") }
+      allow(task_receiver).to receive_messages(
+        current_monorepo_root: "/tmp/repo",
+        current_npm_release_readiness_sha!: "a" * 40,
+        validate_npm_release_readiness!: nil,
+        verbose: nil,
+        release_paths: { monorepo_root: "/tmp/repo", gem_root: "/tmp/repo/react_on_rails" },
+        sh_in_dir_for_release: nil,
+        refresh_npm_release_readiness_after_pull!: "a" * 40,
+        validate_supervised_release_version_after_pull!: nil,
+        resolve_release_version_before_auth!: "17.1.0.rc.0",
+        current_gem_version: "17.1.0.rc.0"
+      )
+      allow(task_receiver).to receive(:release_registry_publication_complete?)
+        .with(gem_version: "17.1.0.rc.0", npm_version: "17.1.0-rc.0")
+        .and_return(true)
+      allow(task_receiver).to receive(:github_release_complete?)
+        .with(monorepo_root: "/tmp/repo", version: "17.1.0.rc.0")
+        .and_return(true)
+      expect(task_receiver).not_to receive(:release_tag_retry_state_for_current_head)
+
+      expect do
+        release_task.invoke("17.1.0.rc.0", false, true, false)
+      end.to raise_error(
+        SystemExit,
+        /17\.1\.0\.rc\.0 is already fully published.*prepare and commit the next non-empty CHANGELOG\.md section/im
+      )
+      expect(task_receiver).to have_received(:release_registry_publication_complete?)
+      expect(task_receiver).to have_received(:github_release_complete?)
+    end
+  end
+
   describe "#github_release_complete?" do
     let(:release_context) do
       {
