@@ -3,6 +3,7 @@
 require "json"
 require "erb"
 require "open3"
+require "ripper"
 require "stringio"
 require "tempfile"
 require "timeout"
@@ -71,6 +72,16 @@ module ReactOnRails
     SERVER_BUNDLE_SOURCE_EXTENSIONS = %w[.js .jsx .ts .tsx .mjs .cjs].freeze
     CUSTOM_LAUNCHER_INDICATOR_FILES = %w[dev].freeze
     RAILS_SERVER_COMMAND_REGEX = %r{\b(?:(?:bin/)?rails\s+(?:server|s)|puma|unicorn|rackup|passenger\s+start)\b}
+    TEMPLATE_HTML_COMMENT_PATTERN = /<!--.*?-->/m
+    TEMPLATE_COMMENT_PATTERN = /<!--.*?-->|<%#.*?%>/m
+    ERB_EXPRESSION_PATTERN = /<%(?![#%])={0,2}\s*(?<expression>.*?)-?%>/m
+    ERB_OUTPUT_EXPRESSION_PATTERN = /<%={1,2}\s*(?<expression>.*?)-?%>/m
+    ERB_NON_OUTPUT_EXPRESSION_PATTERN = /<%(?![#%=])\s*(?<expression>.*?)-?%>/m
+    ERB_CONTROL_FLOW_KEYWORDS = %w[
+      begin case do else elsif end ensure for if rescue return then unless until when while
+    ].freeze
+    REFLECTIVE_HELPER_DISPATCH_METHODS = %w[send public_send __send__ method public_method].freeze
+    REACT_ON_RAILS_INITIALIZER_PATH = "config/initializers/react_on_rails.rb"
 
     # Deprecated-renderer-cache scan (used by check_deprecated_renderer_cache_task):
     # look for references to the old pre_stage_bundle_for_node_renderer task in
@@ -518,6 +529,7 @@ module ReactOnRails
       check_shakapacker_configuration_details
       check_react_on_rails_configuration_details
       check_server_bundle_prerender_consistency
+      check_layout_files
     end
 
     def check_bin_dev_launcher
@@ -1231,7 +1243,6 @@ module ReactOnRails
         )
       end
 
-      check_layout_files
       check_server_rendering_engine
     end
 
@@ -1242,13 +1253,15 @@ module ReactOnRails
       checker.add_info("\n📄 Layout Files Analysis:")
 
       layout_files.each do |layout_file|
-        next unless File.exist?(layout_file)
+        next unless analyzable_layout_file?(layout_file)
 
-        content = File.read(layout_file)
-        has_stylesheet = content.include?("stylesheet_pack_tag")
-        has_javascript = content.include?("javascript_pack_tag")
+        template_content = File.read(layout_file)
+        ambiguous_commented_erb = html_comment_with_executable_erb?(template_content)
+        content = uncommented_template_content(template_content)
+        has_stylesheet = stylesheet_pack_helper_evidence?(content)
+        has_javascript = erb_output_helper?(content, "javascript_pack_tag")
 
-        layout_name = File.basename(layout_file, ".html.erb")
+        layout_name = layout_file.delete_prefix("app/views/layouts/").delete_suffix(".html.erb")
 
         # Report detected pack helpers informationally. A JavaScript-only entrypoint
         # (no emitted CSS), a CSS-only pack, or a hybrid layout that loads CSS via
@@ -1260,10 +1273,762 @@ module ReactOnRails
           checker.add_info("  ℹ️  #{layout_name}: has stylesheet_pack_tag")
         elsif has_javascript
           checker.add_info("  ℹ️  #{layout_name}: has javascript_pack_tag")
+          check_unflushed_auto_loaded_component_css(layout_name, content, ambiguous_commented_erb:)
         else
           checker.add_info("  ℹ️  #{layout_name}: no pack tags found")
         end
       end
+    end
+
+    def analyzable_layout_file?(layout_file)
+      !File.basename(layout_file).start_with?("_") && File.exist?(layout_file)
+    end
+
+    def check_unflushed_auto_loaded_component_css(layout_name, content, ambiguous_commented_erb: false)
+      return if ambiguous_commented_erb
+      return if separate_erb_control_flow?(content)
+      return unless erb_output_helper?(content, "javascript_pack_tag")
+      return if erb_helper_mentioned?(content, "render")
+
+      component_names = auto_loaded_component_names(content)
+      component_names.concat(auto_loaded_component_names_from_implicit_views(layout_name)).uniq.each do |component_name|
+        entrypoint = "generated/#{component_name}"
+        stylesheet_assets = static_stylesheet_assets(entrypoint)
+        next unless stylesheet_assets
+
+        checker.add_warning(
+          "⚠️  #{layout_name}: auto-loaded component entrypoint #{entrypoint} emits CSS " \
+          "(#{stylesheet_assets.join(', ')}), but this React layout flushes javascript_pack_tag without " \
+          "stylesheet_pack_tag"
+        )
+      end
+    end
+
+    def stylesheet_pack_helper_evidence?(content)
+      erb_output_helper?(content, "stylesheet_pack_tag") ||
+        stylesheet_pack_ambiguity_evidence?(content)
+    end
+
+    def stylesheet_pack_ambiguity_evidence?(content)
+      ignored_bare_local = "stylesheet_pack_tag" if erb_local_binding?(content, "stylesheet_pack_tag")
+      stylesheet_pack_output_ambiguity_evidence?(content, ignored_bare_local:) ||
+        content.scan(ERB_NON_OUTPUT_EXPRESSION_PATTERN).any? do |(expression)|
+          statements = ripper_statements(expression)
+          next false if statements.one? &&
+                        discarded_top_level_helper_call?(statements.first, "stylesheet_pack_tag")
+
+          statements.any? do |statement|
+            helper_call_context_evidence?(statement, "stylesheet_pack_tag", ignored_bare_local:)
+          end
+        end
+    end
+
+    def stylesheet_pack_output_ambiguity_evidence?(content, ignored_bare_local: nil)
+      content.scan(ERB_OUTPUT_EXPRESSION_PATTERN).any? do |(expression)|
+        statements = ripper_statements(expression)
+        statements.any? do |statement|
+          helper_call_context_evidence?(statement, "stylesheet_pack_tag", ignored_bare_local:)
+        end
+      end
+    end
+
+    def static_stylesheet_assets(entrypoint)
+      assets = static_manifest_assets(entrypoint)
+      stylesheet_assets = assets["css"] if assets.is_a?(Hash)
+      return unless stylesheet_assets.is_a?(Array) && stylesheet_assets.any?
+      return unless homogeneous_manifest_css_schema?(stylesheet_assets)
+
+      normalized_assets = stylesheet_assets.map { |asset| static_manifest_asset_path(asset) }
+      return if normalized_assets.any?(&:nil?)
+
+      normalized_assets
+    end
+
+    def homogeneous_manifest_css_schema?(assets)
+      assets.all?(String) || assets.all?(Hash)
+    end
+
+    def static_manifest_asset_path(asset)
+      path = asset.is_a?(Hash) ? asset["src"] : asset
+      path if path.is_a?(String) && !path.empty?
+    end
+
+    def static_manifest_assets(entrypoint)
+      manifest = shakapacker_manifest_data
+      return unless manifest.is_a?(Hash)
+
+      entrypoints = manifest["entrypoints"]
+      return unless entrypoints.is_a?(Hash)
+
+      entrypoint_data = entrypoints[entrypoint]
+      entrypoint_data["assets"] if entrypoint_data.is_a?(Hash)
+    end
+
+    def auto_loaded_component_names_from_implicit_views(layout_name)
+      Dir.glob("app/controllers/**/*_controller.rb").flat_map do |controller_file|
+        implicit_view_paths_for_layout(controller_file, layout_name).flat_map do |view_path|
+          auto_loaded_component_names_from_implicit_view(view_path)
+        end
+      rescue StandardError
+        []
+      end
+    rescue StandardError
+      []
+    end
+
+    def auto_loaded_component_names_from_implicit_view(view_path)
+      return [] unless File.exist?(view_path)
+
+      template_content = File.read(view_path)
+      return [] if html_comment_with_executable_erb?(template_content)
+
+      view_content = uncommented_template_content(template_content)
+      return [] if stylesheet_pack_helper_evidence?(view_content)
+      return [] if erb_helper_mentioned?(view_content, "render")
+
+      auto_loaded_component_names(view_content)
+    end
+
+    def implicit_view_paths_for_layout(controller_file, layout_name)
+      action_names = statically_associated_action_names(controller_file, layout_name)
+      return [] unless action_names
+
+      view_directory = controller_file.delete_prefix("app/controllers/").delete_suffix("_controller.rb")
+      action_names.map do |action_name|
+        "app/views/#{view_directory}/#{action_name}.html.erb"
+      end
+    rescue StandardError
+      []
+    end
+
+    def statically_associated_action_names(controller_file, layout_name)
+      return unless File.exist?(controller_file)
+
+      controller = static_controller_class(controller_file)
+      statements = static_body_statements(controller[3]) if controller
+      return unless statements
+
+      layouts = statements.filter_map { |statement| static_layout_declaration(statement) }
+      action_names = statements.filter_map { |statement| static_generated_action_name(statement) }
+      return unless exact_generated_controller_statements?(statements, layouts, action_names, layout_name)
+
+      action_names
+    end
+
+    def exact_generated_controller_statements?(statements, layouts, action_names, layout_name)
+      layouts == [layout_name] && action_names.one? &&
+        statements.length == layouts.length + action_names.length
+    end
+
+    def static_controller_class(controller_file)
+      statements = ripper_statements(File.read(controller_file))
+      return unless statements.one?
+
+      controller = statements.first
+      return unless ast_node?(controller, :class)
+      return unless static_constant_reference(controller[2]) == "ApplicationController"
+
+      relative_name = controller_file.delete_prefix("app/controllers/").delete_suffix("_controller.rb")
+      expected_name = "#{relative_name.split('/').map(&:camelize).join('::')}Controller"
+      controller if static_constant_name(controller[1]) == expected_name
+    end
+
+    def static_constant_name(node)
+      return unless node.is_a?(Array)
+
+      case node.first
+      when :const_ref, :top_const_ref
+        static_constant_token_value(node[1])
+      when :const_path_ref
+        namespace = static_constant_name(node[1])
+        constant = static_constant_token_value(node[2])
+        "#{namespace}::#{constant}" if namespace && constant
+      end
+    end
+
+    def static_constant_token_value(node)
+      node[1] if ast_node?(node, :@const)
+    end
+
+    def static_layout_declaration(node)
+      arguments = static_argument_values(static_call_arguments(node, "layout"))
+      return unless arguments&.one?
+
+      static_string_value(arguments.first)
+    end
+
+    def static_generated_action_name(node)
+      return unless ast_node?(node, :def) && token_type?(node[1], :@ident)
+      return unless empty_method_parameters?(node[2])
+      return unless static_generated_action_body?(node[3])
+
+      node[1][1]
+    end
+
+    def static_generated_action_body?(node)
+      return false unless ast_node?(node, :bodystmt) && node.drop(2).all?(&:nil?)
+
+      statements = static_body_statements(node)
+      statements&.all? { |statement| ast_node?(statement, :void_stmt) || static_ivar_assignment?(statement) }
+    end
+
+    def static_ivar_assignment?(node)
+      return false unless ast_node?(node, :assign)
+
+      field = node[1]
+      ast_node?(field, :var_field) && token_type?(field[1], :@ivar) && static_data_value?(node[2])
+    end
+
+    def empty_method_parameters?(node)
+      ast_node?(node, :params) && node.drop(1).all?(&:nil?)
+    end
+
+    def static_body_statements(node)
+      statements = node[1] if ast_node?(node, :bodystmt)
+      statements if statements.is_a?(Array)
+    end
+
+    def erb_output_helper?(content, helper_name)
+      unqualified_call_ambiguous = erb_local_binding?(content, helper_name)
+
+      content.scan(ERB_OUTPUT_EXPRESSION_PATTERN).any? do |(expression)|
+        statements = ripper_statements(expression)
+        statements.one? && emitted_top_level_helper_call?(
+          statements.first,
+          helper_name,
+          unqualified_call_ambiguous:
+        )
+      end
+    end
+
+    def emitted_top_level_helper_call?(node, helper_name, unqualified_call_ambiguous: false)
+      return true if direct_self_helper_call?(node, helper_name)
+      return true if parenthesized_self_javascript_helper_call?(node, helper_name)
+      return false if unqualified_call_ambiguous && bare_unqualified_helper_vcall?(node, helper_name)
+
+      direct_unqualified_helper_call?(node, helper_name)
+    end
+
+    def erb_local_binding?(content, local_name)
+      content.scan(ERB_EXPRESSION_PATTERN).any? do |(expression)|
+        ripper_statements(expression).any? { |statement| source_proven_local_binding?(statement, local_name) }
+      end
+    end
+
+    def source_proven_local_binding?(node, local_name)
+      return false unless node.is_a?(Array)
+      return source_proven_local_binding?(node[1], local_name) if ast_node?(node, :method_add_block)
+      return false if nested_local_binding_scope?(node)
+      return true if local_variable_field_named?(node, local_name)
+      return true if required_parameter_named?(node, local_name)
+
+      children = node.first.is_a?(Symbol) ? node.drop(1) : node
+      children.any? { |child| source_proven_local_binding?(child, local_name) }
+    end
+
+    def nested_local_binding_scope?(node)
+      %i[brace_block do_block lambda def defs].any? { |type| ast_node?(node, type) }
+    end
+
+    def local_variable_field_named?(node, local_name)
+      ast_node?(node, :var_field) && token_named?(node[1], local_name)
+    end
+
+    def required_parameter_named?(node, local_name)
+      ast_node?(node, :params) && node[1].is_a?(Array) &&
+        node[1].any? { |parameter| token_named?(parameter, local_name) }
+    end
+
+    def direct_self_helper_call?(node, helper_name)
+      return false unless ast_node?(node, :call) || ast_node?(node, :command_call)
+
+      receiver = node[1]
+      self_token = receiver[1] if ast_node?(receiver, :var_ref)
+      token_type?(self_token, :@kw) && self_token[1] == "self" && token_named?(node[3], helper_name)
+    end
+
+    def parenthesized_self_javascript_helper_call?(node, helper_name)
+      return false unless helper_name == "javascript_pack_tag" && ast_node?(node, :method_add_arg)
+
+      argument_parentheses = node[2]
+      ast_node?(argument_parentheses, :arg_paren) && direct_self_helper_call?(node[1], helper_name)
+    end
+
+    def erb_helper_mentioned?(content, helper_name)
+      helper_call_context_in_expressions?(content.scan(ERB_EXPRESSION_PATTERN), helper_name)
+    end
+
+    def helper_call_context_in_expressions?(expressions, helper_name)
+      expressions.any? do |(expression)|
+        ripper_statements(expression).any? { |statement| helper_call_context_evidence?(statement, helper_name) }
+      end
+    end
+
+    def helper_call_context_evidence?(node, helper_name, ignored_bare_local: nil)
+      return false unless node.is_a?(Array)
+      return false if ignored_bare_local == helper_name && bare_unqualified_helper_vcall?(node, helper_name)
+      return true if helper_call_node?(node, helper_name)
+      return true if reflective_helper_dispatch_may_call?(node, helper_name)
+
+      children = node.first.is_a?(Symbol) ? node.drop(1) : node
+      children.any? { |child| helper_call_context_evidence?(child, helper_name, ignored_bare_local:) }
+    end
+
+    def helper_call_node?(node, helper_name)
+      method_token = call_method_token(node)
+      token_named?(method_token, helper_name)
+    end
+
+    def reflective_helper_dispatch_may_call?(node, helper_name)
+      arguments = reflective_dispatch_arguments(node)
+      return false unless arguments&.any?
+
+      dispatched_name = static_string_value(arguments.first) || static_symbol_value(arguments.first)
+      dispatched_name.nil? || dispatched_name == helper_name
+    end
+
+    def reflective_dispatch_arguments(node)
+      if ast_node?(node, :method_add_arg)
+        return unless reflective_dispatch_call?(node[1])
+
+        argument_parentheses = node[2]
+        return unless ast_node?(argument_parentheses, :arg_paren)
+
+        static_argument_values(argument_parentheses[1])
+      elsif ast_node?(node, :command) && reflective_dispatch_call?(node)
+        static_argument_values(node[2])
+      elsif reflective_command_call?(node)
+        static_argument_values(node[4])
+      end
+    end
+
+    def reflective_command_call?(node)
+      return false unless ast_node?(node, :command_call)
+
+      method_token = node[3]
+      token_type?(method_token, :@ident) && REFLECTIVE_HELPER_DISPATCH_METHODS.include?(method_token[1])
+    end
+
+    def reflective_dispatch_call?(node)
+      method_token = call_method_token(node)
+      token_type?(method_token, :@ident) && REFLECTIVE_HELPER_DISPATCH_METHODS.include?(method_token[1])
+    end
+
+    def call_method_token(node)
+      case node&.first
+      when :vcall, :fcall, :command
+        node[1]
+      when :call
+        node[3]
+      end
+    end
+
+    def direct_unqualified_helper_call?(node, helper_name)
+      return token_named?(node[1], helper_name) if ast_node?(node, :vcall) || ast_node?(node, :command)
+
+      ast_node?(node, :method_add_arg) && fcall_named?(node[1], helper_name)
+    end
+
+    def bare_unqualified_helper_vcall?(node, helper_name)
+      ast_node?(node, :vcall) && token_named?(node[1], helper_name)
+    end
+
+    def discarded_top_level_helper_call?(node, helper_name)
+      return true if direct_unqualified_helper_call?(node, helper_name)
+      return true if direct_self_helper_call?(node, helper_name)
+
+      ast_node?(node, :method_add_arg) && direct_self_helper_call?(node[1], helper_name)
+    end
+
+    def uncommented_template_content(content)
+      utf8_content = content.encode(Encoding::UTF_8, invalid: :replace, undef: :replace)
+      loop do
+        uncommented_content = utf8_content.gsub(TEMPLATE_COMMENT_PATTERN, "")
+        return uncommented_content if uncommented_content == utf8_content
+
+        utf8_content = uncommented_content
+      end
+    rescue EncodingError
+      ""
+    end
+
+    def html_comment_with_executable_erb?(content)
+      utf8_content = content.encode(Encoding::UTF_8, invalid: :replace, undef: :replace)
+      loop do
+        return true if utf8_content.scan(TEMPLATE_HTML_COMMENT_PATTERN).any? do |comment|
+          comment.match?(ERB_EXPRESSION_PATTERN)
+        end
+
+        uncommented_content = utf8_content.gsub(TEMPLATE_COMMENT_PATTERN, "")
+        return false if uncommented_content == utf8_content
+
+        utf8_content = uncommented_content
+      end
+    rescue EncodingError
+      true
+    end
+
+    def auto_loaded_component_names(content)
+      return [] if separate_erb_control_flow?(content)
+
+      auto_loaded_component_arguments(content).filter_map do |arguments|
+        next unless statically_auto_loaded_component?(arguments)
+
+        static_string_value(arguments.first)&.camelize
+      end.uniq
+    end
+
+    def auto_loaded_component_arguments(content)
+      expressions = content.scan(ERB_OUTPUT_EXPRESSION_PATTERN).map(&:first)
+      assignments = content.scan(ERB_NON_OUTPUT_EXPRESSION_PATTERN).map(&:first)
+      component_arguments = expressions.filter_map { |expression| static_react_component_arguments(expression) }
+      component_arguments.concat(
+        assignments.filter_map { |expression| static_react_component_assignment_arguments(expression) }
+      )
+    end
+
+    def separate_erb_control_flow?(content)
+      content.scan(ERB_NON_OUTPUT_EXPRESSION_PATTERN).any? do |(expression)|
+        next true unless Ripper.sexp(expression)
+
+        Ripper.lex(expression).any? do |(_position, event, token)|
+          event == :on_kw && ERB_CONTROL_FLOW_KEYWORDS.include?(token)
+        end
+      end
+    end
+
+    def statically_auto_loaded_component?(arguments)
+      options = static_component_options(arguments.drop(1))
+      return false unless options
+      return static_global_auto_load_bundle == true if options == :omitted
+
+      component_option = static_boolean_keyword(options, "auto_load_bundle")
+      return component_option == true unless component_option == :omitted
+
+      static_global_auto_load_bundle == true
+    end
+
+    def static_react_component_arguments(expression)
+      statements = ripper_statements(expression)
+      return unless statements.one?
+
+      %w[react_component react_component_hash].filter_map do |helper_name|
+        static_named_component_arguments(statements.first, helper_name)
+      end.first
+    end
+
+    def static_react_component_assignment_arguments(expression)
+      statements = ripper_statements(expression)
+      return unless statements.one?
+
+      assignment = statements.first
+      return unless ast_node?(assignment, :assign)
+
+      field = assignment[1]
+      return unless ast_node?(field, :var_field) && token_type?(field[1], :@ident)
+
+      %w[react_component react_component_hash].filter_map do |helper_name|
+        static_named_component_arguments(assignment[2], helper_name)
+      end.first
+    end
+
+    def static_named_component_arguments(node, helper_name)
+      node = static_self_component_hash_call(node) || node if helper_name == "react_component_hash"
+      call_arguments = static_call_arguments(node, helper_name) || static_self_call_arguments(node, helper_name)
+      arguments = static_argument_values(call_arguments)
+      component_name = static_string_value(arguments.first) if arguments&.any?
+      arguments if component_name&.match?(/\A[A-Za-z0-9_:]+\z/)
+    end
+
+    def static_self_call_arguments(node, helper_name)
+      return unless ast_node?(node, :method_add_arg) && direct_self_helper_call?(node[1], helper_name)
+
+      argument_parentheses = node[2]
+      argument_parentheses[1] if ast_node?(argument_parentheses, :arg_paren)
+    end
+
+    def static_self_component_hash_call(node)
+      return unless ast_node?(node, :aref)
+
+      call = node[1]
+      return unless ast_node?(call, :method_add_arg) && direct_self_helper_call?(call[1], "react_component_hash")
+
+      access_arguments = static_argument_values(node[2])
+      call if access_arguments&.one? && static_string_value(access_arguments.first) == "componentHtml"
+    end
+
+    def ripper_statements(source)
+      program = Ripper.sexp(source)
+      statements = program[1] if ast_node?(program, :program)
+      statements.is_a?(Array) ? statements : []
+    end
+
+    def static_call_arguments(node, method_name)
+      return node[2] if ast_node?(node, :command) && token_named?(node[1], method_name)
+      return unless ast_node?(node, :method_add_arg) && fcall_named?(node[1], method_name)
+
+      argument_parentheses = node[2]
+      argument_parentheses[1] if ast_node?(argument_parentheses, :arg_paren)
+    end
+
+    def static_argument_values(node)
+      return unless ast_node?(node, :args_add_block) && node[2] == false
+
+      node[1] if node[1].is_a?(Array)
+    end
+
+    def ast_node?(node, type)
+      node.is_a?(Array) && node.first == type
+    end
+
+    def token_type?(node, type)
+      ast_node?(node, type) && node[1].is_a?(String)
+    end
+
+    def fcall_named?(node, name)
+      ast_node?(node, :fcall) && token_named?(node[1], name)
+    end
+
+    def token_named?(node, name)
+      token_type?(node, :@ident) && node[1] == name
+    end
+
+    def static_string_value(node)
+      return unless ast_node?(node, :string_literal)
+
+      content = node[1]
+      return unless ast_node?(content, :string_content)
+
+      parts = content.drop(1)
+      return unless parts.all? { |part| token_type?(part, :@tstring_content) }
+
+      parts.map { |part| part[1] }.join
+    end
+
+    def static_boolean_keyword(associations, keyword)
+      matches = associations.select do |association|
+        static_label_association?(association, "#{keyword}:")
+      end
+      return :omitted if matches.empty?
+      return unless matches.one?
+
+      static_boolean_value(matches.first[2])
+    end
+
+    def static_component_options(arguments)
+      return :omitted if arguments.empty?
+      return unless arguments.one?
+
+      associations = static_hash_associations(arguments.first)
+      associations if associations&.all? { |association| static_data_association?(association) }
+    end
+
+    def static_data_association?(node)
+      static_label_association?(node) && static_data_value?(node[2])
+    end
+
+    def static_data_value?(node)
+      return true if static_scalar_value?(node)
+
+      case node&.first
+      when :array
+        static_data_array?(node[1])
+      when :hash
+        static_data_hash?(node)
+      when :symbol_literal
+        static_symbol_literal?(node)
+      when :unary
+        static_numeric_unary_literal?(node)
+      else
+        false
+      end
+    end
+
+    def static_data_array?(values)
+      values.nil? || (values.is_a?(Array) && values.all? { |value| static_data_value?(value) })
+    end
+
+    def static_data_hash?(node)
+      associations = static_hash_associations(node)
+      associations&.all? { |association| static_data_association?(association) }
+    end
+
+    def static_symbol_literal?(node)
+      !static_symbol_value(node).nil?
+    end
+
+    def static_symbol_value(node)
+      symbol = node[1] if ast_node?(node, :symbol_literal)
+      token = symbol[1] if ast_node?(symbol, :symbol)
+      token[1] if token_type?(token, :@ident) || token_type?(token, :@op)
+    end
+
+    def static_numeric_unary_literal?(node)
+      %i[+@ -@].include?(node[1]) && (token_type?(node[2], :@int) || token_type?(node[2], :@float))
+    end
+
+    def static_scalar_value?(node)
+      return true unless static_string_value(node).nil?
+      return true if token_type?(node, :@int) || token_type?(node, :@float)
+
+      token = node[1] if ast_node?(node, :var_ref)
+      token_type?(token, :@ivar) || (token_type?(token, :@kw) && %w[true false nil].include?(token[1]))
+    end
+
+    def static_hash_associations(node)
+      return node[1] if ast_node?(node, :bare_assoc_hash)
+      return unless ast_node?(node, :hash)
+
+      association_list = node[1]
+      return [] unless association_list
+
+      association_list[1] if ast_node?(association_list, :assoclist_from_args)
+    end
+
+    def static_label_association?(node, label = nil)
+      return false unless ast_node?(node, :assoc_new) && ast_node?(node[1], :@label)
+
+      label.nil? || node[1][1] == label
+    end
+
+    def static_global_auto_load_bundle
+      return @static_global_auto_load_bundle if defined?(@static_global_auto_load_bundle)
+      return (@static_global_auto_load_bundle = nil) unless File.exist?(REACT_ON_RAILS_INITIALIZER_PATH)
+
+      source = File.read(REACT_ON_RAILS_INITIALIZER_PATH)
+      @static_global_auto_load_bundle = static_configured_boolean(source, "auto_load_bundle")
+    rescue StandardError
+      @static_global_auto_load_bundle = nil
+    end
+
+    def static_configured_boolean(source, setting_name)
+      configure_block = unique_top_level_configure_block(source)
+      return unless configure_block
+
+      config_name = configure_block_parameter_name(configure_block)
+      block_body = configure_block.dig(2, 2)
+      direct_assignments = static_direct_config_assignments(block_body, config_name)
+      return unless direct_assignments
+      return unless ast_identifier_count(block_body, setting_name) == 1
+
+      assignments = direct_assignments.select do |statement|
+        config_assignment?(statement, config_name, setting_name)
+      end
+      static_boolean_value(assignments.first[2]) if assignments.one?
+    end
+
+    def unique_top_level_configure_block(source)
+      source_statements = ripper_statements(source)
+      return unless source_statements.one?
+
+      configure_block = source_statements.first
+      configure_block if react_on_rails_configure_block?(configure_block)
+    end
+
+    def static_direct_config_assignments(block_body, config_name)
+      statements = static_body_statements(block_body)
+      return unless config_name && statements
+      return unless statements.all? { |statement| direct_config_assignment?(statement, config_name) }
+      return unless statements.all? { |statement| static_literal_data_value?(statement[2]) }
+      return unless ast_identifier_count(block_body, config_name) == statements.length
+
+      statements
+    end
+
+    def static_literal_data_value?(node)
+      return true if static_literal_scalar_value?(node)
+      return static_literal_array?(node[1]) if ast_node?(node, :array)
+      return static_literal_hash?(node) if ast_node?(node, :hash)
+      return static_symbol_literal?(node) if ast_node?(node, :symbol_literal)
+      return static_numeric_unary_literal?(node) if ast_node?(node, :unary)
+
+      false
+    end
+
+    def static_literal_scalar_value?(node)
+      return true unless static_string_value(node).nil?
+      return true if token_type?(node, :@int) || token_type?(node, :@float)
+
+      keyword = node[1] if ast_node?(node, :var_ref)
+      token_type?(keyword, :@kw) && %w[true false nil].include?(keyword[1])
+    end
+
+    def static_literal_array?(values)
+      values.nil? || (values.is_a?(Array) && values.all? { |value| static_literal_data_value?(value) })
+    end
+
+    def static_literal_hash?(node)
+      associations = static_hash_associations(node)
+      associations&.all? do |association|
+        static_label_association?(association) && static_literal_data_value?(association[2])
+      end
+    end
+
+    def ast_identifier_count(node, identifier)
+      return 0 unless node.is_a?(Array)
+
+      count = token_named?(node, identifier) ? 1 : 0
+      children = node.first.is_a?(Symbol) ? node.drop(1) : node
+      count + children.sum { |child| ast_identifier_count(child, identifier) }
+    end
+
+    def configure_block_parameter_name(node)
+      block_var = node.dig(2, 1)
+      parameters = block_var[1] if ast_node?(block_var, :block_var)
+      required = parameters[1] if ast_node?(parameters, :params)
+      required.first[1] if required&.one? && token_type?(required.first, :@ident)
+    end
+
+    def react_on_rails_configure_block?(node)
+      return false unless ast_node?(node, :method_add_block)
+
+      call = node[1]
+      block = node[2]
+      ast_node?(call, :call) && static_constant_reference(call[1]) == "ReactOnRails" &&
+        token_named?(call[3], "configure") && ast_node?(block, :do_block)
+    end
+
+    def static_constant_reference(node)
+      static_constant_token_value(node[1]) if ast_node?(node, :var_ref)
+    end
+
+    def config_assignment?(node, config_name, setting_name)
+      return false unless direct_config_assignment?(node, config_name)
+
+      field = node[1]
+      token_named?(field[3], setting_name)
+    end
+
+    def direct_config_assignment?(node, config_name)
+      return false unless ast_node?(node, :assign)
+
+      field = node[1]
+      ast_node?(field, :field) && static_identifier_reference(field[1]) == config_name
+    end
+
+    def static_identifier_reference(node)
+      token = node[1] if ast_node?(node, :var_ref)
+      token[1] if token_type?(token, :@ident)
+    end
+
+    def static_boolean_value(node)
+      return unless ast_node?(node, :var_ref)
+
+      keyword = node[1]
+      return true if token_type?(keyword, :@kw) && keyword[1] == "true"
+      return false if token_type?(keyword, :@kw) && keyword[1] == "false"
+
+      nil
+    end
+
+    def shakapacker_manifest_data
+      return @shakapacker_manifest_data if defined?(@shakapacker_manifest_data)
+
+      require "shakapacker"
+      manifest_path = ::Shakapacker.config.manifest_path
+      @shakapacker_manifest_data = JSON.parse(manifest_path.read) if manifest_path&.file?
+    rescue LoadError, StandardError
+      @shakapacker_manifest_data = nil
     end
 
     # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
