@@ -11,20 +11,22 @@ behavioral release verification lanes, see [RC Testing Plan](rc-testing-plan.md)
 and [Release Verification Runbook](release-verification-runbook.md).
 
 > **Execution boundary:** Live publication and accelerated-RC reconciliation use
-> only `script/release VERSION` (or
-> `script/release --reconcile-accelerated-rc VERSION`). The supervisor requires an already-active matching
-> `release-line:X.Y.Z` claim under a fresh process UUID, maintains its heartbeat,
-> and proves that each outward write still has the same live claim. It does not
-> claim, take over, or automatically release the lease. Direct live
+> only `script/release` (or
+> `script/release --reconcile-accelerated-rc`). The supervisor selects the first
+> prepared version after `### [Unreleased]`, creates a fresh process UUID,
+> atomically acquires the matching `release-line:X.Y.Z` claim without takeover,
+> maintains its heartbeat, renews its exact active claim at least hourly, and
+> proves that each outward write still has the same live claim. It never takes
+> over another holder and releases only its acquired claim after proving the
+> supervised process group absent. Direct live
 > `bundle exec rake release[...]` is refused; use Rake directly only with `dry_run=true`.
-> For claim acquisition, identity variables, handoff, and partial-publication
+> For one-time machine setup, advanced automation compatibility, handoff, and partial-publication
 > recovery, follow the [Release-Train
 > Runbook](release-train-runbook.md#serialize-every-release-line-write).
 
-The lease branch must equal the checkout used for publication. The runbook bootstrap defaults
-`RELEASE_BRANCH` to the matching `release/X.Y.Z` train branch. For the documented ordinary stable
-release from `main`, start a fresh coordinator shell with `RELEASE_BRANCH_INPUT=main`; prereleases and
-accelerated-RC reconciliation remain restricted to the matching release branch.
+The derived lease branch must equal the checkout used for publication.
+Prereleases and accelerated-RC reconciliation remain restricted to the matching
+`release/X.Y.Z` branch; a stable release may use that matching branch or `main`.
 
 ## Testing the Gem before Release from a Rails App
 
@@ -72,8 +74,9 @@ React on Rails RC. Follow the ordered dependency-promotion gate in the
 
 If a stable target lacks this section, the release task aborts before confirmation, tagging, or publication.
 For a prerelease, the task warns and skips the GitHub release. After adding the section, preview the idempotent update
-with the dry-run form `sync_github_release[X.Y.Z,true]`; for a live recovery, use the exact version through
-`script/release VERSION` as documented in [Partial-publication recovery](release-train-runbook.md#partial-publication-recovery).
+with the dry-run form `sync_github_release[X.Y.Z,true]`; for a live recovery, keep that exact version as the first
+prepared changelog section and use `script/release` as documented in
+[Partial-publication recovery](release-train-runbook.md#partial-publication-recovery).
 
 #### Why changelog comes BEFORE the release
 
@@ -89,38 +92,37 @@ with the dry-run form `sync_github_release[X.Y.Z,true]`; for a live recovery, us
 
 ### 2. Preview the Release Task
 
-The task reads the version from CHANGELOG.md when the version argument is empty. Preview that path,
-or an explicit target, with `dry_run=true`:
+The maintainer path is changelog-driven. `--doctor` is optional after one-time
+setup, while `--dry-run` previews the same selected version without coordination
+or writes:
 
 ```bash
-# Reads version from CHANGELOG.md (requires step 1)
-bundle exec rake "release[,true]"
+script/release --doctor  # optional setup/diagnostic check
+script/release --dry-run # no coordination and no release writes
+script/release           # live release after the preview and required gates
+```
 
-# For a specific version (overrides CHANGELOG.md detection)
-bundle exec rake "release[16.2.0,true]"
+Do not pass a positional version to the wrapper. The first valid, non-empty
+version section after `### [Unreleased]` is the source of truth. Internal Rake
+arguments remain available only for explicit no-write diagnostics and tightly
+scoped recovery previews:
 
-# For a pre-release version (note: use period, not dash)
+```bash
 bundle exec rake "release[16.2.0.beta.1,true]"  # Previews npm package 16.2.0-beta.1
-
-# For a release candidate
 bundle exec rake "release[16.5.0.rc.0,true]"
-
-# Dry run to test without publishing
-bundle exec rake "release[16.2.0,true]"
-
-# Override version policy checks (monotonic + changelog/bump consistency)
 RELEASE_VERSION_POLICY_OVERRIDE=true bundle exec rake "release[16.2.0,true]"
 bundle exec rake "release[16.2.0,true,true]"
 ```
 
-> **Retry safety:** Never drop the version argument when resuming an interrupted release. Retry the
-> exact prerelease version; preview it with `bundle exec rake "release[17.0.0.rc.10,true]"`, then use
+> **Retry safety:** Keep the interrupted version as the first prepared changelog
+> section. Preview it with `script/release --dry-run`, then use
 > the recovery procedure in
 > [Partial-publication recovery](release-train-runbook.md#partial-publication-recovery). Live retry is
-> only `script/release 17.0.0.rc.10` after its existing matching claim and exact evidence are verified. From a prerelease
-> checkout, an argument-less release fails closed unless the changelog advances the same release line
-> to a newer prerelease. Stable promotion must use an explicit stable version and a matching non-empty
-> changelog section.
+> only `script/release`; its existing idempotent tag and registry checks preserve
+> partial-publication recovery. A fully published selected version stops with
+> instructions to prepare the next changelog section only when the GitHub
+> release also has the exact prepared tag, title, notes, draft state, and
+> prerelease state. A stale or draft release remains eligible for fenced recovery.
 
 When called with no arguments, `rake release`:
 
@@ -229,7 +231,7 @@ bundle exec rake "release[17.0.1,true]"
 ```
 
 This preview validates the target and tracker inputs but does not fetch or persist the selected run. Live
-association uses the repository-owned `script/release VERSION` wrapper described in the execution boundary.
+association uses the repository-owned `script/release` wrapper described in the execution boundary.
 
 This selector is not a waiver. Before appending anything, the task fetches the run and its schema-v2
 artifact from GitHub and verifies repository, workflow, branch, target version, run ID and attempt,
@@ -258,7 +260,7 @@ still proves that no conflicting tracker contains a matching candidate record. F
 fenced invocation:
 
 ```bash
-RELEASE_TRACKER=<issue> script/release VERSION
+RELEASE_TRACKER=<issue> script/release
 ```
 
 The repository-wide candidate-bounded read applies with or without `RELEASE_TRACKER`. It fails closed as `UNKNOWN` at
@@ -292,7 +294,7 @@ stable-only escape hatch:
 ```bash
 RELEASE_TRACKER=4806 \
 RELEASE_FINAL_SHAKAPERF_WAIVER_REASON="GitHub REST observer exhausted its quota" \
-script/release 17.0.1
+script/release
 ```
 
 The task writes and re-fetches an append-only schema-v2 `gate_observation_failed` waiver bound to the exact tracker,
@@ -719,9 +721,8 @@ The task automatically converts Ruby gem format to npm semver format:
 
 1. When prompted for **npm OTP**, enter your 2FA code from your authenticator app
 2. When prompted for **RubyGems OTP**, enter your 2FA code
-3. Invoke the live release with an explicit version through `script/release VERSION`; direct live Rake is refused.
-   A stable checkout may derive a patch candidate in a dry run, but publication still requires a matching non-empty
-   changelog section.
+3. Invoke the changelog-selected live release through `script/release`; direct live Rake and positional wrapper
+   versions are refused.
 4. The script will automatically commit and push version bumps
 5. The script will automatically create a GitHub release (if CHANGELOG.md section exists)
 
@@ -745,8 +746,8 @@ The task automatically converts Ruby gem format to npm semver format:
    `$react-on-rails-update-changelog` instead when the catch-up PR must target
    `release/X.Y.Z`. After the PR merges, preview the GitHub release update. Keep
    `sync_github_release` preview-only; if the matching published release needs a live
-   idempotent GitHub update, resume through `script/release VERSION` under its existing
-   fenced lease as documented in
+   idempotent GitHub update, resume through `script/release` with the published version still selected by
+   CHANGELOG.md under its fenced lease as documented in
    [Partial-publication recovery](release-train-runbook.md#partial-publication-recovery):
 
    ```bash
@@ -766,7 +767,7 @@ The task automatically converts Ruby gem format to npm semver format:
 
 If the automatic GitHub release creation was skipped (e.g., CHANGELOG.md section was missing during release),
 preview the recovery after updating the changelog. Direct live `sync_github_release` remains refused;
-the fenced recovery path is `script/release VERSION`, as documented in
+the fenced recovery path is `script/release`, as documented in
 [Partial-publication recovery](release-train-runbook.md#partial-publication-recovery):
 
 1. Update `CHANGELOG.md` with the published version section
@@ -784,20 +785,25 @@ bundle exec rake "sync_github_release[16.5.0.rc.1,true]"
 `sync_github_release` reads release notes from the matching `CHANGELOG.md` section, applies the same size preparation
 as the main release task, and creates or updates the GitHub release for the corresponding tag. It is the idempotent
 recovery behavior when package publication succeeded but the final GitHub step failed. Preview it directly; for a
-live create or edit, `script/release VERSION` supplies the required supervised per-write fence.
+live create or edit, `script/release` supplies the required supervised per-write fence.
 
 ### Pre-Release Checklist
 
 Before running the release command, verify:
 
-1. **GitHub CLI**: Run `gh auth login` and ensure your account/token has write access to the repository (required for automatic GitHub release creation)
+1. **One-time coordination setup**: Load `AGENT_COORD_API_URL`, the secret
+   `AGENT_COORD_API_TOKEN`, and a stable `AGENT_COORD_MACHINE_ID` from private
+   shell/dotfile configuration; ensure `~/.local/bin` is on `PATH`; then run
+   `script/release --doctor`. Never commit or print the token.
 
-2. **NPM authentication**: Run `npm whoami` to confirm you're logged in
+2. **GitHub CLI**: Run `gh auth login` and ensure your account/token has write access to the repository (required for automatic GitHub release creation)
+
+3. **NPM authentication**: Run `npm whoami` to confirm you're logged in
    - If not logged in, the release script will automatically run `npm login` for you
 
-3. **RubyGems authentication**: Ensure you have valid credentials for `gem push`
+4. **RubyGems authentication**: Ensure you have valid credentials for `gem push`
 
-4. **No uncommitted changes**: Run `git status` to verify clean working tree
+5. **No uncommitted changes**: Run `git status` to verify clean working tree
 
 ### Two-Factor Authentication
 
@@ -908,7 +914,7 @@ If the release fails partway through (e.g., during NPM publish):
    - RubyGems: `gem list react_on_rails -r -a`
 3. Record the exact branch tip, local and remote tag identity, published artifact set, and helper output.
 4. Follow [Partial-publication recovery](release-train-runbook.md#partial-publication-recovery). Resume only through
-   `script/release VERSION` after the required claim, supervisor, and artifact evidence are all exact; if lease state
+   `script/release` after the supervisor has acquired the required claim and the artifact evidence is exact; if lease state
    or any remote/artifact identity is `UNKNOWN`, remain stopped.
 
 ## Version History

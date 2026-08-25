@@ -5,26 +5,32 @@ require "json"
 require "io/wait"
 require "open3"
 require "optparse"
+require "securerandom"
 require "tempfile"
+require "rubygems/version"
+require_relative "../rakelib/release_changelog_selector"
 require_relative "../rakelib/release_lease_guard"
 
-# The sole supported live entry point for the release publication Rake tasks. It does not
-# acquire, take over, or release a coordination claim: the caller must already
-# own the exact release-line lease under a process-unique identity.
+# The sole supported live entry point for the release publication Rake tasks. Normal invocations
+# select the prepared changelog version and own the exact release-line claim for the process lifetime.
+# Externally supplied coordinator identities preserve the pre-acquired automation compatibility path.
 # rubocop:disable Metrics/ClassLength
 class ReleaseSupervisor
   VERSION_PATTERN = ReleaseLeaseGuard::RELEASE_VERSION_PATTERN
   REPOSITORY = ReleaseLeaseGuard::REPOSITORY
   HEARTBEAT_INTERVAL = 60.0
   HEARTBEAT_TTL = 900
+  CLAIM_TTL = 14_400
+  CLAIM_RENEWAL_INTERVAL = 3_600.0
   COORDINATION_TIMEOUT = 20.0
   TERMINATION_GRACE = 5.0
   HANDSHAKE_TIMEOUT = 5.0
   POLL_INTERVAL = 0.05
   SIGNALS = %w[INT TERM HUP].freeze
+  CLAIM_STATUSES = %w[active released].freeze
   PR_SET_CHILD_SUBREAPER = 36
 
-  Identity = Data.define(:agent_id, :instance_id, :machine_id)
+  Identity = Data.define(:agent_id, :instance_id, :machine_id, :managed)
   ReleaseScope = Data.define(:version, :base_version, :repo, :target, :branch)
   ReleasePipes = Data.define(
     :liveness_reader,
@@ -37,44 +43,28 @@ class ReleaseSupervisor
 
   class UsageError < StandardError; end
   class SupervisorError < StandardError; end
+  class ClaimRefusedError < ReleaseLeaseGuard::LeaseError; end
 
   def initialize(argv, env: ENV, stdout: $stdout, stderr: $stderr)
     @argv = argv.dup
     @env = env
     @stdout = stdout
     @stderr = stderr
-    @options = { dry_run: false, reconcile_accelerated_rc: false }
+    @options = { dry_run: false, reconcile_accelerated_rc: false, doctor: false }
     @parser = build_parser
     @received_signal = nil
+    @managed_claim_release_safe = true
   end
 
   def run
+    parse_options!
+    return run_doctor if @options.fetch(:doctor)
+
     scope = parse_scope!
     verify_branch!(scope)
     return run_dry(scope.version) if @options.fetch(:dry_run)
 
-    identity = release_identity!
-    heartbeat_interval = bounded_interval!(
-      "REACT_ON_RAILS_RELEASE_HEARTBEAT_INTERVAL", HEARTBEAT_INTERVAL, maximum: HEARTBEAT_INTERVAL
-    )
-    termination_grace = bounded_interval!(
-      "REACT_ON_RAILS_RELEASE_TERMINATION_GRACE", TERMINATION_GRACE, maximum: TERMINATION_GRACE
-    )
-    handshake_timeout = bounded_interval!(
-      "REACT_ON_RAILS_RELEASE_HANDSHAKE_TIMEOUT", HANDSHAKE_TIMEOUT, maximum: HANDSHAKE_TIMEOUT
-    )
-    coordination_timeout = bounded_interval!(
-      "REACT_ON_RAILS_RELEASE_COORDINATION_TIMEOUT", COORDINATION_TIMEOUT, maximum: HEARTBEAT_INTERVAL
-    )
-
-    supervise_release(
-      scope,
-      identity,
-      heartbeat_interval:,
-      termination_grace:,
-      handshake_timeout:,
-      coordination_timeout:
-    )
+    run_live(scope)
   rescue OptionParser::ParseError, UsageError, SupervisorError, ReleaseLeaseGuard::LeaseError => e
     @stderr.puts "ERROR: #{e.message}"
     @stderr.puts @parser if e.is_a?(OptionParser::ParseError) || e.is_a?(UsageError)
@@ -86,15 +76,100 @@ class ReleaseSupervisor
 
   private
 
+  def run_live(scope)
+    doctor_environment!
+    doctor_tools!
+    identity = release_identity!(scope)
+    intervals = supervisor_intervals
+    validate_coordination_backend!(
+      coordination_timeout: intervals.fetch(:coordination_timeout),
+      termination_grace: intervals.fetch(:termination_grace)
+    )
+
+    enable_descendant_reaping!
+    supervise_with_managed_lease(scope, identity, **intervals)
+  end
+
+  def supervisor_intervals
+    {
+      heartbeat_interval: bounded_interval!(
+        "REACT_ON_RAILS_RELEASE_HEARTBEAT_INTERVAL", HEARTBEAT_INTERVAL, maximum: HEARTBEAT_INTERVAL
+      ),
+      claim_renewal_interval: bounded_interval!(
+        "REACT_ON_RAILS_RELEASE_CLAIM_RENEWAL_INTERVAL",
+        CLAIM_RENEWAL_INTERVAL,
+        maximum: CLAIM_RENEWAL_INTERVAL
+      ),
+      termination_grace: bounded_interval!(
+        "REACT_ON_RAILS_RELEASE_TERMINATION_GRACE", TERMINATION_GRACE, maximum: TERMINATION_GRACE
+      ),
+      handshake_timeout: bounded_interval!(
+        "REACT_ON_RAILS_RELEASE_HANDSHAKE_TIMEOUT", HANDSHAKE_TIMEOUT, maximum: HANDSHAKE_TIMEOUT
+      ),
+      coordination_timeout: bounded_interval!(
+        "REACT_ON_RAILS_RELEASE_COORDINATION_TIMEOUT", COORDINATION_TIMEOUT, maximum: HEARTBEAT_INTERVAL
+      )
+    }.freeze
+  end
+
+  def supervise_with_managed_lease(
+    scope, identity, heartbeat_interval:, claim_renewal_interval:, termination_grace:, handshake_timeout:,
+    coordination_timeout:
+  )
+    previous_signal_handlers = install_signal_handlers
+    managed_claim_cleanup_required = false
+    cleanup_succeeded = true
+    release_status = begin
+      if identity.managed
+        verify_managed_acquisition_available!(scope, identity, coordination_timeout:, termination_grace:)
+        managed_claim_cleanup_required = true
+        begin
+          acquire_release_lease!(scope, identity, coordination_timeout:, termination_grace:)
+        rescue ClaimRefusedError
+          managed_claim_cleanup_required = false
+          raise
+        end
+      else
+        verify_existing_lease!(scope, identity, coordination_timeout:, termination_grace:)
+      end
+      supervise_release(
+        scope,
+        identity,
+        heartbeat_interval:,
+        claim_renewal_interval:,
+        termination_grace:,
+        handshake_timeout:,
+        coordination_timeout:
+      )
+    ensure
+      if managed_claim_cleanup_required && @managed_claim_release_safe
+        cleanup_succeeded = release_managed_lease!(scope, identity, coordination_timeout:, termination_grace:)
+        unless cleanup_succeeded
+          @stderr.puts "ERROR: release-line lease cleanup failed; verify coordination state before retrying"
+        end
+      elsif managed_claim_cleanup_required
+        cleanup_succeeded = false
+        @stderr.puts "ERROR: retaining release-line lease because process-group termination was not proven"
+      end
+      restore_signal_handlers(previous_signal_handlers)
+    end
+    return release_status if cleanup_succeeded
+
+    1
+  end
+
   def build_parser
     OptionParser.new do |parser|
-      parser.banner = "Usage: script/release [--dry-run | --reconcile-accelerated-rc] VERSION"
-      parser.on("--dry-run", "Run bundle exec rake release[VERSION,true] without coordination") do
+      parser.banner = "Usage: script/release [--doctor | --dry-run | --reconcile-accelerated-rc]"
+      parser.on("--doctor", "Validate read-only release-machine setup") do
+        @options[:doctor] = true
+      end
+      parser.on("--dry-run", "Preview the changelog-selected release without coordination") do
         @options[:dry_run] = true
       end
       parser.on(
         "--reconcile-accelerated-rc",
-        "Run release:reconcile_accelerated_rc[VERSION] under the live release contract"
+        "Reconcile the changelog-selected accelerated RC under the live release contract"
       ) do
         @options[:reconcile_accelerated_rc] = true
       end
@@ -105,16 +180,19 @@ class ReleaseSupervisor
     end
   end
 
-  def parse_scope!
-    argv = @argv.dup
-    @parser.parse!(argv)
-    if @options.fetch(:dry_run) && @options.fetch(:reconcile_accelerated_rc)
-      raise UsageError, "--dry-run and --reconcile-accelerated-rc cannot be combined"
-    end
+  def parse_options!
+    @remaining_args = @argv.dup
+    @parser.parse!(@remaining_args)
+    selected_modes = @options.values_at(:doctor, :dry_run, :reconcile_accelerated_rc).count(true)
+    raise UsageError, "choose only one of --doctor, --dry-run, or --reconcile-accelerated-rc" if selected_modes > 1
+  end
 
-    version = argv.shift
-    raise UsageError, "an explicit release VERSION is required" if version.nil? || version.empty?
-    raise UsageError, "too many arguments: #{argv.join(' ')}" unless argv.empty?
+  def parse_scope!
+    argv = @remaining_args.dup
+
+    raise UsageError, "VERSION is read from CHANGELOG.md; do not pass it." unless argv.empty?
+
+    version = release_version_from_changelog!
 
     version_match = VERSION_PATTERN.match(version)
     unless version_match
@@ -131,6 +209,149 @@ class ReleaseSupervisor
       target: "release-line:#{base_version}".freeze,
       branch: branch.freeze
     ).freeze
+  end
+
+  def run_doctor
+    raise UsageError, "--doctor does not accept positional arguments" unless @remaining_args.empty?
+
+    doctor_environment!
+    doctor_tools!
+    validate_coordination_backend!(coordination_timeout: COORDINATION_TIMEOUT, termination_grace: TERMINATION_GRACE)
+    print_doctor_success
+    0
+  end
+
+  def doctor_tools!
+    missing_tools = %w[agent-coord git gh bundle pnpm npm gem].reject { |tool| command_available?(tool) }
+    return if missing_tools.empty?
+
+    raise UsageError, "install required release tool(s) on PATH: #{missing_tools.join(', ')}"
+  end
+
+  def validate_doctor_report!(report)
+    unless report.is_a?(Hash)
+      raise SupervisorError, "agent-coord doctor returned malformed JSON; update agent-coord and retry"
+    end
+
+    unless report["backend"] == "http"
+      raise SupervisorError,
+            "agent-coord must use the shared HTTP backend; unset local/backend selector variables"
+    end
+    return if report["status"] == "ok" && !report.fetch("backend_url", "").to_s.empty?
+
+    raise SupervisorError, "agent-coord HTTP backend health or authentication failed; verify URL and token"
+  end
+
+  def validate_coordination_backend!(coordination_timeout:, termination_grace:)
+    stdout, status = run_agent_coord(
+      "doctor", "--json", timeout: coordination_timeout, termination_grace:
+    )
+    unless status&.success?
+      raise SupervisorError, "agent-coord doctor failed; verify the private HTTP backend URL and token"
+    end
+
+    validate_doctor_report!(JSON.parse(stdout))
+  rescue JSON::ParserError
+    raise SupervisorError, "agent-coord doctor returned malformed JSON; update agent-coord and retry"
+  end
+
+  def print_doctor_success
+    @stdout.puts "Release machine doctor: PASS"
+    @stdout.puts "  agent-coord: installed"
+    @stdout.puts "  coordination: shared HTTP backend healthy and authenticated"
+    @stdout.puts "  machine identity: configured"
+    @stdout.puts "  local release tools: ready"
+  end
+
+  def doctor_environment!
+    required_doctor_environment!("AGENT_COORD_API_URL", "configure the private shared HTTP backend URL")
+    required_doctor_environment!("AGENT_COORD_API_TOKEN", "configure the private backend token")
+    required_doctor_environment!("AGENT_COORD_MACHINE_ID", "configure a stable release-machine name")
+
+    local_selectors = %w[
+      AGENT_COORD_BACKEND
+      AGENT_COORD_REF
+      AGENT_COORD_STATE_ROOT
+      AGENT_COORD_STATUS_STATE_ROOT
+    ].reject { |name| @env.fetch(name, "").strip.empty? }
+    return if local_selectors.empty?
+
+    raise UsageError, "unset local/backend selector variable(s): #{local_selectors.join(', ')}"
+  end
+
+  def required_doctor_environment!(name, action)
+    value = @env.fetch(name, "").strip
+    return unless value.empty? || value.casecmp?("UNKNOWN")
+
+    raise UsageError, "#{name} is missing; #{action} in private shell/dotfile configuration"
+  end
+
+  def command_available?(command)
+    @env.fetch("PATH", "").split(File::PATH_SEPARATOR).any? do |directory|
+      path = File.join(directory, command)
+      File.file?(path) && File.executable?(path)
+    end
+  end
+
+  def release_version_from_changelog!
+    repository_root = repository_root!
+    lines = changelog_lines!(repository_root)
+    version = ReleaseChangelogSelector.prepared_version(lines, version_pattern: VERSION_PATTERN)
+    return no_releasable_version! unless version
+
+    current_version = current_checkout_version!(repository_root)
+    validate_changelog_version!(version, current_version)
+
+    version
+  rescue ArgumentError
+    raise UsageError, "current checkout version is invalid; repair the version file before releasing"
+  end
+
+  def changelog_lines!(repository_root)
+    File.readlines(File.join(repository_root, "CHANGELOG.md"))
+  rescue Errno::ENOENT, Errno::EACCES
+    no_releasable_version!
+  end
+
+  def validate_changelog_version!(version, current_version)
+    return unless Gem::Version.new(version) < Gem::Version.new(current_version)
+
+    raise UsageError,
+          "CHANGELOG.md version #{version} does not advance the current checkout version #{current_version}; " \
+          "prepare and commit the next release section."
+  end
+
+  def current_checkout_version!(repository_root)
+    version_path = File.join(repository_root, "react_on_rails", "lib", "react_on_rails", "version.rb")
+    match = File.read(version_path).match(/VERSION = "([^"]+)"/)
+    return match[1] if match && VERSION_PATTERN.match?(match[1])
+
+    raise UsageError, "current checkout version is unavailable; repair #{version_path} before releasing"
+  rescue Errno::ENOENT, Errno::EACCES
+    raise UsageError, "current checkout version is unavailable; repair #{version_path} before releasing"
+  end
+
+  def repository_root!
+    stdout, _stderr, status = Open3.capture3("git", "rev-parse", "--show-toplevel")
+    root = stdout.strip
+    return root if status.success? && !root.empty?
+
+    raise UsageError, "release must run from a Git checkout"
+  rescue Errno::ENOENT
+    raise UsageError, "release must run from a Git checkout"
+  end
+
+  def no_releasable_version!
+    raise UsageError, <<~ERROR.chomp
+      No releasable version found in CHANGELOG.md.
+
+      Prepare and commit a non-empty version section immediately after
+      `### [Unreleased]`, for example:
+
+      ### [17.1.0.rc.1] - YYYY-MM-DD
+
+      Then rerun: script/release
+    ERROR
   end
 
   def current_branch!
@@ -152,11 +373,26 @@ class ReleaseSupervisor
     raise UsageError, "release must run from branch #{expected_release_branch}"
   end
 
-  def release_identity!
+  def release_identity!(scope)
+    agent_id = @env.fetch("RELEASE_COORDINATOR_ID", "").strip
+    instance_id = @env.fetch("RELEASE_COORDINATOR_INSTANCE_ID", "").strip
+    if agent_id.empty? != instance_id.empty?
+      raise UsageError, "RELEASE_COORDINATOR_ID and RELEASE_COORDINATOR_INSTANCE_ID must be set together"
+    end
+
+    managed = agent_id.empty?
+    if managed
+      instance_id = SecureRandom.uuid
+      agent_id = "release-#{scope.base_version}-#{instance_id}"
+    elsif agent_id.casecmp?("UNKNOWN") || instance_id.casecmp?("UNKNOWN")
+      raise UsageError, "release coordinator identity cannot be UNKNOWN"
+    end
+
     Identity.new(
-      agent_id: required_identity!("RELEASE_COORDINATOR_ID"),
-      instance_id: required_identity!("RELEASE_COORDINATOR_INSTANCE_ID"),
-      machine_id: required_identity!("AGENT_COORD_MACHINE_ID")
+      agent_id: agent_id.freeze,
+      instance_id: instance_id.freeze,
+      machine_id: required_identity!("AGENT_COORD_MACHINE_ID"),
+      managed:
     ).freeze
   end
 
@@ -237,24 +473,133 @@ class ReleaseSupervisor
     false
   end
 
-  def supervise_release(scope, identity, heartbeat_interval:, termination_grace:, handshake_timeout:,
-                        coordination_timeout:)
+  def acquire_release_lease!(scope, identity, coordination_timeout:, termination_grace:)
+    _stdout, status = run_coordination_command(
+      release_claim_helper!,
+      "--agent-id", identity.agent_id,
+      "--instance-id", identity.instance_id,
+      "--machine-id", identity.machine_id,
+      "--repo", scope.repo,
+      "--target", scope.target,
+      "--branch", scope.branch,
+      "--ttl", CLAIM_TTL.to_s,
+      timeout: coordination_timeout,
+      termination_grace:
+    )
+    return if status&.success?
+
+    raise ClaimRefusedError, "release-line lease claim was refused" if status&.exitstatus == 3
+
+    raise ReleaseLeaseGuard::LeaseError, "release-line atomic claim is unavailable or UNKNOWN"
+  end
+
+  def renew_release_lease!(scope, identity, coordination_timeout:, termination_grace:)
+    _stdout, status = run_coordination_command(
+      release_claim_helper!,
+      "--renew",
+      "--agent-id", identity.agent_id,
+      "--instance-id", identity.instance_id,
+      "--machine-id", identity.machine_id,
+      "--repo", scope.repo,
+      "--target", scope.target,
+      "--branch", scope.branch,
+      "--ttl", CLAIM_TTL.to_s,
+      timeout: coordination_timeout,
+      termination_grace:
+    )
+    status&.success? || false
+  rescue SystemCallError
+    false
+  end
+
+  def release_claim_helper!
+    helper = File.join(repository_root!, "script", "release-claim")
+    return helper if File.file?(helper) && File.executable?(helper)
+
+    raise SupervisorError, "repository atomic release-claim helper is missing or not executable"
+  end
+
+  def verify_managed_acquisition_available!(scope, identity, coordination_timeout:, termination_grace:)
+    stdout, status = run_agent_coord(
+      "status", "--repo", scope.repo, "--target", scope.target, "--json",
+      timeout: coordination_timeout,
+      termination_grace:
+    )
+    unless status&.success?
+      raise ReleaseLeaseGuard::LeaseError, "release-line pre-acquisition status is unavailable or UNKNOWN"
+    end
+
+    claims = parse_pre_acquisition_claims!(stdout, scope)
+    return unless claims.any? { |claim| active_foreign_claim?(claim, identity) }
+
+    raise ReleaseLeaseGuard::LeaseError,
+          "release line already has an active foreign claim; do not infer takeover safety from lease or heartbeat age"
+  rescue JSON::ParserError, TypeError
+    raise ReleaseLeaseGuard::LeaseError, "release-line pre-acquisition status is malformed or UNKNOWN"
+  end
+
+  def parse_pre_acquisition_claims!(stdout, scope)
+    report = JSON.parse(stdout)
+    scope_report = report["scope"] if report.is_a?(Hash)
+    claims = report["claims"] if report.is_a?(Hash)
+    unless matching_target_scope?(scope_report, scope) && claims.is_a?(Array) &&
+           claims.all? { |claim| matching_claim?(claim, scope) }
+      raise ReleaseLeaseGuard::LeaseError, "release-line pre-acquisition status is malformed or UNKNOWN"
+    end
+
+    claims
+  end
+
+  def matching_target_scope?(scope_report, scope)
+    scope_report.is_a?(Hash) && scope_report["kind"] == "target" &&
+      scope_report["repo"] == scope.repo && scope_report["target"] == scope.target
+  end
+
+  def matching_claim?(claim, scope)
+    claim.is_a?(Hash) && claim["repo"] == scope.repo && claim["target"] == scope.target &&
+      CLAIM_STATUSES.include?(claim["status"])
+  end
+
+  def active_foreign_claim?(claim, identity)
+    claim["status"] == "active" &&
+      (claim["agent_id"] != identity.agent_id || claim["instance_id"] != identity.instance_id)
+  end
+
+  def release_managed_lease!(scope, identity, coordination_timeout:, termination_grace:)
+    _stdout, status = run_agent_coord(
+      "release",
+      "--agent-id", identity.agent_id,
+      "--instance-id", identity.instance_id,
+      "--repo", scope.repo,
+      "--target", scope.target,
+      timeout: coordination_timeout,
+      termination_grace:,
+      ignore_received_signal: true
+    )
+    status&.success? || false
+  rescue SystemCallError
+    false
+  end
+
+  def supervise_release(scope, identity, heartbeat_interval:, claim_renewal_interval:, termination_grace:,
+                        handshake_timeout:, coordination_timeout:)
     child_pid = nil
     pgid = nil
     liveness_writer = nil
     death_writer = nil
-    previous_signal_handlers = install_signal_handlers
-    enable_descendant_reaping!
-    verify_existing_lease!(scope, identity, coordination_timeout:, termination_grace:)
     unless heartbeat!(scope, identity, coordination_timeout:, termination_grace:)
       raise ReleaseLeaseGuard::LeaseError, "release lease heartbeat failed"
     end
 
+    verify_existing_lease!(scope, identity, coordination_timeout:, termination_grace:)
+
+    @managed_claim_release_safe = false if identity.managed
     child_pid, pgid, liveness_writer, death_writer = spawn_release_group(
       scope, identity, handshake_timeout:, termination_grace:
     )
     @stdout.puts "Release process group #{pgid} started."
     next_heartbeat = monotonic_time + heartbeat_interval
+    next_claim_renewal = initial_claim_renewal_deadline(identity, claim_renewal_interval)
 
     supervise_loop(
       scope,
@@ -263,7 +608,9 @@ class ReleaseSupervisor
       pgid:,
       liveness_writer:,
       next_heartbeat:,
+      next_claim_renewal:,
       heartbeat_interval:,
+      claim_renewal_interval:,
       termination_grace:,
       coordination_timeout:
     )
@@ -273,11 +620,10 @@ class ReleaseSupervisor
   ensure
     liveness_writer&.close unless liveness_writer&.closed?
     death_writer&.close unless death_writer&.closed?
-    restore_signal_handlers(previous_signal_handlers) if previous_signal_handlers
   end
 
-  def supervise_loop(scope, identity, child_pid:, pgid:, liveness_writer:, next_heartbeat:, heartbeat_interval:,
-                     termination_grace:, coordination_timeout:)
+  def supervise_loop(scope, identity, child_pid:, pgid:, liveness_writer:, next_heartbeat:, next_claim_renewal:,
+                     heartbeat_interval:, claim_renewal_interval:, termination_grace:, coordination_timeout:)
     loop do
       return interrupt_release(pgid, child_pid, liveness_writer, termination_grace) if @received_signal
 
@@ -285,15 +631,22 @@ class ReleaseSupervisor
       return complete_release(pgid, liveness_writer, child_status, termination_grace) if child_status
 
       now = monotonic_time
-      if now >= next_heartbeat
-        lease_live = refresh_lease?(scope, identity, coordination_timeout:, termination_grace:)
+      heartbeat_due = now >= next_heartbeat
+      claim_renewal_due = managed_claim_renewal_due?(identity, now, next_claim_renewal)
+      if lease_refresh_due?(heartbeat_due, claim_renewal_due)
+        lease_live = refresh_lease?(
+          scope, identity, renew_claim: claim_renewal_due, coordination_timeout:, termination_grace:
+        )
         return interrupt_release(pgid, child_pid, liveness_writer, termination_grace) if @received_signal
         return lose_lease(pgid, child_pid, liveness_writer, termination_grace) unless lease_live
 
-        next_heartbeat = now + heartbeat_interval
+        next_heartbeat = advanced_deadline(next_heartbeat, now, heartbeat_interval, heartbeat_due)
+        next_claim_renewal = advanced_deadline(
+          next_claim_renewal, now, claim_renewal_interval, claim_renewal_due
+        )
       end
 
-      sleep_duration = [POLL_INTERVAL, next_heartbeat - monotonic_time].min
+      sleep_duration = [POLL_INTERVAL, next_heartbeat - monotonic_time, next_claim_renewal - monotonic_time].min
       sleep(sleep_duration) if sleep_duration.positive?
     end
   rescue Errno::ECHILD
@@ -302,8 +655,26 @@ class ReleaseSupervisor
     1
   end
 
-  def refresh_lease?(scope, identity, coordination_timeout:, termination_grace:)
+  def initial_claim_renewal_deadline(identity, interval)
+    identity.managed ? monotonic_time + interval : Float::INFINITY
+  end
+
+  def managed_claim_renewal_due?(identity, now, deadline)
+    identity.managed && now >= deadline
+  end
+
+  def lease_refresh_due?(heartbeat_due, claim_renewal_due)
+    heartbeat_due || claim_renewal_due
+  end
+
+  def advanced_deadline(current, now, interval, due)
+    due ? now + interval : current
+  end
+
+  def refresh_lease?(scope, identity, renew_claim:, coordination_timeout:, termination_grace:)
     return false unless heartbeat!(scope, identity, coordination_timeout:, termination_grace:)
+    return false if @received_signal
+    return false if renew_claim && !renew_release_lease!(scope, identity, coordination_timeout:, termination_grace:)
     return false if @received_signal
 
     verify_existing_lease!(scope, identity, coordination_timeout:, termination_grace:)
@@ -317,6 +688,7 @@ class ReleaseSupervisor
     @stderr.puts "Release interrupted by signal #{@received_signal}; " \
                  "closed liveness channel and terminating process group #{pgid}."
     terminate_group(pgid, child_pid:, grace: termination_grace)
+    @managed_claim_release_safe = true
     report_group_handoff(pgid)
     128 + Signal.list.fetch(@received_signal)
   end
@@ -329,6 +701,7 @@ class ReleaseSupervisor
   def complete_release(pgid, liveness_writer, child_status, termination_grace)
     close_liveness(liveness_writer)
     terminate_group(pgid, child_pid: nil, grace: termination_grace)
+    @managed_claim_release_safe = true
     exit_code = process_status_code(child_status)
     @stdout.puts "Release process group #{pgid} completed with status #{exit_code}."
     report_group_handoff(pgid)
@@ -339,6 +712,7 @@ class ReleaseSupervisor
     close_liveness(liveness_writer)
     @stderr.puts "Release lease refresh failed; closed liveness channel and terminating process group #{pgid}."
     terminate_group(pgid, child_pid:, grace: termination_grace)
+    @managed_claim_release_safe = true
     report_group_handoff(pgid)
     1
   end
@@ -362,6 +736,7 @@ class ReleaseSupervisor
       close_release_pipes(pipes)
     ensure
       stop_unverified_child(child_pid, grace: termination_grace) if child_pid
+      @managed_claim_release_safe = true
     end
     raise
   ensure
@@ -468,12 +843,19 @@ class ReleaseSupervisor
   ensure
     if pgid && child_pid
       terminate_group(pgid, child_pid:, grace: termination_grace)
+      @managed_claim_release_safe = true
       report_group_handoff(pgid)
     end
   end
 
-  def run_agent_coord(*, timeout:, termination_grace:)
-    return ["", nil] if @received_signal
+  def run_agent_coord(*, timeout:, termination_grace:, ignore_received_signal: false)
+    run_coordination_command(
+      "agent-coord", *, timeout:, termination_grace:, ignore_received_signal:
+    )
+  end
+
+  def run_coordination_command(*command, timeout:, termination_grace:, ignore_received_signal: false)
+    return ["", nil] if @received_signal && !ignore_received_signal
 
     stdout_file = Tempfile.new("react-on-rails-release-coordination-stdout")
     stderr_file = Tempfile.new("react-on-rails-release-coordination-stderr")
@@ -481,9 +863,13 @@ class ReleaseSupervisor
     status = nil
     begin
       child_pid = Process.spawn(
-        "agent-coord", *, out: stdout_file, err: stderr_file, pgroup: true
+        *command, out: stdout_file, err: stderr_file, pgroup: true
       )
-      status = wait_for_coordination(child_pid, monotonic_time + timeout)
+      status = wait_for_coordination(
+        child_pid,
+        monotonic_time + timeout,
+        ignore_received_signal:
+      )
     ensure
       terminate_group(child_pid, child_pid:, grace: termination_grace) if child_pid
     end
@@ -494,11 +880,11 @@ class ReleaseSupervisor
     stderr_file&.close!
   end
 
-  def wait_for_coordination(child_pid, deadline)
+  def wait_for_coordination(child_pid, deadline, ignore_received_signal: false)
     loop do
       waited = Process.waitpid2(child_pid, Process::WNOHANG)
       return waited[1] if waited
-      return nil if @received_signal || monotonic_time >= deadline
+      return nil if (@received_signal && !ignore_received_signal) || monotonic_time >= deadline
 
       sleep POLL_INTERVAL
     end
