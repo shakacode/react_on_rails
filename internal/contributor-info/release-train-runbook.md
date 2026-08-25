@@ -141,7 +141,43 @@ participate in this lease, stop. The repository's merge-group CI does not rerun
 release-specific source-liveness, provenance, attribution, manual QA, or review
 gates and is not an alternative.
 
-Use one non-reusable identity for the lifetime of the coordinator process and
+#### Normal publication path
+
+The publication wrapper owns this coordination for a normal maintainer. Prepare
+and commit the next non-empty version section immediately after
+`### [Unreleased]`, then run:
+
+```bash
+# Optional after initial machine setup or when diagnosing configuration:
+script/release --doctor
+
+# Optional no-write preview of the same changelog-selected version:
+script/release --dry-run
+
+# Live publication; no positional version or per-run identity variables:
+script/release
+```
+
+`script/release` derives `release-line:X.Y.Z` and `release/X.Y.Z` from that
+changelog version, creates a fresh UUID-backed identity, claims the exact line,
+heartbeats and authoritatively verifies it, supervises the Rake process group,
+and releases its own claim after success, failure, or a handled signal. A
+refused, stale, local, unhealthy, or `UNKNOWN` backend state stops before release
+work. Do not pass a version; the wrapper rejects positional arguments so the
+committed changelog remains the source of truth.
+
+Managed acquisition is an atomic conditional write: an absent record is created
+with `If-None-Match: *`, while a released record is replaced only with the exact
+observed version in `If-Match`. Every active record is refused, including one
+whose holder appears dead, stale, or expired. A concurrent `409` is likewise a
+claim refusal. The preliminary status read is diagnostic only and never grants
+takeover authority.
+
+#### Advanced automation compatibility
+
+Automation that already coordinates a broader sequence of release-line writes
+may keep the externally supplied identity path below. This is not the normal
+publication setup. Such automation must use one non-reusable identity for the lifetime of the coordinator process and
 its supervised child processes. Generate a fresh UUID-backed agent id on every
 restart or handoff; never copy an old process's id into its replacement. Carry
 the same instance id in the claim and heartbeat as defense in depth. These
@@ -265,15 +301,20 @@ transition-only heartbeat is insufficient. If either refresh fails, stop all
 release-line writes until `acquire_release_line_lease` succeeds and the live
 assertion passes again.
 
-`script/release VERSION` is the sole supported live entry point for the
-compound publication task. It requires an already-active
-`release-line:X.Y.Z` claim for the current branch under the fresh, per-process
-`RELEASE_COORDINATOR_ID` / `RELEASE_COORDINATOR_INSTANCE_ID` and the stable
-`AGENT_COORD_MACHINE_ID`. The wrapper starts the helper in a dedicated process
-group, maintains a heartbeat below the five-minute maximum, and supplies a
-private liveness channel. Immediately before every outward write, the helper
-performs a new authoritative targeted status read and verifies the exact claim,
-identity, branch, heartbeat, supervisor, and process group.
+`script/release` is the sole supported live entry point for the compound
+publication task. Normal invocations automatically acquire the exact
+`release-line:X.Y.Z` claim for the current branch under a fresh per-process UUID
+and the stable `AGENT_COORD_MACHINE_ID`. If both
+`RELEASE_COORDINATOR_ID` and `RELEASE_COORDINATOR_INSTANCE_ID` are supplied,
+the wrapper preserves the advanced pre-acquired identity path and does not claim
+or release on the automation's behalf. The wrapper starts the helper in a
+dedicated process group, maintains a heartbeat below the five-minute maximum,
+renews its own exact active claim at least hourly with a conditional write, and
+supplies a private liveness channel. An identity mismatch, concurrent claim
+change, or failed heartbeat/renewal stops the supervised process group.
+Immediately before every outward write, the helper performs a new authoritative
+targeted status read and verifies the exact claim, identity, branch, heartbeat,
+supervisor, and process group.
 
 That fence is a point-in-time pre-write ownership check. An independent death
 watch holds a second private pipe and immediately kills the dedicated release
@@ -289,20 +330,27 @@ handoff proof on both platforms.
 Do not invoke live `bundle exec rake "release[...]"`, `sync_github_release`,
 or `release:reconcile_accelerated_rc` directly. They fail closed without the
 private wrapper contract; setting environment variables is not a substitute.
-Direct Rake is supported only for dry runs. The wrapper never acquires, takes
-over, or automatically releases a claim. If it stops, prove its printed process
-group and children are dead before an operator records a handoff or intentionally
-releases/acquires the line with a fresh UUID identity.
+Direct Rake is supported only for dry runs. A normal wrapper invocation releases
+only the claim it acquired. If it stops, it first terminates and proves its
+printed process group absent, then attempts claim cleanup. A cleanup failure is
+reported as an error and must be reconciled before retrying. Advanced automation
+retains ownership and cleanup responsibility for its externally supplied claim.
+
+If the supervisor loses child ownership or otherwise cannot prove the process
+group absent, it deliberately leaves its managed claim active and reports that
+explicit reconciliation is required. Claim expiry is not permission for a new
+normal wrapper to take over that record; reconcile the old process group and
+lease before retrying.
 
 ```bash
-# On release/17.0.0, after the existing claim and heartbeat have been verified:
-script/release "${RELEASE_VERSION}.rc.0"
+# On release/17.0.0 with a prepared ### [17.0.0.rc.0] section:
+script/release
 
 # Dry runs need no coordination identity or claim:
-script/release --dry-run "${RELEASE_VERSION}.rc.0"
+script/release --dry-run
 
 # Reconcile a previously accelerated RC under the same supervised contract:
-RELEASE_TRACKER=4842 script/release --reconcile-accelerated-rc "${RELEASE_VERSION}.rc.0"
+RELEASE_TRACKER=4842 script/release --reconcile-accelerated-rc
 ```
 
 `release:start`, `script/release-finish`, and release-line branch management are
@@ -369,7 +417,7 @@ intentionally releases/acquires the claim under a fresh identity.
 For a known tracker, retry with that exact issue:
 
 ```bash
-RELEASE_TRACKER=<issue> script/release VERSION
+RELEASE_TRACKER=<issue> script/release
 ```
 
 The supplied tracker is the expected canonical tracker, not a discovery scope.
@@ -380,15 +428,17 @@ bounded page/marker limits fail closed when complete durable history cannot be
 proved; GitHub issue search is not a completeness oracle.
 
 - **The tag exists and zero immutable packages were published.** After recording
-  exact evidence, resume only with `RELEASE_TRACKER=<issue> script/release VERSION`
+  exact evidence, resume only with `RELEASE_TRACKER=<issue> script/release`
   when the tracker is known; do not call live Rake directly or alter the tag.
 - **All six immutable packages were published, but GitHub release creation or
   update failed.** Preview `sync_github_release[X.Y.Z,true]`, then use
-  `RELEASE_TRACKER=<issue> script/release VERSION` for the fenced, idempotent
-  live create/edit when the tracker is known.
+  `RELEASE_TRACKER=<issue> script/release` for the fenced, idempotent
+  live create/edit when the tracker is known. The fully-complete short circuit
+  requires the exact prepared tag, title, notes, draft state, and prerelease
+  state; mere release existence does not block recovery of stale or draft data.
 - **Only a subset of the six immutable packages was published.** Stop and record
   the exact artifact set; resume only through
-  `RELEASE_TRACKER=<issue> script/release VERSION` when the tracker is known,
+  `RELEASE_TRACKER=<issue> script/release` when the tracker is known,
   whose read-only probes preserve immutable versions and whose every retry is
   fenced.
 
@@ -440,13 +490,12 @@ git push \
 
 **Step 1b — cut rc.0 from the branch.** After at least one CI run finishes on the `release/17.0.0` tip,
 ensure the rc changelog header is present (`$react-on-rails-update-changelog rc`
-targeting the branch). Use the explicit candidate through the supervised wrapper;
+targeting the branch). Let the supervised wrapper select that prepared candidate;
 do not invoke bare live Rake.
 
 ```bash
 # On release/17.0.0, with CHANGELOG.md stamped ### [17.0.0.rc.0]:
-require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
-script/release "${RELEASE_VERSION}.rc.0"
+script/release
 ```
 
 **Forgot to start the line first?** `script/release` deliberately requires the matching
@@ -482,7 +531,7 @@ Per-release-branch concurrency cancels an obsolete in-progress run when a newer 
 candidate is dispatched; the newest branch candidate is authoritative, so a failed or cancelled newer
 run never causes fallback to an older success.
 
-When `script/release VERSION` later pushes the version-bump commit, it first watches the latest
+When `script/release` later pushes the version-bump commit, it first watches the latest
 prepared-candidate pre-run if that run is still active. A failed or otherwise non-reusable exact-head run
 does not prevent the task from considering the latest pre-run. The task reuses completed pre-run evidence
 only when all of these checks succeed:
@@ -1262,8 +1311,7 @@ and the final:
 
 ```bash
 # $react-on-rails-update-changelog release   (collapses rc sections into ### [17.0.0])
-require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
-script/release "${RELEASE_VERSION}"
+script/release
 ```
 
 > **Run the stable promotion from `release/X.Y.Z` itself.** `rakelib/release.rake` allows a stable
