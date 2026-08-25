@@ -83,6 +83,10 @@ setup_case() {
   exception_group_log="${case_dir}/exception-group.log"
 
   mkdir -p "${fake_bin}" "${fake_repo}"
+  cat >"${fake_bin}/pnpm" <<'FAKE_PNPM'
+#!/usr/bin/env bash
+exit 0
+FAKE_PNPM
   : >"${coord_log}"
   : >"${bundle_log}"
   : >"${output_log}"
@@ -568,7 +572,8 @@ end
 exit UnverifiedChildTestSupervisor.new([]).run
 UNVERIFIED_CHILD_HARNESS
 
-  chmod +x "${fake_bin}/agent-coord" "${fake_bin}/bundle" "${fake_bin}/release-handshake-harness" \
+  chmod +x "${fake_bin}/agent-coord" "${fake_bin}/bundle" "${fake_bin}/pnpm" \
+    "${fake_bin}/release-handshake-harness" \
     "${fake_bin}/release-exception-harness" "${fake_bin}/release-subreaper-failure-harness" \
     "${fake_bin}/release-unverified-child-harness" "${fake_bin}/release-echild-harness"
 
