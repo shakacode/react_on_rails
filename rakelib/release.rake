@@ -13,6 +13,7 @@ require "tempfile"
 require "time"
 require "tmpdir"
 require "uri"
+require_relative "release_changelog_selector"
 require_relative "release_lease_guard"
 require_relative "task_helpers"
 require_relative "../react_on_rails/lib/react_on_rails/version_syntax_converter"
@@ -3092,6 +3093,33 @@ def resolve_release_version_before_auth!(version_input:, monorepo_root:, dry_run
   resolved_version_input
 end
 
+def validate_supervised_release_version_after_pull!(monorepo_root:, selected_version:, dry_run:)
+  return if dry_run
+  return if ENV.fetch(ReleaseLeaseGuard::CONTRACT_ENV, nil).to_s.empty?
+
+  refreshed_version = prepared_release_version_from_changelog(monorepo_root:)
+  return if refreshed_version == selected_version
+
+  abort <<~ERROR
+    ❌ The prepared CHANGELOG.md release changed from #{selected_version} to #{refreshed_version || 'none'}
+    after `git pull --rebase`, or its selected section is now empty.
+
+    No publication has started. Review the refreshed changelog and rerun `script/release`
+    so its release-line claim and supervised contract bind the refreshed version.
+  ERROR
+end
+
+def prepared_release_version_from_changelog(monorepo_root:)
+  changelog_path = File.join(monorepo_root, "CHANGELOG.md")
+  lines = File.readlines(changelog_path)
+  ReleaseChangelogSelector.prepared_version(
+    lines,
+    version_pattern: ReleaseLeaseGuard::RELEASE_VERSION_PATTERN
+  )
+rescue Errno::ENOENT, Errno::EACCES
+  nil
+end
+
 def current_gem_version(monorepo_root)
   version_file = File.join(monorepo_root, "react_on_rails", "lib", "react_on_rails", "version.rb")
   content = File.read(version_file)
@@ -5630,7 +5658,7 @@ def build_accelerated_rc_publication_record(options:, candidate_sha:, runtime_tr
     "approved_by" => approved_by,
     "recorded_at" => recorded_at.iso8601,
     "required_follow_up" => "Complete immutable publication, then run " \
-                            "script/release --reconcile-accelerated-rc #{options.fetch(:target_gem_version)} " \
+                            "script/release --reconcile-accelerated-rc " \
                             "before final.",
     "evidence" => {}
   }
@@ -5878,7 +5906,7 @@ def accelerated_rc_published_record(authorized_record:, recorded_at:, approved_b
     "approved_by" => approved_by,
     "recorded_at" => recorded_at.iso8601,
     "required_follow_up" => "Run script/release --reconcile-accelerated-rc " \
-                            "#{authorized_record.fetch('target_version')} before promoting this RC to final."
+                            "before final promotion."
   )
 end
 
@@ -5923,6 +5951,8 @@ def accelerated_rc_publication_completion_equivalent?(existing, expected)
     comparable = record.except(*retry_variant_fields)
     supported_follow_ups = [
       ACCELERATED_RC_LEGACY_PUBLICATION_FOLLOW_UP,
+      "Run script/release --reconcile-accelerated-rc before final promotion.",
+      "Run script/release --reconcile-accelerated-rc before promoting this RC to final.",
       "Run script/release --reconcile-accelerated-rc #{record['target_version']} " \
       "before promoting this RC to final."
     ]
@@ -8757,10 +8787,11 @@ end
 
 def release_compound_live_boundary_guidance
   <<~GUIDANCE.chomp
-    Live release uses only `script/release VERSION`, which requires the existing matching release-line
-    lease and performs fresh authoritative fences before every outward write. Direct live Rake is refused
-    without its private supervisor contract; use `bundle exec rake "release[VERSION,true]"` only to preview.
-    See internal/contributor-info/release-train-runbook.md for the claim, identity, and recovery procedure.
+    Live release uses only `script/release`, which selects the prepared CHANGELOG.md version, acquires the
+    matching release-line lease, and performs fresh authoritative fences before every outward write. Direct
+    live Rake is refused without its private supervisor contract; use `bundle exec rake
+    "release[VERSION,true]"` only for an explicit internal preview. See
+    internal/contributor-info/release-train-runbook.md for automation compatibility and recovery procedures.
   GUIDANCE
 end
 
@@ -8965,8 +8996,8 @@ end
 def github_release_sync_preview_guidance(version:)
   <<~GUIDANCE.chomp
     Direct live sync_github_release is refused without the private release supervisor contract. For a
-    fenced idempotent create or edit, use `script/release #{version}` after verifying its existing matching
-    lease and exact artifact evidence; do not invoke this task live directly.
+    fenced idempotent create or edit, keep #{version} as the prepared CHANGELOG.md version and use
+    `script/release`; do not invoke this task live directly.
     See internal/contributor-info/release-train-runbook.md for the recovery procedure.
     Preview the idempotent GitHub-only sync step with:
       bundle exec rake "sync_github_release[#{version},true]"
@@ -9314,6 +9345,50 @@ def preflight_registry_publish_conflicts!(gem_version:, npm_version:, idempotent
     #{conflicts.map { |artifact| "  - #{artifact}" }.join("\n")}
 
     Verify the artifact source or remove the conflicting version before tagging and publishing this release.
+  ERROR
+end
+
+def release_registry_publication_complete?(gem_version:, npm_version:)
+  NPM_RELEASE_PACKAGE_NAMES.all? do |package_name|
+    npm_package_already_published?(package_name, npm_version)
+  end && RUBYGEMS_RELEASE_GEM_NAMES.all? do |gem_name|
+    rubygem_version_published?(gem_name, gem_version)
+  end
+end
+
+def github_release_complete?(monorepo_root:, version:)
+  release_context = prepare_github_release_context(monorepo_root:, gem_version: version)
+  repo_slug = github_repo_slug(monorepo_root)
+  output, status = capture_gh_output(
+    "release", "view", release_context.fetch(:tag), "--repo", repo_slug,
+    "--json", "tagName,name,body,isDraft,isPrerelease"
+  )
+  return false unless status.success?
+
+  release = JSON.parse(output)
+  release.is_a?(Hash) && release == {
+    "tagName" => release_context.fetch(:tag),
+    "name" => release_context.fetch(:title),
+    "body" => release_context.fetch(:notes),
+    "isDraft" => false,
+    "isPrerelease" => release_context.fetch(:prerelease)
+  }
+rescue JSON::ParserError
+  false
+end
+
+def abort_if_fully_published_release!(monorepo_root:, gem_version:, npm_version:, idempotent_retry:)
+  return unless idempotent_retry
+  return unless release_registry_publication_complete?(gem_version:, npm_version:)
+  return unless github_release_complete?(monorepo_root:, version: gem_version)
+
+  abort <<~ERROR
+    ❌ #{gem_version} is already fully published.
+
+    Prepare and commit the next non-empty CHANGELOG.md section immediately after
+    `### [Unreleased]`, then rerun:
+
+      script/release
   ERROR
 end
 
@@ -9748,11 +9823,12 @@ Retry safety: Never drop the version argument when previewing recovery from an i
 Preview the exact version, for example `bundle exec rake \"release[16.2.0.rc.1,true]\"`. An argument-less
 command from a prerelease checkout fails closed instead of inferring promotion to the stable version.
 
-Live release entry point: `script/release VERSION`. It requires an existing matching
-release-line claim and supervises this task with fresh authoritative per-write lease fences.
+Live release entry point: `script/release`. It reads the first prepared version after
+`### [Unreleased]`, acquires the matching release-line claim under a fresh process UUID, and
+supervises this task with fresh authoritative per-write lease fences.
 Direct live `bundle exec rake release[...]` is refused without that private wrapper contract;
 use Rake directly only with `dry_run=true`. See internal/contributor-info/release-train-runbook.md
-for claim acquisition, identity, recovery, and the supervised reconciliation path.
+for one-time machine setup, automation compatibility, recovery, and the supervised reconciliation path.
 
 This will update and release:
   PUBLIC (npmjs.org + rubygems.org):
@@ -9819,9 +9895,9 @@ Environment variables:
   GEM_RELEASE_MAX_RETRIES=<n>  # Positive base-10 integer max retry attempts (default: 3)
 
 Examples:
-  script/release 16.2.0.rc.1                  # Only supported live publication path
-  script/release --dry-run 16.2.0.rc.1        # Preview without coordination
-  script/release --reconcile-accelerated-rc 16.2.0.rc.1 # Supervised accelerated-RC reconciliation
+  script/release                              # Only supported live publication path
+  script/release --dry-run                    # Preview the prepared version without coordination
+  script/release --reconcile-accelerated-rc   # Supervised accelerated-RC reconciliation
   rake \"release[,true]\"                       # Preview auto-detected version
   rake \"release[patch,true]\"                  # Preview patch bump (16.1.1 → 16.1.2)
   rake \"release[minor,true]\"                  # Preview minor bump (16.1.1 → 16.2.0)
@@ -9895,6 +9971,12 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
         readiness_sha: npm_readiness_sha
       )
     end
+
+    validate_supervised_release_version_after_pull!(
+      monorepo_root: release_root,
+      selected_version: args_hash.fetch(:version, "").to_s.strip,
+      dry_run: is_dry_run
+    )
 
     version_input = resolve_release_version_before_auth!(
       version_input: args_hash.fetch(:version, ""),
@@ -10093,6 +10175,12 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
 
     unless is_dry_run
       preflight_registry_publish_conflicts!(
+        gem_version: resolved_target_gem_version,
+        npm_version: resolved_target_npm_version,
+        idempotent_retry: idempotent_publish_retry
+      )
+      abort_if_fully_published_release!(
+        monorepo_root: release_root,
         gem_version: resolved_target_gem_version,
         npm_version: resolved_target_npm_version,
         idempotent_retry: idempotent_publish_retry
@@ -10357,7 +10445,7 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
           approved_by: accelerated_approver
         )
         puts "⚠️ RC published with gates still reconciling. Before final promotion, run:"
-        puts "  RELEASE_TRACKER=#{tracker} script/release --reconcile-accelerated-rc #{actual_gem_version}"
+        puts "  RELEASE_TRACKER=#{tracker} script/release --reconcile-accelerated-rc"
       end
     end
   end
@@ -10418,8 +10506,8 @@ end
 desc("Creates or updates a GitHub release from CHANGELOG.md for an already-published version.
 
 Direct live sync_github_release is refused without the private release supervisor contract. Preview this
-task directly; for a fenced idempotent create or edit, use `script/release VERSION` after verifying its
-existing matching lease and exact artifact evidence. See internal/contributor-info/release-train-runbook.md.
+task directly; for a fenced idempotent create or edit, keep the exact published version as the prepared
+CHANGELOG.md section and use `script/release`. See internal/contributor-info/release-train-runbook.md.
 
 Arguments:
 1st argument: Gem version in RubyGems format (required), e.g. 16.4.0 or 16.4.0.rc.1
