@@ -24179,6 +24179,50 @@ RSpec.describe "release.rake helper methods" do
 
     after { reconciliation_task.reenable }
 
+    it "refuses a dirty checkout before pulling or writing tracker state" do
+      allow(task_receiver).to receive(:current_monorepo_root).and_return("/tmp/repo")
+      allow(ENV).to receive(:fetch).and_call_original
+      allow(ENV).to receive(:fetch).with("RELEASE_TRACKER", nil).and_return("3823")
+      expect(ReleaseLeaseGuard).to receive(:activate!).with(dry_run: false).ordered
+      expect(ReactOnRails::GitUtils).to receive(:uncommitted_changes?)
+        .with(an_instance_of(RaisingMessageHandler))
+        .ordered
+        .and_raise(RuntimeError, "You have uncommitted changes")
+      expect(task_receiver).not_to receive(:sh_in_dir_for_release)
+      expect(task_receiver).not_to receive(:verify_gh_auth)
+      expect(task_receiver).not_to receive(:run_accelerated_rc_reconciliation!)
+
+      expect do
+        reconciliation_task.invoke("17.0.0.rc.10")
+      end.to raise_error(RuntimeError, /uncommitted changes/)
+    end
+
+    {
+      "changes versions" => "17.0.0.rc.11",
+      "becomes empty" => nil
+    }.each do |description, refreshed_version|
+      it "refuses reconciliation when the post-pull changelog #{description}" do
+        allow(task_receiver).to receive(:current_monorepo_root).and_return("/tmp/repo")
+        allow(ENV).to receive(:fetch).and_call_original
+        allow(ENV).to receive(:fetch).with(ReleaseLeaseGuard::CONTRACT_ENV, nil).and_return("supervised-contract")
+        allow(ENV).to receive(:fetch).with("RELEASE_TRACKER", nil).and_return("3823")
+        allow(ReactOnRails::GitUtils).to receive(:uncommitted_changes?)
+        allow(task_receiver).to receive(:sh_in_dir_for_release).with("/tmp/repo", "git pull --rebase")
+        allow(task_receiver).to receive(:prepared_release_version_from_changelog)
+          .with(monorepo_root: "/tmp/repo")
+          .and_return(refreshed_version)
+        expect(task_receiver).not_to receive(:verify_gh_auth)
+        expect(task_receiver).not_to receive(:run_accelerated_rc_reconciliation!)
+
+        expect do
+          reconciliation_task.invoke("17.0.0.rc.10")
+        end.to raise_error(
+          SystemExit,
+          /changed from 17\.0\.0\.rc\.10 to #{refreshed_version || 'none'}.*No publication has started/m
+        )
+      end
+    end
+
     it "uses the supervised contract and fences the terminal tracker write" do
       authorization, publication, accepted = accelerated_rc_test_accepted_history
       tracker_reads = 0
@@ -24214,6 +24258,16 @@ RSpec.describe "release.rake helper methods" do
       end
 
       expect(ReleaseLeaseGuard).to receive(:activate!).with(dry_run: false).ordered
+      expect(ReactOnRails::GitUtils).to receive(:uncommitted_changes?)
+        .with(an_instance_of(RaisingMessageHandler))
+        .ordered
+        .and_return(false)
+      expect(task_receiver).to receive(:sh_in_dir_for_release)
+        .with("/tmp/repo", "git pull --rebase")
+        .ordered
+      expect(task_receiver).to receive(:validate_supervised_release_version_after_pull!)
+        .with(monorepo_root: "/tmp/repo", selected_version: "17.0.0.rc.10", dry_run: false)
+        .ordered
       expect(task_receiver).to receive(:verify_gh_auth).with(monorepo_root: "/tmp/repo").ordered
       expect(ReleaseLeaseGuard).to receive(:fence!).ordered
       expect(task_receiver).to receive(:capture_gh_output)

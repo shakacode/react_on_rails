@@ -10598,6 +10598,13 @@ namespace :release do
     target_version = args[:version].to_s.strip
     abort "❌ Accelerated RC reconciliation requires an explicit RC version." if target_version.empty?
     validate_canonical_accelerated_rc_target!(target_version)
+    ReactOnRails::GitUtils.uncommitted_changes?(RaisingMessageHandler.new)
+    sh_in_dir_for_release(monorepo_root, "git pull --rebase")
+    validate_supervised_release_version_after_pull!(
+      monorepo_root:,
+      selected_version: target_version,
+      dry_run: false
+    )
 
     tracker_input = ENV.fetch("RELEASE_TRACKER", nil)
     unless tracker_input.to_s.match?(/\A[1-9]\d*\z/)
