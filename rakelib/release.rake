@@ -13,6 +13,7 @@ require "tempfile"
 require "time"
 require "tmpdir"
 require "uri"
+require_relative "release_lease_guard"
 require_relative "task_helpers"
 require_relative "../react_on_rails/lib/react_on_rails/version_syntax_converter"
 require_relative "../react_on_rails/lib/react_on_rails/git_utils"
@@ -101,6 +102,9 @@ ACCELERATED_RC_RECORD_IDENTITY_FIELDS = %w[status target_version candidate_sha].
 ACCELERATED_RC_PENDING_STATUSES = %w[publication-authorized published-awaiting-gates].freeze
 ACCELERATED_RC_TERMINAL_STATUSES = %w[candidate-accepted candidate-rejected].freeze
 ACCELERATED_RC_RECORD_STATUSES = (ACCELERATED_RC_PENDING_STATUSES + ACCELERATED_RC_TERMINAL_STATUSES).freeze
+ACCELERATED_RC_LEGACY_PUBLICATION_FOLLOW_UP =
+  "Run release:reconcile_accelerated_rc before promoting this RC to final."
+ACCELERATED_RC_PUBLICATION_FOLLOW_UP_CANONICAL_VALUE = "reconcile-accelerated-rc-before-final"
 ACCELERATED_RC_REQUIRED_EVIDENCE = %w[demo_fleet behavioral artifacts].freeze
 ACCELERATED_RC_RECORD_FIELDS = %w[
   schema_version status target_version candidate_sha runtime_tree_fingerprint release_branch release_tracker ci
@@ -317,6 +321,20 @@ def release_truthy?(value)
   [true, "true", "yes", 1, "1", "t"].include?(value.instance_of?(String) ? value.downcase : value)
 end
 
+def activate_release_lease_guard!(dry_run:)
+  return if dry_run
+
+  ReleaseLeaseGuard.activate!(dry_run: false)
+rescue ReleaseLeaseGuard::LeaseError => e
+  abort "❌ Live release requires the supervised `script/release` wrapper: #{e.message}"
+end
+
+def release_write_fence!(operation)
+  ReleaseLeaseGuard.fence!
+rescue ReleaseLeaseGuard::LeaseError => e
+  abort "❌ Release lease fence failed before #{operation}: #{e.message}"
+end
+
 def release_paths(monorepo_root)
   {
     monorepo_root:,
@@ -334,6 +352,11 @@ def sh_in_dir_for_release(dir, *shell_commands)
       sh(shell_command.strip)
     end
   end
+end
+
+def push_release_version_commit!(release_root)
+  release_write_fence!("push version commit")
+  sh_in_dir_for_release(release_root, "LEFTHOOK=0 git push")
 end
 
 def sh_args_in_dir_for_release(dir, *command_args, env: nil)
@@ -2511,6 +2534,7 @@ def print_shakaperf_release_gate_notice(ref:, head_sha:)
 end
 
 def dispatch_shakaperf_release_gate_workflow!(repo_slug:, ref:, target_version:, candidate_sha:)
+  release_write_fence!("dispatch ShakaPerf release gate")
   output, status = capture_gh_output(
     "workflow", "run", SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE,
     "--repo", repo_slug,
@@ -4031,14 +4055,18 @@ def resolve_accelerated_rc_options_for_release!(requested:, explicit_version_inp
                          current_checkout_version == target_gem_version
   return requested_options unless same_candidate_retry
 
+  selected_tracker = normalize_accelerated_rc_retry_tracker(tracker)
+
   unless candidate_sha.to_s.match?(/\A[0-9a-f]{40}\z/)
     abort "❌ Accelerated RC same-candidate retry discovery requires the exact current candidate SHA."
   end
 
-  authorization = accelerated_rc_authorization_for_same_candidate_retry!(
+  authorization_args = {
     repo_slug:, monorepo_root:, target_version: target_gem_version, candidate_sha:,
     accelerated_requested: !requested_options.nil?
-  )
+  }
+  authorization_args[:tracker] = selected_tracker if selected_tracker
+  authorization = accelerated_rc_authorization_for_same_candidate_retry!(**authorization_args)
   return requested_options unless authorization
 
   validate_explicit_accelerated_rc_retry_options!(requested_options, authorization) if requested_options
@@ -4054,6 +4082,14 @@ def resolve_accelerated_rc_options_for_release!(requested:, explicit_version_inp
     reason: authorization.fetch("reason"),
     allow_ci_override: false
   }
+end
+
+def normalize_accelerated_rc_retry_tracker(tracker)
+  normalized_tracker = tracker.to_s.strip
+  return nil if normalized_tracker.empty?
+  return normalized_tracker.to_i if normalized_tracker.match?(/\A[1-9]\d*\z/)
+
+  abort "❌ Accelerated RC same-candidate retry tracker must be a positive issue number."
 end
 
 def validate_explicit_accelerated_rc_retry_options!(requested_options, authorization)
@@ -4301,7 +4337,11 @@ def fetch_accelerated_rc_tracker_records!(repo_slug:, tracker:)
 end
 
 def fetch_repository_accelerated_rc_records_for_candidate!(repo_slug:, target_version:, candidate_sha:)
-  comments = fetch_repository_issue_comments_for_accelerated_rc_retry!(repo_slug:)
+  candidate_commit_time = accelerated_rc_candidate_comment_lower_bound!(repo_slug:, candidate_sha:)
+  candidate_comment_since = (shakaperf_release_gate_time(candidate_commit_time) - 1).utc.iso8601
+  comments = fetch_repository_issue_comments_for_accelerated_rc_retry!(
+    repo_slug:, since: candidate_comment_since
+  )
   marker_comments = comments.select do |comment|
     next false unless accelerated_rc_machine_marker_comment?(comment)
 
@@ -4319,7 +4359,34 @@ def fetch_repository_accelerated_rc_records_for_candidate!(repo_slug:, target_ve
     )
   end
 
-  accelerated_rc_records_for_candidate(records, target_version:, candidate_sha:)
+  candidate_records = accelerated_rc_records_for_candidate(records, target_version:, candidate_sha:)
+  validate_accelerated_rc_candidate_record_times!(candidate_records, candidate_commit_time)
+  candidate_records
+end
+
+def accelerated_rc_candidate_comment_lower_bound!(repo_slug:, candidate_sha:)
+  output, status = capture_gh_output(
+    "api", "repos/#{repo_slug}/commits/#{candidate_sha}", "--jq", ".commit.committer.date"
+  )
+  abort "❌ Unable to establish the candidate commit time for bounded accelerated RC history.\n\n#{output}" unless
+    status.success?
+
+  timestamp = output.strip
+  commit_time = shakaperf_release_gate_time(timestamp)
+  if commit_time.nil? || commit_time > Time.now.utc
+    abort "❌ Candidate commit time is missing, malformed, or in the future; durable retry history is unknown."
+  end
+
+  commit_time.utc.iso8601
+end
+
+def validate_accelerated_rc_candidate_record_times!(records, lower_bound)
+  lower_bound_time = shakaperf_release_gate_time(lower_bound)
+  valid = lower_bound_time && records.all? do |record|
+    recorded_at = shakaperf_release_gate_time(record["recorded_at"])
+    recorded_at && recorded_at >= lower_bound_time
+  end
+  abort "❌ Accelerated RC history predates the candidate commit; durable retry history is invalid." unless valid
 end
 
 def validated_repository_accelerated_rc_candidate_history!(
@@ -4435,18 +4502,19 @@ def validate_accelerated_rc_comment_identity!(comment:, repo_slug:, state:, expe
   metadata
 end
 
-def accelerated_rc_comment_page_endpoint(repo_slug:, tracker:, page:)
+def accelerated_rc_comment_page_endpoint(repo_slug:, tracker:, page:, since: nil)
   resource = tracker ? "repos/#{repo_slug}/issues/#{tracker}/comments" : "repos/#{repo_slug}/issues/comments"
-  "#{resource}?per_page=#{ACCELERATED_RC_REPOSITORY_COMMENT_PAGE_SIZE}" \
-    "&sort=created&direction=asc&page=#{page}"
+  endpoint = "#{resource}?per_page=#{ACCELERATED_RC_REPOSITORY_COMMENT_PAGE_SIZE}" \
+             "&sort=created&direction=asc&page=#{page}"
+  since ? "#{endpoint}&since=#{URI.encode_www_form_component(since)}" : endpoint
 end
 
 def accelerated_rc_comment_source_label(tracker)
   tracker ? "release tracker ##{tracker}" : "repository"
 end
 
-def fetch_accelerated_rc_comment_page!(repo_slug:, tracker:, page:, state:)
-  endpoint = accelerated_rc_comment_page_endpoint(repo_slug:, tracker:, page:)
+def fetch_accelerated_rc_comment_page!(repo_slug:, tracker:, page:, state:, since: nil)
+  endpoint = accelerated_rc_comment_page_endpoint(repo_slug:, tracker:, page:, since:)
   output, status = capture_gh_output("api", endpoint)
   source = accelerated_rc_comment_source_label(tracker)
   abort "❌ Unable to read #{source} comments for accelerated RC history.\n\n#{output}" unless status.success?
@@ -4468,11 +4536,11 @@ rescue JSON::ParserError => e
   abort "❌ #{source.capitalize} comments returned invalid JSON: #{e.message}"
 end
 
-def fetch_bounded_accelerated_rc_marker_comments!(repo_slug:, tracker: nil)
+def fetch_bounded_accelerated_rc_marker_comments!(repo_slug:, tracker: nil, since: nil)
   marker_comments = []
   state = { seen_ids: {}, last_created_at: nil }
   1.upto(ACCELERATED_RC_REPOSITORY_COMMENT_MAX_PAGES) do |page|
-    comments = fetch_accelerated_rc_comment_page!(repo_slug:, tracker:, page:, state:)
+    comments = fetch_accelerated_rc_comment_page!(repo_slug:, tracker:, page:, state:, since:)
 
     marker_comments.concat(
       comments.select { |comment| accelerated_rc_machine_marker_comment?(comment) }
@@ -4489,8 +4557,8 @@ def fetch_bounded_accelerated_rc_marker_comments!(repo_slug:, tracker: nil)
   abort "❌ Bounded #{source} issue-comment page limit was reached; durable retry history is unknown."
 end
 
-def fetch_repository_issue_comments_for_accelerated_rc_retry!(repo_slug:)
-  fetch_bounded_accelerated_rc_marker_comments!(repo_slug:)
+def fetch_repository_issue_comments_for_accelerated_rc_retry!(repo_slug:, tracker: nil, since: nil)
+  fetch_bounded_accelerated_rc_marker_comments!(repo_slug:, tracker:, since:)
 end
 
 def trusted_accelerated_rc_records_from_repository_comment!(
@@ -4630,6 +4698,7 @@ def post_release_tracker_comment!(repo_slug:, tracker:, body:)
   Tempfile.create(["accelerated-rc-record", ".md"]) do |file|
     file.write(body)
     file.flush
+    release_write_fence!("post release tracker comment")
     output, status = capture_gh_output(
       "issue", "comment", tracker.to_s, "--repo", repo_slug, "--body-file", file.path
     )
@@ -5390,6 +5459,7 @@ def push_release_tag_for_candidate!(monorepo_root:, tag:, candidate_sha:, accele
     monorepo_root:, tag:, candidate_sha:, phase: "git tag push"
   )
   validate_ordinary_shakaperf_boundary!(monorepo_root:, contexts: shakaperf_contexts, phase: "git tag push")
+  release_write_fence!("push release tag #{tag}")
   sh_in_dir_for_release(monorepo_root, "LEFTHOOK=0 git push --tags")
   validate_accelerated_tag_publication_phase!(
     monorepo_root:, record: boundary_record, final_promotion_context: accelerated_final_promotion_context,
@@ -5431,12 +5501,12 @@ def accelerated_rc_records_for_candidate(records, target_version:, candidate_sha
 end
 
 def accelerated_rc_authorization_for_same_candidate_retry!(
-  repo_slug:, monorepo_root:, target_version:, candidate_sha:, accelerated_requested:
+  repo_slug:, monorepo_root:, target_version:, candidate_sha:, accelerated_requested:, tracker: nil
 )
   tag = "v#{target_version}"
   tag_exists = local_release_tag_exists?(monorepo_root:, tag:)
   history = validated_repository_accelerated_rc_candidate_history!(
-    repo_slug:, target_version:, candidate_sha:, allow_empty: true
+    repo_slug:, target_version:, candidate_sha:, expected_tracker: tracker, allow_empty: true
   )
   candidate_records = history.fetch(:records)
   if candidate_records.empty?
@@ -5559,7 +5629,9 @@ def build_accelerated_rc_publication_record(options:, candidate_sha:, runtime_tr
     "reason" => options.fetch(:reason),
     "approved_by" => approved_by,
     "recorded_at" => recorded_at.iso8601,
-    "required_follow_up" => "Complete immutable publication, then run release:reconcile_accelerated_rc before final.",
+    "required_follow_up" => "Complete immutable publication, then run " \
+                            "script/release --reconcile-accelerated-rc #{options.fetch(:target_gem_version)} " \
+                            "before final.",
     "evidence" => {}
   }
 end
@@ -5805,7 +5877,8 @@ def accelerated_rc_published_record(authorized_record:, recorded_at:, approved_b
     "status" => "published-awaiting-gates",
     "approved_by" => approved_by,
     "recorded_at" => recorded_at.iso8601,
-    "required_follow_up" => "Run release:reconcile_accelerated_rc before promoting this RC to final."
+    "required_follow_up" => "Run script/release --reconcile-accelerated-rc " \
+                            "#{authorized_record.fetch('target_version')} before promoting this RC to final."
   )
 end
 
@@ -5846,8 +5919,20 @@ end
 
 def accelerated_rc_publication_completion_equivalent?(existing, expected)
   retry_variant_fields = %w[approved_by recorded_at]
-  canonical_accelerated_rc_value(existing.except(*retry_variant_fields)) ==
-    canonical_accelerated_rc_value(expected.except(*retry_variant_fields))
+  normalize = lambda do |record|
+    comparable = record.except(*retry_variant_fields)
+    supported_follow_ups = [
+      ACCELERATED_RC_LEGACY_PUBLICATION_FOLLOW_UP,
+      "Run script/release --reconcile-accelerated-rc #{record['target_version']} " \
+      "before promoting this RC to final."
+    ]
+    if supported_follow_ups.include?(comparable["required_follow_up"])
+      comparable["required_follow_up"] = ACCELERATED_RC_PUBLICATION_FOLLOW_UP_CANONICAL_VALUE
+    end
+    canonical_accelerated_rc_value(comparable)
+  end
+
+  normalize.call(existing) == normalize.call(expected)
 end
 
 def validated_accelerated_rc_publication_set!(candidate_records, authorization, require_publication: false)
@@ -8672,10 +8757,10 @@ end
 
 def release_compound_live_boundary_guidance
   <<~GUIDANCE.chomp
-    Live compound release remains BLOCKED by operational and agent policy until the repository-owned
-    lifetime/per-write lease wrapper exists. This is not runtime enforcement: the release tasks remain
-    technically callable in live mode. Direct live invocation outside the individually guarded procedure in
-    internal/contributor-info/release-train-runbook.md violates repository policy.
+    Live release uses only `script/release VERSION`, which requires the existing matching release-line
+    lease and performs fresh authoritative fences before every outward write. Direct live Rake is refused
+    without its private supervisor contract; use `bundle exec rake "release[VERSION,true]"` only to preview.
+    See internal/contributor-info/release-train-runbook.md for the claim, identity, and recovery procedure.
   GUIDANCE
 end
 
@@ -8879,10 +8964,10 @@ end
 
 def github_release_sync_preview_guidance(version:)
   <<~GUIDANCE.chomp
-    Live GitHub release recovery remains BLOCKED by operational and agent policy until the repository-owned
-    lifetime/per-write lease wrapper exists. This is not runtime enforcement: sync_github_release remains
-    technically callable in live mode. Direct live invocation outside the individually guarded procedure in
-    internal/contributor-info/release-train-runbook.md violates repository policy.
+    Direct live sync_github_release is refused without the private release supervisor contract. For a
+    fenced idempotent create or edit, use `script/release #{version}` after verifying its existing matching
+    lease and exact artifact evidence; do not invoke this task live directly.
+    See internal/contributor-info/release-train-runbook.md for the recovery procedure.
     Preview the idempotent GitHub-only sync step with:
       bundle exec rake "sync_github_release[#{version},true]"
   GUIDANCE
@@ -8921,6 +9006,7 @@ def publish_or_update_github_release(monorepo_root:, release_context:, dry_run:)
                       end
 
     puts "Publishing GitHub release #{release_context[:tag]}#{release_context[:prerelease] ? ' (prerelease)' : ''}"
+    release_write_fence!("#{release_command.fetch(2)} GitHub release #{release_context[:tag]}")
     success = system(*release_command, chdir: monorepo_root)
     abort_github_release_publish_failure!(release_context[:tag]) unless success
   end
@@ -9279,6 +9365,7 @@ def publish_gem_with_retry(dir, gem_name, otp: nil, published_version: nil, idem
       # because `gem release` (gem-release gem) doesn't support --otp,
       # but the underlying `gem push` reads OTP from this env var
       gem_release_env = current_otp ? { "GEM_HOST_OTP_CODE" => current_otp } : nil
+      release_write_fence!("publish RubyGem #{gem_name} attempt #{retry_count + 1}")
       sh_args_in_dir_for_release(dir, "gem", "release", env: gem_release_env)
       success = true
     # Rake's sh method raises RuntimeError (not Gem exceptions) when commands fail
@@ -9556,9 +9643,10 @@ def npm_publish_local_lifecycle_failure?(text)
   end || text.each_line.any? { |line| line.match?(/\berror\s+TS\d+\b/i) }
 end
 
-def run_npm_publish_attempt!(dir:, publish_args:, otp:)
+def run_npm_publish_attempt!(dir:, package_name:, attempt:, publish_args:, otp:)
   command_args = ["pnpm", "publish", *publish_args]
   command_args += ["--otp", otp] if otp
+  release_write_fence!("publish npm #{package_name} attempt #{attempt}")
   output, status = Open3.capture2e(*command_args, chdir: dir)
   return if status.success?
 
@@ -9619,7 +9707,7 @@ def publish_npm_with_retry(dir, package_name, base_args: [], otp: nil, idempoten
     attempt += 1
     begin
       with_publishable_package_json(dir, npm_package_version) do
-        run_npm_publish_attempt!(dir:, publish_args:, otp: current_otp)
+        run_npm_publish_attempt!(dir:, package_name:, attempt:, publish_args:, otp: current_otp)
       end
       verify_npm_package_published!(npm_package_name, npm_package_version)
       return current_otp
@@ -9660,10 +9748,11 @@ Retry safety: Never drop the version argument when previewing recovery from an i
 Preview the exact version, for example `bundle exec rake \"release[16.2.0.rc.1,true]\"`. An argument-less
 command from a prerelease checkout fails closed instead of inferring promotion to the stable version.
 
-Live compound release remains BLOCKED by operational and agent policy until the repository-owned
-lifetime/per-write lease wrapper exists. This is not runtime enforcement: the release tasks remain
-technically callable in live mode. Direct live invocation outside the individually guarded procedure in
-internal/contributor-info/release-train-runbook.md violates repository policy.
+Live release entry point: `script/release VERSION`. It requires an existing matching
+release-line claim and supervises this task with fresh authoritative per-write lease fences.
+Direct live `bundle exec rake release[...]` is refused without that private wrapper contract;
+use Rake directly only with `dry_run=true`. See internal/contributor-info/release-train-runbook.md
+for claim acquisition, identity, recovery, and the supervised reconciliation path.
 
 This will update and release:
   PUBLIC (npmjs.org + rubygems.org):
@@ -9730,6 +9819,9 @@ Environment variables:
   GEM_RELEASE_MAX_RETRIES=<n>  # Positive base-10 integer max retry attempts (default: 3)
 
 Examples:
+  script/release 16.2.0.rc.1                  # Only supported live publication path
+  script/release --dry-run 16.2.0.rc.1        # Preview without coordination
+  script/release --reconcile-accelerated-rc 16.2.0.rc.1 # Supervised accelerated-RC reconciliation
   rake \"release[,true]\"                       # Preview auto-detected version
   rake \"release[patch,true]\"                  # Preview patch bump (16.1.1 → 16.1.2)
   rake \"release[minor,true]\"                  # Preview minor bump (16.1.1 → 16.2.0)
@@ -9748,6 +9840,7 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
   args_hash = args.to_hash
 
   is_dry_run = release_truthy?(args_hash[:dry_run])
+  activate_release_lease_guard!(dry_run: is_dry_run)
   is_verbose = ENV["VERBOSE"] == "1"
   allow_version_policy_override = version_policy_override_enabled?(args_hash[:override_version_policy])
   npm_otp = ENV.fetch("NPM_OTP", nil)
@@ -10089,7 +10182,7 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
       end
 
       # Push the version-bump commit first so the workflow_dispatch run can be matched by headSha.
-      sh_in_dir_for_release(release_root, "LEFTHOOK=0 git push")
+      push_release_version_commit!(release_root)
       release_candidate_sha = current_git_sha!(release_root)
       validated_release_candidate_sha = release_candidate_sha
       tag_name = "v#{actual_gem_version}"
@@ -10264,8 +10357,7 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
           approved_by: accelerated_approver
         )
         puts "⚠️ RC published with gates still reconciling. Before final promotion, run:"
-        puts "  RELEASE_TRACKER=#{tracker} bundle exec rake " \
-             "\"release:reconcile_accelerated_rc[#{actual_gem_version}]\""
+        puts "  RELEASE_TRACKER=#{tracker} script/release --reconcile-accelerated-rc #{actual_gem_version}"
       end
     end
   end
@@ -10325,10 +10417,9 @@ end
 
 desc("Creates or updates a GitHub release from CHANGELOG.md for an already-published version.
 
-Live GitHub release recovery remains BLOCKED by operational and agent policy until the repository-owned
-lifetime/per-write lease wrapper exists. This is not runtime enforcement: sync_github_release remains
-technically callable in live mode. Direct live invocation outside the individually guarded procedure in
-internal/contributor-info/release-train-runbook.md violates repository policy. Preview only.
+Direct live sync_github_release is refused without the private release supervisor contract. Preview this
+task directly; for a fenced idempotent create or edit, use `script/release VERSION` after verifying its
+existing matching lease and exact artifact evidence. See internal/contributor-info/release-train-runbook.md.
 
 Arguments:
 1st argument: Gem version in RubyGems format (required), e.g. 16.4.0 or 16.4.0.rc.1
@@ -10349,6 +10440,7 @@ task :sync_github_release, %i[gem_version dry_run] do |_t, args|
           "rake \"sync_github_release[16.4.0,true]\" or rake \"sync_github_release[16.4.0.rc.1,true]\""
   end
   validate_requested_version_input!(requested_gem_version)
+  activate_release_lease_guard!(dry_run: is_dry_run)
 
   puts "ℹ️ sync_github_release reads local committed CHANGELOG.md; " \
        "run `git pull --rebase` first for latest remote notes."
@@ -10409,6 +10501,7 @@ namespace :release do
   desc("Reconcile an accelerated RC's deferred gates and record an accepted or rejected tracker state.")
   task :reconcile_accelerated_rc, [:version] do |_t, args|
     monorepo_root = current_monorepo_root
+    activate_release_lease_guard!(dry_run: false)
     target_version = args[:version].to_s.strip
     abort "❌ Accelerated RC reconciliation requires an explicit RC version." if target_version.empty?
     validate_canonical_accelerated_rc_target!(target_version)
@@ -10442,10 +10535,9 @@ release CI gate evaluates the branch tip and a just-pushed branch has no checks 
 the branch and cutting rc.0 must be two steps with a CI run between them. After CI runs on the new
 branch tip, preview rc.0 with `bundle exec rake \"release[17.0.0.rc.0,true]\"`.
 
-Live compound release remains BLOCKED by operational and agent policy until the repository-owned
-lifetime/per-write lease wrapper exists. This is not runtime enforcement: release:start remains technically
-callable in live mode. Direct live invocation outside the individually guarded procedure in
-internal/contributor-info/release-train-runbook.md violates repository policy.
+Live release:start remains **policy-blocked**, not runtime-enforced: it is still technically callable
+without the publication wrapper's lifetime/per-write contract. Use its dry run and the separately fenced procedure in
+internal/contributor-info/release-train-runbook.md; `script/release` starts only after the release branch exists.
 
 Arguments:
 1st argument: Release line base version X.Y.Z (optional). When omitted, derived from the top
