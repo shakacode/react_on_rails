@@ -9027,7 +9027,7 @@ def publish_or_update_github_release(monorepo_root:, release_context:, dry_run:)
     release_command = if release_exists
                         ["gh", "release", "edit", release_context[:tag], "--repo", repo_slug,
                          "--title", release_context[:title], "--notes-file", tmp.path,
-                         "--prerelease=#{release_context[:prerelease]}"]
+                         "--prerelease=#{release_context[:prerelease]}", "--draft=false"]
                       else
                         command = ["gh", "release", "create", release_context[:tag], "--repo", repo_slug,
                                    "--verify-tag", "--title", release_context[:title],

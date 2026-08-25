@@ -694,7 +694,7 @@ RSpec.describe "release.rake helper methods" do
       expect(self).to have_received(:system).with(
         "gh", "release", "edit", "v17.0.0", "--repo", "shakacode/react_on_rails",
         "--title", "v17.0.0", "--notes-file", a_string_ending_with(".md"), "--prerelease=false",
-        chdir: "/tmp/repo"
+        "--draft=false", chdir: "/tmp/repo"
       )
     end
 
@@ -24022,7 +24022,7 @@ RSpec.describe "release.rake helper methods" do
         .with(
           "gh", "release", "edit", "v17.1.0.rc.0", "--repo", "shakacode/react_on_rails",
           "--title", "v17.1.0.rc.0", "--notes-file", a_string_ending_with(".md"),
-          "--prerelease=true", chdir: "/tmp/repo"
+          "--prerelease=true", "--draft=false", chdir: "/tmp/repo"
         )
         .ordered
         .and_return(true)
