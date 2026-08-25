@@ -7,6 +7,7 @@ set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DETECTOR="$SCRIPT_DIR/ci-changes-detector"
+CI_LOCAL="$SCRIPT_DIR/../bin/ci-local"
 
 TESTS_RUN=0
 TESTS_FAILED=0
@@ -171,6 +172,480 @@ RUBY
   git commit -m "initial fixture" >/dev/null
 }
 
+setup_ci_local_repo() {
+  git init -b main >/dev/null
+  git config user.email test@example.com
+  git config user.name "CI Local Test"
+
+  mkdir -p bin script test-bin node_modules vendor/bundle
+  mkdir -p react_on_rails/spec/dummy/node_modules
+  cp "$CI_LOCAL" bin/ci-local
+  chmod +x bin/ci-local
+  : > Gemfile
+  : > react_on_rails/Gemfile
+  : > react_on_rails/spec/dummy/Gemfile
+
+  cat > script/check-docs-sidebar <<'BASH'
+#!/usr/bin/env bash
+exit 0
+BASH
+  chmod +x script/check-docs-sidebar
+
+  cat > script/ci-changes-detector <<'BASH'
+#!/usr/bin/env bash
+set -euo pipefail
+
+run_ruby=false
+run_dummy=false
+run_gem_generator_specs=false
+run_release_supervisor_tests=false
+run_generators=false
+run_js=false
+run_pro_tests=false
+case "${CI_LOCAL_FIXTURE_SELECTION:?}" in
+  core_ruby)
+    run_ruby=true
+    run_gem_generator_specs=true
+    ;;
+  gem_generator_specs) run_gem_generator_specs=true ;;
+  release_supervisor) run_release_supervisor_tests=true ;;
+  dummy) run_dummy=true ;;
+  pro_tests) run_pro_tests=true ;;
+  js_and_pro_tests)
+    run_js=true
+    run_pro_tests=true
+    ;;
+  # Consumer-contract fixture: the current detector never emits this one-sided
+  # combination, but ci-local must not couple two independent JSON fields.
+  generated_examples) run_generators=true ;;
+  generator_change)
+    run_ruby=true
+    run_gem_generator_specs=true
+    run_generators=true
+    ;;
+  *) exit 2 ;;
+esac
+
+cat <<JSON
+{
+  "docs_only": false,
+  "run_lint": false,
+  "run_ruby_tests": $run_ruby,
+  "run_js_tests": $run_js,
+  "run_dummy_tests": $run_dummy,
+  "run_gem_generator_specs": $run_gem_generator_specs,
+  "run_release_supervisor_tests": $run_release_supervisor_tests,
+  "run_generators": $run_generators,
+  "run_pro_lint": false,
+  "run_pro_tests": $run_pro_tests
+}
+JSON
+
+if [ "$run_ruby" = true ]; then
+  echo "  ✓ RSpec gem tests"
+fi
+if [ "$run_dummy" = true ]; then
+  echo "  ✓ Dummy app integration tests"
+fi
+if [ "$run_gem_generator_specs" = true ]; then
+  echo "  ✓ RSpec gem generator specs"
+fi
+if [ "$run_release_supervisor_tests" = true ]; then
+  echo "  ✓ Release supervisor integration tests"
+fi
+if [ "$run_generators" = true ]; then
+  echo "  ✓ Generator tests"
+fi
+if [ "$run_pro_tests" = true ]; then
+  echo "  ✓ React on Rails Pro tests"
+fi
+BASH
+  chmod +x script/ci-changes-detector
+
+  cat > script/release-test.bash <<'BASH'
+#!/usr/bin/env bash
+printf 'release-supervisor-test\n' >> "$CI_LOCAL_COMMAND_LOG"
+BASH
+  chmod +x script/release-test.bash
+
+  cat > test-bin/gh <<'BASH'
+#!/usr/bin/env bash
+exit 1
+BASH
+  chmod +x test-bin/gh
+
+  cat > test-bin/bundle <<'BASH'
+#!/usr/bin/env bash
+{
+  printf 'bundle'
+  printf '\t%s' "$@"
+  printf '\n'
+} >> "$CI_LOCAL_COMMAND_LOG"
+exit 0
+BASH
+  chmod +x test-bin/bundle
+
+  cat > test-bin/pnpm <<'BASH'
+#!/usr/bin/env bash
+{
+  printf 'pnpm'
+  printf '\t%s' "$@"
+  printf '\n'
+  printf 'pnpm-cwd\t%s' "$PWD"
+  printf '\t%s' "$@"
+  printf '\n'
+} >> "$CI_LOCAL_COMMAND_LOG"
+if [ "$*" = "install" ]; then
+  printf 'pnpm-install-pwd\t%s\n' "$PWD" >> "$CI_LOCAL_COMMAND_LOG"
+fi
+if [ "${CI_LOCAL_FAIL_DUMMY_BUILD:-false}" = true ] && [ "$*" = "run build:test" ]; then
+  exit 42
+fi
+exit 0
+BASH
+  chmod +x test-bin/pnpm
+
+  git add .
+  git commit -m "ci-local fixture" >/dev/null
+}
+
+ci_local_output() {
+  local command_log="$PWD/ci-local-commands.log"
+  : > "$command_log"
+  CI_LOCAL_COMMAND_LOG="$command_log"
+  PATH="$PWD/test-bin:$PATH"
+  BASH_ENV=/dev/null
+  export BASH_ENV CI_LOCAL_COMMAND_LOG PATH
+  hash -r
+  if [ "$(command -v bundle)" != "$PWD/test-bin/bundle" ]; then
+    printf 'fixture bundle resolution mismatch: expected %s, got %s\n' \
+      "$PWD/test-bin/bundle" "$(command -v bundle)" >&2
+    return 1
+  fi
+  bin/ci-local "$@"
+}
+
+test_ci_local_fast_mode_keeps_generator_specs_out_of_unit_job() {
+  setup_ci_local_repo
+
+  local output
+  if ! output="$(ci_local_output --all --fast 2>&1)"; then
+    fail "ci-local fixture failed: $output"
+    return 1
+  fi
+
+  local commands
+  commands="$(cat ci-local-commands.log)"
+  assert_contains \
+    "$commands" \
+    $'bundle\texec\trake\trun_rspec:gem_unit' \
+    "ci-local command log"
+  case "$commands" in
+    *$'bundle\texec\trake\trun_rspec:gem_generators'*|\
+    *$'bundle\texec\trake\trun_rspec:shakapacker_examples'*|\
+    *$'pnpm\trun\tbuild:test'*|\
+    *$'bundle\texec\trake\trun_rspec:dummy'*)
+      fail "ci-local command log: --fast must skip dummy and generator jobs"
+      ;;
+  esac
+  assert_contains "$output" "Skipping dummy app tests in --fast mode" "ci-local fast output"
+  assert_contains "$output" "Skipping gem generator specs in --fast mode" "ci-local fast output"
+  assert_contains "$output" "Skipping generated example app tests in --fast mode" "ci-local fast output"
+}
+
+test_ci_local_builds_dummy_assets_before_rspec_with_dependencies_present() {
+  setup_ci_local_repo
+
+  [ -d react_on_rails/spec/dummy/node_modules ] || fail "fixture must start with dummy node_modules present"
+  [ ! -e react_on_rails/spec/dummy/public/webpack/test/manifest.json ] ||
+    fail "fixture must start without a dummy test manifest"
+
+  local output commands
+  export CI_LOCAL_FIXTURE_SELECTION=dummy
+  if ! output="$(ci_local_output --changed 2>&1)"; then
+    fail "ci-local dummy fixture failed: $output"
+    return 1
+  fi
+  commands="$(cat ci-local-commands.log)"
+  assert_contains "$commands" $'pnpm\trun\tbuild:test' "dummy command log"
+  assert_contains "$commands" $'bundle\texec\trake\trun_rspec:dummy' "dummy command log"
+  case "$commands" in
+    *$'pnpm\trun\tbuild:test'*$'bundle\texec\trake\trun_rspec:dummy'*) ;;
+    *) fail "dummy command log: bundle build must precede integration RSpec: $commands" ;;
+  esac
+}
+
+test_ci_local_installs_missing_dummy_node_modules_before_build_and_rspec() {
+  setup_ci_local_repo
+  rm -rf react_on_rails/spec/dummy/node_modules
+
+  local output commands fixture_root
+  fixture_root="$(pwd -P)"
+  export CI_LOCAL_FIXTURE_SELECTION=dummy
+  if ! output="$(ci_local_output --changed 2>&1)"; then
+    fail "ci-local missing dummy dependencies fixture failed: $output"
+    return 1
+  fi
+  commands="$(cat ci-local-commands.log)"
+  assert_contains \
+    "$commands" \
+    $'pnpm-install-pwd\t'"$fixture_root/react_on_rails/spec/dummy" \
+    "dummy install working directory"
+  case "$commands" in
+    *$'pnpm\tinstall'*$'pnpm\trun\tbuild:test'*$'bundle\texec\trake\trun_rspec:dummy'*) ;;
+    *) fail "dummy command log: install, build, and RSpec must run in order: $commands" ;;
+  esac
+}
+
+test_ci_local_dummy_paths_are_not_reparsed_as_shell_code() {
+  # shellcheck disable=SC2016 # Literal command substitution is the attack fixture.
+  local checkout='checkout space $(touch ci-local-eval-injection)'
+  mkdir "$checkout"
+  cd "$checkout"
+  setup_ci_local_repo
+
+  local output commands
+  export CI_LOCAL_FIXTURE_SELECTION=dummy
+  if ! output="$(ci_local_output --changed 2>&1)"; then
+    fail "ci-local shell-sensitive checkout fixture failed: $output"
+    return 1
+  fi
+  commands="$(cat ci-local-commands.log)"
+  [ ! -e react_on_rails/spec/dummy/ci-local-eval-injection ] ||
+    fail "dummy Gemfile path was reparsed as shell code"
+  assert_contains "$commands" $'pnpm\trun\tbuild:test' "shell-sensitive dummy command log"
+  assert_contains "$commands" $'bundle\texec\trake\trun_rspec:dummy' "shell-sensitive dummy command log"
+}
+
+test_ci_local_records_dummy_build_failure_and_skips_rspec() {
+  setup_ci_local_repo
+
+  local output commands
+  export CI_LOCAL_FIXTURE_SELECTION=dummy
+  export CI_LOCAL_FAIL_DUMMY_BUILD=true
+  if output="$(ci_local_output --changed 2>&1)"; then
+    fail "ci-local must fail when dummy bundle preparation fails: $output"
+    return 1
+  fi
+  commands="$(cat ci-local-commands.log)"
+  assert_contains "$commands" $'pnpm\trun\tbuild:test' "failed dummy-build command log"
+  assert_contains "$output" "Dummy App Test Bundles failed" "failed dummy-build output"
+  case "$commands" in
+    *$'bundle\texec\trake\trun_rspec:dummy'*)
+      fail "dummy integration RSpec must not run after bundle preparation fails"
+      ;;
+  esac
+}
+
+test_ci_local_preserves_independent_generator_selectors() {
+  setup_ci_local_repo
+
+  local output core_ruby_commands generated_example_commands generator_change_commands
+  export CI_LOCAL_FIXTURE_SELECTION=core_ruby
+  if ! output="$(ci_local_output --changed 2>&1)"; then
+    fail "ci-local core-Ruby fixture failed: $output"
+    return 1
+  fi
+  core_ruby_commands="$(cat ci-local-commands.log)"
+  assert_contains \
+    "$core_ruby_commands" \
+    $'bundle\texec\trake\trun_rspec:gem_unit' \
+    "core-Ruby command log"
+  assert_contains \
+    "$core_ruby_commands" \
+    $'bundle\texec\trake\trun_rspec:gem_generators' \
+    "core-Ruby command log"
+  case "$core_ruby_commands" in
+    *$'bundle\texec\trake\trun_rspec:shakapacker_examples'*|\
+    *$'bundle\texec\trake\trun_rspec:gem\t'*)
+      fail "core Ruby must not select generated example app tests or the unsharded gem task"
+      ;;
+  esac
+
+  export CI_LOCAL_FIXTURE_SELECTION=generated_examples
+  if ! output="$(ci_local_output --changed 2>&1)"; then
+    fail "ci-local generated-example fixture failed: $output"
+    return 1
+  fi
+  generated_example_commands="$(cat ci-local-commands.log)"
+  assert_contains \
+    "$generated_example_commands" \
+    $'bundle\texec\trake\trun_rspec:shakapacker_examples' \
+    "generated-example command log"
+  case "$generated_example_commands" in
+    *$'bundle\texec\trake\trun_rspec:gem_generators'*|\
+    *$'bundle\texec\trake\trun_rspec:gem_unit'*)
+      fail "generated example app selector must not select either gem RSpec shard"
+      ;;
+  esac
+
+  export CI_LOCAL_FIXTURE_SELECTION=generator_change
+  if ! output="$(ci_local_output --changed 2>&1)"; then
+    fail "ci-local generator-change fixture failed: $output"
+    return 1
+  fi
+  generator_change_commands="$(cat ci-local-commands.log)"
+  assert_contains \
+    "$generator_change_commands" \
+    $'bundle\texec\trake\trun_rspec:gem_unit' \
+    "generator-change command log"
+  assert_contains \
+    "$generator_change_commands" \
+    $'bundle\texec\trake\trun_rspec:gem_generators' \
+    "generator-change command log"
+  assert_contains \
+    "$generator_change_commands" \
+    $'bundle\texec\trake\trun_rspec:shakapacker_examples' \
+    "generator-change command log"
+}
+
+assert_ci_local_gem_generator_only_commands() {
+  local commands="$1"
+  local context="$2"
+
+  assert_contains "$commands" $'bundle\tcheck' "$context"
+  assert_contains \
+    "$commands" \
+    $'bundle\texec\trake\trun_rspec:gem_generators' \
+    "$context"
+  case "$commands" in
+    *$'bundle\texec\trake\trun_rspec:gem_unit'*|\
+    *$'bundle\texec\trake\trun_rspec:gem\t'*|\
+    *$'bundle\texec\trake\trun_rspec:shakapacker_examples'*)
+      fail "$context: gem-generator-only selection ran an unselected Ruby job"
+      ;;
+  esac
+}
+
+test_ci_local_json_preserves_gem_generator_only_selector() {
+  setup_ci_local_repo
+
+  local output commands
+  export CI_LOCAL_FIXTURE_SELECTION=gem_generator_specs
+  if ! output="$(ci_local_output --changed 2>&1)"; then
+    fail "ci-local JSON gem-generator-only fixture failed: $output"
+    return 1
+  fi
+  commands="$(cat ci-local-commands.log)"
+  assert_ci_local_gem_generator_only_commands "$commands" "JSON gem-generator-only command log"
+}
+
+assert_ci_local_release_supervisor_selected() {
+  local commands="$1"
+  local context="$2"
+
+  assert_contains "$commands" "release-supervisor-test" "$context"
+}
+
+test_ci_local_json_runs_release_supervisor_selector() {
+  setup_ci_local_repo
+
+  local output commands
+  export CI_LOCAL_FIXTURE_SELECTION=release_supervisor
+  if ! output="$(ci_local_output --changed 2>&1)"; then
+    fail "ci-local JSON release-supervisor fixture failed: $output"
+    return 1
+  fi
+  commands="$(cat ci-local-commands.log)"
+  assert_ci_local_release_supervisor_selected "$commands" "JSON release-supervisor command log"
+}
+
+test_ci_local_text_fallback_runs_release_supervisor_selector() {
+  setup_ci_local_repo
+  cat > test-bin/jq <<'BASH'
+#!/usr/bin/env bash
+exit 1
+BASH
+  chmod +x test-bin/jq
+
+  local output commands
+  export CI_LOCAL_FIXTURE_SELECTION=release_supervisor
+  if ! output="$(ci_local_output --changed 2>&1)"; then
+    fail "ci-local text release-supervisor fixture failed: $output"
+    return 1
+  fi
+  commands="$(cat ci-local-commands.log)"
+  assert_ci_local_release_supervisor_selected "$commands" "text release-supervisor command log"
+}
+
+test_ci_local_all_runs_release_supervisor_harness() {
+  setup_ci_local_repo
+
+  local output commands
+  export CI_LOCAL_FIXTURE_SELECTION=core_ruby
+  if ! output="$(ci_local_output --all --fast 2>&1)"; then
+    fail "ci-local all release-supervisor fixture failed: $output"
+    return 1
+  fi
+  commands="$(cat ci-local-commands.log)"
+  assert_ci_local_release_supervisor_selected "$commands" "all-mode release-supervisor command log"
+}
+
+test_ci_local_text_fallback_preserves_gem_generator_only_selector() {
+  setup_ci_local_repo
+  cat > test-bin/jq <<'BASH'
+#!/usr/bin/env bash
+exit 1
+BASH
+  chmod +x test-bin/jq
+
+  local output commands
+  export CI_LOCAL_FIXTURE_SELECTION=gem_generator_specs
+  if ! output="$(ci_local_output --changed 2>&1)"; then
+    fail "ci-local text-fallback gem-generator-only fixture failed: $output"
+    return 1
+  fi
+  commands="$(cat ci-local-commands.log)"
+  assert_ci_local_gem_generator_only_commands "$commands" "text-fallback gem-generator-only command log"
+}
+
+test_ci_local_pro_tests_use_hosted_workspace_command_from_root() {
+  setup_ci_local_repo
+  mkdir -p react_on_rails_pro/node_modules react_on_rails_pro/vendor/bundle
+  : > react_on_rails_pro/Gemfile
+
+  local output commands fixture_root
+  fixture_root="$(pwd -P)"
+  export CI_LOCAL_FIXTURE_SELECTION=pro_tests
+  if ! output="$(ci_local_output --changed 2>&1)"; then
+    fail "ci-local Pro-tests-only fixture failed: $output"
+    return 1
+  fi
+  commands="$(cat ci-local-commands.log)"
+  assert_contains \
+    "$commands" \
+    $'pnpm-cwd\t'"$fixture_root"$'\t--filter\treact-on-rails-pro\ttest' \
+    "Pro-tests-only command log"
+  assert_contains "$commands" $'bundle\texec\trspec' "Pro-tests-only command log"
+  case "$commands" in
+    *$'pnpm-cwd\t'"$fixture_root/react_on_rails_pro"$'\trun\tnps\ttest'*)
+      fail "Pro tests must not use the unresolvable package-local nps command"
+      ;;
+  esac
+  case "$commands" in
+    *$'pnpm-cwd\t'"$fixture_root"$'\t--filter\treact-on-rails-pro\ttest'*$'bundle\texec\trspec'*) ;;
+    *) fail "Pro workspace tests must precede the preserved Pro RSpec lane: $commands" ;;
+  esac
+}
+
+test_ci_local_combined_js_and_pro_selection_runs_pro_js_once() {
+  setup_ci_local_repo
+  mkdir -p react_on_rails_pro/node_modules react_on_rails_pro/vendor/bundle
+  : > react_on_rails_pro/Gemfile
+
+  local output commands fixture_root pro_js_count
+  fixture_root="$(pwd -P)"
+  export CI_LOCAL_FIXTURE_SELECTION=js_and_pro_tests
+  if ! output="$(ci_local_output --changed 2>&1)"; then
+    fail "ci-local combined JS and Pro fixture failed: $output"
+    return 1
+  fi
+  commands="$(cat ci-local-commands.log)"
+  pro_js_count="$(grep -Fc $'pnpm-cwd\t'"$fixture_root"$'\t--filter\treact-on-rails-pro\ttest' <<<"$commands")"
+  [ "$pro_js_count" = 1 ] || fail "combined JS and Pro selection ran Pro JS $pro_js_count times"
+  assert_contains "$commands" $'bundle\texec\trspec' "combined JS and Pro command log"
+}
+
 detector_output() {
   CI=true CI_JSON_OUTPUT=1 "$DETECTOR" HEAD~1 HEAD
 }
@@ -201,6 +676,7 @@ test_docs_changes_are_non_runtime_only() {
   assert_contains "$out" '"non_runtime_only": true' "docs output"
   assert_contains "$out" '"run_lint": false' "docs output"
   assert_contains "$out" '"run_gem_generator_specs": false' "docs output"
+  assert_contains "$out" '"run_release_supervisor_tests": false' "docs output"
 }
 
 # Regression for PR #3597: an internal docs/planning YAML (e.g.
@@ -452,6 +928,7 @@ test_ci_infrastructure_only_change_runs_tests_but_skips_benchmarks() {
   # Tests still run to validate the CI change (script/ forces the full suite,
   # pro-integration-tests.yml independently requests pro dummy tests) ...
   assert_contains "$out" '"run_ruby_tests": true' "ci infra output"
+  assert_contains "$out" '"run_release_supervisor_tests": true' "ci infra output"
   assert_contains "$out" '"run_pro_dummy_tests": true' "ci infra output"
   assert_contains "$out" '"run_pro_node_renderer_tests": true' "ci infra output"
   # ... but every benchmark suite is off.
@@ -544,6 +1021,7 @@ test_uncategorized_file_runs_tests_but_skips_benchmarks() {
   # Full test suite still runs (the safety the catch-all is there for).
   assert_contains "$out" '"run_ruby_tests": true' "uncategorized output"
   assert_contains "$out" '"run_gem_generator_specs": true' "uncategorized output"
+  assert_contains "$out" '"run_release_supervisor_tests": true' "uncategorized output"
   assert_contains "$out" '"run_pro_tests": true' "uncategorized output"
   # ... but no benchmark suite.
   assert_contains "$out" '"run_core_benchmarks": false' "uncategorized output"
@@ -900,6 +1378,7 @@ test_rspec_only_changes_do_not_request_e2e() {
   local out
   out="$(detector_output)"
   assert_contains "$out" '"run_ruby_tests": true' "rspec-only output"
+  assert_contains "$out" '"run_release_supervisor_tests": false' "rspec-only output"
   assert_contains "$out" '"run_gem_generator_specs": false' "rspec-only output"
   assert_contains "$out" '"run_dummy_tests": false' "rspec-only output"
   assert_contains "$out" '"run_e2e_tests": false' "rspec-only output"
@@ -914,6 +1393,7 @@ assert_generator_spec_support_change_routes_generator_shard() {
   out="$(detector_output)"
   assert_contains "$out" '"run_ruby_tests": true' "$file output"
   assert_contains "$out" '"run_gem_generator_specs": true' "$file output"
+  assert_contains "$out" '"run_generators": false' "$file output"
 }
 
 test_generator_spec_helper_change_routes_generator_shard() {
@@ -970,6 +1450,7 @@ test_core_ruby_changes_request_e2e() {
   local out
   out="$(detector_output)"
   assert_contains "$out" '"run_gem_generator_specs": true' "core ruby output"
+  assert_contains "$out" '"run_generators": false' "core ruby output"
   assert_contains "$out" '"run_dummy_tests": true' "core ruby output"
   assert_contains "$out" '"run_e2e_tests": true' "core ruby output"
 }
@@ -1024,7 +1505,7 @@ test_benchmark_comment_only_change_is_non_runtime_but_keeps_lint() {
 # this arm existed, rakelib/release.rake hit the uncategorized catch-all and set
 # run_generators=true.
 #
-# All five release-tooling paths share one contract, asserted identically via
+# All eight release-tooling paths share one contract, asserted identically via
 # this helper so a one-character typo in any pattern can't silently fall through
 # to the generator-sensitive script/* CI-infra arm.
 assert_release_tooling_contract() {
@@ -1037,6 +1518,11 @@ assert_release_tooling_contract() {
   assert_contains "$out" '"run_lint": true' "$label"
   # Release specs run (release_rake_helpers_spec / release_forward_port_script_spec).
   assert_contains "$out" '"run_ruby_tests": true' "$label"
+  # The supervised wrapper has a separate 13-case integration harness. This
+  # selector is consumed by gem-tests.yml, which runs it once on the latest
+  # unit leg instead of assuming the RSpec suite exercises the shell process
+  # and per-write-fence contract.
+  assert_contains "$out" '"run_release_supervisor_tests": true' "$label"
   # Primary goal: NOT generator-sensitive, so required-pr-gate won't force hosted CI.
   assert_contains "$out" '"run_generators": false' "$label"
   assert_contains "$out" '"run_gem_generator_specs": false' "$label"
@@ -1058,6 +1544,13 @@ test_release_rake_change_runs_ruby_tests_and_lint_without_generators() {
   assert_release_tooling_contract "$(detector_output)" "release rake output"
 }
 
+test_release_lease_guard_change_runs_ruby_tests_and_lint_without_generators() {
+  setup_repo
+  write_file_change "rakelib/release_lease_guard.rb" "module ReleaseLeaseGuard; end"
+
+  assert_release_tooling_contract "$(detector_output)" "release lease guard output"
+}
+
 # The release helper scripts under script/ must be caught by the release-tooling
 # arm, not the broad script/* CI-infrastructure arm (which would set
 # run_generators=true and force hosted CI). Same contract as release.rake.
@@ -1066,6 +1559,20 @@ test_release_finish_script_change_runs_ruby_tests_and_lint_without_generators() 
   write_file_change "script/release-finish" "#!/usr/bin/env bash"
 
   assert_release_tooling_contract "$(detector_output)" "release-finish output"
+}
+
+test_release_script_change_runs_ruby_tests_and_lint_without_generators() {
+  setup_repo
+  write_file_change "script/release" "#!/usr/bin/env ruby"
+
+  assert_release_tooling_contract "$(detector_output)" "release wrapper output"
+}
+
+test_release_script_test_change_runs_ruby_tests_and_lint_without_generators() {
+  setup_repo
+  write_file_change "script/release-test.bash" "#!/usr/bin/env bash"
+
+  assert_release_tooling_contract "$(detector_output)" "release wrapper test output"
 }
 
 # Per-path coverage for the remaining three release-tooling globs. Without these,
@@ -1511,7 +2018,10 @@ test_empty_diff_skips_everything() {
 
 run_test test_empty_diff_skips_everything
 run_test test_release_rake_change_runs_ruby_tests_and_lint_without_generators
+run_test test_release_lease_guard_change_runs_ruby_tests_and_lint_without_generators
 run_test test_release_finish_script_change_runs_ruby_tests_and_lint_without_generators
+run_test test_release_script_change_runs_ruby_tests_and_lint_without_generators
+run_test test_release_script_test_change_runs_ruby_tests_and_lint_without_generators
 run_test test_release_forward_port_script_change_runs_ruby_tests_and_lint_without_generators
 run_test test_release_forward_port_test_change_runs_ruby_tests_and_lint_without_generators
 run_test test_release_finish_test_change_runs_ruby_tests_and_lint_without_generators
@@ -1547,6 +2057,19 @@ run_test test_agent_tooling_changes_are_non_runtime_only
 run_test test_agent_bin_change_runs_ci_infrastructure_without_benchmarks
 run_test test_agent_bin_markdown_change_is_non_runtime_only
 run_test test_agent_workflow_config_change_runs_ci_infrastructure_without_benchmarks
+run_test test_ci_local_fast_mode_keeps_generator_specs_out_of_unit_job
+run_test test_ci_local_builds_dummy_assets_before_rspec_with_dependencies_present
+run_test test_ci_local_installs_missing_dummy_node_modules_before_build_and_rspec
+run_test test_ci_local_dummy_paths_are_not_reparsed_as_shell_code
+run_test test_ci_local_records_dummy_build_failure_and_skips_rspec
+run_test test_ci_local_preserves_independent_generator_selectors
+run_test test_ci_local_json_preserves_gem_generator_only_selector
+run_test test_ci_local_text_fallback_preserves_gem_generator_only_selector
+run_test test_ci_local_json_runs_release_supervisor_selector
+run_test test_ci_local_text_fallback_runs_release_supervisor_selector
+run_test test_ci_local_all_runs_release_supervisor_harness
+run_test test_ci_local_pro_tests_use_hosted_workspace_command_from_root
+run_test test_ci_local_combined_js_and_pro_selection_runs_pro_js_once
 run_test test_ci_infrastructure_only_change_runs_tests_but_skips_benchmarks
 run_test test_suite_workflow_file_runs_its_tests_but_no_benchmark
 run_test test_gem_tests_workflow_change_keeps_generator_specs_fail_closed

@@ -1,3 +1,718 @@
-#!/bin/bash
+#!/usr/bin/env ruby
+# frozen_string_literal: true
 
-echo "See `rake -D release`"
+require "json"
+require "io/wait"
+require "open3"
+require "optparse"
+require "tempfile"
+require_relative "../rakelib/release_lease_guard"
+
+# The sole supported live entry point for the release publication Rake tasks. It does not
+# acquire, take over, or release a coordination claim: the caller must already
+# own the exact release-line lease under a process-unique identity.
+# rubocop:disable Metrics/ClassLength
+class ReleaseSupervisor
+  VERSION_PATTERN = ReleaseLeaseGuard::RELEASE_VERSION_PATTERN
+  REPOSITORY = ReleaseLeaseGuard::REPOSITORY
+  HEARTBEAT_INTERVAL = 60.0
+  HEARTBEAT_TTL = 900
+  COORDINATION_TIMEOUT = 20.0
+  TERMINATION_GRACE = 5.0
+  HANDSHAKE_TIMEOUT = 5.0
+  POLL_INTERVAL = 0.05
+  SIGNALS = %w[INT TERM HUP].freeze
+  PR_SET_CHILD_SUBREAPER = 36
+
+  Identity = Data.define(:agent_id, :instance_id, :machine_id)
+  ReleaseScope = Data.define(:version, :base_version, :repo, :target, :branch)
+  ReleasePipes = Data.define(
+    :liveness_reader,
+    :liveness_writer,
+    :death_reader,
+    :death_writer,
+    :ready_reader,
+    :ready_writer
+  )
+
+  class UsageError < StandardError; end
+  class SupervisorError < StandardError; end
+
+  def initialize(argv, env: ENV, stdout: $stdout, stderr: $stderr)
+    @argv = argv.dup
+    @env = env
+    @stdout = stdout
+    @stderr = stderr
+    @options = { dry_run: false, reconcile_accelerated_rc: false }
+    @parser = build_parser
+    @received_signal = nil
+  end
+
+  def run
+    scope = parse_scope!
+    verify_branch!(scope)
+    return run_dry(scope.version) if @options.fetch(:dry_run)
+
+    identity = release_identity!
+    heartbeat_interval = bounded_interval!(
+      "REACT_ON_RAILS_RELEASE_HEARTBEAT_INTERVAL", HEARTBEAT_INTERVAL, maximum: HEARTBEAT_INTERVAL
+    )
+    termination_grace = bounded_interval!(
+      "REACT_ON_RAILS_RELEASE_TERMINATION_GRACE", TERMINATION_GRACE, maximum: TERMINATION_GRACE
+    )
+    handshake_timeout = bounded_interval!(
+      "REACT_ON_RAILS_RELEASE_HANDSHAKE_TIMEOUT", HANDSHAKE_TIMEOUT, maximum: HANDSHAKE_TIMEOUT
+    )
+    coordination_timeout = bounded_interval!(
+      "REACT_ON_RAILS_RELEASE_COORDINATION_TIMEOUT", COORDINATION_TIMEOUT, maximum: HEARTBEAT_INTERVAL
+    )
+
+    supervise_release(
+      scope,
+      identity,
+      heartbeat_interval:,
+      termination_grace:,
+      handshake_timeout:,
+      coordination_timeout:
+    )
+  rescue OptionParser::ParseError, UsageError, SupervisorError, ReleaseLeaseGuard::LeaseError => e
+    @stderr.puts "ERROR: #{e.message}"
+    @stderr.puts @parser if e.is_a?(OptionParser::ParseError) || e.is_a?(UsageError)
+    @received_signal ? 128 + Signal.list.fetch(@received_signal) : 1
+  rescue SystemCallError
+    @stderr.puts "ERROR: release supervisor process operation failed"
+    1
+  end
+
+  private
+
+  def build_parser
+    OptionParser.new do |parser|
+      parser.banner = "Usage: script/release [--dry-run | --reconcile-accelerated-rc] VERSION"
+      parser.on("--dry-run", "Run bundle exec rake release[VERSION,true] without coordination") do
+        @options[:dry_run] = true
+      end
+      parser.on(
+        "--reconcile-accelerated-rc",
+        "Run release:reconcile_accelerated_rc[VERSION] under the live release contract"
+      ) do
+        @options[:reconcile_accelerated_rc] = true
+      end
+      parser.on("-h", "--help", "Show this help") do
+        @stdout.puts parser
+        exit 0
+      end
+    end
+  end
+
+  def parse_scope!
+    argv = @argv.dup
+    @parser.parse!(argv)
+    if @options.fetch(:dry_run) && @options.fetch(:reconcile_accelerated_rc)
+      raise UsageError, "--dry-run and --reconcile-accelerated-rc cannot be combined"
+    end
+
+    version = argv.shift
+    raise UsageError, "an explicit release VERSION is required" if version.nil? || version.empty?
+    raise UsageError, "too many arguments: #{argv.join(' ')}" unless argv.empty?
+
+    version_match = VERSION_PATTERN.match(version)
+    unless version_match
+      raise UsageError,
+            "VERSION must be X.Y.Z or X.Y.Z.test|beta|alpha|rc|pre.N (got #{version.inspect})"
+    end
+
+    base_version = version_match[:base]
+    branch = current_branch!
+    ReleaseScope.new(
+      version: version.dup.freeze,
+      base_version: base_version.freeze,
+      repo: REPOSITORY,
+      target: "release-line:#{base_version}".freeze,
+      branch: branch.freeze
+    ).freeze
+  end
+
+  def current_branch!
+    stdout, _stderr, status = Open3.capture3("git", "branch", "--show-current")
+    current_branch = stdout.strip
+    return current_branch if status.success? && !current_branch.empty?
+
+    raise UsageError, "release must run from a Git checkout on a named branch"
+  rescue Errno::ENOENT
+    raise UsageError, "release must run from a Git checkout on a named branch"
+  end
+
+  def verify_branch!(scope)
+    expected_release_branch = "release/#{scope.base_version}"
+    stable_main = scope.version == scope.base_version && scope.branch == "main" &&
+                  !@options.fetch(:reconcile_accelerated_rc)
+    return if scope.branch == expected_release_branch || stable_main
+
+    raise UsageError, "release must run from branch #{expected_release_branch}"
+  end
+
+  def release_identity!
+    Identity.new(
+      agent_id: required_identity!("RELEASE_COORDINATOR_ID"),
+      instance_id: required_identity!("RELEASE_COORDINATOR_INSTANCE_ID"),
+      machine_id: required_identity!("AGENT_COORD_MACHINE_ID")
+    ).freeze
+  end
+
+  def required_identity!(name)
+    value = @env.fetch(name, "").strip
+    return value.dup.freeze unless value.empty? || value.casecmp?("UNKNOWN")
+
+    raise UsageError, "#{name} is required for a live release"
+  end
+
+  def bounded_interval!(name, default, maximum:)
+    raw_value = @env.fetch(name, default.to_s)
+    value = Float(raw_value)
+    return value if value.positive? && value <= maximum
+
+    raise UsageError, "#{name} must be greater than zero and no more than #{maximum.to_i} seconds"
+  rescue ArgumentError, TypeError
+    raise UsageError, "#{name} must be a number"
+  end
+
+  def run_dry(version)
+    child_pid = Process.spawn(
+      { ReleaseLeaseGuard::CONTRACT_ENV => nil },
+      "bundle", "exec", "rake", "release[#{version},true]"
+    )
+    _pid, status = Process.wait2(child_pid)
+    process_status_code(status)
+  end
+
+  # Reuse the guard's exact status semantics for the wrapper's preflight. This
+  # temporary channel is local to the supervisor; the child receives a fresh
+  # channel and a contract bound to its dedicated process group.
+  def verify_existing_lease!(scope, identity, coordination_timeout:, termination_grace:)
+    reader, writer = IO.pipe
+    contract = contract_for(
+      scope,
+      identity,
+      liveness_fd: reader.fileno,
+      parent_pid: Process.ppid,
+      pgid: Process.getpgrp
+    )
+    ReleaseLeaseGuard.activate!(
+      dry_run: false,
+      env: { ReleaseLeaseGuard::CONTRACT_ENV => JSON.generate(contract) },
+      liveness_io: reader,
+      status_reader: lambda do |repo:, target:|
+        stdout, status = run_agent_coord(
+          "status", "--repo", repo, "--target", target, "--json",
+          timeout: coordination_timeout,
+          termination_grace:
+        )
+        raise ReleaseLeaseGuard::LeaseError, "release lease status is unavailable" unless status&.success?
+
+        stdout
+      end
+    )
+  ensure
+    reader&.close unless reader&.closed?
+    writer&.close unless writer&.closed?
+  end
+
+  def heartbeat!(scope, identity, coordination_timeout:, termination_grace:)
+    _stdout, status = run_agent_coord(
+      "heartbeat",
+      "--agent-id", identity.agent_id,
+      "--instance-id", identity.instance_id,
+      "--repo", scope.repo,
+      "--target", scope.target,
+      "--branch", scope.branch,
+      "--phase", "release-write-serialization",
+      "--status", "in_progress",
+      "--ttl", HEARTBEAT_TTL.to_s,
+      timeout: coordination_timeout,
+      termination_grace:
+    )
+    status&.success? || false
+  rescue SystemCallError
+    false
+  end
+
+  def supervise_release(scope, identity, heartbeat_interval:, termination_grace:, handshake_timeout:,
+                        coordination_timeout:)
+    child_pid = nil
+    pgid = nil
+    liveness_writer = nil
+    death_writer = nil
+    previous_signal_handlers = install_signal_handlers
+    enable_descendant_reaping!
+    verify_existing_lease!(scope, identity, coordination_timeout:, termination_grace:)
+    unless heartbeat!(scope, identity, coordination_timeout:, termination_grace:)
+      raise ReleaseLeaseGuard::LeaseError, "release lease heartbeat failed"
+    end
+
+    child_pid, pgid, liveness_writer, death_writer = spawn_release_group(
+      scope, identity, handshake_timeout:, termination_grace:
+    )
+    @stdout.puts "Release process group #{pgid} started."
+    next_heartbeat = monotonic_time + heartbeat_interval
+
+    supervise_loop(
+      scope,
+      identity,
+      child_pid:,
+      pgid:,
+      liveness_writer:,
+      next_heartbeat:,
+      heartbeat_interval:,
+      termination_grace:,
+      coordination_timeout:
+    )
+  rescue StandardError
+    cleanup_failed_release(pgid, child_pid, liveness_writer, termination_grace)
+    raise
+  ensure
+    liveness_writer&.close unless liveness_writer&.closed?
+    death_writer&.close unless death_writer&.closed?
+    restore_signal_handlers(previous_signal_handlers) if previous_signal_handlers
+  end
+
+  def supervise_loop(scope, identity, child_pid:, pgid:, liveness_writer:, next_heartbeat:, heartbeat_interval:,
+                     termination_grace:, coordination_timeout:)
+    loop do
+      return interrupt_release(pgid, child_pid, liveness_writer, termination_grace) if @received_signal
+
+      child_status = nonblocking_child_status(child_pid)
+      return complete_release(pgid, liveness_writer, child_status, termination_grace) if child_status
+
+      now = monotonic_time
+      if now >= next_heartbeat
+        lease_live = refresh_lease?(scope, identity, coordination_timeout:, termination_grace:)
+        return interrupt_release(pgid, child_pid, liveness_writer, termination_grace) if @received_signal
+        return lose_lease(pgid, child_pid, liveness_writer, termination_grace) unless lease_live
+
+        next_heartbeat = now + heartbeat_interval
+      end
+
+      sleep_duration = [POLL_INTERVAL, next_heartbeat - monotonic_time].min
+      sleep(sleep_duration) if sleep_duration.positive?
+    end
+  rescue Errno::ECHILD
+    close_liveness(liveness_writer)
+    report_group_handoff(pgid)
+    1
+  end
+
+  def refresh_lease?(scope, identity, coordination_timeout:, termination_grace:)
+    return false unless heartbeat!(scope, identity, coordination_timeout:, termination_grace:)
+    return false if @received_signal
+
+    verify_existing_lease!(scope, identity, coordination_timeout:, termination_grace:)
+    true
+  rescue ReleaseLeaseGuard::LeaseError
+    false
+  end
+
+  def interrupt_release(pgid, child_pid, liveness_writer, termination_grace)
+    close_liveness(liveness_writer)
+    @stderr.puts "Release interrupted by signal #{@received_signal}; " \
+                 "closed liveness channel and terminating process group #{pgid}."
+    terminate_group(pgid, child_pid:, grace: termination_grace)
+    report_group_handoff(pgid)
+    128 + Signal.list.fetch(@received_signal)
+  end
+
+  def nonblocking_child_status(child_pid)
+    _waited_pid, child_status = Process.waitpid2(child_pid, Process::WNOHANG)
+    child_status
+  end
+
+  def complete_release(pgid, liveness_writer, child_status, termination_grace)
+    close_liveness(liveness_writer)
+    terminate_group(pgid, child_pid: nil, grace: termination_grace)
+    exit_code = process_status_code(child_status)
+    @stdout.puts "Release process group #{pgid} completed with status #{exit_code}."
+    report_group_handoff(pgid)
+    exit_code
+  end
+
+  def lose_lease(pgid, child_pid, liveness_writer, termination_grace)
+    close_liveness(liveness_writer)
+    @stderr.puts "Release lease refresh failed; closed liveness channel and terminating process group #{pgid}."
+    terminate_group(pgid, child_pid:, grace: termination_grace)
+    report_group_handoff(pgid)
+    1
+  end
+
+  def spawn_release_group(scope, identity, handshake_timeout:, termination_grace:)
+    pipes = release_pipes
+    child_pid = nil
+    child_pid = fork_release_child(scope, identity, pipes)
+    pipes.liveness_reader.close
+    pipes.death_reader.close
+    pipes.ready_writer.close
+    pgid = read_child_process_group!(
+      pipes.ready_reader,
+      child_pid,
+      timeout: handshake_timeout,
+      termination_grace:
+    )
+    [child_pid, pgid, pipes.liveness_writer, pipes.death_writer]
+  rescue StandardError
+    begin
+      close_release_pipes(pipes)
+    ensure
+      stop_unverified_child(child_pid, grace: termination_grace) if child_pid
+    end
+    raise
+  ensure
+    close_io(pipes&.ready_reader)
+  end
+
+  def release_pipes
+    liveness_pipe = IO.pipe
+    death_pipe = IO.pipe
+    ready_pipe = IO.pipe
+    liveness_pipe.first.close_on_exec = false
+    liveness_pipe.last.close_on_exec = true
+    death_pipe.last.close_on_exec = true
+    ReleasePipes.new(
+      liveness_reader: liveness_pipe.first,
+      liveness_writer: liveness_pipe.last,
+      death_reader: death_pipe.first,
+      death_writer: death_pipe.last,
+      ready_reader: ready_pipe.first,
+      ready_writer: ready_pipe.last
+    )
+  end
+
+  def fork_release_child(scope, identity, pipes)
+    Process.fork do
+      reset_child_signal_handlers
+      pipes.liveness_writer.close
+      pipes.death_writer.close
+      pipes.ready_reader.close
+      Process.setpgid(0, 0)
+      pgid = Process.getpgrp
+      fork_supervisor_death_watch(pipes, pgid)
+      pipes.death_reader.close
+      contract = contract_for(
+        scope,
+        identity,
+        liveness_fd: pipes.liveness_reader.fileno,
+        parent_pid: Process.ppid,
+        pgid:
+      )
+      announce_process_group(pipes.ready_writer, pgid)
+      pipes.ready_writer.close
+      exec(
+        { ReleaseLeaseGuard::CONTRACT_ENV => JSON.generate(contract) },
+        "bundle", "exec", "rake", supervised_rake_task(scope.version)
+      )
+    rescue StandardError
+      @stderr.puts "ERROR: unable to start the supervised release command"
+      exit! 127
+    end
+  end
+
+  def fork_supervisor_death_watch(pipes, pgid)
+    Process.fork do
+      install_death_watch_signal_handlers
+      close_io(pipes.liveness_reader)
+      close_io(pipes.ready_writer)
+      pipes.death_reader.read
+    ensure
+      signal_group("KILL", pgid)
+      exit! 1
+    end
+  end
+
+  def install_death_watch_signal_handlers
+    SIGNALS.each { |signal| Signal.trap(signal) { exit! 1 } }
+  end
+
+  def supervised_rake_task(version)
+    return "release:reconcile_accelerated_rc[#{version}]" if @options.fetch(:reconcile_accelerated_rc)
+
+    "release[#{version}]"
+  end
+
+  def reset_child_signal_handlers
+    SIGNALS.each { |signal| Signal.trap(signal, "DEFAULT") }
+  end
+
+  def announce_process_group(writer, pgid)
+    writer.puts(pgid)
+  end
+
+  def close_release_pipes(pipes)
+    return unless pipes
+
+    [
+      pipes.liveness_reader,
+      pipes.liveness_writer,
+      pipes.death_reader,
+      pipes.death_writer,
+      pipes.ready_reader,
+      pipes.ready_writer
+    ].each do |io|
+      close_io(io)
+    end
+  end
+
+  def close_io(io)
+    io&.close unless io&.closed?
+  end
+
+  def cleanup_failed_release(pgid, child_pid, liveness_writer, termination_grace)
+    close_liveness(liveness_writer) if liveness_writer
+  ensure
+    if pgid && child_pid
+      terminate_group(pgid, child_pid:, grace: termination_grace)
+      report_group_handoff(pgid)
+    end
+  end
+
+  def run_agent_coord(*, timeout:, termination_grace:)
+    return ["", nil] if @received_signal
+
+    stdout_file = Tempfile.new("react-on-rails-release-coordination-stdout")
+    stderr_file = Tempfile.new("react-on-rails-release-coordination-stderr")
+    child_pid = nil
+    status = nil
+    begin
+      child_pid = Process.spawn(
+        "agent-coord", *, out: stdout_file, err: stderr_file, pgroup: true
+      )
+      status = wait_for_coordination(child_pid, monotonic_time + timeout)
+    ensure
+      terminate_group(child_pid, child_pid:, grace: termination_grace) if child_pid
+    end
+    stdout_file.rewind
+    [stdout_file.read, status]
+  ensure
+    stdout_file&.close!
+    stderr_file&.close!
+  end
+
+  def wait_for_coordination(child_pid, deadline)
+    loop do
+      waited = Process.waitpid2(child_pid, Process::WNOHANG)
+      return waited[1] if waited
+      return nil if @received_signal || monotonic_time >= deadline
+
+      sleep POLL_INTERVAL
+    end
+  end
+
+  def read_child_process_group!(ready_reader, child_pid, timeout:, termination_grace:)
+    deadline = monotonic_time + timeout
+    buffer = +""
+    loop do
+      if @received_signal
+        abort_handshake!(
+          child_pid,
+          termination_grace,
+          "release interrupted by signal #{@received_signal} while establishing release process group"
+        )
+      end
+      remaining = deadline - monotonic_time
+      if remaining <= 0
+        abort_handshake!(child_pid, termination_grace, "timed out while establishing release process group")
+      end
+
+      readable = ready_reader.wait_readable([POLL_INTERVAL, remaining].min)
+      next unless readable
+
+      chunk = ready_reader.read_nonblock(64, exception: false)
+      next if chunk == :wait_readable
+
+      return validate_child_process_group!(buffer, child_pid, termination_grace) if chunk.nil?
+
+      buffer << chunk
+      return validate_child_process_group!(buffer.lines.first, child_pid, termination_grace) if buffer.include?("\n")
+
+      if buffer.bytesize >= 64
+        abort_handshake!(child_pid, termination_grace, "release child did not report its process group")
+      end
+    end
+  end
+
+  def validate_child_process_group!(raw_pgid, child_pid, termination_grace)
+    pgid = Integer(raw_pgid&.strip, 10)
+    return pgid if pgid == child_pid
+
+    abort_handshake!(
+      child_pid,
+      termination_grace,
+      "release child did not establish its dedicated process group"
+    )
+  rescue ArgumentError, TypeError
+    abort_handshake!(child_pid, termination_grace, "release child did not report its process group")
+  end
+
+  def abort_handshake!(child_pid, termination_grace, message)
+    stop_unverified_child(child_pid, grace: termination_grace)
+    raise SupervisorError, message
+  end
+
+  def stop_unverified_child(child_pid, grace:)
+    terminate_group(child_pid, child_pid:, grace:, signal_direct_child: true)
+  end
+
+  def contract_for(scope, identity, liveness_fd:, parent_pid:, pgid:)
+    {
+      "version" => ReleaseLeaseGuard::CONTRACT_VERSION,
+      "liveness_fd" => liveness_fd,
+      "parent_pid" => parent_pid,
+      "pgid" => pgid,
+      "repo" => scope.repo,
+      "target" => scope.target,
+      "release_version" => scope.version,
+      "branch" => scope.branch,
+      "agent_id" => identity.agent_id,
+      "instance_id" => identity.instance_id,
+      "machine_id" => identity.machine_id
+    }.freeze
+  end
+
+  def install_signal_handlers
+    SIGNALS.to_h do |signal|
+      previous_handler = Signal.trap(signal) { @received_signal ||= signal }
+      [signal, previous_handler]
+    end
+  end
+
+  def restore_signal_handlers(previous_handlers)
+    previous_handlers.each { |signal, handler| Signal.trap(signal, handler) }
+  end
+
+  def close_liveness(writer)
+    writer.close unless writer.closed?
+  end
+
+  def terminate_group(pgid, child_pid:, grace:, signal_direct_child: false)
+    signal_termination_target("TERM", pgid, child_pid:, signal_direct_child:)
+    child_reaped = child_pid.nil?
+    child_reaped, group_alive = wait_for_group_exit(
+      pgid, child_pid:, child_reaped:, grace:, require_child_exit: signal_direct_child
+    )
+    if group_alive || (signal_direct_child && !child_reaped)
+      signal_termination_target("KILL", pgid, child_pid:, signal_direct_child:)
+      child_reaped, = wait_for_group_exit(
+        pgid, child_pid:, child_reaped:, grace:, require_child_exit: signal_direct_child
+      )
+    end
+    child_reaped = reap_group_once(pgid, child_pid:, child_reaped:)
+    raise SupervisorError, "release child did not terminate after KILL" unless child_reaped
+    return unless group_alive?(pgid)
+
+    raise SupervisorError, "release process group #{pgid} did not terminate after KILL"
+  end
+
+  def signal_termination_target(signal, pgid, child_pid:, signal_direct_child:)
+    signal_group(signal, pgid)
+    signal_child(signal, child_pid) if signal_direct_child
+  end
+
+  def signal_child(signal, child_pid)
+    Process.kill(signal, child_pid)
+  rescue Errno::ESRCH
+    nil
+  end
+
+  def wait_for_group_exit(pgid, child_pid:, child_reaped:, grace:, require_child_exit: false)
+    deadline = monotonic_time + grace
+    while termination_target_alive?(pgid, child_reaped:, require_child_exit:) && monotonic_time < deadline
+      child_reaped = reap_group_once(pgid, child_pid:, child_reaped:)
+      sleep POLL_INTERVAL
+    end
+    child_reaped = reap_group_once(pgid, child_pid:, child_reaped:)
+    [child_reaped, group_alive?(pgid)]
+  end
+
+  def termination_target_alive?(pgid, child_reaped:, require_child_exit:)
+    group_alive?(pgid) || (require_child_exit && !child_reaped)
+  end
+
+  def reap_group_once(pgid, child_pid:, child_reaped:)
+    directly_reaped = child_pid && reap_child_nonblocking(child_pid)
+    group_reaped = reap_group_children_nonblocking(pgid)
+    child_reaped || directly_reaped || group_reaped.include?(child_pid)
+  end
+
+  def enable_descendant_reaping!
+    return unless RUBY_PLATFORM.include?("linux")
+
+    begin
+      require "fiddle"
+    rescue LoadError
+      raise SupervisorError, "could not enable release descendant reaping"
+    end
+    prctl = Fiddle::Function.new(
+      Fiddle::Handle::DEFAULT["prctl"],
+      [Fiddle::TYPE_INT, Fiddle::TYPE_LONG, Fiddle::TYPE_LONG, Fiddle::TYPE_LONG, Fiddle::TYPE_LONG],
+      Fiddle::TYPE_INT
+    )
+    return if prctl.call(PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0).zero?
+
+    errno = Fiddle.last_error
+    raise SupervisorError, "could not enable release descendant reaping (errno #{errno})"
+  rescue Fiddle::DLError
+    raise SupervisorError, "could not enable release descendant reaping"
+  end
+
+  def group_alive?(pgid)
+    Process.kill(0, -pgid)
+    true
+  rescue Errno::ESRCH
+    false
+  rescue Errno::EPERM
+    true
+  end
+
+  def signal_group(signal, pgid)
+    Process.kill(signal, -pgid)
+  rescue Errno::ESRCH
+    nil
+  end
+
+  def reap_child_nonblocking(child_pid)
+    Process.waitpid(child_pid, Process::WNOHANG) == child_pid
+  rescue Errno::ECHILD
+    true
+  end
+
+  def reap_group_children_nonblocking(pgid)
+    reaped = []
+    loop do
+      waited_pid = Process.waitpid(-pgid, Process::WNOHANG)
+      break unless waited_pid
+
+      reaped << waited_pid
+    end
+    reaped
+  rescue Errno::ECHILD
+    reaped
+  end
+
+  def reap_child(child_pid)
+    Process.waitpid(child_pid)
+  rescue Errno::ECHILD
+    nil
+  end
+
+  def report_group_handoff(pgid)
+    @stderr.puts "Release process group #{pgid} must be proven dead before handoff."
+  end
+
+  def process_status_code(status)
+    status.exited? ? status.exitstatus : 128 + status.termsig
+  end
+
+  def monotonic_time
+    Process.clock_gettime(Process::CLOCK_MONOTONIC)
+  end
+end
+# rubocop:enable Metrics/ClassLength
+
+exit ReleaseSupervisor.new(ARGV).run if $PROGRAM_NAME == __FILE__
