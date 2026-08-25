@@ -1010,8 +1010,33 @@ pass "existing release-line claim refusal stops before release work"
 setup_case automatic-claim-response-lost
 unset RELEASE_COORDINATOR_ID RELEASE_COORDINATOR_INSTANCE_ID
 export FAKE_STALL_CLAIM_AFTER_CREATE=1
-export REACT_ON_RAILS_RELEASE_COORDINATION_TIMEOUT=0.5
-if run_release; then
+export REACT_ON_RAILS_RELEASE_COORDINATION_TIMEOUT=30
+(
+  cd "${fake_repo}"
+  exec "${release_script}"
+) >"${output_log}" 2>&1 &
+wrapper_pid=$!
+for _attempt in $(seq 1 200); do
+  test -s "${claim_state_file}" && test -s "${coordination_process_log}" && break
+  sleep 0.05
+done
+if ! test -s "${claim_state_file}" || ! test -s "${coordination_process_log}"; then
+  cleanup_stalled_wrapper "${wrapper_pid}"
+  fail "claim was not accepted before simulating its lost response"
+fi
+coordination_id="$(cut -d: -f1 "${coordination_process_log}")"
+case "${coordination_id}" in
+  ''|*[!0-9]*)
+    cleanup_stalled_wrapper "${wrapper_pid}"
+    fail "invalid coordination process ${coordination_id}"
+    ;;
+esac
+kill -KILL "${coordination_id}"
+if ! wait_for_process_exit "${wrapper_pid}"; then
+  cleanup_stalled_wrapper "${wrapper_pid}"
+  fail "release did not stop after an accepted claim response was lost"
+fi
+if wait "${wrapper_pid}"; then
   fail "release continued after an accepted claim response was lost"
 fi
 assert_contains "${coord_log}" $'claim-atomic|'
