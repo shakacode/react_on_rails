@@ -18921,6 +18921,7 @@ RSpec.describe "release.rake helper methods" do
         success_status = instance_double(Process::Status, success?: true)
         api_path = "repos/shakacode/react_on_rails/branches/main/protection/required_status_checks"
         branch_path = "repos/shakacode/react_on_rails/branches/main"
+        rules_path = "repos/shakacode/react_on_rails/rules/branches/main?per_page=100"
         allow(self).to receive(:required_check_names_for_branch).and_call_original
         allow(self).to receive(:fetch_main_ci_checks)
           .with(monorepo_root:, allow_override: false, dry_run: false, ci_branch: "main")
@@ -18939,6 +18940,9 @@ RSpec.describe "release.rake helper methods" do
         allow(Open3).to receive(:capture2e)
           .with("gh", "api", branch_path)
           .and_return(['{"name":"main","protected":false}', success_status])
+        allow(Open3).to receive(:capture2e)
+          .with("gh", "api", "--paginate", "--slurp", *BRANCH_RULES_API_HEADERS, rules_path)
+          .and_return(["[[]]", success_status])
 
         output = nil
         expect do
@@ -18961,6 +18965,7 @@ RSpec.describe "release.rake helper methods" do
         success_status = instance_double(Process::Status, success?: true)
         api_path = "repos/shakacode/react_on_rails/branches/main/protection/required_status_checks"
         branch_path = "repos/shakacode/react_on_rails/branches/main"
+        rules_path = "repos/shakacode/react_on_rails/rules/branches/main?per_page=100"
         allow(self).to receive(:required_check_names_for_branch).and_call_original
         allow(self).to receive(:fetch_main_ci_checks)
           .with(monorepo_root:, allow_override: false, dry_run: false, ci_branch: "main")
@@ -18979,6 +18984,9 @@ RSpec.describe "release.rake helper methods" do
         allow(Open3).to receive(:capture2e)
           .with("gh", "api", branch_path)
           .and_return(['{"name":"main","protected":true}', success_status])
+        allow(Open3).to receive(:capture2e)
+          .with("gh", "api", "--paginate", "--slurp", *BRANCH_RULES_API_HEADERS, rules_path)
+          .and_return(["[[]]", success_status])
 
         output = nil
         expect do
@@ -22338,14 +22346,138 @@ RSpec.describe "release.rake helper methods" do
     end
   end
 
+  describe "execjs-compatible dummy release lock compatibility" do
+    let(:repo_root) { File.expand_path("../../..", __dir__) }
+    let(:dummy_root) { File.join(repo_root, "react_on_rails_pro", "spec", "execjs-compatible-dummy") }
+
+    it "bounds sqlite resolution and retains both source and native-platform variants" do
+      gemfile = File.read(File.join(dummy_root, "Gemfile"))
+      lockfile = File.read(File.join(dummy_root, "Gemfile.lock"))
+
+      expect(gemfile).to include('gem "sqlite3", "~> 1.7", force_ruby_platform:')
+      expect(lockfile).to match(/^    sqlite3 \(1\.7\.\d+\)$/)
+      expect(lockfile).to match(/^    sqlite3 \(1\.7\.\d+-arm64-darwin\)$/)
+      expect(lockfile).to match(/^  ruby$/)
+      expect(lockfile).to match(/^  sqlite3 \(~> 1\.7\)$/)
+      expect(lockfile).to match(/BUNDLED WITH\n   2\.5\.9\n\z/)
+    end
+  end
+
   describe "#required_check_names_for_branch" do
     let(:monorepo_root) { "/tmp/repo" }
     let(:success_status) { instance_double(Process::Status, success?: true) }
     let(:failure_status) { instance_double(Process::Status, success?: false) }
     let(:expected_jq) { REQUIRED_CHECKS_JQ_QUERY }
+    let(:branch_protection_path) do
+      "repos/shakacode/react_on_rails/branches/main/protection/required_status_checks"
+    end
+    let(:branch_rules_path) { "repos/shakacode/react_on_rails/rules/branches/main?per_page=100" }
+    let(:branch_rules_args) do
+      [
+        "gh", "api", "--paginate", "--slurp",
+        "-H", "Accept: application/vnd.github+json",
+        "-H", "X-GitHub-Api-Version: 2022-11-28",
+        branch_rules_path
+      ]
+    end
 
     before do
       allow(self).to receive(:github_repo_slug).with(monorepo_root).and_return("shakacode/react_on_rails")
+      allow(Open3).to receive(:capture2e)
+        .with(
+          "gh", "api", "--paginate", "--slurp",
+          "-H", "Accept: application/vnd.github+json",
+          "-H", "X-GitHub-Api-Version: 2022-11-28",
+          %r{\Arepos/shakacode/react_on_rails/rules/branches/.+\?per_page=100\z}
+        )
+        .and_return(["[[]]", success_status])
+    end
+
+    def stub_missing_classic_protection(branch_protection_path:, success_status:, failure_status:)
+      allow(Open3).to receive(:capture2e)
+        .with("gh", "api", "--jq", REQUIRED_CHECKS_JQ_QUERY, branch_protection_path)
+        .and_return(["HTTP 404: Branch not protected", failure_status])
+      allow(Open3).to receive(:capture3)
+        .with("gh", "api", "--include", branch_protection_path)
+        .and_return([
+                      "HTTP/2.0 404 Not Found\r\nContent-Type: application/json\r\n\r\n" \
+                      '{"message":"Branch not protected"}',
+                      "gh: branch protection is not enabled for this branch\n",
+                      failure_status
+                    ])
+      allow(Open3).to receive(:capture2e)
+        .with("gh", "api", "repos/shakacode/react_on_rails/branches/main")
+        .and_return(['{"name":"main","protected":true}', success_status])
+    end
+
+    it "discovers required checks from active branch rulesets when classic protection is absent" do
+      stub_missing_classic_protection(branch_protection_path:, success_status:, failure_status:)
+      rules = [
+        {
+          type: "required_status_checks",
+          parameters: {
+            required_status_checks: [{ context: "required-pr-gate", integration_id: 15_368 }]
+          },
+          ruleset_source_type: "Repository",
+          ruleset_source: "shakacode/react_on_rails",
+          ruleset_id: 21_350_286
+        }
+      ]
+      allow(Open3).to receive(:capture2e).with(*branch_rules_args).and_return([[rules].to_json, success_status])
+
+      expect(required_check_names_for_branch(monorepo_root:)).to eq(
+        contexts: [],
+        checks: [{ context: "required-pr-gate", app_id: 15_368 }]
+      )
+    end
+
+    it "combines required checks from every paginated ruleset response" do
+      stub_missing_classic_protection(branch_protection_path:, success_status:, failure_status:)
+      pages = [
+        [
+          {
+            type: "required_status_checks",
+            parameters: { required_status_checks: [{ context: "Lint", integration_id: nil }] },
+            ruleset_source_type: "Repository",
+            ruleset_source: "shakacode/react_on_rails",
+            ruleset_id: 11
+          }
+        ],
+        [
+          {
+            type: "required_status_checks",
+            parameters: { required_status_checks: [{ context: "Test", integration_id: 22 }] },
+            ruleset_source_type: "Organization",
+            ruleset_source: "shakacode",
+            ruleset_id: 12
+          }
+        ]
+      ]
+      allow(Open3).to receive(:capture2e).with(*branch_rules_args).and_return([pages.to_json, success_status])
+
+      expect(required_check_names_for_branch(monorepo_root:)).to eq(
+        contexts: [],
+        checks: [{ context: "Lint", app_id: nil }, { context: "Test", app_id: 22 }]
+      )
+    end
+
+    it "fails closed when a required-status-check ruleset is malformed" do
+      stub_missing_classic_protection(branch_protection_path:, success_status:, failure_status:)
+      malformed_pages = [[{ type: "required_status_checks", parameters: { required_status_checks: nil } }]]
+      allow(Open3).to receive(:capture2e)
+        .with(*branch_rules_args).and_return([malformed_pages.to_json, success_status])
+
+      expect(required_check_names_for_branch(monorepo_root:)).to equal(REQUIRED_CHECK_DISCOVERY_UNKNOWN)
+    end
+
+    it "fails closed when active branch rules cannot be queried" do
+      allow(Open3).to receive(:capture2e)
+        .with("gh", "api", "--jq", expected_jq, branch_protection_path)
+        .and_return([{ contexts: ["Classic"], checks: [] }.to_json, success_status])
+      allow(Open3).to receive(:capture2e)
+        .with(*branch_rules_args).and_return(["HTTP 403: insufficient token scope", failure_status])
+
+      expect(required_check_names_for_branch(monorepo_root:)).to equal(REQUIRED_CHECK_DISCOVERY_UNKNOWN)
     end
 
     it "returns legacy required status contexts when branch protection is configured" do
