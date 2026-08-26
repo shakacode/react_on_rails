@@ -1319,6 +1319,8 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       true
     rescue Errno::ESRCH
       false
+    rescue Errno::EPERM
+      true
     end
 
     def group_alive?(pgid)
@@ -1746,6 +1748,30 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         end
       end
 
+      # A listener we may not signal cannot be one of this app's dev
+      # processes - `bin/dev` starts them all as the invoking user - so it must
+      # not block verification forever the way a genuinely unknown one does.
+      it "does not block verification on a listener owned by another user" do
+        root = app_root("other-user")
+        theirs = start_unrelated_process
+        allow(described_class).to receive_messages(killable_ports: [4573])
+        allow(described_class).to receive(:probe_port_listeners).with(4573).and_return([[theirs[:pid]], :ok])
+        allow(described_class).to receive(:working_directory_for_pid).with(theirs[:pid]).and_return(nil)
+        allow(Process).to receive(:kill).and_call_original
+        allow(Process).to receive(:kill).with(0, theirs[:pid]).and_raise(Errno::EPERM)
+
+        expect(described_class).not_to receive(:terminate_processes)
+
+        output = kill_in(root)
+
+        aggregate_failures do
+          expect(alive?(theirs[:pid])).to be true
+          expect(output).to include("Leaving port 4573 alone")
+          expect(output).not_to include("Shutdown could not be verified")
+          expect(output).to include("No development processes owned by this app directory")
+        end
+      end
+
       # This example fails if :unattributable is ever folded back into
       # :foreign. A pid whose owner could not be determined is NOT evidence
       # that this app directory's listener is gone.
@@ -1993,6 +2019,47 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         aggregate_failures do
           expect(File.exist?(live)).to be true
           expect(File.exist?(dead)).to be false
+        end
+      end
+    end
+
+    describe "attributing a listener whose working directory is unreadable" do
+      # `Process.kill(0, pid)` runs the existence and permission checks without
+      # sending a signal, which is enough to separate "somebody else's" from
+      # "genuinely cannot tell" without parsing any more lsof output.
+      it "treats a process it may not signal as foreign" do
+        allow(described_class).to receive(:working_directory_for_pid).with(4242).and_return(nil)
+        allow(Process).to receive(:kill).with(0, 4242).and_raise(Errno::EPERM)
+
+        expect(described_class.send(:attribute_pid, 4242, "/app")).to eq(:foreign)
+      end
+
+      it "treats a process that has already exited as gone" do
+        allow(described_class).to receive(:working_directory_for_pid).with(4242).and_return(nil)
+        allow(Process).to receive(:kill).with(0, 4242).and_raise(Errno::ESRCH)
+
+        expect(described_class.send(:attribute_pid, 4242, "/app")).to eq(:gone)
+      end
+
+      it "keeps a signalable process with an unreadable cwd genuinely unknown" do
+        allow(described_class).to receive(:working_directory_for_pid).with(4242).and_return(nil)
+        allow(Process).to receive(:kill).with(0, 4242).and_return(1)
+
+        expect(described_class.send(:attribute_pid, 4242, "/app")).to eq(:unknown)
+      end
+
+      it "drops an exited listener from every bucket" do
+        allow(described_class).to receive(:probe_port_listeners).with(3000).and_return([[4242], :ok])
+        allow(described_class).to receive(:working_directory_for_pid).with(4242).and_return(nil)
+        allow(Process).to receive(:kill).with(0, 4242).and_raise(Errno::ESRCH)
+
+        scan = described_class.send(:classify_port_listeners, [3000])
+
+        aggregate_failures do
+          expect(scan[:owned]).to be_empty
+          expect(scan[:foreign]).to be_empty
+          expect(scan[:unattributable]).to be_empty
+          expect(scan[:unavailable]).to be_empty
         end
       end
     end
@@ -2644,8 +2711,13 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
     it "reports a listener whose owner could not be determined separately from a foreign one" do
       allow(described_class).to receive(:probe_port_listeners).with(3000).and_return([[1234], :ok])
       allow(described_class).to receive(:working_directory_for_pid).with(1234).and_return(nil)
+      # Signalable, so not somebody else's - just unreadable. Signal 0 is a
+      # permission probe, not a signal, so only real signals are forbidden here.
+      allow(Process).to receive(:kill).and_call_original
+      allow(Process).to receive(:kill).with(0, 1234).and_return(1)
 
-      expect(Process).not_to receive(:kill)
+      expect(Process).not_to receive(:kill).with("TERM", anything)
+      expect(Process).not_to receive(:kill).with("KILL", anything)
 
       output = capture_stdout { expect(described_class.kill_port_processes([3000])).to be false }
       aggregate_failures do
@@ -2670,6 +2742,9 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       allow(described_class).to receive(:working_directory_for_pid).with(11).and_return(File.realpath(Dir.pwd))
       allow(described_class).to receive(:working_directory_for_pid).with(22).and_return("/somewhere/else")
       allow(described_class).to receive(:working_directory_for_pid).with(33).and_return(nil)
+      # Signalable, so pid 33 is genuinely unattributable rather than foreign.
+      allow(Process).to receive(:kill).and_call_original
+      allow(Process).to receive(:kill).with(0, 33).and_return(1)
 
       scan = described_class.send(:classify_port_listeners, [3000])
 

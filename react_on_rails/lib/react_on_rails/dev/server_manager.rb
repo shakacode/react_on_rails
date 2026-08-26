@@ -1219,6 +1219,14 @@ module ReactOnRails
         # Signalling consumes `owned` only. Verification must block on
         # `unattributable` and `unavailable` too: folding a failed probe into
         # `foreign` is what let a surviving listener be reported as gone.
+        #
+        # Known blind spot, measured rather than assumed: run as a normal user,
+        # `lsof` only attributes sockets it can correlate through the owning
+        # process, so a port held by ANOTHER user's process is reported as
+        # having no listener at all rather than as an unattributable one. Such a
+        # port reads as free here. That is not something this command could act
+        # on anyway - it could not signal that process either - but it does mean
+        # "verified" means "free of anything this user can see".
         def classify_port_listeners(ports)
           root = current_app_root
           scan = { owned: {}, foreign: {}, unattributable: {}, unavailable: [] }
@@ -1257,15 +1265,42 @@ module ReactOnRails
           end
         end
 
-        # :owned, :foreign, or :unknown when the working-directory probe itself
-        # failed. `working_directory_for_pid` returns nil for a missing tool, a
-        # permission error and unparsable output alike - none of which is
-        # evidence that the process belongs to somebody else.
+        # :owned, :foreign, :gone, or :unknown when nothing could be
+        # established. `working_directory_for_pid` returns nil for a missing
+        # tool, a permission error and unparsable output alike - none of which
+        # is evidence that the process belongs to somebody else - so an
+        # unreadable cwd falls through to a second, cheaper probe.
         def attribute_pid(pid, root)
           cwd = working_directory_for_pid(pid)
-          return :unknown if cwd.nil?
+          return inside_dev_app_root?(cwd, root) ? :owned : :foreign if cwd
 
-          inside_dev_app_root?(cwd, root) ? :owned : :foreign
+          signal_permission_attribution(pid)
+        end
+
+        # Fallback when the working-directory probe told us nothing.
+        # `Process.kill(0, pid)` runs the existence and permission checks
+        # without sending anything:
+        #
+        #   ESRCH  the pid is gone, so it is not a leftover at all
+        #   EPERM  it exists and we may not signal it, so its user differs from
+        #          ours; `bin/dev` starts every dev process as the invoking
+        #          user, so this is somebody else's process
+        #   ok     a signalable process whose cwd we still could not read:
+        #          genuinely unknown, and verification keeps blocking on it
+        #
+        # Narrow exception, deliberately accepted: a Procfile line that changes
+        # user (`sudo -u ...`, a setuid helper) yields one of our own processes
+        # that answers EPERM. We could not signal it either way, so the only
+        # choice is between reporting success while it survives and refusing
+        # forever - and it is still printed as a port left alone, with its pid,
+        # so it stays visible rather than silently dropped.
+        def signal_permission_attribution(pid)
+          Process.kill(0, pid)
+          :unknown
+        rescue Errno::ESRCH, ArgumentError, RangeError
+          :gone
+        rescue Errno::EPERM
+          :foreign
         end
 
         # `lsof -a -p PID -d cwd -Fn` prints the process's working directory in

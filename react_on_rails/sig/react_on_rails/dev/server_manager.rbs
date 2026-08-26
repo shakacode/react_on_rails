@@ -124,6 +124,7 @@ module ReactOnRails
       def self.report_unattributable_listeners: (Hash[Integer, Array[Integer]]) -> void
       def self.report_unavailable_port_probes: (Array[Integer]) -> void
       def self.attribute_pid: (Integer, String) -> Symbol
+      def self.signal_permission_attribution: (Integer) -> Symbol
       def self.working_directory_for_pid: (Integer) -> String?
       def self.probe_port_listeners: (Integer) -> [Array[Integer], Symbol]
       def self.default_rails_kill_port: () -> Integer
