@@ -14,6 +14,10 @@ module ReactOnRails
       # :nothing_running, :unverified, :refused.
       type shutdown_result = [Symbol, Array[String]]
 
+      # Four-bucket listener scan: :owned, :foreign and :unattributable map
+      # port => pids, :unavailable is a list of ports whose probe failed.
+      type port_listener_scan = Hash[Symbol, untyped]
+
       def self.start: (mode, String?, ?verbose: bool, ?route: String?, ?rails_env: String?) -> void
       def self.kill_processes: () -> Symbol
       def self.clean_generated_assets_and_caches: () -> bool
@@ -55,6 +59,10 @@ module ReactOnRails
       def self.relative_to_app_root: (String, ?String) -> String
       def self.with_dev_session: () { () -> untyped } -> untyped
       def self.claim_dev_session: (String) -> File?
+      def self.write_dev_session: (File, String) -> void
+      def self.discard_partial_dev_session: (File?, String) -> void
+      def self.warn_dev_session_unrecorded: (Exception) -> void
+      def self.warn_dev_session_contended: (File, String, String) -> nil
       def self.dev_session_payload: (String) -> Hash[String, untyped]
       def self.selected_session_ports: () -> Array[Integer]
       def self.owned_process_group: () -> Integer?
@@ -87,8 +95,13 @@ module ReactOnRails
       def self.shutdown_steps: (Integer?, String?) -> Array[untyped]
       def self.verify_owner_shutdown: (dev_session_view, Integer?, String?) -> shutdown_result
       def self.owner_shutdown_complete?: (dev_session_view, Integer?, String?) -> bool
+      def self.shutdown_settled?: (dev_session_view, Integer?, String?) -> bool
       def self.shutdown_blockers: (dev_session_view, Integer?, String?) -> Array[String]
+      def self.owner_release_state: (dev_session_view) -> Symbol
       def self.owner_released?: (dev_session_view) -> bool
+      def self.session_replaced?: (dev_session_view) -> bool
+      def self.owner_state_blockers: (dev_session_view) -> Array[String]
+      def self.endpoint_blockers: (String?) -> Array[String]
       def self.leftover_owned_listeners: (dev_session_view) -> Array[String]
       def self.remove_dev_session_file: (dev_session_view) -> bool
       def self.shutdown_without_owner: (dev_session_view) -> shutdown_result
@@ -96,6 +109,7 @@ module ReactOnRails
       def self.print_kill_failure: (Symbol, Array[String]) -> void
       def self.live_overmind_endpoint: (String, String?) -> String?
       def self.overmind_endpoint_owned?: (String, ?String) -> bool
+      def self.overmind_endpoint_state: (String) -> Symbol
       def self.overmind_endpoint_alive?: (String) -> bool
       def self.overmind_control: (String, String) -> bool
       def self.signalable_pgid: (untyped) -> Integer?
@@ -103,10 +117,13 @@ module ReactOnRails
       def self.signal_process_group: (Integer, String) -> bool
       def self.process_group_alive?: (Integer) -> bool
       def self.process_alive?: (Integer) -> bool
-      def self.classify_port_listeners: (Array[Integer]) -> [Hash[Integer, Array[Integer]], Hash[Integer, Array[Integer]], Array[Integer]]
+      def self.classify_port_listeners: (Array[Integer]) -> port_listener_scan
+      def self.report_unsignalled_listeners: (port_listener_scan) -> void
+      def self.stop_attributed_pids: (Array[Integer]) -> void
       def self.report_foreign_listeners: (Hash[Integer, Array[Integer]]) -> void
+      def self.report_unattributable_listeners: (Hash[Integer, Array[Integer]]) -> void
       def self.report_unavailable_port_probes: (Array[Integer]) -> void
-      def self.pid_working_directory_owned?: (Integer, ?String) -> bool
+      def self.attribute_pid: (Integer, String) -> Symbol
       def self.working_directory_for_pid: (Integer) -> String?
       def self.probe_port_listeners: (Integer) -> [Array[Integer], Symbol]
       def self.default_rails_kill_port: () -> Integer

@@ -262,26 +262,34 @@ module ReactOnRails
         # signalled. Listeners that cannot be positively attributed are
         # reported as diagnostics and left alone.
         def kill_port_processes(ports)
-          owned, foreign, unavailable = classify_port_listeners(ports)
-          report_foreign_listeners(foreign)
-          report_unavailable_port_probes(unavailable)
-          return false if owned.empty?
+          scan = classify_port_listeners(ports)
+          report_unsignalled_listeners(scan)
+          return false if scan[:owned].empty?
 
-          owned.each do |port, pids|
+          scan[:owned].each do |port, pids|
             puts "   ☠️  Stopping this app's process on port #{port} (PIDs: #{pids.join(', ')})"
           end
 
-          pids = owned.values.flatten.uniq
+          stop_attributed_pids(scan[:owned].values.flatten.uniq)
+          true
+        end
+
+        # Everything the scan turned up that this app directory will not signal.
+        def report_unsignalled_listeners(scan)
+          report_foreign_listeners(scan[:foreign])
+          report_unattributable_listeners(scan[:unattributable])
+          report_unavailable_port_probes(scan[:unavailable])
+        end
+
+        def stop_attributed_pids(pids)
           terminate_processes(pids)
           wait_until(SHUTDOWN_TERM_GRACE_SECS) { pids.none? { |pid| process_alive?(pid) } }
           survivors = pids.select { |pid| process_alive?(pid) }
-          if survivors.any?
-            puts "   ☠️  Escalating to KILL for survivors (PIDs: #{survivors.join(', ')})"
-            terminate_processes(survivors, "KILL")
-            wait_until(SHUTDOWN_KILL_GRACE_SECS) { survivors.none? { |pid| process_alive?(pid) } }
-          end
+          return if survivors.empty?
 
-          true
+          puts "   ☠️  Escalating to KILL for survivors (PIDs: #{survivors.join(', ')})"
+          terminate_processes(survivors, "KILL")
+          wait_until(SHUTDOWN_KILL_GRACE_SECS) { survivors.none? { |pid| process_alive?(pid) } }
         end
 
         # Returns the pids holding a LISTEN socket on `port`.
@@ -339,7 +347,9 @@ module ReactOnRails
 
           files.each do |file|
             next unless File.exist?(file)
-            next if File.socket?(file) && overmind_endpoint_alive?(file)
+            # Remove a socket only when it is positively dead; an unreachable
+            # probe must not be taken as permission to delete a live endpoint.
+            next if File.socket?(file) && overmind_endpoint_state(file) != :gone
 
             puts "   🧹 Removing #{relative_to_app_root(file, root)}"
             File.delete(file)
@@ -542,22 +552,54 @@ module ReactOnRails
           path = dev_session_path(root)
           FileUtils.mkdir_p(File.dirname(path))
           file = File.open(path, File::RDWR | File::CREAT, 0o644)
-          unless file.flock(File::LOCK_EX | File::LOCK_NB)
-            file.close
-            puts "   ℹ️  Another `bin/dev` already owns #{relative_to_app_root(path, root)}; " \
-                 "leaving its session state untouched."
-            puts "   ⚠️  This run is NOT recorded, so `bin/dev kill` will control that other run, " \
-                 "not this one. Stop this one from its own terminal."
+          return warn_dev_session_contended(file, path, root) unless file.flock(File::LOCK_EX | File::LOCK_NB)
+
+          begin
+            write_dev_session(file, root)
+          rescue StandardError => e
+            discard_partial_dev_session(file, path)
+            warn_dev_session_unrecorded(e)
             return nil
           end
 
+          file
+        rescue SystemCallError, IOError => e
+          warn_dev_session_unrecorded(e)
+          nil
+        end
+
+        def write_dev_session(file, root)
           file.truncate(0)
           file.write(JSON.pretty_generate(dev_session_payload(root)))
           file.flush
-          file
-        rescue SystemCallError, IOError => e
-          warn "   ⚠️  Could not record dev session state (#{e.class}). " \
+        end
+
+        # A write that fails once the lock is held (a full filesystem, say) must
+        # not leave a locked handle and a truncated file behind: startup would
+        # announce port-scoped fallback while every later `bin/dev kill` found
+        # malformed *locked* state and refused, until GC happened to close the
+        # descriptor. Drop the file and the lock before degrading.
+        def discard_partial_dev_session(file, path)
+          return if file.nil?
+
+          File.delete(path) if File.exist?(path) && !dev_session_replaced?(path, file)
+          file.flock(File::LOCK_UN)
+          file.close
+        rescue SystemCallError, IOError
+          nil
+        end
+
+        def warn_dev_session_unrecorded(error)
+          warn "   ⚠️  Could not record dev session state (#{error.class}). " \
                "`bin/dev kill` will fall back to port-scoped cleanup."
+        end
+
+        def warn_dev_session_contended(file, path, root)
+          file.close
+          puts "   ℹ️  Another `bin/dev` already owns #{relative_to_app_root(path, root)}; " \
+               "leaving its session state untouched."
+          puts "   ⚠️  This run is NOT recorded, so `bin/dev kill` will control that other run, " \
+               "not this one. Stop this one from its own terminal."
           nil
         end
 
@@ -837,12 +879,24 @@ module ReactOnRails
         # precedes KILL, and KILL only ever reaches whatever survived TERM.
         def request_owner_shutdown(view, pgid, endpoint)
           shutdown_steps(pgid, endpoint).each do |label, grace, action|
+            # Never escalate against state a newer `bin/dev` has taken over: both
+            # the recorded pgid and the socket path can have been reused, so the
+            # next signal would land on somebody else's session.
+            return false if session_replaced?(view)
+
             puts "   #{label}"
             action.call
-            return true if wait_until(grace) { owner_shutdown_complete?(view, pgid, endpoint) }
+            return true if wait_until(grace) { shutdown_settled?(view, pgid, endpoint) }
           end
 
           false
+        end
+
+        # Stop waiting once the shutdown is complete OR the session has been
+        # replaced - polling out the rest of the grace window changes nothing
+        # and only delays the honest failure report.
+        def shutdown_settled?(view, pgid, endpoint)
+          session_replaced?(view) || owner_shutdown_complete?(view, pgid, endpoint)
         end
 
         def shutdown_steps(pgid, endpoint)
@@ -879,38 +933,83 @@ module ReactOnRails
         end
 
         def shutdown_blockers(view, pgid, endpoint)
-          blockers = []
-          blockers << "the `bin/dev` that owns #{view[:path]} is still running" unless owner_released?(view)
+          blockers = owner_state_blockers(view)
           blockers << "process group #{pgid} still has members" if pgid && process_group_alive?(pgid)
-          if endpoint && overmind_endpoint_alive?(endpoint)
-            blockers << "the Overmind endpoint #{endpoint} is still accepting connections"
-          end
+          blockers.concat(endpoint_blockers(endpoint))
           blockers
         end
 
-        # Positive re-observation of the owner: the state file is gone, or its
-        # lock is now free. Anything we cannot observe counts as "still held".
+        def owner_state_blockers(view)
+          case owner_release_state(view)
+          when :held
+            ["the `bin/dev` that owns #{view[:path]} is still running"]
+          when :replaced
+            ["#{view[:path]} was replaced by a newer `bin/dev` while this shutdown was running"]
+          else
+            []
+          end
+        end
+
+        def endpoint_blockers(endpoint)
+          return [] if endpoint.nil?
+
+          case overmind_endpoint_state(endpoint)
+          when :alive
+            ["the Overmind endpoint #{endpoint} is still accepting connections"]
+          when :unknown
+            ["could not determine whether the Overmind endpoint #{endpoint} is still live"]
+          else
+            []
+          end
+        end
+
+        # :released, :held, or :replaced.
         #
         # The re-check has to use the handle we already hold. `flock` locks
         # attach to the open file description, not to the process, so a second
         # descriptor on the same path can be denied by OUR OWN lock - reporting
         # "the owner is still running" when we are the lock holder and the
         # shutdown in fact succeeded. Re-locking the same description is
-        # idempotent, so it answers the question honestly.
-        def owner_released?(view)
+        # idempotent, so it answers that question honestly.
+        #
+        # But an old handle can also be an UNLINKED inode: if a newer `bin/dev`
+        # recreated and locked the path after the previous owner removed it, we
+        # would happily re-lock the dead inode and call it released - and the
+        # escalation ladder could then aim `overmind kill` at the new session
+        # through the reused socket path. So check for replacement first, and
+        # never treat it as success. Anything we cannot observe counts as held.
+        def owner_release_state(view)
           path = view[:path]
-          return true unless File.exist?(path)
+          return :released unless File.exist?(path)
 
           handle = view[:handle]
-          return lock_dev_session(handle) == :acquired if handle && !handle.closed?
+          if handle && !handle.closed?
+            return :replaced if dev_session_replaced?(path, handle)
+
+            return lock_dev_session(handle) == :acquired ? :released : :held
+          end
 
           File.open(path, File::RDONLY) do |file|
-            file.flock(File::LOCK_EX | File::LOCK_NB) ? true : false
+            file.flock(File::LOCK_EX | File::LOCK_NB) ? :released : :held
           end
         rescue Errno::ENOENT
-          true
+          :released
         rescue SystemCallError, IOError
-          false
+          :held
+        end
+
+        def owner_released?(view)
+          owner_release_state(view) == :released
+        end
+
+        # True once a newer `bin/dev` has claimed the path this shutdown was
+        # working against. Used to abandon the escalation ladder rather than
+        # keep signalling on behalf of state we no longer own.
+        def session_replaced?(view)
+          handle = view[:handle]
+          return false if handle.nil? || handle.closed?
+
+          File.exist?(view[:path]) && dev_session_replaced?(view[:path], handle)
         end
 
         # Verification is stricter than signalling. For signalling, "cannot
@@ -919,11 +1018,15 @@ module ReactOnRails
         # transient lsof failure silently upgrades a surviving listener to
         # :verified.
         def leftover_owned_listeners(view)
-          owned, _foreign, unavailable = classify_port_listeners(view[:ports])
-          blockers = owned.map do |port, pids|
+          scan = classify_port_listeners(view[:ports])
+          blockers = scan[:owned].map do |port, pids|
             "port #{port} is still held by this app directory (PIDs: #{pids.join(', ')})"
           end
-          unavailable.each { |port| blockers << "could not verify port #{port} is free (lsof unavailable)" }
+          scan[:unattributable].each do |port, pids|
+            blockers << "port #{port} still has a listener that could not be attributed " \
+                        "(PIDs: #{pids.join(', ')}), so it cannot be confirmed gone"
+          end
+          scan[:unavailable].each { |port| blockers << "could not verify port #{port} is free (lsof unavailable)" }
           blockers
         end
 
@@ -949,10 +1052,16 @@ module ReactOnRails
 
           cleaned = cleanup_socket_files
           killed = kill_port_processes(view[:ports])
-          return [:nothing_running, []] unless cleaned || killed || view[:kind] == :stale
 
+          # Verification runs even when nothing was signalled. "We looked and
+          # found nothing" and "we could not look" must not collapse into the
+          # same answer: with lsof missing, every relevant port goes uninspected
+          # and reporting :nothing_running would let `bin/dev kill && bin/dev`
+          # start a second stack on top of a live one.
           leftover = leftover_owned_listeners(view)
           return [:unverified, leftover] if leftover.any?
+
+          return [:nothing_running, []] unless cleaned || killed || view[:kind] == :stale
 
           killed ? [:verified, []] : [:recovered_stale, []]
         end
@@ -1020,14 +1129,24 @@ module ReactOnRails
           false
         end
 
-        def overmind_endpoint_alive?(path)
-          return false unless File.socket?(path)
+        # :alive, :gone, or :unknown. Same principle as the port probes: a
+        # refused connection is positive evidence the endpoint is dead, but a
+        # probe that could not run is not, and verification must not read the
+        # second as the first.
+        def overmind_endpoint_state(path)
+          return :gone unless File.socket?(path)
 
           socket = UNIXSocket.new(path)
           socket.close
-          true
+          :alive
+        rescue Errno::ECONNREFUSED, Errno::ENOENT, Errno::ENOTSOCK
+          :gone
         rescue SystemCallError, IOError
-          false
+          :unknown
+        end
+
+        def overmind_endpoint_alive?(path)
+          overmind_endpoint_state(path) == :alive
         end
 
         # Re-checks ownership immediately before handing control to Overmind,
@@ -1089,26 +1208,39 @@ module ReactOnRails
           true
         end
 
-        # Returns [owned, foreign, unavailable]. `unavailable` lists ports whose
-        # listener probe could not run at all, which the verification path must
-        # not read as "nothing left".
+        # Returns a scan hash with four buckets, keeping "someone else's" and
+        # "could not tell" strictly apart:
+        #
+        #   owned          Hash[port => pids]  positively this app directory's
+        #   foreign        Hash[port => pids]  positively somebody else's
+        #   unattributable Hash[port => pids]  the cwd probe failed
+        #   unavailable    Array[port]         the listener probe failed
+        #
+        # Signalling consumes `owned` only. Verification must block on
+        # `unattributable` and `unavailable` too: folding a failed probe into
+        # `foreign` is what let a surviving listener be reported as gone.
         def classify_port_listeners(ports)
           root = current_app_root
-          owned = {}
-          foreign = {}
-          unavailable = []
+          scan = { owned: {}, foreign: {}, unattributable: {}, unavailable: [] }
 
           Array(ports).uniq.each do |port|
             pids, probe = probe_port_listeners(port)
-            next unavailable << port if probe == :unavailable
+            next scan[:unavailable] << port if probe == :unavailable
             next if pids.empty?
 
-            mine, theirs = pids.partition { |pid| pid_working_directory_owned?(pid, root) }
-            owned[port] = mine if mine.any?
-            foreign[port] = theirs if theirs.any?
+            grouped = pids.group_by { |pid| attribute_pid(pid, root) }
+            scan[:owned][port] = grouped[:owned] if grouped[:owned]
+            scan[:foreign][port] = grouped[:foreign] if grouped[:foreign]
+            scan[:unattributable][port] = grouped[:unknown] if grouped[:unknown]
           end
 
-          [owned, foreign, unavailable]
+          scan
+        end
+
+        def report_unattributable_listeners(unattributable)
+          unattributable.each do |port, pids|
+            puts "   ⚠️  Could not determine who owns port #{port} (PIDs: #{pids.join(', ')}); leaving it alone"
+          end
         end
 
         def report_unavailable_port_probes(ports)
@@ -1125,11 +1257,15 @@ module ReactOnRails
           end
         end
 
-        def pid_working_directory_owned?(pid, root = current_app_root)
+        # :owned, :foreign, or :unknown when the working-directory probe itself
+        # failed. `working_directory_for_pid` returns nil for a missing tool, a
+        # permission error and unparsable output alike - none of which is
+        # evidence that the process belongs to somebody else.
+        def attribute_pid(pid, root)
           cwd = working_directory_for_pid(pid)
-          return false if cwd.nil?
+          return :unknown if cwd.nil?
 
-          inside_dev_app_root?(cwd, root)
+          inside_dev_app_root?(cwd, root) ? :owned : :foreign
         end
 
         # `lsof -a -p PID -d cwd -Fn` prints the process's working directory in

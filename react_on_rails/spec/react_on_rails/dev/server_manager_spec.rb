@@ -1398,6 +1398,33 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         end
       end
 
+      it "leaves no held lock and no partial file when the session write fails" do
+        root = app_root("write-fails")
+        path = session_path(root)
+        allow(described_class).to receive(:write_dev_session).and_raise(Errno::ENOSPC)
+
+        Dir.chdir(root) { described_class.send(:with_dev_session) { :ran } }
+
+        aggregate_failures do
+          # No partial file left behind...
+          expect(File.exist?(path)).to be false
+          # ...and no lock still held, so a later kill is not stuck refusing.
+          lock_free = File.open(path, File::RDWR | File::CREAT) do |file|
+            file.flock(File::LOCK_EX | File::LOCK_NB)
+          end
+          expect(lock_free).to eq(0)
+        end
+      end
+
+      it "degrades to port-scoped cleanup after a failed session write" do
+        root = app_root("write-fails-warns")
+        allow(described_class).to receive(:write_dev_session).and_raise(Errno::ENOSPC)
+
+        expect do
+          Dir.chdir(root) { described_class.send(:with_dev_session) { :ran } }
+        end.to output(/Could not record dev session state/).to_stderr
+      end
+
       it "leaves state owned by another running bin/dev untouched" do
         root = app_root("contended")
         start_owner(root)
@@ -1699,13 +1726,14 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         end
       end
 
-      it "never signals a listener it cannot attribute to this app root" do
-        root = app_root("unattributable")
+      it "leaves a positively foreign listener alone without blocking verification" do
+        root = app_root("foreign-listener")
         theirs = start_unrelated_process
+        other_dir = app_root("foreign-listener-owner")
         allow(described_class).to receive(:killable_ports).and_return([4569])
         allow(described_class).to receive(:probe_port_listeners).with(4569).and_return([[theirs[:pid]], :ok])
-        # lsof unavailable / permission denied -> not attributable.
-        allow(described_class).to receive(:working_directory_for_pid).with(theirs[:pid]).and_return(nil)
+        # The cwd probe SUCCEEDED and says the listener belongs elsewhere.
+        allow(described_class).to receive(:working_directory_for_pid).with(theirs[:pid]).and_return(other_dir)
 
         expect(described_class).not_to receive(:terminate_processes)
 
@@ -1714,6 +1742,96 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         aggregate_failures do
           expect(alive?(theirs[:pid])).to be true
           expect(output).to include("Leaving port 4569 alone")
+          expect(output).not_to include("Shutdown could not be verified")
+        end
+      end
+
+      # This example fails if :unattributable is ever folded back into
+      # :foreign. A pid whose owner could not be determined is NOT evidence
+      # that this app directory's listener is gone.
+      it "blocks verification on a listener whose owner could not be determined" do
+        root = app_root("unattributable")
+        theirs = start_unrelated_process
+        allow(described_class).to receive(:killable_ports).and_return([4569])
+        allow(described_class).to receive(:probe_port_listeners).with(4569).and_return([[theirs[:pid]], :ok])
+        # The cwd probe FAILED: missing tool, permission denied, unparsable.
+        allow(described_class).to receive(:working_directory_for_pid).with(theirs[:pid]).and_return(nil)
+
+        expect(described_class).not_to receive(:terminate_processes)
+
+        output = kill_in(root)
+
+        aggregate_failures do
+          expect(alive?(theirs[:pid])).to be true
+          expect(output).to include("Could not determine who owns port 4569")
+          expect(output).to include("Shutdown could not be verified")
+          expect(output).to include("could not be attributed")
+          expect(output).not_to include("No development processes owned by this app directory")
+          expect(output).not_to include("verified gone")
+        end
+      end
+
+      # A: the no-session path used to map "could not check" to "nothing was
+      # running", so `bin/dev kill && bin/dev` started a second stack on top of
+      # a live one whenever lsof was unavailable.
+      it "reports an unverified shutdown when no port could be inspected" do
+        root = app_root("probe-down")
+        allow(described_class).to receive_messages(killable_ports: [4570, 4571],
+                                                   probe_port_listeners: [
+                                                     [], :unavailable
+                                                   ])
+
+        output = kill_in(root)
+
+        aggregate_failures do
+          expect(output).to include("Shutdown could not be verified")
+          expect(output).to include("could not verify port 4570 is free")
+          expect(output).to include("could not verify port 4571 is free")
+          expect(output).not_to include("No development processes owned by this app directory")
+        end
+      end
+
+      it "exits non-zero when no port could be inspected" do
+        root = app_root("probe-down-exit")
+        allow(described_class).to receive_messages(killable_ports: [4572], probe_port_listeners: [[], :unavailable])
+
+        expect do
+          capture_stdout { Dir.chdir(root) { described_class.run_from_command_line(["kill"]) } }
+        end.to raise_error(SystemExit) { |error| expect(error.status).to eq(1) }
+      end
+
+      # B: an old handle can be an unlinked inode. Re-locking it would say
+      # "released" while a brand-new session holds the real file.
+      it "refuses instead of succeeding when a newer bin/dev replaces the session mid-shutdown" do
+        root = app_root("replaced")
+        owner = start_owner(root)
+        path = session_path(root)
+
+        # Once the owned group is gone, stand in for a newer `bin/dev`:
+        # unlink the old inode and put a fresh, locked file at the same path.
+        allow(described_class).to receive(:signal_process_group).and_wrap_original do |original, pgid, signal|
+          result = original.call(pgid, signal)
+          if signal == "TERM"
+            wait_for { !group_alive?(owner[:pgid]) }
+            File.delete(path)
+            replacement = File.open(path, File::RDWR | File::CREAT)
+            handles << replacement
+            replacement.flock(File::LOCK_EX | File::LOCK_NB)
+            replacement.write(JSON.generate("schema" => 1, "app_root" => root, "pid" => Process.pid,
+                                            "pgid" => nil, "overmind_socket" => nil, "ports" => []))
+            replacement.flush
+          end
+          result
+        end
+
+        output = kill_in(root)
+
+        aggregate_failures do
+          expect(output).to include("Shutdown could not be verified")
+          expect(output).to include("was replaced by a newer `bin/dev`")
+          expect(output).not_to include("verified gone")
+          # The replacement's state must survive - it is a different session.
+          expect(File.exist?(path)).to be true
         end
       end
     end
@@ -1826,6 +1944,31 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
           expect(result).to be false
           expect(output).to include("Skipping `overmind quit`")
         end
+      end
+
+      it "distinguishes a dead endpoint from one it could not probe" do
+        root = app_root("endpoint-states")
+        socket_path = File.join(root, ".overmind.sock")
+        UNIXServer.new(socket_path).close
+
+        aggregate_failures do
+          expect(described_class.send(:overmind_endpoint_state, socket_path)).to eq(:gone)
+          expect(described_class.send(:overmind_endpoint_state, File.join(root, "absent.sock"))).to eq(:gone)
+
+          allow(UNIXSocket).to receive(:new).and_raise(Errno::EACCES)
+          expect(described_class.send(:overmind_endpoint_state, socket_path)).to eq(:unknown)
+        end
+      end
+
+      it "blocks verification when the endpoint state cannot be determined" do
+        root = app_root("endpoint-unknown")
+        socket_path = File.join(root, ".overmind.sock")
+        UNIXServer.new(socket_path).close
+        allow(described_class).to receive(:overmind_endpoint_state).and_return(:unknown)
+
+        blockers = described_class.send(:endpoint_blockers, socket_path)
+
+        expect(blockers).to include(a_string_matching(/could not determine whether the Overmind endpoint/))
       end
 
       it "ignores a recorded endpoint that no longer answers" do
@@ -2496,6 +2639,59 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
       output = capture_stdout { expect(described_class.kill_port_processes([3000])).to be false }
       expect(output).to include("not attributable to this app directory")
+    end
+
+    it "reports a listener whose owner could not be determined separately from a foreign one" do
+      allow(described_class).to receive(:probe_port_listeners).with(3000).and_return([[1234], :ok])
+      allow(described_class).to receive(:working_directory_for_pid).with(1234).and_return(nil)
+
+      expect(Process).not_to receive(:kill)
+
+      output = capture_stdout { expect(described_class.kill_port_processes([3000])).to be false }
+      aggregate_failures do
+        expect(output).to include("Could not determine who owns port 3000")
+        expect(output).not_to include("not attributable to this app directory")
+      end
+    end
+
+    it "reports an unavailable probe rather than silently finding nothing" do
+      allow(described_class).to receive(:probe_port_listeners).with(3000).and_return([[], :unavailable])
+
+      output = capture_stdout { expect(described_class.kill_port_processes([3000])).to be false }
+      expect(output).to include("Could not check port 3000 for listeners (lsof unavailable)")
+    end
+  end
+
+  describe ".classify_port_listeners" do
+    # The whole point of the four-bucket scan: "somebody else's" and "could not
+    # tell" must never share a bucket.
+    it "keeps foreign and unattributable listeners in separate buckets" do
+      allow(described_class).to receive(:probe_port_listeners).with(3000).and_return([[11, 22, 33], :ok])
+      allow(described_class).to receive(:working_directory_for_pid).with(11).and_return(File.realpath(Dir.pwd))
+      allow(described_class).to receive(:working_directory_for_pid).with(22).and_return("/somewhere/else")
+      allow(described_class).to receive(:working_directory_for_pid).with(33).and_return(nil)
+
+      scan = described_class.send(:classify_port_listeners, [3000])
+
+      aggregate_failures do
+        expect(scan[:owned]).to eq({ 3000 => [11] })
+        expect(scan[:foreign]).to eq({ 3000 => [22] })
+        expect(scan[:unattributable]).to eq({ 3000 => [33] })
+        expect(scan[:unavailable]).to eq([])
+      end
+    end
+
+    it "records a failed listener probe as an unavailable port" do
+      allow(described_class).to receive(:probe_port_listeners).with(3000).and_return([[], :unavailable])
+
+      scan = described_class.send(:classify_port_listeners, [3000])
+
+      aggregate_failures do
+        expect(scan[:unavailable]).to eq([3000])
+        expect(scan[:owned]).to be_empty
+        expect(scan[:foreign]).to be_empty
+        expect(scan[:unattributable]).to be_empty
+      end
     end
   end
 
