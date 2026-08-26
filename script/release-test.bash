@@ -2387,7 +2387,7 @@ scope = ReleaseSupervisor::ReleaseScope.new(
 identity = ReleaseSupervisor::Identity.new(
   agent_id: "agent", instance_id: "instance", machine_id: "machine", managed: true
 )
-state = ReleaseSupervisor::SupervisionState.new(next_heartbeat: 10.0, next_claim_renewal: 20.0)
+state = ReleaseSupervisor::SupervisionState.new(next_heartbeat: 1_010.0, next_claim_renewal: 1_020.0)
 result = NonTtyStoppedSupervisor.new([]).supervise_cycle(
   scope,
   identity,
@@ -2409,6 +2409,78 @@ fi
 assert_no_coordination_mutation
 assert_secret_absent
 pass "non-TTY stopped child preserves its existing fence deadlines"
+
+setup_case repeated-non-tty-stop-refreshes-supervision
+if ! TEST_RELEASE_SCRIPT="${release_script}" "${ruby_executable}" <<'RUBY'
+load ENV.fetch("TEST_RELEASE_SCRIPT")
+
+class RepeatedNonTtyStoppedSupervisor < ReleaseSupervisor
+  attr_reader :refreshes, :waits
+
+  def initialize
+    super([])
+    @now = 1_000.0
+    @refreshes = []
+    @waits = 0
+  end
+
+  private
+
+  def nonblocking_child_status(*)
+    Object.new.tap { |status| status.define_singleton_method(:stopped?) { true } }
+  end
+
+  def monotonic_time
+    @now
+  end
+
+  def wait_for_next_supervision_poll(*)
+    @waits += 1
+    @now = 1_011.0
+  end
+
+  def refresh_lease?(*, renew_claim:, **)
+    @refreshes << renew_claim
+    true
+  end
+
+  public :supervise_cycle
+end
+
+scope = ReleaseSupervisor::ReleaseScope.new(
+  version: "17.1.0", base_version: "17.1.0", repo: "repo", target: "target", branch: "branch"
+)
+identity = ReleaseSupervisor::Identity.new(
+  agent_id: "agent", instance_id: "instance", machine_id: "machine", managed: true
+)
+supervisor = RepeatedNonTtyStoppedSupervisor.new
+state = ReleaseSupervisor::SupervisionState.new(next_heartbeat: 1_010.0, next_claim_renewal: 1_010.0)
+cycle_arguments = {
+  child_pid: 11,
+  pgid: 12,
+  liveness_writer: nil,
+  terminal_handoff: nil,
+  heartbeat_interval: 60.0,
+  claim_renewal_interval: 120.0,
+  termination_grace: 1.0,
+  coordination_timeout: 1.0
+}
+
+first_result = supervisor.supervise_cycle(scope, identity, state:, **cycle_arguments)
+abort "first stopped cycle changed future deadlines" unless first_result.equal?(state)
+second_result = supervisor.supervise_cycle(scope, identity, state: first_result, **cycle_arguments)
+abort "repeated stopped cycle did not wait" unless supervisor.waits == 1
+abort "due stopped cycle did not refresh heartbeat and claim" unless supervisor.refreshes == [true]
+unless second_result.next_heartbeat == 1_071.0 && second_result.next_claim_renewal == 1_131.0
+  abort "validated stopped-cycle refresh advanced deadlines incorrectly"
+end
+RUBY
+then
+  fail "repeated non-TTY stopped-child cycles bypassed normal supervision"
+fi
+assert_no_coordination_mutation
+assert_secret_absent
+pass "repeated non-TTY stopped-child cycles wait and refresh due coordination"
 
 setup_case interactive-confirmation
 export FAKE_BUNDLE_MODE=interactive-confirm

@@ -685,7 +685,12 @@ class ReleaseSupervisor
       scope, identity, child_pid:, pgid:, liveness_writer:, terminal_handoff:, termination_grace:,
                        coordination_timeout:
     )
-    return state if stop_result == :no_handoff
+    if stop_result == :no_handoff
+      return refresh_or_wait(
+        scope, identity, state:, child_pid:, pgid:, liveness_writer:, heartbeat_interval:,
+                         claim_renewal_interval:, termination_grace:, coordination_timeout:
+      )
+    end
     return stop_result unless stop_result == :resumed
 
     now = monotonic_time
