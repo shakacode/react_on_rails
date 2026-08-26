@@ -858,6 +858,17 @@ module ReactOnRails
 
             expect(bundle_load_error_message).to include(failure_message)
           end
+
+          it "does not let the token protect unresolved credentials before it" do
+            failure_message =
+              "Failure loading http://synthetic-user:synthetic-secret-prefixhttp://@host/path"
+            stub_local_bundle_failure(failure_message, bundle_path: "/tmp/server.js")
+
+            message = bundle_load_error_message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret-prefix")
+            expect(message).to include("Failure loading http://@host/path")
+          end
         end
 
         context "when a bundle-load failure contains two valid URLs" do

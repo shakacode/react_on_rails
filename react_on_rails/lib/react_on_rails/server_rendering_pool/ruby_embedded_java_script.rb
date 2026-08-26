@@ -473,7 +473,10 @@ module ReactOnRails
 
         def sanitized_unprotected_prefix(text, raw_url, sanitized_url)
           unresolved_scheme = text.match(%r{https?://}i)
-          return strip_unprotected_userinfo(text) if raw_url == sanitized_url || unresolved_scheme.nil?
+          return strip_unprotected_userinfo(text) if unresolved_scheme.nil?
+
+          empty_userinfo_url = raw_url.match?(%r{\Ahttps?://@[^@/?#]*(?:[/?#]|\z)}i)
+          return strip_unprotected_userinfo(text) if raw_url == sanitized_url && !empty_userinfo_url
 
           text[...unresolved_scheme.begin(0)]
         end
