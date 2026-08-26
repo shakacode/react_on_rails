@@ -4,6 +4,7 @@ set -euo pipefail
 
 repo_root="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
 release_script="${repo_root}/script/release"
+ruby_executable="$(ruby -rrbconfig -e 'puts RbConfig.ruby')"
 test_root="$(mktemp -d "${TMPDIR:-/tmp}/react-on-rails-release-test.XXXXXX")"
 fake_secret="coord-secret-must-never-appear"
 tests_run=0
@@ -397,11 +398,25 @@ case "${FAKE_BUNDLE_MODE:-success}" in
       sleep 0.1
     done
     ;;
+  stopped-hold)
+    trap record_termination TERM INT HUP
+    printf 'stopped:%s\n' "$$" >>"${TEST_BUNDLE_LOG}"
+    kill -STOP "$$"
+    while :; do
+      sleep 0.1
+    done
+    ;;
   guard)
     exec ruby -e '
       require ENV.fetch("TEST_RELEASE_GUARD")
       ReleaseLeaseGuard.activate!(dry_run: false)
     '
+    ;;
+  interactive-confirm)
+    printf 'Proceed with release? [y/N] '
+    IFS= read -r answer || answer=""
+    printf 'confirmation:%s\n' "${answer}" >>"${TEST_BUNDLE_LOG}"
+    test "${answer}" = y
     ;;
   *)
     exit 95
@@ -572,6 +587,22 @@ end
 exit UnverifiedChildTestSupervisor.new([]).run
 UNVERIFIED_CHILD_HARNESS
 
+  cat >"${fake_bin}/release-pty-harness.rb" <<'PTY_HARNESS'
+# frozen_string_literal: true
+
+require "fiddle"
+
+system(ENV.fetch("TEST_RELEASE_SCRIPT"))
+release_status = $?
+tcgetpgrp = Fiddle::Function.new(
+  Fiddle::Handle::DEFAULT["tcgetpgrp"],
+  [Fiddle::TYPE_INT],
+  Fiddle::TYPE_INT
+)
+puts "terminal:#{Process.getpgrp}:#{tcgetpgrp.call($stdin.fileno)}"
+exit(release_status.exited? ? release_status.exitstatus : 128 + release_status.termsig)
+PTY_HARNESS
+
   chmod +x "${fake_bin}/agent-coord" "${fake_bin}/bundle" "${fake_bin}/pnpm" \
     "${fake_bin}/release-handshake-harness" \
     "${fake_bin}/release-exception-harness" "${fake_bin}/release-subreaper-failure-harness" \
@@ -618,6 +649,67 @@ run_release() {
     cd "${fake_repo}"
     "${release_script}" "$@"
   ) >"${output_log}" 2>&1
+}
+
+run_release_in_pty() {
+  pty_input="$1"
+  TEST_PTY_INPUT="${pty_input}" TEST_PTY_REPO="${fake_repo}" TEST_PTY_OUTPUT="${output_log}" \
+    "${ruby_executable}" -rpty -e '
+    harness = File.join(ENV.fetch("TEST_PTY_REPO"), "..", "bin", "release-pty-harness.rb")
+    reader, writer, child_pid = PTY.spawn(RbConfig.ruby, harness, chdir: ENV.fetch("TEST_PTY_REPO"))
+    output = +""
+    status = nil
+    input_sent = false
+    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 3
+
+    loop do
+      begin
+        output << reader.read_nonblock(4096)
+      rescue IO::WaitReadable
+        nil
+      rescue EOFError, Errno::EIO
+        nil
+      end
+      if !input_sent && output.include?("Proceed with release? [y/N]")
+        writer.write(ENV.fetch("TEST_PTY_INPUT"))
+        writer.flush
+        input_sent = true
+      end
+      waited = Process.waitpid2(child_pid, Process::WNOHANG)
+      if waited
+        status = waited.last
+        break
+      end
+      if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
+        bundle_entry = File.readlines(ENV.fetch("TEST_BUNDLE_LOG")).find { |line| line.start_with?("bundle:") }
+        release_pgid = bundle_entry&.split(":", 4)&.fetch(2, nil)&.to_i
+        if release_pgid&.positive? && release_pgid != Process.getpgrp
+          begin
+            Process.kill("KILL", -release_pgid)
+          rescue Errno::ESRCH
+            nil
+          end
+        end
+        Process.kill("KILL", -child_pid)
+        File.binwrite(ENV.fetch("TEST_PTY_OUTPUT"), output)
+        exit! 124
+      end
+      IO.select([reader], nil, nil, 0.05)
+    end
+
+    loop do
+      begin
+        chunk = reader.read_nonblock(4096, exception: false)
+      rescue EOFError, Errno::EIO
+        break
+      end
+      break if chunk.nil? || chunk == :wait_readable
+
+      output << chunk
+    end
+    File.binwrite(ENV.fetch("TEST_PTY_OUTPUT"), output)
+    exit(status.exited? ? status.exitstatus : 128 + status.termsig)
+  '
 }
 
 run_handshake_release() {
@@ -687,6 +779,15 @@ assert_group_dead() {
     kill -KILL -- "-${group_id}" 2>/dev/null || true
     fail "process group ${group_id} survived wrapper shutdown"
   fi
+}
+
+assert_terminal_restored() {
+  terminal_record="$(grep '^terminal:' "${output_log}" | tail -n 1)"
+  supervisor_group="$(printf '%s\n' "${terminal_record}" | cut -d: -f2)"
+  foreground_group="$(printf '%s\n' "${terminal_record}" | cut -d: -f3 | tr -d '\r')"
+  test -n "${supervisor_group}" || fail "PTY harness did not record its process group"
+  test "${foreground_group}" = "${supervisor_group}" || \
+    fail "release wrapper did not restore terminal foreground ownership"
 }
 
 cleanup_stalled_wrapper() {
@@ -1171,6 +1272,48 @@ assert_no_coordination_mutation
 assert_secret_absent
 pass "matching state runs one identity-bound process group"
 
+setup_case interactive-confirmation
+export FAKE_BUNDLE_MODE=interactive-confirm
+if ! run_release_in_pty $'y\n'; then
+  fail "interactive confirmation did not complete through the controlling terminal"
+fi
+assert_contains "${bundle_log}" "confirmation:y"
+process_group="$(awk -F: '/^bundle:/ { print $3; exit }' "${bundle_log}")"
+assert_group_dead "${process_group}"
+assert_terminal_restored
+assert_no_coordination_mutation
+assert_secret_absent
+pass "interactive confirmation completes in the supervised release process group"
+
+for confirmation_input in $'n\n' $'\n'; do
+  setup_case "declined-confirmation-${tests_run}"
+  export FAKE_BUNDLE_MODE=interactive-confirm
+  if run_release_in_pty "${confirmation_input}"; then
+    fail "declined interactive confirmation completed successfully"
+  fi
+  process_group="$(awk -F: '/^bundle:/ { print $3; exit }' "${bundle_log}")"
+  assert_group_dead "${process_group}"
+  assert_terminal_restored
+  assert_no_coordination_mutation
+  assert_secret_absent
+  pass "declined or default interactive confirmation remains fail-safe"
+done
+
+setup_case interactive-confirmation-interrupt
+unset RELEASE_COORDINATOR_ID RELEASE_COORDINATOR_INSTANCE_ID
+export FAKE_BUNDLE_MODE=interactive-confirm
+if run_release_in_pty $'\003'; then
+  fail "interrupt at the interactive confirmation exited successfully"
+fi
+process_group="$(awk -F: '/^bundle:/ { print $3; exit }' "${bundle_log}")"
+assert_group_dead "${process_group}"
+assert_terminal_restored
+assert_contains "${output_log}" "process group ${process_group} was proven dead before handoff"
+assert_contains "${coord_log}" $'claim-atomic|'
+assert_contains "${coord_log}" $'release|'
+assert_secret_absent
+pass "interactive interrupts prove the release group dead and restore the terminal"
+
 setup_case external-identity-ownership-before-heartbeat
 export FAKE_PREFLIGHT_STATUS_MODE=foreign-active
 if run_release; then
@@ -1552,6 +1695,36 @@ assert_contains "${coord_log}" $'release|'
 test "$(tail -n 1 "${coord_log}" | cut -d'|' -f1)" = release || fail "signal cleanup was not last"
 assert_secret_absent
 pass "signals terminate the release group and clean up the process-owned claim"
+
+if supervisor_case_enabled stopped-child; then
+  setup_case stopped-child-signal
+  unset RELEASE_COORDINATOR_ID RELEASE_COORDINATOR_INSTANCE_ID
+  export FAKE_BUNDLE_MODE=stopped-hold
+  (
+    cd "${fake_repo}"
+    exec "${release_script}"
+  ) >"${output_log}" 2>&1 &
+  wrapper_pid=$!
+  for _attempt in $(seq 1 100); do
+    grep -q '^stopped:' "${bundle_log}" 2>/dev/null && break
+    sleep 0.05
+  done
+  grep -q '^stopped:' "${bundle_log}" 2>/dev/null || fail "release child never entered stopped state"
+  kill -TERM "${wrapper_pid}"
+  if ! wait_for_process_exit "${wrapper_pid}"; then
+    cleanup_stalled_wrapper "${wrapper_pid}"
+    fail "signal did not clean up the stopped release child"
+  fi
+  wait "${wrapper_pid}" 2>/dev/null || true
+  process_group="$(awk -F: '/^bundle:/ { print $3; exit }' "${bundle_log}")"
+  assert_group_dead "${process_group}"
+  assert_contains "${bundle_log}" "liveness:eof"
+  assert_contains "${bundle_log}" "termination:signal"
+  assert_contains "${coord_log}" $'release|'
+  assert_contains "${output_log}" "process group ${process_group} was proven dead before handoff"
+  assert_secret_absent
+  pass "signals resume and terminate stopped release descendants before claim cleanup"
+fi
 
 if supervisor_case_enabled death-watch-reader-error; then
   if ! RELEASE_SCRIPT="${release_script}" ruby <<'RUBY'

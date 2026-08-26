@@ -32,6 +32,7 @@ class ReleaseSupervisor
 
   Identity = Data.define(:agent_id, :instance_id, :machine_id, :managed)
   ReleaseScope = Data.define(:version, :base_version, :repo, :target, :branch)
+  TerminalHandoff = Data.define(:fd, :supervisor_pgid, :release_pgid)
   ReleasePipes = Data.define(
     :liveness_reader,
     :liveness_writer,
@@ -587,6 +588,7 @@ class ReleaseSupervisor
     pgid = nil
     liveness_writer = nil
     death_writer = nil
+    terminal_handoff = nil
     unless heartbeat!(scope, identity, coordination_timeout:, termination_grace:)
       raise ReleaseLeaseGuard::LeaseError, "release lease heartbeat failed"
     end
@@ -594,7 +596,7 @@ class ReleaseSupervisor
     verify_existing_lease!(scope, identity, coordination_timeout:, termination_grace:)
 
     @managed_claim_release_safe = false if identity.managed
-    child_pid, pgid, liveness_writer, death_writer = spawn_release_group(
+    child_pid, pgid, liveness_writer, death_writer, terminal_handoff = spawn_release_group(
       scope, identity, handshake_timeout:, termination_grace:
     )
     @stdout.puts "Release process group #{pgid} started."
@@ -618,8 +620,12 @@ class ReleaseSupervisor
     cleanup_failed_release(pgid, child_pid, liveness_writer, termination_grace)
     raise
   ensure
-    liveness_writer&.close unless liveness_writer&.closed?
-    death_writer&.close unless death_writer&.closed?
+    begin
+      restore_terminal_foreground(terminal_handoff)
+    ensure
+      liveness_writer&.close unless liveness_writer&.closed?
+      death_writer&.close unless death_writer&.closed?
+    end
   end
 
   def supervise_loop(scope, identity, child_pid:, pgid:, liveness_writer:, next_heartbeat:, next_claim_renewal:,
@@ -689,7 +695,7 @@ class ReleaseSupervisor
                  "closed liveness channel and terminating process group #{pgid}."
     terminate_group(pgid, child_pid:, grace: termination_grace)
     @managed_claim_release_safe = true
-    report_group_handoff(pgid)
+    report_group_handoff(pgid, proven_dead: true)
     128 + Signal.list.fetch(@received_signal)
   end
 
@@ -704,7 +710,7 @@ class ReleaseSupervisor
     @managed_claim_release_safe = true
     exit_code = process_status_code(child_status)
     @stdout.puts "Release process group #{pgid} completed with status #{exit_code}."
-    report_group_handoff(pgid)
+    report_group_handoff(pgid, proven_dead: true)
     exit_code
   end
 
@@ -713,12 +719,13 @@ class ReleaseSupervisor
     @stderr.puts "Release lease refresh failed; closed liveness channel and terminating process group #{pgid}."
     terminate_group(pgid, child_pid:, grace: termination_grace)
     @managed_claim_release_safe = true
-    report_group_handoff(pgid)
+    report_group_handoff(pgid, proven_dead: true)
     1
   end
 
   def spawn_release_group(scope, identity, handshake_timeout:, termination_grace:)
     pipes = release_pipes
+    terminal_owner = foreground_terminal_owner
     child_pid = nil
     child_pid = fork_release_child(scope, identity, pipes)
     pipes.liveness_reader.close
@@ -730,7 +737,8 @@ class ReleaseSupervisor
       timeout: handshake_timeout,
       termination_grace:
     )
-    [child_pid, pgid, pipes.liveness_writer, pipes.death_writer]
+    terminal_handoff = hand_off_terminal_foreground(terminal_owner, pgid)
+    [child_pid, pgid, pipes.liveness_writer, pipes.death_writer, terminal_handoff]
   rescue StandardError
     begin
       close_release_pipes(pipes)
@@ -838,13 +846,81 @@ class ReleaseSupervisor
     io&.close unless io&.closed?
   end
 
+  def foreground_terminal_owner
+    return unless $stdin.tty?
+
+    fd = $stdin.fileno
+    foreground_pgid = terminal_foreground_pgid(fd)
+    return unless foreground_pgid == Process.getpgrp
+
+    TerminalHandoff.new(fd:, supervisor_pgid: foreground_pgid, release_pgid: nil)
+  end
+
+  def hand_off_terminal_foreground(owner, release_pgid)
+    return unless owner
+    return unless terminal_foreground_pgid(owner.fd, tolerate_missing_terminal: true) == owner.supervisor_pgid
+    return unless group_alive?(release_pgid)
+    return unless set_terminal_foreground_pgid(owner.fd, release_pgid, tolerate_dead_pgid: release_pgid)
+
+    signal_group("CONT", release_pgid)
+    owner.with(release_pgid:)
+  end
+
+  def restore_terminal_foreground(handoff)
+    return unless handoff
+
+    foreground_pgid = terminal_foreground_pgid(handoff.fd, tolerate_missing_terminal: true)
+    return if foreground_pgid.nil? || foreground_pgid == handoff.supervisor_pgid
+    return unless foreground_pgid == handoff.release_pgid
+
+    set_terminal_foreground_pgid(handoff.fd, handoff.supervisor_pgid)
+  end
+
+  def terminal_foreground_pgid(terminal_fd, tolerate_missing_terminal: false)
+    pgid = terminal_function("tcgetpgrp", 1).call(terminal_fd)
+    return pgid unless pgid == -1
+
+    errno = Fiddle.last_error
+    return nil if tolerate_missing_terminal && errno == Errno::ENOTTY::Errno
+
+    raise SupervisorError, "could not read the controlling terminal foreground process group (errno #{errno})"
+  end
+
+  def set_terminal_foreground_pgid(terminal_fd, pgid, tolerate_dead_pgid: nil)
+    result = with_sigttou_ignored do
+      terminal_function("tcsetpgrp", 2).call(terminal_fd, pgid)
+    end
+    return true if result.zero?
+
+    errno = Fiddle.last_error
+    return false if errno == Errno::ENOTTY::Errno
+    return false if tolerate_dead_pgid && !group_alive?(tolerate_dead_pgid)
+
+    raise SupervisorError, "could not set the controlling terminal foreground process group (errno #{errno})"
+  end
+
+  def terminal_function(name, argument_count)
+    require "fiddle"
+    argument_types = Array.new(argument_count, Fiddle::TYPE_INT)
+    Fiddle::Function.new(Fiddle::Handle::DEFAULT[name], argument_types, Fiddle::TYPE_INT)
+  rescue LoadError, Fiddle::DLError
+    raise SupervisorError, "controlling terminal job-control support is unavailable"
+  end
+
+  def with_sigttou_ignored
+    previous_handler = Signal.trap("TTOU", "IGNORE")
+    yield
+  ensure
+    Signal.trap("TTOU", previous_handler) if previous_handler
+  end
+
   def cleanup_failed_release(pgid, child_pid, liveness_writer, termination_grace)
     close_liveness(liveness_writer) if liveness_writer
   ensure
     if pgid && child_pid
       terminate_group(pgid, child_pid:, grace: termination_grace)
       @managed_claim_release_safe = true
-      report_group_handoff(pgid)
+      report_group_handoff(pgid, proven_dead: true)
     end
   end
 
@@ -996,6 +1072,8 @@ class ReleaseSupervisor
   end
 
   def signal_termination_target(signal, pgid, child_pid:, signal_direct_child:)
+    # A controlling-terminal read can stop the release child before shutdown begins.
+    signal_group("CONT", pgid)
     signal_group(signal, pgid)
     signal_child(signal, child_pid) if signal_direct_child
   end
@@ -1087,8 +1165,12 @@ class ReleaseSupervisor
     nil
   end
 
-  def report_group_handoff(pgid)
-    @stderr.puts "Release process group #{pgid} must be proven dead before handoff."
+  def report_group_handoff(pgid, proven_dead: false)
+    if proven_dead
+      @stderr.puts "Release process group #{pgid} was proven dead before handoff."
+    else
+      @stderr.puts "Release process group #{pgid} must be proven dead before handoff."
+    end
   end
 
   def process_status_code(status)
