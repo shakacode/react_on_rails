@@ -42,6 +42,17 @@ module ReactOnRails
       # Grace given to the forceful stop (`overmind kill` / SIGKILL) before giving up.
       SHUTDOWN_KILL_GRACE_SECS = 5
       SHUTDOWN_POLL_INTERVAL_SECS = 0.2
+      # Bounded budget for the Overmind control-socket probe. `UNIXSocket.new`
+      # blocks indefinitely when the accept queue is full or the server is
+      # paused, which would hang `bin/dev kill` inside an otherwise bounded
+      # shutdown loop. Mirrors FileManager::SOCKET_PROBE_TIMEOUT_SECS.
+      OVERMIND_PROBE_TIMEOUT_SECS = 0.15
+      # O_NOFOLLOW so a symlink planted at the session path fails loudly rather
+      # than having its target silently truncated. `overmind_endpoint_owned?`
+      # resolves realpath for the same reason on the read side.
+      DEV_SESSION_OPEN_FLAGS = File::RDWR | File::CREAT |
+                               (defined?(File::NOFOLLOW) ? File::NOFOLLOW : 0)
+      DEV_SESSION_CLAIM_ATTEMPTS = 2
 
       # Markers that identify an app root when a command is run from a
       # subdirectory. Checked nearest-first while walking up from the cwd.
@@ -551,20 +562,54 @@ module ReactOnRails
         def claim_dev_session(root)
           path = dev_session_path(root)
           FileUtils.mkdir_p(File.dirname(path))
-          file = File.open(path, File::RDWR | File::CREAT, 0o644)
-          return warn_dev_session_contended(file, path, root) unless file.flock(File::LOCK_EX | File::LOCK_NB)
 
-          begin
-            write_dev_session(file, root)
-          rescue StandardError => e
-            discard_partial_dev_session(file, path)
-            warn_dev_session_unrecorded(e)
-            return nil
+          DEV_SESSION_CLAIM_ATTEMPTS.times do
+            file = File.open(path, DEV_SESSION_OPEN_FLAGS, 0o644)
+            return warn_dev_session_contended(file, path, root) unless file.flock(File::LOCK_EX | File::LOCK_NB)
+
+            # Holding the lock is not enough. The previous owner can unlink the
+            # path between our open and our flock, leaving us locking an inode
+            # that `dev-session.json` no longer names - we would then write
+            # state nothing can ever read back while running as though we were
+            # recorded. Mirror of the :replaced guard on the kill side.
+            return write_claimed_dev_session(file, path, root) unless dev_session_handle_detached?(path, file)
+
+            release_dev_session_lock(file)
           end
 
-          file
+          warn_dev_session_unrecorded("the session file kept being replaced")
+          nil
         rescue SystemCallError, IOError => e
-          warn_dev_session_unrecorded(e)
+          warn_dev_session_unrecorded(e.class)
+          nil
+        end
+
+        def write_claimed_dev_session(file, path, root)
+          write_dev_session(file, root)
+          file
+        rescue StandardError => e
+          discard_partial_dev_session(file, path)
+          warn_dev_session_unrecorded(e.class)
+          nil
+        end
+
+        # True when `path` no longer names this handle's inode, whether it was
+        # replaced or unlinked.
+        #
+        # Deliberately NOT the same question as #dev_session_replaced?, which
+        # treats a vanished path as "the owner tidied up after itself" rather
+        # than as a replacement. On the claim side a vanished path means our
+        # handle is orphaned, so it has to count. Do not merge the two.
+        def dev_session_handle_detached?(path, file)
+          File.stat(path).ino != file.stat.ino
+        rescue SystemCallError, IOError
+          true
+        end
+
+        def release_dev_session_lock(file)
+          file.flock(File::LOCK_UN)
+          file.close
+        rescue SystemCallError, IOError
           nil
         end
 
@@ -589,8 +634,8 @@ module ReactOnRails
           nil
         end
 
-        def warn_dev_session_unrecorded(error)
-          warn "   ⚠️  Could not record dev session state (#{error.class}). " \
+        def warn_dev_session_unrecorded(reason)
+          warn "   ⚠️  Could not record dev session state (#{reason}). " \
                "`bin/dev kill` will fall back to port-scoped cleanup."
         end
 
@@ -688,9 +733,25 @@ module ReactOnRails
         # fallback only applies when there is no session to read them from, and
         # a killing shell with a different base port must not override what the
         # running session actually bound.
+        # Union rather than "prefer recorded". Recorded ports capture what this
+        # run actually selected, but they only cover variables present in the
+        # parent environment - the generated Pro Procfile starts the renderer
+        # with `RENDERER_PORT=${RENDERER_PORT:-3800}`, so a defaulted renderer
+        # port is never recorded. Preferring recorded exclusively hid that port
+        # from both signalling and verification. A superset is strictly safer:
+        # signalling is cwd-gated, so a wider scan cannot signal anything this
+        # app root does not own, and verification only gains coverage.
+        #
+        # A refused view neither signals nor verifies, so skip the derivation
+        # entirely - `killable_ports` prints a base-port diagnostic that would
+        # otherwise land immediately before "Refusing to signal anything", for a
+        # value that is then discarded.
         def shutdown_ports(view)
+          return [] if view[:kind] == :refused
+
           recorded = view.dig(:session, :ports)
-          recorded.is_a?(Array) && recorded.any? ? recorded : killable_ports
+          recorded = [] unless recorded.is_a?(Array)
+          recorded | killable_ports
         end
 
         def dispatch_dev_shutdown(view)
@@ -803,8 +864,13 @@ module ReactOnRails
           valid_session_socket?(data["overmind_socket"])
         end
 
+        # `pid` is used only for identity and display (see
+        # #unreachable_owner_message), never for signalling, so every positive
+        # value is legitimate - including 1, which is exactly what `bin/dev`
+        # gets in a minimal Docker dev container with no init wrapper. Rejecting
+        # it there disabled the whole mechanism and made every kill refuse.
         def valid_session_pid?(value)
-          value.is_a?(Integer) && value > 1
+          value.is_a?(Integer) && value.positive?
         end
 
         def valid_session_socket?(value)
@@ -822,6 +888,9 @@ module ReactOnRails
           value.is_a?(String) && !value.empty?
         end
 
+        # Deliberately stricter than #valid_session_pid? above: this value IS
+        # signalled, and `Process.kill(sig, -1)` broadcasts to every process the
+        # user may signal. The asymmetry is load-bearing - do not harmonise it.
         def valid_session_pgid?(value)
           value.nil? || (value.is_a?(Integer) && value > 1)
         end
@@ -916,15 +985,22 @@ module ReactOnRails
           steps
         end
 
+        # Cleanup runs only once verification has fully succeeded. Removing the
+        # session file first destroyed the retry path: it carries the ports this
+        # run actually selected, so deleting it on the way to reporting
+        # :unverified meant the retry fell back to a re-derived guess - exactly
+        # the fidelity `selected_session_ports` exists to provide, lost on the
+        # one path where it matters most. It also made `print_kill_failure` tell
+        # the user to remove a file that was already gone.
         def verify_owner_shutdown(view, pgid, endpoint)
           blockers = shutdown_blockers(view, pgid, endpoint)
           return [:unverified, blockers] if blockers.any?
 
-          remove_dev_session_file(view)
-          cleanup_socket_files
           leftover = leftover_owned_listeners(view)
           return [:unverified, leftover] if leftover.any?
 
+          remove_dev_session_file(view)
+          cleanup_socket_files
           [:verified, []]
         end
 
@@ -1046,7 +1122,6 @@ module ReactOnRails
         # ---- kill path: no live owner ----------------------------------
 
         def shutdown_without_owner(view)
-          remove_dev_session_file(view) if view[:kind] == :stale
           endpoint = live_overmind_endpoint(view[:root], view.dig(:session, :overmind_socket))
           return shutdown_orphaned_overmind(view, endpoint) if endpoint
 
@@ -1061,6 +1136,9 @@ module ReactOnRails
           leftover = leftover_owned_listeners(view)
           return [:unverified, leftover] if leftover.any?
 
+          # Same rule as verify_owner_shutdown: the recorded ports outlive an
+          # unverified outcome so a retry still has them.
+          remove_dev_session_file(view) if view[:kind] == :stale
           return [:nothing_running, []] unless cleaned || killed || view[:kind] == :stale
 
           killed ? [:verified, []] : [:recovered_stale, []]
@@ -1108,9 +1186,16 @@ module ReactOnRails
         # Revalidates the recorded endpoint at control time rather than
         # trusting what startup wrote: the socket must still live inside this
         # app root, still be a socket, and still answer.
+        # Candidates in decreasing order of authority: what the session
+        # recorded, what OVERMIND_SOCKET names in the killing shell (only when
+        # it lands inside this app root), then the default path. A configured
+        # value is a candidate, not an authority - each still has to clear the
+        # containment and realpath checks below.
         def live_overmind_endpoint(root, recorded)
-          candidates = [recorded, default_overmind_socket_path(root)].compact.uniq
-          candidates.find { |path| overmind_endpoint_owned?(path, root) && overmind_endpoint_alive?(path) }
+          candidates = [recorded, owned_overmind_socket_path(root), default_overmind_socket_path(root)]
+          candidates.compact.uniq.find do |path|
+            overmind_endpoint_owned?(path, root) && overmind_endpoint_alive?(path)
+          end
         end
 
         # Containment check for a control endpoint. The path is resolved before
@@ -1136,13 +1221,40 @@ module ReactOnRails
         def overmind_endpoint_state(path)
           return :gone unless File.socket?(path)
 
-          socket = UNIXSocket.new(path)
-          socket.close
-          :alive
-        rescue Errno::ECONNREFUSED, Errno::ENOENT, Errno::ENOTSOCK
-          :gone
-        rescue SystemCallError, IOError
-          :unknown
+          begin
+            sockaddr = Socket.sockaddr_un(path)
+          rescue ArgumentError
+            # Only the "too long unix socket path" case (sun_path is capped at
+            # ~104/108 bytes); nothing could be listening there anyway.
+            return :gone
+          end
+
+          probe_unix_socket(sockaddr)
+        end
+
+        # Bounded connect. A blocking `UNIXSocket.new` hangs indefinitely when
+        # the server's accept queue is full or its process is paused, which
+        # could stall `bin/dev kill` outside any of its own timeouts. A probe
+        # that runs out of budget is :unknown, not :gone - it blocks
+        # verification rather than licensing a false "verified".
+        def probe_unix_socket(sockaddr)
+          socket = Socket.new(Socket::AF_UNIX, Socket::SOCK_STREAM, 0)
+          begin
+            socket.connect_nonblock(sockaddr)
+            :alive
+          rescue IO::WaitWritable
+            return :unknown unless socket.wait_writable(OVERMIND_PROBE_TIMEOUT_SECS)
+
+            socket.getsockopt(Socket::SOL_SOCKET, Socket::SO_ERROR).int.zero? ? :alive : :gone
+          rescue Errno::EISCONN
+            :alive
+          rescue Errno::ECONNREFUSED, Errno::ENOENT, Errno::ENOTSOCK
+            :gone
+          rescue SystemCallError, IOError
+            :unknown
+          ensure
+            socket.close
+          end
         end
 
         def overmind_endpoint_alive?(path)

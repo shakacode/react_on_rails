@@ -60,8 +60,11 @@ module ReactOnRails
       def self.with_dev_session: () { () -> untyped } -> untyped
       def self.claim_dev_session: (String) -> File?
       def self.write_dev_session: (File, String) -> void
+      def self.write_claimed_dev_session: (File, String, String) -> File?
+      def self.dev_session_handle_detached?: (String, File) -> bool
+      def self.release_dev_session_lock: (File) -> void
       def self.discard_partial_dev_session: (File?, String) -> void
-      def self.warn_dev_session_unrecorded: (Exception) -> void
+      def self.warn_dev_session_unrecorded: (untyped) -> void
       def self.warn_dev_session_contended: (File, String, String) -> nil
       def self.dev_session_payload: (String) -> Hash[String, untyped]
       def self.selected_session_ports: () -> Array[Integer]
@@ -110,6 +113,7 @@ module ReactOnRails
       def self.live_overmind_endpoint: (String, String?) -> String?
       def self.overmind_endpoint_owned?: (String, ?String) -> bool
       def self.overmind_endpoint_state: (String) -> Symbol
+      def self.probe_unix_socket: (String) -> Symbol
       def self.overmind_endpoint_alive?: (String) -> bool
       def self.overmind_control: (String, String) -> bool
       def self.signalable_pgid: (untyped) -> Integer?
