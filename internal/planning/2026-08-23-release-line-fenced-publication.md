@@ -8,7 +8,7 @@
 
 **Tech Stack:** Ruby, Rake, RSpec, Bash, Node.js ESM, pnpm, node:test, GitHub CLI, agent-coord HTTP backend.
 
-**Spec:** docs/superpowers/specs/2026-08-23-release-line-fenced-publication-design.md
+**Spec:** internal/planning/2026-08-23-release-line-fenced-publication-design.md
 
 ## Global Constraints
 
