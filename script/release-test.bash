@@ -13,7 +13,7 @@ cleanup() {
     printf 'release test files retained at %s\n' "${test_root}" >&2
     return
   fi
-  rm -rf "${test_root}"
+  rm -r "${test_root}"
 }
 trap cleanup EXIT
 

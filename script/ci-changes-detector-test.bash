@@ -377,7 +377,7 @@ test_ci_local_builds_dummy_assets_before_rspec_with_dependencies_present() {
 
 test_ci_local_installs_missing_dummy_node_modules_before_build_and_rspec() {
   setup_ci_local_repo
-  rm -rf react_on_rails/spec/dummy/node_modules
+  rm -r react_on_rails/spec/dummy/node_modules
 
   local output commands fixture_root
   fixture_root="$(pwd -P)"
