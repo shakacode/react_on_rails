@@ -26,6 +26,35 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **`bin/dev kill` now stops only the current app directory's processes, and verifies they are
+  gone**: the kill path matched command lines machine-wide (`pgrep -f rails`, `pgrep -f overmind`,
+  `pgrep -f ruby.*puma`, and friends) and scanned ports with an unfiltered `lsof -ti :PORT`, so
+  running it in one worktree could terminate a Rails server, a Webpack dev server, or an unrelated
+  client connection belonging to a different checkout — then printed "All processes terminated"
+  without checking that anything had actually stopped. `bin/dev` now claims a worktree-scoped,
+  `flock`-backed session file (`tmp/react_on_rails/dev-session.json`) recording the app root it
+  belongs to, the process group it leads, and the Overmind endpoint it would use. `bin/dev kill`
+  shuts that session down through its own Overmind control socket or its own process group,
+  escalating from `TERM` to `KILL` only for survivors, and reports success only after positively
+  observing that the owner, its process group, and its listeners are gone. Fallback port discovery
+  is restricted to LISTEN sockets whose process working directory is inside the current app root;
+  anything it cannot attribute is reported as a diagnostic and never signalled, and missing,
+  malformed, unreadable, or foreign session state fails closed rather than falling back to a broad
+  kill. The default-mode port list now covers the Shakapacker dev-server port
+  (`SHAKAPACKER_DEV_SERVER_PORT`, then `dev_server.port` in `config/shakapacker.yml`, then 3035)
+  instead of a hard-coded 3001, and a session records the ports it actually selected so a kill
+  verifies those rather than re-deriving a guess. Processes that deliberately leave the group with
+  `setsid`/daemonization remain out of scope, which is why Overmind (whose tmux server daemonizes) is
+  controlled through its socket. **Breaking API changes** for anyone calling
+  `ReactOnRails::Dev::ServerManager` directly: `.development_processes` and `.kill_running_processes`
+  are removed, `.kill_processes` now returns a status symbol (and `bin/dev kill` exits non-zero when
+  it refuses or cannot verify a shutdown, with `bin/dev clean` refusing to delete bundles in that
+  case), `.print_kill_summary` takes `(status_symbol, blockers_array)` instead of a boolean, and
+  `.kill_port_processes` / `.find_port_pids` only consider listening sockets attributable to the
+  current app root. Fixes [Issue 4846](https://github.com/shakacode/react_on_rails/issues/4846).
+  [PR 4937](https://github.com/shakacode/react_on_rails/pull/4937) by
+  [justin808](https://github.com/justin808).
+
 - **[Pro]** **Surfaced missing RSC loadable stats in Node Renderer logs**: The first missing
   `loadable-stats.json` read now emits an actionable `INFO` diagnostic per renderer process while
   preserving fallback and retry behavior without replaying the server path to the browser. Fixes
