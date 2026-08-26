@@ -54,6 +54,6 @@ Let’s make your apps faster—together.
 4. styled‑components v3.1.0: introduced streaming SSR support as the next generation of React rendering. ([medium.com][4])
 
 [1]: https://frigade.com/blog/bundle-size-reduction-with-rsc-and-frigade
-[2]: https://geekyants.com/en-gb/blog/boosting-performance-with-nextjs-and-react-server-components-a-geekyantscom-case-study
+[2]: https://web.archive.org/web/20260306053730/https://geekyants.com/en-gb/blog/boosting-performance-with-nextjs-and-react-server-components-a-geekyantscom-case-study
 [3]: https://www.compilenrun.com/docs/framework/nextjs/nextjs-ecosystem/nextjs-case-studies/#case-study-3-hulus-streaming-platform
 [4]: https://medium.com/styled-components/v3-1-0-such-perf-wow-many-streams-c45c434dbd03

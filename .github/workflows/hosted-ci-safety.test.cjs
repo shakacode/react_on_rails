@@ -301,8 +301,33 @@ assertMatches(
 assertMatches(
   'gem generator-spec job gate',
   gemTestsWorkflow,
-  /needs\.detect-changes\.outputs\.run_ruby_tests == 'true' \|\|\s+needs\.detect-changes\.outputs\.run_gem_generator_specs == 'true'/,
+  /needs\.detect-changes\.outputs\.run_ruby_tests == 'true' \|\|\s+needs\.detect-changes\.outputs\.run_gem_generator_specs == 'true' \|\|\s+needs\.detect-changes\.outputs\.run_release_supervisor_tests == 'true'/,
 );
+assertMatches(
+  'release supervisor detector output',
+  gemTestsWorkflow,
+  /run_release_supervisor_tests: \$\{\{ steps\.detect\.outputs\.run_release_supervisor_tests \}\}/,
+);
+assertMatches(
+  'release supervisor force-full override',
+  gemTestsWorkflow,
+  /echo "run_release_supervisor_tests=true"/,
+);
+const releaseSupervisorStep = extractStep(
+  extractJob(gemTestsWorkflow, 'rspec-package-tests'),
+  'Run release supervisor integration tests',
+);
+assertMatches(
+  'release supervisor harness is selected by the detector',
+  releaseSupervisorStep,
+  /needs\.detect-changes\.outputs\.run_release_supervisor_tests == 'true'/,
+);
+assertMatches(
+  'release supervisor harness runs once on the latest unit leg',
+  releaseSupervisorStep,
+  /matrix\.dependency-level == 'latest'[\s\S]*matrix\.shard == 'unit'/,
+);
+assertMatches('release supervisor harness command', releaseSupervisorStep, /bash script\/release-test\.bash/);
 assertMatches('gem matrix keeps failure evidence', gemTestsWorkflow, /strategy:\n\s+fail-fast: false/);
 assertMatches(
   'full matrix event policy',

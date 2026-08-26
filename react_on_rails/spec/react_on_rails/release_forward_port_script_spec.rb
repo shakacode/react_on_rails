@@ -86,7 +86,11 @@ RSpec.describe "script/release-forward-port" do
   end
 
   def documented_release_line_lease_snippet
-    documented_bash_snippet('if [ "${RELEASE_VERSION+x}" = x ] || [ "${RELEASE_LINE_TARGET+x}" = x ]; then')
+    marker = [
+      'if [ "${RELEASE_VERSION+x}" = x ] || [ "${RELEASE_LINE_TARGET+x}" = x ] || ',
+      '[ "${RELEASE_BRANCH+x}" = x ]; then'
+    ].join
+    documented_bash_snippet(marker)
   end
 
   def documented_backport_merge_snippet
@@ -131,9 +135,9 @@ RSpec.describe "script/release-forward-port" do
           shift
         done
         if [ "${command}" = "status" ]; then
-          printf '{"claims":[{"status":"active","agent_id":"%s","instance_id":"%s","expires_at":"2099-01-01T00:00:00Z"}],"heartbeats":[{"agent_id":"%s","instance_id":"%s","target":"shakacode/react_on_rails#%s","liveness":"live"}]}\\n' \
-            "${RELEASE_COORDINATOR_ID}" "${RELEASE_COORDINATOR_INSTANCE_ID}" \
-            "${RELEASE_COORDINATOR_ID}" "${RELEASE_COORDINATOR_INSTANCE_ID}" "${target}"
+          printf '{"claims":[{"status":"active","agent_id":"%s","instance_id":"%s","branch":"%s","expires_at":"2099-01-01T00:00:00Z"}],"heartbeats":[{"agent_id":"%s","instance_id":"%s","branch":"%s","target":"shakacode/react_on_rails#%s","liveness":"live"}]}\\n' \
+            "${RELEASE_COORDINATOR_ID}" "${RELEASE_COORDINATOR_INSTANCE_ID}" "${RELEASE_BRANCH}" \
+            "${RELEASE_COORDINATOR_ID}" "${RELEASE_COORDINATOR_INSTANCE_ID}" "${RELEASE_BRANCH}" "${target}"
         fi
       BASH
     )
@@ -253,6 +257,10 @@ RSpec.describe "script/release-forward-port" do
       defaults = {
         "BUNDLE_GEMFILE" => nil,
         "PR_BATCH_SKILL_DIR" => tmpdir,
+        "RELEASE_BRANCH" => nil,
+        "RELEASE_BRANCH_INPUT" => nil,
+        "RELEASE_LINE_TARGET" => nil,
+        "RELEASE_VERSION" => nil,
         "RELEASE_VERSION_INPUT" => "17.0.0",
         "RUBYLIB" => nil,
         "RUBYOPT" => nil,
@@ -577,21 +585,23 @@ RSpec.describe "script/release-forward-port" do
       expect(stderr).to include("release version must be a stable X.Y.Z version; stop")
     end
 
-    it "keeps the canonical release version and target immutable for the shell lifecycle" do
+    it "keeps the canonical release version, target, and branch immutable for the shell lifecycle" do
       stdout, stderr, status = run_documented_release_line_lease(<<~BASH)
         ( RELEASE_VERSION=17.0.1 ) >/dev/null 2>&1 && exit 70
         ( RELEASE_LINE_TARGET=release-line:17.0.1 ) >/dev/null 2>&1 && exit 71
-        printf '%s %s\n' "${RELEASE_VERSION}" "${RELEASE_LINE_TARGET}"
+        ( RELEASE_BRANCH=release/17.0.1 ) >/dev/null 2>&1 && exit 72
+        printf '%s %s %s\n' "${RELEASE_VERSION}" "${RELEASE_LINE_TARGET}" "${RELEASE_BRANCH}"
       BASH
 
       expect(status).to be_success, stderr
-      expect(stdout).to include("17.0.0 release-line:17.0.0")
+      expect(stdout).to include("17.0.0 release-line:17.0.0 release/17.0.0")
     end
 
     it "refuses either pre-existing canonical variable before assignment or coordination" do
       [
         { "RELEASE_VERSION" => "17.0.0" },
-        { "RELEASE_LINE_TARGET" => "release-line:17.0.0" }
+        { "RELEASE_LINE_TARGET" => "release-line:17.0.0" },
+        { "RELEASE_BRANCH" => "release/17.0.0" }
       ].each do |preexisting|
         _stdout, stderr, status, _mutations, calls = run_documented_release_lifecycle(
           "exit 72",
@@ -616,7 +626,7 @@ RSpec.describe "script/release-forward-port" do
       expect(calls).to be_empty
     end
 
-    it "assigns the canonical release version and target only in the lease bootstrap" do
+    it "assigns the canonical release version, target, and branch only in the lease bootstrap" do
       runbook = File.read(File.join(repo_root, "internal/contributor-info/release-train-runbook.md"))
       snippets = runbook.to_enum(:scan, /```bash\n(.*?)\n[ \t]*```/m).map { Regexp.last_match(1) }
       executable_lines = snippets.flat_map(&:lines).map(&:strip)
@@ -627,6 +637,19 @@ RSpec.describe "script/release-forward-port" do
       expect(executable_lines.grep(/\ARELEASE_LINE_TARGET=/)).to eq(
         ['RELEASE_LINE_TARGET="release-line:${RELEASE_VERSION}"']
       )
+      expect(executable_lines.grep(/\ARELEASE_BRANCH=/)).to eq(
+        ['RELEASE_BRANCH="${RELEASE_BRANCH_INPUT:-release/${RELEASE_VERSION}}"']
+      )
+    end
+
+    it "allows an ordinary stable release to select main explicitly" do
+      stdout, stderr, status = run_documented_release_line_lease(
+        'printf \'%s\n\' "${RELEASE_BRANCH}"',
+        environment: { "RELEASE_BRANCH_INPUT" => "main" }
+      )
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("main")
     end
 
     it "uses the canonical version in every executable release-ref command" do

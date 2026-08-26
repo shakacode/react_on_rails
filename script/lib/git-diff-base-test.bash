@@ -690,6 +690,7 @@ test_resolve_cross_repo_sha_hint_appears() {
   local fake_sha="0000000000000000000000000000000000000001"
   local err
   err="$( \
+    GITHUB_BASE_REF='' \
     GITHUB_HEAD_REF=feature \
     GIT_DIFF_BASE_FETCH_DEPTH=2 \
     GIT_DIFF_BASE_MAX_ATTEMPTS=1 \

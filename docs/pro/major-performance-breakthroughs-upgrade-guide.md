@@ -24,7 +24,7 @@ Server Components execute on the server and stream HTML to the client—no serve
   - **62% reduction** in client‑side bundle size
   - **63% improvement** in Google Speed Index
   - Total blocking time: **from 110 ms to 1 ms**
-- [geekyants.com Case Study](https://geekyants.com/en-gb/blog/boosting-performance-with-nextjs-and-react-server-components-a-geekyantscom-case-study):
+- [geekyants.com Case Study](https://web.archive.org/web/20260306053730/https://geekyants.com/en-gb/blog/boosting-performance-with-nextjs-and-react-server-components-a-geekyantscom-case-study):
   - **52% smaller** JavaScript and TypeScript codebase
   - Lighthouse scores improved **from ~50 to ~90**
 
