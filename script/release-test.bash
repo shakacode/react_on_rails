@@ -82,6 +82,7 @@ setup_case() {
   coordination_process_log="${case_dir}/coordination-process.log"
   coordination_descendant_log="${case_dir}/coordination-descendant.log"
   exception_group_log="${case_dir}/exception-group.log"
+  exception_liveness_log="${case_dir}/exception-liveness.log"
 
   mkdir -p "${fake_bin}" "${fake_repo}"
   cat >"${fake_bin}/pnpm" <<'FAKE_PNPM'
@@ -508,6 +509,29 @@ class ExceptionTestSupervisor < ReleaseSupervisor
     super
     raise SupervisorError, "injected terminal restoration failure" if ENV["FAKE_RESTORE_FAIL"] == "1"
   end
+
+  def close_release_pipes(pipes)
+    super
+    return unless ENV.fetch("FAKE_EXCEPTION_MODE") == "initial-handoff-failure"
+
+    state = pipes.liveness_writer.closed? ? "closed" : "open"
+    File.write(ENV.fetch("TEST_EXCEPTION_LIVENESS_LOG"), "#{state}\n")
+  end
+
+  def foreground_terminal_owner
+    return super unless ENV.fetch("FAKE_EXCEPTION_MODE") == "initial-handoff-failure"
+
+    TerminalHandoff.new(fd: $stdin.fileno, supervisor_pgid: Process.getpgrp, release_pgid: nil)
+  end
+
+  def hand_off_terminal_foreground(_owner, release_pgid)
+    if ENV.fetch("FAKE_EXCEPTION_MODE") == "initial-handoff-failure"
+      File.write(ENV.fetch("TEST_EXCEPTION_GROUP_LOG"), "#{release_pgid}\n")
+      return nil
+    end
+
+    super
+  end
 end
 
 exit ExceptionTestSupervisor.new(ARGV).run
@@ -687,6 +711,7 @@ JOB_CONTROL_HARNESS
   export TEST_COORDINATION_PROCESS_LOG="${coordination_process_log}"
   export TEST_COORDINATION_DESCENDANT_LOG="${coordination_descendant_log}"
   export TEST_EXCEPTION_GROUP_LOG="${exception_group_log}"
+  export TEST_EXCEPTION_LIVENESS_LOG="${exception_liveness_log}"
   export TEST_RELEASE_SCRIPT="${release_script}"
   export TEST_RELEASE_GUARD="${repo_root}/rakelib/release_lease_guard"
   export TEST_REPO="shakacode/react_on_rails"
@@ -1441,6 +1466,136 @@ assert_no_coordination_mutation
 assert_secret_absent
 pass "non-controlling TTY safely declines terminal foreground transfer"
 
+setup_case job-control-resume-with-pending-signal
+if ! TEST_RELEASE_SCRIPT="${release_script}" "${ruby_executable}" <<'RUBY'
+load ENV.fetch("TEST_RELEASE_SCRIPT")
+
+class PendingSignalSuspendSupervisor < ReleaseSupervisor
+  attr_reader :suspensions
+
+  def initialize
+    super([])
+    @received_signal = "HUP"
+    @suspensions = 0
+  end
+
+  private
+
+  def with_default_tstp_handler
+    @suspensions += 1
+    raise "suspension loop re-entered with a pending signal" if @suspensions > 1
+
+    yield
+  end
+
+  def terminal_foreground_pgid(*)
+    nil
+  end
+
+  public :suspend_for_shell_job_control
+end
+
+handoff = ReleaseSupervisor::TerminalHandoff.new(fd: 0, supervisor_pgid: 123, release_pgid: 456)
+supervisor = PendingSignalSuspendSupervisor.new
+result = supervisor.suspend_for_shell_job_control(handoff)
+abort "pending signal did not interrupt job-control resume" unless result == :interrupted
+abort "pending signal caused repeated suspension" unless supervisor.suspensions == 1
+RUBY
+then
+  fail "job-control resume spun instead of honoring its pending signal"
+fi
+assert_no_coordination_mutation
+assert_secret_absent
+pass "job-control resume returns immediately when a termination signal is pending"
+
+setup_case job-control-resume-with-lost-terminal
+if ! TEST_RELEASE_SCRIPT="${release_script}" "${ruby_executable}" <<'RUBY'
+load ENV.fetch("TEST_RELEASE_SCRIPT")
+
+class LostTerminalSuspendSupervisor < ReleaseSupervisor
+  attr_reader :suspensions
+
+  def initialize
+    super([])
+    @suspensions = 0
+  end
+
+  private
+
+  def with_default_tstp_handler
+    @suspensions += 1
+    raise "suspension loop re-entered after terminal loss" if @suspensions > 1
+
+    yield
+  end
+
+  def terminal_foreground_pgid(*)
+    nil
+  end
+
+  public :suspend_for_shell_job_control
+end
+
+handoff = ReleaseSupervisor::TerminalHandoff.new(fd: 0, supervisor_pgid: 123, release_pgid: 456)
+supervisor = LostTerminalSuspendSupervisor.new
+result = supervisor.suspend_for_shell_job_control(handoff)
+abort "terminal loss did not abort job-control resume" unless result == :terminal_lost
+abort "terminal loss caused repeated suspension" unless supervisor.suspensions == 1
+RUBY
+then
+  fail "job-control resume spun after losing its terminal"
+fi
+assert_no_coordination_mutation
+assert_secret_absent
+pass "job-control resume returns immediately when its terminal is lost"
+
+setup_case non-tty-stop-preserves-fence-deadlines
+if ! TEST_RELEASE_SCRIPT="${release_script}" "${ruby_executable}" <<'RUBY'
+load ENV.fetch("TEST_RELEASE_SCRIPT")
+
+class NonTtyStoppedSupervisor < ReleaseSupervisor
+  private
+
+  def nonblocking_child_status(*)
+    Object.new.tap { |status| status.define_singleton_method(:stopped?) { true } }
+  end
+
+  def monotonic_time
+    1_000.0
+  end
+
+  public :supervise_cycle
+end
+
+scope = ReleaseSupervisor::ReleaseScope.new(
+  version: "17.1.0", base_version: "17.1.0", repo: "repo", target: "target", branch: "branch"
+)
+identity = ReleaseSupervisor::Identity.new(
+  agent_id: "agent", instance_id: "instance", machine_id: "machine", managed: true
+)
+state = ReleaseSupervisor::SupervisionState.new(next_heartbeat: 10.0, next_claim_renewal: 20.0)
+result = NonTtyStoppedSupervisor.new([]).supervise_cycle(
+  scope,
+  identity,
+  state:,
+  child_pid: 11,
+  pgid: 12,
+  liveness_writer: nil,
+  terminal_handoff: nil,
+  heartbeat_interval: 60.0,
+  claim_renewal_interval: 120.0,
+  termination_grace: 1.0,
+  coordination_timeout: 1.0
+)
+abort "non-TTY stop changed lease deadlines" unless result.equal?(state)
+RUBY
+then
+  fail "non-TTY stopped child postponed fencing without validation"
+fi
+assert_no_coordination_mutation
+assert_secret_absent
+pass "non-TTY stopped child preserves its existing fence deadlines"
+
 setup_case interactive-confirmation
 export FAKE_BUNDLE_MODE=interactive-confirm
 if ! run_release_in_pty $'y\n'; then
@@ -1710,6 +1865,33 @@ for exception_mode in after-spawn after-handshake; do
     pass "${exception_mode} supervisor exception terminates the release group"
   fi
 done
+
+if supervisor_case_enabled exception-initial-handoff; then
+  setup_case initial-terminal-handoff-failure
+  unset RELEASE_COORDINATOR_ID RELEASE_COORDINATOR_INSTANCE_ID
+  export FAKE_EXCEPTION_MODE=initial-handoff-failure
+  export FAKE_BUNDLE_MODE=hold
+  (
+    cd "${fake_repo}"
+    exec "${fake_bin}/release-exception-harness"
+  ) >"${output_log}" 2>&1 &
+  wrapper_pid=$!
+  if ! wait_for_process_exit "${wrapper_pid}"; then
+    cleanup_stalled_wrapper "${wrapper_pid}"
+    fail "failed initial terminal handoff left the release child supervised without a terminal"
+  fi
+  if wait "${wrapper_pid}"; then
+    fail "failed initial terminal handoff exited successfully"
+  fi
+  process_group="$(cat "${exception_group_log}")"
+  assert_group_dead "${process_group}"
+  assert_contains "${exception_liveness_log}" "closed"
+  assert_contains "${coord_log}" $'claim-atomic|'
+  assert_contains "${coord_log}" $'release|'
+  assert_contains "${output_log}" "initial terminal foreground transfer failed"
+  assert_secret_absent
+  pass "failed initial terminal handoff closes liveness and proves the child group dead"
+fi
 
 if supervisor_case_enabled exception-restore; then
   setup_case exception-restoration-during-unwind
