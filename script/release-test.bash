@@ -795,6 +795,184 @@ loop do
 end
 BACKGROUND_PTY_HARNESS
 
+  cat >"${fake_bin}/release-redirected-input-harness.rb" <<'REDIRECTED_INPUT_HARNESS'
+# frozen_string_literal: true
+
+require "fiddle"
+
+$stdout.sync = true
+tcsetpgrp = Fiddle::Function.new(
+  Fiddle::Handle::DEFAULT["tcsetpgrp"],
+  [Fiddle::TYPE_INT, Fiddle::TYPE_INT],
+  Fiddle::TYPE_INT
+)
+tcgetpgrp = Fiddle::Function.new(
+  Fiddle::Handle::DEFAULT["tcgetpgrp"],
+  [Fiddle::TYPE_INT],
+  Fiddle::TYPE_INT
+)
+set_foreground = lambda do |pgid|
+  previous_handler = Signal.trap("TTOU", "IGNORE")
+  raise "tcsetpgrp failed" unless tcsetpgrp.call($stdout.fileno, pgid).zero?
+ensure
+  Signal.trap("TTOU", previous_handler) if previous_handler
+end
+
+input_reader, input_writer = IO.pipe
+launch_reader, launch_writer = IO.pipe
+wrapper_pid = fork do
+  launch_writer.close
+  input_writer.close
+  Process.setpgid(0, 0)
+  launch_reader.read(1)
+  launch_reader.close
+  $stdin.reopen(input_reader)
+  input_reader.close
+  exec ENV.fetch("TEST_RELEASE_SCRIPT")
+end
+Process.setpgid(wrapper_pid, wrapper_pid)
+
+feeder_pid = fork do
+  launch_writer.close
+  input_reader.close
+  Process.setpgid(0, wrapper_pid)
+  launch_reader.read(1)
+  launch_reader.close
+  input_writer.write("y\n")
+  input_writer.close
+  exit! 0
+end
+Process.setpgid(feeder_pid, wrapper_pid)
+
+launch_reader.close
+input_reader.close
+input_writer.close
+puts "shell:redirected-input:#{wrapper_pid}"
+set_foreground.call(wrapper_pid)
+launch_writer.write("xx")
+launch_writer.close
+
+_wrapper_waited, wrapper_status = Process.waitpid2(wrapper_pid)
+_feeder_waited, feeder_status = Process.waitpid2(feeder_pid)
+set_foreground.call(Process.getpgrp)
+puts "terminal:#{Process.getpgrp}:#{tcgetpgrp.call($stdout.fileno)}"
+raise "input feeder failed" unless feeder_status.success?
+
+exit(wrapper_status.exited? ? wrapper_status.exitstatus : 128 + wrapper_status.termsig)
+REDIRECTED_INPUT_HARNESS
+
+  cat >"${fake_bin}/release-output-pipeline-harness.rb" <<'OUTPUT_PIPELINE_HARNESS'
+# frozen_string_literal: true
+
+require "fiddle"
+
+$stdout.sync = true
+tcsetpgrp = Fiddle::Function.new(
+  Fiddle::Handle::DEFAULT["tcsetpgrp"],
+  [Fiddle::TYPE_INT, Fiddle::TYPE_INT],
+  Fiddle::TYPE_INT
+)
+tcgetpgrp = Fiddle::Function.new(
+  Fiddle::Handle::DEFAULT["tcgetpgrp"],
+  [Fiddle::TYPE_INT],
+  Fiddle::TYPE_INT
+)
+set_foreground = lambda do |pgid|
+  previous_handler = Signal.trap("TTOU", "IGNORE")
+  raise "tcsetpgrp failed" unless tcsetpgrp.call($stdin.fileno, pgid).zero?
+ensure
+  Signal.trap("TTOU", previous_handler) if previous_handler
+end
+
+pipeline_reader, pipeline_writer = IO.pipe
+launch_reader, launch_writer = IO.pipe
+wrapper_pid = fork do
+  launch_writer.close
+  pipeline_reader.close
+  Process.setpgid(0, 0)
+  launch_reader.read(1)
+  launch_reader.close
+  $stdout.reopen(pipeline_writer)
+  pipeline_writer.close
+  exec ENV.fetch("TEST_RELEASE_SCRIPT")
+end
+Process.setpgid(wrapper_pid, wrapper_pid)
+
+tee_pid = fork do
+  launch_writer.close
+  pipeline_writer.close
+  Process.setpgid(0, wrapper_pid)
+  launch_reader.read(1)
+  launch_reader.close
+  $stdin.reopen(pipeline_reader)
+  pipeline_reader.close
+  IO.copy_stream($stdin, $stdout)
+  exit! 0
+end
+Process.setpgid(tee_pid, wrapper_pid)
+
+launch_reader.close
+pipeline_reader.close
+pipeline_writer.close
+puts "shell:output-pipeline:#{wrapper_pid}"
+system("stty", "tostop") if ENV["FAKE_TOSTOP"] == "1"
+set_foreground.call(wrapper_pid)
+launch_writer.write("xx")
+launch_writer.close
+
+statuses = {}
+deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 1.5
+until statuses.size == 2 || Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
+  [wrapper_pid, tee_pid].each do |pid|
+    next if statuses.key?(pid)
+
+    waited = Process.waitpid2(pid, Process::WNOHANG)
+    statuses[pid] = waited.fetch(1) if waited
+  rescue Errno::ECHILD
+    nil
+  end
+  sleep 0.01 if statuses.size < 2
+end
+
+set_foreground.call(Process.getpgrp)
+system("stty", "-tostop") if ENV["FAKE_TOSTOP"] == "1"
+unless statuses.size == 2
+  begin
+    Process.kill("CONT", -wrapper_pid)
+    Process.kill("TERM", -wrapper_pid)
+  rescue Errno::ESRCH
+    nil
+  end
+  bundle_entry = File.readlines(ENV.fetch("TEST_BUNDLE_LOG")).find { |line| line.start_with?("bundle:") }
+  release_pgid = bundle_entry&.split(":", 4)&.fetch(2, nil)&.to_i
+  begin
+    Process.kill("KILL", -release_pgid) if release_pgid&.positive?
+  rescue Errno::ESRCH
+    nil
+  end
+  [wrapper_pid, tee_pid].each do |pid|
+    next if statuses.key?(pid)
+
+    begin
+      Process.kill("KILL", pid)
+    rescue Errno::ESRCH
+      nil
+    end
+    begin
+      Process.wait(pid)
+    rescue Errno::ECHILD
+      nil
+    end
+  end
+  exit 124
+end
+
+puts "terminal:#{Process.getpgrp}:#{tcgetpgrp.call($stdin.fileno)}"
+raise "pipeline tee failed" unless statuses.fetch(tee_pid).success?
+wrapper_status = statuses.fetch(wrapper_pid)
+exit(wrapper_status.exited? ? wrapper_status.exitstatus : 128 + wrapper_status.termsig)
+OUTPUT_PIPELINE_HARNESS
+
   cat >"${fake_bin}/release-job-control-harness.rb" <<'JOB_CONTROL_HARNESS'
 # frozen_string_literal: true
 
@@ -835,12 +1013,27 @@ raise "wrapper did not stop for shell job control" unless stopped_status.stopped
 
 set_foreground.call(Process.getpgrp)
 puts "shell:wrapper-stopped"
+coordination_counts = lambda do
+  heartbeat_count = File.read(ENV.fetch("TEST_HEARTBEAT_COUNT_FILE")).strip
+  status_count = File.read(ENV.fetch("TEST_STATUS_COUNT_FILE")).strip
+  renewal_count = File.readlines(ENV.fetch("TEST_COORD_LOG")).count { |line| line.include?("--renew") }
+  [heartbeat_count, status_count, renewal_count]
+end
+stopped_before = coordination_counts.call
+sleep 0.3
+stopped_after = coordination_counts.call
+puts "shell:wrapper-stopped-coordination:#{[*stopped_before, *stopped_after].join(':')}"
+if ENV["FAKE_SIGNAL_STOPPED_WRAPPER"] == "1"
+  Process.kill("TERM", wrapper_pid)
+  puts "shell:wrapper-signal:TERM"
+end
 set_foreground.call(wrapper_pid)
 Process.kill("CONT", -wrapper_pid)
 puts "shell:wrapper-continued"
 
 _waited_pid, release_status = Process.waitpid2(wrapper_pid)
 set_foreground.call(Process.getpgrp)
+puts "shell:wrapper-final-coordination:#{coordination_counts.call.join(':')}"
 puts "terminal:#{Process.getpgrp}:#{tcgetpgrp.call($stdin.fileno)}"
 exit(release_status.exited? ? release_status.exitstatus : 128 + release_status.termsig)
 JOB_CONTROL_HARNESS
@@ -886,7 +1079,8 @@ JOB_CONTROL_HARNESS
   unset FAKE_DOCTOR_FAIL FAKE_DOCTOR_BACKEND FAKE_DOCTOR_PAYLOAD
   unset FAKE_BUNDLE_MODE FAKE_BUNDLE_START_DELAY FAKE_HANDSHAKE_MODE FAKE_EXCEPTION_MODE FAKE_RESTORE_FAIL
   unset FAKE_HANDSHAKE_IGNORE_TERM
-  unset FAKE_LATE_BACKGROUND FAKE_PAUSE_HEARTBEAT_FOR_BACKGROUND
+  unset FAKE_LATE_BACKGROUND FAKE_PAUSE_HEARTBEAT_FOR_BACKGROUND FAKE_TOSTOP
+  unset FAKE_SIGNAL_STOPPED_WRAPPER
   unset REACT_ON_RAILS_RELEASE_COORDINATION_TIMEOUT
   unset REACT_ON_RAILS_RELEASE_CLAIM_RENEWAL_INTERVAL
 }
@@ -943,6 +1137,15 @@ run_release_with_noncontrolling_tty() {
       master.close unless master.closed?
     end
     exit exit_code
+  ' >"${output_log}" 2>&1
+}
+
+run_release_headless_with_redirected_input() {
+  TEST_PTY_REPO="${fake_repo}" "${ruby_executable}" -e '
+    Process.setsid
+    $stdin.reopen("/dev/null")
+    Dir.chdir(ENV.fetch("TEST_PTY_REPO"))
+    exec ENV.fetch("TEST_RELEASE_SCRIPT")
   ' >"${output_log}" 2>&1
 }
 
@@ -1068,9 +1271,12 @@ run_background_release_in_pty() {
 }
 
 run_job_control_release_in_pty() {
+  job_control_harness="${1:-release-job-control-harness.rb}"
+  continuation_marker="${2:-shell:wrapper-continued}"
   TEST_PTY_REPO="${fake_repo}" TEST_PTY_OUTPUT="${output_log}" \
+    TEST_JOB_CONTROL_HARNESS="${job_control_harness}" TEST_CONTINUATION_MARKER="${continuation_marker}" \
     "${ruby_executable}" -rpty -e '
-    harness = File.join(ENV.fetch("TEST_PTY_REPO"), "..", "bin", "release-job-control-harness.rb")
+    harness = File.join(ENV.fetch("TEST_PTY_REPO"), "..", "bin", ENV.fetch("TEST_JOB_CONTROL_HARNESS"))
     reader, writer, child_pid = PTY.spawn(RbConfig.ruby, harness, chdir: ENV.fetch("TEST_PTY_REPO"))
     output = +""
     status = nil
@@ -1091,7 +1297,7 @@ run_job_control_release_in_pty() {
         writer.flush
         stop_sent = true
       end
-      if !confirmation_sent && output.include?("shell:wrapper-continued")
+      if !confirmation_sent && output.include?(ENV.fetch("TEST_CONTINUATION_MARKER"))
         writer.write("y\n")
         writer.flush
         confirmation_sent = true
@@ -1102,7 +1308,7 @@ run_job_control_release_in_pty() {
         break
       end
       if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
-        process_groups = output.scan(/^shell:wrapper:(\d+)/).flatten.map(&:to_i)
+        process_groups = output.scan(/^shell:(?:wrapper|pipeline):(\d+)/).flatten.map(&:to_i)
         bundle_entry = File.readlines(ENV.fetch("TEST_BUNDLE_LOG")).find { |line| line.start_with?("bundle:") }
         process_groups << bundle_entry&.split(":", 4)&.fetch(2, nil)&.to_i
         process_groups.compact.select(&:positive?).uniq.each do |process_group|
@@ -1701,6 +1907,49 @@ assert_empty "${bundle_log}"
 assert_secret_absent
 pass "background interactive live release is refused before coordination mutation"
 
+setup_case redirected-input-controlling-terminal
+unset RELEASE_COORDINATOR_ID RELEASE_COORDINATOR_INSTANCE_ID
+export FAKE_BUNDLE_MODE=interactive-confirm
+if run_release_in_pty '' release-redirected-input-harness.rb; then
+  fail "foreground live release accepted redirected stdin while attached to a controlling terminal"
+fi
+assert_contains "${output_log}" "shell:redirected-input:"
+assert_contains "${output_log}" "live release requires direct terminal stdin and stdout"
+assert_empty "${coord_log}"
+assert_empty "${bundle_log}"
+assert_terminal_restored
+assert_secret_absent
+pass "foreground live release refuses redirected stdin before coordination mutation"
+
+setup_case output-pipeline-controlling-terminal
+unset RELEASE_COORDINATOR_ID RELEASE_COORDINATOR_INSTANCE_ID
+export FAKE_BUNDLE_MODE=interactive-confirm
+if run_release_in_pty '' release-output-pipeline-harness.rb; then
+  fail "foreground live release accepted piped stdout while attached to a controlling terminal"
+fi
+assert_contains "${output_log}" "shell:output-pipeline:"
+assert_contains "${output_log}" "live release requires direct terminal stdin and stdout"
+assert_empty "${coord_log}"
+assert_empty "${bundle_log}"
+assert_terminal_restored
+assert_secret_absent
+pass "foreground live release refuses an output pipeline before coordination mutation"
+
+setup_case output-pipeline-tostop-controlling-terminal
+unset RELEASE_COORDINATOR_ID RELEASE_COORDINATOR_INSTANCE_ID
+export FAKE_BUNDLE_MODE=interactive-confirm
+export FAKE_TOSTOP=1
+if run_release_in_pty '' release-output-pipeline-harness.rb; then
+  fail "foreground live release accepted a TOSTOP output pipeline"
+fi
+assert_contains "${output_log}" "shell:output-pipeline:"
+assert_contains "${output_log}" "live release requires direct terminal stdin and stdout"
+assert_empty "${coord_log}"
+assert_empty "${bundle_log}"
+assert_terminal_restored
+assert_secret_absent
+pass "foreground live release refuses a TOSTOP output pipeline before coordination mutation"
+
 setup_case spawn-time-terminal-ownership-race
 unset RELEASE_COORDINATOR_ID RELEASE_COORDINATOR_INSTANCE_ID
 if run_release_in_pty '' release-terminal-race-harness.rb; then
@@ -1792,6 +2041,14 @@ assert_no_coordination_mutation
 assert_secret_absent
 pass "live release allows a TTY without a controlling terminal"
 
+setup_case headless-redirected-input
+FAKE_BUNDLE_MODE=success run_release_headless_with_redirected_input || \
+  fail "headless live release rejected redirected stdin without a controlling terminal"
+assert_contains "${bundle_log}" 'args|exec|rake|release[17.1.0.rc.0]'
+assert_no_coordination_mutation
+assert_secret_absent
+pass "headless live release allows redirected stdin without a controlling terminal"
+
 setup_case job-control-resume-with-pending-signal
 if ! TEST_RELEASE_SCRIPT="${release_script}" "${ruby_executable}" <<'RUBY'
 load ENV.fetch("TEST_RELEASE_SCRIPT")
@@ -1831,6 +2088,53 @@ fi
 assert_no_coordination_mutation
 assert_secret_absent
 pass "job-control resume returns immediately when a termination signal is pending"
+
+setup_case job-control-signal-before-group-stop
+if ! TEST_RELEASE_SCRIPT="${release_script}" "${ruby_executable}" <<'RUBY'
+load ENV.fetch("TEST_RELEASE_SCRIPT")
+
+class SignalBeforeGroupStopSupervisor < ReleaseSupervisor
+  attr_reader :group_stop_attempts
+
+  def initialize
+    super([])
+    @group_stop_attempts = 0
+  end
+
+  private
+
+  def terminal_foreground_pgid(*)
+    123
+  end
+
+  def invoking_job_group_suspendable?(*)
+    true
+  end
+
+  def with_default_tstp_handler
+    @received_signal = "TERM"
+    yield
+  end
+
+  def stop_invoking_job_group(*)
+    @group_stop_attempts += 1
+  end
+
+  public :suspend_for_shell_job_control
+end
+
+handoff = ReleaseSupervisor::TerminalHandoff.new(fd: 0, supervisor_pgid: 123, release_pgid: 456)
+supervisor = SignalBeforeGroupStopSupervisor.new
+result = supervisor.suspend_for_shell_job_control(handoff)
+abort "signal before group stop did not interrupt resume" unless result == :interrupted
+abort "signal before group stop still suspended the invoking job" unless supervisor.group_stop_attempts.zero?
+RUBY
+then
+  fail "job-control resume suspended the invoking job after consuming a termination signal"
+fi
+assert_no_coordination_mutation
+assert_secret_absent
+pass "termination signal consumed before group stop returns directly to cleanup"
 
 setup_case job-control-resume-with-lost-terminal
 if ! TEST_RELEASE_SCRIPT="${release_script}" "${ruby_executable}" <<'RUBY'
@@ -2008,6 +2312,16 @@ if ! run_job_control_release_in_pty; then
 fi
 assert_contains "${output_log}" "shell:wrapper-stopped"
 assert_contains "${output_log}" "shell:wrapper-continued"
+stopped_coordination="$(grep '^shell:wrapper-stopped-coordination:' "${output_log}" | tail -n 1 | tr -d '\r')"
+test "$(printf '%s\n' "${stopped_coordination}" | cut -d: -f3)" = \
+  "$(printf '%s\n' "${stopped_coordination}" | cut -d: -f6)" || \
+  fail "release heartbeat advanced while the direct invoking job was stopped"
+test "$(printf '%s\n' "${stopped_coordination}" | cut -d: -f4)" = \
+  "$(printf '%s\n' "${stopped_coordination}" | cut -d: -f7)" || \
+  fail "release fence status advanced while the direct invoking job was stopped"
+test "$(printf '%s\n' "${stopped_coordination}" | cut -d: -f5)" = \
+  "$(printf '%s\n' "${stopped_coordination}" | cut -d: -f8)" || \
+  fail "release claim renewed while the direct invoking job was stopped"
 assert_contains "${bundle_log}" "confirmation:y"
 continuation_record="$(grep '^job-control:continued:' "${bundle_log}" | tail -n 1)"
 continuation_heartbeats="$(printf '%s\n' "${continuation_record}" | cut -d: -f3)"
@@ -2023,6 +2337,36 @@ assert_contains "${coord_log}" $'claim-atomic|'
 assert_contains "${coord_log}" $'release|'
 assert_secret_absent
 pass "Ctrl-Z returns control to the shell and revalidates fencing before foreground resume"
+
+setup_case interactive-job-control-pending-signal
+unset RELEASE_COORDINATOR_ID RELEASE_COORDINATOR_INSTANCE_ID
+export FAKE_BUNDLE_MODE=job-control-confirm
+export FAKE_SIGNAL_STOPPED_WRAPPER=1
+if run_job_control_release_in_pty; then
+  fail "termination signal pending on the stopped invoking job allowed release continuation"
+fi
+assert_contains "${output_log}" "shell:wrapper-stopped"
+assert_contains "${output_log}" "shell:wrapper-signal:TERM"
+assert_contains "${output_log}" "shell:wrapper-continued"
+stopped_coordination="$(grep '^shell:wrapper-stopped-coordination:' "${output_log}" | tail -n 1 | tr -d '\r')"
+final_coordination="$(grep '^shell:wrapper-final-coordination:' "${output_log}" | tail -n 1 | tr -d '\r')"
+test "$(printf '%s\n' "${stopped_coordination}" | cut -d: -f6)" = \
+  "$(printf '%s\n' "${final_coordination}" | cut -d: -f3)" || \
+  fail "pending signal refreshed the heartbeat after the invoking job resumed"
+test "$(printf '%s\n' "${stopped_coordination}" | cut -d: -f7)" = \
+  "$(printf '%s\n' "${final_coordination}" | cut -d: -f4)" || \
+  fail "pending signal refreshed the release fence after the invoking job resumed"
+test "$(printf '%s\n' "${stopped_coordination}" | cut -d: -f8)" = \
+  "$(printf '%s\n' "${final_coordination}" | cut -d: -f5)" || \
+  fail "pending signal renewed the release claim after the invoking job resumed"
+assert_not_contains "${bundle_log}" "confirmation:y"
+process_group="$(awk -F: '/^bundle:/ { print $3; exit }' "${bundle_log}")"
+assert_group_dead "${process_group}"
+assert_terminal_restored
+assert_contains "${coord_log}" $'claim-atomic|'
+assert_contains "${coord_log}" $'release|'
+assert_secret_absent
+pass "pending termination signal cleans up after foreground resume without refreshing the lease"
 
 setup_case interactive-job-control-lost-fence
 export FAKE_BUNDLE_MODE=job-control-confirm

@@ -740,7 +740,9 @@ class ReleaseSupervisor
     @stderr.puts "Release process group #{pgid} stopped; returning terminal control to the invoking shell."
     suspend_result = suspend_for_shell_job_control(terminal_handoff)
     return interrupt_release(pgid, child_pid, liveness_writer, termination_grace) if suspend_result == :interrupted
-    return fail_terminal_resume(pgid, child_pid, liveness_writer, termination_grace) if suspend_result == :terminal_lost
+    if %i[terminal_lost unsafe_job_group].include?(suspend_result)
+      return fail_terminal_resume(pgid, child_pid, liveness_writer, termination_grace)
+    end
 
     lease_live = refresh_lease?(
       scope,
@@ -762,14 +764,29 @@ class ReleaseSupervisor
     loop do
       return :interrupted if @received_signal
       return :terminal_lost if terminal_foreground_pgid(terminal_handoff.fd).nil?
+      return :unsafe_job_group unless invoking_job_group_suspendable?(terminal_handoff.supervisor_pgid)
 
-      with_default_tstp_handler { Process.kill("TSTP", Process.pid) }
+      with_default_tstp_handler do
+        return :interrupted if @received_signal
+
+        stop_invoking_job_group(terminal_handoff.supervisor_pgid)
+      end
       return :interrupted if @received_signal
 
       foreground_pgid = terminal_foreground_pgid(terminal_handoff.fd)
       return :terminal_lost if foreground_pgid.nil?
       return :foreground if foreground_pgid == terminal_handoff.supervisor_pgid
     end
+  end
+
+  def invoking_job_group_suspendable?(pgid)
+    pgid == Process.getpgrp && Process.getpgid(Process.ppid) != pgid
+  rescue Errno::ESRCH
+    false
+  end
+
+  def stop_invoking_job_group(pgid)
+    Process.kill("TSTP", -pgid)
   end
 
   def with_default_tstp_handler
@@ -989,12 +1006,27 @@ class ReleaseSupervisor
   end
 
   def verify_live_terminal_foreground!
-    return unless $stdin.tty?
+    controlling_terminal = open_controlling_terminal
+    return unless controlling_terminal
 
-    foreground_pgid = terminal_foreground_pgid($stdin.fileno)
-    return if foreground_pgid.nil? || foreground_pgid == Process.getpgrp
+    foreground_pgid = terminal_foreground_pgid(controlling_terminal.fileno)
+    return if foreground_pgid.nil?
+    unless foreground_pgid == Process.getpgrp
+      raise SupervisorError, "interactive live release must run in the terminal foreground; use fg and retry"
+    end
 
-    raise SupervisorError, "interactive live release must run in the terminal foreground; use fg and retry"
+    return if $stdin.tty? && $stdout.tty?
+
+    raise SupervisorError,
+          "live release requires direct terminal stdin and stdout when attached to a controlling terminal"
+  ensure
+    close_io(controlling_terminal)
+  end
+
+  def open_controlling_terminal
+    File.open("/dev/tty", File::RDONLY)
+  rescue Errno::ENXIO, Errno::ENODEV, Errno::ENOENT
+    nil
   end
 
   def hand_off_terminal_foreground(owner, release_pgid)
