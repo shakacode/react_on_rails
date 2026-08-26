@@ -1012,6 +1012,17 @@ module ReactOnRails
               expect(message).to include("#{scheme}://renderer.example/bundle.js")
             end
           end
+
+          it "redacts credentials when URI parsing treats the value as opaque" do
+            server_bundle_path =
+              "x:y://synthetic-user:synthetic-secret@renderer.example/bundle.js"
+            stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("x:y://renderer.example/bundle.js")
+          end
         end
 
         context "when the configured scheme parser discards userinfo" do

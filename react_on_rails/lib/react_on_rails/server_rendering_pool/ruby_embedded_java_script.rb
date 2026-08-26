@@ -45,7 +45,7 @@ module ReactOnRails
         | error\son\srenderer\srequest
       /xi
 
-      CONFIGURED_AUTHORITY_SCHEME_REGEX = %r{[^/\s"'?=#@]*://}
+      CONFIGURED_AUTHORITY_SCHEME_REGEX = %r{[^:/\s"'?=#@]*://}
 
       class << self
         def reset_pool
