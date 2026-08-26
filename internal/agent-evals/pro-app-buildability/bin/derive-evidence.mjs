@@ -47,9 +47,10 @@ const commandEvidence = { schema_version: '1.0', limits: eventLimits, commands }
 
 const excludedDirectories = new Set(['.git', 'node_modules', 'vendor', 'tmp', 'log', 'storage']);
 const selectedBasenames = new Set(['Gemfile', 'package.json', 'routes.rb']);
-const selectedExtensions = new Set(['.rb', '.js', '.jsx', '.ts', '.tsx']);
-const selectedRoots = ['app/', 'spec/', 'test/'];
+const selectedSourceExtensions = new Set(['.js', '.jsx', '.ts', '.tsx']);
+const selectedSourceRoots = ['app/', 'spec/', 'test/'];
 const artifacts = [];
+const artifactClassificationContent = new WeakMap();
 const artifactLimits = {
   ...ARTIFACT_LIMITS,
   visited_entries: 0,
@@ -91,13 +92,14 @@ function walk(directory, depth = 0) {
           walk(absolute, depth + 1);
         } else if (entry.isFile()) {
           const relative = path.relative(workspace, absolute).replaceAll(path.sep, '/');
-          const insideSelectedRoot = selectedRoots.some(
+          const insideSelectedSourceRoot = selectedSourceRoots.some(
             (root) => relative.startsWith(root) || relative.includes(`/${root}`),
           );
           const selected =
             selectedBasenames.has(entry.name) ||
             /(?:^|\/)app\/views\/hello_server\/index\.html\.erb$/.test(relative) ||
-            (insideSelectedRoot && selectedExtensions.has(path.extname(entry.name)));
+            path.extname(entry.name) === '.rb' ||
+            (insideSelectedSourceRoot && selectedSourceExtensions.has(path.extname(entry.name)));
           if (selected) {
             artifactLimits.selected_files += 1;
             if (artifactLimits.selected_files > ARTIFACT_LIMITS.max_files) {
@@ -114,14 +116,17 @@ function walk(directory, depth = 0) {
               return;
             } else {
               const content = fs.readFileSync(absolute);
-              const excerpt = truncate(content.toString('utf8'), MAX_EXCERPT);
-              artifacts.push({
+              const decodedContent = content.toString('utf8');
+              const excerpt = truncate(decodedContent, MAX_EXCERPT);
+              const artifact = {
                 path: relative,
                 sha256: crypto.createHash('sha256').update(content).digest('hex'),
                 size: fileSize,
                 excerpt: excerpt.value,
                 excerpt_truncated: excerpt.truncated,
-              });
+              };
+              artifactClassificationContent.set(artifact, decodedContent);
+              artifacts.push(artifact);
               artifactLimits.included_files += 1;
               artifactLimits.included_bytes += fileSize;
             }
@@ -690,6 +695,24 @@ const rubyPercentLiteralDescriptor = (line, start) => {
     type: opener[1],
   };
 };
+const rubyPercentLiteralAllowsInterpolation = (type) => !['i', 'q', 's', 'w'].includes(type);
+const hasExecutableRubyInterpolation = (value) => {
+  for (let index = 0; index < value.length - 1; index += 1) {
+    if (value[index] === '#' && /[{@$]/.test(value[index + 1])) {
+      let precedingBackslashes = 0;
+      for (let cursor = index - 1; cursor >= 0 && value[cursor] === '\\'; cursor -= 1) {
+        precedingBackslashes += 1;
+      }
+      if (precedingBackslashes % 2 === 0) return true;
+    }
+  }
+  return false;
+};
+const hasPotentialRubyTestMutationInterpolation = (value) =>
+  hasExecutableRubyInterpolation(value) &&
+  /(?:ActionDispatch\s*::\s*IntegrationTest|\b[A-Z][A-Za-z0-9_]*Test\b)[\s\S]*(?:\b(?:alias|alias_method|class_eval|class_exec|define_method|define_singleton_method|module_eval|module_exec|prepend|remove_method|singleton_class|undef|undef_method)\b|\b(?:extend|include)(?![!?=])|\bdef\b)/.test(
+    value,
+  );
 const scanRubyPercentLiteral = (line, start, priorState = null) => {
   const descriptor = priorState ?? rubyPercentLiteralDescriptor(line, start);
   if (descriptor === undefined) return undefined;
@@ -711,12 +734,11 @@ const scanRubyPercentLiteral = (line, start, priorState = null) => {
   }
   return { descriptor, end: null, state: { ...descriptor, depth, escaped } };
 };
-const rubySlashRegexEnd = (line, start) => {
-  const prefix = line.slice(0, start).trimEnd();
-  if (!/(?:^|[=(:,[!&|?{};])$/.test(prefix)) return undefined;
-  let escaped = false;
-  let characterClass = false;
-  for (let index = start + 1; index < line.length; index += 1) {
+const scanRubySlashRegex = (line, start, priorState = null) => {
+  let escaped = priorState?.escaped ?? false;
+  let characterClass = priorState?.characterClass ?? false;
+  const cursor = priorState === null ? start + 1 : start;
+  for (let index = cursor; index < line.length; index += 1) {
     const character = line[index];
     if (escaped) {
       escaped = false;
@@ -735,14 +757,52 @@ const rubySlashRegexEnd = (line, start) => {
       characterClass = false;
     } else if (character === '/' && !characterClass) {
       while (/[imxounes]/.test(line[index + 1] ?? '')) index += 1;
-      return index;
+      return { end: index, state: null };
     }
   }
-  return null;
+  return { end: null, state: { characterClass, escaped } };
+};
+const rubySlashRegexEnd = (line, start) => {
+  const prefix = line.slice(0, start).trimEnd();
+  const assertionRegexArgument = /\b(?:assert|refute)_match$/.test(prefix);
+  if (!/(?:^|[=(:,[!&|?{};])$/.test(prefix) && !assertionRegexArgument) return undefined;
+  const scan = scanRubySlashRegex(line, start);
+  return scan?.end ?? null;
+};
+const rubyCharacterLiteralEnd = (line, start) => {
+  if (line[start] !== '?' || /[A-Za-z0-9_!?]/.test(line[start - 1] ?? '')) return undefined;
+  const next = line[start + 1];
+  if (next === undefined || /\s/.test(next)) return undefined;
+  if (next !== '\\') return start + 1;
+
+  const escapeStart = start + 2;
+  const escape = line[escapeStart];
+  if (escape === undefined) return null;
+  if (escape === 'u' && line[escapeStart + 1] === '{') {
+    const closing = line.indexOf('}', escapeStart + 2);
+    return closing >= 0 && /^[0-9A-Fa-f ]+$/.test(line.slice(escapeStart + 2, closing)) ? closing : null;
+  }
+  if (escape === 'u') return /^[0-9A-Fa-f]{4}/.test(line.slice(escapeStart + 1)) ? escapeStart + 4 : null;
+  if (escape === 'x') return /^[0-9A-Fa-f]{2}/.test(line.slice(escapeStart + 1)) ? escapeStart + 2 : null;
+  if (/[0-7]/.test(escape)) {
+    const octal = line.slice(escapeStart).match(/^[0-7]{1,3}/)?.[0];
+    return octal === undefined ? null : escapeStart + octal.length - 1;
+  }
+  let modifiedCharacter = escapeStart;
+  while (
+    line.startsWith('M-', modifiedCharacter) ||
+    line.startsWith('C-', modifiedCharacter) ||
+    line[modifiedCharacter] === 'c'
+  ) {
+    modifiedCharacter += line[modifiedCharacter] === 'c' ? 1 : 2;
+    if (line[modifiedCharacter] === '\\') modifiedCharacter += 1;
+  }
+  return line[modifiedCharacter] === undefined ? null : modifiedCharacter;
 };
 const rubyHeredocOpeners = (line, localVariables) => {
   const openers = [];
   let quote = null;
+  let quoteStart = null;
   let escaped = false;
   for (let index = 0; index < line.length; index += 1) {
     const character = line[index];
@@ -751,18 +811,40 @@ const rubyHeredocOpeners = (line, localVariables) => {
     } else if (quote !== null && character === '\\') {
       escaped = true;
     } else if (quote !== null) {
-      if (character === quote) quote = null;
-    } else if (character === '"' || character === "'") {
+      if (character === quote) {
+        quote = null;
+        quoteStart = null;
+      }
+    } else if (character === '?') {
+      const characterLiteralEnd = rubyCharacterLiteralEnd(line, index);
+      if (characterLiteralEnd === null) return null;
+      if (characterLiteralEnd !== undefined) index = characterLiteralEnd;
+    } else if (character === '"' || character === "'" || character === '`') {
       quote = character;
+      quoteStart = index;
     } else if (character === '%') {
       const percentLiteral = scanRubyPercentLiteral(line, index);
       if (percentLiteral?.end === null) {
-        return { multilinePercent: { index, state: percentLiteral.state }, openers };
+        return {
+          multilinePercent: { index, state: percentLiteral.state },
+          multilineQuote: null,
+          multilineRegex: null,
+          openers,
+        };
       }
       if (percentLiteral?.end !== undefined) index = percentLiteral.end;
     } else if (character === '/') {
       const regexEnd = rubySlashRegexEnd(line, index);
-      if (regexEnd === null) return null;
+      if (regexEnd === null) {
+        const regexScan = scanRubySlashRegex(line, index);
+        if (regexScan === null) return null;
+        return {
+          multilinePercent: null,
+          multilineQuote: null,
+          multilineRegex: { index, state: regexScan.state },
+          openers,
+        };
+      }
       if (regexEnd !== undefined) index = regexEnd;
     } else if (character === '#') {
       break;
@@ -771,18 +853,51 @@ const rubyHeredocOpeners = (line, localVariables) => {
       if (opener) {
         const receiver = line.slice(0, index).match(/\b([a-z_][A-Za-z0-9_]*)[ \t]*$/)?.[1];
         if (receiver === undefined || !localVariables.has(receiver)) {
-          openers.push({ allowIndent: opener[1] !== '', index, name: opener[3] });
+          openers.push({
+            allowIndent: opener[1] !== '',
+            index,
+            interpolated: opener[2] !== "'",
+            name: opener[3],
+          });
         }
         index += opener[0].length - 1;
       }
     }
   }
-  return quote === null && !escaped ? { multilinePercent: null, openers } : null;
+  return {
+    multilinePercent: null,
+    multilineQuote: quote === null ? null : { index: quoteStart, quote },
+    multilineRegex: null,
+    openers,
+  };
 };
-const maskRubyHeredocs = (content) => {
+const rubyMultilineQuoteEnd = (line, quote, interpolationIsUnsafe) => {
+  let escaped = false;
+  for (let index = 0; index < line.length; index += 1) {
+    const character = line[index];
+    if (escaped) {
+      escaped = false;
+    } else if (character === '\\') {
+      escaped = true;
+    } else if (
+      quote !== "'" &&
+      character === '#' &&
+      /[{@$]/.test(line[index + 1] ?? '') &&
+      interpolationIsUnsafe(line)
+    ) {
+      return { executableInterpolation: true, index: null };
+    } else if (character === quote) {
+      return { executableInterpolation: false, index };
+    }
+  }
+  return { executableInterpolation: false, index: null };
+};
+const maskRubyHeredocs = (content, interpolationIsUnsafe = hasExecutableRubyInterpolation) => {
   const records = content.match(/[^\r\n]*(?:\r\n|\n|$)/g)?.filter(Boolean) ?? [];
   let terminator = null;
   let multilinePercent = null;
+  let multilineQuote = null;
+  let multilineRegex = null;
   const masked = [];
   const localVariables = new Set();
   for (const record of records) {
@@ -791,13 +906,24 @@ const maskRubyHeredocs = (content) => {
     if (terminator !== null) {
       const candidate = terminator.allowIndent ? line.trim() : line.trimEnd();
       const closes = candidate === terminator.name && (terminator.allowIndent || !/^[ \t]/.test(line));
+      if (!closes) {
+        terminator.content += `${line}${lineEnding}`;
+        if (terminator.interpolated && interpolationIsUnsafe(terminator.content)) return null;
+      }
       masked.push(`${line.replace(/./g, ' ')}${lineEnding}`);
       if (closes) terminator = null;
     } else if (multilinePercent !== null) {
+      const literalContent = `${multilinePercent.content}${line}`;
+      if (
+        rubyPercentLiteralAllowsInterpolation(multilinePercent.state.type) &&
+        interpolationIsUnsafe(literalContent)
+      ) {
+        return null;
+      }
       const scan = scanRubyPercentLiteral(line, 0, multilinePercent.state);
       if (scan?.end === null) {
         masked.push(`${line.replace(/./g, ' ')}${lineEnding}`);
-        multilinePercent = { state: scan.state };
+        multilinePercent = { content: `${literalContent}${lineEnding}`, state: scan.state };
       } else {
         const suffix = line.slice((scan?.end ?? -1) + 1);
         const suffixPattern =
@@ -805,6 +931,42 @@ const maskRubyHeredocs = (content) => {
         if (!suffixPattern.test(suffix)) return null;
         masked.push(`${line.replace(/./g, ' ')}${lineEnding}`);
         multilinePercent = null;
+      }
+    } else if (multilineQuote !== null) {
+      const literalContent = `${multilineQuote.content}${line}`;
+      if (multilineQuote.quote !== "'" && interpolationIsUnsafe(literalContent)) return null;
+      const closing = rubyMultilineQuoteEnd(line, multilineQuote.quote, interpolationIsUnsafe);
+      if (closing.index === null) {
+        masked.push(`${line.replace(/./g, ' ')}${lineEnding}`);
+        multilineQuote = { ...multilineQuote, content: `${literalContent}${lineEnding}` };
+      } else {
+        const suffix = line.slice(closing.index + 1);
+        const suffixScan = rubyHeredocOpeners(suffix, localVariables);
+        if (
+          suffixScan === null ||
+          suffixScan.openers.length > 0 ||
+          suffixScan.multilinePercent !== null ||
+          suffixScan.multilineQuote !== null ||
+          suffixScan.multilineRegex !== null
+        ) {
+          return null;
+        }
+        masked.push(`${line.slice(0, closing.index + 1).replace(/./g, ' ')}${suffix}${lineEnding}`);
+        multilineQuote = null;
+      }
+    } else if (multilineRegex !== null) {
+      const literalContent = `${multilineRegex.content}${line}`;
+      if (interpolationIsUnsafe(literalContent)) return null;
+      const scan = scanRubySlashRegex(line, 0, multilineRegex.state);
+      if (scan === null) return null;
+      if (scan.end === null) {
+        masked.push(`${line.replace(/./g, ' ')}${lineEnding}`);
+        multilineRegex = { content: `${literalContent}${lineEnding}`, state: scan.state };
+      } else {
+        const suffix = line.slice(scan.end + 1);
+        if (!/^[ \t]*(?:#.*)?$/.test(suffix)) return null;
+        masked.push(`${line.replace(/./g, ' ')}${lineEnding}`);
+        multilineRegex = null;
       }
     } else {
       const localAssignment = line.match(/^[ \t]*([a-z_][A-Za-z0-9_]*)[ \t]*=(?!=)/)?.[1];
@@ -814,58 +976,128 @@ const maskRubyHeredocs = (content) => {
       if (scan.multilinePercent !== null) {
         if (scan.openers.length > 0) return null;
         const literalStart = scan.multilinePercent.index;
+        if (
+          rubyPercentLiteralAllowsInterpolation(scan.multilinePercent.state.type) &&
+          interpolationIsUnsafe(line.slice(literalStart))
+        ) {
+          return null;
+        }
         masked.push(
           `${line.slice(0, literalStart)}${line.slice(literalStart).replace(/./g, ' ')}${lineEnding}`,
         );
-        multilinePercent = { state: scan.multilinePercent.state };
+        multilinePercent = {
+          content: `${line.slice(literalStart)}${lineEnding}`,
+          state: scan.multilinePercent.state,
+        };
+      } else if (scan.multilineQuote !== null) {
+        if (scan.openers.length > 0) return null;
+        const literalStart = scan.multilineQuote.index;
+        if (scan.multilineQuote.quote !== "'" && interpolationIsUnsafe(line.slice(literalStart))) {
+          return null;
+        }
+        masked.push(
+          `${line.slice(0, literalStart)}${line.slice(literalStart).replace(/./g, ' ')}${lineEnding}`,
+        );
+        multilineQuote = {
+          content: `${line.slice(literalStart)}${lineEnding}`,
+          quote: scan.multilineQuote.quote,
+        };
+      } else if (scan.multilineRegex !== null) {
+        if (scan.openers.length > 0) return null;
+        const literalStart = scan.multilineRegex.index;
+        if (interpolationIsUnsafe(line.slice(literalStart))) return null;
+        masked.push(
+          `${line.slice(0, literalStart)}${line.slice(literalStart).replace(/./g, ' ')}${lineEnding}`,
+        );
+        multilineRegex = {
+          content: `${line.slice(literalStart)}${lineEnding}`,
+          state: scan.multilineRegex.state,
+        };
       } else if (scan.openers.length === 0) {
         masked.push(record);
       } else {
         const opener = scan.openers[0];
-        terminator = { allowIndent: opener.allowIndent, name: opener.name };
+        terminator = {
+          allowIndent: opener.allowIndent,
+          content: '',
+          interpolated: opener.interpolated,
+          name: opener.name,
+        };
         const prefix = line.slice(0, opener.index);
         masked.push(`${prefix}${line.slice(opener.index).replace(/./g, ' ')}${lineEnding}`);
       }
     }
   }
-  return terminator === null && multilinePercent === null ? masked.join('') : null;
+  return terminator === null &&
+    multilinePercent === null &&
+    multilineQuote === null &&
+    multilineRegex === null
+    ? masked.join('')
+    : null;
 };
 const maskRubyDataSection = (content) => {
   const marker = /^__END__[ \t]*(?:\r?\n|$)/m.exec(content);
   if (!marker) return content;
   return `${content.slice(0, marker.index)}${content.slice(marker.index).replace(/[^\r\n]/g, ' ')}`;
 };
-const maskExecutableRubyContent = (content) => {
+const maskExecutableRubyContent = (content, interpolationIsUnsafe = hasExecutableRubyInterpolation) => {
   const blockCommentMasked = maskRubyBlockComments(content);
   if (blockCommentMasked === null) return null;
-  const heredocMasked = maskRubyHeredocs(blockCommentMasked);
+  const heredocMasked = maskRubyHeredocs(blockCommentMasked, interpolationIsUnsafe);
   return heredocMasked === null ? null : maskRubyDataSection(heredocMasked);
 };
-const maskRubyControlFlowLine = (line) => {
+const maskRubyControlFlowLine = (line, interpolationIsUnsafe = hasExecutableRubyInterpolation) => {
   const masked = [];
   let quote = null;
-  let regex = false;
   let escaped = false;
   for (let index = 0; index < line.length; index += 1) {
     const character = line[index];
     if (escaped) {
       masked.push(' ');
       escaped = false;
-    } else if (character === '\\' && (quote !== null || regex)) {
+    } else if (character === '\\' && quote !== null) {
       masked.push(' ');
       escaped = true;
     } else if (quote !== null) {
       masked.push(' ');
       if (character === quote) quote = null;
-    } else if (regex) {
-      masked.push(' ');
-      if (character === '/') regex = false;
     } else if (character === '"' || character === "'") {
       masked.push(' ');
       quote = character;
+    } else if (character === '?') {
+      const characterLiteralEnd = rubyCharacterLiteralEnd(line, index);
+      if (characterLiteralEnd === null) return null;
+      if (characterLiteralEnd === undefined) {
+        masked.push(character);
+      } else {
+        masked.push(line.slice(index, characterLiteralEnd + 1).replace(/./g, ' '));
+        index = characterLiteralEnd;
+      }
     } else if (character === '/') {
-      masked.push(' ');
-      regex = true;
+      const regexEnd = rubySlashRegexEnd(line, index);
+      if (regexEnd === null) return null;
+      if (regexEnd === undefined) {
+        masked.push(character);
+      } else {
+        if (interpolationIsUnsafe(line.slice(index, regexEnd + 1))) return null;
+        masked.push(line.slice(index, regexEnd + 1).replace(/./g, ' '));
+        index = regexEnd;
+      }
+    } else if (character === '%') {
+      const percentLiteral = scanRubyPercentLiteral(line, index);
+      if (percentLiteral?.end === null) return null;
+      if (percentLiteral?.end === undefined) {
+        masked.push(character);
+      } else {
+        if (
+          rubyPercentLiteralAllowsInterpolation(percentLiteral.descriptor.type) &&
+          interpolationIsUnsafe(line.slice(index, percentLiteral.end + 1))
+        ) {
+          return null;
+        }
+        masked.push(line.slice(index, percentLiteral.end + 1).replace(/./g, ' '));
+        index = percentLiteral.end;
+      }
     } else if (character === '#') {
       masked.push(line.slice(index).replace(/./g, ' '));
       break;
@@ -873,11 +1105,243 @@ const maskRubyControlFlowLine = (line) => {
       masked.push(character);
     }
   }
-  return quote === null && !regex && !escaped ? masked.join('') : null;
+  return quote === null && !escaped ? masked.join('') : null;
 };
+const maskRubyOrdinaryStrings = (content, interpolationIsUnsafe = hasExecutableRubyInterpolation) => {
+  const records = content.match(/[^\r\n]*(?:\r\n|\n|$)/g)?.filter(Boolean) ?? [];
+  const masked = [];
+  let quote = null;
+  let quoteContent = '';
+  for (const record of records) {
+    const lineEnding = record.match(/\r?\n$/)?.[0] ?? '';
+    const line = record.slice(0, record.length - lineEnding.length);
+    let escaped = false;
+    for (let index = 0; index < line.length; index += 1) {
+      const character = line[index];
+      if (quote !== null) {
+        masked.push(' ');
+        quoteContent += character;
+        if (escaped) {
+          escaped = false;
+        } else if (character === '\\') {
+          escaped = true;
+        } else if (character === quote) {
+          if (quote !== "'" && interpolationIsUnsafe(quoteContent)) return null;
+          quote = null;
+          quoteContent = '';
+        }
+      } else if (character === '?') {
+        const characterLiteralEnd = rubyCharacterLiteralEnd(line, index);
+        if (characterLiteralEnd === null) return null;
+        if (characterLiteralEnd === undefined) {
+          masked.push(character);
+        } else {
+          masked.push(line.slice(index, characterLiteralEnd + 1));
+          index = characterLiteralEnd;
+        }
+      } else if (character === '/') {
+        const regexEnd = rubySlashRegexEnd(line, index);
+        if (regexEnd === null) return null;
+        if (regexEnd === undefined) {
+          masked.push(character);
+        } else {
+          masked.push(line.slice(index, regexEnd + 1));
+          index = regexEnd;
+        }
+      } else if (character === '%') {
+        const percentLiteral = scanRubyPercentLiteral(line, index);
+        if (percentLiteral?.end === null) return null;
+        if (percentLiteral?.end === undefined) {
+          masked.push(character);
+        } else {
+          masked.push(line.slice(index, percentLiteral.end + 1));
+          index = percentLiteral.end;
+        }
+      } else if (character === '"' || character === "'" || character === '`') {
+        masked.push(' ');
+        quote = character;
+        quoteContent = character;
+      } else if (character === '#') {
+        masked.push(line.slice(index));
+        break;
+      } else {
+        masked.push(character);
+      }
+    }
+    if (quote !== null) {
+      quoteContent += lineEnding;
+      if (quote !== "'" && interpolationIsUnsafe(quoteContent)) return null;
+    }
+    masked.push(lineEnding);
+  }
+  return quote === null ? masked.join('') : null;
+};
+const maskRubyMutationSyntax = (content, interpolationIsUnsafe = hasExecutableRubyInterpolation) => {
+  const stringMasked = maskRubyOrdinaryStrings(content, interpolationIsUnsafe);
+  if (stringMasked === null) return null;
+  const records = stringMasked.match(/[^\r\n]*(?:\r\n|\n|$)/g)?.filter(Boolean) ?? [];
+  const masked = [];
+  for (const record of records) {
+    const lineEnding = record.match(/\r?\n$/)?.[0] ?? '';
+    const line = record.slice(0, record.length - lineEnding.length);
+    const maskedLine = maskRubyControlFlowLine(line, interpolationIsUnsafe);
+    if (maskedLine === null) return null;
+    masked.push(`${maskedLine}${lineEnding}`);
+  }
+  return masked.join('');
+};
+const rubyStaticQualifiedConstantPattern = String.raw`[A-Z][A-Za-z0-9_]*(?:::[A-Z][A-Za-z0-9_]*)*`;
+const rubyStaticConstGetArgumentPattern = String.raw`(?:${rubyStaticQualifiedConstantPattern}|["']${rubyStaticQualifiedConstantPattern}["']|:["']?${rubyStaticQualifiedConstantPattern}["']?)`;
+const rubyStaticConstGetReceiverPattern = new RegExp(
+  String.raw`(?:::)?${rubyStaticQualifiedConstantPattern}(?:\s*(?:\.|::|&\.)\s*const_get\s*\(\s*${rubyStaticConstGetArgumentPattern}(?:\s*,\s*(?:true|false))?\s*\))+`,
+  'g',
+);
+const rubyStaticConstantLookupName = (reference) => {
+  const constantReference = reference.startsWith(':') ? reference.slice(1) : reference;
+  const quote = constantReference[0];
+  if (quote === '"' || quote === "'") {
+    return constantReference.at(-1) === quote ? constantReference.slice(1, -1) : null;
+  }
+  return new RegExp(`^${rubyStaticQualifiedConstantPattern}$`).test(constantReference)
+    ? constantReference
+    : null;
+};
+const rubyIntegrationTestMutationTargets = new Set([
+  'ActionController::TemplateAssertions',
+  'ActionDispatch::Assertions',
+  'ActionDispatch::Assertions::ResponseAssertions',
+  'ActionDispatch::Integration::RequestHelpers',
+  'ActionDispatch::Integration::Runner',
+  'ActionDispatch::Integration::Session',
+  'ActionDispatch::IntegrationTest',
+  'ActionDispatch::IntegrationTest::Behavior',
+  'ActiveSupport::Testing::Assertions',
+  'Minitest::Assertions',
+  'Rails::Dom::Testing::Assertions',
+  'Rails::Dom::Testing::Assertions::DomAssertions',
+  'Rails::Dom::Testing::Assertions::SelectorAssertions',
+]);
+const normalizeRubyStaticMutationTargetReceivers = (content) =>
+  content.replace(rubyStaticConstGetReceiverPattern, (receiver) => {
+    const root = receiver.match(new RegExp(`^(?:::)?(${rubyStaticQualifiedConstantPattern})`))?.[1];
+    if (root === undefined) return receiver;
+    const names = [
+      ...receiver.matchAll(
+        new RegExp(
+          String.raw`const_get\s*\(\s*(${rubyStaticConstGetArgumentPattern})(?:\s*,\s*(?:true|false))?\s*\)`,
+          'g',
+        ),
+      ),
+    ].map((match) => rubyStaticConstantLookupName(match[1]));
+    if (names.some((name) => name === null)) return receiver;
+    const qualifiedParts = root === 'Object' ? [] : root.split('::');
+    for (const name of names) {
+      if (qualifiedParts.length > 0 || name !== 'Object') qualifiedParts.push(...name.split('::'));
+    }
+    const qualifiedName = qualifiedParts.join('::');
+    return rubyIntegrationTestMutationTargets.has(qualifiedName)
+      ? qualifiedName.padEnd(receiver.length, ' ')
+      : receiver;
+  });
+const rubyIntegrationTestMutationImpact = (className) =>
+  rubyIntegrationTestMutationTargets.has(className) ? 'ActionDispatch::IntegrationTest' : className;
+const rubyPatternEscape = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const rubyTestMutationInterpolationWithAliases = (aliases) => (value) => {
+  let resolvedValue = value;
+  for (const [alias, className] of aliases) {
+    if (rubyIntegrationTestMutationTargets.has(className)) {
+      resolvedValue = resolvedValue.replace(
+        new RegExp(`\\b${rubyPatternEscape(alias)}\\b`, 'g'),
+        rubyIntegrationTestMutationImpact(className),
+      );
+    }
+  }
+  return hasPotentialRubyTestMutationInterpolation(resolvedValue);
+};
+const rubyClassReceiverTokenPattern = String.raw`(?:::)?[A-Z][A-Za-z0-9_:]*|[a-z_][A-Za-z0-9_]*`;
+const rubyClassReceiverPattern = String.raw`(?:\([ \t]*)?(?:${rubyClassReceiverTokenPattern})[ \t]*\)?`;
+const normalizeRubyMutationContinuations = (content) =>
+  content
+    .replace(/=[ \t]?\r?\n[ \t]*(?=[(:A-Za-z_])/g, (continuation) => continuation.replace(/[\r\n]/g, ' '))
+    .replace(/([A-Za-z0-9_:)](?:[ \t]*))\r?\n([ \t]*)(?=(?:\.|&\.))/g, (continuation) =>
+      continuation.replace(/[\r\n]/g, ' '),
+    );
+const normalizedRubyClassReceiver = (receiver) =>
+  receiver
+    .trim()
+    .replace(/^\(\s*/, '')
+    .replace(/\s*\)$/, '')
+    .replace(/^::/, '');
+const rubyClassNameForReceiver = (receiver, aliases) => {
+  const normalized = normalizedRubyClassReceiver(receiver);
+  return aliases.get(normalized) ?? (/^[A-Z]/.test(normalized) ? normalized : null);
+};
+const rubyClassAliases = (content) => {
+  const normalizedContent = normalizeRubyMutationContinuations(content);
+  const aliases = new Map();
+  const assignments = [
+    ...normalizedContent.matchAll(
+      new RegExp(
+        `(?:^|;)[ \\t]*([A-Za-z_][A-Za-z0-9_]*)[ \\t]*=[ \\t]*(${rubyClassReceiverPattern})[ \\t]*(?=;|$)`,
+        'gm',
+      ),
+    ),
+  ].map((match) => [match[1], match[2]]);
+  const yieldedAliases = [
+    ...normalizedContent.matchAll(
+      new RegExp(
+        `(?:^|[^A-Za-z0-9_:.])(${rubyClassReceiverPattern})[ \\t]*(?:\\.|::|&\\.)[ \\t]*(?:tap|then|yield_self)[ \\t]*(?:\\{|do)[ \\t]*\\|[ \\t]*([a-z_][A-Za-z0-9_]*)[ \\t]*\\|`,
+        'g',
+      ),
+    ),
+  ].map((match) => [match[2], match[1]]);
+  for (let pass = 0; pass < assignments.length + yieldedAliases.length + 1; pass += 1) {
+    let changed = false;
+    for (const [alias, receiver] of [...assignments, ...yieldedAliases]) {
+      const className = rubyClassNameForReceiver(receiver, aliases);
+      if (className !== null && aliases.get(alias) !== className) {
+        aliases.set(alias, className);
+        changed = true;
+      }
+    }
+    if (!changed) break;
+  }
+  return aliases;
+};
+const rubyDoBlockOpeners = (line) => [
+  ...line.matchAll(/(?:^|[^A-Za-z0-9_:])do(?:\s*\|[^|\r\n]*\|)?(?=\s*(?:;|$))/g),
+];
+const rubyInlineDoOwnerBalance = (line) => {
+  const openers = rubyDoBlockOpeners(line);
+  if (openers.length === 0) return null;
+  const nestedOpeners = [
+    ...line.matchAll(/(?:^|;)\s*(?:begin|case|class|def|for|if|module|unless|until|while)\b/g),
+  ];
+  const closers = [...line.matchAll(/(?:^|;)\s*end(?=\s*(?:;|$))/g)];
+  const balance = openers.length + nestedOpeners.length - closers.length;
+  return balance >= 0 ? balance : null;
+};
+const rubyInlineKeywordOwnerBalance = (line) => {
+  const openers = [
+    ...line.matchAll(/(?:^|;)\s*(?:begin|case|class|def|for|if|module|unless|until|while)\b/g),
+  ];
+  if (openers.length === 0) return null;
+  const closers = [...line.matchAll(/(?:^|;)\s*end(?=\s*(?:;|$))/g)];
+  const balance = openers.length - closers.length;
+  return balance >= 0 ? balance : null;
+};
+const hasUnclosedRubyDoBlock = (line) => (rubyInlineDoOwnerBalance(line) ?? 0) > 0;
 const emptyIteratorBraceOwnerPattern =
-  /^(?:[a-z_][A-Za-z0-9_]*[ \t]*=[ \t]*)?(?:(?:\[\s*\]|\{\s*\})\.(?:each|filter_map|map)|0\.times)\s*\{(?:\s*\|[^|\r\n]*\|)?\s*$/;
-const rubyOwnerFramesBefore = (content, targetIndex) => {
+  /^(?:[a-z_][A-Za-z0-9_]*[ \t]*=[ \t]*)?(?:(?:\[\s*\]|\{\s*\})\.(?:(?:collect|cycle|each(?:_cons|_entry|_key|_pair|_slice|_value|_with_index)?|filter(?:_map)?|find(?:_all)?|flat_map|map|reject|reverse_each|select)(?:\([^()\r\n]*\))?)(?:\.with_index(?:\([^()\r\n]*\))?)?|0\.times(?:\.with_index(?:\([^()\r\n]*\))?)?)\s*\{(?:\s*\|[^|\r\n]*\|)?\s*$/;
+const rubyQualifiedOwnerName = (name, frames) => {
+  const normalized = name.replace(/^::/, '');
+  if (name.startsWith('::') || normalized.includes('::')) return normalized;
+  const namespace = frames.findLast(
+    (frame) => ['class', 'module'].includes(frame.type) && frame.className !== undefined,
+  )?.className;
+  return namespace === undefined ? normalized : `${namespace}::${normalized}`;
+};
+const rubyOwnerFramesBefore = (content, targetIndex, aliases = rubyClassAliases(content)) => {
   const frames = [];
   let lineStart = 0;
   const records = content
@@ -892,27 +1356,83 @@ const rubyOwnerFramesBefore = (content, targetIndex) => {
     const statement = codeLine.trim();
     const statementOffset = codeLine.search(/\S/);
     if (statement !== '') {
-      if (/^}\s*$/.test(statement)) {
-        if (frames.at(-1)?.type === 'brace') frames.pop();
+      const inlineDoOwnerBalance = rubyInlineDoOwnerBalance(statement);
+      const inlineKeywordOwnerBalance = rubyInlineKeywordOwnerBalance(statement);
+      if (inlineKeywordOwnerBalance !== null && inlineKeywordOwnerBalance > 1) return null;
+      const braceTokens = [...codeLine.matchAll(/[{}]/g)];
+      for (const token of braceTokens) {
+        if (token[0] === '{') {
+          const classEval = codeLine
+            .slice(0, token.index)
+            .match(
+              new RegExp(
+                `(?:^|[; \\t])(${rubyClassReceiverPattern})\\s*(?:\\.|::)\\s*(?:class_eval|module_eval)(?:\\s*\\(\\s*\\))?\\s*$`,
+              ),
+            );
+          const classEvalName = classEval === null ? null : rubyClassNameForReceiver(classEval[1], aliases);
+          frames.push({
+            ...(classEvalName ? { className: classEvalName } : {}),
+            brace: true,
+            index: lineStart + token.index,
+            type: classEvalName ? 'class-eval' : 'brace',
+          });
+        } else if (frames.at(-1)?.brace) {
+          frames.pop();
+        } else {
+          return null;
+        }
+      }
+      if (inlineDoOwnerBalance === null && inlineKeywordOwnerBalance === 0) {
+        // A balanced one-line owner such as `module Helper; end` does not affect later ownership.
       } else if (/^end\s*$/.test(statement)) {
-        if (frames.length === 0 || frames.at(-1)?.type === 'brace') return null;
+        if (frames.length === 0 || frames.at(-1)?.brace) return null;
         frames.pop();
       } else if (/^(?:else|elsif|ensure|rescue|when)\b/.test(statement)) {
         if (frames.length === 0) return null;
       } else {
         let type = null;
+        let className = null;
+        const eigenclass = statement.match(new RegExp(`^class\\s*<<\\s*(${rubyClassReceiverPattern})\\s*$`));
         if (/^Rails\.application\.routes\.draw\s+do\s*$/.test(statement)) {
           type = 'routes';
+        } else if (eigenclass !== null) {
+          className =
+            normalizedRubyClassReceiver(eigenclass[1]) === 'self'
+              ? (frames.findLast(
+                  (frame) => ['class', 'module'].includes(frame.type) && frame.className !== undefined,
+                )?.className ?? null)
+              : rubyClassNameForReceiver(eigenclass[1], aliases);
+          type = className === null ? 'owner' : 'eigenclass';
         } else if (/^class\b/.test(statement)) {
+          const declaredName = statement.match(/^class\s+(?:::)?([A-Z][A-Za-z0-9_:]*)/)?.[1];
+          className = declaredName === undefined ? null : rubyQualifiedOwnerName(declaredName, frames);
           type = 'class';
-        } else if (/^(?:begin|case|def|for|if|module|unless|until|while)\b/.test(statement)) {
+        } else if (
+          new RegExp(
+            `^(${rubyClassReceiverPattern})\\s*(?:\\.|::)\\s*(?:class_eval|module_eval)(?:\\s*\\(\\s*\\))?\\s+do\\s*$`,
+          ).test(statement)
+        ) {
+          const receiver = statement.match(new RegExp(`^(${rubyClassReceiverPattern})`))?.[1];
+          className = receiver === undefined ? null : rubyClassNameForReceiver(receiver, aliases);
+          type = className === null ? 'block' : 'class-eval';
+        } else if (inlineDoOwnerBalance !== null) {
+          for (let ownerIndex = 0; ownerIndex < inlineDoOwnerBalance; ownerIndex += 1) {
+            frames.push({ index: lineStart + statementOffset, type: ownerIndex === 0 ? 'block' : 'owner' });
+          }
+        } else if (/^module\b/.test(statement)) {
+          const declaredName = statement.match(/^module\s+(?:::)?([A-Z][A-Za-z0-9_:]*)/)?.[1];
+          className = declaredName === undefined ? null : rubyQualifiedOwnerName(declaredName, frames);
+          type = 'module';
+        } else if (/^(?:begin|case|def|for|if|unless|until|while)\b/.test(statement)) {
           type = 'owner';
-        } else if (emptyIteratorBraceOwnerPattern.test(statement)) {
-          type = 'brace';
-        } else if (/\bdo(?:\s*\|[^|\r\n]*\|)?\s*$/.test(statement)) {
-          type = 'block';
         }
-        if (type !== null) frames.push({ index: lineStart + statementOffset, type });
+        if (type !== null) {
+          frames.push({
+            ...(className === null ? {} : { className }),
+            index: lineStart + (['class', 'module'].includes(type) ? 0 : statementOffset),
+            type,
+          });
+        }
       }
     }
     lineStart += record.length;
@@ -1269,14 +1789,350 @@ const hasExactHelloServerRscImplementation = helloServerRscRoots.size > 0;
 const exactHelloServerRscArtifacts = helloServerRscArtifactGroups
   .flat()
   .filter((artifact) => helloServerRscRoots.has(helloServerApplicationRoot(artifact)));
-const rubyTestCases = (content) => {
-  const maskedContent = maskExecutableRubyContent(content);
-  if (maskedContent === null) return [];
-  const classDeclarations = [
-    ...maskedContent.matchAll(
-      /^([ \t]*)class\s+[A-Za-z_][A-Za-z0-9_:]*(?:\s*<\s*([A-Za-z_][A-Za-z0-9_:]*))?[^\r\n]*$/gm,
+const rubyCreditedMethodNames = new Set([
+  'assert',
+  'assert_difference',
+  'assert_dom',
+  'assert_equal',
+  'assert_includes',
+  'assert_match',
+  'assert_no_difference',
+  'assert_not',
+  'assert_not_empty',
+  'assert_operator',
+  'assert_predicate',
+  'assert_present',
+  'assert_redirected_to',
+  'assert_response',
+  'assert_select',
+  'assert_selector',
+  'delete',
+  'follow_redirect!',
+  'get',
+  'head',
+  'options',
+  'patch',
+  'post',
+  'process',
+  'put',
+  'refute',
+  'refute_empty',
+  'refute_predicate',
+  'visit',
+]);
+const rubyMethodReferencePattern = String.raw`(?::(?:[A-Za-z_][A-Za-z0-9_]*[!?=]?|"[A-Za-z_][A-Za-z0-9_]*[!?=]?"|'[A-Za-z_][A-Za-z0-9_]*[!?=]?')|"[A-Za-z_][A-Za-z0-9_]*[!?=]?"|'[A-Za-z_][A-Za-z0-9_]*[!?=]?'|[A-Za-z_][A-Za-z0-9_]*[!?=]?)`;
+const rubyStaticMethodReferencePattern = String.raw`(?::(?:[A-Za-z_][A-Za-z0-9_]*[!?=]?|"[A-Za-z_][A-Za-z0-9_]*[!?=]?"|'[A-Za-z_][A-Za-z0-9_]*[!?=]?')|"[A-Za-z_][A-Za-z0-9_]*[!?=]?"|'[A-Za-z_][A-Za-z0-9_]*[!?=]?')`;
+const rubyMethodNameFromReference = (reference) => {
+  let name = reference.startsWith(':') ? reference.slice(1) : reference;
+  if ((name.startsWith('"') && name.endsWith('"')) || (name.startsWith("'") && name.endsWith("'"))) {
+    name = name.slice(1, -1);
+  }
+  return name;
+};
+const rubyQualifiedClassNames = new WeakMap();
+const rubyClassName = (declaration) =>
+  (declaration === null || declaration === undefined
+    ? undefined
+    : rubyQualifiedClassNames.get(declaration)) ??
+  declaration?.[0].match(/^\s*class\s+(?:::)?([A-Za-z_][A-Za-z0-9_:]*)/)?.[1] ??
+  null;
+const rubyClassDeclarations = (content) =>
+  [
+    ...content.matchAll(
+      /^([ \t]*)class\s+(?:::)?[A-Za-z_][A-Za-z0-9_:]*(?:\s*<\s*([A-Za-z_][A-Za-z0-9_:]*))?[^\r\n]*$/gm,
     ),
-  ];
+  ].map((declaration) => {
+    const declaredName = rubyClassName(declaration);
+    const frames = rubyOwnerFramesBefore(content, declaration.index);
+    if (declaredName !== null && frames !== null) {
+      rubyQualifiedClassNames.set(declaration, rubyQualifiedOwnerName(declaredName, frames));
+    }
+    return declaration;
+  });
+const reflectedRubyClassMutationClasses = (content, aliases = rubyClassAliases(content)) => {
+  const mutationContent = normalizeRubyMutationContinuations(content);
+  const reflectionPattern = new RegExp(
+    `(?:^|[^A-Za-z0-9_:.])(${rubyClassReceiverPattern})[ \\t]*(?:(?:\\.|::|&\\.)[ \\t]*singleton_class)?[ \\t]*(?:\\.|::|&\\.)[ \\t]*(?:__send__|method|public_method|public_send|send)(?:[ \\t]+|\\([ \\t]*)([^,\\s)\\r\\n]+)`,
+    'gm',
+  );
+  const mutationMethods = new Set([
+    'class_eval',
+    'class_exec',
+    'define_method',
+    'define_singleton_method',
+    'extend',
+    'include',
+    'module_eval',
+    'module_exec',
+    'prepend',
+    'remove_method',
+    'singleton_class',
+    'undef_method',
+  ]);
+  const mutations = new Set();
+  for (const match of mutationContent.matchAll(reflectionPattern)) {
+    const explicitClassName = rubyClassNameForReceiver(match[1], aliases);
+    if (explicitClassName !== null) {
+      const staticReference = match[2].match(new RegExp(`^${rubyStaticMethodReferencePattern}$`));
+      if (staticReference === null || mutationMethods.has(rubyMethodNameFromReference(staticReference[0]))) {
+        mutations.add(explicitClassName);
+      }
+    }
+  }
+  return mutations;
+};
+const dangerousRubyClassExecutionClasses = (content, aliases) => {
+  const mutationContent = normalizeRubyMutationContinuations(content);
+  const mutations = new Set();
+  const callPattern = new RegExp(
+    `(?:^|[^A-Za-z0-9_:.])(${rubyClassReceiverPattern})[ \\t]*(?:\\.|::|&\\.)[ \\t]*(?:class_eval|class_exec|module_eval|module_exec)\\b`,
+    'g',
+  );
+  for (const match of mutationContent.matchAll(callPattern)) {
+    const className = rubyClassNameForReceiver(match[1], aliases);
+    if (className !== null) mutations.add(className);
+  }
+  return mutations;
+};
+const creditedRubyMethodMutationClasses = (
+  content,
+  classDeclarations,
+  aliases = rubyClassAliases(content),
+  dangerousClassExecutions = new Set(),
+) => {
+  const mutationContent = normalizeRubyMutationContinuations(content);
+  const mutations = [];
+  const addMutation = (match, references, explicitClassName = null, force = false) => {
+    const names = references.map(rubyMethodNameFromReference);
+    if (force || names.some((name) => rubyCreditedMethodNames.has(name))) {
+      mutations.push({ explicitClassName, index: match.index });
+    }
+  };
+  for (const match of mutationContent.matchAll(
+    /^[ \t]*def[ \t]+((?:self\.)?[A-Za-z_][A-Za-z0-9_]*[!?=]?)(?=[ \t(;]|$)/gm,
+  )) {
+    if (!match[1].startsWith('self.')) addMutation(match, [match[1]]);
+  }
+  for (const match of mutationContent.matchAll(
+    new RegExp(
+      `^[ \\t]*alias[ \\t]+(${rubyMethodReferencePattern})[ \\t]+(${rubyMethodReferencePattern})`,
+      'gm',
+    ),
+  )) {
+    addMutation(match, [match[1], match[2]]);
+  }
+  for (const match of mutationContent.matchAll(
+    new RegExp(
+      `^[ \\t]*alias_method(?:[ \\t]+|\\([ \\t]*)(${rubyMethodReferencePattern})[ \\t]*,[ \\t]*(${rubyMethodReferencePattern})`,
+      'gm',
+    ),
+  )) {
+    addMutation(match, [match[1], match[2]]);
+  }
+  for (const match of mutationContent.matchAll(/\bdefine_method(?:[ \t]+|\([ \t]*)([^,\s)\r\n]+)/g)) {
+    const staticReference = match[1].match(new RegExp(`^${rubyStaticMethodReferencePattern}$`));
+    addMutation(match, staticReference ? [staticReference[0]] : [], null, staticReference === null);
+  }
+  for (const match of mutationContent.matchAll(
+    /\b(?:__send__|public_send|send)\s*\(\s*(?::define_method|["']define_method["'])\s*,\s*([^,\s)\r\n]+)/g,
+  )) {
+    const staticReference = match[1].match(new RegExp(`^${rubyStaticMethodReferencePattern}$`));
+    addMutation(match, staticReference ? [staticReference[0]] : [], null, staticReference === null);
+  }
+  for (const match of mutationContent.matchAll(
+    new RegExp(
+      `(?:^|[^A-Za-z0-9_:.])(${rubyClassReceiverPattern})[ \\t]*(?:\\.|::|&\\.)[ \\t]*(?:define_method[ \\t]*\\([ \\t]*(${rubyMethodReferencePattern})|(?:__send__|public_send|send)[ \\t]*\\([ \\t]*(?::define_method|["']define_method["'])[ \\t]*,[ \\t]*(${rubyMethodReferencePattern}))`,
+      'g',
+    ),
+  )) {
+    const className = rubyClassNameForReceiver(match[1], aliases);
+    if (className !== null) addMutation(match, [match[2] ?? match[3]], className);
+  }
+  for (const match of mutationContent.matchAll(
+    new RegExp(
+      `^[ \\t]*(?:remove_method|undef|undef_method)(?:[ \\t]+|\\([ \\t]*)(${rubyMethodReferencePattern})`,
+      'gm',
+    ),
+  )) {
+    addMutation(match, [match[1]]);
+  }
+  for (const match of mutationContent.matchAll(/^[ \t]*(?:include|prepend|extend)(?=[ \t(])/gm)) {
+    addMutation(match, [], null, true);
+  }
+  for (const match of mutationContent.matchAll(
+    new RegExp(
+      `(?:^|[^A-Za-z0-9_:.])(${rubyClassReceiverPattern})[ \\t]*(?:\\.|::|&\\.)[ \\t]*(?:include|prepend|extend)(?=[ \\t(])`,
+      'g',
+    ),
+  )) {
+    const className = rubyClassNameForReceiver(match[1], aliases);
+    if (className !== null) addMutation(match, [], className, true);
+  }
+  for (const match of mutationContent.matchAll(
+    /\b((?:::)?[A-Z][A-Za-z0-9_:]*)\s*(?:\.|::)\s*(?:__send__|public_send|send)\s*\(\s*(?::(?:include|prepend|extend)|["'](?:include|prepend|extend)["'])/g,
+  )) {
+    addMutation(match, [], match[1].replace(/^::/, ''), true);
+  }
+
+  return new Set(
+    [
+      ...dangerousClassExecutions,
+      ...reflectedRubyClassMutationClasses(content, aliases),
+      ...mutations.flatMap((mutation) => {
+        if (mutation.explicitClassName !== null) return [mutation.explicitClassName];
+        const frames = rubyOwnerFramesBefore(content, mutation.index, aliases);
+        if (frames === null) return [];
+        const innermostClassOrModule = frames.findLast((frame) =>
+          ['class', 'class-eval', 'module'].includes(frame.type),
+        );
+        if (innermostClassOrModule?.type === 'class-eval' || innermostClassOrModule?.type === 'module') {
+          return innermostClassOrModule.className === undefined ? [] : [innermostClassOrModule.className];
+        }
+        if (innermostClassOrModule?.type !== 'class') return [];
+        const declaration = classDeclarations.find(
+          (candidate) => candidate.index === innermostClassOrModule.index,
+        );
+        const className = rubyClassName(declaration);
+        return className === null ? [] : [className];
+      }),
+    ].map(rubyIntegrationTestMutationImpact),
+  );
+};
+const rubyTestDslMutationClasses = (
+  content,
+  classDeclarations,
+  aliases = rubyClassAliases(content),
+  dangerousClassExecutions = new Set(),
+) => {
+  const mutationContent = normalizeRubyMutationContinuations(content);
+  const mutations = [];
+  for (const match of mutationContent.matchAll(
+    /^[ \t]*(?:def[ \t]+self\.test(?=[ \t(;]|$)|define_singleton_method(?:[ \t]+|\([ \t]*)(?::test\b|["']test["']))/gm,
+  )) {
+    mutations.push({ eigenclassOnly: false, explicitClassName: null, index: match.index });
+  }
+  for (const match of mutationContent.matchAll(/^[ \t]*def[ \t]+test(?=[ \t(;]|$)/gm)) {
+    mutations.push({ eigenclassOnly: true, explicitClassName: null, index: match.index });
+  }
+  for (const match of mutationContent.matchAll(
+    new RegExp(
+      `(?:^|[^A-Za-z0-9_:.])(${rubyClassReceiverPattern})[ \\t]*(?:\\.|::|&\\.)[ \\t]*define_singleton_method(?:[ \\t]+|\\([ \\t]*)(?::test\\b|["']test["'])`,
+      'g',
+    ),
+  )) {
+    const className = rubyClassNameForReceiver(match[1], aliases);
+    if (className !== null) {
+      mutations.push({ eigenclassOnly: false, explicitClassName: className, index: match.index });
+    }
+  }
+  for (const match of mutationContent.matchAll(
+    new RegExp(
+      `(?:^|[^A-Za-z0-9_:.])(${rubyClassReceiverPattern})[ \\t]*(?:\\.|::|&\\.)[ \\t]*singleton_class[ \\t]*(?:\\.|::|&\\.)[ \\t]*(?:define_method(?:[ \\t]+|\\([ \\t]*)(?::test\\b|["']test["'])|(?:__send__|public_send|send)[ \\t]*\\([ \\t]*(?::define_method|["']define_method["'])[ \\t]*,[ \\t]*(?::test\\b|["']test["']))`,
+      'g',
+    ),
+  )) {
+    const className = rubyClassNameForReceiver(match[1], aliases);
+    if (className !== null) {
+      mutations.push({ eigenclassOnly: false, explicitClassName: className, index: match.index });
+    }
+  }
+
+  return new Set(
+    [
+      ...dangerousClassExecutions,
+      ...reflectedRubyClassMutationClasses(content, aliases),
+      ...mutations.flatMap((mutation) => {
+        if (mutation.explicitClassName !== null) return [mutation.explicitClassName];
+        const frames = rubyOwnerFramesBefore(content, mutation.index, aliases);
+        if (frames === null) return [];
+        if (mutation.eigenclassOnly) {
+          const innermostEigenclass = frames.findLast((frame) => frame.type === 'eigenclass');
+          return innermostEigenclass === undefined ? [] : [innermostEigenclass.className];
+        }
+        const innermostClass = frames.findLast((frame) => frame.type === 'class');
+        if (innermostClass === undefined) return [];
+        const declaration = classDeclarations.find((candidate) => candidate.index === innermostClass.index);
+        const className = rubyClassName(declaration);
+        return className === null ? [] : [className];
+      }),
+    ].map(rubyIntegrationTestMutationImpact),
+  );
+};
+const workspaceRubyTestMutations = artifacts.reduce(
+  (mutations, artifact) => {
+    if (!/\.rb$/i.test(artifact.path)) return mutations;
+    const classificationContent = artifactClassificationContent.get(artifact);
+    if (classificationContent === undefined) {
+      mutations.unscannable.add(artifact.path);
+      return mutations;
+    }
+    const aliasExecutableRuby = maskExecutableRubyContent(classificationContent, () => false);
+    const aliasMutationRuby =
+      aliasExecutableRuby === null
+        ? null
+        : maskRubyMutationSyntax(
+            normalizeRubyStaticMutationTargetReceivers(aliasExecutableRuby),
+            () => false,
+          );
+    const interpolationIsUnsafe = rubyTestMutationInterpolationWithAliases(
+      aliasMutationRuby === null ? new Map() : rubyClassAliases(aliasMutationRuby),
+    );
+    const executableRuby = maskExecutableRubyContent(classificationContent, interpolationIsUnsafe);
+    const mutationRuby =
+      executableRuby === null
+        ? null
+        : maskRubyMutationSyntax(
+            normalizeRubyStaticMutationTargetReceivers(executableRuby),
+            interpolationIsUnsafe,
+          );
+    if (mutationRuby === null) {
+      mutations.unscannable.add(artifact.path);
+      return mutations;
+    }
+    const classDeclarations = rubyClassDeclarations(mutationRuby);
+    const aliases = rubyClassAliases(mutationRuby);
+    const dangerousClassExecutions = dangerousRubyClassExecutionClasses(mutationRuby, aliases);
+    for (const className of creditedRubyMethodMutationClasses(
+      mutationRuby,
+      classDeclarations,
+      aliases,
+      dangerousClassExecutions,
+    )) {
+      mutations.creditedMethods.add(className);
+    }
+    for (const className of rubyTestDslMutationClasses(
+      mutationRuby,
+      classDeclarations,
+      aliases,
+      dangerousClassExecutions,
+    )) {
+      mutations.testDsl.add(className);
+    }
+    return mutations;
+  },
+  { creditedMethods: new Set(), testDsl: new Set(), unscannable: new Set() },
+);
+const rubyTestCases = (
+  content,
+  externalMutations = { creditedMethods: new Set(), testDsl: new Set(), unscannable: new Set() },
+) => {
+  const maskedContent = maskExecutableRubyContent(content);
+  const mutationRuby =
+    maskedContent === null
+      ? null
+      : maskRubyMutationSyntax(normalizeRubyStaticMutationTargetReceivers(maskedContent));
+  if (maskedContent === null || mutationRuby === null || externalMutations.unscannable.size > 0) return [];
+  const classDeclarations = rubyClassDeclarations(mutationRuby);
+  const aliases = rubyClassAliases(mutationRuby);
+  const dangerousClassExecutions = dangerousRubyClassExecutionClasses(mutationRuby, aliases);
+  const creditedMethodMutationClasses = new Set([
+    ...creditedRubyMethodMutationClasses(mutationRuby, classDeclarations, aliases, dangerousClassExecutions),
+    ...externalMutations.creditedMethods,
+  ]);
+  const testDslMutationClasses = new Set([
+    ...rubyTestDslMutationClasses(mutationRuby, classDeclarations, aliases, dangerousClassExecutions),
+    ...externalMutations.testDsl,
+  ]);
   const starts = [
     ...maskedContent.matchAll(/^([ \t]*)test\s+(?:"([^"\r\n]+)"|'([^'\r\n]+)')\s+do[ \t]*(?:#[^\r\n]*)?$/gm),
   ];
@@ -1337,6 +2193,13 @@ const rubyTestCases = (content) => {
             .match(new RegExp(`^${owningClass[1]}end([^\\r\\n]*)$`, 'm'));
     const owningClassTerminatorIsBare =
       owningClassTerminator !== null && /^[ \t]*(?:#[^\r\n]*)?$/.test(owningClassTerminator[1]);
+    const owningClassName = rubyClassName(owningClass);
+    const mutatesTestDsl =
+      testDslMutationClasses.has('ActionDispatch::IntegrationTest') ||
+      (owningClassName !== null && testDslMutationClasses.has(owningClassName));
+    const overridesCreditedMethod =
+      creditedMethodMutationClasses.has('ActionDispatch::IntegrationTest') ||
+      (owningClassName !== null && creditedMethodMutationClasses.has(owningClassName));
     const classOwnerFrames =
       owningClass === undefined ? null : rubyOwnerFramesBefore(maskedContent, owningClass.index);
     const testOwnerFrames = rubyOwnerFramesBefore(maskedContent, match.index);
@@ -1354,7 +2217,9 @@ const rubyTestCases = (content) => {
           directTopLevelClassOwner &&
           owningClassTerminatorIsBare &&
           owningClass?.[2] === 'ActionDispatch::IntegrationTest' &&
-          !overridesTestDsl,
+          !overridesTestDsl &&
+          !mutatesTestDsl &&
+          !overridesCreditedMethod,
       },
     ];
   });
@@ -1379,7 +2244,7 @@ const hasPotentiallyInactivePageEvidence = (testCase) =>
       codeLine === null ||
       /&&|\|\||\bbegin\b/.test(codeLine) ||
       emptyIteratorBraceOwnerPattern.test(codeLine.trim()) ||
-      /\bdo(?:\s*\|[^|\r\n]*\|)?\s*$/.test(codeLine) ||
+      hasUnclosedRubyDoBlock(codeLine) ||
       /\b(?:case|def|elsif|ensure|for|if|rescue|unless|until|when|while)\b|->|(?:^|[; \t])(?:abort|assert_(?:raises|throws)|break|exit!?|fail|flunk|lambda|next|proc|Proc\.new|raise|redo|retry|return|skip|throw)(?=$|[; \t({])/.test(
         codeLine,
       )
@@ -1405,7 +2270,7 @@ const pageTests = artifacts.filter((artifact) => {
           /^\s*assert_includes(?:\s+|\(\s*)(?:@response|response)\.body\s*,\s*(?:"((?:\\.|[^"\\])*)"|'((?:\\.|[^'\\])*)')(?=\s*(?:,|\)|$))/,
         );
         const literal = assertion?.[1] ?? assertion?.[2];
-        return literal !== undefined && !/#(?:\{|@|\$)/.test(literal) ? [literal] : [];
+        return literal !== undefined && !hasExecutableRubyInterpolation(literal) ? [literal] : [];
       }),
     );
   const hasExactRenderedDataAssertions = (body, expectedLiterals) => {
@@ -1482,7 +2347,9 @@ const semanticFormIntegrationTest = (artifact, uncommentedRuby) => {
     return false;
   }
 
-  const cases = rubyTestCases(uncommentedRuby).filter((testCase) => testCase.actionDispatchIntegrationTest);
+  const cases = rubyTestCases(uncommentedRuby, workspaceRubyTestMutations).filter(
+    (testCase) => testCase.actionDispatchIntegrationTest,
+  );
   const normalizedNameTokens = (name) =>
     name
       .toLowerCase()
@@ -1758,7 +2625,7 @@ const semanticFormIntegrationTest = (artifact, uncommentedRuby) => {
       const codePoint = character.codePointAt(0);
       return codePoint <= 0x1f || codePoint === 0x7f;
     });
-    if (literal.length < 2 || hasControlCharacter || /#(?:\{|@|\$)/.test(literal)) return null;
+    if (literal.length < 2 || hasControlCharacter || hasExecutableRubyInterpolation(literal)) return null;
     const percentRegex = rubyPercentRegexParts(literal);
     if (percentRegex !== undefined)
       return percentRegex !== null && /\S/.test(percentRegex.body) ? 'regex' : null;
@@ -1933,6 +2800,9 @@ const semanticFormIntegrationTest = (artifact, uncommentedRuby) => {
         '0 validation errors',
         'validation errors are zero',
         'no validation errors',
+        'error-free submission',
+        'error free submission',
+        'submission without errors',
       ].some((candidate) => regex.test(candidate))
     ) {
       return true;
@@ -1947,7 +2817,39 @@ const semanticFormIntegrationTest = (artifact, uncommentedRuby) => {
       ) ||
       /\b(?:validation[ \t_-]+)?errors?[ \t_-]+(?:(?:do|does|did)[ \t_-]+not|never|fail(?:s|ed)?[ \t_-]+to)[ \t_-]+(?:appear|display|render|show)\b/i.test(
         normalizedLiteral,
+      ) ||
+      /\berrors?[ \t_-]+free\b|\bfree[ \t_-]+of[ \t_-]+(?:validation[ \t_-]+)?errors?\b/i.test(
+        normalizedLiteral,
       )
+    );
+  }
+  function validationErrorLiteralIsPositive(literal) {
+    if (validationErrorLiteralIsNegative(literal)) return false;
+    const errorPhrases = [
+      'Blocked',
+      'blocked',
+      "can't be blank",
+      'Error',
+      'error',
+      'Failed',
+      'failed',
+      'Failure',
+      'failure',
+      'email is invalid',
+      'is invalid',
+      'is required',
+      'must be valid',
+      'Rejected',
+      'rejected',
+      'Rejection',
+      'rejection',
+      'Validation error',
+      'validation error',
+    ];
+    const regex = javascriptRegexForLiteral(literal);
+    if (regex !== null) return errorPhrases.some((phrase) => regex.test(phrase));
+    return /\b(?:blank|blocked|errors?|fail(?:ed|ure)?|invalid|reject(?:ed|ion)|required|taken)\b|\b(?:can(?:no)?t|doesn'?t|must)\b|\bis (?:not (?:a number|an integer|included)|reserved|too (?:long|short)|the wrong length)\b/i.test(
+      literal,
     );
   }
   function noticeLiteralIsNegative(literal) {
@@ -1957,6 +2859,58 @@ const semanticFormIntegrationTest = (artifact, uncommentedRuby) => {
       /\bnotices?[ \t_-]+(?:are[ \t_-]+)?(?:absent|empty|false|missing|no|none|off|zero)\b/i.test(
         normalizedLiteral,
       )
+    );
+  }
+  function successConfirmationLiteralIsNegative(literal) {
+    const normalizedLiteral = literal
+      .replace(/\\s(?:[*+?]|\{[0-9]+(?:,[0-9]*)?\})?/g, ' ')
+      .replace(/n['’]t\b/gi, ' not');
+    const negativeSuccessPhrases = [
+      'Submission blocked',
+      'Submission failed',
+      'Submission failure',
+      'Submission not completed',
+      'Submission not received',
+      'Submission not saved',
+      'Submission not successful',
+      'Submission rejected',
+      'Unsuccessful submission',
+    ];
+    const regex = javascriptRegexForLiteral(literal);
+    if (regex !== null && negativeSuccessPhrases.some((phrase) => regex.test(phrase))) return true;
+    return (
+      /\b(?:blocked|fail(?:ed|ure)?|reject(?:ed|ion)|unsuccessful)\b/i.test(normalizedLiteral) ||
+      /\b(?:not|never)[ \t_-]+(?:completed|confirmed|created|received|saved|submitted|successful|welcomed)\b/i.test(
+        normalizedLiteral,
+      )
+    );
+  }
+  function successConfirmationLiteralIsPositive(literal) {
+    if (validationErrorLiteralIsNegative(literal) || successConfirmationLiteralIsNegative(literal)) {
+      return false;
+    }
+    const successPhrases = [
+      'Created successfully',
+      'created successfully',
+      'Form submitted',
+      'form submitted',
+      'Submission complete',
+      'submission complete',
+      'Submission received',
+      'submission received',
+      'Success',
+      'success',
+      'Thank you',
+      'thank you',
+      'Thanks',
+      'Thanks, Ada!',
+      'Thanks, Marie Curie!',
+      'thanks',
+    ];
+    const regex = javascriptRegexForLiteral(literal);
+    if (regex !== null) return successPhrases.some((phrase) => regex.test(phrase));
+    return /\b(?:complet(?:e|ed)|confirm(?:ed|ation)|creat(?:ed|ion)|receiv(?:ed|ing)|sav(?:ed|ing)|submit(?:ted|ting)|success(?:ful|fully)?|thanks?|welcome)\b/i.test(
+      literal,
     );
   }
   function positiveAssertEqualLiteralArray(assertion, negativeLiteralPredicate) {
@@ -2086,53 +3040,85 @@ const semanticFormIntegrationTest = (artifact, uncommentedRuby) => {
   };
   const stripRubyTrailingComment = (line) => {
     let quote = null;
-    let regex = false;
     let escaped = false;
     for (let index = 0; index < line.length; index += 1) {
       const character = line[index];
       if (escaped) {
         escaped = false;
-      } else if (character === '\\' && (quote !== null || regex)) {
+      } else if (character === '\\' && quote !== null) {
         escaped = true;
       } else if (quote !== null) {
         if (character === quote) quote = null;
-      } else if (regex) {
-        if (character === '/') regex = false;
       } else if (character === '"' || character === "'") {
         quote = character;
+      } else if (character === '%') {
+        const percentLiteral = scanRubyPercentLiteral(line, index);
+        if (percentLiteral?.end === null) return null;
+        if (percentLiteral?.end !== undefined) index = percentLiteral.end;
       } else if (character === '/') {
-        regex = true;
+        const regexEnd = rubySlashRegexEnd(line, index);
+        if (regexEnd === null) return null;
+        if (regexEnd !== undefined) index = regexEnd;
       } else if (character === '#') {
         return line.slice(0, index);
       }
     }
-    return quote === null && !regex && !escaped ? line : null;
+    return quote === null && !escaped ? line : null;
   };
   const maskRubyStringAndCommentContent = (line) => {
     const masked = [];
     let quote = null;
-    let regex = false;
     let escaped = false;
     for (let index = 0; index < line.length; index += 1) {
       const character = line[index];
       if (escaped) {
         masked.push(' ');
         escaped = false;
-      } else if (character === '\\' && (quote !== null || regex)) {
+      } else if (character === '\\' && quote !== null) {
         masked.push(' ');
         escaped = true;
       } else if (quote !== null) {
+        if (quote === '"' && character === '#' && /[{@$]/.test(line[index + 1] ?? '')) return null;
         masked.push(' ');
         if (character === quote) quote = null;
-      } else if (regex) {
-        masked.push(' ');
-        if (character === '/') regex = false;
       } else if (character === '"' || character === "'") {
         masked.push(' ');
         quote = character;
+      } else if (character === '?') {
+        const characterLiteralEnd = rubyCharacterLiteralEnd(line, index);
+        if (characterLiteralEnd === null) return null;
+        if (characterLiteralEnd === undefined) {
+          masked.push(character);
+        } else {
+          masked.push(line.slice(index, characterLiteralEnd + 1).replace(/./g, ' '));
+          index = characterLiteralEnd;
+        }
+      } else if (character === '%') {
+        const percentLiteral = scanRubyPercentLiteral(line, index);
+        if (percentLiteral?.end === null) return null;
+        if (percentLiteral?.end !== undefined) {
+          const interpolationAllowed = rubyPercentLiteralAllowsInterpolation(percentLiteral.descriptor.type);
+          if (
+            interpolationAllowed &&
+            hasExecutableRubyInterpolation(line.slice(index, percentLiteral.end + 1))
+          ) {
+            return null;
+          }
+          masked.push(line.slice(index, percentLiteral.end + 1).replace(/./g, ' '));
+          index = percentLiteral.end;
+        } else {
+          masked.push(character);
+        }
       } else if (character === '/') {
-        masked.push(' ');
-        regex = true;
+        const regexEnd = rubySlashRegexEnd(line, index);
+        if (regexEnd === null) return null;
+        if (regexEnd === undefined) {
+          masked.push(character);
+        } else {
+          if (hasExecutableRubyInterpolation(line.slice(index, regexEnd + 1))) return null;
+          masked.push(line.slice(index, regexEnd + 1).replace(/./g, ' '));
+          index = regexEnd;
+        }
       } else if (character === '#') {
         masked.push(line.slice(index).replace(/./g, ' '));
         break;
@@ -2140,7 +3126,7 @@ const semanticFormIntegrationTest = (artifact, uncommentedRuby) => {
         masked.push(character);
       }
     }
-    return quote === null && !regex && !escaped ? masked.join('') : null;
+    return quote === null && !escaped ? masked.join('') : null;
   };
   const hasPositiveValueAssertion = (
     body,
@@ -2240,12 +3226,12 @@ const semanticFormIntegrationTest = (artifact, uncommentedRuby) => {
       );
       return match !== null && matchesSubject(match[1]);
     });
-  const hasRenderedBodyAssertion = (body) => {
+  const hasRenderedBodyAssertion = (body, literalPredicate = null) => {
     let responseBodyAlias = null;
     return body.split(/\r?\n/).some((line) => {
       const uncommentedLine = stripRubyTrailingComment(line);
       if (uncommentedLine === null) return false;
-      const assertion = uncommentedLine.trim();
+      const assertion = uncommentedLine.trim().replace(/^and[ \t]+/, '');
       const aliasAssignment = assertion.match(
         /^([a-z_][a-z0-9_]*)[ \t]*=[ \t]*CGI\.unescapeHTML\((?:@response|response)\.body\)$/,
       );
@@ -2259,7 +3245,8 @@ const semanticFormIntegrationTest = (artifact, uncommentedRuby) => {
         includesAssertion !== null &&
         (/^(?:@response|response)\.body$/.test(includesAssertion.subject) ||
           includesAssertion.subject === responseBodyAlias) &&
-        !validationErrorLiteralIsNegative(includesAssertion.member)
+        !validationErrorLiteralIsNegative(includesAssertion.member) &&
+        (literalPredicate === null || literalPredicate(includesAssertion.member))
       ) {
         return true;
       }
@@ -2268,7 +3255,8 @@ const semanticFormIntegrationTest = (artifact, uncommentedRuby) => {
         matchAssertion !== null &&
         (/^(?:@response|response)\.body$/.test(matchAssertion.subject) ||
           matchAssertion.subject === responseBodyAlias) &&
-        !validationErrorLiteralIsNegative(matchAssertion.pattern)
+        !validationErrorLiteralIsNegative(matchAssertion.pattern) &&
+        (literalPredicate === null || literalPredicate(matchAssertion.pattern))
       ) {
         return true;
       }
@@ -2619,7 +3607,7 @@ const semanticFormIntegrationTest = (artifact, uncommentedRuby) => {
     const call = statement.match(
       /^([ \t]*assert_(?:select|selector|dom)(?:[ \t]+|\([ \t]*))(["'])((?:(?!\2).)*)\2/,
     );
-    if (!call || /#(?:\{|@|\$)/.test(call[3])) return false;
+    if (!call || hasExecutableRubyInterpolation(call[3])) return false;
     const errorSelector = call[3].replace(/([.#])([A-Za-z_][A-Za-z0-9_-]*)/g, (_identifier, sigil, name) => {
       const errorName = name.replace(/(^|[-_])(?:flash|notice)(?=$|[-_])/gi, '$1errors');
       return `${sigil}${errorName}`;
@@ -2631,21 +3619,173 @@ const semanticFormIntegrationTest = (artifact, uncommentedRuby) => {
   };
   const hasPositiveNoticeSelector = (testCase) =>
     selectorStatements(testCase).some(positiveNoticeSelectorStatement);
+  const responseMutatingRequests = (codeLine) => {
+    const requests = [];
+    let cursor = 0;
+    while (cursor < codeLine.length) {
+      const suffix = codeLine.slice(cursor);
+      const request = suffix.match(
+        /(?:^|[^A-Za-z0-9_:])(?:(?:\(\s*)?(?:self|@[a-z_][A-Za-z0-9_]*|[a-z_][A-Za-z0-9_]*)(?:\s*\))?\s*(?:::|&?\.)\s*|&?\.\s*)?(delete|get|head|options|patch|post|process|put|visit)(?=\s|\()/,
+      );
+      if (request === null) break;
+      const requestEnd = cursor + request.index + request[0].length;
+      const remainder = codeLine.slice(requestEnd);
+      if (!/^\s*(?:(?:&&|\|\||<<|>>|[+\-*/%&|^])?=|&?\.)/.test(remainder)) {
+        requests.push(request);
+      }
+      cursor = requestEnd;
+    }
+    return requests;
+  };
+  const responseMutatingRequest = (codeLine) => responseMutatingRequests(codeLine)[0] ?? null;
+  const requestStatementEndLine = (physicalLines, startIndex = 0) => {
+    const firstRequestLine = maskRubyStringAndCommentContent(physicalLines[startIndex] ?? '');
+    if (
+      firstRequestLine === null ||
+      !/^\s*(?:delete|get|head|options|patch|post|put)(?:[ \t]+|\()/.test(firstRequestLine)
+    ) {
+      return null;
+    }
+
+    const parenthesized = /^\s*(?:delete|get|head|options|patch|post|put)\s*\(/.test(firstRequestLine);
+    let parentheses = 0;
+    let braces = 0;
+    let brackets = 0;
+    let sawParenthesis = false;
+    let continuationPending = false;
+    let requestCount = 0;
+    for (let lineIndex = startIndex; lineIndex < physicalLines.length; lineIndex += 1) {
+      const maskedLine = maskRubyStringAndCommentContent(physicalLines[lineIndex]);
+      if (maskedLine === null) return null;
+      requestCount += responseMutatingRequests(maskedLine).length;
+      if (requestCount > 1) return null;
+      const continuationGap = continuationPending && maskedLine.trim() === '';
+      for (const character of maskedLine) {
+        if (character === '(') {
+          parentheses += 1;
+          sawParenthesis = true;
+        } else if (character === ')') {
+          parentheses -= 1;
+        } else if (character === '{') braces += 1;
+        else if (character === '}') braces -= 1;
+        else if (character === '[') brackets += 1;
+        else if (character === ']') brackets -= 1;
+        if (parentheses < 0 || braces < 0 || brackets < 0) return null;
+      }
+
+      const delimitersClosed = parentheses === 0 && braces === 0 && brackets === 0;
+      const explicitContinuation = /(?:,|\\|:)[ \t]*$/.test(maskedLine);
+      const unsupportedTrailingOperator =
+        delimitersClosed && /(?:\b(?:and|or)|[&|^+*/%<>=!~?-])[ \t]*$/.test(maskedLine);
+      if (unsupportedTrailingOperator) return null;
+      let leadingDotContinuationAhead = false;
+      if (!parenthesized && delimitersClosed) {
+        for (let nextIndex = lineIndex + 1; nextIndex < physicalLines.length; nextIndex += 1) {
+          const nextMaskedLine = maskRubyStringAndCommentContent(physicalLines[nextIndex]);
+          if (nextMaskedLine === null) return null;
+          if (nextMaskedLine.trim() !== '') {
+            leadingDotContinuationAhead = /^\s*&?\./.test(nextMaskedLine);
+            break;
+          }
+        }
+      }
+      if (delimitersClosed && /\b(?:begin|do)(?:[ \t]*\|[^|\r\n]*\|)?[ \t]*$/.test(maskedLine)) {
+        return null;
+      }
+      if (
+        delimitersClosed &&
+        !explicitContinuation &&
+        !leadingDotContinuationAhead &&
+        !continuationGap &&
+        (!parenthesized || sawParenthesis)
+      ) {
+        return lineIndex;
+      }
+      if (!continuationGap) {
+        continuationPending = delimitersClosed && (explicitContinuation || leadingDotContinuationAhead);
+      }
+    }
+    return null;
+  };
   const postResponseScopes = (testCase) => {
     const scopes = [];
     let currentScope = null;
-    for (const physicalLine of testCase.physicalLines) {
+    let activeRequestEndLine = -1;
+    for (let lineIndex = 0; lineIndex < testCase.physicalLines.length; lineIndex += 1) {
+      const physicalLine = testCase.physicalLines[lineIndex];
       const codeLine = stripRubyTrailingComment(physicalLine)?.trim() ?? '';
+      const maskedCodeLine = maskRubyStringAndCommentContent(physicalLine);
       const request = codeLine.match(/^(delete|get|head|options|patch|post|put)(?:\s+|\()/);
-      if (request) {
+      const requestBoundary = maskedCodeLine === null || responseMutatingRequest(maskedCodeLine);
+      if (requestBoundary && lineIndex > activeRequestEndLine) {
         if (currentScope !== null) scopes.push(currentScope);
-        currentScope = request[1] === 'post' ? [] : null;
+        if (request === null) {
+          activeRequestEndLine = lineIndex;
+          currentScope = null;
+        } else {
+          const statementEndLine = requestStatementEndLine(testCase.physicalLines, lineIndex);
+          if (statementEndLine === null) {
+            activeRequestEndLine = testCase.physicalLines.length - 1;
+            currentScope = null;
+          } else {
+            activeRequestEndLine = statementEndLine;
+            currentScope = request[1] === 'post' ? [] : null;
+          }
+        }
       }
       if (currentScope !== null) currentScope.push(physicalLine);
     }
     if (currentScope !== null) scopes.push(currentScope);
     return scopes.map((physicalLines) => ({ ...testCase, body: physicalLines.join('\n'), physicalLines }));
   };
+  const staticPostRequestProof = (responseScope) => {
+    const statementEndLine = requestStatementEndLine(responseScope.physicalLines);
+    if (statementEndLine === null) return null;
+    const rawLines = responseScope.physicalLines.map(stripRubyTrailingComment);
+    if (rawLines.some((line) => line === null)) return null;
+    const maskedLines = responseScope.physicalLines.map(maskRubyStringAndCommentContent);
+    if (maskedLines.some((line) => line === null)) return null;
+
+    const rawStatement = rawLines
+      .slice(0, statementEndLine + 1)
+      .join('\n')
+      .trim();
+    const maskedStatement = maskedLines
+      .slice(0, statementEndLine + 1)
+      .join('\n')
+      .trim();
+    const initialPost = maskedStatement.match(/^post(?:[ \t]+|\()/);
+    if (
+      initialPost === null ||
+      /(?:^|[;(\s])(?:(?:self|[a-z_][A-Za-z0-9_]*)\s*&?\.\s*|&?\.\s*)?(?:delete|get|head|options|patch|post|process|put|visit)(?=[ \t(])/.test(
+        maskedStatement.slice(initialPost[0].length),
+      )
+    ) {
+      return null;
+    }
+    const helperEndpoint = rawStatement.match(
+      /^post(?:[ \t]+|\([ \t\r\n]*)([a-z][a-z0-9_]*_(?:path|url))(?=[ \t\r\n]*(?:\(|,|\)|$))/,
+    );
+    const literalEndpoint = rawStatement.match(
+      /^post(?:[ \t]+|\([ \t\r\n]*)(["'])(\/[A-Za-z0-9_./:-]*)\1(?=[ \t]*(?:,|\)|$))/,
+    );
+    let endpoint = null;
+    if (helperEndpoint) endpoint = `route:${helperEndpoint[1].replace(/_(?:path|url)$/, '')}`;
+    else if (literalEndpoint) endpoint = `path:${literalEndpoint[2]}`;
+    if (endpoint === null) return null;
+
+    const responsePhysicalLines = responseScope.physicalLines.slice(statementEndLine + 1);
+    return {
+      endpoint,
+      responseBody: responsePhysicalLines.join('\n'),
+      responsePhysicalLines,
+    };
+  };
+  const scopedPostResponses = (testCase) =>
+    postResponseScopes(testCase).flatMap((responseScope) => {
+      const proof = staticPostRequestProof(responseScope);
+      return proof === null ? [] : [{ ...responseScope, ...proof }];
+    });
   const staticPostSubmission = (responseScope) => {
     const rawLines = [];
     const maskedLines = [];
@@ -2713,7 +3853,7 @@ const semanticFormIntegrationTest = (artifact, uncommentedRuby) => {
     const request = maskedStatement.match(
       /^\s*post(?:(?<parenthesized>\s*\(\s*)|\s+)(?<endpoint>[a-z][a-z0-9_]*)_(?:path|url)\b\s*,\s*params\s*:\s*\{/,
     );
-    if (!request || /#(?:\{|@|\$)/.test(rawStatement)) return null;
+    if (!request || hasExecutableRubyInterpolation(rawStatement)) return null;
     const hashStart = maskedStatement.indexOf('{', request.index + request[0].length - 1);
     let depth = 0;
     let hashEnd = -1;
@@ -2777,17 +3917,87 @@ const semanticFormIntegrationTest = (artifact, uncommentedRuby) => {
       /(?:"[ \t]*"|'[ \t]*')/.test(uncommentedHash) || /(?<!:)\bnil\b(?![ \t]*:)/.test(maskedNestedHash);
     return { endpoint: request.groups.endpoint, parameterKey, fingerprint, hasBlankValue };
   };
-  const hasPotentiallyInactiveEvidence = (testCase) =>
-    testCase.physicalLines.some((physicalLine) => {
+  const previousExecutableCodeLine = (physicalLines, lineIndex) => {
+    for (let previousIndex = lineIndex - 1; previousIndex >= 0; previousIndex -= 1) {
+      const previousLine = maskRubyStringAndCommentContent(physicalLines[previousIndex]);
+      if (previousLine === null) return null;
+      if (previousLine.trim() !== '') return previousLine.trimEnd();
+    }
+    return '';
+  };
+  const braceOpenerIsHash = (codeLine, braceIndex, physicalLines, lineIndex) => {
+    const prefix = codeLine.slice(0, braceIndex).trimEnd();
+    const valuePrefix = prefix === '' ? previousExecutableCodeLine(physicalLines, lineIndex) : prefix;
+    return valuePrefix !== null && /(?:=>|<<|[=(:,[])$/.test(valuePrefix.replace(/\\\s*$/, '').trimEnd());
+  };
+  const hasBlockBraceOpener = (codeLine, physicalLines, lineIndex) => {
+    for (
+      let braceIndex = codeLine.indexOf('{');
+      braceIndex >= 0;
+      braceIndex = codeLine.indexOf('{', braceIndex + 1)
+    ) {
+      if (!braceOpenerIsHash(codeLine, braceIndex, physicalLines, lineIndex)) return true;
+    }
+    return false;
+  };
+  const hasPotentiallyInactiveEvidence = (testCase) => {
+    const continuedReceiverAssertion = testCase.physicalLines.some((physicalLine, lineIndex) => {
       const codeLine = maskRubyStringAndCommentContent(physicalLine);
+      if (codeLine === null || !/&?\.\s*$/.test(codeLine)) return codeLine === null;
+      for (let nextIndex = lineIndex + 1; nextIndex < testCase.physicalLines.length; nextIndex += 1) {
+        const nextLine = maskRubyStringAndCommentContent(testCase.physicalLines[nextIndex]);
+        if (nextLine === null) return true;
+        if (nextLine.trim() !== '') {
+          return /^\s*(?:assert(?:_[A-Za-z0-9_]+)?|follow_redirect!|refute(?:_[A-Za-z0-9_]+)?)(?=[ \t(])/.test(
+            nextLine,
+          );
+        }
+      }
+      return false;
+    });
+    if (continuedReceiverAssertion) return true;
+
+    return testCase.physicalLines.some((physicalLine, lineIndex) => {
+      const codeLine = maskRubyStringAndCommentContent(physicalLine);
+      const rawCodeLine = stripRubyTrailingComment(physicalLine);
+      const booleanAssertion = codeLine?.match(
+        /\b(and|or)\s+(?:assert(?:_[A-Za-z0-9_]+)?|follow_redirect!|refute(?:_[A-Za-z0-9_]+)?)(?=[ \t(])/,
+      );
+      let unsupportedBooleanAssertion = false;
+      if (booleanAssertion !== null && booleanAssertion !== undefined) {
+        const inlinePrefix = codeLine.slice(0, booleanAssertion.index).trim();
+        const controllingExpression =
+          inlinePrefix === '' ? previousExecutableCodeLine(testCase.physicalLines, lineIndex) : inlinePrefix;
+        unsupportedBooleanAssertion =
+          booleanAssertion[1] !== 'and' ||
+          controllingExpression === null ||
+          responseMutatingRequest(controllingExpression) === null;
+      }
       const supportedCountDifference =
-        codeLine !== null &&
-        /^\s*assert_difference(?:\s+|\()\s*->\s*\{\s*[A-Z][A-Za-z0-9_:]*\.count\s*\}(?:\s*,\s*1)?\s*\)?\s+do\s*$/.test(
-          codeLine,
+        rawCodeLine !== null &&
+        /^\s*assert_(?:no_)?difference(?:\s+|\()\s*(?:"[A-Z][A-Za-z0-9_:]*\.count"|'[A-Z][A-Za-z0-9_:]*\.count'|->\s*\{\s*[A-Z][A-Za-z0-9_:]*\.count\s*\})(?:\s*,\s*1)?\s*\)?\s+(?:do|\{)\s*$/.test(
+          rawCodeLine,
         );
+      const selectorBlock = rawCodeLine?.match(
+        /^\s*assert_(?:select|selector|dom)(?:\s+|\(\s*)(["'])((?:(?!\1).)+)\1\s*\)?\s+(?:do|\{)(?:\s*\|[^|\r\n]*\|)?\s*$/,
+      );
+      const inlineSelectorBlock = rawCodeLine?.match(
+        /^\s*assert_(?:select|selector|dom)(?:\s+|\(\s*)(["'])((?:(?!\1).)+)\1\s*\)?\s*\{\s*\|([a-z_][A-Za-z0-9_]*)\|\s*assert_predicate(?:\s+|\(\s*)\3\s*,\s*:any\?\s*\)?\s*}\s*$/,
+      );
+      const supportedSelector = selectorBlock?.[2] ?? inlineSelectorBlock?.[2];
+      const supportedSelectorBlock =
+        supportedSelector !== undefined && !hasExecutableRubyInterpolation(supportedSelector);
+      const supportedAlwaysYieldBlock = supportedCountDifference || supportedSelectorBlock;
+      const unsupportedBraceBlock =
+        codeLine !== null &&
+        !supportedAlwaysYieldBlock &&
+        hasBlockBraceOpener(codeLine, testCase.physicalLines, lineIndex);
       return (
         codeLine === null ||
         /&&|\|\||\bbegin\b/.test(codeLine) ||
+        unsupportedBooleanAssertion ||
+        unsupportedBraceBlock ||
+        (!supportedAlwaysYieldBlock && hasUnclosedRubyDoBlock(codeLine)) ||
         /\b(?:case|class|def|elsif|ensure|for|if|module|rescue|unless|until|when|while)\b/.test(codeLine) ||
         /(?:^|[; \t])(?:abort|assert_(?:raises|throws)|break|exit!?|fail|flunk|next|raise|redo|retry|return|skip|throw)(?=$|[; \t({])/.test(
           codeLine,
@@ -2795,20 +4005,33 @@ const semanticFormIntegrationTest = (artifact, uncommentedRuby) => {
         (!supportedCountDifference && /->|(?:^|[; \t])(?:lambda|proc|Proc\.new)(?=$|[; \t({])/.test(codeLine))
       );
     });
+  };
   const hasPotentiallyInactiveCombinedEvidence = (testCase) =>
     hasPotentiallyInactiveEvidence(testCase) ||
-    testCase.physicalLines.some((physicalLine) => {
+    testCase.physicalLines.some((physicalLine, lineIndex) => {
       const codeLine = maskRubyStringAndCommentContent(physicalLine);
       return (
         codeLine === null ||
-        emptyIteratorBraceOwnerPattern.test(codeLine.trim()) ||
-        /\bdo(?:\s*\|[^|\r\n]*\|)?\s*$/.test(codeLine)
+        hasBlockBraceOpener(codeLine, testCase.physicalLines, lineIndex) ||
+        hasUnclosedRubyDoBlock(codeLine)
       );
     });
   const qualifyingFailureScopes = (testCase) => {
     if (hasPotentiallyInactiveEvidence(testCase)) return [];
-    return postResponseScopes(testCase).filter((responseScope) => {
-      const nonSelectorBody = responseScope.body
+    return scopedPostResponses(testCase).filter((responseScope) => {
+      const maskedResponseLines = responseScope.responsePhysicalLines.map(maskRubyStringAndCommentContent);
+      if (
+        maskedResponseLines.some((line) => line === null) ||
+        /\b(?:__send__|method|public_method|public_send|send)\b/.test(maskedResponseLines.join('\n'))
+      ) {
+        return false;
+      }
+      const evidenceScope = {
+        ...responseScope,
+        body: responseScope.responseBody,
+        physicalLines: responseScope.responsePhysicalLines,
+      };
+      const nonSelectorBody = responseScope.responseBody
         .split(/\r?\n/)
         .filter(
           (line) =>
@@ -2819,7 +4042,7 @@ const semanticFormIntegrationTest = (artifact, uncommentedRuby) => {
         .join('\n');
       const response =
         /^\s*assert_response(?:\s+|\()\s*(?::(?:unprocessable_entity|unprocessable_content)\b|422\b)/m.test(
-          responseScope.body,
+          responseScope.responseBody,
         );
       const errors =
         hasPositiveValueAssertion(
@@ -2828,12 +4051,11 @@ const semanticFormIntegrationTest = (artifact, uncommentedRuby) => {
           false,
           validationErrorLiteralIsNegative,
         ) ||
-        hasPositiveErrorSelector(responseScope) ||
-        hasRenderedBodyAssertion(responseScope.body);
+        hasPositiveErrorSelector(evidenceScope) ||
+        hasRenderedBodyAssertion(responseScope.responseBody, validationErrorLiteralIsPositive);
       return response && errors;
     });
   };
-  const qualifiesFailure = (testCase) => qualifyingFailureScopes(testCase).length > 0;
   const qualifyingSuccessScopes = (testCase) => {
     if (hasPotentiallyInactiveEvidence(testCase)) return [];
     const successLines = testCase.body.split(/\r?\n/);
@@ -2910,7 +4132,7 @@ const semanticFormIntegrationTest = (artifact, uncommentedRuby) => {
       if (!closed) return false;
       const contentLines = blockLines.filter((blockLine) => blockLine.trim() !== '');
       if (contentLines.length === 0 || !/^\s*post(?:\s+|\()/.test(contentLines[0])) return false;
-      if (contentLines.some((blockLine) => /#(?:\{|@|\$)/.test(blockLine))) return false;
+      if (contentLines.some(hasExecutableRubyInterpolation)) return false;
       const postIndent = contentLines[0].match(/^([ \t]*)/)?.[1].length ?? 0;
       for (let contentIndex = 1; contentIndex < contentLines.length; contentIndex += 1) {
         const blockLine = contentLines[contentIndex];
@@ -2932,29 +4154,109 @@ const semanticFormIntegrationTest = (artifact, uncommentedRuby) => {
       );
       return matchingRoute || matchingParameter;
     });
-    const responseScopes = postResponseScopes(testCase);
+    const responseScopes = scopedPostResponses(testCase);
     return responseScopes.filter((responseScope) => {
-      const redirect = /^\s*assert_redirected_to(?:\s+|\()/m.test(responseScope.body);
+      const evidenceScope = {
+        ...responseScope,
+        body: responseScope.responseBody,
+        physicalLines: responseScope.responsePhysicalLines,
+      };
+      const maskedResponseBody = responseScope.responsePhysicalLines
+        .map(maskRubyStringAndCommentContent)
+        .join('\n');
+      const directRedirects = [
+        ...maskedResponseBody.matchAll(/(?:^|[;\r\n])[ \t]*assert_redirected_to(?=[ \t(])/g),
+      ];
+      const directFollows = [
+        ...maskedResponseBody.matchAll(/(?:^|[;\r\n])[ \t]*follow_redirect!(?=[ \t(]|$)/gm),
+      ];
+      const directResponses = [
+        ...maskedResponseBody.matchAll(/(?:^|[;\r\n])[ \t]*assert_response(?=[ \t(])/g),
+      ];
+      const redirectTokenCount = [...maskedResponseBody.matchAll(/\bassert_redirected_to\b/g)].length;
+      const followTokenCount = [...maskedResponseBody.matchAll(/\bfollow_redirect!(?![A-Za-z0-9_])/g)].length;
+      const responseTokenCount = [...maskedResponseBody.matchAll(/\bassert_response\b/g)].length;
+      const reflectiveDispatchTokenCount = [
+        ...maskedResponseBody.matchAll(/\b(?:__send__|method|public_method|public_send|send)\b/g),
+      ].length;
+      const directControlCallsOnly =
+        redirectTokenCount === directRedirects.length &&
+        followTokenCount === directFollows.length &&
+        responseTokenCount === directResponses.length &&
+        reflectiveDispatchTokenCount === 0;
+      const renderedStatuses = [
+        ...maskedResponseBody.matchAll(
+          /(?:^|[;\r\n])[ \t]*assert_response(?:[ \t]+|\([ \t]*)(?::(?:success|ok|created|accepted)\b|20[0-2]\b)(?=[ \t]*(?:,|\)|$))/gm,
+        ),
+      ];
+      const followedSuccessStatuses = [
+        ...maskedResponseBody.matchAll(
+          /(?:^|[;\r\n])[ \t]*assert_response(?:[ \t]+|\([ \t]*)(?::(?:success|ok)\b|200\b)(?=[ \t]*(?:,|\)|$))/gm,
+        ),
+      ];
+      const redirectStatuses = [
+        ...maskedResponseBody.matchAll(
+          /(?:^|[;\r\n])[ \t]*assert_response(?:[ \t]+|\([ \t]*)(?::(?:found|moved_permanently|permanent_redirect|redirect|see_other|temporary_redirect)\b|3[0-9]{2}\b)(?=[ \t]*(?:,|\)|$))/gm,
+        ),
+      ];
+      const renderedSuccess =
+        directControlCallsOnly &&
+        directResponses.length === 1 &&
+        renderedStatuses.length === 1 &&
+        directRedirects.length === 0 &&
+        directFollows.length === 0 &&
+        hasRenderedBodyAssertion(responseScope.responseBody, successConfirmationLiteralIsPositive);
+      const redirectIndex = directRedirects[0]?.index ?? -1;
+      const followIndex = directFollows[0]?.index ?? -1;
+      const followedStatusIndex = followedSuccessStatuses[0]?.index ?? -1;
+      const postFollowResponseBody =
+        directFollows.length === 1
+          ? responseScope.responseBody.slice(followIndex + directFollows[0][0].length)
+          : '';
       const message =
         hasPositiveValueAssertion(
-          responseScope.body,
+          responseScope.responseBody,
           /(?:\bflash\b|\bnotice\b)/i,
           true,
           noticeLiteralIsNegative,
         ) ||
-        hasPositiveNoticeSelector(responseScope) ||
-        (/^\s*follow_redirect!(?:\s*|\(\s*\))$/m.test(responseScope.body) &&
-          hasRenderedBodyAssertion(responseScope.body)) ||
+        hasPositiveNoticeSelector(evidenceScope) ||
+        (directFollows.length === 1 && hasRenderedBodyAssertion(postFollowResponseBody)) ||
         (responseScopes.length === 1 && createdRecord);
-      return redirect && message;
+      const redirectOrderCompatible = directFollows.length === 0 || followIndex > redirectIndex;
+      const redirectStatusBeforeFollow =
+        redirectStatuses.length === 0 ||
+        (redirectStatuses.length === 1 &&
+          (directFollows.length === 0 || redirectStatuses[0].index < followIndex));
+      const redirectResponseCompatible =
+        directResponses.length === 0 ||
+        (redirectStatusBeforeFollow &&
+          (directFollows.length === 0
+            ? directResponses.length === redirectStatuses.length
+            : directResponses.length === redirectStatuses.length + 1 &&
+              followedSuccessStatuses.length === 1 &&
+              followedStatusIndex > followIndex));
+      const redirectSuccess =
+        directControlCallsOnly &&
+        directRedirects.length === 1 &&
+        directFollows.length <= 1 &&
+        redirectOrderCompatible &&
+        redirectResponseCompatible &&
+        message;
+      return redirectSuccess || renderedSuccess;
     });
   };
-  const qualifiesSuccess = (testCase) => qualifyingSuccessScopes(testCase).length > 0;
   return (
-    failureCandidates.some(
-      (failureCase) =>
-        qualifiesFailure(failureCase) &&
-        successCandidates.some((successCase) => successCase !== failureCase && qualifiesSuccess(successCase)),
+    failureCandidates.some((failureCase) =>
+      qualifyingFailureScopes(failureCase).some((failureScope) =>
+        successCandidates.some(
+          (successCase) =>
+            successCase !== failureCase &&
+            qualifyingSuccessScopes(successCase).some(
+              (successScope) => successScope.endpoint === failureScope.endpoint,
+            ),
+        ),
+      ),
     ) ||
     combinedOutcomeCandidates.some((combinedCase) => {
       if (hasPotentiallyInactiveCombinedEvidence(combinedCase)) return false;

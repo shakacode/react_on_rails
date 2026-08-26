@@ -3165,11 +3165,12 @@ for artifact_path in \
   app/models/message.rb \
   app/controllers/messages_controller.rb \
   test/integration/hello_server_test.rb \
-  test/integration/messages_test.rb; do
+  test/integration/messages_test.rb \
+  contest/deceptive_test.rb; do
   jq -e --arg path "$artifact_path" '.artifacts[] | select(.path == $path)' \
     "$tmp/claude-v5-root-artifacts-output/artifact-evidence.json" >/dev/null
 done
-if jq -e '.artifacts[] | select(.path | startswith("application/") or startswith("contest/"))' \
+if jq -e '.artifacts[] | select(.path | startswith("application/"))' \
   "$tmp/claude-v5-root-artifacts-output/artifact-evidence.json" >/dev/null; then
   echo "deceptive selected-root substring was captured" >&2
   exit 1
@@ -4874,7 +4875,7 @@ for row in rsc.route tests.page; do
     "$tmp/codex-domain-rsc-heredoc-route-output/rubric-results.json")" = unknown
 done
 
-for route_wrapper in conditional method brace times-brace hash-brace alternate-helper; do
+for route_wrapper in conditional method brace times-brace hash-brace do-hash alternate-helper; do
   cp -R "$tmp/codex-domain-rsc-name-workspace" \
     "$tmp/codex-domain-rsc-inactive-$route_wrapper-route-workspace"
   if [[ "$route_wrapper" == conditional ]]; then
@@ -4922,6 +4923,15 @@ rsc "launch_briefing", to: "launch_briefings#show"
 get "launch_briefing", to: "launch_briefings#show", as: :launch_briefing
 end
 RUBY
+  elif [[ "$route_wrapper" == do-hash ]]; then
+    cat >"$tmp/codex-domain-rsc-inactive-$route_wrapper-route-workspace/eval_app/config/routes.rb" <<'RUBY'
+Rails.application.routes.draw do
+[].each_with_object({}) do
+rsc "launch_briefing", to: "launch_briefings#show"
+end
+get "launch_briefing", to: "launch_briefings#show", as: :launch_briefing
+end
+RUBY
   else
     cat >"$tmp/codex-domain-rsc-inactive-$route_wrapper-route-workspace/eval_app/config/routes.rb" <<'RUBY'
 Rails.application.routes.draw do
@@ -4938,6 +4948,113 @@ RUBY
   for row in rsc.route tests.page; do
     test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
       "$tmp/codex-domain-rsc-inactive-$route_wrapper-route-output/rubric-results.json")" = unknown
+  done
+done
+
+for route_control in completed-inline-do symbol-do open-character-literal close-character-literal escaped-character-literal; do
+  cp -R "$tmp/codex-domain-rsc-name-workspace" \
+    "$tmp/codex-domain-rsc-$route_control-route-workspace"
+  if [[ "$route_control" == completed-inline-do ]]; then
+    cat >"$tmp/codex-domain-rsc-$route_control-route-workspace/eval_app/config/routes.rb" <<'RUBY'
+Rails.application.routes.draw do
+[1].each do; nil; end
+rsc "launch_briefing", to: "launch_briefings#show"
+get "launch_briefing", to: "launch_briefings#show", as: :launch_briefing
+end
+RUBY
+  elif [[ "$route_control" == symbol-do ]]; then
+    cat >"$tmp/codex-domain-rsc-$route_control-route-workspace/eval_app/config/routes.rb" <<'RUBY'
+Rails.application.routes.draw do
+MODE = :do
+rsc "launch_briefing", to: "launch_briefings#show"
+get "launch_briefing", to: "launch_briefings#show", as: :launch_briefing
+end
+RUBY
+  elif [[ "$route_control" == open-character-literal ]]; then
+    cat >"$tmp/codex-domain-rsc-$route_control-route-workspace/eval_app/config/routes.rb" <<'RUBY'
+Rails.application.routes.draw do
+OPEN = ?{
+rsc "launch_briefing", to: "launch_briefings#show"
+get "launch_briefing", to: "launch_briefings#show", as: :launch_briefing
+end
+RUBY
+  elif [[ "$route_control" == close-character-literal ]]; then
+    cat >"$tmp/codex-domain-rsc-$route_control-route-workspace/eval_app/config/routes.rb" <<'RUBY'
+Rails.application.routes.draw do
+CLOSE = ?}
+rsc "launch_briefing", to: "launch_briefings#show"
+get "launch_briefing", to: "launch_briefings#show", as: :launch_briefing
+end
+RUBY
+  else
+    cat >"$tmp/codex-domain-rsc-$route_control-route-workspace/eval_app/config/routes.rb" <<'RUBY'
+Rails.application.routes.draw do
+CLOSE = ?\M-}
+rsc "launch_briefing", to: "launch_briefings#show"
+get "launch_briefing", to: "launch_briefings#show", as: :launch_briefing
+end
+RUBY
+  fi
+  ruby -c "$tmp/codex-domain-rsc-$route_control-route-workspace/eval_app/config/routes.rb" >/dev/null
+  mkdir "$tmp/codex-domain-rsc-$route_control-route-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+    "$tmp/codex-domain-rsc-$route_control-route-workspace" \
+    "$tmp/codex-domain-rsc-$route_control-route-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in rsc.route tests.page; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/codex-domain-rsc-$route_control-route-output/rubric-results.json")" = pass
+  done
+done
+
+cp -R "$tmp/codex-domain-rsc-name-workspace" \
+  "$tmp/codex-domain-rsc-character-literal-bypass-route-workspace"
+cat >"$tmp/codex-domain-rsc-character-literal-bypass-route-workspace/eval_app/config/routes.rb" <<'RUBY'
+Rails.application.routes.draw do
+never_yield {
+CLOSE = ?}
+rsc "launch_briefing", to: "launch_briefings#show"
+}
+get "launch_briefing", to: "launch_briefings#show", as: :launch_briefing
+end
+RUBY
+ruby -c \
+  "$tmp/codex-domain-rsc-character-literal-bypass-route-workspace/eval_app/config/routes.rb" >/dev/null
+mkdir "$tmp/codex-domain-rsc-character-literal-bypass-route-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+  "$tmp/codex-domain-rsc-character-literal-bypass-route-workspace" \
+  "$tmp/codex-domain-rsc-character-literal-bypass-route-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in rsc.route tests.page; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-domain-rsc-character-literal-bypass-route-output/rubric-results.json")" = unknown
+done
+
+escaped_closing_character_literals=('?\M-}' '?\C-}' '?\c}')
+escaped_closing_character_literal_index=0
+for character_literal in "${escaped_closing_character_literals[@]}"; do
+  escaped_closing_character_literal_index=$((escaped_closing_character_literal_index + 1))
+  cp -R "$tmp/codex-domain-rsc-character-literal-bypass-route-workspace" \
+    "$tmp/codex-domain-rsc-escaped-character-literal-$escaped_closing_character_literal_index-route-workspace"
+  ruby -e '
+    path, character_literal = ARGV
+    content = File.read(path)
+    abort unless content.sub!("?}", character_literal)
+    File.write(path, content)
+  ' \
+    "$tmp/codex-domain-rsc-escaped-character-literal-$escaped_closing_character_literal_index-route-workspace/eval_app/config/routes.rb" \
+    "$character_literal"
+  ruby -c \
+    "$tmp/codex-domain-rsc-escaped-character-literal-$escaped_closing_character_literal_index-route-workspace/eval_app/config/routes.rb" \
+    >/dev/null
+  mkdir "$tmp/codex-domain-rsc-escaped-character-literal-$escaped_closing_character_literal_index-route-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+    "$tmp/codex-domain-rsc-escaped-character-literal-$escaped_closing_character_literal_index-route-workspace" \
+    "$tmp/codex-domain-rsc-escaped-character-literal-$escaped_closing_character_literal_index-route-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in rsc.route tests.page; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/codex-domain-rsc-escaped-character-literal-$escaped_closing_character_literal_index-route-output/rubric-results.json")" = unknown
   done
 done
 
@@ -5471,6 +5588,1260 @@ node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
 for row in form.validation tests.form; do
   test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
     "$tmp/claude-v8-form-output/rubric-results.json")" = pass
+done
+
+cp -R "$tmp/claude-v8-form-workspace" "$tmp/redirect-status-form-workspace"
+perl -0pi -e 's/    assert_redirected_to subscriptions_path/    assert_response :redirect\n    assert_redirected_to subscriptions_path/' \
+  "$tmp/redirect-status-form-workspace/eval_app/test/integration/subscriptions_test.rb"
+ruby -c "$tmp/redirect-status-form-workspace/eval_app/test/integration/subscriptions_test.rb" >/dev/null
+mkdir "$tmp/redirect-status-form-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+  "$tmp/redirect-status-form-workspace" "$tmp/redirect-status-form-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/redirect-status-form-output/rubric-results.json")" = pass
+done
+
+cp -R "$tmp/claude-v8-form-workspace" "$tmp/rendered-form-success-workspace"
+printf '%s\n' \
+  'class SubscriptionsTest < ActionDispatch::IntegrationTest' \
+  '  test "server-side validation failure re-renders the form with error messages" do' \
+  '    post subscriptions_path, params: { subscriber: { name: "", email: "bad" } }' \
+  '    assert_response :unprocessable_entity' \
+  '    assert_match "must be a valid email address", response.body' \
+  '  end' \
+  '  test "successful submission shows the success summary" do' \
+  '    post subscriptions_path, params: { subscriber: { name: "Marie Curie", email: "marie@example.com" } }' \
+  '    assert_response :created' \
+  '    assert_includes response.body, "Thanks, Marie Curie!"' \
+  '  end' \
+  'end' >"$tmp/rendered-form-success-workspace/eval_app/test/integration/subscriptions_test.rb"
+mkdir "$tmp/rendered-form-success-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+  "$tmp/rendered-form-success-workspace" "$tmp/rendered-form-success-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/rendered-form-success-output/rubric-results.json")" = pass
+done
+
+rendered_form_validation_messages=(
+  'Email has already been taken'
+  'Name is too short'
+)
+rendered_form_validation_message_index=0
+for validation_message in "${rendered_form_validation_messages[@]}"; do
+  rendered_form_validation_message_index=$((rendered_form_validation_message_index + 1))
+  cp -R "$tmp/rendered-form-success-workspace" \
+    "$tmp/rendered-form-validation-message-$rendered_form_validation_message_index-workspace"
+  ruby -e '
+    path, message = ARGV
+    content = File.read(path)
+    abort unless content.sub!("must be a valid email address", message)
+    File.write(path, content)
+  ' \
+    "$tmp/rendered-form-validation-message-$rendered_form_validation_message_index-workspace/eval_app/test/integration/subscriptions_test.rb" \
+    "$validation_message"
+  mkdir "$tmp/rendered-form-validation-message-$rendered_form_validation_message_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+    "$tmp/rendered-form-validation-message-$rendered_form_validation_message_index-workspace" \
+    "$tmp/rendered-form-validation-message-$rendered_form_validation_message_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/rendered-form-validation-message-$rendered_form_validation_message_index-output/rubric-results.json")" = pass
+  done
+done
+
+cp -R "$tmp/rendered-form-success-workspace" "$tmp/rendered-form-large-unrelated-ruby-workspace"
+ruby -e 'File.write(ARGV.fetch(0), "# unrelated model documentation\n" + "# padding\n" * 5000)' \
+  "$tmp/rendered-form-large-unrelated-ruby-workspace/eval_app/app/models/large_notes.rb"
+ruby -c "$tmp/rendered-form-large-unrelated-ruby-workspace/eval_app/app/models/large_notes.rb" >/dev/null
+mkdir "$tmp/rendered-form-large-unrelated-ruby-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+  "$tmp/rendered-form-large-unrelated-ruby-workspace" \
+  "$tmp/rendered-form-large-unrelated-ruby-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+test "$(jq -r '.artifacts[] | select(.path | endswith("large_notes.rb")) | .excerpt_truncated' \
+  "$tmp/rendered-form-large-unrelated-ruby-output/artifact-evidence.json")" = true
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/rendered-form-large-unrelated-ruby-output/rubric-results.json")" = pass
+done
+
+rendered_form_multiline_string_controls=(
+  $'NOTE = "first line\nsecond line"'
+  $'NOTE = \'first line\nsecond line\''
+  $'NOTE = %Q{first line\nsecond line}'
+  $'NOTE = /first line\nsecond line/'
+  $'NOTE = `printf first\nprintf second`'
+)
+rendered_form_multiline_string_control_index=0
+for multiline_string in "${rendered_form_multiline_string_controls[@]}"; do
+  rendered_form_multiline_string_control_index=$((rendered_form_multiline_string_control_index + 1))
+  cp -R "$tmp/rendered-form-success-workspace" \
+    "$tmp/rendered-form-multiline-string-$rendered_form_multiline_string_control_index-workspace"
+  printf '%s\n' "$multiline_string" \
+    >"$tmp/rendered-form-multiline-string-$rendered_form_multiline_string_control_index-workspace/eval_app/app/models/multiline_note.rb"
+  ruby -c \
+    "$tmp/rendered-form-multiline-string-$rendered_form_multiline_string_control_index-workspace/eval_app/app/models/multiline_note.rb" \
+    >/dev/null
+  mkdir "$tmp/rendered-form-multiline-string-$rendered_form_multiline_string_control_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+    "$tmp/rendered-form-multiline-string-$rendered_form_multiline_string_control_index-workspace" \
+    "$tmp/rendered-form-multiline-string-$rendered_form_multiline_string_control_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/rendered-form-multiline-string-$rendered_form_multiline_string_control_index-output/rubric-results.json")" = pass
+  done
+done
+
+rendered_form_benign_interpolation_controls=(
+  $'NAME = "Ada"\nNOTE = "Hello, #{NAME}!"'
+  $'NAME = "Ada"\nNOTE = %Q{Hello, #{NAME}!}'
+  $'NAME = "Ada"\nPATTERN = /#{Regexp.escape(NAME)}/'
+  $'NAME = "Ada"\nNOTE = <<~TEXT\n  Hello, #{NAME}!\nTEXT'
+  $'COMMAND = "true"\nOUTPUT = `#{COMMAND}`'
+  $'COMMAND = "true"\nOUTPUT = %x{#{COMMAND}}'
+  'NOTE = "#{String.define_method(:eval_interpolation_probe) { nil }}"'
+  'NOTE = %Q{#{String.define_method(:eval_interpolation_probe) { nil }}}'
+  'PATTERN = /#{String.define_method(:eval_interpolation_probe) { nil }}/'
+  $'NOTE = <<~TEXT\n  #{String.define_method(:eval_interpolation_probe) { nil }}\nTEXT'
+  $'OUTPUT = `#{String.define_method(:eval_interpolation_probe) { nil }; "true"}`'
+  'OUTPUT = %x{#{String.define_method(:eval_interpolation_probe) { nil }; "true"}}'
+  $'NAME = "Ada"\nNOTE = "Hello, #{\n  NAME\n}!"'
+  $'NAME = "Ada"\nNOTE = %Q{Hello, #{\n  NAME\n}!}'
+  $'NAME = "Ada"\nPATTERN = /#{\n  Regexp.escape(NAME)\n}/'
+  $'NAME = "Ada"\nNOTE = <<~TEXT\n  Hello, #{\n    NAME\n  }!\nTEXT'
+)
+rendered_form_benign_interpolation_control_index=0
+for benign_interpolation in "${rendered_form_benign_interpolation_controls[@]}"; do
+  rendered_form_benign_interpolation_control_index=$((rendered_form_benign_interpolation_control_index + 1))
+  cp -R "$tmp/rendered-form-success-workspace" \
+    "$tmp/rendered-form-benign-interpolation-$rendered_form_benign_interpolation_control_index-workspace"
+  printf '%s\n' "$benign_interpolation" \
+    >"$tmp/rendered-form-benign-interpolation-$rendered_form_benign_interpolation_control_index-workspace/eval_app/app/models/interpolated_note.rb"
+  ruby -c \
+    "$tmp/rendered-form-benign-interpolation-$rendered_form_benign_interpolation_control_index-workspace/eval_app/app/models/interpolated_note.rb" \
+    >/dev/null
+  mkdir "$tmp/rendered-form-benign-interpolation-$rendered_form_benign_interpolation_control_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+    "$tmp/rendered-form-benign-interpolation-$rendered_form_benign_interpolation_control_index-workspace" \
+    "$tmp/rendered-form-benign-interpolation-$rendered_form_benign_interpolation_control_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/rendered-form-benign-interpolation-$rendered_form_benign_interpolation_control_index-output/rubric-results.json")" = pass
+  done
+done
+
+rendered_form_route_helper_arguments=(
+  'project_subscriptions_path(project_id: @project)'
+  'project_subscriptions_path(42)'
+  'project_subscriptions_path(@project, locale: "en")'
+)
+rendered_form_route_helper_argument_index=0
+for route_helper in "${rendered_form_route_helper_arguments[@]}"; do
+  rendered_form_route_helper_argument_index=$((rendered_form_route_helper_argument_index + 1))
+  cp -R "$tmp/rendered-form-success-workspace" \
+    "$tmp/rendered-form-route-helper-argument-$rendered_form_route_helper_argument_index-workspace"
+  ruby -e '
+    path, route_helper = ARGV
+    content = File.read(path)
+    abort unless content.gsub!("subscriptions_path", route_helper)
+    File.write(path, content)
+  ' \
+    "$tmp/rendered-form-route-helper-argument-$rendered_form_route_helper_argument_index-workspace/eval_app/test/integration/subscriptions_test.rb" \
+    "$route_helper"
+  ruby -c \
+    "$tmp/rendered-form-route-helper-argument-$rendered_form_route_helper_argument_index-workspace/eval_app/test/integration/subscriptions_test.rb" \
+    >/dev/null
+  mkdir "$tmp/rendered-form-route-helper-argument-$rendered_form_route_helper_argument_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+    "$tmp/rendered-form-route-helper-argument-$rendered_form_route_helper_argument_index-workspace" \
+    "$tmp/rendered-form-route-helper-argument-$rendered_form_route_helper_argument_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/rendered-form-route-helper-argument-$rendered_form_route_helper_argument_index-output/rubric-results.json")" = pass
+  done
+done
+
+cp -R "$tmp/rendered-form-success-workspace" "$tmp/rendered-form-percent-regex-workspace"
+perl -0pi -e 's/class SubscriptionsTest < ActionDispatch::IntegrationTest/class SubscriptionsTest < ActionDispatch::IntegrationTest\n  OPEN_BRACE = %r!\\{!/' \
+  "$tmp/rendered-form-percent-regex-workspace/eval_app/test/integration/subscriptions_test.rb"
+ruby -c "$tmp/rendered-form-percent-regex-workspace/eval_app/test/integration/subscriptions_test.rb" >/dev/null
+mkdir "$tmp/rendered-form-percent-regex-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+  "$tmp/rendered-form-percent-regex-workspace" "$tmp/rendered-form-percent-regex-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/rendered-form-percent-regex-output/rubric-results.json")" = pass
+done
+
+for rendered_success_status in :success :ok :accepted 200 201 202; do
+  rendered_success_status_slug="${rendered_success_status#:}"
+  cp -R "$tmp/rendered-form-success-workspace" \
+    "$tmp/rendered-form-success-$rendered_success_status_slug-workspace"
+  perl -0pi -e "s/assert_response :created/assert_response $rendered_success_status/" \
+    "$tmp/rendered-form-success-$rendered_success_status_slug-workspace/eval_app/test/integration/subscriptions_test.rb"
+  mkdir "$tmp/rendered-form-success-$rendered_success_status_slug-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+    "$tmp/rendered-form-success-$rendered_success_status_slug-workspace" \
+    "$tmp/rendered-form-success-$rendered_success_status_slug-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/rendered-form-success-$rendered_success_status_slug-output/rubric-results.json")" = pass
+  done
+done
+
+rendered_success_regex_assertions=(
+  '    assert_match /Thanks/, response.body'
+  '    assert_match %r{Thanks}, response.body'
+  '    assert_match /Thanks, Marie Curie!/, response.body'
+  '    assert_match /thanks/i, response.body'
+)
+rendered_success_regex_assertion_index=0
+for success_assertion in "${rendered_success_regex_assertions[@]}"; do
+  rendered_success_regex_assertion_index=$((rendered_success_regex_assertion_index + 1))
+  cp -R "$tmp/rendered-form-success-workspace" \
+    "$tmp/rendered-form-success-regex-$rendered_success_regex_assertion_index-workspace"
+  ruby -e '
+    path, assertion = ARGV
+    content = File.read(path)
+    abort unless content.sub!(%q{    assert_includes response.body, "Thanks, Marie Curie!"}, assertion)
+    File.write(path, content)
+  ' \
+    "$tmp/rendered-form-success-regex-$rendered_success_regex_assertion_index-workspace/eval_app/test/integration/subscriptions_test.rb" \
+    "$success_assertion"
+  ruby -c \
+    "$tmp/rendered-form-success-regex-$rendered_success_regex_assertion_index-workspace/eval_app/test/integration/subscriptions_test.rb" \
+    >/dev/null
+  mkdir "$tmp/rendered-form-success-regex-$rendered_success_regex_assertion_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+    "$tmp/rendered-form-success-regex-$rendered_success_regex_assertion_index-workspace" \
+    "$tmp/rendered-form-success-regex-$rendered_success_regex_assertion_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/rendered-form-success-regex-$rendered_success_regex_assertion_index-output/rubric-results.json")" = pass
+  done
+done
+
+cp -R "$tmp/rendered-form-success-workspace" "$tmp/rendered-form-literal-path-workspace"
+perl -0pi -e 's/subscriptions_path/"\/project_intake"/g' \
+  "$tmp/rendered-form-literal-path-workspace/eval_app/test/integration/subscriptions_test.rb"
+mkdir "$tmp/rendered-form-literal-path-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+  "$tmp/rendered-form-literal-path-workspace" "$tmp/rendered-form-literal-path-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/rendered-form-literal-path-output/rubric-results.json")" = pass
+done
+
+cp -R "$tmp/rendered-form-success-workspace" "$tmp/rendered-form-helper-arguments-workspace"
+perl -0pi -e 's/subscriptions_path/project_subscriptions_path(\@project)/g' \
+  "$tmp/rendered-form-helper-arguments-workspace/eval_app/test/integration/subscriptions_test.rb"
+mkdir "$tmp/rendered-form-helper-arguments-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+  "$tmp/rendered-form-helper-arguments-workspace" "$tmp/rendered-form-helper-arguments-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/rendered-form-helper-arguments-output/rubric-results.json")" = pass
+done
+
+cp -R "$tmp/rendered-form-success-workspace" "$tmp/rendered-form-empty-helper-workspace"
+perl -0pi -e 's/subscriptions_path/subscriptions_path()/g' \
+  "$tmp/rendered-form-empty-helper-workspace/eval_app/test/integration/subscriptions_test.rb"
+mkdir "$tmp/rendered-form-empty-helper-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+  "$tmp/rendered-form-empty-helper-workspace" "$tmp/rendered-form-empty-helper-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/rendered-form-empty-helper-output/rubric-results.json")" = pass
+done
+
+cp -R "$tmp/rendered-form-success-workspace" "$tmp/rendered-form-hash-rocket-workspace"
+printf '%s\n' \
+  'class SubscriptionsTest < ActionDispatch::IntegrationTest' \
+  '  test "server-side validation failure re-renders the form with error messages" do' \
+  '    post subscriptions_path, params: {' \
+  '      :subscriber => {' \
+  '        :name => "",' \
+  '        :email => "bad"' \
+  '      }' \
+  '    }' \
+  '    assert_response :unprocessable_entity' \
+  '    assert_match "must be a valid email address", response.body' \
+  '  end' \
+  '  test "successful submission shows the success summary" do' \
+  '    post subscriptions_path, params: {' \
+  '      :subscriber => {' \
+  '        :name => "Marie Curie",' \
+  '        :email => "marie@example.com"' \
+  '      }' \
+  '    }' \
+  '    assert_response :created' \
+  '    assert_includes response.body, "Thanks, Marie Curie!"' \
+  '  end' \
+  'end' >"$tmp/rendered-form-hash-rocket-workspace/eval_app/test/integration/subscriptions_test.rb"
+mkdir "$tmp/rendered-form-hash-rocket-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+  "$tmp/rendered-form-hash-rocket-workspace" "$tmp/rendered-form-hash-rocket-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/rendered-form-hash-rocket-output/rubric-results.json")" = pass
+done
+
+cp -R "$tmp/rendered-form-success-workspace" "$tmp/rendered-form-near-miss-workspace"
+perl -0pi -e 's/assert_response :created/assert_response_count = 1\n    assert_response :created/' \
+  "$tmp/rendered-form-near-miss-workspace/eval_app/test/integration/subscriptions_test.rb"
+mkdir "$tmp/rendered-form-near-miss-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+  "$tmp/rendered-form-near-miss-workspace" "$tmp/rendered-form-near-miss-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/rendered-form-near-miss-output/rubric-results.json")" = pass
+done
+
+rendered_form_metadata_controls=(
+  '    get = "metadata"'
+  '    verb = :get # diagnostic metadata'
+  '    options = { expected: 201 }'
+  '    MODE = :do'
+  '    [1].each do; nil; end'
+)
+rendered_form_metadata_control_index=0
+for metadata_line in "${rendered_form_metadata_controls[@]}"; do
+  rendered_form_metadata_control_index=$((rendered_form_metadata_control_index + 1))
+  cp -R "$tmp/rendered-form-success-workspace" \
+    "$tmp/rendered-form-metadata-$rendered_form_metadata_control_index-workspace"
+  ruby -e '
+    path, insertion = ARGV
+    content = File.read(path)
+    abort unless content.sub!("    assert_response :created", "#{insertion}\n    assert_response :created")
+    File.write(path, content)
+  ' "$tmp/rendered-form-metadata-$rendered_form_metadata_control_index-workspace/eval_app/test/integration/subscriptions_test.rb" \
+    "$metadata_line"
+  ruby -c \
+    "$tmp/rendered-form-metadata-$rendered_form_metadata_control_index-workspace/eval_app/test/integration/subscriptions_test.rb" \
+    >/dev/null
+  mkdir "$tmp/rendered-form-metadata-$rendered_form_metadata_control_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+    "$tmp/rendered-form-metadata-$rendered_form_metadata_control_index-workspace" \
+    "$tmp/rendered-form-metadata-$rendered_form_metadata_control_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/rendered-form-metadata-$rendered_form_metadata_control_index-output/rubric-results.json")" = pass
+  done
+done
+
+rendered_form_class_scope_controls=(
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  def self.assert_response(*)\n  end\n\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    post subscriptions_path\n    assert_response :created\n    assert_includes response.body, "Thanks"\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  class Helper\n    def assert_response(*)\n    end\n  end\n\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    post subscriptions_path\n    assert_response :created\n    assert_includes response.body, "Thanks"\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  def assert_email_sent\n    assert true\n  end\n\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    post subscriptions_path\n    assert_response :created\n    assert_includes response.body, "Thanks"\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    post subscriptions_path\n      and assert_includes(response.body, "Thanks")\n    assert_response :created\n  end\nend'
+)
+rendered_form_class_scope_control_index=0
+for form_content in "${rendered_form_class_scope_controls[@]}"; do
+  rendered_form_class_scope_control_index=$((rendered_form_class_scope_control_index + 1))
+  cp -R "$tmp/rendered-form-success-workspace" \
+    "$tmp/rendered-form-class-scope-control-$rendered_form_class_scope_control_index-workspace"
+  printf '%s\n' "$form_content" \
+    >"$tmp/rendered-form-class-scope-control-$rendered_form_class_scope_control_index-workspace/eval_app/test/integration/subscriptions_test.rb"
+  ruby -c \
+    "$tmp/rendered-form-class-scope-control-$rendered_form_class_scope_control_index-workspace/eval_app/test/integration/subscriptions_test.rb" \
+    >/dev/null
+  mkdir "$tmp/rendered-form-class-scope-control-$rendered_form_class_scope_control_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+    "$tmp/rendered-form-class-scope-control-$rendered_form_class_scope_control_index-workspace" \
+    "$tmp/rendered-form-class-scope-control-$rendered_form_class_scope_control_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/rendered-form-class-scope-control-$rendered_form_class_scope_control_index-output/rubric-results.json")" = pass
+  done
+done
+
+rendered_form_success_rejections=(
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  def ineffective(*)\n  end\n  alias :assert_response :ineffective\n  alias :post :ineffective\n\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    post subscriptions_path\n    assert_response :created\n    assert_includes response.body, "Thanks"\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  def ineffective(*)\n  end\n  alias :"assert_response" :ineffective\n  alias_method :"assert_match", :ineffective\n  define_method(:"assert_includes") { |*| }\n\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    post subscriptions_path\n    assert_response :created\n    assert_includes response.body, "Thanks"\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  send(:define_method, :assert_response) { |*| }\n  public_send(:define_method, :assert_match) { |*| }\n  class_eval { define_method(:assert_includes) { |*| } }\n\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    post subscriptions_path\n    assert_response :created\n    assert_includes response.body, "Thanks"\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  alias fetch_fixture get\n\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    fetch_fixture failure_fixture_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    post subscriptions_path\n    fetch_fixture success_fixture_path\n    assert_response :created\n    assert_includes response.body, "Thanks"\n  end\nend'
+  $'class ActionDispatch::IntegrationTest\n  def post(*)\n  end\n  def assert_response(*)\n  end\nend\n\nclass SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    post subscriptions_path\n    assert_response :created\n    assert_includes response.body, "Thanks"\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    post subscriptions_path\n    assert_response :created\n    assert_includes response.body, "Thanks"\n  end\nend\n\nclass SubscriptionsTest\n  def assert_response(*)\n  end\n  def assert_match(*)\n  end\n  def assert_includes(*)\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    post subscriptions_path\n    assert_response :created\n    assert_includes response.body, "Thanks"\n  end\nend\n\nSubscriptionsTest.class_eval { define_method(:assert_response) { |*| } }'
+  $'ActionDispatch::IntegrationTest.class_eval { define_method(:post) { |*| } }\n\nclass SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    post subscriptions_path\n    assert_response :created\n    assert_includes response.body, "Thanks"\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    post subscriptions_path\n    assert_response :created\n    assert_includes response.body, "Thanks"\n  end\nend\n\nclass ::SubscriptionsTest\n  def assert_response(*)\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  credited = :assert_response\n  define_method(credited) { |*| }\n\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    post subscriptions_path\n    assert_response :created\n    assert_includes response.body, "Thanks"\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  def method_missing(*)\n  end\n  undef_method :assert_response\n\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    post subscriptions_path\n    assert_response :created\n    assert_includes response.body, "Thanks"\n  end\nend'
+  $'module FakeAssertions\n  def assert_response(*)\n  end\nend\n\nclass SubscriptionsTest < ActionDispatch::IntegrationTest\n  prepend FakeAssertions\n\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    post subscriptions_path\n    assert_response :created\n    assert_includes response.body, "Thanks"\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_includes response.body, "Subscribe"\n  end\n  test "successful submission shows the success summary" do\n    post subscriptions_path\n    assert_response :created\n    assert_includes response.body, "Thanks"\n  end\nend'
+  $'def self.never_yield\nend\n\nnever_yield do; if true; end\nclass SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    post subscriptions_path\n    assert_response :created\n    assert_includes response.body, "Thanks"\n  end\nend\nend'
+  $'def self.never_yield\nend\n\nnever_yield {\n  CLOSE = ?}\n  class SubscriptionsTest < ActionDispatch::IntegrationTest\n    test "server-side validation failure re-renders the form with error messages" do\n      post subscriptions_path\n      assert_response :unprocessable_entity\n      assert_match "error", response.body\n    end\n    test "successful submission shows the success summary" do\n      post subscriptions_path\n      assert_response :created\n      assert_includes response.body, "Thanks"\n    end\n  end\n}'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path, params: { subscriber: { email: "" } }\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the form" do\n    post subscriptions_path, params: { subscriber: { email: "still-invalid" } }\n    assert_response :ok\n    assert_includes response.body, "Subscribe"\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path, params: { subscriber: { email: "" } }\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission succeeds" do\n    post subscriptions_path, params: { subscriber: { email: "still-invalid" } }\n    assert_response :ok\n    assert_includes response.body, "validation error"\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    post subscriptions_path\n    assert_includes response.body, "Thanks"\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_includes response.body, "Thanks"\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    post subscriptions_path\n    assert_response :created\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    post audit_logs_path\n    assert_response :created\n    assert_includes response.body, "Thanks"\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    0.times do\n      post subscriptions_path\n      assert_response :created\n      assert_includes response.body, "Thanks"\n    end\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    [].each do\n      post subscriptions_path\n      assert_response :created\n      assert_includes response.body, "Thanks"\n    end\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    [].each_with_index do\n      post subscriptions_path\n      assert_response :created\n      assert_includes response.body, "Thanks"\n    end\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    [].each.with_index do\n      post subscriptions_path\n      assert_response :created\n      assert_includes response.body, "Thanks"\n    end\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    0.times.with_index do\n      post subscriptions_path\n      assert_response :created\n      assert_includes response.body, "Thanks"\n    end\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    [].reverse_each do\n      post subscriptions_path\n      assert_response :created\n      assert_includes response.body, "Thanks"\n    end\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    [].each_slice(1) do\n      post subscriptions_path\n      assert_response :created\n      assert_includes response.body, "Thanks"\n    end\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    {}.each_key do\n      post subscriptions_path\n      assert_response :created\n      assert_includes response.body, "Thanks"\n    end\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    [].lazy.each do\n      post subscriptions_path\n      assert_response :created\n      assert_includes response.body, "Thanks"\n    end\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    [].each_with_object({}) do\n      post subscriptions_path\n      assert_response :created\n      assert_includes response.body, "Thanks"\n    end\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  def never_yield\n  end\n\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    never_yield do\n      post subscriptions_path\n      assert_response :created\n      assert_includes response.body, "Thanks"\n    end\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  def never_yield\n  end\n\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    never_yield {\n      post subscriptions_path\n      assert_response :created\n      assert_includes response.body, "Thanks"\n    }\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    [].lazy.each {\n      post subscriptions_path\n      assert_response :created\n      assert_includes response.body, "Thanks"\n    }\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    post subscriptions_path\n    assert_redirected_to subscriptions_path\n    assert_response :created\n    assert_includes response.body, "Thanks"\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    post subscriptions_path\n    assert_response :created\n    assert_response :unprocessable_entity\n    assert_includes response.body, "Thanks"\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    post subscriptions_path\n    follow_redirect! # load the destination\n    assert_response :created\n    assert_includes response.body, "Thanks"\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    post subscriptions_path, params: {\n      status_check: (\n        assert_response(:created)\n      ),\n      body_check: (\n        assert_includes(response.body, "Thanks")\n      )\n    }\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    post subscriptions_path,\n      params: {\n        status_check: (\n          assert_response(:created)\n        ),\n        body_check: (\n          assert_includes(response.body, "Thanks")\n        )\n      }\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    post subscriptions_path,\n\n      params: {\n        status_check: (\n          assert_response(:created)\n        ),\n        body_check: (\n          assert_includes(response.body, "Thanks")\n        )\n      }\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    post subscriptions_path,\n      # The request continues after this comment.
+      params: {\n        status_check: (\n          assert_response(:created)\n        ),\n        body_check: (\n          assert_includes(response.body, "Thanks")\n        )\n      }\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    post subscriptions_path, params:\n      {\n        status_check: (\n          assert_response(:created)\n        ),\n        body_check: (\n          assert_includes(response.body, "Thanks")\n        )\n      }\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post failure_endpoint_path, params: { decoy: (\n      post subscriptions_path\n    ) }\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    post success_endpoint_path, params: { decoy: (\n      post subscriptions_path\n    ) }\n    assert_response :created\n    assert_includes response.body, "Thanks"\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    failure_endpoint = "/failure"\n    post failure_endpoint, params: { decoy: (\npost subscriptions_path\n    ) }\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    success_endpoint = "/success"\n    post success_endpoint, params: { decoy: (\npost subscriptions_path\n    ) }\n    assert_response :created\n    assert_includes response.body, "Thanks"\n  end\nend'
+  $'class String\n  def preserve_route(*_arguments)\n    self\n  end\nend\n\nclass SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post failure_fixture_path\n    post subscriptions_path\n      .preserve_route(\n        assert_response(:unprocessable_entity),\n        assert_match("error", response.body)\n      )\n  end\n  test "successful submission shows the success summary" do\n    post success_fixture_path\n    post subscriptions_path\n      .preserve_route(\n        assert_response(:created),\n        assert_includes(response.body, "Thanks")\n      )\n  end\nend'
+  $'class String\n  def preserve_route(*_arguments)\n    self\n  end\nend\n\nclass SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post failure_fixture_path\n    post subscriptions_path\n      &.preserve_route(\n        assert_response(:unprocessable_entity),\n        assert_match("error", response.body)\n      )\n  end\n  test "successful submission shows the success summary" do\n    post success_fixture_path\n    post subscriptions_path\n      &.preserve_route(\n        assert_response(:created),\n        assert_includes(response.body, "Thanks")\n      )\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  def never_yield\n  end\n\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    never_yield \\\n      {\n        post subscriptions_path\n        assert_response :created\n        assert_includes response.body, "Thanks"\n      }\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    post subscriptions_path\n    [].each { nil; assert_response(:created) }\n    assert_includes response.body, "Thanks"\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  def never_yield\n  end\n\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    post subscriptions_path\n    never_yield do; nil; assert_response(:created)\n    end\n    assert_includes response.body, "Thanks"\n  end\nend'
+  $'def self.never_yield\n  end\n\nnever_yield {\n  class SubscriptionsTest < ActionDispatch::IntegrationTest\n    test "server-side validation failure re-renders the form with error messages" do\n      post subscriptions_path\n      assert_response :unprocessable_entity\n      assert_match "error", response.body\n    end\n    test "successful submission shows the success summary" do\n      post subscriptions_path\n      assert_response :created\n      assert_includes response.body, "Thanks"\n    end\n  end\n}'
+  $'[].lazy.each {\n  class SubscriptionsTest < ActionDispatch::IntegrationTest\n    test "server-side validation failure re-renders the form with error messages" do\n      post subscriptions_path\n      assert_response :unprocessable_entity\n      assert_match "error", response.body\n    end\n    test "successful submission shows the success summary" do\n      post subscriptions_path\n      assert_response :created\n      assert_includes response.body, "Thanks"\n    end\n  end\n}'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    post subscriptions_path\n    self.get success_fixture_path\n    assert_response :created\n    assert_includes response.body, "Thanks"\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    post subscriptions_path\n    self&.get success_fixture_path\n    assert_response :created\n    assert_includes response.body, "Thanks"\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    post subscriptions_path\n    self\n      .get success_fixture_path\n    assert_response :created\n    assert_includes response.body, "Thanks"\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    post subscriptions_path\n    process :get, success_fixture_path\n    assert_response :created\n    assert_includes response.body, "Thanks"\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    post subscriptions_path\n    nil; get success_fixture_path\n    assert_response :created\n    assert_includes response.body, "Thanks"\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    post subscriptions_path\n    other_response = get success_fixture_path\n    assert_response :created\n    assert_includes response.body, "Thanks"\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    post subscriptions_path\n    other_response = self.get success_fixture_path\n    assert_response :created\n    assert_includes response.body, "Thanks"\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    post subscriptions_path\n    (self).get success_fixture_path\n    assert_response :created\n    assert_includes response.body, "Thanks"\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    post subscriptions_path\n    @integration_session.get success_fixture_path\n    assert_response :created\n    assert_includes response.body, "Thanks"\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    send(:get, failure_fixture_path)\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    post subscriptions_path\n    assert_response :created\n    assert_includes response.body, "Thanks"\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    public_send(:get, failure_fixture_path)\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    post subscriptions_path\n    assert_response :created\n    assert_includes response.body, "Thanks"\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  [].lazy.each do; nil\n    test "server-side validation failure re-renders the form with error messages" do\n      post subscriptions_path\n      assert_response :unprocessable_entity\n      assert_match "error", response.body\n    end\n    test "successful submission shows the success summary" do\n      post subscriptions_path\n      assert_response :created\n      assert_includes response.body, "Thanks"\n    end\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  def self.never_yield\n  end\n\n  never_yield do; {}\n    test "server-side validation failure re-renders the form with error messages" do\n      post subscriptions_path\n      assert_response :unprocessable_entity\n      assert_match "error", response.body\n    end\n    test "successful submission shows the success summary" do\n      post subscriptions_path\n      assert_response :created\n      assert_includes response.body, "Thanks"\n    end\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  def assert_response(*)\n    assert true\n  end\n\n  def assert_match(*)\n    assert true\n  end\n\n  def assert_includes(*)\n    assert true\n  end\n\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    post subscriptions_path\n    assert_response :created\n    assert_includes response.body, "Thanks"\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  def ineffective(*)\n    assert true\n  end\n\n  alias assert_response ineffective\n  alias_method :assert_match, :ineffective\n  define_method(:assert_includes) { |*| assert true }\n\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    post subscriptions_path\n    assert_response :created\n    assert_includes response.body, "Thanks"\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  def post(*)\n  end\n\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    post subscriptions_path\n    assert_response :created\n    assert_includes response.body, "Thanks"\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    get failure_fixture_path\n    post subscriptions_path,\n      params: true &\n        assert_response(:unprocessable_entity) &\n        assert_match("error", response.body)\n  end\n  test "successful submission shows the success summary" do\n    get success_fixture_path\n    post subscriptions_path,\n      params: true &\n        assert_response(:created) &\n        assert_includes(response.body, "Thanks")\n  end\nend'
+  $'class FakeAssertions\n  def assert_response(*)\n  end\n\n  def assert_includes(*)\n  end\nend\n\nclass SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    post subscriptions_path\n    fake = FakeAssertions.new\n    fake.\n      assert_response :created\n    fake.\n      assert_includes response.body, "Thanks"\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    post subscriptions_path, params: {}; post success_fixture_path\n    assert_response :created\n    assert_includes response.body, "Thanks"\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    post subscriptions_path, params: { decoy: (\n      post success_fixture_path\n    ) }\n    assert_response :created\n    assert_includes response.body, "Thanks"\n  end\nend'
+  $'class SubscriptionsTest < ActionDispatch::IntegrationTest\n  test "server-side validation failure re-renders the form with error messages" do\n    post subscriptions_path\n    assert_response :unprocessable_entity\n    assert_match "error", response.body\n  end\n  test "successful submission shows the success summary" do\n    post subscriptions_path\n    assert_response 200 + 222\n    assert_includes response.body, "Thanks"\n  end\nend'
+)
+rendered_form_success_rejection_index=0
+for form_content in "${rendered_form_success_rejections[@]}"; do
+  rendered_form_success_rejection_index=$((rendered_form_success_rejection_index + 1))
+  cp -R "$tmp/rendered-form-success-workspace" \
+    "$tmp/rendered-form-success-rejection-$rendered_form_success_rejection_index-workspace"
+  printf '%s\n' "$form_content" \
+    >"$tmp/rendered-form-success-rejection-$rendered_form_success_rejection_index-workspace/eval_app/test/integration/subscriptions_test.rb"
+  mkdir "$tmp/rendered-form-success-rejection-$rendered_form_success_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+    "$tmp/rendered-form-success-rejection-$rendered_form_success_rejection_index-workspace" \
+    "$tmp/rendered-form-success-rejection-$rendered_form_success_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/rendered-form-success-rejection-$rendered_form_success_rejection_index-output/rubric-results.json")" = unknown
+  done
+done
+
+rendered_form_hidden_response_requests=(
+  '    probe = "#{get success_fixture_path}"'
+  $'    probe = <<~TEXT\n      #{get success_fixture_path}\n    TEXT'
+  '    probe = /#{get success_fixture_path}/'
+  '    ratio = 1 / (get(success_fixture_path); 1) / 1'
+  '    self::get success_fixture_path'
+  $'    probe = %Q{\n      #{get success_fixture_path}\n    }'
+  $'    probe = %r{\n      #{get success_fixture_path}\n    }'
+  '    (self)::get success_fixture_path'
+  '    @integration_session::get success_fixture_path'
+  '    session::get success_fixture_path'
+)
+rendered_form_hidden_response_request_index=0
+for hidden_request in "${rendered_form_hidden_response_requests[@]}"; do
+  rendered_form_hidden_response_request_index=$((rendered_form_hidden_response_request_index + 1))
+  cp -R "$tmp/rendered-form-success-workspace" \
+    "$tmp/rendered-form-hidden-response-request-$rendered_form_hidden_response_request_index-workspace"
+  ruby -e '
+    path, insertion = ARGV
+    content = File.read(path)
+    abort unless content.sub!(%q{    assert_response :created}, "#{insertion}\n    assert_response :created")
+    File.write(path, content)
+  ' \
+    "$tmp/rendered-form-hidden-response-request-$rendered_form_hidden_response_request_index-workspace/eval_app/test/integration/subscriptions_test.rb" \
+    "$hidden_request"
+  ruby -c \
+    "$tmp/rendered-form-hidden-response-request-$rendered_form_hidden_response_request_index-workspace/eval_app/test/integration/subscriptions_test.rb" \
+    >/dev/null
+  mkdir "$tmp/rendered-form-hidden-response-request-$rendered_form_hidden_response_request_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+    "$tmp/rendered-form-hidden-response-request-$rendered_form_hidden_response_request_index-workspace" \
+    "$tmp/rendered-form-hidden-response-request-$rendered_form_hidden_response_request_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/rendered-form-hidden-response-request-$rendered_form_hidden_response_request_index-output/rubric-results.json")" = unknown
+  done
+done
+
+# Typographic apostrophes exercise literal Ruby source rather than escaped text.
+# shellcheck disable=SC1112
+rendered_form_contradictory_success_literals=(
+  'Submission failed, thanks anyway'
+  'Submission not successful'
+  'Submission was not completed'
+  'Submission was not saved'
+  "Submission wasn't saved"
+  "Submission wasn't completed"
+  "Submission isn't successful"
+  "Submissions weren't saved"
+  'Submission wasn’t saved'
+  'Submission isn’t successful'
+)
+rendered_form_contradictory_success_index=0
+for success_literal in "${rendered_form_contradictory_success_literals[@]}"; do
+  rendered_form_contradictory_success_index=$((rendered_form_contradictory_success_index + 1))
+  cp -R "$tmp/rendered-form-success-workspace" \
+    "$tmp/rendered-form-contradictory-success-$rendered_form_contradictory_success_index-workspace"
+  ruby -e '
+    path, literal = ARGV
+    content = File.read(path)
+    abort unless content.sub!(%q{Thanks, Marie Curie!}, literal)
+    File.write(path, content)
+  ' \
+    "$tmp/rendered-form-contradictory-success-$rendered_form_contradictory_success_index-workspace/eval_app/test/integration/subscriptions_test.rb" \
+    "$success_literal"
+  ruby -c \
+    "$tmp/rendered-form-contradictory-success-$rendered_form_contradictory_success_index-workspace/eval_app/test/integration/subscriptions_test.rb" \
+    >/dev/null
+  mkdir "$tmp/rendered-form-contradictory-success-$rendered_form_contradictory_success_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+    "$tmp/rendered-form-contradictory-success-$rendered_form_contradictory_success_index-workspace" \
+    "$tmp/rendered-form-contradictory-success-$rendered_form_contradictory_success_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    contradictory_success_status="$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/rendered-form-contradictory-success-$rendered_form_contradictory_success_index-output/rubric-results.json")"
+    if [[ "$contradictory_success_status" != unknown ]]; then
+      echo "contradictory success $rendered_form_contradictory_success_index ($success_literal) left $row=$contradictory_success_status" \
+        >&2
+      exit 1
+    fi
+  done
+done
+
+cp -R "$tmp/rendered-form-success-workspace" "$tmp/rendered-form-contradictory-error-workspace"
+perl -0pi -e 's/must be a valid email address/Error-free submission/' \
+  "$tmp/rendered-form-contradictory-error-workspace/eval_app/test/integration/subscriptions_test.rb"
+ruby -c "$tmp/rendered-form-contradictory-error-workspace/eval_app/test/integration/subscriptions_test.rb" >/dev/null
+mkdir "$tmp/rendered-form-contradictory-error-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+  "$tmp/rendered-form-contradictory-error-workspace" "$tmp/rendered-form-contradictory-error-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/rendered-form-contradictory-error-output/rubric-results.json")" = unknown
+done
+
+rendered_form_explicit_mutations=(
+  $'module FakeAssertions\n  def assert_response(*)\n  end\n\n  def assert_match(*)\n  end\n\n  def assert_includes(*)\n  end\nend\nSubscriptionsTest.prepend FakeAssertions'
+  $'module IneffectiveIntegrationMethods\n  def post(*)\n  end\n\n  def assert_response(*)\n  end\n\n  def assert_match(*)\n  end\n\n  def assert_includes(*)\n  end\nend\nActionDispatch::IntegrationTest.prepend(IneffectiveIntegrationMethods)'
+)
+rendered_form_explicit_mutation_index=0
+for explicit_mutation in "${rendered_form_explicit_mutations[@]}"; do
+  rendered_form_explicit_mutation_index=$((rendered_form_explicit_mutation_index + 1))
+  cp -R "$tmp/rendered-form-success-workspace" \
+    "$tmp/rendered-form-explicit-mutation-$rendered_form_explicit_mutation_index-workspace"
+  printf '\n%s\n' "$explicit_mutation" \
+    >>"$tmp/rendered-form-explicit-mutation-$rendered_form_explicit_mutation_index-workspace/eval_app/test/integration/subscriptions_test.rb"
+  ruby -c \
+    "$tmp/rendered-form-explicit-mutation-$rendered_form_explicit_mutation_index-workspace/eval_app/test/integration/subscriptions_test.rb" \
+    >/dev/null
+  mkdir "$tmp/rendered-form-explicit-mutation-$rendered_form_explicit_mutation_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+    "$tmp/rendered-form-explicit-mutation-$rendered_form_explicit_mutation_index-workspace" \
+    "$tmp/rendered-form-explicit-mutation-$rendered_form_explicit_mutation_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/rendered-form-explicit-mutation-$rendered_form_explicit_mutation_index-output/rubric-results.json")" = unknown
+  done
+done
+
+rendered_form_reflective_mutations=(
+  $'module FakeAssertions\n  def post(*) = nil\n  def assert_response(*) = nil\n  def assert_match(*) = nil\n  def assert_includes(*) = nil\nend\nmutation = :prepend\nActionDispatch::IntegrationTest.public_send(mutation, FakeAssertions)'
+  $'module FakeAssertions\n  def post(*) = nil\n  def assert_response(*) = nil\n  def assert_match(*) = nil\n  def assert_includes(*) = nil\nend\ntarget = ActionDispatch::IntegrationTest\ntarget.public_send(:prepend, FakeAssertions)'
+  $'module FakeAssertions\n  def post(*) = nil\n  def assert_response(*) = nil\n  def assert_match(*) = nil\n  def assert_includes(*) = nil\nend\nActionDispatch::IntegrationTest.public_method(:prepend).call(FakeAssertions)'
+  'ActionDispatch::IntegrationTest.public_send(:define_singleton_method, :test) { |*| }'
+  $'method_name = :define_singleton_method\nActionDispatch::IntegrationTest::public_send(method_name, :test) { |*| }'
+  $'ActionDispatch::IntegrationTest\n  .public_send(:singleton_class)\n  .public_send(:define_method, :test) { |*| }'
+  $'ActionDispatch::IntegrationTest\n  .singleton_class\n  .method(:define_method)\n  .call(:test) { |*| }'
+  $'module FakeAssertions\n  def post(*) = nil\n  def assert_response(*) = nil\n  def assert_match(*) = nil\n  def assert_includes(*) = nil\nend\ntarget = ActionDispatch::IntegrationTest; target.public_send(:prepend, FakeAssertions)'
+  $'target = ActionDispatch::IntegrationTest\ntarget.define_method(:assert_response) { |*| true }'
+  $'module FakeAssertions\n  def post(*) = nil\n  def assert_response(*) = nil\n  def assert_match(*) = nil\n  def assert_includes(*) = nil\nend\ntarget = ActionDispatch::IntegrationTest\ntarget.prepend(FakeAssertions)'
+  $'target = ActionDispatch::IntegrationTest\ntarget.singleton_class.define_method(:test) { |*| }'
+  $'ActionDispatch::IntegrationTest.class_eval <<~CODE\n  def assert_response(*) = true\nCODE'
+  'ActionDispatch::IntegrationTest.class_eval("def assert_response(*) = true")'
+  $'target = ActionDispatch::IntegrationTest\ntarget.class_eval <<~CODE\n  def assert_response(*) = true\nCODE'
+  $'override = "def assert_response(*) = true"\nActionDispatch::IntegrationTest.class_eval(override)'
+  $'target = ActionDispatch::IntegrationTest\ntarget.class_eval do\n  def assert_response(*) = true\nend'
+  $'target = ActionDispatch::IntegrationTest\ntarget.class_eval { define_method(:assert_response) { |*| true } }'
+  $'override = "def assert_response(*) = true"\nActionDispatch::IntegrationTest.module_eval(override)'
+  $'override = "def assert_response(*) = true"\nActionDispatch::IntegrationTest\n  .class_eval(override)'
+  $'override = "def assert_response(*) = true"\n(ActionDispatch::IntegrationTest).class_eval(override)'
+  $'override = "def assert_response(*) = true"\ntarget = ActionDispatch::IntegrationTest\ntarget&.class_eval(override)'
+  $'override = "def assert_response(*) = true"\nActionDispatch::IntegrationTest.send(:class_eval, override)'
+  $'override = "def assert_response(*) = true"\nActionDispatch::IntegrationTest.public_method(:class_eval).call(override)'
+  'ActionDispatch::IntegrationTest.class_exec { define_method(:assert_response) { |*| true } }'
+  $'target = ActionDispatch::IntegrationTest\ntarget.module_exec do\n  define_method(:assert_response) { |*| true }\nend'
+  $'module FakeAssertions\n  def assert_response(*) = nil\nend\ntarget = (ActionDispatch::IntegrationTest)\ntarget.prepend(FakeAssertions)'
+  $'module FakeAssertions\n  def assert_response(*) = nil\nend\ntarget =\n  ActionDispatch::IntegrationTest\ntarget.prepend(FakeAssertions)'
+  $'module FakeAssertions\n  def assert_response(*) = nil\nend\nbase = ActionDispatch::IntegrationTest\ntarget = base\ntarget.prepend(FakeAssertions)'
+  $'module FakeAssertions\n  def assert_response(*) = nil\nend\nTarget = ActionDispatch::IntegrationTest\nTarget.prepend(FakeAssertions)'
+  $'override = "def assert_response(*) = true"\nActionDispatch::IntegrationTest.tap { |target| target.class_eval(override) }'
+  $'Object.const_get(:ActionDispatch).const_get(:IntegrationTest).class_eval do\n  def post(*) = nil\n  def assert_response(*) = true\n  def assert_match(*) = true\n  def assert_includes(*) = true\nend'
+  $'ActionDispatch.const_get("IntegrationTest").class_eval do\n  def post(*) = nil\n  def assert_response(*) = true\n  def assert_match(*) = true\n  def assert_includes(*) = true\nend'
+  $'Object.const_get("ActionDispatch::IntegrationTest").class_eval do\n  def post(*) = nil\n  def assert_response(*) = true\n  def assert_match(*) = true\n  def assert_includes(*) = true\nend'
+  $'Object\n  .const_get(\n    :ActionDispatch\n  )\n  .const_get(\n    "IntegrationTest"\n  )\n  .class_eval do\n    def post(*) = nil\n    def assert_response(*) = true\n    def assert_match(*) = true\n    def assert_includes(*) = true\n  end'
+  $'Object.const_get(:ActionDispatch, false).const_get(:IntegrationTest, false).class_eval do\n  def assert_response(*) = true\nend'
+  $'ActionDispatch.const_get(:"IntegrationTest").class_eval do\n  def assert_response(*) = true\nend'
+  $'Minitest.const_get(:Assertions).class_eval do\n  def assert_match(*) = true\n  def assert_includes(*) = true\nend'
+  $'ActionDispatch.const_get(:Assertions).const_get(:ResponseAssertions).class_eval do\n  def assert_response(*) = true\nend'
+  $'::Object.const_get(:Object, true).const_get("Object", false).const_get(:"ActionDispatch").const_get("IntegrationTest", true).class_eval do\n  def post(*) = nil\nend'
+  $'::Object&.const_get(:ActionDispatch, false)&.const_get(:IntegrationTest, true).class_eval do\n  def assert_response(*) = true\nend'
+  $'::Object&.const_get("Minitest")&.const_get(:"Assertions", false).module_eval do\n  def assert_response(*) = true\nend'
+  $'::ActionDispatch&.const_get(:Assertions)&.const_get("ResponseAssertions", true).class_exec do\n  def assert_response(*) = true\nend'
+)
+rendered_form_reflective_mutation_index=0
+for reflective_mutation in "${rendered_form_reflective_mutations[@]}"; do
+  rendered_form_reflective_mutation_index=$((rendered_form_reflective_mutation_index + 1))
+  cp -R "$tmp/rendered-form-success-workspace" \
+    "$tmp/rendered-form-reflective-mutation-$rendered_form_reflective_mutation_index-workspace"
+  printf '\n%s\n' "$reflective_mutation" \
+    >>"$tmp/rendered-form-reflective-mutation-$rendered_form_reflective_mutation_index-workspace/eval_app/test/integration/subscriptions_test.rb"
+  ruby -c \
+    "$tmp/rendered-form-reflective-mutation-$rendered_form_reflective_mutation_index-workspace/eval_app/test/integration/subscriptions_test.rb" \
+    >/dev/null
+  mkdir "$tmp/rendered-form-reflective-mutation-$rendered_form_reflective_mutation_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+    "$tmp/rendered-form-reflective-mutation-$rendered_form_reflective_mutation_index-workspace" \
+    "$tmp/rendered-form-reflective-mutation-$rendered_form_reflective_mutation_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    reflective_mutation_status="$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/rendered-form-reflective-mutation-$rendered_form_reflective_mutation_index-output/rubric-results.json")"
+    if [[ "$reflective_mutation_status" != unknown ]]; then
+      echo "reflective mutation $rendered_form_reflective_mutation_index left $row=$reflective_mutation_status" >&2
+      exit 1
+    fi
+  done
+done
+
+rendered_form_framework_ancestor_mutations=(
+  $'module ActionDispatch::Assertions::ResponseAssertions\n  def assert_response(*) = true\nend\nmodule Minitest::Assertions\n  def assert_match(*) = true\n  def assert_includes(*) = true\nend'
+  $'module ActionDispatch::Integration::Runner\n  def post(*) = nil\nend'
+  $'module ActionDispatch::Integration::RequestHelpers\n  def post(*) = nil\nend'
+  $'class ActionDispatch::Integration::Session\n  def post(*) = nil\nend'
+  $'module ActionDispatch::IntegrationTest::Behavior\n  def post(*) = nil\nend'
+  $'module ActionDispatch::Assertions\n  def assert_response(*) = true\nend'
+  $'module ActiveSupport::Testing::Assertions\n  def assert_match(*) = true\nend'
+  $'module ActionController::TemplateAssertions\n  def assert_includes(*) = true\nend'
+  $'module Rails::Dom::Testing::Assertions\n  def assert_response(*) = true\nend'
+)
+rendered_form_framework_ancestor_mutation_index=0
+for framework_ancestor_mutation in "${rendered_form_framework_ancestor_mutations[@]}"; do
+  rendered_form_framework_ancestor_mutation_index=$((rendered_form_framework_ancestor_mutation_index + 1))
+  cp -R "$tmp/rendered-form-success-workspace" \
+    "$tmp/rendered-form-framework-ancestor-mutation-$rendered_form_framework_ancestor_mutation_index-workspace"
+  printf '\n%s\n' "$framework_ancestor_mutation" \
+    >>"$tmp/rendered-form-framework-ancestor-mutation-$rendered_form_framework_ancestor_mutation_index-workspace/eval_app/test/integration/subscriptions_test.rb"
+  ruby -c \
+    "$tmp/rendered-form-framework-ancestor-mutation-$rendered_form_framework_ancestor_mutation_index-workspace/eval_app/test/integration/subscriptions_test.rb" \
+    >/dev/null
+  mkdir "$tmp/rendered-form-framework-ancestor-mutation-$rendered_form_framework_ancestor_mutation_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+    "$tmp/rendered-form-framework-ancestor-mutation-$rendered_form_framework_ancestor_mutation_index-workspace" \
+    "$tmp/rendered-form-framework-ancestor-mutation-$rendered_form_framework_ancestor_mutation_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/rendered-form-framework-ancestor-mutation-$rendered_form_framework_ancestor_mutation_index-output/rubric-results.json")" = unknown
+  done
+done
+
+rendered_form_interpolated_mutations=(
+  'probe = "#{ActionDispatch::IntegrationTest.define_method(:assert_response) { |*| true }}"'
+  'probe = "\\#{ActionDispatch::IntegrationTest.define_method(:assert_response) { |*| true }}"'
+  'probe = %Q{#{ActionDispatch::IntegrationTest.define_method(:assert_response) { |*| true }}}'
+  'probe = %Q{\\#{ActionDispatch::IntegrationTest.define_method(:assert_response) { |*| true }}}'
+  'probe = /#{ActionDispatch::IntegrationTest.define_method(:assert_response) { |*| true }}/'
+  'probe = /\\#{ActionDispatch::IntegrationTest.define_method(:assert_response) { |*| true }}/'
+  $'probe = `#{ActionDispatch::IntegrationTest.define_method(:assert_response) { |*| true }; "true"}`'
+  $'probe = `true\n#{ActionDispatch::IntegrationTest.define_method(:assert_response) { |*| true }; "true"}`'
+  'probe = %x{#{ActionDispatch::IntegrationTest.define_method(:assert_response) { |*| true }; "true"}}'
+  'probe = "#{class ActionDispatch::IntegrationTest; def assert_response(*) = true; end}"'
+  $'probe = "#{\n  target = ActionDispatch::IntegrationTest\n  target.define_method(:assert_response) { |*| true }\n}"'
+  $'probe = %Q{#{\n  target = ActionDispatch::IntegrationTest\n  target.define_method(:assert_response) { |*| true }\n}}'
+  $'probe = /#{\n  target = ActionDispatch::IntegrationTest\n  target.define_method(:assert_response) { |*| true }\n}/'
+  $'probe = <<~TEXT\n  #{\n    target = ActionDispatch::IntegrationTest\n    target.define_method(:assert_response) { |*| true }\n  }\nTEXT'
+)
+rendered_form_interpolated_mutation_index=0
+for interpolated_mutation in "${rendered_form_interpolated_mutations[@]}"; do
+  rendered_form_interpolated_mutation_index=$((rendered_form_interpolated_mutation_index + 1))
+  ruby -e '
+    module ActionDispatch
+      class IntegrationTest
+        def assert_response(*) = :original
+      end
+    end
+    eval(ARGV.fetch(0))
+    abort unless ActionDispatch::IntegrationTest.new.assert_response == true
+  ' "$interpolated_mutation"
+  cp -R "$tmp/rendered-form-success-workspace" \
+    "$tmp/rendered-form-interpolated-mutation-$rendered_form_interpolated_mutation_index-workspace"
+  printf '\n%s\n' "$interpolated_mutation" \
+    >>"$tmp/rendered-form-interpolated-mutation-$rendered_form_interpolated_mutation_index-workspace/eval_app/test/integration/subscriptions_test.rb"
+  ruby -c \
+    "$tmp/rendered-form-interpolated-mutation-$rendered_form_interpolated_mutation_index-workspace/eval_app/test/integration/subscriptions_test.rb" \
+    >/dev/null
+  mkdir "$tmp/rendered-form-interpolated-mutation-$rendered_form_interpolated_mutation_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+    "$tmp/rendered-form-interpolated-mutation-$rendered_form_interpolated_mutation_index-workspace" \
+    "$tmp/rendered-form-interpolated-mutation-$rendered_form_interpolated_mutation_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/rendered-form-interpolated-mutation-$rendered_form_interpolated_mutation_index-output/rubric-results.json")" = unknown
+  done
+done
+
+cp -R "$tmp/rendered-form-success-workspace" "$tmp/rendered-form-base-test-dsl-mutation-workspace"
+perl -0pi -e 's/class SubscriptionsTest < ActionDispatch::IntegrationTest/class ActionDispatch::IntegrationTest\n  def self.test(*) end\nend\n\nclass SubscriptionsTest < ActionDispatch::IntegrationTest/' \
+  "$tmp/rendered-form-base-test-dsl-mutation-workspace/eval_app/test/integration/subscriptions_test.rb"
+ruby -c "$tmp/rendered-form-base-test-dsl-mutation-workspace/eval_app/test/integration/subscriptions_test.rb" >/dev/null
+mkdir "$tmp/rendered-form-base-test-dsl-mutation-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+  "$tmp/rendered-form-base-test-dsl-mutation-workspace" "$tmp/rendered-form-base-test-dsl-mutation-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/rendered-form-base-test-dsl-mutation-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/rendered-form-success-workspace" "$tmp/rendered-form-eigenclass-test-dsl-mutation-workspace"
+perl -0pi -e 's/class SubscriptionsTest < ActionDispatch::IntegrationTest/class << ActionDispatch::IntegrationTest\n  def test(*) end\nend\n\nclass SubscriptionsTest < ActionDispatch::IntegrationTest/' \
+  "$tmp/rendered-form-eigenclass-test-dsl-mutation-workspace/eval_app/test/integration/subscriptions_test.rb"
+ruby -c \
+  "$tmp/rendered-form-eigenclass-test-dsl-mutation-workspace/eval_app/test/integration/subscriptions_test.rb" \
+  >/dev/null
+mkdir "$tmp/rendered-form-eigenclass-test-dsl-mutation-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+  "$tmp/rendered-form-eigenclass-test-dsl-mutation-workspace" \
+  "$tmp/rendered-form-eigenclass-test-dsl-mutation-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/rendered-form-eigenclass-test-dsl-mutation-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/rendered-form-success-workspace" "$tmp/rendered-form-singleton-test-dsl-mutation-workspace"
+perl -0pi -e 's/class SubscriptionsTest < ActionDispatch::IntegrationTest/ActionDispatch::IntegrationTest.singleton_class.define_method(:test) { |*| }\n\nclass SubscriptionsTest < ActionDispatch::IntegrationTest/' \
+  "$tmp/rendered-form-singleton-test-dsl-mutation-workspace/eval_app/test/integration/subscriptions_test.rb"
+ruby -c \
+  "$tmp/rendered-form-singleton-test-dsl-mutation-workspace/eval_app/test/integration/subscriptions_test.rb" \
+  >/dev/null
+mkdir "$tmp/rendered-form-singleton-test-dsl-mutation-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+  "$tmp/rendered-form-singleton-test-dsl-mutation-workspace" \
+  "$tmp/rendered-form-singleton-test-dsl-mutation-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/rendered-form-singleton-test-dsl-mutation-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/rendered-form-success-workspace" "$tmp/rendered-form-cross-file-mutation-workspace"
+printf '%s\n' \
+  'class ActionDispatch::IntegrationTest' \
+  '  def post(*)' \
+  '  end' \
+  '  def assert_response(*)' \
+  '  end' \
+  '  def assert_match(*)' \
+  '  end' \
+  '  def assert_includes(*)' \
+  '  end' \
+  'end' \
+  >"$tmp/rendered-form-cross-file-mutation-workspace/eval_app/test/test_helper.rb"
+ruby -c "$tmp/rendered-form-cross-file-mutation-workspace/eval_app/test/test_helper.rb" >/dev/null
+mkdir "$tmp/rendered-form-cross-file-mutation-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+  "$tmp/rendered-form-cross-file-mutation-workspace" "$tmp/rendered-form-cross-file-mutation-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/rendered-form-cross-file-mutation-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/rendered-form-success-workspace" "$tmp/rendered-form-initializer-mutation-workspace"
+mkdir -p "$tmp/rendered-form-initializer-mutation-workspace/eval_app/config/initializers"
+printf '%s\n' \
+  'class ActionDispatch::IntegrationTest' \
+  '  def post(*) = nil' \
+  '  def assert_response(*) = nil' \
+  '  def assert_match(*) = nil' \
+  '  def assert_includes(*) = nil' \
+  'end' \
+  >"$tmp/rendered-form-initializer-mutation-workspace/eval_app/config/initializers/disable_assertions.rb"
+ruby -c \
+  "$tmp/rendered-form-initializer-mutation-workspace/eval_app/config/initializers/disable_assertions.rb" \
+  >/dev/null
+mkdir "$tmp/rendered-form-initializer-mutation-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+  "$tmp/rendered-form-initializer-mutation-workspace" \
+  "$tmp/rendered-form-initializer-mutation-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+jq -e '.artifacts[] | select(.path | endswith("config/initializers/disable_assertions.rb"))' \
+  "$tmp/rendered-form-initializer-mutation-output/artifact-evidence.json" >/dev/null
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/rendered-form-initializer-mutation-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/rendered-form-success-workspace" "$tmp/rendered-form-benign-initializer-workspace"
+mkdir -p "$tmp/rendered-form-benign-initializer-workspace/eval_app/config/initializers"
+printf '%s\n' \
+  'Rails.application.config.x.eval_note = "enabled"' \
+  >"$tmp/rendered-form-benign-initializer-workspace/eval_app/config/initializers/eval_note.rb"
+ruby -c \
+  "$tmp/rendered-form-benign-initializer-workspace/eval_app/config/initializers/eval_note.rb" \
+  >/dev/null
+mkdir "$tmp/rendered-form-benign-initializer-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+  "$tmp/rendered-form-benign-initializer-workspace" \
+  "$tmp/rendered-form-benign-initializer-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+jq -e '.artifacts[] | select(.path | endswith("config/initializers/eval_note.rb"))' \
+  "$tmp/rendered-form-benign-initializer-output/artifact-evidence.json" >/dev/null
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/rendered-form-benign-initializer-output/rubric-results.json")" = pass
+done
+
+rendered_form_external_ruby_paths=(
+  'config/application.rb'
+  'lib/fake_assertions.rb'
+  'support/fake_assertions.rb'
+)
+rendered_form_external_ruby_requires=(
+  ''
+  'require_relative "../lib/fake_assertions"'
+  'require_relative "../support/fake_assertions"'
+)
+for external_ruby_index in "${!rendered_form_external_ruby_paths[@]}"; do
+  external_ruby_path="${rendered_form_external_ruby_paths[$external_ruby_index]}"
+  external_ruby_require="${rendered_form_external_ruby_requires[$external_ruby_index]}"
+  external_ruby_label="${external_ruby_path//\//-}"
+  cp -R "$tmp/rendered-form-success-workspace" \
+    "$tmp/rendered-form-external-ruby-$external_ruby_label-workspace"
+  external_ruby_file="$tmp/rendered-form-external-ruby-$external_ruby_label-workspace/eval_app/$external_ruby_path"
+  mkdir -p "$(dirname "$external_ruby_file")"
+  printf '%s\n' \
+    'class ActionDispatch::IntegrationTest' \
+    '  def post(*) = nil' \
+    '  def assert_response(*) = nil' \
+    '  def assert_match(*) = nil' \
+    '  def assert_includes(*) = nil' \
+    'end' \
+    >"$external_ruby_file"
+  ruby -c "$external_ruby_file" >/dev/null
+  if [[ -n "$external_ruby_require" ]]; then
+    printf '%s\n' "$external_ruby_require" \
+      >"$tmp/rendered-form-external-ruby-$external_ruby_label-workspace/eval_app/test/test_helper.rb"
+    ruby -c \
+      "$tmp/rendered-form-external-ruby-$external_ruby_label-workspace/eval_app/test/test_helper.rb" \
+      >/dev/null
+  fi
+  mkdir "$tmp/rendered-form-external-ruby-$external_ruby_label-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+    "$tmp/rendered-form-external-ruby-$external_ruby_label-workspace" \
+    "$tmp/rendered-form-external-ruby-$external_ruby_label-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  jq -e --arg suffix "$external_ruby_path" \
+    '.artifacts[] | select(.path | endswith($suffix))' \
+    "$tmp/rendered-form-external-ruby-$external_ruby_label-output/artifact-evidence.json" \
+    >/dev/null
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/rendered-form-external-ruby-$external_ruby_label-output/rubric-results.json")" = unknown
+  done
+done
+
+rendered_form_benign_external_ruby_paths=(
+  'config/application.rb'
+  'lib/eval_note.rb'
+  'support/eval_note.rb'
+)
+for benign_external_ruby_path in "${rendered_form_benign_external_ruby_paths[@]}"; do
+  benign_external_ruby_label="${benign_external_ruby_path//\//-}"
+  cp -R "$tmp/rendered-form-success-workspace" \
+    "$tmp/rendered-form-benign-external-ruby-$benign_external_ruby_label-workspace"
+  benign_external_ruby_file="$tmp/rendered-form-benign-external-ruby-$benign_external_ruby_label-workspace/eval_app/$benign_external_ruby_path"
+  mkdir -p "$(dirname "$benign_external_ruby_file")"
+  printf '%s\n' 'EVAL_NOTE = "enabled"' >"$benign_external_ruby_file"
+  ruby -c "$benign_external_ruby_file" >/dev/null
+  mkdir "$tmp/rendered-form-benign-external-ruby-$benign_external_ruby_label-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+    "$tmp/rendered-form-benign-external-ruby-$benign_external_ruby_label-workspace" \
+    "$tmp/rendered-form-benign-external-ruby-$benign_external_ruby_label-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  jq -e --arg suffix "$benign_external_ruby_path" \
+    '.artifacts[] | select(.path | endswith($suffix))' \
+    "$tmp/rendered-form-benign-external-ruby-$benign_external_ruby_label-output/artifact-evidence.json" \
+    >/dev/null
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/rendered-form-benign-external-ruby-$benign_external_ruby_label-output/rubric-results.json")" = pass
+  done
+done
+
+rendered_form_external_interpolation_targets=(
+  'ActionDispatch::IntegrationTest'
+  'Minitest::Assertions'
+  'ActionDispatch::Assertions::ResponseAssertions'
+  'String'
+)
+rendered_form_external_interpolation_methods=(
+  'assert_response'
+  'assert_response'
+  'assert_response'
+  'eval_note_probe'
+)
+rendered_form_external_interpolation_statuses=(
+  'unknown'
+  'unknown'
+  'unknown'
+  'pass'
+)
+for external_interpolation_index in "${!rendered_form_external_interpolation_targets[@]}"; do
+  external_interpolation_target="${rendered_form_external_interpolation_targets[$external_interpolation_index]}"
+  external_interpolation_method="${rendered_form_external_interpolation_methods[$external_interpolation_index]}"
+  external_interpolation_status="${rendered_form_external_interpolation_statuses[$external_interpolation_index]}"
+  cp -R "$tmp/rendered-form-success-workspace" \
+    "$tmp/rendered-form-external-interpolation-$external_interpolation_index-workspace"
+  external_interpolation_file="$tmp/rendered-form-external-interpolation-$external_interpolation_index-workspace/eval_app/support/interpolation_probe.rb"
+  mkdir -p "$(dirname "$external_interpolation_file")"
+  printf '%s\n' \
+    "target = $external_interpolation_target" \
+    "probe = \"#{target.define_method(:$external_interpolation_method) { |*| true }}\"" \
+    >"$external_interpolation_file"
+  ruby -c "$external_interpolation_file" >/dev/null
+  mkdir "$tmp/rendered-form-external-interpolation-$external_interpolation_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+    "$tmp/rendered-form-external-interpolation-$external_interpolation_index-workspace" \
+    "$tmp/rendered-form-external-interpolation-$external_interpolation_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  jq -e '.artifacts[] | select(.path | endswith("support/interpolation_probe.rb"))' \
+    "$tmp/rendered-form-external-interpolation-$external_interpolation_index-output/artifact-evidence.json" \
+    >/dev/null
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/rendered-form-external-interpolation-$external_interpolation_index-output/rubric-results.json")" \
+      = "$external_interpolation_status"
+  done
+done
+
+rendered_form_app_mutations=(
+  $'class ActionDispatch::IntegrationTest\n  def post(*)\n  end\n\n  def assert_response(*)\n  end\n\n  def assert_match(*)\n  end\n\n  def assert_includes(*)\n  end\nend'
+  $'module IneffectiveIntegrationMethods\n  def post(*)\n  end\n\n  def assert_response(*)\n  end\n\n  def assert_match(*)\n  end\n\n  def assert_includes(*)\n  end\nend\nActionDispatch::IntegrationTest.prepend(IneffectiveIntegrationMethods)'
+  $'module ActionDispatch\n  class IntegrationTest\n    def post(*)\n    end\n\n    def assert_response(*)\n    end\n\n    def assert_match(*)\n    end\n\n    def assert_includes(*)\n    end\n  end\nend'
+  $'module ActionDispatch\n  class IntegrationTest\n    class << self\n      def test(*) = :fake\n    end\n  end\nend'
+)
+rendered_form_app_mutation_index=0
+for app_mutation in "${rendered_form_app_mutations[@]}"; do
+  rendered_form_app_mutation_index=$((rendered_form_app_mutation_index + 1))
+  cp -R "$tmp/rendered-form-success-workspace" \
+    "$tmp/rendered-form-app-mutation-$rendered_form_app_mutation_index-workspace"
+  printf '%s\n' "$app_mutation" \
+    >"$tmp/rendered-form-app-mutation-$rendered_form_app_mutation_index-workspace/eval_app/app/models/inert_test_overrides.rb"
+  perl -0pi -e 's/class SubscriptionsTest < ActionDispatch::IntegrationTest/require_relative "..\/..\/app\/models\/inert_test_overrides"\n\nclass SubscriptionsTest < ActionDispatch::IntegrationTest/' \
+    "$tmp/rendered-form-app-mutation-$rendered_form_app_mutation_index-workspace/eval_app/test/integration/subscriptions_test.rb"
+  ruby -c \
+    "$tmp/rendered-form-app-mutation-$rendered_form_app_mutation_index-workspace/eval_app/app/models/inert_test_overrides.rb" \
+    >/dev/null
+  ruby -c \
+    "$tmp/rendered-form-app-mutation-$rendered_form_app_mutation_index-workspace/eval_app/test/integration/subscriptions_test.rb" \
+    >/dev/null
+  mkdir "$tmp/rendered-form-app-mutation-$rendered_form_app_mutation_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+    "$tmp/rendered-form-app-mutation-$rendered_form_app_mutation_index-workspace" \
+    "$tmp/rendered-form-app-mutation-$rendered_form_app_mutation_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/rendered-form-app-mutation-$rendered_form_app_mutation_index-output/rubric-results.json")" = unknown
+  done
+done
+
+cp -R "$tmp/rendered-form-success-workspace" "$tmp/rendered-form-same-line-second-request-workspace"
+perl -0pi -e 's/post subscriptions_path, params: \{ subscriber: \{ name: "Marie Curie", email: "marie\@example.com" \} \}/post subscriptions_path, params: {}; self::get success_fixture_path/' \
+  "$tmp/rendered-form-same-line-second-request-workspace/eval_app/test/integration/subscriptions_test.rb"
+ruby -c "$tmp/rendered-form-same-line-second-request-workspace/eval_app/test/integration/subscriptions_test.rb" \
+  >/dev/null
+mkdir "$tmp/rendered-form-same-line-second-request-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+  "$tmp/rendered-form-same-line-second-request-workspace" \
+  "$tmp/rendered-form-same-line-second-request-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/rendered-form-same-line-second-request-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/rendered-form-success-workspace" "$tmp/rendered-form-inactive-and-assertion-workspace"
+ruby -e '
+  path = ARGV.fetch(0)
+  content = File.read(path)
+  abort unless content.sub!(
+    %q{    assert_includes response.body, "Thanks, Marie Curie!"},
+    %Q{    false\n      and assert_includes(response.body, "Thanks, Marie Curie!")},
+  )
+  File.write(path, content)
+' "$tmp/rendered-form-inactive-and-assertion-workspace/eval_app/test/integration/subscriptions_test.rb"
+ruby -c "$tmp/rendered-form-inactive-and-assertion-workspace/eval_app/test/integration/subscriptions_test.rb" \
+  >/dev/null
+mkdir "$tmp/rendered-form-inactive-and-assertion-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+  "$tmp/rendered-form-inactive-and-assertion-workspace" \
+  "$tmp/rendered-form-inactive-and-assertion-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/rendered-form-inactive-and-assertion-output/rubric-results.json")" = unknown
+done
+
+rendered_form_mutation_syntax_controls=(
+  '# SubscriptionsTest.prepend FakeAssertions'
+  'mutation_note = "SubscriptionsTest.prepend FakeAssertions"'
+  $'module InertHelper; end\nString.extend(InertHelper)'
+  $'target = String\ntarget.define_method(:assert_response) { |*| true }'
+  $'module InertHelper; end\ntarget = String\ntarget.prepend(InertHelper)'
+  $'target = String\ntarget.singleton_class.define_method(:test) { |*| }'
+  'String.class_eval("def assert_response(*) = true")'
+  $'override = "def assert_response(*) = true"\nString\n  .class_eval(override)'
+  $'override = "def assert_response(*) = true"\n(String).class_eval(override)'
+  $'override = "def assert_response(*) = true"\ntarget = String\ntarget&.class_eval(override)'
+  $'override = "def assert_response(*) = true"\nString.send(:class_eval, override)'
+  $'override = "def assert_response(*) = true"\nString.public_method(:class_eval).call(override)'
+  'String.class_exec { define_method(:assert_response) { |*| true } }'
+  $'target = String\ntarget.module_exec do\n  define_method(:assert_response) { |*| true }\nend'
+  $'module InertHelper; end\nTarget = String\nTarget.prepend(InertHelper)'
+  $'override = "def assert_response(*) = true"\nString.tap { |target| target.class_eval(override) }'
+  'Object.const_get(:String).class_eval { define_method(:assert_response) { |*| true } }'
+  'Object.const_get("String").class_eval { define_method(:assert_response) { |*| true } }'
+  'Object.const_get(:String, false).class_eval { define_method(:assert_response) { |*| true } }'
+  'Object.const_get(:"String").class_eval { define_method(:assert_response) { |*| true } }'
+  $'module Example\n  module Assertions\n    def assert_response(*) = true\n    def assert_match(*) = true\n    def assert_includes(*) = true\n  end\nend'
+)
+rendered_form_mutation_syntax_control_index=0
+for mutation_syntax_control in "${rendered_form_mutation_syntax_controls[@]}"; do
+  rendered_form_mutation_syntax_control_index=$((rendered_form_mutation_syntax_control_index + 1))
+  cp -R "$tmp/rendered-form-success-workspace" \
+    "$tmp/rendered-form-mutation-syntax-control-$rendered_form_mutation_syntax_control_index-workspace"
+  printf '\n%s\n' "$mutation_syntax_control" \
+    >>"$tmp/rendered-form-mutation-syntax-control-$rendered_form_mutation_syntax_control_index-workspace/eval_app/test/integration/subscriptions_test.rb"
+  ruby -c \
+    "$tmp/rendered-form-mutation-syntax-control-$rendered_form_mutation_syntax_control_index-workspace/eval_app/test/integration/subscriptions_test.rb" \
+    >/dev/null
+  mkdir "$tmp/rendered-form-mutation-syntax-control-$rendered_form_mutation_syntax_control_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+    "$tmp/rendered-form-mutation-syntax-control-$rendered_form_mutation_syntax_control_index-workspace" \
+    "$tmp/rendered-form-mutation-syntax-control-$rendered_form_mutation_syntax_control_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/rendered-form-mutation-syntax-control-$rendered_form_mutation_syntax_control_index-output/rubric-results.json")" = pass
+  done
+done
+
+rendered_form_literal_controls=(
+  '    OPEN_BRACE = ?{'
+  $'    probe = %q{\n      #{get success_fixture_path}\n    }'
+  $'    probe = %Q{\\#{get success_fixture_path}}'
+  $'    probe = %Q{\n      \\#{get success_fixture_path}\n    }'
+  $'    probe = <<~TEXT\n      \\#{get success_fixture_path}\n    TEXT'
+  $'    probe = /\\#{get success_fixture_path}/'
+)
+rendered_form_literal_control_index=0
+for literal_control in "${rendered_form_literal_controls[@]}"; do
+  rendered_form_literal_control_index=$((rendered_form_literal_control_index + 1))
+  cp -R "$tmp/rendered-form-success-workspace" \
+    "$tmp/rendered-form-literal-control-$rendered_form_literal_control_index-workspace"
+  ruby -e '
+    path, insertion = ARGV
+    content = File.read(path)
+    abort unless content.sub!(%q{    assert_response :created}, "#{insertion}\n    assert_response :created")
+    File.write(path, content)
+  ' \
+    "$tmp/rendered-form-literal-control-$rendered_form_literal_control_index-workspace/eval_app/test/integration/subscriptions_test.rb" \
+    "$literal_control"
+  ruby -c \
+    "$tmp/rendered-form-literal-control-$rendered_form_literal_control_index-workspace/eval_app/test/integration/subscriptions_test.rb" \
+    >/dev/null
+  mkdir "$tmp/rendered-form-literal-control-$rendered_form_literal_control_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+    "$tmp/rendered-form-literal-control-$rendered_form_literal_control_index-workspace" \
+    "$tmp/rendered-form-literal-control-$rendered_form_literal_control_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/rendered-form-literal-control-$rendered_form_literal_control_index-output/rubric-results.json")" = pass
+  done
+done
+
+rendered_form_reflective_rejections=(
+  '    send(:assert_response, 422)'
+  '    send("assert_response", 422)'
+  '    __send__("assert_response", 422)'
+  '    public_send("assert_response", 422)'
+  '    self.assert_response 422'
+  '    method(:assert_response).call(422)'
+  '    method("assert_response").call(422)'
+  '    public_method("assert_response").call(422)'
+  '    send(:assert_redirected_to, subscriptions_path)'
+  '    send("assert_redirected_to", subscriptions_path)'
+  '    __send__("assert_redirected_to", subscriptions_path)'
+  '    public_send("assert_redirected_to", subscriptions_path)'
+  '    public_method("assert_redirected_to").call(subscriptions_path)'
+  '    send(:follow_redirect!)'
+  '    send("follow_redirect!")'
+)
+rendered_form_reflective_rejection_index=0
+for reflective_call in "${rendered_form_reflective_rejections[@]}"; do
+  rendered_form_reflective_rejection_index=$((rendered_form_reflective_rejection_index + 1))
+  cp -R "$tmp/rendered-form-success-workspace" \
+    "$tmp/rendered-form-reflective-$rendered_form_reflective_rejection_index-workspace"
+  printf '%s\n' \
+    'class SubscriptionsTest < ActionDispatch::IntegrationTest' \
+    '  test "server-side validation failure re-renders the form with error messages" do' \
+    '    post subscriptions_path' \
+    '    assert_response :unprocessable_entity' \
+    '    assert_match "error", response.body' \
+    '  end' \
+    '  test "successful submission shows the success summary" do' \
+    '    post subscriptions_path' \
+    '    assert_response :created' \
+    "$reflective_call" \
+    '    assert_includes response.body, "Thanks"' \
+    '  end' \
+    'end' \
+    >"$tmp/rendered-form-reflective-$rendered_form_reflective_rejection_index-workspace/eval_app/test/integration/subscriptions_test.rb"
+  mkdir "$tmp/rendered-form-reflective-$rendered_form_reflective_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+    "$tmp/rendered-form-reflective-$rendered_form_reflective_rejection_index-workspace" \
+    "$tmp/rendered-form-reflective-$rendered_form_reflective_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/rendered-form-reflective-$rendered_form_reflective_rejection_index-output/rubric-results.json")" = unknown
+  done
+done
+
+redirect_follow_response_rejections=(
+  $'    follow_redirect!\n    assert_response :created'
+  $'    follow_redirect!\n    assert_response :unprocessable_entity'
+  $'    follow_redirect!\n    assert_response 500'
+  $'    follow_redirect!\n    assert_response :success\n    assert_response :unprocessable_entity'
+  $'    assert_response :created\n    follow_redirect!'
+  $'    assert_response :unprocessable_entity\n    follow_redirect!\n    assert_response :success'
+)
+redirect_follow_response_rejection_index=0
+for response_sequence in "${redirect_follow_response_rejections[@]}"; do
+  redirect_follow_response_rejection_index=$((redirect_follow_response_rejection_index + 1))
+  cp -R "$tmp/rendered-form-success-workspace" \
+    "$tmp/redirect-follow-response-$redirect_follow_response_rejection_index-workspace"
+  printf '%s\n' \
+    'class SubscriptionsTest < ActionDispatch::IntegrationTest' \
+    '  test "server-side validation failure re-renders the form with error messages" do' \
+    '    post subscriptions_path' \
+    '    assert_response :unprocessable_entity' \
+    '    assert_match "error", response.body' \
+    '  end' \
+    '  test "successful submission redirects with a success message" do' \
+    '    post subscriptions_path' \
+    '    assert_redirected_to subscriptions_path' \
+    "$response_sequence" \
+    '    assert_includes response.body, "Thanks"' \
+    '  end' \
+    'end' \
+    >"$tmp/redirect-follow-response-$redirect_follow_response_rejection_index-workspace/eval_app/test/integration/subscriptions_test.rb"
+  mkdir "$tmp/redirect-follow-response-$redirect_follow_response_rejection_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+    "$tmp/redirect-follow-response-$redirect_follow_response_rejection_index-workspace" \
+    "$tmp/redirect-follow-response-$redirect_follow_response_rejection_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in form.validation tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/redirect-follow-response-$redirect_follow_response_rejection_index-output/rubric-results.json")" = unknown
+  done
+done
+
+cp -R "$tmp/claude-v8-form-workspace" "$tmp/pre-follow-body-form-workspace"
+ruby -e '
+  path = ARGV.fetch(0)
+  content = File.read(path)
+  creation_block = [
+    %q{    assert_difference("Subscriber.count", 1) do},
+    %q{      post subscriptions_path, params: { subscriber: { name: "Marie Curie", email: "marie@example.com" } }},
+    %q{    end},
+  ].join("\n") + "\n"
+  direct_post = \
+    %q{    post subscriptions_path, params: { subscriber: { name: "Marie Curie", email: "marie@example.com" } }} + "\n"
+  abort unless content.sub!(creation_block, direct_post)
+  before = [
+    %q{    assert_redirected_to subscriptions_path},
+    %q{    follow_redirect!},
+    %q{    assert_response :success},
+    %q{    assert_match "Thanks, Marie Curie!", response.body},
+  ].join("\n") + "\n"
+  after = [
+    %q{    assert_redirected_to subscriptions_path},
+    %q{    assert_match "Thanks, Marie Curie!", response.body},
+    %q{    follow_redirect!},
+    %q{    assert_response :success},
+  ].join("\n") + "\n"
+  abort unless content.sub!(before, after)
+  File.write(path, content)
+' "$tmp/pre-follow-body-form-workspace/eval_app/test/integration/subscriptions_test.rb"
+ruby -c "$tmp/pre-follow-body-form-workspace/eval_app/test/integration/subscriptions_test.rb" >/dev/null
+mkdir "$tmp/pre-follow-body-form-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+  "$tmp/pre-follow-body-form-workspace" "$tmp/pre-follow-body-form-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in form.validation tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/pre-follow-body-form-output/rubric-results.json")" = unknown
 done
 
 claude_v8_form_rejections=(
