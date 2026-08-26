@@ -1900,7 +1900,9 @@ if supervisor_case_enabled ordinary-shutdown-supervisor-death; then
   process_group="$(awk -F: '/^bundle:/ { print $3; exit }' "${bundle_log}")"
   descendant_pid="$(cat "${bundle_descendant_log}")"
   kill -TERM "${wrapper_pid}"
-  for _attempt in $(seq 1 100); do
+  # Keep this poll bound well below the five-second termination grace so the
+  # supervisor cannot escalate to KILL before the liveness assertion below.
+  for _attempt in $(seq 1 40); do
     grep -q '^termination:signal$' "${bundle_log}" && break
     sleep 0.05
   done
