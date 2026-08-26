@@ -957,6 +957,19 @@ module ReactOnRails
             end
           end
 
+          it "fails closed when parsed userinfo precedes another delayed userinfo delimiter" do
+            server_bundle_path =
+              "htps://synthetic-user:synthetic-prefix@synthetic-middle/synthetic-secret@renderer.example/path"
+            stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-prefix")
+            expect(message).not_to include("synthetic-middle")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("htps://renderer.example/path")
+          end
+
           it "fails closed when a path at sign could be delayed userinfo" do
             server_bundle_path = "htps://renderer.example/bundle@example.js"
             stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)
@@ -985,6 +998,19 @@ module ReactOnRails
             expect(message).not_to include("synthetic-user")
             expect(message).not_to include("synthetic-secret")
             expect(message).to include("http_://renderer.example/bundle.js")
+          end
+
+          [["a percent sign", "http%"], ["only digits", "123"]].each do |description, scheme|
+            it "redacts credentials when the scheme contains #{description}" do
+              server_bundle_path =
+                "#{scheme}://synthetic-user:synthetic-secret@renderer.example/bundle.js"
+              stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)
+
+              message = bundle_load_error_message
+              expect(message).not_to include("synthetic-user")
+              expect(message).not_to include("synthetic-secret")
+              expect(message).to include("#{scheme}://renderer.example/bundle.js")
+            end
           end
         end
 

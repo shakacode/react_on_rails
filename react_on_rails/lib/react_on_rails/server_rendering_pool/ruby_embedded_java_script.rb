@@ -45,7 +45,7 @@ module ReactOnRails
         | error\son\srenderer\srequest
       /xi
 
-      CONFIGURED_AUTHORITY_SCHEME_REGEX = %r{[a-z][a-z0-9+._-]*://}i
+      CONFIGURED_AUTHORITY_SCHEME_REGEX = %r{[^/\s"'?=#@]*://}
 
       class << self
         def reset_pool
@@ -484,13 +484,17 @@ module ReactOnRails
         # structurally ambiguous because a delimiter may have hidden malformed userinfo from the
         # parser. Returning nil keeps that token unprotected for the caller's fail-closed pass.
         def sanitized_valid_authority_url(url, fail_closed_after_authority: false)
+          scheme = url.match(CONFIGURED_AUTHORITY_SCHEME_REGEX)
+          scheme_suffix = url[scheme.end(0)..]
+          authority_boundary = scheme_suffix.index(%r{[/?#]})
+          if fail_closed_after_authority && authority_boundary && scheme_suffix[authority_boundary..].include?("@")
+            return nil
+          end
+
           uri = URI.parse(url)
           if uri.userinfo.nil?
-            scheme = url.match(CONFIGURED_AUTHORITY_SCHEME_REGEX)
-            scheme_suffix = url[scheme.end(0)..]
             authority = scheme_suffix.split(%r{[/?#]}, 2).first
             return uri.to_s if authority&.include?("@")
-            return nil if fail_closed_after_authority && scheme_suffix.include?("@")
 
             return url
           end
