@@ -583,6 +583,7 @@ while IFS= read -r file; do
           .github/workflows/gem-tests.yml|\
           react_on_rails/spec/react_on_rails/simplecov_helper.rb|\
           react_on_rails/spec/react_on_rails/spec_helper.rb|\
+          react_on_rails/spec/react_on_rails/support/generated_tree_approval.rb|\
           react_on_rails/spec/react_on_rails/support/generator_spec_helper.rb|\
           react_on_rails/spec/react_on_rails/support/version_test_helpers.rb|\
           react_on_rails/spec/react_on_rails/support/shared_examples/*|\

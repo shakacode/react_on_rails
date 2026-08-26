@@ -87,7 +87,7 @@ Commit: 3103496d
       https://github.com/shakacode/react_on_rails/actions/runs/26404417325
 
 To override (use only if the failures are known-unrelated to this release):
-  RELEASE_CI_STATUS_OVERRIDE=true script/release 16.2.0
+  RELEASE_CI_STATUS_OVERRIDE=true script/release
 ```
 
 In-progress checks get a separate message ("CI in progress — wait for it to finish, or override").

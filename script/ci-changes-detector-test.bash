@@ -1401,6 +1401,11 @@ test_generator_spec_helper_change_routes_generator_shard() {
     "react_on_rails/spec/react_on_rails/support/generator_spec_helper.rb"
 }
 
+test_generated_tree_approval_change_routes_generator_shard() {
+  assert_generator_spec_support_change_routes_generator_shard \
+    "react_on_rails/spec/react_on_rails/support/generated_tree_approval.rb"
+}
+
 test_generator_shared_spec_helper_change_routes_generator_shard() {
   assert_generator_spec_support_change_routes_generator_shard \
     "react_on_rails/spec/react_on_rails/spec_helper.rb"
@@ -2150,6 +2155,7 @@ run_test test_block_comment_with_trailing_code_remains_runtime_affecting
 run_test test_pro_only_changes_do_not_request_e2e
 run_test test_rspec_only_changes_do_not_request_e2e
 run_test test_generator_spec_helper_change_routes_generator_shard
+run_test test_generated_tree_approval_change_routes_generator_shard
 run_test test_generator_shared_spec_helper_change_routes_generator_shard
 run_test test_generator_simplecov_helper_change_routes_generator_shard
 run_test test_generator_shared_example_change_routes_generator_shard

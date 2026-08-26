@@ -9554,9 +9554,30 @@ RSpec.describe "release.rake helper methods" do
         File.expand_path("../../../docs/superpowers/specs/2026-05-25-main-ci-release-guard-design.md", __dir__)
       )
       expect(historical_design).to include(
-        "RELEASE_CI_STATUS_OVERRIDE=true script/release 16.2.0"
+        "RELEASE_CI_STATUS_OVERRIDE=true script/release"
       )
+      expect(historical_design).not_to include("script/release 16.2.0")
       expect(historical_design).not_to include('bundle exec rake "release[16.2.0,false,false,true]"')
+      publication_plan = File.read(
+        File.expand_path("../../../docs/superpowers/plans/2026-08-23-release-line-fenced-publication.md", __dir__)
+      )
+      expect(publication_plan).to include("Wrapper usage: script/release.")
+      expect(publication_plan).to include("script/release --dry-run\n")
+      expect(publication_plan).to include("RELEASE_TRACKER=4842 script/release\n")
+      expect(publication_plan).not_to include("script/release VERSION")
+      expect(publication_plan).not_to include("script/release 17.1.0.rc.0")
+      expect(publication_plan).not_to include("script/release --dry-run 17.1.0.rc.0")
+      managed_design = File.read(
+        File.expand_path(
+          "../../../docs/superpowers/specs/2026-08-23-release-line-fenced-publication-design.md",
+          __dir__
+        )
+      )
+      expect(managed_design).to include("atomically acquire that\n   release-line claim")
+      expect(managed_design).to include("renew a wrapper-managed claim")
+      expect(managed_design).to include("Release an exact wrapper-managed claim")
+      expect(managed_design).to include("pre-acquired automation claim")
+      expect(managed_design).not_to include("run the explicit version")
       expect(normalized_guide).to include(
         "exceeding 1,000 markers or requiring a 251st page blocks as unknown"
       )

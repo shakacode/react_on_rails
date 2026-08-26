@@ -84,20 +84,27 @@ channel.
 
 The wrapper will:
 
-1. Require an existing active claim on `release-line:X.Y.Z` owned by the exact
-   process-unique identity and current machine.
-2. Start a dedicated process group containing the release helper and every
+1. Select the prepared release version from the first stamped section directly
+   below `Unreleased` and derive the exact `release-line:X.Y.Z` target.
+2. By default, create a process-unique identity and atomically acquire that
+   release-line claim. When both coordinator identity variables are supplied,
+   preserve the advanced automation path by verifying its pre-acquired claim
+   instead of taking ownership of claim cleanup.
+3. Start a dedicated process group containing the release helper and every
    command it spawns.
-3. Maintain the heartbeat at an interval below the runbook's five-minute
-   maximum.
-4. Maintain a private liveness channel into the helper plus an independent
+4. Maintain the heartbeat at an interval below the runbook's five-minute
+   maximum and renew a wrapper-managed claim before it can expire.
+5. Maintain a private liveness channel into the helper plus an independent
    parent-death channel watched by a process in the release group. Loss of the
    supervisor closes both channels; the death watch immediately kills the full
    group, including an outward command already in progress.
-5. On lease refresh failure, terminate the process group and exit nonzero.
-6. On normal completion or interruption, stop heartbeat activity, terminate any
+6. On lease refresh or managed-claim renewal failure, terminate the process
+   group and exit nonzero.
+7. On normal completion or interruption, stop heartbeat activity, terminate any
    remaining children, and report the exact process group that must be proven
-   dead before handoff. It will not automatically release the train-wide claim.
+   dead before handoff. Release an exact wrapper-managed claim only after that
+   proof; leave a pre-acquired automation claim under its external owner's
+   lifecycle.
 
 On Linux, the supervisor also uses subreaper support to adopt and reap orphaned
 descendants. macOS has no subreaper equivalent, so launchd reaps orphans there;
@@ -138,8 +145,8 @@ new fence.
 
 ### Release retry behavior
 
-For the current RC, the wrapper will run the explicit version with
-`RELEASE_TRACKER=4842`. The release task will detect that the version files are
+For the current RC, the wrapper will select the prepared changelog version and
+run with `RELEASE_TRACKER=4842`. The release task will detect that the version files are
 already set, avoid creating another bump commit, and run all gates at the new
 exact candidate SHA after this change merges. Publication proceeds only after:
 

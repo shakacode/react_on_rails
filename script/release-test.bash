@@ -850,7 +850,29 @@ assert_contains "${output_log}" "Then rerun: script/release"
 assert_secret_absent
 pass "empty changelog selection stops before coordination"
 
-setup_case first-valid-changelog-version
+setup_case unstamped-unreleased-notes
+cat >"${fake_repo}/CHANGELOG.md" <<'CHANGELOG'
+### [Unreleased]
+
+#### Fixed
+
+- Prepared notes that have not been stamped with a release version.
+
+### [17.0.1] - 2026-08-01
+
+- Historical release notes.
+CHANGELOG
+unset RELEASE_COORDINATOR_ID RELEASE_COORDINATOR_INSTANCE_ID
+if run_release --dry-run; then
+  fail "dry-run fell through unstamped Unreleased notes to a historical version"
+fi
+assert_empty "${coord_log}"
+assert_empty "${bundle_log}"
+assert_contains "${output_log}" "No releasable version found in CHANGELOG.md."
+assert_secret_absent
+pass "unstamped Unreleased notes cannot select a historical version"
+
+setup_case invalid-first-changelog-heading
 cat >"${fake_repo}/CHANGELOG.md" <<'CHANGELOG'
 ### [99.0.0] - 2020-01-01
 
@@ -870,10 +892,13 @@ cat >"${fake_repo}/CHANGELOG.md" <<'CHANGELOG'
 
 - Older release candidate.
 CHANGELOG
-run_release --dry-run || fail "dry-run did not skip invalid changelog headings"
-assert_contains "${bundle_log}" 'args|exec|rake|release[17.1.0.rc.1,true]'
+if run_release --dry-run; then
+  fail "dry-run skipped an invalid first changelog section"
+fi
+assert_empty "${bundle_log}"
 assert_empty "${coord_log}"
-pass "selection uses the first valid version section after Unreleased"
+assert_contains "${output_log}" "No releasable version found in CHANGELOG.md."
+pass "selection fails closed when the first section after Unreleased is invalid"
 
 setup_case stale-changelog-version
 write_current_version "17.1.0.rc.1"

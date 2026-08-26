@@ -124,7 +124,7 @@ git commit -m "Test packed Pro packages without registry publication"
 **Interfaces:**
 
 - Produces: ReleaseLeaseGuard.activate!, ReleaseLeaseGuard.fence!, and ReleaseLeaseGuard.active?.
-- Wrapper usage: script/release 17.1.0.rc.0.
+- Wrapper usage: script/release.
 - Private contract: inherited read FD, parent PID, PGID, repo, target, branch, agent ID, instance ID, and machine ID. Never a token.
 
 - [ ] **Step 1: Write failing guard specs**
@@ -220,7 +220,7 @@ git commit -m "Fence every release publication write"
 
 - [ ] **Step 1: Add failing assertions**
 
-Require release help to name script/release VERSION, preserve direct-live refusal, and route changes to the wrapper, wrapper test, and lease guard through release-tooling tests.
+Require release help to name script/release, preserve direct-live refusal, and route changes to the wrapper, wrapper test, and lease guard through release-tooling tests.
 
 - [ ] **Step 2: Run and verify RED**
 
@@ -303,13 +303,13 @@ Dispatch all nine workflows at the merged SHA, inspect job execution, require re
 Record explicit tag/publication authority on #4842, then run:
 
 ```bash
-script/release --dry-run 17.1.0.rc.0
+script/release --dry-run
 ```
 
 - [ ] **Step 4: Run the live fenced release**
 
 ```bash
-RELEASE_TRACKER=4842 script/release 17.1.0.rc.0
+RELEASE_TRACKER=4842 script/release
 ```
 
 Enter fresh npm and RubyGems OTPs only at prompts. Stop on unknown lease, SHA, CI, ShakaPerf, registry, or artifact state.

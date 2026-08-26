@@ -10,14 +10,14 @@ module ReleaseChangelogSelector
     unreleased_index = lines.index { |line| line.match?(UNRELEASED_HEADING) }
     return unless unreleased_index
 
-    version_index = ((unreleased_index + 1)...lines.length).find do |index|
-      version = version_from_heading(lines.fetch(index))
-      version && version_pattern.match?(version)
-    end
+    version_index = ((unreleased_index + 1)...lines.length).find { |index| !lines.fetch(index).strip.empty? }
     return unless version_index
+
+    version = version_from_heading(lines.fetch(version_index))
+    return unless version && version_pattern.match?(version)
     return unless releasable_section?(lines, version_index)
 
-    version_from_heading(lines.fetch(version_index))
+    version
   end
 
   def version_from_heading(line)
