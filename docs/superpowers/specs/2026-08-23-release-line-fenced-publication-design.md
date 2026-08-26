@@ -84,8 +84,8 @@ channel.
 
 The wrapper will:
 
-1. Select the prepared release version from the first stamped section directly
-   below `Unreleased` and derive the exact `release-line:X.Y.Z` target.
+1. Select the first valid, non-empty releasable version section after
+   `### [Unreleased]` and derive the exact `release-line:X.Y.Z` target.
 2. By default, create a process-unique identity and atomically acquire that
    release-line claim. When both coordinator identity variables are supplied,
    preserve the advanced automation path by verifying its pre-acquired claim

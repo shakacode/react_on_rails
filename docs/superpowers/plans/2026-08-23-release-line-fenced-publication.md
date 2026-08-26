@@ -149,7 +149,13 @@ Use temporary fake agent-coord and bundle executables. Assert dry-run needs no i
 
 - [ ] **Step 5: Replace script/release**
 
-Implement Ruby OptionParser. Validate explicit version and matching release/X.Y.Z branch, open a private pipe, spawn bundle exec rake release[VERSION] in a dedicated process group, heartbeat every 60 seconds, poll child, and terminate the group on lease/signal failure. --dry-run runs release[VERSION,true] without coordination.
+Implement Ruby OptionParser. Reject positional arguments, select the prepared
+version from `CHANGELOG.md`, validate the matching `release/X.Y.Z` branch, open
+a private pipe, and pass the selected version internally to `bundle exec rake
+release[VERSION]` in a dedicated process group. Heartbeat every 60 seconds,
+poll the child, and terminate the group on lease or signal failure. `--dry-run`
+passes the selected version internally to `release[VERSION,true]` without
+coordination.
 
 - [ ] **Step 6: Verify GREEN**
 
