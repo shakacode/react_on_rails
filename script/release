@@ -780,8 +780,13 @@ class ReleaseSupervisor
   end
 
   def invoking_job_group_suspendable?(pgid)
-    pgid == Process.getpgrp && Process.getpgid(Process.ppid) != pgid
-  rescue Errno::ESRCH
+    return false unless pgid == Process.getpgrp
+
+    parent_pid = Process.ppid
+    return false unless Process.getsid(parent_pid) == Process.getsid(0)
+
+    Process.getpgid(parent_pid) != pgid
+  rescue SystemCallError
     false
   end
 
@@ -1015,7 +1020,10 @@ class ReleaseSupervisor
       raise SupervisorError, "interactive live release must run in the terminal foreground; use fg and retry"
     end
 
-    return if $stdin.tty? && $stdout.tty?
+    direct_terminal_io = $stdin.tty? && $stdout.tty? &&
+                         terminal_foreground_pgid($stdin.fileno) == foreground_pgid &&
+                         terminal_foreground_pgid($stdout.fileno) == foreground_pgid
+    return if direct_terminal_io
 
     raise SupervisorError,
           "live release requires direct terminal stdin and stdout when attached to a controlling terminal"

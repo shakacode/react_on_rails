@@ -672,7 +672,7 @@ class TerminalRaceSupervisor < ReleaseSupervisor
 
   def terminal_foreground_pgid(*)
     @terminal_reads += 1
-    @terminal_reads == 1 ? Process.getpgrp : Process.getpgrp + 10_000
+    @terminal_reads <= 3 ? Process.getpgrp : Process.getpgrp + 10_000
   end
 
   def fork_release_child(*)
@@ -860,6 +860,76 @@ raise "input feeder failed" unless feeder_status.success?
 
 exit(wrapper_status.exited? ? wrapper_status.exitstatus : 128 + wrapper_status.termsig)
 REDIRECTED_INPUT_HARNESS
+
+  cat >"${fake_bin}/release-alternate-input-pty-harness.rb" <<'ALTERNATE_INPUT_PTY_HARNESS'
+# frozen_string_literal: true
+
+require "fiddle"
+require "pty"
+
+$stdout.sync = true
+tcsetpgrp = Fiddle::Function.new(
+  Fiddle::Handle::DEFAULT["tcsetpgrp"],
+  [Fiddle::TYPE_INT, Fiddle::TYPE_INT],
+  Fiddle::TYPE_INT
+)
+tcgetpgrp = Fiddle::Function.new(
+  Fiddle::Handle::DEFAULT["tcgetpgrp"],
+  [Fiddle::TYPE_INT],
+  Fiddle::TYPE_INT
+)
+set_foreground = lambda do |pgid|
+  previous_handler = Signal.trap("TTOU", "IGNORE")
+  raise "tcsetpgrp failed" unless tcsetpgrp.call($stdout.fileno, pgid).zero?
+ensure
+  Signal.trap("TTOU", previous_handler) if previous_handler
+end
+
+alternate_master, alternate_slave = PTY.open
+wrapper_pid = fork do
+  alternate_master.close
+  Process.setpgid(0, 0)
+  $stdin.reopen(alternate_slave)
+  alternate_slave.close
+  exec ENV.fetch("TEST_RELEASE_SCRIPT")
+end
+Process.setpgid(wrapper_pid, wrapper_pid)
+alternate_slave.close
+puts "shell:alternate-input-pty:#{wrapper_pid}"
+set_foreground.call(wrapper_pid)
+
+status = nil
+deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 2.0
+until status || Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
+  waited = Process.waitpid2(wrapper_pid, Process::WNOHANG)
+  status = waited.fetch(1) if waited
+  sleep 0.01 unless status
+end
+
+set_foreground.call(Process.getpgrp)
+unless status
+  bundle_entry = File.readlines(ENV.fetch("TEST_BUNDLE_LOG")).find { |line| line.start_with?("bundle:") }
+  release_pgid = bundle_entry&.split(":", 4)&.fetch(2, nil)&.to_i
+  [wrapper_pid, release_pgid].compact.select(&:positive?).uniq.each do |pgid|
+    begin
+      Process.kill("CONT", -pgid)
+      Process.kill("KILL", -pgid)
+    rescue Errno::ESRCH
+      nil
+    end
+  end
+  begin
+    Process.wait(wrapper_pid)
+  rescue Errno::ECHILD
+    nil
+  end
+  exit 124
+end
+
+alternate_master.close
+puts "terminal:#{Process.getpgrp}:#{tcgetpgrp.call($stdout.fileno)}"
+exit(status.exited? ? status.exitstatus : 128 + status.termsig)
+ALTERNATE_INPUT_PTY_HARNESS
 
   cat >"${fake_bin}/release-output-pipeline-harness.rb" <<'OUTPUT_PIPELINE_HARNESS'
 # frozen_string_literal: true
@@ -1921,6 +1991,20 @@ assert_terminal_restored
 assert_secret_absent
 pass "foreground live release refuses redirected stdin before coordination mutation"
 
+setup_case alternate-input-pty-controlling-terminal
+unset RELEASE_COORDINATOR_ID RELEASE_COORDINATOR_INSTANCE_ID
+export FAKE_BUNDLE_MODE=success
+if run_release_in_pty '' release-alternate-input-pty-harness.rb; then
+  fail "foreground live release accepted stdin from a different non-controlling TTY"
+fi
+assert_contains "${output_log}" "shell:alternate-input-pty:"
+assert_contains "${output_log}" "live release requires direct terminal stdin and stdout"
+assert_empty "${coord_log}"
+assert_empty "${bundle_log}"
+assert_terminal_restored
+assert_secret_absent
+pass "foreground live release refuses stdin from a different TTY before coordination mutation"
+
 setup_case output-pipeline-controlling-terminal
 unset RELEASE_COORDINATOR_ID RELEASE_COORDINATOR_INSTANCE_ID
 export FAKE_BUNDLE_MODE=interactive-confirm
@@ -2243,6 +2327,41 @@ fi
 assert_no_coordination_mutation
 assert_secret_absent
 pass "job-control preflight avoids an actual non-orphan self-stop"
+
+setup_case job-control-refuses-cross-session-parent
+if ! TEST_RELEASE_SCRIPT="${release_script}" "${ruby_executable}" <<'RUBY'
+load ENV.fetch("TEST_RELEASE_SCRIPT")
+
+class CrossSessionSuspendSupervisor < ReleaseSupervisor
+  public :invoking_job_group_suspendable?
+end
+
+child_pid = Process.fork do
+  Process.setsid
+  supervisor = CrossSessionSuspendSupervisor.new([])
+  exit!(supervisor.invoking_job_group_suspendable?(Process.getpgrp) ? 2 : 0)
+end
+
+deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 2.0
+status = nil
+until status || Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
+  waited = Process.waitpid2(child_pid, Process::WNOHANG)
+  status = waited.fetch(1) if waited
+  sleep 0.01 unless status
+end
+unless status
+  Process.kill("KILL", child_pid)
+  Process.wait(child_pid)
+  abort "cross-session suspension probe did not exit"
+end
+abort "cross-session suspension probe accepted an orphaned job group" unless status.success?
+RUBY
+then
+  fail "job-control suspension accepted an invoking group whose parent is in another session"
+fi
+assert_no_coordination_mutation
+assert_secret_absent
+pass "job-control suspension refuses an invoking group whose parent is in another session"
 
 setup_case non-tty-stop-preserves-fence-deadlines
 if ! TEST_RELEASE_SCRIPT="${release_script}" "${ruby_executable}" <<'RUBY'
