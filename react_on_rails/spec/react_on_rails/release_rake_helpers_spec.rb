@@ -9551,7 +9551,7 @@ RSpec.describe "release.rake helper methods" do
       )
       expect(guide).not_to include('bundle exec rake "release[17.0.1]"')
       historical_design = File.read(
-        File.expand_path("../../../docs/superpowers/specs/2026-05-25-main-ci-release-guard-design.md", __dir__)
+        File.expand_path("../../../internal/planning/2026-05-25-main-ci-release-guard-design.md", __dir__)
       )
       expect(historical_design).to include(
         "RELEASE_CI_STATUS_OVERRIDE=true script/release"
@@ -9559,7 +9559,7 @@ RSpec.describe "release.rake helper methods" do
       expect(historical_design).not_to include("script/release 16.2.0")
       expect(historical_design).not_to include('bundle exec rake "release[16.2.0,false,false,true]"')
       publication_plan = File.read(
-        File.expand_path("../../../docs/superpowers/plans/2026-08-23-release-line-fenced-publication.md", __dir__)
+        File.expand_path("../../../internal/planning/2026-08-23-release-line-fenced-publication.md", __dir__)
       )
       expect(publication_plan).to include("Wrapper usage: script/release.")
       expect(publication_plan).to include("script/release --dry-run\n")
@@ -9569,7 +9569,7 @@ RSpec.describe "release.rake helper methods" do
       expect(publication_plan).not_to include("script/release --dry-run 17.1.0.rc.0")
       managed_design = File.read(
         File.expand_path(
-          "../../../docs/superpowers/specs/2026-08-23-release-line-fenced-publication-design.md",
+          "../../../internal/planning/2026-08-23-release-line-fenced-publication-design.md",
           __dir__
         )
       )
