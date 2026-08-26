@@ -646,6 +646,81 @@ puts "terminal:#{Process.getpgrp}:#{tcgetpgrp.call($stdin.fileno)}"
 exit(release_status.exited? ? release_status.exitstatus : 128 + release_status.termsig)
 PTY_HARNESS
 
+  cat >"${fake_bin}/release-background-pty-harness.rb" <<'BACKGROUND_PTY_HARNESS'
+# frozen_string_literal: true
+
+$stdout.sync = true
+
+wrapper_pid = fork do
+  Process.setpgid(0, 0)
+  exec ENV.fetch("TEST_RELEASE_SCRIPT")
+end
+begin
+  Process.setpgid(wrapper_pid, wrapper_pid)
+rescue Errno::EACCES, Errno::ESRCH
+  nil
+end
+puts "shell:wrapper:#{wrapper_pid}"
+
+deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 2.0
+loop do
+  waited = Process.waitpid2(wrapper_pid, Process::WNOHANG)
+  if waited
+    status = waited.fetch(1)
+    exit_code = status.exited? ? status.exitstatus : 128 + status.termsig
+    puts "shell:wrapper-exited:#{exit_code}"
+    exit exit_code
+  end
+
+  if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
+    bundle_entry = File.readlines(ENV.fetch("TEST_BUNDLE_LOG")).find { |line| line.start_with?("bundle:") }
+    release_pid, release_pgid = bundle_entry&.split(":", 4)&.values_at(1, 2)&.map(&:to_i)
+    release_state = if release_pid&.positive?
+                      IO.popen(["ps", "-o", "stat=", "-p", release_pid.to_s], &:read).strip
+                    end
+    heartbeat_count = File.exist?(ENV.fetch("TEST_HEARTBEAT_COUNT_FILE")) ?
+      File.read(ENV.fetch("TEST_HEARTBEAT_COUNT_FILE")).strip : "0"
+    puts "shell:wrapper-still-running"
+    puts "shell:child-state:#{release_state}"
+    puts "shell:heartbeat-count:#{heartbeat_count}"
+
+    Process.kill("TERM", wrapper_pid)
+    cleanup_deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 2.0
+    wrapper_reaped = false
+    loop do
+      cleaned = Process.waitpid2(wrapper_pid, Process::WNOHANG)
+      if cleaned
+        wrapper_reaped = true
+        break
+      end
+      break if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= cleanup_deadline
+
+      sleep 0.01
+    end
+    begin
+      Process.kill("KILL", -release_pgid) if release_pgid&.positive?
+    rescue Errno::ESRCH
+      nil
+    end
+    unless wrapper_reaped
+      begin
+        Process.kill("KILL", -wrapper_pid)
+      rescue Errno::ESRCH
+        nil
+      end
+      begin
+        Process.wait(wrapper_pid)
+      rescue Errno::ECHILD
+        nil
+      end
+    end
+    exit 124
+  end
+
+  sleep 0.01
+end
+BACKGROUND_PTY_HARNESS
+
   cat >"${fake_bin}/release-job-control-harness.rb" <<'JOB_CONTROL_HARNESS'
 # frozen_string_literal: true
 
@@ -745,6 +820,24 @@ run_release() {
   ) >"${output_log}" 2>&1
 }
 
+run_release_with_noncontrolling_tty() {
+  TEST_PTY_REPO="${fake_repo}" "${ruby_executable}" -rpty -e '
+    master, slave = PTY.open
+    child_pid = Process.fork do
+      master.close
+      Process.setsid
+      $stdin.reopen(slave)
+      slave.close unless slave.closed?
+      Dir.chdir(ENV.fetch("TEST_PTY_REPO"))
+      exec ENV.fetch("TEST_RELEASE_SCRIPT")
+    end
+    slave.close
+    _waited_pid, status = Process.waitpid2(child_pid)
+    master.close
+    exit(status.exited? ? status.exitstatus : 128 + status.termsig)
+  ' >"${output_log}" 2>&1
+}
+
 run_release_in_pty() {
   pty_input="$1"
   TEST_PTY_INPUT="${pty_input}" TEST_PTY_REPO="${fake_repo}" TEST_PTY_OUTPUT="${output_log}" \
@@ -787,6 +880,64 @@ run_release_in_pty() {
         Process.kill("KILL", -child_pid)
         File.binwrite(ENV.fetch("TEST_PTY_OUTPUT"), output)
         exit! 124
+      end
+      IO.select([reader], nil, nil, 0.05)
+    end
+
+    loop do
+      begin
+        chunk = reader.read_nonblock(4096, exception: false)
+      rescue EOFError, Errno::EIO
+        break
+      end
+      break if chunk.nil? || chunk == :wait_readable
+
+      output << chunk
+    end
+    File.binwrite(ENV.fetch("TEST_PTY_OUTPUT"), output)
+    exit(status.exited? ? status.exitstatus : 128 + status.termsig)
+  '
+}
+
+run_background_release_in_pty() {
+  TEST_PTY_REPO="${fake_repo}" TEST_PTY_OUTPUT="${output_log}" \
+    "${ruby_executable}" -rpty -e '
+    harness = File.join(ENV.fetch("TEST_PTY_REPO"), "..", "bin", "release-background-pty-harness.rb")
+    reader, _writer, child_pid = PTY.spawn(RbConfig.ruby, harness, chdir: ENV.fetch("TEST_PTY_REPO"))
+    output = +""
+    status = nil
+    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 6
+
+    loop do
+      begin
+        output << reader.read_nonblock(4096)
+      rescue IO::WaitReadable
+        nil
+      rescue EOFError, Errno::EIO
+        nil
+      end
+      waited = Process.waitpid2(child_pid, Process::WNOHANG)
+      if waited
+        status = waited.last
+        break
+      end
+      if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
+        process_groups = output.scan(/^shell:wrapper:(\d+)/).flatten.map(&:to_i)
+        bundle_entry = File.readlines(ENV.fetch("TEST_BUNDLE_LOG")).find { |line| line.start_with?("bundle:") }
+        process_groups << bundle_entry&.split(":", 4)&.fetch(2, nil)&.to_i
+        process_groups << child_pid
+        process_groups.compact.select(&:positive?).uniq.each do |process_group|
+          next if process_group == Process.getpgrp
+
+          begin
+            Process.kill("KILL", -process_group)
+          rescue Errno::ESRCH
+            nil
+          end
+        end
+        Process.wait(child_pid)
+        File.binwrite(ENV.fetch("TEST_PTY_OUTPUT"), output)
+        exit! 125
       end
       IO.select([reader], nil, nil, 0.05)
     end
@@ -1419,6 +1570,28 @@ assert_empty "${bundle_log}"
 assert_contains "${output_log}" "release/17.1.0"
 pass "accelerated reconciliation remains release-branch-only"
 
+setup_case background-controlling-terminal
+unset RELEASE_COORDINATOR_ID RELEASE_COORDINATOR_INSTANCE_ID
+export FAKE_BUNDLE_MODE=interactive-confirm
+if run_background_release_in_pty; then
+  fail "background interactive live release exited successfully"
+fi
+if grep -F 'shell:wrapper-still-running' "${output_log}" >/dev/null; then
+  assert_contains "${output_log}" "Proceed with release? [y/N]"
+  grep -E '^shell:child-state:T' "${output_log}" >/dev/null || \
+    fail "background release child was not stopped on its terminal read"
+  assert_contains "${coord_log}" $'claim-atomic|'
+  assert_contains "${coord_log}" $'heartbeat|'
+  fail "background interactive live release remained supervised while its child was stopped"
+fi
+assert_contains "${output_log}" "shell:wrapper-exited:1"
+assert_contains "${output_log}" "interactive live release must run in the terminal foreground"
+assert_no_coordination_mutation
+assert_not_contains "${coord_log}" $'heartbeat|'
+assert_empty "${bundle_log}"
+assert_secret_absent
+pass "background interactive live release is refused before coordination mutation"
+
 setup_case matching-state
 FAKE_BUNDLE_MODE=success run_release || fail "matching live release failed"
 assert_contains "${bundle_log}" 'args|exec|rake|release[17.1.0.rc.0]'
@@ -1465,6 +1638,14 @@ fi
 assert_no_coordination_mutation
 assert_secret_absent
 pass "non-controlling TTY safely declines terminal foreground transfer"
+
+setup_case non-controlling-terminal-live-release
+FAKE_BUNDLE_MODE=success run_release_with_noncontrolling_tty || \
+  fail "live release rejected a TTY without a controlling terminal"
+assert_contains "${bundle_log}" 'args|exec|rake|release[17.1.0.rc.0]'
+assert_no_coordination_mutation
+assert_secret_absent
+pass "live release allows a TTY without a controlling terminal"
 
 setup_case job-control-resume-with-pending-signal
 if ! TEST_RELEASE_SCRIPT="${release_script}" "${ruby_executable}" <<'RUBY'

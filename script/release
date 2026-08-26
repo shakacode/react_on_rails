@@ -82,6 +82,7 @@ class ReleaseSupervisor
   def run_live(scope)
     doctor_environment!
     doctor_tools!
+    verify_live_terminal_foreground!
     identity = release_identity!(scope)
     intervals = supervisor_intervals
     validate_coordination_backend!(
@@ -982,6 +983,15 @@ class ReleaseSupervisor
     return unless foreground_pgid == Process.getpgrp
 
     TerminalHandoff.new(fd:, supervisor_pgid: foreground_pgid, release_pgid: nil)
+  end
+
+  def verify_live_terminal_foreground!
+    return unless $stdin.tty?
+
+    foreground_pgid = terminal_foreground_pgid($stdin.fileno)
+    return if foreground_pgid.nil? || foreground_pgid == Process.getpgrp
+
+    raise SupervisorError, "interactive live release must run in the terminal foreground; use fg and retry"
   end
 
   def hand_off_terminal_foreground(owner, release_pgid)
