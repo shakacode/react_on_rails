@@ -1378,6 +1378,46 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         ENV.delete("OVERMIND_SOCKET")
       end
 
+      # Round-trips the REAL write path rather than asserting on
+      # owned_process_group in isolation: the bug was that the writer emitted a
+      # pgid the reader then rejected, so only writing a document and reading it
+      # back can catch it. A minimal container with no init wrapper runs bin/dev
+      # as PID 1 and typically setsid()s it, giving pgid == pid == 1.
+      it "writes a document it can read back when bin/dev is PID 1 in its own session" do
+        root = app_root("pid-one-roundtrip")
+        allow(Process).to receive_messages(pid: 1, getpgrp: 1)
+
+        recorded = nil
+        Dir.chdir(root) do
+          described_class.send(:with_dev_session) do
+            recorded = JSON.parse(File.read(session_path(root)))
+          end
+        end
+
+        aggregate_failures do
+          expect(recorded["pid"]).to eq(1)
+          # Group 1 can never be signalled - Process.kill(sig, -1) broadcasts -
+          # so it must not be recorded at all.
+          expect(recorded["pgid"]).to be_nil
+          expect(described_class.send(:valid_dev_session_document?, recorded)).to be true
+          expect(described_class.send(:parse_dev_session, JSON.generate(recorded))).not_to be_nil
+        end
+      end
+
+      it "does not refuse the session document it wrote as PID 1" do
+        root = app_root("pid-one-kill")
+        allow(Process).to receive_messages(pid: 1, getpgrp: 1)
+        # with_dev_session removes the file on exit, so keep a copy of exactly
+        # what the real write path produced and restore it for the kill.
+        written = nil
+        Dir.chdir(root) do
+          described_class.send(:with_dev_session) { written = File.read(session_path(root)) }
+        end
+        File.write(session_path(root), written)
+
+        expect(kill_in(root)).not_to include("Refusing to signal anything")
+      end
+
       it "records the ports this run actually selected" do
         root = app_root("recorded-ports")
         ENV["PORT"] = "4000"
@@ -2207,6 +2247,44 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         blockers = described_class.send(:endpoint_blockers, socket_path)
 
         expect(blockers).to include(a_string_matching(/could not determine whether the Overmind endpoint/))
+      end
+
+      # An endpoint we could not probe is not an absent one. Falling through to
+      # port-only cleanup would call the session gone without ever reaching it,
+      # and Overmind workers that hold no listening socket never show up in the
+      # port scan.
+      it "reports unverified when an orphan endpoint could not be probed" do
+        root = app_root("op")
+        socket_path = File.join(root, ".overmind.sock")
+        servers << UNIXServer.new(socket_path)
+        allow(described_class).to receive(:overmind_endpoint_state).and_return(:unknown)
+
+        output = kill_in(root)
+
+        aggregate_failures do
+          expect(output).to include("Shutdown could not be verified")
+          expect(output).to include("could not determine whether the Overmind endpoint")
+          expect(output).not_to include("No development processes owned by this app directory")
+          expect(output).not_to include("verified gone")
+          # An unprobeable socket is retained, never deleted.
+          expect(File.socket?(socket_path)).to be true
+        end
+      end
+
+      it "reports unverified when a live owner's endpoint could not be probed" do
+        root = app_root("ou")
+        socket_path = File.join(root, ".overmind.sock")
+        servers << UNIXServer.new(socket_path)
+        start_owner(root)
+        allow(described_class).to receive(:overmind_endpoint_state).and_return(:unknown)
+
+        output = kill_in(root)
+
+        aggregate_failures do
+          expect(output).to include("Shutdown could not be verified")
+          expect(output).to include("could not determine whether the Overmind endpoint")
+          expect(output).not_to include("verified gone")
+        end
       end
 
       it "controls a live custom OVERMIND_SOCKET inside the app root" do

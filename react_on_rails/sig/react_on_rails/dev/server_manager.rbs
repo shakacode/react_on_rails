@@ -97,6 +97,7 @@ module ReactOnRails
       def self.request_owner_shutdown: (dev_session_view, Integer?, String?) -> bool
       def self.shutdown_steps: (Integer?, String?) -> Array[untyped]
       def self.verify_owner_shutdown: (dev_session_view, Integer?, String?) -> shutdown_result
+      def self.outstanding_shutdown_blockers: (dev_session_view) -> Array[String]
       def self.owner_shutdown_complete?: (dev_session_view, Integer?, String?) -> bool
       def self.shutdown_settled?: (dev_session_view, Integer?, String?) -> bool
       def self.shutdown_blockers: (dev_session_view, Integer?, String?) -> Array[String]
@@ -112,6 +113,11 @@ module ReactOnRails
       def self.shutdown_orphaned_overmind: (dev_session_view, String) -> shutdown_result
       def self.print_kill_failure: (Symbol, Array[String]) -> void
       def self.live_overmind_endpoint: (String, String?) -> String?
+      def self.overmind_endpoint_candidates: (String, String?) -> Array[String]
+      def self.scan_overmind_endpoints: (String, String?) -> Hash[Symbol, Array[String]]
+      def self.unprobeable_overmind_endpoints: (dev_session_view) -> Array[String]
+      def self.unprobeable_endpoint_blockers: (Array[String]?) -> Array[String]
+      def self.unprobeable_endpoint_message: (String) -> String
       def self.overmind_endpoint_owned?: (String, ?String) -> bool
       def self.overmind_endpoint_state: (String) -> Symbol
       def self.probe_unix_socket: (String) -> Symbol

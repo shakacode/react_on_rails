@@ -688,7 +688,16 @@ module ReactOnRails
         # attribution, and refusing to guess is fail-closed.
         def owned_process_group
           pgid = Process.getpgrp
-          pgid == Process.pid ? pgid : nil
+          # The `> 1` floor mirrors #valid_session_pgid? on the read side, and
+          # has to be here too or we write a document we then refuse to read.
+          # A minimal container with no init wrapper runs `bin/dev` as PID 1 and
+          # typically setsid()s it, giving pgid == pid == 1; recording that made
+          # valid_dev_session_document? reject the whole document, so every
+          # `bin/dev kill` printed "Refusing to signal anything". Group 1 is
+          # unusable anyway - `Process.kill(sig, -1)` broadcasts rather than
+          # targeting a group - so a nil pgid is the honest record, and shutdown
+          # falls back to the Overmind socket or cwd-attributed ports.
+          pgid == Process.pid && pgid > 1 ? pgid : nil
         rescue NotImplementedError, SystemCallError
           nil
         end
@@ -996,7 +1005,7 @@ module ReactOnRails
           blockers = shutdown_blockers(view, pgid, endpoint)
           return [:unverified, blockers] if blockers.any?
 
-          leftover = leftover_owned_listeners(view)
+          leftover = outstanding_shutdown_blockers(view)
           return [:unverified, leftover] if leftover.any?
 
           # The listener scan shells out to lsof once per port, and by the time
@@ -1014,6 +1023,14 @@ module ReactOnRails
           remove_dev_session_file(view)
           cleanup_socket_files
           [:verified, []]
+        end
+
+        # Everything that has to be positively observed as gone before a
+        # shutdown may be called verified: leftover listeners, ports that could
+        # not be scanned, and endpoints that could not be probed.
+        def outstanding_shutdown_blockers(view)
+          leftover_owned_listeners(view) +
+            unprobeable_endpoint_blockers(unprobeable_overmind_endpoints(view))
         end
 
         def owner_shutdown_complete?(view, pgid, endpoint)
@@ -1049,7 +1066,7 @@ module ReactOnRails
           when :alive
             ["the Overmind endpoint #{endpoint} is still accepting connections"]
           when :unknown
-            ["could not determine whether the Overmind endpoint #{endpoint} is still live"]
+            [unprobeable_endpoint_message(endpoint)]
           else
             []
           end
@@ -1148,8 +1165,11 @@ module ReactOnRails
           # found nothing" and "we could not look" must not collapse into the
           # same answer: with lsof missing, every relevant port goes uninspected
           # and reporting :nothing_running would let `bin/dev kill && bin/dev`
-          # start a second stack on top of a live one.
-          leftover = leftover_owned_listeners(view)
+          # start a second stack on top of a live one. The same holds for an
+          # in-root Overmind endpoint we could not probe - falling through to
+          # port-only cleanup would call the session gone without ever reaching
+          # it.
+          leftover = outstanding_shutdown_blockers(view)
           return [:unverified, leftover] if leftover.any?
 
           # Same rule as verify_owner_shutdown: the recorded ports outlive an
@@ -1208,10 +1228,38 @@ module ReactOnRails
         # value is a candidate, not an authority - each still has to clear the
         # containment and realpath checks below.
         def live_overmind_endpoint(root, recorded)
-          candidates = [recorded, owned_overmind_socket_path(root), default_overmind_socket_path(root)]
-          candidates.compact.uniq.find do |path|
-            overmind_endpoint_owned?(path, root) && overmind_endpoint_alive?(path)
+          scan_overmind_endpoints(root, recorded)[:alive]&.first
+        end
+
+        def overmind_endpoint_candidates(root, recorded)
+          [recorded, owned_overmind_socket_path(root), default_overmind_socket_path(root)].compact.uniq
+        end
+
+        # Probes every in-root candidate once and groups them by state, so a
+        # bounded connect runs at most once per candidate per pass.
+        def scan_overmind_endpoints(root, recorded)
+          owned = overmind_endpoint_candidates(root, recorded).select do |path|
+            overmind_endpoint_owned?(path, root)
           end
+          owned.group_by { |path| overmind_endpoint_state(path) }
+        end
+
+        # In-root endpoints whose liveness could not be determined. An
+        # unprobeable endpoint is not an absent one: the Overmind session behind
+        # it may still be running, along with workers that hold no listening
+        # socket and so never appear in the port scan. Same rule as everywhere
+        # else here - never report success from an observation that could not be
+        # made.
+        def unprobeable_overmind_endpoints(view)
+          scan_overmind_endpoints(view[:root], view.dig(:session, :overmind_socket))[:unknown] || []
+        end
+
+        def unprobeable_endpoint_blockers(endpoints)
+          Array(endpoints).map { |path| unprobeable_endpoint_message(path) }
+        end
+
+        def unprobeable_endpoint_message(path)
+          "could not determine whether the Overmind endpoint #{path} is still live"
         end
 
         # Containment check for a control endpoint. The path is resolved before
