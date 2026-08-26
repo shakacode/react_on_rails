@@ -398,7 +398,7 @@ fi
 run_job_argv "Docs Sidebar Check" script/check-docs-sidebar "$BASE_REF" || true
 
 if [ "$RUN_RELEASE_SUPERVISOR_TESTS" = true ]; then
-  run_job_argv "Release Supervisor Integration Tests" bash script/release-test.bash
+  run_job_argv "Release Supervisor Integration Tests" bash script/release-test.bash || true
 fi
 
 if [ "$RUN_RUBY" = true ] || [ "$RUN_DUMMY" = true ] ||

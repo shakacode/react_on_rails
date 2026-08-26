@@ -265,6 +265,7 @@ BASH
   cat > script/release-test.bash <<'BASH'
 #!/usr/bin/env bash
 printf 'release-supervisor-test\n' >> "$CI_LOCAL_COMMAND_LOG"
+[ "${CI_LOCAL_FAIL_RELEASE_SUPERVISOR:-false}" != true ] || exit 42
 BASH
   chmod +x script/release-test.bash
 
@@ -579,6 +580,31 @@ test_ci_local_all_runs_release_supervisor_harness() {
   fi
   commands="$(cat ci-local-commands.log)"
   assert_ci_local_release_supervisor_selected "$commands" "all-mode release-supervisor command log"
+}
+
+test_ci_local_release_supervisor_failure_continues_selected_jobs() {
+  setup_ci_local_repo
+
+  local output commands
+  export CI_LOCAL_FIXTURE_SELECTION=core_ruby
+  export CI_LOCAL_FAIL_RELEASE_SUPERVISOR=true
+  if output="$(ci_local_output --all --fast 2>&1)"; then
+    fail "ci-local must report a failing release-supervisor harness"
+    return 1
+  fi
+  unset CI_LOCAL_FAIL_RELEASE_SUPERVISOR
+
+  commands="$(cat ci-local-commands.log)"
+  assert_contains "$commands" "release-supervisor-test" "release-supervisor failure command log"
+  assert_contains \
+    "$commands" \
+    $'bundle\texec\trake\trun_rspec:gem_unit' \
+    "release-supervisor failure command log"
+  assert_contains "$output" "Failed jobs:" "release-supervisor failure summary"
+  assert_contains \
+    "$output" \
+    "Release Supervisor Integration Tests" \
+    "release-supervisor failure summary"
 }
 
 test_ci_local_text_fallback_preserves_gem_generator_only_selector() {
@@ -2118,6 +2144,7 @@ run_test test_ci_local_text_fallback_preserves_gem_generator_only_selector
 run_test test_ci_local_json_runs_release_supervisor_selector
 run_test test_ci_local_text_fallback_runs_release_supervisor_selector
 run_test test_ci_local_all_runs_release_supervisor_harness
+run_test test_ci_local_release_supervisor_failure_continues_selected_jobs
 run_test test_ci_local_pro_tests_use_hosted_workspace_command_from_root
 run_test test_ci_local_combined_js_and_pro_selection_runs_pro_js_once
 run_test test_ci_infrastructure_only_change_runs_tests_but_skips_benchmarks
