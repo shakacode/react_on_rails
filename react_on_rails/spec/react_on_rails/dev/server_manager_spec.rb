@@ -1820,8 +1820,62 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
         aggregate_failures do
           expect(output).to include("Refusing to signal anything")
-          expect(output).to include("could not open")
+          expect(output).to include("must be a regular file")
           expect(output).not_to include("No development processes owned by this app directory")
+        end
+      end
+
+      # The security claim of this whole change: a symlink at the session path
+      # must never become authority to signal the process group it names.
+      it "refuses a symlinked session path instead of signalling the group it names" do
+        root = app_root("symlink-read")
+        victim = start_unrelated_process
+        # A locked, entirely valid-looking document that names THIS app root and
+        # an arbitrary pgid, reachable only through a symlink at the session path.
+        planted = File.join(root, "planted.json")
+        File.write(planted, JSON.generate("schema" => 1, "app_root" => root, "pid" => victim[:pid],
+                                          "pgid" => victim[:pgid], "overmind_socket" => nil, "ports" => []))
+        holder = File.open(planted, File::RDWR)
+        handles << holder
+        holder.flock(File::LOCK_EX | File::LOCK_NB)
+        File.symlink(planted, session_path(root))
+
+        output = kill_in(root)
+
+        aggregate_failures do
+          expect(output).to include("Refusing to signal anything")
+          expect(output).to include("must be a regular file")
+          # The point of the test: the planted group is untouched.
+          expect(group_alive?(victim[:pgid])).to be(true), "the planted process group was signalled"
+          expect(alive?(victim[:pid])).to be true
+        end
+      end
+
+      it "refuses a session path that is not a regular file" do
+        root = app_root("dir-session")
+        FileUtils.mkdir_p(session_path(root))
+
+        expect(described_class).not_to receive(:kill_port_processes)
+
+        output = kill_in(root)
+
+        aggregate_failures do
+          expect(output).to include("Refusing to signal anything")
+          expect(output).to include("not a regular file")
+        end
+      end
+
+      # Without O_NONBLOCK the open never returns, so the regular-file check
+      # below it is unreachable and `bin/dev kill` hangs outright.
+      it "refuses a FIFO at the session path without blocking on the open" do
+        root = app_root("fifo-session")
+        File.mkfifo(session_path(root))
+
+        output = Timeout.timeout(20) { kill_in(root) }
+
+        aggregate_failures do
+          expect(output).to include("Refusing to signal anything")
+          expect(output).to include("not a regular file")
         end
       end
 
@@ -2130,6 +2184,27 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
           .and_return(true)
 
         expect(Dir.chdir(root) { described_class.send(:overmind_control, "quit", socket_path) }).to be true
+      end
+
+      # The socket probe was bounded but the command acting on it was not, so a
+      # wedged `overmind quit` blocked inside action.call before wait_until ever
+      # started polling, and the KILL escalation was never reached.
+      it "gives up on a wedged Overmind control command so the ladder can proceed" do
+        stub_const("#{described_class}::OVERMIND_CONTROL_TIMEOUT_SECS", 0.2)
+        allow(ReactOnRails::Dev::ProcessManager).to receive(:run_process_if_available) { sleep 30 }
+
+        result = nil
+        started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+        output = capture_stdout do
+          result = described_class.send(:run_overmind_command, ["quit", "-s", "/tmp/none.sock"])
+        end
+        elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started
+
+        aggregate_failures do
+          expect(result).to be false
+          expect(elapsed).to be < 5
+          expect(output).to include("did not return within")
+        end
       end
 
       it "reports an Overmind control command that could not be run" do

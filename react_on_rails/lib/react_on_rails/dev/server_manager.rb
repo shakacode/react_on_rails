@@ -10,6 +10,7 @@ require "rainbow"
 require "erb"
 require "rbconfig"
 require "socket"
+require "timeout"
 require "time"
 require "uri"
 require "yaml"
@@ -52,6 +53,21 @@ module ReactOnRails
       # resolves realpath for the same reason on the read side.
       DEV_SESSION_OPEN_FLAGS = File::RDWR | File::CREAT |
                                (defined?(File::NOFOLLOW) ? File::NOFOLLOW : 0)
+      # The read side needs the same O_NOFOLLOW guarantee as the write side: it
+      # is the path that leads to signalling, so a symlink here is worth more to
+      # an attacker than one on the write path. O_NONBLOCK additionally keeps a
+      # FIFO planted at this path from blocking the open forever - without it
+      # the "must be a regular file" check below is unreachable, because the
+      # open never returns.
+      DEV_SESSION_READ_FLAGS = File::RDONLY |
+                               (defined?(File::NOFOLLOW) ? File::NOFOLLOW : 0) |
+                               (defined?(File::NONBLOCK) ? File::NONBLOCK : 0)
+      # Bounded budget for an Overmind control command. The socket probe was
+      # already bounded; leaving the command that acts on it unbounded meant a
+      # wedged `overmind quit` blocked inside `action.call`, before
+      # `wait_until(grace)` ever started polling, so the KILL escalation was
+      # never reached. Mirrors ProcessManager::VERSION_CHECK_TIMEOUT.
+      OVERMIND_CONTROL_TIMEOUT_SECS = 10
       DEV_SESSION_CLAIM_ATTEMPTS = 2
 
       # Markers that identify an app root when a command is run from a
@@ -601,7 +617,10 @@ module ReactOnRails
         # than as a replacement. On the claim side a vanished path means our
         # handle is orphaned, so it has to count. Do not merge the two.
         def dev_session_handle_detached?(path, file)
-          File.stat(path).ino != file.stat.ino
+          # lstat, not stat: both opens are O_NOFOLLOW, so a handle can never
+          # refer to a symlink target. Resolving through a link here would let a
+          # symlink planted over the path still compare equal to our handle.
+          File.lstat(path).ino != file.stat.ino
         rescue SystemCallError, IOError
           true
         end
@@ -794,7 +813,19 @@ module ReactOnRails
         # works on a read-only descriptor, so requiring write access would
         # refuse sessions we can perfectly well inspect.
         def open_dev_session(path)
-          [:opened, File.open(path, File::RDONLY)]
+          file = File.open(path, DEV_SESSION_READ_FLAGS)
+          return [:opened, file] if file.stat.file?
+
+          file.close
+          [:refused, "#{path} is not a regular file, so it cannot be trusted as dev session state"]
+        rescue Errno::ELOOP
+          # A symlink here is never legitimate, and it is the highest-value
+          # target in this file: a link to a locked, valid-looking document
+          # naming this app root would otherwise be classified as a live owner
+          # and its pgid signalled. Refuse rather than fall through to :absent -
+          # :absent means "nothing here, carry on with port cleanup", which is
+          # the wrong disposition for state that is actively suspicious.
+          [:refused, "#{path} is a symlink; dev session state must be a regular file"]
         rescue Errno::ENOENT
           [:absent, nil]
         rescue SystemCallError => e
@@ -918,7 +949,10 @@ module ReactOnRails
         # A path that simply vanished is the owner tidying up after itself, not
         # a replacement.
         def dev_session_replaced?(path, file)
-          File.stat(path).ino != file.stat.ino
+          # lstat for the same reason as #dev_session_handle_detached?: a
+          # symlink appearing over the session path is a replacement, never a
+          # match.
+          File.lstat(path).ino != file.stat.ino
         rescue Errno::ENOENT
           false
         rescue SystemCallError, IOError
@@ -1098,7 +1132,9 @@ module ReactOnRails
             return lock_dev_session(handle) == :acquired ? :released : :held
           end
 
-          File.open(path, File::RDONLY) do |file|
+          # Same flags as #open_dev_session: this is the other read of the
+          # session path, and it decides whether a shutdown counts as verified.
+          File.open(path, DEV_SESSION_READ_FLAGS) do |file|
             file.flock(File::LOCK_EX | File::LOCK_NB) ? :released : :held
           end
         rescue Errno::ENOENT
@@ -1361,7 +1397,15 @@ module ReactOnRails
         # coupling so a rename fails loudly instead of silently reverting to the
         # broken path.
         def run_overmind_command(args)
-          ProcessManager.send(:run_process_if_available, "overmind", args) == true
+          Timeout.timeout(OVERMIND_CONTROL_TIMEOUT_SECS) do
+            ProcessManager.send(:run_process_if_available, "overmind", args) == true
+          end
+        rescue Timeout::Error
+          # Treated exactly like the runner reporting failure, so the escalation
+          # ladder moves on to the next step instead of hanging here forever.
+          puts "   ⚠️  `overmind #{args.first}` did not return within " \
+               "#{OVERMIND_CONTROL_TIMEOUT_SECS}s; moving on"
+          false
         end
 
         def signalable_pgid(pgid)
