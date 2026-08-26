@@ -999,6 +999,18 @@ module ReactOnRails
           leftover = leftover_owned_listeners(view)
           return [:unverified, leftover] if leftover.any?
 
+          # The listener scan shells out to lsof once per port, and by the time
+          # it returns the path may belong to a newer `bin/dev`. That window is
+          # real rather than theoretical: the previous owner deletes its state
+          # on exit, so #owner_release_state returns :released without ever
+          # taking the lock, leaving the path free for anyone to claim. Reporting
+          # :verified here would tell `bin/dev kill && bin/dev` to start a second
+          # session on top of the one that just claimed this directory - and
+          # cleanup_socket_files below would delete that session's socket on the
+          # way out. Re-check and refuse instead of discarding the signal
+          # #remove_dev_session_file already computes.
+          return [:unverified, [session_replaced_blocker(view)]] if session_replaced?(view)
+
           remove_dev_session_file(view)
           cleanup_socket_files
           [:verified, []]
@@ -1015,12 +1027,16 @@ module ReactOnRails
           blockers
         end
 
+        def session_replaced_blocker(view)
+          "#{view[:path]} was replaced by a newer `bin/dev` while this shutdown was running"
+        end
+
         def owner_state_blockers(view)
           case owner_release_state(view)
           when :held
             ["the `bin/dev` that owns #{view[:path]} is still running"]
           when :replaced
-            ["#{view[:path]} was replaced by a newer `bin/dev` while this shutdown was running"]
+            [session_replaced_blocker(view)]
           else
             []
           end
@@ -1270,10 +1286,34 @@ module ReactOnRails
             return false
           end
 
-          system("overmind", subcommand, "-s", endpoint, out: File::NULL, err: File::NULL) ? true : false
+          return true if run_overmind_command([subcommand, "-s", endpoint])
+
+          puts "   ⚠️  `overmind #{subcommand}` did not run successfully for #{endpoint}"
+          false
         rescue Errno::ENOENT, Interrupt
           puts "   ⚠️  Could not run `overmind #{subcommand}` for #{endpoint}"
           false
+        end
+
+        # Control commands have to take the same route startup took.
+        #
+        # ProcessManager falls back to running the process outside the Bundler
+        # context when the system-installed binary is not usable inside it - and
+        # that is the documented install shape for this project: install the
+        # process manager globally and deliberately keep it OUT of the Gemfile.
+        # A bare `system("overmind", ...)` here just repeats the context that
+        # already failed at startup, so `quit` and `kill` both return false and
+        # the session becomes unkillable by the tool that started it. The
+        # process-group fallback cannot rescue it either: Overmind's tmux server
+        # daemonizes to PPID 1 in its own process group, out of reach of any
+        # group signal.
+        #
+        # This deliberately reaches ProcessManager's private runner rather than
+        # reimplementing its Bundler API-compat shim here. The spec pins the
+        # coupling so a rename fails loudly instead of silently reverting to the
+        # broken path.
+        def run_overmind_command(args)
+          ProcessManager.send(:run_process_if_available, "overmind", args) == true
         end
 
         def signalable_pgid(pgid)

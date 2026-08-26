@@ -103,6 +103,7 @@ module ReactOnRails
       def self.owner_release_state: (dev_session_view) -> Symbol
       def self.owner_released?: (dev_session_view) -> bool
       def self.session_replaced?: (dev_session_view) -> bool
+      def self.session_replaced_blocker: (dev_session_view) -> String
       def self.owner_state_blockers: (dev_session_view) -> Array[String]
       def self.endpoint_blockers: (String?) -> Array[String]
       def self.leftover_owned_listeners: (dev_session_view) -> Array[String]
@@ -116,6 +117,7 @@ module ReactOnRails
       def self.probe_unix_socket: (String) -> Symbol
       def self.overmind_endpoint_alive?: (String) -> bool
       def self.overmind_control: (String, String) -> bool
+      def self.run_overmind_command: (Array[String]) -> bool
       def self.signalable_pgid: (untyped) -> Integer?
       def self.own_process_group: () -> Integer?
       def self.signal_process_group: (Integer, String) -> bool

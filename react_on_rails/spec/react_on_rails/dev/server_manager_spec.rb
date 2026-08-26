@@ -1677,6 +1677,44 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         end
       end
 
+      # The previous owner deletes its state on exit, so owner_release_state
+      # returns :released without taking the lock - leaving the path free for a
+      # newer `bin/dev` to claim while the lsof-backed listener scan runs.
+      # Reporting :verified then would tell `bin/dev kill && bin/dev` to start a
+      # second session on top of the one that just claimed this directory.
+      it "refuses when a newer bin/dev claims the path during the listener scan" do
+        root = app_root("claimed-mid-scan")
+        path = session_path(root)
+        start_owner(root)
+        replacement = nil
+
+        # Stand in for the replacement appearing while lsof is out: the original
+        # inode is unlinked and a fresh, locked session file takes its place.
+        allow(described_class).to receive(:leftover_owned_listeners).and_wrap_original do |original, view|
+          result = original.call(view)
+          if replacement.nil?
+            FileUtils.rm_f(path)
+            replacement = File.open(path, File::RDWR | File::CREAT)
+            handles << replacement
+            replacement.flock(File::LOCK_EX | File::LOCK_NB)
+            replacement.write(JSON.generate("schema" => 1, "app_root" => root, "pid" => Process.pid,
+                                            "pgid" => nil, "overmind_socket" => nil, "ports" => []))
+            replacement.flush
+          end
+          result
+        end
+
+        output = kill_in(root)
+
+        aggregate_failures do
+          expect(output).to include("Shutdown could not be verified")
+          expect(output).to include("was replaced by a newer `bin/dev`")
+          expect(output).not_to include("verified gone")
+          # The replacement's own state must survive - it is a different session.
+          expect(File.exist?(path)).to be true
+        end
+      end
+
       # The session file carries the ports this run actually selected, so it
       # has to outlive an unverified outcome - otherwise the retry falls back to
       # a re-derived guess, and the printed advice names a file already gone.
@@ -2033,6 +2071,51 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         kill_in(root)
 
         expect(File.socket?(victim_socket)).to be true
+      end
+
+      # `bin/dev` starts the process manager through ProcessManager, which
+      # falls back to a Bundler-free context when the globally installed binary
+      # is not usable inside the bundle - the documented install shape for this
+      # project. A bare `system("overmind", ...)` here repeats the context that
+      # already failed, and the process-group fallback cannot reach an Overmind
+      # session because its tmux server daemonizes to PPID 1.
+      it "controls Overmind through the same runner startup uses" do
+        root = app_root("runner")
+        socket_path = File.join(root, "r.sock")
+        servers << UNIXServer.new(socket_path)
+
+        expect(ReactOnRails::Dev::ProcessManager)
+          .to receive(:run_process_if_available)
+          .with("overmind", ["quit", "-s", socket_path])
+          .and_return(true)
+
+        expect(Dir.chdir(root) { described_class.send(:overmind_control, "quit", socket_path) }).to be true
+      end
+
+      it "reports an Overmind control command that could not be run" do
+        root = app_root("runner-fail")
+        socket_path = File.join(root, "rf.sock")
+        servers << UNIXServer.new(socket_path)
+        # nil is what the runner returns when the binary is unusable in both
+        # the bundled and unbundled contexts.
+        allow(ReactOnRails::Dev::ProcessManager).to receive(:run_process_if_available).and_return(nil)
+
+        result = nil
+        output = capture_stdout do
+          Dir.chdir(root) { result = described_class.send(:overmind_control, "kill", socket_path) }
+        end
+
+        aggregate_failures do
+          expect(result).to be false
+          expect(output).to include("`overmind kill` did not run successfully")
+        end
+      end
+
+      # Pins the cross-class coupling: if ProcessManager renames this runner,
+      # this fails loudly instead of silently reverting to the broken bare
+      # `system` call.
+      it "depends on a runner ProcessManager still provides" do
+        expect(ReactOnRails::Dev::ProcessManager.respond_to?(:run_process_if_available, true)).to be true
       end
 
       it "refuses to control an endpoint outside this app root" do
