@@ -1505,7 +1505,7 @@ test_benchmark_comment_only_change_is_non_runtime_but_keeps_lint() {
 # this arm existed, rakelib/release.rake hit the uncategorized catch-all and set
 # run_generators=true.
 #
-# All eight release-tooling paths share one contract, asserted identically via
+# All eleven release-tooling paths share one contract, asserted identically via
 # this helper so a one-character typo in any pattern can't silently fall through
 # to the generator-sensitive script/* CI-infra arm.
 assert_release_tooling_contract() {
@@ -1518,7 +1518,7 @@ assert_release_tooling_contract() {
   assert_contains "$out" '"run_lint": true' "$label"
   # Release specs run (release_rake_helpers_spec / release_forward_port_script_spec).
   assert_contains "$out" '"run_ruby_tests": true' "$label"
-  # The supervised wrapper has a separate 13-case integration harness. This
+  # The supervised wrapper has a separate deterministic integration harness. This
   # selector is consumed by gem-tests.yml, which runs it once on the latest
   # unit leg instead of assuming the RSpec suite exercises the shell process
   # and per-write-fence contract.
@@ -1549,6 +1549,27 @@ test_release_lease_guard_change_runs_ruby_tests_and_lint_without_generators() {
   write_file_change "rakelib/release_lease_guard.rb" "module ReleaseLeaseGuard; end"
 
   assert_release_tooling_contract "$(detector_output)" "release lease guard output"
+}
+
+test_release_atomic_claim_change_runs_ruby_tests_and_lint_without_generators() {
+  setup_repo
+  write_file_change "rakelib/release_atomic_claim.rb" "module ReleaseAtomicClaim; end"
+
+  assert_release_tooling_contract "$(detector_output)" "release atomic claim output"
+}
+
+test_release_changelog_selector_change_runs_ruby_tests_and_lint_without_generators() {
+  setup_repo
+  write_file_change "rakelib/release_changelog_selector.rb" "module ReleaseChangelogSelector; end"
+
+  assert_release_tooling_contract "$(detector_output)" "release changelog selector output"
+}
+
+test_release_claim_script_change_runs_ruby_tests_and_lint_without_generators() {
+  setup_repo
+  write_file_change "script/release-claim" "#!/usr/bin/env ruby"
+
+  assert_release_tooling_contract "$(detector_output)" "release-claim output"
 }
 
 # The release helper scripts under script/ must be caught by the release-tooling
@@ -1604,7 +1625,7 @@ assert_ruby_release_tooling_heredoc_fixture_change_runs_release_specs() {
   local label="$2"
 
   setup_repo
-  mkdir -p script
+  mkdir -p "$(dirname "$script_path")"
   cat > "$script_path" <<'RUBY'
 #!/usr/bin/env ruby
 FIXTURE = <<~CHANGELOG
@@ -1636,6 +1657,24 @@ test_release_finish_heredoc_fixture_change_runs_release_specs() {
   assert_ruby_release_tooling_heredoc_fixture_change_runs_release_specs \
     "script/release-finish" \
     "release-finish"
+}
+
+test_release_atomic_claim_heredoc_fixture_change_runs_release_specs() {
+  assert_ruby_release_tooling_heredoc_fixture_change_runs_release_specs \
+    "rakelib/release_atomic_claim.rb" \
+    "release-atomic-claim"
+}
+
+test_release_changelog_selector_heredoc_fixture_change_runs_release_specs() {
+  assert_ruby_release_tooling_heredoc_fixture_change_runs_release_specs \
+    "rakelib/release_changelog_selector.rb" \
+    "release-changelog-selector"
+}
+
+test_release_claim_heredoc_fixture_change_runs_release_specs() {
+  assert_ruby_release_tooling_heredoc_fixture_change_runs_release_specs \
+    "script/release-claim" \
+    "release-claim"
 }
 
 test_release_forward_port_plain_heredoc_fixture_change_runs_release_specs() {
@@ -2019,6 +2058,9 @@ test_empty_diff_skips_everything() {
 run_test test_empty_diff_skips_everything
 run_test test_release_rake_change_runs_ruby_tests_and_lint_without_generators
 run_test test_release_lease_guard_change_runs_ruby_tests_and_lint_without_generators
+run_test test_release_atomic_claim_change_runs_ruby_tests_and_lint_without_generators
+run_test test_release_changelog_selector_change_runs_ruby_tests_and_lint_without_generators
+run_test test_release_claim_script_change_runs_ruby_tests_and_lint_without_generators
 run_test test_release_finish_script_change_runs_ruby_tests_and_lint_without_generators
 run_test test_release_script_change_runs_ruby_tests_and_lint_without_generators
 run_test test_release_script_test_change_runs_ruby_tests_and_lint_without_generators
@@ -2027,6 +2069,9 @@ run_test test_release_forward_port_test_change_runs_ruby_tests_and_lint_without_
 run_test test_release_finish_test_change_runs_ruby_tests_and_lint_without_generators
 run_test test_release_forward_port_heredoc_fixture_change_runs_release_specs
 run_test test_release_finish_heredoc_fixture_change_runs_release_specs
+run_test test_release_atomic_claim_heredoc_fixture_change_runs_release_specs
+run_test test_release_changelog_selector_heredoc_fixture_change_runs_release_specs
+run_test test_release_claim_heredoc_fixture_change_runs_release_specs
 run_test test_release_forward_port_plain_heredoc_fixture_change_runs_release_specs
 run_test test_release_finish_method_plain_heredoc_fixture_change_runs_release_specs
 run_test test_release_forward_port_quoted_numeric_heredoc_fixture_change_runs_release_specs

@@ -96,7 +96,7 @@ BENCH_PRO_NODE_RENDERER_CHANGED=false
 
 is_release_tooling_path() {
   case "$1" in
-    rakelib/release.rake|rakelib/release_lease_guard.rb|script/release|script/release-test.bash|script/release-forward-port|script/release-forward-port-test.bash|script/release-finish|script/release-finish-test.bash)
+    rakelib/release.rake|rakelib/release_lease_guard.rb|rakelib/release_atomic_claim.rb|rakelib/release_changelog_selector.rb|script/release|script/release-claim|script/release-test.bash|script/release-forward-port|script/release-forward-port-test.bash|script/release-finish|script/release-finish-test.bash)
       return 0
       ;;
     *)
@@ -107,7 +107,7 @@ is_release_tooling_path() {
 
 release_tooling_heredoc_language() {
   case "$1" in
-    rakelib/release.rake|rakelib/release_lease_guard.rb|script/release|script/release-forward-port|script/release-finish)
+    rakelib/release.rake|rakelib/release_lease_guard.rb|rakelib/release_atomic_claim.rb|rakelib/release_changelog_selector.rb|script/release|script/release-claim|script/release-forward-port|script/release-finish)
       printf '%s\n' "ruby"
       ;;
     script/release-test.bash|script/release-forward-port-test.bash|script/release-finish-test.bash)
@@ -467,7 +467,7 @@ while IFS= read -r file; do
 
 # Release tooling (rake release tasks + their helper scripts) needs the release
 # RSpec suite (react_on_rails/spec/react_on_rails/release_rake_helpers_spec.rb
-# and release_forward_port_script_spec.rb) *and* the 13-case supervised wrapper
+# and release_forward_port_script_spec.rb) *and* the supervised wrapper
 # integration harness (script/release-test.bash). Route it to RSPEC_CHANGED,
 # RELEASE_TOOLING_CHANGED, and the dedicated harness selector rather than the
 # CI-infrastructure arm below. That arm's catch-all-equivalent behavior set

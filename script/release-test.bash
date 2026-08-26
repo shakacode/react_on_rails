@@ -1357,19 +1357,83 @@ for exception_mode in after-spawn after-handshake; do
   fi
 done
 
-setup_case managed-echild-retains-claim
+setup_case managed-echild-terminates-group
 unset RELEASE_COORDINATOR_ID RELEASE_COORDINATOR_INSTANCE_ID
 export FAKE_BUNDLE_MODE=hold
 if run_echild_release; then
-  fail "managed release with unproven process-group termination exited successfully"
+  fail "managed release with lost child ownership exited successfully"
 fi
 process_group="$(cat "${exception_group_log}")"
-wait_for_group_exit "${process_group}" || fail "death watch did not stop the unproven release group"
+assert_group_dead "${process_group}"
 assert_contains "${coord_log}" $'claim-atomic|'
-assert_not_contains "${coord_log}" $'release|'
-assert_contains "${output_log}" "retaining release-line lease because process-group termination was not proven"
+assert_contains "${coord_log}" $'release|'
+assert_contains "${output_log}" "lost child process ownership"
 assert_secret_absent
-pass "managed release retains its claim when process-group termination is unproven"
+pass "lost child ownership closes supervision channels and terminates the release group"
+
+if ! TEST_RELEASE_SCRIPT="${release_script}" ruby <<'RUBY'
+require "stringio"
+
+load ENV.fetch("TEST_RELEASE_SCRIPT")
+
+class NonReapingEchildDrainSupervisor < ReleaseSupervisor
+  attr_reader :events
+
+  def initialize
+    super([], stdout: StringIO.new, stderr: StringIO.new)
+    @events = []
+    @adopted_child_visible = true
+  end
+
+  def exercise(liveness_writer, death_writer)
+    @liveness_writer = liveness_writer
+    @death_writer = death_writer
+    @managed_claim_release_safe = false
+    send(:handle_lost_child_ownership, 42_424, liveness_writer, death_writer, 0.1)
+  end
+
+  private
+
+  def signal_group(signal, pgid)
+    raise "termination began before both supervision channels closed" unless
+      @liveness_writer.closed? && @death_writer.closed?
+
+    @events << [:signal, signal, pgid]
+  end
+
+  def group_alive?(_pgid)
+    @adopted_child_visible
+  end
+
+  def reap_group_children_nonblocking(_pgid)
+    @events << :drain
+    return [] unless @adopted_child_visible
+
+    @adopted_child_visible = false
+    [52_525]
+  end
+
+  def sleep(*)
+    nil
+  end
+end
+
+liveness_reader, liveness_writer = IO.pipe
+death_reader, death_writer = IO.pipe
+supervisor = NonReapingEchildDrainSupervisor.new
+result = supervisor.exercise(liveness_writer, death_writer)
+raise "unexpected ECHILD result #{result}" unless result == 1
+raise "liveness channel stayed open" unless liveness_writer.closed?
+raise "death-watch channel stayed open" unless death_writer.closed?
+raise "group termination did not start" unless supervisor.events.include?([:signal, "TERM", 42_424])
+raise "adopted descendant was not drained" unless supervisor.events.include?(:drain)
+raise "managed lease remained unsafe after proven group absence" unless
+  supervisor.instance_variable_get(:@managed_claim_release_safe)
+RUBY
+then
+  fail "ECHILD unit seam did not drain a zombie-visible adopted descendant"
+fi
+pass "ECHILD draining proves group absence without relying on a reaping PID 1"
 
 setup_case managed-claim-renewal
 unset RELEASE_COORDINATOR_ID RELEASE_COORDINATOR_INSTANCE_ID

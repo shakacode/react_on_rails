@@ -607,6 +607,7 @@ class ReleaseSupervisor
       child_pid:,
       pgid:,
       liveness_writer:,
+      death_writer:,
       next_heartbeat:,
       next_claim_renewal:,
       heartbeat_interval:,
@@ -622,8 +623,9 @@ class ReleaseSupervisor
     death_writer&.close unless death_writer&.closed?
   end
 
-  def supervise_loop(scope, identity, child_pid:, pgid:, liveness_writer:, next_heartbeat:, next_claim_renewal:,
-                     heartbeat_interval:, claim_renewal_interval:, termination_grace:, coordination_timeout:)
+  def supervise_loop(scope, identity, child_pid:, pgid:, liveness_writer:, death_writer:, next_heartbeat:,
+                     next_claim_renewal:, heartbeat_interval:, claim_renewal_interval:, termination_grace:,
+                     coordination_timeout:)
     loop do
       return interrupt_release(pgid, child_pid, liveness_writer, termination_grace) if @received_signal
 
@@ -650,7 +652,16 @@ class ReleaseSupervisor
       sleep(sleep_duration) if sleep_duration.positive?
     end
   rescue Errno::ECHILD
+    handle_lost_child_ownership(pgid, liveness_writer, death_writer, termination_grace)
+  end
+
+  def handle_lost_child_ownership(pgid, liveness_writer, death_writer, termination_grace)
     close_liveness(liveness_writer)
+    close_io(death_writer)
+    @stderr.puts "Release supervisor lost child process ownership; " \
+                 "closed supervision channels and terminating process group #{pgid}."
+    terminate_group(pgid, child_pid: nil, grace: termination_grace)
+    @managed_claim_release_safe = true
     report_group_handoff(pgid)
     1
   end

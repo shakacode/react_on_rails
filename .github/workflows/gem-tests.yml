@@ -190,7 +190,7 @@ jobs:
         with:
           ruby-version: ${{ matrix.ruby-version }}
       - name: Run release supervisor integration tests
-        # Run once: the detector selects this 13-case harness for wrapper/guard/
+        # Run once: the detector selects this deterministic harness for wrapper/guard/
         # release paths, while the latest unit leg keeps it independent of the
         # RSpec shard and avoids duplicating it across the full matrix.
         if: |
