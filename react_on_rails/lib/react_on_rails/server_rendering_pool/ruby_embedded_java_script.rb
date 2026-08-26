@@ -45,7 +45,7 @@ module ReactOnRails
         | error\son\srenderer\srequest
       /xi
 
-      CONFIGURED_AUTHORITY_SCHEME_REGEX = %r{[a-z][a-z0-9+.-]*://}i
+      CONFIGURED_AUTHORITY_SCHEME_REGEX = %r{[a-z][a-z0-9+._-]*://}i
 
       class << self
         def reset_pool
@@ -420,7 +420,7 @@ module ReactOnRails
                              configured_url.scan(CONFIGURED_AUTHORITY_SCHEME_REGEX).length > 1
                             strip_malformed_url_userinfo(configured_url)
                           else
-                            sanitized_valid_authority_url(configured_url) ||
+                            sanitized_valid_authority_url(configured_url, fail_closed_after_authority: true) ||
                               strip_malformed_url_userinfo(configured_url)
                           end
 
@@ -478,17 +478,21 @@ module ReactOnRails
           text[...unresolved_scheme.begin(0)]
         end
 
-        # URI handles valid authority URLs structurally, so an @ in the path is never mistaken for
-        # userinfo. Some scheme-specific parsers, such as URI::File, discard authority credentials
-        # while exposing no userinfo; use their serialized value only when the raw authority contained
-        # an @ so ordinary scheme spelling and valid path @ characters remain unchanged. Returning nil
-        # for invalid input keeps that token unprotected for fail-closed handling.
-        def sanitized_valid_authority_url(url)
+        # Some scheme-specific parsers, such as URI::File, discard authority credentials while
+        # exposing no userinfo; use their serialized value when the raw authority contained an @.
+        # When configured-value sanitization requests fail-closed handling, any later @ is
+        # structurally ambiguous because a delimiter may have hidden malformed userinfo from the
+        # parser. Returning nil keeps that token unprotected for the caller's fail-closed pass.
+        def sanitized_valid_authority_url(url, fail_closed_after_authority: false)
           uri = URI.parse(url)
           if uri.userinfo.nil?
             scheme = url.match(CONFIGURED_AUTHORITY_SCHEME_REGEX)
-            authority = url[scheme.end(0)..].split(%r{[/?#]}, 2).first
-            return authority&.include?("@") ? uri.to_s : url
+            scheme_suffix = url[scheme.end(0)..]
+            authority = scheme_suffix.split(%r{[/?#]}, 2).first
+            return uri.to_s if authority&.include?("@")
+            return nil if fail_closed_after_authority && scheme_suffix.include?("@")
+
+            return url
           end
 
           # URI rejects a password without a user, so clear password first.

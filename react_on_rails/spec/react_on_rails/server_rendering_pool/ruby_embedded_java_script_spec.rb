@@ -613,12 +613,14 @@ module ReactOnRails
           end
         end
 
-        context "when a configured URL has an at sign only in its path" do
-          it "preserves the URL because the configured value parses without userinfo" do
+        context "when a configured URL has an at sign after the authority" do
+          it "fails closed because the path could contain delayed userinfo" do
             server_bundle_url = "http://host/path@example"
             stub_http_bundle_failure("connection failed", bundle_url: server_bundle_url)
 
-            expect(bundle_load_error_message).to include(server_bundle_url)
+            message = bundle_load_error_message
+            expect(message).not_to include("host/path")
+            expect(message).to include("http://example")
           end
         end
 
@@ -942,11 +944,27 @@ module ReactOnRails
             expect(message).to include("htps://renderer.example/bundle.js")
           end
 
-          it "preserves an at sign that belongs only to the path" do
+          ["/", "?", "#"].each do |delimiter|
+            it "fails closed when #{delimiter.inspect} precedes a delayed userinfo delimiter" do
+              server_bundle_path =
+                "htps://synthetic-user#{delimiter}synthetic-secret@renderer.example/bundle.js"
+              stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)
+
+              message = bundle_load_error_message
+              expect(message).not_to include("synthetic-user")
+              expect(message).not_to include("synthetic-secret")
+              expect(message).to include("htps://renderer.example/bundle.js")
+            end
+          end
+
+          it "fails closed when a path at sign could be delayed userinfo" do
             server_bundle_path = "htps://renderer.example/bundle@example.js"
             stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)
 
-            expect(bundle_load_error_message).to include(server_bundle_path)
+            message = bundle_load_error_message
+            expect(message).not_to include("renderer.example")
+            expect(message).not_to include("renderer.example/bundle")
+            expect(message).to include("htps://example.js")
           end
 
           it "preserves a scheme-only value without masking the bundle-load diagnostic" do
@@ -954,6 +972,19 @@ module ReactOnRails
             stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)
 
             expect(bundle_load_error_message).to include(server_bundle_path)
+          end
+        end
+
+        context "when a configured bundle authority uses an invalid scheme spelling" do
+          it "redacts credentials after an underscore in the scheme" do
+            server_bundle_path =
+              "http_://synthetic-user:synthetic-secret@renderer.example/bundle.js"
+            stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("http_://renderer.example/bundle.js")
           end
         end
 
