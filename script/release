@@ -602,7 +602,6 @@ class ReleaseSupervisor
     child_pid, pgid, liveness_writer, death_writer, terminal_handoff = spawn_release_group(
       scope, identity, handshake_timeout:, termination_grace:
     )
-    @stdout.puts "Release process group #{pgid} started."
     next_heartbeat = monotonic_time + heartbeat_interval
     next_claim_renewal = initial_claim_renewal_deadline(identity, claim_renewal_interval)
 
@@ -621,6 +620,7 @@ class ReleaseSupervisor
       coordination_timeout:
     )
   rescue StandardError
+    restore_terminal_after_release(terminal_handoff, $ERROR_INFO)
     cleanup_failed_release(pgid, child_pid, liveness_writer, termination_grace)
     raise
   ensure
@@ -637,7 +637,9 @@ class ReleaseSupervisor
   rescue StandardError
     raise unless active_exception
 
-    @stderr.puts "ERROR: terminal foreground restoration also failed while handling a release failure"
+    with_sigttou_ignored do
+      @stderr.puts "ERROR: terminal foreground restoration also failed while handling a release failure"
+    end
   end
 
   def supervise_loop(scope, identity, child_pid:, pgid:, liveness_writer:, terminal_handoff:, next_heartbeat:,
@@ -655,13 +657,17 @@ class ReleaseSupervisor
     end
   rescue Errno::ECHILD
     close_liveness(liveness_writer)
+    restore_terminal_foreground(terminal_handoff)
     report_group_handoff(pgid)
     1
   end
 
   def supervise_cycle(scope, identity, state:, child_pid:, pgid:, liveness_writer:, terminal_handoff:,
                       heartbeat_interval:, claim_renewal_interval:, termination_grace:, coordination_timeout:)
-    return interrupt_release(pgid, child_pid, liveness_writer, termination_grace) if @received_signal
+    if @received_signal
+      restore_terminal_foreground(terminal_handoff)
+      return interrupt_release(pgid, child_pid, liveness_writer, termination_grace)
+    end
 
     child_status = nonblocking_child_status(child_pid)
     if child_status&.stopped?
@@ -670,11 +676,14 @@ class ReleaseSupervisor
                          claim_renewal_interval:, termination_grace:, coordination_timeout:
       )
     end
-    return complete_release(pgid, liveness_writer, child_status, termination_grace) if child_status
+    if child_status
+      restore_terminal_foreground(terminal_handoff)
+      return complete_release(pgid, liveness_writer, child_status, termination_grace)
+    end
 
     refresh_or_wait(
-      scope, identity, state:, child_pid:, pgid:, liveness_writer:, heartbeat_interval:, claim_renewal_interval:,
-                       termination_grace:, coordination_timeout:
+      scope, identity, state:, child_pid:, pgid:, liveness_writer:, terminal_handoff:, heartbeat_interval:,
+                       claim_renewal_interval:, termination_grace:, coordination_timeout:
     )
   end
 
@@ -687,7 +696,7 @@ class ReleaseSupervisor
     )
     if stop_result == :no_handoff
       return refresh_or_wait(
-        scope, identity, state:, child_pid:, pgid:, liveness_writer:, heartbeat_interval:,
+        scope, identity, state:, child_pid:, pgid:, liveness_writer:, terminal_handoff:, heartbeat_interval:,
                          claim_renewal_interval:, termination_grace:, coordination_timeout:
       )
     end
@@ -700,8 +709,8 @@ class ReleaseSupervisor
     )
   end
 
-  def refresh_or_wait(scope, identity, state:, child_pid:, pgid:, liveness_writer:, heartbeat_interval:,
-                      claim_renewal_interval:, termination_grace:, coordination_timeout:)
+  def refresh_or_wait(scope, identity, state:, child_pid:, pgid:, liveness_writer:, terminal_handoff:,
+                      heartbeat_interval:, claim_renewal_interval:, termination_grace:, coordination_timeout:)
     now = monotonic_time
     heartbeat_due = now >= state.next_heartbeat
     claim_renewal_due = managed_claim_renewal_due?(identity, now, state.next_claim_renewal)
@@ -713,8 +722,14 @@ class ReleaseSupervisor
     lease_live = refresh_lease?(
       scope, identity, renew_claim: claim_renewal_due, coordination_timeout:, termination_grace:
     )
-    return interrupt_release(pgid, child_pid, liveness_writer, termination_grace) if @received_signal
-    return lose_lease(pgid, child_pid, liveness_writer, termination_grace) unless lease_live
+    if @received_signal
+      restore_terminal_foreground(terminal_handoff)
+      return interrupt_release(pgid, child_pid, liveness_writer, termination_grace)
+    end
+    unless lease_live
+      restore_terminal_foreground(terminal_handoff)
+      return lose_lease(pgid, child_pid, liveness_writer, termination_grace)
+    end
 
     SupervisionState.new(
       next_heartbeat: advanced_deadline(state.next_heartbeat, now, heartbeat_interval, heartbeat_due),
@@ -808,9 +823,11 @@ class ReleaseSupervisor
 
   def fail_terminal_resume(pgid, child_pid, liveness_writer, termination_grace)
     close_liveness(liveness_writer)
-    @stderr.puts "Release terminal resume failed; closed liveness channel and terminating process group #{pgid}."
     terminate_group(pgid, child_pid:, grace: termination_grace)
     @managed_claim_release_safe = true
+    with_sigttou_ignored do
+      @stderr.puts "Release terminal resume failed; closed liveness channel and terminated process group #{pgid}."
+    end
     report_group_handoff(pgid, proven_dead: true)
     1
   end
@@ -891,6 +908,7 @@ class ReleaseSupervisor
       timeout: handshake_timeout,
       termination_grace:
     )
+    @stdout.puts "Release process group #{pgid} started."
     terminal_handoff = hand_off_terminal_foreground(terminal_owner, pgid)
     raise SupervisorError, "initial terminal foreground transfer failed" if terminal_owner && !terminal_handoff
 
@@ -1352,10 +1370,12 @@ class ReleaseSupervisor
   end
 
   def report_group_handoff(pgid, proven_dead: false)
-    if proven_dead
-      @stderr.puts "Release process group #{pgid} was proven dead before handoff."
-    else
-      @stderr.puts "Release process group #{pgid} must be proven dead before handoff."
+    with_sigttou_ignored do
+      if proven_dead
+        @stderr.puts "Release process group #{pgid} was proven dead before handoff."
+      else
+        @stderr.puts "Release process group #{pgid} must be proven dead before handoff."
+      end
     end
   end
 

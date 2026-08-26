@@ -488,23 +488,14 @@ HANDSHAKE_HARNESS
 
 load ENV.fetch("TEST_RELEASE_SCRIPT")
 
-class FailingReleaseOutput
-  def puts(*)
-    raise Errno::EPIPE
-  end
-end
-
 class ExceptionTestSupervisor < ReleaseSupervisor
-  def initialize(argv)
-    stdout = ENV.fetch("FAKE_EXCEPTION_MODE") == "after-spawn" ? FailingReleaseOutput.new : $stdout
-    super(argv, stdout:)
-  end
-
   private
 
   def spawn_release_group(...)
     result = super
     File.write(ENV.fetch("TEST_EXCEPTION_GROUP_LOG"), "#{result.fetch(1)}\n")
+    raise Errno::EPIPE if ENV.fetch("FAKE_EXCEPTION_MODE") == "after-spawn"
+
     result
   end
 
@@ -646,8 +637,14 @@ UNVERIFIED_CHILD_HARNESS
 
 require "fiddle"
 
-system(ENV.fetch("TEST_RELEASE_SCRIPT"))
-release_status = $?
+tostop = ENV["FAKE_TOSTOP"] == "1"
+raise "could not enable TOSTOP" if tostop && !system("stty", "tostop")
+begin
+  system(ENV.fetch("TEST_RELEASE_SCRIPT"))
+  release_status = $?
+ensure
+  raise "could not disable TOSTOP" if tostop && !system("stty", "-tostop")
+end
 tcgetpgrp = Fiddle::Function.new(
   Fiddle::Handle::DEFAULT["tcgetpgrp"],
   [Fiddle::TYPE_INT],
@@ -1149,7 +1146,7 @@ JOB_CONTROL_HARNESS
   unset FAKE_DOCTOR_FAIL FAKE_DOCTOR_BACKEND FAKE_DOCTOR_PAYLOAD
   unset FAKE_BUNDLE_MODE FAKE_BUNDLE_START_DELAY FAKE_HANDSHAKE_MODE FAKE_EXCEPTION_MODE FAKE_RESTORE_FAIL
   unset FAKE_HANDSHAKE_IGNORE_TERM
-  unset FAKE_LATE_BACKGROUND FAKE_PAUSE_HEARTBEAT_FOR_BACKGROUND FAKE_TOSTOP
+  unset FAKE_LATE_BACKGROUND FAKE_PAUSE_HEARTBEAT_FOR_BACKGROUND FAKE_TOSTOP TEST_PTY_CONFIRMATION_DELAY
   unset FAKE_SIGNAL_STOPPED_WRAPPER
   unset REACT_ON_RAILS_RELEASE_COORDINATION_TIMEOUT
   unset REACT_ON_RAILS_RELEASE_CLAIM_RENEWAL_INTERVAL
@@ -1241,6 +1238,7 @@ run_release_in_pty() {
         nil
       end
       if !input_sent && output.include?("Proceed with release? [y/N]")
+        sleep Float(ENV.fetch("TEST_PTY_CONFIRMATION_DELAY", "0"))
         writer.write(ENV.fetch("TEST_PTY_INPUT"))
         writer.flush
         input_sent = true
@@ -2495,9 +2493,66 @@ assert_no_coordination_mutation
 assert_secret_absent
 pass "interactive confirmation completes in the supervised release process group"
 
+setup_case interactive-confirmation-tostop
+export FAKE_BUNDLE_MODE=interactive-confirm
+export FAKE_TOSTOP=1
+export TEST_PTY_CONFIRMATION_DELAY=0.3
+if ! run_release_in_pty $'y\n'; then
+  fail "TOSTOP stalled the supervisor while the release process group owned the terminal"
+fi
+assert_contains "${bundle_log}" "confirmation:y"
+process_group="$(awk -F: '/^bundle:/ { print $3; exit }' "${bundle_log}")"
+assert_group_dead "${process_group}"
+assert_terminal_restored
+started_line="$(grep -n 'Release process group .* started' "${output_log}" | cut -d: -f1)"
+prompt_line="$(grep -n 'Proceed with release? \[y/N\]' "${output_log}" | cut -d: -f1)"
+completed_line="$(grep -n 'Release process group .* completed with status 0' "${output_log}" | cut -d: -f1)"
+terminal_line="$(grep -n '^terminal:' "${output_log}" | cut -d: -f1)"
+test "${started_line}" -lt "${prompt_line}" || fail "release start output followed terminal handoff"
+test "${prompt_line}" -lt "${completed_line}" || fail "release completion output preceded child completion"
+test "${completed_line}" -lt "${terminal_line}" || fail "release completion output followed terminal restoration proof"
+test "$(cat "${heartbeat_count_file}")" -ge 2 || fail "supervisor heartbeat stalled while the child owned the terminal"
+assert_no_coordination_mutation
+assert_secret_absent
+pass "TOSTOP preserves supervision and orders output around terminal handoff"
+
+setup_case declined-confirmation-tostop
+export FAKE_BUNDLE_MODE=interactive-confirm
+export FAKE_TOSTOP=1
+if run_release_in_pty $'n\n'; then
+  fail "declined TOSTOP confirmation exited successfully"
+fi
+assert_contains "${bundle_log}" "confirmation:n"
+process_group="$(awk -F: '/^bundle:/ { print $3; exit }' "${bundle_log}")"
+assert_group_dead "${process_group}"
+assert_terminal_restored
+assert_contains "${output_log}" "Release process group ${process_group} completed with status 1"
+assert_no_coordination_mutation
+assert_secret_absent
+pass "TOSTOP restores the terminal before unsuccessful completion output"
+
+setup_case lease-failure-tostop
+export FAKE_BUNDLE_MODE=hold
+export FAKE_TOSTOP=1
+export FAKE_FAIL_HEARTBEAT_AFTER=1
+export REACT_ON_RAILS_RELEASE_HEARTBEAT_INTERVAL=0.5
+if run_release_in_pty ''; then
+  fail "TOSTOP lease failure exited successfully"
+fi
+process_group="$(awk -F: '/^bundle:/ { print $3; exit }' "${bundle_log}")"
+test -n "${process_group}" || fail "TOSTOP lease-failure case never started the release group"
+assert_group_dead "${process_group}"
+assert_terminal_restored
+assert_contains "${output_log}" "Release lease refresh failed"
+assert_contains "${output_log}" "Release process group ${process_group} was proven dead before handoff"
+assert_no_coordination_mutation
+assert_secret_absent
+pass "TOSTOP restores the terminal before lease-loss cleanup output"
+
 setup_case interactive-job-control-stop
 unset RELEASE_COORDINATOR_ID RELEASE_COORDINATOR_INSTANCE_ID
 export FAKE_BUNDLE_MODE=job-control-confirm
+export FAKE_TOSTOP=1
 if ! run_job_control_release_in_pty; then
   fail "Ctrl-Z did not hand terminal control back through the invoking shell"
 fi
@@ -2522,6 +2577,7 @@ test "${continuation_heartbeats}" -ge 2 || fail "release child continued before 
 test "${continuation_statuses}" -ge 3 || fail "release child continued before a fresh authoritative fence"
 test "${continuation_renewals}" -ge 1 || fail "managed release child continued before exact claim renewal"
 process_group="$(awk -F: '/^bundle:/ { print $3; exit }' "${bundle_log}")"
+assert_contains "${output_log}" "Release process group ${process_group} stopped; returning terminal control"
 assert_group_dead "${process_group}"
 assert_terminal_restored
 assert_contains "${coord_log}" $'claim-atomic|'
