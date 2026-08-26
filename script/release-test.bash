@@ -418,6 +418,20 @@ case "${FAKE_BUNDLE_MODE:-success}" in
     printf 'confirmation:%s\n' "${answer}" >>"${TEST_BUNDLE_LOG}"
     test "${answer}" = y
     ;;
+  job-control-confirm)
+    record_continuation() {
+      heartbeat_count="$(cat "${TEST_HEARTBEAT_COUNT_FILE}")"
+      status_count="$(cat "${TEST_STATUS_COUNT_FILE}")"
+      renewal_count="$(grep -c -- '--renew' "${TEST_COORD_LOG}" || true)"
+      printf 'job-control:continued:%s:%s:%s\n' \
+        "${heartbeat_count}" "${status_count}" "${renewal_count}" >>"${TEST_BUNDLE_LOG}"
+    }
+    trap record_continuation CONT
+    printf 'Proceed with release? [y/N] '
+    IFS= read -r answer || answer=""
+    printf 'confirmation:%s\n' "${answer}" >>"${TEST_BUNDLE_LOG}"
+    test "${answer}" = y
+    ;;
   *)
     exit 95
     ;;
@@ -488,6 +502,11 @@ class ExceptionTestSupervisor < ReleaseSupervisor
 
     File.write(ENV.fetch("TEST_EXCEPTION_GROUP_LOG"), "#{pgid}\n")
     raise SupervisorError, "injected failure after process-group handshake"
+  end
+
+  def restore_terminal_foreground(...)
+    super
+    raise SupervisorError, "injected terminal restoration failure" if ENV["FAKE_RESTORE_FAIL"] == "1"
   end
 end
 
@@ -603,6 +622,56 @@ puts "terminal:#{Process.getpgrp}:#{tcgetpgrp.call($stdin.fileno)}"
 exit(release_status.exited? ? release_status.exitstatus : 128 + release_status.termsig)
 PTY_HARNESS
 
+  cat >"${fake_bin}/release-job-control-harness.rb" <<'JOB_CONTROL_HARNESS'
+# frozen_string_literal: true
+
+require "fiddle"
+
+$stdout.sync = true
+tcsetpgrp = Fiddle::Function.new(
+  Fiddle::Handle::DEFAULT["tcsetpgrp"],
+  [Fiddle::TYPE_INT, Fiddle::TYPE_INT],
+  Fiddle::TYPE_INT
+)
+tcgetpgrp = Fiddle::Function.new(
+  Fiddle::Handle::DEFAULT["tcgetpgrp"],
+  [Fiddle::TYPE_INT],
+  Fiddle::TYPE_INT
+)
+set_foreground = lambda do |pgid|
+  previous_handler = Signal.trap("TTOU", "IGNORE")
+  raise "tcsetpgrp failed" unless tcsetpgrp.call($stdin.fileno, pgid).zero?
+ensure
+  Signal.trap("TTOU", previous_handler) if previous_handler
+end
+
+wrapper_pid = fork do
+  Process.setpgid(0, 0)
+  exec ENV.fetch("TEST_RELEASE_SCRIPT")
+end
+begin
+  Process.setpgid(wrapper_pid, wrapper_pid)
+rescue Errno::EACCES, Errno::ESRCH
+  nil
+end
+puts "shell:wrapper:#{wrapper_pid}"
+set_foreground.call(wrapper_pid)
+
+_waited_pid, stopped_status = Process.waitpid2(wrapper_pid, Process::WUNTRACED)
+raise "wrapper did not stop for shell job control" unless stopped_status.stopped?
+
+set_foreground.call(Process.getpgrp)
+puts "shell:wrapper-stopped"
+set_foreground.call(wrapper_pid)
+Process.kill("CONT", -wrapper_pid)
+puts "shell:wrapper-continued"
+
+_waited_pid, release_status = Process.waitpid2(wrapper_pid)
+set_foreground.call(Process.getpgrp)
+puts "terminal:#{Process.getpgrp}:#{tcgetpgrp.call($stdin.fileno)}"
+exit(release_status.exited? ? release_status.exitstatus : 128 + release_status.termsig)
+JOB_CONTROL_HARNESS
+
   chmod +x "${fake_bin}/agent-coord" "${fake_bin}/bundle" "${fake_bin}/pnpm" \
     "${fake_bin}/release-handshake-harness" \
     "${fake_bin}/release-exception-harness" "${fake_bin}/release-subreaper-failure-harness" \
@@ -638,7 +707,7 @@ PTY_HARNESS
   unset FAKE_RELEASE_FAIL FAKE_CLAIM_FAIL FAKE_STALL_CLAIM_AFTER_CREATE FAKE_ATOMIC_CLAIM_MODE
   unset FAKE_ATOMIC_RENEW_MODE
   unset FAKE_DOCTOR_FAIL FAKE_DOCTOR_BACKEND FAKE_DOCTOR_PAYLOAD
-  unset FAKE_BUNDLE_MODE FAKE_BUNDLE_START_DELAY FAKE_HANDSHAKE_MODE FAKE_EXCEPTION_MODE
+  unset FAKE_BUNDLE_MODE FAKE_BUNDLE_START_DELAY FAKE_HANDSHAKE_MODE FAKE_EXCEPTION_MODE FAKE_RESTORE_FAIL
   unset FAKE_HANDSHAKE_IGNORE_TERM
   unset REACT_ON_RAILS_RELEASE_COORDINATION_TIMEOUT
   unset REACT_ON_RAILS_RELEASE_CLAIM_RENEWAL_INTERVAL
@@ -686,6 +755,75 @@ run_release_in_pty() {
         if release_pgid&.positive? && release_pgid != Process.getpgrp
           begin
             Process.kill("KILL", -release_pgid)
+          rescue Errno::ESRCH
+            nil
+          end
+        end
+        Process.kill("KILL", -child_pid)
+        File.binwrite(ENV.fetch("TEST_PTY_OUTPUT"), output)
+        exit! 124
+      end
+      IO.select([reader], nil, nil, 0.05)
+    end
+
+    loop do
+      begin
+        chunk = reader.read_nonblock(4096, exception: false)
+      rescue EOFError, Errno::EIO
+        break
+      end
+      break if chunk.nil? || chunk == :wait_readable
+
+      output << chunk
+    end
+    File.binwrite(ENV.fetch("TEST_PTY_OUTPUT"), output)
+    exit(status.exited? ? status.exitstatus : 128 + status.termsig)
+  '
+}
+
+run_job_control_release_in_pty() {
+  TEST_PTY_REPO="${fake_repo}" TEST_PTY_OUTPUT="${output_log}" \
+    "${ruby_executable}" -rpty -e '
+    harness = File.join(ENV.fetch("TEST_PTY_REPO"), "..", "bin", "release-job-control-harness.rb")
+    reader, writer, child_pid = PTY.spawn(RbConfig.ruby, harness, chdir: ENV.fetch("TEST_PTY_REPO"))
+    output = +""
+    status = nil
+    stop_sent = false
+    confirmation_sent = false
+    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 5
+
+    loop do
+      begin
+        output << reader.read_nonblock(4096)
+      rescue IO::WaitReadable
+        nil
+      rescue EOFError, Errno::EIO
+        nil
+      end
+      if !stop_sent && output.include?("Proceed with release? [y/N]")
+        writer.write("\x1a")
+        writer.flush
+        stop_sent = true
+      end
+      if !confirmation_sent && output.include?("shell:wrapper-continued")
+        writer.write("y\n")
+        writer.flush
+        confirmation_sent = true
+      end
+      waited = Process.waitpid2(child_pid, Process::WNOHANG)
+      if waited
+        status = waited.last
+        break
+      end
+      if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
+        process_groups = output.scan(/^shell:wrapper:(\d+)/).flatten.map(&:to_i)
+        bundle_entry = File.readlines(ENV.fetch("TEST_BUNDLE_LOG")).find { |line| line.start_with?("bundle:") }
+        process_groups << bundle_entry&.split(":", 4)&.fetch(2, nil)&.to_i
+        process_groups.compact.select(&:positive?).uniq.each do |process_group|
+          next if process_group == Process.getpgrp
+
+          begin
+            Process.kill("KILL", -process_group)
           rescue Errno::ESRCH
             nil
           end
@@ -1272,6 +1410,37 @@ assert_no_coordination_mutation
 assert_secret_absent
 pass "matching state runs one identity-bound process group"
 
+setup_case non-controlling-terminal
+if ! TEST_RELEASE_SCRIPT="${release_script}" "${ruby_executable}" <<'RUBY'
+require "fiddle"
+
+load ENV.fetch("TEST_RELEASE_SCRIPT")
+
+class NonControllingTerminalSupervisor < ReleaseSupervisor
+  private
+
+  def terminal_function(*)
+    Object.new.tap do |function|
+      function.define_singleton_method(:call) do |*|
+        Fiddle.last_error = Errno::ENOTTY::Errno
+        -1
+      end
+    end
+  end
+
+  public :terminal_foreground_pgid
+end
+
+supervisor = NonControllingTerminalSupervisor.new([])
+abort "non-controlling TTY was not declined" unless supervisor.terminal_foreground_pgid(0).nil?
+RUBY
+then
+  fail "non-controlling TTY aborted foreground-owner discovery"
+fi
+assert_no_coordination_mutation
+assert_secret_absent
+pass "non-controlling TTY safely declines terminal foreground transfer"
+
 setup_case interactive-confirmation
 export FAKE_BUNDLE_MODE=interactive-confirm
 if ! run_release_in_pty $'y\n'; then
@@ -1284,6 +1453,48 @@ assert_terminal_restored
 assert_no_coordination_mutation
 assert_secret_absent
 pass "interactive confirmation completes in the supervised release process group"
+
+setup_case interactive-job-control-stop
+unset RELEASE_COORDINATOR_ID RELEASE_COORDINATOR_INSTANCE_ID
+export FAKE_BUNDLE_MODE=job-control-confirm
+if ! run_job_control_release_in_pty; then
+  fail "Ctrl-Z did not hand terminal control back through the invoking shell"
+fi
+assert_contains "${output_log}" "shell:wrapper-stopped"
+assert_contains "${output_log}" "shell:wrapper-continued"
+assert_contains "${bundle_log}" "confirmation:y"
+continuation_record="$(grep '^job-control:continued:' "${bundle_log}" | tail -n 1)"
+continuation_heartbeats="$(printf '%s\n' "${continuation_record}" | cut -d: -f3)"
+continuation_statuses="$(printf '%s\n' "${continuation_record}" | cut -d: -f4)"
+continuation_renewals="$(printf '%s\n' "${continuation_record}" | cut -d: -f5)"
+test "${continuation_heartbeats}" -ge 2 || fail "release child continued before a fresh heartbeat"
+test "${continuation_statuses}" -ge 3 || fail "release child continued before a fresh authoritative fence"
+test "${continuation_renewals}" -ge 1 || fail "managed release child continued before exact claim renewal"
+process_group="$(awk -F: '/^bundle:/ { print $3; exit }' "${bundle_log}")"
+assert_group_dead "${process_group}"
+assert_terminal_restored
+assert_contains "${coord_log}" $'claim-atomic|'
+assert_contains "${coord_log}" $'release|'
+assert_secret_absent
+pass "Ctrl-Z returns control to the shell and revalidates fencing before foreground resume"
+
+setup_case interactive-job-control-lost-fence
+export FAKE_BUNDLE_MODE=job-control-confirm
+export FAKE_STATUS_CHANGE_AFTER=2
+export FAKE_STATUS_AFTER_FIRST=released
+export REACT_ON_RAILS_RELEASE_HEARTBEAT_INTERVAL=60
+if run_job_control_release_in_pty; then
+  fail "Ctrl-Z resume continued after the authoritative release fence was lost"
+fi
+assert_contains "${output_log}" "shell:wrapper-stopped"
+assert_contains "${output_log}" "Release lease refresh failed"
+assert_not_contains "${bundle_log}" "confirmation:y"
+process_group="$(awk -F: '/^bundle:/ { print $3; exit }' "${bundle_log}")"
+assert_group_dead "${process_group}"
+assert_terminal_restored
+assert_no_coordination_mutation
+assert_secret_absent
+pass "Ctrl-Z resume terminates the stopped release group when fresh fencing fails"
 
 for confirmation_input in $'n\n' $'\n'; do
   setup_case "declined-confirmation-${tests_run}"
@@ -1499,6 +1710,37 @@ for exception_mode in after-spawn after-handshake; do
     pass "${exception_mode} supervisor exception terminates the release group"
   fi
 done
+
+if supervisor_case_enabled exception-restore; then
+  setup_case exception-restoration-during-unwind
+  export FAKE_EXCEPTION_MODE=after-spawn
+  export FAKE_RESTORE_FAIL=1
+  export FAKE_BUNDLE_MODE=hold
+  if run_exception_release; then
+    fail "release with nested terminal restoration failure exited successfully"
+  fi
+  process_group="$(cat "${exception_group_log}")"
+  assert_group_dead "${process_group}"
+  assert_contains "${output_log}" "release supervisor process operation failed"
+  assert_not_contains "${output_log}" "injected terminal restoration failure"
+  assert_no_coordination_mutation
+  assert_secret_absent
+  pass "terminal restoration failure does not mask the active release exception"
+
+  setup_case standalone-terminal-restoration-failure
+  export FAKE_EXCEPTION_MODE=restore-only
+  export FAKE_RESTORE_FAIL=1
+  export FAKE_BUNDLE_MODE=success
+  if run_exception_release; then
+    fail "standalone terminal restoration failure exited successfully"
+  fi
+  process_group="$(cat "${exception_group_log}")"
+  assert_group_dead "${process_group}"
+  assert_contains "${output_log}" "injected terminal restoration failure"
+  assert_no_coordination_mutation
+  assert_secret_absent
+  pass "standalone terminal restoration failure remains fail-closed"
+fi
 
 setup_case managed-echild-retains-claim
 unset RELEASE_COORDINATOR_ID RELEASE_COORDINATOR_INSTANCE_ID
