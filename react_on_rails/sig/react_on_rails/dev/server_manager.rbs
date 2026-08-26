@@ -15,7 +15,10 @@ module ReactOnRails
       type shutdown_result = [Symbol, Array[String]]
 
       def self.start: (mode, String?, ?verbose: bool, ?route: String?, ?rails_env: String?) -> void
-      def self.kill_processes: () -> void
+      def self.kill_processes: () -> Symbol
+      def self.clean_generated_assets_and_caches: () -> bool
+      def self.killable_ports: () -> Array[Integer]
+      def self.default_killable_ports: () -> Array[Integer]
       def self.terminate_processes: (Array[Integer], ?String) -> void
       def self.kill_port_processes: (Array[Integer]) -> bool
       def self.find_port_pids: (Integer) -> Array[Integer]
@@ -47,25 +50,34 @@ module ReactOnRails
       # -- Scoped dev shutdown ------------------------------------------
       def self.dev_session_path: (String) -> String
       def self.current_app_root: () -> String
+      def self.app_root_ancestor: (String) -> String?
       def self.inside_dev_app_root?: (untyped, ?String) -> bool
       def self.relative_to_app_root: (String, ?String) -> String
       def self.with_dev_session: () { () -> untyped } -> untyped
       def self.claim_dev_session: (String) -> File?
       def self.dev_session_payload: (String) -> Hash[String, untyped]
+      def self.selected_session_ports: () -> Array[Integer]
       def self.owned_process_group: () -> Integer?
       def self.owned_overmind_socket_path: (String) -> String?
       def self.default_overmind_socket_path: (String) -> String
       def self.release_dev_session: (File?) -> void
       def self.shutdown_dev_session: () -> shutdown_result
+      def self.shutdown_ports: (dev_session_view) -> Array[Integer]
+      def self.shutdown_failed?: (Symbol?) -> bool
+      def self.abort_clean_after_failed_shutdown: () -> bool
       def self.dispatch_dev_shutdown: (dev_session_view) -> shutdown_result
       def self.dev_session_view: (String) -> dev_session_view
-      def self.open_dev_session: (String) -> File?
+      def self.open_dev_session: (String) -> [Symbol, untyped]
       def self.classify_dev_session: (String, String, File) -> [Symbol, untyped]
+      def self.confirm_locked_dev_session: (String, File, dev_session) -> [Symbol, untyped]
       def self.classify_released_dev_session: (String, File, dev_session) -> [Symbol, untyped]
       def self.parse_dev_session: (untyped) -> dev_session?
       def self.valid_dev_session_document?: (untyped) -> bool
       def self.valid_session_root?: (untyped) -> bool
+      def self.valid_session_pid?: (untyped) -> bool
       def self.valid_session_pgid?: (untyped) -> bool
+      def self.valid_session_ports?: (untyped) -> bool
+      def self.valid_session_socket?: (untyped) -> bool
       def self.lock_dev_session: (File) -> Symbol
       def self.dev_session_replaced?: (String, File) -> bool
       def self.close_session_handle: (dev_session_view?) -> void
@@ -76,7 +88,7 @@ module ReactOnRails
       def self.verify_owner_shutdown: (dev_session_view, Integer?, String?) -> shutdown_result
       def self.owner_shutdown_complete?: (dev_session_view, Integer?, String?) -> bool
       def self.shutdown_blockers: (dev_session_view, Integer?, String?) -> Array[String]
-      def self.owner_released?: (String) -> bool
+      def self.owner_released?: (dev_session_view) -> bool
       def self.leftover_owned_listeners: (dev_session_view) -> Array[String]
       def self.remove_dev_session_file: (dev_session_view) -> bool
       def self.shutdown_without_owner: (dev_session_view) -> shutdown_result
@@ -91,10 +103,15 @@ module ReactOnRails
       def self.signal_process_group: (Integer, String) -> bool
       def self.process_group_alive?: (Integer) -> bool
       def self.process_alive?: (Integer) -> bool
-      def self.classify_port_listeners: (Array[Integer]) -> [Hash[Integer, Array[Integer]], Hash[Integer, Array[Integer]]]
+      def self.classify_port_listeners: (Array[Integer]) -> [Hash[Integer, Array[Integer]], Hash[Integer, Array[Integer]], Array[Integer]]
       def self.report_foreign_listeners: (Hash[Integer, Array[Integer]]) -> void
-      def self.pid_working_directory_owned?: (Integer) -> bool
+      def self.report_unavailable_port_probes: (Array[Integer]) -> void
+      def self.pid_working_directory_owned?: (Integer, ?String) -> bool
       def self.working_directory_for_pid: (Integer) -> String?
+      def self.probe_port_listeners: (Integer) -> [Array[Integer], Symbol]
+      def self.default_rails_kill_port: () -> Integer
+      def self.default_dev_server_kill_port: () -> Integer
+      def self.configured_dev_server_port: () -> Integer?
       def self.stale_cleanup_candidates: (String) -> Array[String]
       def self.wait_until: (Numeric) { () -> untyped } -> bool
       def self.monotonic_now: () -> Float

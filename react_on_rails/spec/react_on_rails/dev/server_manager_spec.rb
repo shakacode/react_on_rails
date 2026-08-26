@@ -1240,9 +1240,13 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       File.realpath(base)
     end
 
+    # A Gemfile makes the fixture look like a real app root, which is what
+    # `current_app_root` walks up to find when a command runs from a
+    # subdirectory.
     def app_root(name)
       root = File.join(@dev_session_base, name)
       FileUtils.mkdir_p(File.join(root, "tmp", "react_on_rails"))
+      File.write(File.join(root, "Gemfile"), "# fixture app root\n")
       root
     end
 
@@ -1371,6 +1375,29 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         ENV.delete("OVERMIND_SOCKET")
       end
 
+      it "records the ports this run actually selected" do
+        root = app_root("recorded-ports")
+        ENV["PORT"] = "4000"
+        ENV["SHAKAPACKER_DEV_SERVER_PORT"] = "4035"
+        recorded = nil
+
+        Dir.chdir(root) do
+          described_class.send(:with_dev_session) { recorded = JSON.parse(File.read(session_path(root))) }
+        end
+
+        expect(recorded["ports"]).to eq([4000, 4035])
+      end
+
+      it "prefers the recorded ports over the killing shell's derived guess" do
+        allow(described_class).to receive(:killable_ports).and_return([3000, 3035])
+
+        aggregate_failures do
+          expect(described_class.send(:shutdown_ports, { session: { ports: [4000, 4035] } })).to eq([4000, 4035])
+          expect(described_class.send(:shutdown_ports, { session: { ports: [] } })).to eq([3000, 3035])
+          expect(described_class.send(:shutdown_ports, {})).to eq([3000, 3035])
+        end
+      end
+
       it "leaves state owned by another running bin/dev untouched" do
         root = app_root("contended")
         start_owner(root)
@@ -1382,6 +1409,9 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
         aggregate_failures do
           expect(output).to include("Another `bin/dev` already owns")
+          # The untracked second run must say plainly that `bin/dev kill` will
+          # not control it.
+          expect(output).to include("This run is NOT recorded")
           expect(File.read(session_path(root))).to eq(before_contents)
         end
       end
@@ -1537,16 +1567,122 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         end
       end
 
+      it "detects a leftover listener on a recorded port instead of reporting success" do
+        root = app_root("leftover")
+        start_owner(root)
+        listener = start_unrelated_process
+        allow(described_class).to receive(:shutdown_ports).and_return([4567])
+        allow(described_class).to receive(:probe_port_listeners).with(4567).and_return([[listener[:pid]], :ok])
+        allow(described_class).to receive(:working_directory_for_pid).with(listener[:pid]).and_return(root)
+
+        output = kill_in(root)
+
+        aggregate_failures do
+          expect(output).to include("Shutdown could not be verified")
+          expect(output).to include("port 4567 is still held by this app directory")
+          expect(output).not_to include("verified gone")
+        end
+      end
+
+      it "does not claim verified when the listener probe could not run" do
+        root = app_root("lsof-down")
+        start_owner(root)
+        allow(described_class).to receive(:shutdown_ports).and_return([4567])
+        allow(described_class).to receive(:probe_port_listeners).with(4567).and_return([[], :unavailable])
+
+        output = kill_in(root)
+
+        aggregate_failures do
+          expect(output).to include("Shutdown could not be verified")
+          expect(output).to include("could not verify port 4567 is free")
+          expect(output).not_to include("verified gone")
+        end
+      end
+
+      it "refuses when the session path exists but cannot be opened" do
+        root = app_root("unopenable")
+        # A self-referential symlink: open(2) fails with ELOOP, which is NOT
+        # ENOENT and so must not be read as "there is no session here" - that
+        # would bypass a lock we could not inspect and go on to signal.
+        File.symlink(session_path(root), session_path(root))
+
+        expect(described_class).not_to receive(:kill_port_processes)
+
+        output = kill_in(root)
+
+        aggregate_failures do
+          expect(output).to include("Refusing to signal anything")
+          expect(output).to include("could not open")
+          expect(output).not_to include("No development processes owned by this app directory")
+        end
+      end
+
+      it "refuses when the payload changed under a freshly observed lock" do
+        # claim_dev_session locks, then truncates and writes, so a reader can
+        # see the previous owner's bytes while a NEW owner holds the lock. That
+        # must not turn a recycled pgid into proven-live signal authority.
+        root = app_root("payload-race")
+        write_session(root, "pgid" => 4321)
+        allow(described_class).to receive(:lock_dev_session).and_return(:held)
+        first_read = true
+        allow(described_class).to receive(:parse_dev_session).and_wrap_original do |original, raw|
+          parsed = original.call(raw)
+          next parsed unless first_read && parsed
+
+          first_read = false
+          parsed.merge(pgid: 9999)
+        end
+
+        expect(described_class).not_to receive(:signal_process_group)
+
+        output = kill_in(root)
+
+        aggregate_failures do
+          expect(output).to include("Refusing to signal anything")
+          expect(output).to include("changed while its owner was being identified")
+        end
+      end
+
+      it "refuses when the payload is truncated under the lock" do
+        root = app_root("payload-truncated")
+        write_session(root)
+        allow(described_class).to receive(:lock_dev_session).and_return(:held)
+        reads = 0
+        allow(described_class).to receive(:parse_dev_session).and_wrap_original do |original, raw|
+          reads += 1
+          reads == 1 ? original.call(raw) : nil
+        end
+
+        expect(described_class).not_to receive(:signal_process_group)
+
+        expect(kill_in(root)).to include("Refusing to signal anything")
+      end
+
+      it "stops the session when run from a subdirectory of the app root" do
+        root = app_root("subdir")
+        nested = File.join(root, "app", "models")
+        FileUtils.mkdir_p(nested)
+        start_owner(root)
+
+        output = capture_stdout { Dir.chdir(nested) { described_class.kill_processes } }
+
+        aggregate_failures do
+          expect(output).to include(root)
+          expect(output).not_to include("No development processes owned by this app directory")
+          expect(output).to include("verified gone")
+        end
+      end
+
       it "signals only listeners whose working directory is inside this app root" do
         root = app_root("ports")
         mine = start_unrelated_process
         theirs = start_unrelated_process
         allow(described_class).to receive(:killable_ports).and_return([4567, 4568])
-        allow(described_class).to receive(:find_port_pids) do |port|
+        allow(described_class).to receive(:probe_port_listeners) do |port|
           case port
-          when 4567 then alive?(mine[:pid]) ? [mine[:pid]] : []
-          when 4568 then alive?(theirs[:pid]) ? [theirs[:pid]] : []
-          else []
+          when 4567 then [alive?(mine[:pid]) ? [mine[:pid]] : [], :ok]
+          when 4568 then [alive?(theirs[:pid]) ? [theirs[:pid]] : [], :ok]
+          else [[], :ok]
           end
         end
         allow(described_class).to receive(:working_directory_for_pid).with(mine[:pid]).and_return(root)
@@ -1567,7 +1703,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         root = app_root("unattributable")
         theirs = start_unrelated_process
         allow(described_class).to receive(:killable_ports).and_return([4569])
-        allow(described_class).to receive(:find_port_pids).with(4569).and_return([theirs[:pid]])
+        allow(described_class).to receive(:probe_port_listeners).with(4569).and_return([[theirs[:pid]], :ok])
         # lsof unavailable / permission denied -> not attributable.
         allow(described_class).to receive(:working_directory_for_pid).with(theirs[:pid]).and_return(nil)
 
@@ -1606,6 +1742,52 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
           expect(output).to include("verified gone")
           expect(alive?(unrelated[:pid])).to be true
         end
+      end
+
+      it "rejects an endpoint that symlinks outside this app root" do
+        # `File.socket?` follows symlinks, so comparing the unresolved string
+        # let <root>/.overmind.sock point at another checkout's live endpoint
+        # and still pass containment - no session-file tampering needed,
+        # because the default path is always a candidate.
+        root = app_root("symlink-escape")
+        other = app_root("symlink-target")
+        victim_socket = File.join(other, ".overmind.sock")
+        servers << UNIXServer.new(victim_socket)
+        File.symlink(victim_socket, File.join(root, ".overmind.sock"))
+
+        aggregate_failures do
+          expect(Dir.chdir(root) do
+            described_class.send(:overmind_endpoint_owned?, File.join(root, ".overmind.sock"))
+          end).to be false
+          expect(Dir.chdir(root) { described_class.send(:live_overmind_endpoint, root, nil) }).to be_nil
+        end
+      end
+
+      it "rejects a recorded endpoint that escapes the app root with .." do
+        root = app_root("dotdot-escape")
+        other = app_root("dotdot-target")
+        victim_socket = File.join(other, ".overmind.sock")
+        servers << UNIXServer.new(victim_socket)
+        escaped = File.join(root, "..", File.basename(other), ".overmind.sock")
+
+        aggregate_failures do
+          expect(Dir.chdir(root) { described_class.send(:overmind_endpoint_owned?, escaped) }).to be false
+          expect(Dir.chdir(root) { described_class.send(:live_overmind_endpoint, root, escaped) }).to be_nil
+        end
+      end
+
+      it "never tears down another checkout's session through a symlinked endpoint" do
+        root = app_root("attacker")
+        victim = app_root("victim")
+        victim_socket = File.join(victim, ".overmind.sock")
+        servers << UNIXServer.new(victim_socket)
+        File.symlink(victim_socket, File.join(root, ".overmind.sock"))
+
+        expect(described_class).not_to receive(:overmind_control)
+
+        kill_in(root)
+
+        expect(File.socket?(victim_socket)).to be true
       end
 
       it "refuses to control an endpoint outside this app root" do
@@ -1672,6 +1854,69 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       end
     end
 
+    describe "app root discovery" do
+      it "anchors on the nearest ancestor that looks like an app root" do
+        root = app_root("anchor")
+        nested = File.join(root, "app", "assets", "config")
+        FileUtils.mkdir_p(nested)
+
+        expect(Dir.chdir(nested) { described_class.send(:current_app_root) }).to eq(root)
+      end
+
+      it "anchors on the app root itself when invoked there" do
+        root = app_root("anchor-self")
+
+        expect(Dir.chdir(root) { described_class.send(:current_app_root) }).to eq(root)
+      end
+
+      it "recognises a directory holding only dev session state" do
+        root = File.join(@dev_session_base, "session-only")
+        FileUtils.mkdir_p(File.join(root, "tmp", "react_on_rails"))
+        File.write(File.join(root, "tmp", "react_on_rails", "dev-session.json"), "{}")
+        nested = File.join(root, "lib")
+        FileUtils.mkdir_p(nested)
+
+        expect(Dir.chdir(nested) { described_class.send(:current_app_root) }).to eq(root)
+      end
+    end
+
+    describe "owner liveness re-observation" do
+      # `flock` locks attach to the open file description, not the process, so
+      # a second descriptor can be denied by our OWN lock - which would report
+      # a successful shutdown as "the owner is still running".
+      it "does not mistake this process's own lock for a live owner" do
+        root = app_root("own-lock")
+        write_session(root)
+        handle = File.open(session_path(root), File::RDONLY)
+        handles << handle
+        expect(described_class.send(:lock_dev_session, handle)).to eq(:acquired)
+
+        second_fd_result = File.open(session_path(root), File::RDONLY) do |file|
+          file.flock(File::LOCK_EX | File::LOCK_NB)
+        end
+
+        aggregate_failures do
+          expect(second_fd_result).to be false
+          expect(described_class.send(:owner_released?, { path: session_path(root), handle: })).to be true
+        end
+      end
+
+      it "reports a genuinely live owner as not released" do
+        root = app_root("live-lock")
+        start_owner(root)
+        handle = File.open(session_path(root), File::RDONLY)
+        handles << handle
+
+        expect(described_class.send(:owner_released?, { path: session_path(root), handle: })).to be false
+      end
+
+      it "treats a removed session file as released" do
+        root = app_root("gone-lock")
+
+        expect(described_class.send(:owner_released?, { path: session_path(root), handle: nil })).to be true
+      end
+    end
+
     describe "process-group ownership" do
       it "records a pgid only when bin/dev leads its own process group" do
         allow(Process).to receive_messages(getpgrp: 4321, pid: 4321)
@@ -1733,6 +1978,71 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
     end
   end
 
+  describe ".probe_port_listeners" do
+    # Verification must distinguish "lsof ran and found nothing" from "lsof
+    # could not run": treating a failed probe as an empty result would silently
+    # upgrade a surviving listener to a verified shutdown.
+    it "reports a missing lsof as unavailable rather than as an empty result" do
+      allow(Open3).to receive(:capture2).and_raise(Errno::ENOENT)
+
+      expect(described_class.send(:probe_port_listeners, 3000)).to eq([[], :unavailable])
+    end
+
+    it "reports an lsof exit status above 1 as unavailable" do
+      allow(Open3).to receive(:capture2).and_return(["", instance_double(Process::Status, exitstatus: 127)])
+
+      expect(described_class.send(:probe_port_listeners, 3000)).to eq([[], :unavailable])
+    end
+
+    it "treats lsof exit 1 with no output as a genuine empty result" do
+      allow(Open3).to receive(:capture2).and_return(["", instance_double(Process::Status, exitstatus: 1)])
+
+      expect(described_class.send(:probe_port_listeners, 3000)).to eq([[], :ok])
+    end
+  end
+
+  describe "shutdown exit status" do
+    it "exits non-zero when `bin/dev kill` refuses to signal anything" do
+      allow(described_class).to receive(:kill_processes).and_return(:refused)
+
+      expect { described_class.run_from_command_line(["kill"]) }
+        .to raise_error(SystemExit) { |error| expect(error.status).to eq(1) }
+    end
+
+    it "exits non-zero when the shutdown could not be verified" do
+      allow(described_class).to receive(:kill_processes).and_return(:unverified)
+
+      expect { described_class.run_from_command_line(["kill"]) }
+        .to raise_error(SystemExit) { |error| expect(error.status).to eq(1) }
+    end
+
+    it "exits zero when the shutdown is verified" do
+      allow(described_class).to receive(:kill_processes).and_return(:verified)
+
+      expect { described_class.run_from_command_line(["kill"]) }.not_to raise_error
+    end
+
+    # `bin/dev clean` deletes pack outputs. Doing that after an explicit refusal
+    # would leave a still-running dev server serving files it just removed.
+    it "refuses to delete bundles when the shutdown could not be verified" do
+      allow(described_class).to receive(:kill_processes).and_return(:unverified)
+
+      expect(described_class).not_to receive(:remove_clean_targets)
+
+      output = capture_stdout { expect(described_class.clean_generated_assets_and_caches).to be false }
+      expect(output).to include("Not cleaning")
+    end
+
+    it "cleans normally once the shutdown is verified" do
+      allow(described_class).to receive_messages(kill_processes: :verified,
+                                                 print_shakapacker_config_status: nil,
+                                                 clean_targets: [], remove_clean_targets: true)
+
+      output = capture_stdout { expect(described_class.clean_generated_assets_and_caches).to be true }
+      expect(output).to include("Generated bundles and caches cleaned")
+    end
+  end
+
   describe ".killable_ports" do
     include_context "with clean port env"
 
@@ -1767,11 +2077,48 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         .to include("Including renderer port 5002")
     end
 
+    it "covers the Shakapacker dev-server port in default mode" do
+      # Regression: this list used to be [3000, 3001]. Shakapacker's dev server
+      # defaults to 3035 and `Procfile.dev` runs it, so a default-mode kill
+      # neither stopped it nor noticed it was still there - and because
+      # verification reuses the same list, `bin/dev kill` reported a verified
+      # shutdown while the dev server was still serving.
+      allow(ReactOnRails::Dev::PortSelector).to receive(:base_port_hash).and_return(nil)
+      allow(described_class).to receive(:pro_renderer_active?).and_return(false)
+
+      expect(described_class.killable_ports).to eq([3000, 3035])
+    end
+
+    it "prefers explicit PORT / SHAKAPACKER_DEV_SERVER_PORT over the defaults" do
+      ENV["PORT"] = "4000"
+      ENV["SHAKAPACKER_DEV_SERVER_PORT"] = "4035"
+      allow(ReactOnRails::Dev::PortSelector).to receive(:base_port_hash).and_return(nil)
+      allow(described_class).to receive(:pro_renderer_active?).and_return(false)
+
+      expect(described_class.killable_ports).to eq([4000, 4035])
+    end
+
+    it "falls back to the dev_server port configured in shakapacker.yml" do
+      allow(ReactOnRails::Dev::PortSelector).to receive(:base_port_hash).and_return(nil)
+      allow(described_class).to receive_messages(pro_renderer_active?: false,
+                                                 development_dev_server_config: { "port" => 3210 })
+
+      expect(described_class.killable_ports).to eq([3000, 3210])
+    end
+
+    it "ignores an unusable dev_server port in shakapacker.yml" do
+      allow(ReactOnRails::Dev::PortSelector).to receive(:base_port_hash).and_return(nil)
+      allow(described_class).to receive_messages(pro_renderer_active?: false,
+                                                 development_dev_server_config: { "port" => "auto" })
+
+      expect(described_class.killable_ports).to eq([3000, 3035])
+    end
+
     it "does not widen scope to 3800 when the Pro gem is loaded but no renderer env vars are set" do
       allow(ReactOnRails::Dev::PortSelector).to receive(:base_port_hash).and_return(nil)
       allow(described_class).to receive(:pro_renderer_active?).and_return(true)
 
-      expect(described_class.killable_ports).to eq([3000, 3001])
+      expect(described_class.killable_ports).to eq([3000, 3035])
     end
 
     it "targets 3800 when a localhost REACT_RENDERER_URL is set without an explicit port" do
@@ -1779,7 +2126,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       allow(ReactOnRails::Dev::PortSelector).to receive(:base_port_hash).and_return(nil)
       allow(described_class).to receive(:pro_renderer_active?).and_return(true)
 
-      expect(described_class.killable_ports).to eq([3000, 3001, 3800])
+      expect(described_class.killable_ports).to eq([3000, 3035, 3800])
     end
 
     it "targets the configured renderer port when Pro renderer support is active without a base port" do
@@ -1787,21 +2134,21 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       allow(ReactOnRails::Dev::PortSelector).to receive(:base_port_hash).and_return(nil)
       allow(described_class).to receive(:pro_renderer_active?).and_return(true)
 
-      expect(described_class.killable_ports).to eq([3000, 3001, 3900])
+      expect(described_class.killable_ports).to eq([3000, 3035, 3900])
     end
 
     it "does not target the default renderer port for a remote renderer URL" do
       ENV["REACT_RENDERER_URL"] = "https://renderer.internal:3800"
       allow(ReactOnRails::Dev::PortSelector).to receive(:base_port_hash).and_return(nil)
 
-      expect(described_class.killable_ports).to eq([3000, 3001])
+      expect(described_class.killable_ports).to eq([3000, 3035])
     end
 
     it "targets the local renderer URL port when RENDERER_PORT is not set" do
       ENV["REACT_RENDERER_URL"] = "http://localhost:3900"
       allow(ReactOnRails::Dev::PortSelector).to receive(:base_port_hash).and_return(nil)
 
-      expect(described_class.killable_ports).to eq([3000, 3001, 3900])
+      expect(described_class.killable_ports).to eq([3000, 3035, 3900])
     end
 
     it "does not treat userinfo digits as an explicit local renderer URL port" do
@@ -1809,7 +2156,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       allow(ReactOnRails::Dev::PortSelector).to receive(:base_port_hash).and_return(nil)
       allow(described_class).to receive(:pro_renderer_active?).and_return(true)
 
-      expect(described_class.killable_ports).to eq([3000, 3001, 3800])
+      expect(described_class.killable_ports).to eq([3000, 3035, 3800])
     end
   end
 
@@ -2122,8 +2469,8 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
   describe ".kill_port_processes" do
     it "signals only listeners whose working directory is inside this app root" do
-      allow(described_class).to receive(:find_port_pids).with(3000).and_return([1234])
-      allow(described_class).to receive(:find_port_pids).with(3001).and_return([5678])
+      allow(described_class).to receive(:probe_port_listeners).with(3000).and_return([[1234], :ok])
+      allow(described_class).to receive(:probe_port_listeners).with(3001).and_return([[5678], :ok])
       allow(described_class).to receive(:working_directory_for_pid).with(1234).and_return(File.realpath(Dir.pwd))
       allow(described_class).to receive(:working_directory_for_pid).with(5678).and_return("/somewhere/else")
       allow(described_class).to receive(:process_alive?).and_return(false)
@@ -2136,13 +2483,13 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
     end
 
     it "returns false when no processes found on ports" do
-      allow(described_class).to receive(:find_port_pids).and_return([])
+      allow(described_class).to receive(:probe_port_listeners).and_return([[], :ok])
 
       expect(described_class.kill_port_processes([3000, 3001])).to be false
     end
 
     it "never signals a listener it cannot attribute to this app root" do
-      allow(described_class).to receive(:find_port_pids).with(3000).and_return([1234])
+      allow(described_class).to receive(:probe_port_listeners).with(3000).and_return([[1234], :ok])
       allow(described_class).to receive(:working_directory_for_pid).with(1234).and_return("/somewhere/else")
 
       expect(Process).not_to receive(:kill)
@@ -2344,7 +2691,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
     it "documents the clean command" do
       output = capture_stdout { described_class.show_help }
 
-      expect(output).to match(%r{clean\s+Kill dev processes and remove generated bundles/caches})
+      expect(output).to match(%r{clean\s+Stop dev processes, then remove generated bundles/caches})
     end
 
     it "links to the published documentation for dev server and testing guidance" do

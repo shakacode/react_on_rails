@@ -43,6 +43,14 @@ module ReactOnRails
       SHUTDOWN_KILL_GRACE_SECS = 5
       SHUTDOWN_POLL_INTERVAL_SECS = 0.2
 
+      # Markers that identify an app root when a command is run from a
+      # subdirectory. Checked nearest-first while walking up from the cwd.
+      APP_ROOT_MARKERS = [File.join("config", "environment.rb"), "Gemfile", DEV_SESSION_RELATIVE_PATH].freeze
+
+      # Shutdown outcomes that must never be reported as success: `bin/dev kill`
+      # exits non-zero on these, and `bin/dev clean` refuses to delete anything.
+      SHUTDOWN_FAILURE_STATUSES = %i[refused unverified].freeze
+
       DOCS_BASE_URL = "https://reactonrails.com/docs"
       DEV_SERVER_AND_TESTING_DOCS_URL = "#{DOCS_BASE_URL}/building-features/dev-server-and-testing/".freeze
       TESTING_CONFIGURATION_DOCS_URL = "#{DOCS_BASE_URL}/building-features/testing-configuration/".freeze
@@ -80,6 +88,8 @@ module ReactOnRails
         # nothing is signalled unless it can be positively attributed to the
         # current app root. See the "Scoped dev shutdown" section below for
         # the ownership model and its known limitation.
+        # Returns the shutdown status symbol so callers can distinguish a
+        # verified stop from a refusal. See SHUTDOWN_FAILURE_STATUSES.
         def kill_processes
           puts "🔪 Stopping this app's development processes..."
           puts "   #{current_app_root}"
@@ -87,12 +97,18 @@ module ReactOnRails
 
           status, blockers = shutdown_dev_session
           print_kill_summary(status, blockers)
+          status
         end
 
+        # Returns true when the cleanup ran to completion without warnings.
+        # Deleting bundles is refused outright when the dev processes could not
+        # be stopped - removing output from under a still-running dev server
+        # leaves it serving files this command just deleted.
         def clean_generated_assets_and_caches
           puts "🧹 Cleaning generated bundles and caches..."
           puts ""
-          kill_processes
+          return false if shutdown_failed?(kill_processes) && abort_clean_after_failed_shutdown
+
           puts ""
           print_shakapacker_config_status
           puts ""
@@ -105,6 +121,8 @@ module ReactOnRails
           else
             puts "⚠️  Cleanup completed with warnings"
           end
+
+          clean_finished_without_warnings
         end
 
         # Fallback port list for the port-scan kill path. Uses the base-port
@@ -146,12 +164,42 @@ module ReactOnRails
         end
 
         def default_killable_ports
-          ports = [3000, 3001]
+          ports = [default_rails_kill_port, default_dev_server_kill_port]
           if pro_renderer_active?
             renderer_port = configured_renderer_port_for_kill
             ports << renderer_port if renderer_port
           end
-          ports
+          ports.uniq
+        end
+
+        def default_rails_kill_port
+          raw = ENV.fetch("PORT", nil)
+          PortSelector.valid_port_string?(raw) ? raw.strip.to_i : PortSelector::DEFAULT_RAILS_PORT
+        end
+
+        # `Procfile.dev` runs `bin/shakapacker-dev-server`, whose port comes from
+        # SHAKAPACKER_DEV_SERVER_PORT or `dev_server.port` in
+        # config/shakapacker.yml and defaults to 3035 - it is NOT "the Rails port
+        # plus one". The hard-coded 3001 this replaced meant a default-mode kill
+        # neither stopped nor even looked at a dev server on 3035, so
+        # `bin/dev kill` could report a verified shutdown while it was still
+        # serving. Widening the scanned list is safe: the cwd-attribution filter
+        # still decides whether anything is actually signalled.
+        def default_dev_server_kill_port
+          raw = ENV.fetch("SHAKAPACKER_DEV_SERVER_PORT", nil)
+          return raw.strip.to_i if PortSelector.valid_port_string?(raw)
+
+          configured = configured_dev_server_port
+          return configured if configured
+
+          PortSelector::DEFAULT_WEBPACK_PORT
+        end
+
+        def configured_dev_server_port
+          value = development_dev_server_config["port"]
+          PortSelector.valid_port_string?(value.to_s) ? value.to_s.strip.to_i : nil
+        rescue StandardError
+          nil
         end
 
         def configured_renderer_port_for_kill
@@ -214,8 +262,9 @@ module ReactOnRails
         # signalled. Listeners that cannot be positively attributed are
         # reported as diagnostics and left alone.
         def kill_port_processes(ports)
-          owned, foreign = classify_port_listeners(ports)
+          owned, foreign, unavailable = classify_port_listeners(ports)
           report_foreign_listeners(foreign)
+          report_unavailable_port_probes(unavailable)
           return false if owned.empty?
 
           owned.each do |port, pids|
@@ -241,11 +290,28 @@ module ReactOnRails
         # also matched *client* sockets connected to the port (a browser tab, a
         # curl, another app's HTTP client), and those pids were then signalled.
         def find_port_pids(port)
-          stdout, _status = Open3.capture2("lsof", "-nP", "-t", "-iTCP:#{port}", "-sTCP:LISTEN", err: File::NULL)
-          stdout.split("\n").map(&:to_i).reject { |pid| pid <= 1 || pid == Process.pid }
+          probe_port_listeners(port).first
+        end
+
+        # Returns [pids, :ok] or [[], :unavailable].
+        #
+        # `find_port_pids` keeps the plain-Array contract for the public API and
+        # the signalling path, but verification needs to tell "lsof ran and found
+        # nothing" apart from "lsof could not run".
+        #
+        # Caveat, deliberately not papered over: lsof exits 1 both when it
+        # matches nothing and for some soft failures, so only a failure to run at
+        # all (missing binary, spawn failure) or an exit status above 1 can be
+        # reported as :unavailable.
+        def probe_port_listeners(port)
+          stdout, status = Open3.capture2("lsof", "-nP", "-t", "-iTCP:#{port}", "-sTCP:LISTEN", err: File::NULL)
+          exit_status = status.respond_to?(:exitstatus) ? status.exitstatus.to_i : 0
+          return [[], :unavailable] if exit_status > 1
+
+          [stdout.split("\n").map(&:to_i).reject { |pid| pid <= 1 || pid == Process.pid }, :ok]
         rescue StandardError
           # lsof command not found or other error (permission denied, etc.)
-          []
+          [[], :unavailable]
         end
 
         # Read-only probe used by `bin/dev test-watch` to notice an existing
@@ -357,9 +423,9 @@ module ReactOnRails
                                                          open_browser: options[:open_browser],
                                                          open_browser_once: options[:open_browser_once])
           when "kill"
-            kill_processes
+            exit 1 if shutdown_failed?(kill_processes)
           when "clean"
-            clean_generated_assets_and_caches
+            exit 1 unless clean_generated_assets_and_caches
           when "help"
             show_help
           when "test-watch"
@@ -414,12 +480,32 @@ module ReactOnRails
           File.join(root, DEV_SESSION_RELATIVE_PATH)
         end
 
-        # Absolute, symlink-resolved identity of the app directory `bin/dev`
-        # was invoked from. Every ownership decision is made against this.
+        # Absolute, symlink-resolved identity of the app directory this command
+        # belongs to. Every ownership decision is made against this.
+        #
+        # `bin/dev kill` is routinely run from a subdirectory (`../../bin/dev
+        # kill` from app/models). Anchoring on the cwd alone computed a root of
+        # <app>/app/models, found no session state there, and reported "nothing
+        # running" while the session was very much alive - so walk up to the
+        # nearest ancestor that looks like an app root and fall back to the cwd
+        # only when nothing matches.
         def current_app_root
-          File.realpath(Dir.pwd)
+          start = File.realpath(Dir.pwd)
+          app_root_ancestor(start) || start
         rescue SystemCallError
           File.expand_path(Dir.pwd)
+        end
+
+        def app_root_ancestor(start)
+          dir = start
+          loop do
+            return dir if APP_ROOT_MARKERS.any? { |marker| File.exist?(File.join(dir, marker)) }
+
+            parent = File.dirname(dir)
+            return nil if parent == dir
+
+            dir = parent
+          end
         end
 
         # Distinct from #path_inside_app_root? (used by `bin/dev clean`, which
@@ -460,6 +546,8 @@ module ReactOnRails
             file.close
             puts "   ℹ️  Another `bin/dev` already owns #{relative_to_app_root(path, root)}; " \
                  "leaving its session state untouched."
+            puts "   ⚠️  This run is NOT recorded, so `bin/dev kill` will control that other run, " \
+                 "not this one. Stop this one from its own terminal."
             return nil
           end
 
@@ -480,8 +568,20 @@ module ReactOnRails
             "pid" => Process.pid,
             "pgid" => owned_process_group,
             "overmind_socket" => owned_overmind_socket_path(root),
+            "ports" => selected_session_ports,
             "started_at" => Time.now.utc.iso8601
           }
+        end
+
+        # The ports this run actually selected, read after `configure_ports` has
+        # written them to ENV. Recording them means `bin/dev kill` verifies the
+        # session's real ports instead of re-deriving a guess from whatever
+        # environment the killing shell happens to have.
+        def selected_session_ports
+          %w[PORT SHAKAPACKER_DEV_SERVER_PORT RENDERER_PORT].filter_map do |var|
+            raw = ENV.fetch(var, nil)
+            PortSelector.valid_port_string?(raw) ? raw.strip.to_i : nil
+          end.uniq
         end
 
         # Only report a pgid we actually lead. When the shell's job control put
@@ -489,6 +589,16 @@ module ReactOnRails
         # `bin/dev` and its descendants and nothing else, so signalling it can
         # never reach the parent shell or a sibling job. If we are not the
         # group leader the group is somebody else's and is not ours to signal.
+        #
+        # We deliberately do NOT call `Process.setpgid`/`setpgrp` to manufacture
+        # a group when we do not already lead one: that detaches `bin/dev` from
+        # the terminal's foreground process group and breaks Ctrl-C, which is
+        # how people actually stop the dev server. When no group is owned (a
+        # non-job-control invocation, e.g. a plain background job in a script),
+        # the pgid is recorded as null and shutdown falls back to the Overmind
+        # socket or to cwd-attributed port cleanup. That is the
+        # Foreman-without-job-control case: still cleanable through port
+        # attribution, and refusing to guess is fail-closed.
         def owned_process_group
           pgid = Process.getpgrp
           pgid == Process.pid ? pgid : nil
@@ -523,12 +633,22 @@ module ReactOnRails
         # ---- kill path: reading and classifying the session ------------
 
         def shutdown_dev_session
-          view = dev_session_view(current_app_root).merge(ports: killable_ports)
+          view = dev_session_view(current_app_root)
+          view = view.merge(ports: shutdown_ports(view))
           begin
             dispatch_dev_shutdown(view)
           ensure
             close_session_handle(view)
           end
+        end
+
+        # Prefer the ports this session recorded at startup. The derived
+        # fallback only applies when there is no session to read them from, and
+        # a killing shell with a different base port must not override what the
+        # running session actually bound.
+        def shutdown_ports(view)
+          recorded = view.dig(:session, :ports)
+          recorded.is_a?(Array) && recorded.any? ? recorded : killable_ports
         end
 
         def dispatch_dev_shutdown(view)
@@ -541,20 +661,32 @@ module ReactOnRails
 
         def dev_session_view(root)
           path = dev_session_path(root)
-          file = open_dev_session(path)
-          return { kind: :absent, root:, path:, handle: nil } if file.nil?
+          outcome, payload = open_dev_session(path)
+          return { kind: :absent, root:, path:, handle: nil } if outcome == :absent
+          return { kind: :refused, root:, path:, handle: nil, blockers: [payload] } if outcome == :refused
 
-          kind, payload = classify_dev_session(root, path, file)
-          base = { kind:, root:, path:, handle: file }
-          kind == :refused ? base.merge(blockers: [payload]) : base.merge(session: payload)
+          kind, result = classify_dev_session(root, path, payload)
+          base = { kind:, root:, path:, handle: payload }
+          kind == :refused ? base.merge(blockers: [result]) : base.merge(session: result)
         end
 
-        # Missing state, an unreadable file and a permissions problem are all
-        # "no usable owner record", handled by the caller's no-owner path.
+        # Returns [:opened, File], [:absent, nil] or [:refused, message].
+        #
+        # Only a genuinely missing file means "no session here". Anything else -
+        # a permissions change, a read-only filesystem, a directory in the way -
+        # means we could not inspect a lock that may well be held, so it fails
+        # closed instead of letting the no-owner path go on to signal
+        # port-attributed processes and print success.
+        #
+        # Opened read-only: this handle is never written through, and `flock`
+        # works on a read-only descriptor, so requiring write access would
+        # refuse sessions we can perfectly well inspect.
         def open_dev_session(path)
-          File.open(path, File::RDWR)
-        rescue SystemCallError
-          nil
+          [:opened, File.open(path, File::RDONLY)]
+        rescue Errno::ENOENT
+          [:absent, nil]
+        rescue SystemCallError => e
+          [:refused, "could not open #{path} to determine dev session ownership (#{e.class})"]
         end
 
         def classify_dev_session(root, path, file)
@@ -569,12 +701,28 @@ module ReactOnRails
           when :error
             [:refused, "could not determine whether #{path} is still owned by a running `bin/dev`"]
           when :held
-            [:owner_alive, session]
+            confirm_locked_dev_session(path, file, session)
           else
             classify_released_dev_session(path, file, session)
           end
         rescue SystemCallError, IOError
           [:refused, "could not read #{path}"]
+        end
+
+        # `claim_dev_session` takes the lock and THEN truncates and writes, so
+        # the payload and the lock holder are not written atomically: a reader
+        # can see the previous owner's bytes while a NEW owner already holds the
+        # lock, which would turn a recycled pgid into "proven live" signal
+        # authority. Re-read under the lock verdict and require the payload to be
+        # unchanged; a mismatch, a truncated read, or an invalid document fails
+        # closed rather than signalling on the strength of a bare number.
+        def confirm_locked_dev_session(path, file, session)
+          file.rewind
+          confirmed = parse_dev_session(file.read)
+          return [:refused, "#{path} changed while its owner was being identified"] unless confirmed == session
+          return [:refused, "#{path} was replaced while it was being read"] if dev_session_replaced?(path, file)
+
+          [:owner_alive, confirmed]
         end
 
         # The owner released the lock: either it tidied up after itself or it
@@ -592,7 +740,7 @@ module ReactOnRails
           return nil unless valid_dev_session_document?(data)
 
           { app_root: data["app_root"], pid: data["pid"], pgid: data["pgid"],
-            overmind_socket: data["overmind_socket"] }
+            overmind_socket: data["overmind_socket"], ports: data["ports"] }
         rescue JSON::ParserError, TypeError
           nil
         end
@@ -606,10 +754,26 @@ module ReactOnRails
           return false unless data.is_a?(Hash)
           return false unless data["schema"] == DEV_SESSION_SCHEMA
           return false unless valid_session_root?(data["app_root"])
-          return false unless data["pid"].is_a?(Integer) && data["pid"] > 1
+          return false unless valid_session_pid?(data["pid"])
           return false unless valid_session_pgid?(data["pgid"])
+          return false unless valid_session_ports?(data["ports"])
 
-          data["overmind_socket"].nil? || data["overmind_socket"].is_a?(String)
+          valid_session_socket?(data["overmind_socket"])
+        end
+
+        def valid_session_pid?(value)
+          value.is_a?(Integer) && value > 1
+        end
+
+        def valid_session_socket?(value)
+          value.nil? || value.is_a?(String)
+        end
+
+        def valid_session_ports?(value)
+          return true if value.nil?
+          return false unless value.is_a?(Array)
+
+          value.all? { |port| port.is_a?(Integer) && port.between?(1, PortSelector::TCP_PORT_MAX) }
         end
 
         def valid_session_root?(value)
@@ -716,7 +880,7 @@ module ReactOnRails
 
         def shutdown_blockers(view, pgid, endpoint)
           blockers = []
-          blockers << "the `bin/dev` that owns #{view[:path]} is still running" unless owner_released?(view[:path])
+          blockers << "the `bin/dev` that owns #{view[:path]} is still running" unless owner_released?(view)
           blockers << "process group #{pgid} still has members" if pgid && process_group_alive?(pgid)
           if endpoint && overmind_endpoint_alive?(endpoint)
             blockers << "the Overmind endpoint #{endpoint} is still accepting connections"
@@ -726,10 +890,21 @@ module ReactOnRails
 
         # Positive re-observation of the owner: the state file is gone, or its
         # lock is now free. Anything we cannot observe counts as "still held".
-        def owner_released?(path)
+        #
+        # The re-check has to use the handle we already hold. `flock` locks
+        # attach to the open file description, not to the process, so a second
+        # descriptor on the same path can be denied by OUR OWN lock - reporting
+        # "the owner is still running" when we are the lock holder and the
+        # shutdown in fact succeeded. Re-locking the same description is
+        # idempotent, so it answers the question honestly.
+        def owner_released?(view)
+          path = view[:path]
           return true unless File.exist?(path)
 
-          File.open(path, File::RDWR) do |file|
+          handle = view[:handle]
+          return lock_dev_session(handle) == :acquired if handle && !handle.closed?
+
+          File.open(path, File::RDONLY) do |file|
             file.flock(File::LOCK_EX | File::LOCK_NB) ? true : false
           end
         rescue Errno::ENOENT
@@ -738,11 +913,18 @@ module ReactOnRails
           false
         end
 
+        # Verification is stricter than signalling. For signalling, "cannot
+        # attribute" correctly means "leave it alone"; for verification, a probe
+        # that could not run at all must not be reported as "nothing left", or a
+        # transient lsof failure silently upgrades a surviving listener to
+        # :verified.
         def leftover_owned_listeners(view)
-          owned, _foreign = classify_port_listeners(view[:ports])
-          owned.map do |port, pids|
+          owned, _foreign, unavailable = classify_port_listeners(view[:ports])
+          blockers = owned.map do |port, pids|
             "port #{port} is still held by this app directory (PIDs: #{pids.join(', ')})"
           end
+          unavailable.each { |port| blockers << "could not verify port #{port} is free (lsof unavailable)" }
+          blockers
         end
 
         def remove_dev_session_file(view)
@@ -786,6 +968,19 @@ module ReactOnRails
           verify_owner_shutdown(view, nil, endpoint)
         end
 
+        def shutdown_failed?(status)
+          SHUTDOWN_FAILURE_STATUSES.include?(status)
+        end
+
+        # Always returns true so the caller can read as a single guard clause.
+        def abort_clean_after_failed_shutdown
+          puts ""
+          puts "⛔ Not cleaning: this app directory's development processes could not be stopped."
+          puts "   Removing bundles and caches under a running dev server would leave it serving"
+          puts "   output this command just deleted. Resolve the shutdown above, then retry."
+          true
+        end
+
         def print_kill_failure(status, blockers)
           puts ""
           if status == :refused
@@ -809,8 +1004,18 @@ module ReactOnRails
           candidates.find { |path| overmind_endpoint_owned?(path, root) && overmind_endpoint_alive?(path) }
         end
 
+        # Containment check for a control endpoint. The path is resolved before
+        # comparing: `File.socket?` follows symlinks, so comparing the raw string
+        # let `<root>/.overmind.sock` be a symlink pointing at ANOTHER checkout's
+        # live endpoint and still pass as "ours" - and `overmind kill -s` would
+        # then tear down that other checkout's session, with no session-file
+        # tampering required because the default path is always a candidate.
+        # Resolving also collapses `..` escapes in a recorded path.
         def overmind_endpoint_owned?(path, root = current_app_root)
-          inside_dev_app_root?(path, root) && File.socket?(path)
+          return false unless path.is_a?(String) && !path.empty?
+          return false unless File.socket?(path)
+
+          inside_dev_app_root?(File.realpath(path), root)
         rescue SystemCallError
           false
         end
@@ -884,20 +1089,33 @@ module ReactOnRails
           true
         end
 
+        # Returns [owned, foreign, unavailable]. `unavailable` lists ports whose
+        # listener probe could not run at all, which the verification path must
+        # not read as "nothing left".
         def classify_port_listeners(ports)
+          root = current_app_root
           owned = {}
           foreign = {}
+          unavailable = []
 
           Array(ports).uniq.each do |port|
-            pids = find_port_pids(port)
+            pids, probe = probe_port_listeners(port)
+            next unavailable << port if probe == :unavailable
             next if pids.empty?
 
-            mine, theirs = pids.partition { |pid| pid_working_directory_owned?(pid) }
+            mine, theirs = pids.partition { |pid| pid_working_directory_owned?(pid, root) }
             owned[port] = mine if mine.any?
             foreign[port] = theirs if theirs.any?
           end
 
-          [owned, foreign]
+          [owned, foreign, unavailable]
+        end
+
+        def report_unavailable_port_probes(ports)
+          return if ports.empty?
+
+          puts "   ⚠️  Could not check port#{'s' if ports.size > 1} #{ports.join(', ')} " \
+               "for listeners (lsof unavailable)"
         end
 
         def report_foreign_listeners(foreign)
@@ -907,11 +1125,11 @@ module ReactOnRails
           end
         end
 
-        def pid_working_directory_owned?(pid)
+        def pid_working_directory_owned?(pid, root = current_app_root)
           cwd = working_directory_for_pid(pid)
           return false if cwd.nil?
 
-          inside_dev_app_root?(cwd)
+          inside_dev_app_root?(cwd, root)
         end
 
         # `lsof -a -p PID -d cwd -Fn` prints the process's working directory in
@@ -1442,8 +1660,8 @@ module ReactOnRails
               #{Rainbow('test-watch').green.bold}          #{Rainbow('Watch and rebuild test assets with smart defaults').white}
                                   #{Rainbow('→ Uses:').yellow} bin/shakapacker --watch (RAILS_ENV=test)
 
-              #{Rainbow('kill').red.bold}                #{Rainbow('Kill all development processes for a clean start').white}
-              #{Rainbow('clean').red.bold}               #{Rainbow('Kill dev processes and remove generated bundles/caches').white}
+              #{Rainbow('kill').red.bold}                #{Rainbow('Stop the dev processes owned by this app directory').white}
+              #{Rainbow('clean').red.bold}               #{Rainbow('Stop dev processes, then remove generated bundles/caches').white}
               #{Rainbow('help').blue.bold}                #{Rainbow('Show this help message').white}
           COMMANDS
         end
