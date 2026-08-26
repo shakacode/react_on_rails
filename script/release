@@ -2,6 +2,7 @@
 # frozen_string_literal: true
 
 require "json"
+require "English"
 require "io/wait"
 require "open3"
 require "optparse"
@@ -29,9 +30,15 @@ class ReleaseSupervisor
   SIGNALS = %w[INT TERM HUP].freeze
   CLAIM_STATUSES = %w[active released].freeze
   PR_SET_CHILD_SUBREAPER = 36
+  CLAIM_CLEANUP_FAILED_MESSAGE =
+    "ERROR: release-line lease cleanup failed; verify coordination state before retrying"
+  CLAIM_RETAINED_MESSAGE =
+    "ERROR: retaining release-line lease because process-group termination was not proven"
 
   Identity = Data.define(:agent_id, :instance_id, :machine_id, :managed)
   ReleaseScope = Data.define(:version, :base_version, :repo, :target, :branch)
+  TerminalHandoff = Data.define(:fd, :supervisor_pgid, :release_pgid)
+  SupervisionState = Data.define(:next_heartbeat, :next_claim_renewal)
   ReleasePipes = Data.define(
     :liveness_reader,
     :liveness_writer,
@@ -79,6 +86,7 @@ class ReleaseSupervisor
   def run_live(scope)
     doctor_environment!
     doctor_tools!
+    verify_live_terminal_foreground!
     identity = release_identity!(scope)
     intervals = supervisor_intervals
     validate_coordination_backend!(
@@ -144,18 +152,22 @@ class ReleaseSupervisor
     ensure
       if managed_claim_cleanup_required && @managed_claim_release_safe
         cleanup_succeeded = release_managed_lease!(scope, identity, coordination_timeout:, termination_grace:)
-        unless cleanup_succeeded
-          @stderr.puts "ERROR: release-line lease cleanup failed; verify coordination state before retrying"
-        end
+        report_managed_cleanup_failure(CLAIM_CLEANUP_FAILED_MESSAGE, $ERROR_INFO) unless cleanup_succeeded
       elsif managed_claim_cleanup_required
         cleanup_succeeded = false
-        @stderr.puts "ERROR: retaining release-line lease because process-group termination was not proven"
+        report_managed_cleanup_failure(CLAIM_RETAINED_MESSAGE, $ERROR_INFO)
       end
       restore_signal_handlers(previous_signal_handlers)
     end
     return release_status if cleanup_succeeded
 
     1
+  end
+
+  def report_managed_cleanup_failure(message, active_exception)
+    with_sigttou_ignored { @stderr.puts message }
+  rescue StandardError
+    raise unless active_exception
   end
 
   def build_parser
@@ -587,6 +599,7 @@ class ReleaseSupervisor
     pgid = nil
     liveness_writer = nil
     death_writer = nil
+    terminal_handoff = nil
     unless heartbeat!(scope, identity, coordination_timeout:, termination_grace:)
       raise ReleaseLeaseGuard::LeaseError, "release lease heartbeat failed"
     end
@@ -594,10 +607,9 @@ class ReleaseSupervisor
     verify_existing_lease!(scope, identity, coordination_timeout:, termination_grace:)
 
     @managed_claim_release_safe = false if identity.managed
-    child_pid, pgid, liveness_writer, death_writer = spawn_release_group(
+    child_pid, pgid, liveness_writer, death_writer, terminal_handoff = spawn_release_group(
       scope, identity, handshake_timeout:, termination_grace:
     )
-    @stdout.puts "Release process group #{pgid} started."
     next_heartbeat = monotonic_time + heartbeat_interval
     next_claim_renewal = initial_claim_renewal_deadline(identity, claim_renewal_interval)
 
@@ -607,6 +619,7 @@ class ReleaseSupervisor
       child_pid:,
       pgid:,
       liveness_writer:,
+      terminal_handoff:,
       next_heartbeat:,
       next_claim_renewal:,
       heartbeat_interval:,
@@ -615,43 +628,215 @@ class ReleaseSupervisor
       coordination_timeout:
     )
   rescue StandardError
+    restore_terminal_after_release(terminal_handoff, $ERROR_INFO)
     cleanup_failed_release(pgid, child_pid, liveness_writer, termination_grace)
     raise
   ensure
-    liveness_writer&.close unless liveness_writer&.closed?
-    death_writer&.close unless death_writer&.closed?
+    begin
+      restore_terminal_after_release(terminal_handoff, $ERROR_INFO)
+    ensure
+      liveness_writer&.close unless liveness_writer&.closed?
+      death_writer&.close unless death_writer&.closed?
+    end
   end
 
-  def supervise_loop(scope, identity, child_pid:, pgid:, liveness_writer:, next_heartbeat:, next_claim_renewal:,
-                     heartbeat_interval:, claim_renewal_interval:, termination_grace:, coordination_timeout:)
+  def restore_terminal_after_release(terminal_handoff, active_exception)
+    restore_terminal_foreground(terminal_handoff)
+  rescue StandardError
+    raise unless active_exception
+
+    with_sigttou_ignored do
+      @stderr.puts "ERROR: terminal foreground restoration also failed while handling a release failure"
+    end
+  end
+
+  def supervise_loop(scope, identity, child_pid:, pgid:, liveness_writer:, terminal_handoff:, next_heartbeat:,
+                     next_claim_renewal:, heartbeat_interval:, claim_renewal_interval:, termination_grace:,
+                     coordination_timeout:)
+    state = SupervisionState.new(next_heartbeat:, next_claim_renewal:)
     loop do
-      return interrupt_release(pgid, child_pid, liveness_writer, termination_grace) if @received_signal
+      cycle_result = supervise_cycle(
+        scope, identity, state:, child_pid:, pgid:, liveness_writer:, terminal_handoff:, heartbeat_interval:,
+                         claim_renewal_interval:, termination_grace:, coordination_timeout:
+      )
+      return cycle_result if cycle_result.is_a?(Integer)
 
-      child_status = nonblocking_child_status(child_pid)
-      return complete_release(pgid, liveness_writer, child_status, termination_grace) if child_status
-
-      now = monotonic_time
-      heartbeat_due = now >= next_heartbeat
-      claim_renewal_due = managed_claim_renewal_due?(identity, now, next_claim_renewal)
-      if lease_refresh_due?(heartbeat_due, claim_renewal_due)
-        lease_live = refresh_lease?(
-          scope, identity, renew_claim: claim_renewal_due, coordination_timeout:, termination_grace:
-        )
-        return interrupt_release(pgid, child_pid, liveness_writer, termination_grace) if @received_signal
-        return lose_lease(pgid, child_pid, liveness_writer, termination_grace) unless lease_live
-
-        next_heartbeat = advanced_deadline(next_heartbeat, now, heartbeat_interval, heartbeat_due)
-        next_claim_renewal = advanced_deadline(
-          next_claim_renewal, now, claim_renewal_interval, claim_renewal_due
-        )
-      end
-
-      sleep_duration = [POLL_INTERVAL, next_heartbeat - monotonic_time, next_claim_renewal - monotonic_time].min
-      sleep(sleep_duration) if sleep_duration.positive?
+      state = cycle_result
     end
   rescue Errno::ECHILD
     close_liveness(liveness_writer)
+    restore_terminal_foreground(terminal_handoff)
     report_group_handoff(pgid)
+    1
+  end
+
+  def supervise_cycle(scope, identity, state:, child_pid:, pgid:, liveness_writer:, terminal_handoff:,
+                      heartbeat_interval:, claim_renewal_interval:, termination_grace:, coordination_timeout:)
+    if @received_signal
+      restore_terminal_foreground(terminal_handoff)
+      return interrupt_release(pgid, child_pid, liveness_writer, termination_grace)
+    end
+
+    child_status = nonblocking_child_status(child_pid)
+    if child_status&.stopped?
+      return resume_stopped_release(
+        scope, identity, state:, child_pid:, pgid:, liveness_writer:, terminal_handoff:, heartbeat_interval:,
+                         claim_renewal_interval:, termination_grace:, coordination_timeout:
+      )
+    end
+    if child_status
+      restore_terminal_foreground(terminal_handoff)
+      return complete_release(pgid, liveness_writer, child_status, termination_grace)
+    end
+
+    refresh_or_wait(
+      scope, identity, state:, child_pid:, pgid:, liveness_writer:, terminal_handoff:, heartbeat_interval:,
+                       claim_renewal_interval:, termination_grace:, coordination_timeout:
+    )
+  end
+
+  def resume_stopped_release(scope, identity, state:, child_pid:, pgid:, liveness_writer:, terminal_handoff:,
+                             heartbeat_interval:, claim_renewal_interval:, termination_grace:,
+                             coordination_timeout:)
+    stop_result = handle_release_stop(
+      scope, identity, child_pid:, pgid:, liveness_writer:, terminal_handoff:, termination_grace:,
+                       coordination_timeout:
+    )
+    if stop_result == :no_handoff
+      return refresh_or_wait(
+        scope, identity, state:, child_pid:, pgid:, liveness_writer:, terminal_handoff:, heartbeat_interval:,
+                         claim_renewal_interval:, termination_grace:, coordination_timeout:
+      )
+    end
+    return stop_result unless stop_result == :resumed
+
+    now = monotonic_time
+    SupervisionState.new(
+      next_heartbeat: now + heartbeat_interval,
+      next_claim_renewal: initial_claim_renewal_deadline(identity, claim_renewal_interval)
+    )
+  end
+
+  def refresh_or_wait(scope, identity, state:, child_pid:, pgid:, liveness_writer:, terminal_handoff:,
+                      heartbeat_interval:, claim_renewal_interval:, termination_grace:, coordination_timeout:)
+    now = monotonic_time
+    heartbeat_due = now >= state.next_heartbeat
+    claim_renewal_due = managed_claim_renewal_due?(identity, now, state.next_claim_renewal)
+    unless lease_refresh_due?(heartbeat_due, claim_renewal_due)
+      wait_for_next_supervision_poll(state)
+      return state
+    end
+
+    lease_live = refresh_lease?(
+      scope, identity, renew_claim: claim_renewal_due, coordination_timeout:, termination_grace:
+    )
+    if @received_signal
+      restore_terminal_foreground(terminal_handoff)
+      return interrupt_release(pgid, child_pid, liveness_writer, termination_grace)
+    end
+    unless lease_live
+      restore_terminal_foreground(terminal_handoff)
+      return lose_lease(pgid, child_pid, liveness_writer, termination_grace)
+    end
+
+    SupervisionState.new(
+      next_heartbeat: advanced_deadline(state.next_heartbeat, now, heartbeat_interval, heartbeat_due),
+      next_claim_renewal: advanced_deadline(
+        state.next_claim_renewal, now, claim_renewal_interval, claim_renewal_due
+      )
+    )
+  end
+
+  def wait_for_next_supervision_poll(state)
+    sleep_duration = [
+      POLL_INTERVAL,
+      state.next_heartbeat - monotonic_time,
+      state.next_claim_renewal - monotonic_time
+    ].min
+    sleep(sleep_duration) if sleep_duration.positive?
+  end
+
+  def handle_release_stop(scope, identity, child_pid:, pgid:, liveness_writer:, terminal_handoff:,
+                          termination_grace:, coordination_timeout:)
+    return :no_handoff unless terminal_handoff
+
+    restore_terminal_foreground(terminal_handoff)
+    unless terminal_foreground_pgid(terminal_handoff.fd) == terminal_handoff.supervisor_pgid
+      return fail_terminal_resume(pgid, child_pid, liveness_writer, termination_grace)
+    end
+
+    @stderr.puts "Release process group #{pgid} stopped; returning terminal control to the invoking shell."
+    suspend_result = suspend_for_shell_job_control(terminal_handoff)
+    return interrupt_release(pgid, child_pid, liveness_writer, termination_grace) if suspend_result == :interrupted
+    if %i[terminal_lost unsafe_job_group].include?(suspend_result)
+      return fail_terminal_resume(pgid, child_pid, liveness_writer, termination_grace)
+    end
+
+    lease_live = refresh_lease?(
+      scope,
+      identity,
+      renew_claim: identity.managed,
+      coordination_timeout:,
+      termination_grace:
+    )
+    return interrupt_release(pgid, child_pid, liveness_writer, termination_grace) if @received_signal
+    return lose_lease(pgid, child_pid, liveness_writer, termination_grace) unless lease_live
+
+    resumed_handoff = hand_off_terminal_foreground(terminal_handoff, pgid)
+    return fail_terminal_resume(pgid, child_pid, liveness_writer, termination_grace) unless resumed_handoff
+
+    :resumed
+  end
+
+  def suspend_for_shell_job_control(terminal_handoff)
+    loop do
+      return :interrupted if @received_signal
+      return :terminal_lost if terminal_foreground_pgid(terminal_handoff.fd).nil?
+      return :unsafe_job_group unless invoking_job_group_suspendable?(terminal_handoff.supervisor_pgid)
+
+      with_default_tstp_handler do
+        return :interrupted if @received_signal
+
+        stop_invoking_job_group(terminal_handoff.supervisor_pgid)
+      end
+      return :interrupted if @received_signal
+
+      foreground_pgid = terminal_foreground_pgid(terminal_handoff.fd)
+      return :terminal_lost if foreground_pgid.nil?
+      return :foreground if foreground_pgid == terminal_handoff.supervisor_pgid
+    end
+  end
+
+  def invoking_job_group_suspendable?(pgid)
+    return false unless pgid == Process.getpgrp
+
+    parent_pid = Process.ppid
+    return false unless Process.getsid(parent_pid) == Process.getsid(0)
+
+    Process.getpgid(parent_pid) != pgid
+  rescue SystemCallError
+    false
+  end
+
+  def stop_invoking_job_group(pgid)
+    Process.kill("TSTP", -pgid)
+  end
+
+  def with_default_tstp_handler
+    previous_handler = Signal.trap("TSTP", "DEFAULT")
+    yield
+  ensure
+    Signal.trap("TSTP", previous_handler) if previous_handler
+  end
+
+  def fail_terminal_resume(pgid, child_pid, liveness_writer, termination_grace)
+    close_liveness(liveness_writer)
+    terminate_group(pgid, child_pid:, grace: termination_grace)
+    @managed_claim_release_safe = true
+    with_sigttou_ignored do
+      @stderr.puts "Release terminal resume failed; closed liveness channel and terminated process group #{pgid}."
+    end
+    report_group_handoff(pgid, proven_dead: true)
     1
   end
 
@@ -689,12 +874,12 @@ class ReleaseSupervisor
                  "closed liveness channel and terminating process group #{pgid}."
     terminate_group(pgid, child_pid:, grace: termination_grace)
     @managed_claim_release_safe = true
-    report_group_handoff(pgid)
+    report_group_handoff(pgid, proven_dead: true)
     128 + Signal.list.fetch(@received_signal)
   end
 
   def nonblocking_child_status(child_pid)
-    _waited_pid, child_status = Process.waitpid2(child_pid, Process::WNOHANG)
+    _waited_pid, child_status = Process.waitpid2(child_pid, Process::WNOHANG | Process::WUNTRACED)
     child_status
   end
 
@@ -704,7 +889,7 @@ class ReleaseSupervisor
     @managed_claim_release_safe = true
     exit_code = process_status_code(child_status)
     @stdout.puts "Release process group #{pgid} completed with status #{exit_code}."
-    report_group_handoff(pgid)
+    report_group_handoff(pgid, proven_dead: true)
     exit_code
   end
 
@@ -713,12 +898,13 @@ class ReleaseSupervisor
     @stderr.puts "Release lease refresh failed; closed liveness channel and terminating process group #{pgid}."
     terminate_group(pgid, child_pid:, grace: termination_grace)
     @managed_claim_release_safe = true
-    report_group_handoff(pgid)
+    report_group_handoff(pgid, proven_dead: true)
     1
   end
 
   def spawn_release_group(scope, identity, handshake_timeout:, termination_grace:)
     pipes = release_pipes
+    terminal_owner = foreground_terminal_owner
     child_pid = nil
     child_pid = fork_release_child(scope, identity, pipes)
     pipes.liveness_reader.close
@@ -730,7 +916,11 @@ class ReleaseSupervisor
       timeout: handshake_timeout,
       termination_grace:
     )
-    [child_pid, pgid, pipes.liveness_writer, pipes.death_writer]
+    @stdout.puts "Release process group #{pgid} started."
+    terminal_handoff = hand_off_terminal_foreground(terminal_owner, pgid)
+    raise SupervisorError, "initial terminal foreground transfer failed" if terminal_owner && !terminal_handoff
+
+    [child_pid, pgid, pipes.liveness_writer, pipes.death_writer, terminal_handoff]
   rescue StandardError
     begin
       close_release_pipes(pipes)
@@ -838,13 +1028,111 @@ class ReleaseSupervisor
     io&.close unless io&.closed?
   end
 
+  def foreground_terminal_owner
+    return unless $stdin.tty?
+
+    fd = $stdin.fileno
+    foreground_pgid = terminal_foreground_pgid(fd)
+    return if foreground_pgid.nil?
+    unless foreground_pgid == Process.getpgrp
+      raise SupervisorError, "terminal foreground ownership changed before release child spawn; use fg and retry"
+    end
+
+    TerminalHandoff.new(fd:, supervisor_pgid: foreground_pgid, release_pgid: nil)
+  end
+
+  def verify_live_terminal_foreground!
+    controlling_terminal = open_controlling_terminal
+    return unless controlling_terminal
+
+    foreground_pgid = terminal_foreground_pgid(controlling_terminal.fileno)
+    return if foreground_pgid.nil?
+    unless foreground_pgid == Process.getpgrp
+      raise SupervisorError, "interactive live release must run in the terminal foreground; use fg and retry"
+    end
+
+    direct_terminal_io = $stdin.tty? && $stdout.tty? &&
+                         terminal_foreground_pgid($stdin.fileno) == foreground_pgid &&
+                         terminal_foreground_pgid($stdout.fileno) == foreground_pgid
+    return if direct_terminal_io
+
+    raise SupervisorError,
+          "live release requires direct terminal stdin and stdout when attached to a controlling terminal"
+  ensure
+    close_io(controlling_terminal)
+  end
+
+  def open_controlling_terminal
+    File.open("/dev/tty", File::RDONLY)
+  rescue Errno::ENXIO, Errno::ENODEV, Errno::ENOENT
+    nil
+  end
+
+  def hand_off_terminal_foreground(owner, release_pgid)
+    return unless owner
+    return unless terminal_foreground_pgid(owner.fd) == owner.supervisor_pgid
+    return unless group_alive?(release_pgid)
+    return unless set_terminal_foreground_pgid(owner.fd, release_pgid, tolerate_dead_pgid: release_pgid)
+
+    signal_group("CONT", release_pgid)
+    owner.with(release_pgid:)
+  end
+
+  def restore_terminal_foreground(handoff)
+    return unless handoff
+
+    foreground_pgid = terminal_foreground_pgid(handoff.fd)
+    return if foreground_pgid.nil? || foreground_pgid == handoff.supervisor_pgid
+    return unless foreground_pgid == handoff.release_pgid
+
+    set_terminal_foreground_pgid(handoff.fd, handoff.supervisor_pgid)
+  end
+
+  def terminal_foreground_pgid(terminal_fd)
+    pgid = terminal_function("tcgetpgrp", 1).call(terminal_fd)
+    return pgid unless pgid == -1
+
+    errno = Fiddle.last_error
+    return nil if errno == Errno::ENOTTY::Errno
+
+    raise SupervisorError, "could not read the controlling terminal foreground process group (errno #{errno})"
+  end
+
+  def set_terminal_foreground_pgid(terminal_fd, pgid, tolerate_dead_pgid: nil)
+    result = with_sigttou_ignored do
+      terminal_function("tcsetpgrp", 2).call(terminal_fd, pgid)
+    end
+    return true if result.zero?
+
+    errno = Fiddle.last_error
+    return false if errno == Errno::ENOTTY::Errno
+    return false if tolerate_dead_pgid && !group_alive?(tolerate_dead_pgid)
+
+    raise SupervisorError, "could not set the controlling terminal foreground process group (errno #{errno})"
+  end
+
+  def terminal_function(name, argument_count)
+    require "fiddle"
+    argument_types = Array.new(argument_count, Fiddle::TYPE_INT)
+    Fiddle::Function.new(Fiddle::Handle::DEFAULT[name], argument_types, Fiddle::TYPE_INT)
+  rescue LoadError, Fiddle::DLError
+    raise SupervisorError, "controlling terminal job-control support is unavailable"
+  end
+
+  def with_sigttou_ignored
+    previous_handler = Signal.trap("TTOU", "IGNORE")
+    yield
+  ensure
+    Signal.trap("TTOU", previous_handler) if previous_handler
+  end
+
   def cleanup_failed_release(pgid, child_pid, liveness_writer, termination_grace)
     close_liveness(liveness_writer) if liveness_writer
   ensure
     if pgid && child_pid
       terminate_group(pgid, child_pid:, grace: termination_grace)
       @managed_claim_release_safe = true
-      report_group_handoff(pgid)
+      report_group_handoff(pgid, proven_dead: true)
     end
   end
 
@@ -996,6 +1284,8 @@ class ReleaseSupervisor
   end
 
   def signal_termination_target(signal, pgid, child_pid:, signal_direct_child:)
+    # A controlling-terminal read can stop the release child before shutdown begins.
+    signal_group("CONT", pgid)
     signal_group(signal, pgid)
     signal_child(signal, child_pid) if signal_direct_child
   end
@@ -1087,8 +1377,14 @@ class ReleaseSupervisor
     nil
   end
 
-  def report_group_handoff(pgid)
-    @stderr.puts "Release process group #{pgid} must be proven dead before handoff."
+  def report_group_handoff(pgid, proven_dead: false)
+    with_sigttou_ignored do
+      if proven_dead
+        @stderr.puts "Release process group #{pgid} was proven dead before handoff."
+      else
+        @stderr.puts "Release process group #{pgid} must be proven dead before handoff."
+      end
+    end
   end
 
   def process_status_code(status)
