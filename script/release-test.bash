@@ -80,6 +80,8 @@ setup_case() {
   handshake_log="${case_dir}/handshake.log"
   coordination_process_log="${case_dir}/coordination-process.log"
   coordination_descendant_log="${case_dir}/coordination-descendant.log"
+  bundle_descendant_log="${case_dir}/bundle-descendant.log"
+  death_watch_log="${case_dir}/death-watch.log"
   exception_group_log="${case_dir}/exception-group.log"
 
   mkdir -p "${fake_bin}" "${fake_repo}"
@@ -392,6 +394,10 @@ case "${FAKE_BUNDLE_MODE:-success}" in
     wait "$!"
     ;;
   hold)
+    if test "${FAKE_BUNDLE_TERM_RESISTANT_DESCENDANT:-0}" = 1; then
+      sh -c 'trap "" TERM INT HUP; while :; do sleep 1; done' &
+      printf '%s\n' "$!" >"${TEST_BUNDLE_DESCENDANT_LOG}"
+    fi
     trap record_termination TERM INT HUP
     while :; do
       sleep 0.1
@@ -502,6 +508,30 @@ end
 exit EchildTestSupervisor.new(ARGV).run
 ECHILD_HARNESS
 
+  cat >"${fake_bin}/release-death-watch-startup-failure-harness" <<'DEATH_WATCH_STARTUP_FAILURE_HARNESS'
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+load ENV.fetch("TEST_RELEASE_SCRIPT")
+
+class DeathWatchStartupFailureSupervisor < ReleaseSupervisor
+  private
+
+  def announce_process_group(writer, pgid)
+    File.write(ENV.fetch("TEST_EXCEPTION_GROUP_LOG"), "#{pgid}\n")
+    super
+  end
+
+  def install_death_watch_signal_handlers
+    super
+    File.write(ENV.fetch("TEST_DEATH_WATCH_LOG"), "#{Process.pid}\n")
+    raise SupervisorError, "injected death-watch setup failure"
+  end
+end
+
+exit DeathWatchStartupFailureSupervisor.new(ARGV).run
+DEATH_WATCH_STARTUP_FAILURE_HARNESS
+
   cat >"${fake_bin}/release-subreaper-failure-harness" <<'SUBREAPER_FAILURE_HARNESS'
 #!/usr/bin/env ruby
 # frozen_string_literal: true
@@ -574,6 +604,7 @@ UNVERIFIED_CHILD_HARNESS
 
   chmod +x "${fake_bin}/agent-coord" "${fake_bin}/bundle" "${fake_bin}/pnpm" \
     "${fake_bin}/release-handshake-harness" \
+    "${fake_bin}/release-death-watch-startup-failure-harness" \
     "${fake_bin}/release-exception-harness" "${fake_bin}/release-subreaper-failure-harness" \
     "${fake_bin}/release-unverified-child-harness" "${fake_bin}/release-echild-harness"
 
@@ -586,6 +617,8 @@ UNVERIFIED_CHILD_HARNESS
   export TEST_HANDSHAKE_LOG="${handshake_log}"
   export TEST_COORDINATION_PROCESS_LOG="${coordination_process_log}"
   export TEST_COORDINATION_DESCENDANT_LOG="${coordination_descendant_log}"
+  export TEST_BUNDLE_DESCENDANT_LOG="${bundle_descendant_log}"
+  export TEST_DEATH_WATCH_LOG="${death_watch_log}"
   export TEST_EXCEPTION_GROUP_LOG="${exception_group_log}"
   export TEST_RELEASE_SCRIPT="${release_script}"
   export TEST_RELEASE_GUARD="${repo_root}/rakelib/release_lease_guard"
@@ -608,6 +641,7 @@ UNVERIFIED_CHILD_HARNESS
   unset FAKE_ATOMIC_RENEW_MODE
   unset FAKE_DOCTOR_FAIL FAKE_DOCTOR_BACKEND FAKE_DOCTOR_PAYLOAD
   unset FAKE_BUNDLE_MODE FAKE_BUNDLE_START_DELAY FAKE_HANDSHAKE_MODE FAKE_EXCEPTION_MODE
+  unset FAKE_BUNDLE_TERM_RESISTANT_DESCENDANT
   unset FAKE_HANDSHAKE_IGNORE_TERM
   unset REACT_ON_RAILS_RELEASE_COORDINATION_TIMEOUT
   unset REACT_ON_RAILS_RELEASE_CLAIM_RENEWAL_INTERVAL
@@ -638,6 +672,13 @@ run_echild_release() {
   (
     cd "${fake_repo}"
     "${fake_bin}/release-echild-harness" "$@"
+  ) >"${output_log}" 2>&1
+}
+
+run_death_watch_startup_failure_release() {
+  (
+    cd "${fake_repo}"
+    "${fake_bin}/release-death-watch-startup-failure-harness" "$@"
   ) >"${output_log}" 2>&1
 }
 
@@ -1414,14 +1455,14 @@ class NonReapingEchildDrainSupervisor < ReleaseSupervisor
     @liveness_writer = liveness_writer
     @death_writer = death_writer
     @managed_claim_release_safe = false
-    send(:handle_lost_child_ownership, 42_424, liveness_writer, death_writer, 0.1)
+    send(:handle_lost_child_ownership, 42_424, liveness_writer, 0.1)
   end
 
   private
 
   def signal_group(signal, pgid)
-    raise "termination began before both supervision channels closed" unless
-      @liveness_writer.closed? && @death_writer.closed?
+    raise "termination began before liveness closed" unless @liveness_writer.closed?
+    raise "death watch disarmed before process-group absence" if @death_writer.closed?
 
     @events << [:signal, signal, pgid]
   end
@@ -1449,7 +1490,7 @@ supervisor = NonReapingEchildDrainSupervisor.new
 result = supervisor.exercise(liveness_writer, death_writer)
 raise "unexpected ECHILD result #{result}" unless result == 1
 raise "liveness channel stayed open" unless liveness_writer.closed?
-raise "death-watch channel stayed open" unless death_writer.closed?
+raise "death-watch channel closed before outer cleanup" if death_writer.closed?
 raise "group termination did not start" unless supervisor.events.include?([:signal, "TERM", 42_424])
 raise "adopted descendant was not drained" unless supervisor.events.include?(:drain)
 raise "managed lease remained unsafe after proven group absence" unless
@@ -1459,6 +1500,60 @@ then
   fail "ECHILD unit seam did not drain a zombie-visible adopted descendant"
 fi
 pass "ECHILD draining proves group absence without relying on a reaping PID 1"
+
+if ! TEST_RELEASE_SCRIPT="${release_script}" ruby <<'RUBY'
+load ENV.fetch("TEST_RELEASE_SCRIPT")
+
+supervisor = ReleaseSupervisor.new([])
+original_kill = Process.method(:kill)
+Process.define_singleton_method(:kill) { |_signal, _target| raise Errno::EPERM }
+
+begin
+  begin
+    supervisor.send(:signal_group, "KILL", 42_424)
+    raise "death-watch group signal swallowed EPERM"
+  rescue Errno::EPERM
+    nil
+  end
+
+  supervisor.send(
+    :signal_termination_target,
+    "TERM",
+    42_424,
+    child_pid: nil,
+    signal_direct_child: false
+  )
+ensure
+  Process.define_singleton_method(:kill) { |*arguments| original_kill.call(*arguments) }
+end
+RUBY
+then
+  fail "EPERM handling was not limited to supervisor-owned termination"
+fi
+pass "death-watch EPERM stays visible while supervised termination can continue to absence proof"
+
+if supervisor_case_enabled death-watch-startup-failure; then
+  setup_case death-watch-startup-failure
+  unset RELEASE_COORDINATOR_ID RELEASE_COORDINATOR_INSTANCE_ID
+  export FAKE_BUNDLE_MODE=hold
+  export REACT_ON_RAILS_RELEASE_HANDSHAKE_TIMEOUT=0.2
+  export REACT_ON_RAILS_RELEASE_TERMINATION_GRACE=0.2
+  if run_death_watch_startup_failure_release; then
+    fail "release continued after its death watch failed to become ready"
+  fi
+  process_group="$(cat "${exception_group_log}")"
+  watcher_pid="$(cat "${death_watch_log}")"
+  test ! -s "${bundle_log}" || fail "release child execed before the death watch became ready"
+  assert_group_dead "${process_group}"
+  ! kill -0 "${watcher_pid}" 2>/dev/null || fail "failed death watch was not reaped"
+  assert_contains "${output_log}" "release death watch did not become ready"
+  assert_contains "${coord_log}" $'claim-atomic|'
+  assert_contains "${coord_log}" $'release|'
+  test "$(tail -n 1 "${coord_log}" | cut -d'|' -f1)" = release ||
+    fail "death-watch startup failure did not finish with claim cleanup"
+  assert_secret_absent
+  pass "death-watch startup failure keeps the release child blocked and cleans up boundedly"
+fi
 
 setup_case managed-claim-renewal
 unset RELEASE_COORDINATOR_ID RELEASE_COORDINATOR_INSTANCE_ID
@@ -1661,6 +1756,7 @@ ready_reader.close
 liveness_reader, liveness_writer = IO.pipe
 death_reader, death_writer = IO.pipe
 ready_reader, ready_writer = IO.pipe
+start_reader, start_writer = IO.pipe
 death_reader.close
 pipes = ReleaseSupervisor::ReleasePipes.new(
   liveness_reader:,
@@ -1668,7 +1764,9 @@ pipes = ReleaseSupervisor::ReleasePipes.new(
   death_reader:,
   death_writer:,
   ready_reader:,
-  ready_writer:
+  ready_writer:,
+  start_reader:,
+  start_writer:
 )
 
 supervisor = ReleaseSupervisor.new([])
@@ -1721,18 +1819,39 @@ ready_reader.close
 liveness_reader, liveness_writer = IO.pipe
 death_reader, death_writer = IO.pipe
 ready_reader, ready_writer = IO.pipe
+start_reader, start_writer = IO.pipe
 pipes = ReleaseSupervisor::ReleasePipes.new(
   liveness_reader:,
   liveness_writer:,
   death_reader:,
   death_writer:,
   ready_reader:,
-  ready_writer:
+  ready_writer:,
+  start_reader:,
+  start_writer:
 )
 
-supervisor = ReleaseSupervisor.new([])
+watcher_ready_reader, watcher_ready_writer = IO.pipe
+ready_supervisor_class = Class.new(ReleaseSupervisor) do
+  define_method(:initialize) do
+    super([])
+    @watcher_ready_writer = watcher_ready_writer
+  end
+
+  define_method(:install_death_watch_signal_handlers) do
+    super()
+    @watcher_ready_writer.write("1")
+    @watcher_ready_writer.close
+  end
+  private :install_death_watch_signal_handlers
+end
+supervisor = ready_supervisor_class.new
 watcher_pid = supervisor.send(:fork_supervisor_death_watch, pipes, release_pid)
-sleep 0.05
+watcher_ready_writer.close
+raise "death watch did not install signal handlers" unless watcher_ready_reader.read(1) == "1"
+raise "death watch remained in the release process group" if Process.getpgid(watcher_pid) == release_pid
+
+watcher_ready_reader.close
 Process.kill("TERM", watcher_pid)
 Process.waitpid(watcher_pid)
 
@@ -1761,6 +1880,41 @@ RUBY
     fail "direct death-watch signal did not kill the release process group"
   fi
   pass "direct death-watch signals still kill the release process group"
+fi
+
+if supervisor_case_enabled ordinary-shutdown-supervisor-death; then
+  setup_case ordinary-shutdown-supervisor-death
+  export FAKE_BUNDLE_MODE=hold
+  export FAKE_BUNDLE_TERM_RESISTANT_DESCENDANT=1
+  export REACT_ON_RAILS_RELEASE_TERMINATION_GRACE=5
+  (
+    cd "${fake_repo}"
+    exec "${release_script}"
+  ) >"${output_log}" 2>&1 &
+  wrapper_pid=$!
+  for _attempt in $(seq 1 100); do
+    test -s "${bundle_descendant_log}" && break
+    sleep 0.05
+  done
+  test -s "${bundle_descendant_log}" || fail "TERM-resistant release descendant never started"
+  process_group="$(awk -F: '/^bundle:/ { print $3; exit }' "${bundle_log}")"
+  descendant_pid="$(cat "${bundle_descendant_log}")"
+  kill -TERM "${wrapper_pid}"
+  for _attempt in $(seq 1 100); do
+    grep -q '^termination:signal$' "${bundle_log}" && break
+    sleep 0.05
+  done
+  grep -q '^termination:signal$' "${bundle_log}" || fail "ordinary release shutdown never sent group TERM"
+  kill -0 "${descendant_pid}" 2>/dev/null || fail "TERM-resistant descendant exited before supervisor death"
+  kill -KILL "${wrapper_pid}"
+  wait "${wrapper_pid}" 2>/dev/null || true
+  if ! wait_for_group_exit "${process_group}"; then
+    kill -KILL -- "-${process_group}" 2>/dev/null || true
+    fail "supervisor death after ordinary shutdown left a TERM-resistant descendant"
+  fi
+  ! kill -0 "${descendant_pid}" 2>/dev/null || fail "TERM-resistant descendant survived supervisor death"
+  assert_secret_absent
+  pass "death watch stays armed after ordinary shutdown starts"
 fi
 
 if supervisor_case_enabled supervisor-death; then

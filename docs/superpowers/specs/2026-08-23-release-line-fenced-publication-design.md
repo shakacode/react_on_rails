@@ -95,9 +95,10 @@ The wrapper will:
 4. Maintain the heartbeat at an interval below the runbook's five-minute
    maximum and renew a wrapper-managed claim before it can expire.
 5. Maintain a private liveness channel into the helper plus an independent
-   parent-death channel watched by a process in the release group. Loss of the
-   supervisor closes both channels; the death watch immediately kills the full
-   group, including an outward command already in progress.
+   parent-death channel watched by a direct supervisor child outside the release
+   group. The release child cannot exec until that death watch is armed. Loss of
+   the supervisor closes both channels; the death watch immediately kills the
+   full release group, including an outward command already in progress.
 6. On lease refresh or managed-claim renewal failure, terminate the process
    group and exit nonzero.
 7. On normal completion or interruption, stop heartbeat activity, terminate any

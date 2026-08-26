@@ -27,6 +27,7 @@ class ReleaseSupervisor
   HANDSHAKE_TIMEOUT = 5.0
   POLL_INTERVAL = 0.05
   SIGNALS = %w[INT TERM HUP].freeze
+  RELEASE_START = "S"
   CLAIM_STATUSES = %w[active released].freeze
   PR_SET_CHILD_SUBREAPER = 36
 
@@ -38,7 +39,9 @@ class ReleaseSupervisor
     :death_reader,
     :death_writer,
     :ready_reader,
-    :ready_writer
+    :ready_writer,
+    :start_reader,
+    :start_writer
   )
 
   class UsageError < StandardError; end
@@ -585,6 +588,7 @@ class ReleaseSupervisor
                         handshake_timeout:, coordination_timeout:)
     child_pid = nil
     pgid = nil
+    death_watch_pid = nil
     liveness_writer = nil
     death_writer = nil
     unless heartbeat!(scope, identity, coordination_timeout:, termination_grace:)
@@ -594,7 +598,7 @@ class ReleaseSupervisor
     verify_existing_lease!(scope, identity, coordination_timeout:, termination_grace:)
 
     @managed_claim_release_safe = false if identity.managed
-    child_pid, pgid, liveness_writer, death_writer = spawn_release_group(
+    child_pid, pgid, death_watch_pid, liveness_writer, death_writer = spawn_release_group(
       scope, identity, handshake_timeout:, termination_grace:
     )
     @stdout.puts "Release process group #{pgid} started."
@@ -607,7 +611,6 @@ class ReleaseSupervisor
       child_pid:,
       pgid:,
       liveness_writer:,
-      death_writer:,
       next_heartbeat:,
       next_claim_renewal:,
       heartbeat_interval:,
@@ -619,11 +622,12 @@ class ReleaseSupervisor
     cleanup_failed_release(pgid, child_pid, liveness_writer, termination_grace)
     raise
   ensure
-    liveness_writer&.close unless liveness_writer&.closed?
-    death_writer&.close unless death_writer&.closed?
+    close_io(liveness_writer)
+    close_io(death_writer)
+    reap_death_watch(death_watch_pid, grace: termination_grace)
   end
 
-  def supervise_loop(scope, identity, child_pid:, pgid:, liveness_writer:, death_writer:, next_heartbeat:,
+  def supervise_loop(scope, identity, child_pid:, pgid:, liveness_writer:, next_heartbeat:,
                      next_claim_renewal:, heartbeat_interval:, claim_renewal_interval:, termination_grace:,
                      coordination_timeout:)
     loop do
@@ -652,14 +656,13 @@ class ReleaseSupervisor
       sleep(sleep_duration) if sleep_duration.positive?
     end
   rescue Errno::ECHILD
-    handle_lost_child_ownership(pgid, liveness_writer, death_writer, termination_grace)
+    handle_lost_child_ownership(pgid, liveness_writer, termination_grace)
   end
 
-  def handle_lost_child_ownership(pgid, liveness_writer, death_writer, termination_grace)
+  def handle_lost_child_ownership(pgid, liveness_writer, termination_grace)
     close_liveness(liveness_writer)
-    close_io(death_writer)
     @stderr.puts "Release supervisor lost child process ownership; " \
-                 "closed supervision channels and terminating process group #{pgid}."
+                 "closed liveness channel and terminating process group #{pgid}."
     terminate_group(pgid, child_pid: nil, grace: termination_grace)
     @managed_claim_release_safe = true
     report_group_handoff(pgid)
@@ -731,33 +734,44 @@ class ReleaseSupervisor
   def spawn_release_group(scope, identity, handshake_timeout:, termination_grace:)
     pipes = release_pipes
     child_pid = nil
+    death_watch_pid = nil
     child_pid = fork_release_child(scope, identity, pipes)
-    pipes.liveness_reader.close
-    pipes.death_reader.close
-    pipes.ready_writer.close
+    prepare_supervisor_release_pipes(pipes)
     pgid = read_child_process_group!(
       pipes.ready_reader,
       child_pid,
       timeout: handshake_timeout,
       termination_grace:
     )
-    [child_pid, pgid, pipes.liveness_writer, pipes.death_writer]
+    death_watch_pid = fork_supervisor_death_watch(
+      pipes,
+      pgid,
+      timeout: handshake_timeout,
+      termination_grace:
+    )
+    pipes.death_reader.close
+    release_child(pipes.start_writer)
+    [child_pid, pgid, death_watch_pid, pipes.liveness_writer, pipes.death_writer]
   rescue StandardError
     begin
       close_release_pipes(pipes)
     ensure
       stop_unverified_child(child_pid, grace: termination_grace) if child_pid
+      reap_death_watch(death_watch_pid, grace: termination_grace)
       @managed_claim_release_safe = true
     end
     raise
   ensure
     close_io(pipes&.ready_reader)
+    close_io(pipes&.death_reader)
+    close_io(pipes&.start_writer)
   end
 
   def release_pipes
     liveness_pipe = IO.pipe
     death_pipe = IO.pipe
     ready_pipe = IO.pipe
+    start_pipe = IO.pipe
     liveness_pipe.first.close_on_exec = false
     liveness_pipe.last.close_on_exec = true
     death_pipe.last.close_on_exec = true
@@ -767,20 +781,34 @@ class ReleaseSupervisor
       death_reader: death_pipe.first,
       death_writer: death_pipe.last,
       ready_reader: ready_pipe.first,
-      ready_writer: ready_pipe.last
+      ready_writer: ready_pipe.last,
+      start_reader: start_pipe.first,
+      start_writer: start_pipe.last
     )
+  end
+
+  def prepare_supervisor_release_pipes(pipes)
+    close_io(pipes.liveness_reader)
+    close_io(pipes.ready_writer)
+    close_io(pipes.start_reader)
+  end
+
+  def prepare_release_child(pipes)
+    reset_child_signal_handlers
+    [
+      pipes.liveness_writer,
+      pipes.death_reader,
+      pipes.death_writer,
+      pipes.ready_reader,
+      pipes.start_writer
+    ].each { |io| close_io(io) }
+    Process.setpgid(0, 0)
+    Process.getpgrp
   end
 
   def fork_release_child(scope, identity, pipes)
     Process.fork do
-      reset_child_signal_handlers
-      pipes.liveness_writer.close
-      pipes.death_writer.close
-      pipes.ready_reader.close
-      Process.setpgid(0, 0)
-      pgid = Process.getpgrp
-      fork_supervisor_death_watch(pipes, pgid)
-      pipes.death_reader.close
+      pgid = prepare_release_child(pipes)
       contract = contract_for(
         scope,
         identity,
@@ -790,6 +818,8 @@ class ReleaseSupervisor
       )
       announce_process_group(pipes.ready_writer, pgid)
       pipes.ready_writer.close
+      wait_for_release_start(pipes.start_reader)
+      pipes.start_reader.close
       exec(
         { ReleaseLeaseGuard::CONTRACT_ENV => JSON.generate(contract) },
         "bundle", "exec", "rake", supervised_rake_task(scope.version)
@@ -800,16 +830,44 @@ class ReleaseSupervisor
     end
   end
 
-  def fork_supervisor_death_watch(pipes, pgid)
-    Process.fork do
-      install_death_watch_signal_handlers
-      close_io(pipes.liveness_reader)
-      close_io(pipes.ready_writer)
-      pipes.death_reader.read
-    ensure
-      signal_group("KILL", pgid)
-      exit! 1
-    end
+  def fork_supervisor_death_watch(pipes, pgid, timeout: HANDSHAKE_TIMEOUT, termination_grace: TERMINATION_GRACE)
+    ready_reader, ready_writer = IO.pipe
+    watcher_pid = Process.fork { run_death_watch(pipes, pgid, ready_reader, ready_writer) }
+    ready_writer.close
+    wait_for_death_watch_ready!(ready_reader, timeout:)
+    watcher_pid
+  rescue StandardError
+    signal_child("TERM", watcher_pid) if watcher_pid
+    reap_death_watch(watcher_pid, grace: termination_grace) if watcher_pid
+    raise
+  ensure
+    close_io(ready_reader)
+    close_io(ready_writer)
+  end
+
+  def run_death_watch(pipes, pgid, ready_reader, ready_writer)
+    ready_reader.close
+    install_death_watch_signal_handlers
+    Process.setpgid(0, 0)
+    close_death_watch_unused_pipes(pipes)
+    ready_writer.write("1")
+    ready_writer.close
+    pipes.death_reader.read
+  ensure
+    signal_group("KILL", pgid)
+    exit! 1
+  end
+
+  def close_death_watch_unused_pipes(pipes)
+    [
+      pipes.liveness_reader,
+      pipes.liveness_writer,
+      pipes.death_writer,
+      pipes.ready_reader,
+      pipes.ready_writer,
+      pipes.start_reader,
+      pipes.start_writer
+    ].each { |io| close_io(io) }
   end
 
   def install_death_watch_signal_handlers
@@ -830,6 +888,38 @@ class ReleaseSupervisor
     writer.puts(pgid)
   end
 
+  def wait_for_death_watch_ready!(reader, timeout:)
+    deadline = monotonic_time + timeout
+    loop do
+      raise SupervisorError, "release interrupted while starting death watch" if @received_signal
+
+      remaining = deadline - monotonic_time
+      raise SupervisorError, "timed out while starting release death watch" unless remaining.positive?
+
+      next unless reader.wait_readable([POLL_INTERVAL, remaining].min)
+
+      ready = reader.read_nonblock(1, exception: false)
+      next if ready == :wait_readable
+      return if ready == "1"
+
+      raise SupervisorError, "release death watch did not become ready"
+    end
+  end
+
+  def release_child(writer)
+    writer.write(RELEASE_START)
+  rescue IOError, SystemCallError
+    raise SupervisorError, "release child exited before death watch became ready"
+  ensure
+    close_io(writer)
+  end
+
+  def wait_for_release_start(reader)
+    return if reader.read(1) == RELEASE_START
+
+    raise SupervisorError, "release supervisor exited before death watch became ready"
+  end
+
   def close_release_pipes(pipes)
     return unless pipes
 
@@ -839,7 +929,9 @@ class ReleaseSupervisor
       pipes.death_reader,
       pipes.death_writer,
       pipes.ready_reader,
-      pipes.ready_writer
+      pipes.ready_writer,
+      pipes.start_reader,
+      pipes.start_writer
     ].each do |io|
       close_io(io)
     end
@@ -991,7 +1083,11 @@ class ReleaseSupervisor
     signal_termination_target("TERM", pgid, child_pid:, signal_direct_child:)
     child_reaped = child_pid.nil?
     child_reaped, group_alive = wait_for_group_exit(
-      pgid, child_pid:, child_reaped:, grace:, require_child_exit: signal_direct_child
+      pgid,
+      child_pid:,
+      child_reaped:,
+      grace:,
+      require_child_exit: signal_direct_child
     )
     if group_alive || (signal_direct_child && !child_reaped)
       signal_termination_target("KILL", pgid, child_pid:, signal_direct_child:)
@@ -1007,7 +1103,11 @@ class ReleaseSupervisor
   end
 
   def signal_termination_target(signal, pgid, child_pid:, signal_direct_child:)
-    signal_group(signal, pgid)
+    begin
+      signal_group(signal, pgid)
+    rescue Errno::EPERM
+      nil
+    end
     signal_child(signal, child_pid) if signal_direct_child
   end
 
@@ -1077,6 +1177,29 @@ class ReleaseSupervisor
     Process.waitpid(child_pid, Process::WNOHANG) == child_pid
   rescue Errno::ECHILD
     true
+  end
+
+  def reap_death_watch(watcher_pid, grace:)
+    return unless watcher_pid
+    return if wait_for_child_exit(watcher_pid, grace:)
+
+    signal_child("TERM", watcher_pid)
+    return if wait_for_child_exit(watcher_pid, grace:)
+
+    signal_child("KILL", watcher_pid)
+    return if wait_for_child_exit(watcher_pid, grace:)
+
+    raise SupervisorError, "release death watch did not terminate after KILL"
+  end
+
+  def wait_for_child_exit(child_pid, grace:)
+    deadline = monotonic_time + grace
+    loop do
+      return true if reap_child_nonblocking(child_pid)
+      return false unless monotonic_time < deadline
+
+      sleep POLL_INTERVAL
+    end
   end
 
   def reap_group_children_nonblocking(pgid)
