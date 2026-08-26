@@ -494,9 +494,13 @@ class ExceptionTestSupervisor < ReleaseSupervisor
   def spawn_release_group(...)
     result = super
     File.write(ENV.fetch("TEST_EXCEPTION_GROUP_LOG"), "#{result.fetch(1)}\n")
+    result
+  end
+
+  def supervise_loop(...)
     raise Errno::EPIPE if ENV.fetch("FAKE_EXCEPTION_MODE") == "after-spawn"
 
-    result
+    super
   end
 
   def read_child_process_group!(...)
@@ -510,6 +514,14 @@ class ExceptionTestSupervisor < ReleaseSupervisor
   def restore_terminal_foreground(...)
     super
     raise SupervisorError, "injected terminal restoration failure" if ENV["FAKE_RESTORE_FAIL"] == "1"
+  end
+
+  def cleanup_failed_release(pgid, child_pid, liveness_writer, termination_grace)
+    if ENV.fetch("FAKE_EXCEPTION_MODE") == "after-spawn"
+      ownership = pgid && child_pid && liveness_writer ? "owned" : "unowned"
+      File.write(ENV.fetch("TEST_EXCEPTION_LIVENESS_LOG"), "#{ownership}\n")
+    end
+    super
   end
 
   def close_release_pipes(pipes)
@@ -3034,6 +3046,10 @@ for exception_mode in after-spawn after-handshake; do
       fail "${exception_mode} supervisor exception exited successfully"
     fi
     process_group="$(cat "${exception_group_log}")"
+    if test "${exception_mode}" = after-spawn && ! grep -Fx 'owned' "${exception_liveness_log}" >/dev/null; then
+      kill -KILL -- "-${process_group}" 2>/dev/null || true
+      fail "after-spawn exception reached cleanup without owning the spawned group resources"
+    fi
     assert_group_dead "${process_group}"
     assert_no_coordination_mutation
     assert_secret_absent
