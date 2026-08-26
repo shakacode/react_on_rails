@@ -851,6 +851,15 @@ module ReactOnRails
           end
         end
 
+        context "when unrelated reporter text contains an empty-userinfo URL" do
+          it "preserves the empty-userinfo token" do
+            failure_message = "Failure loading http://@host/path"
+            stub_local_bundle_failure(failure_message, bundle_path: "/tmp/server.js")
+
+            expect(bundle_load_error_message).to include(failure_message)
+          end
+        end
+
         context "when a bundle-load failure contains two valid URLs" do
           it "preserves both URLs, including an at sign in the second URL's path" do
             failure_message = "Failure loading http://first-host/path http://second-host/path@example"

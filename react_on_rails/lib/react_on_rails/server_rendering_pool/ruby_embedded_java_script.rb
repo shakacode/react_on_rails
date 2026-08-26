@@ -494,7 +494,7 @@ module ReactOnRails
           uri = URI.parse(url)
           if uri.userinfo.nil?
             authority = scheme_suffix.split(%r{[/?#]}, 2).first
-            return uri.to_s if authority&.include?("@")
+            return sanitized_dropped_userinfo_url(url, uri, authority) if authority&.include?("@")
 
             return url
           end
@@ -505,6 +505,12 @@ module ReactOnRails
           uri.to_s
         rescue URI::Error
           nil
+        end
+
+        def sanitized_dropped_userinfo_url(url, uri, authority)
+          return url if authority.match?(/\A@[^@]*\z/)
+
+          uri.to_s
         end
 
         def strip_unprotected_userinfo(text)
