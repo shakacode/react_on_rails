@@ -813,7 +813,7 @@ class ReleaseSupervisor
   end
 
   def install_death_watch_signal_handlers
-    SIGNALS.each { |signal| Signal.trap(signal) { exit! 1 } }
+    SIGNALS.each { |signal| Signal.trap(signal) { exit 1 } }
   end
 
   def supervised_rake_task(version)
