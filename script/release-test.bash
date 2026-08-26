@@ -1105,6 +1105,133 @@ puts "terminal:#{Process.getpgrp}:#{tcgetpgrp.call($stdin.fileno)}"
 exit(release_status.exited? ? release_status.exitstatus : 128 + release_status.termsig)
 JOB_CONTROL_HARNESS
 
+  cat >"${fake_bin}/release-managed-cleanup-tostop-supervisor" <<'CLEANUP_TOSTOP_SUPERVISOR'
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+load ENV.fetch("TEST_RELEASE_SCRIPT")
+
+class ManagedCleanupTostopSupervisor < ReleaseSupervisor
+  private
+
+  def release_managed_lease!(...)
+    released = super
+    transfer_terminal_to_foreign_group
+    released
+  end
+
+  def nonblocking_child_status(child_pid)
+    return super unless ENV.fetch("FAKE_MANAGED_CLEANUP_MODE") == "unproven"
+
+    transfer_terminal_to_foreign_group
+    raise Errno::ECHILD
+  end
+
+  def transfer_terminal_to_foreign_group
+    return if @foreign_terminal_owner
+
+    foreign_pgid = Integer(ENV.fetch("TEST_FOREIGN_PGID"))
+    raise "could not install foreign terminal owner" unless set_terminal_foreground_pgid($stdin.fileno, foreign_pgid)
+
+    @foreign_terminal_owner = true
+  end
+end
+
+exit ManagedCleanupTostopSupervisor.new(ARGV).run
+CLEANUP_TOSTOP_SUPERVISOR
+
+  cat >"${fake_bin}/release-managed-cleanup-tostop-harness.rb" <<'CLEANUP_TOSTOP_HARNESS'
+# frozen_string_literal: true
+
+require "fiddle"
+require "rbconfig"
+
+$stdout.sync = true
+tcsetpgrp = Fiddle::Function.new(
+  Fiddle::Handle::DEFAULT["tcsetpgrp"],
+  [Fiddle::TYPE_INT, Fiddle::TYPE_INT],
+  Fiddle::TYPE_INT
+)
+tcgetpgrp = Fiddle::Function.new(
+  Fiddle::Handle::DEFAULT["tcgetpgrp"],
+  [Fiddle::TYPE_INT],
+  Fiddle::TYPE_INT
+)
+set_foreground = lambda do |pgid|
+  previous_handler = Signal.trap("TTOU", "IGNORE")
+  raise "tcsetpgrp failed" unless tcsetpgrp.call($stdin.fileno, pgid).zero?
+ensure
+  Signal.trap("TTOU", previous_handler) if previous_handler
+end
+
+raise "could not enable TOSTOP" unless system("stty", "tostop")
+shell_pgid = Process.getpgrp
+launch_reader, launch_writer = IO.pipe
+wrapper_pid = fork do
+  launch_writer.close
+  Process.setpgid(0, 0)
+  launch_reader.read(1)
+  launch_reader.close
+  ENV["TEST_FOREIGN_PGID"] = shell_pgid.to_s
+  supervisor = File.join(ENV.fetch("TEST_PTY_REPO"), "..", "bin", "release-managed-cleanup-tostop-supervisor")
+  exec RbConfig.ruby, supervisor
+end
+launch_reader.close
+begin
+  Process.setpgid(wrapper_pid, wrapper_pid)
+rescue Errno::EACCES, Errno::ESRCH
+  nil
+end
+puts "shell:wrapper:#{wrapper_pid}"
+set_foreground.call(wrapper_pid)
+launch_writer.write("x")
+launch_writer.close
+
+status = nil
+deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 2.0
+loop do
+  waited = Process.waitpid2(wrapper_pid, Process::WNOHANG | Process::WUNTRACED)
+  if waited
+    status = waited.last
+    break
+  end
+  break if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
+
+  sleep 0.02
+end
+
+set_foreground.call(shell_pgid)
+if status&.stopped?
+  puts "shell:wrapper-stopped-by-tostop:#{status.stopsig}"
+  begin
+    Process.kill("CONT", -wrapper_pid)
+    Process.kill("KILL", -wrapper_pid)
+  rescue Errno::ESRCH
+    nil
+  end
+  Process.wait(wrapper_pid)
+  system("stty", "-tostop")
+  puts "terminal:#{shell_pgid}:#{tcgetpgrp.call($stdin.fileno)}"
+  exit 124
+end
+unless status
+  begin
+    Process.kill("KILL", -wrapper_pid)
+  rescue Errno::ESRCH
+    nil
+  end
+  Process.wait(wrapper_pid)
+  system("stty", "-tostop")
+  puts "shell:wrapper-timeout"
+  exit 125
+end
+
+system("stty", "-tostop")
+puts "shell:wrapper-exited:#{status.exitstatus}"
+puts "terminal:#{shell_pgid}:#{tcgetpgrp.call($stdin.fileno)}"
+exit(status.exited? ? status.exitstatus : 128 + status.termsig)
+CLEANUP_TOSTOP_HARNESS
+
   chmod +x "${fake_bin}/agent-coord" "${fake_bin}/bundle" "${fake_bin}/pnpm" \
     "${fake_bin}/release-handshake-harness" \
     "${fake_bin}/release-exception-harness" "${fake_bin}/release-subreaper-failure-harness" \
@@ -1147,6 +1274,7 @@ JOB_CONTROL_HARNESS
   unset FAKE_BUNDLE_MODE FAKE_BUNDLE_START_DELAY FAKE_HANDSHAKE_MODE FAKE_EXCEPTION_MODE FAKE_RESTORE_FAIL
   unset FAKE_HANDSHAKE_IGNORE_TERM
   unset FAKE_LATE_BACKGROUND FAKE_PAUSE_HEARTBEAT_FOR_BACKGROUND FAKE_TOSTOP TEST_PTY_CONFIRMATION_DELAY
+  unset FAKE_MANAGED_CLEANUP_MODE
   unset FAKE_SIGNAL_STOPPED_WRAPPER
   unset REACT_ON_RAILS_RELEASE_COORDINATION_TIMEOUT
   unset REACT_ON_RAILS_RELEASE_CLAIM_RENEWAL_INTERVAL
@@ -2548,6 +2676,71 @@ assert_contains "${output_log}" "Release process group ${process_group} was prov
 assert_no_coordination_mutation
 assert_secret_absent
 pass "TOSTOP restores the terminal before lease-loss cleanup output"
+
+setup_case managed-cleanup-failure-tostop
+unset RELEASE_COORDINATOR_ID RELEASE_COORDINATOR_INSTANCE_ID
+export FAKE_BUNDLE_MODE=success
+export FAKE_RELEASE_FAIL=1
+export FAKE_MANAGED_CLEANUP_MODE=proven
+if run_release_in_pty '' release-managed-cleanup-tostop-harness.rb; then
+  fail "failed managed-claim cleanup exited successfully"
+fi
+assert_not_contains "${output_log}" "shell:wrapper-stopped-by-tostop"
+assert_contains "${output_log}" "shell:wrapper-exited:1"
+assert_contains "${output_log}" "release-line lease cleanup failed"
+process_group="$(awk -F: '/^bundle:/ { print $3; exit }' "${bundle_log}")"
+assert_group_dead "${process_group}"
+assert_terminal_restored
+assert_contains "${coord_log}" $'claim-atomic|'
+assert_contains "${coord_log}" $'release|'
+assert_secret_absent
+pass "failed managed-claim cleanup cannot SIGTTOU-stop after the release group is proven dead"
+
+setup_case managed-retained-claim-tostop
+unset RELEASE_COORDINATOR_ID RELEASE_COORDINATOR_INSTANCE_ID
+export FAKE_BUNDLE_MODE=hold
+export FAKE_MANAGED_CLEANUP_MODE=unproven
+if run_release_in_pty '' release-managed-cleanup-tostop-harness.rb; then
+  fail "unproven managed release termination exited successfully"
+fi
+assert_not_contains "${output_log}" "shell:wrapper-stopped-by-tostop"
+assert_contains "${output_log}" "shell:wrapper-exited:1"
+assert_contains "${output_log}" "retaining release-line lease because process-group termination was not proven"
+process_group="$(awk -F: '/^bundle:/ { print $3; exit }' "${bundle_log}")"
+wait_for_group_exit "${process_group}" || fail "death watch did not stop the unproven TOSTOP release group"
+assert_terminal_restored
+assert_contains "${coord_log}" $'claim-atomic|'
+assert_not_contains "${coord_log}" $'release|'
+assert_secret_absent
+pass "retained-claim diagnostics cannot SIGTTOU-stop when release-group death is unproven"
+
+setup_case managed-cleanup-diagnostic-unwind
+if ! "${ruby_executable}" -e '
+  load ENV.fetch("TEST_RELEASE_SCRIPT")
+  failing_output = Object.new
+  def failing_output.puts(*)
+    raise Errno::EPIPE
+  end
+  supervisor = ReleaseSupervisor.new([], stderr: failing_output)
+  original = RuntimeError.new("original release failure")
+  observed = nil
+  begin
+    raise original
+  rescue RuntimeError
+    begin
+      supervisor.send(:report_managed_cleanup_failure, "cleanup failed", $ERROR_INFO)
+      raise
+    rescue StandardError => error
+      observed = error
+    end
+  end
+  abort "cleanup diagnostic masked the original exception" unless observed.equal?(original)
+'; then
+  fail "managed cleanup diagnostic masked the active release exception"
+fi
+assert_no_coordination_mutation
+assert_secret_absent
+pass "managed cleanup diagnostic write failures preserve the active release exception"
 
 setup_case interactive-job-control-stop
 unset RELEASE_COORDINATOR_ID RELEASE_COORDINATOR_INSTANCE_ID

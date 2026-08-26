@@ -30,6 +30,10 @@ class ReleaseSupervisor
   SIGNALS = %w[INT TERM HUP].freeze
   CLAIM_STATUSES = %w[active released].freeze
   PR_SET_CHILD_SUBREAPER = 36
+  CLAIM_CLEANUP_FAILED_MESSAGE =
+    "ERROR: release-line lease cleanup failed; verify coordination state before retrying"
+  CLAIM_RETAINED_MESSAGE =
+    "ERROR: retaining release-line lease because process-group termination was not proven"
 
   Identity = Data.define(:agent_id, :instance_id, :machine_id, :managed)
   ReleaseScope = Data.define(:version, :base_version, :repo, :target, :branch)
@@ -148,18 +152,22 @@ class ReleaseSupervisor
     ensure
       if managed_claim_cleanup_required && @managed_claim_release_safe
         cleanup_succeeded = release_managed_lease!(scope, identity, coordination_timeout:, termination_grace:)
-        unless cleanup_succeeded
-          @stderr.puts "ERROR: release-line lease cleanup failed; verify coordination state before retrying"
-        end
+        report_managed_cleanup_failure(CLAIM_CLEANUP_FAILED_MESSAGE, $ERROR_INFO) unless cleanup_succeeded
       elsif managed_claim_cleanup_required
         cleanup_succeeded = false
-        @stderr.puts "ERROR: retaining release-line lease because process-group termination was not proven"
+        report_managed_cleanup_failure(CLAIM_RETAINED_MESSAGE, $ERROR_INFO)
       end
       restore_signal_handlers(previous_signal_handlers)
     end
     return release_status if cleanup_succeeded
 
     1
+  end
+
+  def report_managed_cleanup_failure(message, active_exception)
+    with_sigttou_ignored { @stderr.puts message }
+  rescue StandardError
+    raise unless active_exception
   end
 
   def build_parser
