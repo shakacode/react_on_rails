@@ -980,7 +980,10 @@ class ReleaseSupervisor
 
     fd = $stdin.fileno
     foreground_pgid = terminal_foreground_pgid(fd)
-    return unless foreground_pgid == Process.getpgrp
+    return if foreground_pgid.nil?
+    unless foreground_pgid == Process.getpgrp
+      raise SupervisorError, "terminal foreground ownership changed before release child spawn; use fg and retry"
+    end
 
     TerminalHandoff.new(fd:, supervisor_pgid: foreground_pgid, release_pgid: nil)
   end

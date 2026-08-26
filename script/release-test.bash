@@ -83,6 +83,9 @@ setup_case() {
   coordination_descendant_log="${case_dir}/coordination-descendant.log"
   exception_group_log="${case_dir}/exception-group.log"
   exception_liveness_log="${case_dir}/exception-liveness.log"
+  fork_attempt_log="${case_dir}/fork-attempt.log"
+  terminal_pause_file="${case_dir}/terminal-pause"
+  terminal_resume_file="${case_dir}/terminal-resume"
 
   mkdir -p "${fake_bin}" "${fake_repo}"
   cat >"${fake_bin}/pnpm" <<'FAKE_PNPM'
@@ -300,6 +303,14 @@ case "${command_name}" in
     test ! -f "${TEST_HEARTBEAT_COUNT_FILE}" || count="$(cat "${TEST_HEARTBEAT_COUNT_FILE}")"
     count=$((count + 1))
     printf '%s\n' "${count}" >"${TEST_HEARTBEAT_COUNT_FILE}"
+    if test "${FAKE_PAUSE_HEARTBEAT_FOR_BACKGROUND:-0}" = 1 && test "${count}" = 1; then
+      : >"${TEST_TERMINAL_PAUSE_FILE}"
+      for _attempt in $(seq 1 500); do
+        test ! -f "${TEST_TERMINAL_RESUME_FILE}" || break
+        sleep 0.01
+      done
+      test -f "${TEST_TERMINAL_RESUME_FILE}" || exit 95
+    fi
     if test -n "${FAKE_STALL_HEARTBEAT_AFTER:-}" && test "${count}" -gt "${FAKE_STALL_HEARTBEAT_AFTER}"; then
       process_group="$(ps -o pgid= -p "$$" | tr -d ' ')"
       printf '%s:%s\n' "$$" "${process_group}" >"${TEST_COORDINATION_PROCESS_LOG}"
@@ -646,21 +657,84 @@ puts "terminal:#{Process.getpgrp}:#{tcgetpgrp.call($stdin.fileno)}"
 exit(release_status.exited? ? release_status.exitstatus : 128 + release_status.termsig)
 PTY_HARNESS
 
+  cat >"${fake_bin}/release-terminal-race-harness.rb" <<'TERMINAL_RACE_HARNESS'
+# frozen_string_literal: true
+
+load ENV.fetch("TEST_RELEASE_SCRIPT")
+
+class TerminalRaceSupervisor < ReleaseSupervisor
+  def initialize(argv)
+    super
+    @terminal_reads = 0
+  end
+
+  private
+
+  def terminal_foreground_pgid(*)
+    @terminal_reads += 1
+    @terminal_reads == 1 ? Process.getpgrp : Process.getpgrp + 10_000
+  end
+
+  def fork_release_child(*)
+    File.write(ENV.fetch("TEST_FORK_ATTEMPT_LOG"), "attempted\n")
+    raise SupervisorError, "release child fork attempted after terminal ownership changed"
+  end
+end
+
+exit TerminalRaceSupervisor.new(ARGV).run
+TERMINAL_RACE_HARNESS
+
   cat >"${fake_bin}/release-background-pty-harness.rb" <<'BACKGROUND_PTY_HARNESS'
 # frozen_string_literal: true
 
+require "fiddle"
+
 $stdout.sync = true
+late_background = ENV["FAKE_LATE_BACKGROUND"] == "1"
+launch_reader, launch_writer = IO.pipe if late_background
+tcsetpgrp = Fiddle::Function.new(
+  Fiddle::Handle::DEFAULT["tcsetpgrp"],
+  [Fiddle::TYPE_INT, Fiddle::TYPE_INT],
+  Fiddle::TYPE_INT
+)
+set_foreground = lambda do |pgid|
+  previous_handler = Signal.trap("TTOU", "IGNORE")
+  raise "tcsetpgrp failed" unless tcsetpgrp.call($stdin.fileno, pgid).zero?
+ensure
+  Signal.trap("TTOU", previous_handler) if previous_handler
+end
 
 wrapper_pid = fork do
+  launch_writer&.close
   Process.setpgid(0, 0)
+  launch_reader&.read(1)
+  launch_reader&.close
   exec ENV.fetch("TEST_RELEASE_SCRIPT")
 end
+launch_reader&.close
 begin
   Process.setpgid(wrapper_pid, wrapper_pid)
 rescue Errno::EACCES, Errno::ESRCH
   nil
 end
 puts "shell:wrapper:#{wrapper_pid}"
+if late_background
+  set_foreground.call(wrapper_pid)
+  launch_writer.write("x")
+  launch_writer.close
+  pause_deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 3.0
+  until File.exist?(ENV.fetch("TEST_TERMINAL_PAUSE_FILE"))
+    if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= pause_deadline
+      Process.kill("KILL", -wrapper_pid)
+      Process.wait(wrapper_pid)
+      raise "release setup did not reach the terminal transition point"
+    end
+    sleep 0.01
+  end
+  set_foreground.call(Process.getpgrp)
+  File.write(ENV.fetch("TEST_TERMINAL_RESUME_FILE"), "resume\n")
+  puts "shell:terminal-backgrounded"
+end
 
 deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 2.0
 loop do
@@ -787,6 +861,9 @@ JOB_CONTROL_HARNESS
   export TEST_COORDINATION_DESCENDANT_LOG="${coordination_descendant_log}"
   export TEST_EXCEPTION_GROUP_LOG="${exception_group_log}"
   export TEST_EXCEPTION_LIVENESS_LOG="${exception_liveness_log}"
+  export TEST_FORK_ATTEMPT_LOG="${fork_attempt_log}"
+  export TEST_TERMINAL_PAUSE_FILE="${terminal_pause_file}"
+  export TEST_TERMINAL_RESUME_FILE="${terminal_resume_file}"
   export TEST_RELEASE_SCRIPT="${release_script}"
   export TEST_RELEASE_GUARD="${repo_root}/rakelib/release_lease_guard"
   export TEST_REPO="shakacode/react_on_rails"
@@ -809,6 +886,7 @@ JOB_CONTROL_HARNESS
   unset FAKE_DOCTOR_FAIL FAKE_DOCTOR_BACKEND FAKE_DOCTOR_PAYLOAD
   unset FAKE_BUNDLE_MODE FAKE_BUNDLE_START_DELAY FAKE_HANDSHAKE_MODE FAKE_EXCEPTION_MODE FAKE_RESTORE_FAIL
   unset FAKE_HANDSHAKE_IGNORE_TERM
+  unset FAKE_LATE_BACKGROUND FAKE_PAUSE_HEARTBEAT_FOR_BACKGROUND
   unset REACT_ON_RAILS_RELEASE_COORDINATION_TIMEOUT
   unset REACT_ON_RAILS_RELEASE_CLAIM_RENEWAL_INTERVAL
 }
@@ -823,26 +901,58 @@ run_release() {
 run_release_with_noncontrolling_tty() {
   TEST_PTY_REPO="${fake_repo}" "${ruby_executable}" -rpty -e '
     master, slave = PTY.open
-    child_pid = Process.fork do
-      master.close
-      Process.setsid
-      $stdin.reopen(slave)
+    child_pid = nil
+    status = nil
+    exit_code = 124
+    begin
+      child_pid = Process.fork do
+        master.close
+        Process.setsid
+        $stdin.reopen(slave)
+        slave.close unless slave.closed?
+        Dir.chdir(ENV.fetch("TEST_PTY_REPO"))
+        exec ENV.fetch("TEST_RELEASE_SCRIPT")
+      end
+      slave.close
+      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 5.0
+      loop do
+        waited = Process.waitpid2(child_pid, Process::WNOHANG)
+        if waited
+          status = waited.fetch(1)
+          exit_code = status.exited? ? status.exitstatus : 128 + status.termsig
+          break
+        end
+        break if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
+
+        sleep 0.01
+      end
+    ensure
       slave.close unless slave.closed?
-      Dir.chdir(ENV.fetch("TEST_PTY_REPO"))
-      exec ENV.fetch("TEST_RELEASE_SCRIPT")
+      unless status || child_pid.nil?
+        begin
+          Process.kill("KILL", child_pid)
+        rescue Errno::ESRCH
+          nil
+        end
+        begin
+          Process.wait(child_pid)
+        rescue Errno::ECHILD
+          nil
+        end
+      end
+      master.close unless master.closed?
     end
-    slave.close
-    _waited_pid, status = Process.waitpid2(child_pid)
-    master.close
-    exit(status.exited? ? status.exitstatus : 128 + status.termsig)
+    exit exit_code
   ' >"${output_log}" 2>&1
 }
 
 run_release_in_pty() {
   pty_input="$1"
-  TEST_PTY_INPUT="${pty_input}" TEST_PTY_REPO="${fake_repo}" TEST_PTY_OUTPUT="${output_log}" \
+  pty_harness="${2:-release-pty-harness.rb}"
+  TEST_PTY_INPUT="${pty_input}" TEST_PTY_HARNESS="${pty_harness}" \
+    TEST_PTY_REPO="${fake_repo}" TEST_PTY_OUTPUT="${output_log}" \
     "${ruby_executable}" -rpty -e '
-    harness = File.join(ENV.fetch("TEST_PTY_REPO"), "..", "bin", "release-pty-harness.rb")
+    harness = File.join(ENV.fetch("TEST_PTY_REPO"), "..", "bin", ENV.fetch("TEST_PTY_HARNESS"))
     reader, writer, child_pid = PTY.spawn(RbConfig.ruby, harness, chdir: ENV.fetch("TEST_PTY_REPO"))
     output = +""
     status = nil
@@ -1586,11 +1696,46 @@ if grep -F 'shell:wrapper-still-running' "${output_log}" >/dev/null; then
 fi
 assert_contains "${output_log}" "shell:wrapper-exited:1"
 assert_contains "${output_log}" "interactive live release must run in the terminal foreground"
-assert_no_coordination_mutation
-assert_not_contains "${coord_log}" $'heartbeat|'
+assert_empty "${coord_log}"
 assert_empty "${bundle_log}"
 assert_secret_absent
 pass "background interactive live release is refused before coordination mutation"
+
+setup_case spawn-time-terminal-ownership-race
+unset RELEASE_COORDINATOR_ID RELEASE_COORDINATOR_INSTANCE_ID
+if run_release_in_pty '' release-terminal-race-harness.rb; then
+  fail "spawn-time terminal ownership race exited successfully"
+fi
+assert_empty "${fork_attempt_log}"
+assert_contains "${coord_log}" $'claim-atomic|'
+assert_contains "${coord_log}" $'release|'
+assert_empty "${bundle_log}"
+assert_contains "${output_log}" "terminal foreground ownership changed before release child spawn"
+assert_secret_absent
+pass "spawn-time terminal ownership change fails before forking the release child"
+
+setup_case late-background-terminal-transition
+unset RELEASE_COORDINATOR_ID RELEASE_COORDINATOR_INSTANCE_ID
+export FAKE_BUNDLE_MODE=interactive-confirm
+export FAKE_LATE_BACKGROUND=1
+export FAKE_PAUSE_HEARTBEAT_FOR_BACKGROUND=1
+if run_background_release_in_pty; then
+  fail "late-background interactive live release exited successfully"
+fi
+assert_contains "${output_log}" "shell:terminal-backgrounded"
+if grep -F 'shell:wrapper-still-running' "${output_log}" >/dev/null; then
+  assert_contains "${output_log}" "Proceed with release? [y/N]"
+  grep -E '^shell:child-state:T' "${output_log}" >/dev/null || \
+    fail "late-background release child was not stopped on its terminal read"
+  fail "late-background release remained supervised while its child was stopped"
+fi
+assert_contains "${output_log}" "shell:wrapper-exited:1"
+assert_contains "${output_log}" "terminal foreground ownership changed before release child spawn"
+assert_contains "${coord_log}" $'claim-atomic|'
+assert_contains "${coord_log}" $'release|'
+assert_empty "${bundle_log}"
+assert_secret_absent
+pass "late terminal backgrounding releases the managed claim without forking a child"
 
 setup_case matching-state
 FAKE_BUNDLE_MODE=success run_release || fail "matching live release failed"
