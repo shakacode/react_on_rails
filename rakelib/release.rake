@@ -7419,6 +7419,11 @@ REQUIRED_CHECKS_JQ_QUERY = [
   "else .checks end)}"
 ].join(" ")
 REQUIRED_CHECK_DISCOVERY_UNKNOWN = Object.new.freeze
+BRANCH_RULES_PAGE_SIZE = 100
+BRANCH_RULES_API_HEADERS = [
+  "-H", "Accept: application/vnd.github+json",
+  "-H", "X-GitHub-Api-Version: 2022-11-28"
+].freeze
 
 # Upper bound on how many consecutive non-runtime-only commits the CI gate will
 # walk past when choosing which origin/main commit to evaluate. Bounds the git
@@ -7941,6 +7946,86 @@ def normalize_required_checks_payload(parsed)
   contexts.empty? && checks.empty? ? nil : { contexts:, checks: }
 end
 
+def valid_branch_rules_identity?(rule)
+  rule.is_a?(Hash) &&
+    rule["type"].is_a?(String) && !rule["type"].empty? &&
+    rule["ruleset_source_type"].is_a?(String) && !rule["ruleset_source_type"].empty? &&
+    rule["ruleset_source"].is_a?(String) && !rule["ruleset_source"].empty? &&
+    positive_github_id?(rule["ruleset_id"])
+end
+
+def valid_ruleset_required_check?(check)
+  return false unless check.is_a?(Hash)
+
+  context = check["context"]
+  integration_id = check["integration_id"]
+  context.is_a?(String) && !context.empty? && (integration_id.nil? || positive_github_id?(integration_id))
+end
+
+def valid_branch_rules_pages?(parsed_pages)
+  parsed_pages.is_a?(Array) && !parsed_pages.empty? && parsed_pages.all?(Array)
+end
+
+def ruleset_required_checks(rule)
+  return [] unless rule["type"] == "required_status_checks"
+
+  parameters = rule["parameters"]
+  checks = parameters["required_status_checks"] if parameters.is_a?(Hash)
+  return REQUIRED_CHECK_DISCOVERY_UNKNOWN unless checks.is_a?(Array)
+  return REQUIRED_CHECK_DISCOVERY_UNKNOWN unless checks.all? { |check| valid_ruleset_required_check?(check) }
+
+  checks.map { |check| { "context" => check["context"], "app_id" => check["integration_id"] } }
+end
+
+def required_checks_from_branch_rules(rules)
+  rules.each_with_object([]) do |rule, required_checks|
+    checks = ruleset_required_checks(rule)
+    return REQUIRED_CHECK_DISCOVERY_UNKNOWN if checks.equal?(REQUIRED_CHECK_DISCOVERY_UNKNOWN)
+
+    required_checks.concat(checks)
+  end
+end
+
+def normalize_branch_rules_pages(parsed_pages)
+  return REQUIRED_CHECK_DISCOVERY_UNKNOWN unless valid_branch_rules_pages?(parsed_pages)
+
+  rules = parsed_pages.flatten(1)
+  return REQUIRED_CHECK_DISCOVERY_UNKNOWN unless rules.all? { |rule| valid_branch_rules_identity?(rule) }
+
+  required_checks = required_checks_from_branch_rules(rules)
+  return REQUIRED_CHECK_DISCOVERY_UNKNOWN if required_checks.equal?(REQUIRED_CHECK_DISCOVERY_UNKNOWN)
+
+  normalized = normalize_required_checks_payload("contexts" => [], "checks" => required_checks)
+  return REQUIRED_CHECK_DISCOVERY_UNKNOWN if normalized.equal?(REQUIRED_CHECK_DISCOVERY_UNKNOWN)
+
+  { required_checks: normalized, active_rule_count: rules.length }
+end
+
+def branch_rules_required_checks(repo_slug:, encoded_branch:)
+  api_path = "repos/#{repo_slug}/rules/branches/#{encoded_branch}?per_page=#{BRANCH_RULES_PAGE_SIZE}"
+  output, status = capture_gh_output(
+    "api", "--paginate", "--slurp", *BRANCH_RULES_API_HEADERS, api_path
+  )
+  return REQUIRED_CHECK_DISCOVERY_UNKNOWN unless status.success?
+
+  normalize_branch_rules_pages(JSON.parse(output))
+rescue JSON::ParserError
+  REQUIRED_CHECK_DISCOVERY_UNKNOWN
+end
+
+def combine_required_check_discoveries(*discoveries)
+  return REQUIRED_CHECK_DISCOVERY_UNKNOWN if discoveries.any? do |discovery|
+    discovery.equal?(REQUIRED_CHECK_DISCOVERY_UNKNOWN)
+  end
+
+  checks = discoveries.compact.flat_map { |discovery| discovery.fetch(:checks) }
+  contexts = discoveries.compact.flat_map { |discovery| discovery.fetch(:contexts) }
+  normalize_required_checks_payload(
+    "contexts" => contexts,
+    "checks" => checks.map { |check| { "context" => check.fetch(:context), "app_id" => check.fetch(:app_id) } }
+  )
+end
+
 def gh_included_json_response(output)
   header_block, body, newline = gh_included_response_parts(output)
   status = gh_included_response_status(header_block, newline:)
@@ -8022,24 +8107,6 @@ def gh_included_response_status(header_block, newline:)
   status_match[1].to_i
 end
 
-def known_branch_without_required_checks?(repo_slug:, branch_name:, encoded_branch:, required_status_checks_path:)
-  included_output, _included_error, included_status = capture_gh_stdout_and_stderr(
-    "api", "--include", required_status_checks_path
-  )
-  return false if included_status.success?
-
-  expected_protected = required_status_checks_protection_state(included_output)
-  return false if expected_protected.nil?
-
-  branch_output, branch_status = capture_gh_output("api", "repos/#{repo_slug}/branches/#{encoded_branch}")
-  return false unless branch_status.success?
-
-  branch = JSON.parse(branch_output)
-  branch.is_a?(Hash) && branch["name"] == branch_name && branch["protected"] == expected_protected
-rescue JSON::ParserError
-  false
-end
-
 def required_status_checks_protection_state(output)
   response = gh_included_json_response(output)
   return unless response&.dig(:status) == 404
@@ -8050,6 +8117,55 @@ def required_status_checks_protection_state(output)
   when "Required status checks not enabled"
     true
   end
+end
+
+def valid_branch_protection_payload?(branch, branch_name:)
+  branch.is_a?(Hash) && branch["name"] == branch_name && [true, false].include?(branch["protected"])
+end
+
+def classic_required_checks_absence_corroborated?(branch_protected:, expected_protected:, ruleset_active_rule_count:)
+  branch_protected == expected_protected ||
+    (!expected_protected && branch_protected && ruleset_active_rule_count.positive?)
+end
+
+def corroborated_classic_required_checks_absence(
+  repo_slug:, branch_name:, encoded_branch:, expected_protected:, ruleset_active_rule_count:
+)
+  branch_output, branch_status = capture_gh_output("api", "repos/#{repo_slug}/branches/#{encoded_branch}")
+  return REQUIRED_CHECK_DISCOVERY_UNKNOWN unless branch_status.success?
+
+  branch = JSON.parse(branch_output)
+  return REQUIRED_CHECK_DISCOVERY_UNKNOWN unless valid_branch_protection_payload?(branch, branch_name:)
+  if classic_required_checks_absence_corroborated?(
+    branch_protected: branch["protected"], expected_protected:, ruleset_active_rule_count:
+  )
+    return nil
+  end
+
+  REQUIRED_CHECK_DISCOVERY_UNKNOWN
+rescue JSON::ParserError
+  REQUIRED_CHECK_DISCOVERY_UNKNOWN
+end
+
+def classic_required_checks_for_branch(
+  repo_slug:, branch_name:, encoded_branch:, required_status_checks_path:, ruleset_active_rule_count:
+)
+  output, status = capture_gh_output("api", "--jq", REQUIRED_CHECKS_JQ_QUERY, required_status_checks_path)
+  return normalize_required_checks_payload(JSON.parse(output)) if status.success?
+
+  included_output, _included_error, included_status = capture_gh_stdout_and_stderr(
+    "api", "--include", required_status_checks_path
+  )
+  return REQUIRED_CHECK_DISCOVERY_UNKNOWN if included_status.success?
+
+  expected_protected = required_status_checks_protection_state(included_output)
+  return REQUIRED_CHECK_DISCOVERY_UNKNOWN if expected_protected.nil?
+
+  corroborated_classic_required_checks_absence(
+    repo_slug:, branch_name:, encoded_branch:, expected_protected:, ruleset_active_rule_count:
+  )
+rescue JSON::ParserError
+  REQUIRED_CHECK_DISCOVERY_UNKNOWN
 end
 
 def required_check_names_for_branch(monorepo_root:, repo_slug: nil, ci_branch: "main")
@@ -8063,23 +8179,17 @@ def required_check_names_for_branch(monorepo_root:, repo_slug: nil, ci_branch: "
   # before `validate_main_ci_status!` calls this helper. The remaining failure
   # mode here is "branch protection unknown". Keep it distinct from a known
   # unprotected branch so exact-HEAD recovery can fail closed.
-  output, status = capture_gh_output("api", "--jq", REQUIRED_CHECKS_JQ_QUERY, api_path)
-  # Only a successful, structurally valid empty configuration means no required
-  # checks. API errors and malformed payloads leave required gates unknown.
-  return nil if !status.success? && known_branch_without_required_checks?(
+  ruleset_discovery = branch_rules_required_checks(repo_slug:, encoded_branch:)
+  return REQUIRED_CHECK_DISCOVERY_UNKNOWN if ruleset_discovery.equal?(REQUIRED_CHECK_DISCOVERY_UNKNOWN)
+
+  classic_discovery = classic_required_checks_for_branch(
     repo_slug:,
     branch_name: ci_branch.to_s,
     encoded_branch:,
-    required_status_checks_path: api_path
+    required_status_checks_path: api_path,
+    ruleset_active_rule_count: ruleset_discovery.fetch(:active_rule_count)
   )
-  return REQUIRED_CHECK_DISCOVERY_UNKNOWN unless status.success?
-
-  begin
-    parsed = JSON.parse(output)
-    normalize_required_checks_payload(parsed)
-  rescue JSON::ParserError
-    REQUIRED_CHECK_DISCOVERY_UNKNOWN
-  end
+  combine_required_check_discoveries(classic_discovery, ruleset_discovery.fetch(:required_checks))
 end
 
 def check_run_app_id(run)
