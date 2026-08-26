@@ -2,8 +2,13 @@
 
 require_relative "../spec_helper"
 require "react_on_rails/dev/server_manager"
+require "fileutils"
+require "json"
 require "open3"
+require "rbconfig"
+require "socket"
 require "stringio"
+require "tmpdir"
 
 RSpec.describe ReactOnRails::Dev::ServerManager do
   # Suppress stdout/stderr during tests
@@ -81,6 +86,12 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
   ensure
     $stdout = original_stdout
   end
+
+  # `.start` now wraps the process-manager run in a real, flock-backed dev
+  # session that writes tmp/react_on_rails/dev-session.json under the cwd. The
+  # session mechanics have dedicated coverage in "worktree-scoped dev sessions";
+  # everywhere else the wrapper is a pass-through.
+  before { allow(described_class).to receive(:with_dev_session).and_yield }
 
   describe ".start" do
     before { mock_system_calls }
@@ -1175,135 +1186,566 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
     end
   end
 
-  describe ".kill_processes" do
+  describe "worktree-scoped dev sessions" do
     include_context "with clean port env"
 
+    # These examples deliberately use real processes, real process groups, real
+    # flocks and real Unix sockets. The bug they cover (machine-global
+    # `pgrep -f rails` plus an unfiltered `lsof -ti :PORT`) was invisible to
+    # mock-shaped tests: every stub agreed with the implementation while the
+    # implementation was signalling other people's checkouts.
+    let(:spawned) { [] }
+    let(:servers) { [] }
+    let(:handles) { [] }
+
+    around do |example|
+      Dir.mktmpdir("rk", short_tmp_root) do |tmpdir|
+        @dev_session_base = File.realpath(tmpdir)
+        example.run
+      end
+    end
+
     before do
-      allow_any_instance_of(Kernel).to receive(:`).and_return("")
-      allow(File).to receive(:exist?).and_return(false)
+      # The port fallback shells out to lsof against real ports; examples that
+      # exercise it opt in explicitly.
+      allow(described_class).to receive(:killable_ports).and_return([])
+      stub_const("#{described_class}::SHUTDOWN_TERM_GRACE_SECS", 3)
+      stub_const("#{described_class}::SHUTDOWN_KILL_GRACE_SECS", 2)
+      stub_const("#{described_class}::SHUTDOWN_POLL_INTERVAL_SECS", 0.05)
     end
 
-    it "attempts to kill development processes" do
-      # Mock Open3.capture2 calls that find_process_pids uses
-      allow(Open3).to receive(:capture2).with("pgrep", "-f", "rails", err: File::NULL).and_return(["1234\n5678", nil])
-      allow(Open3).to receive(:capture2)
-        .with("pgrep", "-f", "node.*react[-_]on[-_]rails", err: File::NULL)
-        .and_return(["2345", nil])
-      allow(Open3).to receive(:capture2).with("pgrep", "-f", "overmind", err: File::NULL).and_return(["", nil])
-      allow(Open3).to receive(:capture2).with("pgrep", "-f", "foreman", err: File::NULL).and_return(["", nil])
-      allow(Open3).to receive(:capture2).with("pgrep", "-f", "ruby.*puma", err: File::NULL).and_return(["", nil])
-      allow(Open3).to receive(:capture2)
-        .with("pgrep", "-f", "webpack-dev-server", err: File::NULL).and_return(["", nil])
-      allow(Open3).to receive(:capture2)
-        .with("pgrep", "-f", "bin/shakapacker-dev-server", err: File::NULL).and_return(["", nil])
-
-      # Mock lsof calls for port checking
-      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":3000", err: File::NULL).and_return(["", nil])
-      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":3001", err: File::NULL).and_return(["", nil])
-
-      allow(Process).to receive(:pid).and_return(9999) # Current process PID
-      expect(Process).to receive(:kill).with("TERM", 1234)
-      expect(Process).to receive(:kill).with("TERM", 5678)
-      expect(Process).to receive(:kill).with("TERM", 2345)
-
-      described_class.kill_processes
+    after do
+      spawned.each do |pid|
+        Process.kill("KILL", -pid)
+      rescue Errno::ESRCH, Errno::EPERM
+        nil
+      end
+      servers.each do |server|
+        server.close
+      rescue IOError, SystemCallError
+        nil
+      end
+      handles.each do |handle|
+        handle.close
+      rescue IOError, SystemCallError
+        nil
+      end
     end
 
-    it "kills processes on ports 3000 and 3001" do
-      # No pattern-based processes
-      allow(Open3).to receive(:capture2).with("pgrep", any_args).and_return(["", nil])
+    # macOS's default TMPDIR is deep enough that a Unix socket underneath it
+    # blows past the 104-byte sun_path limit, so anchor these fixtures on the
+    # shortest writable temp root available.
+    def short_tmp_root
+      base = ["/tmp", Dir.tmpdir].find { |dir| File.directory?(dir) && File.writable?(dir) } || Dir.tmpdir
+      File.realpath(base)
+    end
 
-      # Mock port processes
-      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":3000", err: File::NULL).and_return(["3456", nil])
-      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":3001", err: File::NULL).and_return(["3457\n3458", nil])
+    def app_root(name)
+      root = File.join(@dev_session_base, name)
+      FileUtils.mkdir_p(File.join(root, "tmp", "react_on_rails"))
+      root
+    end
 
+    def session_path(root)
+      File.join(root, "tmp", "react_on_rails", "dev-session.json")
+    end
+
+    # Stand-in for a running `bin/dev`: leads its own process group, holds the
+    # session flock for its whole life, and has a child of its own so
+    # descendant shutdown is genuinely exercised rather than asserted.
+    def owner_script(trap_term:)
+      <<~RUBY
+        require "json"
+        root, ready, socket = ARGV
+        #{trap_term ? 'Signal.trap("TERM") { nil }' : ''}
+        file = File.open(File.join(root, "tmp", "react_on_rails", "dev-session.json"),
+                         File::RDWR | File::CREAT)
+        file.flock(File::LOCK_EX)
+        file.truncate(0)
+        file.write(JSON.generate("schema" => 1, "app_root" => root, "pid" => Process.pid,
+                                 "pgid" => Process.getpgrp,
+                                 "overmind_socket" => (socket.empty? ? nil : socket),
+                                 "started_at" => "2026-01-01T00:00:00Z"))
+        file.flush
+        child = spawn("sleep", "120")
+        File.write(ready, child.to_s)
+        sleep 300
+      RUBY
+    end
+
+    def start_owner(root, socket: nil, trap_term: false)
+      ready = File.join(root, "owner-ready")
+      pid = Process.spawn(RbConfig.ruby, "-e", owner_script(trap_term:),
+                          root, ready, socket.to_s,
+                          pgroup: true, out: File::NULL, err: File::NULL)
+      spawned << pid
+      # Reap promptly: an unreaped zombie is still a process-group member, and
+      # would make the shutdown verification below read as "still running".
+      Process.detach(pid)
+      raise "dev session owner for #{root} never started" unless wait_for { owner_ready?(ready) }
+
+      { pid:, pgid: pid, child: Integer(File.read(ready).strip) }
+    end
+
+    def owner_ready?(ready)
+      File.exist?(ready) && !File.read(ready).strip.empty?
+    end
+
+    # Alive, leads its own process group, holds no session lock. Used to prove
+    # that stale recorded numbers never become signal authority.
+    def start_unrelated_process
+      pid = Process.spawn("sleep", "120", pgroup: true, out: File::NULL, err: File::NULL)
+      spawned << pid
+      Process.detach(pid)
+      { pid:, pgid: pid }
+    end
+
+    def wait_for(timeout = 5)
+      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout
+      loop do
+        return true if yield
+        return false if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
+
+        sleep 0.02
+      end
+    end
+
+    def alive?(pid)
+      Process.kill(0, pid)
+      true
+    rescue Errno::ESRCH
+      false
+    end
+
+    def group_alive?(pgid)
+      Process.kill(0, -pgid)
+      true
+    rescue Errno::ESRCH
+      false
+    end
+
+    def write_session(root, overrides = {})
+      payload = { "schema" => 1, "app_root" => root, "pid" => 999_999, "pgid" => nil,
+                  "overmind_socket" => nil, "started_at" => "2026-01-01T00:00:00Z" }.merge(overrides)
+      File.write(session_path(root), JSON.generate(payload))
+    end
+
+    def kill_in(root)
+      capture_stdout { Dir.chdir(root) { described_class.kill_processes } }
+    end
+
+    describe ".with_dev_session" do
+      before { allow(described_class).to receive(:with_dev_session).and_call_original }
+
+      it "records worktree-scoped state, holds its lock, and removes it afterwards" do
+        root = app_root("start")
+        path = session_path(root)
+        recorded = nil
+        lock_taken = nil
+
+        Dir.chdir(root) do
+          described_class.send(:with_dev_session) do
+            recorded = JSON.parse(File.read(path))
+            lock_taken = File.open(path, File::RDWR) { |file| file.flock(File::LOCK_EX | File::LOCK_NB) }
+          end
+        end
+
+        aggregate_failures do
+          expect(recorded["schema"]).to eq(1)
+          expect(recorded["app_root"]).to eq(root)
+          expect(recorded["pid"]).to eq(Process.pid)
+          # Failing to take the lock is the liveness proof `bin/dev kill` relies on.
+          expect(lock_taken).to be false
+          expect(File.exist?(path)).to be false
+        end
+      end
+
+      it "records the Overmind endpoint it would use, and only when it is inside the app root" do
+        root = app_root("endpoint")
+        recorded = Dir.chdir(root) { described_class.send(:owned_overmind_socket_path, root) }
+        expect(recorded).to eq(File.join(root, ".overmind.sock"))
+
+        ENV["OVERMIND_SOCKET"] = File.join(@dev_session_base, "elsewhere.sock")
+        expect(Dir.chdir(root) { described_class.send(:owned_overmind_socket_path, root) }).to be_nil
+      ensure
+        ENV.delete("OVERMIND_SOCKET")
+      end
+
+      it "leaves state owned by another running bin/dev untouched" do
+        root = app_root("contended")
+        start_owner(root)
+        before_contents = File.read(session_path(root))
+
+        output = capture_stdout do
+          Dir.chdir(root) { described_class.send(:with_dev_session) { :ran } }
+        end
+
+        aggregate_failures do
+          expect(output).to include("Another `bin/dev` already owns")
+          expect(File.read(session_path(root))).to eq(before_contents)
+        end
+      end
+    end
+
+    describe ".kill_processes" do
+      it "stops this worktree's process tree and leaves another worktree running" do
+        root_a = app_root("worktree-a")
+        root_b = app_root("worktree-b")
+        owner_a = start_owner(root_a)
+        owner_b = start_owner(root_b)
+
+        output = kill_in(root_a)
+
+        aggregate_failures do
+          expect(wait_for { !group_alive?(owner_a[:pgid]) }).to be(true), "worktree A's process group survived"
+          expect(alive?(owner_a[:child])).to be false
+          expect(group_alive?(owner_b[:pgid])).to be(true), "worktree B's process group was killed"
+          expect(alive?(owner_b[:pid])).to be true
+          expect(alive?(owner_b[:child])).to be true
+          expect(File.exist?(session_path(root_b))).to be true
+          expect(JSON.parse(File.read(session_path(root_b)))["app_root"]).to eq(root_b)
+          expect(File.exist?(session_path(root_a))).to be false
+          expect(output).to include("verified gone")
+        end
+      end
+
+      it "sends TERM first and escalates to KILL only for the survivors" do
+        root = app_root("stubborn")
+        owner = start_owner(root, trap_term: true)
+        signals = []
+        allow(described_class).to receive(:signal_process_group).and_wrap_original do |original, pgid, signal|
+          signals << [pgid, signal]
+          original.call(pgid, signal)
+        end
+
+        output = kill_in(root)
+
+        aggregate_failures do
+          expect(signals.map(&:last)).to eq(%w[TERM KILL])
+          expect(signals.map(&:first).uniq).to eq([owner[:pgid]])
+          expect(wait_for { !group_alive?(owner[:pgid]) }).to be true
+          expect(output).to include("verified gone")
+        end
+      end
+
+      it "recovers stale session state without signalling the recorded pgid" do
+        root = app_root("stale")
+        unrelated = start_unrelated_process
+        write_session(root, "pgid" => unrelated[:pgid], "pid" => unrelated[:pid])
+        socket_path = File.join(root, ".overmind.sock")
+        UNIXServer.new(socket_path).close
+
+        expect(described_class).not_to receive(:signal_process_group)
+        expect(described_class).not_to receive(:terminate_processes)
+
+        output = kill_in(root)
+
+        aggregate_failures do
+          expect(File.exist?(session_path(root))).to be false
+          expect(File.exist?(socket_path)).to be false
+          expect(alive?(unrelated[:pid])).to be true
+          expect(output).to include("Cleaned up stale dev session state")
+        end
+      end
+
+      it "reports nothing to do when this app directory has no session and no listeners" do
+        root = app_root("idle")
+
+        output = kill_in(root)
+
+        aggregate_failures do
+          expect(output).to include("No development processes owned by this app directory")
+          expect(output).not_to include("verified gone")
+        end
+      end
+
+      [
+        ["malformed JSON", "{not json"],
+        ["a JSON number", "7"],
+        ["a JSON string", '"running"'],
+        ["JSON null", "null"],
+        ["an unknown schema", '{"schema":99,"app_root":"/x","pid":2,"pgid":null}'],
+        ["a non-integer pid", '{"schema":1,"app_root":"/x","pid":"2","pgid":null}']
+      ].each do |label, contents|
+        it "refuses to signal anything when the session state is #{label}" do
+          root = app_root("bad-#{label.gsub(/\W+/, '-')}")
+          File.write(session_path(root), contents)
+
+          expect(described_class).not_to receive(:signal_process_group)
+          expect(described_class).not_to receive(:terminate_processes)
+
+          output = kill_in(root)
+
+          aggregate_failures do
+            expect(output).to include("Refusing to signal anything")
+            expect(output).not_to include("verified gone")
+            # Fail closed: untrusted state is reported, never quietly discarded.
+            expect(File.exist?(session_path(root))).to be true
+          end
+        end
+      end
+
+      it "refuses session state recorded against a different app root" do
+        root = app_root("mine")
+        foreign = app_root("theirs")
+        unrelated = start_unrelated_process
+        write_session(root, "app_root" => foreign, "pgid" => unrelated[:pgid])
+
+        expect(described_class).not_to receive(:signal_process_group)
+
+        output = kill_in(root)
+
+        aggregate_failures do
+          expect(output).to include("Refusing to signal anything")
+          expect(output).to include(foreign)
+          expect(alive?(unrelated[:pid])).to be true
+        end
+      end
+
+      it "refuses a live owner that recorded no controllable handle" do
+        root = app_root("no-handle")
+        path = session_path(root)
+        holder = File.open(path, File::RDWR | File::CREAT)
+        handles << holder
+        holder.flock(File::LOCK_EX)
+        holder.write(JSON.generate("schema" => 1, "app_root" => root, "pid" => Process.pid,
+                                   "pgid" => nil, "overmind_socket" => nil))
+        holder.flush
+
+        output = kill_in(root)
+
+        aggregate_failures do
+          expect(output).to include("Refusing to signal anything")
+          expect(output).to include("recorded no process group")
+          expect(File.exist?(path)).to be true
+        end
+      end
+
+      it "prints an explicit failure when the shutdown cannot be verified" do
+        root = app_root("unverified")
+        owner = start_owner(root)
+        allow(described_class).to receive(:signal_process_group).and_return(false)
+
+        output = kill_in(root)
+
+        aggregate_failures do
+          expect(output).to include("Shutdown could not be verified")
+          expect(output).to include("process group #{owner[:pgid]} still has members")
+          expect(output).not_to include("verified gone")
+          expect(group_alive?(owner[:pgid])).to be true
+          expect(File.exist?(session_path(root))).to be true
+        end
+      end
+
+      it "signals only listeners whose working directory is inside this app root" do
+        root = app_root("ports")
+        mine = start_unrelated_process
+        theirs = start_unrelated_process
+        allow(described_class).to receive(:killable_ports).and_return([4567, 4568])
+        allow(described_class).to receive(:find_port_pids) do |port|
+          case port
+          when 4567 then alive?(mine[:pid]) ? [mine[:pid]] : []
+          when 4568 then alive?(theirs[:pid]) ? [theirs[:pid]] : []
+          else []
+          end
+        end
+        allow(described_class).to receive(:working_directory_for_pid).with(mine[:pid]).and_return(root)
+        allow(described_class).to receive(:working_directory_for_pid)
+          .with(theirs[:pid]).and_return(File.join(@dev_session_base, "elsewhere"))
+
+        output = kill_in(root)
+
+        aggregate_failures do
+          expect(wait_for { !alive?(mine[:pid]) }).to be true
+          expect(alive?(theirs[:pid])).to be true
+          expect(output).to include("Leaving port 4568 alone")
+          expect(output).to include("not attributable to this app directory")
+        end
+      end
+
+      it "never signals a listener it cannot attribute to this app root" do
+        root = app_root("unattributable")
+        theirs = start_unrelated_process
+        allow(described_class).to receive(:killable_ports).and_return([4569])
+        allow(described_class).to receive(:find_port_pids).with(4569).and_return([theirs[:pid]])
+        # lsof unavailable / permission denied -> not attributable.
+        allow(described_class).to receive(:working_directory_for_pid).with(theirs[:pid]).and_return(nil)
+
+        expect(described_class).not_to receive(:terminate_processes)
+
+        output = kill_in(root)
+
+        aggregate_failures do
+          expect(alive?(theirs[:pid])).to be true
+          expect(output).to include("Leaving port 4569 alone")
+        end
+      end
+    end
+
+    describe "Overmind endpoint handling" do
+      it "controls an orphaned endpoint instead of guessing at the stale pgid" do
+        root = app_root("orphan")
+        socket_path = File.join(root, ".overmind.sock")
+        server = UNIXServer.new(socket_path)
+        servers << server
+        unrelated = start_unrelated_process
+        write_session(root, "pgid" => unrelated[:pgid], "overmind_socket" => socket_path)
+
+        allow(described_class).to receive(:overmind_control) do |_subcommand, endpoint|
+          expect(endpoint).to eq(socket_path)
+          server.close
+          File.delete(socket_path)
+          true
+        end
+        expect(described_class).not_to receive(:signal_process_group)
+
+        output = kill_in(root)
+
+        aggregate_failures do
+          expect(output).to include("orphaned Overmind endpoint")
+          expect(output).to include("verified gone")
+          expect(alive?(unrelated[:pid])).to be true
+        end
+      end
+
+      it "refuses to control an endpoint outside this app root" do
+        root = app_root("outside")
+        outside = File.join(@dev_session_base, "other.sock")
+        servers << UNIXServer.new(outside)
+
+        result = nil
+        output = capture_stdout do
+          Dir.chdir(root) { result = described_class.send(:overmind_control, "quit", outside) }
+        end
+
+        aggregate_failures do
+          expect(result).to be false
+          expect(output).to include("no longer this app's endpoint")
+        end
+      end
+
+      it "revalidates the recorded endpoint immediately before control" do
+        root = app_root("revalidate")
+        socket_path = File.join(root, ".overmind.sock")
+        server = UNIXServer.new(socket_path)
+        servers << server
+        resolved = Dir.chdir(root) { described_class.send(:live_overmind_endpoint, root, socket_path) }
+        expect(resolved).to eq(socket_path)
+
+        server.close
+        File.delete(socket_path)
+
+        result = nil
+        output = capture_stdout do
+          Dir.chdir(root) { result = described_class.send(:overmind_control, "quit", socket_path) }
+        end
+
+        aggregate_failures do
+          expect(result).to be false
+          expect(output).to include("Skipping `overmind quit`")
+        end
+      end
+
+      it "ignores a recorded endpoint that no longer answers" do
+        root = app_root("dead-endpoint")
+        socket_path = File.join(root, ".overmind.sock")
+        UNIXServer.new(socket_path).close
+
+        resolved = Dir.chdir(root) { described_class.send(:live_overmind_endpoint, root, socket_path) }
+        expect(resolved).to be_nil
+      end
+
+      it "leaves a live socket in place while removing dead ones" do
+        root = app_root("sockets")
+        FileUtils.mkdir_p(File.join(root, "tmp", "sockets"))
+        live = File.join(root, "tmp", "sockets", "overmind-live.sock")
+        dead = File.join(root, "tmp", "sockets", "overmind-dead.sock")
+        servers << UNIXServer.new(live)
+        UNIXServer.new(dead).close
+
+        Dir.chdir(root) { capture_stdout { described_class.cleanup_socket_files } }
+
+        aggregate_failures do
+          expect(File.exist?(live)).to be true
+          expect(File.exist?(dead)).to be false
+        end
+      end
+    end
+
+    describe "process-group ownership" do
+      it "records a pgid only when bin/dev leads its own process group" do
+        allow(Process).to receive_messages(getpgrp: 4321, pid: 4321)
+        expect(described_class.send(:owned_process_group)).to eq(4321)
+
+        allow(Process).to receive(:pid).and_return(9999)
+        expect(described_class.send(:owned_process_group)).to be_nil
+      end
+
+      it "never signals its own process group or an impossible pgid" do
+        other = Process.getpgrp + 1
+
+        aggregate_failures do
+          expect(described_class.send(:signalable_pgid, Process.getpgrp)).to be_nil
+          expect(described_class.send(:signalable_pgid, 1)).to be_nil
+          expect(described_class.send(:signalable_pgid, 0)).to be_nil
+          expect(described_class.send(:signalable_pgid, nil)).to be_nil
+          expect(described_class.send(:signalable_pgid, "4321")).to be_nil
+          expect(described_class.send(:signalable_pgid, other)).to eq(other)
+        end
+      end
+
+      it "treats an unobservable process group as still alive" do
+        allow(Process).to receive(:kill).with(0, -4321).and_raise(Errno::EPERM)
+        expect(described_class.send(:process_group_alive?, 4321)).to be true
+      end
+    end
+  end
+
+  describe ".find_port_pids" do
+    it "asks lsof only for LISTEN sockets" do
+      # Regression: the previous `lsof -ti :PORT` also matched established
+      # client sockets (a browser tab, a curl), and those pids were signalled.
+      expect(Open3).to receive(:capture2)
+        .with("lsof", "-nP", "-t", "-iTCP:3000", "-sTCP:LISTEN", err: File::NULL)
+        .and_return(["1234\n5678", nil])
       allow(Process).to receive(:pid).and_return(9999)
-      expect(Process).to receive(:kill).with("TERM", 3456)
-      expect(Process).to receive(:kill).with("TERM", 3457)
-      expect(Process).to receive(:kill).with("TERM", 3458)
 
-      described_class.kill_processes
+      expect(described_class.find_port_pids(3000)).to eq([1234, 5678])
     end
 
-    it "cleans up socket files when they exist" do
-      # Make sure no processes are found so cleanup_socket_files gets called
-      allow(Open3).to receive(:capture2).and_return(["", nil])
-
-      allow(Dir).to receive(:glob).with("tmp/sockets/overmind*.sock").and_return([])
-      allow(File).to receive(:exist?).with(".overmind.sock").and_return(true)
-      allow(File).to receive(:exist?).with("tmp/pids/server.pid").and_return(false)
-      expect(File).to receive(:delete).with(".overmind.sock")
-
-      described_class.kill_processes
-    end
-
-    it "cleans up renamed/copied overmind sockets via the same glob FileManager uses" do
-      # Mirrors FileManager#cleanup_overmind_sockets: variants like
-      # overmind-4100.sock from copied app dirs must also be removed during
-      # `bin/dev kill`, not just at startup.
-      allow(Open3).to receive(:capture2).and_return(["", nil])
-
-      copied = "tmp/sockets/overmind-4100.sock"
-      allow(Dir).to receive(:glob).with("tmp/sockets/overmind*.sock").and_return([copied])
-      allow(File).to receive(:exist?).with(".overmind.sock").and_return(false)
-      allow(File).to receive(:exist?).with(copied).and_return(true)
-      allow(File).to receive(:exist?).with("tmp/pids/server.pid").and_return(false)
-      expect(File).to receive(:delete).with(copied)
-
-      described_class.kill_processes
-    end
-
-    # Regression: previously kill_processes used `||` which short-circuited
-    # subsequent cleanup steps as soon as one returned truthy. A successful
-    # pattern-based kill would leave stale port-bound processes and socket/pid
-    # files behind. All three cleanup helpers must always run.
-    it "runs port kills and socket cleanup even when pattern-based kill found processes" do
-      # The catch-all must be defined FIRST. RSpec uses the most-recently-defined
-      # matching stub regardless of specificity (`any_args` does not yield to a
-      # narrower matcher automatically), so the specific "rails" stub below wins
-      # because it is defined last. Reversing the order would cause
-      # `kill_running_processes` to always return false, missing the regression
-      # path this test covers (the old `||` short-circuit would have skipped the
-      # remaining cleanup steps once pattern-based kill returned truthy).
-      allow(Open3).to receive(:capture2).with("pgrep", any_args).and_return(["", nil])
-      allow(Open3).to receive(:capture2).with("pgrep", "-f", "rails", err: File::NULL).and_return(["1234", nil])
+    it "excludes the current process and impossible pids" do
+      allow(Open3).to receive(:capture2).and_return(["1234\n9999\n0\n1", nil])
       allow(Process).to receive(:pid).and_return(9999)
-      allow(Process).to receive(:kill)
 
-      expect(Open3).to receive(:capture2).with("lsof", "-ti", ":3000", err: File::NULL).and_return(["", nil])
-      expect(Open3).to receive(:capture2).with("lsof", "-ti", ":3001", err: File::NULL).and_return(["", nil])
-
-      socket = ".overmind.sock"
-      allow(Dir).to receive(:glob).with("tmp/sockets/overmind*.sock").and_return([])
-      allow(File).to receive(:exist?).with(socket).and_return(true)
-      allow(File).to receive(:exist?).with("tmp/pids/server.pid").and_return(false)
-      expect(File).to receive(:delete).with(socket)
-
-      described_class.kill_processes
+      expect(described_class.find_port_pids(3000)).to eq([1234])
     end
+
+    it "returns empty array when lsof is not found" do
+      allow(Open3).to receive(:capture2).and_raise(Errno::ENOENT)
+
+      expect(described_class.find_port_pids(3000)).to eq([])
+    end
+
+    it "returns empty array on permission denied" do
+      allow(Open3).to receive(:capture2).and_raise(Errno::EACCES)
+
+      expect(described_class.find_port_pids(3000)).to eq([])
+    end
+  end
+
+  describe ".killable_ports" do
+    include_context "with clean port env"
 
     it "targets base-port-derived ports when REACT_ON_RAILS_BASE_PORT is active" do
       # Without base-port awareness, `bin/dev kill` in a worktree running on
-      # 5000/5001/5002 would fall back to killing stale processes on 3000/3001
-      # instead — the actual ports would be left untouched. RENDERER_PORT is
-      # set so `pro_renderer_active?` returns true via `renderer_env_signal?`
-      # (the Pro gem isn't loaded in the open-source spec suite), exercising
-      # the base+2 inclusion path.
+      # 5000/5001/5002 would fall back to 3000/3001 and leave the actual ports
+      # untouched.
       ENV["RENDERER_PORT"] = "5002"
       allow(ReactOnRails::Dev::PortSelector)
         .to receive(:base_port_hash)
         .and_return({ rails: 5000, webpack: 5001, renderer: 5002, base_port_mode: true })
-      # No pattern-based processes so kill_port_processes runs.
-      allow(Open3).to receive(:capture2).with("pgrep", any_args).and_return(["", nil])
 
-      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":5000", err: File::NULL).and_return(["4501", nil])
-      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":5001", err: File::NULL).and_return(["", nil])
-      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":5002", err: File::NULL).and_return(["", nil])
-
-      allow(Process).to receive(:pid).and_return(9999)
-      expect(Process).to receive(:kill).with("TERM", 4501)
-
-      described_class.kill_processes
+      expect(described_class.killable_ports).to eq([5000, 5001, 5002])
     end
 
     it "skips the base-port-derived renderer port when Pro renderer support is inactive" do
@@ -1311,171 +1753,63 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         .to receive(:base_port_hash)
         .and_return({ rails: 5000, webpack: 5001, renderer: 5002, base_port_mode: true })
       allow(described_class).to receive(:pro_renderer_active?).and_return(false)
-      # No pattern-based processes so kill_port_processes runs.
-      allow(Open3).to receive(:capture2).with("pgrep", any_args).and_return(["", nil])
 
-      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":5000", err: File::NULL).and_return(["", nil])
-      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":5001", err: File::NULL).and_return(["", nil])
-      expect(Open3).not_to receive(:capture2).with("lsof", "-ti", ":5002", err: File::NULL)
-
-      described_class.kill_processes
+      expect(described_class.killable_ports).to eq([5000, 5001])
     end
 
-    it "includes the base-port-derived renderer port when Pro gem is loaded even without renderer env vars" do
-      # bin/dev kill is usually invoked from a fresh shell where RENDERER_PORT
-      # and REACT_RENDERER_URL aren't carried over. The Pro renderer runs as
-      # `node renderer/node-renderer.js` (see react_on_rails_pro Procfile.dev),
-      # which the development_processes pattern (`node.*react[-_]on[-_]rails`)
-      # does not match — so port-based killing is the only reliable path to
-      # reap a stale renderer on base+2. In base-port mode the user owns the
-      # port range, so the conservative env-var gate isn't needed.
+    it "includes the base-port-derived renderer port when the Pro gem is loaded without renderer env vars" do
       allow(ReactOnRails::Dev::PortSelector)
         .to receive(:base_port_hash)
         .and_return({ rails: 5000, webpack: 5001, renderer: 5002, base_port_mode: true })
       allow(described_class).to receive(:pro_renderer_active?).and_return(true)
-      # No pattern-based processes so kill_port_processes runs.
-      allow(Open3).to receive(:capture2).with("pgrep", any_args).and_return(["", nil])
 
-      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":5000", err: File::NULL).and_return(["", nil])
-      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":5001", err: File::NULL).and_return(["", nil])
-      expect(Open3).to receive(:capture2).with("lsof", "-ti", ":5002", err: File::NULL).and_return(["", nil])
-
-      described_class.kill_processes
+      expect(capture_stdout { expect(described_class.killable_ports).to eq([5000, 5001, 5002]) })
+        .to include("Including renderer port 5002")
     end
 
-    it "does not widen kill scope to 3800 when the Pro gem is loaded but no renderer env vars are set" do
-      # Pro gem may be present in OSS+Pro-gem apps that never run the
-      # renderer. Without an explicit RENDERER_PORT / REACT_RENDERER_URL /
-      # RENDERER_URL signal, `bin/dev kill` must not target 3800 — that
-      # port could belong to an unrelated process.
+    it "does not widen scope to 3800 when the Pro gem is loaded but no renderer env vars are set" do
       allow(ReactOnRails::Dev::PortSelector).to receive(:base_port_hash).and_return(nil)
       allow(described_class).to receive(:pro_renderer_active?).and_return(true)
-      # No pattern-based processes so kill_port_processes runs.
-      allow(Open3).to receive(:capture2).with("pgrep", any_args).and_return(["", nil])
 
-      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":3000", err: File::NULL).and_return(["", nil])
-      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":3001", err: File::NULL).and_return(["", nil])
-      expect(Open3).not_to receive(:capture2).with("lsof", "-ti", ":3800", err: File::NULL)
-
-      allow(Process).to receive(:pid).and_return(9999)
-      expect(Process).not_to receive(:kill).with("TERM", 3801)
-
-      described_class.kill_processes
+      expect(described_class.killable_ports).to eq([3000, 3001])
     end
 
-    it "targets 3800 when a localhost REACT_RENDERER_URL is set without an explicit :port" do
+    it "targets 3800 when a localhost REACT_RENDERER_URL is set without an explicit port" do
       ENV["REACT_RENDERER_URL"] = "http://localhost"
       allow(ReactOnRails::Dev::PortSelector).to receive(:base_port_hash).and_return(nil)
       allow(described_class).to receive(:pro_renderer_active?).and_return(true)
-      # No pattern-based processes so kill_port_processes runs.
-      allow(Open3).to receive(:capture2).with("pgrep", any_args).and_return(["", nil])
 
-      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":3000", err: File::NULL).and_return(["", nil])
-      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":3001", err: File::NULL).and_return(["", nil])
-      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":3800", err: File::NULL).and_return(["3801", nil])
-
-      allow(Process).to receive(:pid).and_return(9999)
-      expect(Process).to receive(:kill).with("TERM", 3801)
-
-      described_class.kill_processes
+      expect(described_class.killable_ports).to eq([3000, 3001, 3800])
     end
 
     it "targets the configured renderer port when Pro renderer support is active without a base port" do
       ENV["RENDERER_PORT"] = "3900"
       allow(ReactOnRails::Dev::PortSelector).to receive(:base_port_hash).and_return(nil)
       allow(described_class).to receive(:pro_renderer_active?).and_return(true)
-      # No pattern-based processes so kill_port_processes runs.
-      allow(Open3).to receive(:capture2).with("pgrep", any_args).and_return(["", nil])
 
-      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":3000", err: File::NULL).and_return(["", nil])
-      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":3001", err: File::NULL).and_return(["", nil])
-      expect(Open3).not_to receive(:capture2).with("lsof", "-ti", ":3800", err: File::NULL)
-      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":3900", err: File::NULL).and_return(["3901", nil])
-
-      allow(Process).to receive(:pid).and_return(9999)
-      expect(Process).to receive(:kill).with("TERM", 3901)
-
-      described_class.kill_processes
+      expect(described_class.killable_ports).to eq([3000, 3001, 3900])
     end
 
     it "does not target the default renderer port for a remote renderer URL" do
       ENV["REACT_RENDERER_URL"] = "https://renderer.internal:3800"
       allow(ReactOnRails::Dev::PortSelector).to receive(:base_port_hash).and_return(nil)
-      # No pattern-based processes so kill_port_processes runs.
-      allow(Open3).to receive(:capture2).with("pgrep", any_args).and_return(["", nil])
 
-      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":3000", err: File::NULL).and_return(["", nil])
-      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":3001", err: File::NULL).and_return(["", nil])
-      expect(Open3).not_to receive(:capture2).with("lsof", "-ti", ":3800", err: File::NULL)
-
-      described_class.kill_processes
+      expect(described_class.killable_ports).to eq([3000, 3001])
     end
 
     it "targets the local renderer URL port when RENDERER_PORT is not set" do
       ENV["REACT_RENDERER_URL"] = "http://localhost:3900"
       allow(ReactOnRails::Dev::PortSelector).to receive(:base_port_hash).and_return(nil)
-      # No pattern-based processes so kill_port_processes runs.
-      allow(Open3).to receive(:capture2).with("pgrep", any_args).and_return(["", nil])
 
-      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":3000", err: File::NULL).and_return(["", nil])
-      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":3001", err: File::NULL).and_return(["", nil])
-      expect(Open3).not_to receive(:capture2).with("lsof", "-ti", ":3800", err: File::NULL)
-      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":3900", err: File::NULL).and_return(["3901", nil])
-
-      allow(Process).to receive(:pid).and_return(9999)
-      expect(Process).to receive(:kill).with("TERM", 3901)
-
-      described_class.kill_processes
+      expect(described_class.killable_ports).to eq([3000, 3001, 3900])
     end
 
     it "does not treat userinfo digits as an explicit local renderer URL port" do
       ENV["REACT_RENDERER_URL"] = "http://user:3800@localhost"
       allow(ReactOnRails::Dev::PortSelector).to receive(:base_port_hash).and_return(nil)
       allow(described_class).to receive(:pro_renderer_active?).and_return(true)
-      # No pattern-based processes so kill_port_processes runs.
-      allow(Open3).to receive(:capture2).with("pgrep", any_args).and_return(["", nil])
 
-      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":3000", err: File::NULL).and_return(["", nil])
-      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":3001", err: File::NULL).and_return(["", nil])
-      expect(Open3).not_to receive(:capture2).with("lsof", "-ti", ":80", err: File::NULL)
-      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":3800", err: File::NULL).and_return(["3801", nil])
-
-      allow(Process).to receive(:pid).and_return(9999)
-      expect(Process).to receive(:kill).with("TERM", 3801)
-
-      described_class.kill_processes
-    end
-  end
-
-  describe ".find_port_pids" do
-    it "finds PIDs listening on a specific port" do
-      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":3000", err: File::NULL).and_return(["1234\n5678", nil])
-      allow(Process).to receive(:pid).and_return(9999)
-
-      pids = described_class.find_port_pids(3000)
-      expect(pids).to eq([1234, 5678])
-    end
-
-    it "excludes current process PID" do
-      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":3000", err: File::NULL).and_return(["1234\n9999", nil])
-      allow(Process).to receive(:pid).and_return(9999)
-
-      pids = described_class.find_port_pids(3000)
-      expect(pids).to eq([1234])
-    end
-
-    it "returns empty array when lsof is not found" do
-      allow(Open3).to receive(:capture2).and_raise(Errno::ENOENT)
-
-      pids = described_class.find_port_pids(3000)
-      expect(pids).to eq([])
-    end
-
-    it "returns empty array on permission denied" do
-      allow(Open3).to receive(:capture2).and_raise(Errno::EACCES)
-
-      pids = described_class.find_port_pids(3000)
-      expect(pids).to eq([])
+      expect(described_class.killable_ports).to eq([3000, 3001, 3800])
     end
   end
 
@@ -1787,23 +2121,34 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
   end
 
   describe ".kill_port_processes" do
-    it "kills processes on specified ports" do
-      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":3000", err: File::NULL).and_return(["1234", nil])
-      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":3001", err: File::NULL).and_return(["5678", nil])
-      allow(Process).to receive(:pid).and_return(9999)
+    it "signals only listeners whose working directory is inside this app root" do
+      allow(described_class).to receive(:find_port_pids).with(3000).and_return([1234])
+      allow(described_class).to receive(:find_port_pids).with(3001).and_return([5678])
+      allow(described_class).to receive(:working_directory_for_pid).with(1234).and_return(File.realpath(Dir.pwd))
+      allow(described_class).to receive(:working_directory_for_pid).with(5678).and_return("/somewhere/else")
+      allow(described_class).to receive(:process_alive?).and_return(false)
 
       expect(Process).to receive(:kill).with("TERM", 1234)
-      expect(Process).to receive(:kill).with("TERM", 5678)
+      expect(Process).not_to receive(:kill).with("TERM", 5678)
 
-      result = described_class.kill_port_processes([3000, 3001])
-      expect(result).to be true
+      output = capture_stdout { expect(described_class.kill_port_processes([3000, 3001])).to be true }
+      expect(output).to include("Leaving port 3001 alone")
     end
 
     it "returns false when no processes found on ports" do
-      allow(Open3).to receive(:capture2).and_return(["", nil])
+      allow(described_class).to receive(:find_port_pids).and_return([])
 
-      result = described_class.kill_port_processes([3000, 3001])
-      expect(result).to be false
+      expect(described_class.kill_port_processes([3000, 3001])).to be false
+    end
+
+    it "never signals a listener it cannot attribute to this app root" do
+      allow(described_class).to receive(:find_port_pids).with(3000).and_return([1234])
+      allow(described_class).to receive(:working_directory_for_pid).with(1234).and_return("/somewhere/else")
+
+      expect(Process).not_to receive(:kill)
+
+      output = capture_stdout { expect(described_class.kill_port_processes([3000])).to be false }
+      expect(output).to include("not attributable to this app directory")
     end
   end
 

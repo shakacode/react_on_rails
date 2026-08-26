@@ -2,6 +2,7 @@
 
 require "English"
 require "fileutils"
+require "json"
 require "net/http"
 require "open3"
 require "optparse"
@@ -31,6 +32,17 @@ module ReactOnRails
       CLEAN_SHAKAPACKER_ENVIRONMENTS = %w[development test production].freeze
       OPEN_BROWSER_WAIT_TIMEOUT = 60
       OPEN_BROWSER_POLL_INTERVAL = 0.5
+
+      # Per-app-directory run state written by `bin/dev` and consumed by
+      # `bin/dev kill`. See the "Scoped dev shutdown" section further down.
+      DEV_SESSION_RELATIVE_PATH = File.join("tmp", "react_on_rails", "dev-session.json")
+      DEV_SESSION_SCHEMA = 1
+      # Grace given to a graceful stop (`overmind quit` / SIGTERM) before escalating.
+      SHUTDOWN_TERM_GRACE_SECS = 10
+      # Grace given to the forceful stop (`overmind kill` / SIGKILL) before giving up.
+      SHUTDOWN_KILL_GRACE_SECS = 5
+      SHUTDOWN_POLL_INTERVAL_SECS = 0.2
+
       DOCS_BASE_URL = "https://reactonrails.com/docs"
       DEV_SERVER_AND_TESTING_DOCS_URL = "#{DOCS_BASE_URL}/building-features/dev-server-and-testing/".freeze
       TESTING_CONFIGURATION_DOCS_URL = "#{DOCS_BASE_URL}/building-features/testing-configuration/".freeze
@@ -61,21 +73,20 @@ module ReactOnRails
           end
         end
 
+        # Stops the development processes owned by THIS app directory and
+        # verifies they are gone before reporting success.
+        #
+        # This is deliberately not an OS-wide development-process cleanup:
+        # nothing is signalled unless it can be positively attributed to the
+        # current app root. See the "Scoped dev shutdown" section below for
+        # the ownership model and its known limitation.
         def kill_processes
-          puts "🔪 Killing all development processes..."
+          puts "🔪 Stopping this app's development processes..."
+          puts "   #{current_app_root}"
           puts ""
 
-          # Run every cleanup step unconditionally so a successful first step
-          # (e.g. pattern-based kill) doesn't leave stale port-bound processes
-          # or socket/pid files behind. `.any?` still gives us the
-          # "anything actually got killed?" signal for the summary message.
-          killed_any = [
-            kill_running_processes,
-            kill_port_processes(killable_ports),
-            cleanup_socket_files
-          ].any?
-
-          print_kill_summary(killed_any)
+          status, blockers = shutdown_dev_session
+          print_kill_summary(status, blockers)
         end
 
         def clean_generated_assets_and_caches
@@ -182,44 +193,11 @@ module ReactOnRails
           end
         end
 
-        def development_processes
-          {
-            "rails" => "Rails server",
-            "node.*react[-_]on[-_]rails" => "React on Rails Node processes",
-            "overmind" => "Overmind process manager",
-            "foreman" => "Foreman process manager",
-            "ruby.*puma" => "Puma server",
-            "webpack-dev-server" => "Webpack dev server",
-            "bin/shakapacker-dev-server" => "Shakapacker dev server"
-          }
-        end
-
-        def kill_running_processes
-          killed_any = false
-
-          development_processes.each do |pattern, description|
-            pids = find_process_pids(pattern)
-            next unless pids.any?
-
-            puts "   ☠️  Killing #{description} (PIDs: #{pids.join(', ')})"
-            terminate_processes(pids)
-            killed_any = true
-          end
-
-          killed_any
-        end
-
-        def find_process_pids(pattern)
-          stdout, _status = Open3.capture2("pgrep", "-f", pattern, err: File::NULL)
-          stdout.split("\n").map(&:to_i).reject { |pid| pid == Process.pid }
-        rescue Errno::ENOENT
-          # pgrep command not found
-          []
-        end
-
-        def terminate_processes(pids)
+        # Signals every pid in `pids`. Callers must have already attributed
+        # each pid to this app directory - this helper does no filtering.
+        def terminate_processes(pids, signal = "TERM")
           pids.each do |pid|
-            Process.kill("TERM", pid)
+            Process.kill(signal, pid)
           rescue Errno::ESRCH, ArgumentError, RangeError
             # Process already stopped, or invalid signal/PID - silently skip
             nil
@@ -230,57 +208,97 @@ module ReactOnRails
           end
         end
 
+        # Last-resort path used when there is no live dev-session owner to
+        # control. Only LISTEN sockets are considered, and every candidate pid
+        # must have a working directory inside this app root before it is
+        # signalled. Listeners that cannot be positively attributed are
+        # reported as diagnostics and left alone.
         def kill_port_processes(ports)
-          killed_any = false
+          owned, foreign = classify_port_listeners(ports)
+          report_foreign_listeners(foreign)
+          return false if owned.empty?
 
-          ports.each do |port|
-            pids = find_port_pids(port)
-            next unless pids.any?
-
-            puts "   ☠️  Killing process on port #{port} (PIDs: #{pids.join(', ')})"
-            terminate_processes(pids)
-            killed_any = true
+          owned.each do |port, pids|
+            puts "   ☠️  Stopping this app's process on port #{port} (PIDs: #{pids.join(', ')})"
           end
 
-          killed_any
+          pids = owned.values.flatten.uniq
+          terminate_processes(pids)
+          wait_until(SHUTDOWN_TERM_GRACE_SECS) { pids.none? { |pid| process_alive?(pid) } }
+          survivors = pids.select { |pid| process_alive?(pid) }
+          if survivors.any?
+            puts "   ☠️  Escalating to KILL for survivors (PIDs: #{survivors.join(', ')})"
+            terminate_processes(survivors, "KILL")
+            wait_until(SHUTDOWN_KILL_GRACE_SECS) { survivors.none? { |pid| process_alive?(pid) } }
+          end
+
+          true
         end
 
+        # Returns the pids holding a LISTEN socket on `port`.
+        #
+        # `-sTCP:LISTEN` matters: the unfiltered `lsof -ti :PORT` this replaced
+        # also matched *client* sockets connected to the port (a browser tab, a
+        # curl, another app's HTTP client), and those pids were then signalled.
         def find_port_pids(port)
-          stdout, _status = Open3.capture2("lsof", "-ti", ":#{port}", err: File::NULL)
-          stdout.split("\n").map(&:to_i).reject { |pid| pid == Process.pid }
+          stdout, _status = Open3.capture2("lsof", "-nP", "-t", "-iTCP:#{port}", "-sTCP:LISTEN", err: File::NULL)
+          stdout.split("\n").map(&:to_i).reject { |pid| pid <= 1 || pid == Process.pid }
         rescue StandardError
           # lsof command not found or other error (permission denied, etc.)
           []
         end
 
+        # Read-only probe used by `bin/dev test-watch` to notice an existing
+        # Shakapacker watcher. Deliberately NOT part of the shutdown path:
+        # `pgrep -f` matches command lines machine-wide, so its results say
+        # nothing about which checkout a process belongs to and must never be
+        # used as signal authority.
+        def find_process_pids(pattern)
+          stdout, _status = Open3.capture2("pgrep", "-f", pattern, err: File::NULL)
+          stdout.split("\n").map(&:to_i).reject { |pid| pid == Process.pid }
+        rescue Errno::ENOENT
+          # pgrep command not found
+          []
+        end
+
+        # Removes this app's Overmind sockets and Rails pid file. Mirrors
+        # FileManager#cleanup_overmind_sockets so renamed/copied variants like
+        # overmind-4100.sock are removed during `bin/dev kill`, not just at
+        # startup. A socket that still answers is left in place - removing a
+        # live endpoint would strand the process manager behind it.
         def cleanup_socket_files
-          # Mirrors FileManager#cleanup_overmind_sockets so renamed/copied
-          # variants like overmind-4100.sock are removed during `bin/dev kill`,
-          # not just at startup.
-          overmind_sockets = Dir.glob("tmp/sockets/overmind*.sock")
-          files = [".overmind.sock", *overmind_sockets, "tmp/pids/server.pid"].uniq
-          killed_any = false
+          root = current_app_root
+          files = stale_cleanup_candidates(root)
+          cleaned_any = false
 
           files.each do |file|
             next unless File.exist?(file)
+            next if File.socket?(file) && overmind_endpoint_alive?(file)
 
-            puts "   🧹 Removing #{file}"
+            puts "   🧹 Removing #{relative_to_app_root(file, root)}"
             File.delete(file)
-            killed_any = true
+            cleaned_any = true
           rescue StandardError
             nil
           end
 
-          killed_any
+          cleaned_any
         end
 
-        def print_kill_summary(killed_any)
-          if killed_any
+        def print_kill_summary(status, blockers = [])
+          case status
+          when :verified
             puts ""
-            puts "✅ All processes terminated and sockets cleaned"
+            puts "✅ This app's development processes are stopped, and verified gone"
             puts "💡 You can now run 'bin/dev' for a clean start"
+          when :recovered_stale
+            puts ""
+            puts "✅ Cleaned up stale dev session state - nothing was running"
+            puts "💡 You can now run 'bin/dev' for a clean start"
+          when :nothing_running
+            puts "   ℹ️  No development processes owned by this app directory are running"
           else
-            puts "   ℹ️  No development processes found running"
+            print_kill_failure(status, blockers)
           end
         end
 
@@ -360,6 +378,576 @@ module ReactOnRails
         # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity
 
         private
+
+        # =================================================================
+        # Scoped dev shutdown
+        #
+        # `bin/dev kill` must never terminate processes belonging to another
+        # checkout of the same app. Ownership is therefore established when the
+        # session STARTS rather than guessed at kill time:
+        #
+        #   * `bin/dev` claims `tmp/react_on_rails/dev-session.json` with an
+        #     exclusive `flock` that it holds for the whole session, and records
+        #     the absolute realpath of the app root it belongs to, its own pid,
+        #     the process group it leads (when it leads one), and the Overmind
+        #     endpoint it would use.
+        #   * `bin/dev kill` re-opens that file. Failing to take the lock is
+        #     positive proof the owner is still alive; taking it is positive
+        #     proof the owner is gone and the recorded numbers are stale. A bare
+        #     pid or pgid is never authority on its own, because pids are
+        #     recycled - the lock is the liveness proof, and the recorded app
+        #     root is the identity proof.
+        #   * Anything that cannot be positively attributed to this app root is
+        #     reported as a diagnostic and never signalled. Missing, malformed,
+        #     foreign or unreadable state fails closed: nothing is signalled and
+        #     no success is printed.
+        #
+        # Known limitation: the guarantee covers foreground Procfile processes
+        # and their ordinary descendants. A process that deliberately escapes
+        # its process group with `setsid`/daemonization is out of scope for this
+        # mechanism. Overmind's tmux server is exactly such a process, which is
+        # why an Overmind session is shut down through its own per-worktree
+        # control socket instead of by signalling the process group.
+        # =================================================================
+
+        def dev_session_path(root)
+          File.join(root, DEV_SESSION_RELATIVE_PATH)
+        end
+
+        # Absolute, symlink-resolved identity of the app directory `bin/dev`
+        # was invoked from. Every ownership decision is made against this.
+        def current_app_root
+          File.realpath(Dir.pwd)
+        rescue SystemCallError
+          File.expand_path(Dir.pwd)
+        end
+
+        # Distinct from #path_inside_app_root? (used by `bin/dev clean`, which
+        # anchors on the Shakapacker config base dir): shutdown ownership is
+        # decided against the symlink-resolved cwd, and the root itself counts
+        # as inside.
+        def inside_dev_app_root?(path, root = current_app_root)
+          return false unless path.is_a?(String) && !path.empty?
+
+          path == root || path.start_with?("#{root}#{File::SEPARATOR}")
+        end
+
+        def relative_to_app_root(path, root = current_app_root)
+          prefix = "#{root}#{File::SEPARATOR}"
+          path.start_with?(prefix) ? path[prefix.length..].to_s : path
+        end
+
+        # ---- start path: claiming the session -------------------------
+
+        # Wraps a foreground process-manager run so `bin/dev kill` has a
+        # trustworthy, worktree-scoped handle on it. Startup is never blocked by
+        # a bookkeeping failure - the kill path degrades to port-attributed
+        # cleanup instead.
+        def with_dev_session
+          handle = claim_dev_session(current_app_root)
+          begin
+            yield
+          ensure
+            release_dev_session(handle)
+          end
+        end
+
+        def claim_dev_session(root)
+          path = dev_session_path(root)
+          FileUtils.mkdir_p(File.dirname(path))
+          file = File.open(path, File::RDWR | File::CREAT, 0o644)
+          unless file.flock(File::LOCK_EX | File::LOCK_NB)
+            file.close
+            puts "   ℹ️  Another `bin/dev` already owns #{relative_to_app_root(path, root)}; " \
+                 "leaving its session state untouched."
+            return nil
+          end
+
+          file.truncate(0)
+          file.write(JSON.pretty_generate(dev_session_payload(root)))
+          file.flush
+          file
+        rescue SystemCallError, IOError => e
+          warn "   ⚠️  Could not record dev session state (#{e.class}). " \
+               "`bin/dev kill` will fall back to port-scoped cleanup."
+          nil
+        end
+
+        def dev_session_payload(root)
+          {
+            "schema" => DEV_SESSION_SCHEMA,
+            "app_root" => root,
+            "pid" => Process.pid,
+            "pgid" => owned_process_group,
+            "overmind_socket" => owned_overmind_socket_path(root),
+            "started_at" => Time.now.utc.iso8601
+          }
+        end
+
+        # Only report a pgid we actually lead. When the shell's job control put
+        # `bin/dev` at the head of its own process group, that group contains
+        # `bin/dev` and its descendants and nothing else, so signalling it can
+        # never reach the parent shell or a sibling job. If we are not the
+        # group leader the group is somebody else's and is not ours to signal.
+        def owned_process_group
+          pgid = Process.getpgrp
+          pgid == Process.pid ? pgid : nil
+        rescue NotImplementedError, SystemCallError
+          nil
+        end
+
+        # The endpoint Overmind will use for this run. Only recorded when it
+        # lives inside this app root - an OVERMIND_SOCKET pointing elsewhere is
+        # not ours to control.
+        def owned_overmind_socket_path(root)
+          configured = ENV.fetch("OVERMIND_SOCKET", nil).to_s.strip
+          path = configured.empty? ? default_overmind_socket_path(root) : File.expand_path(configured, root)
+          inside_dev_app_root?(path, root) ? path : nil
+        end
+
+        def default_overmind_socket_path(root)
+          File.join(root, ".overmind.sock")
+        end
+
+        def release_dev_session(handle)
+          return if handle.nil?
+
+          path = handle.path
+          File.delete(path) if File.exist?(path) && !dev_session_replaced?(path, handle)
+          handle.flock(File::LOCK_UN)
+          handle.close
+        rescue SystemCallError, IOError
+          nil
+        end
+
+        # ---- kill path: reading and classifying the session ------------
+
+        def shutdown_dev_session
+          view = dev_session_view(current_app_root).merge(ports: killable_ports)
+          begin
+            dispatch_dev_shutdown(view)
+          ensure
+            close_session_handle(view)
+          end
+        end
+
+        def dispatch_dev_shutdown(view)
+          case view[:kind]
+          when :refused then [:refused, view[:blockers]]
+          when :owner_alive then shutdown_live_owner(view)
+          else shutdown_without_owner(view)
+          end
+        end
+
+        def dev_session_view(root)
+          path = dev_session_path(root)
+          file = open_dev_session(path)
+          return { kind: :absent, root:, path:, handle: nil } if file.nil?
+
+          kind, payload = classify_dev_session(root, path, file)
+          base = { kind:, root:, path:, handle: file }
+          kind == :refused ? base.merge(blockers: [payload]) : base.merge(session: payload)
+        end
+
+        # Missing state, an unreadable file and a permissions problem are all
+        # "no usable owner record", handled by the caller's no-owner path.
+        def open_dev_session(path)
+          File.open(path, File::RDWR)
+        rescue SystemCallError
+          nil
+        end
+
+        def classify_dev_session(root, path, file)
+          session = parse_dev_session(file.read)
+          return [:refused, "#{path} is not readable React on Rails dev session state"] if session.nil?
+
+          unless session[:app_root] == root
+            return [:refused, "#{path} records app root #{session[:app_root]}, which is not #{root}"]
+          end
+
+          case lock_dev_session(file)
+          when :error
+            [:refused, "could not determine whether #{path} is still owned by a running `bin/dev`"]
+          when :held
+            [:owner_alive, session]
+          else
+            classify_released_dev_session(path, file, session)
+          end
+        rescue SystemCallError, IOError
+          [:refused, "could not read #{path}"]
+        end
+
+        # The owner released the lock: either it tidied up after itself or it
+        # died. Both mean the recorded pid/pgid are stale and must not be
+        # signalled. A file that was *replaced* under us is a contradiction, so
+        # that fails closed instead.
+        def classify_released_dev_session(path, file, session)
+          return [:refused, "#{path} was replaced while it was being read"] if dev_session_replaced?(path, file)
+
+          [:stale, session]
+        end
+
+        def parse_dev_session(raw)
+          data = JSON.parse(raw.to_s)
+          return nil unless valid_dev_session_document?(data)
+
+          { app_root: data["app_root"], pid: data["pid"], pgid: data["pgid"],
+            overmind_socket: data["overmind_socket"] }
+        rescue JSON::ParserError, TypeError
+          nil
+        end
+
+        # Validates the parsed shape before anything reads a key. `JSON.parse`
+        # happily returns a String, an Integer or nil for valid-but-wrong
+        # documents (`"x"`, `7`, `null`), so the Hash check has to come first -
+        # otherwise a well-formed but meaningless file would raise
+        # NoMethodError instead of being rejected as untrusted state.
+        def valid_dev_session_document?(data)
+          return false unless data.is_a?(Hash)
+          return false unless data["schema"] == DEV_SESSION_SCHEMA
+          return false unless valid_session_root?(data["app_root"])
+          return false unless data["pid"].is_a?(Integer) && data["pid"] > 1
+          return false unless valid_session_pgid?(data["pgid"])
+
+          data["overmind_socket"].nil? || data["overmind_socket"].is_a?(String)
+        end
+
+        def valid_session_root?(value)
+          value.is_a?(String) && !value.empty?
+        end
+
+        def valid_session_pgid?(value)
+          value.nil? || (value.is_a?(Integer) && value > 1)
+        end
+
+        # Returns :held when another process owns the lock (the owner is
+        # alive), :acquired when we took it (the owner is gone), :error when we
+        # cannot tell - which the caller treats as a refusal.
+        def lock_dev_session(file)
+          file.flock(File::LOCK_EX | File::LOCK_NB) ? :acquired : :held
+        rescue SystemCallError, IOError
+          :error
+        end
+
+        # True when the path now resolves to a different inode than the handle
+        # we read - i.e. a newer `bin/dev` replaced the state underneath us.
+        # A path that simply vanished is the owner tidying up after itself, not
+        # a replacement.
+        def dev_session_replaced?(path, file)
+          File.stat(path).ino != file.stat.ino
+        rescue Errno::ENOENT
+          false
+        rescue SystemCallError, IOError
+          true
+        end
+
+        def close_session_handle(view)
+          handle = view && view[:handle]
+          return if handle.nil?
+
+          handle.flock(File::LOCK_UN)
+          handle.close
+        rescue SystemCallError, IOError
+          nil
+        end
+
+        # ---- kill path: shutting down a live owner ---------------------
+
+        def shutdown_live_owner(view)
+          session = view[:session]
+          endpoint = live_overmind_endpoint(view[:root], session[:overmind_socket])
+          pgid = signalable_pgid(session[:pgid])
+          return [:refused, [unreachable_owner_message(view, session)]] if endpoint.nil? && pgid.nil?
+
+          request_owner_shutdown(view, pgid, endpoint)
+          verify_owner_shutdown(view, pgid, endpoint)
+        end
+
+        def unreachable_owner_message(view, session)
+          "`bin/dev` (pid #{session[:pid]}) still owns #{view[:path]}, but it recorded no process group " \
+            "and has no live Overmind endpoint. Stop it in its own terminal instead."
+        end
+
+        # Escalation ladder: each step runs only if the previous one did not
+        # produce a verified shutdown inside its grace window. TERM always
+        # precedes KILL, and KILL only ever reaches whatever survived TERM.
+        def request_owner_shutdown(view, pgid, endpoint)
+          shutdown_steps(pgid, endpoint).each do |label, grace, action|
+            puts "   #{label}"
+            action.call
+            return true if wait_until(grace) { owner_shutdown_complete?(view, pgid, endpoint) }
+          end
+
+          false
+        end
+
+        def shutdown_steps(pgid, endpoint)
+          steps = []
+          if endpoint
+            steps << ["🛑 Asking Overmind to quit via #{endpoint}", SHUTDOWN_TERM_GRACE_SECS,
+                      -> { overmind_control("quit", endpoint) }]
+            steps << ["☠️  Overmind did not quit in time; running `overmind kill`", SHUTDOWN_KILL_GRACE_SECS,
+                      -> { overmind_control("kill", endpoint) }]
+          end
+          if pgid
+            steps << ["🛑 Sending TERM to this app's process group (PGID #{pgid})", SHUTDOWN_TERM_GRACE_SECS,
+                      -> { signal_process_group(pgid, "TERM") }]
+            steps << ["☠️  Sending KILL to the survivors of PGID #{pgid}", SHUTDOWN_KILL_GRACE_SECS,
+                      -> { signal_process_group(pgid, "KILL") }]
+          end
+          steps
+        end
+
+        def verify_owner_shutdown(view, pgid, endpoint)
+          blockers = shutdown_blockers(view, pgid, endpoint)
+          return [:unverified, blockers] if blockers.any?
+
+          remove_dev_session_file(view)
+          cleanup_socket_files
+          leftover = leftover_owned_listeners(view)
+          return [:unverified, leftover] if leftover.any?
+
+          [:verified, []]
+        end
+
+        def owner_shutdown_complete?(view, pgid, endpoint)
+          shutdown_blockers(view, pgid, endpoint).empty?
+        end
+
+        def shutdown_blockers(view, pgid, endpoint)
+          blockers = []
+          blockers << "the `bin/dev` that owns #{view[:path]} is still running" unless owner_released?(view[:path])
+          blockers << "process group #{pgid} still has members" if pgid && process_group_alive?(pgid)
+          if endpoint && overmind_endpoint_alive?(endpoint)
+            blockers << "the Overmind endpoint #{endpoint} is still accepting connections"
+          end
+          blockers
+        end
+
+        # Positive re-observation of the owner: the state file is gone, or its
+        # lock is now free. Anything we cannot observe counts as "still held".
+        def owner_released?(path)
+          return true unless File.exist?(path)
+
+          File.open(path, File::RDWR) do |file|
+            file.flock(File::LOCK_EX | File::LOCK_NB) ? true : false
+          end
+        rescue Errno::ENOENT
+          true
+        rescue SystemCallError, IOError
+          false
+        end
+
+        def leftover_owned_listeners(view)
+          owned, _foreign = classify_port_listeners(view[:ports])
+          owned.map do |port, pids|
+            "port #{port} is still held by this app directory (PIDs: #{pids.join(', ')})"
+          end
+        end
+
+        def remove_dev_session_file(view)
+          handle = view[:handle]
+          path = view[:path]
+          return false if handle.nil? || !File.exist?(path)
+          return false if dev_session_replaced?(path, handle)
+
+          puts "   🧹 Removing #{relative_to_app_root(path, view[:root])}"
+          File.delete(path)
+          true
+        rescue SystemCallError
+          false
+        end
+
+        # ---- kill path: no live owner ----------------------------------
+
+        def shutdown_without_owner(view)
+          remove_dev_session_file(view) if view[:kind] == :stale
+          endpoint = live_overmind_endpoint(view[:root], view.dig(:session, :overmind_socket))
+          return shutdown_orphaned_overmind(view, endpoint) if endpoint
+
+          cleaned = cleanup_socket_files
+          killed = kill_port_processes(view[:ports])
+          return [:nothing_running, []] unless cleaned || killed || view[:kind] == :stale
+
+          leftover = leftover_owned_listeners(view)
+          return [:unverified, leftover] if leftover.any?
+
+          killed ? [:verified, []] : [:recovered_stale, []]
+        end
+
+        # An Overmind endpoint inside this app root that still answers is a
+        # live, worktree-scoped handle even though the `bin/dev` that started it
+        # is gone (its terminal was closed, or it was SIGKILLed). Controlling it
+        # natively is scoped; guessing at pids from the stale record is not, so
+        # the recorded pgid is deliberately not used here.
+        def shutdown_orphaned_overmind(view, endpoint)
+          puts "   ℹ️  Found an orphaned Overmind endpoint for this app directory; controlling it directly."
+          request_owner_shutdown(view, nil, endpoint)
+          verify_owner_shutdown(view, nil, endpoint)
+        end
+
+        def print_kill_failure(status, blockers)
+          puts ""
+          if status == :refused
+            puts "❌ Refusing to signal anything: this app's dev session state could not be trusted"
+          else
+            puts "❌ Shutdown could not be verified - some processes are still running"
+          end
+          Array(blockers).each { |blocker| puts "   • #{blocker}" }
+          puts ""
+          puts "💡 Inspect the processes above. Once you are certain nothing is running, remove"
+          puts "   #{DEV_SESSION_RELATIVE_PATH} and run `bin/dev kill` again."
+        end
+
+        # ---- process / endpoint observation ----------------------------
+
+        # Revalidates the recorded endpoint at control time rather than
+        # trusting what startup wrote: the socket must still live inside this
+        # app root, still be a socket, and still answer.
+        def live_overmind_endpoint(root, recorded)
+          candidates = [recorded, default_overmind_socket_path(root)].compact.uniq
+          candidates.find { |path| overmind_endpoint_owned?(path, root) && overmind_endpoint_alive?(path) }
+        end
+
+        def overmind_endpoint_owned?(path, root = current_app_root)
+          inside_dev_app_root?(path, root) && File.socket?(path)
+        rescue SystemCallError
+          false
+        end
+
+        def overmind_endpoint_alive?(path)
+          return false unless File.socket?(path)
+
+          socket = UNIXSocket.new(path)
+          socket.close
+          true
+        rescue SystemCallError, IOError
+          false
+        end
+
+        # Re-checks ownership immediately before handing control to Overmind,
+        # so a socket that was replaced or removed between validation and use
+        # cannot be acted on.
+        def overmind_control(subcommand, endpoint)
+          unless overmind_endpoint_owned?(endpoint)
+            puts "   ⚠️  Skipping `overmind #{subcommand}`: #{endpoint} is no longer this app's endpoint"
+            return false
+          end
+
+          system("overmind", subcommand, "-s", endpoint, out: File::NULL, err: File::NULL) ? true : false
+        rescue Errno::ENOENT, Interrupt
+          puts "   ⚠️  Could not run `overmind #{subcommand}` for #{endpoint}"
+          false
+        end
+
+        def signalable_pgid(pgid)
+          return nil unless pgid.is_a?(Integer) && pgid > 1
+          return nil if pgid == own_process_group
+
+          pgid
+        end
+
+        def own_process_group
+          Process.getpgrp
+        rescue NotImplementedError, SystemCallError
+          nil
+        end
+
+        def signal_process_group(pgid, signal)
+          Process.kill(signal, -pgid)
+          true
+        rescue Errno::ESRCH, ArgumentError, RangeError, NotImplementedError
+          false
+        rescue Errno::EPERM
+          puts "   ⚠️  Permission denied signalling process group #{pgid}"
+          false
+        end
+
+        # Fails closed: anything we cannot positively observe as gone counts
+        # as still alive, so an unverifiable shutdown is never reported as
+        # success.
+        def process_group_alive?(pgid)
+          Process.kill(0, -pgid)
+          true
+        rescue Errno::ESRCH
+          false
+        rescue Errno::EPERM, ArgumentError, RangeError, NotImplementedError
+          true
+        end
+
+        def process_alive?(pid)
+          Process.kill(0, pid)
+          true
+        rescue Errno::ESRCH, ArgumentError, RangeError
+          false
+        rescue Errno::EPERM
+          true
+        end
+
+        def classify_port_listeners(ports)
+          owned = {}
+          foreign = {}
+
+          Array(ports).uniq.each do |port|
+            pids = find_port_pids(port)
+            next if pids.empty?
+
+            mine, theirs = pids.partition { |pid| pid_working_directory_owned?(pid) }
+            owned[port] = mine if mine.any?
+            foreign[port] = theirs if theirs.any?
+          end
+
+          [owned, foreign]
+        end
+
+        def report_foreign_listeners(foreign)
+          foreign.each do |port, pids|
+            puts "   ℹ️  Leaving port #{port} alone (PIDs: #{pids.join(', ')}): " \
+                 "not attributable to this app directory"
+          end
+        end
+
+        def pid_working_directory_owned?(pid)
+          cwd = working_directory_for_pid(pid)
+          return false if cwd.nil?
+
+          inside_dev_app_root?(cwd)
+        end
+
+        # `lsof -a -p PID -d cwd -Fn` prints the process's working directory in
+        # a machine-readable form. Returning nil (tooling missing, permission
+        # denied, unparsable) means "not attributable", which keeps the pid out
+        # of the signal set.
+        def working_directory_for_pid(pid)
+          stdout, status = Open3.capture2("lsof", "-a", "-p", pid.to_s, "-d", "cwd", "-Fn", err: File::NULL)
+          return nil unless status.success?
+
+          line = stdout.split("\n").find { |entry| entry.start_with?("n") }
+          return nil if line.nil?
+
+          File.realpath(line[1..].to_s)
+        rescue StandardError
+          nil
+        end
+
+        def stale_cleanup_candidates(root)
+          overmind_sockets = Dir.glob(File.join(root, "tmp", "sockets", "overmind*.sock"))
+          [default_overmind_socket_path(root), *overmind_sockets, File.join(root, "tmp", "pids", "server.pid")].uniq
+        end
+
+        def wait_until(timeout_secs)
+          deadline = monotonic_now + timeout_secs
+          loop do
+            return true if yield
+            return false if monotonic_now >= deadline
+
+            sleep(SHUTDOWN_POLL_INTERVAL_SECS)
+          end
+        end
+
+        def monotonic_now
+          Process.clock_gettime(Process::CLOCK_MONOTONIC)
+        end
 
         def clean_targets
           deduplicate_clean_targets(
@@ -1181,7 +1769,7 @@ module ReactOnRails
                                                open_browser:,
                                                open_browser_once:)
             ProcessManager.ensure_procfile(procfile)
-            ProcessManager.run_with_process_manager(procfile)
+            with_dev_session { ProcessManager.run_with_process_manager(procfile) }
           else
             puts "❌ Asset precompilation failed"
             puts ""
@@ -1291,7 +1879,7 @@ module ReactOnRails
                                              open_browser:,
                                              open_browser_once:)
           ProcessManager.ensure_procfile(procfile)
-          ProcessManager.run_with_process_manager(procfile)
+          with_dev_session { ProcessManager.run_with_process_manager(procfile) }
         end
 
         def run_development(procfile, verbose: false, route: nil, skip_database_check: false,
@@ -1313,7 +1901,7 @@ module ReactOnRails
                                              open_browser:,
                                              open_browser_once:)
           ProcessManager.ensure_procfile(procfile)
-          ProcessManager.run_with_process_manager(procfile)
+          with_dev_session { ProcessManager.run_with_process_manager(procfile) }
         end
 
         def print_server_info(title, features, port = 3000, route: nil)

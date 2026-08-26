@@ -26,6 +26,25 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **`bin/dev kill` now stops only the current app directory's processes, and verifies they are
+  gone**: the kill path matched command lines machine-wide (`pgrep -f rails`, `pgrep -f overmind`,
+  `pgrep -f ruby.*puma`, and friends) and scanned ports with an unfiltered `lsof -ti :PORT`, so
+  running it in one worktree could terminate a Rails server, a Webpack dev server, or an unrelated
+  client connection belonging to a different checkout — then printed "All processes terminated"
+  without checking that anything had actually stopped. `bin/dev` now claims a worktree-scoped,
+  `flock`-backed session file (`tmp/react_on_rails/dev-session.json`) recording the app root it
+  belongs to, the process group it leads, and the Overmind endpoint it would use. `bin/dev kill`
+  shuts that session down through its own Overmind control socket or its own process group,
+  escalating from `TERM` to `KILL` only for survivors, and reports success only after positively
+  observing that the owner, its process group, and its listeners are gone. Fallback port discovery
+  is restricted to LISTEN sockets whose process working directory is inside the current app root;
+  anything it cannot attribute is reported as a diagnostic and never signalled, and missing,
+  malformed, or foreign session state fails closed rather than falling back to a broad kill.
+  Processes that deliberately leave the group with `setsid`/daemonization remain out of scope, which
+  is why Overmind (whose tmux server daemonizes) is controlled through its socket. Fixes
+  [Issue 4846](https://github.com/shakacode/react_on_rails/issues/4846). PR NNNN (link added when the
+  PR is opened) by [justin808](https://github.com/justin808).
+
 - **[Pro]** **Surfaced missing RSC loadable stats in Node Renderer logs**: The first missing
   `loadable-stats.json` read now emits an actionable `INFO` diagnostic per renderer process while
   preserving fallback and retry behavior without replaying the server path to the browser. Fixes
