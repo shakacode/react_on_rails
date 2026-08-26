@@ -1483,9 +1483,7 @@ class PendingSignalSuspendSupervisor < ReleaseSupervisor
 
   def with_default_tstp_handler
     @suspensions += 1
-    raise "suspension loop re-entered with a pending signal" if @suspensions > 1
-
-    yield
+    raise "pending signal attempted self-stop"
   end
 
   def terminal_foreground_pgid(*)
@@ -1499,7 +1497,7 @@ handoff = ReleaseSupervisor::TerminalHandoff.new(fd: 0, supervisor_pgid: 123, re
 supervisor = PendingSignalSuspendSupervisor.new
 result = supervisor.suspend_for_shell_job_control(handoff)
 abort "pending signal did not interrupt job-control resume" unless result == :interrupted
-abort "pending signal caused repeated suspension" unless supervisor.suspensions == 1
+abort "pending signal attempted self-stop" unless supervisor.suspensions.zero?
 RUBY
 then
   fail "job-control resume spun instead of honoring its pending signal"
@@ -1524,9 +1522,7 @@ class LostTerminalSuspendSupervisor < ReleaseSupervisor
 
   def with_default_tstp_handler
     @suspensions += 1
-    raise "suspension loop re-entered after terminal loss" if @suspensions > 1
-
-    yield
+    raise "lost terminal attempted self-stop"
   end
 
   def terminal_foreground_pgid(*)
@@ -1540,7 +1536,7 @@ handoff = ReleaseSupervisor::TerminalHandoff.new(fd: 0, supervisor_pgid: 123, re
 supervisor = LostTerminalSuspendSupervisor.new
 result = supervisor.suspend_for_shell_job_control(handoff)
 abort "terminal loss did not abort job-control resume" unless result == :terminal_lost
-abort "terminal loss caused repeated suspension" unless supervisor.suspensions == 1
+abort "terminal loss attempted self-stop" unless supervisor.suspensions.zero?
 RUBY
 then
   fail "job-control resume spun after losing its terminal"
@@ -1548,6 +1544,75 @@ fi
 assert_no_coordination_mutation
 assert_secret_absent
 pass "job-control resume returns immediately when its terminal is lost"
+
+setup_case job-control-preflight-avoids-actual-self-stop
+if ! TEST_RELEASE_SCRIPT="${release_script}" "${ruby_executable}" <<'RUBY'
+load ENV.fetch("TEST_RELEASE_SCRIPT")
+
+class ActualSuspendSupervisor < ReleaseSupervisor
+  def initialize(received_signal:, foreground_pgid:)
+    super([])
+    @received_signal = received_signal
+    @foreground_pgid = foreground_pgid
+  end
+
+  private
+
+  def terminal_foreground_pgid(*)
+    @foreground_pgid
+  end
+
+  public :suspend_for_shell_job_control
+end
+
+[
+  ["pending signal", "HUP", 123, :interrupted],
+  ["lost terminal", nil, nil, :terminal_lost]
+].each do |description, received_signal, foreground_pgid, expected_result|
+  child_pid = Process.fork do
+    Process.setpgid(0, 0)
+    handoff = ReleaseSupervisor::TerminalHandoff.new(
+      fd: 0, supervisor_pgid: Process.getpgrp, release_pgid: Process.getpgrp + 1
+    )
+    result = ActualSuspendSupervisor.new(
+      received_signal:, foreground_pgid:
+    ).suspend_for_shell_job_control(handoff)
+    exit!(result == expected_result ? 0 : 2)
+  end
+
+  deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 2.0
+  final_status = nil
+  stopped = false
+  loop do
+    waited = Process.waitpid2(child_pid, Process::WNOHANG | Process::WUNTRACED)
+    if waited
+      child_status = waited.fetch(1)
+      if child_status.stopped?
+        stopped = true
+        Process.kill("CONT", child_pid)
+      else
+        final_status = child_status
+        break
+      end
+    end
+    if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
+      Process.kill("KILL", child_pid)
+      Process.wait(child_pid)
+      abort "#{description} preflight probe did not exit"
+    end
+    sleep 0.01
+  end
+
+  abort "#{description} preflight probe self-stopped" if stopped
+  abort "#{description} preflight probe failed" unless final_status.success?
+end
+RUBY
+then
+  fail "job-control preflight allowed an actual self-stop"
+fi
+assert_no_coordination_mutation
+assert_secret_absent
+pass "job-control preflight avoids an actual non-orphan self-stop"
 
 setup_case non-tty-stop-preserves-fence-deadlines
 if ! TEST_RELEASE_SCRIPT="${release_script}" "${ruby_executable}" <<'RUBY'

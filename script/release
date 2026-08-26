@@ -759,6 +759,9 @@ class ReleaseSupervisor
 
   def suspend_for_shell_job_control(terminal_handoff)
     loop do
+      return :interrupted if @received_signal
+      return :terminal_lost if terminal_foreground_pgid(terminal_handoff.fd).nil?
+
       with_default_tstp_handler { Process.kill("TSTP", Process.pid) }
       return :interrupted if @received_signal
 
