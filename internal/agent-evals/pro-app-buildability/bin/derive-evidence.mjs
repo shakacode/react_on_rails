@@ -1386,18 +1386,25 @@ const rubyOwnerFramesBefore = (content, targetIndex, aliases = rubyClassAliases(
             .slice(0, token.index)
             .match(
               new RegExp(
-                `(?:^|[; \\t])(${rubyClassReceiverPattern})\\s*(?:\\.|::|&\\.)\\s*${rubyReceiverChangingBlockMethodPattern}(?:\\s*\\([^()\\r\\n]*\\))?\\s*$`,
+                `(?:^|[; \\t])(${rubyClassReceiverPattern})\\s*(?:\\.|::|&\\.)\\s*(${rubyReceiverChangingBlockMethodPattern})(?:\\s*\\([^()\\r\\n]*\\))?\\s*$`,
               ),
             );
-          const classEvalName =
-            receiverChangingBlock === null
+          const receiverIsSelf =
+            receiverChangingBlock !== null &&
+            normalizedRubyClassReceiver(receiverChangingBlock[1]) === 'self';
+          const receiverOwnerName =
+            receiverChangingBlock === null || receiverIsSelf
               ? null
               : rubyClassNameForReceiver(receiverChangingBlock[1], aliases);
-          let receiverOwnerType = 'receiver-exec';
-          if (receiverChangingBlock === null) receiverOwnerType = 'brace';
-          else if (classEvalName !== null) receiverOwnerType = 'class-eval';
+          let receiverOwnerType = 'brace';
+          if (receiverChangingBlock !== null && !receiverIsSelf) {
+            receiverOwnerType =
+              receiverChangingBlock[2].startsWith('instance_') || receiverOwnerName === null
+                ? 'receiver-exec'
+                : 'class-eval';
+          }
           frames.push({
-            ...(classEvalName ? { className: classEvalName } : {}),
+            ...(receiverOwnerName ? { className: receiverOwnerName } : {}),
             brace: true,
             index: lineStart + token.index,
             type: receiverOwnerType,
@@ -1419,6 +1426,11 @@ const rubyOwnerFramesBefore = (content, targetIndex, aliases = rubyClassAliases(
         let type = null;
         let className = null;
         const eigenclass = statement.match(new RegExp(`^class\\s*<<\\s*(${rubyClassReceiverPattern})\\s*$`));
+        const receiverChangingDoBlock = statement.match(
+          new RegExp(
+            `^(${rubyClassReceiverPattern})\\s*(?:\\.|::|&\\.)\\s*(${rubyReceiverChangingBlockMethodPattern})(?:\\s*\\([^()\\r\\n]*\\))?\\s+do(?:\\s*\\|[^|\\r\\n]*\\|)?\\s*$`,
+          ),
+        );
         if (/^Rails\.application\.routes\.draw\s+do\s*$/.test(statement)) {
           type = 'routes';
         } else if (eigenclass !== null) {
@@ -1433,14 +1445,17 @@ const rubyOwnerFramesBefore = (content, targetIndex, aliases = rubyClassAliases(
           const declaredName = statement.match(/^class\s+(?:::)?([A-Z][A-Za-z0-9_:]*)/)?.[1];
           className = declaredName === undefined ? null : rubyQualifiedOwnerName(declaredName, frames);
           type = 'class';
-        } else if (
-          new RegExp(
-            `^(${rubyClassReceiverPattern})\\s*(?:\\.|::|&\\.)\\s*${rubyReceiverChangingBlockMethodPattern}(?:\\s*\\([^()\\r\\n]*\\))?\\s+do(?:\\s*\\|[^|\\r\\n]*\\|)?\\s*$`,
-          ).test(statement)
-        ) {
-          const receiver = statement.match(new RegExp(`^(${rubyClassReceiverPattern})`))?.[1];
-          className = receiver === undefined ? null : rubyClassNameForReceiver(receiver, aliases);
-          type = className === null ? 'receiver-exec' : 'class-eval';
+        } else if (receiverChangingDoBlock !== null) {
+          const receiver = receiverChangingDoBlock[1];
+          if (normalizedRubyClassReceiver(receiver) === 'self') {
+            type = 'block';
+          } else {
+            className = rubyClassNameForReceiver(receiver, aliases);
+            type =
+              receiverChangingDoBlock[2].startsWith('instance_') || className === null
+                ? 'receiver-exec'
+                : 'class-eval';
+          }
         } else if (inlineDoOwnerBalance !== null) {
           for (let ownerIndex = 0; ownerIndex < inlineDoOwnerBalance; ownerIndex += 1) {
             frames.push({ index: lineStart + statementOffset, type: ownerIndex === 0 ? 'block' : 'owner' });
