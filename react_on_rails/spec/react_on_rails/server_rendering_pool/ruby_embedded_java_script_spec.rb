@@ -272,6 +272,36 @@ module ReactOnRails
           end
         end
 
+        context "when malformed renderer-request wrapper userinfo contains punctuation" do
+          credential_canaries = %w[synthetic-user sec ret]
+          ["Connection", "Time out"].each do |wrapper_type|
+            it "redacts comma-separated credentials from the #{wrapper_type} wrapper" do
+              error = StandardError.new(
+                "#{wrapper_type} error on renderer request: " \
+                "synthetic-user:sec,ret@renderer.internal:3800"
+              )
+
+              message = render_error_for(error).message
+              credential_canaries.each { |canary| expect(message).not_to include(canary) }
+              expect(message).to include("renderer.internal:3800")
+            end
+          end
+
+          [",", ", while retrying"].each do |trailing_context|
+            it "keeps #{trailing_context.inspect} outside the credential-bearing authority" do
+              error = StandardError.new(
+                "Connection error on renderer request: " \
+                "synthetic-user:synthetic-secret@renderer.internal:3800#{trailing_context}"
+              )
+
+              message = render_error_for(error).message
+              expect(message).not_to include("synthetic-user")
+              expect(message).not_to include("synthetic-secret")
+              expect(message).to include("renderer.internal:3800#{trailing_context}")
+            end
+          end
+        end
+
         context "when the error uses the Net::HTTP 'Failed to open TCP connection' format" do
           let(:error) do
             StandardError.new("Failed to open TCP connection to 127.0.0.1:3800 (Connection refused)")

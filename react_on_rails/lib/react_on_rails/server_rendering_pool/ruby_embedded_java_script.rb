@@ -46,7 +46,10 @@ module ReactOnRails
 
       RENDERER_REQUEST_WRAPPER_REGEX = /
         (?:(?:Connection|Time\sout)\s)?error\son\srenderer\srequest:
-        \s*(?<target>[^\s,)]+)
+        \s*(?<target>
+          (?=[^\s)]*@)[^\s)]*@[^\s,)]+
+          | [^\s,)]+
+        )
       /xi
 
       CONFIGURED_AUTHORITY_SCHEME_REGEX = %r{[^:/\s"'?=#@]*://}
