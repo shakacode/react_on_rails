@@ -4931,29 +4931,65 @@ for row in rsc.route tests.page; do
     "$tmp/codex-domain-rsc-mutated-setup-page-output/rubric-results.json")" = unknown
 done
 
-cp -R "$tmp/codex-domain-rsc-setup-page-workspace" \
-  "$tmp/codex-domain-rsc-mutated-setup-dsl-workspace"
-ruby -e '
-  path = ARGV.fetch(0)
-  content = File.read(path)
-  content.sub!(/    assert_response :success\n    assert_includes response\.body, "Orbital Launch Briefing"\n    assert_includes response\.body, "EVAL-204"/, "    assert true") or abort
-  File.write(path, content)
-' "$tmp/codex-domain-rsc-mutated-setup-dsl-workspace/eval_app/test/integration/launch_rsc_page_test.rb"
-cat >"$tmp/codex-domain-rsc-mutated-setup-dsl-workspace/eval_app/test/test_helper.rb" <<'RUBY'
-class ActionDispatch::IntegrationTest
-  def self.setup(*)
-  end
-end
-RUBY
-ruby -c "$tmp/codex-domain-rsc-mutated-setup-dsl-workspace/eval_app/test/test_helper.rb" >/dev/null
-mkdir "$tmp/codex-domain-rsc-mutated-setup-dsl-output"
-node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
-  "$tmp/codex-domain-rsc-mutated-setup-dsl-workspace" \
-  "$tmp/codex-domain-rsc-mutated-setup-dsl-output" \
-  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
-for row in rsc.route tests.page; do
-  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
-    "$tmp/codex-domain-rsc-mutated-setup-dsl-output/rubric-results.json")" = unknown
+codex_domain_rsc_setup_dsl_mutations=(
+  $'class ActionDispatch::IntegrationTest\n  def self.setup(*)\n  end\nend'
+  $'class << ActionDispatch::IntegrationTest\n  define_method(:setup) { |*| }\nend'
+  $'class << ActionDispatch::IntegrationTest\n  undef_method :setup\nend'
+  $'class << ActionDispatch::IntegrationTest\n  alias_method :setup, :teardown\nend'
+  $'class ActiveSupport::TestCase\n  def self.setup(*)\n  end\nend'
+)
+codex_domain_rsc_setup_dsl_mutation_index=0
+for setup_dsl_mutation in "${codex_domain_rsc_setup_dsl_mutations[@]}"; do
+  codex_domain_rsc_setup_dsl_mutation_index=$((codex_domain_rsc_setup_dsl_mutation_index + 1))
+  cp -R "$tmp/codex-domain-rsc-setup-page-workspace" \
+    "$tmp/codex-domain-rsc-mutated-setup-dsl-$codex_domain_rsc_setup_dsl_mutation_index-workspace"
+  ruby -e '
+    path = ARGV.fetch(0)
+    content = File.read(path)
+    content.sub!(/    assert_response :success\n    assert_includes response\.body, "Orbital Launch Briefing"\n    assert_includes response\.body, "EVAL-204"/, "    assert true") or abort
+    File.write(path, content)
+  ' \
+    "$tmp/codex-domain-rsc-mutated-setup-dsl-$codex_domain_rsc_setup_dsl_mutation_index-workspace/eval_app/test/integration/launch_rsc_page_test.rb"
+  printf '%s\n' "$setup_dsl_mutation" \
+    >"$tmp/codex-domain-rsc-mutated-setup-dsl-$codex_domain_rsc_setup_dsl_mutation_index-workspace/eval_app/test/test_helper.rb"
+  ruby -c \
+    "$tmp/codex-domain-rsc-mutated-setup-dsl-$codex_domain_rsc_setup_dsl_mutation_index-workspace/eval_app/test/test_helper.rb" \
+    >/dev/null
+  mkdir "$tmp/codex-domain-rsc-mutated-setup-dsl-$codex_domain_rsc_setup_dsl_mutation_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+    "$tmp/codex-domain-rsc-mutated-setup-dsl-$codex_domain_rsc_setup_dsl_mutation_index-workspace" \
+    "$tmp/codex-domain-rsc-mutated-setup-dsl-$codex_domain_rsc_setup_dsl_mutation_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in rsc.route tests.page; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/codex-domain-rsc-mutated-setup-dsl-$codex_domain_rsc_setup_dsl_mutation_index-output/rubric-results.json")" = unknown
+  done
+done
+
+codex_domain_rsc_setup_dsl_controls=(
+  $'class << String\n  define_method(:setup) { |*| }\nend'
+  $'class << String\n  undef_method :setup\nend'
+  $'class ActiveSupport::TestCase\n  setup do\n    true\n  end\nend'
+)
+codex_domain_rsc_setup_dsl_control_index=0
+for setup_dsl_control in "${codex_domain_rsc_setup_dsl_controls[@]}"; do
+  codex_domain_rsc_setup_dsl_control_index=$((codex_domain_rsc_setup_dsl_control_index + 1))
+  cp -R "$tmp/codex-domain-rsc-setup-page-workspace" \
+    "$tmp/codex-domain-rsc-setup-dsl-control-$codex_domain_rsc_setup_dsl_control_index-workspace"
+  printf '%s\n' "$setup_dsl_control" \
+    >"$tmp/codex-domain-rsc-setup-dsl-control-$codex_domain_rsc_setup_dsl_control_index-workspace/eval_app/test/test_helper.rb"
+  ruby -c \
+    "$tmp/codex-domain-rsc-setup-dsl-control-$codex_domain_rsc_setup_dsl_control_index-workspace/eval_app/test/test_helper.rb" \
+    >/dev/null
+  mkdir "$tmp/codex-domain-rsc-setup-dsl-control-$codex_domain_rsc_setup_dsl_control_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+    "$tmp/codex-domain-rsc-setup-dsl-control-$codex_domain_rsc_setup_dsl_control_index-workspace" \
+    "$tmp/codex-domain-rsc-setup-dsl-control-$codex_domain_rsc_setup_dsl_control_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  for row in rsc.route tests.page; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/codex-domain-rsc-setup-dsl-control-$codex_domain_rsc_setup_dsl_control_index-output/rubric-results.json")" = pass
+  done
 done
 
 cp -R "$tmp/codex-rsc-name-workspace" "$tmp/codex-rsc-reversed-name-workspace"

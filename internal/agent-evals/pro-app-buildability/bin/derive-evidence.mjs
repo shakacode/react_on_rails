@@ -1215,6 +1215,7 @@ const rubyIntegrationTestMutationTargets = new Set([
   'ActionDispatch::Integration::Session',
   'ActionDispatch::IntegrationTest',
   'ActionDispatch::IntegrationTest::Behavior',
+  'ActiveSupport::TestCase',
   'ActiveSupport::Testing::Assertions',
   'Minitest::Assertions',
   'Rails::Dom::Testing::Assertions',
@@ -2007,6 +2008,8 @@ const rubyDslMutationClasses = (
 ) => {
   const mutationContent = normalizeRubyMutationContinuations(content);
   const mutations = [];
+  const staticDslReference = `(?::${dslMethod}\\b|:["']${dslMethod}["']|["']${dslMethod}["'])`;
+  const aliasDslReference = `(?:${staticDslReference}|${dslMethod}\\b)`;
   for (const match of mutationContent.matchAll(
     new RegExp(
       `^[ \\t]*(?:def[ \\t]+self\\.${dslMethod}(?=[ \\t(;]|$)|define_singleton_method(?:[ \\t]+|\\([ \\t]*)(?::${dslMethod}\\b|["']${dslMethod}["']))`,
@@ -2017,6 +2020,30 @@ const rubyDslMutationClasses = (
   }
   for (const match of mutationContent.matchAll(
     new RegExp(`^[ \\t]*def[ \\t]+${dslMethod}(?=[ \\t(;]|$)`, 'gm'),
+  )) {
+    mutations.push({ eigenclassOnly: true, explicitClassName: null, index: match.index });
+  }
+  for (const match of mutationContent.matchAll(
+    new RegExp(
+      `^[ \\t]*(?:define_method(?:[ \\t]+|\\([ \\t]*)${staticDslReference}|(?:__send__|public_send|send)[ \\t]*\\([ \\t]*(?::define_method|["']define_method["'])[ \\t]*,[ \\t]*${staticDslReference})`,
+      'gm',
+    ),
+  )) {
+    mutations.push({ eigenclassOnly: true, explicitClassName: null, index: match.index });
+  }
+  for (const match of mutationContent.matchAll(
+    new RegExp(
+      `^[ \\t]*(?:(?:remove_method|undef|undef_method)(?:[ \\t]+|\\([ \\t]*)${aliasDslReference}|(?:__send__|public_send|send)[ \\t]*\\([ \\t]*(?::(?:remove_method|undef_method)|["'](?:remove_method|undef_method)["'])[ \\t]*,[ \\t]*${staticDslReference})`,
+      'gm',
+    ),
+  )) {
+    mutations.push({ eigenclassOnly: true, explicitClassName: null, index: match.index });
+  }
+  for (const match of mutationContent.matchAll(
+    new RegExp(
+      `^[ \\t]*(?:alias[ \\t]+${aliasDslReference}[ \\t]+${rubyMethodReferencePattern}|alias_method(?:[ \\t]+|\\([ \\t]*)${staticDslReference}[ \\t]*,[ \\t]*${rubyMethodReferencePattern}|(?:__send__|public_send|send)[ \\t]*\\([ \\t]*(?::alias_method|["']alias_method["'])[ \\t]*,[ \\t]*${staticDslReference}[ \\t]*,[ \\t]*${rubyMethodReferencePattern})`,
+      'gm',
+    ),
   )) {
     mutations.push({ eigenclassOnly: true, explicitClassName: null, index: match.index });
   }
