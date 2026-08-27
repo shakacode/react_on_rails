@@ -122,6 +122,24 @@ historical_run="$eval_dir/runs/2026-07-12-codex-gpt-5.4-final21-network-off"
 node "$eval_dir/bin/validate-json.mjs" "$historical_run" >/dev/null
 "$eval_dir/bin/validate-run-pair" "$historical_run/run.json" \
   "$historical_run/invocation.json"
+credential_format_run="$tmp/model-credential-format"
+cp -R "$historical_run" "$credential_format_run"
+jq '.model_credential_format = "native"' "$historical_run/invocation.json" \
+  >"$credential_format_run/invocation.json"
+jq '.security.model_credential_format = "native"' "$historical_run/run.json" \
+  >"$credential_format_run/run.json"
+node "$eval_dir/bin/validate-json.mjs" "$credential_format_run" >/dev/null
+"$eval_dir/bin/validate-run-pair" "$credential_format_run/run.json" \
+  "$credential_format_run/invocation.json"
+jq 'del(.security.model_credential_format)' "$credential_format_run/run.json" \
+  >"$tmp/missing-run-model-credential-format.json"
+if "$eval_dir/bin/validate-run-pair" "$tmp/missing-run-model-credential-format.json" \
+  "$credential_format_run/invocation.json" 2>"$tmp/missing-run-model-credential-format-error"; then
+  echo "run/invocation validator accepted a one-sided model credential format" >&2
+  exit 1
+fi
+rg -q 'run/invocation security or agent identity disagrees' \
+  "$tmp/missing-run-model-credential-format-error"
 timeout_grace_run="$tmp/timeout-kill-grace"
 cp -R "$historical_run" "$timeout_grace_run"
 jq '.timeout_kill_grace_seconds = 10 |
@@ -389,6 +407,14 @@ const nonattestedCodexInvocation = {
 if (!invocationValidate(nonattestedCodexInvocation)) {
   throw new Error(ajv.errorsText(invocationValidate.errors));
 }
+nonattestedCodexInvocation.model_credential_format = 'claude-oauth';
+if (invocationValidate(nonattestedCodexInvocation)) {
+  throw new Error('Codex invocation accepted the Claude OAuth credential format');
+}
+nonattestedCodexInvocation.model_credential_format = 'native';
+if (!invocationValidate(nonattestedCodexInvocation)) {
+  throw new Error(ajv.errorsText(invocationValidate.errors));
+}
 nonattestedCodexInvocation.sandbox = 'isolated-host-attested';
 if (invocationValidate(nonattestedCodexInvocation)) {
   throw new Error('non-attested Codex invocation escaped workspace-write');
@@ -414,6 +440,7 @@ if (!invocationValidate(invocation)) throw new Error(ajv.errorsText(invocationVa
 Object.assign(invocation, { agent: 'claude', command: 'claude -p', sandbox: 'workspace-write' });
 if (invocationValidate(invocation)) throw new Error('Claude invocation claimed Codex workspace sandbox');
 invocation.sandbox = 'isolated-host-attested';
+invocation.model_credential_format = 'claude-oauth';
 if (!invocationValidate(invocation)) throw new Error(ajv.errorsText(invocationValidate.errors));
 
 const run = load(`${fixtureDir}/run.json`);
@@ -436,9 +463,14 @@ run.runner.isolated_host_attestation = true;
 if (runValidate(run)) throw new Error('attested Codex run claimed unavailable inner workspace sandbox');
 run.runner.execution_boundary = 'isolated-host-attested';
 if (!runValidate(run)) throw new Error(ajv.errorsText(runValidate.errors));
+run.security.model_credential_format = 'claude-oauth';
+if (runValidate(run)) throw new Error('Codex run accepted the Claude OAuth credential format');
+run.security.model_credential_format = 'native';
+if (!runValidate(run)) throw new Error(ajv.errorsText(runValidate.errors));
 
 const attestedClaudeRun = structuredClone(run);
 attestedClaudeRun.agent.name = 'claude';
+attestedClaudeRun.security.model_credential_format = 'claude-oauth';
 attestedClaudeRun.runner.execution_boundary = 'claude-permission-gated';
 if (runValidate(attestedClaudeRun)) {
   throw new Error('attested Claude run claimed its non-attested permission boundary');
@@ -447,7 +479,11 @@ attestedClaudeRun.runner.execution_boundary = 'isolated-host-attested';
 if (!runValidate(attestedClaudeRun)) throw new Error(ajv.errorsText(runValidate.errors));
 
 const nonattestedClaudeRun = structuredClone(attestedClaudeRun);
-Object.assign(nonattestedClaudeRun.security, { auth_material_available: false, auth_source: 'none' });
+Object.assign(nonattestedClaudeRun.security, {
+  auth_material_available: false,
+  auth_source: 'none',
+  model_credential_format: 'native',
+});
 Object.assign(nonattestedClaudeRun.runner, {
   isolated_host_attestation: false,
   execution_boundary: 'workspace-write',
@@ -2099,6 +2135,10 @@ rg -q 'run/invocation security or agent identity disagrees' "$eval_dir/bin/valid
 rg -q 'cli_auth_credentials_store=.?file' "$eval_dir/bin/run-eval"
 rg -q 'auth_material_available:\$auth_material_available' "$eval_dir/bin/run-eval"
 rg -q 'auth_source:\$auth_source' "$eval_dir/bin/run-eval"
+test "$(rg -Fc 'model_credential_format:$model_credential_format' \
+  "$eval_dir/bin/run-eval")" = 2
+rg -Fq '.security.model_credential_format == $invocation[0].model_credential_format' \
+  "$eval_dir/bin/validate-run-pair"
 rg -Fq -- '--arg run_id "$run_id"' "$eval_dir/bin/run-eval"
 rg -Fq -- '--print-width 100' "$eval_dir/bin/run-eval"
 rg -q -- '--model-credential-file' "$eval_dir/bin/run-eval"

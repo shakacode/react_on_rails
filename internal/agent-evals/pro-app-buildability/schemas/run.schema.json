@@ -94,6 +94,7 @@
         "process_environment": { "const": "env -i" },
         "shell_environment_inherit": { "const": "none" },
         "credential_store": { "const": "file" },
+        "model_credential_format": { "enum": ["native", "claude-oauth"] },
         "auth_material_available": { "type": "boolean" },
         "auth_source": { "enum": ["none", "operator-attested-file-broker"] },
         "stripped_sensitive_variable_categories": {
@@ -190,6 +191,61 @@
             "type": "object",
             "properties": { "execution_boundary": { "const": "isolated-host-attested" } },
             "required": ["execution_boundary"]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "security": {
+            "type": "object",
+            "properties": { "model_credential_format": { "const": "claude-oauth" } },
+            "required": ["model_credential_format"]
+          }
+        },
+        "required": ["security"]
+      },
+      "then": {
+        "properties": {
+          "agent": {
+            "type": "object",
+            "properties": { "name": { "const": "claude" } },
+            "required": ["name"]
+          },
+          "security": {
+            "type": "object",
+            "properties": {
+              "auth_material_available": { "const": true },
+              "auth_source": { "const": "operator-attested-file-broker" }
+            },
+            "required": ["auth_material_available", "auth_source"]
+          },
+          "runner": {
+            "type": "object",
+            "properties": { "isolated_host_attestation": { "const": true } },
+            "required": ["isolated_host_attestation"]
+          }
+        },
+        "required": ["agent", "runner"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "agent": {
+            "type": "object",
+            "properties": { "name": { "const": "codex" } },
+            "required": ["name"]
+          }
+        },
+        "required": ["agent"]
+      },
+      "then": {
+        "properties": {
+          "security": {
+            "type": "object",
+            "properties": { "model_credential_format": { "const": "native" } }
           }
         }
       }
