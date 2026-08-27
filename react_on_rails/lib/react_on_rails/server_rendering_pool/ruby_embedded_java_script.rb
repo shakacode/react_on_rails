@@ -322,7 +322,10 @@ module ReactOnRails
           target = renderer_target_from_error(err)
           caught_error = err.message.to_s
           raw_target = target_from_message(caught_error)
-          caught_error = sanitized_renderer_error_message(caught_error, raw_target) if raw_target
+          if raw_target
+            sanitized_target = sanitized_renderer_url(raw_target, strict_schemeless: true)
+            caught_error = sanitized_renderer_error_message(caught_error, raw_target, sanitized_target)
+          end
           configured_var, configured_url = configured_renderer_url
           configured_line = if configured_url
                               "#{configured_var} is currently \"#{configured_url}\" — confirm it matches the " \
@@ -376,7 +379,7 @@ module ReactOnRails
             target = target_from_message(current.message)
             # Sanitize here too: a target scraped from the message can itself be a full URL
             # with embedded credentials (e.g. "TCP connection to https://user:pw@host:3800").
-            return sanitized_renderer_url(target) if target
+            return sanitized_renderer_url(target, strict_schemeless: true) if target
           end
           configured_renderer_url.last
         end

@@ -332,6 +332,18 @@ module ReactOnRails
           end
         end
 
+        context "when the error message names a token-style scheme-less renderer authority" do
+          let(:error) do
+            Errno::ECONNREFUSED.new("connect(2) for synthetic-token@renderer.internal:3800")
+          end
+
+          it "redacts the token from the entire public connection diagnostic" do
+            message = render_error_for(error).message
+            expect(message).not_to include("synthetic-token")
+            expect(message).to include("renderer.internal:3800")
+          end
+        end
+
         context "when an error target absorbs credential text into an apparent scheme" do
           let(:error) do
             Errno::ECONNREFUSED.new(
