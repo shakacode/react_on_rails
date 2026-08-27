@@ -443,28 +443,74 @@ module ReactOnRails
 
         def target_with_range_from_message(message, start_at = 0)
           message = message.to_s
-          target = target_with_range_after_prefix(message, CONNECT_TARGET_PREFIX_REGEX, start_at:)
-          return target if target
+          candidates = target_candidates_from_message(message, start_at)
 
-          target = target_with_range_after_prefix(message, TCP_CONNECTION_TARGET_PREFIX_REGEX, start_at:)
-          return target if target
+          # Array order is the specificity tie-breaker: an anchored renderer/socket prefix
+          # wins over a generic URL candidate when both identify a target at the same offset.
+          candidates.each_with_index
+                    .reject { |candidate, _priority| candidate.nil? }
+                    .min_by { |candidate, priority| [candidate.last.begin, priority] }
+                    &.first
+        end
 
-          match = message.match(%r{(?<target>[^:/\s"'?=#@]+https?://[^\s,"')]*@[^\s,"')]+)}i, start_at)
-          return [match[:target], match.begin(:target)...match.end(:target)] if match
+        def target_candidates_from_message(message, start_at)
+          connect_target = each_target_with_range_after_prefix(message, CONNECT_TARGET_PREFIX_REGEX, start_at:).first
+          tcp_target = each_target_with_range_after_prefix(message, TCP_CONNECTION_TARGET_PREFIX_REGEX, start_at:).first
+          wrapper_target = preferred_wrapper_target_with_range(message, start_at)
+          embedded_http_target = target_with_range_for_match(
+            message.match(%r{(?<target>[^:/\s"'?=#@]+https?://[^\s,"')]*@[^\s,"')]+)}i, start_at)
+          )
+          socket_targets = [connect_target, tcp_target].compact
+          authority_targets = socket_targets + Array(embedded_http_target)
+          authority_targets << wrapper_target if wrapper_authority_target?(wrapper_target)
+          wrapper_target = nil if wrapper_target_deferred?(wrapper_target, authority_targets, socket_targets)
 
-          target = target_with_range_after_prefix(
+          structured_targets = [connect_target, tcp_target, wrapper_target, embedded_http_target].compact
+          return structured_targets unless structured_targets.empty?
+
+          [target_with_range_for_match(message.match(%r{(?<target>https?://[^\s,"')]+)}, start_at))]
+        end
+
+        def preferred_wrapper_target_with_range(message, start_at)
+          fallback = nil
+          each_target_with_range_after_prefix(
             message,
             RENDERER_REQUEST_WRAPPER_PREFIX_REGEX,
             allow_request_path: true,
             start_at:
-          )
-          return target if target
+          ).each do |candidate|
+            fallback ||= candidate
+            return candidate if wrapper_authority_target?(candidate) && !explicit_filesystem_path?(candidate.first)
+          end
+          fallback
+        end
 
-          match = message.match(%r{(?<target>https?://[^\s,"')]+)}, start_at)
+        def wrapper_authority_target?(candidate)
+          return false unless candidate
+
+          target = candidate.first
+          target.include?("@") || recognized_renderer_target?(target, allow_request_path: false)
+        end
+
+        def wrapper_target_deferred?(wrapper_target, authority_targets, socket_targets)
+          return false unless wrapper_target && authority_targets.any?
+
+          target, range = wrapper_target
+          nested_socket_target = socket_targets.any? do |candidate|
+            range.cover?(candidate.last.begin)
+          end
+          return true if nested_socket_target || explicit_filesystem_path?(target)
+
+          !target.include?("@") && !recognized_renderer_target?(target, allow_request_path: false)
+        end
+
+        def target_with_range_for_match(match)
           [match[:target], match.begin(:target)...match.end(:target)] if match
         end
 
-        def target_with_range_after_prefix(message, prefix_regex, allow_request_path: false, start_at: 0)
+        def each_target_with_range_after_prefix(message, prefix_regex, allow_request_path: false, start_at: 0)
+          return enum_for(__method__, message, prefix_regex, allow_request_path:, start_at:) unless block_given?
+
           while (prefix = prefix_regex.match(message, start_at))
             same_line = message[prefix.end(0)..].to_s.split(/[\r\n]/, 2).first
             if same_line.nil? || same_line.empty?
@@ -478,9 +524,9 @@ module ReactOnRails
               next
             end
 
-            return [target, prefix.end(0)...(prefix.end(0) + target.length)]
+            yield [target, prefix.end(0)...(prefix.end(0) + target.length)]
+            start_at = prefix.end(0)
           end
-          nil
         end
 
         def renderer_target_candidate(same_line, allow_request_path:)

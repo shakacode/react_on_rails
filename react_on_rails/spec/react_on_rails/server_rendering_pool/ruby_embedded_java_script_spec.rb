@@ -283,6 +283,94 @@ module ReactOnRails
           end
         end
 
+        context "when a renderer error message contains mixed target prefixes" do
+          it "sanitizes an earlier wrapper target before a later connect(2) target" do
+            error = StandardError.new(
+              "Connection error on renderer request: " \
+              "synthetic-user:synthetic-secret@renderer-a.internal:3800; " \
+              "connect(2) for renderer-b.internal:3800"
+            )
+
+            message = render_error_for(error).message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("renderer-a.internal:3800")
+            expect(message).to include("renderer-b.internal:3800")
+          end
+
+          [
+            [
+              "connect(2) before a wrapper",
+              "connect(2) for synthetic-user:synthetic-secret@renderer-a.internal:3800; " \
+              "Connection error on renderer request: renderer-b.internal:3800"
+            ],
+            [
+              "a wrapper before TCP",
+              "Connection error on renderer request: " \
+              "synthetic-user:synthetic-secret@renderer-a.internal:3800; " \
+              "Failed to open TCP connection to renderer-b.internal:3800"
+            ],
+            [
+              "TCP before a wrapper",
+              "Failed to open TCP connection to synthetic-user:synthetic-secret@renderer-a.internal:3800; " \
+              "Connection error on renderer request: renderer-b.internal:3800"
+            ]
+          ].each do |description, error_message|
+            it "sanitizes #{description} in textual order" do
+              message = render_error_for(StandardError.new(error_message)).message
+              expect(message).not_to include("synthetic-user")
+              expect(message).not_to include("synthetic-secret")
+              expect(message).to include("renderer-a.internal:3800")
+              expect(message).to include("renderer-b.internal:3800")
+            end
+          end
+
+          it "does not let an unrelated earlier URL mask a later credentialed wrapper" do
+            error = StandardError.new(
+              "See https://docs.example/help; Connection error on renderer request: " \
+              "synthetic-user:synthetic-secret@renderer.internal:3800"
+            )
+
+            message = render_error_for(error).message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("https://docs.example/help")
+            expect(message).to include("renderer.internal:3800")
+          end
+
+          it "continues past a request-path wrapper to sanitize a later credentialed wrapper" do
+            error = StandardError.new(
+              "Connection error on renderer request: /bundles/x; " \
+              "Connection error on renderer request: " \
+              "synthetic-user:synthetic-secret@renderer-a.internal:3800; " \
+              "connect(2) for renderer-b.internal:3800"
+            )
+
+            message = render_error_for(error).message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("renderer-a.internal:3800")
+            expect(message).to include("renderer-b.internal:3800")
+          end
+        end
+
+        context "when a prefix-aware target and a generic URL start together" do
+          [
+            "connect(2) for ",
+            "Failed to open TCP connection to ",
+            "Connection error on renderer request: "
+          ].each do |target_prefix|
+            it "keeps the prefix-aware span for #{target_prefix.strip}" do
+              target = "http://synthetic-user synthetic-secret@renderer.internal:3800"
+              message = "#{target_prefix}#{target}"
+
+              extracted_target, target_range = described_class.send(:target_with_range_from_message, message)
+              expect(extracted_target).to eq(target)
+              expect(message[target_range]).to eq(target)
+            end
+          end
+        end
+
         context "when malformed renderer-request wrapper userinfo contains punctuation" do
           credential_canaries = %w[synthetic-user sec ret]
 
