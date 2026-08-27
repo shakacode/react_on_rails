@@ -1237,21 +1237,24 @@ const normalizeRubyStaticMutationTargetReceivers = (content) =>
   content.replace(rubyStaticConstGetReceiverPattern, (receiver) => {
     const root = receiver.match(new RegExp(`^(?:::)?(${rubyStaticQualifiedConstantPattern})`))?.[1];
     if (root === undefined) return receiver;
-    const names = [
+    const lookups = [
       ...receiver.matchAll(
         new RegExp(
-          String.raw`const_get\s*\(\s*(${rubyStaticConstGetArgumentPattern})(?:\s*,\s*(?:true|false))?\s*\)`,
+          String.raw`const_get\s*\(\s*(${rubyStaticConstGetArgumentPattern})(?:\s*,\s*(true|false))?\s*\)`,
           'g',
         ),
       ),
-    ].map((match) => rubyStaticConstantLookupName(match[1]));
-    if (names.some((name) => name === null)) return receiver;
+    ].map((match) => ({ inherit: match[2] !== 'false', name: rubyStaticConstantLookupName(match[1]) }));
+    if (lookups.some(({ name }) => name === null)) return receiver;
     const qualifiedParts = root === 'Object' ? [] : root.split('::');
-    for (const name of names) {
+    for (const { name } of lookups) {
       if (qualifiedParts.length > 0 || name !== 'Object') qualifiedParts.push(...name.split('::'));
     }
     const qualifiedName = qualifiedParts.join('::') || 'Object';
-    return qualifiedName.padEnd(receiver.length, ' ');
+    const lexicallyResolved = root === 'Object' || lookups.every(({ inherit }) => !inherit);
+    return lexicallyResolved || rubyIntegrationTestMutationTargets.has(qualifiedName)
+      ? qualifiedName.padEnd(receiver.length, ' ')
+      : 'x'.padEnd(receiver.length, ' ');
   });
 const rubyIntegrationTestMutationImpact = (className) =>
   rubyIntegrationTestMutationTargets.has(className) ? 'ActionDispatch::IntegrationTest' : className;
@@ -1376,7 +1379,7 @@ const rubyReceiverChangingOwner = (match, frames, aliases, fallbackType) => {
     ...(receiverKind === undefined ? {} : { receiverKind }),
   };
   if (match[2].startsWith('instance_')) {
-    return { ...knownOwner, type: 'instance-exec' };
+    return className === null ? { type: 'receiver-exec' } : { ...knownOwner, type: 'instance-exec' };
   }
   return className === null ? { type: 'receiver-exec' } : { ...knownOwner, type: 'class-eval' };
 };
