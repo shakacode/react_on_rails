@@ -371,6 +371,74 @@ module ReactOnRails
           end
         end
 
+        context "when repeated same-family prefixes contain later credentials" do
+          it "keeps an earlier safe connect(2) target while sanitizing the later target" do
+            error_message =
+              "connect(2) for renderer-a.internal:3800; " \
+              "connect(2) for synthetic-user:synthetic-secret@renderer-b.internal:3800"
+
+            message = render_error_for(StandardError.new(error_message)).message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("could not connect to the Node renderer at renderer-a.internal:3800")
+            expect(message).to include(
+              "Caught error:\nconnect(2) for renderer-a.internal:3800; connect(2) for renderer-b.internal:3800"
+            )
+          end
+
+          it "keeps an earlier safe TCP target while sanitizing the later target" do
+            error_message =
+              "Failed to open TCP connection to renderer-a.internal:3800; " \
+              "Failed to open TCP connection to synthetic-user:synthetic-secret@renderer-b.internal:3800"
+
+            message = render_error_for(StandardError.new(error_message)).message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("could not connect to the Node renderer at renderer-a.internal:3800")
+            expect(message).to include(
+              "Caught error:\nFailed to open TCP connection to renderer-a.internal:3800; " \
+              "Failed to open TCP connection to renderer-b.internal:3800"
+            )
+          end
+
+          it "keeps an earlier safe wrapper target while sanitizing the later target" do
+            error_message =
+              "Connection error on renderer request: renderer-a.internal:3800; " \
+              "Connection error on renderer request: " \
+              "synthetic-user:synthetic-secret@renderer-b.internal:3800"
+
+            message = render_error_for(StandardError.new(error_message)).message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("could not connect to the Node renderer at renderer-a.internal:3800")
+            expect(message).to include(
+              "Caught error:\nConnection error on renderer request: renderer-a.internal:3800; " \
+              "Connection error on renderer request: renderer-b.internal:3800"
+            )
+          end
+
+          it "does not treat delimiter-free repeated family prefixes as safe boundaries" do
+            prefixes = [
+              "connect(2) for ",
+              "Failed to open TCP connection to ",
+              "Connection error on renderer request: "
+            ]
+
+            prefixes.each do |prefix|
+              error_message =
+                "#{prefix}http://synthetic-user " \
+                "#{prefix}synthetic-secret@renderer.internal:3800"
+              message = render_error_for(StandardError.new(error_message)).message
+
+              aggregate_failures(prefix.strip) do
+                expect(message).not_to include("synthetic-user")
+                expect(message).not_to include("synthetic-secret")
+                expect(message).to include("renderer.internal:3800")
+              end
+            end
+          end
+        end
+
         context "when malformed renderer-request wrapper userinfo contains punctuation" do
           credential_canaries = %w[synthetic-user sec ret]
 

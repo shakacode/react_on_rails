@@ -518,6 +518,7 @@ module ReactOnRails
               next
             end
 
+            same_line = same_family_target_segment(same_line, prefix_regex, allow_request_path:)
             target = renderer_target_candidate(same_line, allow_request_path:)
             unless target
               start_at = prefix.end(0)
@@ -527,6 +528,19 @@ module ReactOnRails
             yield [target, prefix.end(0)...(prefix.end(0) + target.length)]
             start_at = prefix.end(0)
           end
+        end
+
+        def same_family_target_segment(same_line, prefix_regex, allow_request_path:)
+          next_prefix = prefix_regex.match(same_line)
+          return same_line unless next_prefix
+
+          prefix_lead = same_line[...next_prefix.begin(0)]
+          separator = prefix_lead.rindex(/[.;,](?=\s)/)
+          return same_line unless separator
+
+          segment = same_line[...separator].rstrip
+          first_target = segment[RENDERER_TARGET_AT_LINE_START_REGEX, :target]
+          recognized_renderer_target?(first_target, allow_request_path:) ? segment : same_line
         end
 
         def renderer_target_candidate(same_line, allow_request_path:)
@@ -733,7 +747,9 @@ module ReactOnRails
           while current_target
             current_range, current_sanitized_target = current_target
             sanitized << strip_userinfo(message[cursor...current_range.begin])
-            if delayed_userinfo_after_target?(message, current_range)
+            next_target = immediately_following_http_target(message, current_range.end) ||
+                          target_with_range_from_message(message, current_range.end)
+            if delayed_userinfo_after_target?(message, current_range, next_target)
               sanitized << strip_userinfo(message[current_range.begin..])
               return sanitized
             end
@@ -741,8 +757,6 @@ module ReactOnRails
             sanitized << current_sanitized_target
             cursor = current_range.end
 
-            next_target = immediately_following_http_target(message, cursor) ||
-                          target_with_range_from_message(message, cursor)
             current_target = if next_target
                                next_raw_target, next_range = next_target
                                [next_range, sanitized_renderer_target(next_raw_target)]
@@ -752,12 +766,14 @@ module ReactOnRails
           sanitized << strip_userinfo(message[cursor..])
         end
 
-        def delayed_userinfo_after_target?(message, target_range)
+        def delayed_userinfo_after_target?(message, target_range, next_target)
           continuation = message[target_range.end..]
           return false if safe_notification_email_prose?(continuation)
 
-          boundary = continuation.match(%r{https?://}i)
-          continuation = continuation[...boundary.begin(0)] if boundary
+          scheme_boundary = continuation.match(%r{https?://}i)&.begin(0)
+          target_boundary = next_target.last.begin - target_range.end if next_target
+          boundary = [scheme_boundary, target_boundary].compact.min
+          continuation = continuation[...boundary] if boundary
           continuation.include?("@")
         end
 
