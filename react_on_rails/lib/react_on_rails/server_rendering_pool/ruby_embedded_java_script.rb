@@ -407,7 +407,8 @@ module ReactOnRails
         # syntactically scheme-like typo or unsupported authority is still sanitized so malformed
         # configuration cannot leak secrets. One configured value is not free-form prose: multiple
         # schemes or line breaks after its first scheme make it structurally ambiguous, so that URL
-        # suffix fails closed through its final @. Any non-URL prefix is preserved for context.
+        # suffix fails closed through its final @. A safe non-URL prefix is preserved for context,
+        # while a pre-scheme @ makes that prefix ambiguous credential material and fails closed.
         def sanitized_renderer_url(url)
           return url if url.nil? || url.empty?
 
@@ -415,6 +416,7 @@ module ReactOnRails
           return url unless scheme
 
           prefix = url[...scheme.begin(0)]
+          prefix = "" if prefix.include?("@")
           configured_url = url[scheme.begin(0)..]
           sanitized_url = if configured_url.match?(/[\r\n]/) ||
                              configured_url.scan(CONFIGURED_AUTHORITY_SCHEME_REGEX).length > 1

@@ -656,6 +656,29 @@ module ReactOnRails
           end
         end
 
+        context "when configured credential material precedes the URL scheme" do
+          it "fails closed across the pre-scheme userinfo delimiter" do
+            server_bundle_path =
+              "synthetic-user:synthetic-secret@https://renderer-host:3800"
+            stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("https://renderer-host:3800")
+          end
+        end
+
+        context "when the same token appears only in unrelated reporter text" do
+          it "preserves the free-form token byte for byte" do
+            failure_message =
+              "Failure loading synthetic-user:synthetic-secret@https://renderer-host:3800"
+            stub_local_bundle_failure(failure_message, bundle_path: "/tmp/server.js")
+
+            expect(bundle_load_error_message).to include(failure_message)
+          end
+        end
+
         context "when malformed URL userinfo contains a literal double quote" do
           it "redacts the escaped URL from the URI error" do
             server_bundle_url = "http://synthetic-user:sec\"ret@host/path"
