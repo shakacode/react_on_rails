@@ -47,9 +47,13 @@ module ReactOnRails
       RENDERER_REQUEST_WRAPPER_REGEX = /
         (?:(?:Connection|Time\sout)\s)?error\son\srenderer\srequest:
         \s*(?<target>
-          (?=[^\s)]*@)[^\s)]*@[^\s,)]+
+          (?=[^\s]*@)[^\s]*@[^\s,)]+
           | [^\s,)]+
         )
+      /xi
+
+      TARGETLESS_RENDERER_REQUEST_WRAPPER_REGEX = /
+        \A(?:(?:Connection|Time\sout)\s)?error\son\srenderer\srequest:?\s*\z
       /xi
 
       CONFIGURED_AUTHORITY_SCHEME_REGEX = %r{[^:/\s"'?=#@]*://}
@@ -312,7 +316,8 @@ module ReactOnRails
           each_in_cause_chain(err) do |current|
             message = current.message.to_s
             return true if message.match?(RENDERER_CONNECTION_ERROR_REGEX) ||
-                           message.match?(RENDERER_REQUEST_WRAPPER_REGEX)
+                           message.match?(RENDERER_REQUEST_WRAPPER_REGEX) ||
+                           message.match?(TARGETLESS_RENDERER_REQUEST_WRAPPER_REGEX)
           end
           false
         end
