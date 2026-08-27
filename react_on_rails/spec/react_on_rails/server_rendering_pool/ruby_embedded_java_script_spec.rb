@@ -332,6 +332,52 @@ module ReactOnRails
           end
         end
 
+        context "when an error target absorbs credential text into an apparent scheme" do
+          let(:error) do
+            Errno::ECONNREFUSED.new(
+              "connect(2) for synthetic-secrethttps://apikey@renderer.internal:3800"
+            )
+          end
+
+          it "redacts the credential from the entire public connection diagnostic" do
+            message = render_error_for(error).message
+            expect(message).not_to include("synthetic-secret")
+            expect(message).not_to include("apikey")
+            expect(message).to include("https://renderer.internal:3800")
+          end
+        end
+
+        context "when a wrapped connection error absorbs credential text into an apparent scheme" do
+          let(:error) do
+            StandardError.new(
+              "Connection error on renderer request: synthetic-secrethttps://apikey@renderer.internal:3800"
+            )
+          end
+
+          it "redacts the credential from the entire public connection diagnostic" do
+            message = render_error_for(error).message
+            expect(message).not_to include("synthetic-secret")
+            expect(message).not_to include("apikey")
+            expect(message).to include("https://renderer.internal:3800")
+          end
+        end
+
+        context "when a cause has unrelated token text before a URL without userinfo" do
+          let(:error) do
+            wrapped_error(
+              Errno::ECONNREFUSED,
+              "transport metadata=synthetic-tokenhttps://renderer.internal:3800",
+              "renderer request failed"
+            )
+          end
+
+          it "does not promote the unrelated token into the public connection target" do
+            message = render_error_for(error).message
+            expect(message).not_to include("synthetic-token")
+            expect(message).to include("https://renderer.internal:3800")
+          end
+        end
+
         context "when only the legacy RENDERER_URL is set and the error carries no host/port" do
           let(:error) { Errno::ECONNREFUSED.new }
 
@@ -394,6 +440,29 @@ module ReactOnRails
               expect(message).not_to include("synthetic-token")
               expect(message).to include("could not connect to the Node renderer at renderer.internal:3800")
               expect(message).to include(%(#{renderer_env} is currently "renderer.internal:3800"))
+            end
+          end
+        end
+
+        context "when renderer env credentials are absorbed into an apparent scheme" do
+          let(:error) { Errno::ECONNREFUSED.new }
+
+          %w[REACT_RENDERER_URL RENDERER_URL].each do |renderer_env|
+            it "redacts the apparent-scheme credential for #{renderer_env}" do
+              ENV[renderer_env] = "synthetic-secrethttps://apikey@renderer.internal:3800"
+
+              message = render_error_for(error).message
+              expect(message).not_to include("synthetic-secret")
+              expect(message).not_to include("apikey")
+              expect(message).to include("renderer.internal:3800")
+            end
+
+            it "redacts the apparent-scheme credential before empty userinfo for #{renderer_env}" do
+              ENV[renderer_env] = "synthetic-secrethttps://@renderer.internal:3800"
+
+              message = render_error_for(error).message
+              expect(message).not_to include("synthetic-secret")
+              expect(message).to include("renderer.internal:3800")
             end
           end
         end
@@ -865,6 +934,40 @@ module ReactOnRails
             stub_local_bundle_failure(failure_message, bundle_path: "/tmp/server.js")
 
             expect(bundle_load_error_message).to include(failure_message)
+          end
+
+          it "keeps apparent-scheme text on the existing free-form scanning path" do
+            failure_message =
+              "Failure loading synthetic-secrethttps://apikey@renderer.internal:3800"
+            stub_local_bundle_failure(failure_message, bundle_path: "/tmp/server.js")
+
+            message = bundle_load_error_message
+            expect(message).to include("Failure loading synthetic-secrethttps://renderer.internal:3800")
+            expect(message).not_to include("apikey")
+          end
+        end
+
+        context "when a configured bundle URL absorbs credential text into an apparent scheme" do
+          it "redacts the credential while retaining the safe URL context" do
+            server_bundle_url =
+              "synthetic-secrethttps://apikey@renderer.internal:3800/bundle.js"
+            stub_http_bundle_failure("connection failed", bundle_url: server_bundle_url)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("synthetic-secret")
+            expect(message).not_to include("apikey")
+            expect(message).to include("https://renderer.internal:3800/bundle.js")
+          end
+
+          it "preserves a safe label while redacting the absorbed credential" do
+            server_bundle_url =
+              "URL=synthetic-secrethttps://apikey@renderer.internal:3800/bundle.js"
+            stub_http_bundle_failure("connection failed", bundle_url: server_bundle_url)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("synthetic-secret")
+            expect(message).not_to include("apikey")
+            expect(message).to include("URL=https://renderer.internal:3800/bundle.js")
           end
         end
 

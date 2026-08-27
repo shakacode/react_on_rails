@@ -401,6 +401,7 @@ module ReactOnRails
           [
             /connect\(2\) for (?<target>[^\s,)]+)/,
             /TCP connection to (?<target>[^\s,)]+)/,
+            %r{(?<target>[^:/\s"'?=#@]+https?://[^\s,"')]*@[^\s,"')]+)}i,
             %r{(?<target>https?://[^\s,"')]+)}
           ].each do |regex|
             match = message.match(regex)
@@ -449,7 +450,8 @@ module ReactOnRails
           scheme = url.match(CONFIGURED_AUTHORITY_SCHEME_REGEX)
           return unless scheme
 
-          candidate = ambiguous_renderer_url_candidate(url, scheme, strict_schemeless)
+          candidate = embedded_http_url_candidate(url, scheme)
+          candidate ||= ambiguous_renderer_url_candidate(url, scheme, strict_schemeless)
           sanitized_renderer_url(candidate, strict_schemeless:) if candidate
         end
 
@@ -463,6 +465,22 @@ module ReactOnRails
                         (strict_schemeless || (prefix.include?(":") && !prefix.end_with?(":")))
 
           userinfo_delimiter < scheme.begin(0) ? configured_url : url[(userinfo_delimiter + 1)..]
+        end
+
+        def embedded_http_url_candidate(url, scheme)
+          userinfo_delimiter = url.rindex("@")
+          return unless userinfo_delimiter && userinfo_delimiter >= scheme.end(0)
+
+          scheme_name = scheme[0].delete_suffix("://")
+          embedded_http_scheme = scheme_name.match(/https?\z/i)
+          return unless embedded_http_scheme&.begin(0)&.positive?
+
+          prefix = url[...scheme.begin(0)]
+          configured_url = url[scheme.begin(0)..]
+          return if ambiguous_credential_prefix?(prefix, configured_url)
+
+          embedded_scheme_start = scheme.begin(0) + embedded_http_scheme.begin(0)
+          "#{prefix}#{url[embedded_scheme_start..]}"
         end
 
         def sanitized_schemeless_authority(url, strict_schemeless: false)
