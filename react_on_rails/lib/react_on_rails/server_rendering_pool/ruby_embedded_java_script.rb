@@ -423,7 +423,7 @@ module ReactOnRails
           return url if url.nil? || url.empty?
 
           scheme = url.match(CONFIGURED_AUTHORITY_SCHEME_REGEX)
-          return url unless scheme
+          return sanitized_schemeless_authority(url) unless scheme
 
           prefix = url[...scheme.begin(0)]
           configured_url = url[scheme.begin(0)..]
@@ -437,6 +437,17 @@ module ReactOnRails
                           end
 
           "#{prefix}#{sanitized_url}"
+        end
+
+        def sanitized_schemeless_authority(url)
+          userinfo_delimiter = url.rindex("@")
+          return url unless userinfo_delimiter
+
+          userinfo = url[...userinfo_delimiter]
+          return url unless userinfo.include?(":")
+          return url if userinfo.match?(%r{[/\\]})
+
+          url[(userinfo_delimiter + 1)..]
         end
 
         def ambiguous_credential_prefix?(prefix, configured_url)

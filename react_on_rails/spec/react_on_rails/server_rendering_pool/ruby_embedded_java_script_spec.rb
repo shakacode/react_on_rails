@@ -285,6 +285,18 @@ module ReactOnRails
           end
         end
 
+        context "when the error message names a scheme-less renderer authority with credentials" do
+          let(:error) do
+            Errno::ECONNREFUSED.new("connect(2) for synthetic-user:synthetic-secret@renderer.example.com:3800")
+          end
+
+          it "redacts credentials from the target named in the headline" do
+            message = render_error_for(error).message
+            expect(message).to include("could not connect to the Node renderer at renderer.example.com:3800")
+            expect(message).not_to include("at synthetic-user:synthetic-secret@")
+          end
+        end
+
         context "when only the legacy RENDERER_URL is set and the error carries no host/port" do
           let(:error) { Errno::ECONNREFUSED.new }
 
@@ -803,6 +815,19 @@ module ReactOnRails
             stub_local_bundle_failure(failure_message, bundle_path: "/tmp/server.js")
 
             expect(bundle_load_error_message).to include(failure_message)
+          end
+        end
+
+        context "when a configured local bundle value is a scheme-less credential authority" do
+          it "redacts credentials while retaining the host and path" do
+            server_bundle_path =
+              "synthetic-user:synthetic-secret@cdn.example.com/bundle.js"
+            stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("cdn.example.com/bundle.js")
           end
         end
 
