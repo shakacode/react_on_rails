@@ -2279,7 +2279,7 @@ const pageTests = artifacts.filter((artifact) => {
   };
   const exactRenderedDataAssertions = (body) =>
     hasExactRenderedDataAssertions(body, ['Orbital Launch Briefing', 'EVAL-204']);
-  const qualifiedRubyCases = rubyTestCases(uncommentedRuby).filter(
+  const qualifiedRubyCases = rubyTestCases(uncommentedRuby, workspaceRubyTestMutations).filter(
     (testCase) => testCase.actionDispatchIntegrationTest && !hasPotentiallyInactivePageEvidence(testCase),
   );
   const hasRequestAndAssertion = (testCase) =>

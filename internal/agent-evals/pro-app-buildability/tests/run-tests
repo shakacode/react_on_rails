@@ -4781,6 +4781,24 @@ for row in rsc.route tests.page; do
     "$tmp/codex-domain-rsc-name-output/rubric-results.json")" = pass
 done
 
+cp -R "$tmp/codex-domain-rsc-name-workspace" "$tmp/codex-domain-rsc-cross-file-mutation-workspace"
+cat >"$tmp/codex-domain-rsc-cross-file-mutation-workspace/eval_app/test/test_helper.rb" <<'RUBY'
+class ActionDispatch::IntegrationTest
+  def get(*) = nil
+  def assert_response(*) = nil
+end
+RUBY
+ruby -c "$tmp/codex-domain-rsc-cross-file-mutation-workspace/eval_app/test/test_helper.rb" >/dev/null
+mkdir "$tmp/codex-domain-rsc-cross-file-mutation-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+  "$tmp/codex-domain-rsc-cross-file-mutation-workspace" \
+  "$tmp/codex-domain-rsc-cross-file-mutation-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in rsc.route tests.page; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-domain-rsc-cross-file-mutation-output/rubric-results.json")" = unknown
+done
+
 cp -R "$tmp/codex-domain-rsc-name-workspace" "$tmp/codex-domain-js-page-workspace"
 rm "$tmp/codex-domain-js-page-workspace/eval_app/test/integration/launch_briefings_test.rb"
 cat >"$tmp/codex-domain-js-page-workspace/eval_app/test/rsc-page.test.tsx" <<'TSX'
