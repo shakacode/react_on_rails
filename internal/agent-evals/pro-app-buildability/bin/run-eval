@@ -315,6 +315,7 @@ shell_policy="shell_environment_policy.set={PATH=\"$safe_path\",HOME=\"$private_
 npm_probe_command='npm view create-react-on-rails-app version --json'
 rubygems_probe_command="gem search --remote --exact '^rails$'"
 agent_command="codex exec"
+agent_configuration_mode="codex-native"
 if [[ "$agent" == codex ]]; then
   agent_args=(exec --ephemeral --ignore-user-config --ignore-rules --strict-config --model "$model")
   if [[ "$isolated_host_attestation" == true ]]; then
@@ -331,8 +332,10 @@ else
   agent_command="claude -p"
   agent_args=(-p --no-session-persistence --disable-slash-commands --no-chrome)
   if [[ "$claude_oauth" == true ]]; then
+    agent_configuration_mode="claude-safe-mode"
     agent_args+=(--safe-mode)
   else
+    agent_configuration_mode="claude-bare"
     agent_args+=(--bare)
   fi
   agent_args+=(--strict-mcp-config --mcp-config '{"mcpServers":{}}' --tools 'Bash,Read,Write,Edit,Glob,Grep')
@@ -398,7 +401,7 @@ maximum_agent_call_wall_clock_seconds=$((probe_timeout_seconds + timeout_seconds
 
 invocation_json="$(jq -n --arg command "$agent_command" --arg agent "$agent" --arg model "$model" \
   --arg execution_boundary "$execution_boundary" \
-  --arg model_credential_format "$model_credential_format" \
+  --arg agent_configuration_mode "$agent_configuration_mode" \
   --arg auth_source "$auth_source" --argjson auth_material_available "$auth_material_available" \
   --argjson scaffold_timeout "$timeout_seconds" \
   --argjson probe_timeout "$probe_timeout_seconds" \
@@ -414,7 +417,7 @@ invocation_json="$(jq -n --arg command "$agent_command" --arg agent "$agent" --a
     ignore_user_config:true,ignore_rules:true,strict_config:true,multi_agent:false,
     sandbox_network_access:$sandbox_network_access,isolated_host_attestation:$isolated_host_attestation,
     capability_probe:{npm:$npm_probe,rubygems:$rubygems_probe},
-    credential_store:"file",model_credential_format:$model_credential_format,
+    credential_store:"file",agent_configuration_mode:$agent_configuration_mode,
     auth_material_available:$auth_material_available,auth_source:$auth_source,
     human_followups_sent:0,
     shell_environment_policy:{inherit:"none",allowlist:["PATH","HOME","TMPDIR","LANG","LC_ALL","SHELL","CODEX_EVAL"]}}')"
@@ -524,7 +527,7 @@ reason="Machine-derived rubric result: $classification; see rubric-results.json"
 jq -n \
   --arg run_id "$run_id" --arg started "$started_at" --arg finished "$finished_at" \
   --arg revision "$revision" --arg agent "$agent" --arg version "$agent_version" --arg model "$model" \
-  --arg model_credential_format "$model_credential_format" \
+  --arg agent_configuration_mode "$agent_configuration_mode" \
   --arg auth_source "$auth_source" --argjson auth_material_available "$auth_material_available" \
   --arg os "$(uname -srm)" --arg ruby "$(ruby --version 2>&1)" --arg node "$(node --version)" \
   --arg npm "$(npm --version)" --arg pnpm "$(pnpm --version)" --arg git "$(git --version)" \
@@ -542,7 +545,7 @@ jq -n \
     agent:{name:$agent,version:$version,model:$model,probe_invoked:true,scaffold_invoked:$scaffold_invoked},
     environment:{os:$os,ruby:$ruby,node:$node,npm:$npm,pnpm:$pnpm,git:$git},
     security:{umask:"077",process_environment:"env -i",shell_environment_inherit:"none",
-      credential_store:"file",model_credential_format:$model_credential_format,
+      credential_store:"file",
       auth_material_available:$auth_material_available,auth_source:$auth_source,
       stripped_sensitive_variable_categories:$stripped,
       raw_cleanup:"EXIT/INT/TERM",auth_material_persisted:false},
@@ -551,6 +554,7 @@ jq -n \
       probe_timeout_seconds:$probe_timeout,timeout_kill_grace_seconds:$timeout_kill_grace,
       maximum_agent_call_wall_clock_seconds:$maximum_agent_wall_clock,
       sandbox_network_access:$sandbox_network_access,
+      agent_configuration_mode:$agent_configuration_mode,
       isolated_host_attestation:$isolated_host_attestation,network_probe_artifact:"sandbox-network-probe.json",
       exit_code:$exit_code,timed_out:$timed_out,config_artifact:"invocation.json",
       execution_boundary:$execution_boundary},

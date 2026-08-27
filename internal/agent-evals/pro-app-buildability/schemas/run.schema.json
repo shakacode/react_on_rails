@@ -94,7 +94,6 @@
         "process_environment": { "const": "env -i" },
         "shell_environment_inherit": { "const": "none" },
         "credential_store": { "const": "file" },
-        "model_credential_format": { "enum": ["native", "claude-oauth"] },
         "auth_material_available": { "type": "boolean" },
         "auth_source": { "enum": ["none", "operator-attested-file-broker"] },
         "stripped_sensitive_variable_categories": {
@@ -141,6 +140,9 @@
         "timeout_kill_grace_seconds": { "type": "integer", "minimum": 0 },
         "maximum_agent_call_wall_clock_seconds": { "type": "integer", "minimum": 2 },
         "sandbox_network_access": { "type": "boolean" },
+        "agent_configuration_mode": {
+          "enum": ["codex-native", "claude-bare", "claude-safe-mode"]
+        },
         "isolated_host_attestation": { "type": "boolean" },
         "network_probe_artifact": { "const": "sandbox-network-probe.json" },
         "exit_code": { "type": "integer" },
@@ -198,13 +200,13 @@
     {
       "if": {
         "properties": {
-          "security": {
+          "runner": {
             "type": "object",
-            "properties": { "model_credential_format": { "const": "claude-oauth" } },
-            "required": ["model_credential_format"]
+            "properties": { "agent_configuration_mode": { "const": "claude-safe-mode" } },
+            "required": ["agent_configuration_mode"]
           }
         },
-        "required": ["security"]
+        "required": ["runner"]
       },
       "then": {
         "properties": {
@@ -243,9 +245,31 @@
       },
       "then": {
         "properties": {
-          "security": {
+          "runner": {
             "type": "object",
-            "properties": { "model_credential_format": { "const": "native" } }
+            "properties": { "agent_configuration_mode": { "const": "codex-native" } }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "agent": {
+            "type": "object",
+            "properties": { "name": { "const": "claude" } },
+            "required": ["name"]
+          }
+        },
+        "required": ["agent"]
+      },
+      "then": {
+        "properties": {
+          "runner": {
+            "type": "object",
+            "properties": {
+              "agent_configuration_mode": { "enum": ["claude-bare", "claude-safe-mode"] }
+            }
           }
         }
       }

@@ -50,7 +50,9 @@
       }
     },
     "credential_store": { "const": "file" },
-    "model_credential_format": { "enum": ["native", "claude-oauth"] },
+    "agent_configuration_mode": {
+      "enum": ["codex-native", "claude-bare", "claude-safe-mode"]
+    },
     "auth_material_available": { "type": "boolean" },
     "auth_source": { "enum": ["none", "operator-attested-file-broker"] },
     "human_followups_sent": { "const": 0 },
@@ -87,18 +89,23 @@
       "then": {
         "properties": {
           "command": { "const": "codex exec" },
-          "model_credential_format": { "const": "native" }
+          "agent_configuration_mode": { "const": "codex-native" }
         }
       }
     },
     {
       "if": { "properties": { "agent": { "const": "claude" } }, "required": ["agent"] },
-      "then": { "properties": { "command": { "const": "claude -p" } } }
+      "then": {
+        "properties": {
+          "command": { "const": "claude -p" },
+          "agent_configuration_mode": { "enum": ["claude-bare", "claude-safe-mode"] }
+        }
+      }
     },
     {
       "if": {
-        "properties": { "model_credential_format": { "const": "claude-oauth" } },
-        "required": ["model_credential_format"]
+        "properties": { "agent_configuration_mode": { "const": "claude-safe-mode" } },
+        "required": ["agent_configuration_mode"]
       },
       "then": {
         "properties": {

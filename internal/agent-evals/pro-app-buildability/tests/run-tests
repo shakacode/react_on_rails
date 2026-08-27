@@ -122,24 +122,24 @@ historical_run="$eval_dir/runs/2026-07-12-codex-gpt-5.4-final21-network-off"
 node "$eval_dir/bin/validate-json.mjs" "$historical_run" >/dev/null
 "$eval_dir/bin/validate-run-pair" "$historical_run/run.json" \
   "$historical_run/invocation.json"
-credential_format_run="$tmp/model-credential-format"
-cp -R "$historical_run" "$credential_format_run"
-jq '.model_credential_format = "native"' "$historical_run/invocation.json" \
-  >"$credential_format_run/invocation.json"
-jq '.security.model_credential_format = "native"' "$historical_run/run.json" \
-  >"$credential_format_run/run.json"
-node "$eval_dir/bin/validate-json.mjs" "$credential_format_run" >/dev/null
-"$eval_dir/bin/validate-run-pair" "$credential_format_run/run.json" \
-  "$credential_format_run/invocation.json"
-jq 'del(.security.model_credential_format)' "$credential_format_run/run.json" \
-  >"$tmp/missing-run-model-credential-format.json"
-if "$eval_dir/bin/validate-run-pair" "$tmp/missing-run-model-credential-format.json" \
-  "$credential_format_run/invocation.json" 2>"$tmp/missing-run-model-credential-format-error"; then
-  echo "run/invocation validator accepted a one-sided model credential format" >&2
+agent_configuration_run="$tmp/agent-configuration-mode"
+cp -R "$historical_run" "$agent_configuration_run"
+jq '.agent_configuration_mode = "codex-native"' "$historical_run/invocation.json" \
+  >"$agent_configuration_run/invocation.json"
+jq '.runner.agent_configuration_mode = "codex-native"' "$historical_run/run.json" \
+  >"$agent_configuration_run/run.json"
+node "$eval_dir/bin/validate-json.mjs" "$agent_configuration_run" >/dev/null
+"$eval_dir/bin/validate-run-pair" "$agent_configuration_run/run.json" \
+  "$agent_configuration_run/invocation.json"
+jq 'del(.runner.agent_configuration_mode)' "$agent_configuration_run/run.json" \
+  >"$tmp/missing-run-agent-configuration-mode.json"
+if "$eval_dir/bin/validate-run-pair" "$tmp/missing-run-agent-configuration-mode.json" \
+  "$agent_configuration_run/invocation.json" 2>"$tmp/missing-run-agent-configuration-mode-error"; then
+  echo "run/invocation validator accepted a one-sided agent configuration mode" >&2
   exit 1
 fi
 rg -q 'run/invocation security or agent identity disagrees' \
-  "$tmp/missing-run-model-credential-format-error"
+  "$tmp/missing-run-agent-configuration-mode-error"
 timeout_grace_run="$tmp/timeout-kill-grace"
 cp -R "$historical_run" "$timeout_grace_run"
 jq '.timeout_kill_grace_seconds = 10 |
@@ -407,11 +407,11 @@ const nonattestedCodexInvocation = {
 if (!invocationValidate(nonattestedCodexInvocation)) {
   throw new Error(ajv.errorsText(invocationValidate.errors));
 }
-nonattestedCodexInvocation.model_credential_format = 'claude-oauth';
+nonattestedCodexInvocation.agent_configuration_mode = 'claude-safe-mode';
 if (invocationValidate(nonattestedCodexInvocation)) {
-  throw new Error('Codex invocation accepted the Claude OAuth credential format');
+  throw new Error('Codex invocation accepted the Claude safe-mode configuration');
 }
-nonattestedCodexInvocation.model_credential_format = 'native';
+nonattestedCodexInvocation.agent_configuration_mode = 'codex-native';
 if (!invocationValidate(nonattestedCodexInvocation)) {
   throw new Error(ajv.errorsText(invocationValidate.errors));
 }
@@ -440,7 +440,7 @@ if (!invocationValidate(invocation)) throw new Error(ajv.errorsText(invocationVa
 Object.assign(invocation, { agent: 'claude', command: 'claude -p', sandbox: 'workspace-write' });
 if (invocationValidate(invocation)) throw new Error('Claude invocation claimed Codex workspace sandbox');
 invocation.sandbox = 'isolated-host-attested';
-invocation.model_credential_format = 'claude-oauth';
+invocation.agent_configuration_mode = 'claude-safe-mode';
 if (!invocationValidate(invocation)) throw new Error(ajv.errorsText(invocationValidate.errors));
 
 const run = load(`${fixtureDir}/run.json`);
@@ -463,14 +463,14 @@ run.runner.isolated_host_attestation = true;
 if (runValidate(run)) throw new Error('attested Codex run claimed unavailable inner workspace sandbox');
 run.runner.execution_boundary = 'isolated-host-attested';
 if (!runValidate(run)) throw new Error(ajv.errorsText(runValidate.errors));
-run.security.model_credential_format = 'claude-oauth';
-if (runValidate(run)) throw new Error('Codex run accepted the Claude OAuth credential format');
-run.security.model_credential_format = 'native';
+run.runner.agent_configuration_mode = 'claude-safe-mode';
+if (runValidate(run)) throw new Error('Codex run accepted the Claude safe-mode configuration');
+run.runner.agent_configuration_mode = 'codex-native';
 if (!runValidate(run)) throw new Error(ajv.errorsText(runValidate.errors));
 
 const attestedClaudeRun = structuredClone(run);
 attestedClaudeRun.agent.name = 'claude';
-attestedClaudeRun.security.model_credential_format = 'claude-oauth';
+attestedClaudeRun.runner.agent_configuration_mode = 'claude-safe-mode';
 attestedClaudeRun.runner.execution_boundary = 'claude-permission-gated';
 if (runValidate(attestedClaudeRun)) {
   throw new Error('attested Claude run claimed its non-attested permission boundary');
@@ -482,11 +482,11 @@ const nonattestedClaudeRun = structuredClone(attestedClaudeRun);
 Object.assign(nonattestedClaudeRun.security, {
   auth_material_available: false,
   auth_source: 'none',
-  model_credential_format: 'native',
 });
 Object.assign(nonattestedClaudeRun.runner, {
   isolated_host_attestation: false,
   execution_boundary: 'workspace-write',
+  agent_configuration_mode: 'claude-bare',
 });
 if (runValidate(nonattestedClaudeRun)) {
   throw new Error('non-attested Claude run claimed the Codex workspace boundary');
@@ -1848,6 +1848,14 @@ scanner_serialized_safe_exit=$?
 set -e
 test "$scanner_serialized_safe_exit" = 1
 
+printf '%s\n' '{"agent_configuration_mode":"claude-safe-mode"}' \
+  >"$tmp/scanner-agent-configuration-safe.json"
+set +e
+"$eval_dir/bin/scan-sensitive-artifacts" "$tmp/scanner-agent-configuration-safe.json" >/dev/null
+scanner_agent_configuration_safe_exit=$?
+set -e
+test "$scanner_agent_configuration_safe_exit" = 1
+
 printf '%s\n' '{"nested":{"items":[{"api_key":"synthetic-structural-secret"}]}}' \
   >"$tmp/scanner-structural-sensitive.json"
 "$eval_dir/bin/scan-sensitive-artifacts" "$tmp/scanner-structural-sensitive.json" >/dev/null
@@ -2135,9 +2143,9 @@ rg -q 'run/invocation security or agent identity disagrees' "$eval_dir/bin/valid
 rg -q 'cli_auth_credentials_store=.?file' "$eval_dir/bin/run-eval"
 rg -q 'auth_material_available:\$auth_material_available' "$eval_dir/bin/run-eval"
 rg -q 'auth_source:\$auth_source' "$eval_dir/bin/run-eval"
-test "$(rg -Fc 'model_credential_format:$model_credential_format' \
+test "$(rg -Fc 'agent_configuration_mode:$agent_configuration_mode' \
   "$eval_dir/bin/run-eval")" = 2
-rg -Fq '.security.model_credential_format == $invocation[0].model_credential_format' \
+rg -Fq '.runner.agent_configuration_mode == $invocation[0].agent_configuration_mode' \
   "$eval_dir/bin/validate-run-pair"
 rg -Fq -- '--arg run_id "$run_id"' "$eval_dir/bin/run-eval"
 rg -Fq -- '--print-width 100' "$eval_dir/bin/run-eval"
