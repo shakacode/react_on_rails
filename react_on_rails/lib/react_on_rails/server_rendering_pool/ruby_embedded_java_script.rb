@@ -317,6 +317,9 @@ module ReactOnRails
 
         def renderer_connection_error_message(err)
           target = renderer_target_from_error(err)
+          caught_error = err.message.to_s
+          raw_target = target_from_message(caught_error)
+          caught_error = sanitized_renderer_error_message(caught_error, raw_target) if raw_target
           configured_var, configured_url = configured_renderer_url
           configured_line = if configured_url
                               "#{configured_var} is currently \"#{configured_url}\" — confirm it matches the " \
@@ -330,7 +333,7 @@ module ReactOnRails
             React on Rails could not connect to the Node renderer#{" at #{target}" if target}.
             ===============================================================
             Caught error:
-            #{err.message}
+            #{caught_error}
             ===============================================================
             This is a renderer connection failure, not a webpack/server-bundle evaluation error.
             The bundle was not evaluated because the renderer could not be reached.

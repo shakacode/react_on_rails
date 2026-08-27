@@ -275,13 +275,11 @@ module ReactOnRails
             )
           end
 
-          it "redacts credentials from the target named in the headline" do
+          it "redacts credentials from the full connection diagnostic" do
             message = render_error_for(error).message
             expect(message).to include("could not connect to the Node renderer at https://renderer.example.com:3800")
-            # The credentialed form must not appear in the target position. (The raw exception
-            # text is still echoed verbatim under "Caught error:" — pre-existing behavior for
-            # every error type in this file — so the password can survive there.)
-            expect(message).not_to include("at https://user:sekret@")
+            expect(message).not_to include("user")
+            expect(message).not_to include("sekret")
           end
         end
 
@@ -290,10 +288,11 @@ module ReactOnRails
             Errno::ECONNREFUSED.new("connect(2) for synthetic-user:synthetic-secret@renderer.example.com:3800")
           end
 
-          it "redacts credentials from the target named in the headline" do
+          it "redacts credentials from the full connection diagnostic" do
             message = render_error_for(error).message
             expect(message).to include("could not connect to the Node renderer at renderer.example.com:3800")
-            expect(message).not_to include("at synthetic-user:synthetic-secret@")
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
           end
         end
 
