@@ -501,6 +501,40 @@ module ReactOnRails
           end
         end
 
+        context "when connection-target userinfo contains malformed punctuation" do
+          credential_canaries = %w[synthetic-user sec ret]
+          punctuation_marks = [")", ","]
+
+          [
+            ["connect(2)", Errno::ECONNREFUSED, "connect(2) for"],
+            ["TCP", StandardError, "Failed to open TCP connection to"]
+          ].each do |target_type, error_class, target_prefix|
+            punctuation_marks.each do |punctuation|
+              it "redacts #{punctuation.inspect} inside #{target_type} target userinfo" do
+                error = error_class.new(
+                  "#{target_prefix} synthetic-user:sec#{punctuation}ret@renderer.internal:3800"
+                )
+
+                message = render_error_for(error).message
+                credential_canaries.each { |canary| expect(message).not_to include(canary) }
+                expect(message).to include("renderer.internal:3800")
+              end
+
+              it "keeps #{punctuation.inspect} after the #{target_type} authority" do
+                error = error_class.new(
+                  "#{target_prefix} synthetic-user:synthetic-secret@renderer.internal:3800#{punctuation}"
+                )
+
+                message = render_error_for(error).message
+                expect(message).not_to include("synthetic-user")
+                expect(message).not_to include("synthetic-secret")
+                expect(message).to include("could not connect to the Node renderer at renderer.internal:3800.")
+                expect(message).to include("#{target_prefix} renderer.internal:3800#{punctuation}")
+              end
+            end
+          end
+        end
+
         context "when an error target absorbs credential text into an apparent scheme" do
           let(:error) do
             Errno::ECONNREFUSED.new(
@@ -1199,6 +1233,19 @@ module ReactOnRails
             ["a dot-relative Windows path", ".\\releases\\build@2026\\server-bundle.js"],
             ["a parent-relative Windows path", "..\\releases\\build@2026\\server-bundle.js"],
             ["a Windows UNC path", "\\\\server\\share\\build@2026\\server-bundle.js"]
+          ].each do |description, server_bundle_path|
+            it "preserves #{description} byte for byte" do
+              stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)
+
+              expect(bundle_load_error_message).to include(server_bundle_path)
+            end
+          end
+        end
+
+        context "when a configured local bundle uses a scoped-package path" do
+          [
+            ["a node_modules scoped-package path", "node_modules/@org/pkg/dist/server-bundle.js"],
+            ["a direct scoped-package path", "@org/pkg/server-bundle.js"]
           ].each do |description, server_bundle_path|
             it "preserves #{description} byte for byte" do
               stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)

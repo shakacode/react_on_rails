@@ -44,12 +44,17 @@ module ReactOnRails
         | Failed\sto\sopen\sTCP\sconnection
       /xi
 
+      RENDERER_TARGET_TOKEN_REGEX = /
+        (?=[^\s]*@)[^\s]*@[^\s,)]+
+        | [^\s,)]+
+      /x
+
+      CONNECT_TARGET_REGEX = /connect\(2\) for (?<target>#{RENDERER_TARGET_TOKEN_REGEX})/
+      TCP_CONNECTION_TARGET_REGEX = /TCP connection to (?<target>#{RENDERER_TARGET_TOKEN_REGEX})/
+
       RENDERER_REQUEST_WRAPPER_REGEX = /
         (?:(?:Connection|Time\sout)\s)?error\son\srenderer\srequest:
-        \s*(?<target>
-          (?=[^\s]*@)[^\s]*@[^\s,)]+
-          | [^\s,)]+
-        )
+        \s*(?<target>#{RENDERER_TARGET_TOKEN_REGEX})
       /xi
 
       TARGETLESS_RENDERER_REQUEST_WRAPPER_REGEX = /
@@ -421,8 +426,8 @@ module ReactOnRails
         def target_from_message(message)
           message = message.to_s
           [
-            /connect\(2\) for (?<target>[^\s,)]+)/,
-            /TCP connection to (?<target>[^\s,)]+)/,
+            CONNECT_TARGET_REGEX,
+            TCP_CONNECTION_TARGET_REGEX,
             %r{(?<target>[^:/\s"'?=#@]+https?://[^\s,"')]*@[^\s,"')]+)}i,
             RENDERER_REQUEST_WRAPPER_REGEX,
             %r{(?<target>https?://[^\s,"')]+)}
@@ -471,7 +476,10 @@ module ReactOnRails
         end
 
         def passthrough_renderer_url?(url, preserve_filesystem_path)
-          url.nil? || url.empty? || (preserve_filesystem_path && explicit_filesystem_path?(url))
+          return true if url.nil? || url.empty?
+
+          preserve_filesystem_path &&
+            (explicit_filesystem_path?(url) || explicit_scoped_package_path?(url))
         end
 
         def sanitized_ambiguous_renderer_url(url, strict_schemeless, preserve_filesystem_path)
@@ -544,6 +552,10 @@ module ReactOnRails
           (url.start_with?("/") && !url.start_with?("//")) ||
             url.start_with?("./", "../", ".\\", "..\\", "\\\\") ||
             url.match?(%r{\A[A-Za-z]:[/\\]})
+        end
+
+        def explicit_scoped_package_path?(url)
+          url.match?(%r{\A(?:node_modules/)?@[A-Za-z0-9._-]+/[A-Za-z0-9._-]+(?:/[^/\s@]+)*\z})
         end
 
         def ambiguous_credential_prefix?(prefix, configured_url)
