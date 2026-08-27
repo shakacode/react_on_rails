@@ -1998,25 +1998,31 @@ const creditedRubyMethodMutationClasses = (
     ].map(rubyIntegrationTestMutationImpact),
   );
 };
-const rubyTestDslMutationClasses = (
+const rubyDslMutationClasses = (
   content,
   classDeclarations,
+  dslMethod,
   aliases = rubyClassAliases(content),
   dangerousClassExecutions = new Set(),
 ) => {
   const mutationContent = normalizeRubyMutationContinuations(content);
   const mutations = [];
   for (const match of mutationContent.matchAll(
-    /^[ \t]*(?:def[ \t]+self\.test(?=[ \t(;]|$)|define_singleton_method(?:[ \t]+|\([ \t]*)(?::test\b|["']test["']))/gm,
+    new RegExp(
+      `^[ \\t]*(?:def[ \\t]+self\\.${dslMethod}(?=[ \\t(;]|$)|define_singleton_method(?:[ \\t]+|\\([ \\t]*)(?::${dslMethod}\\b|["']${dslMethod}["']))`,
+      'gm',
+    ),
   )) {
     mutations.push({ eigenclassOnly: false, explicitClassName: null, index: match.index });
   }
-  for (const match of mutationContent.matchAll(/^[ \t]*def[ \t]+test(?=[ \t(;]|$)/gm)) {
+  for (const match of mutationContent.matchAll(
+    new RegExp(`^[ \\t]*def[ \\t]+${dslMethod}(?=[ \\t(;]|$)`, 'gm'),
+  )) {
     mutations.push({ eigenclassOnly: true, explicitClassName: null, index: match.index });
   }
   for (const match of mutationContent.matchAll(
     new RegExp(
-      `(?:^|[^A-Za-z0-9_:.])(${rubyClassReceiverPattern})[ \\t]*(?:\\.|::|&\\.)[ \\t]*define_singleton_method(?:[ \\t]+|\\([ \\t]*)(?::test\\b|["']test["'])`,
+      `(?:^|[^A-Za-z0-9_:.])(${rubyClassReceiverPattern})[ \\t]*(?:\\.|::|&\\.)[ \\t]*define_singleton_method(?:[ \\t]+|\\([ \\t]*)(?::${dslMethod}\\b|["']${dslMethod}["'])`,
       'g',
     ),
   )) {
@@ -2027,7 +2033,7 @@ const rubyTestDslMutationClasses = (
   }
   for (const match of mutationContent.matchAll(
     new RegExp(
-      `(?:^|[^A-Za-z0-9_:.])(${rubyClassReceiverPattern})[ \\t]*(?:\\.|::|&\\.)[ \\t]*singleton_class[ \\t]*(?:\\.|::|&\\.)[ \\t]*(?:define_method(?:[ \\t]+|\\([ \\t]*)(?::test\\b|["']test["'])|(?:__send__|public_send|send)[ \\t]*\\([ \\t]*(?::define_method|["']define_method["'])[ \\t]*,[ \\t]*(?::test\\b|["']test["']))`,
+      `(?:^|[^A-Za-z0-9_:.])(${rubyClassReceiverPattern})[ \\t]*(?:\\.|::|&\\.)[ \\t]*singleton_class[ \\t]*(?:\\.|::|&\\.)[ \\t]*(?:define_method(?:[ \\t]+|\\([ \\t]*)(?::${dslMethod}\\b|["']${dslMethod}["'])|(?:__send__|public_send|send)[ \\t]*\\([ \\t]*(?::define_method|["']define_method["'])[ \\t]*,[ \\t]*(?::${dslMethod}\\b|["']${dslMethod}["']))`,
       'g',
     ),
   )) {
@@ -2100,21 +2106,30 @@ const workspaceRubyTestMutations = artifacts.reduce(
     )) {
       mutations.creditedMethods.add(className);
     }
-    for (const className of rubyTestDslMutationClasses(
-      mutationRuby,
-      classDeclarations,
-      aliases,
-      dangerousClassExecutions,
-    )) {
-      mutations.testDsl.add(className);
+    for (const dslMethod of ['test', 'setup']) {
+      for (const className of rubyDslMutationClasses(
+        mutationRuby,
+        classDeclarations,
+        dslMethod,
+        aliases,
+        dangerousClassExecutions,
+      )) {
+        mutations[`${dslMethod}Dsl`].add(className);
+      }
     }
     return mutations;
   },
-  { creditedMethods: new Set(), testDsl: new Set(), unscannable: new Set() },
+  { creditedMethods: new Set(), setupDsl: new Set(), testDsl: new Set(), unscannable: new Set() },
 );
 const rubyTestCases = (
   content,
-  externalMutations = { creditedMethods: new Set(), testDsl: new Set(), unscannable: new Set() },
+  externalMutations = {
+    creditedMethods: new Set(),
+    setupDsl: new Set(),
+    testDsl: new Set(),
+    unscannable: new Set(),
+  },
+  dslMethod = 'test',
 ) => {
   const maskedContent = maskExecutableRubyContent(content);
   const mutationRuby =
@@ -2129,9 +2144,9 @@ const rubyTestCases = (
     ...creditedRubyMethodMutationClasses(mutationRuby, classDeclarations, aliases, dangerousClassExecutions),
     ...externalMutations.creditedMethods,
   ]);
-  const testDslMutationClasses = new Set([
-    ...rubyTestDslMutationClasses(mutationRuby, classDeclarations, aliases, dangerousClassExecutions),
-    ...externalMutations.testDsl,
+  const dslMutationClasses = new Set([
+    ...rubyDslMutationClasses(mutationRuby, classDeclarations, dslMethod, aliases, dangerousClassExecutions),
+    ...(externalMutations[`${dslMethod}Dsl`] ?? []),
   ]);
   const starts = [
     ...maskedContent.matchAll(/^([ \t]*)test\s+(?:"([^"\r\n]+)"|'([^'\r\n]+)')\s+do[ \t]*(?:#[^\r\n]*)?$/gm),
@@ -2181,10 +2196,10 @@ const rubyTestCases = (
       owningClass === undefined
         ? ''
         : maskedContent.slice(owningClass.index + owningClass[0].length, match.index);
-    const overridesTestDsl =
-      /^\s*(?:class\s*<<\s*self\b|def\s+self\.test\b|define_singleton_method(?:\s+|\(\s*)(?::test\b|["']test["']))/m.test(
-        owningClassPrefix,
-      );
+    const overridesDsl = new RegExp(
+      `^\\s*(?:class\\s*<<\\s*self\\b|def\\s+self\\.${dslMethod}\\b|define_singleton_method(?:\\s+|\\(\\s*)(?::${dslMethod}\\b|["']${dslMethod}["']))`,
+      'm',
+    ).test(owningClassPrefix);
     const owningClassTerminator =
       owningClass === undefined
         ? null
@@ -2194,9 +2209,9 @@ const rubyTestCases = (
     const owningClassTerminatorIsBare =
       owningClassTerminator !== null && /^[ \t]*(?:#[^\r\n]*)?$/.test(owningClassTerminator[1]);
     const owningClassName = rubyClassName(owningClass);
-    const mutatesTestDsl =
-      testDslMutationClasses.has('ActionDispatch::IntegrationTest') ||
-      (owningClassName !== null && testDslMutationClasses.has(owningClassName));
+    const mutatesDsl =
+      dslMutationClasses.has('ActionDispatch::IntegrationTest') ||
+      (owningClassName !== null && dslMutationClasses.has(owningClassName));
     const overridesCreditedMethod =
       creditedMethodMutationClasses.has('ActionDispatch::IntegrationTest') ||
       (owningClassName !== null && creditedMethodMutationClasses.has(owningClassName));
@@ -2218,8 +2233,8 @@ const rubyTestCases = (
           directTopLevelClassOwner &&
           owningClassTerminatorIsBare &&
           owningClass?.[2] === 'ActionDispatch::IntegrationTest' &&
-          !overridesTestDsl &&
-          !mutatesTestDsl &&
+          !overridesDsl &&
+          !mutatesDsl &&
           !overridesCreditedMethod,
       },
     ];
@@ -2236,7 +2251,9 @@ const rubySetupCases = (content, externalMutations) => {
   );
   if (setupContent === content) return [];
 
-  return rubyTestCases(setupContent, externalMutations).filter((testCase) => testCase.name === setupCaseName);
+  return rubyTestCases(setupContent, externalMutations, 'setup').filter(
+    (testCase) => testCase.name === setupCaseName,
+  );
 };
 const rubyRequestResponseScopes = (testCase) => {
   const scopes = [];
