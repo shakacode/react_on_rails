@@ -1361,6 +1361,21 @@ const rubyQualifiedOwnerName = (name, frames) => {
   )?.className;
   return namespace === undefined ? normalized : `${namespace}::${normalized}`;
 };
+const rubyCurrentSelfOwnerName = (frames) =>
+  frames.findLast((frame) =>
+    ['class', 'class-eval', 'eigenclass', 'instance-exec', 'module', 'receiver-exec'].includes(frame.type),
+  )?.className ?? null;
+const rubyReceiverChangingOwner = (match, frames, aliases, fallbackType) => {
+  if (match === null) return { type: fallbackType };
+  const className =
+    normalizedRubyClassReceiver(match[1]) === 'self'
+      ? rubyCurrentSelfOwnerName(frames)
+      : rubyClassNameForReceiver(match[1], aliases);
+  if (match[2].startsWith('instance_')) {
+    return { ...(className === null ? {} : { className }), type: 'instance-exec' };
+  }
+  return className === null ? { type: 'receiver-exec' } : { className, type: 'class-eval' };
+};
 const rubyOwnerFramesBefore = (content, targetIndex, aliases = rubyClassAliases(content)) => {
   const frames = [];
   let lineStart = 0;
@@ -1389,25 +1404,11 @@ const rubyOwnerFramesBefore = (content, targetIndex, aliases = rubyClassAliases(
                 `(?:^|[; \\t])(${rubyClassReceiverPattern})\\s*(?:\\.|::|&\\.)\\s*(${rubyReceiverChangingBlockMethodPattern})(?:\\s*\\([^()\\r\\n]*\\))?\\s*$`,
               ),
             );
-          const receiverIsSelf =
-            receiverChangingBlock !== null &&
-            normalizedRubyClassReceiver(receiverChangingBlock[1]) === 'self';
-          const receiverOwnerName =
-            receiverChangingBlock === null || receiverIsSelf
-              ? null
-              : rubyClassNameForReceiver(receiverChangingBlock[1], aliases);
-          let receiverOwnerType = 'brace';
-          if (receiverChangingBlock !== null && !receiverIsSelf) {
-            receiverOwnerType =
-              receiverChangingBlock[2].startsWith('instance_') || receiverOwnerName === null
-                ? 'receiver-exec'
-                : 'class-eval';
-          }
+          const receiverOwner = rubyReceiverChangingOwner(receiverChangingBlock, frames, aliases, 'brace');
           frames.push({
-            ...(receiverOwnerName ? { className: receiverOwnerName } : {}),
+            ...receiverOwner,
             brace: true,
             index: lineStart + token.index,
-            type: receiverOwnerType,
           });
         } else if (frames.at(-1)?.brace) {
           frames.pop();
@@ -1446,16 +1447,9 @@ const rubyOwnerFramesBefore = (content, targetIndex, aliases = rubyClassAliases(
           className = declaredName === undefined ? null : rubyQualifiedOwnerName(declaredName, frames);
           type = 'class';
         } else if (receiverChangingDoBlock !== null) {
-          const receiver = receiverChangingDoBlock[1];
-          if (normalizedRubyClassReceiver(receiver) === 'self') {
-            type = 'block';
-          } else {
-            className = rubyClassNameForReceiver(receiver, aliases);
-            type =
-              receiverChangingDoBlock[2].startsWith('instance_') || className === null
-                ? 'receiver-exec'
-                : 'class-eval';
-          }
+          const receiverOwner = rubyReceiverChangingOwner(receiverChangingDoBlock, frames, aliases, 'block');
+          className = receiverOwner.className ?? null;
+          type = receiverOwner.type;
         } else if (inlineDoOwnerBalance !== null) {
           for (let ownerIndex = 0; ownerIndex < inlineDoOwnerBalance; ownerIndex += 1) {
             frames.push({ index: lineStart + statementOffset, type: ownerIndex === 0 ? 'block' : 'owner' });
@@ -1943,10 +1937,14 @@ const creditedRubyMethodMutationClasses = (
 ) => {
   const mutationContent = normalizeRubyMutationContinuations(content);
   const mutations = [];
-  const addMutation = (match, references, explicitClassName = null, force = false) => {
+  const addMutation = (
+    match,
+    references,
+    { explicitClassName = null, force = false, instanceExecReceiverAllowed = false } = {},
+  ) => {
     const names = references.map(rubyMethodNameFromReference);
     if (force || names.some((name) => rubyCreditedMethodNames.has(name))) {
-      mutations.push({ explicitClassName, index: match.index });
+      mutations.push({ explicitClassName, index: match.index, instanceExecReceiverAllowed });
     }
   };
   for (const match of mutationContent.matchAll(
@@ -1968,17 +1966,23 @@ const creditedRubyMethodMutationClasses = (
       'gm',
     ),
   )) {
-    addMutation(match, [match[1], match[2]]);
+    addMutation(match, [match[1], match[2]], { instanceExecReceiverAllowed: true });
   }
   for (const match of mutationContent.matchAll(/\bdefine_method(?:[ \t]+|\([ \t]*)([^,\s)\r\n]+)/g)) {
     const staticReference = match[1].match(new RegExp(`^${rubyStaticMethodReferencePattern}$`));
-    addMutation(match, staticReference ? [staticReference[0]] : [], null, staticReference === null);
+    addMutation(match, staticReference ? [staticReference[0]] : [], {
+      force: staticReference === null,
+      instanceExecReceiverAllowed: true,
+    });
   }
   for (const match of mutationContent.matchAll(
     /\b(?:__send__|public_send|send)\s*\(\s*(?::define_method|["']define_method["'])\s*,\s*([^,\s)\r\n]+)/g,
   )) {
     const staticReference = match[1].match(new RegExp(`^${rubyStaticMethodReferencePattern}$`));
-    addMutation(match, staticReference ? [staticReference[0]] : [], null, staticReference === null);
+    addMutation(match, staticReference ? [staticReference[0]] : [], {
+      force: staticReference === null,
+      instanceExecReceiverAllowed: true,
+    });
   }
   for (const match of mutationContent.matchAll(
     new RegExp(
@@ -1987,18 +1991,20 @@ const creditedRubyMethodMutationClasses = (
     ),
   )) {
     const className = rubyClassNameForReceiver(match[1], aliases);
-    if (className !== null) addMutation(match, [match[2] ?? match[3]], className);
+    if (className !== null) {
+      addMutation(match, [match[2] ?? match[3]], { explicitClassName: className });
+    }
   }
   for (const match of mutationContent.matchAll(
     new RegExp(
-      `^[ \\t]*(?:remove_method|undef|undef_method)(?:[ \\t]+|\\([ \\t]*)(${rubyMethodReferencePattern})`,
+      `^[ \\t]*(remove_method|undef|undef_method)(?:[ \\t]+|\\([ \\t]*)(${rubyMethodReferencePattern})`,
       'gm',
     ),
   )) {
-    addMutation(match, [match[1]]);
+    addMutation(match, [match[2]], { instanceExecReceiverAllowed: match[1] !== 'undef' });
   }
   for (const match of mutationContent.matchAll(/^[ \t]*(?:include|prepend|extend)(?=[ \t(])/gm)) {
-    addMutation(match, [], null, true);
+    addMutation(match, [], { force: true, instanceExecReceiverAllowed: true });
   }
   for (const match of mutationContent.matchAll(
     new RegExp(
@@ -2007,12 +2013,12 @@ const creditedRubyMethodMutationClasses = (
     ),
   )) {
     const className = rubyClassNameForReceiver(match[1], aliases);
-    if (className !== null) addMutation(match, [], className, true);
+    if (className !== null) addMutation(match, [], { explicitClassName: className, force: true });
   }
   for (const match of mutationContent.matchAll(
     /\b((?:::)?[A-Z][A-Za-z0-9_:]*)\s*(?:\.|::)\s*(?:__send__|public_send|send)\s*\(\s*(?::(?:include|prepend|extend)|["'](?:include|prepend|extend)["'])/g,
   )) {
-    addMutation(match, [], match[1].replace(/^::/, ''), true);
+    addMutation(match, [], { explicitClassName: match[1].replace(/^::/, ''), force: true });
   }
 
   return new Set(
@@ -2024,8 +2030,14 @@ const creditedRubyMethodMutationClasses = (
         const frames = rubyOwnerFramesBefore(content, mutation.index, aliases);
         if (frames === null) return [];
         const innermostClassOrModule = frames.findLast((frame) =>
-          ['class', 'class-eval', 'module'].includes(frame.type),
+          ['class', 'class-eval', 'instance-exec', 'module', 'receiver-exec'].includes(frame.type),
         );
+        if (innermostClassOrModule?.type === 'receiver-exec') return [];
+        if (innermostClassOrModule?.type === 'instance-exec') {
+          return mutation.instanceExecReceiverAllowed && innermostClassOrModule.className !== undefined
+            ? [innermostClassOrModule.className]
+            : [];
+        }
         if (innermostClassOrModule?.type === 'class-eval' || innermostClassOrModule?.type === 'module') {
           return innermostClassOrModule.className === undefined ? [] : [innermostClassOrModule.className];
         }
@@ -2056,7 +2068,12 @@ const rubyDslMutationClasses = (
       'gm',
     ),
   )) {
-    mutations.push({ eigenclassOnly: false, explicitClassName: null, index: match.index });
+    mutations.push({
+      eigenclassOnly: false,
+      explicitClassName: null,
+      index: match.index,
+      instanceExecReceiverImpact: 'singleton',
+    });
   }
   for (const match of mutationContent.matchAll(
     new RegExp(`^[ \\t]*def[ \\t]+${dslMethod}(?=[ \\t(;]|$)`, 'gm'),
@@ -2079,13 +2096,11 @@ const rubyDslMutationClasses = (
       eigenclassOnly: true,
       explicitClassName: null,
       index: match.index,
+      instanceExecReceiverImpact: 'instance',
     });
   }
   for (const match of mutationContent.matchAll(
-    new RegExp(
-      `^[ \\t]*(?:(?:remove_method|undef|undef_method)(?:[ \\t]+|\\([ \\t]*)${aliasDslReference}|(?:__send__|public_send|send)[ \\t]*\\([ \\t]*(?::(?:remove_method|undef_method)|["'](?:remove_method|undef_method)["'])[ \\t]*,[ \\t]*${staticDslReference})`,
-      'gm',
-    ),
+    new RegExp(`^[ \\t]*undef[ \\t]+${aliasDslReference}`, 'gm'),
   )) {
     mutations.push({
       dslOwnerModuleAllowed: true,
@@ -2096,7 +2111,7 @@ const rubyDslMutationClasses = (
   }
   for (const match of mutationContent.matchAll(
     new RegExp(
-      `^[ \\t]*(?:alias[ \\t]+${aliasDslReference}[ \\t]+${rubyMethodReferencePattern}|alias_method(?:[ \\t]+|\\([ \\t]*)${staticDslReference}[ \\t]*,[ \\t]*${rubyMethodReferencePattern}|(?:__send__|public_send|send)[ \\t]*\\([ \\t]*(?::alias_method|["']alias_method["'])[ \\t]*,[ \\t]*${staticDslReference}[ \\t]*,[ \\t]*${rubyMethodReferencePattern})`,
+      `^[ \\t]*(?:(?:remove_method|undef_method)(?:[ \\t]+|\\([ \\t]*)${aliasDslReference}|(?:__send__|public_send|send)[ \\t]*\\([ \\t]*(?::(?:remove_method|undef_method)|["'](?:remove_method|undef_method)["'])[ \\t]*,[ \\t]*${staticDslReference})`,
       'gm',
     ),
   )) {
@@ -2105,6 +2120,31 @@ const rubyDslMutationClasses = (
       eigenclassOnly: true,
       explicitClassName: null,
       index: match.index,
+      instanceExecReceiverImpact: 'instance',
+    });
+  }
+  for (const match of mutationContent.matchAll(
+    new RegExp(`^[ \\t]*alias[ \\t]+${aliasDslReference}[ \\t]+${rubyMethodReferencePattern}`, 'gm'),
+  )) {
+    mutations.push({
+      dslOwnerModuleAllowed: true,
+      eigenclassOnly: true,
+      explicitClassName: null,
+      index: match.index,
+    });
+  }
+  for (const match of mutationContent.matchAll(
+    new RegExp(
+      `^[ \\t]*(?:alias_method(?:[ \\t]+|\\([ \\t]*)${staticDslReference}[ \\t]*,[ \\t]*${rubyMethodReferencePattern}|(?:__send__|public_send|send)[ \\t]*\\([ \\t]*(?::alias_method|["']alias_method["'])[ \\t]*,[ \\t]*${staticDslReference}[ \\t]*,[ \\t]*${rubyMethodReferencePattern})`,
+      'gm',
+    ),
+  )) {
+    mutations.push({
+      dslOwnerModuleAllowed: true,
+      eigenclassOnly: true,
+      explicitClassName: null,
+      index: match.index,
+      instanceExecReceiverImpact: 'instance',
     });
   }
   for (const match of mutationContent.matchAll(
@@ -2118,6 +2158,7 @@ const rubyDslMutationClasses = (
       eigenclassOnly: true,
       explicitClassName: null,
       index: match.index,
+      instanceExecReceiverImpact: 'instance',
     });
   }
   for (const match of mutationContent.matchAll(
@@ -2131,6 +2172,7 @@ const rubyDslMutationClasses = (
       eigenclassOnly: true,
       explicitClassName: null,
       index: match.index,
+      instanceExecReceiverImpact: 'instance',
     });
   }
   for (const match of mutationContent.matchAll(
@@ -2144,6 +2186,7 @@ const rubyDslMutationClasses = (
       eigenclassOnly: true,
       explicitClassName: null,
       index: match.index,
+      instanceExecReceiverImpact: 'instance',
     });
   }
   for (const match of mutationContent.matchAll(
@@ -2169,6 +2212,15 @@ const rubyDslMutationClasses = (
     }
   }
 
+  const instanceExecMutationClasses = (mutation, frame) => {
+    if (frame.className === undefined) return [];
+    if (mutation.instanceExecReceiverImpact === 'instance') return [frame.className];
+    return mutation.instanceExecReceiverImpact === 'singleton' &&
+      rubyIntegrationTestMutationTargets.has(frame.className)
+      ? [frame.className]
+      : [];
+  };
+
   return new Set(
     [
       ...dangerousClassExecutions,
@@ -2179,8 +2231,14 @@ const rubyDslMutationClasses = (
         if (frames === null) return [];
         if (mutation.eigenclassOnly) {
           const innermostLexicalOwner = frames.findLast((frame) =>
-            ['class', 'class-eval', 'eigenclass', 'module', 'receiver-exec'].includes(frame.type),
+            ['class', 'class-eval', 'eigenclass', 'instance-exec', 'module', 'receiver-exec'].includes(
+              frame.type,
+            ),
           );
+          if (innermostLexicalOwner?.type === 'receiver-exec') return [];
+          if (innermostLexicalOwner?.type === 'instance-exec') {
+            return instanceExecMutationClasses(mutation, innermostLexicalOwner);
+          }
           if (innermostLexicalOwner?.type === 'eigenclass') return [innermostLexicalOwner.className];
           return mutation.dslOwnerModuleAllowed &&
             innermostLexicalOwner?.type === 'module' &&
@@ -2188,7 +2246,13 @@ const rubyDslMutationClasses = (
             ? [innermostLexicalOwner.className]
             : [];
         }
-        const innermostClass = frames.findLast((frame) => frame.type === 'class');
+        const innermostClass = frames.findLast((frame) =>
+          ['class', 'instance-exec', 'receiver-exec'].includes(frame.type),
+        );
+        if (innermostClass?.type === 'receiver-exec') return [];
+        if (innermostClass?.type === 'instance-exec') {
+          return instanceExecMutationClasses(mutation, innermostClass);
+        }
         if (innermostClass === undefined) return [];
         const declaration = classDeclarations.find((candidate) => candidate.index === innermostClass.index);
         const className = rubyClassName(declaration);

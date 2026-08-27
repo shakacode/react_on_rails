@@ -4942,6 +4942,7 @@ codex_domain_rsc_setup_dsl_mutations=(
   $'module ActiveSupport::Testing::SetupAndTeardown::ClassMethods\n  self.remove_method(:setup)\nend'
   $'module ActiveSupport::Testing::SetupAndTeardown::ClassMethods\n  self.alias_method(:setup, :teardown)\nend'
   $'module ActiveSupport::Testing::SetupAndTeardown::ClassMethods\n  self.instance_exec(:context) do |_context|\n    self.define_method(:setup) { |*| }\n  end\nend'
+  $'ActionDispatch::IntegrationTest.instance_exec {\n  self.define_method(:get) { |*| nil }\n}'
   $'class << ActiveSupport::TestCase\n  self.define_method(:setup) { |*| }\nend'
   $'class << ActiveSupport::TestCase\n  define_method("setup") { |*| }\nend'
   $'class << ActiveSupport::TestCase\n  self.alias_method("setup", "teardown")\nend'
@@ -4985,6 +4986,7 @@ codex_domain_rsc_setup_dsl_controls=(
   $'module UnrelatedHelper\nend\n\nmodule ActiveSupport::Testing::SetupAndTeardown::ClassMethods\n  UnrelatedHelper&.module_exec(:context) do |_context|\n    self.define_method(:setup) { |*| }\n  end\nend'
   $'module UnrelatedHelper\nend\n\nmodule ActiveSupport::Testing::SetupAndTeardown::ClassMethods\n  UnrelatedHelper.instance_exec(:context) { |_context|\n    self.define_method(:setup) { |*| }\n  }\nend'
   $'ActionDispatch::IntegrationTest.instance_exec do\n  def get(*) = nil\nend'
+  $'module ActiveSupport::Testing::SetupAndTeardown::ClassMethods\n  self.instance_exec {\n    def setup(*) = nil\n  }\nend'
   $'class ActiveSupport::TestCase\n  self.define_method(:setup) { |*| }\nend'
   $'mutation_note = \'define_method("setup")\''
 )
