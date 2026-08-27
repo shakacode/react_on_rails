@@ -2092,7 +2092,7 @@ const rubyDslMutationClasses = (
     ),
   )) {
     mutations.push({
-      dslOwnerModuleAllowed: false,
+      dslOwnerModuleAllowed: true,
       eigenclassOnly: true,
       explicitClassName: null,
       index: match.index,
@@ -2105,7 +2105,7 @@ const rubyDslMutationClasses = (
     ),
   )) {
     mutations.push({
-      dslOwnerModuleAllowed: false,
+      dslOwnerModuleAllowed: true,
       eigenclassOnly: true,
       explicitClassName: null,
       index: match.index,
@@ -2118,7 +2118,7 @@ const rubyDslMutationClasses = (
     ),
   )) {
     mutations.push({
-      dslOwnerModuleAllowed: false,
+      dslOwnerModuleAllowed: true,
       eigenclassOnly: true,
       explicitClassName: null,
       index: match.index,
@@ -2156,13 +2156,14 @@ const rubyDslMutationClasses = (
         const frames = rubyOwnerFramesBefore(content, mutation.index, aliases);
         if (frames === null) return [];
         if (mutation.eigenclassOnly) {
-          const innermostEigenclass = frames.findLast((frame) => frame.type === 'eigenclass');
-          if (innermostEigenclass !== undefined) return [innermostEigenclass.className];
-          if (!mutation.dslOwnerModuleAllowed) return [];
-          const innermostClassOrModule = frames.findLast((frame) => ['class', 'module'].includes(frame.type));
-          return innermostClassOrModule?.type === 'module' &&
-            rubyIntegrationTestDslOwnerModules.get(dslMethod)?.has(innermostClassOrModule.className)
-            ? [innermostClassOrModule.className]
+          const innermostLexicalOwner = frames.findLast((frame) =>
+            ['class', 'class-eval', 'eigenclass', 'module'].includes(frame.type),
+          );
+          if (innermostLexicalOwner?.type === 'eigenclass') return [innermostLexicalOwner.className];
+          return mutation.dslOwnerModuleAllowed &&
+            innermostLexicalOwner?.type === 'module' &&
+            rubyIntegrationTestDslOwnerModules.get(dslMethod)?.has(innermostLexicalOwner.className)
+            ? [innermostLexicalOwner.className]
             : [];
         }
         const innermostClass = frames.findLast((frame) => frame.type === 'class');
