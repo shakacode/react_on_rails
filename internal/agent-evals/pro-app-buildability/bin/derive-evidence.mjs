@@ -1250,10 +1250,8 @@ const normalizeRubyStaticMutationTargetReceivers = (content) =>
     for (const name of names) {
       if (qualifiedParts.length > 0 || name !== 'Object') qualifiedParts.push(...name.split('::'));
     }
-    const qualifiedName = qualifiedParts.join('::');
-    return rubyIntegrationTestMutationTargets.has(qualifiedName)
-      ? qualifiedName.padEnd(receiver.length, ' ')
-      : receiver;
+    const qualifiedName = qualifiedParts.join('::') || 'Object';
+    return qualifiedName.padEnd(receiver.length, ' ');
   });
 const rubyIntegrationTestMutationImpact = (className) =>
   rubyIntegrationTestMutationTargets.has(className) ? 'ActionDispatch::IntegrationTest' : className;
@@ -1361,20 +1359,26 @@ const rubyQualifiedOwnerName = (name, frames) => {
   )?.className;
   return namespace === undefined ? normalized : `${namespace}::${normalized}`;
 };
-const rubyCurrentSelfOwnerName = (frames) =>
+const rubyCurrentSelfOwner = (frames) =>
   frames.findLast((frame) =>
     ['class', 'class-eval', 'eigenclass', 'instance-exec', 'module', 'receiver-exec'].includes(frame.type),
-  )?.className ?? null;
+  ) ?? null;
 const rubyReceiverChangingOwner = (match, frames, aliases, fallbackType) => {
   if (match === null) return { type: fallbackType };
-  const className =
-    normalizedRubyClassReceiver(match[1]) === 'self'
-      ? rubyCurrentSelfOwnerName(frames)
-      : rubyClassNameForReceiver(match[1], aliases);
+  const receiverIsSelf = normalizedRubyClassReceiver(match[1]) === 'self';
+  const currentSelfOwner = receiverIsSelf ? rubyCurrentSelfOwner(frames) : null;
+  const className = receiverIsSelf
+    ? (currentSelfOwner?.className ?? null)
+    : rubyClassNameForReceiver(match[1], aliases);
+  const receiverKind = currentSelfOwner?.receiverKind ?? currentSelfOwner?.type;
+  const knownOwner = {
+    ...(className === null ? {} : { className }),
+    ...(receiverKind === undefined ? {} : { receiverKind }),
+  };
   if (match[2].startsWith('instance_')) {
-    return { ...(className === null ? {} : { className }), type: 'instance-exec' };
+    return { ...knownOwner, type: 'instance-exec' };
   }
-  return className === null ? { type: 'receiver-exec' } : { className, type: 'class-eval' };
+  return className === null ? { type: 'receiver-exec' } : { ...knownOwner, type: 'class-eval' };
 };
 const rubyOwnerFramesBefore = (content, targetIndex, aliases = rubyClassAliases(content)) => {
   const frames = [];
@@ -1426,6 +1430,7 @@ const rubyOwnerFramesBefore = (content, targetIndex, aliases = rubyClassAliases(
       } else {
         let type = null;
         let className = null;
+        let receiverKind = null;
         const eigenclass = statement.match(new RegExp(`^class\\s*<<\\s*(${rubyClassReceiverPattern})\\s*$`));
         const receiverChangingDoBlock = statement.match(
           new RegExp(
@@ -1449,6 +1454,7 @@ const rubyOwnerFramesBefore = (content, targetIndex, aliases = rubyClassAliases(
         } else if (receiverChangingDoBlock !== null) {
           const receiverOwner = rubyReceiverChangingOwner(receiverChangingDoBlock, frames, aliases, 'block');
           className = receiverOwner.className ?? null;
+          receiverKind = receiverOwner.receiverKind ?? null;
           type = receiverOwner.type;
         } else if (inlineDoOwnerBalance !== null) {
           for (let ownerIndex = 0; ownerIndex < inlineDoOwnerBalance; ownerIndex += 1) {
@@ -1464,6 +1470,7 @@ const rubyOwnerFramesBefore = (content, targetIndex, aliases = rubyClassAliases(
         if (type !== null) {
           frames.push({
             ...(className === null ? {} : { className }),
+            ...(receiverKind === null ? {} : { receiverKind }),
             index: lineStart + (['class', 'module'].includes(type) ? 0 : statementOffset),
             type,
           });
@@ -1884,6 +1891,28 @@ const rubyClassDeclarations = (content) =>
     }
     return declaration;
   });
+const rubyIntegrationTestSubclassNames = (classDeclarations, aliases) => {
+  const subclassNames = new Set();
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const declaration of classDeclarations) {
+      const className = rubyClassName(declaration);
+      const superclassReference = declaration[2];
+      if (className !== null && superclassReference !== undefined) {
+        const superclassName = aliases.get(superclassReference) ?? superclassReference;
+        if (
+          (superclassName === 'ActionDispatch::IntegrationTest' || subclassNames.has(superclassName)) &&
+          !subclassNames.has(className)
+        ) {
+          subclassNames.add(className);
+          changed = true;
+        }
+      }
+    }
+  }
+  return subclassNames;
+};
 const reflectedRubyClassMutationClasses = (content, aliases = rubyClassAliases(content)) => {
   const mutationContent = normalizeRubyMutationContinuations(content);
   const reflectionPattern = new RegExp(
@@ -2032,13 +2061,21 @@ const creditedRubyMethodMutationClasses = (
         const innermostClassOrModule = frames.findLast((frame) =>
           ['class', 'class-eval', 'instance-exec', 'module', 'receiver-exec'].includes(frame.type),
         );
-        if (innermostClassOrModule?.type === 'receiver-exec') return [];
+        if (innermostClassOrModule?.type === 'receiver-exec') {
+          return ['ActionDispatch::IntegrationTest'];
+        }
         if (innermostClassOrModule?.type === 'instance-exec') {
           return mutation.instanceExecReceiverAllowed && innermostClassOrModule.className !== undefined
             ? [innermostClassOrModule.className]
             : [];
         }
-        if (innermostClassOrModule?.type === 'class-eval' || innermostClassOrModule?.type === 'module') {
+        if (innermostClassOrModule?.type === 'class-eval') {
+          return innermostClassOrModule.className === undefined ||
+            innermostClassOrModule.receiverKind === 'eigenclass'
+            ? []
+            : [innermostClassOrModule.className];
+        }
+        if (innermostClassOrModule?.type === 'module') {
           return innermostClassOrModule.className === undefined ? [] : [innermostClassOrModule.className];
         }
         if (innermostClassOrModule?.type !== 'class') return [];
@@ -2060,6 +2097,7 @@ const rubyDslMutationClasses = (
 ) => {
   const mutationContent = normalizeRubyMutationContinuations(content);
   const mutations = [];
+  const integrationTestSubclassNames = rubyIntegrationTestSubclassNames(classDeclarations, aliases);
   const staticDslReference = `(?::${dslMethod}\\b|:["']${dslMethod}["']|["']${dslMethod}["'])`;
   const aliasDslReference = `(?:${staticDslReference}|${dslMethod}\\b)`;
   for (const match of mutationContent.matchAll(
@@ -2083,6 +2121,7 @@ const rubyDslMutationClasses = (
       eigenclassOnly: true,
       explicitClassName: null,
       index: match.index,
+      instanceExecReceiverImpact: 'singleton',
     });
   }
   for (const match of mutationContent.matchAll(
@@ -2107,6 +2146,7 @@ const rubyDslMutationClasses = (
       eigenclassOnly: true,
       explicitClassName: null,
       index: match.index,
+      instanceExecReceiverImpact: 'singleton',
     });
   }
   for (const match of mutationContent.matchAll(
@@ -2131,6 +2171,7 @@ const rubyDslMutationClasses = (
       eigenclassOnly: true,
       explicitClassName: null,
       index: match.index,
+      instanceExecReceiverImpact: 'singleton',
     });
   }
   for (const match of mutationContent.matchAll(
@@ -2216,7 +2257,8 @@ const rubyDslMutationClasses = (
     if (frame.className === undefined) return [];
     if (mutation.instanceExecReceiverImpact === 'instance') return [frame.className];
     return mutation.instanceExecReceiverImpact === 'singleton' &&
-      rubyIntegrationTestMutationTargets.has(frame.className)
+      (rubyIntegrationTestMutationTargets.has(frame.className) ||
+        integrationTestSubclassNames.has(frame.className))
       ? [frame.className]
       : [];
   };
@@ -2235,11 +2277,23 @@ const rubyDslMutationClasses = (
               frame.type,
             ),
           );
-          if (innermostLexicalOwner?.type === 'receiver-exec') return [];
+          if (innermostLexicalOwner?.type === 'receiver-exec') {
+            return ['ActionDispatch::IntegrationTest'];
+          }
           if (innermostLexicalOwner?.type === 'instance-exec') {
             return instanceExecMutationClasses(mutation, innermostLexicalOwner);
           }
           if (innermostLexicalOwner?.type === 'eigenclass') return [innermostLexicalOwner.className];
+          if (innermostLexicalOwner?.type === 'class-eval') {
+            if (innermostLexicalOwner.receiverKind === 'eigenclass') {
+              return innermostLexicalOwner.className === undefined ? [] : [innermostLexicalOwner.className];
+            }
+            return mutation.dslOwnerModuleAllowed &&
+              innermostLexicalOwner.receiverKind === 'module' &&
+              rubyIntegrationTestDslOwnerModules.get(dslMethod)?.has(innermostLexicalOwner.className)
+              ? [innermostLexicalOwner.className]
+              : [];
+          }
           return mutation.dslOwnerModuleAllowed &&
             innermostLexicalOwner?.type === 'module' &&
             rubyIntegrationTestDslOwnerModules.get(dslMethod)?.has(innermostLexicalOwner.className)
@@ -2249,7 +2303,9 @@ const rubyDslMutationClasses = (
         const innermostClass = frames.findLast((frame) =>
           ['class', 'instance-exec', 'receiver-exec'].includes(frame.type),
         );
-        if (innermostClass?.type === 'receiver-exec') return [];
+        if (innermostClass?.type === 'receiver-exec') {
+          return ['ActionDispatch::IntegrationTest'];
+        }
         if (innermostClass?.type === 'instance-exec') {
           return instanceExecMutationClasses(mutation, innermostClass);
         }
