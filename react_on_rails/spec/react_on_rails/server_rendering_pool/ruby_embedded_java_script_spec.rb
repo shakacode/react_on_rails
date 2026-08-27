@@ -216,6 +216,40 @@ module ReactOnRails
           end
         end
 
+        context "when REACT_RENDERER_URL is a scheme-less credential authority" do
+          let(:error) { Errno::ECONNREFUSED.new }
+
+          before do
+            ENV["REACT_RENDERER_URL"] =
+              "synthetic-user:synthetic-secret@renderer.internal:3800"
+          end
+
+          it "fails closed through the userinfo delimiter while retaining the host and port" do
+            message = render_error_for(error).message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("could not connect to the Node renderer at renderer.internal:3800")
+            expect(message).to include('REACT_RENDERER_URL is currently "renderer.internal:3800"')
+          end
+        end
+
+        context "when scheme-less renderer credentials contain a scheme-like substring" do
+          let(:error) { Errno::ECONNREFUSED.new }
+
+          before do
+            ENV["REACT_RENDERER_URL"] =
+              "synthetic-user:synthetic-secrethttps://suffix@renderer.internal:3800"
+          end
+
+          it "does not mistake the userinfo substring for a leading URL scheme" do
+            message = render_error_for(error).message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("could not connect to the Node renderer at renderer.internal:3800")
+            expect(message).to include('REACT_RENDERER_URL is currently "renderer.internal:3800"')
+          end
+        end
+
         context "when a configured typo-scheme renderer authority has multiple at signs" do
           let(:error) { Errno::ECONNREFUSED.new }
 
@@ -265,6 +299,40 @@ module ReactOnRails
             message = render_error_for(error).message
             expect(message).to include('RENDERER_URL is currently "http://legacy-host:3800"')
             expect(message).not_to include("REACT_RENDERER_URL is not set")
+          end
+        end
+
+        context "when only RENDERER_URL is a scheme-less credential authority" do
+          let(:error) { Errno::ECONNREFUSED.new }
+
+          before do
+            ENV["RENDERER_URL"] =
+              "synthetic-user:synthetic-secret@renderer.internal:3800"
+          end
+
+          it "fails closed through the userinfo delimiter while retaining the host and port" do
+            message = render_error_for(error).message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("could not connect to the Node renderer at renderer.internal:3800")
+            expect(message).to include('RENDERER_URL is currently "renderer.internal:3800"')
+          end
+        end
+
+        context "when scheme-less RENDERER_URL credentials contain a scheme-like substring" do
+          let(:error) { Errno::ECONNREFUSED.new }
+
+          before do
+            ENV["RENDERER_URL"] =
+              "synthetic-user:synthetic-secrethttps://suffix@renderer.internal:3800"
+          end
+
+          it "does not mistake the userinfo substring for a leading URL scheme" do
+            message = render_error_for(error).message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("could not connect to the Node renderer at renderer.internal:3800")
+            expect(message).to include('RENDERER_URL is currently "renderer.internal:3800"')
           end
         end
 
@@ -676,6 +744,23 @@ module ReactOnRails
             stub_local_bundle_failure(failure_message, bundle_path: "/tmp/server.js")
 
             expect(bundle_load_error_message).to include(failure_message)
+          end
+
+          it "preserves a scheme-less credential-shaped token byte for byte" do
+            failure_message =
+              "Failure loading synthetic-user:synthetic-secret@renderer.internal:3800"
+            stub_local_bundle_failure(failure_message, bundle_path: "/tmp/server.js")
+
+            expect(bundle_load_error_message).to include(failure_message)
+          end
+        end
+
+        context "when an ordinary local bundle path contains an at sign" do
+          it "preserves the configured path byte for byte" do
+            server_bundle_path = "/tmp/releases/build@2026/server-bundle.js"
+            stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)
+
+            expect(bundle_load_error_message).to include(server_bundle_path)
           end
         end
 

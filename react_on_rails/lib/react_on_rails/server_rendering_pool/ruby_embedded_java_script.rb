@@ -377,12 +377,22 @@ module ReactOnRails
 
         # Resolves the configured renderer URL and the env var it came from, so the headline
         # target and the checklist line stay consistent. A blank (present-but-empty) value is
-        # treated as unset, and the legacy RENDERER_URL alias is the fallback. Credentials are
-        # stripped for safe display. Returns [var_name, sanitized_url] or [nil, nil].
+        # treated as unset, and the legacy RENDERER_URL alias is the fallback. Credentials,
+        # including userinfo on a scheme-less authority, are stripped for safe display. Returns
+        # [var_name, sanitized_url] or [nil, nil].
         def configured_renderer_url
           %w[REACT_RENDERER_URL RENDERER_URL].each do |var|
             value = ENV.fetch(var, nil)
-            return [var, sanitized_renderer_url(value)] unless value.nil? || value.empty?
+            next if value.nil? || value.empty?
+
+            leading_scheme = value.match(CONFIGURED_AUTHORITY_SCHEME_REGEX)&.begin(0)&.zero?
+            userinfo_delimiter = value.rindex("@")
+            sanitized_url = if !leading_scheme && userinfo_delimiter
+                              value[(userinfo_delimiter + 1)..]
+                            else
+                              sanitized_renderer_url(value)
+                            end
+            return [var, sanitized_url]
           end
           [nil, nil]
         end
