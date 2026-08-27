@@ -183,7 +183,8 @@ never sufficient.
 ## Interpretation
 
 - **Pass:** every required rubric item has independent evidence, the application
-  tests and production build pass, and no human rescue occurred.
+  tests and production build pass, no human rescue occurred, and manual review
+  confirms that the command evidence complied with the immutable prompt.
 - **Fail:** the agent completed its attempt, but one or more required rubric
   items failed.
 - **Incomplete:** infrastructure, credentials, network, time, or runner failure

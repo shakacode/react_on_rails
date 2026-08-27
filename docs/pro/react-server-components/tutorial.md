@@ -85,28 +85,32 @@ success from generated files.
 
 ### Point-in-time agent evidence
 
-On August 13, 2026, Codex completed this exercise from an empty repository at
-React on Rails revision `06d962d089f34dc1ec2963a50c233508ecbc7103`. Its
-isolated run passed all nine rubric rows: Pro installation, RSC route,
-server-side form validation, page and form tests, production build, green
-tests, unaided execution, and complete evidence.
+On August 13, 2026, Codex and Claude each attempted this exercise from an empty
+repository at React on Rails revision
+`06d962d089f34dc1ec2963a50c233508ecbc7103`. Both isolated runs passed the
+machine-derived nine-row rubric: Pro installation, RSC route, server-side form
+validation, page and form tests, production build, green tests, unaided
+execution, and complete evidence. Manual protocol review later found that
+neither run complied with the immutable evaluation prompt.
 
-| Run                                                                                                                                                                                        | Agent and model             | Review result                                                                      | Recorded environment                                                                |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------- | ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| [Claude evidence bundle](https://github.com/shakacode/react_on_rails/tree/deee3f55bebb7ffeebf24219fe9fd6751db54c73/internal/agent-evals/pro-app-buildability/runs/final-claude-06d962d0-1) | Claude Code 2.1.210, Sonnet | Protocol-noncompliant diagnostic; not counted as an independent completion         | Linux 7.0.0-28-generic aarch64; Ruby 3.4.10; Node 22.23.2; npm 10.9.8; pnpm 10.33.4 |
-| [Codex evidence bundle](https://github.com/shakacode/react_on_rails/tree/deee3f55bebb7ffeebf24219fe9fd6751db54c73/internal/agent-evals/pro-app-buildability/runs/final-codex-06d962d0-1)   | Codex CLI 0.144.4, GPT-5.4  | Accepted point-in-time completion; all nine rubric rows passed after manual review | Linux 7.0.0-28-generic aarch64; Ruby 3.4.10; Node 22.23.2; npm 10.9.8; pnpm 10.33.4 |
+| Run                                                                                                                                                                                        | Agent and model             | Review result                                                 | Recorded environment                                                                |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| [Claude evidence bundle](https://github.com/shakacode/react_on_rails/tree/deee3f55bebb7ffeebf24219fe9fd6751db54c73/internal/agent-evals/pro-app-buildability/runs/final-claude-06d962d0-1) | Claude Code 2.1.210, Sonnet | Protocol-noncompliant diagnostic; not counted as a completion | Linux 7.0.0-28-generic aarch64; Ruby 3.4.10; Node 22.23.2; npm 10.9.8; pnpm 10.33.4 |
+| [Codex evidence bundle](https://github.com/shakacode/react_on_rails/tree/deee3f55bebb7ffeebf24219fe9fd6751db54c73/internal/agent-evals/pro-app-buildability/runs/final-codex-06d962d0-1)   | Codex CLI 0.144.4, GPT-5.4  | Protocol-noncompliant diagnostic; not counted as a completion | Linux 7.0.0-28-generic aarch64; Ruby 3.4.10; Node 22.23.2; npm 10.9.8; pnpm 10.33.4 |
 
 Both bundles passed the structural and security validation gate and came from a
 network-enabled, isolated, ephemeral host with an empty inherited environment.
 Authentication was available to the agent runner but was not persisted in
 either result. No human follow-up was sent during either run.
 
-The Claude bundle's machine-derived rubric result was later invalidated by
-manual protocol review: its command evidence included filesystem searches
-outside the assigned workspace, contrary to the immutable evaluation prompt.
-The bundle remains useful as a diagnostic record, but it does not count as an
-independent completion. A fresh compliant Claude run is required before making
-a two-agent completion claim.
+Manual protocol review invalidated both machine-derived rubric results. The
+Codex command evidence included a root-level filesystem search and a read of
+`/etc/os-release`; the Claude evidence included those classes of access and
+additional host-wide inspection. All were outside the assigned workspace,
+contrary to the immutable evaluation prompt. The bundles remain useful as
+diagnostic records, but neither counts as a completion. Fresh compliant Codex
+and Claude runs are required before making either a single-agent or two-agent
+completion claim.
 
 The runs also surfaced environment-specific friction:
 
@@ -122,10 +126,10 @@ The runs also surfaced environment-specific friction:
 These bundles are point-in-time observations, not a compatibility guarantee for
 other versions, platforms, databases, or network conditions. In particular,
 package resolution through `npx` and the public network may change. The run
-schema deliberately records `tutorial_claims_supported: false`: the accepted
-Codex bundle supports the bounded completion statements above only after manual
-review, while the Claude bundle supplies diagnostic context. Neither bundle
-automatically attests to this tutorial or to broader product claims.
+schema deliberately records `tutorial_claims_supported: false`: both retained
+bundles supply diagnostic context after manual protocol review, and neither
+supports a completion claim or automatically attests to this tutorial or to
+broader product claims.
 
 ## Continue the RSC Tutorial
 

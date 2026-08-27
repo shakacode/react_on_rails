@@ -637,7 +637,7 @@ printf '%s' \
 printf '%s\n' enterprise user:inference default_claude_max_5x 1780000000000 1790000000000 \
   >"$oauth_scan_metadata_output/benign-artifact.txt"
 "$eval_dir/bin/assert-credential-absent" \
-  "$oauth_scan_metadata_output" "$oauth_scan_metadata_store"
+  "$oauth_scan_metadata_output" "$oauth_scan_metadata_store" reject claude-oauth
 
 assert_structured_credential_leak_rejected() {
   local name="$1"
@@ -673,6 +673,48 @@ assert_structured_credential_leak_rejected secret \
 assert_structured_credential_leak_rejected token_array \
   '{"container":{"token":["generic-array-token-value"]}}' \
   'generic-array-token-value'
+assert_structured_credential_leak_rejected inherited_sensitive_context \
+  '{"auth":{"session":"nested-auth-leaf-value"}}' \
+  'nested-auth-leaf-value'
+assert_structured_credential_leak_rejected inherited_exact_token_context \
+  '{"accessToken":{"value":"@"}}' \
+  '@'
+for metadata_key in expiresAt refreshTokenExpiresAt scopes subscriptionType rateLimitTier; do
+  inherited_metadata_value="nested-auth-$metadata_key-value"
+  assert_structured_credential_leak_rejected "inherited_${metadata_key}_under_auth" \
+    "{\"auth\":{\"$metadata_key\":\"$inherited_metadata_value\"}}" \
+    "$inherited_metadata_value"
+  assert_structured_credential_leak_rejected "inherited_${metadata_key}_under_access_token" \
+    "{\"accessToken\":{\"$metadata_key\":\"@\"}}" \
+    '@'
+  assert_structured_credential_leak_rejected "inherited_${metadata_key}_under_refresh_token" \
+    "{\"refreshToken\":{\"$metadata_key\":\"@\"}}" \
+    '@'
+done
+assert_structured_credential_leak_rejected oauth_scopes_object \
+  '{"claudeAiOauth":{"scopes":[{"leaf":"wrong-scope-object-sensitive-value"}]}}' \
+  'wrong-scope-object-sensitive-value'
+assert_structured_credential_leak_rejected oauth_scopes_nested_array \
+  '{"claudeAiOauth":{"scopes":[["wrong-scope-array-sensitive-value"]]}}' \
+  'wrong-scope-array-sensitive-value'
+assert_structured_credential_leak_rejected oauth_scopes_numeric \
+  '{"claudeAiOauth":{"scopes":[12345678]}}' \
+  '12345678'
+assert_structured_credential_leak_rejected oauth_expires_at_string \
+  '{"claudeAiOauth":{"expiresAt":"1780000000000"}}' \
+  '1780000000000'
+assert_structured_credential_leak_rejected oauth_refresh_expires_at_string \
+  '{"claudeAiOauth":{"refreshTokenExpiresAt":"1790000000000"}}' \
+  '1790000000000'
+assert_structured_credential_leak_rejected oauth_subscription_type_numeric \
+  '{"claudeAiOauth":{"subscriptionType":12345678}}' \
+  '12345678'
+assert_structured_credential_leak_rejected oauth_rate_limit_tier_numeric \
+  '{"claudeAiOauth":{"rateLimitTier":12345678}}' \
+  '12345678'
+assert_structured_credential_leak_rejected generic_oauth_metadata_lookalike \
+  '{"claudeAiOauth":{"subscriptionType":"generic-codex-hidden-value"}}' \
+  'generic-codex-hidden-value'
 oauth_serialized_scan='{"claudeAiOauth":{"accessToken":"serialized-access-token","refreshToken":"serialized-refresh-token"}}'
 assert_structured_credential_leak_rejected serialized \
   "$oauth_serialized_scan" "$oauth_serialized_scan"
