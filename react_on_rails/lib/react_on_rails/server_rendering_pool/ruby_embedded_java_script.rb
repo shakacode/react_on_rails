@@ -168,7 +168,8 @@ module ReactOnRails
           # are scrubbed here because URI::InvalidURIError embeds the raw URL in its message.
           sanitized_url = sanitized_renderer_url(
             server_js_file,
-            preserve_filesystem_path: !server_bundle_path_is_http
+            preserve_filesystem_path: !server_bundle_path_is_http,
+            strict_schemeless: true
           )
           sanitized_error = if server_bundle_path_is_http && e.is_a?(ReactOnRails::ServerBundleLoadError)
                               e.message
@@ -402,6 +403,7 @@ module ReactOnRails
         def target_from_message(message)
           message = message.to_s
           [
+            /\AConnection error on renderer request:\s*(?<target>[^\s,)]+)\s*\z/i,
             /connect\(2\) for (?<target>[^\s,)]+)/,
             /TCP connection to (?<target>[^\s,)]+)/,
             %r{(?<target>[^:/\s"'?=#@]+https?://[^\s,"')]*@[^\s,"')]+)}i,
@@ -425,7 +427,7 @@ module ReactOnRails
         def sanitized_renderer_url(url, preserve_filesystem_path: false, strict_schemeless: false)
           return url if passthrough_renderer_url?(url, preserve_filesystem_path)
 
-          ambiguous_url = sanitized_ambiguous_renderer_url(url, strict_schemeless)
+          ambiguous_url = sanitized_ambiguous_renderer_url(url, strict_schemeless, preserve_filesystem_path)
           return ambiguous_url if ambiguous_url
 
           scheme = url.match(CONFIGURED_AUTHORITY_SCHEME_REGEX)
@@ -449,13 +451,25 @@ module ReactOnRails
           url.nil? || url.empty? || (preserve_filesystem_path && explicit_filesystem_path?(url))
         end
 
-        def sanitized_ambiguous_renderer_url(url, strict_schemeless)
+        def sanitized_ambiguous_renderer_url(url, strict_schemeless, preserve_filesystem_path)
           scheme = url.match(CONFIGURED_AUTHORITY_SCHEME_REGEX)
           return unless scheme
 
           candidate = embedded_http_url_candidate(url, scheme)
-          candidate ||= ambiguous_renderer_url_candidate(url, scheme, strict_schemeless)
+          candidate ||= unknown_apparent_scheme_candidate(url, scheme)
+          strict_prefix = strict_schemeless && !preserve_filesystem_path
+          candidate ||= ambiguous_renderer_url_candidate(url, scheme, strict_prefix)
           sanitized_renderer_url(candidate, strict_schemeless:) if candidate
+        end
+
+        def unknown_apparent_scheme_candidate(url, scheme)
+          userinfo_delimiter = url.rindex("@")
+          return unless scheme.begin(0).zero? && userinfo_delimiter && userinfo_delimiter >= scheme.end(0)
+
+          scheme_name = scheme[0].delete_suffix("://").upcase
+          return if URI.scheme_list.key?(scheme_name)
+
+          url[(userinfo_delimiter + 1)..]
         end
 
         def ambiguous_renderer_url_candidate(url, scheme, strict_schemeless)

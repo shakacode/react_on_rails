@@ -121,6 +121,31 @@ module ReactOnRails
           end
         end
 
+        context "when a wrapper names only a scheme-less renderer authority" do
+          let(:error) do
+            StandardError.new(
+              "Connection error on renderer request: synthetic-user:synthetic-secret@renderer.internal:3800"
+            )
+          end
+
+          it "redacts credentials from the entire public connection diagnostic" do
+            message = render_error_for(error).message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("renderer.internal:3800")
+          end
+
+          it "redacts token-style userinfo from the entire public connection diagnostic" do
+            token_error = StandardError.new(
+              "Connection error on renderer request: synthetic-token@renderer.internal:3800"
+            )
+
+            message = render_error_for(token_error).message
+            expect(message).not_to include("synthetic-token")
+            expect(message).to include("renderer.internal:3800")
+          end
+        end
+
         context "when the connection Errno survives only as the error's #cause" do
           # The Pro renderer client wraps the original Errno (ReactOnRailsPro::Error ->
           # ConnectionError -> Errno::ECONNREFUSED). The wrapper message here carries no
@@ -294,12 +319,12 @@ module ReactOnRails
               "htps://synthetic-user:synthetic-prefix@synthetic-secret@renderer.example.com:3800/path"
           end
 
-          it "fails closed through the final at sign while retaining the scheme, host, and path" do
+          it "fails closed through the final at sign while retaining the host and path" do
             message = render_error_for(error).message
             expect(message).not_to include("synthetic-user")
             expect(message).not_to include("synthetic-prefix")
             expect(message).not_to include("synthetic-secret")
-            expect(message).to include("htps://renderer.example.com:3800/path")
+            expect(message).to include("renderer.example.com:3800/path")
           end
         end
 
@@ -475,6 +500,22 @@ module ReactOnRails
               message = render_error_for(error).message
               expect(message).not_to include("synthetic-secret")
               expect(message).to include("renderer.internal:3800")
+            end
+          end
+        end
+
+        context "when renderer env credentials are absorbed into an unknown apparent scheme" do
+          let(:error) { Errno::ECONNREFUSED.new }
+
+          %w[REACT_RENDERER_URL RENDERER_URL].each do |renderer_env|
+            it "fails closed through the userinfo delimiter for #{renderer_env}" do
+              ENV[renderer_env] = "synthetic-secrethtps://apikey@renderer.internal:3800"
+
+              message = render_error_for(error).message
+              expect(message).not_to include("synthetic-secret")
+              expect(message).not_to include("apikey")
+              expect(message).to include("could not connect to the Node renderer at renderer.internal:3800")
+              expect(message).to include(%(#{renderer_env} is currently "renderer.internal:3800"))
             end
           end
         end
@@ -984,6 +1025,15 @@ module ReactOnRails
         end
 
         context "when a configured local bundle value is a scheme-less credential authority" do
+          it "redacts token-style userinfo while retaining the host and path" do
+            server_bundle_path = "apikey@cdn.example.com/bundle.js"
+            stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("apikey")
+            expect(message).to include("cdn.example.com/bundle.js")
+          end
+
           it "redacts credentials while retaining the host and path" do
             server_bundle_path =
               "synthetic-user:synthetic-secret@cdn.example.com/bundle.js"
@@ -1323,7 +1373,7 @@ module ReactOnRails
         end
 
         context "when a configured typo-scheme bundle authority embeds credentials" do
-          it "redacts the credentials while retaining the scheme, host, and path" do
+          it "redacts the credentials while retaining the host and path" do
             server_bundle_path =
               "htps://synthetic-user:synthetic-secret@renderer.example/bundle.js"
             stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)
@@ -1331,7 +1381,7 @@ module ReactOnRails
             message = bundle_load_error_message
             expect(message).not_to include("synthetic-user")
             expect(message).not_to include("synthetic-secret")
-            expect(message).to include("htps://renderer.example/bundle.js")
+            expect(message).to include("renderer.example/bundle.js")
           end
 
           ["/", "?", "#"].each do |delimiter|
@@ -1343,7 +1393,7 @@ module ReactOnRails
               message = bundle_load_error_message
               expect(message).not_to include("synthetic-user")
               expect(message).not_to include("synthetic-secret")
-              expect(message).to include("htps://renderer.example/bundle.js")
+              expect(message).to include("renderer.example/bundle.js")
             end
           end
 
@@ -1357,7 +1407,7 @@ module ReactOnRails
             expect(message).not_to include("synthetic-prefix")
             expect(message).not_to include("synthetic-middle")
             expect(message).not_to include("synthetic-secret")
-            expect(message).to include("htps://renderer.example/path")
+            expect(message).to include("renderer.example/path")
           end
 
           it "fails closed when a path at sign could be delayed userinfo" do
@@ -1367,7 +1417,7 @@ module ReactOnRails
             message = bundle_load_error_message
             expect(message).not_to include("renderer.example")
             expect(message).not_to include("renderer.example/bundle")
-            expect(message).to include("htps://example.js")
+            expect(message).to include("example.js")
           end
 
           it "preserves a scheme-only value without masking the bundle-load diagnostic" do
@@ -1387,7 +1437,7 @@ module ReactOnRails
             message = bundle_load_error_message
             expect(message).not_to include("synthetic-user")
             expect(message).not_to include("synthetic-secret")
-            expect(message).to include("http_://renderer.example/bundle.js")
+            expect(message).to include("renderer.example/bundle.js")
           end
 
           [["a percent sign", "http%"], ["only digits", "123"]].each do |description, scheme|
@@ -1399,7 +1449,7 @@ module ReactOnRails
               message = bundle_load_error_message
               expect(message).not_to include("synthetic-user")
               expect(message).not_to include("synthetic-secret")
-              expect(message).to include("#{scheme}://renderer.example/bundle.js")
+              expect(message).to include("renderer.example/bundle.js")
             end
           end
 
@@ -1411,7 +1461,7 @@ module ReactOnRails
             message = bundle_load_error_message
             expect(message).not_to include("synthetic-user")
             expect(message).not_to include("synthetic-secret")
-            expect(message).to include("y://renderer.example/bundle.js")
+            expect(message).to include("renderer.example/bundle.js")
           end
         end
 
@@ -1437,7 +1487,7 @@ module ReactOnRails
             expect(message).not_to include("outer.example")
             expect(message).not_to include("synthetic-user")
             expect(message).not_to include("synthetic-secret")
-            expect(message).to include("htps://renderer.example/bundle.js")
+            expect(message).to include("renderer.example/bundle.js")
           end
         end
 
