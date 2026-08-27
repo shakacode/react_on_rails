@@ -564,6 +564,138 @@ module ReactOnRails
           end
         end
 
+        context "when a safe renderer URL target precedes unrelated email prose" do
+          it "preserves the exact HTTP(S) wrapper text in the caught error" do
+            aggregate_failures do
+              %w[http https].each do |scheme|
+                caught_error =
+                  "Connection error on renderer request: " \
+                  "#{scheme}://renderer.internal:3800/render?x=1#frag while notifying ops@example.com"
+
+                message = render_error_for(StandardError.new(caught_error)).message
+                expect(message).to include("Caught error:\n#{caught_error}\n====")
+              end
+            end
+          end
+
+          it "still redacts HTTP(S) target credentials before preserving the later prose" do
+            aggregate_failures do
+              %w[http https].each do |scheme|
+                caught_error =
+                  "Connection error on renderer request: " \
+                  "#{scheme}://synthetic-user:synthetic-secret@renderer.internal:3800/render?x=1#frag " \
+                  "while notifying ops@example.com"
+                sanitized_caught_error =
+                  "Connection error on renderer request: " \
+                  "#{scheme}://renderer.internal:3800/render?x=1#frag while notifying ops@example.com"
+
+                message = render_error_for(StandardError.new(caught_error)).message
+                expect(message).not_to include("synthetic-user")
+                expect(message).not_to include("synthetic-secret")
+                expect(message).to include("Caught error:\n#{sanitized_caught_error}\n====")
+              end
+            end
+          end
+
+          it "protects the wrapper target rather than an earlier duplicate URL" do
+            aggregate_failures do
+              %w[http https].each do |scheme|
+                target = "#{scheme}://renderer.internal:3800/render?x=1#frag"
+                caught_error =
+                  "Previous attempt to #{target} failed; " \
+                  "Connection error on renderer request: #{target} while notifying ops@example.com"
+
+                message = render_error_for(StandardError.new(caught_error)).message
+                expect(message).to include("Caught error:\n#{caught_error}\n====")
+              end
+            end
+          end
+
+          it "still fails closed when renderer credentials cross the target boundary" do
+            aggregate_failures do
+              %w[http https].each do |scheme|
+                caught_error =
+                  "Connection error on renderer request: " \
+                  "#{scheme}://synthetic-user synthetic-secret@renderer.internal:3800"
+
+                message = render_error_for(StandardError.new(caught_error)).message
+                expect(message).not_to include("synthetic-user")
+                expect(message).not_to include("synthetic-secret")
+                expect(message).to include("renderer.internal:3800")
+              end
+            end
+          end
+
+          it "fails closed when the later credential authority has no explicit port" do
+            aggregate_failures do
+              %w[http https].product(["renderer.internal", "renderer.internal/render"]).each do |scheme, authority|
+                caught_error =
+                  "Connection error on renderer request: " \
+                  "#{scheme}://synthetic-user synthetic-secret@#{authority}"
+
+                message = render_error_for(StandardError.new(caught_error)).message
+                expect(message).not_to include("synthetic-user")
+                expect(message).not_to include("synthetic-secret")
+                expect(message).to include(authority)
+              end
+            end
+          end
+
+          it "sanitizes a later credential-bearing renderer wrapper" do
+            caught_error =
+              "Connection error on renderer request: http://renderer-a.internal:3800\n" \
+              "Connection error on renderer request: " \
+              "synthetic-user:synthetic-secret@renderer-b.internal:3800"
+
+            message = render_error_for(StandardError.new(caught_error)).message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("renderer-b.internal:3800")
+          end
+
+          it "does not mistake renderer credentials for notification email prose" do
+            caught_error =
+              "Connection error on renderer request: http://renderer-a.internal:3800/render " \
+              "while notifying synthetic-user:synthetic-secret@renderer-b.internal"
+
+            message = render_error_for(StandardError.new(caught_error)).message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("renderer-b.internal")
+          end
+
+          it "does not protect a malformed HTTP target from credentials on the next line" do
+            caught_error =
+              "Connection error on renderer request: http://synthetic-user:synthetic-secret\n" \
+              "part@renderer.internal:3800"
+
+            message = render_error_for(StandardError.new(caught_error)).message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).not_to include("part@")
+            expect(message).to include("renderer.internal:3800")
+          end
+
+          it "does not protect a later malformed HTTP target from its delayed userinfo" do
+            caught_error =
+              "Connection error on renderer request: http://renderer-a.internal:3800\n" \
+              "http://synthetic-user synthetic-secret@renderer-b.internal:3800"
+
+            message = render_error_for(StandardError.new(caught_error)).message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("renderer-b.internal:3800")
+          end
+
+          it "sanitizes a long diagnostic without recursive stack growth" do
+            caught_error =
+              "Connection error on renderer request: http://renderer.internal:3800 " \
+              "#{'http://other-renderer.internal:3800 ' * 5000}"
+
+            expect { render_error_for(StandardError.new(caught_error)) }.not_to raise_error
+          end
+        end
+
         context "when whitespace-spanning userinfo starts with an apparent URL" do
           it "does not accept a typo scheme as the renderer-target boundary" do
             error = Errno::ECONNREFUSED.new(

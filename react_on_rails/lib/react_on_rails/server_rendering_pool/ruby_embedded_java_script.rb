@@ -345,10 +345,20 @@ module ReactOnRails
         def renderer_connection_error_message(err)
           target = renderer_target_from_error(err)
           caught_error = err.message.to_s
-          raw_target = target_from_message(caught_error)
-          if raw_target
+          target_with_range = target_with_range_from_message(caught_error)
+          if target_with_range
+            raw_target, target_range = target_with_range
             sanitized_target = sanitized_renderer_target(raw_target)
-            caught_error = sanitized_renderer_error_message(caught_error, raw_target, sanitized_target)
+            caught_error = sanitized_renderer_target_error_message(
+              caught_error,
+              raw_target,
+              sanitized_target,
+              target_range
+            )
+          end
+          sanitized_caught_target = target_from_message(caught_error)
+          if sanitized_caught_target && !explicit_filesystem_path?(sanitized_caught_target)
+            target = sanitized_renderer_target(sanitized_caught_target)
           end
           configured_var, configured_url = configured_renderer_url
           configured_line = if configured_url
@@ -428,36 +438,80 @@ module ReactOnRails
         end
 
         def target_from_message(message)
-          message = message.to_s
-          target = target_after_prefix(message, CONNECT_TARGET_PREFIX_REGEX)
-          return target if target
-
-          target = target_after_prefix(message, TCP_CONNECTION_TARGET_PREFIX_REGEX)
-          return target if target
-
-          match = message.match(%r{(?<target>[^:/\s"'?=#@]+https?://[^\s,"')]*@[^\s,"')]+)}i)
-          return match[:target] if match
-
-          target = target_after_prefix(message, RENDERER_REQUEST_WRAPPER_PREFIX_REGEX, allow_request_path: true)
-          return target if target
-
-          message[%r{(?<target>https?://[^\s,"')]+)}, :target]
+          target_with_range_from_message(message)&.first
         end
 
-        def target_after_prefix(message, prefix_regex, allow_request_path: false)
-          message.to_enum(:scan, prefix_regex).each do
-            prefix = Regexp.last_match
+        def target_with_range_from_message(message, start_at = 0)
+          message = message.to_s
+          target = target_with_range_after_prefix(message, CONNECT_TARGET_PREFIX_REGEX, start_at:)
+          return target if target
+
+          target = target_with_range_after_prefix(message, TCP_CONNECTION_TARGET_PREFIX_REGEX, start_at:)
+          return target if target
+
+          match = message.match(%r{(?<target>[^:/\s"'?=#@]+https?://[^\s,"')]*@[^\s,"')]+)}i, start_at)
+          return [match[:target], match.begin(:target)...match.end(:target)] if match
+
+          target = target_with_range_after_prefix(
+            message,
+            RENDERER_REQUEST_WRAPPER_PREFIX_REGEX,
+            allow_request_path: true,
+            start_at:
+          )
+          return target if target
+
+          match = message.match(%r{(?<target>https?://[^\s,"')]+)}, start_at)
+          [match[:target], match.begin(:target)...match.end(:target)] if match
+        end
+
+        def target_with_range_after_prefix(message, prefix_regex, allow_request_path: false, start_at: 0)
+          while (prefix = prefix_regex.match(message, start_at))
             same_line = message[prefix.end(0)..].to_s.split(/[\r\n]/, 2).first
-            next if same_line.nil? || same_line.empty?
+            if same_line.nil? || same_line.empty?
+              start_at = prefix.end(0)
+              next
+            end
 
-            # A structurally complete first token owns the target boundary. Only an unresolved
-            # first token may absorb later same-line text through a credential-bearing authority.
-            first_target = same_line[RENDERER_TARGET_AT_LINE_START_REGEX, :target]
-            return first_target if recognized_renderer_target?(first_target, allow_request_path:)
+            target = renderer_target_candidate(same_line, allow_request_path:)
+            unless target
+              start_at = prefix.end(0)
+              next
+            end
 
-            return ambiguous_renderer_target_span(same_line) || first_target
+            return [target, prefix.end(0)...(prefix.end(0) + target.length)]
           end
           nil
+        end
+
+        def renderer_target_candidate(same_line, allow_request_path:)
+          # A structurally complete first token owns the target boundary unless a later @ names
+          # another renderer authority. That later authority makes the whole span ambiguous
+          # userinfo, while ordinary prose such as an email address remains outside the target.
+          first_target = same_line[RENDERER_TARGET_AT_LINE_START_REGEX, :target]
+          ambiguous_target = ambiguous_renderer_target_span(same_line)
+          ambiguous_target ||= ambiguous_http_userinfo_span(same_line, first_target)
+          return first_target if recognized_renderer_target?(first_target, allow_request_path:) && ambiguous_target.nil?
+
+          ambiguous_target || first_target
+        end
+
+        def ambiguous_http_userinfo_span(same_line, first_target)
+          return unless first_target&.match?(%r{\Ahttps?://}i)
+
+          trailing_text = same_line[first_target.length..]
+          return if safe_notification_email_prose?(trailing_text)
+
+          userinfo_delimiter = trailing_text.rindex("@")
+          return unless userinfo_delimiter
+
+          authority_end = trailing_text.index(/[\s,"')]/, userinfo_delimiter + 1) || trailing_text.length
+          return if authority_end == userinfo_delimiter + 1
+
+          same_line[...(first_target.length + authority_end)]
+        end
+
+        def safe_notification_email_prose?(text)
+          text.match?(%r{\A while notifying [A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@(?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,}\z})
         end
 
         def recognized_renderer_target?(target, allow_request_path:)
@@ -619,6 +673,53 @@ module ReactOnRails
           message = message.gsub(raw_url.inspect) { sanitized_url.inspect }
                            .gsub(raw_url) { sanitized_url }
           strip_userinfo(message)
+        end
+
+        def sanitized_renderer_target_error_message(message, raw_target, sanitized_target, target_range)
+          return sanitized_renderer_error_message(message, raw_target, sanitized_target) unless
+            recognized_renderer_target?(sanitized_target, allow_request_path: false)
+
+          message = message.to_s
+          sanitized = message.dup.clear
+          cursor = 0
+          current_target = [target_range, sanitized_target]
+
+          while current_target
+            current_range, current_sanitized_target = current_target
+            sanitized << strip_userinfo(message[cursor...current_range.begin])
+            if delayed_userinfo_after_target?(message, current_range)
+              sanitized << strip_userinfo(message[current_range.begin..])
+              return sanitized
+            end
+
+            sanitized << current_sanitized_target
+            cursor = current_range.end
+
+            next_target = immediately_following_http_target(message, cursor) ||
+                          target_with_range_from_message(message, cursor)
+            current_target = if next_target
+                               next_raw_target, next_range = next_target
+                               [next_range, sanitized_renderer_target(next_raw_target)]
+                             end
+          end
+
+          sanitized << strip_userinfo(message[cursor..])
+        end
+
+        def delayed_userinfo_after_target?(message, target_range)
+          continuation = message[target_range.end..]
+          return false if safe_notification_email_prose?(continuation)
+
+          boundary = continuation.match(%r{https?://}i)
+          continuation = continuation[...boundary.begin(0)] if boundary
+          continuation.include?("@")
+        end
+
+        def immediately_following_http_target(message, start_at)
+          match = message.match(%r{(?<target>https?://[^\s,"')]+)}, start_at)
+          return unless match && message[start_at...match.begin(:target)].match?(/\A\s*\z/)
+
+          [match[:target], match.begin(:target)...match.end(:target)]
         end
 
         # Protects successfully parsed bare HTTP(S) tokens by assembling the result from spans,
