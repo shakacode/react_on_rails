@@ -2252,7 +2252,7 @@ const hasPotentiallyInactivePageEvidence = (testCase) =>
   });
 const pageTests = artifacts.filter((artifact) => {
   const testContent = /expect|assert|test\s|it\s/.test(artifact.excerpt);
-  const namedPageTest =
+  const namedPageTestPath =
     /(?:spec|test)\/.*(?:page|rsc).*(?:_spec\.rb|_test\.rb|\.(?:test|spec)\.[jt]sx?)$/i.test(artifact.path);
   const rubyArtifact = /\.rb$/i.test(artifact.path);
   const executableRuby = rubyArtifact ? maskExecutableRubyContent(artifact.excerpt) : artifact.excerpt;
@@ -2288,6 +2288,8 @@ const pageTests = artifacts.filter((artifact) => {
         /^\s*(?:get|visit)(?:\s+|\()[^\r\n]+/m.test(responseScope.body) &&
         /^\s*(?:assert\w*|expect)(?:\s|\()/m.test(responseScope.body),
     );
+  const namedPageTest =
+    namedPageTestPath && (!actionDispatchIntegrationTest || qualifiedRubyCases.some(hasRequestAndAssertion));
   const legacySemanticPhraseTest = qualifiedRubyCases.some(
     (testCase) =>
       /(?:react server component|server-provided data)/i.test(testCase.name) &&
