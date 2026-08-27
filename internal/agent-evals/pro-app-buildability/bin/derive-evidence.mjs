@@ -1350,6 +1350,7 @@ const rubyInlineKeywordOwnerBalance = (line) => {
   return balance >= 0 ? balance : null;
 };
 const hasUnclosedRubyDoBlock = (line) => (rubyInlineDoOwnerBalance(line) ?? 0) > 0;
+const rubyReceiverChangingBlockMethodPattern = String.raw`(?:class_eval|class_exec|instance_eval|instance_exec|module_eval|module_exec)`;
 const emptyIteratorBraceOwnerPattern =
   /^(?:[a-z_][A-Za-z0-9_]*[ \t]*=[ \t]*)?(?:(?:\[\s*\]|\{\s*\})\.(?:(?:collect|cycle|each(?:_cons|_entry|_key|_pair|_slice|_value|_with_index)?|filter(?:_map)?|find(?:_all)?|flat_map|map|reject|reverse_each|select)(?:\([^()\r\n]*\))?)(?:\.with_index(?:\([^()\r\n]*\))?)?|0\.times(?:\.with_index(?:\([^()\r\n]*\))?)?)\s*\{(?:\s*\|[^|\r\n]*\|)?\s*$/;
 const rubyQualifiedOwnerName = (name, frames) => {
@@ -1381,19 +1382,25 @@ const rubyOwnerFramesBefore = (content, targetIndex, aliases = rubyClassAliases(
       const braceTokens = [...codeLine.matchAll(/[{}]/g)];
       for (const token of braceTokens) {
         if (token[0] === '{') {
-          const classEval = codeLine
+          const receiverChangingBlock = codeLine
             .slice(0, token.index)
             .match(
               new RegExp(
-                `(?:^|[; \\t])(${rubyClassReceiverPattern})\\s*(?:\\.|::)\\s*(?:class_eval|module_eval)(?:\\s*\\(\\s*\\))?\\s*$`,
+                `(?:^|[; \\t])(${rubyClassReceiverPattern})\\s*(?:\\.|::|&\\.)\\s*${rubyReceiverChangingBlockMethodPattern}(?:\\s*\\([^()\\r\\n]*\\))?\\s*$`,
               ),
             );
-          const classEvalName = classEval === null ? null : rubyClassNameForReceiver(classEval[1], aliases);
+          const classEvalName =
+            receiverChangingBlock === null
+              ? null
+              : rubyClassNameForReceiver(receiverChangingBlock[1], aliases);
+          let receiverOwnerType = 'receiver-exec';
+          if (receiverChangingBlock === null) receiverOwnerType = 'brace';
+          else if (classEvalName !== null) receiverOwnerType = 'class-eval';
           frames.push({
             ...(classEvalName ? { className: classEvalName } : {}),
             brace: true,
             index: lineStart + token.index,
-            type: classEvalName ? 'class-eval' : 'brace',
+            type: receiverOwnerType,
           });
         } else if (frames.at(-1)?.brace) {
           frames.pop();
@@ -1428,12 +1435,12 @@ const rubyOwnerFramesBefore = (content, targetIndex, aliases = rubyClassAliases(
           type = 'class';
         } else if (
           new RegExp(
-            `^(${rubyClassReceiverPattern})\\s*(?:\\.|::)\\s*(?:class_eval|module_eval)(?:\\s*\\(\\s*\\))?\\s+do\\s*$`,
+            `^(${rubyClassReceiverPattern})\\s*(?:\\.|::|&\\.)\\s*${rubyReceiverChangingBlockMethodPattern}(?:\\s*\\([^()\\r\\n]*\\))?\\s+do(?:\\s*\\|[^|\\r\\n]*\\|)?\\s*$`,
           ).test(statement)
         ) {
           const receiver = statement.match(new RegExp(`^(${rubyClassReceiverPattern})`))?.[1];
           className = receiver === undefined ? null : rubyClassNameForReceiver(receiver, aliases);
-          type = className === null ? 'block' : 'class-eval';
+          type = className === null ? 'receiver-exec' : 'class-eval';
         } else if (inlineDoOwnerBalance !== null) {
           for (let ownerIndex = 0; ownerIndex < inlineDoOwnerBalance; ownerIndex += 1) {
             frames.push({ index: lineStart + statementOffset, type: ownerIndex === 0 ? 'block' : 'owner' });
@@ -2157,7 +2164,7 @@ const rubyDslMutationClasses = (
         if (frames === null) return [];
         if (mutation.eigenclassOnly) {
           const innermostLexicalOwner = frames.findLast((frame) =>
-            ['class', 'class-eval', 'eigenclass', 'module'].includes(frame.type),
+            ['class', 'class-eval', 'eigenclass', 'module', 'receiver-exec'].includes(frame.type),
           );
           if (innermostLexicalOwner?.type === 'eigenclass') return [innermostLexicalOwner.className];
           return mutation.dslOwnerModuleAllowed &&

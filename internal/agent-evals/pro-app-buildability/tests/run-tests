@@ -4981,6 +4981,8 @@ codex_domain_rsc_setup_dsl_controls=(
   $'module ActiveSupport::Testing::SetupAndTeardown::ClassMethods\n  self.define_method(:unrelated_helper) { |*| }\nend'
   $'class << ActiveSupport::TestCase\n  self.define_method(:unrelated_helper) { |*| }\nend'
   $'class << ActiveSupport::TestCase\n  module UnrelatedHelper\n    self.define_method(:setup) { |*| }\n  end\nend'
+  $'module UnrelatedHelper\nend\n\nmodule ActiveSupport::Testing::SetupAndTeardown::ClassMethods\n  UnrelatedHelper&.module_exec(:context) do |_context|\n    self.define_method(:setup) { |*| }\n  end\nend'
+  $'module UnrelatedHelper\nend\n\nmodule ActiveSupport::Testing::SetupAndTeardown::ClassMethods\n  UnrelatedHelper.instance_exec(:context) { |_context|\n    self.define_method(:setup) { |*| }\n  }\nend'
   $'class ActiveSupport::TestCase\n  self.define_method(:setup) { |*| }\nend'
   $'mutation_note = \'define_method("setup")\''
 )
