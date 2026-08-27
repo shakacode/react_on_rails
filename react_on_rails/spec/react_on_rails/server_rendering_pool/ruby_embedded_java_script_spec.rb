@@ -722,6 +722,16 @@ module ReactOnRails
               end
             end
           end
+
+          it "preserves a safe label before a credential-bearing URL" do
+            server_bundle_path = "URL=https://synthetic-user:synthetic-secret@host/path"
+            stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("URL=https://host/path")
+          end
         end
 
         context "when configured credential material precedes the URL scheme" do
@@ -734,6 +744,39 @@ module ReactOnRails
             expect(message).not_to include("synthetic-user")
             expect(message).not_to include("synthetic-secret")
             expect(message).to include("https://renderer-host:3800")
+          end
+
+          it "fails closed when a nested scheme hides the userinfo delimiter from the prefix" do
+            server_bundle_path =
+              "synthetic-user:synthetic-secretx:y://token@renderer.example/bundle.js"
+            stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("renderer.example/bundle.js")
+          end
+
+          it "fails closed when malformed characters split a nested credential prefix" do
+            server_bundle_path =
+              "synthetic-user:prefix/secret:y://token@renderer.example/bundle.js"
+            stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("prefix/secret")
+            expect(message).to include("renderer.example/bundle.js")
+          end
+
+          it "fails closed when a separator leaves one colon before a nested scheme" do
+            server_bundle_path =
+              "synthetic-user:synthetic-secret/y://token@renderer.example/bundle.js"
+            stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("renderer.example/bundle.js")
           end
         end
 
@@ -749,6 +792,14 @@ module ReactOnRails
           it "preserves a scheme-less credential-shaped token byte for byte" do
             failure_message =
               "Failure loading synthetic-user:synthetic-secret@renderer.internal:3800"
+            stub_local_bundle_failure(failure_message, bundle_path: "/tmp/server.js")
+
+            expect(bundle_load_error_message).to include(failure_message)
+          end
+
+          it "preserves an unsupported nested-scheme token byte for byte" do
+            failure_message =
+              "Failure loading synthetic-user:synthetic-secretx:y://token@renderer.example/bundle.js"
             stub_local_bundle_failure(failure_message, bundle_path: "/tmp/server.js")
 
             expect(bundle_load_error_message).to include(failure_message)
@@ -1149,7 +1200,7 @@ module ReactOnRails
             message = bundle_load_error_message
             expect(message).not_to include("synthetic-user")
             expect(message).not_to include("synthetic-secret")
-            expect(message).to include("x:y://renderer.example/bundle.js")
+            expect(message).to include("y://renderer.example/bundle.js")
           end
         end
 

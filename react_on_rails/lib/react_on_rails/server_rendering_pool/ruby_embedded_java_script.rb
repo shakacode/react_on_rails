@@ -426,8 +426,8 @@ module ReactOnRails
           return url unless scheme
 
           prefix = url[...scheme.begin(0)]
-          prefix = "" if prefix.include?("@")
           configured_url = url[scheme.begin(0)..]
+          prefix = "" if ambiguous_credential_prefix?(prefix, configured_url)
           sanitized_url = if configured_url.match?(/[\r\n]/) ||
                              configured_url.scan(CONFIGURED_AUTHORITY_SCHEME_REGEX).length > 1
                             strip_malformed_url_userinfo(configured_url)
@@ -437,6 +437,13 @@ module ReactOnRails
                           end
 
           "#{prefix}#{sanitized_url}"
+        end
+
+        def ambiguous_credential_prefix?(prefix, configured_url)
+          return true if prefix.include?("@")
+          return false unless configured_url.include?("@")
+
+          prefix.include?(":")
         end
 
         def sanitized_renderer_error_message(message, raw_url, sanitized_url = sanitized_renderer_url(raw_url))
