@@ -42,7 +42,11 @@ module ReactOnRails
       RENDERER_CONNECTION_ERROR_REGEX = /
         connect\(2\)\sfor
         | Failed\sto\sopen\sTCP\sconnection
-        | error\son\srenderer\srequest
+      /xi
+
+      RENDERER_REQUEST_WRAPPER_REGEX = /
+        (?:(?:Connection|Time\sout)\s)?error\son\srenderer\srequest:
+        \s*(?<target>[^\s,)]+)
       /xi
 
       CONFIGURED_AUTHORITY_SCHEME_REGEX = %r{[^:/\s"'?=#@]*://}
@@ -303,7 +307,9 @@ module ReactOnRails
 
         def connection_error_message_in_chain?(err)
           each_in_cause_chain(err) do |current|
-            return true if current.message.to_s.match?(RENDERER_CONNECTION_ERROR_REGEX)
+            message = current.message.to_s
+            return true if message.match?(RENDERER_CONNECTION_ERROR_REGEX) ||
+                           message.match?(RENDERER_REQUEST_WRAPPER_REGEX)
           end
           false
         end
@@ -324,7 +330,7 @@ module ReactOnRails
           caught_error = err.message.to_s
           raw_target = target_from_message(caught_error)
           if raw_target
-            sanitized_target = sanitized_renderer_url(raw_target, strict_schemeless: true)
+            sanitized_target = sanitized_renderer_target(raw_target)
             caught_error = sanitized_renderer_error_message(caught_error, raw_target, sanitized_target)
           end
           configured_var, configured_url = configured_renderer_url
@@ -378,9 +384,13 @@ module ReactOnRails
         def renderer_target_from_error(err)
           each_in_cause_chain(err) do |current|
             target = target_from_message(current.message)
+            # The Pro wrapper places its HTTP request path after this marker. It proves a
+            # connection failure, but a path is not the renderer's network address.
+            next if target && explicit_filesystem_path?(target)
+
             # Sanitize here too: a target scraped from the message can itself be a full URL
             # with embedded credentials (e.g. "TCP connection to https://user:pw@host:3800").
-            return sanitized_renderer_url(target, strict_schemeless: true) if target
+            return sanitized_renderer_target(target) if target
           end
           configured_renderer_url.last
         end
@@ -403,18 +413,23 @@ module ReactOnRails
         def target_from_message(message)
           message = message.to_s
           [
-            /\A(?:Connection|Time out) error on renderer request:\s*(?<target>[^\s,)]+)\s*\z/i,
             /connect\(2\) for (?<target>[^\s,)]+)/,
             /TCP connection to (?<target>[^\s,)]+)/,
             %r{(?<target>[^:/\s"'?=#@]+https?://[^\s,"')]*@[^\s,"')]+)}i,
+            RENDERER_REQUEST_WRAPPER_REGEX,
             %r{(?<target>https?://[^\s,"')]+)}
           ].each do |regex|
             match = message.match(regex)
-            # Trim trailing prose punctuation (e.g. a sentence-final "." or ":") that the
-            # broad capture classes can otherwise absorb.
-            return match[:target].delete('"').sub(/[.;:]+\z/, "") if match
+            return match[:target] if match
           end
           nil
+        end
+
+        def sanitized_renderer_target(raw_target)
+          # Keep raw_target untouched so caught-error substitution can match quote-bearing input;
+          # normalize only the separate value used in the public display.
+          display_target = raw_target.delete('"').sub(/[.;:]+\z/, "")
+          sanitized_renderer_url(display_target, strict_schemeless: true)
         end
 
         # Strips embedded credentials from a configured renderer value before it is interpolated

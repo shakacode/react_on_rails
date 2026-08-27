@@ -203,6 +203,15 @@ module ReactOnRails
             expect(message).to include("could not connect to the Node renderer")
             expect(message).not_to include("Check your webpack configuration")
           end
+
+          it "uses the configured renderer authority instead of the wrapped request path" do
+            ENV["REACT_RENDERER_URL"] = "http://renderer.internal:3800"
+
+            message = render_error_for(error).message
+            expect(message).to include("could not connect to the Node renderer at http://renderer.internal:3800")
+            expect(message).to include("renderer process is running and listening on http://renderer.internal:3800")
+            expect(message).not_to include("Node renderer at /bundles/abc123/render")
+          end
         end
 
         context "when a timeout wrapper names only a token-style scheme-less renderer authority" do
@@ -216,6 +225,50 @@ module ReactOnRails
             message = render_error_for(error).message
             expect(message).not_to include("synthetic-token")
             expect(message).to include("renderer.internal:3800")
+          end
+        end
+
+        context "when a renderer-request wrapper embeds an untrusted scheme-less authority" do
+          [
+            [
+              "a quote-bearing target",
+              "Connection error on renderer request: synthetic-user:sec\"ret@renderer.internal:3800",
+              ["synthetic-user", "sec\"ret"]
+            ],
+            [
+              "a quote-bearing HTTP target",
+              "Connection error on renderer request: https://synthetic-user:sec\"ret@renderer.internal:3800",
+              ["synthetic-user", "sec\"ret"]
+            ],
+            [
+              "the generic lowercase wrapper",
+              "error on renderer request: synthetic-user:synthetic-secret@renderer.internal:3800",
+              %w[synthetic-user synthetic-secret]
+            ],
+            [
+              "a prefixed connection wrapper",
+              "transport failure: Connection error on renderer request: " \
+              "synthetic-user:synthetic-secret@renderer.internal:3800",
+              %w[synthetic-user synthetic-secret]
+            ],
+            [
+              "a connection wrapper with trailing context",
+              "Connection error on renderer request: " \
+              "synthetic-user:synthetic-secret@renderer.internal:3800 while retrying",
+              %w[synthetic-user synthetic-secret]
+            ],
+            [
+              "wrapper context before a later credential URL",
+              "Connection error on renderer request: " \
+              "synthetic-secret,https://synthetic-user:synthetic-password@renderer.internal:3800",
+              %w[synthetic-secret synthetic-user synthetic-password]
+            ]
+          ].each do |description, wrapper_message, canaries|
+            it "redacts #{description} from the entire public connection diagnostic" do
+              message = render_error_for(StandardError.new(wrapper_message)).message
+              canaries.each { |canary| expect(message).not_to include(canary) }
+              expect(message).to include("renderer.internal:3800")
+            end
           end
         end
 
