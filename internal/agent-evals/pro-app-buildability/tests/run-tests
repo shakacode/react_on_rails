@@ -4937,6 +4937,10 @@ codex_domain_rsc_setup_dsl_mutations=(
   $'class << ActionDispatch::IntegrationTest\n  undef_method :setup\nend'
   $'class << ActionDispatch::IntegrationTest\n  alias_method :setup, :teardown\nend'
   $'class ActiveSupport::TestCase\n  def self.setup(*)\n  end\nend'
+  $'module ActiveSupport::Testing::SetupAndTeardown::ClassMethods\n  def setup(*)\n  end\nend'
+  $'class << ActiveSupport::TestCase\n  self.define_method(:setup) { |*| }\nend'
+  $'class << ActiveSupport::TestCase\n  define_method("setup") { |*| }\nend'
+  $'class << ActiveSupport::TestCase\n  self.alias_method("setup", "teardown")\nend'
 )
 codex_domain_rsc_setup_dsl_mutation_index=0
 for setup_dsl_mutation in "${codex_domain_rsc_setup_dsl_mutations[@]}"; do
@@ -4970,6 +4974,9 @@ codex_domain_rsc_setup_dsl_controls=(
   $'class << String\n  define_method(:setup) { |*| }\nend'
   $'class << String\n  undef_method :setup\nend'
   $'class ActiveSupport::TestCase\n  setup do\n    true\n  end\nend'
+  $'module ActiveSupport::Testing::SetupAndTeardown::ClassMethods\n  def unrelated_helper(*)\n  end\nend'
+  $'class << ActiveSupport::TestCase\n  self.define_method(:unrelated_helper) { |*| }\nend'
+  $'mutation_note = \'define_method("setup")\''
 )
 codex_domain_rsc_setup_dsl_control_index=0
 for setup_dsl_control in "${codex_domain_rsc_setup_dsl_controls[@]}"; do

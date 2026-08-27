@@ -1176,8 +1176,19 @@ const maskRubyOrdinaryStrings = (content, interpolationIsUnsafe = hasExecutableR
   }
   return quote === null ? masked.join('') : null;
 };
+const normalizeRubyStaticMethodNameStrings = (content) =>
+  content.replace(
+    /:(['"])([A-Za-z_][A-Za-z0-9_]*[!?=]?)\1|(['"])([A-Za-z_][A-Za-z0-9_]*[!?=]?)\3/g,
+    (literal, _symbolQuote, symbolName, _stringQuote, stringName) => {
+      const methodName = symbolName ?? stringName;
+      return `:${methodName}${' '.repeat(literal.length - methodName.length - 1)}`;
+    },
+  );
 const maskRubyMutationSyntax = (content, interpolationIsUnsafe = hasExecutableRubyInterpolation) => {
-  const stringMasked = maskRubyOrdinaryStrings(content, interpolationIsUnsafe);
+  const stringMasked = maskRubyOrdinaryStrings(
+    normalizeRubyStaticMethodNameStrings(content),
+    interpolationIsUnsafe,
+  );
   if (stringMasked === null) return null;
   const records = stringMasked.match(/[^\r\n]*(?:\r\n|\n|$)/g)?.filter(Boolean) ?? [];
   const masked = [];
@@ -1246,6 +1257,13 @@ const normalizeRubyStaticMutationTargetReceivers = (content) =>
   });
 const rubyIntegrationTestMutationImpact = (className) =>
   rubyIntegrationTestMutationTargets.has(className) ? 'ActionDispatch::IntegrationTest' : className;
+const rubyIntegrationTestDslOwnerModules = new Map([
+  ['setup', new Set(['ActiveSupport::Testing::SetupAndTeardown::ClassMethods'])],
+]);
+const rubyIntegrationTestDslMutationImpact = (className, dslMethod) =>
+  rubyIntegrationTestDslOwnerModules.get(dslMethod)?.has(className)
+    ? 'ActionDispatch::IntegrationTest'
+    : rubyIntegrationTestMutationImpact(className);
 const rubyPatternEscape = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const rubyTestMutationInterpolationWithAliases = (aliases) => (value) => {
   let resolvedValue = value;
@@ -2021,7 +2039,12 @@ const rubyDslMutationClasses = (
   for (const match of mutationContent.matchAll(
     new RegExp(`^[ \\t]*def[ \\t]+${dslMethod}(?=[ \\t(;]|$)`, 'gm'),
   )) {
-    mutations.push({ eigenclassOnly: true, explicitClassName: null, index: match.index });
+    mutations.push({
+      dslOwnerModuleAllowed: true,
+      eigenclassOnly: true,
+      explicitClassName: null,
+      index: match.index,
+    });
   }
   for (const match of mutationContent.matchAll(
     new RegExp(
@@ -2029,7 +2052,12 @@ const rubyDslMutationClasses = (
       'gm',
     ),
   )) {
-    mutations.push({ eigenclassOnly: true, explicitClassName: null, index: match.index });
+    mutations.push({
+      dslOwnerModuleAllowed: true,
+      eigenclassOnly: true,
+      explicitClassName: null,
+      index: match.index,
+    });
   }
   for (const match of mutationContent.matchAll(
     new RegExp(
@@ -2037,7 +2065,12 @@ const rubyDslMutationClasses = (
       'gm',
     ),
   )) {
-    mutations.push({ eigenclassOnly: true, explicitClassName: null, index: match.index });
+    mutations.push({
+      dslOwnerModuleAllowed: true,
+      eigenclassOnly: true,
+      explicitClassName: null,
+      index: match.index,
+    });
   }
   for (const match of mutationContent.matchAll(
     new RegExp(
@@ -2045,7 +2078,51 @@ const rubyDslMutationClasses = (
       'gm',
     ),
   )) {
-    mutations.push({ eigenclassOnly: true, explicitClassName: null, index: match.index });
+    mutations.push({
+      dslOwnerModuleAllowed: true,
+      eigenclassOnly: true,
+      explicitClassName: null,
+      index: match.index,
+    });
+  }
+  for (const match of mutationContent.matchAll(
+    new RegExp(
+      `^[ \\t]*self[ \\t]*(?:\\.|::)[ \\t]*(?:define_method(?:[ \\t]+|\\([ \\t]*)${staticDslReference}|(?:__send__|public_send|send)[ \\t]*\\([ \\t]*(?::define_method|["']define_method["'])[ \\t]*,[ \\t]*${staticDslReference})`,
+      'gm',
+    ),
+  )) {
+    mutations.push({
+      dslOwnerModuleAllowed: false,
+      eigenclassOnly: true,
+      explicitClassName: null,
+      index: match.index,
+    });
+  }
+  for (const match of mutationContent.matchAll(
+    new RegExp(
+      `^[ \\t]*self[ \\t]*(?:\\.|::)[ \\t]*(?:(?:remove_method|undef_method)(?:[ \\t]+|\\([ \\t]*)${aliasDslReference}|(?:__send__|public_send|send)[ \\t]*\\([ \\t]*(?::(?:remove_method|undef_method)|["'](?:remove_method|undef_method)["'])[ \\t]*,[ \\t]*${staticDslReference})`,
+      'gm',
+    ),
+  )) {
+    mutations.push({
+      dslOwnerModuleAllowed: false,
+      eigenclassOnly: true,
+      explicitClassName: null,
+      index: match.index,
+    });
+  }
+  for (const match of mutationContent.matchAll(
+    new RegExp(
+      `^[ \\t]*self[ \\t]*(?:\\.|::)[ \\t]*(?:alias_method(?:[ \\t]+|\\([ \\t]*)${staticDslReference}[ \\t]*,[ \\t]*${rubyMethodReferencePattern}|(?:__send__|public_send|send)[ \\t]*\\([ \\t]*(?::alias_method|["']alias_method["'])[ \\t]*,[ \\t]*${staticDslReference}[ \\t]*,[ \\t]*${rubyMethodReferencePattern})`,
+      'gm',
+    ),
+  )) {
+    mutations.push({
+      dslOwnerModuleAllowed: false,
+      eigenclassOnly: true,
+      explicitClassName: null,
+      index: match.index,
+    });
   }
   for (const match of mutationContent.matchAll(
     new RegExp(
@@ -2080,7 +2157,13 @@ const rubyDslMutationClasses = (
         if (frames === null) return [];
         if (mutation.eigenclassOnly) {
           const innermostEigenclass = frames.findLast((frame) => frame.type === 'eigenclass');
-          return innermostEigenclass === undefined ? [] : [innermostEigenclass.className];
+          if (innermostEigenclass !== undefined) return [innermostEigenclass.className];
+          if (!mutation.dslOwnerModuleAllowed) return [];
+          const innermostClassOrModule = frames.findLast((frame) => ['class', 'module'].includes(frame.type));
+          return innermostClassOrModule?.type === 'module' &&
+            rubyIntegrationTestDslOwnerModules.get(dslMethod)?.has(innermostClassOrModule.className)
+            ? [innermostClassOrModule.className]
+            : [];
         }
         const innermostClass = frames.findLast((frame) => frame.type === 'class');
         if (innermostClass === undefined) return [];
@@ -2088,7 +2171,7 @@ const rubyDslMutationClasses = (
         const className = rubyClassName(declaration);
         return className === null ? [] : [className];
       }),
-    ].map(rubyIntegrationTestMutationImpact),
+    ].map((className) => rubyIntegrationTestDslMutationImpact(className, dslMethod)),
   );
 };
 const workspaceRubyTestMutations = artifacts.reduce(
