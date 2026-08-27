@@ -2213,6 +2213,7 @@ const rubyTestCases = (
         name: match[2] ?? match[3],
         body,
         physicalLines,
+        owningClassName,
         actionDispatchIntegrationTest:
           directTopLevelClassOwner &&
           owningClassTerminatorIsBare &&
@@ -2223,6 +2224,19 @@ const rubyTestCases = (
       },
     ];
   });
+};
+const rubySetupCases = (content, externalMutations) => {
+  let setupCaseName = '__react_on_rails_eval_setup__';
+  while (content.includes(`"${setupCaseName}"`) || content.includes(`'${setupCaseName}'`)) {
+    setupCaseName += '_';
+  }
+  const setupContent = content.replace(
+    /^([ \t]*)setup[ \t]+do[ \t]*(?:#[^\r\n]*)?$/gm,
+    `$1test "${setupCaseName}" do`,
+  );
+  if (setupContent === content) return [];
+
+  return rubyTestCases(setupContent, externalMutations).filter((testCase) => testCase.name === setupCaseName);
 };
 const rubyRequestResponseScopes = (testCase) => {
   const scopes = [];
@@ -2282,14 +2296,33 @@ const pageTests = artifacts.filter((artifact) => {
   const qualifiedRubyCases = rubyTestCases(uncommentedRuby, workspaceRubyTestMutations).filter(
     (testCase) => testCase.actionDispatchIntegrationTest && !hasPotentiallyInactivePageEvidence(testCase),
   );
+  const qualifiedRubySetupCases = rubySetupCases(uncommentedRuby, workspaceRubyTestMutations).filter(
+    (testCase) => testCase.actionDispatchIntegrationTest && !hasPotentiallyInactivePageEvidence(testCase),
+  );
+  const hasPageRequest = (testCase) =>
+    rubyRequestResponseScopes(testCase).some((responseScope) =>
+      /^\s*(?:get|visit)(?:\s+|\()[^\r\n]+/m.test(responseScope.body),
+    );
+  const hasPageAssertion = (testCase) => /^\s*(?:assert\w*|expect)(?:\s|\()/m.test(testCase.body);
   const hasRequestAndAssertion = (testCase) =>
     rubyRequestResponseScopes(testCase).some(
       (responseScope) =>
         /^\s*(?:get|visit)(?:\s+|\()[^\r\n]+/m.test(responseScope.body) &&
         /^\s*(?:assert\w*|expect)(?:\s|\()/m.test(responseScope.body),
     );
+  const hasSetupBackedRequestAndAssertion = qualifiedRubySetupCases.some(
+    (setupCase) =>
+      hasPageRequest(setupCase) &&
+      qualifiedRubyCases.some(
+        (testCase) => testCase.owningClassName === setupCase.owningClassName && hasPageAssertion(testCase),
+      ),
+  );
   const namedPageTest =
-    namedPageTestPath && (!actionDispatchIntegrationTest || qualifiedRubyCases.some(hasRequestAndAssertion));
+    namedPageTestPath &&
+    (!rubyArtifact ||
+      !actionDispatchIntegrationTest ||
+      qualifiedRubyCases.some(hasRequestAndAssertion) ||
+      hasSetupBackedRequestAndAssertion);
   const legacySemanticPhraseTest = qualifiedRubyCases.some(
     (testCase) =>
       /(?:react server component|server-provided data)/i.test(testCase.name) &&

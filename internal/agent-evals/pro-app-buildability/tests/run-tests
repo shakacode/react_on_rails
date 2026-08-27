@@ -4833,6 +4833,104 @@ for row in rsc.route tests.page; do
     "$tmp/codex-domain-js-page-output/rubric-results.json")" = pass
 done
 
+cp -R "$tmp/codex-domain-js-page-workspace" "$tmp/codex-domain-js-ruby-example-page-workspace"
+cat >"$tmp/codex-domain-js-ruby-example-page-workspace/eval_app/test/rsc-page.test.tsx" <<'TSX'
+const documentationExample = `
+class HelloPageTest < ActionDispatch::IntegrationTest
+`;
+
+test("RSC page documents a Ruby integration test", () => {
+  expect(documentationExample).toContain("ActionDispatch::IntegrationTest");
+});
+TSX
+mkdir "$tmp/codex-domain-js-ruby-example-page-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+  "$tmp/codex-domain-js-ruby-example-page-workspace" \
+  "$tmp/codex-domain-js-ruby-example-page-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in rsc.route tests.page; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-domain-js-ruby-example-page-output/rubric-results.json")" = pass
+done
+
+cp -R "$tmp/codex-domain-rsc-name-workspace" "$tmp/codex-domain-rsc-setup-page-workspace"
+mv "$tmp/codex-domain-rsc-setup-page-workspace/eval_app/test/integration/launch_briefings_test.rb" \
+  "$tmp/codex-domain-rsc-setup-page-workspace/eval_app/test/integration/launch_rsc_page_test.rb"
+cat >"$tmp/codex-domain-rsc-setup-page-workspace/eval_app/test/integration/launch_rsc_page_test.rb" <<'RUBY'
+require "test_helper"
+
+class LaunchRscPageTest < ActionDispatch::IntegrationTest
+  setup do
+    get launch_briefing_path
+  end
+
+  test "launch briefing page streams server-provided mission data" do
+    assert_response :success
+    assert_includes response.body, "Orbital Launch Briefing"
+    assert_includes response.body, "EVAL-204"
+  end
+end
+RUBY
+mkdir "$tmp/codex-domain-rsc-setup-page-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+  "$tmp/codex-domain-rsc-setup-page-workspace" "$tmp/codex-domain-rsc-setup-page-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in rsc.route tests.page; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-domain-rsc-setup-page-output/rubric-results.json")" = pass
+done
+
+cp -R "$tmp/codex-domain-rsc-setup-page-workspace" \
+  "$tmp/codex-domain-rsc-cross-class-setup-page-workspace"
+cat >"$tmp/codex-domain-rsc-cross-class-setup-page-workspace/eval_app/test/integration/launch_rsc_page_test.rb" <<'RUBY'
+require "test_helper"
+
+class LaunchRscPageSetupTest < ActionDispatch::IntegrationTest
+  setup do
+    get launch_briefing_path
+  end
+end
+
+class LaunchRscPageAssertionsTest < ActionDispatch::IntegrationTest
+  test "launch briefing page streams server-provided mission data" do
+    assert_response :success
+    assert_includes response.body, "Orbital Launch Briefing"
+    assert_includes response.body, "EVAL-204"
+  end
+end
+RUBY
+ruby -c \
+  "$tmp/codex-domain-rsc-cross-class-setup-page-workspace/eval_app/test/integration/launch_rsc_page_test.rb" \
+  >/dev/null
+mkdir "$tmp/codex-domain-rsc-cross-class-setup-page-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+  "$tmp/codex-domain-rsc-cross-class-setup-page-workspace" \
+  "$tmp/codex-domain-rsc-cross-class-setup-page-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in rsc.route tests.page; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-domain-rsc-cross-class-setup-page-output/rubric-results.json")" = unknown
+done
+
+cp -R "$tmp/codex-domain-rsc-setup-page-workspace" \
+  "$tmp/codex-domain-rsc-mutated-setup-page-workspace"
+cat >"$tmp/codex-domain-rsc-mutated-setup-page-workspace/eval_app/test/test_helper.rb" <<'RUBY'
+class ActionDispatch::IntegrationTest
+  def get(*) = nil
+  def assert_response(*) = nil
+end
+RUBY
+ruby -c "$tmp/codex-domain-rsc-mutated-setup-page-workspace/eval_app/test/test_helper.rb" >/dev/null
+mkdir "$tmp/codex-domain-rsc-mutated-setup-page-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v6-test-events.jsonl" \
+  "$tmp/codex-domain-rsc-mutated-setup-page-workspace" \
+  "$tmp/codex-domain-rsc-mutated-setup-page-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in rsc.route tests.page; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/codex-domain-rsc-mutated-setup-page-output/rubric-results.json")" = unknown
+done
+
 cp -R "$tmp/codex-rsc-name-workspace" "$tmp/codex-rsc-reversed-name-workspace"
 perl -0pi -e 's/renders server-provided briefing data on the RSC page/renders the page with RSC briefing data/' \
   "$tmp/codex-rsc-reversed-name-workspace/eval_app/test/integration/hello_server_flow_test.rb"
