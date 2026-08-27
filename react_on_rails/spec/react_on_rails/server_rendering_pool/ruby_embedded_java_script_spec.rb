@@ -535,6 +535,98 @@ module ReactOnRails
           end
         end
 
+        context "when connection-target userinfo spans whitespace" do
+          credential_canaries = %w[synthetic-user synthetic-secret part@]
+
+          [
+            ["connect(2)", Errno::ECONNREFUSED, "connect(2) for"],
+            ["TCP", StandardError, "Failed to open TCP connection to"],
+            ["Connection wrapper", StandardError, "Connection error on renderer request:"],
+            ["Time out wrapper", StandardError, "Time out error on renderer request:"]
+          ].each do |target_type, error_class, target_prefix|
+            it "redacts credentials through a later authority in a #{target_type} target" do
+              error = error_class.new(
+                "#{target_prefix} synthetic-user:synthetic-secret part@renderer.internal:3800"
+              )
+
+              message = render_error_for(error).message
+              credential_canaries.each { |canary| expect(message).not_to include(canary) }
+              expect(message).to include("renderer.internal:3800")
+            end
+
+            it "keeps a valid #{target_type} target ahead of unrelated later at-sign prose" do
+              caught_error = "#{target_prefix} renderer.internal:3800 while notifying ops@example.com"
+
+              message = render_error_for(error_class.new(caught_error)).message
+              expect(message).to include("could not connect to the Node renderer at renderer.internal:3800.")
+              expect(message).to include(caught_error)
+            end
+          end
+        end
+
+        context "when whitespace-spanning userinfo starts with an apparent URL" do
+          it "does not accept a typo scheme as the renderer-target boundary" do
+            error = Errno::ECONNREFUSED.new(
+              "connect(2) for synthetic-secrethtps://decoy part@renderer.internal:3800"
+            )
+
+            message = render_error_for(error).message
+            expect(message).not_to include("synthetic-secret")
+            expect(message).not_to include("part@")
+            expect(message).to include("renderer.internal:3800")
+          end
+
+          it "redacts through a later authority with a request path" do
+            error = StandardError.new(
+              "Connection error on renderer request: " \
+              "synthetic-user:synthetic-secret part@renderer.internal:3800/render"
+            )
+
+            message = render_error_for(error).message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).not_to include("part@")
+            expect(message).to include("renderer.internal:3800/render")
+          end
+        end
+
+        context "when a renderer-request wrapper target starts after a line break" do
+          wrapper_types = ["Connection", "Time out"]
+          line_breaks = ["\n", "\r", "\r\n"]
+
+          wrapper_types.each do |wrapper_type|
+            line_breaks.each do |line_break|
+              it "redacts #{wrapper_type} credentials after #{line_break.inspect}" do
+                error = StandardError.new(
+                  "#{wrapper_type} error on renderer request:#{line_break}" \
+                  "synthetic-user:synthetic-secret@renderer.internal:3800"
+                )
+
+                message = render_error_for(error).message
+                expect(message).not_to include("synthetic-user")
+                expect(message).not_to include("synthetic-secret")
+                expect(message).to include("renderer.internal:3800")
+              end
+            end
+          end
+        end
+
+        context "when a targetless socket prefix precedes a credential-bearing prefix" do
+          ["connect(2) for", "Failed to open TCP connection to"].each do |target_prefix|
+            it "continues to the later #{target_prefix} target" do
+              error = StandardError.new(
+                "#{target_prefix} \n#{target_prefix} " \
+                "synthetic-user:synthetic-secret@renderer.internal:3800"
+              )
+
+              message = render_error_for(error).message
+              expect(message).not_to include("synthetic-user")
+              expect(message).not_to include("synthetic-secret")
+              expect(message).to include("renderer.internal:3800")
+            end
+          end
+        end
+
         context "when an error target absorbs credential text into an apparent scheme" do
           let(:error) do
             Errno::ECONNREFUSED.new(

@@ -48,13 +48,17 @@ module ReactOnRails
         (?=[^\s]*@)[^\s]*@[^\s,)]+
         | [^\s,)]+
       /x
+      RENDERER_TARGET_AT_LINE_START_REGEX = /\A(?<target>#{RENDERER_TARGET_TOKEN_REGEX})/
 
-      CONNECT_TARGET_REGEX = /connect\(2\) for (?<target>#{RENDERER_TARGET_TOKEN_REGEX})/
-      TCP_CONNECTION_TARGET_REGEX = /TCP connection to (?<target>#{RENDERER_TARGET_TOKEN_REGEX})/
+      CONNECT_TARGET_PREFIX_REGEX = /connect\(2\) for[ \t]+/i
+      TCP_CONNECTION_TARGET_PREFIX_REGEX = /TCP connection to[ \t]+/i
+      RENDERER_REQUEST_WRAPPER_PREFIX_REGEX = /
+        (?:(?:Connection|Time\sout)\s)?error\son\srenderer\srequest:\s*
+      /xi
 
       RENDERER_REQUEST_WRAPPER_REGEX = /
-        (?:(?:Connection|Time\sout)\s)?error\son\srenderer\srequest:
-        \s*(?<target>#{RENDERER_TARGET_TOKEN_REGEX})
+        #{RENDERER_REQUEST_WRAPPER_PREFIX_REGEX}
+        (?<target>#{RENDERER_TARGET_TOKEN_REGEX})
       /xi
 
       TARGETLESS_RENDERER_REQUEST_WRAPPER_REGEX = /
@@ -425,15 +429,57 @@ module ReactOnRails
 
         def target_from_message(message)
           message = message.to_s
-          [
-            CONNECT_TARGET_REGEX,
-            TCP_CONNECTION_TARGET_REGEX,
-            %r{(?<target>[^:/\s"'?=#@]+https?://[^\s,"')]*@[^\s,"')]+)}i,
-            RENDERER_REQUEST_WRAPPER_REGEX,
-            %r{(?<target>https?://[^\s,"')]+)}
-          ].each do |regex|
-            match = message.match(regex)
-            return match[:target] if match
+          target = target_after_prefix(message, CONNECT_TARGET_PREFIX_REGEX)
+          return target if target
+
+          target = target_after_prefix(message, TCP_CONNECTION_TARGET_PREFIX_REGEX)
+          return target if target
+
+          match = message.match(%r{(?<target>[^:/\s"'?=#@]+https?://[^\s,"')]*@[^\s,"')]+)}i)
+          return match[:target] if match
+
+          target = target_after_prefix(message, RENDERER_REQUEST_WRAPPER_PREFIX_REGEX, allow_request_path: true)
+          return target if target
+
+          message[%r{(?<target>https?://[^\s,"')]+)}, :target]
+        end
+
+        def target_after_prefix(message, prefix_regex, allow_request_path: false)
+          message.to_enum(:scan, prefix_regex).each do
+            prefix = Regexp.last_match
+            same_line = message[prefix.end(0)..].to_s.split(/[\r\n]/, 2).first
+            next if same_line.nil? || same_line.empty?
+
+            # A structurally complete first token owns the target boundary. Only an unresolved
+            # first token may absorb later same-line text through a credential-bearing authority.
+            first_target = same_line[RENDERER_TARGET_AT_LINE_START_REGEX, :target]
+            return first_target if recognized_renderer_target?(first_target, allow_request_path:)
+
+            return ambiguous_renderer_target_span(same_line) || first_target
+          end
+          nil
+        end
+
+        def recognized_renderer_target?(target, allow_request_path:)
+          return false unless target
+
+          display_target = target.delete('"').sub(/[.;:]+\z/, "")
+          return true if display_target.match?(%r{\A(?:\[[^\]\s]+\]|[^:@/\s]+):\d+(?:[/?#][^\s]*)?\z})
+          return true if allow_request_path && explicit_filesystem_path?(display_target)
+
+          parsed = URI.parse(display_target)
+          parsed.is_a?(URI::HTTP) && parsed.host
+        rescue URI::Error
+          false
+        end
+
+        def ambiguous_renderer_target_span(same_line)
+          same_line.to_enum(:scan, /@(?<authority>[^\s,@)]+)/).each do
+            match = Regexp.last_match
+            authority = match[:authority].sub(/[.;:]+\z/, "")
+            next unless recognized_renderer_target?(authority, allow_request_path: false)
+
+            return same_line[0...(match.begin(:authority) + authority.length)]
           end
           nil
         end
