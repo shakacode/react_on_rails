@@ -403,7 +403,7 @@ module ReactOnRails
         def target_from_message(message)
           message = message.to_s
           [
-            /\AConnection error on renderer request:\s*(?<target>[^\s,)]+)\s*\z/i,
+            /\A(?:Connection|Time out) error on renderer request:\s*(?<target>[^\s,)]+)\s*\z/i,
             /connect\(2\) for (?<target>[^\s,)]+)/,
             /TCP connection to (?<target>[^\s,)]+)/,
             %r{(?<target>[^:/\s"'?=#@]+https?://[^\s,"')]*@[^\s,"')]+)}i,

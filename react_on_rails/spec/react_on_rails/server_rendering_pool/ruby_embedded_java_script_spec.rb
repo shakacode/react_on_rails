@@ -205,6 +205,20 @@ module ReactOnRails
           end
         end
 
+        context "when a timeout wrapper names only a token-style scheme-less renderer authority" do
+          let(:error) do
+            StandardError.new(
+              "Time out error on renderer request: synthetic-token@renderer.internal:3800"
+            )
+          end
+
+          it "redacts the token from the entire public connection diagnostic" do
+            message = render_error_for(error).message
+            expect(message).not_to include("synthetic-token")
+            expect(message).to include("renderer.internal:3800")
+          end
+        end
+
         context "when the error uses the Net::HTTP 'Failed to open TCP connection' format" do
           let(:error) do
             StandardError.new("Failed to open TCP connection to 127.0.0.1:3800 (Connection refused)")
