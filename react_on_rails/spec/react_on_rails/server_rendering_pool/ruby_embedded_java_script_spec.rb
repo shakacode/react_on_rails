@@ -250,6 +250,42 @@ module ReactOnRails
           end
         end
 
+        context "when scheme-less renderer credentials precede a separate URL" do
+          let(:error) { Errno::ECONNREFUSED.new }
+
+          before do
+            ENV["REACT_RENDERER_URL"] =
+              "u:leaked_secret@stray_context http://renderer-host:3800"
+          end
+
+          it "fails closed across the entire ambiguous prefix" do
+            message = render_error_for(error).message
+            expect(message).not_to include("leaked_secret")
+            expect(message).not_to include("stray_context")
+            expect(message).to include("could not connect to the Node renderer at http://renderer-host:3800")
+            expect(message).to include('REACT_RENDERER_URL is currently "http://renderer-host:3800"')
+          end
+        end
+
+        context "when malformed renderer credentials resemble filesystem or custom-scheme values" do
+          let(:error) { Errno::ECONNREFUSED.new }
+
+          [
+            "/http://synthetic-user:synthetic-secret@renderer.internal:3800",
+            "synthetic-user:synthetic-secretx://suffix@renderer.internal:3800"
+          ].each do |renderer_url|
+            it "fails closed for #{renderer_url.inspect}" do
+              ENV["REACT_RENDERER_URL"] = renderer_url
+
+              message = render_error_for(error).message
+              expect(message).not_to include("synthetic-user")
+              expect(message).not_to include("synthetic-secret")
+              expect(message).to include("could not connect to the Node renderer at renderer.internal:3800")
+              expect(message).to include('REACT_RENDERER_URL is currently "renderer.internal:3800"')
+            end
+          end
+        end
+
         context "when a configured typo-scheme renderer authority has multiple at signs" do
           let(:error) { Errno::ECONNREFUSED.new }
 
@@ -344,6 +380,21 @@ module ReactOnRails
             expect(message).not_to include("synthetic-secret")
             expect(message).to include("could not connect to the Node renderer at renderer.internal:3800")
             expect(message).to include('RENDERER_URL is currently "renderer.internal:3800"')
+          end
+        end
+
+        context "when a renderer env value has token-style scheme-less userinfo" do
+          let(:error) { Errno::ECONNREFUSED.new }
+
+          %w[REACT_RENDERER_URL RENDERER_URL].each do |renderer_env|
+            it "fails closed through the userinfo delimiter for #{renderer_env}" do
+              ENV[renderer_env] = "synthetic-token@renderer.internal:3800"
+
+              message = render_error_for(error).message
+              expect(message).not_to include("synthetic-token")
+              expect(message).to include("could not connect to the Node renderer at renderer.internal:3800")
+              expect(message).to include(%(#{renderer_env} is currently "renderer.internal:3800"))
+            end
           end
         end
 
@@ -828,14 +879,35 @@ module ReactOnRails
             expect(message).not_to include("synthetic-secret")
             expect(message).to include("cdn.example.com/bundle.js")
           end
+
+          it "fails closed when a slash appears before the userinfo delimiter" do
+            server_bundle_path =
+              "synthetic-user:synthetic-secret/part@cdn.example/bundle.js"
+            stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).not_to include("part@")
+            expect(message).to include("cdn.example/bundle.js")
+          end
         end
 
         context "when an ordinary local bundle path contains an at sign" do
-          it "preserves the configured path byte for byte" do
-            server_bundle_path = "/tmp/releases/build@2026/server-bundle.js"
-            stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)
+          [
+            ["an absolute POSIX path", "/tmp/releases/build@2026/server-bundle.js"],
+            ["a dot-relative POSIX path", "./releases/build@2026/server-bundle.js"],
+            ["a parent-relative POSIX path", "../releases/build@2026/server-bundle.js"],
+            ["a Windows drive path", "C:\\releases\\build@2026\\server-bundle.js"],
+            ["a dot-relative Windows path", ".\\releases\\build@2026\\server-bundle.js"],
+            ["a parent-relative Windows path", "..\\releases\\build@2026\\server-bundle.js"],
+            ["a Windows UNC path", "\\\\server\\share\\build@2026\\server-bundle.js"]
+          ].each do |description, server_bundle_path|
+            it "preserves #{description} byte for byte" do
+              stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)
 
-            expect(bundle_load_error_message).to include(server_bundle_path)
+              expect(bundle_load_error_message).to include(server_bundle_path)
+            end
           end
         end
 

@@ -166,7 +166,10 @@ module ReactOnRails
           # file_url_to_string have passed through the same message sanitizer; scanning that
           # wrapper again would treat its diagnostic text as fresh untrusted input. Other errors
           # are scrubbed here because URI::InvalidURIError embeds the raw URL in its message.
-          sanitized_url = sanitized_renderer_url(server_js_file)
+          sanitized_url = sanitized_renderer_url(
+            server_js_file,
+            preserve_filesystem_path: !server_bundle_path_is_http
+          )
           sanitized_error = if server_bundle_path_is_http && e.is_a?(ReactOnRails::ServerBundleLoadError)
                               e.message
                             else
@@ -388,14 +391,7 @@ module ReactOnRails
             value = ENV.fetch(var, nil)
             next if value.nil? || value.empty?
 
-            leading_scheme = value.match(CONFIGURED_AUTHORITY_SCHEME_REGEX)&.begin(0)&.zero?
-            userinfo_delimiter = value.rindex("@")
-            sanitized_url = if !leading_scheme && userinfo_delimiter
-                              value[(userinfo_delimiter + 1)..]
-                            else
-                              sanitized_renderer_url(value)
-                            end
-            return [var, sanitized_url]
+            return [var, sanitized_renderer_url(value, strict_schemeless: true)]
           end
           [nil, nil]
         end
@@ -422,11 +418,14 @@ module ReactOnRails
         # schemes or line breaks after its first scheme make it structurally ambiguous, so that URL
         # suffix fails closed through its final @. A safe non-URL prefix is preserved for context,
         # while a pre-scheme @ makes that prefix ambiguous credential material and fails closed.
-        def sanitized_renderer_url(url)
-          return url if url.nil? || url.empty?
+        def sanitized_renderer_url(url, preserve_filesystem_path: false, strict_schemeless: false)
+          return url if passthrough_renderer_url?(url, preserve_filesystem_path)
+
+          ambiguous_url = sanitized_ambiguous_renderer_url(url, strict_schemeless)
+          return ambiguous_url if ambiguous_url
 
           scheme = url.match(CONFIGURED_AUTHORITY_SCHEME_REGEX)
-          return sanitized_schemeless_authority(url) unless scheme
+          return sanitized_schemeless_authority(url, strict_schemeless:) unless scheme
 
           prefix = url[...scheme.begin(0)]
           configured_url = url[scheme.begin(0)..]
@@ -442,15 +441,51 @@ module ReactOnRails
           "#{prefix}#{sanitized_url}"
         end
 
-        def sanitized_schemeless_authority(url)
+        def passthrough_renderer_url?(url, preserve_filesystem_path)
+          url.nil? || url.empty? || (preserve_filesystem_path && explicit_filesystem_path?(url))
+        end
+
+        def sanitized_ambiguous_renderer_url(url, strict_schemeless)
+          scheme = url.match(CONFIGURED_AUTHORITY_SCHEME_REGEX)
+          return unless scheme
+
+          candidate = ambiguous_renderer_url_candidate(url, scheme, strict_schemeless)
+          sanitized_renderer_url(candidate, strict_schemeless:) if candidate
+        end
+
+        def ambiguous_renderer_url_candidate(url, scheme, strict_schemeless)
+          prefix = url[...scheme.begin(0)]
+          configured_url = url[scheme.begin(0)..]
+          userinfo_delimiter = url.rindex("@")
+          return url[(userinfo_delimiter + 1)..] if
+            embedded_http_scheme_in_schemeless_userinfo?(scheme, prefix, userinfo_delimiter)
+          return unless scheme.begin(0).positive? && userinfo_delimiter &&
+                        (strict_schemeless || (prefix.include?(":") && !prefix.end_with?(":")))
+
+          userinfo_delimiter < scheme.begin(0) ? configured_url : url[(userinfo_delimiter + 1)..]
+        end
+
+        def sanitized_schemeless_authority(url, strict_schemeless: false)
           userinfo_delimiter = url.rindex("@")
           return url unless userinfo_delimiter
 
           userinfo = url[...userinfo_delimiter]
-          return url unless userinfo.include?(":")
-          return url if userinfo.match?(%r{[/\\]})
+          return url unless strict_schemeless || userinfo.include?(":")
 
           url[(userinfo_delimiter + 1)..]
+        end
+
+        def embedded_http_scheme_in_schemeless_userinfo?(scheme, prefix, userinfo_delimiter)
+          return false unless userinfo_delimiter && userinfo_delimiter > scheme.end(0)
+          return false unless prefix.end_with?(":")
+
+          scheme[0].delete_suffix("://").match?(/.+https?\z/i)
+        end
+
+        def explicit_filesystem_path?(url)
+          (url.start_with?("/") && !url.start_with?("//")) ||
+            url.start_with?("./", "../", ".\\", "..\\", "\\\\") ||
+            url.match?(%r{\A[A-Za-z]:[/\\]})
         end
 
         def ambiguous_credential_prefix?(prefix, configured_url)
