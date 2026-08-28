@@ -898,7 +898,8 @@ bundle install
 git clean -fd && git reset --hard generator_testing_base && git clean -fd
 
 # Add Shakapacker to Gemfile
-bundle add shakapacker --strict
+SHAKAPACKER_VERSION="$(bin/read-tool-version .ci-dependency-versions latest-shakapacker)"
+bundle add shakapacker --version="${SHAKAPACKER_VERSION}" --strict
 
 # Run Shakapacker installer first
 ./bin/rails shakapacker:install
