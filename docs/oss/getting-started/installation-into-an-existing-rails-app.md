@@ -19,9 +19,13 @@ Use this path when you already have a Rails application and want React on Rails 
 ## 1. Add the gems
 
 ```bash
-bundle add shakapacker --strict
 bundle add react_on_rails --strict
+SHAKAPACKER_VERSION="$(bundle exec ruby -rreact_on_rails -e 'print ReactOnRails::PackerUtils.shakapacker_version')"
+bundle add shakapacker --version="${SHAKAPACKER_VERSION}" --strict
 ```
+
+Adding React on Rails first lets Bundler select a compatible Shakapacker release. Pinning that resolved version when
+adding Shakapacker directly prevents an older globally installed gem from replacing it.
 
 React on Rails attempts to install the matching `react-on-rails` JavaScript package during the generator run. In some existing apps, dependency installation can fail (or required package-manager tooling may be unavailable), and the generator prints manual install commands. Run those commands before starting the app.
 

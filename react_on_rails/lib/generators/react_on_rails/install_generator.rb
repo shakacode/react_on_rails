@@ -1033,7 +1033,13 @@ module ReactOnRails
         say "📝 Adding Shakapacker to Gemfile...", :yellow
         # Use with_unbundled_env to prevent inheriting BUNDLE_GEMFILE from parent process
         # See: https://github.com/shakacode/react_on_rails/issues/2287
-        success = Bundler.with_unbundled_env { system("bundle add shakapacker --strict") }
+        # Pin the version already resolved through react_on_rails. Without an explicit
+        # version, `bundle add --strict` can prefer an older globally installed gem and
+        # downgrade the target app's lockfile.
+        shakapacker_version = ReactOnRails::PackerUtils.shakapacker_version
+        success = Bundler.with_unbundled_env do
+          system("bundle", "add", "shakapacker", "--version", shakapacker_version, "--strict")
+        end
         return true if success
 
         handle_shakapacker_gemfile_error
@@ -1163,6 +1169,7 @@ module ReactOnRails
       end
 
       def handle_shakapacker_gemfile_error
+        shakapacker_version = ReactOnRails::PackerUtils.shakapacker_version
         error = <<~MSG.strip
           🚫 Failed to add Shakapacker to your Gemfile.
 
@@ -1172,7 +1179,7 @@ module ReactOnRails
           • Gemfile permissions
 
           Please try manually:
-              bundle add shakapacker --strict
+              bundle add shakapacker --version #{shakapacker_version} --strict
 
           #{recovery_working_tree_note}
           Then re-run: #{recovery_install_command}

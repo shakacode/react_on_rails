@@ -11,7 +11,8 @@ Use this guide for an existing Rails app. Keep app-specific choices and custom c
 
 ## Install
 
-Add Shakapacker and React on Rails through Bundler.
+Add React on Rails first so Bundler resolves a compatible Shakapacker version, then pin that resolved version when
+promoting Shakapacker to a direct dependency.
 Choose exactly one stack flag before running the install generator.
 Use `--standard-only` for OSS, `--pro` for Pro, or `--rsc` for Pro with RSC.
 Do not rely on an interactive TTY prompt; replace `<STACK_FLAG>` explicitly in every command.
@@ -19,8 +20,9 @@ Choose the language explicitly too: replace `<LANGUAGE_CHOICE>` with `--typescri
 or remove that placeholder for JavaScript. TypeScript is optional; omitting its flag preserves JavaScript.
 
 ```bash
-bundle add shakapacker --strict
 bundle add react_on_rails --strict
+SHAKAPACKER_VERSION="$(bundle exec ruby -rreact_on_rails -e 'print ReactOnRails::PackerUtils.shakapacker_version')"
+bundle add shakapacker --version="${SHAKAPACKER_VERSION}" --strict
 ```
 
 For `--pro` or `--rsc`, React on Rails Pro is free for evaluation and non-production use;
