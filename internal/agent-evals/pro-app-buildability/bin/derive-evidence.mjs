@@ -1233,9 +1233,19 @@ const rubyIntegrationTestMutationTargets = new Set([
   'Rails::Dom::Testing::Assertions::DomAssertions',
   'Rails::Dom::Testing::Assertions::SelectorAssertions',
 ]);
-const rubyUnresolvedMutationReceiver = '__unresolved__';
-const normalizeRubyStaticMutationTargetReceivers = (content) =>
-  content.replace(rubyStaticConstGetReceiverPattern, (receiver) => {
+const rubyUnresolvedMutationReceiver = (content) => {
+  const identifiers = new Set(content.match(/[A-Za-z_][A-Za-z0-9_]*/g) ?? []);
+  let index = 0;
+  let candidate;
+  do {
+    candidate = `_u${index.toString(36)}`;
+    index += 1;
+  } while (identifiers.has(candidate));
+  return candidate;
+};
+const normalizeRubyStaticMutationTargetReceivers = (content) => {
+  const unresolvedReceiver = rubyUnresolvedMutationReceiver(content);
+  return content.replace(rubyStaticConstGetReceiverPattern, (receiver) => {
     const root = receiver.match(new RegExp(`^(?:::)?(${rubyStaticQualifiedConstantPattern})`))?.[1];
     if (root === undefined) return receiver;
     const lookups = [
@@ -1255,8 +1265,9 @@ const normalizeRubyStaticMutationTargetReceivers = (content) =>
     const lexicallyResolved = lookups.slice(root === 'Object' ? 1 : 0).every(({ inherit }) => !inherit);
     return lexicallyResolved || rubyIntegrationTestMutationTargets.has(qualifiedName)
       ? qualifiedName.padEnd(receiver.length, ' ')
-      : rubyUnresolvedMutationReceiver.padEnd(receiver.length, ' ');
+      : unresolvedReceiver.padEnd(receiver.length, ' ');
   });
+};
 const rubyIntegrationTestMutationImpact = (className) =>
   rubyIntegrationTestMutationTargets.has(className) ? 'ActionDispatch::IntegrationTest' : className;
 const rubyIntegrationTestDslOwnerModules = new Map([
@@ -1295,7 +1306,6 @@ const normalizedRubyClassReceiver = (receiver) =>
     .replace(/^::/, '');
 const rubyClassNameForReceiver = (receiver, aliases) => {
   const normalized = normalizedRubyClassReceiver(receiver);
-  if (normalized === rubyUnresolvedMutationReceiver) return null;
   return aliases.get(normalized) ?? (/^[A-Z]/.test(normalized) ? normalized : null);
 };
 const rubyClassAliases = (content) => {

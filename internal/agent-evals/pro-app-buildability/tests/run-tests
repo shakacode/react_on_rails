@@ -6504,6 +6504,9 @@ done
 rendered_form_reflective_mutations=(
   $'module FakeAssertions\n  def post(*) = nil\n  def assert_response(*) = nil\n  def assert_match(*) = nil\n  def assert_includes(*) = nil\nend\nmutation = :prepend\nActionDispatch::IntegrationTest.public_send(mutation, FakeAssertions)'
   $'module FakeAssertions\n  def post(*) = nil\n  def assert_response(*) = nil\n  def assert_match(*) = nil\n  def assert_includes(*) = nil\nend\ntarget = ActionDispatch::IntegrationTest\ntarget.public_send(:prepend, FakeAssertions)'
+  $'__unresolved__ = ActionDispatch::IntegrationTest\n__unresolved__.define_method(:assert_response) { |*| nil }'
+  $'_u0 = ActiveSupport\n\nclass Shim\nend\n\nShim.const_get(:ActionDispatch).const_get(:IntegrationTest).class_eval do\n  def assert_response(*) = nil\nend'
+  $'DOC = <<~RUBY\n  Shim.const_get(:Elsewhere) = ActiveSupport\nRUBY\n\nclass Shim\nend\n\nShim.const_get(:ActionDispatch).const_get(:IntegrationTest).class_eval do\n  def assert_response(*) = nil\nend'
   $'module FakeAssertions\n  def post(*) = nil\n  def assert_response(*) = nil\n  def assert_match(*) = nil\n  def assert_includes(*) = nil\nend\nActionDispatch::IntegrationTest.public_method(:prepend).call(FakeAssertions)'
   'ActionDispatch::IntegrationTest.public_send(:define_singleton_method, :test) { |*| }'
   $'method_name = :define_singleton_method\nActionDispatch::IntegrationTest::public_send(method_name, :test) { |*| }'
