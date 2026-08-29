@@ -53,8 +53,8 @@ RSpec.describe "script/release-forward-port" do
     git(repo, "rev-parse", "HEAD").strip
   end
 
-  def run_script(repo, *args)
-    Open3.capture3(git_env, RbConfig.ruby, script_path, *args, chdir: repo)
+  def run_script(repo, *args, env: {})
+    Open3.capture3(git_env.merge(env), RbConfig.ruby, script_path, *args, chdir: repo)
   end
 
   def run_script_from_repo_root(*args)
@@ -2143,8 +2143,15 @@ RSpec.describe "script/release-forward-port" do
       release_fix_sha = git(repo, "rev-parse", "HEAD").strip
       git(repo, "checkout", "main")
 
-      stdout, stderr, status =
-        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--dry-run")
+      stdout, stderr, status = run_script(
+        repo,
+        "--source",
+        "release/1.0.1",
+        "--target",
+        "main",
+        "--dry-run",
+        env: { "LANG" => "C", "LC_ALL" => "C", "RUBYOPT" => "-EUS-ASCII" }
+      )
 
       expect(status).to be_success, stderr
       expect(stdout).to include("PICK #{release_fix_sha[0, 12]} Fix separate release regression (#900)")

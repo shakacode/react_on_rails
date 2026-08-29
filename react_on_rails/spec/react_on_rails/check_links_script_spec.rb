@@ -9,7 +9,7 @@ RSpec.describe "bin/check-links" do
   let(:repo_root) { File.expand_path("../../..", __dir__) }
   let(:script_path) { File.join(repo_root, "bin/check-links") }
 
-  it "invokes lychee with the same inputs as the markdown link CI workflow" do
+  it "invokes lychee with deterministically ordered CI inputs under UTF-8 collation" do
     Dir.mktmpdir do |tmpdir|
       args_file = File.join(tmpdir, "lychee.args")
       lychee_stub = File.join(tmpdir, "lychee")
@@ -24,6 +24,8 @@ RSpec.describe "bin/check-links" do
 
       _stdout, stderr, status = Open3.capture3(
         {
+          "LANG" => "en_US.UTF-8",
+          "LC_ALL" => "en_US.UTF-8",
           "LYCHEE_ARGS_FILE" => args_file,
           "PATH" => "#{tmpdir}:#{ENV.fetch('PATH')}"
         },
@@ -40,7 +42,7 @@ RSpec.describe "bin/check-links" do
     script_content = File.read(script_path)
     executable_lines = script_content.lines.grep_v(/\A\s*(#|$)/).join
 
-    expect(script_content.scan(/^# Word-split the globs/).size).to eq(1)
+    expect(script_content.scan(/^# Expand the same globs/).size).to eq(1)
     expect(script_content.scan(/^exec lychee /).size).to eq(1)
     expect(executable_lines).not_to include("--files-from")
   end

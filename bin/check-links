@@ -30,6 +30,11 @@ if ! command -v lychee &> /dev/null; then
 fi
 
 # shellcheck disable=SC2035
-# Word-split the globs so *.md and react_on_rails_pro/*.md expand, matching
-# the workflow's `args: --config .lychee.toml docs/ *.md react_on_rails_pro/*.md`.
-exec lychee --config .lychee.toml docs/ *.md react_on_rails_pro/*.md
+# Expand the same globs as CI, then byte-sort them so caller locale does not
+# change lychee's argument order.
+markdown_files=()
+while IFS= read -r file; do
+  markdown_files+=("$file")
+done < <(printf '%s\n' *.md react_on_rails_pro/*.md | LC_ALL=C sort)
+
+exec lychee --config .lychee.toml docs/ "${markdown_files[@]}"

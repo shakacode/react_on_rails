@@ -1895,7 +1895,7 @@ class ReleaseForwardPort
     stdout, stderr, status = capture_git(*args)
     raise GitError, git_error(args, stdout, stderr, status) unless status.success?
 
-    stdout
+    stdout.force_encoding(Encoding::UTF_8)
   end
 
   def capture_git(*, stdin_data: "")
