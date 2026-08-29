@@ -24,6 +24,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+### [17.1.0.rc.1] - 2026-08-28
+
 #### Fixed
 
 - **Fresh generated apps now preserve their resolved Shakapacker version**: The installer now pins
@@ -3198,7 +3200,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.1.0.rc.0...main
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.1.0.rc.1...main
+[17.1.0.rc.1]: https://github.com/shakacode/react_on_rails/compare/v17.1.0.rc.0...v17.1.0.rc.1
 [17.1.0.rc.0]: https://github.com/shakacode/react_on_rails/compare/v17.0.1...v17.1.0.rc.0
 [17.0.1]: https://github.com/shakacode/react_on_rails/compare/v17.0.0...v17.0.1
 [17.0.0]: https://github.com/shakacode/react_on_rails/compare/v16.6.0...v17.0.0
