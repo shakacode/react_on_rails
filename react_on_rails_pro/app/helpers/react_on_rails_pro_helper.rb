@@ -1504,7 +1504,7 @@ module ReactOnRailsProHelper
     {
       shell_html: cached_entry["shell_html"],
       postponed_state: cached_entry["postponed_state"],
-      asset_manifest: cached_entry["assets"],
+      asset_manifest: ppr_validated_asset_manifest(cached_entry["assets"]),
       console_script: "",
       render_options:,
       tag: generate_component_script(render_options)
@@ -1525,7 +1525,7 @@ module ReactOnRailsProHelper
     {
       shell_html: parsed[:shell_html],
       postponed_state: parsed[:postponed_state],
-      asset_manifest: parsed[:asset_manifest],
+      asset_manifest: ppr_validated_asset_manifest(parsed[:asset_manifest]),
       had_render_error: parsed[:had_render_error],
       console_script: parsed[:console_scripts].join("\n"),
       render_options: internal_result[:render_options],
@@ -1659,6 +1659,30 @@ module ReactOnRailsProHelper
     asset_manifest = prerender_result[:asset_manifest]
     envelope["assets"] = asset_manifest if asset_manifest.is_a?(String)
     envelope
+  end
+
+  # Validates the shape of a cached asset manifest string. Returns the string unchanged if it
+  # parses as JSON with the expected shape ({stylesheetHrefs: string[], initScriptKeys: string[]});
+  # returns nil (graceful degradation — resume operates without dedup) if the string is nil,
+  # not a String, or malformed. This guards against corrupted cache entries: the assets field is
+  # excluded from the envelope checksum, so a corrupted value would pass envelope validation
+  # and reach the renderer as raw JS without this check (issue #4897).
+  def ppr_validated_asset_manifest(raw)
+    return nil unless raw.is_a?(String)
+
+    parsed = JSON.parse(raw)
+    return nil unless parsed.is_a?(Hash)
+    return nil unless ppr_valid_string_array?(parsed["stylesheetHrefs"])
+    return nil unless ppr_valid_string_array?(parsed["initScriptKeys"])
+
+    raw
+  rescue JSON::ParserError
+    nil
+  end
+
+  # Returns true when +value+ is an Array whose elements are all Strings.
+  def ppr_valid_string_array?(value)
+    value.is_a?(Array) && value.all?(String)
   end
 
   # Writes the envelope and registers cache tags. If the write fails (falsy return or exception),

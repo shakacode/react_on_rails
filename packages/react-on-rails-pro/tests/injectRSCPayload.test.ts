@@ -2465,6 +2465,82 @@ describe('injectRSCPayload', () => {
     expect(output).not.toContain(`href="${shellCssHref}"`);
   });
 
+  it('includes promoted preload hrefs in the onAssetsEmitted manifest', async () => {
+    // When loadable-stats.json is unavailable, CSS arrives via React's streamed
+    // <link rel="preload" as="style"> tags. The promoted hrefs must appear in the
+    // asset manifest so the resume pass knows the shell already declared them.
+    const preloadHref = '/webpack/test/css/client1-46072b81.css?body=1';
+    const mockRSC = createMockRSCStream(['{"test": "data"}']);
+    const mockHTML = createMockHTMLStream([
+      `<link rel="preload" as="style" href="${preloadHref}" crossorigin="anonymous"/>`,
+    ]);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    let capturedManifest: { stylesheetHrefs: string[]; initScriptKeys: string[] } | null = null;
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId, undefined, {
+      rscClientChunkStylesheetHrefsByChunkName: new Map(),
+      onAssetsEmitted: (manifest) => {
+        capturedManifest = manifest;
+      },
+    });
+    await collectStreamData(result);
+
+    expect(capturedManifest).not.toBeNull();
+    // The promoted preload href should appear in the manifest's stylesheetHrefs
+    expect(capturedManifest!.stylesheetHrefs).toContain(preloadHref);
+  });
+
+  it('does not duplicate promoted preload hrefs when also inferred from loadable stats', async () => {
+    // When both loadable-stats inference AND preload promotion fire for the same href,
+    // the manifest should contain the href only once.
+    const cssHref = '/webpack/test/css/client1-46072b81.css';
+    const flightData = '"client1","js/client1-abc123.chunk.js"';
+    const mockRSC = createMockRSCStream([flightData]);
+    const mockHTML = createMockHTMLStream([
+      `<link rel="preload" as="style" href="${cssHref}" crossorigin="anonymous"/>`,
+    ]);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    let capturedManifest: { stylesheetHrefs: string[]; initScriptKeys: string[] } | null = null;
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId, undefined, {
+      rscClientChunkStylesheetHrefsByChunkName: new Map([['client1', [cssHref]]]),
+      onAssetsEmitted: (manifest) => {
+        capturedManifest = manifest;
+      },
+    });
+    await collectStreamData(result);
+
+    expect(capturedManifest).not.toBeNull();
+    // The href should appear exactly once, not duplicated
+    const hrefOccurrences = capturedManifest!.stylesheetHrefs.filter((h) => h === cssHref);
+    expect(hrefOccurrences).toHaveLength(1);
+  });
+
+  it('suppresses promoted preloads on resume when the href is in the shellAssetManifest', async () => {
+    const preloadHref = '/webpack/test/css/client1-46072b81.css?body=1';
+
+    // Resume render with shellAssetManifest containing the same href that React re-streams
+    const mockRSC = createMockRSCStream(['{"test": "resume data"}']);
+    const mockHTML = createMockHTMLStream([
+      `<link rel="preload" as="style" href="${preloadHref}" crossorigin="anonymous"/>`,
+    ]);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId, undefined, {
+      rscClientChunkStylesheetHrefsByChunkName: new Map(),
+      shellAssetManifest: {
+        stylesheetHrefs: [preloadHref],
+        initScriptKeys: [],
+      },
+    });
+    const output = await collectStreamData(result);
+
+    // The preload should NOT be promoted — the shell already declared this stylesheet.
+    // It should remain as a preload (harmless fetch hint, not a duplicate stylesheet link).
+    expect(output).toContain('rel="preload"');
+    expect(output).not.toContain('data-precedence="rsc-css"');
+  });
+
   it('adds valid nonce attribute to opt-in observability mark script tags', async () => {
     const mockRSC = createMockRSCStream(['{"test": "data"}']);
     const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);

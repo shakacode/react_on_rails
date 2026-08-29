@@ -423,7 +423,6 @@ function stylesheetTagsForRSCClientChunks(
   emittedStylesheetHrefs: Set<string>,
 ) {
   const stylesheetTags: string[] = [];
-
   for (const match of flightData.matchAll(RSC_CLIENT_CHUNK_NAME_WITH_JS_ASSET)) {
     const chunkName = match[1];
     const stylesheetHrefs = stylesheetHrefsByChunkName.get(chunkName);
@@ -1557,6 +1556,7 @@ function applyStreamedStylesheetPreloadGating(
   incompleteHtmlTailMode: IncompleteHtmlTailMode,
   rscClientManifestStylesheetHrefs: ReadonlySet<string>,
   retainedTailScanState?: RetainedIncompleteHtmlTailScanState,
+  alreadyEmittedStylesheetHrefs?: ReadonlySet<string>,
 ) {
   let stringSafeHtmlBuffer = html;
   let incompleteUTF8TailBuffer: Buffer = Buffer.alloc(0);
@@ -1592,12 +1592,23 @@ function applyStreamedStylesheetPreloadGating(
       } = splitTrailingIncompleteHtmlTagTail(completeHtml));
     }
   }
+  // PPR: track hrefs of promoted preload tags so they appear in the asset manifest.
+  // Without this, promoted preloads would be missing from emittedRSCClientStylesheetHrefs
+  // and the resume pass would re-promote the same preloads (issue #4897).
+  const promotedPreloadHrefs: string[] = [];
   const gatedHtml = completeHtml.replace(
     /<link\b(?=[^>]*\brel=(["'])(?:(?!\1).)*\bpreload\b(?:(?!\1).)*\1)(?=[^>]*\bas=(["'])style\2)(?=[^>]*\bhref=(["'])(?:(?!\3).)+\3)[^>]*\/?>/gi,
-    (linkTag) =>
-      shouldPromoteStylesheetPreloadTag(linkTag, rscClientManifestStylesheetHrefs)
-        ? promoteStylesheetPreloadTag(linkTag)
-        : linkTag,
+    (linkTag) => {
+      if (shouldPromoteStylesheetPreloadTag(linkTag, rscClientManifestStylesheetHrefs)) {
+        const href = getQuotedAttribute(linkTag, 'href');
+        // PPR resume: skip promotion if the shell already declared this stylesheet. Without this
+        // check, the resume pass re-promotes preloads the cached shell already emitted as links.
+        if (href && alreadyEmittedStylesheetHrefs?.has(href)) return linkTag;
+        if (href) promotedPreloadHrefs.push(href);
+        return promoteStylesheetPreloadTag(linkTag);
+      }
+      return linkTag;
+    },
   );
   const completeHtmlByteLength = Buffer.byteLength(completeHtml, 'utf8');
   const completeHtmlBuffer =
@@ -1612,6 +1623,7 @@ function applyStreamedStylesheetPreloadGating(
     incompleteHtmlTailBuffer,
     incompleteHtmlTailScanState:
       incompleteHtmlTailBuffer.length > 0 ? nextIncompleteHtmlTailScanState : undefined,
+    promotedPreloadHrefs,
   };
 }
 
@@ -1771,12 +1783,19 @@ export default function injectRSCPayload(
       gatedHtmlBuffer,
       incompleteHtmlTailBuffer,
       incompleteHtmlTailScanState: nextRetainedHtmlTailScanState,
+      promotedPreloadHrefs,
     } = applyStreamedStylesheetPreloadGating(
       htmlBuffer,
       incompleteHtmlTailMode,
       rscClientManifestStylesheetHrefs,
       retainedHtmlTailScanState,
+      emittedRSCClientStylesheetHrefs,
     );
+    // PPR: record promoted preload hrefs in the dedup set so they appear in the asset
+    // manifest and the resume pass knows the shell already declared these stylesheets.
+    for (const href of promotedPreloadHrefs) {
+      emittedRSCClientStylesheetHrefs.add(href);
+    }
     const shouldDeferRevealHtml =
       rscPromise &&
       shouldInferRSCClientStylesheets &&

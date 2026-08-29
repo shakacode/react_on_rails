@@ -24,6 +24,20 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Added
+
+- **[Pro]** **PPR CSS/asset coordination between cached shell and resume stream**: The PPR resume
+  pass now suppresses duplicate `<link>` tags and init scripts that the cached shell already declared,
+  and gates hole-only CSS (stylesheets needed only by components inside Suspense holes) ahead of their
+  `$RC()` reveals to prevent FOUC. A small asset manifest captured at prerender time travels through
+  the cache envelope and pre-seeds the resume injector's dedup sets. Promoted streamed stylesheet
+  preload hrefs are also tracked so the manifest is complete even when `loadable-stats.json` is
+  unavailable. The manifest field is optional and excluded from the envelope checksum — an older
+  renderer or a missing field degrades gracefully to the previous behavior (no dedup). Resolves
+  [Issue 4897](https://github.com/shakacode/react_on_rails/issues/4897).
+  [PR 4907](https://github.com/shakacode/react_on_rails/pull/4907) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 #### Fixed
 
 - **[Pro]** **Bounded Node Renderer VM retention now avoids old/new RSC rebuild thrash during rolling deploys**:

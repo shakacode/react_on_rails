@@ -210,7 +210,7 @@ module ReactOnRailsPro
           # PPR asset manifest: the CSS hrefs and init-script keys the cached shell emitted.
           # The resume renderer uses this to suppress duplicate CSS links and init scripts
           # (issue #4897 — PPR CSS/asset coordination). Gracefully omitted when absent.
-          js << "railsContext.pprShellAssets = #{shell_assets};\n" if shell_assets.is_a?(String)
+          js << "railsContext.pprShellAssets = #{shell_assets.to_json};\n" if shell_assets.is_a?(String)
           js
         else
           ""
