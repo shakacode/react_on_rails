@@ -214,32 +214,24 @@ const stripExplicitPgTestSetupPrefix = (lines) => {
   if (!cdFirst && cursor < lines.length - 1 && sanitizedEvalDirectory.test(lines[cursor])) cursor += 1;
   return lines.slice(cursor);
 };
+const stripExactPrefix = (lines, prefixLines) =>
+  prefixLines.every((line, index) => lines[index] === line) ? lines.slice(prefixLines.length) : null;
 const relativeCdTestSetupLines = ['cd eval_app', ...explicitPgTestSetupLines];
-const stripRelativeCdTestSetupPrefix = (lines) =>
-  relativeCdTestSetupLines.every((line, index) => lines[index] === line)
-    ? lines.slice(relativeCdTestSetupLines.length)
-    : null;
+const stripRelativeCdTestSetupPrefix = (lines) => stripExactPrefix(lines, relativeCdTestSetupLines);
 const scaffoldRetrySetupLines = [
   'rm -rf <LOCAL_PATH>/eval_app',
   'cd <LOCAL_PATH>',
   ...explicitPgTestSetupLines,
 ];
-const stripScaffoldRetrySetupPrefix = (lines) =>
-  scaffoldRetrySetupLines.every((line, index) => lines[index] === line)
-    ? lines.slice(scaffoldRetrySetupLines.length)
-    : null;
+const stripScaffoldRetrySetupPrefix = (lines) => stripExactPrefix(lines, scaffoldRetrySetupLines);
 const workspaceRelativeScaffoldRetrySetupLines = ['cd <EVAL_WORKSPACE>', 'rm -rf eval_app'];
 const stripWorkspaceRelativeScaffoldRetrySetupPrefix = (lines) =>
-  workspaceRelativeScaffoldRetrySetupLines.every((line, index) => lines[index] === line)
-    ? lines.slice(workspaceRelativeScaffoldRetrySetupLines.length)
-    : null;
+  stripExactPrefix(lines, workspaceRelativeScaffoldRetrySetupLines);
 const immediatePhaseStatusTarget = (
   lines,
   output,
   phase,
-  allowWithoutPipefail = false,
-  allowStdoutOnly = false,
-  allowExactByteTail = false,
+  { allowWithoutPipefail = false, allowStdoutOnly = false, allowExactByteTail = false } = {},
 ) => {
   const hasTopLevelPipefail = lines[0] === 'set -o pipefail';
   const proofLines = hasTopLevelPipefail ? lines.slice(1) : lines;
@@ -411,14 +403,11 @@ const phaseStatusProductionBuildTarget = (lines, output) => {
   const cleanup = 'rm -rf public/assets public/packs public/packs-test';
   const hasCleanup = lines[0] === cleanup;
   const proofLines = hasCleanup ? lines.slice(1) : lines;
-  const proof = immediatePhaseStatusTarget(
-    proofLines,
-    output,
-    'BUILD',
-    !hasCleanup,
-    !hasCleanup,
-    !hasCleanup,
-  );
+  const proof = immediatePhaseStatusTarget(proofLines, output, 'BUILD', {
+    allowWithoutPipefail: !hasCleanup,
+    allowStdoutOnly: !hasCleanup,
+    allowExactByteTail: !hasCleanup,
+  });
   if (
     !proof ||
     (proof.target !== 'npm run build' &&
@@ -439,7 +428,7 @@ const relativeCdCompoundProductionBuildTarget = (lines, output, outputTruncated)
   if (outputTruncated || lines[0] !== 'cd eval_app' || /(?:^|\n)\s*(?:[^\n]*:\s*)?cd:\s/i.test(output)) {
     return null;
   }
-  const proof = immediatePhaseStatusTarget(lines.slice(1), output, 'BUILD', true);
+  const proof = immediatePhaseStatusTarget(lines.slice(1), output, 'BUILD', { allowWithoutPipefail: true });
   return proof?.target === compoundShakapackerBuildTarget &&
     proof.outputLines
       .slice(0, -1)
@@ -534,7 +523,6 @@ const topLevelShellLines = (command) => {
   }
   return executableLines;
 };
-const normalizedEvidenceLines = (command) => stripSanitizedSetupPrefix(topLevelShellLines(command));
 const pipefailPipelineTargets = (lines, pipelineMatcher = (line) => line.match(boundedLogPipeline)) =>
   lines.flatMap((line, index) => {
     const pipelineMatch = pipelineMatcher(line);
@@ -576,7 +564,7 @@ const installEvidenceTargets = (command) => {
 };
 const buildEvidenceTargets = (command) => {
   const rawLines = topLevelShellLines(command.command);
-  const lines = normalizedEvidenceLines(command.command);
+  const lines = stripSanitizedSetupPrefix(rawLines);
   const phaseLines = stripSanitizedPhaseSetupPrefix(rawLines);
   const targets = [
     ...(lines.length === 1 && !/[;&|<>]/.test(lines[0]) ? lines : []),
@@ -4696,7 +4684,11 @@ const recognizedTestInvocation = (line) => {
   );
 };
 const phaseStatusRailsTestTarget = (lines, output) => {
-  const proof = immediatePhaseStatusTarget(lines, output, 'TEST', true, true, true);
+  const proof = immediatePhaseStatusTarget(lines, output, 'TEST', {
+    allowWithoutPipefail: true,
+    allowStdoutOnly: true,
+    allowExactByteTail: true,
+  });
   if (!proof || isHelpOrVersion(proof.target) || !recognizedTestInvocation(proof.target)) return null;
   const summaries = proof.outputLines.filter((line) => railsTestSummary.test(line));
   return summaries.length === 1 && proof.outputLines.at(-2) === summaries[0] ? proof.target : null;
@@ -4906,12 +4898,9 @@ const completionRow = outcomesComplete
     };
 const items = [...outcomeRows, completionRow];
 let overall = 'incomplete';
-if (sourceLimitsExceeded) {
-  overall = 'incomplete';
-} else if (outcomesComplete) {
-  overall = 'pass';
-} else if (reportCompleted) {
-  overall = 'fail';
+if (!sourceLimitsExceeded) {
+  if (outcomesComplete) overall = 'pass';
+  else if (reportCompleted) overall = 'fail';
 }
 const rubricResults = { schema_version: '1.0', overall, items };
 
