@@ -33,8 +33,9 @@ fi
 # Expand the same globs as CI, then byte-sort them so caller locale does not
 # change lychee's argument order.
 markdown_files=()
+sorted_markdown_files=$(printf '%s\n' *.md react_on_rails_pro/*.md | LC_ALL=C sort) || exit $?
 while IFS= read -r file; do
   markdown_files+=("$file")
-done < <(printf '%s\n' *.md react_on_rails_pro/*.md | LC_ALL=C sort)
+done <<< "$sorted_markdown_files"
 
 exec lychee --config .lychee.toml docs/ "${markdown_files[@]}"
