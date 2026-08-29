@@ -78,6 +78,44 @@ RSpec.describe "bin/check-links" do
     end
   end
 
+  it "passes a newline-bearing Markdown filename to lychee as one argument" do
+    Dir.mktmpdir do |tmpdir|
+      write_controlled_markdown_files(tmpdir)
+      newline_filename = "release\nnotes.md"
+      File.write(File.join(tmpdir, newline_filename), "")
+      args_file = File.join(tmpdir, "lychee.args")
+      write_executable(
+        File.join(tmpdir, "lychee"),
+        <<~'BASH'
+          printf '%s\0' "$@" > "$LYCHEE_ARGS_FILE"
+        BASH
+      )
+
+      _stdout, stderr, status = Open3.capture3(
+        {
+          "LC_ALL" => "C",
+          "LYCHEE_ARGS_FILE" => args_file,
+          "PATH" => "#{tmpdir}:#{ENV.fetch('PATH')}"
+        },
+        script_path,
+        chdir: tmpdir
+      )
+
+      expect(status).to be_success, stderr
+      expect(File.binread(args_file).split("\0")).to eq(
+        [
+          "--config",
+          ".lychee.toml",
+          "docs/",
+          "AGENTS.md",
+          "AGENTS_USER_GUIDE.md",
+          "react_on_rails_pro/README.md",
+          newline_filename
+        ]
+      )
+    end
+  end
+
   it "keeps the lychee invocation documented once" do
     script_content = File.read(script_path)
     executable_lines = script_content.lines.grep_v(/\A\s*(#|$)/).join
