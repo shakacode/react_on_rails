@@ -60,8 +60,9 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   case), `.print_kill_summary` takes `(status_symbol, blockers_array)` instead of a boolean,
   `.kill_port_processes` only signals listening sockets whose process working directory is inside
   the current app root, and `.find_port_pids` is now restricted to listening sockets (it returns
-  every listener on the port and does **not** filter by app root — attribution happens in the kill
-  path). Fixes [Issue 4846](https://github.com/shakacode/react_on_rails/issues/4846).
+  those listeners other than pid ≤ 1 and the calling process, and does **not** filter by app root —
+  attribution happens in the kill path). Fixes
+  [Issue 4846](https://github.com/shakacode/react_on_rails/issues/4846).
   [PR 4937](https://github.com/shakacode/react_on_rails/pull/4937) by
   [justin808](https://github.com/justin808).
 
