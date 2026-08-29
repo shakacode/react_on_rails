@@ -234,8 +234,11 @@ assertMatches(
   hostedSelectorsAction,
   /shouldUseFullMatrix = [\s\S]*isTrustedReleaseTarget/,
 );
+const verifiedDiffBaseHelperCommand = /^[ \t]*script\/ci-required-diff-base[ \t]*$/m;
 for (const workflowFile of hostedWorkflowFiles) {
   const workflow = read(`.github/workflows/${workflowFile}`);
+  const detectChangesJob = extractJob(workflow, 'detect-changes');
+  const detectorStep = extractStep(detectChangesJob, 'Detect relevant changes');
   assertMatches(`${workflowFile} pull-request trigger`, workflow, /\n\s{2}pull_request:/);
   assertMatches(
     `${workflowFile} hosted selector`,
@@ -243,6 +246,41 @@ for (const workflowFile of hostedWorkflowFiles) {
     /uses: \.\/\.github\/actions\/hosted-ci-selectors/,
   );
   assertMatches(`${workflowFile} hosted gate`, workflow, /should_run_hosted_ci/);
+  assertMatches(`${workflowFile} verified diff-base helper`, detectorStep, verifiedDiffBaseHelperCommand);
+  const commentOnlyDetectorStep = detectorStep.replace(
+    /^([ \t]*)script\/ci-required-diff-base[ \t]*$/m,
+    '$1# script/ci-required-diff-base',
+  );
+  assert.notEqual(
+    commentOnlyDetectorStep,
+    detectorStep,
+    `${workflowFile} comment-only helper mutation did not replace the command`,
+  );
+  assertDoesNotMatch(
+    `${workflowFile} comment-only diff-base helper`,
+    commentOnlyDetectorStep,
+    verifiedDiffBaseHelperCommand,
+  );
+  assertMatches(
+    `${workflowFile} dispatch base SHA helper input`,
+    detectorStep,
+    /PULL_REQUEST_BASE_SHA: \$\{\{ inputs\.pull_request_base_sha \|\| '' \}\}/,
+  );
+  assertMatches(
+    `${workflowFile} pull-request head SHA helper input`,
+    detectorStep,
+    /PULL_REQUEST_HEAD_SHA: \$\{\{ github\.event\.pull_request\.head\.sha \|\| '' \}\}/,
+  );
+  assertMatches(
+    `${workflowFile} event base helper input`,
+    detectorStep,
+    /EVENT_BASE_REF: \$\{\{ github\.event\.pull_request\.base\.sha \|\| github\.event\.merge_group\.base_sha \|\| github\.event\.before \|\| 'origin\/main' \}\}/,
+  );
+  assertDoesNotMatch(
+    `${workflowFile} direct changed-files detector wiring`,
+    detectorStep,
+    /script\/ci-changes-detector/,
+  );
 }
 
 assertMatches(
@@ -263,8 +301,33 @@ assertMatches(
 assertMatches(
   'gem generator-spec job gate',
   gemTestsWorkflow,
-  /needs\.detect-changes\.outputs\.run_ruby_tests == 'true' \|\|\s+needs\.detect-changes\.outputs\.run_gem_generator_specs == 'true'/,
+  /needs\.detect-changes\.outputs\.run_ruby_tests == 'true' \|\|\s+needs\.detect-changes\.outputs\.run_gem_generator_specs == 'true' \|\|\s+needs\.detect-changes\.outputs\.run_release_supervisor_tests == 'true'/,
 );
+assertMatches(
+  'release supervisor detector output',
+  gemTestsWorkflow,
+  /run_release_supervisor_tests: \$\{\{ steps\.detect\.outputs\.run_release_supervisor_tests \}\}/,
+);
+assertMatches(
+  'release supervisor force-full override',
+  gemTestsWorkflow,
+  /echo "run_release_supervisor_tests=true"/,
+);
+const releaseSupervisorStep = extractStep(
+  extractJob(gemTestsWorkflow, 'rspec-package-tests'),
+  'Run release supervisor integration tests',
+);
+assertMatches(
+  'release supervisor harness is selected by the detector',
+  releaseSupervisorStep,
+  /needs\.detect-changes\.outputs\.run_release_supervisor_tests == 'true'/,
+);
+assertMatches(
+  'release supervisor harness runs once on the latest unit leg',
+  releaseSupervisorStep,
+  /matrix\.dependency-level == 'latest'[\s\S]*matrix\.shard == 'unit'/,
+);
+assertMatches('release supervisor harness command', releaseSupervisorStep, /bash script\/release-test\.bash/);
 assertMatches('gem matrix keeps failure evidence', gemTestsWorkflow, /strategy:\n\s+fail-fast: false/);
 assertMatches(
   'full matrix event policy',

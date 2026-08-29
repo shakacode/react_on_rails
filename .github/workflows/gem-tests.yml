@@ -51,6 +51,7 @@ jobs:
       run_lint: ${{ steps.detect.outputs.run_lint }}
       run_js_tests: ${{ steps.detect.outputs.run_js_tests }}
       run_ruby_tests: ${{ steps.detect.outputs.run_ruby_tests }}
+      run_release_supervisor_tests: ${{ steps.detect.outputs.run_release_supervisor_tests }}
       run_gem_generator_specs: ${{ steps.detect.outputs.run_gem_generator_specs }}
       run_dummy_tests: ${{ steps.detect.outputs.run_dummy_tests }}
       run_generators: ${{ steps.detect.outputs.run_generators }}
@@ -73,8 +74,9 @@ jobs:
       - name: Detect relevant changes
         id: detect
         env:
-          DISPATCH_BASE_REF: ${{ inputs.pull_request_base_ref || '' }}
-          DISPATCH_BASE_SHA: ${{ inputs.pull_request_base_sha || '' }}
+          PULL_REQUEST_BASE_SHA: ${{ inputs.pull_request_base_sha || '' }}
+          PULL_REQUEST_HEAD_SHA: ${{ github.event.pull_request.head.sha || '' }}
+          EVENT_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before || 'origin/main' }}
         run: |
           # Force-full hosted CI is the explicit escape hatch that bypasses
           # optimized change selection. Hosted readiness alone stays path-based.
@@ -83,6 +85,7 @@ jobs:
               echo "run_lint=true"
               echo "run_js_tests=true"
               echo "run_ruby_tests=true"
+              echo "run_release_supervisor_tests=true"
               echo "run_gem_generator_specs=true"
               echo "run_dummy_tests=true"
               echo "run_generators=true"
@@ -92,13 +95,7 @@ jobs:
             exit 0
           fi
 
-          if [ -n "$DISPATCH_BASE_SHA" ]; then
-            export GITHUB_BASE_REF="$DISPATCH_BASE_REF"
-            BASE_REF="$DISPATCH_BASE_SHA"
-          else
-            BASE_REF="${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before || 'origin/main' }}"
-          fi
-          script/ci-changes-detector "$BASE_REF"
+          script/ci-required-diff-base
         shell: bash
       - name: Read runtime versions
         id: tool-versions
@@ -173,11 +170,13 @@ jobs:
 
   rspec-package-tests:
     needs: detect-changes
-    # Run hosted gem tests only when hosted CI is allowed and Ruby or generator-spec coverage is required.
+    # Run hosted gem tests only when hosted CI is allowed and Ruby, generator-spec,
+    # or release-supervisor coverage is required.
     if: |
       needs.detect-changes.outputs.should_run_hosted_ci == 'true' &&
       (needs.detect-changes.outputs.run_ruby_tests == 'true' ||
-       needs.detect-changes.outputs.run_gem_generator_specs == 'true')
+       needs.detect-changes.outputs.run_gem_generator_specs == 'true' ||
+       needs.detect-changes.outputs.run_release_supervisor_tests == 'true')
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
@@ -190,6 +189,15 @@ jobs:
         uses: ./.github/actions/setup-ruby
         with:
           ruby-version: ${{ matrix.ruby-version }}
+      - name: Run release supervisor integration tests
+        # Run once: the detector selects this deterministic harness for wrapper/guard/
+        # release paths, while the latest unit leg keeps it independent of the
+        # RSpec shard and avoids duplicating it across the full matrix.
+        if: |
+          needs.detect-changes.outputs.run_release_supervisor_tests == 'true' &&
+          matrix.dependency-level == 'latest' &&
+          matrix.shard == 'unit'
+        run: bash script/release-test.bash
       - name: Print system information
         run: |
           echo "Linux release: "; cat /etc/issue

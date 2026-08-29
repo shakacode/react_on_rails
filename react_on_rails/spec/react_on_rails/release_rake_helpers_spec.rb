@@ -307,10 +307,13 @@ RSpec.describe "release.rake helper methods" do
   end
 
   before do
-    next if Object.instance_variable_defined?(:@release_rake_helpers_loaded)
-
-    load File.expand_path("../../../rakelib/release.rake", __dir__)
-    Object.instance_variable_set(:@release_rake_helpers_loaded, true)
+    unless Object.instance_variable_defined?(:@release_rake_helpers_loaded)
+      load File.expand_path("../../../rakelib/release.rake", __dir__)
+      Object.instance_variable_set(:@release_rake_helpers_loaded, true)
+    end
+    allow(self).to receive(:release_write_fence!) if respond_to?(:release_write_fence!, true)
+    allow(self).to receive(:activate_release_lease_guard!) if respond_to?(:activate_release_lease_guard!, true)
+    allow(ReleaseLeaseGuard).to receive(:activate!) if defined?(ReleaseLeaseGuard)
   end
 
   describe "#parse_release_tag_to_gem_version" do
@@ -691,11 +694,11 @@ RSpec.describe "release.rake helper methods" do
       expect(self).to have_received(:system).with(
         "gh", "release", "edit", "v17.0.0", "--repo", "shakacode/react_on_rails",
         "--title", "v17.0.0", "--notes-file", a_string_ending_with(".md"), "--prerelease=false",
-        chdir: "/tmp/repo"
+        "--draft=false", chdir: "/tmp/repo"
       )
     end
 
-    it "reports only preview-safe GitHub recovery guidance when publication fails" do
+    it "routes GitHub recovery through the fenced release wrapper when publication fails" do
       release_context = {
         notes: "#### Fixed\n\n- Release fix",
         prerelease: false,
@@ -714,7 +717,8 @@ RSpec.describe "release.rake helper methods" do
         )
       end.to raise_error(SystemExit) { |error|
         expect(error.message).to include(
-          "Live GitHub release recovery remains BLOCKED",
+          "Direct live sync_github_release is refused",
+          "`script/release`",
           'bundle exec rake "sync_github_release[17.0.0,true]"',
           "internal/contributor-info/release-train-runbook.md"
         )
@@ -724,7 +728,7 @@ RSpec.describe "release.rake helper methods" do
   end
 
   describe "#sync_github_release_after_publish" do
-    it "reports only preview-safe guidance when the changelog section is missing" do
+    it "routes missing-changelog recovery through the fenced release wrapper" do
       allow(self).to receive(:extract_changelog_section)
         .with(changelog_path: "/tmp/repo/CHANGELOG.md", version: "17.0.0")
         .and_return(nil)
@@ -734,50 +738,89 @@ RSpec.describe "release.rake helper methods" do
         sync_github_release_after_publish(monorepo_root: "/tmp/repo", gem_version: "17.0.0", dry_run: false)
       end
 
-      expect(output).to match(
-        /Skipping GitHub release.*Live GitHub release recovery remains BLOCKED.*sync_github_release\[17\.0\.0,true\]/m
+      expect(output).to include(
+        "Skipping GitHub release",
+        "Direct live sync_github_release is refused",
+        "`script/release`",
+        "sync_github_release[17.0.0,true]"
       )
       expect(output).not_to match(/sync_github_release\[17\.0\.0\]"/)
+    end
+
+    it "verifies the exact non-draft release after a live GitHub sync" do
+      release_context = { tag: "v17.0.0" }
+      allow(self).to receive_messages(
+        extract_changelog_section: "#### Fixed\n\n- Release fix",
+        prepare_github_release_context: release_context
+      )
+      allow(self).to receive(:verify_gh_auth)
+      allow(self).to receive(:publish_or_update_github_release)
+      allow(self).to receive(:github_release_complete?).and_return(true)
+
+      expect do
+        sync_github_release_after_publish(monorepo_root: "/tmp/repo", gem_version: "17.0.0", dry_run: false)
+      end.not_to raise_error
+      expect(self).to have_received(:github_release_complete?)
+        .with(monorepo_root: "/tmp/repo", version: "17.0.0")
+    end
+
+    it "refuses completion when a successful GitHub edit leaves the release draft or stale" do
+      release_context = { tag: "v17.0.0" }
+      allow(self).to receive_messages(
+        extract_changelog_section: "#### Fixed\n\n- Release fix",
+        prepare_github_release_context: release_context
+      )
+      allow(self).to receive(:verify_gh_auth)
+      allow(self).to receive(:publish_or_update_github_release)
+      allow(self).to receive(:github_release_complete?)
+        .with(monorepo_root: "/tmp/repo", version: "17.0.0")
+        .and_return(false)
+
+      expect do
+        sync_github_release_after_publish(monorepo_root: "/tmp/repo", gem_version: "17.0.0", dry_run: false)
+      end.to raise_error(SystemExit, /Failed to publish GitHub release v17\.0\.0/)
     end
   end
 
   describe "#report_release_dry_run_follow_up" do
-    it "points only to another preview instead of an unfenced live release" do
+    it "points to the fenced release wrapper and a preview" do
       output = capture_stdout do
         report_release_dry_run_follow_up(version: "17.0.0")
       end
 
       expect(output).to include(
-        "Live compound release remains BLOCKED",
+        "Live release uses only `script/release`",
         'bundle exec rake "release[17.0.0,true]"',
         "release-train-runbook.md"
       )
-      expect(output).not_to match(/To actually release|bundle exec rake "release\[17\.0\.0\]"/)
+      expect(output.gsub(/\s+/, " ")).to include("Direct live Rake is refused")
+      expect(output).not_to match(/bundle exec rake "release\[17\.0\.0\]"/)
     end
   end
 
-  describe "preview-only compound release guidance" do
+  describe "fenced compound release guidance" do
     let(:release_runbook) { "internal/contributor-info/release-train-runbook.md" }
 
-    it "states exactly that the live boundary is policy, not runtime enforcement" do
+    it "states the wrapper boundary and direct-Rake refusal" do
       expect(release_compound_live_boundary_guidance).to eq(<<~GUIDANCE.chomp)
-        Live compound release remains BLOCKED by operational and agent policy until the repository-owned
-        lifetime/per-write lease wrapper exists. This is not runtime enforcement: the release tasks remain
-        technically callable in live mode. Direct live invocation outside the individually guarded procedure in
-        internal/contributor-info/release-train-runbook.md violates repository policy.
+        Live release uses only `script/release`, which selects the prepared CHANGELOG.md version, acquires the
+        matching release-line lease, and performs fresh authoritative fences before every outward write. Direct
+        live Rake is refused without its private supervisor contract; use `bundle exec rake
+        "release[VERSION,true]"` only for an explicit internal preview. See
+        internal/contributor-info/release-train-runbook.md for automation compatibility and recovery procedures.
       GUIDANCE
 
       expect(github_release_sync_preview_guidance(version: "17.0.0")).to eq(<<~GUIDANCE.chomp)
-        Live GitHub release recovery remains BLOCKED by operational and agent policy until the repository-owned
-        lifetime/per-write lease wrapper exists. This is not runtime enforcement: sync_github_release remains
-        technically callable in live mode. Direct live invocation outside the individually guarded procedure in
-        internal/contributor-info/release-train-runbook.md violates repository policy.
+        Direct live sync_github_release is refused without the private release supervisor contract. For a
+        fenced idempotent create or edit, keep 17.0.0 as the prepared CHANGELOG.md version and use
+        `script/release`; do not invoke this task live directly.
+        See internal/contributor-info/release-train-runbook.md for the recovery procedure.
         Preview the idempotent GitHub-only sync step with:
           bundle exec rake "sync_github_release[17.0.0,true]"
       GUIDANCE
     end
 
-    it "keeps release retry guidance in preview mode" do
+    it "keeps previews separate from the fenced live retry path" do
       allow(self).to receive(:extract_changelog_section)
         .with(changelog_path: "/tmp/repo/CHANGELOG.md", version: "17.0.0")
         .and_return(nil)
@@ -786,7 +829,7 @@ RSpec.describe "release.rake helper methods" do
         confirm_release!(version: "17.0.0", monorepo_root: "/tmp/repo")
       end.to raise_error(SystemExit) { |error|
         expect(error.message).to include(
-          "Live compound release remains BLOCKED",
+          "Live release uses only `script/release`",
           'bundle exec rake "release[17.0.0,true]"',
           release_runbook
         )
@@ -798,7 +841,7 @@ RSpec.describe "release.rake helper methods" do
         current_version: "17.0.0.rc.10"
       )
       expect(retry_message).to include(
-        "Live compound release remains BLOCKED",
+        "Live release uses only `script/release`",
         'bundle exec rake "release[17.0.0.rc.10,true]"',
         'bundle exec rake "release[17.0.0,true]"',
         release_runbook
@@ -809,7 +852,7 @@ RSpec.describe "release.rake helper methods" do
       )
     end
 
-    it "keeps CI retry and override guidance in preview mode" do
+    it "keeps CI previews separate from the fenced live path" do
       placeholder_instruction =
         "Replace VERSION with the exact requested version or the exact CHANGELOG.md version " \
         "before running this preview."
@@ -821,7 +864,7 @@ RSpec.describe "release.rake helper methods" do
           'RELEASE_CI_STATUS_OVERRIDE=true bundle exec rake "release[VERSION,true]"',
           'bundle exec rake "release[VERSION,true,false,true]"',
           placeholder_instruction,
-          "Live compound release remains BLOCKED",
+          "Live release uses only `script/release`",
           release_runbook
         )
         expect(error.message).to include("Preserve the failure evidence", "do not rerun or revert")
@@ -836,7 +879,7 @@ RSpec.describe "release.rake helper methods" do
           'RELEASE_CI_STATUS_OVERRIDE=true bundle exec rake "release[VERSION,true]"',
           'bundle exec rake "release[VERSION,true,false,true]"',
           placeholder_instruction,
-          "Live compound release remains BLOCKED",
+          "Live release uses only `script/release`",
           release_runbook
         )
         expect(guidance).not_to include(
@@ -853,7 +896,7 @@ RSpec.describe "release.rake helper methods" do
       )
     end
 
-    it "keeps release-line follow-up guidance in preview mode" do
+    it "keeps release-line previews separate from the fenced live path" do
       placeholder_instruction =
         "Replace VERSION with the exact requested version or the exact CHANGELOG.md version " \
         "before running this preview."
@@ -865,7 +908,7 @@ RSpec.describe "release.rake helper methods" do
         expect(guidance).to include(
           'bundle exec rake "release[VERSION,true]"',
           placeholder_instruction,
-          "Live compound release remains BLOCKED",
+          "Live release uses only `script/release`",
           release_runbook
         )
         expect(guidance).not_to include('bundle exec rake "release[17.0.0.rc.0,true]"')
@@ -939,9 +982,9 @@ RSpec.describe "release.rake helper methods" do
   end
 
   describe "#run_release_preflight_checks!" do
-    it "checks both npm and GitHub auth before a real release" do
-      expect(self).to receive(:verify_npm_auth)
-      expect(self).to receive(:verify_gh_auth).with(monorepo_root: "/tmp/repo")
+    it "runs both authentication checks for a real release" do
+      expect(self).to receive(:verify_npm_auth).ordered
+      expect(self).to receive(:verify_gh_auth).with(monorepo_root: "/tmp/repo").ordered
 
       run_release_preflight_checks!(monorepo_root: "/tmp/repo", dry_run: false)
     end
@@ -955,6 +998,89 @@ RSpec.describe "release.rake helper methods" do
   end
 
   describe "#resolve_release_version_before_auth!" do
+    it "refuses a wrapper-selected version made stale by the live pull before authentication" do
+      allow(ENV).to receive(:fetch).and_call_original
+      allow(ENV).to receive(:fetch).with(ReleaseLeaseGuard::CONTRACT_ENV, nil).and_return("supervised-contract")
+      allow(self).to receive(:prepared_release_version_from_changelog)
+        .with(monorepo_root: "/tmp/repo")
+        .and_return("17.0.0.rc.11")
+      expect(self).not_to receive(:run_release_preflight_checks!)
+
+      expect do
+        validate_supervised_release_version_after_pull!(
+          monorepo_root: "/tmp/repo",
+          selected_version: "17.0.0.rc.10",
+          dry_run: false
+        )
+      end.to raise_error(SystemExit, %r{changed from 17\.0\.0\.rc\.10 to 17\.0\.0\.rc\.11.*script/release}m)
+    end
+
+    it "accepts the wrapper-selected version after the live pull when its changelog section remains current" do
+      allow(ENV).to receive(:fetch).and_call_original
+      allow(ENV).to receive(:fetch).with(ReleaseLeaseGuard::CONTRACT_ENV, nil).and_return("supervised-contract")
+      allow(self).to receive(:prepared_release_version_from_changelog)
+        .with(monorepo_root: "/tmp/repo")
+        .and_return("17.0.0.rc.10")
+
+      expect(
+        validate_supervised_release_version_after_pull!(
+          monorepo_root: "/tmp/repo",
+          selected_version: "17.0.0.rc.10",
+          dry_run: false
+        )
+      ).to be_nil
+    end
+
+    it "rejects a selected version whose post-pull changelog section contains headings only" do
+      allow(ENV).to receive(:fetch).and_call_original
+      allow(ENV).to receive(:fetch).with(ReleaseLeaseGuard::CONTRACT_ENV, nil).and_return("supervised-contract")
+
+      Dir.mktmpdir do |directory|
+        File.write(
+          File.join(directory, "CHANGELOG.md"),
+          "### [Unreleased]\n\n### [17.0.0.rc.10]\n\n#### Fixed\n"
+        )
+
+        expect do
+          validate_supervised_release_version_after_pull!(
+            monorepo_root: directory,
+            selected_version: "17.0.0.rc.10",
+            dry_run: false
+          )
+        end.to raise_error(SystemExit, /changed from 17\.0\.0\.rc\.10 to none/)
+      end
+    end
+
+    it "ignores historical version headings before Unreleased during post-pull validation" do
+      allow(ENV).to receive(:fetch).and_call_original
+      allow(ENV).to receive(:fetch).with(ReleaseLeaseGuard::CONTRACT_ENV, nil).and_return("supervised-contract")
+
+      Dir.mktmpdir do |directory|
+        File.write(
+          File.join(directory, "CHANGELOG.md"),
+          <<~CHANGELOG
+            ### [99.0.0]
+
+            - Historical entry.
+
+            ### [Unreleased]
+
+            ### [17.0.0.rc.10]
+
+            - Prepared entry.
+          CHANGELOG
+        )
+
+        expect(
+          validate_supervised_release_version_after_pull!(
+            monorepo_root: directory,
+            selected_version: "17.0.0.rc.10",
+            dry_run: false
+          )
+        ).to be_nil
+      end
+    end
+
     it "aborts an argument-less prerelease retry before external authentication checks" do
       allow(self).to receive(:extract_latest_changelog_version)
         .with(monorepo_root: "/tmp/repo")
@@ -5184,10 +5310,12 @@ RSpec.describe "release.rake helper methods" do
           "BUNDLE_LOCKFILE" => File.join(monorepo_root, "react_on_rails", "Gemfile.lock"),
           "BUNDLE_FROZEN" => "true"
         }
-        stdout, stderr, status = Open3.capture3(
-          package_bundle_environment,
-          "bundle", "exec", "ruby", stdin_data: root_probe, chdir: monorepo_root
-        )
+        stdout, stderr, status = Bundler.with_unbundled_env do
+          Open3.capture3(
+            package_bundle_environment,
+            "bundle", "exec", "ruby", stdin_data: root_probe, chdir: monorepo_root
+          )
+        end
         result_line = stdout.lines.find { |line| line.start_with?("ROOT_RAKE_RESULT=") }
 
         expect(unavailable_status).not_to be_success
@@ -7157,6 +7285,153 @@ RSpec.describe "release.rake helper methods" do
     end
   end
 
+  describe "#abort_if_fully_published_release!" do
+    it "asks the operator to prepare the next changelog section when the selected release is complete" do
+      allow(self).to receive(:release_registry_publication_complete?)
+        .with(gem_version: "17.1.0.rc.0", npm_version: "17.1.0-rc.0")
+        .and_return(true)
+      allow(self).to receive(:github_release_complete?)
+        .with(monorepo_root: "/tmp/repo", version: "17.1.0.rc.0")
+        .and_return(true)
+
+      expect do
+        abort_if_fully_published_release!(
+          monorepo_root: "/tmp/repo",
+          gem_version: "17.1.0.rc.0",
+          npm_version: "17.1.0-rc.0",
+          idempotent_retry: true
+        )
+      end.to raise_error(
+        SystemExit,
+        /17\.1\.0\.rc\.0 is already fully published.*prepare and commit the next non-empty CHANGELOG\.md section/im
+      )
+    end
+
+    it "preserves partial-publication recovery for the same changelog version" do
+      allow(self).to receive(:release_registry_publication_complete?)
+        .with(gem_version: "17.1.0.rc.0", npm_version: "17.1.0-rc.0")
+        .and_return(false)
+      expect(self).not_to receive(:github_release_complete?)
+
+      expect do
+        abort_if_fully_published_release!(
+          monorepo_root: "/tmp/repo",
+          gem_version: "17.1.0.rc.0",
+          npm_version: "17.1.0-rc.0",
+          idempotent_retry: true
+        )
+      end.not_to raise_error
+    end
+
+    it "continues recovery when packages exist but the GitHub release is missing" do
+      allow(self).to receive(:release_registry_publication_complete?)
+        .with(gem_version: "17.1.0.rc.0", npm_version: "17.1.0-rc.0")
+        .and_return(true)
+      allow(self).to receive(:github_release_complete?)
+        .with(monorepo_root: "/tmp/repo", version: "17.1.0.rc.0")
+        .and_return(false)
+
+      expect do
+        abort_if_fully_published_release!(
+          monorepo_root: "/tmp/repo",
+          gem_version: "17.1.0.rc.0",
+          npm_version: "17.1.0-rc.0",
+          idempotent_retry: true
+        )
+      end.not_to raise_error
+    end
+  end
+
+  describe "release task fully-published guidance" do
+    let(:release_task) { Rake::Task["release"] }
+    let(:task_receiver) { release_task.actions.first.binding.receiver }
+    let(:success_status) { instance_double(Process::Status, success?: true) }
+
+    after { release_task.reenable }
+
+    it "guides an advanced-head retry to the next changelog section before exact-head tag gating" do
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", "/tmp/repo", "rev-parse", "--abbrev-ref", "HEAD")
+        .and_return(["release/17.1.0\n", success_status])
+      allow(ReactOnRails::GitUtils).to receive(:uncommitted_changes?)
+      allow(task_receiver).to receive(:with_release_checkout) { |**_, &block| block.call("/tmp/repo") }
+      allow(task_receiver).to receive_messages(
+        current_monorepo_root: "/tmp/repo",
+        current_npm_release_readiness_sha!: "a" * 40,
+        validate_npm_release_readiness!: nil,
+        verbose: nil,
+        release_paths: { monorepo_root: "/tmp/repo", gem_root: "/tmp/repo/react_on_rails" },
+        sh_in_dir_for_release: nil,
+        refresh_npm_release_readiness_after_pull!: "a" * 40,
+        validate_supervised_release_version_after_pull!: nil,
+        resolve_release_version_before_auth!: "17.1.0.rc.0",
+        current_gem_version: "17.1.0.rc.0"
+      )
+      allow(task_receiver).to receive(:release_registry_publication_complete?)
+        .with(gem_version: "17.1.0.rc.0", npm_version: "17.1.0-rc.0")
+        .and_return(true)
+      allow(task_receiver).to receive(:github_release_complete?)
+        .with(monorepo_root: "/tmp/repo", version: "17.1.0.rc.0")
+        .and_return(true)
+      expect(task_receiver).not_to receive(:release_tag_retry_state_for_current_head)
+
+      expect do
+        release_task.invoke("17.1.0.rc.0", false, true, false)
+      end.to raise_error(
+        SystemExit,
+        /17\.1\.0\.rc\.0 is already fully published.*prepare and commit the next non-empty CHANGELOG\.md section/im
+      )
+      expect(task_receiver).to have_received(:release_registry_publication_complete?)
+      expect(task_receiver).to have_received(:github_release_complete?)
+    end
+  end
+
+  describe "#github_release_complete?" do
+    let(:release_context) do
+      {
+        tag: "v17.1.0.rc.0",
+        title: "v17.1.0.rc.0",
+        notes: "Prepared notes",
+        prerelease: true
+      }
+    end
+
+    before do
+      allow(self).to receive(:prepare_github_release_context)
+        .with(monorepo_root: "/tmp/repo", gem_version: "17.1.0.rc.0")
+        .and_return(release_context)
+      allow(self).to receive(:github_repo_slug).with("/tmp/repo").and_return("shakacode/react_on_rails")
+    end
+
+    it "accepts only an exact non-draft release" do
+      success = instance_double(Process::Status, success?: true)
+      payload = {
+        "tagName" => "v17.1.0.rc.0",
+        "name" => "v17.1.0.rc.0",
+        "body" => "Prepared notes",
+        "isDraft" => false,
+        "isPrerelease" => true
+      }
+      allow(self).to receive(:capture_gh_output).and_return([JSON.generate(payload), success])
+
+      expect(github_release_complete?(monorepo_root: "/tmp/repo", version: "17.1.0.rc.0")).to be(true)
+    end
+
+    it "keeps draft or stale releases eligible for fenced recovery" do
+      success = instance_double(Process::Status, success?: true)
+      payload = {
+        "tagName" => "v17.1.0.rc.0",
+        "name" => "v17.1.0.rc.0",
+        "body" => "Stale notes",
+        "isDraft" => true,
+        "isPrerelease" => true
+      }
+      allow(self).to receive(:capture_gh_output).and_return([JSON.generate(payload), success])
+
+      expect(github_release_complete?(monorepo_root: "/tmp/repo", version: "17.1.0.rc.0")).to be(false)
+    end
+  end
+
   describe "#publish_gem_with_retry" do
     it "passes OTP via environment instead of shell interpolation" do
       expect(self).to receive(:sh_args_in_dir_for_release).with(
@@ -8393,12 +8668,12 @@ RSpec.describe "release.rake helper methods" do
       )
     end
 
-    def resolve_unflagged_accelerated_retry(allow_ci_override: false)
+    def resolve_unflagged_accelerated_retry(tracker: nil, allow_ci_override: false)
       resolve_accelerated_rc_options_for_release!(
         requested: false,
         explicit_version_input: "17.0.0.rc.10",
         target_gem_version: "17.0.0.rc.10",
-        tracker: nil,
+        tracker:,
         reason: nil,
         allow_ci_override:,
         repo_slug: "shakacode/react_on_rails",
@@ -8435,6 +8710,105 @@ RSpec.describe "release.rake helper methods" do
         tracker: 3823,
         reason: authorization.fetch("reason")
       )
+    end
+
+    it "requires unflagged same-candidate retry history to match the selected tracker" do
+      selected_authorization = authorization.merge("release_tracker" => 4842)
+      allow(self).to receive_messages(
+        local_release_tag_exists?: false,
+        fetch_repository_accelerated_rc_records_for_candidate!: [selected_authorization],
+        fetch_release_tracker_issue!: {}
+      )
+
+      expect(resolve_unflagged_accelerated_retry(tracker: "4842")).to include(
+        target_gem_version: "17.0.0.rc.10",
+        tracker: 4842,
+        reason: selected_authorization.fetch("reason")
+      )
+      expect(self).to have_received(:fetch_repository_accelerated_rc_records_for_candidate!).with(
+        repo_slug: "shakacode/react_on_rails",
+        target_version: "17.0.0.rc.10",
+        candidate_sha: "f" * 40
+      )
+    end
+
+    it "rejects another tracker even while issue search has not indexed its candidate comment" do
+      comment = accelerated_rc_test_issue_comment(
+        id: 1,
+        body: accelerated_rc_tracker_comment(authorization),
+        user: { "login" => "justin808" }
+      )
+      allow(self).to receive(:accelerated_rc_candidate_comment_lower_bound!)
+        .with(repo_slug: "shakacode/react_on_rails", candidate_sha: "f" * 40)
+        .and_return("2026-07-14T12:00:00Z")
+      allow(self).to receive(:fetch_repository_issue_comments_for_accelerated_rc_retry!) do |tracker: nil, **|
+        tracker.nil? ? [comment] : []
+      end
+      allow(self).to receive_messages(
+        local_release_tag_exists?: false,
+        accelerated_rc_repository_comment_permission!: "maintain",
+        fetch_release_tracker_issue!: {}
+      )
+
+      expect do
+        resolve_unflagged_accelerated_retry(tracker: "4842")
+      end.to raise_error(SystemExit, /different release tracker/i)
+      expect(self).to have_received(:fetch_repository_issue_comments_for_accelerated_rc_retry!).with(
+        repo_slug: "shakacode/react_on_rails", since: "2026-07-14T11:59:59Z"
+      )
+    end
+
+    it "fails closed when the candidate commit timestamp is in the future" do
+      success = instance_double(Process::Status, success?: true)
+      allow(self).to receive(:capture_gh_output).and_return(["2999-01-01T00:00:00Z\n", success])
+
+      expect do
+        accelerated_rc_candidate_comment_lower_bound!(
+          repo_slug: "shakacode/react_on_rails", candidate_sha: "f" * 40
+        )
+      end.to raise_error(SystemExit, /candidate commit time.*future.*history is unknown/i)
+    end
+
+    it "loads the candidate commit timestamp as the authoritative comment lower bound" do
+      success = instance_double(Process::Status, success?: true)
+      allow(self).to receive(:capture_gh_output).and_return(["2026-07-14T12:00:00Z\n", success])
+
+      expect(
+        accelerated_rc_candidate_comment_lower_bound!(
+          repo_slug: "shakacode/react_on_rails", candidate_sha: "f" * 40
+        )
+      ).to eq("2026-07-14T12:00:00Z")
+      expect(self).to have_received(:capture_gh_output).with(
+        "api", "repos/shakacode/react_on_rails/commits/#{'f' * 40}", "--jq", ".commit.committer.date"
+      )
+    end
+
+    it "rejects candidate history recorded before the candidate commit" do
+      expect do
+        validate_accelerated_rc_candidate_record_times!([authorization], "2026-07-14T13:31:00Z")
+      end.to raise_error(SystemExit, /history predates the candidate commit/i)
+    end
+
+    it "preserves an ordinary retry when the selected tracker is empty" do
+      allow(self).to receive_messages(
+        local_release_tag_exists?: true,
+        accelerated_rc_tag_provenance_for_tag!: nil,
+        fetch_repository_accelerated_rc_records_for_candidate!: []
+      )
+
+      expect(resolve_unflagged_accelerated_retry(tracker: "")).to be_nil
+    end
+
+    it "rejects selected-tracker retry history bound to another tracker" do
+      allow(self).to receive_messages(
+        local_release_tag_exists?: false,
+        fetch_repository_accelerated_rc_records_for_candidate!: [authorization.merge("release_tracker" => 3823)],
+        fetch_release_tracker_issue!: {}
+      )
+
+      expect do
+        resolve_unflagged_accelerated_retry(tracker: "4842")
+      end.to raise_error(SystemExit, /different release tracker/i)
     end
 
     it "resumes an annotated accelerated-tag retry when accelerated variables are omitted" do
@@ -8511,7 +8885,7 @@ RSpec.describe "release.rake helper methods" do
       aggregate_failures do
         expect do
           resolve_flagged_accelerated_retry(tracker: 3824)
-        end.to raise_error(SystemExit, /explicit accelerated RC retry.*canonical authorization/i)
+        end.to raise_error(SystemExit, /different release tracker/i)
         expect do
           resolve_flagged_accelerated_retry(reason: "A different retry reason")
         end.to raise_error(SystemExit, /explicit accelerated RC retry.*canonical authorization/i)
@@ -8731,6 +9105,11 @@ RSpec.describe "release.rake helper methods" do
   end
 
   describe "accelerated RC tracker records" do
+    before do
+      allow(self).to receive(:accelerated_rc_candidate_comment_lower_bound!)
+        .and_return("2026-07-14T12:00:00Z")
+    end
+
     let(:accelerated_rc_options) do
       {
         target_gem_version: "17.0.0.rc.10",
@@ -8889,7 +9268,7 @@ RSpec.describe "release.rake helper methods" do
       expect(record).to include(
         "status" => "publication-authorized",
         "recorded_at" => "2026-07-14T13:30:00Z",
-        "required_follow_up" => /complete immutable publication/i
+        "required_follow_up" => %r{script/release --reconcile-accelerated-rc before final}
       )
       expect(validate_accelerated_rc_tracker_record!(record)).to eq(record)
     end
@@ -8912,7 +9291,7 @@ RSpec.describe "release.rake helper methods" do
         "target_version" => "17.0.0.rc.10",
         "candidate_sha" => "f" * 40,
         "recorded_at" => "2026-07-14T14:00:00Z",
-        "required_follow_up" => /reconcile_accelerated_rc/
+        "required_follow_up" => %r{script/release --reconcile-accelerated-rc before final}
       )
       expect(authorized_record["status"]).to eq("publication-authorized")
     end
@@ -9159,6 +9538,47 @@ RSpec.describe "release.rake helper methods" do
         "Exactly 1,000 retained machine-marker comments are allowed, and a short 250th page completes discovery"
       )
       expect(normalized_guide).to include(
+        "Candidate history is always read through the authoritative repository issue-comments endpoint"
+      )
+      expect(normalized_guide).to include(
+        "the repository-wide read still proves that no conflicting tracker contains a matching candidate record"
+      )
+      expect(normalized_guide).to include(
+        "The repository-wide candidate-bounded read applies with or without `RELEASE_TRACKER`"
+      )
+      expect(guide).to include(
+        "RELEASE_FINAL_SHAKAPERF_WAIVER_REASON=\"GitHub REST observer exhausted its quota\" \\\nscript/release"
+      )
+      expect(guide).not_to include('bundle exec rake "release[17.0.1]"')
+      historical_design = File.read(
+        File.expand_path("../../../internal/planning/2026-05-25-main-ci-release-guard-design.md", __dir__)
+      )
+      expect(historical_design).to include(
+        "RELEASE_CI_STATUS_OVERRIDE=true script/release"
+      )
+      expect(historical_design).not_to include("script/release 16.2.0")
+      expect(historical_design).not_to include('bundle exec rake "release[16.2.0,false,false,true]"')
+      publication_plan = File.read(
+        File.expand_path("../../../internal/planning/2026-08-23-release-line-fenced-publication.md", __dir__)
+      )
+      expect(publication_plan).to include("Wrapper usage: script/release.")
+      expect(publication_plan).to include("script/release --dry-run\n")
+      expect(publication_plan).to include("RELEASE_TRACKER=4842 script/release\n")
+      expect(publication_plan).not_to include("script/release VERSION")
+      expect(publication_plan).not_to include("script/release 17.1.0.rc.0")
+      expect(publication_plan).not_to include("script/release --dry-run 17.1.0.rc.0")
+      managed_design = File.read(
+        File.expand_path(
+          "../../../internal/planning/2026-08-23-release-line-fenced-publication-design.md",
+          __dir__
+        )
+      )
+      expect(managed_design).to include("atomically acquire that\n   release-line claim")
+      expect(managed_design).to include("renew a wrapper-managed claim")
+      expect(managed_design).to include("Release an exact wrapper-managed claim")
+      expect(managed_design).to include("pre-acquired automation claim")
+      expect(managed_design).not_to include("run the explicit version")
+      expect(normalized_guide).to include(
         "exceeding 1,000 markers or requiring a 251st page blocks as unknown"
       )
       expect(normalized_guide).to include(
@@ -9209,6 +9629,23 @@ RSpec.describe "release.rake helper methods" do
       )
       expect(normalized_guide).to include(
         "deterministically newer ordered success may supersede older ordered failures"
+      )
+    end
+
+    it "keeps canonical agent policy aligned with the supervised live release boundary" do
+      agent_policy = File.read(File.expand_path("../../../AGENTS.md", __dir__))
+      normalized_policy = agent_policy.gsub(/\s+/, " ")
+
+      expect(normalized_policy).to include(
+        "Live RC publication and reconciliation must use the repository-owned argumentless `script/release` wrapper"
+      )
+      expect(normalized_policy).to include(
+        "Live compound promotion is supported only through the same repository-owned argumentless `script/release`"
+      )
+      expect(normalized_policy).not_to include("`script/release VERSION`")
+      expect(normalized_policy).not_to include("`script/release X.Y.Z`")
+      expect(normalized_policy).to include(
+        "Direct live Rake invocation remains **BLOCKED**"
       )
     end
 
@@ -9576,6 +10013,17 @@ RSpec.describe "release.rake helper methods" do
       ).to eq([marker_comment])
     end
 
+    it "binds bounded repository discovery to the candidate commit timestamp" do
+      expect(
+        accelerated_rc_comment_page_endpoint(
+          repo_slug: "shakacode/react_on_rails", tracker: nil, page: 1, since: "2026-07-14T12:00:00Z"
+        )
+      ).to eq(
+        "repos/shakacode/react_on_rails/issues/comments?per_page=100&sort=created&direction=asc&page=1" \
+        "&since=2026-07-14T12%3A00%3A00Z"
+      )
+    end
+
     it "allows a safely structured markerless repository comment whose author was deleted" do
       success = instance_double(Process::Status, success?: true)
       deleted_user_comment = accelerated_rc_test_issue_comment(
@@ -9839,7 +10287,8 @@ RSpec.describe "release.rake helper methods" do
       allow(self).to receive(:capture_gh_output)
         .with(
           "api",
-          "repos/shakacode/react_on_rails/issues/comments?per_page=100&sort=created&direction=asc&page=1"
+          "repos/shakacode/react_on_rails/issues/comments?per_page=100&sort=created&direction=asc&page=1" \
+          "&since=2026-07-14T11%3A59%3A59Z"
         ).and_return([JSON.generate([comment]), success])
       allow(self).to receive(:capture_gh_output)
         .with(
@@ -9854,6 +10303,24 @@ RSpec.describe "release.rake helper methods" do
           candidate_sha: "f" * 40
         )
       ).to eq([authorization])
+    end
+
+    it "bounds trackerless repository discovery to the candidate commit timestamp" do
+      allow(self).to receive_messages(
+        fetch_repository_issue_comments_for_accelerated_rc_retry!: [],
+        accelerated_rc_candidate_comment_lower_bound!: "2026-07-14T12:00:00Z"
+      )
+
+      expect(
+        fetch_repository_accelerated_rc_records_for_candidate!(
+          repo_slug: "shakacode/react_on_rails",
+          target_version: "17.0.0.rc.10",
+          candidate_sha: "f" * 40
+        )
+      ).to eq([])
+      expect(self).to have_received(:fetch_repository_issue_comments_for_accelerated_rc_retry!).with(
+        repo_slug: "shakacode/react_on_rails", since: "2026-07-14T11:59:59Z"
+      )
     end
 
     it "caches eligibility for repeated repository-discovered markers on the same tracker" do
@@ -12039,6 +12506,35 @@ RSpec.describe "release.rake helper methods" do
           ), name
         end
       end
+    end
+
+    it "accepts the legacy reconciliation instruction on an otherwise canonical publication" do
+      authorization = build_accelerated_rc_publication_record(
+        options: accelerated_rc_options,
+        candidate_sha: "f" * 40,
+        runtime_tree_fingerprint: "a" * 64,
+        release_branch: "release/17.0.0",
+        ci_snapshot: accelerated_rc_ci_snapshot,
+        shakaperf: accelerated_rc_shakaperf_snapshot,
+        approved_by: "justin808",
+        recorded_at: Time.utc(2026, 7, 14, 13, 30)
+      )
+      canonical_publication = accelerated_rc_published_record(
+        authorized_record: authorization,
+        recorded_at: Time.utc(2026, 7, 14, 14)
+      )
+      legacy_publication = canonical_publication.merge(
+        "required_follow_up" => "Run release:reconcile_accelerated_rc before promoting this RC to final."
+      )
+
+      expect(
+        accelerated_rc_publication_completion_equivalent?(legacy_publication, canonical_publication)
+      ).to be(true)
+      expect(
+        accelerated_rc_publication_completion_equivalent?(
+          legacy_publication.merge("required_follow_up" => "Skip reconciliation"), canonical_publication
+        )
+      ).to be(false)
     end
 
     it "treats every distinct valid authorization digest as conflicting" do
@@ -15414,21 +15910,24 @@ RSpec.describe "release.rake helper methods" do
   end
 
   describe "release task help" do
-    it "advertises only preview commands while live compound release is blocked" do
+    it "documents the fenced wrapper while direct live rake remains refused" do
       rakefile = File.read(File.expand_path("../../../rakelib/release.rake", __dir__))
       release_help = rakefile.match(/desc\("(.*?)"\)\ntask :release/m)[1]
       sync_help = rakefile.match(/desc\("Creates or updates a GitHub release(.*?)"\)\ntask :sync_github_release/m)[1]
       start_help = rakefile.match(/desc\("Start a release line(.*?)"\)\n  task :start/m)[1]
 
-      expect([release_help, start_help]).to all(
-        include("Live compound release remains BLOCKED", "internal/contributor-info/release-train-runbook.md")
+      expect(release_help).to include(
+        "script/release",
+        "Direct live `bundle exec rake release[...]` is refused"
       )
       expect(sync_help).to include(
-        "Live GitHub release recovery remains BLOCKED",
+        "Direct live sync_github_release is refused",
+        "script/release",
         "internal/contributor-info/release-train-runbook.md"
       )
+      expect(start_help).to include("policy-blocked", "internal/contributor-info/release-train-runbook.md")
 
-      release_commands = release_help.lines.grep(/rake (?:\\?"?)release(?:\[|\\?"?$)/)
+      release_commands = release_help.lines.grep(/^\s*rake (?:\\?"?)release(?:\[|\\?"?$)/)
       sync_commands = sync_help.lines.grep(/rake \\"sync_github_release\[/)
       start_commands = start_help.lines.grep(/rake (?:\\?")?release:start/)
 
@@ -15484,6 +15983,7 @@ RSpec.describe "release.rake helper methods" do
       checkout_index = release_task.index("with_release_checkout")
       pull_index = release_task.index('sh_in_dir_for_release(release_root, "git pull --rebase")')
       readiness_refresh_index = release_task.index("refresh_npm_release_readiness_after_pull!")
+      selected_version_refresh_index = release_task.index("validate_supervised_release_version_after_pull!")
       version_resolution_index = release_task.index("resolve_release_version_before_auth!")
       tag_retry_index = release_task.index("release_tag_retry_state_for_current_head")
       retry_mode_index = release_task.index("resolve_accelerated_rc_options_for_release!")
@@ -15514,6 +16014,8 @@ RSpec.describe "release.rake helper methods" do
       expect(release_task.scan("validate_npm_release_readiness!").length).to eq(1)
       expect(checkout_index).to be < pull_index
       expect(pull_index).to be < readiness_refresh_index
+      expect(readiness_refresh_index).to be < selected_version_refresh_index
+      expect(selected_version_refresh_index).to be < version_resolution_index
       expect(readiness_refresh_index).to be < version_resolution_index
       expect(post_pull_sha_index).to be < unchanged_sha_return_index
       expect(unchanged_sha_return_index).to be < changed_sha_readiness_index
@@ -16542,6 +17044,7 @@ RSpec.describe "release.rake helper methods" do
         preflight_registry_publish_conflicts!: nil,
         confirm_release!: nil,
         sh_in_dir_for_release: nil,
+        release_write_fence!: nil,
         unbundled_sh_in_dir_for_release: nil,
         current_git_sha!: "f" * 40,
         authorize_accelerated_rc_publication!: authorization,
@@ -18439,6 +18942,7 @@ RSpec.describe "release.rake helper methods" do
         success_status = instance_double(Process::Status, success?: true)
         api_path = "repos/shakacode/react_on_rails/branches/main/protection/required_status_checks"
         branch_path = "repos/shakacode/react_on_rails/branches/main"
+        rules_path = "repos/shakacode/react_on_rails/rules/branches/main?per_page=100"
         allow(self).to receive(:required_check_names_for_branch).and_call_original
         allow(self).to receive(:fetch_main_ci_checks)
           .with(monorepo_root:, allow_override: false, dry_run: false, ci_branch: "main")
@@ -18457,6 +18961,9 @@ RSpec.describe "release.rake helper methods" do
         allow(Open3).to receive(:capture2e)
           .with("gh", "api", branch_path)
           .and_return(['{"name":"main","protected":false}', success_status])
+        allow(Open3).to receive(:capture2e)
+          .with("gh", "api", "--paginate", "--slurp", *BRANCH_RULES_API_HEADERS, rules_path)
+          .and_return(["[[]]", success_status])
 
         output = nil
         expect do
@@ -18479,6 +18986,7 @@ RSpec.describe "release.rake helper methods" do
         success_status = instance_double(Process::Status, success?: true)
         api_path = "repos/shakacode/react_on_rails/branches/main/protection/required_status_checks"
         branch_path = "repos/shakacode/react_on_rails/branches/main"
+        rules_path = "repos/shakacode/react_on_rails/rules/branches/main?per_page=100"
         allow(self).to receive(:required_check_names_for_branch).and_call_original
         allow(self).to receive(:fetch_main_ci_checks)
           .with(monorepo_root:, allow_override: false, dry_run: false, ci_branch: "main")
@@ -18497,6 +19005,9 @@ RSpec.describe "release.rake helper methods" do
         allow(Open3).to receive(:capture2e)
           .with("gh", "api", branch_path)
           .and_return(['{"name":"main","protected":true}', success_status])
+        allow(Open3).to receive(:capture2e)
+          .with("gh", "api", "--paginate", "--slurp", *BRANCH_RULES_API_HEADERS, rules_path)
+          .and_return(["[[]]", success_status])
 
         output = nil
         expect do
@@ -21856,14 +22367,138 @@ RSpec.describe "release.rake helper methods" do
     end
   end
 
+  describe "execjs-compatible dummy release lock compatibility" do
+    let(:repo_root) { File.expand_path("../../..", __dir__) }
+    let(:dummy_root) { File.join(repo_root, "react_on_rails_pro", "spec", "execjs-compatible-dummy") }
+
+    it "bounds sqlite resolution and retains both source and native-platform variants" do
+      gemfile = File.read(File.join(dummy_root, "Gemfile"))
+      lockfile = File.read(File.join(dummy_root, "Gemfile.lock"))
+
+      expect(gemfile).to include('gem "sqlite3", "~> 1.7", force_ruby_platform:')
+      expect(lockfile).to match(/^    sqlite3 \(1\.7\.\d+\)$/)
+      expect(lockfile).to match(/^    sqlite3 \(1\.7\.\d+-arm64-darwin\)$/)
+      expect(lockfile).to match(/^  ruby$/)
+      expect(lockfile).to match(/^  sqlite3 \(~> 1\.7\)$/)
+      expect(lockfile).to match(/BUNDLED WITH\n   2\.5\.9\n\z/)
+    end
+  end
+
   describe "#required_check_names_for_branch" do
     let(:monorepo_root) { "/tmp/repo" }
     let(:success_status) { instance_double(Process::Status, success?: true) }
     let(:failure_status) { instance_double(Process::Status, success?: false) }
     let(:expected_jq) { REQUIRED_CHECKS_JQ_QUERY }
+    let(:branch_protection_path) do
+      "repos/shakacode/react_on_rails/branches/main/protection/required_status_checks"
+    end
+    let(:branch_rules_path) { "repos/shakacode/react_on_rails/rules/branches/main?per_page=100" }
+    let(:branch_rules_args) do
+      [
+        "gh", "api", "--paginate", "--slurp",
+        "-H", "Accept: application/vnd.github+json",
+        "-H", "X-GitHub-Api-Version: 2022-11-28",
+        branch_rules_path
+      ]
+    end
 
     before do
       allow(self).to receive(:github_repo_slug).with(monorepo_root).and_return("shakacode/react_on_rails")
+      allow(Open3).to receive(:capture2e)
+        .with(
+          "gh", "api", "--paginate", "--slurp",
+          "-H", "Accept: application/vnd.github+json",
+          "-H", "X-GitHub-Api-Version: 2022-11-28",
+          %r{\Arepos/shakacode/react_on_rails/rules/branches/.+\?per_page=100\z}
+        )
+        .and_return(["[[]]", success_status])
+    end
+
+    def stub_missing_classic_protection(branch_protection_path:, success_status:, failure_status:)
+      allow(Open3).to receive(:capture2e)
+        .with("gh", "api", "--jq", REQUIRED_CHECKS_JQ_QUERY, branch_protection_path)
+        .and_return(["HTTP 404: Branch not protected", failure_status])
+      allow(Open3).to receive(:capture3)
+        .with("gh", "api", "--include", branch_protection_path)
+        .and_return([
+                      "HTTP/2.0 404 Not Found\r\nContent-Type: application/json\r\n\r\n" \
+                      '{"message":"Branch not protected"}',
+                      "gh: branch protection is not enabled for this branch\n",
+                      failure_status
+                    ])
+      allow(Open3).to receive(:capture2e)
+        .with("gh", "api", "repos/shakacode/react_on_rails/branches/main")
+        .and_return(['{"name":"main","protected":true}', success_status])
+    end
+
+    it "discovers required checks from active branch rulesets when classic protection is absent" do
+      stub_missing_classic_protection(branch_protection_path:, success_status:, failure_status:)
+      rules = [
+        {
+          type: "required_status_checks",
+          parameters: {
+            required_status_checks: [{ context: "required-pr-gate", integration_id: 15_368 }]
+          },
+          ruleset_source_type: "Repository",
+          ruleset_source: "shakacode/react_on_rails",
+          ruleset_id: 21_350_286
+        }
+      ]
+      allow(Open3).to receive(:capture2e).with(*branch_rules_args).and_return([[rules].to_json, success_status])
+
+      expect(required_check_names_for_branch(monorepo_root:)).to eq(
+        contexts: [],
+        checks: [{ context: "required-pr-gate", app_id: 15_368 }]
+      )
+    end
+
+    it "combines required checks from every paginated ruleset response" do
+      stub_missing_classic_protection(branch_protection_path:, success_status:, failure_status:)
+      pages = [
+        [
+          {
+            type: "required_status_checks",
+            parameters: { required_status_checks: [{ context: "Lint", integration_id: nil }] },
+            ruleset_source_type: "Repository",
+            ruleset_source: "shakacode/react_on_rails",
+            ruleset_id: 11
+          }
+        ],
+        [
+          {
+            type: "required_status_checks",
+            parameters: { required_status_checks: [{ context: "Test", integration_id: 22 }] },
+            ruleset_source_type: "Organization",
+            ruleset_source: "shakacode",
+            ruleset_id: 12
+          }
+        ]
+      ]
+      allow(Open3).to receive(:capture2e).with(*branch_rules_args).and_return([pages.to_json, success_status])
+
+      expect(required_check_names_for_branch(monorepo_root:)).to eq(
+        contexts: [],
+        checks: [{ context: "Lint", app_id: nil }, { context: "Test", app_id: 22 }]
+      )
+    end
+
+    it "fails closed when a required-status-check ruleset is malformed" do
+      stub_missing_classic_protection(branch_protection_path:, success_status:, failure_status:)
+      malformed_pages = [[{ type: "required_status_checks", parameters: { required_status_checks: nil } }]]
+      allow(Open3).to receive(:capture2e)
+        .with(*branch_rules_args).and_return([malformed_pages.to_json, success_status])
+
+      expect(required_check_names_for_branch(monorepo_root:)).to equal(REQUIRED_CHECK_DISCOVERY_UNKNOWN)
+    end
+
+    it "fails closed when active branch rules cannot be queried" do
+      allow(Open3).to receive(:capture2e)
+        .with("gh", "api", "--jq", expected_jq, branch_protection_path)
+        .and_return([{ contexts: ["Classic"], checks: [] }.to_json, success_status])
+      allow(Open3).to receive(:capture2e)
+        .with(*branch_rules_args).and_return(["HTTP 403: insufficient token scope", failure_status])
+
+      expect(required_check_names_for_branch(monorepo_root:)).to equal(REQUIRED_CHECK_DISCOVERY_UNKNOWN)
     end
 
     it "returns legacy required status contexts when branch protection is configured" do
@@ -23454,6 +24089,426 @@ RSpec.describe "release.rake helper methods" do
       expect do
         resolve_release_start_base_version("", monorepo_root: "/tmp/repo")
       end.to raise_error(SystemExit, /Could not determine which release line to start/)
+    end
+  end
+
+  describe "outward write fencing" do
+    it "fences the version commit push immediately before the outward write" do
+      expect(self).to receive(:release_write_fence!).with("push version commit").ordered
+      expect(self).to receive(:sh_in_dir_for_release)
+        .with("/tmp/repo", "LEFTHOOK=0 git push")
+        .ordered
+
+      push_release_version_commit!("/tmp/repo")
+    end
+
+    it "fences a ShakaPerf dispatch immediately before the outward write" do
+      success = instance_double(Process::Status, success?: true)
+      expect(self).to receive(:release_write_fence!).with("dispatch ShakaPerf release gate").ordered
+      expect(self).to receive(:capture_gh_output)
+        .with(
+          "workflow", "run", SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE,
+          "--repo", "shakacode/react_on_rails",
+          "--ref", "release/17.1.0",
+          "-f", "target_version=17.1.0.rc.0",
+          "-f", "candidate_sha=#{'f' * 40}"
+        )
+        .ordered
+        .and_return(["", success])
+
+      dispatch_shakaperf_release_gate_workflow!(
+        repo_slug: "shakacode/react_on_rails",
+        ref: "release/17.1.0",
+        target_version: "17.1.0.rc.0",
+        candidate_sha: "f" * 40
+      )
+    end
+
+    it "fences ShakaPerf evidence and accelerated tracker comments immediately before each outward write" do
+      success = instance_double(Process::Status, success?: true)
+      comments = [
+        "<!-- #{SHAKAPERF_RELEASE_TRACKER_ASSOCIATION_MARKER} -->",
+        "<!-- #{ACCELERATED_RC_RECORD_MARKER} -->"
+      ]
+
+      comments.each do |body|
+        expect(self).to receive(:release_write_fence!).with("post release tracker comment").ordered
+        expect(self).to receive(:capture_gh_output)
+          .with(
+            "issue", "comment", "4842", "--repo", "shakacode/react_on_rails",
+            "--body-file", a_string_ending_with(".md")
+          )
+          .ordered
+          .and_return(["", success])
+
+        post_release_tracker_comment!(repo_slug: "shakacode/react_on_rails", tracker: 4842, body:)
+      end
+    end
+
+    it "fences the tag push immediately before the outward write" do
+      candidate_sha = "f" * 40
+      allow(self).to receive_messages(
+        system: true,
+        validate_release_tag_candidate_sha!: candidate_sha,
+        validate_release_candidate_publication_boundary!: candidate_sha,
+        validate_accelerated_tag_publication_boundary!: nil,
+        validate_remote_release_tag_candidate_sha!: candidate_sha
+      )
+      expect(self).to receive(:release_write_fence!).with("push release tag v17.1.0.rc.0").ordered
+      expect(self).to receive(:sh_in_dir_for_release)
+        .with("/tmp/repo", "LEFTHOOK=0 git push --tags")
+        .ordered
+
+      push_release_tag_for_candidate!(
+        monorepo_root: "/tmp/repo",
+        tag: "v17.1.0.rc.0",
+        candidate_sha:
+      )
+    end
+
+    %w[
+      react-on-rails
+      react-on-rails-pro
+      react-on-rails-pro-node-renderer
+      create-react-on-rails-app
+    ].each do |package_name|
+      it "fences the named npm #{package_name} attempt immediately before its outward write" do
+        Dir.mktmpdir do |dir|
+          package_ref = "#{package_name}@17.1.0-rc.0"
+          File.write(
+            File.join(dir, "package.json"),
+            JSON.generate("name" => package_name, "version" => "17.1.0-rc.0")
+          )
+          success = instance_double(Process::Status, success?: true)
+          expect(self).to receive(:npm_package_already_published?)
+            .with(package_name, "17.1.0-rc.0")
+            .ordered
+            .and_return(false)
+          expect(self).to receive(:release_write_fence!)
+            .with("publish npm #{package_ref} attempt 1")
+            .ordered
+          expect(Open3).to receive(:capture2e)
+            .with("pnpm", "publish", chdir: dir)
+            .ordered
+            .and_return(["published\n", success])
+          expect(self).to receive(:verify_npm_package_published!)
+            .with(package_name, "17.1.0-rc.0")
+
+          publish_npm_with_retry(dir, package_ref, max_retries: 1)
+        end
+      end
+    end
+
+    %w[react_on_rails react_on_rails_pro].each do |gem_name|
+      it "fences the named RubyGem #{gem_name} attempt immediately before its outward write" do
+        expect(self).to receive(:release_write_fence!)
+          .with("publish RubyGem #{gem_name} attempt 1")
+          .ordered
+        expect(self).to receive(:sh_args_in_dir_for_release)
+          .with("/tmp/gem", "gem", "release", env: nil)
+          .ordered
+
+        publish_gem_with_retry("/tmp/gem", gem_name, max_retries: 1)
+      end
+    end
+
+    it "fences GitHub release create and edit immediately before each outward write" do
+      release_context = {
+        notes: "#### Fixed\n\n- Release fix",
+        prerelease: true,
+        tag: "v17.1.0.rc.0",
+        title: "v17.1.0.rc.0"
+      }
+      allow(self).to receive(:ensure_git_tag_exists!)
+      allow(self).to receive(:github_repo_slug).with("/tmp/repo").and_return("shakacode/react_on_rails")
+      expect(self).to receive(:system)
+        .with(
+          "gh", "release", "view", "v17.1.0.rc.0", "--repo", "shakacode/react_on_rails",
+          chdir: "/tmp/repo", out: File::NULL, err: File::NULL
+        )
+        .ordered
+        .and_return(false)
+      expect(self).to receive(:release_write_fence!)
+        .with("create GitHub release v17.1.0.rc.0")
+        .ordered
+      expect(self).to receive(:system)
+        .with(
+          "gh", "release", "create", "v17.1.0.rc.0", "--repo", "shakacode/react_on_rails",
+          "--verify-tag", "--title", "v17.1.0.rc.0", "--notes-file", a_string_ending_with(".md"),
+          "--prerelease", chdir: "/tmp/repo"
+        )
+        .ordered
+        .and_return(true)
+      expect(self).to receive(:system)
+        .with(
+          "gh", "release", "view", "v17.1.0.rc.0", "--repo", "shakacode/react_on_rails",
+          chdir: "/tmp/repo", out: File::NULL, err: File::NULL
+        )
+        .ordered
+        .and_return(true)
+      expect(self).to receive(:release_write_fence!)
+        .with("edit GitHub release v17.1.0.rc.0")
+        .ordered
+      expect(self).to receive(:system)
+        .with(
+          "gh", "release", "edit", "v17.1.0.rc.0", "--repo", "shakacode/react_on_rails",
+          "--title", "v17.1.0.rc.0", "--notes-file", a_string_ending_with(".md"),
+          "--prerelease=true", "--draft=false", chdir: "/tmp/repo"
+        )
+        .ordered
+        .and_return(true)
+
+      2.times do
+        publish_or_update_github_release(monorepo_root: "/tmp/repo", release_context:, dry_run: false)
+      end
+    end
+
+    it "leaves registry visibility checks unfenced when no outward write is needed" do
+      allow(self).to receive(:npm_package_already_published?)
+        .with("react-on-rails", "17.1.0-rc.0")
+        .and_return(true)
+      allow(self).to receive(:rubygem_version_published?)
+        .with("react_on_rails", "17.1.0.rc.0")
+        .and_return(true)
+      expect(self).not_to receive(:release_write_fence!)
+      expect(Open3).not_to receive(:capture2e)
+      expect(self).not_to receive(:sh_args_in_dir_for_release)
+
+      publish_npm_with_retry(
+        "/tmp/npm",
+        "react-on-rails@17.1.0-rc.0",
+        idempotent_retry: true,
+        max_retries: 1
+      )
+      publish_gem_with_retry(
+        "/tmp/gem",
+        "react_on_rails",
+        published_version: "17.1.0.rc.0",
+        idempotent_retry: true,
+        max_retries: 1
+      )
+    end
+  end
+
+  describe "direct live release guard" do
+    let(:release_task) { Rake::Task["release"] }
+    let(:task_receiver) { release_task.actions.first.binding.receiver }
+    let(:success_status) { instance_double(Process::Status, success?: true) }
+
+    after { release_task.reenable }
+
+    it "refuses direct live Rake invocation before build, pull, authentication, or mutation" do
+      allow(task_receiver).to receive(:current_monorepo_root).and_return("/tmp/repo")
+      expect(ReleaseLeaseGuard).to receive(:activate!)
+        .with(dry_run: false)
+        .and_raise(ReleaseLeaseGuard::LeaseError, "live release wrapper contract is required")
+      expect(Open3).not_to receive(:capture2e)
+      expect(ReactOnRails::GitUtils).not_to receive(:uncommitted_changes?)
+      expect(task_receiver).not_to receive(:current_npm_release_readiness_sha!)
+      expect(task_receiver).not_to receive(:validate_npm_release_readiness!)
+      expect(task_receiver).not_to receive(:with_release_checkout)
+      expect(task_receiver).not_to receive(:sh_in_dir_for_release)
+      expect(task_receiver).not_to receive(:verify_npm_auth)
+      expect(task_receiver).not_to receive(:verify_gh_auth)
+      expect(task_receiver).not_to receive(:release_write_fence!)
+
+      expect do
+        release_task.invoke("17.1.0.rc.0", false, true, false)
+      end.to raise_error(SystemExit, %r{script/release.*wrapper contract is required}m)
+    end
+
+    it "keeps a direct dry run guard-free and coordination-free" do
+      expect(ReleaseLeaseGuard).not_to receive(:activate!)
+      expect(ReleaseLeaseGuard).not_to receive(:fence!)
+
+      activate_release_lease_guard!(dry_run: true)
+    end
+  end
+
+  describe "accelerated RC reconciliation task guard" do
+    let(:reconciliation_task) { Rake::Task["release:reconcile_accelerated_rc"] }
+    let(:task_receiver) { reconciliation_task.actions.first.binding.receiver }
+    let(:success_status) { instance_double(Process::Status, success?: true) }
+
+    after { reconciliation_task.reenable }
+
+    it "refuses a dirty checkout before pulling or writing tracker state" do
+      allow(task_receiver).to receive(:current_monorepo_root).and_return("/tmp/repo")
+      allow(ENV).to receive(:fetch).and_call_original
+      allow(ENV).to receive(:fetch).with("RELEASE_TRACKER", nil).and_return("3823")
+      expect(ReleaseLeaseGuard).to receive(:activate!).with(dry_run: false).ordered
+      expect(ReactOnRails::GitUtils).to receive(:uncommitted_changes?)
+        .with(an_instance_of(RaisingMessageHandler))
+        .ordered
+        .and_raise(RuntimeError, "You have uncommitted changes")
+      expect(task_receiver).not_to receive(:sh_in_dir_for_release)
+      expect(task_receiver).not_to receive(:verify_gh_auth)
+      expect(task_receiver).not_to receive(:run_accelerated_rc_reconciliation!)
+
+      expect do
+        reconciliation_task.invoke("17.0.0.rc.10")
+      end.to raise_error(RuntimeError, /uncommitted changes/)
+    end
+
+    {
+      "changes versions" => "17.0.0.rc.11",
+      "becomes empty" => nil
+    }.each do |description, refreshed_version|
+      it "refuses reconciliation when the post-pull changelog #{description}" do
+        allow(task_receiver).to receive(:current_monorepo_root).and_return("/tmp/repo")
+        allow(ENV).to receive(:fetch).and_call_original
+        allow(ENV).to receive(:fetch).with(ReleaseLeaseGuard::CONTRACT_ENV, nil).and_return("supervised-contract")
+        allow(ENV).to receive(:fetch).with("RELEASE_TRACKER", nil).and_return("3823")
+        allow(ReactOnRails::GitUtils).to receive(:uncommitted_changes?)
+        allow(task_receiver).to receive(:sh_in_dir_for_release).with("/tmp/repo", "git pull --rebase")
+        allow(task_receiver).to receive(:prepared_release_version_from_changelog)
+          .with(monorepo_root: "/tmp/repo")
+          .and_return(refreshed_version)
+        expect(task_receiver).not_to receive(:verify_gh_auth)
+        expect(task_receiver).not_to receive(:run_accelerated_rc_reconciliation!)
+
+        expect do
+          reconciliation_task.invoke("17.0.0.rc.10")
+        end.to raise_error(
+          SystemExit,
+          /changed from 17\.0\.0\.rc\.10 to #{refreshed_version || 'none'}.*No publication has started/m
+        )
+      end
+    end
+
+    it "uses the supervised contract and fences the terminal tracker write" do
+      authorization, publication, accepted = accelerated_rc_test_accepted_history
+      tracker_reads = 0
+      repository_reads = 0
+      allow(task_receiver).to receive_messages(
+        current_monorepo_root: "/tmp/repo",
+        github_repo_slug: "shakacode/react_on_rails",
+        fetch_release_tracker_issue!: nil,
+        current_release_approver!: "justin808",
+        fetch_accelerated_rc_ci_snapshot!: accepted.fetch("ci"),
+        accelerated_rc_shakaperf_snapshot!: accepted.fetch("shakaperf")
+      )
+      allow(task_receiver).to receive(:fetch_accelerated_rc_tracker_records!) do
+        tracker_reads += 1
+        tracker_reads < 3 ? [authorization, publication] : [authorization, publication, accepted]
+      end
+      allow(task_receiver).to receive(:fetch_repository_accelerated_rc_records_for_candidate!) do
+        repository_reads += 1
+        repository_reads == 1 ? [authorization, publication] : [authorization, publication, accepted]
+      end
+      allow(Time).to receive(:now).and_return(Time.utc(2026, 7, 14, 15))
+      allow(ENV).to receive(:fetch).and_call_original
+      allow(ENV).to receive(:fetch).with("RELEASE_TRACKER", nil).and_return("3823")
+      allow(ENV).to receive(:fetch)
+        .with("RELEASE_ACCELERATED_RC_RECONCILIATION_REASON", nil)
+        .and_return("All required evidence passed")
+      {
+        "RELEASE_DEMO_FLEET_EVIDENCE_URL" => "https://github.com/demo-fleet",
+        "RELEASE_BEHAVIORAL_EVIDENCE_URL" => "https://github.com/behavioral",
+        "RELEASE_ARTIFACT_EVIDENCE_URL" => "https://github.com/artifacts"
+      }.each do |name, value|
+        allow(ENV).to receive(:fetch).with(name, nil).and_return(value)
+      end
+
+      expect(ReleaseLeaseGuard).to receive(:activate!).with(dry_run: false).ordered
+      expect(ReactOnRails::GitUtils).to receive(:uncommitted_changes?)
+        .with(an_instance_of(RaisingMessageHandler))
+        .ordered
+        .and_return(false)
+      expect(task_receiver).to receive(:sh_in_dir_for_release)
+        .with("/tmp/repo", "git pull --rebase")
+        .ordered
+      expect(task_receiver).to receive(:validate_supervised_release_version_after_pull!)
+        .with(monorepo_root: "/tmp/repo", selected_version: "17.0.0.rc.10", dry_run: false)
+        .ordered
+      expect(task_receiver).to receive(:verify_gh_auth).with(monorepo_root: "/tmp/repo").ordered
+      expect(ReleaseLeaseGuard).to receive(:fence!).ordered
+      expect(task_receiver).to receive(:capture_gh_output)
+        .with(
+          "issue", "comment", "3823", "--repo", "shakacode/react_on_rails",
+          "--body-file", a_string_ending_with(".md")
+        )
+        .ordered do |*arguments|
+          body_path = arguments.last
+          expect(File.read(body_path)).to include(ACCELERATED_RC_RECORD_MARKER, "candidate-accepted")
+          ["", success_status]
+        end
+
+      expect do
+        reconciliation_task.invoke("17.0.0.rc.10")
+      end.to output(/candidate accepted/i).to_stdout
+    end
+  end
+
+  describe "publish retry outward write fencing" do
+    it "uses a fresh fence for each npm publish retry attempt" do
+      Dir.mktmpdir do |dir|
+        File.write(
+          File.join(dir, "package.json"),
+          JSON.generate("name" => "react-on-rails", "version" => "17.1.0-rc.0")
+        )
+        failure = instance_double(Process::Status, success?: false)
+        success = instance_double(Process::Status, success?: true)
+        expect(self).to receive(:npm_package_already_published?)
+          .with("react-on-rails", "17.1.0-rc.0")
+          .ordered
+          .and_return(false)
+        expect(self).to receive(:release_write_fence!)
+          .with("publish npm react-on-rails@17.1.0-rc.0 attempt 1")
+          .ordered
+        expect(Open3).to receive(:capture2e)
+          .with("pnpm", "publish", "--otp", "987654", chdir: dir)
+          .ordered
+          .and_return(["npm ERR! code E503\n", failure])
+        expect(self).to receive(:npm_package_already_published?)
+          .with("react-on-rails", "17.1.0-rc.0")
+          .ordered
+          .and_return(false)
+        expect(self).to receive(:sleep).with(1).ordered
+        expect(self).to receive(:release_write_fence!)
+          .with("publish npm react-on-rails@17.1.0-rc.0 attempt 2")
+          .ordered
+        expect(Open3).to receive(:capture2e)
+          .with("pnpm", "publish", "--otp", "987654", chdir: dir)
+          .ordered
+          .and_return(["published\n", success])
+        expect(self).to receive(:verify_npm_package_published!)
+          .with("react-on-rails", "17.1.0-rc.0")
+
+        publish_npm_with_retry(
+          dir,
+          "react-on-rails@17.1.0-rc.0",
+          otp: "987654",
+          max_retries: 2
+        )
+      end
+    end
+
+    it "uses a fresh fence for each RubyGem publish retry attempt" do
+      first_failure = RuntimeError.new("temporary RubyGems failure")
+      expect(self).to receive(:release_write_fence!)
+        .with("publish RubyGem react_on_rails attempt 1")
+        .ordered
+      expect(self).to receive(:sh_args_in_dir_for_release)
+        .with("/tmp/gem", "gem", "release", env: { "GEM_HOST_OTP_CODE" => "987654" })
+        .ordered
+        .and_raise(first_failure)
+      expect(self).to receive(:prompt_for_otp).with("RubyGems").ordered.and_return("123456")
+      expect(self).to receive(:release_write_fence!)
+        .with("publish RubyGem react_on_rails attempt 2")
+        .ordered
+      expect(self).to receive(:sh_args_in_dir_for_release)
+        .with("/tmp/gem", "gem", "release", env: { "GEM_HOST_OTP_CODE" => "123456" })
+        .ordered
+
+      expect(
+        publish_gem_with_retry(
+          "/tmp/gem",
+          "react_on_rails",
+          otp: "987654",
+          max_retries: 2
+        )
+      ).to eq("123456")
     end
   end
 end

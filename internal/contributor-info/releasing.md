@@ -10,21 +10,23 @@ RC to final, and close out the release branch, see
 behavioral release verification lanes, see [RC Testing Plan](rc-testing-plan.md)
 and [Release Verification Runbook](release-verification-runbook.md).
 
-> **Execution boundary:** This page is a mechanical reference, not a live-release
-> procedure. Until a repository-owned wrapper binds a compound helper to the
-> release-line lease for its whole lifetime and fences every outward operation,
-> use `bundle exec rake release`, `script/release-finish`, and other compound
-> release helpers only in dry-run or preview mode. All release-mutating examples
-> on this page are therefore previews. For a live cut or reconciliation, follow
-> the individually guarded commands in the
-> [Release-Train Runbook](release-train-runbook.md#serialize-every-release-line-write).
-> **BLOCKED** is an operational and agent policy stop, not runtime enforcement:
-> these tasks remain technically callable in live mode, but direct live
-> invocation outside that individually guarded procedure violates release
-> policy.
-> Interrupted or partial-publication recovery is currently blocked; preserve
-> the evidence and follow the dispositions in
-> [Partial-publication recovery](release-train-runbook.md#partial-publication-recovery).
+> **Execution boundary:** Live publication and accelerated-RC reconciliation use
+> only `script/release` (or
+> `script/release --reconcile-accelerated-rc`). The supervisor selects the first
+> prepared version after `### [Unreleased]`, creates a fresh process UUID,
+> atomically acquires the matching `release-line:X.Y.Z` claim without takeover,
+> maintains its heartbeat, renews its exact active claim at least hourly, and
+> proves that each outward write still has the same live claim. It never takes
+> over another holder and releases only its acquired claim after proving the
+> supervised process group absent. Direct live
+> `bundle exec rake release[...]` is refused; use Rake directly only with `dry_run=true`.
+> For one-time machine setup, advanced automation compatibility, handoff, and partial-publication
+> recovery, follow the [Release-Train
+> Runbook](release-train-runbook.md#serialize-every-release-line-write).
+
+The derived lease branch must equal the checkout used for publication.
+Prereleases and accelerated-RC reconciliation remain restricted to the matching
+`release/X.Y.Z` branch; a stable release may use that matching branch or `main`.
 
 ## Testing the Gem before Release from a Rails App
 
@@ -72,8 +74,9 @@ React on Rails RC. Follow the ordered dependency-promotion gate in the
 
 If a stable target lacks this section, the release task aborts before confirmation, tagging, or publication.
 For a prerelease, the task warns and skips the GitHub release. After adding the section, preview the idempotent update
-with the dry-run form `sync_github_release[X.Y.Z,true]`; live GitHub release creation or editing remains **BLOCKED** as
-documented in [Partial-publication recovery](release-train-runbook.md#partial-publication-recovery).
+with the dry-run form `sync_github_release[X.Y.Z,true]`; for a live recovery, keep that exact version as the first
+prepared changelog section and use `script/release` as documented in
+[Partial-publication recovery](release-train-runbook.md#partial-publication-recovery).
 
 #### Why changelog comes BEFORE the release
 
@@ -89,38 +92,37 @@ documented in [Partial-publication recovery](release-train-runbook.md#partial-pu
 
 ### 2. Preview the Release Task
 
-The task reads the version from CHANGELOG.md when the version argument is empty. Preview that path,
-or an explicit target, with `dry_run=true`:
+The maintainer path is changelog-driven. `--doctor` is optional after one-time
+setup, while `--dry-run` previews the same selected version without coordination
+or writes:
 
 ```bash
-# Reads version from CHANGELOG.md (requires step 1)
-bundle exec rake "release[,true]"
+script/release --doctor  # optional setup/diagnostic check
+script/release --dry-run # no coordination and no release writes
+script/release           # live release after the preview and required gates
+```
 
-# For a specific version (overrides CHANGELOG.md detection)
-bundle exec rake "release[16.2.0,true]"
+Do not pass a positional version to the wrapper. The first valid, non-empty
+version section after `### [Unreleased]` is the source of truth. Internal Rake
+arguments remain available only for explicit no-write diagnostics and tightly
+scoped recovery previews:
 
-# For a pre-release version (note: use period, not dash)
+```bash
 bundle exec rake "release[16.2.0.beta.1,true]"  # Previews npm package 16.2.0-beta.1
-
-# For a release candidate
 bundle exec rake "release[16.5.0.rc.0,true]"
-
-# Dry run to test without publishing
-bundle exec rake "release[16.2.0,true]"
-
-# Override version policy checks (monotonic + changelog/bump consistency)
 RELEASE_VERSION_POLICY_OVERRIDE=true bundle exec rake "release[16.2.0,true]"
 bundle exec rake "release[16.2.0,true,true]"
 ```
 
-> **Retry safety:** Never drop the version argument when resuming an interrupted release. Retry the
-> exact prerelease version; preview it with `bundle exec rake "release[17.0.0.rc.10,true]"`, then use
-> the blocked-state dispositions in
-> [Partial-publication recovery](release-train-runbook.md#partial-publication-recovery). There is no
-> safe live retry until the required fencing exists. From a prerelease
-> checkout, an argument-less release fails closed unless the changelog advances the same release line
-> to a newer prerelease. Stable promotion must use an explicit stable version and a matching non-empty
-> changelog section.
+> **Retry safety:** Keep the interrupted version as the first prepared changelog
+> section. Preview it with `script/release --dry-run`, then use
+> the recovery procedure in
+> [Partial-publication recovery](release-train-runbook.md#partial-publication-recovery). Live retry is
+> only `script/release`; its existing idempotent tag and registry checks preserve
+> partial-publication recovery. A fully published selected version stops with
+> instructions to prepare the next changelog section only when the GitHub
+> release also has the exact prepared tag, title, notes, draft state, and
+> prerelease state. A stale or draft release remains eligible for fenced recovery.
 
 When called with no arguments, `rake release`:
 
@@ -229,7 +231,7 @@ bundle exec rake "release[17.0.1,true]"
 ```
 
 This preview validates the target and tracker inputs but does not fetch or persist the selected run. Live
-association remains blocked until the repository-owned release wrapper described in the execution boundary exists.
+association uses the repository-owned `script/release` wrapper described in the execution boundary.
 
 This selector is not a waiver. Before appending anything, the task fetches the run and its schema-v2
 artifact from GitHub and verifies repository, workflow, branch, target version, run ID and attempt,
@@ -251,7 +253,18 @@ On a later invocation, set `RELEASE_TRACKER` without `RELEASE_SHAKAPERF_RUN`. Th
 unedited machine comments, re-fetches the saved run and artifact, and re-runs the same checks. Exact-SHA
 evidence is preferred. Existing machine-verified runtime-equivalence remains supported because the stored
 candidate is bound to the live run while the schema-v2 runtime fingerprint is compared with the current
-release commit. Output names both the tracker URL and reused run URL.
+release commit. Output names both the tracker URL and reused run URL. Candidate history is always read through the
+authoritative repository issue-comments endpoint, bounded from one second before the candidate commit timestamp.
+When `RELEASE_TRACKER=<issue>` is present, that issue is the expected canonical tracker, but the repository-wide read
+still proves that no conflicting tracker contains a matching candidate record. For a known-tracker recovery, use the
+fenced invocation:
+
+```bash
+RELEASE_TRACKER=<issue> script/release
+```
+
+The repository-wide candidate-bounded read applies with or without `RELEASE_TRACKER`. It fails closed as `UNKNOWN` at
+the configured page or marker bound, or when the candidate commit timestamp cannot be established.
 
 Only automatic association reuse may discard naturally invalid evidence and continue through normal discovery.
 That recovery is limited to authoritative staleness, a 404-proven missing run or artifact, GitHub CLI's exact
@@ -281,7 +294,7 @@ stable-only escape hatch:
 ```bash
 RELEASE_TRACKER=4806 \
 RELEASE_FINAL_SHAKAPERF_WAIVER_REASON="GitHub REST observer exhausted its quota" \
-bundle exec rake "release[17.0.1]"
+script/release
 ```
 
 The task writes and re-fetches an append-only schema-v2 `gate_observation_failed` waiver bound to the exact tracker,
@@ -381,16 +394,16 @@ creating the tag or publishing any package. After all six immutable npm and Ruby
 confirmed, it immediately appends `published-awaiting-gates` before fallible GitHub-release synchronization
 or other post-publish work. Partial package publication never appends that transition; once every package
 is published, a later GitHub-release sync failure still leaves the candidate durably awaiting reconciliation.
-At that completion boundary, the task first proves that the tracker is still eligible and that bounded
-repository-wide history has one canonical tracker and authorization with no absorbing rejection. It repeats
-that repository-wide proof after append or idempotent reuse, so a concurrent cross-tracker or terminal conflict
-cannot be reported as a successful completion.
+At that completion boundary, the task first proves that the selected tracker is still eligible and that bounded,
+authoritative repository comment history from the candidate commit forward has one canonical authorization with no
+absorbing rejection. It repeats that proof after append or idempotent reuse and rejects matching records on any other
+tracker. GitHub issue search is eventually indexed and therefore is never used as the completeness oracle.
 If all six artifacts became public but that completion append was interrupted, the reconciliation task can
 recover the missing transition before it evaluates the deferred gates. Recovery requires the canonical
-authorization-only repository history, the exact remote annotated RC tag object, its peeled candidate SHA and
+authorization-only selected-tracker history, the exact remote annotated RC tag object, its peeled candidate SHA and
 authorization provenance, and exact registry metadata for all four npm packages and both RubyGems. It
 revalidates the complete remote tag-object/candidate identity after the registry reads and then uses the normal
-repository-wide completion append. Partial, mismatched, malformed, ambiguous,
+selected-tracker completion append. Partial, mismatched, malformed, ambiguous,
 or unavailable registry/tag/history evidence blocks, and a GitHub outage still blocks durable recovery; there
 is no offline or unaudited completion bypass.
 Retries reuse the same candidate without appending duplicate status records. Accelerated RCs use an annotated
@@ -404,9 +417,9 @@ already be completed successfully and pass the live artifact, runtime-tree, ance
 commit proof; an active different-SHA run cannot be authorized, persisted, reused, or carried across a
 publication boundary. An active status paired with any non-null conclusion is contradictory evidence and
 blocks. Failed, missing, malformed, stale, API-unknown, or otherwise non-deferable evidence also blocks the
-retry. Every same-version-and-SHA retry discovers durable repository history first,
-whether or not it explicitly supplies `RELEASE_ACCELERATED_RC`. If history exists, the unique tracker and
-canonical authorization chain control the retry; explicit tracker, reason, and options must match that
+retry. Every same-version-and-SHA retry discovers durable history first. When `RELEASE_TRACKER` is supplied,
+it identifies the expected canonical issue while authoritative repository issue-comment enumeration still checks the
+candidate across trackers. Its canonical authorization chain controls the retry, and explicit tracker, reason, and options must match that
 authorization exactly, and a rejected or conflicting chain remains blocking. The task never refreshes or
 creates a conflicting authorization. A history-free explicit attempt may create its first authorization only
 when the exact RC tag does not exist. An existing ordinary lightweight RC tag can be retried unflagged through
@@ -419,10 +432,11 @@ may continue.
 Exact-head CI snapshots sort non-success checks canonically by name, state, and URL before persistence and
 comparison. API enumeration-order changes therefore do not require another confirmation or block a publication
 boundary, while any real check identity, state, URL, duplicate, or conflicting-entry change remains material.
-Before accepting, reusing, or appending that authorization, the task loads every trusted repository issue
-comment for the exact version and SHA and requires one tracker with one canonical chain. It repeats that
-repository-wide proof after posting and immediately before tag handling, so an authorization or rejection
-that appears concurrently on another tracker blocks immutable publication. Before tag handling, immediately
+Before accepting, reusing, or appending that authorization, the task loads trusted repository issue comments updated
+since the candidate commit for the exact version and SHA and requires one canonical chain on the expected tracker. It
+repeats that repository-wide proof after posting and immediately before tag handling. Candidate commit time in the
+future, history recorded before that commit, malformed chronology, or a bounded page/marker limit blocks. Before tag
+handling, immediately
 before tag push, and again after tag push before package publication, accelerated RCs also refresh exact-head
 CI and the recorded ShakaPerf run. A newly failed, missing, malformed, or unknown gate blocks; pending evidence
 must still exactly match the confirmed authorization, and pending ShakaPerf must name the immutable RC candidate,
@@ -503,9 +517,9 @@ final promotion require at least one canonical `published-awaiting-gates` transi
 be ordered authorization, publication completion, then terminal state, with parseable monotonic timestamps.
 Exact authorization duplicates and the narrowly permitted publication/terminal retry variants remain
 idempotent only within their phase; pending transitions after terminal state are invalid.
-Reconciliation performs bounded repository-wide exact-version-and-SHA validation against the selected
-tracker and canonical authorization before reporting existing terminal state or appending a new terminal
-transition, then repeats that validation after the append helper re-fetches the selected tracker.
+Reconciliation performs bounded authoritative repository exact-version-and-SHA validation against the canonical
+authorization before reporting existing terminal state or appending a new terminal transition, then repeats
+that validation after the append helper re-fetches durable history.
 
 Reconcile the record after the deferred gates and all downstream RC testing finish. The live
 reconciliation command is intentionally omitted here; run it only from the guarded release coordinator
@@ -546,8 +560,9 @@ record must bind to the exact remote RC tag SHA and be complete. A provenance-be
 also use the literal canonical ref `v<target_version>` with lowercase dotted `.rc.` spelling; a dashed or
 case-varied alias is rejected even when it points at the same annotated object. Dashed-tag compatibility is
 limited to ordinary RCs for which complete discovery proves there is no accelerated provenance or history.
-Final promotion repeats repository-wide exact-version-and-SHA discovery and rejects any record on a tracker
-other than the one selected by the canonical tag provenance. The final tip must be that SHA or
+Final promotion re-fetches the selected tracker's exact-version-and-SHA chain identified by the canonical tag
+provenance. This selected-tracker read does not prove that another tracker has no matching record. The final tip
+must be that SHA or
 mechanically runtime-equivalent through the existing metadata-only promotion rules. Runtime
 equivalence is checked again after the final version-bump commit. The task first proves that the immutable
 accepted RC still exactly matches its recorded runtime fingerprint. When the final SHA differs, the canonical
@@ -561,7 +576,7 @@ refreshed and re-verified against the final tip when automatic reuse applies. An
 `RELEASE_SHAKAPERF_RUN` instead bypasses that reuse and must pass and persist through the strict final selector
 path; otherwise the normal strict final ShakaPerf gate runs only for a still-runtime-equivalent finalization.
 After that gate completes, the task re-fetches the live
-remote RC tag, repository-wide canonical tracker chain, and exact accepted-RC CI immediately before stable
+remote RC tag, selected-tracker canonical chain, and exact accepted-RC CI immediately before stable
 tagging and publication. The re-fetched accepted record must differ from the originally gated record only by its
 permitted retry timestamp. Local `HEAD` must still equal the validated final candidate, and the stable tag
 is created and verified against that explicit SHA rather than implicit moving `HEAD`. Deletion, mutation,
@@ -580,9 +595,9 @@ that same captured object and candidate; deletion, movement, replacement by anot
 lightweight tag, lost provenance, or an unclassifiable tag blocks. This source-tag check is additional to the live
 stable-tag peeled-SHA validation. For
 accelerated RC publication and accelerated-RC
-final promotion, both boundaries also re-fetch all trusted repository history for the exact RC candidate
-and require the same unique tracker and canonical, retry-equivalent authorization/terminal chain. A new
-rejection, tracker conflict, chain mutation, missing record, or unknown repository read aborts before the
+final promotion, both boundaries also re-fetch the selected tracker's trusted history for the exact RC candidate
+and require the same canonical, retry-equivalent authorization/terminal chain. A new rejection, chain mutation,
+missing record, or unknown selected-tracker read aborts before the
 next irreversible step. Accelerated final promotion also carries the exact refreshed RC CI snapshot and the
 exact ShakaPerf identity that passed the final gate, whether reused from the accepted RC or produced by a new
 strict final run. The carried boundary context names that mode explicitly: reused evidence must exactly match the
@@ -706,8 +721,8 @@ The task automatically converts Ruby gem format to npm semver format:
 
 1. When prompted for **npm OTP**, enter your 2FA code from your authenticator app
 2. When prompted for **RubyGems OTP**, enter your 2FA code
-3. If using `rake release` with no version, confirm the version detected from CHANGELOG.md. A stable checkout
-   may derive a patch candidate, but publication remains blocked until that version has a matching non-empty section.
+3. Invoke the changelog-selected live release through `script/release`; direct live Rake and positional wrapper
+   versions are refused.
 4. The script will automatically commit and push version bumps
 5. The script will automatically create a GitHub release (if CHANGELOG.md section exists)
 
@@ -729,9 +744,10 @@ The task automatically converts Ruby gem format to npm semver format:
    Run `$update-changelog 16.5.0` (using the already-released version) to analyze
    commits, write entries, and automatically open a PR. Use
    `$react-on-rails-update-changelog` instead when the catch-up PR must target
-   `release/X.Y.Z`. After the PR merges, preview the GitHub release update. The
-   `sync_github_release` command below is preview-only; live GitHub release creation or editing remains
-   **BLOCKED** as documented in
+   `release/X.Y.Z`. After the PR merges, preview the GitHub release update. Keep
+   `sync_github_release` preview-only; if the matching published release needs a live
+   idempotent GitHub update, resume through `script/release` with the published version still selected by
+   CHANGELOG.md under its fenced lease as documented in
    [Partial-publication recovery](release-train-runbook.md#partial-publication-recovery):
 
    ```bash
@@ -750,7 +766,8 @@ The task automatically converts Ruby gem format to npm semver format:
 ### Syncing GitHub Releases Manually
 
 If the automatic GitHub release creation was skipped (e.g., CHANGELOG.md section was missing during release),
-preview the recovery after updating the changelog. The live path is blocked, as documented in
+preview the recovery after updating the changelog. Direct live `sync_github_release` remains refused;
+the fenced recovery path is `script/release`, as documented in
 [Partial-publication recovery](release-train-runbook.md#partial-publication-recovery):
 
 1. Update `CHANGELOG.md` with the published version section
@@ -767,21 +784,26 @@ bundle exec rake "sync_github_release[16.5.0.rc.1,true]"
 
 `sync_github_release` reads release notes from the matching `CHANGELOG.md` section, applies the same size preparation
 as the main release task, and creates or updates the GitHub release for the corresponding tag. It is the idempotent
-recovery behavior when package publication succeeded but the final GitHub step failed. Its live GitHub create/edit
-boundary remains unfenced, so the commands above are preview-only until the required wrapper exists.
+recovery behavior when package publication succeeded but the final GitHub step failed. Preview it directly; for a
+live create or edit, `script/release` supplies the required supervised per-write fence.
 
 ### Pre-Release Checklist
 
 Before running the release command, verify:
 
-1. **GitHub CLI**: Run `gh auth login` and ensure your account/token has write access to the repository (required for automatic GitHub release creation)
+1. **One-time coordination setup**: Load `AGENT_COORD_API_URL`, the secret
+   `AGENT_COORD_API_TOKEN`, and a stable `AGENT_COORD_MACHINE_ID` from private
+   shell/dotfile configuration; ensure `~/.local/bin` is on `PATH`; then run
+   `script/release --doctor`. Never commit or print the token.
 
-2. **NPM authentication**: Run `npm whoami` to confirm you're logged in
+2. **GitHub CLI**: Run `gh auth login` and ensure your account/token has write access to the repository (required for automatic GitHub release creation)
+
+3. **NPM authentication**: Run `npm whoami` to confirm you're logged in
    - If not logged in, the release script will automatically run `npm login` for you
 
-3. **RubyGems authentication**: Ensure you have valid credentials for `gem push`
+4. **RubyGems authentication**: Ensure you have valid credentials for `gem push`
 
-4. **No uncommitted changes**: Run `git status` to verify clean working tree
+5. **No uncommitted changes**: Run `git status` to verify clean working tree
 
 ### Two-Factor Authentication
 
@@ -891,10 +913,9 @@ If the release fails partway through (e.g., during NPM publish):
    - NPM: `npm view react-on-rails@X.Y.Z`
    - RubyGems: `gem list react_on_rails -r -a`
 3. Record the exact branch tip, local and remote tag identity, published artifact set, and helper output.
-4. Follow the blocked-state dispositions in
-   [Partial-publication recovery](release-train-runbook.md#partial-publication-recovery). Current live recovery paths
-   are blocked until the required fencing exists. If lease state or any remote/artifact identity is `UNKNOWN`, remain
-   stopped.
+4. Follow [Partial-publication recovery](release-train-runbook.md#partial-publication-recovery). Resume only through
+   `script/release` after the supervisor has acquired the required claim and the artifact evidence is exact; if lease state
+   or any remote/artifact identity is `UNKNOWN`, remain stopped.
 
 ## Version History
 

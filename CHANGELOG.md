@@ -26,6 +26,53 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **Fresh generated apps now preserve their resolved Shakapacker version**: The installer now pins
+  `bundle add shakapacker --strict` to the version already selected through React on Rails instead
+  of allowing an older globally installed gem to downgrade the app's lockfile. The tested
+  Shakapacker baseline is now 10.3.1, which includes the rack-proxy v1 development-server proxy fix
+  and the macOS 27 liveness fix. Fixes
+  [Issue 4947](https://github.com/shakacode/react_on_rails/issues/4947). [PR 4948](https://github.com/shakacode/react_on_rails/pull/4948) by
+  [justin808](https://github.com/justin808).
+
+- **`bin/dev kill` now stops only the current app directory's processes, and verifies they are
+  gone**: the kill path matched command lines machine-wide (`pgrep -f rails`, `pgrep -f overmind`,
+  `pgrep -f ruby.*puma`, and friends) and scanned ports with an unfiltered `lsof -ti :PORT`, so
+  running it in one worktree could terminate a Rails server, a Webpack dev server, or an unrelated
+  client connection belonging to a different checkout — then printed "All processes terminated"
+  without checking that anything had actually stopped. `bin/dev` now claims a worktree-scoped,
+  `flock`-backed session file (`tmp/react_on_rails/dev-session.json`) recording the app root it
+  belongs to, the process group it leads, and the Overmind endpoint it would use. `bin/dev kill`
+  shuts that session down through its own Overmind control socket or its own process group,
+  escalating from `TERM` to `KILL` only for survivors, and reports success only after positively
+  observing that the owner, its process group, and its listeners are gone. Fallback port discovery
+  is restricted to LISTEN sockets whose process working directory is inside the current app root;
+  anything it cannot attribute is reported as a diagnostic and never signalled, and missing,
+  malformed, unreadable, or foreign session state fails closed rather than falling back to a broad
+  kill. The default-mode port list now covers the Shakapacker dev-server port
+  (`SHAKAPACKER_DEV_SERVER_PORT`, then `dev_server.port` in `config/shakapacker.yml`, then 3035)
+  instead of a hard-coded 3001, and a session records the ports it actually selected so a kill
+  verifies those rather than re-deriving a guess. Processes that deliberately leave the group with
+  `setsid`/daemonization remain out of scope, which is why Overmind (whose tmux server daemonizes) is
+  controlled through its socket. **Breaking API changes** for anyone calling
+  `ReactOnRails::Dev::ServerManager` directly: `.development_processes` and `.kill_running_processes`
+  are removed, `.kill_processes` now returns a status symbol (and `bin/dev kill` exits non-zero when
+  it refuses or cannot verify a shutdown, with `bin/dev clean` refusing to delete bundles in that
+  case), `.print_kill_summary` takes `(status_symbol, blockers_array)` instead of a boolean,
+  `.kill_port_processes` only signals listening sockets whose process working directory is inside
+  the current app root, and `.find_port_pids` is now restricted to listening sockets (it returns
+  those listeners other than pid ≤ 1 and the calling process, and does **not** filter by app root —
+  attribution happens in the kill path). Fixes
+  [Issue 4846](https://github.com/shakacode/react_on_rails/issues/4846).
+  [PR 4937](https://github.com/shakacode/react_on_rails/pull/4937) by
+  [justin808](https://github.com/justin808).
+
+- **[Pro]** **Surfaced missing RSC loadable stats in Node Renderer logs**: The first missing
+  `loadable-stats.json` read now emits an actionable `INFO` diagnostic per renderer process while
+  preserving fallback and retry behavior without replaying the server path to the browser. Fixes
+  [Issue 4731](https://github.com/shakacode/react_on_rails/issues/4731).
+  [PR 4918](https://github.com/shakacode/react_on_rails/pull/4918) by
+  [justin808](https://github.com/justin808).
+
 - **[Pro]** **Expected Node Renderer cold starts no longer emit OpenTelemetry error spans**: The
   `ror.bundle.build_execution_context` cache-first probe previously ended with status ERROR when a worker had not
   compiled a bundle's VM context yet, even though the normal cache-miss path then rendered successfully. The probe

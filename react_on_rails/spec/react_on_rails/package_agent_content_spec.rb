@@ -294,8 +294,11 @@ RSpec.describe "packaged agent content" do
   it "prepares an exact matching Pro gem before a Pro or RSC install" do
     guide = gem_root.join("docs/agent/install-and-upgrade.md").read
     install = guide.match(/^## Install\n(?<body>.*?)(?=^## Upgrade$)/m)[:body]
-    shakapacker = "bundle add shakapacker --strict"
     base_gem = "bundle add react_on_rails --strict"
+    shakapacker_version =
+      "SHAKAPACKER_VERSION=\"$(bundle exec ruby -rreact_on_rails -e " \
+      "'print ReactOnRails::PackerUtils.shakapacker_version')\""
+    shakapacker = %(bundle add shakapacker --version="${SHAKAPACKER_VERSION}" --strict)
     version =
       %(ROR_GEM_VERSION="$(bundle exec ruby -rreact_on_rails/version -e 'print ReactOnRails::VERSION')")
     pro_gem = %(bundle add react_on_rails_pro --version="${ROR_GEM_VERSION}" --strict)
@@ -307,14 +310,15 @@ RSpec.describe "packaged agent content" do
 
     expect(install).to include("For `--pro` or `--rsc` only")
     expect(install).to include("Skip this Pro-gem preparation for `--standard-only`")
-    expect(install).to include(shakapacker, base_gem, version, pro_gem, generator)
+    expect(install).to include(base_gem, shakapacker_version, shakapacker, version, pro_gem, generator)
     expect(install).to match(license_notice)
     expect(install).to include(license_link)
     expect(install).to include("unpublished prerelease")
     expect(install).to include("matching local/path `react_on_rails_pro` gem")
     expect(install).to include("Never fall back silently to a stable Pro gem")
-    expect(install.index(shakapacker)).to be < install.index(base_gem)
-    expect(install.index(base_gem)).to be < install.index(version)
+    expect(install.index(base_gem)).to be < install.index(shakapacker_version)
+    expect(install.index(shakapacker_version)).to be < install.index(shakapacker)
+    expect(install.index(shakapacker)).to be < install.index(version)
     expect(install.index(license_notice_start)).to be < install.index(version)
     expect(install.index(version)).to be < install.index(pro_gem)
     expect(install.index(pro_gem)).to be < install.index(generator)

@@ -21,6 +21,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import compatibilityCases from './packed-react-compatibility-cases.mjs';
+import buildPackedCompatibilityManifest from './packed-react-compatibility-manifest.mjs';
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const proPackageDirectory = path.resolve(scriptDirectory, '..');
@@ -50,19 +51,12 @@ const writeConsumerFiles = (consumerDirectory, { reactVersion, streaming }, core
   fs.writeFileSync(
     path.join(consumerDirectory, 'package.json'),
     `${JSON.stringify(
-      {
-        name: `react-on-rails-pro-react-${reactVersion}-smoke`,
-        private: true,
-        version: '1.0.0',
+      buildPackedCompatibilityManifest({
         packageManager: rootPackage.packageManager,
-        dependencies: {
-          react: reactVersion,
-          'react-dom': reactVersion,
-          'react-on-rails': `file:${coreArtifact}`,
-          'react-on-rails-pro': `file:${proArtifact}`,
-          webpack: '5.104.1',
-        },
-      },
+        reactVersion,
+        coreArtifact,
+        proArtifact,
+      }),
       null,
       2,
     )}\n`,
