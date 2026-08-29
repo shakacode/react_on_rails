@@ -31,8 +31,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 - **Fresh generated apps now preserve their resolved Shakapacker version**: The installer now pins
   `bundle add shakapacker --strict` to the version already selected through React on Rails instead
   of allowing an older globally installed gem to downgrade the app's lockfile. The tested
-  Shakapacker baseline is now 10.3.1, which includes the rack-proxy v1 development-server proxy fix
-  and the macOS 27 liveness fix. Fixes
+  Shakapacker baseline is now 10.3.2, which includes the rack-proxy v1 development-server proxy fix
+  and the macOS 27 liveness fix. The release fixtures are qualified against Rspack 2.2.1. Fixes
   [Issue 4947](https://github.com/shakacode/react_on_rails/issues/4947). [PR 4948](https://github.com/shakacode/react_on_rails/pull/4948) by
   [justin808](https://github.com/justin808).
 
