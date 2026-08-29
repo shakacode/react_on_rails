@@ -853,9 +853,12 @@ For comprehensive testing of generator changes, use this manual testing workflow
 **1. Set up test application with clean baseline:**
 
 ```bash
+# Run from the React on Rails repository root
+REACT_ON_RAILS_ROOT="$(pwd)"
+
 # Create a test Rails app
-mkdir -p {project_dir}/test-app
-cd {project_dir}/test-app
+mkdir -p "${REACT_ON_RAILS_ROOT}/test-app"
+cd "${REACT_ON_RAILS_ROOT}/test-app"
 rails new . --skip-javascript
 
 # Set up for testing the generator
@@ -898,7 +901,12 @@ bundle install
 git clean -fd && git reset --hard generator_testing_base && git clean -fd
 
 # Add Shakapacker to Gemfile
-bundle add shakapacker --strict
+SHAKAPACKER_VERSION="$(
+  "${REACT_ON_RAILS_ROOT}/bin/read-tool-version" \
+    "${REACT_ON_RAILS_ROOT}/.ci-dependency-versions" \
+    latest-shakapacker
+)"
+bundle add shakapacker --version="${SHAKAPACKER_VERSION}" --strict
 
 # Run Shakapacker installer first
 ./bin/rails shakapacker:install
