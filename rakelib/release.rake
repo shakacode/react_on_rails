@@ -376,6 +376,38 @@ def unbundled_sh_in_dir_for_release(dir, *shell_commands)
   end
 end
 
+def update_execjs_dummy_release_lock_versions!(lockfile_path, target_gem_version)
+  content = File.read(lockfile_path)
+  replacements = [
+    [
+      "react_on_rails path entry",
+      /^    react_on_rails \([^)]+\)$/,
+      "    react_on_rails (#{target_gem_version})"
+    ],
+    [
+      "react_on_rails_pro path entry",
+      /^    react_on_rails_pro \([^)]+\)$/,
+      "    react_on_rails_pro (#{target_gem_version})"
+    ],
+    [
+      "react_on_rails exact dependency",
+      /^      react_on_rails \(= [^)]+\)$/,
+      "      react_on_rails (= #{target_gem_version})"
+    ]
+  ]
+
+  replacements.each do |label, pattern, _replacement|
+    next if content.scan(pattern).length == 1
+
+    abort "Expected exactly one #{label} in #{lockfile_path}; refusing to rewrite the release lockfile."
+  end
+
+  updated_content = replacements.reduce(content) do |memo, (_label, pattern, replacement)|
+    memo.sub(pattern, replacement)
+  end
+  File.write(lockfile_path, updated_content)
+end
+
 def prompt_for_otp(service_name, allow_blank: false, hint: nil)
   print "\n🔑 Enter OTP code for #{service_name}#{hint ? " (#{hint})" : ''}: "
   $stdout.flush
@@ -10363,9 +10395,13 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
     end
 
     if Dir.exist?(release_paths_hash[:pro_execjs_dummy_app_dir])
+      update_execjs_dummy_release_lock_versions!(
+        File.join(release_paths_hash[:pro_execjs_dummy_app_dir], "Gemfile.lock"),
+        actual_gem_version
+      )
       unbundled_sh_in_dir_for_release(
         release_paths_hash[:pro_execjs_dummy_app_dir],
-        "bundle install#{bundle_quiet_flag}"
+        "BUNDLE_FROZEN=true bundle install#{bundle_quiet_flag}"
       )
     end
 

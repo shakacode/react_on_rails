@@ -22346,6 +22346,55 @@ RSpec.describe "release.rake helper methods" do
     end
   end
 
+  describe "#update_execjs_dummy_release_lock_versions!" do
+    let(:lockfile) do
+      <<~LOCK
+        PATH
+          remote: ../../..
+          specs:
+            react_on_rails (17.1.0.rc.0)
+
+        PATH
+          remote: ../..
+          specs:
+            react_on_rails_pro (17.1.0.rc.0)
+              react_on_rails (= 17.1.0.rc.0)
+
+        GEM
+          specs:
+            sqlite3 (1.7.3)
+            sqlite3 (1.7.3-arm64-darwin)
+      LOCK
+    end
+
+    it "updates only the release path-gem versions" do
+      Dir.mktmpdir do |dir|
+        lockfile_path = File.join(dir, "Gemfile.lock")
+        File.write(lockfile_path, lockfile)
+
+        update_execjs_dummy_release_lock_versions!(lockfile_path, "17.1.0.rc.1")
+
+        expect(File.read(lockfile_path)).to eq(lockfile.gsub("17.1.0.rc.0", "17.1.0.rc.1"))
+      end
+    end
+
+    it "fails closed without rewriting when the expected lock entries are ambiguous" do
+      Dir.mktmpdir do |dir|
+        lockfile_path = File.join(dir, "Gemfile.lock")
+        ambiguous_lockfile = lockfile.sub(
+          "    react_on_rails (17.1.0.rc.0)",
+          "    react_on_rails (17.1.0.rc.0)\n    react_on_rails (17.1.0.rc.0)"
+        )
+        File.write(lockfile_path, ambiguous_lockfile)
+
+        expect do
+          update_execjs_dummy_release_lock_versions!(lockfile_path, "17.1.0.rc.1")
+        end.to raise_error(SystemExit, /Expected exactly one react_on_rails path entry/)
+        expect(File.read(lockfile_path)).to eq(ambiguous_lockfile)
+      end
+    end
+  end
+
   describe "execjs-compatible dummy release lock compatibility" do
     let(:repo_root) { File.expand_path("../../..", __dir__) }
     let(:dummy_root) { File.join(repo_root, "react_on_rails_pro", "spec", "execjs-compatible-dummy") }
