@@ -1233,6 +1233,7 @@ const rubyIntegrationTestMutationTargets = new Set([
   'Rails::Dom::Testing::Assertions::DomAssertions',
   'Rails::Dom::Testing::Assertions::SelectorAssertions',
 ]);
+const rubyUnresolvedMutationReceiver = '__unresolved__';
 const normalizeRubyStaticMutationTargetReceivers = (content) =>
   content.replace(rubyStaticConstGetReceiverPattern, (receiver) => {
     const root = receiver.match(new RegExp(`^(?:::)?(${rubyStaticQualifiedConstantPattern})`))?.[1];
@@ -1251,10 +1252,10 @@ const normalizeRubyStaticMutationTargetReceivers = (content) =>
       if (qualifiedParts.length > 0 || name !== 'Object') qualifiedParts.push(...name.split('::'));
     }
     const qualifiedName = qualifiedParts.join('::') || 'Object';
-    const lexicallyResolved = root === 'Object' || lookups.every(({ inherit }) => !inherit);
+    const lexicallyResolved = lookups.slice(root === 'Object' ? 1 : 0).every(({ inherit }) => !inherit);
     return lexicallyResolved || rubyIntegrationTestMutationTargets.has(qualifiedName)
       ? qualifiedName.padEnd(receiver.length, ' ')
-      : 'x'.padEnd(receiver.length, ' ');
+      : rubyUnresolvedMutationReceiver.padEnd(receiver.length, ' ');
   });
 const rubyIntegrationTestMutationImpact = (className) =>
   rubyIntegrationTestMutationTargets.has(className) ? 'ActionDispatch::IntegrationTest' : className;
@@ -1294,6 +1295,7 @@ const normalizedRubyClassReceiver = (receiver) =>
     .replace(/^::/, '');
 const rubyClassNameForReceiver = (receiver, aliases) => {
   const normalized = normalizedRubyClassReceiver(receiver);
+  if (normalized === rubyUnresolvedMutationReceiver) return null;
   return aliases.get(normalized) ?? (/^[A-Z]/.test(normalized) ? normalized : null);
 };
 const rubyClassAliases = (content) => {

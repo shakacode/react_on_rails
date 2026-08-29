@@ -4952,6 +4952,8 @@ codex_domain_rsc_setup_dsl_mutations=(
   $'class ActionDispatch::IntegrationTest\n  target = [self].first\n  target.class_eval do\n    def get(*) = nil\n  end\nend'
   $'target = [ActionDispatch::IntegrationTest].first\ntarget.instance_exec do\n  self.define_method(:get) { |*| nil }\nend'
   $'class Shim\nend\n\nShim.const_get(:ActionDispatch).const_get(:IntegrationTest).class_eval do\n  def assert_response(*) = nil\nend'
+  $'class Shim\nend\n\nObject.const_get(:Shim).const_get(:ActionDispatch).const_get(:IntegrationTest).class_eval do\n  def assert_response(*) = nil\nend'
+  $'x = ActiveSupport\n\nclass Shim\nend\n\nShim.const_get(:ActionDispatch).const_get(:IntegrationTest).class_eval do\n  def assert_response(*) = nil\nend'
   $'class << ActionDispatch::IntegrationTest\n  self.class_eval do\n    def setup(*) = nil\n  end\nend'
   $'class << ActiveSupport::TestCase\n  self.define_method(:setup) { |*| }\nend'
   $'class << ActiveSupport::TestCase\n  define_method("setup") { |*| }\nend'
