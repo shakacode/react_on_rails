@@ -1697,12 +1697,7 @@ class ReleaseForwardPort
   end
 
   def changelog_at(ref, label:)
-    # CHANGELOG.md is authored as UTF-8 (it contains characters like the ⚠️
-    # breaking-change marker). Open3 tags git's stdout with the process external
-    # encoding, which is US-ASCII under a C/POSIX-locale CI runner; matching a
-    # regex against those bytes then raises "invalid byte sequence in US-ASCII".
-    # Re-tag the bytes as UTF-8 so parsing is locale-independent.
-    git("show", "#{ref}:#{CHANGELOG_FILE}").dup.force_encoding(Encoding::UTF_8)
+    git("show", "#{ref}:#{CHANGELOG_FILE}")
   rescue GitError => e
     raise GitError, "unable to read #{CHANGELOG_FILE} at #{label} ref #{ref.inspect}: #{e.message}"
   end
