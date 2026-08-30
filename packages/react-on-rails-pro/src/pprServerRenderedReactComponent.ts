@@ -25,7 +25,7 @@ import {
   StreamRenderState,
   StreamableComponentResult,
 } from 'react-on-rails/types';
-import injectRSCPayload from './injectRSCPayload.ts';
+import injectRSCPayload, { type PPRShellAssetManifest } from './injectRSCPayload.ts';
 import { getRSCClientManifestStylesheetHrefs } from './cache/manifestStylesheets.ts';
 import { isRSCRouteSSRFalseBailoutError } from './RSCRouteSSRFalseBailoutError.ts';
 import {
@@ -50,12 +50,16 @@ import { getRegisteredPPRApis, type RegisteredPPRApis } from './pprApiRegistry.t
  *   and skips the resume phase.
  * - `pprRenderErrored` (true): React's onError fired during the prerender. Ruby must not cache
  *   this render's shell (the #4581 class of bug).
+ * - `pprAssetManifest` (JSON string): the CSS hrefs and init-script keys emitted during the
+ *   prerender. Stored in the cache envelope so the resume pass can suppress duplicates and
+ *   gate hole-only CSS before reveals (issue #4897 — PPR CSS/asset coordination).
  *
  * MIRROR VALUES OF: react_on_rails_pro/lib/react_on_rails_pro/ppr.rb
  */
 export const PPR_PRERENDER_COMPLETE_CHUNK_KEY = 'pprPrerenderComplete';
 export const PPR_POSTPONED_STATE_CHUNK_KEY = 'pprPostponedState';
 export const PPR_RENDER_ERRORED_CHUNK_KEY = 'pprRenderErrored';
+export const PPR_ASSET_MANIFEST_CHUNK_KEY = 'pprAssetManifest';
 // MIRROR VALUES END
 
 /**
@@ -307,6 +311,9 @@ const pprPrerenderRenderReactComponent = (
         // CSS links are part of the cached shell, exactly like the streaming path's shell.
         const rscClientManifestStylesheetHrefs =
           await rscClientManifestStylesheetHrefsFor(reactClientManifestFileName);
+        // PPR: capture the emitted CSS hrefs and init-script keys so they can be stored in the
+        // cache envelope and passed to the resume pass for duplicate suppression (#4897).
+        let capturedAssetManifest: PPRShellAssetManifest | null = null;
         const injectedStream = injectRSCPayload(
           prelude as unknown as import('react-on-rails/types').PipeableOrReadableStream,
           streamingTrackers.rscRequestTracker,
@@ -317,6 +324,9 @@ const pprPrerenderRenderReactComponent = (
             ...(reactClientManifestFileName ? {} : { rscClientChunkStylesheetHrefsByChunkName: new Map() }),
             rscStreamObservability: railsContext.rscStreamObservability,
             railsEnv: railsContext.railsEnv,
+            onAssetsEmitted: (manifest) => {
+              capturedAssetManifest = manifest;
+            },
           },
         );
 
@@ -348,6 +358,11 @@ const pprPrerenderRenderReactComponent = (
             [PPR_PRERENDER_COMPLETE_CHUNK_KEY]: true,
             ...(sawUnexpectedRenderError ? { [PPR_RENDER_ERRORED_CHUNK_KEY]: true } : {}),
             ...(postponed != null ? { [PPR_POSTPONED_STATE_CHUNK_KEY]: JSON.stringify(postponed) } : {}),
+            // PPR asset manifest: the onAssetsEmitted callback fires during endResultStream
+            // (before the 'end' event), so capturedAssetManifest is populated by this point.
+            ...(capturedAssetManifest != null
+              ? { [PPR_ASSET_MANIFEST_CHUNK_KEY]: JSON.stringify(capturedAssetManifest) }
+              : {}),
           });
 
           streamingTrackers.postSSRHookTracker.notifySSREnd({
@@ -501,6 +516,14 @@ const pprResumeRenderReactComponent = (
         // when the consumer is already gone, aborting the in-flight resume render.
         const rscClientManifestStylesheetHrefs =
           await rscClientManifestStylesheetHrefsFor(reactClientManifestFileName);
+
+        // PPR: parse the shell's asset manifest from railsContext so the resume injector
+        // suppresses duplicate CSS links and init scripts (#4897).
+        const shellAssetManifest: PPRShellAssetManifest | undefined =
+          typeof railsContext.pprShellAssets === 'string'
+            ? (JSON.parse(railsContext.pprShellAssets) as PPRShellAssetManifest)
+            : railsContext.pprShellAssets;
+
         const injectedResumeStream = injectRSCPayload(
           renderingStream,
           streamingTrackers.rscRequestTracker,
@@ -511,6 +534,7 @@ const pprResumeRenderReactComponent = (
             ...(reactClientManifestFileName ? {} : { rscClientChunkStylesheetHrefsByChunkName: new Map() }),
             rscStreamObservability: railsContext.rscStreamObservability,
             railsEnv: railsContext.railsEnv,
+            shellAssetManifest,
           },
         );
 
