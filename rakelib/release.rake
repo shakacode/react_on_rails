@@ -3120,6 +3120,18 @@ rescue Errno::ENOENT, Errno::EACCES
   nil
 end
 
+def prepared_release_version_from_changelog_at_revision(monorepo_root:, revision:)
+  changelog, status = Open3.capture2e(
+    "git", "-C", monorepo_root, "show", "#{revision}:CHANGELOG.md"
+  )
+  return nil unless status.success?
+
+  ReleaseChangelogSelector.prepared_version(
+    changelog.lines,
+    version_pattern: ReleaseLeaseGuard::RELEASE_VERSION_PATTERN
+  )
+end
+
 def current_gem_version(monorepo_root)
   version_file = File.join(monorepo_root, "react_on_rails", "lib", "react_on_rails", "version.rb")
   content = File.read(version_file)
@@ -3148,6 +3160,16 @@ end
 # allowed, but `release/X.Y.Z` branches cannot cut another release line.
 def stable_release_branch_allowed?(current_branch:, target_gem_version:)
   ["main", "release/#{target_gem_version}"].include?(current_branch)
+end
+
+def supervised_release_branch_allowed?(current_branch:, target_gem_version:)
+  return false if current_branch.to_s.empty? || target_gem_version.to_s.empty?
+
+  if release_prerelease_version?(target_gem_version)
+    current_branch == "release/#{release_base_version(target_gem_version)}"
+  else
+    stable_release_branch_allowed?(current_branch:, target_gem_version:)
+  end
 end
 
 def release_base_version(gem_version)
@@ -8526,8 +8548,9 @@ def fetch_accelerated_rc_ci_snapshot!(repo_slug:, sha:, monorepo_root: nil, ci_b
   )
 end
 
-def exact_head_recovery_guidance(repo_slug:, head_sha:, evaluated_sha:, required_names:, is_prerelease:, ci_branch:,
-                                 required_checks_known: true, target_gem_version: nil)
+def exact_head_recovery_guidance(repo_slug:, monorepo_root:, head_sha:, evaluated_sha:, required_names:,
+                                 is_prerelease:, ci_branch:, required_checks_known: true, current_branch: nil,
+                                 target_gem_version: nil)
   return nil if head_sha.nil? || head_sha == evaluated_sha
   unless required_checks_known
     return exact_head_unknown_guidance("❌ Required CI check discovery is unknown; release remains blocked.")
@@ -8595,11 +8618,41 @@ def exact_head_recovery_guidance(repo_slug:, head_sha:, evaluated_sha:, required
         "❌ Exact HEAD is healthy, but the resolved release version is unavailable; release remains blocked."
       )
     end
+    unless supervised_release_branch_allowed?(current_branch:, target_gem_version:)
+      branch_label = current_branch.to_s.empty? ? "unknown" : current_branch
+      return "❌ Exact HEAD #{head_sha[0, 8]} is healthy, but current branch #{branch_label} is not supported by " \
+             "script/release for #{target_gem_version}; wrapper recovery remains blocked."
+    end
+    prepared_head_version = prepared_release_version_from_changelog_at_revision(
+      monorepo_root:,
+      revision: head_sha
+    )
+    if prepared_head_version.to_s.empty?
+      return "❌ Exact HEAD #{head_sha[0, 8]} is healthy, but script/release cannot resolve a prepared " \
+             "CHANGELOG.md version; wrapper recovery remains blocked."
+    end
+    unless prepared_head_version == target_gem_version
+      return "❌ Exact HEAD #{head_sha[0, 8]} is healthy, but script/release would select #{prepared_head_version} " \
+             "while the diagnostic target is #{target_gem_version}; wrapper recovery remains blocked."
+    end
+    prepared_checkout_version = prepared_release_version_from_changelog(monorepo_root:)
+    if prepared_checkout_version.to_s.empty?
+      return "❌ Exact HEAD #{head_sha[0, 8]} is healthy, but the current checkout has no prepared " \
+             "CHANGELOG.md version; wrapper recovery remains blocked."
+    end
+    unless prepared_checkout_version == target_gem_version
+      return "❌ Exact HEAD #{head_sha[0, 8]} is healthy, but the current checkout would select " \
+             "#{prepared_checkout_version} while the diagnostic target is #{target_gem_version}; " \
+             "wrapper recovery remains blocked."
+    end
 
     <<~GUIDANCE.strip
       ✓ Exact HEAD #{head_sha[0, 8]} has complete healthy CI evidence.
       Preview a re-evaluation of that exact HEAD (strict evaluation, not a waiver):
-        RELEASE_CI_EVALUATE_HEAD=true bundle exec rake "release[#{target_gem_version},true]"
+        script/release --dry-run --evaluate-head
+
+      Live retry through the supervised release path:
+        script/release --evaluate-head
 
       #{release_compound_live_boundary_guidance}
     GUIDANCE
@@ -8615,7 +8668,7 @@ def exact_head_recovery_guidance(repo_slug:, head_sha:, evaluated_sha:, required
 end
 
 def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dry_run:, ci_branch: "main",
-                             target_gem_version: nil, defer_pending: false)
+                             target_gem_version: nil, defer_pending: false, current_branch: nil)
   ensure_ci_status_override_is_prerelease!(allow_override:, is_prerelease:)
   puts "\nChecking CI status on origin/#{ci_branch}..."
 
@@ -8729,12 +8782,14 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
     if recovery_eligible && %i[no_checks no_required_checks].include?(evaluation[:kind])
       guidance = exact_head_recovery_guidance(
         repo_slug:,
+        monorepo_root:,
         head_sha: data[:head_sha],
         evaluated_sha: sha,
         required_names:,
         is_prerelease:,
         ci_branch:,
         required_checks_known:,
+        current_branch:,
         target_gem_version:
       )
       message += "\n\n#{guidance}" if guidance
@@ -9291,11 +9346,11 @@ def fetch_rubygems_versions(gem_name, api_url: RUBYGEMS_VERSIONS_API_URL)
   [response.body, response]
 end
 
-def abort_npm_release_readiness!(reason)
+def abort_npm_release_readiness!(reason, recovery:)
   abort <<~ERROR
     ❌ npm release readiness failed: #{reason}.
 
-    pnpm install --frozen-lockfile
+    #{recovery}
   ERROR
 end
 
@@ -9305,15 +9360,87 @@ def declared_pnpm_release_version!(monorepo_root:)
   match = package_manager.to_s.match(/\Apnpm@(?<version>\d+\.\d+\.\d+)(?:\+sha512\.[0-9a-f]+)?\z/i)
   return match[:version] if match
 
-  abort_npm_release_readiness!("root packageManager must declare an exact pnpm version")
+  abort_npm_release_readiness!(
+    "root packageManager must declare an exact pnpm version",
+    recovery: <<~RECOVERY.strip
+      Restore an exact pnpm@X.Y.Z pin in the root packageManager field.
+      Then retry:
+        script/release
+    RECOVERY
+  )
 rescue Errno::ENOENT, JSON::ParserError => e
-  abort_npm_release_readiness!("root packageManager cannot be verified (#{e.class}: #{e.message})")
+  abort_npm_release_readiness!(
+    "root packageManager cannot be verified (#{e.class}: #{e.message})",
+    recovery: <<~RECOVERY.strip
+      Restore a readable root package.json with a valid exact packageManager pin.
+      Then retry:
+        script/release
+    RECOVERY
+  )
 end
 
 def capture_npm_release_readiness_command(monorepo_root, *command)
   Open3.capture2e(*command, chdir: monorepo_root)
 rescue StandardError => e
-  abort_npm_release_readiness!("npm toolchain command failed to start (#{e.class}: #{e.message})")
+  abort_npm_release_readiness!(
+    "npm toolchain command failed to start (#{e.class}: #{e.message})",
+    recovery: <<~RECOVERY.strip
+      Restore the repository-declared pnpm command on PATH.
+      Then retry:
+        script/release
+    RECOVERY
+  )
+end
+
+def abort_stale_npm_release_dependencies!
+  abort_npm_release_readiness!(
+    "installed dependency state is missing or stale",
+    recovery: <<~RECOVERY.strip
+      Required recovery:
+        pnpm install --frozen-lockfile
+      Then retry:
+        script/release
+
+      Optional broader environment refresh (not required for this failure):
+        bin/setup
+    RECOVERY
+  )
+end
+
+def abort_pnpm_release_version_mismatch!(installed_version:, declared_version:)
+  abort_npm_release_readiness!(
+    "installed pnpm version #{installed_version.inspect} does not match packageManager #{declared_version.inspect}",
+    recovery: <<~RECOVERY.strip
+      Activate pnpm #{declared_version} declared by the root packageManager, then verify:
+        pnpm --version
+      Then retry:
+        script/release
+    RECOVERY
+  )
+end
+
+def abort_pnpm_release_version_probe_failure!(output:)
+  abort_npm_release_readiness!(
+    "pnpm --version failed\n\n#{output.to_s.strip}",
+    recovery: <<~RECOVERY.strip
+      Restore the repository-declared pnpm command on PATH, then verify:
+        pnpm --version
+      Then retry:
+        script/release
+    RECOVERY
+  )
+end
+
+def abort_npm_release_package_build!(package_name:, output:)
+  abort_npm_release_readiness!(
+    "#{package_name} build failed\n\n#{output.to_s.strip}",
+    recovery: <<~RECOVERY.strip
+      Fix the package build failure, then verify:
+        pnpm --filter #{package_name} run build
+      Then retry:
+        script/release
+    RECOVERY
+  )
 end
 
 def validate_npm_release_readiness!(monorepo_root:)
@@ -9322,14 +9449,16 @@ def validate_npm_release_readiness!(monorepo_root:)
   installed_lock = File.join(monorepo_root, "node_modules", ".pnpm", "lock.yaml")
   dependency_state_ready = File.file?(workspace_lock) && File.file?(installed_lock) &&
                            File.binread(workspace_lock) == File.binread(installed_lock)
-  abort_npm_release_readiness!("installed dependency state is missing or stale") unless dependency_state_ready
+  abort_stale_npm_release_dependencies! unless dependency_state_ready
 
   version_output, version_status = capture_npm_release_readiness_command(monorepo_root, "pnpm", "--version")
   installed_pnpm_version = version_output.to_s.strip
-  unless version_status.success? && installed_pnpm_version == declared_pnpm_version
-    abort_npm_release_readiness!(
-      "installed pnpm version #{installed_pnpm_version.inspect} does not match packageManager " \
-      "#{declared_pnpm_version.inspect}"
+  abort_pnpm_release_version_probe_failure!(output: version_output) unless version_status.success?
+
+  unless installed_pnpm_version == declared_pnpm_version
+    abort_pnpm_release_version_mismatch!(
+      installed_version: installed_pnpm_version,
+      declared_version: declared_pnpm_version
     )
   end
 
@@ -9339,7 +9468,7 @@ def validate_npm_release_readiness!(monorepo_root:)
     )
     next if status.success?
 
-    abort_npm_release_readiness!("#{package_name} build failed\n\n#{output.to_s.strip}")
+    abort_npm_release_package_build!(package_name:, output:)
   end
 
   puts "✓ npm release packages are ready to publish"
@@ -10280,6 +10409,7 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
       allow_override: allow_ci_status_override,
       dry_run: is_dry_run,
       ci_branch:,
+      current_branch:,
       target_gem_version: resolved_target_gem_version,
       defer_pending: !accelerated_rc_options.nil?
     )

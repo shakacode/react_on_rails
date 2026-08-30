@@ -158,6 +158,14 @@ script/release --dry-run
 script/release
 ```
 
+Only when a CI-walkback failure proves exact HEAD has complete healthy evidence,
+use the exact modifier commands printed by that failure:
+
+```bash
+script/release --dry-run --evaluate-head
+script/release --evaluate-head
+```
+
 `script/release` derives `release-line:X.Y.Z` and `release/X.Y.Z` from that
 changelog version, creates a fresh UUID-backed identity, claims the exact line,
 heartbeats and authoritatively verifies it, supervises the Rake process group,
@@ -172,6 +180,18 @@ observed version in `If-Match`. Every active record is refused, including one
 whose holder appears dead, stale, or expired. A concurrent `409` is likewise a
 claim refusal. The preliminary status read is diagnostic only and never grants
 takeover authority.
+
+On a foreign-claim refusal, the wrapper prints available holder metadata,
+including task/thread and session fields when the claim recorded them, plus the
+targeted inspection command:
+
+```bash
+agent-coord status --repo shakacode/react_on_rails --target release-line:X.Y.Z --json
+```
+
+Inspect and coordinate with the recorded holder. Never infer takeover safety
+from lease expiry or heartbeat age alone; the wrapper does not provide or
+attempt an automatic takeover.
 
 #### Advanced automation compatibility
 

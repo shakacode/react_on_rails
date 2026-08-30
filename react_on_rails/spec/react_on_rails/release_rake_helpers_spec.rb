@@ -7190,12 +7190,133 @@ RSpec.describe "release.rake helper methods" do
         File.write(File.join(monorepo_root, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n")
         expect(Open3).not_to receive(:capture2e)
 
-        expect do
+        failure = begin
           validate_npm_release_readiness!(monorepo_root:)
-        end.to raise_error(
-          SystemExit,
-          /installed dependency state is missing or stale.*\npnpm install --frozen-lockfile\n?\z/m
+          nil
+        rescue SystemExit => error
+          error
+        end
+
+        aggregate_failures do
+          expect(failure&.message).to include("installed dependency state is missing or stale")
+          expect(failure&.message).to include("Required recovery:")
+          expect(failure&.message).to include("pnpm install --frozen-lockfile")
+          expect(failure&.message).to include("Then retry:\n  script/release")
+          expect(failure&.message).to include("Optional broader environment refresh")
+          expect(failure&.message).to include("bin/setup")
+        end
+      end
+    end
+
+    it "reports pnpm-version recovery without prescribing a dependency reinstall" do
+      success_status = instance_double(Process::Status, success?: true)
+
+      Dir.mktmpdir do |monorepo_root|
+        File.write(
+          File.join(monorepo_root, "package.json"),
+          JSON.generate("packageManager" => "pnpm@10.33.4+sha512.abc123")
         )
+        workspace_lock = File.join(monorepo_root, "pnpm-lock.yaml")
+        installed_store = File.join(monorepo_root, "node_modules", ".pnpm")
+        FileUtils.mkdir_p(installed_store)
+        File.write(workspace_lock, "lockfileVersion: '9.0'\n")
+        File.write(File.join(installed_store, "lock.yaml"), File.read(workspace_lock))
+        allow(Open3).to receive(:capture2e)
+          .with("pnpm", "--version", chdir: monorepo_root)
+          .and_return(["9.15.0\n", success_status])
+
+        failure = begin
+          validate_npm_release_readiness!(monorepo_root:)
+          nil
+        rescue SystemExit => error
+          error
+        end
+
+        aggregate_failures do
+          expect(failure&.message).to include('installed pnpm version "9.15.0" does not match packageManager "10.33.4"')
+          expect(failure&.message).to include("Activate pnpm 10.33.4")
+          expect(failure&.message).to include("pnpm --version")
+          expect(failure&.message).to include("Then retry:\n  script/release")
+          expect(failure&.message).not_to include("pnpm install --frozen-lockfile")
+          expect(failure&.message).not_to include("bin/setup")
+        end
+      end
+    end
+
+    it "reports a failed pnpm version probe without claiming a version mismatch" do
+      failure_status = instance_double(Process::Status, success?: false)
+
+      Dir.mktmpdir do |monorepo_root|
+        File.write(
+          File.join(monorepo_root, "package.json"),
+          JSON.generate("packageManager" => "pnpm@10.33.4+sha512.abc123")
+        )
+        workspace_lock = File.join(monorepo_root, "pnpm-lock.yaml")
+        installed_store = File.join(monorepo_root, "node_modules", ".pnpm")
+        FileUtils.mkdir_p(installed_store)
+        File.write(workspace_lock, "lockfileVersion: '9.0'\n")
+        File.write(File.join(installed_store, "lock.yaml"), File.read(workspace_lock))
+        allow(Open3).to receive(:capture2e)
+          .with("pnpm", "--version", chdir: monorepo_root)
+          .and_return(["corepack failed to activate pnpm\n", failure_status])
+
+        failure = begin
+          validate_npm_release_readiness!(monorepo_root:)
+          nil
+        rescue SystemExit => error
+          error
+        end
+
+        aggregate_failures do
+          expect(failure&.message).to include("pnpm --version failed")
+          expect(failure&.message).to include("corepack failed to activate pnpm")
+          expect(failure&.message).to include("Restore the repository-declared pnpm command")
+          expect(failure&.message).to include("Then retry:\n  script/release")
+          expect(failure&.message).not_to include("does not match packageManager")
+          expect(failure&.message).not_to include("pnpm install --frozen-lockfile")
+          expect(failure&.message).not_to include("bin/setup")
+        end
+      end
+    end
+
+    it "reports the exact failed package build command without prescribing setup or install" do
+      stub_const("NPM_RELEASE_PACKAGE_NAMES", ["react-on-rails"])
+      success_status = instance_double(Process::Status, success?: true)
+      failure_status = instance_double(Process::Status, success?: false)
+
+      Dir.mktmpdir do |monorepo_root|
+        File.write(
+          File.join(monorepo_root, "package.json"),
+          JSON.generate("packageManager" => "pnpm@10.33.4+sha512.abc123")
+        )
+        workspace_lock = File.join(monorepo_root, "pnpm-lock.yaml")
+        installed_store = File.join(monorepo_root, "node_modules", ".pnpm")
+        FileUtils.mkdir_p(installed_store)
+        File.write(workspace_lock, "lockfileVersion: '9.0'\n")
+        File.write(File.join(installed_store, "lock.yaml"), File.read(workspace_lock))
+        expect(Open3).to receive(:capture2e)
+          .with("pnpm", "--version", chdir: monorepo_root)
+          .ordered.and_return(["10.33.4\n", success_status])
+        expect(Open3).to receive(:capture2e)
+          .with("pnpm", "--filter", "react-on-rails", "run", "build", chdir: monorepo_root)
+          .ordered.and_return(["TypeScript compilation failed\n", failure_status])
+
+        failure = begin
+          validate_npm_release_readiness!(monorepo_root:)
+          nil
+        rescue SystemExit => error
+          error
+        end
+
+        aggregate_failures do
+          expect(failure&.message).to include("react-on-rails build failed")
+          expect(failure&.message).to include("TypeScript compilation failed")
+          expect(failure&.message).to include("Fix the package build failure, then verify:")
+          expect(failure&.message).to include("pnpm --filter react-on-rails run build")
+          expect(failure&.message).to include("Then retry:\n  script/release")
+          expect(failure&.message).not_to include("pnpm install --frozen-lockfile")
+          expect(failure&.message).not_to include("bin/setup")
+        end
       end
     end
 
@@ -15945,7 +16066,7 @@ RSpec.describe "release.rake helper methods" do
       rakefile = File.read(File.expand_path("../../../rakelib/release.rake", __dir__))
       help = rakefile.match(/desc\("(.*?)"\)\ntask :release/m)[1]
 
-      expect(help).not_to include("RELEASE_CI_EVALUATE_HEAD=true")
+      expect(help).not_to include("--evaluate-head")
       expect(help).to include("only after it has found complete healthy\n    CI evidence")
       expect(help).to include("Override prerelease CI gates only")
     end
@@ -19114,7 +19235,7 @@ RSpec.describe "release.rake helper methods" do
           )
         end.to raise_error(SystemExit) { |error|
           expect(error.message).to include("No required CI check runs found")
-          expect(error.message).not_to include("RELEASE_CI_EVALUATE_HEAD=true")
+          expect(error.message).not_to include("--evaluate-head")
         }
         expect(self).to have_received(:fetch_main_commit_statuses).once
       end
@@ -19345,7 +19466,7 @@ RSpec.describe "release.rake helper methods" do
           )
         end.to raise_error(SystemExit) { |error|
           expect(error.message).to include("Required CI check discovery is unknown")
-          expect(error.message).not_to include("RELEASE_CI_EVALUATE_HEAD=true")
+          expect(error.message).not_to include("--evaluate-head")
         }
       end
     end
@@ -19672,6 +19793,12 @@ RSpec.describe "release.rake helper methods" do
         allow(self).to receive(:fetch_main_ci_checks)
           .with(monorepo_root:, allow_override: false, dry_run: false, ci_branch: "main")
           .and_return(walkback_without_ci_runs)
+        allow(self).to receive(:prepared_release_version_from_changelog)
+          .with(monorepo_root:)
+          .and_return("17.0.0.rc.10")
+        allow(self).to receive(:prepared_release_version_from_changelog_at_revision)
+          .with(monorepo_root:, revision: exact_head_sha)
+          .and_return("17.0.0.rc.10")
       end
 
       it "keeps the complete walkback output free of strict guidance for incomplete exact-HEAD evidence" do
@@ -19718,7 +19845,7 @@ RSpec.describe "release.rake helper methods" do
           end
 
           expect(error).to be_a(SystemExit), "#{kind} exact-HEAD evidence should block the release"
-          expect(output).not_to include("RELEASE_CI_EVALUATE_HEAD=true"),
+          expect(output).not_to include("--evaluate-head"),
                                 "#{kind} exact-HEAD evidence must not receive strict guidance"
         end
       end
@@ -19726,7 +19853,8 @@ RSpec.describe "release.rake helper methods" do
       it "offers strict exact-HEAD evaluation only after exact HEAD is healthy" do
         strict_head_guidance = [
           "strict evaluation, not a waiver",
-          'RELEASE_CI_EVALUATE_HEAD=true bundle exec rake "release\\[17\\.0\\.0\\.rc\\.10,true\\]"',
+          "script/release --dry-run --evaluate-head",
+          "script/release --evaluate-head",
           "DANGEROUS",
           "RELEASE_CI_STATUS_OVERRIDE=true"
         ].join(".*")
@@ -19745,12 +19873,169 @@ RSpec.describe "release.rake helper methods" do
             is_prerelease: false,
             allow_override: false,
             dry_run: false,
+            current_branch: "release/17.0.0",
             target_gem_version: "17.0.0.rc.10"
           )
         end.to raise_error(
           SystemExit,
           Regexp.new(strict_head_guidance, Regexp::MULTILINE)
         )
+      end
+
+      it "withholds wrapper recovery when the changelog-selected version differs from an explicit diagnostic target" do
+        allow(self).to receive(:prepared_release_version_from_changelog_at_revision)
+          .with(monorepo_root:, revision: exact_head_sha)
+          .and_return("17.1.0.rc.1")
+        allow(self).to receive(:fetch_ci_check_runs_for_sha)
+          .with(repo_slug: "shakacode/react_on_rails", sha: exact_head_sha)
+          .and_return(check_runs: [passing_run("Lint")])
+        allow(self).to receive(:fetch_ci_statuses_for_sha)
+          .with(repo_slug: "shakacode/react_on_rails", sha: exact_head_sha)
+          .and_return(statuses: [])
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root:,
+            is_prerelease: true,
+            allow_override: false,
+            dry_run: false,
+            current_branch: "release/17.1.0",
+            target_gem_version: "17.1.0.rc.2"
+          )
+        end.to raise_error(SystemExit) { |error|
+          expect(error.message).to include("script/release would select 17.1.0.rc.1")
+          expect(error.message).to include("diagnostic target is 17.1.0.rc.2")
+          expect(error.message).not_to include("--evaluate-head")
+        }
+      end
+
+      it "binds wrapper recovery to the changelog version at the diagnosed exact HEAD" do
+        allow(self).to receive(:prepared_release_version_from_changelog)
+          .with(monorepo_root:)
+          .and_return("17.1.0.rc.2")
+        allow(self).to receive(:prepared_release_version_from_changelog_at_revision)
+          .with(monorepo_root:, revision: exact_head_sha)
+          .and_return("17.1.0.rc.2")
+        allow(self).to receive(:fetch_ci_check_runs_for_sha)
+          .with(repo_slug: "shakacode/react_on_rails", sha: exact_head_sha)
+          .and_return(check_runs: [passing_run("Lint")])
+        allow(self).to receive(:fetch_ci_statuses_for_sha)
+          .with(repo_slug: "shakacode/react_on_rails", sha: exact_head_sha)
+          .and_return(statuses: [])
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root:,
+            is_prerelease: true,
+            allow_override: false,
+            dry_run: false,
+            current_branch: "release/17.1.0",
+            target_gem_version: "17.1.0.rc.2"
+          )
+        end.to raise_error(
+          SystemExit,
+          %r{script/release --dry-run --evaluate-head.*script/release --evaluate-head}m
+        )
+      end
+
+      it "withholds wrapper recovery when the current branch is not supported by script/release" do
+        allow(self).to receive(:prepared_release_version_from_changelog)
+          .with(monorepo_root:)
+          .and_return("17.1.0.rc.2")
+        allow(self).to receive(:prepared_release_version_from_changelog_at_revision)
+          .with(monorepo_root:, revision: exact_head_sha)
+          .and_return("17.1.0.rc.2")
+        allow(self).to receive(:fetch_ci_check_runs_for_sha)
+          .with(repo_slug: "shakacode/react_on_rails", sha: exact_head_sha)
+          .and_return(check_runs: [passing_run("Lint")])
+        allow(self).to receive(:fetch_ci_statuses_for_sha)
+          .with(repo_slug: "shakacode/react_on_rails", sha: exact_head_sha)
+          .and_return(statuses: [])
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root:,
+            is_prerelease: true,
+            allow_override: false,
+            dry_run: false,
+            current_branch: "main",
+            target_gem_version: "17.1.0.rc.2"
+          )
+        end.to raise_error(SystemExit) { |error|
+          expect(error.message).to include("current branch main is not supported by script/release")
+          expect(error.message).not_to include("--evaluate-head")
+        }
+      end
+
+      it "withholds wrapper recovery when the current checkout selects a different version" do
+        allow(self).to receive(:prepared_release_version_from_changelog)
+          .with(monorepo_root:)
+          .and_return("17.1.0.rc.1")
+        allow(self).to receive(:prepared_release_version_from_changelog_at_revision)
+          .with(monorepo_root:, revision: exact_head_sha)
+          .and_return("17.1.0.rc.2")
+        allow(self).to receive(:fetch_ci_check_runs_for_sha)
+          .with(repo_slug: "shakacode/react_on_rails", sha: exact_head_sha)
+          .and_return(check_runs: [passing_run("Lint")])
+        allow(self).to receive(:fetch_ci_statuses_for_sha)
+          .with(repo_slug: "shakacode/react_on_rails", sha: exact_head_sha)
+          .and_return(statuses: [])
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root:,
+            is_prerelease: true,
+            allow_override: false,
+            dry_run: false,
+            current_branch: "release/17.1.0",
+            target_gem_version: "17.1.0.rc.2"
+          )
+        end.to raise_error(SystemExit) { |error|
+          expect(error.message).to include("current checkout would select 17.1.0.rc.1")
+          expect(error.message).to include("diagnostic target is 17.1.0.rc.2")
+          expect(error.message).not_to include("--evaluate-head")
+        }
+      end
+
+      it "replays the observed RC.1 walkback stop with supervised preview and live recovery" do
+        allow(self).to receive(:prepared_release_version_from_changelog)
+          .with(monorepo_root:)
+          .and_return("17.1.0.rc.1")
+        allow(self).to receive(:prepared_release_version_from_changelog_at_revision)
+          .with(monorepo_root:, revision: exact_head_sha)
+          .and_return("17.1.0.rc.1")
+        allow(self).to receive(:required_check_names_for_branch)
+          .with(monorepo_root:, repo_slug: "shakacode/react_on_rails", ci_branch: "main")
+          .and_return(required_checks(checks: [required_check("required-pr-gate")]))
+        allow(self).to receive(:fetch_ci_check_runs_for_sha)
+          .with(repo_slug: "shakacode/react_on_rails", sha: exact_head_sha)
+          .and_return(check_runs: [passing_run("required-pr-gate")])
+        allow(self).to receive(:fetch_ci_statuses_for_sha)
+          .with(repo_slug: "shakacode/react_on_rails", sha: exact_head_sha)
+          .and_return(statuses: [])
+
+        failure = begin
+          validate_main_ci_status!(
+            monorepo_root:,
+            is_prerelease: true,
+            allow_override: false,
+            dry_run: false,
+            current_branch: "release/17.1.0",
+            target_gem_version: "17.1.0.rc.1"
+          )
+          nil
+        rescue SystemExit => error
+          error
+        end
+
+        message = failure&.message.to_s
+        aggregate_failures do
+          expect(message).to include("script/release --dry-run --evaluate-head")
+          expect(message).to include("script/release --evaluate-head")
+          expect(message).not_to include("RELEASE_CI_EVALUATE_HEAD")
+          expect(message.index("script/release --evaluate-head"))
+            .to be < message.index("RELEASE_CI_STATUS_OVERRIDE")
+        end
       end
 
       it "offers strict guidance when a successful exact-HEAD check rerun supersedes an earlier failure" do
@@ -19773,11 +20058,12 @@ RSpec.describe "release.rake helper methods" do
             is_prerelease: false,
             allow_override: false,
             dry_run: false,
+            current_branch: "release/17.0.0",
             target_gem_version: "17.0.0.rc.10"
           )
         end.to raise_error(
           SystemExit,
-          /RELEASE_CI_EVALUATE_HEAD=true bundle exec rake "release\[17\.0\.0\.rc\.10,true\]"/
+          %r{script/release --dry-run --evaluate-head.*script/release --evaluate-head}m
         )
       end
 
@@ -19805,11 +20091,12 @@ RSpec.describe "release.rake helper methods" do
             is_prerelease: true,
             allow_override: false,
             dry_run: false,
+            current_branch: "release/17.0.0",
             target_gem_version: "17.0.0.rc.10"
           )
         end.to raise_error(
           SystemExit,
-          /RELEASE_CI_EVALUATE_HEAD=true bundle exec rake "release\[17\.0\.0\.rc\.10,true\]"/
+          %r{script/release --dry-run --evaluate-head.*script/release --evaluate-head}m
         )
       end
 
@@ -19837,7 +20124,7 @@ RSpec.describe "release.rake helper methods" do
           )
         end.to raise_error(SystemExit) { |error|
           expect(error.message).to include("No required CI check runs found")
-          expect(error.message).not_to include("RELEASE_CI_EVALUATE_HEAD=true")
+          expect(error.message).not_to include("--evaluate-head")
         }
         expect(self).not_to have_received(:fetch_ci_check_runs_for_sha)
       end
@@ -19875,7 +20162,7 @@ RSpec.describe "release.rake helper methods" do
           )
         end.to raise_error(SystemExit) { |error|
           expect(error.message).to include("No required CI check runs found")
-          expect(error.message).not_to include("RELEASE_CI_EVALUATE_HEAD=true")
+          expect(error.message).not_to include("--evaluate-head")
         }
         expect(self).not_to have_received(:fetch_ci_check_runs_for_sha)
         expect(self).not_to have_received(:fetch_ci_statuses_for_sha)
@@ -19905,7 +20192,7 @@ RSpec.describe "release.rake helper methods" do
           )
         end.to raise_error(SystemExit) { |error|
           expect(error.message).to include("No required CI check runs found")
-          expect(error.message).not_to include("RELEASE_CI_EVALUATE_HEAD=true")
+          expect(error.message).not_to include("--evaluate-head")
         }
         expect(self).not_to have_received(:fetch_ci_check_runs_for_sha)
         expect(self).not_to have_received(:fetch_ci_statuses_for_sha)
@@ -19941,7 +20228,7 @@ RSpec.describe "release.rake helper methods" do
         end.to raise_error(SystemExit) { |error|
           expect(error.message).to include("Exact HEAD evidence is unknown")
           expect(error.message).to include("malformed")
-          expect(error.message).not_to include("RELEASE_CI_EVALUATE_HEAD=true")
+          expect(error.message).not_to include("--evaluate-head")
         }
       end
 
@@ -19972,7 +20259,7 @@ RSpec.describe "release.rake helper methods" do
         end.to raise_error(SystemExit) { |error|
           expect(error.message).to include("Exact HEAD evidence is unknown")
           expect(error.message).to include("malformed")
-          expect(error.message).not_to include("RELEASE_CI_EVALUATE_HEAD=true")
+          expect(error.message).not_to include("--evaluate-head")
         }
       end
 
@@ -20004,7 +20291,7 @@ RSpec.describe "release.rake helper methods" do
         end.to raise_error(SystemExit) { |error|
           expect(error.message).to include("Exact HEAD evidence is unknown")
           expect(error.message).to include("malformed")
-          expect(error.message).not_to include("RELEASE_CI_EVALUATE_HEAD=true")
+          expect(error.message).not_to include("--evaluate-head")
         }
       end
 
@@ -20038,7 +20325,7 @@ RSpec.describe "release.rake helper methods" do
         end.to raise_error(SystemExit) { |error|
           expect(error.message).to include("Exact HEAD evidence is unknown")
           expect(error.message).to include("malformed")
-          expect(error.message).not_to include("RELEASE_CI_EVALUATE_HEAD=true")
+          expect(error.message).not_to include("--evaluate-head")
         }
       end
 
@@ -20078,7 +20365,7 @@ RSpec.describe "release.rake helper methods" do
         end.to raise_error(SystemExit) { |error|
           expect(error.message).to include("Exact HEAD evidence is unknown")
           expect(error.message).to include("malformed")
-          expect(error.message).not_to include("RELEASE_CI_EVALUATE_HEAD=true")
+          expect(error.message).not_to include("--evaluate-head")
         }
       end
 
@@ -20124,7 +20411,7 @@ RSpec.describe "release.rake helper methods" do
         end.to raise_error(SystemExit) { |error|
           expect(error.message).to include("Exact HEAD #{exact_head_sha} has failing CI evidence")
           expect(error.message).to include("Legacy CI")
-          expect(error.message).not_to include("RELEASE_CI_EVALUATE_HEAD=true")
+          expect(error.message).not_to include("--evaluate-head")
         }
       end
 
@@ -20167,7 +20454,7 @@ RSpec.describe "release.rake helper methods" do
         end.to raise_error(SystemExit) { |error|
           expect(error.message).to include("Exact HEAD evidence is unknown")
           expect(error.message).to include("Statuses API")
-          expect(error.message).not_to include("RELEASE_CI_EVALUATE_HEAD=true")
+          expect(error.message).not_to include("--evaluate-head")
         }
         expect(statuses_query).to eq(expected_statuses_query)
       end
@@ -20347,7 +20634,8 @@ RSpec.describe "release.rake helper methods" do
 
         expected_output = [
           "⚠️ DRY RUN: CI evidence below would block a real release:",
-          '^  RELEASE_CI_EVALUATE_HEAD=true bundle exec rake "release\\[17\\.0\\.0\\.rc\\.10,true\\]"$',
+          "^  script/release --dry-run --evaluate-head$",
+          "^  script/release --evaluate-head$",
           "⚠️ DRY RUN: Real release remains blocked.",
           "⚠️ DRY RUN: DANGEROUS PRERELEASE-ONLY LAST RESORT",
           "RELEASE_CI_STATUS_OVERRIDE=true"
@@ -20359,6 +20647,7 @@ RSpec.describe "release.rake helper methods" do
             is_prerelease: false,
             allow_override: false,
             dry_run: true,
+            current_branch: "release/17.0.0",
             target_gem_version: "17.0.0.rc.10"
           )
         end.to output(Regexp.new(expected_output, Regexp::MULTILINE)).to_stdout
@@ -20381,7 +20670,7 @@ RSpec.describe "release.rake helper methods" do
           )
         end.to raise_error(SystemExit) { |error|
           expect(error.message).to include("resolved release version is unavailable")
-          expect(error.message).not_to include("RELEASE_CI_EVALUATE_HEAD=true")
+          expect(error.message).not_to include("--evaluate-head")
         }
       end
 
@@ -20401,7 +20690,7 @@ RSpec.describe "release.rake helper methods" do
           )
         end.to raise_error(SystemExit) { |error|
           expect(error.message).to include("Required CI check discovery is unknown")
-          expect(error.message).not_to include("RELEASE_CI_EVALUATE_HEAD=true")
+          expect(error.message).not_to include("--evaluate-head")
         }
       end
 
@@ -20425,11 +20714,12 @@ RSpec.describe "release.rake helper methods" do
             is_prerelease: true,
             allow_override: false,
             dry_run: false,
+            current_branch: "release/17.0.0",
             target_gem_version: "17.0.0.rc.10"
           )
         end.to raise_error(
           SystemExit,
-          /RELEASE_CI_EVALUATE_HEAD=true bundle exec rake "release\[17\.0\.0\.rc\.10,true\]"/
+          %r{script/release --dry-run --evaluate-head.*script/release --evaluate-head}m
         )
       end
 
@@ -20450,7 +20740,7 @@ RSpec.describe "release.rake helper methods" do
           )
         end.to raise_error(SystemExit) { |error|
           expect(error.message).to match(%r{Exact HEAD.*pending.*Wait.*Slow test.*https://github\.com}m)
-          expect(error.message).not_to include("RELEASE_CI_EVALUATE_HEAD=true")
+          expect(error.message).not_to include("--evaluate-head")
         }
       end
 
@@ -20471,7 +20761,7 @@ RSpec.describe "release.rake helper methods" do
           )
         end.to raise_error(SystemExit) { |error|
           expect(error.message).to match(%r{Exact HEAD.*failing.*JS unit tests.*https://github\.com}m)
-          expect(error.message).not_to include("RELEASE_CI_EVALUATE_HEAD=true")
+          expect(error.message).not_to include("--evaluate-head")
         }
       end
 
@@ -20494,7 +20784,7 @@ RSpec.describe "release.rake helper methods" do
           expect(error.message).to match(
             /Exact HEAD.*does not provide complete healthy CI evidence.*No CI check runs visible/m
           )
-          expect(error.message).not_to include("RELEASE_CI_EVALUATE_HEAD=true")
+          expect(error.message).not_to include("--evaluate-head")
         }
       end
 
@@ -20512,7 +20802,7 @@ RSpec.describe "release.rake helper methods" do
           )
         end.to raise_error(SystemExit) { |error|
           expect(error.message).to match(/Exact HEAD evidence is unknown.*Unable to query GitHub Checks API/m)
-          expect(error.message).not_to include("RELEASE_CI_EVALUATE_HEAD=true")
+          expect(error.message).not_to include("--evaluate-head")
         }
       end
 
@@ -20540,7 +20830,7 @@ RSpec.describe "release.rake helper methods" do
           )
         end.to raise_error(SystemExit) { |error|
           expect(error.message).to match(/Exact HEAD.*failing CI evidence.*Advisory benchmark/m)
-          expect(error.message).not_to include("RELEASE_CI_EVALUATE_HEAD=true")
+          expect(error.message).not_to include("--evaluate-head")
         }
       end
 
@@ -20565,7 +20855,7 @@ RSpec.describe "release.rake helper methods" do
           )
         end.to raise_error(SystemExit) { |error|
           expect(error.message).to match(/Exact HEAD.*pending CI evidence.*Benchmark/m)
-          expect(error.message).not_to include("RELEASE_CI_EVALUATE_HEAD=true")
+          expect(error.message).not_to include("--evaluate-head")
         }
       end
 
@@ -20596,7 +20886,7 @@ RSpec.describe "release.rake helper methods" do
           )
         end.to raise_error(SystemExit) { |error|
           expect(error.message).to include("No required CI check runs found")
-          expect(error.message).not_to include("RELEASE_CI_EVALUATE_HEAD=true")
+          expect(error.message).not_to include("--evaluate-head")
         }
         expect(self).to have_received(:fetch_main_commit_statuses)
       end
@@ -20631,7 +20921,7 @@ RSpec.describe "release.rake helper methods" do
           )
         end.to raise_error(SystemExit) { |error|
           expect(error.message).to match(/Exact HEAD.*failing CI evidence.*Advisory/m)
-          expect(error.message).not_to include("RELEASE_CI_EVALUATE_HEAD=true")
+          expect(error.message).not_to include("--evaluate-head")
         }
         expect(self).to have_received(:fetch_ci_statuses_for_sha)
       end
@@ -20662,11 +20952,12 @@ RSpec.describe "release.rake helper methods" do
             is_prerelease: true,
             allow_override: false,
             dry_run: false,
+            current_branch: "release/17.0.0",
             target_gem_version: "17.0.0.rc.10"
           )
         end.to raise_error(
           SystemExit,
-          /RELEASE_CI_EVALUATE_HEAD=true bundle exec rake "release\[17\.0\.0\.rc\.10,true\]"/
+          %r{script/release --dry-run --evaluate-head.*script/release --evaluate-head}m
         )
       end
     end
@@ -21121,7 +21412,7 @@ RSpec.describe "release.rake helper methods" do
           )
         end
 
-        expect(output).not_to include("RELEASE_CI_EVALUATE_HEAD=true")
+        expect(output).not_to include("--evaluate-head")
         expect(self).not_to have_received(:fetch_ci_check_runs_for_sha)
         expect(self).not_to have_received(:fetch_ci_statuses_for_sha)
       end
@@ -21837,7 +22128,7 @@ RSpec.describe "release.rake helper methods" do
         main_ci_evaluation_sha(monorepo_root:, head_sha: "head")
       end
 
-      expect(output).not_to include("RELEASE_CI_EVALUATE_HEAD=true")
+      expect(output).not_to include("--evaluate-head")
       expect(output).to include(
         "Strict exact-HEAD recovery is offered only after exact-HEAD CI evidence is complete and healthy."
       )

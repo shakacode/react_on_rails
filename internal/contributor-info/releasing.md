@@ -102,6 +102,20 @@ script/release --dry-run # no coordination and no release writes
 script/release           # live release after the preview and required gates
 ```
 
+`--evaluate-head` is a strict CI-evaluation modifier, not a waiver. Use it only
+when the release failure itself confirms that exact HEAD has complete healthy
+required-check evidence and prints both of these recovery commands:
+
+```bash
+script/release --dry-run --evaluate-head # no-write preview
+script/release --evaluate-head           # supervised live retry
+```
+
+Existing automation that already supplies `RELEASE_CI_EVALUATE_HEAD=true` to
+the wrapper remains supported for backward compatibility. New and interactive
+operator guidance must use `--evaluate-head`; the environment variable is an
+internal child contract, not the normal interface.
+
 Do not pass a positional version to the wrapper. The first valid, non-empty
 version section after `### [Unreleased]` is the source of truth. Internal Rake
 arguments remain available only for explicit no-write diagnostics and tightly
@@ -141,13 +155,21 @@ the clean-worktree check and verbosity setup. The root
 must byte-match the committed `pnpm-lock.yaml`, and every npm release package must pass its normal `build` script
 with lifecycle scripts enabled. This happens before release-checkout creation, `git pull`, npm or GitHub
 authentication, CI/tag/version-policy remote reads, registry probes, confirmation, version mutation, ShakaPerf
-dispatch, tagging, publication, or OTP prompting. A pnpm version mismatch must first be repaired by activating the
-exact pnpm version declared by the root `packageManager`. The release prints this frozen-install command for the
-installed-dependency repair:
+dispatch, tagging, publication, or OTP prompting. Recovery is reason-specific:
+
+- Missing or stale installed dependencies: run the frozen install the error prints.
+- Pnpm-version mismatch: activate the exact version declared by the root `packageManager`, verify `pnpm --version`,
+  and retry without treating dependency installation as the failure.
+- Package-build failure: fix and rerun the exact `pnpm --filter <package> run build` command the error prints.
+
+For only the stale-dependency case, the required repair is:
 
 ```bash
 pnpm install --frozen-lockfile
 ```
+
+`bin/setup` is never run automatically. The stale-dependency diagnostic may mention it only as an optional broader
+environment refresh; it is not required to retry the release.
 
 After the initial check succeeds, the task binds it to the exact current commit. A live release then runs
 `git pull --rebase` and immediately resolves `HEAD` again. If the pull advanced the checkout, all four release-package
@@ -205,7 +227,6 @@ VERBOSE=1                    # Enable verbose logging (shows all output)
 NPM_OTP=<code>               # Provide NPM one-time password (reused for all NPM publishes)
 RUBYGEMS_OTP=<code>          # Provide RubyGems one-time password (reused for both gems)
 RELEASE_VERSION_POLICY_OVERRIDE=true # Override release version policy checks
-RELEASE_CI_EVALUATE_HEAD=true # Strictly evaluate the fetched exact release-source HEAD; not a waiver
 RELEASE_CI_STATUS_OVERRIDE=true # DANGEROUS last-resort waiver for the release CI-status gate
 RELEASE_ACCELERATED_RC=true # Explicit RC only: publish while named pending gates finish
 RELEASE_TRACKER=<issue> # Active release tracker for ShakaPerf evidence, accelerated RCs, and final promotion
@@ -323,25 +344,26 @@ the newest runtime-bearing commit. This is intentional: CI path filtering can at
 runtime suite to metadata-only commits, while the runtime-bearing commit is the one whose full
 suite establishes release health.
 
-`RELEASE_CI_EVALUATE_HEAD=true` disables only that walkback. It still queries and enforces the
-same CI gate at the exact fetched HEAD; it is a strict evaluation, not a waiver. It is appropriate
+`script/release --evaluate-head` disables only that walkback for its supervised child. It still queries and enforces
+the same CI gate at the exact fetched HEAD; it is a strict evaluation, not a waiver. It is appropriate
 only for the narrow topology where GitHub attached complete workflows to the final release tip,
 while the intermediate runtime SHA selected by normal walkback has zero usable runs.
 
-| Normal walkback / exact HEAD evidence                                                                                      | Required action                                                                                            |
-| -------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| Walked-back SHA has usable CI evidence                                                                                     | Let the normal gate decide. Do not set either variable.                                                    |
-| Walked-back SHA has no usable runs; exact HEAD is pending                                                                  | Wait for the linked exact-HEAD checks. They remain blocking.                                               |
-| Walked-back SHA has no usable runs; exact HEAD has failed checks                                                           | Fix or otherwise resolve the failures. They remain blocking.                                               |
-| Walked-back SHA has no usable runs; exact HEAD is completely healthy under the same stable/prerelease required-check rules | Re-run with `RELEASE_CI_EVALUATE_HEAD=true`; it evaluates that exact HEAD and still blocks on any failure. |
-| Walked-back SHA has no usable runs; exact HEAD has no checks, unknown status, or an API failure                            | Fail closed. Wait for evidence or repair API/auth access; do not use strict HEAD without evidence.         |
-| Any case where a maintainer-approved waiver is truly required                                                              | `RELEASE_CI_STATUS_OVERRIDE=true` is the dangerous last resort, not a recovery default.                    |
+| Normal walkback / exact HEAD evidence                                                                                      | Required action                                                                                    |
+| -------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Walked-back SHA has usable CI evidence                                                                                     | Let the normal gate decide. Do not add a recovery modifier or waiver.                              |
+| Walked-back SHA has no usable runs; exact HEAD is pending                                                                  | Wait for the linked exact-HEAD checks. They remain blocking.                                       |
+| Walked-back SHA has no usable runs; exact HEAD has failed checks                                                           | Fix or otherwise resolve the failures. They remain blocking.                                       |
+| Walked-back SHA has no usable runs; exact HEAD is completely healthy under the same stable/prerelease required-check rules | Use the printed `script/release --evaluate-head` recovery; it still blocks on any failure.         |
+| Walked-back SHA has no usable runs; exact HEAD has no checks, unknown status, or an API failure                            | Fail closed. Wait for evidence or repair API/auth access; do not use strict HEAD without evidence. |
+| Any case where a maintainer-approved waiver is truly required                                                              | `RELEASE_CI_STATUS_OVERRIDE=true` is the dangerous last resort, not a recovery default.            |
 
 Examples:
 
 ```bash
-# Only after the task reports complete healthy exact-HEAD evidence, retry the explicit target version:
-RELEASE_CI_EVALUATE_HEAD=true bundle exec rake "release[17.0.0.rc.10,true]"
+# Only after the task reports complete healthy exact-HEAD evidence:
+script/release --dry-run --evaluate-head
+script/release --evaluate-head
 ```
 
 Do not use `RELEASE_CI_STATUS_OVERRIDE=true` to substitute for pending, missing, failed, or
@@ -852,7 +874,7 @@ This task depends on the `gem-release` Ruby gem, which is installed via `bundle 
 Before releasing to production, always preview with a dry run:
 
 ```bash
-bundle exec rake "release[16.5.0,true]"
+script/release --dry-run
 ```
 
 This uses a temporary git worktree to show exactly what would be updated without making any changes.
@@ -864,7 +886,7 @@ This uses a temporary git worktree to show exactly what would be updated without
 Always test with a dry run before actually releasing:
 
 ```bash
-bundle exec rake "release[16.2.0,true]"
+script/release --dry-run
 ```
 
 This shows you exactly what would be updated without making any changes.
@@ -881,15 +903,24 @@ The release script now checks NPM authentication at the start and will automatic
 
 ### NPM Release Readiness Issues
 
-If the release reports a pnpm version mismatch, first activate the exact pnpm version declared by the root
-`packageManager`. Then run the exact frozen-install repair command it prints from the repository root for the
-installed dependency check:
+Follow the reason named by the release failure:
+
+- For missing or stale installed dependencies, run from the repository root:
 
 ```bash
 pnpm install --frozen-lockfile
 ```
 
-Then fix any remaining build error and rerun the same explicit release version. The release will not have reached
+- For a pnpm-version mismatch, activate the exact version declared by the root `packageManager`, verify it with
+  `pnpm --version`, and retry `script/release`. Do not reinstall dependencies unless a separate stale-dependency
+  failure requests it.
+- For a package-build failure, fix the reported error, rerun the exact printed
+  `pnpm --filter <package> run build` command, and retry `script/release`.
+
+`bin/setup` is only an optional broader environment refresh for a stale dependency state. The release script does
+not run it automatically, and neither a pnpm-version mismatch nor a package-build failure should recommend it.
+
+These readiness failures happen before
 release-checkout creation, pull/authentication, remote CI/tag/version reads, confirmation, version mutation,
 ShakaPerf dispatch, tagging, publication, or OTP prompting.
 
