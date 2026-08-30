@@ -26,6 +26,7 @@ import * as errorReporter from '../../src/shared/errorReporter';
 import {
   trace,
   subSpan,
+  setupSubSpan,
   setupTracing,
   startSsrRequestOptions,
   __resetSubSpanForTest,
@@ -395,6 +396,24 @@ describe('opentelemetry integration: tracing wiring', () => {
     } finally {
       messageSpy.mockRestore();
     }
+  });
+
+  test('managed init preserves root tracing when another sub-span integration is active', async () => {
+    const existingSubSpan = jest.fn((_opts, fn) => fn({ setAttributes() {} }));
+    expect(setupSubSpan(existingSubSpan)).toBe(true);
+
+    init({
+      tracing: true,
+      spanProcessor: new SimpleSpanProcessor(exporter),
+    });
+
+    await trace(
+      () => subSpan({ name: 'foreign.child' }, async () => 'ok'),
+      startSsrRequestOptions({ renderingRequest: 'irrelevant' }),
+    );
+
+    expect(exporter.getFinishedSpans().map((span) => span.name)).toEqual(['ror.ssr.request']);
+    expect(existingSubSpan).toHaveBeenCalledTimes(1);
   });
 
   test('subSpan does not leak renderingRequest payload into span attributes (sensitive data audit)', async () => {

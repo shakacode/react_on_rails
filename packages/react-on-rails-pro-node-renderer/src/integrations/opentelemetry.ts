@@ -59,10 +59,14 @@ export interface OpenTelemetryInitOptions {
   fastify?: boolean;
   /** Wrap SSR work in spans via setupTracing + setupSubSpan. Default: false. */
   tracing?: boolean;
-  /** Override the default OTLP HTTP exporter. */
+  /** Override the default OTLP HTTP exporter.
+   *  The renderer owns the processor it creates around this exporter, including
+   *  shutting the exporter down if a later initialization step fails. */
   exporter?: SpanExporter;
   /** Override the default span processor.
-   *  Default: BatchSpanProcessor in production, SimpleSpanProcessor otherwise. */
+   *  Default: BatchSpanProcessor in production, SimpleSpanProcessor otherwise.
+   *  A caller-supplied processor remains caller-owned if initialization fails;
+   *  the renderer force-flushes it when supported but does not shut it down. */
   spanProcessor?: SpanProcessor;
   /** Additional resource attributes merged into the default resource. */
   resourceAttributes?: Record<string, string>;
@@ -266,12 +270,16 @@ function hasWorkingContextManager(otelApi: typeof import('@opentelemetry/api')):
 }
 
 function warnAboutExistingProviderOptions(opts: OpenTelemetryInitOptions): void {
+  const hasNonServiceResourceAttributes = Object.keys(opts.resourceAttributes ?? {}).some(
+    (attribute) => attribute !== SERVICE_NAME_ATTRIBUTE,
+  );
   const ignoredOptions = [
-    opts.fastify ? 'fastify' : undefined,
+    opts.fastify !== undefined ? 'fastify' : undefined,
     opts.exporter !== undefined ? 'exporter' : undefined,
     opts.spanProcessor !== undefined ? 'spanProcessor' : undefined,
-    opts.resourceDetectors?.length ? 'resourceDetectors' : undefined,
-    opts.instrumentations?.length ? 'instrumentations' : undefined,
+    hasNonServiceResourceAttributes ? 'resourceAttributes (except service.name)' : undefined,
+    opts.resourceDetectors !== undefined ? 'resourceDetectors' : undefined,
+    opts.instrumentations !== undefined ? 'instrumentations' : undefined,
     opts.shutdownTimeoutMs !== undefined ? 'shutdownTimeoutMs' : undefined,
   ].filter((option): option is string => option !== undefined);
 
@@ -285,6 +293,7 @@ function warnAboutExistingProviderOptions(opts: OpenTelemetryInitOptions): void 
 }
 
 function initWithExistingGlobalProvider(opts: OpenTelemetryInitOptions): void {
+  warnAboutExistingProviderOptions(opts);
   if (!opts.tracing) {
     message(
       '[OpenTelemetry] useExistingGlobalProvider requires tracing: true; no renderer spans were installed.',
@@ -315,10 +324,13 @@ function initWithExistingGlobalProvider(opts: OpenTelemetryInitOptions): void {
       return;
     }
 
-    warnAboutExistingProviderOptions(opts);
     installedAdapters = installTracingAdapters(otelApi, serviceName);
 
-    if (installedAdapters.tracing) {
+    if (installedAdapters.tracing && !installedAdapters.subSpan) {
+      installedAdapters = resetInstalledTracingAdapters(installedAdapters);
+      return;
+    }
+    if (installedAdapters.tracing && installedAdapters.subSpan) {
       setUsingExistingGlobalTracerProvider(true);
       log.info('[OpenTelemetry] Renderer tracing attached to the existing global provider');
     }

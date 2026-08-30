@@ -261,6 +261,56 @@ RSpec.describe ReactOnRailsPro::OpenTelemetry do
 
       expect(status).to be_success, "stdout:\n#{stdout}\nstderr:\n#{stderr}"
     end
+
+    it "replaces stale mixed-case propagation headers with the SDK span context" do
+      lib_path = File.expand_path("../../lib", __dir__)
+      script = <<~RUBY
+        require "opentelemetry/sdk"
+        require "react_on_rails_pro/open_telemetry"
+
+        OpenTelemetry::SDK.configure
+        parent_span_context = OpenTelemetry::Trace::SpanContext.new(
+          trace_id: ["0123456789abcdef0123456789abcdef"].pack("H*"),
+          span_id: ["fedcba9876543210"].pack("H*"),
+          trace_flags: OpenTelemetry::Trace::TraceFlags::SAMPLED,
+          tracestate: OpenTelemetry::Trace::Tracestate.from_string("vendor=current"),
+          remote: true
+        )
+        parent_span = OpenTelemetry::Trace.non_recording_span(parent_span_context)
+        parent_context = OpenTelemetry::Trace.context_with_span(parent_span)
+        client_span = ReactOnRailsPro::OpenTelemetry.start_client_span(
+          :post,
+          "/render",
+          parent_context: parent_context
+        )
+        headers = [
+          ["Authorization", "private-token"],
+          ["TraceParent", "00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01"],
+          ["TRACESTATE", "stale=value"]
+        ]
+
+        client_span.within_context do
+          current_context = OpenTelemetry::Trace.current_span.context
+          client_span.inject(headers)
+          expected_traceparent = "00-\#{current_context.hex_trace_id}-\#{current_context.hex_span_id}-01"
+          unless headers == [
+            ["Authorization", "private-token"],
+            ["traceparent", expected_traceparent],
+            ["tracestate", "vendor=current"]
+          ]
+            warn "unexpected headers: \#{headers.inspect}"
+            exit 1
+          end
+        end
+      RUBY
+
+      env = { "OTEL_SDK_DISABLED" => nil, "OTEL_TRACES_EXPORTER" => "none" }
+      stdout, stderr, status = Timeout.timeout(60) do
+        Open3.capture3(env, RbConfig.ruby, "-I", lib_path, "-e", script)
+      end
+
+      expect(status).to be_success, "stdout:\n#{stdout}\nstderr:\n#{stderr}"
+    end
   end
 
   context "with a registered tracer provider" do
@@ -557,7 +607,11 @@ RSpec.describe ReactOnRailsPro::OpenTelemetry do
       propagator = fake_propagator_class.new
       OpenTelemetry.define_singleton_method(:tracer_provider) { sequential_provider }
       OpenTelemetry.define_singleton_method(:propagation) { propagator }
-      raw_headers = [%w[authorization private-token]]
+      raw_headers = [
+        %w[authorization private-token],
+        ["TraceParent", "00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01"],
+        ["TRACESTATE", "stale=value"]
+      ]
       sent_headers = []
       async_client = double
       allow(async_client).to receive(:post) do |_path, headers:, **|
@@ -584,7 +638,13 @@ RSpec.describe ReactOnRailsPro::OpenTelemetry do
           ]
         ]
       )
-      expect(raw_headers).to eq([%w[authorization private-token]])
+      expect(raw_headers).to eq(
+        [
+          %w[authorization private-token],
+          ["TraceParent", "00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01"],
+          ["TRACESTATE", "stale=value"]
+        ]
+      )
       expect(first_span).to be_finished
       expect(second_span).to be_finished
     ensure

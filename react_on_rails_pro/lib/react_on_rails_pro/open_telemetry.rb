@@ -50,10 +50,11 @@ module ReactOnRailsPro
         ::OpenTelemetry::Context.with_current(@context) do
           ::OpenTelemetry.propagation.inject(carrier)
         end
+        headers.reject! { |name, _| TRACE_HEADER_NAMES.include?(name.to_s.downcase) }
         carrier.each do |name, value|
           next unless TRACE_HEADER_NAMES.include?(name.to_s.downcase)
 
-          set_header(headers, name.to_s, value)
+          headers << [name.to_s, value]
         end
       rescue StandardError
         nil
@@ -124,12 +125,6 @@ module ReactOnRailsPro
         @span.status = ::OpenTelemetry::Trace::Status.error
       rescue StandardError
         nil
-      end
-
-      def set_header(headers, name, value)
-        return if headers.any? { |header_name, _| header_name.to_s.casecmp?(name) }
-
-        headers << [name, value]
       end
     end
 
