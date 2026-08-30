@@ -24,6 +24,7 @@ import {
   PPR_PRERENDER_COMPLETE_CHUNK_KEY,
   PPR_POSTPONED_STATE_CHUNK_KEY,
   PPR_RENDER_ERRORED_CHUNK_KEY,
+  PPR_ASSET_MANIFEST_CHUNK_KEY,
 } from '../src/pprServerRenderedReactComponent.ts';
 import * as ComponentRegistry from '../src/ComponentRegistry.ts';
 import ReactOnRails from '../src/ReactOnRails.node.ts';
@@ -445,6 +446,69 @@ describe('pprServerRenderedReactComponent', () => {
     } finally {
       jest.resetModules();
     }
+  });
+
+  it('captures the asset manifest in the prerender trailing protocol chunk', async () => {
+    const { chunks, errors } = await collectStreamResult(runPrerender());
+    expect(errors).toHaveLength(0);
+
+    // The trailing protocol chunk carries the asset manifest alongside PostponedState.
+    const trailingChunk = chunks[chunks.length - 1];
+    expect(trailingChunk[PPR_PRERENDER_COMPLETE_CHUNK_KEY]).toBe(true);
+
+    const rawManifest = trailingChunk[PPR_ASSET_MANIFEST_CHUNK_KEY];
+    expect(typeof rawManifest).toBe('string');
+
+    const manifest = JSON.parse(rawManifest);
+    expect(manifest).toHaveProperty('stylesheetHrefs');
+    expect(manifest).toHaveProperty('initScriptKeys');
+    expect(Array.isArray(manifest.stylesheetHrefs)).toBe(true);
+    expect(Array.isArray(manifest.initScriptKeys)).toBe(true);
+  });
+
+  it('captures the asset manifest even when the prerender has no RSC payloads (empty arrays)', async () => {
+    // The test components are plain React (no RSC), so the manifest should have empty arrays —
+    // the manifest structure is still captured and stored for the resume pass.
+    const { chunks, errors } = await collectStreamResult(runPrerender());
+    expect(errors).toHaveLength(0);
+
+    const trailingChunk = chunks[chunks.length - 1];
+    const manifest = JSON.parse(trailingChunk[PPR_ASSET_MANIFEST_CHUNK_KEY]);
+
+    // Empty arrays are valid — the resume pass pre-seeds its dedup sets from them.
+    expect(manifest.stylesheetHrefs).toEqual([]);
+    expect(manifest.initScriptKeys).toEqual([]);
+  });
+
+  it('passes the shell asset manifest to the resume injector via railsContext.pprShellAssets', async () => {
+    // Step 1: prerender and capture the manifest
+    const { chunks: prerenderChunks } = await collectStreamResult(runPrerender());
+    const trailingChunk = prerenderChunks[prerenderChunks.length - 1];
+    const postponedStateJson = trailingChunk[PPR_POSTPONED_STATE_CHUNK_KEY];
+    const assetManifestJson = trailingChunk[PPR_ASSET_MANIFEST_CHUNK_KEY];
+
+    // Step 2: resume with the manifest — confirm it completes without errors.
+    // The resume receives pprShellAssets via railsContext and uses it to pre-seed dedup sets.
+    ReactOnRails.register({ PprShellWithHole });
+    const resumeResult = pprResumeServerRenderedReactComponent({
+      name: 'PprShellWithHole',
+      domNodeId: 'pprDomId',
+      trace: false,
+      props: {},
+      throwJsErrors: false,
+      railsContext: {
+        ...testingRailsContext,
+        pprPostponedState: postponedStateJson,
+        pprShellAssets: assetManifestJson,
+      },
+    });
+
+    const { chunks: resumeChunks, errors: resumeErrors } = await collectStreamResult(resumeResult);
+    expect(resumeErrors).toHaveLength(0);
+
+    // The resume should produce the hole content (the Suspense hole's async component resolves).
+    const resumeHtml = resumeChunks.map((c) => c.html).join('');
+    expect(resumeHtml).toContain(HOLE_CONTENT_MARKER);
   });
 
   it('raises a clear configuration error when react-dom does not satisfy the PPR version range', async () => {
