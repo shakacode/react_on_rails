@@ -29,6 +29,10 @@ class ReleaseSupervisor
   POLL_INTERVAL = 0.05
   SIGNALS = %w[INT TERM HUP].freeze
   CLAIM_STATUSES = %w[active released].freeze
+  FOREIGN_CLAIM_METADATA_FIELDS = %w[
+    agent_id instance_id branch phase operator host machine_id thread_handle chat_handle session_id session_source
+    expires_at
+  ].freeze
   PR_SET_CHILD_SUBREAPER = 36
   CLAIM_CLEANUP_FAILED_MESSAGE =
     "ERROR: release-line lease cleanup failed; verify coordination state before retrying"
@@ -57,7 +61,7 @@ class ReleaseSupervisor
     @env = env
     @stdout = stdout
     @stderr = stderr
-    @options = { dry_run: false, reconcile_accelerated_rc: false, doctor: false }
+    @options = { dry_run: false, reconcile_accelerated_rc: false, doctor: false, evaluate_head: false }
     @parser = build_parser
     @received_signal = nil
     @managed_claim_release_safe = true
@@ -135,7 +139,8 @@ class ReleaseSupervisor
           acquire_release_lease!(scope, identity, coordination_timeout:, termination_grace:)
         rescue ClaimRefusedError
           managed_claim_cleanup_required = false
-          raise
+          guidance = atomic_claim_refusal_guidance(scope, identity, coordination_timeout:, termination_grace:)
+          raise ClaimRefusedError, guidance
         end
       else
         verify_existing_lease!(scope, identity, coordination_timeout:, termination_grace:)
@@ -172,7 +177,7 @@ class ReleaseSupervisor
 
   def build_parser
     OptionParser.new do |parser|
-      parser.banner = "Usage: script/release [--doctor | --dry-run | --reconcile-accelerated-rc]"
+      parser.banner = "Usage: script/release [--doctor | --dry-run | --reconcile-accelerated-rc] [--evaluate-head]"
       parser.on("--doctor", "Validate read-only release-machine setup") do
         @options[:doctor] = true
       end
@@ -185,6 +190,9 @@ class ReleaseSupervisor
       ) do
         @options[:reconcile_accelerated_rc] = true
       end
+      parser.on("--evaluate-head", "Strictly evaluate exact release-source HEAD instead of CI walkback") do
+        @options[:evaluate_head] = true
+      end
       parser.on("-h", "--help", "Show this help") do
         @stdout.puts parser
         exit 0
@@ -196,7 +204,17 @@ class ReleaseSupervisor
     @remaining_args = @argv.dup
     @parser.parse!(@remaining_args)
     selected_modes = @options.values_at(:doctor, :dry_run, :reconcile_accelerated_rc).count(true)
-    raise UsageError, "choose only one of --doctor, --dry-run, or --reconcile-accelerated-rc" if selected_modes > 1
+    incompatible_head_evaluation_mode = if @options.fetch(:doctor)
+                                          "--doctor"
+                                        elsif @options.fetch(:reconcile_accelerated_rc)
+                                          "--reconcile-accelerated-rc"
+                                        end
+    option_error = if selected_modes > 1
+                     "choose only one of --doctor, --dry-run, or --reconcile-accelerated-rc"
+                   elsif @options.fetch(:evaluate_head) && incompatible_head_evaluation_mode
+                     "--evaluate-head does not apply to #{incompatible_head_evaluation_mode}"
+                   end
+    raise UsageError, option_error if option_error
   end
 
   def parse_scope!
@@ -427,7 +445,7 @@ class ReleaseSupervisor
 
   def run_dry(version)
     child_pid = Process.spawn(
-      { ReleaseLeaseGuard::CONTRACT_ENV => nil },
+      release_child_environment(contract: nil),
       "bundle", "exec", "rake", "release[#{version},true]"
     )
     _pid, status = Process.wait2(child_pid)
@@ -542,10 +560,10 @@ class ReleaseSupervisor
     end
 
     claims = parse_pre_acquisition_claims!(stdout, scope)
-    return unless claims.any? { |claim| active_foreign_claim?(claim, identity) }
+    foreign_claims = claims.select { |claim| active_foreign_claim?(claim, identity) }
+    return if foreign_claims.empty?
 
-    raise ReleaseLeaseGuard::LeaseError,
-          "release line already has an active foreign claim; do not infer takeover safety from lease or heartbeat age"
+    raise ReleaseLeaseGuard::LeaseError, foreign_claim_failure_guidance(scope, foreign_claims)
   rescue JSON::ParserError, TypeError
     raise ReleaseLeaseGuard::LeaseError, "release-line pre-acquisition status is malformed or UNKNOWN"
   end
@@ -575,6 +593,52 @@ class ReleaseSupervisor
   def active_foreign_claim?(claim, identity)
     claim["status"] == "active" &&
       (claim["agent_id"] != identity.agent_id || claim["instance_id"] != identity.instance_id)
+  end
+
+  def foreign_claim_failure_guidance(scope, claims)
+    lines = ["release line already has an active foreign claim:"]
+    claims.each_with_index do |claim, index|
+      lines << "  Claim #{index + 1}:"
+      FOREIGN_CLAIM_METADATA_FIELDS.each do |field|
+        next unless claim.key?(field) && !claim[field].to_s.empty?
+
+        lines << "    #{field}: #{JSON.generate(claim[field])}"
+      end
+    end
+    lines.concat(
+      foreign_claim_inspection_guidance(scope)
+    )
+    lines.join("\n")
+  end
+
+  def atomic_claim_refusal_guidance(scope, identity, coordination_timeout:, termination_grace:)
+    stdout, status = run_agent_coord(
+      "status", "--repo", scope.repo, "--target", scope.target, "--json",
+      timeout: coordination_timeout,
+      termination_grace:
+    )
+    if status&.success?
+      claims = parse_pre_acquisition_claims!(stdout, scope)
+      foreign_claims = claims.select { |claim| active_foreign_claim?(claim, identity) }
+      unless foreign_claims.empty?
+        refusal = ["release-line lease claim was refused.", foreign_claim_failure_guidance(scope, foreign_claims)]
+        return refusal.join("\n")
+      end
+    end
+
+    (["release-line lease claim was refused; current holder metadata is unavailable."] +
+      foreign_claim_inspection_guidance(scope)).join("\n")
+  rescue StandardError
+    (["release-line lease claim was refused; current holder metadata is unavailable or malformed."] +
+      foreign_claim_inspection_guidance(scope)).join("\n")
+  end
+
+  def foreign_claim_inspection_guidance(scope)
+    [
+      "Inspect authoritative coordination state:",
+      "  agent-coord status --repo #{scope.repo} --target #{scope.target} --json",
+      "Do not infer takeover safety from lease or heartbeat age alone."
+    ]
   end
 
   def release_managed_lease!(scope, identity, coordination_timeout:, termination_grace:)
@@ -970,7 +1034,7 @@ class ReleaseSupervisor
       announce_process_group(pipes.ready_writer, pgid)
       pipes.ready_writer.close
       exec(
-        { ReleaseLeaseGuard::CONTRACT_ENV => JSON.generate(contract) },
+        release_child_environment(contract: JSON.generate(contract)),
         "bundle", "exec", "rake", supervised_rake_task(scope.version)
       )
     rescue StandardError
@@ -999,6 +1063,12 @@ class ReleaseSupervisor
     return "release:reconcile_accelerated_rc[#{version}]" if @options.fetch(:reconcile_accelerated_rc)
 
     "release[#{version}]"
+  end
+
+  def release_child_environment(contract:)
+    child_environment = { ReleaseLeaseGuard::CONTRACT_ENV => contract }
+    child_environment["RELEASE_CI_EVALUATE_HEAD"] = "true" if @options.fetch(:evaluate_head)
+    child_environment
   end
 
   def reset_child_signal_handlers
