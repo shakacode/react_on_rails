@@ -122,6 +122,15 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4869](https://github.com/shakacode/react_on_rails/pull/4869) by
   [sashakhar1](https://github.com/sashakhar1).
 
+- **[Pro]** **OpenTelemetry propagation and existing-provider attachment now recover cleanly**: Rails-to-renderer
+  requests replace stale mixed-case W3C propagation headers with each request attempt's current client-span context
+  without mutating caller-owned raw headers. Node Renderer attachment to an application-owned provider now rolls back
+  a newly installed tracing adapter when a conflicting sub-span integration rejects installation, so initialization can
+  be retried after the conflict is removed. Existing-provider mode also reports every ignored renderer-managed option
+  before provider and context checks, while both provider modes share one service-name precedence implementation.
+  [PR 4956](https://github.com/shakacode/react_on_rails/pull/4956) by
+  [justin808](https://github.com/justin808).
+
 - **[Pro]** **Node Renderer transport follow-ups now expose protocol errors and accurate Fastify modes**:
   Rails retries continue for network disconnects and peer-reset HTTP/2 streams, while HTTP parser and framing errors
   surface directly. Public `configureFastify` callbacks and `fastifyServerOptions` now reflect both HTTP/1.1 and
@@ -402,8 +411,9 @@ pair`, returns invalid UTF-8, or silently mis-decodes the value. The parser now 
   attributes below explicit resource configuration, or opt in to preserving renderer `ror.*` spans through an
   application-owned global provider. Empty service-name values from environment variables, options, and resource
   attributes are treated as unset. Renderer-managed shutdown disables registered instrumentations and shuts down
-  provider components after successful initialization, while failed initialization preserves caller-supplied processors
-  and exporters.
+  provider components after successful initialization. On failed initialization, a caller-supplied `spanProcessor`
+  remains caller-owned and is force-flushed when supported; a supplied `exporter` is wrapped by a renderer-owned
+  processor and is shut down with that processor.
   Fixes [Issue 4867](https://github.com/shakacode/react_on_rails/issues/4867).
   [PR 4878](https://github.com/shakacode/react_on_rails/pull/4878) by
   [sashakhar1](https://github.com/sashakhar1).

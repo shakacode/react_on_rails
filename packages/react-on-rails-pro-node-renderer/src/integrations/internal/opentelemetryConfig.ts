@@ -28,6 +28,11 @@ interface ResolvedResource {
   serviceName: string;
 }
 
+interface ResolvedServiceConfiguration {
+  resourceAttributes: Record<string, string>;
+  serviceName: string;
+}
+
 type ResourcesModule = Pick<
   typeof import('@opentelemetry/resources'),
   'detectResources' | 'resourceFromAttributes'
@@ -112,17 +117,26 @@ function resolveResourceServiceName(
   return resourceAttributes[serviceNameAttribute] || undefined;
 }
 
-export function resolveServiceName(opts: OpenTelemetryResourceOptions, serviceNameAttribute: string): string {
+function resolveServiceConfiguration(
+  opts: OpenTelemetryResourceOptions,
+  serviceNameAttribute: string,
+): ResolvedServiceConfiguration {
   const resourceAttributes = {
     ...parseResourceAttributes(process.env.OTEL_RESOURCE_ATTRIBUTES),
     ...(opts.resourceAttributes ?? {}),
   };
 
-  return (
-    resolveConfiguredServiceName(opts) ??
-    resolveResourceServiceName(resourceAttributes, serviceNameAttribute) ??
-    DEFAULT_SERVICE_NAME
-  );
+  return {
+    resourceAttributes,
+    serviceName:
+      resolveConfiguredServiceName(opts) ??
+      resolveResourceServiceName(resourceAttributes, serviceNameAttribute) ??
+      DEFAULT_SERVICE_NAME,
+  };
+}
+
+export function resolveServiceName(opts: OpenTelemetryResourceOptions, serviceNameAttribute: string): string {
+  return resolveServiceConfiguration(opts, serviceNameAttribute).serviceName;
 }
 
 export function resolveResource(
@@ -131,15 +145,7 @@ export function resolveResource(
   serviceNameAttribute: string,
   reportDetectorError: ResourceDetectorErrorReporter,
 ): ResolvedResource {
-  const resourceAttributes = {
-    ...parseResourceAttributes(process.env.OTEL_RESOURCE_ATTRIBUTES),
-    ...(opts.resourceAttributes ?? {}),
-  };
-  const configuredServiceName = resolveConfiguredServiceName(opts);
-  const serviceName =
-    configuredServiceName ??
-    resolveResourceServiceName(resourceAttributes, serviceNameAttribute) ??
-    DEFAULT_SERVICE_NAME;
+  const { resourceAttributes, serviceName } = resolveServiceConfiguration(opts, serviceNameAttribute);
 
   if (!opts.resourceDetectors?.length) {
     return {
