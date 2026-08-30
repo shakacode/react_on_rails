@@ -13,6 +13,10 @@ For licensing terms:
 https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
 -%>
 var container = document.getElementById('component-container');
+// Clear the previous refresh's marker first: the container itself survives the
+// innerHTML swap, so a stale attribute would satisfy the wait before this
+// cycle's swap has actually happened.
+container.removeAttribute('data-refreshed');
 container.innerHTML = "<%= escape_javascript(render partial: 'xhr_refresh_partial') %>";
 
 var event = document.createEvent('Event');

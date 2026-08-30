@@ -41,7 +41,11 @@ class HelloWorldRehydratable extends React.Component {
       // Rehydrate through the Pro client lifecycle: it reads props from the component
       // specification <script> tag for this dom id, unmounts the React root orphaned by
       // the innerHTML replacement (cleaning up its listeners), and hydrates the new node.
-      ReactOnRails.reactOnRailsComponentLoaded(component.id);
+      // Log rejections: the async lifecycle otherwise surfaces failures only as an
+      // unhandled promise rejection with no stack tying it back to this dispatch.
+      ReactOnRails.reactOnRailsComponentLoaded(component.id).catch((error) => {
+        console.error(`rehydrateAllInstances failed for ${component.id}:`, error);
+      });
     }
   }
 
