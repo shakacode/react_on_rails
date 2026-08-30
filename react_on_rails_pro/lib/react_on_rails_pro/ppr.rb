@@ -28,6 +28,7 @@ module ReactOnRailsPro
     PRERENDER_COMPLETE_CHUNK_KEY = "pprPrerenderComplete"
     POSTPONED_STATE_CHUNK_KEY = "pprPostponedState"
     RENDER_ERRORED_CHUNK_KEY = "pprRenderErrored"
+    ASSET_MANIFEST_CHUNK_KEY = "pprAssetManifest"
     # MIRROR VALUES END
 
     # Version of the cache-record format. Part of every PPR cache key so a storage-format change

@@ -63,6 +63,10 @@ export type RailsContext = {
       // pinned wire contract between the Rails helper and the Pro renderer.
       pprSettleBudgetMs?: number;
       pprPostponedState?: string;
+      // Injected by React on Rails Pro for :ppr_resume renders: the CSS hrefs and init-script keys
+      // emitted during the prerender phase, so the resume pass can suppress duplicates and gate
+      // hole-only CSS before reveals (issue #4897 — PPR CSS/asset coordination).
+      pprShellAssets?: string | { stylesheetHrefs: string[]; initScriptKeys: string[] };
       getRSCPayloadStream: (componentName: string, props: unknown) => Promise<NodeJS.ReadableStream>;
     }
 );
