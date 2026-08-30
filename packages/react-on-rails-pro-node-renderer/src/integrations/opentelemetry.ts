@@ -327,7 +327,7 @@ function initWithExistingGlobalProvider(opts: OpenTelemetryInitOptions): void {
     installedAdapters = installTracingAdapters(otelApi, serviceName);
 
     if (installedAdapters.tracing && !installedAdapters.subSpan) {
-      installedAdapters = resetInstalledTracingAdapters(installedAdapters);
+      resetInstalledTracingAdapters(installedAdapters);
       return;
     }
     if (installedAdapters.tracing && installedAdapters.subSpan) {
