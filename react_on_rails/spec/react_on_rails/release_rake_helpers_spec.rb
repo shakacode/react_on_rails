@@ -19796,6 +19796,9 @@ RSpec.describe "release.rake helper methods" do
         allow(self).to receive(:prepared_release_version_from_changelog)
           .with(monorepo_root:)
           .and_return("17.0.0.rc.10")
+        allow(self).to receive(:prepared_release_version_from_changelog_at_revision)
+          .with(monorepo_root:, revision: exact_head_sha)
+          .and_return("17.0.0.rc.10")
       end
 
       it "keeps the complete walkback output free of strict guidance for incomplete exact-HEAD evidence" do
@@ -19870,6 +19873,7 @@ RSpec.describe "release.rake helper methods" do
             is_prerelease: false,
             allow_override: false,
             dry_run: false,
+            current_branch: "release/17.0.0",
             target_gem_version: "17.0.0.rc.10"
           )
         end.to raise_error(
@@ -19879,8 +19883,8 @@ RSpec.describe "release.rake helper methods" do
       end
 
       it "withholds wrapper recovery when the changelog-selected version differs from an explicit diagnostic target" do
-        allow(self).to receive(:prepared_release_version_from_changelog)
-          .with(monorepo_root:)
+        allow(self).to receive(:prepared_release_version_from_changelog_at_revision)
+          .with(monorepo_root:, revision: exact_head_sha)
           .and_return("17.1.0.rc.1")
         allow(self).to receive(:fetch_ci_check_runs_for_sha)
           .with(repo_slug: "shakacode/react_on_rails", sha: exact_head_sha)
@@ -19895,6 +19899,7 @@ RSpec.describe "release.rake helper methods" do
             is_prerelease: true,
             allow_override: false,
             dry_run: false,
+            current_branch: "release/17.1.0",
             target_gem_version: "17.1.0.rc.2"
           )
         end.to raise_error(SystemExit) { |error|
@@ -19904,9 +19909,100 @@ RSpec.describe "release.rake helper methods" do
         }
       end
 
+      it "binds wrapper recovery to the changelog version at the diagnosed exact HEAD" do
+        allow(self).to receive(:prepared_release_version_from_changelog)
+          .with(monorepo_root:)
+          .and_return("17.1.0.rc.2")
+        allow(self).to receive(:prepared_release_version_from_changelog_at_revision)
+          .with(monorepo_root:, revision: exact_head_sha)
+          .and_return("17.1.0.rc.2")
+        allow(self).to receive(:fetch_ci_check_runs_for_sha)
+          .with(repo_slug: "shakacode/react_on_rails", sha: exact_head_sha)
+          .and_return(check_runs: [passing_run("Lint")])
+        allow(self).to receive(:fetch_ci_statuses_for_sha)
+          .with(repo_slug: "shakacode/react_on_rails", sha: exact_head_sha)
+          .and_return(statuses: [])
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root:,
+            is_prerelease: true,
+            allow_override: false,
+            dry_run: false,
+            current_branch: "release/17.1.0",
+            target_gem_version: "17.1.0.rc.2"
+          )
+        end.to raise_error(
+          SystemExit,
+          %r{script/release --dry-run --evaluate-head.*script/release --evaluate-head}m
+        )
+      end
+
+      it "withholds wrapper recovery when the current branch is not supported by script/release" do
+        allow(self).to receive(:prepared_release_version_from_changelog)
+          .with(monorepo_root:)
+          .and_return("17.1.0.rc.2")
+        allow(self).to receive(:prepared_release_version_from_changelog_at_revision)
+          .with(monorepo_root:, revision: exact_head_sha)
+          .and_return("17.1.0.rc.2")
+        allow(self).to receive(:fetch_ci_check_runs_for_sha)
+          .with(repo_slug: "shakacode/react_on_rails", sha: exact_head_sha)
+          .and_return(check_runs: [passing_run("Lint")])
+        allow(self).to receive(:fetch_ci_statuses_for_sha)
+          .with(repo_slug: "shakacode/react_on_rails", sha: exact_head_sha)
+          .and_return(statuses: [])
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root:,
+            is_prerelease: true,
+            allow_override: false,
+            dry_run: false,
+            current_branch: "main",
+            target_gem_version: "17.1.0.rc.2"
+          )
+        end.to raise_error(SystemExit) { |error|
+          expect(error.message).to include("current branch main is not supported by script/release")
+          expect(error.message).not_to include("--evaluate-head")
+        }
+      end
+
+      it "withholds wrapper recovery when the current checkout selects a different version" do
+        allow(self).to receive(:prepared_release_version_from_changelog)
+          .with(monorepo_root:)
+          .and_return("17.1.0.rc.1")
+        allow(self).to receive(:prepared_release_version_from_changelog_at_revision)
+          .with(monorepo_root:, revision: exact_head_sha)
+          .and_return("17.1.0.rc.2")
+        allow(self).to receive(:fetch_ci_check_runs_for_sha)
+          .with(repo_slug: "shakacode/react_on_rails", sha: exact_head_sha)
+          .and_return(check_runs: [passing_run("Lint")])
+        allow(self).to receive(:fetch_ci_statuses_for_sha)
+          .with(repo_slug: "shakacode/react_on_rails", sha: exact_head_sha)
+          .and_return(statuses: [])
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root:,
+            is_prerelease: true,
+            allow_override: false,
+            dry_run: false,
+            current_branch: "release/17.1.0",
+            target_gem_version: "17.1.0.rc.2"
+          )
+        end.to raise_error(SystemExit) { |error|
+          expect(error.message).to include("current checkout would select 17.1.0.rc.1")
+          expect(error.message).to include("diagnostic target is 17.1.0.rc.2")
+          expect(error.message).not_to include("--evaluate-head")
+        }
+      end
+
       it "replays the observed RC.1 walkback stop with supervised preview and live recovery" do
         allow(self).to receive(:prepared_release_version_from_changelog)
           .with(monorepo_root:)
+          .and_return("17.1.0.rc.1")
+        allow(self).to receive(:prepared_release_version_from_changelog_at_revision)
+          .with(monorepo_root:, revision: exact_head_sha)
           .and_return("17.1.0.rc.1")
         allow(self).to receive(:required_check_names_for_branch)
           .with(monorepo_root:, repo_slug: "shakacode/react_on_rails", ci_branch: "main")
@@ -19924,6 +20020,7 @@ RSpec.describe "release.rake helper methods" do
             is_prerelease: true,
             allow_override: false,
             dry_run: false,
+            current_branch: "release/17.1.0",
             target_gem_version: "17.1.0.rc.1"
           )
           nil
@@ -19961,6 +20058,7 @@ RSpec.describe "release.rake helper methods" do
             is_prerelease: false,
             allow_override: false,
             dry_run: false,
+            current_branch: "release/17.0.0",
             target_gem_version: "17.0.0.rc.10"
           )
         end.to raise_error(
@@ -19993,6 +20091,7 @@ RSpec.describe "release.rake helper methods" do
             is_prerelease: true,
             allow_override: false,
             dry_run: false,
+            current_branch: "release/17.0.0",
             target_gem_version: "17.0.0.rc.10"
           )
         end.to raise_error(
@@ -20548,6 +20647,7 @@ RSpec.describe "release.rake helper methods" do
             is_prerelease: false,
             allow_override: false,
             dry_run: true,
+            current_branch: "release/17.0.0",
             target_gem_version: "17.0.0.rc.10"
           )
         end.to output(Regexp.new(expected_output, Regexp::MULTILINE)).to_stdout
@@ -20614,6 +20714,7 @@ RSpec.describe "release.rake helper methods" do
             is_prerelease: true,
             allow_override: false,
             dry_run: false,
+            current_branch: "release/17.0.0",
             target_gem_version: "17.0.0.rc.10"
           )
         end.to raise_error(
@@ -20851,6 +20952,7 @@ RSpec.describe "release.rake helper methods" do
             is_prerelease: true,
             allow_override: false,
             dry_run: false,
+            current_branch: "release/17.0.0",
             target_gem_version: "17.0.0.rc.10"
           )
         end.to raise_error(

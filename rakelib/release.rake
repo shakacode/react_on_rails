@@ -3120,6 +3120,18 @@ rescue Errno::ENOENT, Errno::EACCES
   nil
 end
 
+def prepared_release_version_from_changelog_at_revision(monorepo_root:, revision:)
+  changelog, status = Open3.capture2e(
+    "git", "-C", monorepo_root, "show", "#{revision}:CHANGELOG.md"
+  )
+  return nil unless status.success?
+
+  ReleaseChangelogSelector.prepared_version(
+    changelog.lines,
+    version_pattern: ReleaseLeaseGuard::RELEASE_VERSION_PATTERN
+  )
+end
+
 def current_gem_version(monorepo_root)
   version_file = File.join(monorepo_root, "react_on_rails", "lib", "react_on_rails", "version.rb")
   content = File.read(version_file)
@@ -3148,6 +3160,16 @@ end
 # allowed, but `release/X.Y.Z` branches cannot cut another release line.
 def stable_release_branch_allowed?(current_branch:, target_gem_version:)
   ["main", "release/#{target_gem_version}"].include?(current_branch)
+end
+
+def supervised_release_branch_allowed?(current_branch:, target_gem_version:)
+  return false if current_branch.to_s.empty? || target_gem_version.to_s.empty?
+
+  if release_prerelease_version?(target_gem_version)
+    current_branch == "release/#{release_base_version(target_gem_version)}"
+  else
+    stable_release_branch_allowed?(current_branch:, target_gem_version:)
+  end
 end
 
 def release_base_version(gem_version)
@@ -8527,7 +8549,8 @@ def fetch_accelerated_rc_ci_snapshot!(repo_slug:, sha:, monorepo_root: nil, ci_b
 end
 
 def exact_head_recovery_guidance(repo_slug:, monorepo_root:, head_sha:, evaluated_sha:, required_names:,
-                                 is_prerelease:, ci_branch:, required_checks_known: true, target_gem_version: nil)
+                                 is_prerelease:, ci_branch:, required_checks_known: true, current_branch: nil,
+                                 target_gem_version: nil)
   return nil if head_sha.nil? || head_sha == evaluated_sha
   unless required_checks_known
     return exact_head_unknown_guidance("❌ Required CI check discovery is unknown; release remains blocked.")
@@ -8595,14 +8618,32 @@ def exact_head_recovery_guidance(repo_slug:, monorepo_root:, head_sha:, evaluate
         "❌ Exact HEAD is healthy, but the resolved release version is unavailable; release remains blocked."
       )
     end
-    prepared_version = prepared_release_version_from_changelog(monorepo_root:)
-    if prepared_version.to_s.empty?
+    unless supervised_release_branch_allowed?(current_branch:, target_gem_version:)
+      branch_label = current_branch.to_s.empty? ? "unknown" : current_branch
+      return "❌ Exact HEAD #{head_sha[0, 8]} is healthy, but current branch #{branch_label} is not supported by " \
+             "script/release for #{target_gem_version}; wrapper recovery remains blocked."
+    end
+    prepared_head_version = prepared_release_version_from_changelog_at_revision(
+      monorepo_root:,
+      revision: head_sha
+    )
+    if prepared_head_version.to_s.empty?
       return "❌ Exact HEAD #{head_sha[0, 8]} is healthy, but script/release cannot resolve a prepared " \
              "CHANGELOG.md version; wrapper recovery remains blocked."
     end
-    unless prepared_version == target_gem_version
-      return "❌ Exact HEAD #{head_sha[0, 8]} is healthy, but script/release would select #{prepared_version} " \
+    unless prepared_head_version == target_gem_version
+      return "❌ Exact HEAD #{head_sha[0, 8]} is healthy, but script/release would select #{prepared_head_version} " \
              "while the diagnostic target is #{target_gem_version}; wrapper recovery remains blocked."
+    end
+    prepared_checkout_version = prepared_release_version_from_changelog(monorepo_root:)
+    if prepared_checkout_version.to_s.empty?
+      return "❌ Exact HEAD #{head_sha[0, 8]} is healthy, but the current checkout has no prepared " \
+             "CHANGELOG.md version; wrapper recovery remains blocked."
+    end
+    unless prepared_checkout_version == target_gem_version
+      return "❌ Exact HEAD #{head_sha[0, 8]} is healthy, but the current checkout would select " \
+             "#{prepared_checkout_version} while the diagnostic target is #{target_gem_version}; " \
+             "wrapper recovery remains blocked."
     end
 
     <<~GUIDANCE.strip
@@ -8627,7 +8668,7 @@ def exact_head_recovery_guidance(repo_slug:, monorepo_root:, head_sha:, evaluate
 end
 
 def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dry_run:, ci_branch: "main",
-                             target_gem_version: nil, defer_pending: false)
+                             target_gem_version: nil, defer_pending: false, current_branch: nil)
   ensure_ci_status_override_is_prerelease!(allow_override:, is_prerelease:)
   puts "\nChecking CI status on origin/#{ci_branch}..."
 
@@ -8748,6 +8789,7 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
         is_prerelease:,
         ci_branch:,
         required_checks_known:,
+        current_branch:,
         target_gem_version:
       )
       message += "\n\n#{guidance}" if guidance
@@ -10367,6 +10409,7 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
       allow_override: allow_ci_status_override,
       dry_run: is_dry_run,
       ci_branch:,
+      current_branch:,
       target_gem_version: resolved_target_gem_version,
       defer_pending: !accelerated_rc_options.nil?
     )
