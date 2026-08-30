@@ -122,6 +122,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   a newly installed tracing adapter when a conflicting sub-span integration rejects installation, so initialization can
   be retried after the conflict is removed. Existing-provider mode also reports every ignored renderer-managed option
   before provider and context checks, while both provider modes share one service-name precedence implementation.
+  [PR 4956](https://github.com/shakacode/react_on_rails/pull/4956) by
+  [justin808](https://github.com/justin808).
 
 - **[Pro]** **Node Renderer transport follow-ups now expose protocol errors and accurate Fastify modes**:
   Rails retries continue for network disconnects and peer-reset HTTP/2 streams, while HTTP parser and framing errors
