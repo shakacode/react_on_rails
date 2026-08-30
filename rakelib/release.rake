@@ -9377,6 +9377,18 @@ def abort_pnpm_release_version_mismatch!(installed_version:, declared_version:)
   )
 end
 
+def abort_pnpm_release_version_probe_failure!(output:)
+  abort_npm_release_readiness!(
+    "pnpm --version failed\n\n#{output.to_s.strip}",
+    recovery: <<~RECOVERY.strip
+      Restore the repository-declared pnpm command on PATH, then verify:
+        pnpm --version
+      Then retry:
+        script/release
+    RECOVERY
+  )
+end
+
 def abort_npm_release_package_build!(package_name:, output:)
   abort_npm_release_readiness!(
     "#{package_name} build failed\n\n#{output.to_s.strip}",
@@ -9399,7 +9411,9 @@ def validate_npm_release_readiness!(monorepo_root:)
 
   version_output, version_status = capture_npm_release_readiness_command(monorepo_root, "pnpm", "--version")
   installed_pnpm_version = version_output.to_s.strip
-  unless version_status.success? && installed_pnpm_version == declared_pnpm_version
+  abort_pnpm_release_version_probe_failure!(output: version_output) unless version_status.success?
+
+  unless installed_pnpm_version == declared_pnpm_version
     abort_pnpm_release_version_mismatch!(
       installed_version: installed_pnpm_version,
       declared_version: declared_pnpm_version

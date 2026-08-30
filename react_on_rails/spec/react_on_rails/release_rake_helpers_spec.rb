@@ -7243,6 +7243,42 @@ RSpec.describe "release.rake helper methods" do
       end
     end
 
+    it "reports a failed pnpm version probe without claiming a version mismatch" do
+      failure_status = instance_double(Process::Status, success?: false)
+
+      Dir.mktmpdir do |monorepo_root|
+        File.write(
+          File.join(monorepo_root, "package.json"),
+          JSON.generate("packageManager" => "pnpm@10.33.4+sha512.abc123")
+        )
+        workspace_lock = File.join(monorepo_root, "pnpm-lock.yaml")
+        installed_store = File.join(monorepo_root, "node_modules", ".pnpm")
+        FileUtils.mkdir_p(installed_store)
+        File.write(workspace_lock, "lockfileVersion: '9.0'\n")
+        File.write(File.join(installed_store, "lock.yaml"), File.read(workspace_lock))
+        allow(Open3).to receive(:capture2e)
+          .with("pnpm", "--version", chdir: monorepo_root)
+          .and_return(["corepack failed to activate pnpm\n", failure_status])
+
+        failure = begin
+          validate_npm_release_readiness!(monorepo_root:)
+          nil
+        rescue SystemExit => error
+          error
+        end
+
+        aggregate_failures do
+          expect(failure&.message).to include("pnpm --version failed")
+          expect(failure&.message).to include("corepack failed to activate pnpm")
+          expect(failure&.message).to include("Restore the repository-declared pnpm command")
+          expect(failure&.message).to include("Then retry:\n  script/release")
+          expect(failure&.message).not_to include("does not match packageManager")
+          expect(failure&.message).not_to include("pnpm install --frozen-lockfile")
+          expect(failure&.message).not_to include("bin/setup")
+        end
+      end
+    end
+
     it "reports the exact failed package build command without prescribing setup or install" do
       stub_const("NPM_RELEASE_PACKAGE_NAMES", ["react-on-rails"])
       success_status = instance_double(Process::Status, success?: true)
