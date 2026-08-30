@@ -139,6 +139,18 @@ type LoadableStats = {
 };
 
 type RSCClientChunkStylesheetHrefsByChunkName = Map<string, string[]>;
+
+/**
+ * Asset state captured during a PPR prerender and stored in the cache envelope.
+ * The resume pass uses this to suppress duplicate CSS links and init scripts
+ * that the cached shell already declared.
+ */
+export type PPRShellAssetManifest = {
+  /** CSS hrefs emitted as <link> tags in the shell's output. */
+  stylesheetHrefs: string[];
+  /** RSC payload keys whose init scripts were emitted in the shell. */
+  initScriptKeys: string[];
+};
 type RSCClientChunkStylesheetHrefsLoadState =
   | {
       status: 'success';
@@ -411,7 +423,6 @@ function stylesheetTagsForRSCClientChunks(
   emittedStylesheetHrefs: Set<string>,
 ) {
   const stylesheetTags: string[] = [];
-
   for (const match of flightData.matchAll(RSC_CLIENT_CHUNK_NAME_WITH_JS_ASSET)) {
     const chunkName = match[1];
     const stylesheetHrefs = stylesheetHrefsByChunkName.get(chunkName);
@@ -1545,6 +1556,7 @@ function applyStreamedStylesheetPreloadGating(
   incompleteHtmlTailMode: IncompleteHtmlTailMode,
   rscClientManifestStylesheetHrefs: ReadonlySet<string>,
   retainedTailScanState?: RetainedIncompleteHtmlTailScanState,
+  alreadyEmittedStylesheetHrefs?: ReadonlySet<string>,
 ) {
   let stringSafeHtmlBuffer = html;
   let incompleteUTF8TailBuffer: Buffer = Buffer.alloc(0);
@@ -1580,12 +1592,23 @@ function applyStreamedStylesheetPreloadGating(
       } = splitTrailingIncompleteHtmlTagTail(completeHtml));
     }
   }
+  // PPR: track hrefs of promoted preload tags so they appear in the asset manifest.
+  // Without this, promoted preloads would be missing from emittedRSCClientStylesheetHrefs
+  // and the resume pass would re-promote the same preloads (issue #4897).
+  const promotedPreloadHrefs: string[] = [];
   const gatedHtml = completeHtml.replace(
     /<link\b(?=[^>]*\brel=(["'])(?:(?!\1).)*\bpreload\b(?:(?!\1).)*\1)(?=[^>]*\bas=(["'])style\2)(?=[^>]*\bhref=(["'])(?:(?!\3).)+\3)[^>]*\/?>/gi,
-    (linkTag) =>
-      shouldPromoteStylesheetPreloadTag(linkTag, rscClientManifestStylesheetHrefs)
-        ? promoteStylesheetPreloadTag(linkTag)
-        : linkTag,
+    (linkTag) => {
+      if (shouldPromoteStylesheetPreloadTag(linkTag, rscClientManifestStylesheetHrefs)) {
+        const href = getQuotedAttribute(linkTag, 'href');
+        // PPR resume: skip promotion if the shell already declared this stylesheet. Without this
+        // check, the resume pass re-promotes preloads the cached shell already emitted as links.
+        if (href && alreadyEmittedStylesheetHrefs?.has(href)) return linkTag;
+        if (href) promotedPreloadHrefs.push(href);
+        return promoteStylesheetPreloadTag(linkTag);
+      }
+      return linkTag;
+    },
   );
   const completeHtmlByteLength = Buffer.byteLength(completeHtml, 'utf8');
   const completeHtmlBuffer =
@@ -1600,6 +1623,7 @@ function applyStreamedStylesheetPreloadGating(
     incompleteHtmlTailBuffer,
     incompleteHtmlTailScanState:
       incompleteHtmlTailBuffer.length > 0 ? nextIncompleteHtmlTailScanState : undefined,
+    promotedPreloadHrefs,
   };
 }
 
@@ -1608,6 +1632,18 @@ type InjectRSCPayloadOptions = {
   rscClientChunkStylesheetHrefsByChunkName?: RSCClientChunkStylesheetHrefsByChunkName;
   rscStreamObservability?: boolean;
   railsEnv?: string;
+  /**
+   * PPR resume: assets already declared in the cached shell. Pre-seeds dedup sets so
+   * duplicate stylesheet links and init scripts are suppressed. New hole-only assets
+   * are still emitted and gated ahead of their reveals by the existing
+   * deferredRevealHtmlBuffer machinery.
+   */
+  shellAssetManifest?: PPRShellAssetManifest;
+  /**
+   * PPR prerender: callback invoked when the stream ends with the final asset state.
+   * Called after the last flush so all CSS hrefs and init script keys are finalized.
+   */
+  onAssetsEmitted?: (manifest: PPRShellAssetManifest) => void;
 };
 
 /**
@@ -1648,12 +1684,19 @@ export default function injectRSCPayload(
     rscClientChunkStylesheetHrefsByChunkName = loadRSCClientChunkStylesheetHrefsByChunkName(),
     rscStreamObservability = false,
     railsEnv,
+    shellAssetManifest,
+    onAssetsEmitted,
   } = options;
   const sanitizedNonce = sanitizeNonce(cspNonce);
   const htmlStream = new PassThrough();
   const resultStream = new PassThrough();
   let rscPromise: Promise<void> | null = null;
-  const emittedRSCClientStylesheetHrefs = new Set<string>();
+  // PPR: pre-seed the stylesheet dedup set from the cached shell's asset manifest so the resume
+  // pass suppresses CSS links the page already has. New hole-only CSS is still emitted normally.
+  const emittedRSCClientStylesheetHrefs = new Set<string>(shellAssetManifest?.stylesheetHrefs);
+  // PPR: track which RSC payload init scripts have been emitted. Pre-seeded from the shell
+  // manifest so the resume pass does not re-initialize arrays the cached shell already declared.
+  const emittedInitScriptKeys = new Set<string>(shellAssetManifest?.initScriptKeys);
   const shouldInferRSCClientStylesheets = rscClientChunkStylesheetHrefsByChunkName.size > 0;
   let pendingRSCClientStylesheetInferenceStreams = 0;
 
@@ -1740,12 +1783,19 @@ export default function injectRSCPayload(
       gatedHtmlBuffer,
       incompleteHtmlTailBuffer,
       incompleteHtmlTailScanState: nextRetainedHtmlTailScanState,
+      promotedPreloadHrefs,
     } = applyStreamedStylesheetPreloadGating(
       htmlBuffer,
       incompleteHtmlTailMode,
       rscClientManifestStylesheetHrefs,
       retainedHtmlTailScanState,
+      emittedRSCClientStylesheetHrefs,
     );
+    // PPR: record promoted preload hrefs in the dedup set so they appear in the asset
+    // manifest and the resume pass knows the shell already declared these stylesheets.
+    for (const href of promotedPreloadHrefs) {
+      emittedRSCClientStylesheetHrefs.add(href);
+    }
     const shouldDeferRevealHtml =
       rscPromise &&
       shouldInferRSCClientStylesheets &&
@@ -1891,6 +1941,14 @@ export default function injectRSCPayload(
       flushFallbackTimeout = null;
     }
     flush();
+    // PPR: fire asset capture callback after the final flush so all CSS hrefs and init script
+    // keys are finalized. The prerender uses this to store the manifest in the cache envelope.
+    if (onAssetsEmitted) {
+      onAssetsEmitted({
+        stylesheetHrefs: Array.from(emittedRSCClientStylesheetHrefs),
+        initScriptKeys: Array.from(emittedInitScriptKeys),
+      });
+    }
     if (!resultStream.writableEnded) {
       resultStream.end();
     }
@@ -1988,8 +2046,15 @@ export default function injectRSCPayload(
         // The initialization script clears stale diagnostics, then creates:
         // (self.REACT_ON_RAILS_RSC_PAYLOADS||={})[cacheKey]||=[]
         // This creates a global array that the client-side RSCProvider monitors for new chunks.
-        const initializationScript = createRSCPayloadInitializationScript(rscPayloadKey, sanitizedNonce);
-        rscInitializationBuffers.push(Buffer.from(initializationScript));
+        //
+        // PPR: skip if the cached shell already emitted this key's init script. The shell's
+        // `||=[]` created the array; re-emitting it is safe (||= is a no-op on existing arrays)
+        // but wastes bytes and the `delete` prefix would clear the shell's diagnostics.
+        if (!emittedInitScriptKeys.has(rscPayloadKey)) {
+          const initializationScript = createRSCPayloadInitializationScript(rscPayloadKey, sanitizedNonce);
+          rscInitializationBuffers.push(Buffer.from(initializationScript));
+          emittedInitScriptKeys.add(rscPayloadKey);
+        }
         let inferenceTimeout: NodeJS.Timeout | undefined;
         let hasResolvedRSCClientStylesheetInferenceForStream = !shouldInferRSCClientStylesheets;
         const resolveRSCClientStylesheetInferenceForStream = () => {
