@@ -8599,7 +8599,10 @@ def exact_head_recovery_guidance(repo_slug:, head_sha:, evaluated_sha:, required
     <<~GUIDANCE.strip
       ✓ Exact HEAD #{head_sha[0, 8]} has complete healthy CI evidence.
       Preview a re-evaluation of that exact HEAD (strict evaluation, not a waiver):
-        RELEASE_CI_EVALUATE_HEAD=true bundle exec rake "release[#{target_gem_version},true]"
+        script/release --dry-run --evaluate-head
+
+      Live retry through the supervised release path:
+        script/release --evaluate-head
 
       #{release_compound_live_boundary_guidance}
     GUIDANCE
@@ -9291,11 +9294,11 @@ def fetch_rubygems_versions(gem_name, api_url: RUBYGEMS_VERSIONS_API_URL)
   [response.body, response]
 end
 
-def abort_npm_release_readiness!(reason)
+def abort_npm_release_readiness!(reason, recovery:)
   abort <<~ERROR
     ❌ npm release readiness failed: #{reason}.
 
-    pnpm install --frozen-lockfile
+    #{recovery}
   ERROR
 end
 
@@ -9305,15 +9308,75 @@ def declared_pnpm_release_version!(monorepo_root:)
   match = package_manager.to_s.match(/\Apnpm@(?<version>\d+\.\d+\.\d+)(?:\+sha512\.[0-9a-f]+)?\z/i)
   return match[:version] if match
 
-  abort_npm_release_readiness!("root packageManager must declare an exact pnpm version")
+  abort_npm_release_readiness!(
+    "root packageManager must declare an exact pnpm version",
+    recovery: <<~RECOVERY.strip
+      Restore an exact pnpm@X.Y.Z pin in the root packageManager field.
+      Then retry:
+        script/release
+    RECOVERY
+  )
 rescue Errno::ENOENT, JSON::ParserError => e
-  abort_npm_release_readiness!("root packageManager cannot be verified (#{e.class}: #{e.message})")
+  abort_npm_release_readiness!(
+    "root packageManager cannot be verified (#{e.class}: #{e.message})",
+    recovery: <<~RECOVERY.strip
+      Restore a readable root package.json with a valid exact packageManager pin.
+      Then retry:
+        script/release
+    RECOVERY
+  )
 end
 
 def capture_npm_release_readiness_command(monorepo_root, *command)
   Open3.capture2e(*command, chdir: monorepo_root)
 rescue StandardError => e
-  abort_npm_release_readiness!("npm toolchain command failed to start (#{e.class}: #{e.message})")
+  abort_npm_release_readiness!(
+    "npm toolchain command failed to start (#{e.class}: #{e.message})",
+    recovery: <<~RECOVERY.strip
+      Restore the repository-declared pnpm command on PATH.
+      Then retry:
+        script/release
+    RECOVERY
+  )
+end
+
+def abort_stale_npm_release_dependencies!
+  abort_npm_release_readiness!(
+    "installed dependency state is missing or stale",
+    recovery: <<~RECOVERY.strip
+      Required recovery:
+        pnpm install --frozen-lockfile
+      Then retry:
+        script/release
+
+      Optional broader environment refresh (not required for this failure):
+        bin/setup
+    RECOVERY
+  )
+end
+
+def abort_pnpm_release_version_mismatch!(installed_version:, declared_version:)
+  abort_npm_release_readiness!(
+    "installed pnpm version #{installed_version.inspect} does not match packageManager #{declared_version.inspect}",
+    recovery: <<~RECOVERY.strip
+      Activate pnpm #{declared_version} declared by the root packageManager, then verify:
+        pnpm --version
+      Then retry:
+        script/release
+    RECOVERY
+  )
+end
+
+def abort_npm_release_package_build!(package_name:, output:)
+  abort_npm_release_readiness!(
+    "#{package_name} build failed\n\n#{output.to_s.strip}",
+    recovery: <<~RECOVERY.strip
+      Fix the package build failure, then verify:
+        pnpm --filter #{package_name} run build
+      Then retry:
+        script/release
+    RECOVERY
+  )
 end
 
 def validate_npm_release_readiness!(monorepo_root:)
@@ -9322,14 +9385,14 @@ def validate_npm_release_readiness!(monorepo_root:)
   installed_lock = File.join(monorepo_root, "node_modules", ".pnpm", "lock.yaml")
   dependency_state_ready = File.file?(workspace_lock) && File.file?(installed_lock) &&
                            File.binread(workspace_lock) == File.binread(installed_lock)
-  abort_npm_release_readiness!("installed dependency state is missing or stale") unless dependency_state_ready
+  abort_stale_npm_release_dependencies! unless dependency_state_ready
 
   version_output, version_status = capture_npm_release_readiness_command(monorepo_root, "pnpm", "--version")
   installed_pnpm_version = version_output.to_s.strip
   unless version_status.success? && installed_pnpm_version == declared_pnpm_version
-    abort_npm_release_readiness!(
-      "installed pnpm version #{installed_pnpm_version.inspect} does not match packageManager " \
-      "#{declared_pnpm_version.inspect}"
+    abort_pnpm_release_version_mismatch!(
+      installed_version: installed_pnpm_version,
+      declared_version: declared_pnpm_version
     )
   end
 
@@ -9339,7 +9402,7 @@ def validate_npm_release_readiness!(monorepo_root:)
     )
     next if status.success?
 
-    abort_npm_release_readiness!("#{package_name} build failed\n\n#{output.to_s.strip}")
+    abort_npm_release_package_build!(package_name:, output:)
   end
 
   puts "✓ npm release packages are ready to publish"
