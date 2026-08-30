@@ -19757,6 +19757,9 @@ RSpec.describe "release.rake helper methods" do
         allow(self).to receive(:fetch_main_ci_checks)
           .with(monorepo_root:, allow_override: false, dry_run: false, ci_branch: "main")
           .and_return(walkback_without_ci_runs)
+        allow(self).to receive(:prepared_release_version_from_changelog)
+          .with(monorepo_root:)
+          .and_return("17.0.0.rc.10")
       end
 
       it "keeps the complete walkback output free of strict guidance for incomplete exact-HEAD evidence" do
@@ -19839,7 +19842,36 @@ RSpec.describe "release.rake helper methods" do
         )
       end
 
+      it "withholds wrapper recovery when the changelog-selected version differs from an explicit diagnostic target" do
+        allow(self).to receive(:prepared_release_version_from_changelog)
+          .with(monorepo_root:)
+          .and_return("17.1.0.rc.1")
+        allow(self).to receive(:fetch_ci_check_runs_for_sha)
+          .with(repo_slug: "shakacode/react_on_rails", sha: exact_head_sha)
+          .and_return(check_runs: [passing_run("Lint")])
+        allow(self).to receive(:fetch_ci_statuses_for_sha)
+          .with(repo_slug: "shakacode/react_on_rails", sha: exact_head_sha)
+          .and_return(statuses: [])
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root:,
+            is_prerelease: true,
+            allow_override: false,
+            dry_run: false,
+            target_gem_version: "17.1.0.rc.2"
+          )
+        end.to raise_error(SystemExit) { |error|
+          expect(error.message).to include("script/release would select 17.1.0.rc.1")
+          expect(error.message).to include("diagnostic target is 17.1.0.rc.2")
+          expect(error.message).not_to include("--evaluate-head")
+        }
+      end
+
       it "replays the observed RC.1 walkback stop with supervised preview and live recovery" do
+        allow(self).to receive(:prepared_release_version_from_changelog)
+          .with(monorepo_root:)
+          .and_return("17.1.0.rc.1")
         allow(self).to receive(:required_check_names_for_branch)
           .with(monorepo_root:, repo_slug: "shakacode/react_on_rails", ci_branch: "main")
           .and_return(required_checks(checks: [required_check("required-pr-gate")]))

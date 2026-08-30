@@ -931,6 +931,16 @@ assert_contains "${output_log}" "--evaluate-head does not apply to --reconcile-a
 assert_secret_absent
 pass "evaluate-head rejects accelerated RC reconciliation where it would be inert"
 
+setup_case evaluate-head-doctor-rejected
+if run_release --doctor --evaluate-head; then
+  fail "evaluate-head was accepted for release doctor"
+fi
+assert_empty "${coord_log}"
+assert_empty "${bundle_log}"
+assert_contains "${output_log}" "--evaluate-head does not apply to --doctor"
+assert_secret_absent
+pass "evaluate-head rejects release doctor where it would be inert"
+
 setup_case missing-changelog-version
 cat >"${fake_repo}/CHANGELOG.md" <<'CHANGELOG'
 ### [Unreleased]

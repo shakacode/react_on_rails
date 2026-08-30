@@ -8526,8 +8526,8 @@ def fetch_accelerated_rc_ci_snapshot!(repo_slug:, sha:, monorepo_root: nil, ci_b
   )
 end
 
-def exact_head_recovery_guidance(repo_slug:, head_sha:, evaluated_sha:, required_names:, is_prerelease:, ci_branch:,
-                                 required_checks_known: true, target_gem_version: nil)
+def exact_head_recovery_guidance(repo_slug:, monorepo_root:, head_sha:, evaluated_sha:, required_names:,
+                                 is_prerelease:, ci_branch:, required_checks_known: true, target_gem_version: nil)
   return nil if head_sha.nil? || head_sha == evaluated_sha
   unless required_checks_known
     return exact_head_unknown_guidance("❌ Required CI check discovery is unknown; release remains blocked.")
@@ -8594,6 +8594,15 @@ def exact_head_recovery_guidance(repo_slug:, head_sha:, evaluated_sha:, required
       return exact_head_unknown_guidance(
         "❌ Exact HEAD is healthy, but the resolved release version is unavailable; release remains blocked."
       )
+    end
+    prepared_version = prepared_release_version_from_changelog(monorepo_root:)
+    if prepared_version.to_s.empty?
+      return "❌ Exact HEAD #{head_sha[0, 8]} is healthy, but script/release cannot resolve a prepared " \
+             "CHANGELOG.md version; wrapper recovery remains blocked."
+    end
+    unless prepared_version == target_gem_version
+      return "❌ Exact HEAD #{head_sha[0, 8]} is healthy, but script/release would select #{prepared_version} " \
+             "while the diagnostic target is #{target_gem_version}; wrapper recovery remains blocked."
     end
 
     <<~GUIDANCE.strip
@@ -8732,6 +8741,7 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
     if recovery_eligible && %i[no_checks no_required_checks].include?(evaluation[:kind])
       guidance = exact_head_recovery_guidance(
         repo_slug:,
+        monorepo_root:,
         head_sha: data[:head_sha],
         evaluated_sha: sha,
         required_names:,
