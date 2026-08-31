@@ -26,6 +26,17 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Added
 
+- **[Pro]** **PPR cache warm-up mechanism (experimental)**: New `rake react_on_rails_pro:ppr:warm`
+  task and `ReactOnRailsPro::Ppr::CacheWarmer.call` API populate PPR shell cache entries by issuing
+  real in-process requests against routes listed in the new `config.ppr_warm_up_paths` (an Array or a
+  callable resolved at warm time). Run it after each deploy — the PPR cache key includes the bundle
+  digests, so deploys invalidate every PPR entry and the first visitor per route otherwise pays the
+  full prerender. One failing route never aborts the rest; the run finishes with a
+  warmed / already-warm / failed summary. Resolves
+  [Issue 4965](https://github.com/shakacode/react_on_rails/issues/4965).
+  [PR 4967](https://github.com/shakacode/react_on_rails/pull/4967) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 - **[Pro]** **PPR CSS/asset coordination between cached shell and resume stream**: The PPR resume
   pass now suppresses duplicate `<link>` tags and init scripts that the cached shell already declared,
   and gates hole-only CSS (stylesheets needed only by components inside Suspense holes) ahead of their
