@@ -16289,6 +16289,7 @@ RSpec.describe "release.rake helper methods" do
       allow(ENV).to receive(:fetch).with("RELEASE_ACCELERATED_RC", nil).and_return(nil)
       allow(ENV).to receive(:fetch).with("RELEASE_ACCELERATED_RC_REASON", nil).and_return(nil)
       allow(ENV).to receive(:fetch).with("RELEASE_CI_EVALUATE_HEAD", nil).and_return(nil)
+      allow(ENV).to receive(:fetch).with("REACT_ON_RAILS_RELEASE_SUPERVISED", nil).and_return("true")
     end
 
     after { release_task.reenable }
@@ -16336,6 +16337,32 @@ RSpec.describe "release.rake helper methods" do
             a_string_matching(/gem bump|git push|git tag/)
           )
         end
+      end
+    end
+
+    it "preserves every explicit Rake argument in direct dry-run readiness recovery" do
+      allow(ENV).to receive(:fetch).with("REACT_ON_RAILS_RELEASE_SUPERVISED", nil).and_return(nil)
+      allow(task_receiver).to receive(:current_git_sha!).and_return("a" * 40)
+      expected_retry_command = "bundle exec rake release\\[17.0.0.rc.10,true,true,false\\]"
+      allow(task_receiver).to receive(:validate_npm_release_readiness!) do |monorepo_root:, retry_command:|
+        expect(monorepo_root).to eq(self.monorepo_root)
+        expect(retry_command).to eq(expected_retry_command)
+        abort "direct dry-run readiness stopped the release"
+      end
+
+      failure = begin
+        release_task.reenable
+        release_task.invoke("17.0.0.rc.10", true, true, false)
+        nil
+      rescue SystemExit => error
+        error
+      end
+
+      aggregate_failures do
+        expect(failure&.message).to eq("direct dry-run readiness stopped the release")
+        expect(task_receiver).to have_received(:validate_npm_release_readiness!)
+          .with(monorepo_root:, retry_command: expected_retry_command).once
+        expect(task_receiver).not_to have_received(:with_release_checkout)
       end
     end
 

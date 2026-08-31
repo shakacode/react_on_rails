@@ -9361,6 +9361,21 @@ def supervised_release_retry_command(dry_run:, evaluate_head:)
   command.join(" ")
 end
 
+def direct_release_dry_run_retry_command(task_arguments, evaluate_head:)
+  rake_task = "release[#{task_arguments.to_a.map(&:to_s).join(',')}]"
+  command = Shellwords.join(["bundle", "exec", "rake", rake_task])
+  return command unless evaluate_head
+
+  "RELEASE_CI_EVALUATE_HEAD=true #{command}"
+end
+
+def release_readiness_retry_command(task_arguments:, dry_run:, evaluate_head:)
+  supervised = release_truthy?(ENV.fetch("REACT_ON_RAILS_RELEASE_SUPERVISED", nil))
+  return supervised_release_retry_command(dry_run:, evaluate_head:) if supervised || !dry_run
+
+  direct_release_dry_run_retry_command(task_arguments, evaluate_head:)
+end
+
 def declared_pnpm_release_version!(monorepo_root:, retry_command: "script/release")
   package_json = JSON.parse(File.read(File.join(monorepo_root, "package.json")))
   package_manager = package_json["packageManager"]
@@ -10168,7 +10183,8 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
   args_hash = args.to_hash
 
   is_dry_run = release_truthy?(args_hash[:dry_run])
-  release_retry_command = supervised_release_retry_command(
+  release_retry_command = release_readiness_retry_command(
+    task_arguments: args,
     dry_run: is_dry_run,
     evaluate_head: ci_evaluate_head_only?
   )
