@@ -7180,6 +7180,20 @@ RSpec.describe "release.rake helper methods" do
     end
   end
 
+  describe "#supervised_release_retry_command" do
+    it "preserves dry-run and exact-HEAD modifiers" do
+      aggregate_failures do
+        expect(supervised_release_retry_command(dry_run: false, evaluate_head: false)).to eq("script/release")
+        expect(supervised_release_retry_command(dry_run: true, evaluate_head: false))
+          .to eq("script/release --dry-run")
+        expect(supervised_release_retry_command(dry_run: false, evaluate_head: true))
+          .to eq("script/release --evaluate-head")
+        expect(supervised_release_retry_command(dry_run: true, evaluate_head: true))
+          .to eq("script/release --dry-run --evaluate-head")
+      end
+    end
+  end
+
   describe "#validate_npm_release_readiness!" do
     it "fails closed on a clean clone without installed dependencies and prints the exact repair command" do
       Dir.mktmpdir do |monorepo_root|
@@ -7191,7 +7205,10 @@ RSpec.describe "release.rake helper methods" do
         expect(Open3).not_to receive(:capture2e)
 
         failure = begin
-          validate_npm_release_readiness!(monorepo_root:)
+          validate_npm_release_readiness!(
+            monorepo_root:,
+            retry_command: "script/release --dry-run --evaluate-head"
+          )
           nil
         rescue SystemExit => error
           error
@@ -7201,7 +7218,7 @@ RSpec.describe "release.rake helper methods" do
           expect(failure&.message).to include("installed dependency state is missing or stale")
           expect(failure&.message).to include("Required recovery:")
           expect(failure&.message).to include("pnpm install --frozen-lockfile")
-          expect(failure&.message).to include("Then retry:\n  script/release")
+          expect(failure&.message).to include("Then retry:\n  script/release --dry-run --evaluate-head")
           expect(failure&.message).to include("Optional broader environment refresh")
           expect(failure&.message).to include("bin/setup")
         end
@@ -7226,7 +7243,7 @@ RSpec.describe "release.rake helper methods" do
           .and_return(["9.15.0\n", success_status])
 
         failure = begin
-          validate_npm_release_readiness!(monorepo_root:)
+          validate_npm_release_readiness!(monorepo_root:, retry_command: "script/release --evaluate-head")
           nil
         rescue SystemExit => error
           error
@@ -7236,7 +7253,7 @@ RSpec.describe "release.rake helper methods" do
           expect(failure&.message).to include('installed pnpm version "9.15.0" does not match packageManager "10.33.4"')
           expect(failure&.message).to include("Activate pnpm 10.33.4")
           expect(failure&.message).to include("pnpm --version")
-          expect(failure&.message).to include("Then retry:\n  script/release")
+          expect(failure&.message).to include("Then retry:\n  script/release --evaluate-head")
           expect(failure&.message).not_to include("pnpm install --frozen-lockfile")
           expect(failure&.message).not_to include("bin/setup")
         end
@@ -7261,7 +7278,7 @@ RSpec.describe "release.rake helper methods" do
           .and_return(["corepack failed to activate pnpm\n", failure_status])
 
         failure = begin
-          validate_npm_release_readiness!(monorepo_root:)
+          validate_npm_release_readiness!(monorepo_root:, retry_command: "script/release --dry-run")
           nil
         rescue SystemExit => error
           error
@@ -7271,7 +7288,7 @@ RSpec.describe "release.rake helper methods" do
           expect(failure&.message).to include("pnpm --version failed")
           expect(failure&.message).to include("corepack failed to activate pnpm")
           expect(failure&.message).to include("Restore the repository-declared pnpm command")
-          expect(failure&.message).to include("Then retry:\n  script/release")
+          expect(failure&.message).to include("Then retry:\n  script/release --dry-run")
           expect(failure&.message).not_to include("does not match packageManager")
           expect(failure&.message).not_to include("pnpm install --frozen-lockfile")
           expect(failure&.message).not_to include("bin/setup")
@@ -16250,6 +16267,7 @@ RSpec.describe "release.rake helper methods" do
       allow(ENV).to receive(:fetch).with("RELEASE_TRACKER", nil).and_return(nil)
       allow(ENV).to receive(:fetch).with("RELEASE_ACCELERATED_RC", nil).and_return(nil)
       allow(ENV).to receive(:fetch).with("RELEASE_ACCELERATED_RC_REASON", nil).and_return(nil)
+      allow(ENV).to receive(:fetch).with("RELEASE_CI_EVALUATE_HEAD", nil).and_return(nil)
     end
 
     after { release_task.reenable }
@@ -16258,9 +16276,11 @@ RSpec.describe "release.rake helper methods" do
       mode = dry_run ? "dry run" : "live run"
 
       it "blocks a #{mode} from the original workspace before any release side effect" do
+        expected_retry_command = dry_run ? "script/release --dry-run" : "script/release"
         allow(task_receiver).to receive(:current_git_sha!).and_return("a" * 40)
-        allow(task_receiver).to receive(:validate_npm_release_readiness!) do |monorepo_root:|
+        allow(task_receiver).to receive(:validate_npm_release_readiness!) do |monorepo_root:, retry_command:|
           expect(monorepo_root).to eq(self.monorepo_root)
+          expect(retry_command).to eq(expected_retry_command)
           abort "npm readiness stopped the release"
         end
 
@@ -16275,7 +16295,7 @@ RSpec.describe "release.rake helper methods" do
         aggregate_failures do
           expect(failure&.message).to eq("npm readiness stopped the release")
           expect(task_receiver).to have_received(:validate_npm_release_readiness!)
-            .with(monorepo_root:).once
+            .with(monorepo_root:, retry_command: expected_retry_command).once
           expect(task_receiver).not_to have_received(:with_release_checkout)
           expect(task_receiver).not_to have_received(:resolve_release_version_before_auth!)
           expect(task_receiver).not_to have_received(:verify_npm_auth)
@@ -16298,6 +16318,26 @@ RSpec.describe "release.rake helper methods" do
       end
     end
 
+    it "preserves dry-run and exact-HEAD modifiers in initial readiness recovery" do
+      allow(ENV).to receive(:fetch).with("RELEASE_CI_EVALUATE_HEAD", nil).and_return("true")
+      allow(task_receiver).to receive(:current_git_sha!).and_return("a" * 40)
+      allow(task_receiver).to receive(:validate_npm_release_readiness!) do |monorepo_root:, retry_command:|
+        expect(monorepo_root).to eq(self.monorepo_root)
+        expect(retry_command).to eq("script/release --dry-run --evaluate-head")
+        abort "modifier-preserving readiness stopped the release"
+      end
+
+      failure = begin
+        release_task.reenable
+        release_task.invoke("17.0.0.rc.10", true, true, false)
+        nil
+      rescue SystemExit => error
+        error
+      end
+
+      expect(failure&.message).to eq("modifier-preserving readiness stopped the release")
+    end
+
     it "hard-fails when HEAD changes during the initial readiness check before any later release action" do
       initial_sha = "a" * 40
       moved_sha = "b" * 40
@@ -16316,7 +16356,8 @@ RSpec.describe "release.rake helper methods" do
 
       aggregate_failures do
         expect(failure&.message).to match(/HEAD changed while npm release readiness was running/i)
-        expect(task_receiver).to have_received(:validate_npm_release_readiness!).with(monorepo_root:).once
+        expect(task_receiver).to have_received(:validate_npm_release_readiness!)
+          .with(monorepo_root:, retry_command: "script/release --dry-run").once
         expect(task_receiver).not_to have_received(:with_release_checkout)
         expect(task_receiver).not_to have_received(:resolve_release_version_before_auth!)
         expect(task_receiver).not_to have_received(:verify_npm_auth)
@@ -16339,9 +16380,11 @@ RSpec.describe "release.rake helper methods" do
       initial_sha = "a" * 40
       pulled_sha = "b" * 40
       readiness_roots = []
+      retry_commands = []
       allow(task_receiver).to receive(:current_git_sha!).and_return(initial_sha, initial_sha, pulled_sha)
-      allow(task_receiver).to receive(:validate_npm_release_readiness!) do |monorepo_root:|
+      allow(task_receiver).to receive(:validate_npm_release_readiness!) do |monorepo_root:, retry_command:|
         readiness_roots << monorepo_root
+        retry_commands << retry_command
         abort "post-pull npm readiness stopped the release" if readiness_roots.length == 2
       end
       allow(task_receiver).to receive(:resolve_release_version_before_auth!) do
@@ -16359,6 +16402,7 @@ RSpec.describe "release.rake helper methods" do
       aggregate_failures do
         expect(failure&.message).to eq("post-pull npm readiness stopped the release")
         expect(readiness_roots).to eq([monorepo_root, release_root])
+        expect(retry_commands).to eq(["script/release", "script/release"])
         expect(task_receiver).not_to have_received(:verify_npm_auth)
         expect(task_receiver).not_to have_received(:verify_gh_auth)
         expect(task_receiver).not_to have_received(:validate_main_ci_status!)
@@ -16377,9 +16421,11 @@ RSpec.describe "release.rake helper methods" do
       pulled_sha = "b" * 40
       moved_sha = "c" * 40
       readiness_roots = []
+      retry_commands = []
       allow(task_receiver).to receive(:current_git_sha!).and_return(initial_sha, initial_sha, pulled_sha, moved_sha)
-      allow(task_receiver).to receive(:validate_npm_release_readiness!) do |monorepo_root:|
+      allow(task_receiver).to receive(:validate_npm_release_readiness!) do |monorepo_root:, retry_command:|
         readiness_roots << monorepo_root
+        retry_commands << retry_command
       end
       allow(task_receiver).to receive(:resolve_release_version_before_auth!) do
         abort "version resolution reached with stale readiness"
@@ -16396,6 +16442,7 @@ RSpec.describe "release.rake helper methods" do
       aggregate_failures do
         expect(failure&.message).to match(/HEAD changed while npm release readiness was running/i)
         expect(readiness_roots).to eq([monorepo_root, release_root])
+        expect(retry_commands).to eq(["script/release", "script/release"])
         expect(task_receiver).not_to have_received(:verify_npm_auth)
         expect(task_receiver).not_to have_received(:verify_gh_auth)
         expect(task_receiver).not_to have_received(:validate_main_ci_status!)
@@ -16409,8 +16456,8 @@ RSpec.describe "release.rake helper methods" do
     it "keeps one readiness check when a live pull leaves HEAD unchanged" do
       head_sha = "a" * 40
       events = []
-      allow(task_receiver).to receive(:validate_npm_release_readiness!) do |monorepo_root:|
-        events << [:readiness, monorepo_root]
+      allow(task_receiver).to receive(:validate_npm_release_readiness!) do |monorepo_root:, retry_command:|
+        events << [:readiness, monorepo_root, retry_command]
       end
       allow(task_receiver).to receive(:current_git_sha!) do |root, context:|
         events << [:sha, root, context]
@@ -16437,7 +16484,7 @@ RSpec.describe "release.rake helper methods" do
         expect(events).to eq(
           [
             [:sha, monorepo_root, "initial npm release readiness verification"],
-            [:readiness, monorepo_root],
+            [:readiness, monorepo_root, "script/release"],
             [:sha, monorepo_root, "initial npm release readiness binding"],
             [:command, release_root, "git pull --rebase"],
             [:sha, release_root, "post-pull npm release readiness verification"],
@@ -16451,9 +16498,11 @@ RSpec.describe "release.rake helper methods" do
       initial_sha = "a" * 40
       pulled_sha = "b" * 40
       readiness_roots = []
+      retry_commands = []
       allow(task_receiver).to receive(:current_git_sha!).and_return(initial_sha, initial_sha, pulled_sha, pulled_sha)
-      allow(task_receiver).to receive(:validate_npm_release_readiness!) do |monorepo_root:|
+      allow(task_receiver).to receive(:validate_npm_release_readiness!) do |monorepo_root:, retry_command:|
         readiness_roots << monorepo_root
+        retry_commands << retry_command
       end
       allow(task_receiver).to receive(:resolve_release_version_before_auth!) do
         abort "refreshed readiness reached version resolution"
@@ -16470,6 +16519,7 @@ RSpec.describe "release.rake helper methods" do
       aggregate_failures do
         expect(failure&.message).to eq("refreshed readiness reached version resolution")
         expect(readiness_roots).to eq([monorepo_root, release_root])
+        expect(retry_commands).to eq(["script/release", "script/release"])
         expect(task_receiver).to have_received(:current_git_sha!).exactly(4).times
       end
     end
@@ -16477,9 +16527,11 @@ RSpec.describe "release.rake helper methods" do
     it "keeps a dry run bound to one original-workspace readiness check without pulling" do
       head_sha = "a" * 40
       readiness_roots = []
+      retry_commands = []
       allow(task_receiver).to receive(:current_git_sha!).and_return(head_sha, head_sha)
-      allow(task_receiver).to receive(:validate_npm_release_readiness!) do |monorepo_root:|
+      allow(task_receiver).to receive(:validate_npm_release_readiness!) do |monorepo_root:, retry_command:|
         readiness_roots << monorepo_root
+        retry_commands << retry_command
       end
       allow(task_receiver).to receive(:resolve_release_version_before_auth!) do
         abort "dry readiness reached version resolution"
@@ -16496,6 +16548,7 @@ RSpec.describe "release.rake helper methods" do
       aggregate_failures do
         expect(failure&.message).to eq("dry readiness reached version resolution")
         expect(readiness_roots).to eq([monorepo_root])
+        expect(retry_commands).to eq(["script/release --dry-run"])
         expect(task_receiver).to have_received(:current_git_sha!)
           .with(monorepo_root, context: "initial npm release readiness verification").once
         expect(task_receiver).to have_received(:current_git_sha!)
