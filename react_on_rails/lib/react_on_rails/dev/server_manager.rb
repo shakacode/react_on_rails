@@ -848,22 +848,22 @@ module ReactOnRails
 
         def dev_session_view(root)
           path = dev_session_path(root)
-          return { kind: :absent, root:, path:, handle: nil } if dev_session_path_absent?(path)
+          return { kind: :absent, root:, path:, handle: nil, claim_handle: nil } if dev_session_path_absent?(path)
 
           lock_outcome, claim_handle = open_dev_session_read_lock(root)
-          return { kind: :refused, root:, path:, handle: nil, blockers: [claim_handle] } if lock_outcome == :refused
-
-          begin
-            outcome, payload = open_dev_session(path)
-            return { kind: :absent, root:, path:, handle: nil } if outcome == :absent
-            return { kind: :refused, root:, path:, handle: nil, blockers: [payload] } if outcome == :refused
-
-            kind, result = classify_dev_session(root, path, payload)
-            base = { kind:, root:, path:, handle: payload }
-            kind == :refused ? base.merge(blockers: [result]) : base.merge(session: result)
-          ensure
-            release_dev_session_lock(claim_handle)
+          if lock_outcome == :refused
+            return { kind: :refused, root:, path:, handle: nil, claim_handle: nil, blockers: [claim_handle] }
           end
+
+          outcome, payload = open_dev_session(path)
+          return { kind: :absent, root:, path:, handle: nil, claim_handle: } if outcome == :absent
+          if outcome == :refused
+            return { kind: :refused, root:, path:, handle: nil, claim_handle:, blockers: [payload] }
+          end
+
+          kind, result = classify_dev_session(root, path, payload)
+          base = { kind:, root:, path:, handle: payload, claim_handle: }
+          kind == :refused ? base.merge(blockers: [result]) : base.merge(session: result)
         end
 
         def dev_session_path_absent?(path)
@@ -876,11 +876,11 @@ module ReactOnRails
         end
 
         # A claimant takes this lock exclusively before it touches
-        # `dev-session.json`. The kill path holds a shared lock from its first
-        # read through its final ownership decision, so an exclusive claimant
-        # can never make the previous payload look live. An absent view releases
-        # the lock immediately; detecting a later claim during the fallback scan
-        # is tracked separately by #4943 item 2.
+        # `dev-session.json`. A kill reader also takes it exclusively and retains
+        # it through shutdown cleanup, so neither another reader nor a claimant
+        # can make a stale payload look live while that reader owns the JSON
+        # lock. A session absent before this lock is opened remains the separate
+        # fallback-scan race tracked by #4943 item 2.
         def open_dev_session_read_lock(root)
           path = dev_session_lock_path(root)
           file = File.open(path, DEV_SESSION_LOCK_OPEN_FLAGS, 0o644)
@@ -889,9 +889,9 @@ module ReactOnRails
             return [:refused, "#{path} is not a regular file, so dev session ownership cannot be trusted"]
           end
 
-          unless file.flock(File::LOCK_SH | File::LOCK_NB)
+          unless file.flock(File::LOCK_EX | File::LOCK_NB)
             file.close
-            return [:refused, "#{path} is locked because a dev session claim is still being published"]
+            return [:refused, "#{path} is locked because another dev session operation is still in progress"]
           end
           if dev_session_handle_detached?(path, file)
             file.close
@@ -1062,10 +1062,13 @@ module ReactOnRails
         end
 
         def close_session_handle(view)
-          handle = view && view[:handle]
-          return if handle.nil?
+          return if view.nil?
 
-          release_dev_session_lock(handle)
+          # Keep the fixed lock until after the JSON lock is gone. Reversing
+          # this order would let another kill reader authenticate the stale JSON
+          # against the lock still held by this reader.
+          release_dev_session_lock(view[:handle])
+          release_dev_session_lock(view[:claim_handle])
         rescue SystemCallError, IOError
           nil
         end

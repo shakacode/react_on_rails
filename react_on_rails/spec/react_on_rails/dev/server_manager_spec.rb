@@ -1948,9 +1948,29 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
         aggregate_failures do
           expect(output).to include("Refusing to signal anything")
-          expect(output).to include("session claim is still being published")
+          expect(output).to include("another dev session operation is still in progress")
           expect(group_alive?(unrelated[:pgid])).to be true
         end
+      end
+
+      it "refuses a second kill reader while the first owns a stale session" do
+        root = app_root("concurrent-kill-readers")
+        unrelated = start_unrelated_process
+        write_session(root, "pid" => unrelated[:pid], "pgid" => unrelated[:pgid])
+        first_view = described_class.send(:dev_session_view, root)
+
+        expect(described_class).not_to receive(:open_dev_session)
+        second_view = described_class.send(:dev_session_view, root)
+
+        aggregate_failures do
+          expect(first_view[:kind]).to eq(:stale)
+          expect(second_view[:kind]).to eq(:refused)
+          expect(second_view).not_to have_key(:session)
+          expect(group_alive?(unrelated[:pgid])).to be true
+        end
+      ensure
+        described_class.send(:close_session_handle, second_view)
+        described_class.send(:close_session_handle, first_view)
       end
 
       it "refuses when the payload changed under a freshly observed lock" do
