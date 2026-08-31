@@ -92,6 +92,43 @@ import {
   });
 });
 
+redisReceiverPageTest(
+  'keeps close-together Suspense resolutions ordered without assuming reveal timing',
+  async ({ page, sendRedisItemValue }) => {
+    const itemContainers = page.locator('.redis-items-container > section');
+
+    await expect(itemContainers).toHaveText([
+      'Waiting for the key "Item1"',
+      'Waiting for the key "Item2"',
+      'Waiting for the key "Item3"',
+      'Waiting for the key "Item4"',
+      'Waiting for the key "Item5"',
+    ]);
+
+    await Promise.all([
+      sendRedisItemValue(0, 'Close Resolution Value1'),
+      sendRedisItemValue(1, 'Close Resolution Value2'),
+    ]);
+
+    await expect(itemContainers).toHaveText([
+      'Value of "Item1": Close Resolution Value1',
+      'Value of "Item2": Close Resolution Value2',
+      'Waiting for the key "Item3"',
+      'Waiting for the key "Item4"',
+      'Waiting for the key "Item5"',
+    ]);
+
+    await sendRedisItemValue(4, 'Later Resolution Value5');
+    await expect(itemContainers).toHaveText([
+      'Value of "Item1": Close Resolution Value1',
+      'Value of "Item2": Close Resolution Value2',
+      'Waiting for the key "Item3"',
+      'Waiting for the key "Item4"',
+      'Value of "Item5": Later Resolution Value5',
+    ]);
+  },
+);
+
 redisReceiverInsideRouterPageTest(
   'no RSC payload request is made when the page is server side rendered',
   async ({ getNetworkRequests }) => {
