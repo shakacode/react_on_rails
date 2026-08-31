@@ -1597,6 +1597,25 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         end
       end
 
+      it "refuses to start when the ownership-lock directory cannot be prepared" do
+        root = app_root("unpreparable-session-lock-directory")
+        session_directory = File.dirname(session_path(root))
+        allow(FileUtils).to receive(:mkdir_p).with(session_directory).and_raise(Errno::EACCES)
+        process_manager_started = false
+        nonzero_exit = raise_error(SystemExit) { |error| expect(error.status).to eq(1) }
+
+        expect do
+          Dir.chdir(root) do
+            described_class.send(:with_dev_session) { process_manager_started = true }
+          end
+        end.to output(/Cannot start.*directory.*Errno::EACCES/m).to_stderr.and(nonzero_exit)
+
+        aggregate_failures do
+          expect(process_manager_started).to be false
+          expect(File.exist?(session_path(root))).to be false
+        end
+      end
+
       it "refuses to start when the session lock path is not a regular file" do
         root = app_root("non-regular-session-lock")
         FileUtils.mkdir_p(session_lock_path(root))

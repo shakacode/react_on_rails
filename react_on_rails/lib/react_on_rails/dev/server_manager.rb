@@ -588,7 +588,11 @@ module ReactOnRails
 
         def claim_dev_session(root)
           path = dev_session_path(root)
-          FileUtils.mkdir_p(File.dirname(path))
+          begin
+            FileUtils.mkdir_p(File.dirname(path))
+          rescue SystemCallError, IOError => e
+            abort_dev_session_claim(root, "the fixed ownership lock directory could not be prepared (#{e.class})")
+          end
 
           claim_lock = open_dev_session_claim_lock(root)
 
