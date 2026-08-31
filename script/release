@@ -1066,7 +1066,10 @@ class ReleaseSupervisor
   end
 
   def release_child_environment(contract:)
-    child_environment = { ReleaseLeaseGuard::CONTRACT_ENV => contract }
+    child_environment = {
+      ReleaseLeaseGuard::CONTRACT_ENV => contract,
+      "REACT_ON_RAILS_RELEASE_SUPERVISED" => "true"
+    }
     child_environment["RELEASE_CI_EVALUATE_HEAD"] = "true" if @options.fetch(:evaluate_head)
     child_environment
   end
