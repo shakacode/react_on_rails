@@ -1938,6 +1938,24 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         end
       end
 
+      it "stops a session when its existing ownership lock is not writable" do
+        skip "file permissions are not enforceable for root" if Process.euid.zero?
+
+        root = app_root("read-only-session-lock")
+        owner = start_owner(root)
+        File.write(session_lock_path(root), "")
+        File.chmod(0o444, session_lock_path(root))
+
+        output = kill_in(root)
+
+        aggregate_failures do
+          expect(output).to include("verified gone")
+          expect(wait_for { !group_alive?(owner[:pgid]) }).to be true
+        end
+      ensure
+        File.chmod(0o644, session_lock_path(root)) if root && File.exist?(session_lock_path(root))
+      end
+
       it "refuses a session path that is not a regular file" do
         root = app_root("dir-session")
         FileUtils.mkdir_p(session_path(root))

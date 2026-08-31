@@ -57,6 +57,7 @@ module ReactOnRails
                                (defined?(File::NOFOLLOW) ? File::NOFOLLOW : 0)
       DEV_SESSION_LOCK_OPEN_FLAGS = DEV_SESSION_OPEN_FLAGS |
                                     (defined?(File::NONBLOCK) ? File::NONBLOCK : 0)
+      DEV_SESSION_LOCK_CREATE_FLAGS = DEV_SESSION_LOCK_OPEN_FLAGS | File::EXCL
       # The read side needs the same O_NOFOLLOW guarantee as the write side: it
       # is the path that leads to signalling, so a symlink here is worth more to
       # an attacker than one on the write path. O_NONBLOCK additionally keeps a
@@ -883,7 +884,7 @@ module ReactOnRails
         # fallback-scan race tracked by #4943 item 2.
         def open_dev_session_read_lock(root)
           path = dev_session_lock_path(root)
-          file = File.open(path, DEV_SESSION_LOCK_OPEN_FLAGS, 0o644)
+          file = open_existing_or_create_dev_session_read_lock(path)
           unless file.stat.file?
             file.close
             return [:refused, "#{path} is not a regular file, so dev session ownership cannot be trusted"]
@@ -903,6 +904,25 @@ module ReactOnRails
           [:refused, "#{path} is a symlink; the dev session lock must be a regular file"]
         rescue SystemCallError, IOError => e
           [:refused, "could not lock #{path} to determine dev session ownership (#{e.class})"]
+        end
+
+        # Existing ownership locks are coordination handles, not writable
+        # state. Open them read-only so a lock left by another UID remains
+        # usable by `bin/dev kill`; only the missing-file path needs write
+        # access to create the handle. O_EXCL makes a concurrent creator a
+        # retry instead of reopening its file with unnecessary write access.
+        def open_existing_or_create_dev_session_read_lock(path)
+          DEV_SESSION_CLAIM_ATTEMPTS.times do
+            return File.open(path, DEV_SESSION_READ_FLAGS)
+          rescue Errno::ENOENT
+            begin
+              return File.open(path, DEV_SESSION_LOCK_CREATE_FLAGS, 0o644)
+            rescue Errno::EEXIST
+              next
+            end
+          end
+
+          File.open(path, DEV_SESSION_READ_FLAGS)
         end
 
         # Returns [:opened, File], [:absent, nil] or [:refused, message].
