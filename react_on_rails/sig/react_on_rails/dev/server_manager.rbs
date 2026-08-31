@@ -86,6 +86,7 @@ module ReactOnRails
       def self.dev_session_view: (String) -> dev_session_view
       def self.dev_session_path_absent?: (String) -> bool
       def self.open_dev_session_read_lock: (String) -> [Symbol, untyped]
+      def self.open_existing_or_create_dev_session_read_lock: (String) -> File
       def self.open_dev_session: (String) -> [Symbol, untyped]
       def self.classify_dev_session: (String, String, File) -> [Symbol, untyped]
       def self.confirm_locked_dev_session: (String, File, dev_session) -> [Symbol, untyped]
