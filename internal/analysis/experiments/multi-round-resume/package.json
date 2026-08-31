@@ -1,0 +1,13 @@
+{
+  "name": "ppr-multi-round-resume-experiments",
+  "private": true,
+  "type": "module",
+  "description": "Standalone experiments proving/bounding multi-round Fizz prerender/resume chaining on stable React 19.2.8 (#4770 / #4885). Run each with `npx tsx <name>.jsx` after `npm install`.",
+  "dependencies": {
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "tsx": "^4.23.10"
+  }
+}

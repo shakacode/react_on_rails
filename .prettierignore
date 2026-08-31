@@ -33,3 +33,6 @@ CLAUDE.md
 
 # Generated ShakaPerf investigation reports; keep the archived HTML untouched.
 internal/analysis/rsc-fouc-shakaperf-artifacts/reports/**/*.html
+
+# PPR evidence-base experiment artifacts (#4885); byte-faithful to what ran.
+internal/analysis/experiments/
