@@ -1383,10 +1383,14 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       end
 
       it "refuses to start while a kill owns the fixed lock, then claims normally after release" do
+        skip "file permissions are not enforceable for root" if Process.euid.zero?
+
         root = app_root("start-during-kill")
-        fixed_lock = File.open(session_lock_path(root), File::RDWR | File::CREAT, 0o644)
+        fixed_lock_path = session_lock_path(root)
+        fixed_lock = File.open(fixed_lock_path, File::RDWR | File::CREAT, 0o644)
         handles << fixed_lock
         expect(fixed_lock.flock(File::LOCK_EX | File::LOCK_NB)).to eq(0)
+        File.chmod(0o444, fixed_lock_path)
         process_manager_started = false
         nonzero_exit = raise_error(SystemExit) { |error| expect(error.status).to eq(1) }
 
@@ -1415,6 +1419,8 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
           expect(recorded["app_root"]).to eq(root)
           expect(File.exist?(session_path(root))).to be false
         end
+      ensure
+        File.chmod(0o644, fixed_lock_path) if fixed_lock_path && File.exist?(fixed_lock_path)
       end
 
       it "records the Overmind endpoint it would use, and only when it is inside the app root" do

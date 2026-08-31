@@ -706,7 +706,7 @@ module ReactOnRails
 
         def open_dev_session_claim_lock(root)
           path = dev_session_lock_path(root)
-          file = File.open(path, DEV_SESSION_LOCK_OPEN_FLAGS, 0o644)
+          file = open_existing_or_create_dev_session_lock(path)
           return file if file.stat.file?
 
           file.close
@@ -884,7 +884,7 @@ module ReactOnRails
         # fallback-scan race tracked by #4943 item 2.
         def open_dev_session_read_lock(root)
           path = dev_session_lock_path(root)
-          file = open_existing_or_create_dev_session_read_lock(path)
+          file = open_existing_or_create_dev_session_lock(path)
           unless file.stat.file?
             file.close
             return [:refused, "#{path} is not a regular file, so dev session ownership cannot be trusted"]
@@ -908,10 +908,11 @@ module ReactOnRails
 
         # Existing ownership locks are coordination handles, not writable
         # state. Open them read-only so a lock left by another UID remains
-        # usable by `bin/dev kill`; only the missing-file path needs write
-        # access to create the handle. O_EXCL makes a concurrent creator a
-        # retry instead of reopening its file with unnecessary write access.
-        def open_existing_or_create_dev_session_read_lock(path)
+        # usable by both `bin/dev` and `bin/dev kill`; only the missing-file
+        # path needs write access to create the handle. O_EXCL makes a
+        # concurrent creator a retry instead of reopening its file with
+        # unnecessary write access.
+        def open_existing_or_create_dev_session_lock(path)
           DEV_SESSION_CLAIM_ATTEMPTS.times do
             return File.open(path, DEV_SESSION_READ_FLAGS)
           rescue Errno::ENOENT
