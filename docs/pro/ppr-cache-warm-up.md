@@ -88,7 +88,7 @@ summary.success?                  # => false if anything failed
 Rails.logger.warn(summary.to_log) unless summary.success?
 ```
 
-Outcomes are attributed by observing the `ppr.cache.write` / `ppr.cache.write_refused` instrumentation events during each request. One caveat until PPR hit/miss counters land: a 2xx response with no cache write is reported as _already warm_, which also covers a page that renders no `ppr_react_component` at all — a typo'd path that still routes somewhere real shows up in this bucket, not in `failed`.
+Outcomes are attributed by observing the `ppr.cache.write` / `ppr.cache.write_refused` instrumentation events during each request. One caveat until PPR hit/miss counters land: a 2xx response with no cache write is reported as _already warm_, which also covers a page that renders no `ppr_react_component` at all — a typo'd path that still routes somewhere real shows up in this bucket, not in `failed`. Attribution observes process-global events, so run warm-up in a process that is not concurrently serving PPR traffic (a release phase, rake task, or job worker — the usual setups — all qualify); in a process that is also serving requests, another request's events could be attributed to the path being warmed.
 
 ## Where to Hook It Into Your Deploy
 
@@ -117,12 +117,12 @@ spec:
       restartPolicy: Never
 ```
 
-**Boot-time background job** — when you have no release phase, enqueue from an initializer so warming starts as the new version boots (requests served before warming finishes fall back to first-request prerender):
+**Boot-time background job** — when you have no release phase, enqueue from an initializer so warming starts as the new version boots (requests served before warming finishes fall back to first-request prerender). A spurious enqueue from a console or rake boot is harmless — paths that are already cached classify as _already warm_ and run no prerender — so a plain production check is a reasonable guard. (Don't gate on `defined?(Rails::Server)`: it is only defined when booted via `bin/rails server`, not when Puma is started directly.)
 
 ```ruby
 # config/initializers/ppr_warm_up.rb
 Rails.application.config.after_initialize do
-  PprWarmUpJob.perform_later if Rails.env.production? && defined?(Rails::Server)
+  PprWarmUpJob.perform_later if Rails.env.production?
 end
 
 class PprWarmUpJob < ApplicationJob
