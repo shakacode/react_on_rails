@@ -39,10 +39,20 @@ These are evidence, not plan. They stay as-is:
 - [`internal/analysis/ppr-settle-criterion-findings.md`](../analysis/ppr-settle-criterion-findings.md)
   — Next.js source analysis + 15 experiments on React 19.2.8; experiment 8 is
   the proof that untracked real I/O is silently missed by timing-based aborts.
+  The experiment scripts are preserved in
+  [`internal/analysis/experiments/settle-criterion/`](../analysis/experiments/settle-criterion/)
+  (recovered from the deleted #4852 research worktree; all 15 re-validated
+  2026-08-31 on react-dom 19.2.8).
 - [`internal/analysis/ppr-settle-by-example.md`](../analysis/ppr-settle-by-example.md)
   — 7 rules for which components reach the static shell.
 - [`internal/analysis/ppr-rsc-payload-by-example.md`](../analysis/ppr-rsc-payload-by-example.md)
   — RSC payload lifecycle; the unclosing-stream trick.
+- [`internal/analysis/experiments/multi-round-resume/`](../analysis/experiments/multi-round-resume/)
+  — standalone scripts (stable React 19.2.8) behind §1.3's upstream bound:
+  multi-round chaining works via progressive deepening;
+  `multi-resume-test.jsx` is the repro for the carried-over-pending-boundary
+  crash; the prune/graft surgery and parallel fan-out workarounds are
+  verified.
 - [`internal/analysis/ppr-spike-findings.md`](../analysis/ppr-spike-findings.md)
   — **ported 2026-08-13** from the closed `react_on_rails_rsc` PR
   [#194](https://github.com/shakacode/react_on_rails_rsc/pull/194) (branch
@@ -136,7 +146,9 @@ react-dom 19.2.7, with every step in a **separate OS process**:
 - Replay identity: the resume tree must be structurally identical (component
   names post-minification + keys); the same bundle must serve both phases.
 - Upstream bound: re-postponing a carried-over pending boundary crashes — a
-  limit on multi-round chaining, not on v1's single prerender→resume cycle.
+  limit on multi-round chaining, not on v1's single prerender→resume cycle
+  (repro:
+  [`internal/analysis/experiments/multi-round-resume/`](../analysis/experiments/multi-round-resume/)).
 
 ### 1.4 Production Readiness Gap (remaining)
 
