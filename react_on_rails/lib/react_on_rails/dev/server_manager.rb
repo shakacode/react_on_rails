@@ -572,9 +572,9 @@ module ReactOnRails
         # ---- start path: claiming the session -------------------------
 
         # Wraps a foreground process-manager run so `bin/dev kill` has a
-        # trustworthy, worktree-scoped handle on it. Ordinary bookkeeping
-        # failures do not block startup - the kill path degrades to
-        # port-attributed cleanup instead. Positive contention on the fixed
+        # trustworthy, worktree-scoped handle on it. Ordinary session-document
+        # bookkeeping failures do not block startup - the kill path degrades to
+        # port-attributed cleanup instead. Failure or contention on the fixed
         # ownership lock is different: a kill may be acting on the previous
         # session, so an unrecorded replacement must not start.
         def with_dev_session
@@ -591,13 +591,17 @@ module ReactOnRails
           FileUtils.mkdir_p(File.dirname(path))
 
           claim_lock = open_dev_session_claim_lock(root)
-          return nil if claim_lock.nil?
 
-          abort_dev_session_claim_in_progress(root) unless claim_lock.flock(File::LOCK_EX | File::LOCK_NB)
+          locked = begin
+            claim_lock.flock(File::LOCK_EX | File::LOCK_NB)
+          rescue SystemCallError, IOError => e
+            abort_dev_session_claim(root, "the fixed ownership lock could not be acquired (#{e.class})")
+          end
+
+          abort_dev_session_claim(root, "another `bin/dev` start or kill operation owns the fixed lock") unless locked
 
           if dev_session_handle_detached?(dev_session_lock_path(root), claim_lock)
-            warn_dev_session_unrecorded("the session claim lock was replaced")
-            return nil
+            abort_dev_session_claim(root, "the fixed ownership lock was replaced during acquisition")
           end
 
           DEV_SESSION_CLAIM_ATTEMPTS.times do
@@ -627,7 +631,12 @@ module ReactOnRails
           published = write_dev_session(path, root)
           release_dev_session_lock(file)
           { path:, handle: published }
+        rescue Interrupt
+          discard_partial_dev_session(published, path)
+          discard_partial_dev_session(file, path)
+          raise
         rescue StandardError => e
+          discard_partial_dev_session(published, path)
           discard_partial_dev_session(file, path)
           warn_dev_session_unrecorded(e.class)
           nil
@@ -667,7 +676,7 @@ module ReactOnRails
 
           File.rename(file.path, path)
           file
-        rescue StandardError
+        rescue StandardError, Interrupt
           unless file.nil?
             FileUtils.rm_f(file.path)
             file.close unless file.closed?
@@ -710,17 +719,20 @@ module ReactOnRails
           return file if file.stat.file?
 
           file.close
-          warn_dev_session_unrecorded("#{relative_to_app_root(path, root)} is not a regular file")
-          nil
+          abort_dev_session_claim(root, "the fixed ownership lock is not a regular file")
+        rescue Errno::ELOOP
+          abort_dev_session_claim(root, "the fixed ownership lock is a symlink")
         rescue SystemCallError, IOError => e
-          warn_dev_session_unrecorded(e.class)
-          nil
+          release_dev_session_lock(file)
+          abort_dev_session_claim(root, "the fixed ownership lock could not be opened (#{e.class})")
         end
 
-        def abort_dev_session_claim_in_progress(root)
+        def abort_dev_session_claim(root, reason)
           path = dev_session_lock_path(root)
-          warn "   ❌ Cannot start `bin/dev` because another `bin/dev` start or kill operation owns " \
-               "#{relative_to_app_root(path, root)}. Wait for it to finish, then retry."
+          relative_path = relative_to_app_root(path, root)
+          warn "   ❌ Cannot start `bin/dev` because #{relative_path} cannot be trusted: #{reason}. " \
+               "Wait for it to finish, then retry; if no operation is active, " \
+               "correct the ownership-lock problem first."
           exit 1
         end
 
@@ -806,8 +818,8 @@ module ReactOnRails
 
         def shutdown_dev_session
           view = dev_session_view(current_app_root)
-          view = view.merge(ports: shutdown_ports(view))
           begin
+            view = view.merge(ports: shutdown_ports(view))
             dispatch_dev_shutdown(view)
           ensure
             close_session_handle(view)
