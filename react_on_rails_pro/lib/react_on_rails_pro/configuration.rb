@@ -58,7 +58,8 @@ module ReactOnRailsPro
       concurrent_component_streaming_buffer_size: Configuration::DEFAULT_CONCURRENT_COMPONENT_STREAMING_BUFFER_SIZE,
       cache_tag_index_expires_in: Configuration::DEFAULT_CACHE_TAG_INDEX_EXPIRES_IN,
       cache_tag_index_max_keys: Configuration::DEFAULT_CACHE_TAG_INDEX_MAX_KEYS,
-      ppr_settle_budget_ms: Configuration::DEFAULT_PPR_SETTLE_BUDGET_MS
+      ppr_settle_budget_ms: Configuration::DEFAULT_PPR_SETTLE_BUDGET_MS,
+      ppr_warm_up_paths: Configuration::DEFAULT_PPR_WARM_UP_PATHS
     )
   end
 
@@ -111,6 +112,10 @@ module ReactOnRailsPro
     # Keep aligned with DEFAULT_PPR_SETTLE_BUDGET_MS in
     # packages/react-on-rails-pro/src/pprServerRenderedReactComponent.ts.
     DEFAULT_PPR_SETTLE_BUDGET_MS = 500
+    # Paths warmed by ReactOnRailsPro::Ppr::CacheWarmer (rake react_on_rails_pro:ppr:warm) when
+    # no explicit list is given. An Array of absolute paths, or a callable returning one
+    # (evaluated at warm time, so it may query the database).
+    DEFAULT_PPR_WARM_UP_PATHS = [].freeze
     ROLLING_DEPLOY_UPLOAD_POSITIONAL_PARAMS = %i[req opt rest].freeze
     ROLLING_DEPLOY_UPLOAD_KEYWORD_PARAMS = %i[key keyreq].freeze
     ROLLING_DEPLOY_UPLOAD_ALL_KEYWORD_PARAMS = %i[keyrest].freeze
@@ -130,7 +135,7 @@ module ReactOnRailsPro
 
     attr_reader :concurrent_component_streaming_buffer_size, :renderer_http_keep_alive_timeout,
                 :renderer_http_pool_size, :cache_tag_index_expires_in, :cache_tag_index_max_keys,
-                :rsc_payload_authorizer, :ppr_settle_budget_ms
+                :rsc_payload_authorizer, :ppr_settle_budget_ms, :ppr_warm_up_paths
 
     # Sets how long tag->key index entries live (see Cache::TagIndex).
     #
@@ -225,6 +230,24 @@ module ReactOnRailsPro
       @ppr_settle_budget_ms = value
     end
 
+    # Route list for the PPR cache warm-up mechanism (ReactOnRailsPro::Ppr::CacheWarmer and the
+    # react_on_rails_pro:ppr:warm rake task). Accepts an Array of absolute paths
+    # (e.g. ["/", "/pricing"]) or a callable returning one — the callable runs at warm time, so
+    # it may query the database (e.g. -> { Product.popular.map { |p| "/products/#{p.slug}" } }).
+    # nil resets to the default (empty list).
+    #
+    # @param value [Array<String>, #call, nil]
+    # @raise [ReactOnRailsPro::Error] if value is not nil, an Array, or a callable
+    def ppr_warm_up_paths=(value)
+      value = DEFAULT_PPR_WARM_UP_PATHS if value.nil?
+      unless value.is_a?(Array) || value.respond_to?(:call)
+        raise ReactOnRailsPro::Error,
+              "config.ppr_warm_up_paths must be an Array of paths or a callable returning one"
+      end
+
+      @ppr_warm_up_paths = value
+    end
+
     def rsc_payload_authorizer=(value)
       unless value.nil? || value.respond_to?(:call)
         raise ReactOnRailsPro::Error, "config.rsc_payload_authorizer must be nil or respond to #call"
@@ -257,7 +280,8 @@ module ReactOnRailsPro
                    concurrent_component_streaming_buffer_size: DEFAULT_CONCURRENT_COMPONENT_STREAMING_BUFFER_SIZE,
                    cache_tag_index_expires_in: DEFAULT_CACHE_TAG_INDEX_EXPIRES_IN,
                    cache_tag_index_max_keys: DEFAULT_CACHE_TAG_INDEX_MAX_KEYS,
-                   ppr_settle_budget_ms: DEFAULT_PPR_SETTLE_BUDGET_MS)
+                   ppr_settle_budget_ms: DEFAULT_PPR_SETTLE_BUDGET_MS,
+                   ppr_warm_up_paths: DEFAULT_PPR_WARM_UP_PATHS)
       self.renderer_url = renderer_url
       self.renderer_password = renderer_password
       self.license_token = license_token
@@ -297,6 +321,7 @@ module ReactOnRailsPro
       self.cache_tag_index_expires_in = cache_tag_index_expires_in
       self.cache_tag_index_max_keys = cache_tag_index_max_keys
       self.ppr_settle_budget_ms = ppr_settle_budget_ms
+      self.ppr_warm_up_paths = ppr_warm_up_paths
     end
 
     def setup_config_values

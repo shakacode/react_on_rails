@@ -1180,5 +1180,38 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
         end
       end
     end
+
+    describe ".ppr_warm_up_paths" do
+      it "defaults to an empty list" do
+        expect(ReactOnRailsPro.configuration.ppr_warm_up_paths).to eq([])
+      end
+
+      it "accepts an Array of paths" do
+        ReactOnRailsPro.configure { |config| config.ppr_warm_up_paths = ["/", "/pricing"] }
+
+        expect(ReactOnRailsPro.configuration.ppr_warm_up_paths).to eq(["/", "/pricing"])
+      end
+
+      it "accepts a callable returning paths" do
+        paths_proc = -> { ["/products/1"] }
+        ReactOnRailsPro.configure { |config| config.ppr_warm_up_paths = paths_proc }
+
+        expect(ReactOnRailsPro.configuration.ppr_warm_up_paths).to eq(paths_proc)
+      end
+
+      it "resets to the default on nil" do
+        ReactOnRailsPro.configure { |config| config.ppr_warm_up_paths = nil }
+
+        expect(ReactOnRailsPro.configuration.ppr_warm_up_paths).to eq([])
+      end
+
+      it "raises error for values that are neither an Array nor callable" do
+        ["/a", 42, { path: "/a" }].each do |invalid_value|
+          expect do
+            ReactOnRailsPro.configure { |config| config.ppr_warm_up_paths = invalid_value }
+          end.to raise_error(ReactOnRailsPro::Error, /ppr_warm_up_paths/)
+        end
+      end
+    end
   end
 end
