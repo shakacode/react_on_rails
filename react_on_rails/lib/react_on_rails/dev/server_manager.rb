@@ -55,9 +55,12 @@ module ReactOnRails
       # resolves realpath for the same reason on the read side.
       DEV_SESSION_OPEN_FLAGS = File::RDWR | File::CREAT |
                                (defined?(File::NOFOLLOW) ? File::NOFOLLOW : 0)
-      DEV_SESSION_LOCK_OPEN_FLAGS = DEV_SESSION_OPEN_FLAGS |
+      # Opening an existing fixed lock must remain separate from creating one:
+      # including CREAT here would bypass the bounded CREAT|EXCL race below.
+      DEV_SESSION_LOCK_OPEN_FLAGS = File::RDWR |
+                                    (defined?(File::NOFOLLOW) ? File::NOFOLLOW : 0) |
                                     (defined?(File::NONBLOCK) ? File::NONBLOCK : 0)
-      DEV_SESSION_LOCK_CREATE_FLAGS = DEV_SESSION_LOCK_OPEN_FLAGS | File::EXCL
+      DEV_SESSION_LOCK_CREATE_FLAGS = DEV_SESSION_LOCK_OPEN_FLAGS | File::CREAT | File::EXCL
       # The read side needs the same O_NOFOLLOW guarantee as the write side: it
       # is the path that leads to signalling, so a symlink here is worth more to
       # an attacker than one on the write path. O_NONBLOCK additionally keeps a
@@ -726,6 +729,8 @@ module ReactOnRails
           abort_dev_session_claim(root, "the fixed ownership lock is not a regular file")
         rescue Errno::ELOOP
           abort_dev_session_claim(root, "the fixed ownership lock is a symlink")
+        rescue Errno::EISDIR
+          abort_dev_session_claim(root, "the fixed ownership lock is not a regular file")
         rescue SystemCallError, IOError => e
           release_dev_session_lock(file)
           abort_dev_session_claim(root, "the fixed ownership lock could not be opened (#{e.class})")
@@ -918,19 +923,21 @@ module ReactOnRails
           [:opened, file]
         rescue Errno::ELOOP
           [:refused, "#{path} is a symlink; the dev session lock must be a regular file"]
+        rescue Errno::EISDIR
+          [:refused, "#{path} is not a regular file, so dev session ownership cannot be trusted"]
         rescue SystemCallError, IOError => e
           [:refused, "could not lock #{path} to determine dev session ownership (#{e.class})"]
         end
 
-        # Existing ownership locks are coordination handles, not writable
-        # state. Open them read-only so a lock left by another UID remains
-        # usable by both `bin/dev` and `bin/dev kill`; only the missing-file
-        # path needs write access to create the handle. O_EXCL makes a
-        # concurrent creator a retry instead of reopening its file with
-        # unnecessary write access.
+        # Existing ownership locks are coordination handles, not state we
+        # mutate. Prefer a writable descriptor because Linux NFS emulates an
+        # exclusive flock with fcntl and rejects read-only descriptors. If the
+        # lock is readable but not writable, retain the local-filesystem path
+        # that can still lock it read-only. O_EXCL keeps a concurrent creator a
+        # retry instead of silently creating through the existing-file path.
         def open_existing_or_create_dev_session_lock(path)
           DEV_SESSION_CLAIM_ATTEMPTS.times do
-            return File.open(path, DEV_SESSION_READ_FLAGS)
+            return open_existing_dev_session_lock(path)
           rescue Errno::ENOENT
             begin
               return File.open(path, DEV_SESSION_LOCK_CREATE_FLAGS, 0o644)
@@ -939,6 +946,12 @@ module ReactOnRails
             end
           end
 
+          open_existing_dev_session_lock(path)
+        end
+
+        def open_existing_dev_session_lock(path)
+          File.open(path, DEV_SESSION_LOCK_OPEN_FLAGS)
+        rescue Errno::EACCES, Errno::EPERM, Errno::EROFS
           File.open(path, DEV_SESSION_READ_FLAGS)
         end
 

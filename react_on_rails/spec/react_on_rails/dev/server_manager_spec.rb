@@ -1382,6 +1382,24 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         end
       end
 
+      it "opens an existing fixed lock writable before taking its exclusive lock" do
+        root = app_root("writable-existing-session-lock")
+        lock_path = session_lock_path(root)
+        File.write(lock_path, "")
+        process_manager_started = false
+
+        allow(File).to receive(:open).and_call_original
+        expect(File).to receive(:open)
+          .with(lock_path, satisfy { |flags| (flags & File::RDWR) == File::RDWR })
+          .and_call_original
+
+        Dir.chdir(root) do
+          described_class.send(:with_dev_session) { process_manager_started = true }
+        end
+
+        expect(process_manager_started).to be true
+      end
+
       it "refuses to start while a kill owns the fixed lock, then claims normally after release" do
         skip "file permissions are not enforceable for root" if Process.euid.zero?
 
