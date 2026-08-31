@@ -110,8 +110,6 @@ export const createForm = ({
 
 export const createUploadAssetsForm = (options: Partial<RequestOptions> = {}) => {
   const requestForm = createForm(options);
-  requestForm.append('targetBundles[]', SERVER_BUNDLE_TIMESTAMP);
-  requestForm.append('targetBundles[]', RSC_BUNDLE_TIMESTAMP);
   return requestForm;
 };
 
@@ -134,7 +132,7 @@ export const makeRequest = (app: ReturnType<typeof buildApp>, options: Partial<R
   const usedBundleTimestamp = options.renderRscPayload ? RSC_BUNDLE_TIMESTAMP : SERVER_BUNDLE_TIMESTAMP;
   const request = client.request({
     ':method': 'POST',
-    ':path': `/bundles/${usedBundleTimestamp}/render/454a82526211afdb215352755d36032c`,
+    ':path': `/bundles/${usedBundleTimestamp}/render`,
     'content-type': `multipart/form-data; boundary=${form.getBoundary()}`,
   });
   const buffer: Buffer[] = [];

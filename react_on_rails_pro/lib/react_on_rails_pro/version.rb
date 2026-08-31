@@ -15,5 +15,5 @@
 
 module ReactOnRailsPro
   VERSION = "17.0.0.rc.6"
-  PROTOCOL_VERSION = "2.0.0"
+  PROTOCOL_VERSION = "3.0.0"
 end

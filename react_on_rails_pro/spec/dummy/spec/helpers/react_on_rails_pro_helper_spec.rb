@@ -39,7 +39,7 @@ module StreamingTestHelpers
   end
 
   def test_server_render_url_pattern
-    %r{\Ahttp://localhost:3800/bundles/#{Regexp.escape(test_server_artifact_id)}/render/[a-f0-9]{32}\z}
+    %r{\Ahttp://localhost:3800/bundles/#{Regexp.escape(test_server_artifact_id)}/render\z}
   end
 end
 

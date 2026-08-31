@@ -99,13 +99,13 @@ describe ReactOnRailsPro::Request do
 
       expect(
         described_class.render_code(
-          "/bundles/old-id/render/digest",
+          "/bundles/old-id/render",
           "ReactOnRails.dummy",
           true,
           bundle_role: :server
         )
       ).to be(response)
-      expect(requested_path).to eq("/bundles/#{artifact.id}/render/digest")
+      expect(requested_path).to eq("/bundles/#{artifact.id}/render")
       expect(requested_form).to include("bundle_#{artifact.id}")
     end
 
@@ -138,14 +138,14 @@ describe ReactOnRailsPro::Request do
 
       expect(
         described_class.render_code(
-          "/bundles/#{server_artifact.id}/render/digest",
+          "/bundles/#{server_artifact.id}/render",
           "ReactOnRails.dummy",
           true,
           bundle_role: :server,
           artifacts: identities
         )
       ).to be(response)
-      expect(requested_path).to eq("/bundles/#{server_artifact.id}/render/digest")
+      expect(requested_path).to eq("/bundles/#{server_artifact.id}/render")
       expect(requested_form).to include("bundle_#{server_artifact.id}", "bundle_#{rsc_artifact.id}")
       expect(requested_form.fetch("dependencyBundleTimestamps")).to eq([rsc_artifact.id, server_artifact.id])
     end
@@ -166,7 +166,7 @@ describe ReactOnRailsPro::Request do
 
       expect do
         described_class.render_code(
-          "/bundles/#{identity.id}/render/digest",
+          "/bundles/#{identity.id}/render",
           "ReactOnRails.dummy",
           true,
           bundle_role: :server,
@@ -277,7 +277,7 @@ describe ReactOnRailsPro::Request do
       end
 
       stream = described_class.render_code_as_stream(
-        "/bundles/old-id/render/digest",
+        "/bundles/old-id/render",
         "console.log('Hello, world!');",
         is_rsc_payload: false
       )
@@ -285,9 +285,9 @@ describe ReactOnRailsPro::Request do
       stream.each_chunk { |chunk| chunks << chunk }
       expect(chunks.map { |c| c["html"] }).to eq(["Hello, world!"])
       expect(request_paths).to eq([
-                                    "/bundles/old-id/render/digest",
+                                    "/bundles/old-id/render",
                                     "/upload-assets",
-                                    "/bundles/#{artifact.id}/render/digest"
+                                    "/bundles/#{artifact.id}/render"
                                   ])
     end
 
@@ -324,7 +324,7 @@ describe ReactOnRailsPro::Request do
       js_code = "runOnOtherBundle(#{rsc_artifact.id.to_json})"
 
       stream = described_class.render_code_as_stream(
-        "/bundles/#{server_artifact.id}/render/digest",
+        "/bundles/#{server_artifact.id}/render",
         js_code,
         is_rsc_payload: false,
         artifacts:
@@ -332,9 +332,9 @@ describe ReactOnRailsPro::Request do
       stream.each_chunk(&:itself)
 
       expected_paths = [
-        "/bundles/#{server_artifact.id}/render/digest",
+        "/bundles/#{server_artifact.id}/render",
         "/upload-assets",
-        "/bundles/#{server_artifact.id}/render/digest"
+        "/bundles/#{server_artifact.id}/render"
       ]
       expect(requests.map(&:first)).to eq(expected_paths)
       upload_form = requests.fetch(1)[1]
@@ -440,7 +440,7 @@ describe ReactOnRailsPro::Request do
         "console.log('héllo');",
         {
           "renderingRequest" => "console.log('héllo');",
-          "protocolVersion" => "2.0.0",
+          "protocolVersion" => "3.0.0",
           "gemVersion" => "16.0.0",
           "password" => "secret",
           "railsEnv" => "test",
@@ -453,7 +453,7 @@ describe ReactOnRailsPro::Request do
       expect(raw_request[:headers]).to include(
         ["content-type", "application/vnd.react-on-rails.render-request+javascript"],
         ["authorization", "Bearer secret"],
-        ["x-react-on-rails-pro-protocol-version", "2.0.0"],
+        ["x-react-on-rails-pro-protocol-version", "3.0.0"],
         ["x-react-on-rails-pro-dependency-bundle-timestamps", '["server","rsc"]'],
         %w[x-react-on-rails-pro-rsc-stream-observability true]
       )
@@ -466,7 +466,7 @@ describe ReactOnRailsPro::Request do
           "ReactOnRails.dummy",
           {
             "renderingRequest" => "ReactOnRails.dummy",
-            "protocolVersion" => "2.0.0",
+            "protocolVersion" => "3.0.0",
             "gemVersion" => "16.0.0",
             "password" => "secret\r\ninjected: true",
             "railsEnv" => "test",
@@ -483,7 +483,7 @@ describe ReactOnRailsPro::Request do
           "ReactOnRails.dummy",
           {
             "renderingRequest" => "ReactOnRails.dummy",
-            "protocolVersion" => "2.0.0",
+            "protocolVersion" => "3.0.0",
             "gemVersion" => "16.0.0",
             "password" => "secret",
             "railsEnv" => "test\r\ninjected: true",
@@ -498,7 +498,7 @@ describe ReactOnRailsPro::Request do
     let(:form) do
       {
         "renderingRequest" => "ReactOnRails.dummy",
-        "protocolVersion" => "2.0.0",
+        "protocolVersion" => "3.0.0",
         "gemVersion" => "17.0.0",
         "password" => "secret",
         "railsEnv" => "test",
@@ -984,15 +984,15 @@ describe ReactOnRailsPro::Request do
       allow(mock_connection).to receive(:post).and_return(mock_response(status: 200, chunks: ["Assets uploaded"]))
 
       stream = described_class.render_code_with_incremental_updates(
-        "/bundles/old-id/incremental-render/digest",
+        "/bundles/old-id/incremental-render",
         js_code,
         async_props_block:
       )
       stream.each_chunk(&:itself)
 
       expect(request_paths).to eq([
-                                    "/bundles/old-id/incremental-render/digest",
-                                    "/bundles/#{artifact.id}/incremental-render/digest"
+                                    "/bundles/old-id/incremental-render",
+                                    "/bundles/#{artifact.id}/incremental-render"
                                   ])
     end
 
@@ -1031,7 +1031,7 @@ describe ReactOnRailsPro::Request do
       js_code_with_rsc_id = "runOnOtherBundle(#{rsc_artifact.id.to_json})"
 
       stream = described_class.render_code_with_incremental_updates(
-        "/bundles/#{server_artifact.id}/incremental-render/digest",
+        "/bundles/#{server_artifact.id}/incremental-render",
         js_code_with_rsc_id,
         async_props_block:,
         artifacts:
@@ -1039,8 +1039,8 @@ describe ReactOnRailsPro::Request do
       stream.each_chunk(&:itself)
 
       expect(request_paths).to eq([
-                                    "/bundles/#{server_artifact.id}/incremental-render/digest",
-                                    "/bundles/#{server_artifact.id}/incremental-render/digest"
+                                    "/bundles/#{server_artifact.id}/incremental-render",
+                                    "/bundles/#{server_artifact.id}/incremental-render"
                                   ])
       expect(ReactOnRailsPro::AsyncPropsEmitter).to have_received(:new)
         .with(rsc_artifact.id, mock_output, pull_enabled: false).twice

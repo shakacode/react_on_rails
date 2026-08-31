@@ -128,7 +128,7 @@ const postRendering = (
     const client = http2.connect(`http://localhost:${port}`);
     const request = client.request({
       ':method': 'POST',
-      ':path': `/bundles/${BUNDLE_TIMESTAMP}/render/disconnect-abort`,
+      ':path': `/bundles/${BUNDLE_TIMESTAMP}/render`,
       'content-type': `multipart/form-data; boundary=${form.getBoundary()}`,
     });
     request.setEncoding('utf8');

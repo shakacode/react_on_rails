@@ -417,7 +417,7 @@ describe('concurrent upload isolation (issue #2449)', () => {
     });
   });
 
-  describe('/bundles/:bundleTimestamp/render/:renderRequestDigest endpoint', () => {
+  describe('/bundles/:bundleTimestamp/render endpoint', () => {
     // Race manifests in two ways:
     // 1. Bundle move ENOENT: both onFile write to uploads/bundle.js. One handler
     //    move()s it first; the other gets ENOENT → error response.
@@ -459,13 +459,13 @@ describe('concurrent upload isolation (issue #2449)', () => {
       const [resA, resB] = await Promise.all([
         app
           .inject()
-          .post(`/bundles/${bundleTimestampA}/render/d41d8cd98f00b204e9800998ecf8427e`)
+          .post(`/bundles/${bundleTimestampA}/render`)
           .payload(formA.payload)
           .headers(formA.headers)
           .end(),
         app
           .inject()
-          .post(`/bundles/${bundleTimestampB}/render/d41d8cd98f00b204e9800998ecf8427e`)
+          .post(`/bundles/${bundleTimestampB}/render`)
           .payload(formB.payload)
           .headers(formB.headers)
           .end(),
@@ -555,7 +555,7 @@ describe('concurrent upload isolation (issue #2449)', () => {
       const [renderRes, uploadRes] = await Promise.all([
         app
           .inject()
-          .post(`/bundles/${bundleTimestamp}/render/d41d8cd98f00b204e9800998ecf8427e`)
+          .post(`/bundles/${bundleTimestamp}/render`)
           .payload(renderForm.payload)
           .headers(renderForm.headers)
           .end(),

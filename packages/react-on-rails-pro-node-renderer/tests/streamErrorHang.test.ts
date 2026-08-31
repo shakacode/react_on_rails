@@ -82,7 +82,7 @@ const makeRequest = (renderingRequest: string, timeoutMs = 3000) =>
     const client = http2.connect(`http://localhost:${port}`);
     const request = client.request({
       ':method': 'POST',
-      ':path': `/bundles/${BUNDLE_TIMESTAMP}/render/stream-error-test`,
+      ':path': `/bundles/${BUNDLE_TIMESTAMP}/render`,
       'content-type': `multipart/form-data; boundary=${form.getBoundary()}`,
     });
     request.setEncoding('utf8');
