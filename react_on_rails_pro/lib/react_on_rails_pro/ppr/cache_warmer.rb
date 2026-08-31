@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-# Copyright (c) 2026 ShakaCode LLC - React on Rails Pro (commercial license)
+# Copyright (c) 2025-2026 ShakaCode LLC - React on Rails Pro (commercial license)
 #
 # This file is NOT licensed under the MIT (open source) license. It is part of
 # the React on Rails Pro offering and is licensed separately.
@@ -45,7 +45,9 @@ module ReactOnRailsPro
       # Outcome of warming one path.
       #
       # status is one of:
-      # - :warmed  — the request wrote at least one PPR cache entry (`ppr.cache.write`).
+      # - :warmed  — the request wrote at least one PPR cache entry (`ppr.cache.write`). On a
+      #   page with several PPR components, `detail` carries a partial-failure note when some
+      #   other write was refused.
       # - :already_warm — 2xx response and no cache write. Either every PPR component on the
       #   page was a cache hit, or the page renders no `ppr_react_component` at all — the two
       #   are indistinguishable until a cache-hit event exists (observability child issue).
@@ -92,7 +94,9 @@ module ReactOnRailsPro
 
         def result_detail_suffix(result)
           case result.status
-          when :warmed then " (#{result.writes} #{'entry'.pluralize(result.writes)} written)"
+          when :warmed
+            partial = result.detail ? "; #{result.detail}" : ""
+            " (#{result.writes} #{'entry'.pluralize(result.writes)} written#{partial})"
           when :failed then " (#{result.detail})"
           else ""
           end
@@ -115,10 +119,10 @@ module ReactOnRailsPro
       # @param paths [Array<String>, #call, nil] absolute request paths (e.g. "/products/1").
       #   A callable is invoked at warm time, so it may query the database. Defaults to
       #   `ReactOnRailsPro.configuration.ppr_warm_up_paths`.
-      # @param host [String, nil] Host header for the requests. Defaults to
-      #   `Rails.application.routes.default_url_options[:host]`, then to the integration-session
-      #   default ("www.example.com"). Set your canonical host when cached shells contain
-      #   absolute URLs — the shell HTML is cached verbatim, host included.
+      # @param host [String, nil] Host header for the requests. Defaults to the
+      #   integration-session default ("www.example.com") — `routes.default_url_options` only
+      #   affects URL generation, never the issued Host header. Set your canonical host when
+      #   cached shells contain absolute URLs — the shell HTML is cached verbatim, host included.
       # @param https [Boolean] issue the requests as HTTPS (default true, so `force_ssl` apps
       #   don't respond with a redirect).
       # @param headers [Hash] extra request headers (e.g. auth cookie) sent with every request.
@@ -213,12 +217,26 @@ module ReactOnRailsPro
         if counts[:degraded_post_flush].positive?
           failed(path, http_status, counts, "resume degraded post-flush; entry evicted")
         elsif counts[:writes].positive?
-          PathResult.new(path:, status: :warmed, http_status:, writes: counts[:writes])
+          PathResult.new(path:, status: :warmed, http_status:, writes: counts[:writes],
+                         detail: partial_warm_detail(counts, details))
         elsif counts[:refusals].positive? || counts[:degraded_pre_flush].positive?
           failed(path, http_status, counts, details.first || "cache write refused")
         else
           PathResult.new(path:, status: :already_warm, http_status:, writes: 0)
         end
+      end
+
+      # A page can render several ppr_react_component instances, so one can write while another
+      # is refused (the refused component stays uncached and its first visitor still pays a
+      # prerender). Keep the warmed classification — something usable was cached — but surface
+      # the partial failure instead of silently masking it. Pre-flush degradations are not
+      # partial failures: their cache-miss fallback re-writes the entry (counted in writes).
+      def partial_warm_detail(counts, details)
+        return nil unless counts[:refusals].positive?
+
+        refusal = details.find { |detail| detail.start_with?("refusals: ") }
+        reason = refusal ? " (#{refusal.delete_prefix('refusals: ')})" : ""
+        "partial — #{counts[:refusals]} cache #{'write'.pluralize(counts[:refusals])} refused#{reason}"
       end
 
       def http_failure_detail(http_status, response)

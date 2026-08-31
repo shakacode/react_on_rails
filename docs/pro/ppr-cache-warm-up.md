@@ -60,14 +60,16 @@ The task requests each configured path, isolates failures (one failing route nev
 
 Options via environment variables:
 
-| Variable      | Effect                                                                                                                                           |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `PATHS=/a,/b` | Override the configured list for this run.                                                                                                       |
-| `HOST=...`    | Host header for the requests. Set your canonical host if cached shells contain absolute URLs — the shell HTML is cached verbatim, host included. |
-| `HTTPS=false` | Issue plain-HTTP requests (default is HTTPS so `force_ssl` apps don't answer with a redirect).                                                   |
-| `STRICT=true` | Exit non-zero when any path fails.                                                                                                               |
+| Variable               | Effect                                                                                                                                           |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `PPR_WARM_PATHS=/a,/b` | Override the configured list for this run.                                                                                                       |
+| `PPR_WARM_HOST=...`    | Host header for the requests. Set your canonical host if cached shells contain absolute URLs — the shell HTML is cached verbatim, host included. |
+| `PPR_WARM_HTTPS=false` | Issue plain-HTTP requests (default is HTTPS so `force_ssl` apps don't answer with a redirect).                                                   |
+| `PPR_WARM_STRICT=true` | Exit non-zero when any path fails.                                                                                                               |
 
-**Exit-code policy:** by default the task exits 0 even when paths fail, because warm-up is best-effort — the worst case is what you have without it (the first visitor pays the prerender), and a failed warm-up should not roll back an otherwise good release. Use `STRICT=true` where you want the deploy pipeline to surface failures loudly.
+The variables are `PPR_WARM_`-prefixed on purpose: bare `HOST`/`HTTPS` are commonly pre-set by shells, CGI servers, and Docker images, and a leaked value would silently change warm-up behavior.
+
+**Exit-code policy:** by default the task exits 0 even when paths fail, because warm-up is best-effort — the worst case is what you have without it (the first visitor pays the prerender), and a failed warm-up should not roll back an otherwise good release. Use `PPR_WARM_STRICT=true` where you want the deploy pipeline to surface failures loudly. The one exception: an entirely empty path list (nothing configured and no `PPR_WARM_PATHS`) is a misconfiguration, not a failed warm-up, and exits non-zero with guidance regardless of `PPR_WARM_STRICT`.
 
 ## The Ruby API
 
@@ -76,7 +78,7 @@ The task is a thin wrapper over a callable service, for use from background jobs
 ```ruby
 summary = ReactOnRailsPro::Ppr::CacheWarmer.call(
   paths: ["/", "/pricing"],                       # optional; defaults to config.ppr_warm_up_paths
-  host: "www.example.com",                         # optional; see HOST above
+  host: "www.example.com",                         # optional; see PPR_WARM_HOST above
   https: true,                                     # optional; default true
   headers: { "Cookie" => warm_up_session_cookie }  # optional; e.g. for member-only pages
 )
@@ -126,8 +128,8 @@ Rails.application.config.after_initialize do
 end
 
 class PprWarmUpJob < ApplicationJob
-  def perform
-    summary = ReactOnRailsPro::Ppr::CacheWarmer.call
+  def perform(paths: nil)
+    summary = ReactOnRailsPro::Ppr::CacheWarmer.call(paths: paths)
     Rails.logger.warn(summary.to_log) unless summary.success?
   end
 end

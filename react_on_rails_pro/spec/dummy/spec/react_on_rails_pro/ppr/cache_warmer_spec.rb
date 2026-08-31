@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-# Copyright (c) 2026 ShakaCode LLC - React on Rails Pro (commercial license)
+# Copyright (c) 2025-2026 ShakaCode LLC - React on Rails Pro (commercial license)
 #
 # This file is NOT licensed under the MIT (open source) license. It is part of
 # the React on Rails Pro offering and is licensed separately.
@@ -122,6 +122,19 @@ describe ReactOnRailsPro::Ppr::CacheWarmer do
       expect(result.status).to eq(:warmed)
       expect(result.writes).to eq(2)
       expect(result.http_status).to eq(200)
+    end
+
+    it "keeps a partially refused multi-component page warmed but surfaces the refusal" do
+      stub_get(200) do
+        instrument_write
+        ReactOnRailsPro::Ppr.instrument_cache_write_refused(component_name: "Other", reason: "render_error")
+      end
+
+      result = described_class.call(paths: ["/a"]).results.first
+
+      expect(result.status).to eq(:warmed)
+      expect(result.writes).to eq(1)
+      expect(result.detail).to include("partial — 1 cache write refused (render_error)")
     end
 
     it "classifies a 2xx response with no cache write as already warm" do
