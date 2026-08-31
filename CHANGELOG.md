@@ -52,6 +52,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   `tmp/react_on_rails/dev-session.lock`: writers publish a same-directory temporary file with an
   atomic rename while retaining the JSON file's lifetime lock, and a kill reader retains both locks
   through shutdown cleanup so another reader cannot authenticate a stale or recycled process group.
+  A concurrent `bin/dev` start now exits non-zero with retry guidance instead of running unrecorded
+  while that shutdown lock is held.
   `bin/dev kill` shuts that session down through its own Overmind control socket or its own process group,
   escalating from `TERM` to `KILL` only for survivors, and reports success only after positively
   observing that the owner, its process group, and its listeners are gone. Fallback port discovery

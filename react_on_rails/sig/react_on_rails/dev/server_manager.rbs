@@ -71,7 +71,7 @@ module ReactOnRails
       def self.warn_dev_session_unrecorded: (untyped) -> void
       def self.warn_dev_session_contended: (File, String, String) -> nil
       def self.open_dev_session_claim_lock: (String) -> File?
-      def self.warn_dev_session_claim_in_progress: (File, String) -> nil
+      def self.abort_dev_session_claim_in_progress: (String) -> bot
       def self.dev_session_payload: (String) -> Hash[String, untyped]
       def self.selected_session_ports: () -> Array[Integer]
       def self.owned_process_group: () -> Integer?

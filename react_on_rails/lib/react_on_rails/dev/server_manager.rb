@@ -571,9 +571,11 @@ module ReactOnRails
         # ---- start path: claiming the session -------------------------
 
         # Wraps a foreground process-manager run so `bin/dev kill` has a
-        # trustworthy, worktree-scoped handle on it. Startup is never blocked by
-        # a bookkeeping failure - the kill path degrades to port-attributed
-        # cleanup instead.
+        # trustworthy, worktree-scoped handle on it. Ordinary bookkeeping
+        # failures do not block startup - the kill path degrades to
+        # port-attributed cleanup instead. Positive contention on the fixed
+        # ownership lock is different: a kill may be acting on the previous
+        # session, so an unrecorded replacement must not start.
         def with_dev_session
           handle = claim_dev_session(current_app_root)
           begin
@@ -590,9 +592,7 @@ module ReactOnRails
           claim_lock = open_dev_session_claim_lock(root)
           return nil if claim_lock.nil?
 
-          unless claim_lock.flock(File::LOCK_EX | File::LOCK_NB)
-            return warn_dev_session_claim_in_progress(claim_lock, root)
-          end
+          abort_dev_session_claim_in_progress(root) unless claim_lock.flock(File::LOCK_EX | File::LOCK_NB)
 
           if dev_session_handle_detached?(dev_session_lock_path(root), claim_lock)
             warn_dev_session_unrecorded("the session claim lock was replaced")
@@ -716,11 +716,11 @@ module ReactOnRails
           nil
         end
 
-        def warn_dev_session_claim_in_progress(file, root)
-          file.close
+        def abort_dev_session_claim_in_progress(root)
           path = dev_session_lock_path(root)
-          warn_dev_session_unrecorded("another process is using #{relative_to_app_root(path, root)}")
-          nil
+          warn "   ❌ Cannot start `bin/dev` because another `bin/dev` start or kill operation owns " \
+               "#{relative_to_app_root(path, root)}. Wait for it to finish, then retry."
+          exit 1
         end
 
         def dev_session_payload(root)

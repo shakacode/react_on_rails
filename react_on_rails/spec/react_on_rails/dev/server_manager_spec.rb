@@ -1382,6 +1382,41 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         end
       end
 
+      it "refuses to start while a kill owns the fixed lock, then claims normally after release" do
+        root = app_root("start-during-kill")
+        fixed_lock = File.open(session_lock_path(root), File::RDWR | File::CREAT, 0o644)
+        handles << fixed_lock
+        expect(fixed_lock.flock(File::LOCK_EX | File::LOCK_NB)).to eq(0)
+        process_manager_started = false
+        nonzero_exit = raise_error(SystemExit) { |error| expect(error.status).to eq(1) }
+
+        expect do
+          Dir.chdir(root) do
+            described_class.send(:with_dev_session) { process_manager_started = true }
+          end
+        end.to output(/Cannot start.*Wait for it to finish, then retry/m).to_stderr.and(nonzero_exit)
+
+        aggregate_failures do
+          expect(process_manager_started).to be false
+          expect(File.exist?(session_path(root))).to be false
+        end
+
+        fixed_lock.flock(File::LOCK_UN)
+        fixed_lock.close
+        recorded = nil
+
+        Dir.chdir(root) do
+          described_class.send(:with_dev_session) do
+            recorded = JSON.parse(File.read(session_path(root)))
+          end
+        end
+
+        aggregate_failures do
+          expect(recorded["app_root"]).to eq(root)
+          expect(File.exist?(session_path(root))).to be false
+        end
+      end
+
       it "records the Overmind endpoint it would use, and only when it is inside the app root" do
         root = app_root("endpoint")
         recorded = Dir.chdir(root) { described_class.send(:owned_overmind_socket_path, root) }
