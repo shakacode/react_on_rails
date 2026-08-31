@@ -685,8 +685,13 @@ module ReactOnRails
           file
         rescue StandardError, Interrupt
           unless file.nil?
-            FileUtils.rm_f(file.path)
+            # The rename can succeed immediately before an asynchronous
+            # Interrupt. Remove `path` only when it still names this handle;
+            # before the rename it names the prior session and must survive
+            # until the outer cleanup releases that original handle.
+            discard_partial_dev_session(file, path)
             file.close unless file.closed?
+            FileUtils.rm_f(file.path)
           end
           raise
         end

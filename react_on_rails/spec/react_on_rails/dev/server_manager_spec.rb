@@ -1748,6 +1748,37 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         described_class.send(:close_session_handle, view)
       end
 
+      it "removes canonical state when interruption lands after atomic publication" do
+        root = app_root("interrupted-after-session-rename")
+        path = session_path(root)
+        write_session(root, "pid" => 424_242)
+        original_handle = nil
+        temporary_handle = nil
+        allow(File).to receive(:open).and_wrap_original do |original, *args, **kwargs, &block|
+          handle = original.call(*args, **kwargs, &block)
+          original_handle ||= handle if args.first == path
+          handle
+        end
+        allow(Tempfile).to receive(:create).and_wrap_original do |original, *args|
+          temporary_handle = original.call(*args)
+        end
+        allow(File).to receive(:rename).and_wrap_original do |original, *args|
+          original.call(*args)
+          raise Interrupt
+        end
+
+        expect do
+          Dir.chdir(root) { described_class.send(:with_dev_session) { :ran } }
+        end.to raise_error(Interrupt)
+
+        aggregate_failures do
+          expect(original_handle).to be_closed
+          expect(temporary_handle).to be_closed
+          expect(File.exist?(path)).to be false
+          expect(Dir.glob(File.join(File.dirname(path), "dev-session-*.json"))).to be_empty
+        end
+      end
+
       it "cleans up the published session when releasing the previous handle is interrupted" do
         root = app_root("interrupted-session-release")
         path = session_path(root)
