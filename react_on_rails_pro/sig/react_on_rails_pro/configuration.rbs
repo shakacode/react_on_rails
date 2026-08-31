@@ -95,6 +95,7 @@ module ReactOnRailsPro
     attr_accessor cache_tag_index_expires_in: Numeric | ActiveSupport::Duration
     attr_accessor cache_tag_index_max_keys: Integer
     attr_accessor ppr_settle_budget_ms: Integer
+    attr_accessor ppr_warm_up_paths: Array[String] | ^() -> Array[String]
 
     def initialize: (
       ?renderer_url: String?,
@@ -134,7 +135,8 @@ module ReactOnRailsPro
       ?concurrent_component_streaming_buffer_size: Integer,
       ?cache_tag_index_expires_in: Numeric | ActiveSupport::Duration,
       ?cache_tag_index_max_keys: Integer,
-      ?ppr_settle_budget_ms: Integer
+      ?ppr_settle_budget_ms: Integer,
+      ?ppr_warm_up_paths: Array[String] | ^() -> Array[String]
     ) -> void
 
     def register_async_props: (String component_name, String provider_class_name) -> void
