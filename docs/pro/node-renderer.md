@@ -28,13 +28,15 @@ The contrast in one picture — the old way runs JavaScript inside Rails, while 
 
 | Metric               | ExecJS                      | Node Renderer            |
 | -------------------- | --------------------------- | ------------------------ |
-| SSR throughput       | Baseline                    | 10-100x faster           |
+| SSR throughput       | Baseline                    | Workload-dependent       |
 | Memory isolation     | Shared with Ruby            | Separate process         |
 | Worker concurrency   | Single-threaded per request | Configurable worker pool |
 | Profiling            | Not available               | Full Node.js tooling     |
 | Memory leak recovery | Crashes Ruby                | Rolling worker restarts  |
 
 At [Popmenu](https://www.shakacode.com/recent-work/popmenu/) (a ShakaCode client), switching to the Node Renderer contributed to a 73% decrease in average response times and 20-25% lower Heroku costs across tens of millions of daily SSR requests.
+
+Because results depend on application code, traffic, and deployment topology, [benchmark your own pages](../oss/core-concepts/performance-benchmarks.md) rather than relying on a universal multiplier.
 
 ## How It Works
 
