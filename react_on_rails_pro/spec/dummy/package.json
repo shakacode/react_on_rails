@@ -47,7 +47,7 @@
     "node-fetch": "^2.0.0",
     "node-libs-browser": "^2.2.1",
     "nps": "^5.9.3",
-    "postcss": "^8.5.10",
+    "postcss": "^8.5.23",
     "postcss-loader": "^7.1.0",
     "prop-types": "^15.7.2",
     "react": "~19.2.7",
