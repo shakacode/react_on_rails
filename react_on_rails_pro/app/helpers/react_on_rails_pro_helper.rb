@@ -18,6 +18,7 @@
 # 2. Keep all #{some_var} fully to the left so that all indentation is done evenly in that var
 
 require "react_on_rails/helper"
+require "react_on_rails_pro/open_telemetry"
 require "async/promise"
 require "digest"
 require "json"
@@ -180,10 +181,11 @@ module ReactOnRailsProHelper
     end
 
     on_complete = options.delete(:on_complete)
+    on_chunk_errors = options.delete(:on_chunk_errors)
     collect_chunks = on_complete.respond_to?(:call)
     buffer = collect_chunks ? [] : +""
 
-    internal_stream_react_component(component_name, options).each_chunk do |chunk|
+    internal_stream_react_component(component_name, options, on_chunk_errors:).each_chunk do |chunk|
       buffer << chunk.to_s
     end
 
@@ -335,13 +337,12 @@ module ReactOnRailsProHelper
         prerender: true
       )
 
-      cached_result = fetch_react_component(component_name, cache_options) do
-        options = render_options.merge(
-          props: yield,
-          skip_prerender_cache: true
-        )
-        buffered_stream_react_component(component_name, options)
-      end
+      cached_result = render_cached_buffered_stream_react_component(
+        component_name,
+        cache_options,
+        render_options,
+        &block
+      )
       cached_result.html_safe
     end
   end
@@ -396,8 +397,11 @@ module ReactOnRailsProHelper
             "Include ReactOnRailsPro::AsyncRendering in your controller and call enable_async_react_rendering."
     end
 
+    parent_context = ReactOnRailsPro::OpenTelemetry.capture_context
     task = @react_on_rails_async_barrier.async do
-      react_component(component_name, options)
+      ReactOnRailsPro::OpenTelemetry.with_context(parent_context) do
+        react_component(component_name, options)
+      end
     end
 
     ReactOnRailsPro::AsyncValue.new(task:)
@@ -449,28 +453,62 @@ module ReactOnRailsProHelper
 
   private
 
-  def fetch_react_component(component_name, options)
+  def render_cached_buffered_stream_react_component(component_name, cache_options, render_options)
+    stream_has_errors = false
+    fetch_react_component(component_name, cache_options, cache_write_if: -> { !stream_has_errors }) do
+      options = render_options.merge(
+        props: yield,
+        skip_prerender_cache: true,
+        on_chunk_errors: ->(chunk_has_errors) { stream_has_errors ||= chunk_has_errors == true }
+      )
+      buffered_stream_react_component(component_name, options)
+    end
+  end
+
+  def fetch_react_component(component_name, options, cache_write_if: nil)
     return yield unless ReactOnRailsPro::Cache.use_cache?(options)
 
     cache_key = ReactOnRailsPro::Cache.react_component_cache_key(component_name, options)
     Rails.logger.debug { "React on Rails Pro cache_key is #{cache_key.inspect}" }
-    cache_options = ReactOnRailsPro::Cache.cache_write_options(options[:cache_options])
+    cache_write_options = ReactOnRailsPro::Cache.cache_write_options(options[:cache_options])
     if ReactOnRailsPro::Cache.cache_write_expired?(options[:cache_options])
       return add_component_cache_metadata(yield, cache_key, false)
     end
 
-    cache_hit = true
     normalized_cache_tags = []
-    result = Rails.cache.fetch(cache_key, cache_options) do
-      cache_hit = false
+    result, cache_hit, cache_write_skipped = fetch_cache_entry(
+      cache_key,
+      cache_write_options,
+      cache_write_if:
+    ) do
       normalized_cache_tags = ReactOnRailsPro::Cache.normalize_tags(options[:cache_tags])
       yield
     end
-    ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_options) unless cache_hit
+    unless cache_hit || cache_write_skipped
+      ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_write_options)
+    end
     load_pack_for_cached_react_component(component_name, options) if cache_hit
     result = normalize_cached_pro_attribution(result) if cache_hit
 
     add_component_cache_metadata(result, cache_key, cache_hit)
+  end
+
+  def fetch_cache_entry(cache_key, cache_write_options, cache_write_if:)
+    cache_hit = true
+    cache_write_skipped = false
+    skip_cache_write = Object.new
+    result = catch(skip_cache_write) do
+      Rails.cache.fetch(cache_key, cache_write_options) do
+        cache_hit = false
+        rendered_result = yield
+        next rendered_result unless cache_write_if && !cache_write_if.call
+
+        cache_write_skipped = true
+        throw(skip_cache_write, rendered_result)
+      end
+    end
+
+    [result, cache_hit, cache_write_skipped]
   end
 
   def normalize_cached_pro_attribution(result)
@@ -604,21 +642,30 @@ module ReactOnRailsProHelper
   end
 
   def render_cached_static_rsc_component(component_name, cache_options, render_options, diagnostics_context, &block)
+    stream_has_errors = false
     fetch_static_rsc_component(
       component_name,
       cache_options,
       render_options,
       diagnostics_context[:cache],
-      diagnostics_enabled: static_rsc_render_diagnostics_enabled?(diagnostics_context[:config])
+      diagnostics_enabled: static_rsc_render_diagnostics_enabled?(diagnostics_context[:config]),
+      cache_write_if: -> { !stream_has_errors }
     ) do
-      static_rsc_component_cache_miss_html(component_name, render_options, diagnostics_context, &block)
+      static_rsc_component_cache_miss_html(
+        component_name,
+        render_options,
+        diagnostics_context,
+        on_chunk_errors: ->(chunk_has_errors) { stream_has_errors ||= chunk_has_errors == true },
+        &block
+      )
     end
   end
 
-  def static_rsc_component_cache_miss_html(component_name, render_options, diagnostics_context)
+  def static_rsc_component_cache_miss_html(component_name, render_options, diagnostics_context, on_chunk_errors:)
     options = render_options.merge(
       props: yield,
-      skip_prerender_cache: true
+      skip_prerender_cache: true,
+      on_chunk_errors:
     )
     strip_static_rsc_payload_scripts(
       buffered_stream_react_component(component_name, options),
@@ -632,6 +679,7 @@ module ReactOnRailsProHelper
     render_options,
     cache_diagnostics,
     diagnostics_enabled:,
+    cache_write_if:,
     &
   )
     cache_enabled = ReactOnRailsPro::Cache.use_cache?(cache_options)
@@ -657,6 +705,7 @@ module ReactOnRailsProHelper
       render_options,
       cache_diagnostics,
       cache_key,
+      cache_write_if:,
       &
     )
   end
@@ -666,18 +715,21 @@ module ReactOnRailsProHelper
     cache_options,
     render_options,
     cache_diagnostics,
-    cache_key
+    cache_key,
+    cache_write_if:
   )
     cache_write_options = ReactOnRailsPro::Cache.cache_write_options(cache_options[:cache_options])
-    cache_hit = true
     normalized_cache_tags = []
-    result = Rails.cache.fetch(cache_key, cache_write_options) do
-      cache_hit = false
+    result, cache_hit, cache_write_skipped = fetch_cache_entry(
+      cache_key,
+      cache_write_options,
+      cache_write_if:
+    ) do
       normalized_cache_tags = ReactOnRailsPro::Cache.normalize_tags(cache_options[:cache_tags])
       yield
     end
 
-    unless cache_hit
+    unless cache_hit || cache_write_skipped
       ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_write_options)
     end
     load_pack_for_cached_react_component(component_name, render_options) if cache_hit
@@ -1117,14 +1169,17 @@ module ReactOnRailsProHelper
     initial_result = normalize_cached_pro_attribution(cached_chunks.first)
 
     # Enqueue remaining chunks asynchronously
+    parent_context = ReactOnRailsPro::OpenTelemetry.capture_context
     @async_barrier.async do |task|
-      task.yield
+      ReactOnRailsPro::OpenTelemetry.with_context(parent_context) do
+        task.yield
 
-      cached_chunks.each_with_index do |chunk, index|
-        next if index.zero?
-        break if response.stream.closed?
+        cached_chunks.each_with_index do |chunk, index|
+          next if index.zero?
+          break if response.stream.closed?
 
-        @main_output_queue.enqueue(normalize_cached_pro_attribution(chunk))
+          @main_output_queue.enqueue(normalize_cached_pro_attribution(chunk))
+        end
       end
     rescue Async::Queue::ClosedError
       # Queue closed due to error/disconnect in another component — stop enqueuing
@@ -1238,8 +1293,11 @@ module ReactOnRailsProHelper
   def render_async_react_component_uncached(component_name, raw_options, &)
     options = prepare_async_render_options(raw_options, &)
 
+    parent_context = ReactOnRailsPro::OpenTelemetry.capture_context
     task = @react_on_rails_async_barrier.async do
-      react_component(component_name, options)
+      ReactOnRailsPro::OpenTelemetry.with_context(parent_context) do
+        react_component(component_name, options)
+      end
     end
 
     ReactOnRailsPro::AsyncValue.new(task:)
@@ -1256,14 +1314,17 @@ module ReactOnRailsProHelper
     normalized_cache_tags = ReactOnRailsPro::Cache.normalize_tags(raw_options[:cache_tags])
     options = prepare_async_render_options(raw_options, &)
 
+    parent_context = ReactOnRailsPro::OpenTelemetry.capture_context
     task = @react_on_rails_async_barrier.async do
-      result = react_component(component_name, options)
-      unless ReactOnRailsPro::Cache.cache_write_expired?(raw_cache_options)
-        cache_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
-        Rails.cache.write(cache_key, result, cache_options)
-        ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_options)
+      ReactOnRailsPro::OpenTelemetry.with_context(parent_context) do
+        result = react_component(component_name, options)
+        unless ReactOnRailsPro::Cache.cache_write_expired?(raw_cache_options)
+          cache_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
+          Rails.cache.write(cache_key, result, cache_options)
+          ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_options)
+        end
+        result
       end
-      result
     end
 
     ReactOnRailsPro::AsyncValue.new(task:)
@@ -1288,13 +1349,16 @@ module ReactOnRailsProHelper
     first_chunk_promise = Async::Promise.new
     all_chunks = [] if on_complete # Only collect if callback provided
     renderer_server_timing_collector = ReactOnRailsPro::Stream.renderer_server_timing_collector
+    parent_context = ReactOnRailsPro::OpenTelemetry.capture_context
 
     # Start an async task on the barrier to stream all chunks
     @async_barrier.async do
-      ReactOnRailsPro::Stream.with_renderer_server_timing_collector(renderer_server_timing_collector) do
-        stream = yield
-        fully_consumed = process_stream_chunks(stream, first_chunk_promise, all_chunks)
-        on_complete&.call(all_chunks) if fully_consumed
+      ReactOnRailsPro::OpenTelemetry.with_context(parent_context) do
+        ReactOnRailsPro::Stream.with_renderer_server_timing_collector(renderer_server_timing_collector) do
+          stream = yield
+          fully_consumed = process_stream_chunks(stream, first_chunk_promise, all_chunks)
+          on_complete&.call(all_chunks) if fully_consumed
+        end
       end
     rescue StandardError => e
       # Propagate the error to the calling fiber via the promise.
@@ -1373,10 +1437,56 @@ module ReactOnRailsProHelper
       # persist an empty payload and every cache hit would serve zero bytes.
       # See https://github.com/shakacode/react_on_rails/issues/4550.
       html = chunk["html"] || ""
-      metadata = chunk.except("html").to_json
+      metadata = redact_rsc_payload_error_metadata(chunk.except("html")).to_json
       content_bytes = html.bytesize.to_s(16).rjust(8, "0")
       "#{metadata}\t#{content_bytes}\n#{html}".html_safe
     end
+  end
+
+  # The fetched (client-navigation) RSC payload crosses the trusted-server -> untrusted-client
+  # boundary, so server-internal error text must not ride along on it.
+  #
+  # This mirrors the fail-closed allowlist in `createRSCDiagnosticScript`
+  # (packages/react-on-rails-pro/src/injectRSCPayload.ts), which redacts the same fields on the
+  # inline payload path: full detail only in development/test, and every other environment --
+  # production, staging, or anything unrecognized -- is redacted.
+  #
+  # Redacting here rather than in the shared producer (`buildRenderMetadata` in
+  # packages/react-on-rails/src/serverRenderUtils.ts) is deliberate. `server_rendered_react_component`
+  # installs a raise-transform that runs BEFORE this one and feeds `renderingError` to
+  # `raise_prerender_error`/`rendering_error_from_result`. Redacting upstream would silently strip
+  # the message and stack out of `PrerenderError` for apps that enable
+  # `raise_non_shell_server_rendering_errors`. This transform is the last hop before the bytes
+  # reach the browser, so the server keeps full detail and only the wire is redacted.
+  #
+  # Returns a new Hash; never mutates the caller's chunk (StreamCache buffers it -- see
+  # https://github.com/shakacode/react_on_rails/issues/4550).
+  def redact_rsc_payload_error_metadata(metadata)
+    return metadata if Rails.env.development? || Rails.env.test?
+
+    error_signal = rsc_payload_rendering_error_signal?(metadata)
+    return metadata unless error_signal || metadata.key?("renderingError")
+
+    redacted = metadata.except("renderingError")
+    # Preserve a generic failure signal so client error boundaries still fire. `hasErrors` is
+    # forced true when only a non-blank message/stack indicated the failure, matching the
+    # inline path's redacted branch.
+    redacted["hasErrors"] = true if error_signal
+    redacted
+  end
+
+  def rsc_payload_rendering_error_signal?(metadata)
+    return true if metadata["hasErrors"] == true
+
+    rendering_error = metadata["renderingError"]
+    return false unless rendering_error.is_a?(Hash)
+
+    non_blank_rsc_metadata_string?(rendering_error["message"]) ||
+      non_blank_rsc_metadata_string?(rendering_error["stack"])
+  end
+
+  def non_blank_rsc_metadata_string?(value)
+    value.is_a?(String) && value.strip.present?
   end
 
   def build_react_component_result_for_server_streamed_content(

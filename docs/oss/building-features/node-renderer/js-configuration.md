@@ -23,7 +23,13 @@ available default ENV values if you wire them into your own launch script.
 1. **logLevel** (default: `process.env.RENDERER_LOG_LEVEL || 'info'`) - The renderer log level. Set it to `silent` to turn logging off.
    [Available levels](https://getpino.io/#/docs/api?id=levels): `{ fatal: 60, error: 50, warn: 40, info: 30, debug: 20, trace: 10 }`. `silent` can be used as well.
 1. **logHttpLevel** (default: `process.env.RENDERER_LOG_HTTP_LEVEL || 'error'`) - The HTTP server log level (same allowed values as `logLevel`).
-1. **fastifyServerOptions** (default: `{}`) - Additional options to pass to the Fastify server factory. See [Fastify documentation](https://fastify.dev/docs/latest/Reference/Server/#factory).
+1. **fastifyServerOptions** (default: `{}`) - Additional options to pass to the Fastify server factory. The options
+   override the renderer defaults, so `fastifyServerOptions: { http2: false }` is the supported way to select an
+   HTTP/1.1 listener. For a cleartext renderer URL, pair it with `config.renderer_http_force_http2 = false` in Rails;
+   HTTPS negotiates its protocol through ALPN. HTTP/1.1 supports regular rendering and health checks. Direct
+   connections can stream async props in both directions, but request-buffering or half-duplex intermediaries are not
+   supported for async props. See [Health and Readiness Endpoints](./health-checks.md#choosing-h2c-or-http11) and the
+   [Fastify documentation](https://fastify.dev/docs/latest/Reference/Server/#factory).
 1. **serverBundleCachePath** (default: `process.env.RENDERER_SERVER_BUNDLE_CACHE_PATH || process.env.RENDERER_BUNDLE_PATH || '/tmp/react-on-rails-pro-node-renderer-bundles'` ) - Path to a cache directory where uploaded server bundle files will be stored. This is distinct from Shakapacker's public asset directory. For example you can set it to `path.resolve(__dirname, './.node-renderer-bundles')` if you configured renderer from the `/` directory of your app.
 1. **workersCount** (default: `process.env.RENDERER_WORKERS_COUNT || defaultWorkersCount()` where default is your CPUs count - 1) - Number of workers that will be forked to serve rendering requests. If you set this manually make sure that value is a **Number** and is `>= 0`. Setting this to `0` will run the renderer in a single process mode without forking any workers, which is useful for debugging purposes. For production use, the value should be `>= 1`.
 1. **password** (default: `env.RENDERER_PASSWORD`) - The password expected to receive from the **Rails client** to authenticate rendering requests.
@@ -52,9 +58,57 @@ available default ENV values if you wire them into your own launch script.
    Because these functions are valid client-side, they are ignored on server-side rendering without errors or warnings.
    Note that `performance` (exposed when `supportModules: true`) is the host's real `performance` object and is **not** stubbed by `stubTimers`; if rendered output embeds `performance.now()` values (e.g., dev-only timing annotations) they will vary between renders. Override via `additionalContext` (e.g., `{ performance: { now: () => 0 } }`) if strict SSR determinism is required.
    See also `supportModules`.
-1. **enableHealthEndpoints** - (default: `false`; set `RENDERER_ENABLE_HEALTH_ENDPOINTS` to `true`, `TRUE`, `yes`, `YES`, or `1` to enable) - If set to `true`, the renderer registers built-in, unauthenticated `GET /health` (liveness) and `GET /ready` (readiness) probe endpoints with status-only response bodies. See [Health and Readiness Endpoints](./health-checks.md) for semantics and working Kubernetes/ECS probe examples (the renderer's h2c listener cannot be probed with HTTP/1.1 `httpGet` probes).
+1. **enableHealthEndpoints** - (default: `false`; set `RENDERER_ENABLE_HEALTH_ENDPOINTS` to `true`, `TRUE`, `yes`, `YES`, or `1` to enable) - If set to `true`, the renderer registers built-in, unauthenticated `GET /health` (liveness) and `GET /ready` (readiness) probe endpoints with status-only response bodies. See [Health and Readiness Endpoints](./health-checks.md) for semantics and working Kubernetes/ECS probe examples. The default h2c listener needs an h2c-aware probe; an explicitly configured HTTP/1.1 listener supports ordinary `httpGet` probes.
+1. **currentGenerationManifestPath** (default: `process.env.RENDERER_CURRENT_GENERATION_MANIFEST`) - Absolute path to the immutable, revision-scoped current-generation declaration emitted by `react_on_rails_pro:pre_seed_renderer_cache`. When configured, every renderer worker validates the declaration and its server plus optional RSC artifacts, compiles the complete set, and pins it as current before listening. In supported `MODE=symlink` deployments, startup validates and compiles each immutable snapshot target while registering its renderer-facing cache path as the same in-memory VM identity; requests therefore reuse the prewarmed context without resolving the symlink again. Startup fails if the declaration is missing, malformed, oversized, outside the cache declaration directory, resolves an artifact outside the allowed immutable cache roots, or needs more contexts than `maxVMPoolSize`. Point each renderer revision at its own content-addressed declaration; do not create a mutable shared-volume `current` pointer.
 1. **replayServerAsyncOperationLogs** (default: `process.env.REPLAY_SERVER_ASYNC_OPERATION_LOGS` if set, otherwise `true` when `NODE_ENV=development`, `false` in other environments) - If set to `true`, enables replay of console logs from asynchronous server operations. If `false`, only logs that occur before any awaited asynchronous operations are replayed. Note: unlike `password`, this option only checks `NODE_ENV`, not `RAILS_ENV` — async log replay is a JS debugging concern, so it keys off the JS runtime environment alone.
-1. **maxVMPoolSize** (default: `2`; set via `MAX_VM_POOL_SIZE` env var, parsed as integer) - Maximum number of VM contexts to keep in memory. Typically only two contexts are needed — one for the server bundle and one for React Server Components (RSC) if enabled. Older contexts are removed when this limit is reached. Must be a positive integer.
+1. **maxVMPoolSize** (default: `4`; set via `MAX_VM_POOL_SIZE` env var, parsed as integer) - Absolute maximum number of compiled VM contexts retained in the pool **per renderer worker**. The default holds the server and RSC contexts for one draining and one current bundle generation. Least-recently-used pooled contexts are evicted when the hard cap is exceeded. Must be a positive integer.
+1. **vmPoolRolloutDrainTimeout** (default: `60`; set via `VM_POOL_ROLLOUT_DRAIN_TIMEOUT`, parsed as seconds) - How long an inactive bundle set remains eligible for VM reuse during a rolling deploy. The default covers a representative 40-second overlap plus 20 seconds of drain and scheduling margin. Must be a positive finite number. Tune it to exceed the longest interval during which a draining app revision can still send a render request.
+
+## Sizing and draining the VM pool
+
+Use this per-worker sizing formula:
+
+```text
+maxVMPoolSize >= simultaneous bundle generations × contexts per generation
+```
+
+- SSR-only uses one context per generation.
+- RSC uses two contexts per generation: one server context and one RSC context.
+- A renderer shared by old and new RSC-enabled Rails revisions therefore needs `2 × 2 = 4` contexts per worker. This is the default.
+- If your topology guarantees that each renderer receives requests from only one app revision, the minimum is `1` for SSR-only or `2` for RSC. Keep the default `4` unless the memory savings justify relying on that topology guarantee.
+
+`maxVMPoolSize` remains an absolute cap on contexts retained in the VM pool. Setting it below the formula does not create temporary rollout headroom: the renderer evicts least-recently-used pooled contexts and may rebuild them as old and new requests alternate. Hard-limit pressure logs are rate-limited and include cumulative build and eviction counters.
+
+The drain timeout bounds how long inactive generation metadata and unshared contexts remain in the pool. Cleanup runs from one unreferenced timer, so it does not require another render request. Shared bundle paths remain pooled while any live bundle set references them. An already-running request can keep an evicted execution context and source-map registration alive outside the pool until it releases them.
+
+With `currentGenerationManifestPath`, the trusted revision-scoped declaration—not request order—identifies the current bundle set. Old requests cannot demote it, even across an arbitrarily long old-only traffic gap. Inactive nonmatching generations drain on the configured timer, while the declared current contexts remain pinned. Without a declaration, the compatibility path retains the most recently observed successful bundle set and `/ready` keeps its legacy “any compiled context” meaning.
+
+The pool uses one global per-worker hard cap. Declared current contexts have eviction priority over draining request generations; a draining context that cannot be pooled is still safe for its active request until release. Startup fails instead of weakening the cap when the declared set itself cannot fit. Generation-affinity routing can reduce overlap pressure only when the deployment platform guarantees that every renderer receives one revision, so size the pool for the generations that can actually reach each renderer.
+
+Disk-cache seeding and VM retention solve different cold paths:
+
+- `pre_seed_renderer_cache` places bundle files and companion artifacts on disk, avoiding a `410 Gone`, upload, and retry, and emits the new revision's immutable current-generation declaration.
+- Configuring that exact declaration makes each worker compile the new server and optional RSC contexts before it listens.
+- A correctly sized VM pool retains those pinned contexts while old request generations drain.
+
+At `debug`, `vm_pool_context_built` reports cumulative builds and hard-cap evictions. `vm_pool_hard_limit_eviction` is a rate-limited warning that indicates the configured cap is causing pressure. `vm_pool_rollout_generation_retired` reports bounded drain cleanup without logging bundle paths.
+
+The exact fleet-wide upper bound on pooled contexts is:
+
+```text
+renderer replicas × effective workers per replica × maxVMPoolSize
+```
+
+`workersCount: 0` means one effective in-process worker; otherwise use the configured worker count. During a rollout, use the maximum simultaneously live renderer replicas, including old replicas and `maxSurge`, not only steady-state replicas. Estimate each replica's memory request and limit from `effective workers × maxVMPoolSize × measured memory per pooled context`, then add the master process, base V8 heaps, bundle buffers, and headroom for source maps and evicted execution contexts held by concurrent in-flight requests. The total cluster reservation multiplies that per-replica budget by the overlapping replica count.
+
+With `currentGenerationManifestPath`, startup is the supported eager prewarm seam and `/ready` means the answering worker compiled its complete declared current set. A safe controlled rollout is:
+
+1. Complete pre-seeding and capture the exact emitted declaration path for this renderer revision.
+2. Set `RENDERER_CURRENT_GENERATION_MANIFEST` to that immutable file and start the renderer on private networking.
+3. Wait for the renderer to listen and for `/ready`; each worker crosses its own compile barrier before accepting connections.
+4. Deploy the matching Rails revision. Application-owned authenticated smoke requests remain useful for end-to-end behavior, but are no longer the VM prewarm mechanism.
+
+If no declaration is configured, startup remains backward compatible: bundles compile on requests and `/ready` means only that some VM exists. That mode cannot guarantee a prewarmed new generation through an old-only request gap.
 
 Deprecated options:
 
@@ -457,15 +511,15 @@ Do not put Rails, database, Redis, or other external dependency checks in the no
 temporary dependency outage should not restart every renderer replica. If SSR must be available before Rails receives
 traffic, make the Rails readiness endpoint perform a short renderer check.
 
-The renderer listens with cleartext HTTP/2 (h2c). Do not configure a Kubernetes `httpGet` probe, Control Plane HTTP
-probe, or any other HTTP/1.1-only probe directly against the renderer port; those probes are rejected by the h2c
-listener. Use one of these probe styles instead:
+The renderer listens with cleartext HTTP/2 (h2c) by default. In that mode, do not configure a Kubernetes `httpGet`
+probe, Control Plane HTTP probe, or any other HTTP/1.1-only probe directly against the renderer port. Use one of these
+probe styles instead, or select the paired [HTTP/1.1 transport](./health-checks.md#choosing-h2c-or-http11):
 
-| Probe style  | When to use it                                                                                                                      |
-| ------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `tcpSocket`  | Startup checks, default liveness checks, and fallback readiness when curl with HTTP/2 support is unavailable.                       |
-| `exec` probe | Application-level readiness and optional stricter liveness checks with an h2c-aware client, such as `curl --http2-prior-knowledge`. |
-| HTTP/1.1     | Only if you probe Rails, a separate HTTP/1.1 health sidecar/port, or another endpoint that is not the renderer h2c listener.        |
+| Probe style  | When to use it                                                                                                                                           |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tcpSocket`  | Startup checks, default liveness checks, and fallback readiness when curl with HTTP/2 support is unavailable.                                            |
+| `exec` probe | Application-level readiness and optional stricter liveness checks with an h2c-aware client, such as `curl --http2-prior-knowledge`.                      |
+| HTTP/1.1     | Direct renderer probes when both the Node listener and Rails client use HTTP/1.1, or probes against a separate HTTP/1.1 health endpoint or Rails itself. |
 
 A passing `tcpSocket` probe means the h2c listener has bound to the port; cluster workers might still be warming up.
 Keep an application-level readiness probe if traffic should wait for worker initialization.

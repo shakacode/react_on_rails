@@ -811,6 +811,98 @@ describe ReactOnRailsPro::Request do
       described_class.instance_variable_set(:@connection, nil)
     end
 
+    it "keeps routine connection setup at debug level" do
+      connection = instance_double(ReactOnRailsPro::RendererHttpClient)
+      setup_messages = []
+      allow(ReactOnRailsPro.configuration).to receive_messages(
+        renderer_http_pool_timeout: 5,
+        ssr_timeout: 10
+      )
+      allow(ReactOnRailsPro::RendererHttpClient).to receive(:new).and_return(connection)
+      allow(logger_mock).to receive(:debug) { |&block| setup_messages << block.call }
+      expect(logger_mock).not_to receive(:info)
+
+      expect(described_class.send(:create_connection)).to be(connection)
+      expect(setup_messages).to eq(["[ReactOnRailsPro] Setting up Node Renderer connection to #{renderer_url}"])
+    end
+
+    it "forces h2c when the transport setting is left at its default" do
+      connection = instance_double(ReactOnRailsPro::RendererHttpClient)
+      allow(ReactOnRailsPro.configuration).to receive_messages(
+        renderer_http_pool_timeout: 5,
+        renderer_http_force_http2: true,
+        ssr_timeout: 10
+      )
+      allow(ReactOnRailsPro::RendererHttpClient).to receive(:new).and_return(connection)
+
+      expect(described_class.send(:create_connection)).to be(connection)
+      expect(ReactOnRailsPro::RendererHttpClient).to have_received(:new).with(
+        origin: renderer_url,
+        pool_size: 20,
+        connect_timeout: 5,
+        read_timeout: 10,
+        force_http2: true
+      )
+    end
+
+    it "does not force h2c when HTTP/1.1 is configured" do
+      connection = instance_double(ReactOnRailsPro::RendererHttpClient)
+      allow(ReactOnRailsPro.configuration).to receive_messages(
+        renderer_http_pool_timeout: 5,
+        renderer_http_force_http2: false,
+        ssr_timeout: 10
+      )
+      allow(ReactOnRailsPro::RendererHttpClient).to receive(:new).and_return(connection)
+
+      expect(described_class.send(:create_connection)).to be(connection)
+      expect(ReactOnRailsPro::RendererHttpClient).to have_received(:new).with(
+        origin: renderer_url,
+        pool_size: 20,
+        connect_timeout: 5,
+        read_timeout: 10,
+        force_http2: false
+      )
+    end
+
+    it "includes the transport setting after request retries are exhausted" do
+      allow(ReactOnRailsPro.configuration).to receive_messages(
+        renderer_http_force_http2: false
+      )
+      transport_error = ReactOnRailsPro::RendererHttpClient::ConnectionError.new("unexpected protocol")
+
+      expect do
+        described_class.send(:retry_or_raise_transport_error, transport_error, 0, "/render", "Connection")
+      end.to raise_error(
+        ReactOnRailsPro::Error,
+        a_string_including(
+          "renderer_http_force_http2 = false",
+          "unexpected protocol"
+        )
+      )
+    end
+
+    it "keeps renderer connection failures actionable" do
+      allow(ReactOnRailsPro.configuration).to receive_messages(
+        renderer_http_pool_timeout: 5,
+        renderer_http_pool_warn_timeout: 10,
+        renderer_http_keep_alive_timeout: 15,
+        ssr_timeout: 20
+      )
+      allow(ReactOnRailsPro::RendererHttpClient).to receive(:new)
+        .and_raise(StandardError, "invalid renderer URL")
+
+      expect { described_class.send(:create_connection) }
+        .to raise_error(
+          ReactOnRailsPro::Error,
+          a_string_including(
+            "Error creating async-http connection",
+            "renderer_url = #{renderer_url}",
+            "Be sure to use a url that contains the protocol of http or https",
+            "invalid renderer URL"
+          )
+        )
+    end
+
     it "creates only one connection when accessed concurrently" do
       connections_created = 0
       counter_mutex = Mutex.new
@@ -1118,6 +1210,42 @@ describe ReactOnRailsPro::Request do
       stream.each_chunk(&:itself)
 
       expect(emitter_received).to be_a(ReactOnRailsPro::AsyncPropsEmitter)
+    end
+
+    it "preserves the Rails OpenTelemetry context inside the async props block" do
+      captured_contexts = []
+      capture_fibers = []
+      active_contexts = []
+      with_context_fibers = []
+      observed_contexts = nil
+      props_fiber = nil
+      allow(ReactOnRailsPro::OpenTelemetry).to receive(:capture_context) do
+        capture_fibers << Fiber.current
+        Object.new.tap { |context| captured_contexts << context }
+      end
+      allow(ReactOnRailsPro::OpenTelemetry).to receive(:with_context) do |context, &block|
+        with_context_fibers << Fiber.current
+        active_contexts.push(context)
+        block.call
+      ensure
+        active_contexts.pop
+      end
+      test_async_props_block = proc do |_emitter|
+        props_fiber = Fiber.current
+        observed_contexts = active_contexts.dup
+      end
+
+      stream = described_class.render_code_with_incremental_updates(
+        "/render-incremental",
+        js_code,
+        async_props_block: test_async_props_block
+      )
+      stream.each_chunk(&:itself)
+
+      expect(captured_contexts.length).to eq(2)
+      expect(observed_contexts).to eq(captured_contexts)
+      expect(capture_fibers).not_to include(props_fiber)
+      expect(with_context_fibers.last).to be(props_fiber)
     end
 
     it "uses rsc_bundle_hash for the AsyncPropsEmitter" do

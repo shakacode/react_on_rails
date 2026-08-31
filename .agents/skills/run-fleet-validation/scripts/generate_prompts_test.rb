@@ -3276,6 +3276,35 @@ class FleetValidationGeneratorTest < Minitest::Test
     end
   end
 
+  def test_index_closeout_command_targets_the_generated_pack_directory
+    Dir.mktmpdir do |root|
+      output_dir = File.join(root, "fleet pack")
+      build_generator.write_pack(output_dir)
+      index = File.read(File.join(output_dir, "INDEX.md"))
+
+      assert_includes index, "PACK_DIR=#{Shellwords.escape(output_dir)}"
+      assert_includes index, "bundle exec ruby .agents/skills/run-fleet-validation/scripts/validate_ledger.rb"
+      assert_includes index, '--ledger "$PACK_DIR/result-ledger.json"'
+      assert_includes index, '--render-tracker "$PACK_DIR/tracker-closeout.md"'
+    end
+  end
+
+  def test_index_closeout_command_anchors_a_relative_output_directory
+    Dir.mktmpdir do |root|
+      relative_output_dir = "fleet pack"
+      output_dir = File.join(File.realpath(root), relative_output_dir)
+      launch_dir = File.join(root, "closeout")
+      FileUtils.mkdir_p(launch_dir)
+
+      Dir.chdir(root) { build_generator.write_pack(relative_output_dir) }
+      index = File.read(File.join(output_dir, "INDEX.md"))
+      assignment = index.lines.find { |line| line.strip.start_with?("PACK_DIR=") }.strip
+      pack_dir = Shellwords.split(assignment.delete_prefix("PACK_DIR=")).fetch(0)
+
+      assert_equal output_dir, File.expand_path(pack_dir, launch_dir)
+    end
+  end
+
   def test_core_matrix_gate_is_always_assigned_to_coordinator_one
     (4..8).each do |prompt_count|
       generator = build_generator(prompt_count:)

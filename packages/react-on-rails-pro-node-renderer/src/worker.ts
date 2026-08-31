@@ -23,7 +23,8 @@ import cluster from 'cluster';
 import { randomUUID } from 'crypto';
 import { rm } from 'fs/promises';
 import { Readable, Transform } from 'stream';
-import fastify from 'fastify';
+import fastify, { type FastifyServerOptions } from 'fastify';
+import type { Http2Server } from 'http2';
 import fastifyFormbody from '@fastify/formbody';
 import fastifyMultipart, { type MultipartFile } from '@fastify/multipart';
 import log, { sharedLoggerOptions } from './shared/log.js';
@@ -63,7 +64,8 @@ import {
 } from './shared/utils.js';
 import { startSsrRequestOptions, subSpan, trace, type TracingContext } from './shared/tracing.js';
 import { applyFastifyConfigFunctions } from './worker/fastifyConfig.js';
-import { hasAnyVMContext } from './worker/vm.js';
+import { hasAnyVMContext, isDeclaredCurrentGenerationReady } from './worker/vm.js';
+import { prewarmCurrentGenerationBeforeListen } from './worker/startCurrentGeneration.js';
 
 export { configureFastify, type FastifyConfigFunction } from './worker/fastifyConfig.js';
 
@@ -606,18 +608,25 @@ export default function run(config: Partial<Config>) {
     fastifyServerOptions,
     workersCount,
     enableHealthEndpoints,
+    currentGenerationManifestPath,
   } = getConfig();
 
-  // The renderer uses cleartext HTTP/2 (h2c). Node's `allowHTTP1` option only
-  // applies to TLS servers (http2.createSecureServer), so it cannot enable
-  // HTTP/1.1 Kubernetes httpGet probes on this listener.
-  const app = fastify({
-    http2: useHttp2 as true,
+  const { http2: configuredHttp2, ...serverOptions } = fastifyServerOptions ?? {};
+  const http2Enabled = configuredHttp2 ?? useHttp2;
+  const commonServerOptions = {
     bodyLimit: BODY_SIZE_LIMIT,
     logger:
       logHttpLevel !== 'silent' ? { name: 'RORP HTTP', level: logHttpLevel, ...sharedLoggerOptions } : false,
-    ...fastifyServerOptions,
-  });
+    ...serverOptions,
+  };
+  const app = (
+    http2Enabled
+      ? fastify<Http2Server>({
+          ...(commonServerOptions as FastifyServerOptions<Http2Server>),
+          http2: true,
+        })
+      : fastify(commonServerOptions as FastifyServerOptions)
+  ) as FastifyInstance;
 
   handleGracefulShutdown(app);
 
@@ -1474,13 +1483,12 @@ export default function run(config: Partial<Config>) {
   });
 
   // Built-in, opt-in probe endpoints (enableHealthEndpoints config option).
-  // Like /info, they are plain GET routes outside the authenticated render and
-  // asset endpoints: orchestrator probes cannot carry the renderer password.
-  // Both intentionally return status-only bodies — no versions, paths, or
-  // license details — so leaving them reachable exposes nothing sensitive.
-  // NOTE: this listener speaks cleartext HTTP/2 (h2c), so HTTP/1.1-only probes
-  // (e.g. Kubernetes httpGet) cannot reach these routes. Use tcpSocket or exec
-  // probes (`curl --http2-prior-knowledge`). See
+  // They are plain GET routes outside the authenticated render and asset
+  // endpoints because orchestrator probes cannot carry the renderer password.
+  // Unlike /info above, both return status-only bodies with no version details.
+  // The listener uses cleartext HTTP/2 (h2c) by default. With
+  // fastifyServerOptions.http2 set to false, ordinary HTTP/1.1 probes can reach
+  // these routes. See
   // docs/oss/building-features/node-renderer/health-checks.md.
   if (enableHealthEndpoints) {
     // Liveness: 200 whenever this process can answer — i.e. the event loop is
@@ -1506,35 +1514,58 @@ export default function run(config: Partial<Config>) {
     // codeql[js/missing-rate-limiting]
     // lgtm[js/missing-rate-limiting]
     app.get('/ready', (_req, res) => {
-      if (hasAnyVMContext()) {
+      const ready = currentGenerationManifestPath ? isDeclaredCurrentGenerationReady() : hasAnyVMContext();
+      if (ready) {
         res.send({ status: 'ready' });
       } else {
         res
           .status(503)
           .header('Retry-After', String(READY_RETRY_AFTER_SECONDS))
-          .send({ status: 'waiting_for_bundle' });
+          .send({
+            status: currentGenerationManifestPath ? 'waiting_for_current_generation' : 'waiting_for_bundle',
+          });
       }
     });
   }
 
-  // In tests we will run worker in master thread, so we need to ensure server
-  // will not listen:
-  // we are extracting worker from cluster to avoid false TS error
+  // Integration hooks must be registered before Fastify boots during listen.
+  applyFastifyConfigWithHealthEndpointMigrationHint(app, enableHealthEndpoints);
+
+  // In tests we will run worker in master thread, so we need to ensure server will not listen.
+  // We are extracting worker from cluster to avoid false TS error.
   const { worker } = cluster;
   if (workersCount === 0 || cluster.isWorker) {
-    app.listen({ port, host }, (err, address) => {
-      if (err) {
-        handleStartupListenError({ err, host, port });
-        return;
-      }
-      const workerName = worker ? `worker #${worker.id}` : 'master (single-process)';
-      log.info({ workerName, address }, 'Node renderer listening');
+    let startupStage: 'prewarm' | 'listen' = currentGenerationManifestPath ? 'prewarm' : 'listen';
+    const listen = () => {
+      startupStage = 'listen';
+      return new Promise<void>((resolve, reject) => {
+        app.listen({ port, host }, (err, address) => {
+          if (err) {
+            reject(err);
+            return;
+          }
+          const workerName = worker ? `worker #${worker.id}` : 'master (single-process)';
+          log.info({ workerName, address }, 'Node renderer listening');
+          resolve();
+        });
+      });
+    };
+    const start = currentGenerationManifestPath
+      ? prewarmCurrentGenerationBeforeListen({
+          currentGenerationManifestPath,
+          serverBundleCachePath,
+          listen,
+        })
+      : listen();
+    void start.catch((error: unknown) => {
+      handleStartupListenError({
+        err: error instanceof Error ? error : new Error(String(error)),
+        host,
+        port,
+        stage: startupStage,
+      });
     });
   }
-
-  // Integration hooks registered before the worker loads are applied here, immediately after
-  // listen() is scheduled and before Fastify finishes booting.
-  applyFastifyConfigWithHealthEndpointMigrationHint(app, enableHealthEndpoints);
 
   return app;
 }

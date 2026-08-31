@@ -195,7 +195,8 @@ High-performance standalone Node.js server for server-side rendering with connec
 
 - **Parallel rendering**: Multiple worker processes for concurrent SSR
 - **Memory management**: Automatic worker restarts to prevent leaks
-- **Better performance**: Up to 10x faster than ExecJS for high-traffic sites
+- **Workload-dependent performance**: Persistent worker processes support concurrent SSR;
+  [benchmark your own pages](../docs/oss/core-concepts/performance-benchmarks.md) rather than relying on a headline multiple
 - **Loadable Components**: Full support for code splitting with SSR
 
 **Example Configuration:**

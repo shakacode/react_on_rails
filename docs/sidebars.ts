@@ -253,6 +253,7 @@ const sidebars: SidebarsConfig = {
             'pro/react-server-components/create-without-ssr',
             'pro/react-server-components/inside-client-components',
             'pro/react-server-components/selective-hydration-in-streamed-components',
+            'pro/react-server-components/activity-inside-rsc',
             'pro/react-server-components/client-reference-diagnostics',
             'pro/react-server-components/system-spec-streaming-rsc',
             'pro/react-server-components/flight-protocol-syntax',

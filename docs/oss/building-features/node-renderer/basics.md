@@ -168,7 +168,8 @@ jobs:
         run: |
           node renderer/node-renderer.js &
           # Wait for the renderer to be ready.
-          # The renderer uses cleartext HTTP/2 (h2c), so use --http2-prior-knowledge for the probe.
+          # The renderer uses cleartext HTTP/2 (h2c) by default, so use
+          # --http2-prior-knowledge unless fastifyServerOptions.http2 is false.
           # --max-time 2 prevents hangs if the port is open but the process is stalled.
           for i in $(seq 1 30); do
             if curl -s --http2-prior-knowledge --max-time 2 http://localhost:3800/ > /dev/null 2>&1; then
@@ -187,7 +188,7 @@ jobs:
 
 Key points:
 
-- **Readiness check**: Poll port 3800 (or your configured port) before running tests. The renderer uses **cleartext HTTP/2 (h2c)**, so the `curl` probe must include `--http2-prior-knowledge`. Without it, `curl` sends an HTTP/1.1 request that the h2c server rejects.
+- **Readiness check**: Poll port 3800 (or your configured port) before running tests. By default, the renderer uses **cleartext HTTP/2 (h2c)**, so the `curl` probe must include `--http2-prior-knowledge`. Drop that flag when you configure `fastifyServerOptions: { http2: false }` for HTTP/1.1.
 - **`RENDERER_PASSWORD`**: Must be set in the CI environment and match the value configured in `react_on_rails_pro.rb`. Add it as a CI secret. **Important:** Declare this at the job level (not just the renderer step) so Rails can also read it when running tests.
 - **Bundle pre-staging**: You do **not** need to set a bundle path env var for the renderer. In CI, run `rake react_on_rails_pro:pre_stage_bundle_for_node_renderer` after the webpack build and before starting the renderer — this symlinks the compiled bundle into the renderer's cache directory, eliminating the first-request upload latency. For remote renderers, use `rake react_on_rails_pro:copy_assets_to_remote_vm_renderer` instead.
 

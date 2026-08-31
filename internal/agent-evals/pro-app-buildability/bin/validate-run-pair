@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+run_file="${1:-}"
+invocation_file="${2:-}"
+[[ -f "$run_file" && -f "$invocation_file" ]] || {
+  echo "usage: $0 RUN_JSON INVOCATION_JSON" >&2
+  exit 64
+}
+
+jq -e --slurpfile invocation "$invocation_file" \
+  '.agent.name == ($invocation[0].agent // "codex") and
+    .agent.model == $invocation[0].model and
+    .security.credential_store == $invocation[0].credential_store and
+    .security.auth_material_available == $invocation[0].auth_material_available and
+    (.security.auth_source // "none") == ($invocation[0].auth_source // "none") and
+    (
+      (
+        (.runner | has("execution_boundary")) and
+        .runner.execution_boundary == $invocation[0].sandbox
+      ) or
+      (
+        (.runner | has("execution_boundary") | not) and
+        ($invocation[0] | has("agent") | not) and
+        ($invocation[0] | has("auth_source") | not) and
+        .agent.name == "codex" and
+        .security.auth_material_available == false and
+        (.security | has("auth_source") | not) and
+        .runner.sandbox_network_access == false and
+        .runner.isolated_host_attestation == false and
+        $invocation[0].command == "codex exec" and
+        $invocation[0].auth_material_available == false and
+        $invocation[0].sandbox == "workspace-write" and
+        $invocation[0].sandbox_network_access == false and
+        $invocation[0].isolated_host_attestation == false
+      )
+    ) and
+    .runner.sandbox_network_access == $invocation[0].sandbox_network_access and
+    .runner.isolated_host_attestation == $invocation[0].isolated_host_attestation and
+    (.runner.timeout_kill_grace_seconds // 0) ==
+      ($invocation[0].timeout_kill_grace_seconds // 0)' \
+  "$run_file" >/dev/null || {
+  echo "run/invocation security or agent identity disagrees" >&2
+  exit 1
+}

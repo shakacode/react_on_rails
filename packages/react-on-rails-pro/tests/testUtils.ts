@@ -48,6 +48,22 @@ export const createNodeReadableStream = () => {
 
 export const getNodeVersion = () => parseInt(process.version.slice(1), 10);
 
+/**
+ * Wraps content in the node renderer's length-prefixed envelope, mirroring the
+ * writer in src/streamingUtils.ts (transformRenderStreamChunksToResultObject):
+ * `<metadata JSON>\t<content byte length hex, 8 digits>\n<raw content bytes>`.
+ * Shared by the streaming tests so the encoded shape can't silently drift
+ * between test files if the protocol's metadata fields ever change.
+ */
+export const toLengthPrefixedEnvelope = (
+  content: Buffer | string,
+  metadata: Record<string, unknown> = { consoleReplayScript: '', hasErrors: false, isShellReady: true },
+): Buffer => {
+  const contentBuffer = Buffer.isBuffer(content) ? content : Buffer.from(content, 'utf8');
+  const header = `${JSON.stringify(metadata)}\t${contentBuffer.length.toString(16).padStart(8, '0')}\n`;
+  return Buffer.concat([Buffer.from(header, 'utf8'), contentBuffer]);
+};
+
 export const flushMacrotasks = () =>
   new Promise<void>((resolve) => {
     setTimeout(resolve, 0);

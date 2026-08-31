@@ -7,11 +7,13 @@ and selects a private `agent-coord` backend through
 
 `shakacode/agent-coordination` is the public CLI/bootstrap source repository.
 Runtime coordination state lives in the backend reported by
-`agent-coord config show --json` and `agent-coord doctor --json`; the current
-default is the private `shakacode/agent-coordination-state` repository on the
-`state` ref. Do not hardcode an old backend repo name in lane handoffs or
-workflow prose. The CLI help, config JSON, state repo README, and schema files
-are authoritative when they differ from this public pointer.
+`agent-coord doctor --json`; live multi-machine coordination uses the HTTP/D1
+backend selected by `AGENT_COORD_API_URL` and `AGENT_COORD_API_TOKEN`. The
+legacy `shakacode/agent-coordination-state` GitHub repository is intentionally
+archived and read-only, so it is historical state rather than a valid live
+backend. Do not hardcode a backend repo, URL, or token in lane handoffs or
+workflow prose. The CLI help, config JSON, HTTP backend health response, and
+schema files are authoritative when they differ from this public pointer.
 
 This repo carries only the React on Rails supplement: setup commands, public
 workflow links, and release-train phase rules. Keep authoritative JSON schema
@@ -28,24 +30,72 @@ and then run the backend setup below.
 ```bash
 gh auth status
 gh repo view shakacode/agent-coordination
-gh repo view shakacode/agent-coordination-state
 gh repo clone shakacode/agent-coordination
 cd agent-coordination
-ruby -Itest test/agent_coord_test.rb
+bundle install
+.agents/bin/test
+.agents/bin/validate
 bin/agent-coord --help
 bin/agent-coord bootstrap
 export PATH="$HOME/.local/bin:$PATH"
+hash -r 2>/dev/null || true
 agent-coord --help
-agent_coord --help
 agent-coord version --json
 agent-coord config show --json
+: "${AGENT_COORD_API_URL:?load the private HTTP backend URL before continuing}"
+: "${AGENT_COORD_API_TOKEN:?load this machine's private HTTP backend token before continuing}"
+unset AGENT_COORD_BACKEND AGENT_COORD_REF AGENT_COORD_STATE_ROOT AGENT_COORD_STATUS_STATE_ROOT
 agent-coord doctor --json
 ```
 
 The workflow docs assume `agent-coord` is available on `PATH`.
-`bin/agent-coord bootstrap` installs both `agent-coord` and the compatibility
-alias `agent_coord` into `$HOME/.local/bin` by default. Add that directory to the
-active shell `PATH` if the shell has not reloaded its profile yet.
+`bin/agent-coord bootstrap` installs `agent-coord` into `$HOME/.local/bin` by
+default. Add that directory to the active shell `PATH` if the shell has not
+reloaded its profile yet. Obtain the deployed HTTP URL and a scoped machine
+token through the private operator channel; never copy those values into this
+repository, a PR, or a lane handoff. The token is a secret and must never appear
+in shell output. The deployment-specific URL is not an authentication secret;
+`doctor --json` reports it so operators can verify the selected backend. Review
+doctor and status output before sharing it outside the private operator channel.
+Remove stale legacy GitHub backend exports instead of relying on selector
+precedence to hide them.
+
+### Release-machine setup
+
+A maintainer normally configures release coordination once in a private shell
+or dotfile, not once per release:
+
+- `AGENT_COORD_API_URL`: the deployed shared HTTP backend URL.
+- `AGENT_COORD_API_TOKEN`: the scoped secret token. Never commit, echo, or paste
+  it into an issue, PR, log, or handoff.
+- `AGENT_COORD_MACHINE_ID`: a stable, recognizable name for this release
+  machine; do not generate it per invocation.
+- `~/.local/bin` on `PATH`, so the bootstrapped `agent-coord` is callable.
+
+After loading that configuration, run `script/release --doctor`. It performs
+only local command/config checks plus the read-only `agent-coord doctor --json`
+probe. It rejects local or legacy backend selection, verifies shared HTTP health
+and authentication, and reports setup actions without printing the token. The
+normal `script/release` path then generates its own fresh UUID identity, derives
+the exact release line from `CHANGELOG.md`, and owns claim/heartbeat/release
+cleanup. Per-run `RELEASE_COORDINATOR_ID` variables are unnecessary.
+
+Normal acquisition uses the repository-owned `script/release-claim` helper
+against that same shared HTTP URL and token. The helper conditionally creates an
+absent record or replaces the exact observed version of a released record. It
+never asks the general coordination client to take over a dead, stale, or
+expired active holder. A concurrent winner is therefore a claim refusal, not a
+takeover opportunity, and helper errors never echo the token.
+During a managed live run, the wrapper also uses this helper to renew the same
+active identity at least hourly with the exact observed backend version. Any
+identity mismatch or conditional-write conflict stops the supervised release
+process group before the wrapper attempts exact-identity cleanup.
+
+Automation that already owns a broader release-line lease may supply both
+`RELEASE_COORDINATOR_ID` and `RELEASE_COORDINATOR_INSTANCE_ID` and pre-acquire
+the exact claim. That compatibility path is advanced-only: the wrapper verifies
+and heartbeats the supplied identity but does not claim, take over, or release
+the automation's lease.
 
 Treat the backend as available when `agent-coord doctor --json` and targeted
 lane-scoped status probes exit 0. In React on Rails batch workflows, run agent
@@ -93,17 +143,16 @@ state as `UNKNOWN` and stay in advisory fallback mode until a coordinator
 validates the backend.
 
 Use a temporary local state directory for smoke checks that should not write to
-GitHub. `AGENT_COORD_STATE_ROOT` sets the directory where `agent-coord` reads
-and writes JSON state; override it here so dry runs stay local instead of using
-the configured backend.
+the configured backend. Pass `--state-root` explicitly so it takes precedence
+over the loaded HTTP backend environment and keeps dry runs local.
 
 ```bash
 STATE_ROOT=$(mktemp -d)
-AGENT_COORD_STATE_ROOT="$STATE_ROOT" agent-coord heartbeat \
+agent-coord heartbeat --state-root "$STATE_ROOT" \
   --agent-id smoke-test-0 \
   --repo shakacode/react_on_rails \
   --target 9999
-AGENT_COORD_STATE_ROOT="$STATE_ROOT" agent-coord status
+agent-coord status --state-root "$STATE_ROOT"
 rm -rf "$STATE_ROOT"
 ```
 

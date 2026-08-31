@@ -87,6 +87,8 @@ jobs:
             bin/ci-rerun-failures \
             bin/request-hosted-ci \
             script/ci-changes-detector \
+            script/ci-required-diff-base \
+            script/ci-required-diff-base-test.bash \
             script/ci-required-hosted-gate
           do
             bash -n "$script"
@@ -96,6 +98,7 @@ jobs:
       - name: Run CI gate tests
         run: |
           bash script/ci-required-hosted-gate-test.bash
+          bash script/ci-required-diff-base-test.bash
           bash script/lint-mirrored-blocks-test.bash
           ruby script/ci_required_merge_group_gate_test.rb
           node --test .github/workflows/ci-commands.test.cjs
@@ -124,12 +127,14 @@ jobs:
         id: changes
         env:
           PULL_REQUEST_BASE_SHA: ${{ github.event.inputs.pull_request_base_sha || '' }}
-        run: |
-          base_ref="${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before || 'origin/main' }}"
-          if [ -n "${PULL_REQUEST_BASE_SHA}" ]; then
-            base_ref="${PULL_REQUEST_BASE_SHA}"
-          fi
-          script/ci-changes-detector "$base_ref"
+          PULL_REQUEST_HEAD_SHA: ${{ github.event.pull_request.head.sha || '' }}
+          # Keep this expression on one line. It is the merge-queue base-ref
+          # contract asserted by react_on_rails/spec/react_on_rails/ruby_version_support_spec.rb,
+          # which matches the raw file text, and a folded scalar would preserve
+          # the newlines rather than fold them (the continuation lines are more
+          # indented than the first).
+          EVENT_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before || 'origin/main' }}
+        run: script/ci-required-diff-base
 
       - name: Enforce hosted CI for generator changes
         env:

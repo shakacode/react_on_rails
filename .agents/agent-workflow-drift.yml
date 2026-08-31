@@ -118,9 +118,10 @@ files:
 - source: skills/pr-batch/bin/dispatcher-capability-preflight-test.rb
   consumer: ".agents/skills/pr-batch/bin/dispatcher-capability-preflight-test.rb"
   mode: identical
-# Count disposition: the pull request 182 pin alone would classify these two files
-# as identical. Retaining the merged pull request 198 cancellation guardrail
-# honestly reclassifies them as overlays, yielding 26 identical and 16 overlays.
+# Count disposition: the pull request 182 pin alone would classify these four files
+# as identical. Retaining the merged pull request 198 cancellation guardrail and
+# pull request 270 canonical bot resolution honestly reclassifies them as overlays,
+# yielding 24 identical and 18 overlays.
 - source: skills/pr-batch/bin/pr-ci-readiness
   consumer: ".agents/skills/pr-batch/bin/pr-ci-readiness"
   mode: overlay
@@ -139,10 +140,20 @@ files:
   consumer_sha256: c4d8ef00f739e307054d2298629a971efa916ed148b432c4ddf6a071505219d8
 - source: skills/pr-batch/bin/pr-security-preflight
   consumer: ".agents/skills/pr-batch/bin/pr-security-preflight"
-  mode: identical
+  mode: overlay
+  reason: React on Rails keeps merged agent-workflows pull requests 201 trust-config provenance
+    and 270 canonical-node bot identity resolution ahead of the global source pin.
+  consumer_mode: '100755'
+  source_sha256: 9853bc0f8e0ae512ad54a3bc926c7ee871c3878590717f623fe269a1acaf0da0
+  consumer_sha256: 0f2dd2e81899a04f7b3a0a5dcf8dd90e4b7a4b5a6e8cccbf521ec64f5e1bbcc8
 - source: skills/pr-batch/bin/pr-security-preflight-test.rb
   consumer: ".agents/skills/pr-batch/bin/pr-security-preflight-test.rb"
-  mode: identical
+  mode: overlay
+  reason: React on Rails keeps merged agent-workflows pull requests 201 trust-config provenance
+    and 270 canonical-node bot identity regression coverage ahead of the global source pin.
+  consumer_mode: '100755'
+  source_sha256: e0e4978e46030c9a91bfafde07a7837d1b6e72beb970ac1654e2d9236cbe1c19
+  consumer_sha256: b8753b6f9a19e86cfae1a2ebacc3e6d971f9f30a1420875eff92f166a3920396
 - source: skills/pr-batch/lib/git_probe_env.rb
   consumer: ".agents/skills/pr-batch/lib/git_probe_env.rb"
   mode: identical

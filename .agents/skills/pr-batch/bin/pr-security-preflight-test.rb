@@ -35,6 +35,7 @@ class PrSecurityPreflightTest < Minitest::Test
       )
 
       assert status.success?, out
+      assert_trust_config_evidence(out, path: global_config, source: "env")
       assert_includes out, "SECURITY_PREFLIGHT_OK"
       refute_includes out, "SECURITY_PREFLIGHT_BLOCKED"
     end
@@ -1097,6 +1098,7 @@ class PrSecurityPreflightTest < Minitest::Test
       )
 
       refute status.success?, out
+      assert_trust_config_evidence(out, path: explicit_config, source: "explicit")
       assert_includes out, "SECURITY_PREFLIGHT_BLOCKED"
       assert_includes out, "not in trusted actor allowlist"
     end
@@ -1182,6 +1184,7 @@ class PrSecurityPreflightTest < Minitest::Test
       )
 
       assert status.success?, out
+      assert_trust_config_evidence(out, path: File.realpath(repo_config), source: "repo-local")
       assert_includes out, "SECURITY_PREFLIGHT_OK"
       refute_includes out, "SECURITY_PREFLIGHT_BLOCKED"
     end
@@ -1294,6 +1297,7 @@ class PrSecurityPreflightTest < Minitest::Test
       )
 
       assert status.success?, out
+      assert_trust_config_evidence(out, path: home_config, source: "user-global")
       assert_includes out, "SECURITY_PREFLIGHT_OK"
       refute_includes out, "SECURITY_PREFLIGHT_BLOCKED"
     end
@@ -1315,6 +1319,11 @@ class PrSecurityPreflightTest < Minitest::Test
       )
 
       refute status.success?, out
+      assert_trust_config_evidence(
+        out,
+        path: File.expand_path("../trusted-github-actors.yml", __dir__),
+        source: "packaged-fallback"
+      )
       assert_includes out, "SECURITY_PREFLIGHT_BLOCKED"
       assert_includes out, "not in trusted actor allowlist"
     end
@@ -2048,12 +2057,39 @@ class PrSecurityPreflightTest < Minitest::Test
     end
   end
 
-  def test_human_login_matching_bot_base_name_is_not_trusted_as_bot
-    with_fake_gh("human-bot-basename-participant") do |env, trust_config_path, _log_path|
+  def test_bare_bot_alias_resolves_canonical_bot_identity
+    with_fake_gh("canonical-bare-bot-alias-participant") do |env, trust_config_path, _log_path|
       File.write(trust_config_path, <<~YAML)
         trusted_users: []
         trusted_bots:
-          - claude
+          - copilot
+          - copilot-pull-request-reviewer
+        trusted_teams: []
+      YAML
+
+      out, status = run_script(
+        env,
+        "--repo",
+        "owner/repo",
+        "--trust-config",
+        trust_config_path,
+        "--strict-trust",
+        "123"
+      )
+
+      assert status.success?, out
+      assert_includes out, "SECURITY_PREFLIGHT_OK"
+      assert_includes out, "Untrusted or hidden participant findings: none"
+    end
+  end
+
+  def test_bare_bot_alias_rejects_mismatched_canonical_bot_identity
+    with_fake_gh("canonical-bot-mismatch-participant") do |env, trust_config_path, _log_path|
+      File.write(trust_config_path, <<~YAML)
+        trusted_users: []
+        trusted_bots:
+          - copilot
+          - copilot-pull-request-reviewer
         trusted_teams: []
       YAML
 
@@ -2070,8 +2106,150 @@ class PrSecurityPreflightTest < Minitest::Test
       refute status.success?, out
       assert_equal 2, status.exitstatus
       assert_includes out, "SECURITY_PREFLIGHT_BLOCKED"
-      assert_includes out, "claude: no visible comment/review/commit/reaction trail"
+      assert_includes out, "Copilot: no visible comment/review/commit/reaction trail"
       assert_includes out, "not in trusted actor allowlist"
+    end
+  end
+
+  def test_bare_bot_alias_fails_closed_when_canonical_lookup_fails
+    with_fake_gh("canonical-bot-query-failure-participant") do |env, trust_config_path, _log_path|
+      File.write(trust_config_path, <<~YAML)
+        trusted_users: []
+        trusted_bots:
+          - copilot
+          - copilot-pull-request-reviewer
+        trusted_teams: []
+      YAML
+
+      out, status = run_script(
+        env,
+        "--repo",
+        "owner/repo",
+        "--trust-config",
+        trust_config_path,
+        "--strict-trust",
+        "123"
+      )
+
+      refute status.success?, out
+      assert_equal 2, status.exitstatus
+      assert_includes out, "WARN: could not resolve canonical bot identity for node BOT_kgDOCnlnWA"
+      assert_includes out, "SECURITY_PREFLIGHT_BLOCKED"
+      assert_includes out, "Copilot: no visible comment/review/commit/reaction trail"
+      assert_includes out, "not in trusted actor allowlist"
+    end
+  end
+
+  def test_bare_bot_alias_without_node_id_fails_closed_without_lookup
+    with_fake_gh("bare-bot-missing-id-participant") do |env, trust_config_path, log_path|
+      File.write(trust_config_path, <<~YAML)
+        trusted_users: []
+        trusted_bots:
+          - copilot
+          - copilot-pull-request-reviewer
+        trusted_teams: []
+      YAML
+
+      out, status = run_script(
+        env,
+        "--repo",
+        "owner/repo",
+        "--trust-config",
+        trust_config_path,
+        "--strict-trust",
+        "123"
+      )
+
+      refute status.success?, out
+      assert_equal 2, status.exitstatus
+      assert_includes out, "SECURITY_PREFLIGHT_BLOCKED"
+      assert_includes out, "Copilot: no visible comment/review/commit/reaction trail"
+      assert_equal 0, canonical_bot_query_call_count(log_path)
+    end
+  end
+
+  def test_bare_bot_aliases_share_canonical_node_cache
+    with_fake_gh("cached-bare-bot-alias-participants") do |env, trust_config_path, log_path|
+      File.write(trust_config_path, <<~YAML)
+        trusted_users: []
+        trusted_bots:
+          - copilot
+          - copilot-alias
+          - copilot-pull-request-reviewer
+        trusted_teams: []
+      YAML
+
+      out, status = run_script(
+        env,
+        "--repo",
+        "owner/repo",
+        "--trust-config",
+        trust_config_path,
+        "--strict-trust",
+        "123"
+      )
+
+      assert status.success?, out
+      assert_includes out, "SECURITY_PREFLIGHT_OK"
+      assert_includes out, "Untrusted or hidden participant findings: none"
+      assert_equal 1, canonical_bot_query_call_count(log_path)
+    end
+  end
+
+  def test_human_login_matching_bot_base_name_is_not_trusted_as_bot
+    with_fake_gh("human-bot-basename-participant") do |env, trust_config_path, log_path|
+      File.write(trust_config_path, <<~YAML)
+        trusted_users: []
+        trusted_bots:
+          - copilot
+        trusted_teams: []
+      YAML
+
+      out, status = run_script(
+        env,
+        "--repo",
+        "owner/repo",
+        "--trust-config",
+        trust_config_path,
+        "--strict-trust",
+        "123"
+      )
+
+      refute status.success?, out
+      assert_equal 2, status.exitstatus
+      assert_includes out, "SECURITY_PREFLIGHT_BLOCKED"
+      assert_includes out, "Copilot: no visible comment/review/commit/reaction trail"
+      assert_includes out, "not in trusted actor allowlist"
+      assert_equal 1, canonical_bot_query_call_count(log_path)
+    end
+  end
+
+  def test_blank_trusted_bot_entry_does_not_trust_human_canonical_node
+    with_fake_gh("human-bot-basename-participant") do |env, trust_config_path, log_path|
+      File.write(trust_config_path, <<~YAML)
+        trusted_users: []
+        trusted_bots:
+          - copilot
+          - null
+        trusted_teams: []
+      YAML
+
+      out, status = run_script(
+        env,
+        "--repo",
+        "owner/repo",
+        "--trust-config",
+        trust_config_path,
+        "--strict-trust",
+        "123"
+      )
+
+      refute status.success?, out
+      assert_equal 2, status.exitstatus
+      assert_includes out, "SECURITY_PREFLIGHT_BLOCKED"
+      assert_includes out, "Copilot: no visible comment/review/commit/reaction trail"
+      assert_includes out, "not in trusted actor allowlist"
+      assert_equal 1, canonical_bot_query_call_count(log_path)
     end
   end
 
@@ -2287,6 +2465,12 @@ class PrSecurityPreflightTest < Minitest::Test
 
   private
 
+  def assert_trust_config_evidence(out, path:, source:)
+    lines = out.lines.map(&:chomp)
+    assert_includes lines, "Trust config: #{File.expand_path(path)}"
+    assert_includes lines, "Trust config source: #{source}"
+  end
+
   def run_script(env, *args, chdir: nil, clear_git_env: true)
     options = {}
     options[:chdir] = chdir if chdir
@@ -2383,6 +2567,10 @@ class PrSecurityPreflightTest < Minitest::Test
 
   def graphql_call_count(log_path)
     File.readlines(log_path).count { |line| line.start_with?("api graphql") }
+  end
+
+  def canonical_bot_query_call_count(log_path)
+    File.readlines(log_path).count { |line| line.include?("query CanonicalBot") }
   end
 
   def fake_gh_script(log_path)
@@ -2515,7 +2703,11 @@ class PrSecurityPreflightTest < Minitest::Test
 
       mode_uses_issue_author_payload() {
         case "$1" in
-          reaction-only-participant|trusted-hidden-participant|trusted-bot-participant|human-bot-basename-participant|\
+          reaction-only-participant|trusted-hidden-participant|trusted-bot-participant|\
+          canonical-bare-bot-alias-participant|canonical-bot-mismatch-participant|\
+          canonical-bot-query-failure-participant|\
+          bare-bot-missing-id-participant|cached-bare-bot-alias-participants|\
+          human-bot-basename-participant|\
           paginated-timeline|paginated-timeline-missing-page-info|paginated-timeline-page-fetch-failure|\
           paginated-timeline-cursor-cycle|paginated-timeline-partial-error|paginated-participants)
             return 0
@@ -2618,6 +2810,27 @@ class PrSecurityPreflightTest < Minitest::Test
       {"data":{"repository":{"issue":{"number":${number},"title":"Maintainer target ${number}","url":"https://github.com/acme/widgets/issues/${number}","author":{"login":"maintainer-login"},"participants":{"totalCount":1,"pageInfo":{"hasNextPage":false},"nodes":[{"login":"maintainer-login","url":"https://github.com/maintainer-login","__typename":"User"}]},"timelineItems":{"totalCount":1,"pageInfo":{"hasNextPage":false},"nodes":[{"__typename":"IssueComment","author":{"login":"maintainer-login"}}]}}}}}
       JSON
             exit 0
+          fi
+        elif [[ "$*" == *"query CanonicalBot"* ]]; then
+          if [ "$mode" = "canonical-bare-bot-alias-participant" ] ||
+             [ "$mode" = "cached-bare-bot-alias-participants" ]; then
+            cat <<'JSON'
+      {"data":{"node":{"id":"BOT_kgDOCnlnWA","__typename":"Bot","login":"copilot-pull-request-reviewer"}}}
+      JSON
+          elif [ "$mode" = "canonical-bot-mismatch-participant" ]; then
+            cat <<'JSON'
+      {"data":{"node":{"id":"BOT_kgDOCnlnWA","__typename":"Bot","login":"other-reviewer"}}}
+      JSON
+          elif [ "$mode" = "canonical-bot-query-failure-participant" ]; then
+            printf 'simulated canonical node lookup failure\\n' >&2
+            exit 1
+          elif [ "$mode" = "human-bot-basename-participant" ]; then
+            cat <<'JSON'
+      {"data":{"node":{"id":"U_kgDOCnlnWA","__typename":"User"}}}
+      JSON
+          else
+            printf 'unexpected canonical bot lookup for mode: %s\\n' "$mode" >&2
+            exit 1
           fi
         elif [[ "$*" == *"reviewThreads"* ]]; then
           if [ "$mode" = "resolved-trusted-bot-review-comment" ] || [ "$mode" = "resolved-metadata-bot-warning-review-comment" ]; then
@@ -2747,9 +2960,23 @@ class PrSecurityPreflightTest < Minitest::Test
           cat <<'JSON'
       {"data":{"repository":{"issue":{"number":123,"title":"Test issue","url":"https://github.com/owner/repo/issues/123","author":{"login":"issue-author"},"participants":{"totalCount":1,"pageInfo":{"hasNextPage":false},"nodes":[{"login":"coderabbitai[bot]","url":"https://github.com/apps/coderabbitai","__typename":"Bot"}]},"timelineItems":{"totalCount":0,"pageInfo":{"hasNextPage":false},"nodes":[]}}}}}
       JSON
+        elif [ "$mode" = "canonical-bare-bot-alias-participant" ] ||
+             [ "$mode" = "canonical-bot-mismatch-participant" ] ||
+             [ "$mode" = "canonical-bot-query-failure-participant" ]; then
+          cat <<'JSON'
+      {"data":{"repository":{"issue":{"number":123,"title":"Test issue","url":"https://github.com/owner/repo/issues/123","author":{"login":"issue-author"},"participants":{"totalCount":1,"pageInfo":{"hasNextPage":false},"nodes":[{"id":"BOT_kgDOCnlnWA","login":"Copilot","url":"https://github.com/apps/github-copilot-code-review","__typename":"User"}]},"timelineItems":{"totalCount":0,"pageInfo":{"hasNextPage":false},"nodes":[]}}}}}
+      JSON
+        elif [ "$mode" = "bare-bot-missing-id-participant" ]; then
+          cat <<'JSON'
+      {"data":{"repository":{"issue":{"number":123,"title":"Test issue","url":"https://github.com/owner/repo/issues/123","author":{"login":"issue-author"},"participants":{"totalCount":1,"pageInfo":{"hasNextPage":false},"nodes":[{"login":"Copilot","url":"https://github.com/apps/github-copilot-code-review","__typename":"User"}]},"timelineItems":{"totalCount":0,"pageInfo":{"hasNextPage":false},"nodes":[]}}}}}
+      JSON
+        elif [ "$mode" = "cached-bare-bot-alias-participants" ]; then
+          cat <<'JSON'
+      {"data":{"repository":{"issue":{"number":123,"title":"Test issue","url":"https://github.com/owner/repo/issues/123","author":{"login":"issue-author"},"participants":{"totalCount":2,"pageInfo":{"hasNextPage":false},"nodes":[{"id":"BOT_kgDOCnlnWA","login":"Copilot","url":"https://github.com/apps/github-copilot-code-review","__typename":"User"},{"id":"BOT_kgDOCnlnWA","login":"Copilot-Alias","url":"https://github.com/apps/github-copilot-code-review","__typename":"User"}]},"timelineItems":{"totalCount":0,"pageInfo":{"hasNextPage":false},"nodes":[]}}}}}
+      JSON
         elif [ "$mode" = "human-bot-basename-participant" ]; then
           cat <<'JSON'
-      {"data":{"repository":{"issue":{"number":123,"title":"Test issue","url":"https://github.com/owner/repo/issues/123","author":{"login":"issue-author"},"participants":{"totalCount":1,"pageInfo":{"hasNextPage":false},"nodes":[{"login":"claude","url":"https://github.com/claude","__typename":"User"}]},"timelineItems":{"totalCount":0,"pageInfo":{"hasNextPage":false},"nodes":[]}}}}}
+      {"data":{"repository":{"issue":{"number":123,"title":"Test issue","url":"https://github.com/owner/repo/issues/123","author":{"login":"issue-author"},"participants":{"totalCount":1,"pageInfo":{"hasNextPage":false},"nodes":[{"id":"U_kgDOCnlnWA","login":"Copilot","url":"https://github.com/Copilot","__typename":"User"}]},"timelineItems":{"totalCount":0,"pageInfo":{"hasNextPage":false},"nodes":[]}}}}}
       JSON
         elif [ "$mode" = "metadata-bot-comment" ]; then
           cat <<'JSON'

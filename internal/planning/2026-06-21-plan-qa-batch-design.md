@@ -511,10 +511,9 @@ readiness) differ enough that overloading `pr-batch` would muddy both.
   only, no automated gate) and must say so in every handoff. A later iteration can
   add the field to `agent-coord` or use a surrogate such as a dedicated GitHub
   status/check.
-- **Mislocated existing specs (separate task).** Three design docs sit under
-  public `docs/superpowers/specs/`; by the "`docs/` is public, internal design
-  goes to `internal/planning/`" rule they should move. Out of scope for this
-  work — handle in a separate PR.
+- **Mislocated existing specs.** Three design docs formerly sat under the public
+  documentation tree; by the "`docs/` is public, internal design goes to
+  `internal/planning/`" rule they moved to `internal/planning/`.
 - **Canonical home.** This planning artifact is useful in this repository because
   it ties QA labels to React on Rails release readiness, but the reusable
   `plan-qa-batch` / `qa-batch` skill implementation may belong in

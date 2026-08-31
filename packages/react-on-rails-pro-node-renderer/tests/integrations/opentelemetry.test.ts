@@ -26,6 +26,7 @@ import * as errorReporter from '../../src/shared/errorReporter';
 import {
   trace,
   subSpan,
+  setupSubSpan,
   setupTracing,
   startSsrRequestOptions,
   __resetSubSpanForTest,
@@ -50,10 +51,29 @@ disableHttp2();
 
 describe('opentelemetry integration: init()', () => {
   let exporter: InMemorySpanExporter;
+  let originalServiceName: string | undefined;
+  let originalResourceAttributes: string | undefined;
 
   beforeEach(async () => {
+    originalServiceName = process.env.OTEL_SERVICE_NAME;
+    originalResourceAttributes = process.env.OTEL_RESOURCE_ATTRIBUTES;
+    delete process.env.OTEL_SERVICE_NAME;
+    delete process.env.OTEL_RESOURCE_ATTRIBUTES;
     exporter = new InMemorySpanExporter();
     await resetOpenTelemetryForTest();
+  });
+
+  afterEach(() => {
+    if (originalServiceName === undefined) {
+      delete process.env.OTEL_SERVICE_NAME;
+    } else {
+      process.env.OTEL_SERVICE_NAME = originalServiceName;
+    }
+    if (originalResourceAttributes === undefined) {
+      delete process.env.OTEL_RESOURCE_ATTRIBUTES;
+    } else {
+      process.env.OTEL_RESOURCE_ATTRIBUTES = originalResourceAttributes;
+    }
   });
 
   afterAll(async () => {
@@ -378,6 +398,24 @@ describe('opentelemetry integration: tracing wiring', () => {
     }
   });
 
+  test('managed init preserves root tracing when another sub-span integration is active', async () => {
+    const existingSubSpan = jest.fn((_opts, fn) => fn({ setAttributes() {} }));
+    expect(setupSubSpan(existingSubSpan)).toBe(true);
+
+    init({
+      tracing: true,
+      spanProcessor: new SimpleSpanProcessor(exporter),
+    });
+
+    await trace(
+      () => subSpan({ name: 'foreign.child' }, async () => 'ok'),
+      startSsrRequestOptions({ renderingRequest: 'irrelevant' }),
+    );
+
+    expect(exporter.getFinishedSpans().map((span) => span.name)).toEqual(['ror.ssr.request']);
+    expect(existingSubSpan).toHaveBeenCalledTimes(1);
+  });
+
   test('subSpan does not leak renderingRequest payload into span attributes (sensitive data audit)', async () => {
     init({
       tracing: true,
@@ -433,6 +471,25 @@ describe('opentelemetry integration: end-to-end render request', () => {
     type: 'asset',
   });
 
+  const renderColdStart = async () => {
+    await createUploadedBundle(testName);
+
+    return trace(
+      () =>
+        handleRenderRequest({
+          renderingRequest: 'ReactOnRails.dummy',
+          bundleTimestamp: BUNDLE_TIMESTAMP,
+          providedNewBundles: [
+            {
+              bundle: uploadedBundleForTest(),
+              timestamp: BUNDLE_TIMESTAMP,
+            },
+          ],
+        }),
+      startSsrRequestOptions({ renderingRequest: 'ReactOnRails.dummy' }),
+    );
+  };
+
   beforeEach(async () => {
     exporter = new InMemorySpanExporter();
     __resetSubSpanForTest();
@@ -449,34 +506,19 @@ describe('opentelemetry integration: end-to-end render request', () => {
     await resetForTest(testName);
   });
 
-  test('cache-miss probe labels intent instead of reporting cache.hit=true on the error span', async () => {
+  test('cache-miss probe and build label intent without reporting cache.hit', async () => {
     init({
       tracing: true,
       spanProcessor: new SimpleSpanProcessor(exporter),
     });
 
-    await createUploadedBundle(testName);
-
-    await trace(
-      async () => {
-        const result = await handleRenderRequest({
-          renderingRequest: 'ReactOnRails.dummy',
-          bundleTimestamp: BUNDLE_TIMESTAMP,
-          providedNewBundles: [
-            {
-              bundle: uploadedBundleForTest(),
-              timestamp: BUNDLE_TIMESTAMP,
-            },
-          ],
-        });
-        expect(result.response.status).toBe(200);
-      },
-      startSsrRequestOptions({ renderingRequest: 'ReactOnRails.dummy' }),
-    );
+    const result = await renderColdStart();
+    expect(result.response.status).toBe(200);
 
     const spans = exporter.getFinishedSpans();
     const cacheMissProbeSpan = spans.find(
-      (s) => s.name === 'ror.bundle.build_execution_context' && s.status.code === 2,
+      (s) =>
+        s.name === 'ror.bundle.build_execution_context' && s.attributes['cache.strategy'] === 'cache-first',
     );
     const cacheMissBuildSpan = spans.find(
       (s) =>
@@ -484,10 +526,22 @@ describe('opentelemetry integration: end-to-end render request', () => {
     );
 
     expect(cacheMissProbeSpan).toBeDefined();
-    expect(cacheMissProbeSpan!.attributes['cache.strategy']).toBe('cache-first');
+    expect(cacheMissProbeSpan!.status.code).not.toBe(2);
     expect(cacheMissProbeSpan!.attributes).not.toHaveProperty('cache.hit');
     expect(cacheMissBuildSpan).toBeDefined();
     expect(cacheMissBuildSpan!.attributes).not.toHaveProperty('cache.hit');
+  });
+
+  test('cold-start render succeeds without error spans', async () => {
+    init({
+      tracing: true,
+      spanProcessor: new SimpleSpanProcessor(exporter),
+    });
+
+    const result = await renderColdStart();
+
+    expect(result.response.status).toBe(200);
+    expect(exporter.getFinishedSpans().filter((span) => span.status.code === 2)).toHaveLength(0);
   });
 
   test('invalid incremental update chunks do not create process_chunk error spans', async () => {
