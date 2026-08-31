@@ -9354,7 +9354,14 @@ def abort_npm_release_readiness!(reason, recovery:)
   ERROR
 end
 
-def declared_pnpm_release_version!(monorepo_root:)
+def supervised_release_retry_command(dry_run:, evaluate_head:)
+  command = ["script/release"]
+  command << "--dry-run" if dry_run
+  command << "--evaluate-head" if evaluate_head
+  command.join(" ")
+end
+
+def declared_pnpm_release_version!(monorepo_root:, retry_command: "script/release")
   package_json = JSON.parse(File.read(File.join(monorepo_root, "package.json")))
   package_manager = package_json["packageManager"]
   match = package_manager.to_s.match(/\Apnpm@(?<version>\d+\.\d+\.\d+)(?:\+sha512\.[0-9a-f]+)?\z/i)
@@ -9365,7 +9372,7 @@ def declared_pnpm_release_version!(monorepo_root:)
     recovery: <<~RECOVERY.strip
       Restore an exact pnpm@X.Y.Z pin in the root packageManager field.
       Then retry:
-        script/release
+        #{retry_command}
     RECOVERY
   )
 rescue Errno::ENOENT, JSON::ParserError => e
@@ -9374,12 +9381,12 @@ rescue Errno::ENOENT, JSON::ParserError => e
     recovery: <<~RECOVERY.strip
       Restore a readable root package.json with a valid exact packageManager pin.
       Then retry:
-        script/release
+        #{retry_command}
     RECOVERY
   )
 end
 
-def capture_npm_release_readiness_command(monorepo_root, *command)
+def capture_npm_release_readiness_command(monorepo_root, *command, retry_command: "script/release")
   Open3.capture2e(*command, chdir: monorepo_root)
 rescue StandardError => e
   abort_npm_release_readiness!(
@@ -9387,19 +9394,19 @@ rescue StandardError => e
     recovery: <<~RECOVERY.strip
       Restore the repository-declared pnpm command on PATH.
       Then retry:
-        script/release
+        #{retry_command}
     RECOVERY
   )
 end
 
-def abort_stale_npm_release_dependencies!
+def abort_stale_npm_release_dependencies!(retry_command: "script/release")
   abort_npm_release_readiness!(
     "installed dependency state is missing or stale",
     recovery: <<~RECOVERY.strip
       Required recovery:
         pnpm install --frozen-lockfile
       Then retry:
-        script/release
+        #{retry_command}
 
       Optional broader environment refresh (not required for this failure):
         bin/setup
@@ -9407,68 +9414,71 @@ def abort_stale_npm_release_dependencies!
   )
 end
 
-def abort_pnpm_release_version_mismatch!(installed_version:, declared_version:)
+def abort_pnpm_release_version_mismatch!(installed_version:, declared_version:, retry_command: "script/release")
   abort_npm_release_readiness!(
     "installed pnpm version #{installed_version.inspect} does not match packageManager #{declared_version.inspect}",
     recovery: <<~RECOVERY.strip
       Activate pnpm #{declared_version} declared by the root packageManager, then verify:
         pnpm --version
       Then retry:
-        script/release
+        #{retry_command}
     RECOVERY
   )
 end
 
-def abort_pnpm_release_version_probe_failure!(output:)
+def abort_pnpm_release_version_probe_failure!(output:, retry_command: "script/release")
   abort_npm_release_readiness!(
     "pnpm --version failed\n\n#{output.to_s.strip}",
     recovery: <<~RECOVERY.strip
       Restore the repository-declared pnpm command on PATH, then verify:
         pnpm --version
       Then retry:
-        script/release
+        #{retry_command}
     RECOVERY
   )
 end
 
-def abort_npm_release_package_build!(package_name:, output:)
+def abort_npm_release_package_build!(package_name:, output:, retry_command: "script/release")
   abort_npm_release_readiness!(
     "#{package_name} build failed\n\n#{output.to_s.strip}",
     recovery: <<~RECOVERY.strip
       Fix the package build failure, then verify:
         pnpm --filter #{package_name} run build
       Then retry:
-        script/release
+        #{retry_command}
     RECOVERY
   )
 end
 
-def validate_npm_release_readiness!(monorepo_root:)
-  declared_pnpm_version = declared_pnpm_release_version!(monorepo_root:)
+def validate_npm_release_readiness!(monorepo_root:, retry_command: "script/release")
+  declared_pnpm_version = declared_pnpm_release_version!(monorepo_root:, retry_command:)
   workspace_lock = File.join(monorepo_root, "pnpm-lock.yaml")
   installed_lock = File.join(monorepo_root, "node_modules", ".pnpm", "lock.yaml")
   dependency_state_ready = File.file?(workspace_lock) && File.file?(installed_lock) &&
                            File.binread(workspace_lock) == File.binread(installed_lock)
-  abort_stale_npm_release_dependencies! unless dependency_state_ready
+  abort_stale_npm_release_dependencies!(retry_command:) unless dependency_state_ready
 
-  version_output, version_status = capture_npm_release_readiness_command(monorepo_root, "pnpm", "--version")
+  version_output, version_status = capture_npm_release_readiness_command(
+    monorepo_root, "pnpm", "--version", retry_command:
+  )
   installed_pnpm_version = version_output.to_s.strip
-  abort_pnpm_release_version_probe_failure!(output: version_output) unless version_status.success?
+  abort_pnpm_release_version_probe_failure!(output: version_output, retry_command:) unless version_status.success?
 
   unless installed_pnpm_version == declared_pnpm_version
     abort_pnpm_release_version_mismatch!(
       installed_version: installed_pnpm_version,
-      declared_version: declared_pnpm_version
+      declared_version: declared_pnpm_version,
+      retry_command:
     )
   end
 
   NPM_RELEASE_PACKAGE_NAMES.each do |package_name|
     output, status = capture_npm_release_readiness_command(
-      monorepo_root, "pnpm", "--filter", package_name, "run", "build"
+      monorepo_root, "pnpm", "--filter", package_name, "run", "build", retry_command:
     )
     next if status.success?
 
-    abort_npm_release_package_build!(package_name:, output:)
+    abort_npm_release_package_build!(package_name:, output:, retry_command:)
   end
 
   puts "✓ npm release packages are ready to publish"
@@ -9481,14 +9491,14 @@ def current_npm_release_readiness_sha!(monorepo_root:, context:)
   abort "❌ Unable to bind npm release readiness to an exact git SHA before #{context}."
 end
 
-def refresh_npm_release_readiness_after_pull!(monorepo_root:, readiness_sha:)
+def refresh_npm_release_readiness_after_pull!(monorepo_root:, readiness_sha:, retry_command: "script/release")
   post_pull_sha = current_npm_release_readiness_sha!(
     monorepo_root:,
     context: "post-pull npm release readiness verification"
   )
   return readiness_sha if post_pull_sha == readiness_sha
 
-  validate_npm_release_readiness!(monorepo_root:)
+  validate_npm_release_readiness!(monorepo_root:, retry_command:)
   validated_sha = current_npm_release_readiness_sha!(
     monorepo_root:,
     context: "post-pull npm release readiness binding"
@@ -10158,6 +10168,10 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
   args_hash = args.to_hash
 
   is_dry_run = release_truthy?(args_hash[:dry_run])
+  release_retry_command = supervised_release_retry_command(
+    dry_run: is_dry_run,
+    evaluate_head: ci_evaluate_head_only?
+  )
   activate_release_lease_guard!(dry_run: is_dry_run)
   is_verbose = ENV["VERBOSE"] == "1"
   allow_version_policy_override = version_policy_override_enabled?(args_hash[:override_version_policy])
@@ -10183,7 +10197,7 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
     monorepo_root:,
     context: "initial npm release readiness verification"
   )
-  validate_npm_release_readiness!(monorepo_root:)
+  validate_npm_release_readiness!(monorepo_root:, retry_command: release_retry_command)
   validated_readiness_sha = current_npm_release_readiness_sha!(
     monorepo_root:,
     context: "initial npm release readiness binding"
@@ -10210,7 +10224,8 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
       sh_in_dir_for_release(release_root, "git pull --rebase")
       npm_readiness_sha = refresh_npm_release_readiness_after_pull!(
         monorepo_root: release_root,
-        readiness_sha: npm_readiness_sha
+        readiness_sha: npm_readiness_sha,
+        retry_command: release_retry_command
       )
     end
 
