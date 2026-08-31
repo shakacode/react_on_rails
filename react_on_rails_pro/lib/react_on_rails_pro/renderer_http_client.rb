@@ -21,8 +21,10 @@ require "pathname"
 require "protocol/http/body/readable"
 require "protocol/http/body/writable"
 require "protocol/http/headers"
+require "protocol/http1"
 require "securerandom"
 require "uri"
+require_relative "open_telemetry"
 
 module ReactOnRailsPro
   class RendererHttpClient # rubocop:disable Metrics/ClassLength
@@ -50,11 +52,12 @@ module ReactOnRailsPro
       Errno::ENETUNREACH,
       Errno::EPIPE,
       Errno::ETIMEDOUT,
-      Protocol::HTTP::RefusedError,
-      # Treat HTTP/2 stream resets as transport failures because the renderer can
-      # abort streams without a usable HTTP response for Request/StreamRequest.
-      Protocol::HTTP2::StreamError
+      Protocol::HTTP::RefusedError
     ].freeze
+
+    def self.transport_config_description
+      "renderer_http_force_http2 = #{ReactOnRailsPro.configuration.renderer_http_force_http2}"
+    end
 
     # Per-scheduler storage for persistent HTTP clients. When an outer Fiber.scheduler
     # exists BEFORE we enter `Sync {}`, clients are stored on the scheduler object using
@@ -123,6 +126,14 @@ module ReactOnRailsPro
         @io&.close if @owns_io && @io && !@io.closed?
       end
 
+      def bytesize
+        return @body.size if @body.is_a?(Pathname)
+        return unless @body.respond_to?(:size)
+
+        position = @body.respond_to?(:pos) ? @body.pos : 0
+        @body.size - position
+      end
+
       private
 
       def opened_io
@@ -173,7 +184,53 @@ module ReactOnRailsPro
         @chunks[@index..]&.each { |chunk| chunk.close if chunk.respond_to?(:close) }
         super
       end
+
+      def bytesize
+        total = 0
+        index = 0
+        while index < @chunks.length
+          chunk = @chunks[index]
+          chunk_size = chunk.respond_to?(:bytesize) ? chunk.bytesize : nil
+          return unless chunk_size.is_a?(Integer)
+
+          total += chunk_size
+          index += 1
+        end
+        total
+      end
     end
+
+    class WritableBody < Protocol::HTTP::Body::Writable
+      attr_reader :bytesize
+
+      def initialize
+        super
+        @bytesize = 0
+        @trace = nil
+        @write_closed = false
+      end
+
+      def write(chunk)
+        result = super
+        @bytesize += chunk.bytesize
+        result
+      end
+
+      def trace=(trace)
+        @trace = trace
+        trace.wait_for_request_close
+        trace.request_body = self
+        trace.seal_request_size if @write_closed
+      end
+
+      def close_write(...)
+        super
+      ensure
+        @write_closed = true
+        @trace&.seal_request_size
+      end
+    end
+    private_constant :WritableBody
 
     class PersistentThreadClient
       ResponseEnvelope = Struct.new(:status, :body, :headers)
@@ -560,35 +617,42 @@ module ReactOnRailsPro
     def post(path, form: nil, json: nil, raw: nil, stream: false)
       ensure_open!
       headers, body = request_body(form:, json:, raw:)
+      parent_context = ReactOnRailsPro::OpenTelemetry.capture_context
       build_response(stream:) do |yielder, status_assigner, headers_assigner|
-        execute_request(:post, path, [headers, body],
-                        stream:,
-                        response_handlers: [yielder, status_assigner, headers_assigner])
+        execute_request_with_trace(:post, path, [headers, body],
+                                   stream:,
+                                   response_handlers: [yielder, status_assigner, headers_assigner],
+                                   parent_context:)
       end
     end
 
     def get(path)
       ensure_open!
+      headers = []
+      parent_context = ReactOnRailsPro::OpenTelemetry.capture_context
       build_response(stream: false) do |yielder, status_assigner, headers_assigner|
-        execute_request(:get, path, [[], nil],
-                        stream: false,
-                        response_handlers: [yielder, status_assigner, headers_assigner])
+        execute_request_with_trace(:get, path, [headers, nil],
+                                   stream: false,
+                                   response_handlers: [yielder, status_assigner, headers_assigner],
+                                   parent_context:)
       end
     end
 
-    # Bidirectional HTTP/2 streaming POST. Returns [output, response] where:
+    # Bidirectional streaming POST. Returns [output, response] where:
     # - output is a Protocol::HTTP::Body::Writable::Output (supports << and close)
     # - response is a lazy Response whose body is consumed via Response#each
     #
     # The caller writes NDJSON lines to output while concurrently reading response
-    # chunks. Calling output.close sends END_STREAM on the HTTP/2 stream.
+    # chunks. Calling output.close signals request-body EOF to the selected transport.
     def post_bidi(path, headers:)
       ensure_open!
-      writable = Protocol::HTTP::Body::Writable.new
+      writable = WritableBody.new
+      parent_context = ReactOnRailsPro::OpenTelemetry.capture_context
       response = build_response(stream: true) do |yielder, status_assigner, headers_assigner|
-        execute_request(:post, path, [headers, writable],
-                        stream: true,
-                        response_handlers: [yielder, status_assigner, headers_assigner])
+        execute_request_with_trace(:post, path, [headers, writable],
+                                   stream: true,
+                                   response_handlers: [yielder, status_assigner, headers_assigner],
+                                   parent_context:)
       end
       [writable.output, response]
     end
@@ -663,7 +727,7 @@ module ReactOnRailsPro
       raise ConnectionError, "renderer HTTP client is closed" if @closed
     end
 
-    def execute_request(method, path, request_body, stream:, response_handlers:)
+    def execute_request(method, path, request_body, stream:, response_handlers:, trace: nil)
       headers, body = request_body
       yielder, status_assigner, headers_assigner = response_handlers
 
@@ -681,14 +745,52 @@ module ReactOnRailsPro
                          end
 
           status_assigner.call(raw_response.status)
+          trace&.record_response(raw_response.status)
           headers_assigner&.call(response_headers(raw_response))
-          stream_body(raw_response, yielder)
+          stream_body(raw_response, yielder, trace:)
         end
       end
     rescue Async::TimeoutError, IO::TimeoutError => e
       raise TimeoutError, e.message
     rescue *CONNECTION_ERRORS => e
       raise ConnectionError, e.message
+    rescue Protocol::HTTP2::Error => e
+      raise unless retryable_http2_error?(e)
+
+      raise ConnectionError, e.message
+    end
+
+    def retryable_http2_error?(error)
+      # async-http uses the bare Error for an already-closed pooled client. protocol-http2 uses exact StreamError and
+      # GoawayError instances for peer-driven stream and connection teardown. Exact checks keep parser and framing
+      # subclasses visible.
+      error.instance_of?(Protocol::HTTP2::Error) ||
+        error.instance_of?(Protocol::HTTP2::StreamError) ||
+        error.instance_of?(Protocol::HTTP2::GoawayError)
+    end
+
+    def execute_request_with_trace(method, path, request_body, stream:, response_handlers:, parent_context:)
+      headers, body = request_body
+      trace = start_client_trace(method, path, body, parent_context:)
+      return execute_request(method, path, request_body, stream:, response_handlers:) unless trace
+
+      traced_headers = headers.map(&:dup)
+      trace.inject(traced_headers)
+      trace.within_context do
+        execute_request(method, path, [traced_headers, body], stream:, response_handlers:, trace:)
+      end
+    end
+
+    def start_client_trace(method, path, body, parent_context:)
+      trace = ReactOnRailsPro::OpenTelemetry.start_client_span(method, path, parent_context:)
+      return unless trace
+
+      if body.is_a?(WritableBody)
+        body.trace = trace
+      else
+        trace.request_body = body
+      end
+      trace
     end
 
     def with_client(outer_scheduler:, stream: false, &)
@@ -886,9 +988,12 @@ module ReactOnRailsPro
       @pool_size || ReactOnRailsPro::Configuration::DEFAULT_RENDERER_HTTP_POOL_SIZE
     end
 
-    def stream_body(raw_response, yielder)
+    def stream_body(raw_response, yielder, trace: nil)
       body = raw_response&.body
-      body&.each { |chunk| yielder.call(chunk) }
+      body&.each do |chunk|
+        trace&.record_response_chunk(chunk)
+        yielder.call(chunk)
+      end
     ensure
       body&.close
     end

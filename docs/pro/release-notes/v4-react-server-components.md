@@ -31,13 +31,6 @@ SSR Streaming sends HTML to the browser in chunks as it’s generated, enabling 
 - **30% faster** full‑page load times at Hulu by combining streaming SSR with Server Components [[3]]
 - Popular libraries like styled‑components v3.1.0 have introduced streaming SSR support as the next generation of React app rendering [[4]]
 
-## 📊 Core Web Vitals & TTI Improvements
-
-- **60% faster** Time to Interactive on Meta’s developer portal after adopting RSC (from 3.5 s to \~1.4 s) [[5]]
-- **45% quicker** First Contentful Paint in the same migration [[5]]
-- **50% lower** server response time with Server Components [[5]]
-- **15% improvement** in Core Web Vitals and **23% reduction** in Time to First Byte at Airbnb after RSC migration [[5]]
-
 > **React on Rails note:** These performance benefits carry over to React on Rails Pro. In React on Rails, data delivery is prop-based — Rails controllers handle database queries, authentication, and caching, then pass data to components as [props](../../oss/migrating/rsc-data-fetching.md#data-fetching-in-react-on-rails-pro). Components do not fetch data directly. See [RSC Migration: Data Fetching Patterns](../../oss/migrating/rsc-data-fetching.md).
 
 ---
@@ -59,10 +52,8 @@ Let’s make your apps faster—together.
 2. GeekyAnts.com case study: 52% code reduction, Lighthouse 50→90+ ([geekyants.com][2])
 3. Hulu—30% faster full‑page loads with streaming SSR + RSC ([questlab.pro][3])
 4. styled‑components v3.1.0: introduced streaming SSR support as the next generation of React rendering. ([medium.com][4])
-5. QuestLab: Meta’s RSC migration—30% JS reduction, 60% faster TTI, 45% faster FCP, 50% lower server response ([questlab.pro][5])
 
 [1]: https://frigade.com/blog/bundle-size-reduction-with-rsc-and-frigade
-[2]: https://geekyants.com/en-gb/blog/boosting-performance-with-nextjs-and-react-server-components-a-geekyantscom-case-study
+[2]: https://web.archive.org/web/20260306053730/https://geekyants.com/en-gb/blog/boosting-performance-with-nextjs-and-react-server-components-a-geekyantscom-case-study
 [3]: https://www.compilenrun.com/docs/framework/nextjs/nextjs-ecosystem/nextjs-case-studies/#case-study-3-hulus-streaming-platform
 [4]: https://medium.com/styled-components/v3-1-0-such-perf-wow-many-streams-c45c434dbd03
-[5]: https://web.archive.org/web/20250908030148/https://questlab.pro/blog-posts/web-development/wd-pl-2024-articleId912i1h212818

@@ -15,13 +15,13 @@
 # frozen_string_literal: true
 
 # Shared dev dependencies (rubocop, etc.)
-eval_gemfile File.expand_path("../Gemfile.shared_dev_dependencies", __dir__)
+Dir.chdir(__dir__) { eval_gemfile "../Gemfile.shared_dev_dependencies" }
 
 git_source(:github) { |repo| "https://github.com/#{repo}.git" }
 
 gem "react_on_rails", path: "../"
 
-gem "shakapacker", "10.3.0"
+gem "shakapacker", "10.3.1"
 gem "bootsnap", require: false
 gem "rails", "~> 7.1"
 gem "puma", "~> 6"
@@ -89,6 +89,7 @@ group :test do
   gem "equivalent-xml"
   gem "generator_spec"
   gem "launchy"
+  gem "opentelemetry-sdk", require: false
   gem "rspec_junit_formatter"
   gem "rspec-rails"
   gem "rspec-retry"

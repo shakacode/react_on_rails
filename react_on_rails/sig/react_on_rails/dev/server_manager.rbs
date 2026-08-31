@@ -3,16 +3,32 @@ module ReactOnRails
     class ServerManager
       type mode = :development | :production_like | :static | :hmr
 
+      # Validated `tmp/react_on_rails/dev-session.json` contents.
+      type dev_session = Hash[Symbol, untyped]
+
+      # Classified view of this app directory's dev session state, plus the
+      # ports the kill path may inspect.
+      type dev_session_view = Hash[Symbol, untyped]
+
+      # [status, blockers] - status is one of :verified, :recovered_stale,
+      # :nothing_running, :unverified, :refused.
+      type shutdown_result = [Symbol, Array[String]]
+
+      # Four-bucket listener scan: :owned, :foreign and :unattributable map
+      # port => pids, :unavailable is a list of ports whose probe failed.
+      type port_listener_scan = Hash[Symbol, untyped]
+
       def self.start: (mode, String?, ?verbose: bool, ?route: String?, ?rails_env: String?) -> void
-      def self.kill_processes: () -> void
-      def self.development_processes: () -> Hash[String, String]
-      def self.kill_running_processes: () -> bool
-      def self.find_process_pids: (String) -> Array[Integer]
-      def self.terminate_processes: (Array[Integer]) -> void
+      def self.kill_processes: () -> Symbol
+      def self.clean_generated_assets_and_caches: () -> bool
+      def self.killable_ports: () -> Array[Integer]
+      def self.default_killable_ports: () -> Array[Integer]
+      def self.terminate_processes: (Array[Integer], ?String) -> void
       def self.kill_port_processes: (Array[Integer]) -> bool
       def self.find_port_pids: (Integer) -> Array[Integer]
+      def self.find_process_pids: (String) -> Array[Integer]
       def self.cleanup_socket_files: () -> bool
-      def self.print_kill_summary: (bool) -> void
+      def self.print_kill_summary: (Symbol, ?Array[String]) -> void
       def self.show_help: () -> void
       def self.run_from_command_line: (?Array[String]) -> void
 
@@ -34,6 +50,101 @@ module ReactOnRails
       def self.box_bottom: (Integer) -> String
       def self.box_empty_line: (Integer) -> String
       def self.format_box_line: (String, Integer) -> String
+
+      # -- Scoped dev shutdown ------------------------------------------
+      def self.dev_session_path: (String) -> String
+      def self.current_app_root: () -> String
+      def self.app_root_ancestor: (String) -> String?
+      def self.inside_dev_app_root?: (untyped, ?String) -> bool
+      def self.relative_to_app_root: (String, ?String) -> String
+      def self.with_dev_session: () { () -> untyped } -> untyped
+      def self.claim_dev_session: (String) -> File?
+      def self.write_dev_session: (File, String) -> void
+      def self.write_claimed_dev_session: (File, String, String) -> File?
+      def self.dev_session_handle_detached?: (String, File) -> bool
+      def self.release_dev_session_lock: (File) -> void
+      def self.discard_partial_dev_session: (File?, String) -> void
+      def self.warn_dev_session_unrecorded: (untyped) -> void
+      def self.warn_dev_session_contended: (File, String, String) -> nil
+      def self.dev_session_payload: (String) -> Hash[String, untyped]
+      def self.selected_session_ports: () -> Array[Integer]
+      def self.owned_process_group: () -> Integer?
+      def self.owned_overmind_socket_path: (String) -> String?
+      def self.default_overmind_socket_path: (String) -> String
+      def self.release_dev_session: (File?) -> void
+      def self.shutdown_dev_session: () -> shutdown_result
+      def self.shutdown_ports: (dev_session_view) -> Array[Integer]
+      def self.shutdown_failed?: (Symbol?) -> bool
+      def self.abort_clean_after_failed_shutdown: () -> bool
+      def self.dispatch_dev_shutdown: (dev_session_view) -> shutdown_result
+      def self.dev_session_view: (String) -> dev_session_view
+      def self.open_dev_session: (String) -> [Symbol, untyped]
+      def self.classify_dev_session: (String, String, File) -> [Symbol, untyped]
+      def self.confirm_locked_dev_session: (String, File, dev_session) -> [Symbol, untyped]
+      def self.classify_released_dev_session: (String, File, dev_session) -> [Symbol, untyped]
+      def self.parse_dev_session: (untyped) -> dev_session?
+      def self.valid_dev_session_document?: (untyped) -> bool
+      def self.valid_session_root?: (untyped) -> bool
+      def self.valid_session_pid?: (untyped) -> bool
+      def self.valid_session_pgid?: (untyped) -> bool
+      def self.valid_session_ports?: (untyped) -> bool
+      def self.valid_session_socket?: (untyped) -> bool
+      def self.lock_dev_session: (File) -> Symbol
+      def self.dev_session_replaced?: (String, File) -> bool
+      def self.close_session_handle: (dev_session_view?) -> void
+      def self.shutdown_live_owner: (dev_session_view) -> shutdown_result
+      def self.unreachable_owner_message: (dev_session_view, dev_session) -> String
+      def self.request_owner_shutdown: (dev_session_view, Integer?, String?) -> bool
+      def self.shutdown_steps: (Integer?, String?) -> Array[untyped]
+      def self.verify_owner_shutdown: (dev_session_view, Integer?, String?) -> shutdown_result
+      def self.outstanding_shutdown_blockers: (dev_session_view) -> Array[String]
+      def self.owner_shutdown_complete?: (dev_session_view, Integer?, String?) -> bool
+      def self.shutdown_settled?: (dev_session_view, Integer?, String?) -> bool
+      def self.shutdown_blockers: (dev_session_view, Integer?, String?) -> Array[String]
+      def self.owner_release_state: (dev_session_view) -> Symbol
+      def self.owner_released?: (dev_session_view) -> bool
+      def self.session_replaced?: (dev_session_view) -> bool
+      def self.session_replaced_blocker: (dev_session_view) -> String
+      def self.owner_state_blockers: (dev_session_view) -> Array[String]
+      def self.endpoint_blockers: (String?) -> Array[String]
+      def self.leftover_owned_listeners: (dev_session_view) -> Array[String]
+      def self.remove_dev_session_file: (dev_session_view) -> bool
+      def self.shutdown_without_owner: (dev_session_view) -> shutdown_result
+      def self.shutdown_orphaned_overmind: (dev_session_view, String) -> shutdown_result
+      def self.print_kill_failure: (Symbol, Array[String]) -> void
+      def self.live_overmind_endpoint: (String, String?) -> String?
+      def self.overmind_endpoint_candidates: (String, String?) -> Array[String]
+      def self.scan_overmind_endpoints: (String, String?) -> Hash[Symbol, Array[String]]
+      def self.unprobeable_overmind_endpoints: (dev_session_view) -> Array[String]
+      def self.unprobeable_endpoint_blockers: (Array[String]?) -> Array[String]
+      def self.unprobeable_endpoint_message: (String) -> String
+      def self.overmind_endpoint_owned?: (String, ?String) -> bool
+      def self.overmind_endpoint_state: (String) -> Symbol
+      def self.probe_unix_socket: (String) -> Symbol
+      def self.overmind_endpoint_alive?: (String) -> bool
+      def self.overmind_control: (String, String) -> bool
+      def self.run_overmind_command: (Array[String]) -> bool
+      def self.signalable_pgid: (untyped) -> Integer?
+      def self.own_process_group: () -> Integer?
+      def self.signal_process_group: (Integer, String) -> bool
+      def self.process_group_alive?: (Integer) -> bool
+      def self.process_alive?: (Integer) -> bool
+      def self.classify_port_listeners: (Array[Integer]) -> port_listener_scan
+      def self.report_unsignalled_listeners: (port_listener_scan) -> void
+      def self.stop_attributed_pids: (Array[Integer]) -> void
+      def self.report_foreign_listeners: (Hash[Integer, Array[Integer]]) -> void
+      def self.report_unattributable_listeners: (Hash[Integer, Array[Integer]]) -> void
+      def self.report_unavailable_port_probes: (Array[Integer]) -> void
+      def self.attribute_pid: (Integer, String) -> Symbol
+      def self.signal_permission_attribution: (Integer) -> Symbol
+      def self.working_directory_for_pid: (Integer) -> String?
+      def self.probe_port_listeners: (Integer) -> [Array[Integer], Symbol]
+      def self.default_rails_kill_port: () -> Integer
+      def self.default_dev_server_kill_port: () -> Integer
+      def self.configured_dev_server_port: () -> Integer?
+      def self.stale_cleanup_candidates: (String) -> Array[String]
+      def self.wait_until: (Numeric) { () -> untyped } -> bool
+      def self.monotonic_now: () -> Float
     end
   end
 end

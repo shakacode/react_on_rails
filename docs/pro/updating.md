@@ -398,6 +398,11 @@ This affects render, streaming render, and asset upload requests.
 Before upgrading:
 
 - Run Ruby 3.3 or newer. The `async-http` dependency requires Ruby 3.3+.
+- Audit Rails console detection that calls `Rails.const_defined?(:Console)`. The `console` gem arrives through Pro's
+  `async` dependency, which was already present in Pro 16.x, and defines top-level `::Console`. Pro 17 loads `async` on
+  the ordinary render path, while Pro 16 loaded it only for streaming or async rendering, so the default lookup inherits
+  through `Object` and silently returns `true` outside a Rails console. Use `Rails.const_defined?(:Console, false)` to
+  set `inherit: false`.
 - Remove direct application assumptions about HTTPX-specific response or error classes in Pro renderer request paths.
 - Treat `config.ssr_timeout` as a per-read socket timeout. With the async-http client, this is applied as the
   read timeout on each renderer socket. It no longer wraps the entire request as a single task-level timeout.
@@ -413,6 +418,12 @@ Before upgrading:
 - Expect renderer connection drops to surface immediately as `ReactOnRailsPro::Error`/connection failures. HTTPX
   previously performed one implicit transport retry for some connection drops; the async-http adapter uses
   `retries: 0` and leaves retry policy to the existing bundle-upload retry loop and caller behavior.
+- If your Rails application uses OpenTelemetry, run `OpenTelemetry::SDK.configure` before the first renderer request
+  so both the tracer provider and W3C propagator are registered. HTTPX instrumentation no longer observes the
+  async-http transport. React on Rails Pro now creates the replacement CLIENT span itself and injects W3C trace
+  context for regular, streaming, incremental, raw-render, and asset-upload requests. Configure the Node Renderer
+  with `fastify: true` so its server spans extract that context. No OpenTelemetry dependency is added by the Pro gem;
+  when the SDK is absent or no provider is registered, renderer requests remain uninstrumented.
 - Run the node renderer client from the normal Rails request path. **Note for Falcon/async-rails users:** the earlier
   advisory to keep Falcon deployments on the HTTPX renderer client is superseded; HTTPX has been removed and async-http
   now handles Falcon natively. Async Rails servers (Falcon, Puma with an async scheduler) are supported: the async-http

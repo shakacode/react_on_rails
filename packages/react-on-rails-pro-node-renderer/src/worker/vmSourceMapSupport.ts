@@ -141,7 +141,7 @@ export const MAX_INLINE_SOURCE_MAP_BYTES = MAX_SOURCE_MAP_BYTES;
 export const MAX_EXTERNAL_SOURCE_MAP_BYTES = MAX_SOURCE_MAP_BYTES;
 
 // `preloadSourceMapJsonForBundle` re-checks the map on every VM build, and with
-// `maxVMPoolSize` defaulting to 2 an app with more bundles than that rebuilds
+// `maxVMPoolSize` defaulting to 4 an app with more bundles than that rebuilds
 // per request — so an unthrottled warning is a flood at request rate. (The
 // error-path lookup can also repeat, but only until the miss retires, bounded by
 // MAX_MISSING_SOURCE_MAP_RETRIES.) Warn once per map path instead. Bundle paths

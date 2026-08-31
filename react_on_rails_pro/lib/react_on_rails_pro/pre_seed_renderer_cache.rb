@@ -14,6 +14,8 @@
 # https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
 
 require "fileutils"
+require "digest"
+require "json"
 require "react_on_rails_pro/renderer_cache_helpers"
 require "react_on_rails_pro/renderer_cache_path"
 require "react_on_rails_pro/rolling_deploy_cache_stager"
@@ -21,11 +23,20 @@ require "securerandom"
 
 module ReactOnRailsPro
   module PreSeedRendererCacheFilesystem
+    CURRENT_GENERATION_DIRECTORY = ".current-generations"
+    CURRENT_GENERATION_ID_PREFIX = "rorp-generation-v1"
+
     module_function
 
     def canonical_cache_dir(cache_dir)
       FileUtils.mkdir_p(cache_dir)
       File.realpath(cache_dir)
+    end
+
+    def validate_mode!(mode, valid_modes)
+      return if valid_modes.include?(mode)
+
+      raise ArgumentError, "mode must be one of #{valid_modes.inspect}, got #{mode.inspect}"
     end
 
     # Resolve every existing prefix through the filesystem so separate textual
@@ -102,6 +113,39 @@ module ReactOnRailsPro
     def path_present?(path)
       File.exist?(path) || File.symlink?(path)
     end
+
+    def stage_current_generation_declaration(artifacts, cache_dir)
+      declaration_artifacts = artifacts.sort_by { |artifact| artifact.role == :server ? 0 : 1 }.map do |artifact|
+        { "role" => artifact.role.to_s, "id" => artifact.id }
+      end
+      roles = declaration_artifacts.map { |artifact| artifact.fetch("role") }
+      unless [["server"], %w[server rsc]].include?(roles)
+        raise ReactOnRailsPro::Error,
+              "Current renderer generation must contain one server artifact and optional RSC artifact"
+      end
+
+      digest = Digest::SHA256.new
+      digest << "react-on-rails-pro-current-generation-v1\0"
+      declaration_artifacts.each do |artifact|
+        digest << "#{artifact.fetch('role')}\0#{artifact.fetch('id')}\0"
+      end
+      generation_id = "#{CURRENT_GENERATION_ID_PREFIX}-#{digest.hexdigest}"
+      declaration = JSON.generate(
+        "schema_version" => 1,
+        "generation_id" => generation_id,
+        "artifacts" => declaration_artifacts
+      )
+      declaration_dir = File.join(cache_dir, CURRENT_GENERATION_DIRECTORY)
+      declaration_path = File.join(declaration_dir, "#{generation_id}.json")
+      FileUtils.mkdir_p(declaration_dir)
+      RendererCacheHelpers.write_content_atomically(
+        declaration,
+        declaration_path,
+        log_prefix: "Wrote current generation declaration",
+        source_label: "current pre-seeded renderer artifacts"
+      )
+      declaration_path
+    end
   end
   private_constant :PreSeedRendererCacheFilesystem
 
@@ -132,18 +176,16 @@ module ReactOnRailsPro
     # in a dev shell). The rake task and AssetsPrecompile auto-invocation both pass
     # `mode:` explicitly with their own context-appropriate defaults.
     def self.call(mode:)
-      unless VALID_MODES.include?(mode)
-        raise ArgumentError, "mode must be one of #{VALID_MODES.inspect}, got #{mode.inspect}"
-      end
+      PreSeedRendererCacheFilesystem.validate_mode!(mode, VALID_MODES)
 
-      cache_dir = resolve_cache_dir(mode)
+      cache_dir = PreSeedRendererCacheFilesystem.canonical_cache_dir(resolve_cache_dir(mode))
       action_description = mode == :copy ? "pre-seeding" : "pre-staging"
       artifacts = ReactOnRailsPro::Utils.renderer_artifacts(action_description:)
-      cache_dir = PreSeedRendererCacheFilesystem.canonical_cache_dir(cache_dir)
       puts "[ReactOnRailsPro] Staging renderer cache (mode: #{mode}) in: #{cache_dir}"
 
-      current_hashes = with_cache_mutation_lock(cache_dir) do
-        stage_artifacts(artifacts, cache_dir, mode)
+      current_hashes, current_generation_manifest_path = with_cache_mutation_lock(cache_dir) do
+        hashes = stage_artifacts(artifacts, cache_dir, mode)
+        [hashes, PreSeedRendererCacheFilesystem.stage_current_generation_declaration(artifacts, cache_dir)]
       end
 
       # Previous-deploy staging performs bounded network I/O and uses its own
@@ -151,6 +193,8 @@ module ReactOnRailsPro
       # so a slow adapter cannot block another process from staging current
       # artifacts or pruning snapshots.
       RollingDeployCacheStager.call(cache_dir:, current_hashes:, mode:)
+      puts "[ReactOnRailsPro] Current renderer generation declaration: #{current_generation_manifest_path}"
+      current_generation_manifest_path
     end
 
     def self.stage_artifacts(artifacts, cache_dir, mode)

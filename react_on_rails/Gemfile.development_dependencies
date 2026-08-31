@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-eval_gemfile File.expand_path("../Gemfile.shared_dev_dependencies", __dir__)
+Dir.chdir(__dir__) { eval_gemfile "../Gemfile.shared_dev_dependencies" }
 
-gem "shakapacker", "10.3.0"
+gem "shakapacker", "10.3.1"
 gem "bootsnap", require: false
 gem "rails", "~> 7.1.0"
 
