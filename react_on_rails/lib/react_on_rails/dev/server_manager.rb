@@ -10,6 +10,7 @@ require "rainbow"
 require "erb"
 require "rbconfig"
 require "socket"
+require "tempfile"
 require "timeout"
 require "time"
 require "uri"
@@ -37,6 +38,7 @@ module ReactOnRails
       # Per-app-directory run state written by `bin/dev` and consumed by
       # `bin/dev kill`. See the "Scoped dev shutdown" section further down.
       DEV_SESSION_RELATIVE_PATH = File.join("tmp", "react_on_rails", "dev-session.json")
+      DEV_SESSION_LOCK_RELATIVE_PATH = File.join("tmp", "react_on_rails", "dev-session.lock")
       DEV_SESSION_SCHEMA = 1
       # Grace given to a graceful stop (`overmind quit` / SIGTERM) before escalating.
       SHUTDOWN_TERM_GRACE_SECS = 10
@@ -53,6 +55,8 @@ module ReactOnRails
       # resolves realpath for the same reason on the read side.
       DEV_SESSION_OPEN_FLAGS = File::RDWR | File::CREAT |
                                (defined?(File::NOFOLLOW) ? File::NOFOLLOW : 0)
+      DEV_SESSION_LOCK_OPEN_FLAGS = DEV_SESSION_OPEN_FLAGS |
+                                    (defined?(File::NONBLOCK) ? File::NONBLOCK : 0)
       # The read side needs the same O_NOFOLLOW guarantee as the write side: it
       # is the path that leads to signalling, so a symlink here is worth more to
       # an attacker than one on the write path. O_NONBLOCK additionally keeps a
@@ -517,6 +521,10 @@ module ReactOnRails
           File.join(root, DEV_SESSION_RELATIVE_PATH)
         end
 
+        def dev_session_lock_path(root)
+          File.join(root, DEV_SESSION_LOCK_RELATIVE_PATH)
+        end
+
         # Absolute, symlink-resolved identity of the app directory this command
         # belongs to. Every ownership decision is made against this.
         #
@@ -579,6 +587,18 @@ module ReactOnRails
           path = dev_session_path(root)
           FileUtils.mkdir_p(File.dirname(path))
 
+          claim_lock = open_dev_session_claim_lock(root)
+          return nil if claim_lock.nil?
+
+          unless claim_lock.flock(File::LOCK_EX | File::LOCK_NB)
+            return warn_dev_session_claim_in_progress(claim_lock, root)
+          end
+
+          if dev_session_handle_detached?(dev_session_lock_path(root), claim_lock)
+            warn_dev_session_unrecorded("the session claim lock was replaced")
+            return nil
+          end
+
           DEV_SESSION_CLAIM_ATTEMPTS.times do
             file = File.open(path, DEV_SESSION_OPEN_FLAGS, 0o644)
             return warn_dev_session_contended(file, path, root) unless file.flock(File::LOCK_EX | File::LOCK_NB)
@@ -598,11 +618,14 @@ module ReactOnRails
         rescue SystemCallError, IOError => e
           warn_dev_session_unrecorded(e.class)
           nil
+        ensure
+          release_dev_session_lock(claim_lock)
         end
 
         def write_claimed_dev_session(file, path, root)
-          write_dev_session(file, root)
-          file
+          published = write_dev_session(path, root)
+          release_dev_session_lock(file)
+          { path:, handle: published }
         rescue StandardError => e
           discard_partial_dev_session(file, path)
           warn_dev_session_unrecorded(e.class)
@@ -626,16 +649,29 @@ module ReactOnRails
         end
 
         def release_dev_session_lock(file)
+          return if file.nil? || file.closed?
+
           file.flock(File::LOCK_UN)
           file.close
         rescue SystemCallError, IOError
           nil
         end
 
-        def write_dev_session(file, root)
-          file.truncate(0)
+        def write_dev_session(path, root)
+          file = Tempfile.create(["dev-session-", ".json"], File.dirname(path))
+          file.chmod(0o644)
           file.write(JSON.pretty_generate(dev_session_payload(root)))
           file.flush
+          raise IOError, "could not lock the published dev session" unless file.flock(File::LOCK_EX | File::LOCK_NB)
+
+          File.rename(file.path, path)
+          file
+        rescue StandardError
+          unless file.nil?
+            FileUtils.rm_f(file.path)
+            file.close unless file.closed?
+          end
+          raise
         end
 
         # A write that fails once the lock is held (a full filesystem, say) must
@@ -664,6 +700,26 @@ module ReactOnRails
                "leaving its session state untouched."
           puts "   ⚠️  This run is NOT recorded, so `bin/dev kill` will control that other run, " \
                "not this one. Stop this one from its own terminal."
+          nil
+        end
+
+        def open_dev_session_claim_lock(root)
+          path = dev_session_lock_path(root)
+          file = File.open(path, DEV_SESSION_LOCK_OPEN_FLAGS, 0o644)
+          return file if file.stat.file?
+
+          file.close
+          warn_dev_session_unrecorded("#{relative_to_app_root(path, root)} is not a regular file")
+          nil
+        rescue SystemCallError, IOError => e
+          warn_dev_session_unrecorded(e.class)
+          nil
+        end
+
+        def warn_dev_session_claim_in_progress(file, root)
+          file.close
+          path = dev_session_lock_path(root)
+          warn_dev_session_unrecorded("another process is using #{relative_to_app_root(path, root)}")
           nil
         end
 
@@ -734,13 +790,13 @@ module ReactOnRails
           File.join(root, ".overmind.sock")
         end
 
-        def release_dev_session(handle)
-          return if handle.nil?
+        def release_dev_session(claim)
+          return if claim.nil?
 
-          path = handle.path
+          path = claim[:path]
+          handle = claim[:handle]
           File.delete(path) if File.exist?(path) && !dev_session_replaced?(path, handle)
-          handle.flock(File::LOCK_UN)
-          handle.close
+          release_dev_session_lock(handle)
         rescue SystemCallError, IOError
           nil
         end
@@ -792,13 +848,61 @@ module ReactOnRails
 
         def dev_session_view(root)
           path = dev_session_path(root)
-          outcome, payload = open_dev_session(path)
-          return { kind: :absent, root:, path:, handle: nil } if outcome == :absent
-          return { kind: :refused, root:, path:, handle: nil, blockers: [payload] } if outcome == :refused
+          return { kind: :absent, root:, path:, handle: nil } if dev_session_path_absent?(path)
 
-          kind, result = classify_dev_session(root, path, payload)
-          base = { kind:, root:, path:, handle: payload }
-          kind == :refused ? base.merge(blockers: [result]) : base.merge(session: result)
+          lock_outcome, claim_handle = open_dev_session_read_lock(root)
+          return { kind: :refused, root:, path:, handle: nil, blockers: [claim_handle] } if lock_outcome == :refused
+
+          begin
+            outcome, payload = open_dev_session(path)
+            return { kind: :absent, root:, path:, handle: nil } if outcome == :absent
+            return { kind: :refused, root:, path:, handle: nil, blockers: [payload] } if outcome == :refused
+
+            kind, result = classify_dev_session(root, path, payload)
+            base = { kind:, root:, path:, handle: payload }
+            kind == :refused ? base.merge(blockers: [result]) : base.merge(session: result)
+          ensure
+            release_dev_session_lock(claim_handle)
+          end
+        end
+
+        def dev_session_path_absent?(path)
+          File.lstat(path)
+          false
+        rescue Errno::ENOENT
+          true
+        rescue SystemCallError, IOError
+          false
+        end
+
+        # A claimant takes this lock exclusively before it touches
+        # `dev-session.json`. The kill path holds a shared lock from its first
+        # read through its final ownership decision, so an exclusive claimant
+        # can never make the previous payload look live. An absent view releases
+        # the lock immediately; detecting a later claim during the fallback scan
+        # is tracked separately by #4943 item 2.
+        def open_dev_session_read_lock(root)
+          path = dev_session_lock_path(root)
+          file = File.open(path, DEV_SESSION_LOCK_OPEN_FLAGS, 0o644)
+          unless file.stat.file?
+            file.close
+            return [:refused, "#{path} is not a regular file, so dev session ownership cannot be trusted"]
+          end
+
+          unless file.flock(File::LOCK_SH | File::LOCK_NB)
+            file.close
+            return [:refused, "#{path} is locked because a dev session claim is still being published"]
+          end
+          if dev_session_handle_detached?(path, file)
+            file.close
+            return [:refused, "#{path} was replaced while its ownership lock was being acquired"]
+          end
+
+          [:opened, file]
+        rescue Errno::ELOOP
+          [:refused, "#{path} is a symlink; the dev session lock must be a regular file"]
+        rescue SystemCallError, IOError => e
+          [:refused, "could not lock #{path} to determine dev session ownership (#{e.class})"]
         end
 
         # Returns [:opened, File], [:absent, nil] or [:refused, message].
@@ -852,13 +956,11 @@ module ReactOnRails
           [:refused, "could not read #{path}"]
         end
 
-        # `claim_dev_session` takes the lock and THEN truncates and writes, so
-        # the payload and the lock holder are not written atomically: a reader
-        # can see the previous owner's bytes while a NEW owner already holds the
-        # lock, which would turn a recycled pgid into "proven live" signal
-        # authority. Re-read under the lock verdict and require the payload to be
-        # unchanged; a mismatch, a truncated read, or an invalid document fails
-        # closed rather than signalling on the strength of a bare number.
+        # The caller holds the shared claim lock through this ownership
+        # decision, preventing a new writer from entering its publication
+        # phase. Re-read under the session-file lock verdict as an additional
+        # guard against an unexpected mutation; a mismatch, truncated read, or
+        # invalid document still fails closed.
         def confirm_locked_dev_session(path, file, session)
           file.rewind
           confirmed = parse_dev_session(file.read)
@@ -963,8 +1065,7 @@ module ReactOnRails
           handle = view && view[:handle]
           return if handle.nil?
 
-          handle.flock(File::LOCK_UN)
-          handle.close
+          release_dev_session_lock(handle)
         rescue SystemCallError, IOError
           nil
         end

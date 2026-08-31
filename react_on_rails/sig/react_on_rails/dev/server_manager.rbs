@@ -6,6 +6,9 @@ module ReactOnRails
       # Validated `tmp/react_on_rails/dev-session.json` contents.
       type dev_session = Hash[Symbol, untyped]
 
+      # The atomically published session handle and its canonical path.
+      type dev_session_claim = Hash[Symbol, untyped]
+
       # Classified view of this app directory's dev session state, plus the
       # ports the kill path may inspect.
       type dev_session_view = Hash[Symbol, untyped]
@@ -53,31 +56,36 @@ module ReactOnRails
 
       # -- Scoped dev shutdown ------------------------------------------
       def self.dev_session_path: (String) -> String
+      def self.dev_session_lock_path: (String) -> String
       def self.current_app_root: () -> String
       def self.app_root_ancestor: (String) -> String?
       def self.inside_dev_app_root?: (untyped, ?String) -> bool
       def self.relative_to_app_root: (String, ?String) -> String
       def self.with_dev_session: () { () -> untyped } -> untyped
-      def self.claim_dev_session: (String) -> File?
-      def self.write_dev_session: (File, String) -> void
-      def self.write_claimed_dev_session: (File, String, String) -> File?
+      def self.claim_dev_session: (String) -> dev_session_claim?
+      def self.write_dev_session: (String, String) -> File
+      def self.write_claimed_dev_session: (File, String, String) -> dev_session_claim?
       def self.dev_session_handle_detached?: (String, File) -> bool
-      def self.release_dev_session_lock: (File) -> void
+      def self.release_dev_session_lock: (File?) -> void
       def self.discard_partial_dev_session: (File?, String) -> void
       def self.warn_dev_session_unrecorded: (untyped) -> void
       def self.warn_dev_session_contended: (File, String, String) -> nil
+      def self.open_dev_session_claim_lock: (String) -> File?
+      def self.warn_dev_session_claim_in_progress: (File, String) -> nil
       def self.dev_session_payload: (String) -> Hash[String, untyped]
       def self.selected_session_ports: () -> Array[Integer]
       def self.owned_process_group: () -> Integer?
       def self.owned_overmind_socket_path: (String) -> String?
       def self.default_overmind_socket_path: (String) -> String
-      def self.release_dev_session: (File?) -> void
+      def self.release_dev_session: (dev_session_claim?) -> void
       def self.shutdown_dev_session: () -> shutdown_result
       def self.shutdown_ports: (dev_session_view) -> Array[Integer]
       def self.shutdown_failed?: (Symbol?) -> bool
       def self.abort_clean_after_failed_shutdown: () -> bool
       def self.dispatch_dev_shutdown: (dev_session_view) -> shutdown_result
       def self.dev_session_view: (String) -> dev_session_view
+      def self.dev_session_path_absent?: (String) -> bool
+      def self.open_dev_session_read_lock: (String) -> [Symbol, untyped]
       def self.open_dev_session: (String) -> [Symbol, untyped]
       def self.classify_dev_session: (String, String, File) -> [Symbol, untyped]
       def self.confirm_locked_dev_session: (String, File, dev_session) -> [Symbol, untyped]

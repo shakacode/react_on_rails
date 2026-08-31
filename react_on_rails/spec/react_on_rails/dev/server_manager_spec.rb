@@ -1254,6 +1254,10 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       File.join(root, "tmp", "react_on_rails", "dev-session.json")
     end
 
+    def session_lock_path(root)
+      File.join(root, "tmp", "react_on_rails", "dev-session.lock")
+    end
+
     # Stand-in for a running `bin/dev`: leads its own process group, holds the
     # session flock for its whole life, and has a child of its own so
     # descendant shutdown is genuinely exercised rather than asserted.
@@ -1347,13 +1351,21 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       it "records worktree-scoped state, holds its lock, and removes it afterwards" do
         root = app_root("start")
         path = session_path(root)
+        write_session(root)
+        previous_inode = File.stat(path).ino
         recorded = nil
+        recorded_inode = nil
         lock_taken = nil
+        claim_read_lock_taken = nil
 
         Dir.chdir(root) do
           described_class.send(:with_dev_session) do
             recorded = JSON.parse(File.read(path))
+            recorded_inode = File.stat(path).ino
             lock_taken = File.open(path, File::RDWR) { |file| file.flock(File::LOCK_EX | File::LOCK_NB) }
+            claim_read_lock_taken = File.open(session_lock_path(root), File::RDWR) do |file|
+              file.flock(File::LOCK_SH | File::LOCK_NB)
+            end
           end
         end
 
@@ -1361,8 +1373,11 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
           expect(recorded["schema"]).to eq(1)
           expect(recorded["app_root"]).to eq(root)
           expect(recorded["pid"]).to eq(Process.pid)
+          expect(recorded_inode).not_to eq(previous_inode)
           # Failing to take the lock is the liveness proof `bin/dev kill` relies on.
           expect(lock_taken).to be false
+          # Publication has completed before the wrapped command starts.
+          expect(claim_read_lock_taken).to eq(0)
           expect(File.exist?(path)).to be false
         end
       end
@@ -1468,8 +1483,8 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         root = app_root("claim-detached")
         path = session_path(root)
         unlinked = false
-        allow(File).to receive(:open).and_wrap_original do |original, *args, &block|
-          handle = original.call(*args, &block)
+        allow(File).to receive(:open).and_wrap_original do |original, *args, **kwargs, &block|
+          handle = original.call(*args, **kwargs, &block)
           if !unlinked && args.first == path
             unlinked = true
             File.delete(path)
@@ -1502,6 +1517,22 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         end.to output(/Could not record dev session state/).to_stderr
 
         expect(File.read(target)).to eq("original")
+      end
+
+      it "refuses to claim through a symlink planted at the session lock path" do
+        root = app_root("symlinked-session-lock")
+        target = File.join(root, "target.lock")
+        File.write(target, "original")
+        File.symlink(target, session_lock_path(root))
+
+        expect do
+          Dir.chdir(root) { described_class.send(:with_dev_session) { :ran } }
+        end.to output(/Could not record dev session state/).to_stderr
+
+        aggregate_failures do
+          expect(File.read(target)).to eq("original")
+          expect(File.exist?(session_path(root))).to be false
+        end
       end
 
       it "leaves no held lock and no partial file when the session write fails" do
@@ -1619,6 +1650,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         aggregate_failures do
           expect(output).to include("No development processes owned by this app directory")
           expect(output).not_to include("verified gone")
+          expect(File.exist?(session_lock_path(root))).to be false
         end
       end
 
@@ -1851,6 +1883,26 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         end
       end
 
+      it "refuses a symlinked session lock path before inspecting signal authority" do
+        root = app_root("symlink-read-lock")
+        unrelated = start_unrelated_process
+        write_session(root, "pid" => unrelated[:pid], "pgid" => unrelated[:pgid])
+        target = File.join(root, "planted.lock")
+        File.write(target, "not a lock")
+        File.symlink(target, session_lock_path(root))
+
+        expect(described_class).not_to receive(:signal_process_group)
+        expect(described_class).not_to receive(:kill_port_processes)
+
+        output = kill_in(root)
+
+        aggregate_failures do
+          expect(output).to include("Refusing to signal anything")
+          expect(output).to include("dev session lock must be a regular file")
+          expect(group_alive?(unrelated[:pgid])).to be true
+        end
+      end
+
       it "refuses a session path that is not a regular file" do
         root = app_root("dir-session")
         FileUtils.mkdir_p(session_path(root))
@@ -1879,10 +1931,31 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         end
       end
 
+      it "refuses an old payload while a replacement claimant holds the same session inode" do
+        root = app_root("same-inode-claim")
+        unrelated = start_unrelated_process
+        write_session(root, "pid" => unrelated[:pid], "pgid" => unrelated[:pgid])
+
+        session_handle = File.open(session_path(root), File::RDWR)
+        claim_handle = File.open(session_lock_path(root), File::RDWR | File::CREAT, 0o644)
+        handles.push(session_handle, claim_handle)
+        session_handle.flock(File::LOCK_EX)
+        claim_handle.flock(File::LOCK_EX)
+
+        expect(described_class).not_to receive(:signal_process_group)
+
+        output = kill_in(root)
+
+        aggregate_failures do
+          expect(output).to include("Refusing to signal anything")
+          expect(output).to include("session claim is still being published")
+          expect(group_alive?(unrelated[:pgid])).to be true
+        end
+      end
+
       it "refuses when the payload changed under a freshly observed lock" do
-        # claim_dev_session locks, then truncates and writes, so a reader can
-        # see the previous owner's bytes while a NEW owner holds the lock. That
-        # must not turn a recycled pgid into proven-live signal authority.
+        # Keep the same-payload re-read as defense in depth: unexpected
+        # mutation while a held lock is being classified must still fail closed.
         root = app_root("payload-race")
         write_session(root, "pgid" => 4321)
         allow(described_class).to receive(:lock_dev_session).and_return(:held)
