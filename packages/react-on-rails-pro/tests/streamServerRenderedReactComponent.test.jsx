@@ -97,6 +97,21 @@ TestComponentForStreaming.propTypes = {
   throwAsyncError: PropTypes.bool,
 };
 
+const UseIdField = ({ label }) => {
+  const id = React.useId();
+
+  return (
+    <label htmlFor={id}>
+      {label}
+      <input id={id} />
+    </label>
+  );
+};
+
+UseIdField.propTypes = {
+  label: PropTypes.string.isRequired,
+};
+
 const ManifestStylesheetPreload = () => (
   <main>
     <link rel="preload" as="style" href="https://cdn.example.com/webpack/test/css/4092-98880bc1.css?body=1" />
@@ -1026,6 +1041,40 @@ describe('streamServerRenderedReactComponent', () => {
     expect(chunks[1].consoleReplayScript).toBe('');
     expect(chunks[1].hasErrors).toBe(false);
     expect(chunks[1].isShellReady).toBe(true);
+  });
+
+  it('keeps useId values isolated across streamed roots without assuming React private ID encoding', async () => {
+    ReactOnRails.register({ UseIdField });
+
+    const renderRoot = async (domNodeId, label) => {
+      const renderResult = streamServerRenderedReactComponent({
+        name: 'UseIdField',
+        domNodeId,
+        trace: false,
+        props: { label },
+        throwJsErrors: false,
+        railsContext: testingRailsContext,
+      });
+      const { chunks, errors } = await collectStreamResult(renderResult);
+      const html = chunks.map((chunk) => chunk.html).join('');
+      const labelId = html.match(/<label for="([^"]+)"/)?.[1];
+      const inputId = html.match(/<input id="([^"]+)"/)?.[1];
+
+      expect(errors).toHaveLength(0);
+      expect(labelId).toBeDefined();
+      expect(inputId).toBe(labelId);
+
+      return labelId;
+    };
+
+    const [firstRootId, secondRootId] = await Promise.all([
+      renderRoot('use-id-root-a', 'First field'),
+      renderRoot('use-id-root-b', 'Second field'),
+    ]);
+
+    expect(firstRootId).toContain('use-id-root-a');
+    expect(secondRootId).toContain('use-id-root-b');
+    expect(firstRootId).not.toBe(secondRootId);
   });
 
   it('does not mutate global manifest filenames during a streamed render', async () => {
