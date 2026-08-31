@@ -669,11 +669,11 @@ module ReactOnRails
 
         def write_dev_session(path, root)
           file = Tempfile.create(["dev-session-", ".json"], File.dirname(path))
-          file.chmod(0o644)
           file.write(JSON.pretty_generate(dev_session_payload(root)))
           file.flush
           raise IOError, "could not lock the published dev session" unless file.flock(File::LOCK_EX | File::LOCK_NB)
 
+          file.chmod(0o644 & ~File.umask)
           File.rename(file.path, path)
           file
         rescue StandardError, Interrupt

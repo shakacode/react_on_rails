@@ -1487,6 +1487,22 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         expect(recorded["ports"]).to eq([4000, 4035])
       end
 
+      it "preserves a restrictive caller umask on the published session" do
+        root = app_root("restrictive-session-umask")
+        previous_umask = File.umask(0o077)
+        published_mode = nil
+
+        Dir.chdir(root) do
+          described_class.send(:with_dev_session) do
+            published_mode = File.stat(session_path(root)).mode & 0o777
+          end
+        end
+
+        expect(published_mode).to eq(0o600)
+      ensure
+        File.umask(previous_umask) unless previous_umask.nil?
+      end
+
       it "verifies the union of the recorded and derived ports" do
         allow(described_class).to receive(:killable_ports).and_return([3000, 3035])
 
