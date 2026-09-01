@@ -129,11 +129,16 @@ module ReactOnRails
     end
 
     describe "error message formatting" do
-      it "does not include props or generated JavaScript" do
-        error = described_class.new(props: sensitive_props, js_code: sensitive_js_code)
+      it "does not include props, generated JavaScript, or console messages" do
+        sensitive_console = "User session abc-secret-token-123 rendered component"
+        error = described_class.new(
+          props: sensitive_props,
+          js_code: sensitive_js_code,
+          console_messages: sensitive_console
+        )
 
         expect(error.message).to include("[REDACTED]")
-        expect(error.message).not_to include("person@example.com", "top-secret")
+        expect(error.message).not_to include("person@example.com", "top-secret", "abc-secret-token-123")
       end
 
       context "when FULL_TEXT_ERRORS is true" do

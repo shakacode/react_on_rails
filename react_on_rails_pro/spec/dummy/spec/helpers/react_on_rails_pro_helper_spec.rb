@@ -2791,7 +2791,7 @@ describe ReactOnRailsProHelper do
           expect(read_error_events.length).to eq(1)
           expect(read_error_events.first.payload[:component_name]).to eq(component_name)
           # Redacted: payload carries only the error class name, never the raw message (#4966)
-          expect(read_error_events.first.payload[:error]).to eq("RuntimeError")
+          expect(read_error_events.first.payload[:error]).to eq("Redis::ConnectionError")
         ensure
           ActiveSupport::Notifications.unsubscribe(subscription)
         end
