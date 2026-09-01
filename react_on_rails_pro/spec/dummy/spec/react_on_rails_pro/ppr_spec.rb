@@ -266,5 +266,28 @@ describe ReactOnRailsPro::Ppr do
       )
       expect(events.first.payload[:error]).not_to include("redis://")
     end
+
+    it "publishes the full namespaced class name for custom error classes" do
+      custom_error_class = Class.new(StandardError)
+      stub_const("ReactOnRailsPro::CustomCacheError", custom_error_class)
+      custom_error = ReactOnRailsPro::CustomCacheError.new("connection refused to redis://internal:6379")
+
+      events = []
+      subscription = ActiveSupport::Notifications.subscribe(
+        described_class::CACHE_READ_ERROR_NOTIFICATION
+      ) { |event| events << event }
+
+      begin
+        described_class.instrument_cache_read_error(
+          component_name: "TestComponent",
+          error: custom_error
+        )
+      ensure
+        ActiveSupport::Notifications.unsubscribe(subscription)
+      end
+
+      expect(events.first.payload[:error]).to eq("ReactOnRailsPro::CustomCacheError")
+      expect(events.first.payload[:error]).not_to include("redis://")
+    end
   end
 end

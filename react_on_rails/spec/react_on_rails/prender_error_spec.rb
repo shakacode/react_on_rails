@@ -122,9 +122,10 @@ module ReactOnRails
       end
     end
 
-    it "does not retain raw props or generated JavaScript on the exception" do
+    it "does not retain raw props, generated JavaScript, or console messages on the exception" do
       expect(expected_error.props).to eq("[REDACTED]")
       expect(expected_error.js_code).to eq("[REDACTED]")
+      expect(expected_error.console_messages).to eq("[REDACTED]")
     end
 
     describe "error message formatting" do
