@@ -378,6 +378,7 @@ process_group="$(ps -o pgid= -p "$$" | tr -d ' ')"
     printf '|%s' "${argument}"
   done
   printf '\ncontract:%s\n' "${REACT_ON_RAILS_RELEASE_LEASE_CONTRACT:-}"
+  printf 'supervised:%s\n' "${REACT_ON_RAILS_RELEASE_SUPERVISED:-}"
   printf 'evaluate-head:%s\n' "${RELEASE_CI_EVALUATE_HEAD:-}"
 } >>"${TEST_BUNDLE_LOG}"
 
@@ -1801,6 +1802,7 @@ run_release --dry-run || fail "argumentless dry-run failed"
 assert_empty "${coord_log}"
 assert_contains "${bundle_log}" 'args|exec|rake|release[17.1.0.rc.0,true]'
 assert_contains "${bundle_log}" 'contract:'
+assert_contains "${bundle_log}" 'supervised:true'
 pass "dry-run selects the first prepared changelog version"
 
 setup_case evaluate-head-dry-run
@@ -1921,6 +1923,7 @@ assert_contains "${coord_log}" $'heartbeat|'
 assert_contains "${coord_log}" $'status|'
 assert_contains "${coord_log}" $'release|'
 assert_contains "${bundle_log}" 'args|exec|rake|release[17.1.0.rc.0]'
+assert_contains "${bundle_log}" 'supervised:true'
 assert_secret_absent
 pass "live mode acquires and cleans up a process-owned release lease"
 
