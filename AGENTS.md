@@ -34,6 +34,14 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
 - `.agents/skills/*/bin`: repo-pinned shared helper scripts for workflows that
   must run inside checkout-only or directory-restricted agent sessions. These
   directories intentionally do not include duplicate shared `SKILL.md` files.
+- This repo deliberately does not adopt the pack's
+  `autonomous-merge-eligibility`, `merge-assurance`, `pr-merge-submit`, or
+  `autonomous-merge-closeout` helpers as repo-pinned merge or closeout gates.
+  When pack logic probes those absent helpers, its result is a structural
+  `UNKNOWN` for the unadopted helper chain, not evidence that a particular PR
+  is blocked. The adopted React on Rails merge seam is
+  `script/pr-merge-ledger <PR> --strict`, followed by the applicable phase and
+  merge-authority gates in this `AGENTS.md`.
 - `.agents/.rubocop.yml`: lint seam for repo-local agent helper scripts. Keep it
   aligned with `shakacode/agent-workflows/.rubocop.yml`, with only local
   toolchain compatibility adjustments such as this repo's supported Ruby target.
