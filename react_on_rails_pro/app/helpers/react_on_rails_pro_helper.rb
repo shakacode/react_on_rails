@@ -1385,7 +1385,7 @@ module ReactOnRailsProHelper
       nil
     end
   rescue StandardError => e
-    Rails.logger.warn("[ReactOnRailsPro] PPR cache read failed (treating as miss): #{e.class}: #{e.message}")
+    Rails.logger.warn("[ReactOnRailsPro] PPR cache read failed (treating as miss): #{ppr_redacted_error_for_log(e)}")
     ppr_instrument_non_fatal(component_name, :read_error, e)
     nil
   end
@@ -1614,7 +1614,7 @@ module ReactOnRailsProHelper
     rescue StandardError => e
       Rails.logger.warn do
         "[ReactOnRailsPro] PPR cache write failed (non-fatal, this request still serves): " \
-          "#{e.class}: #{e.message}"
+          "#{ppr_redacted_error_for_log(e)}"
       end
       ppr_instrument_non_fatal(component_name, :write_refused, "store_error")
     end
@@ -1811,13 +1811,13 @@ module ReactOnRailsProHelper
     Rails.cache.delete(cache_key, cache_write_options)
     ReactOnRailsPro::Ppr.instrument_degraded_pre_flush(component_name:, error:)
     Rails.logger.warn do
-      safe_msg = ppr_sanitize_for_log(error.message)
-      "[ReactOnRailsPro] PPR pre-flush degradation for #{component_name}: #{error.class}: #{safe_msg}. " \
+      "[ReactOnRailsPro] PPR pre-flush degradation for #{component_name}: " \
+        "#{ppr_redacted_error_for_log(error)}. " \
         "Evicted #{cache_key.inspect} and falling back to full SSR."
     end
   rescue StandardError => e
     Rails.logger.debug do
-      "[ReactOnRailsPro] PPR pre-flush degradation handler failed: #{e.class}: #{e.message}"
+      "[ReactOnRailsPro] PPR pre-flush degradation handler failed: #{ppr_redacted_error_for_log(e)}"
     end
   end
 
@@ -1832,21 +1832,23 @@ module ReactOnRailsProHelper
     end
     ReactOnRailsPro::Ppr.instrument_degraded_post_flush(component_name:, error:)
     Rails.logger.warn do
-      safe_msg = ppr_sanitize_for_log(error.message)
-      "[ReactOnRailsPro] PPR post-flush degradation for #{component_name}: #{error.class}: #{safe_msg}. " \
+      "[ReactOnRailsPro] PPR post-flush degradation for #{component_name}: " \
+        "#{ppr_redacted_error_for_log(error)}. " \
         "Stream terminated; entry evicted. Next request will prerender cleanly."
     end
   rescue StandardError => e
     Rails.logger.debug do
-      "[ReactOnRailsPro] PPR post-flush degradation handler failed: #{e.class}: #{e.message}"
+      "[ReactOnRailsPro] PPR post-flush degradation handler failed: #{ppr_redacted_error_for_log(e)}"
     end
   end
 
-  # Sanitizes a string for safe interpolation into log messages. Strips newlines (which could
-  # inject fake log lines) and truncates to a reasonable length (preventing oversized log entries
-  # from error messages that dump full payloads).
-  def ppr_sanitize_for_log(value, max_length: 1024)
-    value.to_s.tr("\n\r", " ")[0, max_length]
+  # Redacted error summary for safe interpolation into PPR log messages (issue #4966).
+  #
+  # Logs only the error class name — never raw error.message content, which can contain
+  # request-derived PII (console output from SSR, user data in props, external service
+  # responses). Consistent with the AS::Notifications redaction in Ppr.safe_error_summary.
+  def ppr_redacted_error_for_log(error)
+    error.class.name
   end
 
   # Async version of fetch_react_component. Handles cache lookup synchronously,

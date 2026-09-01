@@ -35,7 +35,7 @@ module ReactOnRails
     end
 
     let(:expected_error_info) do
-      input_error_info.merge(props: "[REDACTED]", js_code: "[REDACTED]")
+      input_error_info.merge(props: "[REDACTED]", js_code: "[REDACTED]", console_messages: "[REDACTED]")
     end
 
     let(:sensitive_props) { { email: "person@example.com", access_token: "top-secret" } }

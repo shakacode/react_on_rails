@@ -150,7 +150,7 @@ describe ReactOnRailsPro::Ppr do
   end
 
   describe ".instrument_degraded_pre_flush" do
-    it "emits the ppr.resume.degraded_pre_flush notification with the error message" do
+    it "emits the ppr.resume.degraded_pre_flush notification with redacted error (class name only)" do
       events = []
       subscription = ActiveSupport::Notifications.subscribe(
         described_class::DEGRADED_PRE_FLUSH_NOTIFICATION
@@ -159,19 +159,20 @@ describe ReactOnRailsPro::Ppr do
       begin
         described_class.instrument_degraded_pre_flush(
           component_name: "TestComponent",
-          error: RuntimeError.new("test failure")
+          error: RuntimeError.new("test failure with user@email.com")
         )
       ensure
         ActiveSupport::Notifications.unsubscribe(subscription)
       end
 
       expect(events.length).to eq(1)
-      expect(events.first.payload).to include(component_name: "TestComponent", error: "test failure")
+      expect(events.first.payload).to include(component_name: "TestComponent", error: "RuntimeError")
+      expect(events.first.payload[:error]).not_to include("user@email.com")
     end
   end
 
   describe ".instrument_degraded_post_flush" do
-    it "emits the ppr.resume.degraded_post_flush notification with the error message" do
+    it "emits the ppr.resume.degraded_post_flush notification with redacted error (class name only)" do
       events = []
       subscription = ActiveSupport::Notifications.subscribe(
         described_class::DEGRADED_POST_FLUSH_NOTIFICATION
@@ -180,14 +181,15 @@ describe ReactOnRailsPro::Ppr do
       begin
         described_class.instrument_degraded_post_flush(
           component_name: "TestComponent",
-          error: RuntimeError.new("resume exploded")
+          error: RuntimeError.new("resume exploded with secret-token-123")
         )
       ensure
         ActiveSupport::Notifications.unsubscribe(subscription)
       end
 
       expect(events.length).to eq(1)
-      expect(events.first.payload).to include(component_name: "TestComponent", error: "resume exploded")
+      expect(events.first.payload).to include(component_name: "TestComponent", error: "RuntimeError")
+      expect(events.first.payload[:error]).not_to include("secret-token-123")
     end
   end
 
@@ -242,7 +244,7 @@ describe ReactOnRailsPro::Ppr do
   end
 
   describe ".instrument_cache_read_error" do
-    it "emits the ppr.cache.read_error notification with component_name and error message" do
+    it "emits the ppr.cache.read_error notification with redacted error (class name only)" do
       events = []
       subscription = ActiveSupport::Notifications.subscribe(
         described_class::CACHE_READ_ERROR_NOTIFICATION
@@ -251,7 +253,7 @@ describe ReactOnRailsPro::Ppr do
       begin
         described_class.instrument_cache_read_error(
           component_name: "TestComponent",
-          error: RuntimeError.new("Redis connection refused")
+          error: RuntimeError.new("Redis connection refused at redis://internal:6379")
         )
       ensure
         ActiveSupport::Notifications.unsubscribe(subscription)
@@ -260,8 +262,9 @@ describe ReactOnRailsPro::Ppr do
       expect(events.length).to eq(1)
       expect(events.first.payload).to include(
         component_name: "TestComponent",
-        error: "Redis connection refused"
+        error: "RuntimeError"
       )
+      expect(events.first.payload[:error]).not_to include("redis://")
     end
   end
 end

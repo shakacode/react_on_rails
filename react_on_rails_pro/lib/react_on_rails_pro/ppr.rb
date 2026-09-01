@@ -180,11 +180,18 @@ module ReactOnRailsPro
 
       private
 
-      # Bounded, newline-stripped summary of an error for AS::Notifications payloads.
-      # PrerenderError#message can include renderer console output with request-derived values;
-      # truncating prevents PII from propagating through APM/logging subscribers.
+      # Redacted summary of an error for AS::Notifications payloads (issue #4966).
+      #
+      # PrerenderError#message can include renderer console output with request-derived
+      # values (user data logged during SSR), and arbitrary StandardError messages (store
+      # errors, parse errors) flow through the same handlers. Publishing raw error.message
+      # into AS::Notifications would propagate PII through APM/logging subscribers that
+      # forward data to external services beyond the operator's log access controls.
+      #
+      # Publishes only `error.class.name` — safe, always available, and sufficient for APM
+      # triage (e.g. "PrerenderError", "Redis::ConnectionError", "JSON::ParserError").
       def safe_error_summary(error)
-        error.message.to_s.tr("\n\r", " ")[0, 256]
+        error.class.name
       end
 
       def detect_react_version_cache_key
