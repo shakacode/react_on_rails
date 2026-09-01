@@ -28,6 +28,12 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **Release failures now provide supervised, reason-specific recovery**: `script/release --evaluate-head`
+  supports strict exact-HEAD CI evaluation for both preview and live retries, foreign claims identify the available
+  holder/task/session metadata and targeted status command, and npm readiness distinguishes stale dependencies,
+  pnpm-version mismatches, and package-build failures without requiring `bin/setup`. Fixes
+  [Issue 4955](https://github.com/shakacode/react_on_rails/issues/4955).
+
 - **Fresh generated apps now preserve their resolved Shakapacker version**: The installer now pins
   `bundle add shakapacker --strict` to the version already selected through React on Rails instead
   of allowing an older globally installed gem to downgrade the app's lockfile. The tested
