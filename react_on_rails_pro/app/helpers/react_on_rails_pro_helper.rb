@@ -1424,7 +1424,7 @@ module ReactOnRailsProHelper
   rescue StandardError => e
     # Eviction instrumentation must not mask the original miss path.
     Rails.logger.debug do
-      "[ReactOnRailsPro] PPR eviction instrumentation failed: #{e.class}: #{e.message}"
+      "[ReactOnRailsPro] PPR eviction instrumentation failed: #{ppr_redacted_error_for_log(e)}"
     end
   end
 
@@ -1847,8 +1847,10 @@ module ReactOnRailsProHelper
   # Logs only the error class name — never raw error.message content, which can contain
   # request-derived PII (console output from SSR, user data in props, external service
   # responses). Consistent with the AS::Notifications redaction in Ppr.safe_error_summary.
+  # Falls back to the superclass name for anonymous exception classes (where
+  # Class#name returns nil).
   def ppr_redacted_error_for_log(error)
-    error.class.name
+    error.class.name || error.class.superclass&.name || "StandardError"
   end
 
   # Async version of fetch_react_component. Handles cache lookup synchronously,

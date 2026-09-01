@@ -190,8 +190,10 @@ module ReactOnRailsPro
       #
       # Publishes only `error.class.name` — safe, always available, and sufficient for APM
       # triage (e.g. "PrerenderError", "Redis::ConnectionError", "JSON::ParserError").
+      # Falls back to the superclass name for anonymous exception classes (where
+      # Class#name returns nil).
       def safe_error_summary(error)
-        error.class.name
+        error.class.name || error.class.superclass&.name || "StandardError"
       end
 
       def detect_react_version_cache_key

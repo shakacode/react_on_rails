@@ -289,5 +289,26 @@ describe ReactOnRailsPro::Ppr do
       expect(events.first.payload[:error]).to eq("ReactOnRailsPro::CustomCacheError")
       expect(events.first.payload[:error]).not_to include("redis://")
     end
+
+    it "falls back to the superclass name for anonymous exception classes" do
+      anonymous_error = Class.new(StandardError).new("should not appear in payload")
+
+      events = []
+      subscription = ActiveSupport::Notifications.subscribe(
+        described_class::CACHE_READ_ERROR_NOTIFICATION
+      ) { |event| events << event }
+
+      begin
+        described_class.instrument_cache_read_error(
+          component_name: "TestComponent",
+          error: anonymous_error
+        )
+      ensure
+        ActiveSupport::Notifications.unsubscribe(subscription)
+      end
+
+      expect(events.first.payload[:error]).to eq("StandardError")
+      expect(events.first.payload[:error]).not_to include("should not appear")
+    end
   end
 end
