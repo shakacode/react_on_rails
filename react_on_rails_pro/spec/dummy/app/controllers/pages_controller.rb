@@ -408,6 +408,11 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     stream_view_containing_react_components(template: "/pages/cache_demo")
   end
 
+  # Spike for issue #4874 (Server Functions RFC): RSC page hosting the demo form.
+  def spike_server_functions
+    stream_view_containing_react_components(template: "/pages/spike_server_functions")
+  end
+
   # Demo page showing 10 async components rendering concurrently
   # Each component delays 1 second - sequential would take ~10s, concurrent takes ~1s
   def async_components_demo
