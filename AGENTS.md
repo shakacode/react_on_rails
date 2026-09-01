@@ -41,7 +41,8 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
   `UNKNOWN` for the unadopted helper chain, not evidence that a particular PR
   is blocked. The adopted React on Rails merge seam is
   `script/pr-merge-ledger <PR> --strict`, followed by the applicable phase and
-  merge-authority gates in this `AGENTS.md`.
+  merge-authority gates in this `AGENTS.md` and the configured merge-submission
+  mode in `.agents/agent-workflow.yml`.
 - `.agents/.rubocop.yml`: lint seam for repo-local agent helper scripts. Keep it
   aligned with `shakacode/agent-workflows/.rubocop.yml`, with only local
   toolchain compatibility adjustments such as this repo's supported Ruby target.
