@@ -16,9 +16,13 @@ if (!eventsPath || !workspace || !outputDir || !reportPath || !invocationPath) {
 const MAX_OUTPUT = 12_000;
 const MAX_EXCERPT = 16_000;
 const sanitize = (value) => redactSensitiveValues(redactLocalPaths(value, [workspace, outputDir]));
+const sanitizeTrustedEvent = (value) =>
+  redactSensitiveValues(redactLocalPaths(value, [workspace, outputDir]), {
+    runtimeGeneratedSecretMode: 'trusted',
+  });
 
-const truncate = (value, limit) => {
-  const safe = sanitize(value);
+const truncate = (value, limit, sanitizer = sanitize) => {
+  const safe = sanitizer(value);
   return { value: safe.slice(0, limit), truncated: safe.length > limit };
 };
 
@@ -29,8 +33,8 @@ const classificationCommandText = new WeakMap();
 for (const event of events) {
   const item = event?.item;
   if (event?.type === 'item.completed' && item?.type === 'command_execution') {
-    const output = truncate(item.aggregated_output ?? item.output ?? '', MAX_OUTPUT);
-    const classifiedCommand = sanitize(normalizeCommand(item.command) || 'UNKNOWN');
+    const output = truncate(item.aggregated_output ?? item.output ?? '', MAX_OUTPUT, sanitizeTrustedEvent);
+    const classifiedCommand = sanitizeTrustedEvent(normalizeCommand(item.command) || 'UNKNOWN');
     const command = {
       id: `command-${commands.length + 1}`,
       command: classifiedCommand.replaceAll('<EVAL_WORKSPACE>', '<LOCAL_PATH>'),

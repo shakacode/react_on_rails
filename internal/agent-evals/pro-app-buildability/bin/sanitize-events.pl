@@ -24,10 +24,12 @@ sub credential_value {
 
 sub canonicalize_runtime_generated_secret {
   my ($value) = @_;
-  $value =~ s{(^|[ \t])SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>"(?=[ \t]|$)}{
+  # This sanitizer is the trust boundary: a pre-existing marker is forged even
+  # when it is immediately followed by punctuation or a word character.
+  $value =~ s{(^|[ \t`]|^/(?:usr/)?bin/(?:zsh|bash|sh) -lc ')SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>"}{
     "$1" . 'SECRET_KEY_BASE="[REDACTED]"'
   }gme;
-  $value =~ s{(^|[ \t`]|^/(?:usr/)?bin/(?:zsh|bash|sh) -lc ')SECRET_KEY_BASE=\$\(bin/rails secret\)(?=[ \t]|$)}{
+  $value =~ s{(^|[ \t`]|^/(?:usr/)?bin/(?:zsh|bash|sh) -lc ')SECRET_KEY_BASE=\$\(bin/rails secret\)(?=[ \t;|&<>()`"']|$)}{
     "$1" . 'SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>"'
   }gme;
   return $value;

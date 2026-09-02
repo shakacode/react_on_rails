@@ -66,11 +66,34 @@ const redactUrlCredentials = (url) => {
 const redactCredentialsInWebUrls = (value) =>
   String(value).replace(/https?:\/\/[^\s"']+/gi, (url) => redactUrlCredentials(url));
 
+const runtimeGeneratedSecretPrefix = String.raw`(^|[ \t\x60]|^\/(?:usr\/)?bin\/(?:zsh|bash|sh) -lc ')`;
+const runtimeGeneratedSecretBoundary = String.raw`(?=[ \t;|&<>()\x60"']|$)`;
+const runtimeGeneratedSecretMarker = new RegExp(
+  // A marker is trusted only when this helper is explicitly called in trusted mode.
+  `${runtimeGeneratedSecretPrefix}SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>"`,
+  'gm',
+);
+const runtimeGeneratedSecretExpression = new RegExp(
+  `${runtimeGeneratedSecretPrefix}SECRET_KEY_BASE=\\$\\(bin/rails secret\\)${runtimeGeneratedSecretBoundary}`,
+  'gm',
+);
+const replaceRuntimeGeneratedSecret = (value, replacement, preserveExistingMarker = false) => {
+  const demoted = preserveExistingMarker
+    ? String(value)
+    : String(value).replace(runtimeGeneratedSecretMarker, '$1SECRET_KEY_BASE="[REDACTED]"');
+  return demoted.replace(runtimeGeneratedSecretExpression, `$1${replacement}`);
+};
 const canonicalizeRuntimeGeneratedSecret = (value) =>
-  String(value).replace(
-    /(^|[ \t`]|^\/(?:usr\/)?bin\/(?:zsh|bash|sh) -lc ')SECRET_KEY_BASE=\$\(bin\/rails secret\)(?=[ \t]|$)/gm,
-    '$1SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>"',
-  );
+  replaceRuntimeGeneratedSecret(value, 'SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>"');
+const preserveRuntimeGeneratedSecret = (value) =>
+  replaceRuntimeGeneratedSecret(value, 'SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>"', true);
+const redactRuntimeGeneratedSecret = (value) =>
+  replaceRuntimeGeneratedSecret(value, 'SECRET_KEY_BASE="[REDACTED]"');
+const sanitizeRuntimeGeneratedSecret = (value, mode) => {
+  if (mode === 'trusted') return preserveRuntimeGeneratedSecret(value);
+  if (mode === 'redact') return redactRuntimeGeneratedSecret(value);
+  return canonicalizeRuntimeGeneratedSecret(value);
+};
 
 const structuredValueEnd = (value, start) => {
   const stack = [value[start] === '{' ? '}' : ']'];
@@ -114,8 +137,10 @@ const redactStructuredSensitiveValues = (value) => {
   return output + input.slice(cursor);
 };
 
-export const redactSensitiveValues = (value) =>
-  redactStructuredSensitiveValues(redactCredentialsInWebUrls(canonicalizeRuntimeGeneratedSecret(value)))
+export const redactSensitiveValues = (value, { runtimeGeneratedSecretMode = 'canonicalize' } = {}) =>
+  redactStructuredSensitiveValues(
+    redactCredentialsInWebUrls(sanitizeRuntimeGeneratedSecret(value, runtimeGeneratedSecretMode)),
+  )
     .replace(quotedNamedValue, (match, name, separator, doubleQuotedValue, singleQuotedValue) => {
       const doubleQuoted = doubleQuotedValue !== undefined;
       const quote = doubleQuoted ? '"' : "'";

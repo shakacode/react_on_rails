@@ -66,7 +66,9 @@ try {
     if (depth > MAX_DEPTH) fail(`JSON depth exceeds ${MAX_DEPTH}`);
     traversal.nodes += 1;
     if (traversal.nodes > MAX_NODES) fail(`JSON nodes exceed ${MAX_NODES}`);
-    if (typeof value === 'string') return redactSensitiveValues(value);
+    if (typeof value === 'string') {
+      return redactSensitiveValues(value, { runtimeGeneratedSecretMode: 'redact' });
+    }
     if (Array.isArray(value)) return value.map((nestedValue) => sanitize(nestedValue, depth + 1));
     if (value === null || typeof value !== 'object') return value;
     return Object.fromEntries(
