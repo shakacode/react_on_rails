@@ -386,5 +386,12 @@ RSpec.describe ReactOnRails::DiagnosticUrlRedactor do
       expect(sanitized).not_to match(/nested-(?:user|secret)/)
       expect(sanitized).to include("next=ftp%3A%2F%2Fnested.test%2Fpath")
     end
+
+    it "preserves a large diagnostic with many incomplete HTTP URL starts" do
+      message = "Failure loading #{'http://' * 10_000}host/path@example.test"
+      expect(message.bytesize).to be > 65_536
+
+      expect(sanitize_error(message)).to eq(message)
+    end
   end
 end

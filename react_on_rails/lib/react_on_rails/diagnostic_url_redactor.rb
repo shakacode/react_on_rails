@@ -15,6 +15,7 @@ module ReactOnRails
     ENCODED_USERINFO_DELIMITER_PATTERN = /@|%40/i
     ENCODED_AUTHORITY_END_PATTERN = %r{/|%2f|\?|%3f|\#|%23}i
     HTTP_URL_TOKEN_PATTERN = /#{HTTP_URL_SCHEME_PATTERN}(?:(?!#{HTTP_URL_SCHEME_PATTERN})[^\s"'])+/
+    FLEXIBLE_HTTP_URL_SCHEME_PATTERN = %r{https?\s*:\s*//}i
 
     CONFIGURED_URL_NOT_PROVIDED = Object.new.freeze
     private_constant :CONFIGURED_URL_NOT_PROVIDED
@@ -41,13 +42,13 @@ module ReactOnRails
         # Treat whitespace around a scheme delimiter as a malformed HTTP(S) URL rather than a
         # local path. URL classification may reject that spelling, but diagnostics must still
         # fail closed if the value contains credential-like userinfo.
-        scheme_pattern = %r{https?\s*:\s*//}i
-        scheme = url.match(scheme_pattern)
+        scheme = url.match(FLEXIBLE_HTTP_URL_SCHEME_PATTERN)
         return sanitized_authority_relative_url(url) unless scheme
 
         prefix = url[...scheme.begin(0)]
         configured_url = url[scheme.begin(0)..]
-        sanitized_url = if configured_url.match?(/[\r\n]/) || configured_url.scan(scheme_pattern).length > 1
+        sanitized_url = if configured_url.match?(/[\r\n]/) ||
+                           configured_url.scan(FLEXIBLE_HTTP_URL_SCHEME_PATTERN).length > 1
                           strip_malformed_url_userinfo(configured_url)
                         else
                           sanitized_valid_network_url(configured_url) || strip_malformed_url_userinfo(configured_url)
@@ -217,8 +218,24 @@ module ReactOnRails
         /mx
         text = text.gsub(malformed_authority_pattern) { |span| strip_malformed_url_userinfo(span) }
 
-        scheme_pattern = %r{https?\s*:\s*//}i
-        text.gsub(/#{scheme_pattern}(?:(?!#{scheme_pattern}).)*@/m) { |span| strip_malformed_url_userinfo(span) }
+        strip_malformed_http_userinfo(text)
+      end
+
+      # Scan disjoint spans between flexible HTTP(S) schemes. Each bounded span reuses the
+      # fail-closed last-@ rule, so each input character is scanned a constant number of times.
+      def strip_malformed_http_userinfo(text)
+        sanitized = text.dup.clear
+        unprocessed_start = 0
+        scheme = text.match(FLEXIBLE_HTTP_URL_SCHEME_PATTERN)
+        while scheme
+          next_scheme = text.match(FLEXIBLE_HTTP_URL_SCHEME_PATTERN, scheme.end(0))
+          span_end = next_scheme&.begin(0) || text.length
+          sanitized << text[unprocessed_start...scheme.begin(0)]
+          sanitized << strip_malformed_url_userinfo(text[scheme.begin(0)...span_end])
+          unprocessed_start = span_end
+          scheme = next_scheme
+        end
+        sanitized << text[unprocessed_start..]
       end
 
       # For malformed URLs or unprotected scheme-delimited spans, remove through the last @. The
