@@ -1,3 +1,6 @@
+> **Superseded by [`internal/planning/ppr-plan.md`](./ppr-plan.md) (2026-08-13).**
+> Kept for reasoning history.
+
 # PPR Implementation Plan for React on Rails
 
 **Status:** Planning — answers the open questions in §10 of

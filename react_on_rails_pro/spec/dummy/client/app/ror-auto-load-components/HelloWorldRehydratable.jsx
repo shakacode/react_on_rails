@@ -28,6 +28,27 @@ class HelloWorldRehydratable extends React.Component {
     railsContext: PropTypes.object,
   };
 
+  // Static because rehydrating every instance is class-level work; each mounted
+  // instance's "hydrate" listener delegates here through forceClientHydration.
+  static rehydrateAllInstances() {
+    const registeredComponentName = 'HelloWorldRehydratable';
+
+    // Target all instances of the component in the DOM
+    const match = document.querySelectorAll(`[id^=${registeredComponentName}-react-component-]`);
+    // Not all browsers support forEach on NodeList so we go with a classic for-loop
+    for (let i = 0; i < match.length; i += 1) {
+      const component = match[i];
+      // Rehydrate through the Pro client lifecycle: it reads props from the component
+      // specification <script> tag for this dom id, unmounts the React root orphaned by
+      // the innerHTML replacement (cleaning up its listeners), and hydrates the new node.
+      // Log rejections: the async lifecycle otherwise surfaces failures only as an
+      // unhandled promise rejection with no stack tying it back to this dispatch.
+      ReactOnRails.reactOnRailsComponentLoaded(component.id).catch((error) => {
+        console.error(`rehydrateAllInstances failed for ${component.id}:`, error);
+      });
+    }
+  }
+
   // Not necessary if we only call super, but we'll need to initialize state, etc.
   constructor(props) {
     super(props);
@@ -39,6 +60,14 @@ class HelloWorldRehydratable extends React.Component {
 
   componentDidMount() {
     document.addEventListener('hydrate', this.forceClientHydration);
+    // Mark the react_on_rails mount container once this instance's mount has committed.
+    // The innerHTML replacement in xhr_refresh.js.erb wipes the attribute together with
+    // the old node, so it re-appears only after the remounted component commits — tests
+    // wait for it before interacting with the refreshed DOM.
+    const container = this.nameDomRef.closest('[id^=HelloWorldRehydratable-react-component-]');
+    if (container) {
+      container.setAttribute('data-hydrated', 'true');
+    }
   }
 
   componentWillUnmount() {
@@ -55,21 +84,7 @@ class HelloWorldRehydratable extends React.Component {
   }
 
   forceClientHydration() {
-    const registeredComponentName = 'HelloWorldRehydratable';
-    const { railsContext } = this.props;
-
-    // Target all instances of the component in the DOM
-    const match = document.querySelectorAll(`[id^=${registeredComponentName}-react-component-]`);
-    // Not all browsers support forEach on NodeList so we go with a classic for-loop
-    for (let i = 0; i < match.length; i += 1) {
-      const component = match[i];
-      // Get component specification <script> tag
-      const componentSpecificationTag = document.querySelector(`script[data-dom-id=${component.id}]`);
-      // Read props from the component specification tag and merge railsContext
-      const mergedProps = { ...JSON.parse(componentSpecificationTag.textContent), railsContext };
-      // Hydrate
-      ReactOnRails.render(registeredComponentName, mergedProps, component.id, true);
-    }
+    this.constructor.rehydrateAllInstances();
   }
 
   render() {
