@@ -67,7 +67,7 @@ const redactCredentialsInWebUrls = (value) =>
   String(value).replace(/https?:\/\/[^\s"']+/gi, (url) => redactUrlCredentials(url));
 
 const runtimeGeneratedSecretPrefix = String.raw`(^|[ \t\x60]|^\/(?:usr\/)?bin\/(?:zsh|bash|sh) -lc ')`;
-const runtimeGeneratedSecretBoundary = String.raw`(?=[ \t;|&<>()\x60"']|$)`;
+const runtimeGeneratedSecretBoundary = String.raw`(?=[ \t;|&<>()\x60]|$)`;
 const runtimeGeneratedSecretMarker = new RegExp(
   // A marker is trusted only when this helper is explicitly called in trusted mode.
   `${runtimeGeneratedSecretPrefix}SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>"`,

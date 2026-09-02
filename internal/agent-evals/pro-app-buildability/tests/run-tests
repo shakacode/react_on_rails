@@ -1614,7 +1614,7 @@ runtime_generated_secret_prefixes=(
   "/bin/sh -lc '"
   "/usr/bin/sh -lc '"
 )
-runtime_generated_secret_delimiters=(';' '`' '|' '&' '<' '>' ')' '"' "'" ' ' $'\t' '')
+runtime_generated_secret_delimiters=(';' '`' '|' '&' '<' '>' ')' ' ' $'\t' '')
 : >"$tmp/runtime-generated-secret-delimiters"
 : >"$tmp/runtime-generated-secret-delimiters.canonicalize.expected"
 : >"$tmp/runtime-generated-secret-delimiters.redact.expected"
@@ -1689,6 +1689,10 @@ SECRET_KEY_BASE=$(bin/rails secret --hex) npm run build
 SECRET_KEY_BASE=$(rails secret) npm run build
 RAILS_MASTER_KEY=$(bin/rails secret) npm run build
 SECRET_KEY_BASE=$(bin/rails secret)x npm run build
+SECRET_KEY_BASE=$(bin/rails secret)"literal-secret-suffix" npm run build
+SECRET_KEY_BASE=$(bin/rails secret)'literal-secret-suffix' npm run build
+/bin/bash -lc 'SECRET_KEY_BASE=$(bin/rails secret)'literal-secret-suffix
+/bin/bash -lc 'SECRET_KEY_BASE=$(bin/rails secret)'"literal-secret-suffix"
 SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>"x npm run build
 XSECRET_KEY_BASE=$(bin/rails secret) npm run build
 SECRET_KEY_BASE="<generated_at_runtime>" npm run build
@@ -1711,9 +1715,10 @@ node --input-type=module -e \
   >"$tmp/runtime-generated-secret-near-misses.js-safe"
 cmp "$tmp/runtime-generated-secret-near-misses.perl-safe" \
   "$tmp/runtime-generated-secret-near-misses.js-safe"
-test "$(rg -c '\[REDACTED\]' "$tmp/runtime-generated-secret-near-misses.perl-safe")" = 20
+test "$(rg -c '\[REDACTED\]' "$tmp/runtime-generated-secret-near-misses.perl-safe")" = 24
 if rg -Fq '$(bin/rails secret)' "$tmp/runtime-generated-secret-near-misses.perl-safe" ||
-  rg -Fq 'real-runtime-value' "$tmp/runtime-generated-secret-near-misses.perl-safe"; then
+  rg -Fq 'real-runtime-value' "$tmp/runtime-generated-secret-near-misses.perl-safe" ||
+  rg -Fq 'literal-secret-suffix' "$tmp/runtime-generated-secret-near-misses.perl-safe"; then
   echo "runtime-generated secret near miss bypassed redaction" >&2
   exit 1
 fi
