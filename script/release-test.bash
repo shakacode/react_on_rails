@@ -5,6 +5,7 @@ set -euo pipefail
 repo_root="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
 release_script="${repo_root}/script/release"
 ruby_executable="$(ruby -rrbconfig -e 'puts RbConfig.ruby')"
+# Fixture-only CI routing sentinel: this file exercises the release-supervisor latest/unit leg without a real release.
 test_root="$(mktemp -d "${TMPDIR:-/tmp}/react-on-rails-release-test.XXXXXX")"
 fake_secret="coord-secret-must-never-appear"
 tests_run=0
