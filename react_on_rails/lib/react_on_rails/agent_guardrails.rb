@@ -87,7 +87,7 @@ module ReactOnRails
 
         unless unchanged
           FileUtils.mkdir_p(File.dirname(dest_path))
-          File.write(dest_path, new_content)
+          atomic_write(dest_path, new_content, new_file_mode: 0o666 & ~File.umask)
         end
         File.chmod(0o755, dest_path) if dest_rel == HOOK_REL
 
@@ -110,12 +110,11 @@ module ReactOnRails
         existed ? "updated    #{SETTINGS_REL} (registered hook)" : "created    #{SETTINGS_REL} (registered hook)"
       end
 
-      # settings.json is the user's file and may hold unrelated configuration, so it is replaced by
-      # rename rather than truncate-and-write: an interrupted or failed write can never leave a
-      # half-written or empty settings file behind.
-      def atomic_write(path, content)
+      # Files are replaced by rename rather than truncate-and-write so an interrupted or failed write
+      # can never leave a half-written or empty destination behind.
+      def atomic_write(path, content, new_file_mode: 0o644)
         directory = File.dirname(path)
-        mode = File.exist?(path) ? File.stat(path).mode & 0o7777 : 0o644
+        mode = File.exist?(path) ? File.stat(path).mode & 0o7777 : new_file_mode
         temp = Tempfile.create([".#{File.basename(path)}", ".tmp"], directory)
         begin
           temp.write(content)
@@ -200,15 +199,23 @@ module ReactOnRails
       def add_hook(settings)
         hooks = (settings["hooks"] ||= {})
         post_tool_use = (hooks["PostToolUse"] ||= [])
-        post_tool_use.each do |candidate|
-          Array(candidate["hooks"]).reject! { |hook| managed_hook?(hook) }
-        end
+        remove_managed_hooks(post_tool_use)
         entry = post_tool_use.find { |candidate| candidate["matcher"] == HOOK_MATCHER }
         unless entry
           entry = { "matcher" => HOOK_MATCHER, "hooks" => [] }
           post_tool_use << entry
         end
         (entry["hooks"] ||= []) << { "type" => "command", "command" => HOOK_COMMAND, "args" => HOOK_ARGS }
+      end
+
+      def remove_managed_hooks(post_tool_use)
+        post_tool_use.reject! do |candidate|
+          candidate_hooks = candidate["hooks"]
+          next false unless candidate_hooks
+
+          removed_hooks = candidate_hooks.reject! { |hook| managed_hook?(hook) }
+          removed_hooks && candidate_hooks.empty?
+        end
       end
 
       def registered_hook?(hook)

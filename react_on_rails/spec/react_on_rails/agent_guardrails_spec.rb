@@ -97,6 +97,38 @@ module ReactOnRails
       expect(actions).to include("unchanged  .claude/hooks/rsc-app-safety-check.rb")
     end
 
+    it "leaves an existing hook intact when its atomic replacement fails" do
+      described_class.install(@app_root)
+      hook_path = File.join(@app_root, ".claude/hooks/rsc-app-safety-check.rb")
+      File.write(hook_path, "existing hook\n")
+      File.chmod(0o700, hook_path)
+      allow(File).to receive(:rename).and_wrap_original do |original, source, destination|
+        raise Errno::EIO, destination if destination == hook_path
+
+        original.call(source, destination)
+      end
+
+      expect { described_class.install(@app_root) }.to raise_error(Errno::EIO)
+
+      expect(File.read(hook_path)).to eq("existing hook\n")
+      expect(File.stat(hook_path).mode & 0o7777).to eq(0o700)
+      expect(Dir.children(File.dirname(hook_path))).not_to include(a_string_matching(/\.tmp\z/))
+    end
+
+    it "keeps the copy permissions contract when creating guardrail files" do
+      previous_umask = File.umask(0o077)
+      begin
+        described_class.install(@app_root)
+      ensure
+        File.umask(previous_umask)
+      end
+
+      skill_path = File.join(@app_root, ".claude/skills/rsc-app-safety/SKILL.md")
+      hook_path = File.join(@app_root, ".claude/hooks/rsc-app-safety-check.rb")
+      expect(File.stat(skill_path).mode & 0o7777).to eq(0o600)
+      expect(File.stat(hook_path).mode & 0o7777).to eq(0o755)
+    end
+
     it "parses Claude hook input without requiring jq" do
       described_class.install(@app_root)
       routes_path = File.join(@app_root, "config/routes.rb")
@@ -727,6 +759,53 @@ module ReactOnRails
 
       described_class.install(@app_root)
 
+      expect(rsc_hooks).to contain_exactly(
+        "type" => "command", "command" => described_class::HOOK_COMMAND, "args" => described_class::HOOK_ARGS
+      )
+    end
+
+    it "removes hook groups emptied by an upgrade without changing unrelated settings" do
+      claude_dir = File.join(@app_root, ".claude")
+      settings_path = File.join(claude_dir, "settings.json")
+      FileUtils.mkdir_p(claude_dir)
+      unrelated_hook = { "type" => "command", "command" => "bin/unrelated-hook" }
+      pre_tool_use = [{ "matcher" => "Bash", "hooks" => [{ "type" => "command", "command" => "bin/pre-hook" }] }]
+      File.write(
+        settings_path,
+        JSON.pretty_generate(
+          "model" => "opus",
+          "hooks" => {
+            "PreToolUse" => pre_tool_use,
+            "PostToolUse" => [
+              {
+                "matcher" => "Bash",
+                "hooks" => [{ "type" => "command", "command" => described_class::LEGACY_HOOK_COMMAND }]
+              },
+              { "matcher" => "Read", "hooks" => [] },
+              {
+                "matcher" => "NotebookEdit",
+                "hooks" => [
+                  { "type" => "command", "command" => described_class::LEGACY_HOOK_COMMAND },
+                  unrelated_hook
+                ]
+              },
+              { "matcher" => "Edit|Write", "hooks" => [unrelated_hook] }
+            ]
+          }
+        )
+      )
+
+      described_class.install(@app_root)
+
+      expect(settings["model"]).to eq("opus")
+      expect(settings.dig("hooks", "PreToolUse")).to eq(pre_tool_use)
+      expect(settings.dig("hooks", "PostToolUse")).to include("matcher" => "Read", "hooks" => [])
+      expect(settings.dig("hooks", "PostToolUse")).not_to include(include("matcher" => "Bash"))
+      expect(settings.dig("hooks", "PostToolUse")).to include(
+        "matcher" => "NotebookEdit", "hooks" => [unrelated_hook]
+      )
+      expect(settings.dig("hooks", "PostToolUse").find { |entry| entry["matcher"] == "Edit|Write" }["hooks"])
+        .to include(unrelated_hook)
       expect(rsc_hooks).to contain_exactly(
         "type" => "command", "command" => described_class::HOOK_COMMAND, "args" => described_class::HOOK_ARGS
       )
