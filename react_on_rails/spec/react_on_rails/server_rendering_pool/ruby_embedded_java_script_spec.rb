@@ -940,6 +940,18 @@ module ReactOnRails
           end
         end
 
+        context "when a bundle-load failure contains authority-relative credentials" do
+          it "redacts the credentials while retaining the host and path" do
+            failure_message = "Failure loading //synthetic-user:synthetic-secret@host/path"
+            stub_http_bundle_failure(failure_message)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("Failure loading //host/path")
+          end
+        end
+
         context "when a bundle-load failure contains non-URL double-slash text" do
           it "preserves the arbitrary message text" do
             failure_message = "// contact dev@example"

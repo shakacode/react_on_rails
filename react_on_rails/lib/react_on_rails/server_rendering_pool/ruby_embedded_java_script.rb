@@ -501,6 +501,14 @@ module ReactOnRails
         end
 
         def strip_unprotected_userinfo(text)
+          # A credential-bearing network-path reference can appear in an exception message even
+          # when it is not the configured bundle URL. Require a non-whitespace token immediately
+          # after // so ordinary prose such as "// contact dev@example" remains untouched.
+          authority_pattern = %r{(?<!:)//[^\s"']+}
+          text = text.gsub(authority_pattern) do |url|
+            sanitized_valid_network_url(url) || strip_malformed_url_userinfo(url)
+          end
+
           scheme_pattern = %r{https?\s*:\s*//}i
           text.gsub(/#{scheme_pattern}(?:(?!#{scheme_pattern}).)*@/m) { |span| strip_malformed_url_userinfo(span) }
         end
