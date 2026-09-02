@@ -2,6 +2,7 @@
 
 require "uri"
 require_relative "diagnostic_url_redactor/authority_relative_rewriter"
+require_relative "diagnostic_url_redactor/encoded_authority_redactor"
 
 module ReactOnRails
   # Removes URL userinfo from configured values and diagnostic prose before either is displayed.
@@ -9,11 +10,18 @@ module ReactOnRails
     HTTP_URL_SCHEME_PATTERN = %r{https?://}i
     ENCODED_USERINFO_DELIMITER_PATTERN = /@|%40/i
     ENCODED_AUTHORITY_END_PATTERN = %r{/|%2f|\?|%3f|\#|%23}i
+    # A bare authority start whose two slashes are not both literal, so the literal marker
+    # scan in AuthorityRelativeRewriter cannot see it.
+    ENCODED_AUTHORITY_MARKER_PATTERN = %r{%2f(?:/|%2f)|/%2f}i
+    ENCODED_AUTHORITY_TOKEN_PATTERN = /#{ENCODED_AUTHORITY_MARKER_PATTERN}[^\s"']+/
+    ENCODED_PORT_SUFFIX_PATTERN = /(?::|%3a)\d*\z/i
+    ENCODED_AUTHORITY_USERINFO_HINT_PATTERN = /:|%3a|@|%40/i
     HTTP_URL_TOKEN_PATTERN = /#{HTTP_URL_SCHEME_PATTERN}(?:(?!#{HTTP_URL_SCHEME_PATTERN})[^\s"'])+/
     FLEXIBLE_HTTP_URL_SCHEME_PATTERN = %r{https?\s*:\s*//}i
 
     CONFIGURED_URL_NOT_PROVIDED = Object.new.freeze
-    private_constant :AuthorityRelativeRewriter, :CONFIGURED_URL_NOT_PROVIDED
+    private_constant :AuthorityRelativeRewriter, :EncodedNetworkUrlRewriter,
+                     :EncodedAuthorityRedactor, :CONFIGURED_URL_NOT_PROVIDED
 
     # Rewrites disjoint regex-delimited spans with byte offsets so multibyte prefixes do not
     # force Ruby to rescan the string for every match.
@@ -302,67 +310,6 @@ module ReactOnRails
     end
     private_constant :NetworkUrlStartScanner
 
-    # Removes userinfo from every encoded-or-literal authority without decoding
-    # or rewriting unrelated path, query, and fragment text.
-    module EncodedNetworkUrlRewriter
-      module_function
-
-      def rewrite(url, authority_start: nil)
-        start_offset = authority_start || detected_authority_start(url)
-        return nil unless start_offset
-
-        removal_span = userinfo_removal_span(url, start_offset)
-        return nil unless removal_span
-
-        remove_byte_spans(url, [removal_span])
-      end
-
-      def rewrite_all(url)
-        removal_spans = NetworkUrlStartScanner.authority_starts(url).filter_map do |authority_start|
-          userinfo_removal_span(url, authority_start)
-        end
-        return nil if removal_spans.empty?
-
-        remove_byte_spans(url, removal_spans)
-      end
-
-      def authority_end(url, authority_start)
-        url.b.match(ENCODED_AUTHORITY_END_PATTERN, authority_start)&.begin(0) || url.bytesize
-      end
-
-      def detected_authority_start(url)
-        network_url = NetworkUrlStartScanner.spans(url).first
-        return network_url.last if network_url&.first&.zero?
-
-        2 if url.start_with?("//")
-      end
-
-      def userinfo_removal_span(url, authority_start)
-        end_offset = authority_end(url, authority_start)
-        authority = url.byteslice(authority_start, end_offset - authority_start)
-        _userinfo, delimiter, host = authority.rpartition(ENCODED_USERINFO_DELIMITER_PATTERN)
-        return nil if delimiter.empty?
-
-        [authority_start, end_offset - host.bytesize]
-      end
-
-      def remove_byte_spans(text, spans)
-        rewritten = text.dup.clear
-        unprocessed_start = 0
-
-        spans.each do |start_offset, end_offset|
-          if start_offset > unprocessed_start
-            rewritten << text.byteslice(unprocessed_start, start_offset - unprocessed_start)
-          end
-          unprocessed_start = [unprocessed_start, end_offset].max
-        end
-        rewritten << text.byteslice(unprocessed_start, text.bytesize - unprocessed_start)
-      end
-
-      private_class_method :authority_end, :detected_authority_start, :userinfo_removal_span, :remove_byte_spans
-    end
-    private_constant :EncodedNetworkUrlRewriter
-
     class << self
       # Sanitizes a configured URL when called with one argument. When sanitizing exception text,
       # pass the originating URL so both its raw and inspected spellings are replaced safely.
@@ -410,14 +357,21 @@ module ReactOnRails
 
         prefix = sanitized_configured_prefix(url.byteslice(0, start_offset))
         configured_url = url.byteslice(start_offset, url.bytesize - start_offset)
-        sanitized_url = EncodedNetworkUrlRewriter.rewrite_all(configured_url) || configured_url
+        sanitized_url = EncodedNetworkUrlRewriter.rewrite_all(configured_url) ||
+                        EncodedAuthorityRedactor.fail_closed_userinfo(configured_url,
+                                                                      end_offset - start_offset) ||
+                        configured_url
         "#{prefix}#{sanitized_nested_network_urls(sanitized_url)}"
       end
 
       def sanitized_authority_relative_url(url)
-        AuthorityRelativeRewriter.rewrite(url, delimiter_pattern: ENCODED_USERINFO_DELIMITER_PATTERN) do |span|
+        rewritten = AuthorityRelativeRewriter.rewrite(url,
+                                                      delimiter_pattern: ENCODED_USERINFO_DELIMITER_PATTERN) do |span|
           sanitized_valid_network_url(span)
         end
+        return rewritten unless rewritten == url
+
+        EncodedAuthorityRedactor.sanitized_authority_relative_url(url) || rewritten
       end
 
       def sanitized_error_message(message, raw_url)
@@ -467,11 +421,14 @@ module ReactOnRails
         continuation.match?(ENCODED_USERINFO_DELIMITER_PATTERN)
       end
 
+      # The unresolved region starting at the first scheme is discarded, but the text kept before
+      # it is ordinary prose that can still carry an authority-relative credential, so it is
+      # sanitized rather than returned verbatim.
       def sanitized_unprotected_prefix(text, raw_url, sanitized_url)
         unresolved_scheme = text.match(HTTP_URL_SCHEME_PATTERN)
         return strip_unprotected_userinfo(text) if raw_url == sanitized_url || unresolved_scheme.nil?
 
-        text[...unresolved_scheme.begin(0)]
+        strip_unprotected_userinfo(text[...unresolved_scheme.begin(0)])
       end
 
       # A configured value with credential-like text before its first URL scheme is malformed,
@@ -565,7 +522,9 @@ module ReactOnRails
         /mx
         text = text.gsub(malformed_authority_pattern) { |span| strip_malformed_url_userinfo(span) }
 
-        strip_malformed_http_userinfo(text)
+        # The patterns above only recognize a literal // authority start, so prose can still
+        # carry a bare authority whose slashes are encoded.
+        EncodedAuthorityRedactor.strip_userinfo(strip_malformed_http_userinfo(text))
       end
 
       # Scan disjoint spans between flexible HTTP(S) schemes. Each bounded span reuses the

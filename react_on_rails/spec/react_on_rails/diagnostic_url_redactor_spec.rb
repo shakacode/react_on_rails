@@ -27,6 +27,26 @@ RSpec.describe ReactOnRails::DiagnosticUrlRedactor do
         "http:%2F%2Fhost/bundle.js"
       ],
       [
+        "an encoded authority terminator before an encoded userinfo delimiter",
+        "http:%2F%2Fbundle-user:synthetic-password%2Fsegment%40host/bundle.js",
+        "http:%2F%2Fhost/bundle.js"
+      ],
+      [
+        "a fully encoded authority-relative start",
+        "%2F%2Fbundle-user:synthetic-password%40host/bundle.js",
+        "%2F%2Fhost/bundle.js"
+      ],
+      [
+        "a mixed literal and encoded authority-relative start",
+        "/%2Fbundle-user:synthetic-password%40host/bundle.js",
+        "/%2Fhost/bundle.js"
+      ],
+      [
+        "an encoded authority-relative start after a prefix",
+        "URL= %2F%2Fbundle-user:synthetic-password%40host/bundle.js",
+        "URL= %2F%2Fhost/bundle.js"
+      ],
+      [
         "fully encoded outer and nested URL credentials",
         "http%3A%2F%2Fouter-user%3Aouter-secret%40outer.test%2Fredirect%3Fnext%3D" \
         "ftp%3A%2F%2Fnested-user%3Anested-secret%40nested.test%2Fpath",
@@ -397,9 +417,9 @@ RSpec.describe ReactOnRails::DiagnosticUrlRedactor do
       end
 
       safe_values = [
-        "nothttp%20 :%2F%2Fsafe@example.test",
-        "httpish%20 :%2F%2Fsafe@example.test",
-        "%61http%20 :%2F%2Fsafe@example.test",
+        "nothttp%20 :%2F%2Fhost/path?mail=safe@example.test",
+        "httpish%20 :%2F%2Fhost/path?mail=safe@example.test",
+        "%61http%20 :%2F%2Fhost/path?mail=safe@example.test",
         "http%20 :%2F%2Fhost/path%40asset",
         "http%20 :%2F%2Fhost/path?mail=safe@example.test",
         "http%20 :%2F%2Fhost/path%23safe%40example.test"
@@ -407,6 +427,17 @@ RSpec.describe ReactOnRails::DiagnosticUrlRedactor do
       safe_values.each do |safe_value|
         expect(described_class.sanitize(safe_value)).to eq(safe_value)
         expect(sanitize_error("Failure loading #{safe_value}")).to eq("Failure loading #{safe_value}")
+      end
+
+      # A rejected scheme leaves an encoded bare authority, which fails closed exactly like the
+      # literal spelling rather than escaping redaction because its slashes are encoded.
+      rejected_scheme_authorities = [
+        ["nothttp%20 :%2F%2Fsynthetic-user%40host/path", "nothttp%20 :%2F%2Fhost/path"],
+        ["httpish%20 :%2F%2Fsynthetic-user%40host/path", "httpish%20 :%2F%2Fhost/path"],
+        ["%61http%20 :%2F%2Fsynthetic-user%40host/path", "%61http%20 :%2F%2Fhost/path"]
+      ]
+      rejected_scheme_authorities.each do |configured_url, expected_url|
+        expect(described_class.sanitize(configured_url)).to eq(expected_url)
       end
     end
 
@@ -418,7 +449,7 @@ RSpec.describe ReactOnRails::DiagnosticUrlRedactor do
         encoded_prefix = format("%%%02X", byte)
         schemes.each do |scheme|
           if scheme_continuation_bytes.include?(byte)
-            safe_value = "#{encoded_prefix}#{scheme} %3A%2F%2Fsafe@example.test"
+            safe_value = "#{encoded_prefix}#{scheme} %3A%2F%2Fhost/path?mail=safe@example.test"
             expect(described_class.sanitize(safe_value)).to eq(safe_value)
             expect(sanitize_error("Failure loading #{safe_value}")).to eq("Failure loading #{safe_value}")
           else
@@ -434,9 +465,13 @@ RSpec.describe ReactOnRails::DiagnosticUrlRedactor do
 
       invalid_percent_controls = ["%GGhttp", "%61http", "%61%2Dhttp", "a%20nothttp", "a%20httpish"]
       invalid_percent_controls.each do |prefix|
-        safe_value = "#{prefix} %3A%2F%2Fsafe@example.test"
+        safe_value = "#{prefix} %3A%2F%2Fhost/path?mail=safe@example.test"
         expect(described_class.sanitize(safe_value)).to eq(safe_value)
         expect(sanitize_error("Failure loading #{safe_value}")).to eq("Failure loading #{safe_value}")
+
+        # The rejected scheme still leaves an encoded bare authority, which fails closed.
+        expect(described_class.sanitize("#{prefix} %3A%2F%2Fsynthetic-user%40host/path"))
+          .to eq("#{prefix} %3A%2F%2Fhost/path")
       end
     end
 
@@ -692,13 +727,28 @@ RSpec.describe ReactOnRails::DiagnosticUrlRedactor do
       ],
       [
         "a non-HTTP word before encoded separators",
-        "Contact nothttp %3A%2F%2Fsafe@example.test",
-        "Contact nothttp %3A%2F%2Fsafe@example.test"
+        "Contact nothttp %3A%2F%2Fhost/path?mail=safe@example.test",
+        "Contact nothttp %3A%2F%2Fhost/path?mail=safe@example.test"
+      ],
+      [
+        "an encoded bare authority after a non-HTTP word",
+        "Contact nothttp %3A%2F%2Fsynthetic-user%40host/path",
+        "Contact nothttp %3A%2F%2Fhost/path"
+      ],
+      [
+        "an encoded bare authority in prose",
+        "Failure loading %2F%2Fsynthetic-user:synthetic-secret%40host/path",
+        "Failure loading %2F%2Fhost/path"
+      ],
+      [
+        "a mixed-slash bare authority in prose",
+        "Failure loading /%2Fsynthetic-user:synthetic-secret@host/path",
+        "Failure loading /%2Fhost/path"
       ],
       [
         "an HTTP-prefixed word before encoded separators",
-        "Contact httpish %3A%2F%2Fsafe@example.test",
-        "Contact httpish %3A%2F%2Fsafe@example.test"
+        "Contact httpish %3A%2F%2Fhost/path?mail=safe@example.test",
+        "Contact httpish %3A%2F%2Fhost/path?mail=safe@example.test"
       ]
     ]
 
@@ -737,6 +787,14 @@ RSpec.describe ReactOnRails::DiagnosticUrlRedactor do
                 "HtTpS://synthetic-secret@host/path"
 
       expect(sanitize_error(message)).to eq("Failure loading https://host/path")
+    end
+
+    it "sanitizes an authority-relative credential inside a discarded unresolved region" do
+      message = "//synthetic-admin:synthetic-secret@internal.host then " \
+                "http://synthetic-user:nonnumeric-prefix\nsynthetic-tail " \
+                "HtTpS://synthetic-other@host/path"
+
+      expect(sanitize_error(message)).to eq("//internal.host then https://host/path")
     end
 
     it "replaces raw and inspected spellings of the configured URL" do
@@ -867,6 +925,15 @@ RSpec.describe ReactOnRails::DiagnosticUrlRedactor do
 
         sanitized_url = Timeout.timeout(1) { described_class.sanitize(configured_url) }
         expect(sanitized_url).to eq(expected_url)
+      end
+    end
+
+    it "redacts repeated bare authority markers without a scheme in bounded time" do
+      [2, 4_000].each do |count|
+        message = %(prefix //a "b '#{'//segment "gap \'tail ' * count}//user:synthetic-secret@host/path)
+
+        sanitized = Timeout.timeout(1) { sanitize_error(message) }
+        expect(sanitized).not_to include("synthetic-secret")
       end
     end
   end
