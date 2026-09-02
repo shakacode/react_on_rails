@@ -7,7 +7,7 @@ require_relative "generator_messages/ci_section"
 require_relative "generator_messages/shakapacker_status_section"
 
 module GeneratorMessages
-  PRO_UPGRADE_HINT = "\n\n    💎 For RSC, streaming SSR, and 10-100x faster SSR, try React on Rails Pro:" \
+  PRO_UPGRADE_HINT = "\n\n    💎 For RSC, streaming SSR, and a dedicated Node renderer, try React on Rails Pro:" \
                      "\n       #{Rainbow('https://reactonrails.com/docs/pro/upgrading-to-pro/').cyan.underline}".freeze
   # Package manager constants and detection helpers live in PackageManagerDetection,
   # re-exported here for backwards compatibility (external callers use ::SUPPORTED_PACKAGE_MANAGERS).

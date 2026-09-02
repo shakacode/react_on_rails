@@ -28,13 +28,15 @@ The contrast in one picture — the old way runs JavaScript inside Rails, while 
 
 | Metric               | ExecJS                      | Node Renderer            |
 | -------------------- | --------------------------- | ------------------------ |
-| SSR throughput       | Baseline                    | 10-100x faster           |
+| SSR throughput       | Baseline                    | Workload-dependent       |
 | Memory isolation     | Shared with Ruby            | Separate process         |
 | Worker concurrency   | Single-threaded per request | Configurable worker pool |
 | Profiling            | Not available               | Full Node.js tooling     |
 | Memory leak recovery | Crashes Ruby                | Rolling worker restarts  |
 
 At [Popmenu](https://www.shakacode.com/recent-work/popmenu/) (a ShakaCode client), switching to the Node Renderer contributed to a 73% decrease in average response times and 20-25% lower Heroku costs across tens of millions of daily SSR requests.
+
+Because results depend on application code, traffic, and deployment topology, [benchmark your own pages](../oss/core-concepts/performance-benchmarks.md) rather than relying on a universal multiplier.
 
 ## How It Works
 
@@ -392,7 +394,7 @@ await reactOnRailsProNodeRenderer().catch((e) => {
 > [!NOTE]
 > With `fastify: true` or a nonempty `instrumentations` list, OpenTelemetry patches modules process-wide. If a later init step fails, the renderer disables every registered instrumentation before cleaning up the provider. It also disables them during normal renderer-managed shutdown so they stop creating spans.
 
-After renderer-managed initialization succeeds, the renderer owns the provider lifecycle, including any supplied `spanProcessor` or `exporter`, and shuts those components down with the provider. Until initialization succeeds, supplied processors and exporters remain caller-owned: failed initialization force-flushes them when supported but does not shut them down.
+After renderer-managed initialization succeeds, the renderer owns the provider lifecycle, including any supplied `spanProcessor` or `exporter`, and shuts those components down with the provider. Failed initialization preserves a caller-supplied `spanProcessor`: the renderer force-flushes it when supported but does not shut it down. A supplied `exporter` has a different contract because the renderer creates and owns its wrapping processor; if initialization later fails, shutting down that processor also shuts down the exporter.
 
 ### Add instrumentations and resource detectors
 
@@ -433,7 +435,7 @@ initOpenTelemetry({
 
 The renderer verifies that a global tracer provider and a working context manager have been registered before it installs `setupTracing` and `setupSubSpan`, preserving the renderer's nested `ror.*` spans. Register the application SDK with `provider.register()` before calling renderer `init()`. Calling only `trace.setGlobalTracerProvider()` is insufficient because it does not install context propagation. If either prerequisite is unavailable, `init()` logs a retryable warning without installing adapters. Register the SDK, then call `init()` again to attach renderer tracing.
 
-The application continues to own exporters, processors, resources, instrumentations, propagators, flushing, and provider shutdown. Renderer-managed options such as `fastify`, `instrumentations`, `resourceDetectors`, `exporter`, `spanProcessor`, and `shutdownTimeoutMs` are ignored in this mode and produce a warning when supplied. Configure those features on the application-owned SDK before starting the renderer. In particular, register HTTP and Fastify instrumentation before the Fastify server loads so incoming `traceparent` context from Rails becomes the parent of the renderer's `ror.*` spans. The renderer does not add a shutdown hook for an external provider, so the host must flush and shut down its SDK during application shutdown.
+The application continues to own exporters, processors, resources, instrumentations, propagators, flushing, and provider shutdown. Renderer-managed options such as `fastify`, `instrumentations`, `resourceDetectors`, `exporter`, `spanProcessor`, and `shutdownTimeoutMs` are ignored in this mode and produce a warning when supplied, including explicit false, zero, or empty values. Non-service-name `resourceAttributes` are also ignored and warned about; only `resourceAttributes['service.name']` participates in tracer-scope naming. These warnings are emitted even when the provider or context-manager prerequisite is still missing. Configure those features on the application-owned SDK before starting the renderer. In particular, register HTTP and Fastify instrumentation before the Fastify server loads so incoming `traceparent` context from Rails becomes the parent of the renderer's `ror.*` spans. The renderer does not add a shutdown hook for an external provider, so the host must flush and shut down its SDK during application shutdown.
 
 `serviceName`, or `resourceAttributes['service.name']` when no higher-priority name is set, selects the tracer instrumentation scope for renderer spans. It does not change the existing provider's resource. Configure the resource `service.name` on the host-owned SDK.
 

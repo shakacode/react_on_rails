@@ -13,8 +13,16 @@ For licensing terms:
 https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
 -%>
 var container = document.getElementById('component-container');
+// Note: data-refreshed is cleared at request start by the ajax:send listener in
+// xhr_refresh.html.erb. Clearing it here would be unobservable — this whole script
+// runs as one synchronous evaluation, so remove + set could never expose a
+// cleared state to a DOM waiter.
 container.innerHTML = "<%= escape_javascript(render partial: 'xhr_refresh_partial') %>";
 
 var event = document.createEvent('Event');
 event.initEvent('hydrate', true, true);
 document.dispatchEvent(event);
+
+// Signal that the XHR response has been applied and hydration dispatched.
+// Tests wait for this attribute before interacting with the refreshed DOM.
+container.setAttribute('data-refreshed', 'true');

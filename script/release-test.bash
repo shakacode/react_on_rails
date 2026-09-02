@@ -283,8 +283,9 @@ case "${command_name}" in
       "${claim_status}" "${TEST_REPO}" "${TEST_TARGET}"
     printf '"branch":"%s","agent_id":"%s","instance_id":"%s",' \
       "${TEST_BRANCH}" "${claim_agent_id}" "${claim_instance_id}"
-    printf '"machine_id":"%s","expires_at":"%s"}],' \
-      "${claim_machine_id}" "${claim_expiry}"
+    printf '"machine_id":"%s","expires_at":"%s",' "${claim_machine_id}" "${claim_expiry}"
+    printf '"host":"codex","operator":"release-operator","phase":"publishing",'
+    printf '"thread_handle":"release-task-123","session_id":"release-session-456"}],'
     if test "${include_heartbeat}" = 1; then
       printf '"heartbeats":[{"agent_id":"%s","instance_id":"%s",' \
         "${claim_agent_id}" "${claim_instance_id}"
@@ -366,6 +367,8 @@ process_group="$(ps -o pgid= -p "$$" | tr -d ' ')"
     printf '|%s' "${argument}"
   done
   printf '\ncontract:%s\n' "${REACT_ON_RAILS_RELEASE_LEASE_CONTRACT:-}"
+  printf 'supervised:%s\n' "${REACT_ON_RAILS_RELEASE_SUPERVISED:-}"
+  printf 'evaluate-head:%s\n' "${RELEASE_CI_EVALUATE_HEAD:-}"
 } >>"${TEST_BUNDLE_LOG}"
 
 record_liveness() {
@@ -484,6 +487,28 @@ end
 
 exit ExceptionTestSupervisor.new(ARGV).run
 EXCEPTION_HARNESS
+
+  cat >"${fake_bin}/release-claim-refusal-diagnostic-failure-harness" <<'CLAIM_REFUSAL_HARNESS'
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+load ENV.fetch("TEST_RELEASE_SCRIPT")
+
+class ClaimRefusalDiagnosticFailureSupervisor < ReleaseSupervisor
+  private
+
+  def run_agent_coord(*command, **)
+    if command.first == "status"
+      @status_reads = @status_reads.to_i + 1
+      raise SupervisorError, "injected claim-refusal diagnostic failure" if @status_reads > 1
+    end
+
+    super
+  end
+end
+
+exit ClaimRefusalDiagnosticFailureSupervisor.new(ARGV).run
+CLAIM_REFUSAL_HARNESS
 
   cat >"${fake_bin}/release-echild-harness" <<'ECHILD_HARNESS'
 #!/usr/bin/env ruby
@@ -605,7 +630,8 @@ UNVERIFIED_CHILD_HARNESS
   chmod +x "${fake_bin}/agent-coord" "${fake_bin}/bundle" "${fake_bin}/pnpm" \
     "${fake_bin}/release-handshake-harness" \
     "${fake_bin}/release-death-watch-startup-failure-harness" \
-    "${fake_bin}/release-exception-harness" "${fake_bin}/release-subreaper-failure-harness" \
+    "${fake_bin}/release-exception-harness" "${fake_bin}/release-claim-refusal-diagnostic-failure-harness" \
+    "${fake_bin}/release-subreaper-failure-harness" \
     "${fake_bin}/release-unverified-child-harness" "${fake_bin}/release-echild-harness"
 
   export PATH="${fake_bin}:${PATH}"
@@ -645,6 +671,7 @@ UNVERIFIED_CHILD_HARNESS
   unset FAKE_HANDSHAKE_IGNORE_TERM
   unset REACT_ON_RAILS_RELEASE_COORDINATION_TIMEOUT
   unset REACT_ON_RAILS_RELEASE_CLAIM_RENEWAL_INTERVAL
+  unset RELEASE_CI_EVALUATE_HEAD
 }
 
 run_release() {
@@ -665,6 +692,13 @@ run_exception_release() {
   (
     cd "${fake_repo}"
     "${fake_bin}/release-exception-harness" "$@"
+  ) >"${output_log}" 2>&1
+}
+
+run_claim_refusal_diagnostic_failure_release() {
+  (
+    cd "${fake_repo}"
+    "${fake_bin}/release-claim-refusal-diagnostic-failure-harness" "$@"
   ) >"${output_log}" 2>&1
 }
 
@@ -870,7 +904,44 @@ run_release --dry-run || fail "argumentless dry-run failed"
 assert_empty "${coord_log}"
 assert_contains "${bundle_log}" 'args|exec|rake|release[17.1.0.rc.0,true]'
 assert_contains "${bundle_log}" 'contract:'
+assert_contains "${bundle_log}" 'supervised:true'
 pass "dry-run selects the first prepared changelog version"
+
+setup_case evaluate-head-dry-run
+unset RELEASE_COORDINATOR_ID RELEASE_COORDINATOR_INSTANCE_ID AGENT_COORD_MACHINE_ID AGENT_COORD_API_TOKEN
+run_release --dry-run --evaluate-head || fail "evaluate-head dry-run failed"
+assert_empty "${coord_log}"
+assert_contains "${bundle_log}" 'args|exec|rake|release[17.1.0.rc.0,true]'
+assert_contains "${bundle_log}" 'evaluate-head:true'
+pass "evaluate-head modifies the dry-run child without enabling coordination"
+
+setup_case evaluate-head-environment-backward-compatibility
+unset RELEASE_COORDINATOR_ID RELEASE_COORDINATOR_INSTANCE_ID AGENT_COORD_MACHINE_ID AGENT_COORD_API_TOKEN
+export RELEASE_CI_EVALUATE_HEAD=true
+run_release --dry-run || fail "legacy evaluate-head environment contract failed"
+assert_empty "${coord_log}"
+assert_contains "${bundle_log}" 'evaluate-head:true'
+pass "evaluate-head preserves the existing environment contract for automation compatibility"
+
+setup_case evaluate-head-reconciliation-rejected
+if run_release --reconcile-accelerated-rc --evaluate-head; then
+  fail "evaluate-head was accepted for accelerated RC reconciliation"
+fi
+assert_empty "${coord_log}"
+assert_empty "${bundle_log}"
+assert_contains "${output_log}" "--evaluate-head does not apply to --reconcile-accelerated-rc"
+assert_secret_absent
+pass "evaluate-head rejects accelerated RC reconciliation where it would be inert"
+
+setup_case evaluate-head-doctor-rejected
+if run_release --doctor --evaluate-head; then
+  fail "evaluate-head was accepted for release doctor"
+fi
+assert_empty "${coord_log}"
+assert_empty "${bundle_log}"
+assert_contains "${output_log}" "--evaluate-head does not apply to --doctor"
+assert_secret_absent
+pass "evaluate-head rejects release doctor where it would be inert"
 
 setup_case missing-changelog-version
 cat >"${fake_repo}/CHANGELOG.md" <<'CHANGELOG'
@@ -979,8 +1050,19 @@ assert_contains "${coord_log}" $'heartbeat|'
 assert_contains "${coord_log}" $'status|'
 assert_contains "${coord_log}" $'release|'
 assert_contains "${bundle_log}" 'args|exec|rake|release[17.1.0.rc.0]'
+assert_contains "${bundle_log}" 'supervised:true'
 assert_secret_absent
 pass "live mode acquires and cleans up a process-owned release lease"
+
+setup_case evaluate-head-live
+unset RELEASE_COORDINATOR_ID RELEASE_COORDINATOR_INSTANCE_ID
+FAKE_BUNDLE_MODE=success run_release --evaluate-head || fail "evaluate-head live release failed"
+assert_contains "${coord_log}" $'claim-atomic|'
+assert_contains "${coord_log}" $'release|'
+assert_contains "${bundle_log}" 'args|exec|rake|release[17.1.0.rc.0]'
+assert_contains "${bundle_log}" 'evaluate-head:true'
+assert_secret_absent
+pass "evaluate-head modifies the supervised live child without bypassing coordination"
 
 setup_case managed-acquisition-empty-status
 unset RELEASE_COORDINATOR_ID RELEASE_COORDINATOR_INSTANCE_ID
@@ -1004,8 +1086,29 @@ assert_contains "${coord_log}" $'claim-atomic|'
 assert_not_contains "${coord_log}" $'claim|'
 assert_not_contains "${coord_log}" $'release|'
 assert_empty "${bundle_log}"
+assert_contains "${output_log}" "release line already has an active foreign claim"
+assert_contains "${output_log}" 'agent_id: "foreign-agent"'
+assert_contains "${output_log}" 'thread_handle: "release-task-123"'
+assert_contains "${output_log}" 'session_id: "release-session-456"'
+assert_contains "${output_log}" \
+  "agent-coord status --repo shakacode/react_on_rails --target release-line:17.1.0 --json"
 assert_secret_absent
 pass "managed acquisition atomically refuses an intervening foreign claim"
+
+setup_case managed-atomic-claim-race-diagnostic-failure
+unset RELEASE_COORDINATOR_ID RELEASE_COORDINATOR_INSTANCE_ID
+export FAKE_ATOMIC_CLAIM_MODE=foreign-race
+if run_claim_refusal_diagnostic_failure_release; then
+  fail "managed release ignored a claim-refusal diagnostic failure"
+fi
+assert_contains "${coord_log}" $'claim-atomic|'
+assert_not_contains "${coord_log}" $'release|'
+assert_empty "${bundle_log}"
+assert_contains "${output_log}" "current holder metadata is unavailable or malformed"
+assert_contains "${output_log}" \
+  "agent-coord status --repo shakacode/react_on_rails --target release-line:17.1.0 --json"
+assert_secret_absent
+pass "claim-refusal diagnostic failures never release a foreign lease"
 
 for foreign_mode in dead expired missing-heartbeat; do
   setup_case "managed-acquisition-foreign-${foreign_mode}"
@@ -1019,6 +1122,11 @@ for foreign_mode in dead expired missing-heartbeat; do
   assert_not_contains "${coord_log}" $'release|'
   assert_empty "${bundle_log}"
   assert_contains "${output_log}" "release line already has an active foreign claim"
+  assert_contains "${output_log}" 'agent_id: "foreign-agent"'
+  assert_contains "${output_log}" 'thread_handle: "release-task-123"'
+  assert_contains "${output_log}" 'session_id: "release-session-456"'
+  assert_contains "${output_log}" \
+    "agent-coord status --repo shakacode/react_on_rails --target release-line:17.1.0 --json"
   assert_secret_absent
   pass "foreign ${foreign_mode} claims block managed acquisition without takeover"
 done
