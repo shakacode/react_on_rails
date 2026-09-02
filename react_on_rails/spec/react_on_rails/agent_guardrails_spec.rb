@@ -115,6 +115,44 @@ module ReactOnRails
       expect(Dir.children(File.dirname(hook_path))).not_to include(a_string_matching(/\.tmp\z/))
     end
 
+    it "updates a symlinked guardrail target without replacing the symlink" do
+      described_class.install(@app_root)
+      skill_path = File.join(@app_root, ".claude/skills/rsc-app-safety/SKILL.md")
+      expected_content = File.read(skill_path)
+      shared_path = File.join(@app_root, "shared/rsc-app-safety-skill.md")
+      FileUtils.mkdir_p(File.dirname(shared_path))
+      File.write(shared_path, "stale shared content\n")
+      File.chmod(0o600, shared_path)
+      File.unlink(skill_path)
+      link_target = Pathname.new(shared_path).relative_path_from(Pathname.new(File.dirname(skill_path))).to_s
+      File.symlink(link_target, skill_path)
+
+      actions = described_class.install(@app_root)
+
+      expect(File.symlink?(skill_path)).to be true
+      expect(File.readlink(skill_path)).to eq(link_target)
+      expect(File.read(shared_path)).to eq(expected_content)
+      expect(File.stat(shared_path).mode & 0o7777).to eq(0o600)
+      expect(actions).to include("updated    .claude/skills/rsc-app-safety/SKILL.md")
+    end
+
+    it "creates a missing symlink target without replacing the symlink" do
+      described_class.install(@app_root)
+      skill_path = File.join(@app_root, ".claude/skills/rsc-app-safety/SKILL.md")
+      expected_content = File.read(skill_path)
+      shared_path = File.join(@app_root, "shared/rsc-app-safety-skill.md")
+      FileUtils.mkdir_p(File.dirname(shared_path))
+      File.unlink(skill_path)
+      link_target = Pathname.new(shared_path).relative_path_from(Pathname.new(File.dirname(skill_path))).to_s
+      File.symlink(link_target, skill_path)
+
+      described_class.install(@app_root)
+
+      expect(File.symlink?(skill_path)).to be true
+      expect(File.readlink(skill_path)).to eq(link_target)
+      expect(File.read(shared_path)).to eq(expected_content)
+    end
+
     it "keeps the copy permissions contract when creating guardrail files" do
       previous_umask = File.umask(0o077)
       begin

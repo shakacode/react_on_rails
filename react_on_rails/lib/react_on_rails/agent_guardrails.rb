@@ -87,7 +87,7 @@ module ReactOnRails
 
         unless unchanged
           FileUtils.mkdir_p(File.dirname(dest_path))
-          atomic_write(dest_path, new_content, new_file_mode: 0o666 & ~File.umask)
+          atomic_write(write_path_for(dest_path), new_content, new_file_mode: 0o666 & ~File.umask)
         end
         File.chmod(0o755, dest_path) if dest_rel == HOOK_REL
 
@@ -108,6 +108,12 @@ module ReactOnRails
         existed = File.exist?(settings_path)
         atomic_write(settings_path, "#{JSON.pretty_generate(settings)}\n")
         existed ? "updated    #{SETTINGS_REL} (registered hook)" : "created    #{SETTINGS_REL} (registered hook)"
+      end
+
+      def write_path_for(path)
+        return path unless File.symlink?(path)
+
+        File.realdirpath(path)
       end
 
       # Files are replaced by rename rather than truncate-and-write so an interrupted or failed write
