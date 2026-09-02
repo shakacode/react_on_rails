@@ -460,6 +460,18 @@ module ReactOnRails
               "http ://host/path"
             ],
             [
+              "a percent-encoded authority delimiter",
+              "http://bundle-user:synthetic-password%40host/bundle.js",
+              true,
+              "http://host/bundle.js"
+            ],
+            [
+              "mixed encoded and literal authority delimiters",
+              "http://synthetic-user%40mail:synthetic-secret@host/path",
+              true,
+              "http://host/path"
+            ],
+            [
               "whitespace after a bare authority marker",
               "// synthetic-user:synthetic-secret@host/path",
               false,
@@ -552,6 +564,12 @@ module ReactOnRails
               "http://synthetic-user:nonnumeric-prefixhttp://synthetic-secret@host/path",
               true,
               "http://host/path"
+            ],
+            [
+              "credential-like text before a later HTTP URL",
+              "synthetic-user:synthetic-secret@host http://actual-host/path",
+              false,
+              "host http://actual-host/path"
             ]
           ].each do |description, configured_value, http_path, expected|
             it "redacts #{description}" do
@@ -562,7 +580,7 @@ module ReactOnRails
               end
 
               message = bundle_load_error_message
-              expect(message).not_to match(/(?:synthetic|nested)-(?:user|secret)/)
+              expect(message).not_to match(/(?:synthetic|nested|bundle)-(?:user|secret|password)/)
               expect(message).to include(expected)
             end
           end

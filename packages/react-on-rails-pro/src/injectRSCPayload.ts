@@ -96,6 +96,12 @@ function hasRenderingErrorSignal(renderingError: unknown) {
   return nonEmptyMetadataString(message) || nonEmptyMetadataString(stack);
 }
 
+function hasMalformedHasErrors(metadata: Record<string, unknown>) {
+  return (
+    Object.prototype.hasOwnProperty.call(metadata, 'hasErrors') && typeof metadata.hasErrors !== 'boolean'
+  );
+}
+
 function shouldEmitConsoleReplay(metadata: Record<string, unknown>, railsEnv?: string) {
   // Console replay remains useful in development/test and for clean production chunks. On an
   // error-bearing chunk, however, it can repeat the same server-only message or stack path that
@@ -103,9 +109,7 @@ function shouldEmitConsoleReplay(metadata: Record<string, unknown>, railsEnv?: s
   if (railsEnv === 'development' || railsEnv === 'test') return true;
 
   const hasRenderingErrorMetadata = Object.prototype.hasOwnProperty.call(metadata, 'renderingError');
-  const hasMalformedHasErrors =
-    Object.prototype.hasOwnProperty.call(metadata, 'hasErrors') && typeof metadata.hasErrors !== 'boolean';
-  return metadata.hasErrors !== true && !hasRenderingErrorMetadata && !hasMalformedHasErrors;
+  return metadata.hasErrors !== true && !hasRenderingErrorMetadata && !hasMalformedHasErrors(metadata);
 }
 
 function createRSCDiagnosticScript(
@@ -115,13 +119,19 @@ function createRSCDiagnosticScript(
   railsEnv?: string,
 ) {
   const { hasErrors, renderingError } = metadata;
+  const showFullDiagnostics = railsEnv === 'development' || railsEnv === 'test';
   // `hasErrors` is a boolean per the server wire contract; renderingError only carries
-  // a useful diagnostic when the server provided a non-blank message or stack.
-  if (hasErrors !== true && !hasRenderingErrorSignal(renderingError)) return undefined;
+  // a useful diagnostic when the server provided a non-blank message or stack. Outside
+  // development/test, a malformed hasErrors value fails closed to the same generic signal as
+  // the fetched RSC path instead of suppressing both the replay and the diagnostic.
+  const hasDiagnosticSignal =
+    hasErrors === true ||
+    hasRenderingErrorSignal(renderingError) ||
+    (!showFullDiagnostics && hasMalformedHasErrors(metadata));
+  if (!hasDiagnosticSignal) return undefined;
   // Outside development/test, emit only the error signal without the server error message or stack.
   // Full diagnostics are reported server-side via the streaming error reporter (Sentry/Honeybadger).
   // Fail-closed: unknown or missing railsEnv defaults to redacted (safe for a security gate).
-  const showFullDiagnostics = railsEnv === 'development' || railsEnv === 'test';
   // The two branches normalize `hasErrors` differently on purpose. The redacted (production)
   // branch forces `hasErrors: true` so a chunk that only tripped `hasRenderingErrorSignal`
   // (server sent `hasErrors: false` but a non-blank message/stack) still emits a positive

@@ -20,6 +20,39 @@ module ReactOnRails
     CONFIGURED_URL_NOT_PROVIDED = Object.new.freeze
     private_constant :CONFIGURED_URL_NOT_PROVIDED
 
+    # Rewrites disjoint regex-delimited spans with byte offsets so multibyte prefixes do not
+    # force Ruby to rescan the string for every match.
+    module ByteSpanRewriter
+      module_function
+
+      def rewrite(text, pattern, skip_initial: false)
+        binary_text = text.b
+        match = first_match(binary_text, pattern, skip_initial)
+        return text unless match
+
+        rewritten = text.dup.clear
+        unprocessed_start = 0
+        while match
+          next_match = binary_text.match(pattern, match.end(0))
+          span_end = next_match&.begin(0) || text.bytesize
+          rewritten << text.byteslice(unprocessed_start, match.begin(0) - unprocessed_start)
+          rewritten << yield(text.byteslice(match.begin(0), span_end - match.begin(0)))
+          unprocessed_start = span_end
+          match = next_match
+        end
+        rewritten << text.byteslice(unprocessed_start, text.bytesize - unprocessed_start)
+      end
+
+      def first_match(binary_text, pattern, skip_initial)
+        match = binary_text.match(pattern)
+        return match unless skip_initial && match&.begin(0)&.zero?
+
+        binary_text.match(pattern, match.end(0))
+      end
+      private_class_method :first_match
+    end
+    private_constant :ByteSpanRewriter
+
     class << self
       # Sanitizes a configured URL when called with one argument. When sanitizing exception text,
       # pass the originating URL so both its raw and inspected spellings are replaced safely.
@@ -45,7 +78,7 @@ module ReactOnRails
         scheme = url.match(FLEXIBLE_HTTP_URL_SCHEME_PATTERN)
         return sanitized_authority_relative_url(url) unless scheme
 
-        prefix = url[...scheme.begin(0)]
+        prefix = sanitized_configured_prefix(url[...scheme.begin(0)])
         configured_url = url[scheme.begin(0)..]
         sanitized_url = if configured_url.match?(/[\r\n]/) ||
                            configured_url.scan(FLEXIBLE_HTTP_URL_SCHEME_PATTERN).length > 1
@@ -122,11 +155,21 @@ module ReactOnRails
         text[...unresolved_scheme.begin(0)]
       end
 
+      # A configured value with credential-like text before its first URL scheme is malformed,
+      # not free-form prose. Fail closed through the prefix's final userinfo delimiter.
+      def sanitized_configured_prefix(prefix)
+        _userinfo, delimiter, suffix = prefix.rpartition(ENCODED_USERINFO_DELIMITER_PATTERN)
+        delimiter.empty? ? prefix : suffix
+      end
+
       # URI handles valid network URLs structurally, so an @ in the path is never mistaken for
       # userinfo. A missing host means an authority-shaped value was parsed as a path instead;
       # returning nil keeps that ambiguous token unprotected for the fail-closed pass.
       def sanitized_valid_network_url(url)
         sanitized_url = sanitized_single_network_url(url)&.dup
+        if sanitized_url.nil? || sanitized_url == url
+          sanitized_url = strip_encoded_network_url_userinfo(url) || sanitized_url
+        end
         return nil unless sanitized_url
 
         sanitized_nested_network_urls(sanitized_url)
@@ -137,26 +180,13 @@ module ReactOnRails
         # input into disjoint scheme spans and assemble their replacements from left to right,
         # keeping the work bounded by the input size even when a diagnostic has many URL starts.
         # The first scheme belongs to the outer URL and was handled structurally above.
-        nested_scheme_starts = sanitized_url.to_enum(:scan, NETWORK_URL_START_PATTERN)
-                                            .map { Regexp.last_match.begin(0) }
-        nested_scheme_starts.shift if nested_scheme_starts.first&.zero?
-        return sanitized_url if nested_scheme_starts.empty?
+        ByteSpanRewriter.rewrite(sanitized_url, NETWORK_URL_START_PATTERN, skip_initial: true) do |nested_url|
+          next nested_url unless nested_url.match?(ENCODED_USERINFO_DELIMITER_PATTERN)
 
-        sanitized = sanitized_url.dup.clear
-        unprocessed_start = 0
-
-        nested_scheme_starts.each_with_index do |start, index|
-          token_end = nested_scheme_starts.fetch(index + 1, sanitized_url.length)
-          nested_url = sanitized_url[start...token_end]
-          replacement = strip_encoded_network_url_userinfo(nested_url) ||
-                        sanitized_single_network_url(nested_url) ||
-                        nested_url
-          sanitized << sanitized_url[unprocessed_start...start]
-          sanitized << replacement
-          unprocessed_start = token_end
+          strip_encoded_network_url_userinfo(nested_url) ||
+            sanitized_single_network_url(nested_url) ||
+            nested_url
         end
-
-        sanitized << sanitized_url[unprocessed_start..]
       end
 
       # Percent encoding can hide the structural delimiters of a nested URL from URI.parse.
@@ -224,18 +254,9 @@ module ReactOnRails
       # Scan disjoint spans between flexible HTTP(S) schemes. Each bounded span reuses the
       # fail-closed last-@ rule, so each input character is scanned a constant number of times.
       def strip_malformed_http_userinfo(text)
-        sanitized = text.dup.clear
-        unprocessed_start = 0
-        scheme = text.match(FLEXIBLE_HTTP_URL_SCHEME_PATTERN)
-        while scheme
-          next_scheme = text.match(FLEXIBLE_HTTP_URL_SCHEME_PATTERN, scheme.end(0))
-          span_end = next_scheme&.begin(0) || text.length
-          sanitized << text[unprocessed_start...scheme.begin(0)]
-          sanitized << strip_malformed_url_userinfo(text[scheme.begin(0)...span_end])
-          unprocessed_start = span_end
-          scheme = next_scheme
+        ByteSpanRewriter.rewrite(text, FLEXIBLE_HTTP_URL_SCHEME_PATTERN) do |span|
+          strip_malformed_url_userinfo(span)
         end
-        sanitized << text[unprocessed_start..]
       end
 
       # For malformed URLs or unprotected scheme-delimited spans, remove through the last @. The

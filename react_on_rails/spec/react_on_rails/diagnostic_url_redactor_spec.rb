@@ -2,6 +2,7 @@
 
 require_relative "spec_helper"
 require "react_on_rails/diagnostic_url_redactor"
+require "timeout"
 
 RSpec.describe ReactOnRails::DiagnosticUrlRedactor do
   describe ".sanitize" do
@@ -13,6 +14,16 @@ RSpec.describe ReactOnRails::DiagnosticUrlRedactor do
       [
         "valid HTTP userinfo",
         "http://synthetic-user:synthetic-secret@host/path",
+        "http://host/path"
+      ],
+      [
+        "a percent-encoded authority delimiter",
+        "http://bundle-user:synthetic-password%40host/bundle.js",
+        "http://host/bundle.js"
+      ],
+      [
+        "mixed encoded and literal authority delimiters",
+        "http://synthetic-user%40mail:synthetic-secret@host/path",
         "http://host/path"
       ],
       [
@@ -96,9 +107,24 @@ RSpec.describe ReactOnRails::DiagnosticUrlRedactor do
         "URL=https://host/path"
       ],
       [
+        "credential-like text before a later HTTP URL",
+        "user:pass@host http://actual-host/path",
+        "host http://actual-host/path"
+      ],
+      [
         "an at sign only in the path",
         "http://host/path@example",
         "http://host/path@example"
+      ],
+      [
+        "a percent-encoded at sign only in the path",
+        "http://host/assets/component%402.js",
+        "http://host/assets/component%402.js"
+      ],
+      [
+        "a percent-encoded at sign only in the query",
+        "http://host/bundle.js?contact=safe%40example.test",
+        "http://host/bundle.js?contact=safe%40example.test"
       ],
       [
         "an at sign only in an authority-relative path",
@@ -392,6 +418,14 @@ RSpec.describe ReactOnRails::DiagnosticUrlRedactor do
       expect(message.bytesize).to be > 65_536
 
       expect(sanitize_error(message)).to eq(message)
+    end
+
+    it "processes a large multibyte diagnostic with many incomplete HTTP URL starts in bounded time" do
+      message = "éhttp://" * 16_000
+      expect(message.bytesize).to be > 131_072
+
+      sanitized = Timeout.timeout(1) { sanitize_error(message) }
+      expect(sanitized).to eq(message)
     end
   end
 end

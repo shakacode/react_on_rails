@@ -520,6 +520,24 @@ describe('injectRSCPayload', () => {
     expect(resultStr).toContain(expectedPayloadPushScript('{"test": "data"}'));
   });
 
+  it('emits a generic production diagnostic when hasErrors is not boolean', async () => {
+    const mockRSC = createMockRSCStreamWithMetadata('{"test": "data"}', {
+      hasErrors: 'true',
+      consoleReplayScript: 'console.error("malformed metadata secret")',
+    });
+    const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId, undefined, {
+      railsEnv: 'production',
+    });
+    const resultStr = await collectStreamData(result);
+
+    expect(resultStr).toContain('REACT_ON_RAILS_RSC_ERRORS');
+    expect(resultStr).toContain('"hasErrors":true');
+    expect(resultStr).not.toContain('malformed metadata secret');
+  });
+
   it('preserves console replay for malformed metadata in development', async () => {
     const mockRSC = createMockRSCStreamWithMetadata('{"test": "data"}', {
       hasErrors: 'true',
