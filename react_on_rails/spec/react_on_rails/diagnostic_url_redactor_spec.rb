@@ -53,6 +53,17 @@ RSpec.describe ReactOnRails::DiagnosticUrlRedactor do
         "redis%3A%2F%2Flast.test%2Fpath"
       ],
       [
+        "encoded outer and nested credentials with whitespace between authority separators",
+        "http %3A%2F %2Fouter-user%3Aouter-secret%40outer.test%2Fnext%3D" \
+        "ftp%3A%2F %2Fnested-user%3Anested-secret%40nested.test%2Fpath",
+        "http %3A%2F %2Fouter.test%2Fnext%3Dftp%3A%2F %2Fnested.test%2Fpath"
+      ],
+      [
+        "an internal HTTP scheme after an encoded boundary in an outer URL",
+        "http://outer.test/path?next=%61%20http %3A%2F%2Fnested-user:nested-secret%40nested.test/path",
+        "http://outer.test/path?next=%61%20http %3A%2F%2Fnested.test/path"
+      ],
+      [
         "mixed encoded and literal authority delimiters",
         "http://synthetic-user%40mail:synthetic-secret@host/path",
         "http://host/path"
@@ -68,6 +79,21 @@ RSpec.describe ReactOnRails::DiagnosticUrlRedactor do
         "http : %2F%2Fhost/path"
       ],
       [
+        "whitespace before an encoded colon and encoded authority separators",
+        "http %3A%2F%2Fsynthetic-user:synthetic-secret%40host/path",
+        "http %3A%2F%2Fhost/path"
+      ],
+      [
+        "a partially encoded HTTP scheme before a whitespace-delimited encoded colon",
+        "h%74tp %3A%2F%2Fsynthetic-user:synthetic-secret%40host/path",
+        "h%74tp %3A%2F%2Fhost/path"
+      ],
+      [
+        "an encoded whitespace token before an internal HTTP scheme",
+        "%20http %3A%2F%2Fsynthetic-user:synthetic-secret%40host/path",
+        "%20http %3A%2F%2Fhost/path"
+      ],
+      [
         "whitespace before fully encoded authority separators",
         "http: %2F%2Fsynthetic-user:synthetic-secret%40host/path",
         "http: %2F%2Fhost/path"
@@ -81,6 +107,26 @@ RSpec.describe ReactOnRails::DiagnosticUrlRedactor do
         "whitespace before an encoded and literal authority separator",
         "http: %2F/synthetic-user:synthetic-secret%40host/path",
         "http: %2F/host/path"
+      ],
+      [
+        "whitespace between encoded authority separators",
+        "http:%2F %2Fsynthetic-user:synthetic-secret%40host/path",
+        "http:%2F %2Fhost/path"
+      ],
+      [
+        "encoded whitespace before encoded authority separators",
+        "http:%20%2F%2Fsynthetic-user:synthetic-secret%40host/path",
+        "http:%20%2F%2Fhost/path"
+      ],
+      [
+        "encoded whitespace between encoded authority separators",
+        "http:%2F%20%2Fsynthetic-user:synthetic-secret%40host/path",
+        "http:%2F%20%2Fhost/path"
+      ],
+      [
+        "mixed literal and encoded whitespace around mixed authority separators",
+        "h%74tp \t%20%3A%0A/%09%2Fsynthetic-user:synthetic-secret%40host/path",
+        "h%74tp \t%20%3A%0A/%09%2Fhost/path"
       ],
       [
         "authority-relative userinfo",
@@ -228,6 +274,36 @@ RSpec.describe ReactOnRails::DiagnosticUrlRedactor do
         "http: %2F/host%23contact-safe%40example.test"
       ],
       [
+        "an encoded at sign only in a path after whitespace between encoded authority separators",
+        "http:%2F %2Fhost/path%40asset",
+        "http:%2F %2Fhost/path%40asset"
+      ],
+      [
+        "an at sign only in a query after whitespace between encoded authority separators",
+        "http:%2F %2Fhost/path?contact=safe@example.test",
+        "http:%2F %2Fhost/path?contact=safe@example.test"
+      ],
+      [
+        "an encoded at sign only in a fragment after whitespace between encoded authority separators",
+        "http:%2F %2Fhost/path#safe%40example.test",
+        "http:%2F %2Fhost/path#safe%40example.test"
+      ],
+      [
+        "no userinfo after whitespace before an encoded colon",
+        "http %3A%2F%2Fhost/path",
+        "http %3A%2F%2Fhost/path"
+      ],
+      [
+        "no userinfo after whitespace between encoded authority separators",
+        "http:%2F %2Fhost/path",
+        "http:%2F %2Fhost/path"
+      ],
+      [
+        "an encoded path at sign after encoded whitespace between authority separators",
+        "http:%2F%20%2Fhost/path%40asset",
+        "http:%2F%20%2Fhost/path%40asset"
+      ],
+      [
         "an at sign after a literal path terminator in an encoded HTTP URL",
         "http:%2F%2Fhost/assets/component@2.js",
         "http:%2F%2Fhost/assets/component@2.js"
@@ -267,6 +343,100 @@ RSpec.describe ReactOnRails::DiagnosticUrlRedactor do
     configured_url_cases.each do |description, configured_url, expected|
       it "sanitizes configured userinfo with #{description}" do
         expect(described_class.sanitize(configured_url)).to eq(expected)
+      end
+    end
+
+    it "sanitizes literal and encoded HTTP separator compositions across ASCII whitespace spellings" do
+      schemes = ["http", "HTTP", "https", "HTTPS", "h%74tp", "%68ttp", "h%74tps", "%68%74%74%70",
+                 "%48%54%54%50%53"]
+      separators = [":", "%3A", "%3a"]
+      slashes = ["/", "%2F", "%2f"]
+      whitespace_spellings = ["\t", "\n", "\v", "\f", "\r", " ", "%09", "%0A", "%0a", "%0B", "%0b",
+                              "%0C", "%0c", "%0D", "%0d", "%20"]
+      gap_profiles = [["", "", ""]]
+      whitespace_spellings.each do |whitespace|
+        gap_profiles.push([whitespace, "", ""], ["", whitespace, ""], ["", "", whitespace],
+                          [whitespace, whitespace, whitespace])
+      end
+
+      schemes.product(separators, slashes, slashes, gap_profiles).each do |scheme, colon, first_slash, second_slash,
+                                                                         gaps|
+        before_colon, after_colon, between_slashes = gaps
+        prefix = "#{scheme}#{before_colon}#{colon}#{after_colon}#{first_slash}#{between_slashes}#{second_slash}"
+        configured_url = "#{prefix}synthetic-user:synthetic-secret%40host/path"
+        expected_url = "#{prefix}host/path"
+
+        expect(described_class.sanitize(configured_url)).to eq(expected_url)
+        expect(sanitize_error("Failure loading #{configured_url}")).to eq("Failure loading #{expected_url}")
+      end
+    end
+
+    it "sanitizes ordered literal and encoded whitespace sequences before an HTTP colon" do
+      schemes = ["http", "HTTPS", "h%74tp", "%68%74%74%70%73"]
+      separators = [":", "%3A", "%3a"]
+      whitespace_pairs = [["\t", "%09"], ["\n", "%0A"], ["\v", "%0B"], ["\f", "%0C"],
+                          ["\r", "%0D"], [" ", "%20"]]
+
+      schemes.product(separators, whitespace_pairs).each do |scheme, separator, whitespace_pair|
+        literal_whitespace, encoded_whitespace = whitespace_pair
+        gaps = [
+          "#{literal_whitespace}#{encoded_whitespace}",
+          "#{encoded_whitespace}#{literal_whitespace}",
+          "#{literal_whitespace}#{encoded_whitespace}#{literal_whitespace}",
+          "#{encoded_whitespace}#{literal_whitespace}#{encoded_whitespace}"
+        ]
+
+        gaps.each do |gap|
+          prefix = "#{scheme}#{gap}#{separator}%2F%2F"
+          configured_url = "#{prefix}synthetic-user:synthetic-secret%40host/path"
+          expected_url = "#{prefix}host/path"
+
+          expect(described_class.sanitize(configured_url)).to eq(expected_url)
+          expect(sanitize_error("Failure loading #{configured_url}")).to eq("Failure loading #{expected_url}")
+        end
+      end
+
+      safe_values = [
+        "nothttp%20 :%2F%2Fsafe@example.test",
+        "httpish%20 :%2F%2Fsafe@example.test",
+        "%61http%20 :%2F%2Fsafe@example.test",
+        "http%20 :%2F%2Fhost/path%40asset",
+        "http%20 :%2F%2Fhost/path?mail=safe@example.test",
+        "http%20 :%2F%2Fhost/path%23safe%40example.test"
+      ]
+      safe_values.each do |safe_value|
+        expect(described_class.sanitize(safe_value)).to eq(safe_value)
+        expect(sanitize_error("Failure loading #{safe_value}")).to eq("Failure loading #{safe_value}")
+      end
+    end
+
+    it "restarts an internal HTTP candidate only after an encoded non-scheme byte" do
+      schemes = ["http", "https", "h%74tp", "%68%74%74%70", "%48%54%54%50%53"]
+      scheme_continuation_bytes = (48..57).to_a + (65..90).to_a + (97..122).to_a + [43, 45, 46]
+
+      (0..255).each do |byte|
+        encoded_prefix = format("%%%02X", byte)
+        schemes.each do |scheme|
+          if scheme_continuation_bytes.include?(byte)
+            safe_value = "#{encoded_prefix}#{scheme} %3A%2F%2Fsafe@example.test"
+            expect(described_class.sanitize(safe_value)).to eq(safe_value)
+            expect(sanitize_error("Failure loading #{safe_value}")).to eq("Failure loading #{safe_value}")
+          else
+            configured_url =
+              "#{encoded_prefix}#{scheme} %3A%2F%2Fsynthetic-user:synthetic-secret%40host/path"
+            expected_url = "#{encoded_prefix}#{scheme} %3A%2F%2Fhost/path"
+
+            expect(described_class.sanitize(configured_url)).to eq(expected_url)
+            expect(sanitize_error("Failure loading #{configured_url}")).to eq("Failure loading #{expected_url}")
+          end
+        end
+      end
+
+      invalid_percent_controls = ["%GGhttp", "%61http", "%61%2Dhttp", "a%20nothttp", "a%20httpish"]
+      invalid_percent_controls.each do |prefix|
+        safe_value = "#{prefix} %3A%2F%2Fsafe@example.test"
+        expect(described_class.sanitize(safe_value)).to eq(safe_value)
+        expect(sanitize_error("Failure loading #{safe_value}")).to eq("Failure loading #{safe_value}")
       end
     end
 
@@ -366,6 +536,21 @@ RSpec.describe ReactOnRails::DiagnosticUrlRedactor do
         "Failure loading http : %2F%2Fhost/path"
       ],
       [
+        "whitespace before an encoded colon and encoded authority separators",
+        "Failure loading http %3A%2F%2Fsynthetic-user:synthetic-secret%40host/path",
+        "Failure loading http %3A%2F%2Fhost/path"
+      ],
+      [
+        "a partially encoded HTTP scheme before a whitespace-delimited encoded colon",
+        "Failure loading h%74tp %3A%2F%2Fsynthetic-user:synthetic-secret%40host/path",
+        "Failure loading h%74tp %3A%2F%2Fhost/path"
+      ],
+      [
+        "an encoded whitespace token before an internal HTTP scheme",
+        "Failure loading %20http %3A%2F%2Fsynthetic-user:synthetic-secret%40host/path",
+        "Failure loading %20http %3A%2F%2Fhost/path"
+      ],
+      [
         "whitespace before a literal and encoded authority separator",
         "Failure loading http: /%2Fsynthetic-user:synthetic-secret%40host/path",
         "Failure loading http: /%2Fhost/path"
@@ -374,6 +559,26 @@ RSpec.describe ReactOnRails::DiagnosticUrlRedactor do
         "whitespace before an encoded and literal authority separator",
         "Failure loading http: %2F/synthetic-user:synthetic-secret%40host/path",
         "Failure loading http: %2F/host/path"
+      ],
+      [
+        "whitespace between encoded authority separators",
+        "Failure loading http:%2F %2Fsynthetic-user:synthetic-secret%40host/path",
+        "Failure loading http:%2F %2Fhost/path"
+      ],
+      [
+        "encoded whitespace before encoded authority separators",
+        "Failure loading http:%20%2F%2Fsynthetic-user:synthetic-secret%40host/path",
+        "Failure loading http:%20%2F%2Fhost/path"
+      ],
+      [
+        "encoded whitespace between encoded authority separators",
+        "Failure loading http:%2F%20%2Fsynthetic-user:synthetic-secret%40host/path",
+        "Failure loading http:%2F%20%2Fhost/path"
+      ],
+      [
+        "mixed literal and encoded whitespace around mixed authority separators",
+        "Failure loading h%74tp \t%20%3A%0A/%09%2Fsynthetic-user:synthetic-secret%40host/path",
+        "Failure loading h%74tp \t%20%3A%0A/%09%2Fhost/path"
       ],
       [
         "a postgres URL",
@@ -479,6 +684,21 @@ RSpec.describe ReactOnRails::DiagnosticUrlRedactor do
         "non-URL prose with whitespace before a colon and double slash",
         "Contact support : // contact safe@example.test",
         "Contact support : // contact safe@example.test"
+      ],
+      [
+        "non-URL prose with encoded separators",
+        "Contact support %3A %2F %2Fsafe@example.test",
+        "Contact support %3A %2F %2Fsafe@example.test"
+      ],
+      [
+        "a non-HTTP word before encoded separators",
+        "Contact nothttp %3A%2F%2Fsafe@example.test",
+        "Contact nothttp %3A%2F%2Fsafe@example.test"
+      ],
+      [
+        "an HTTP-prefixed word before encoded separators",
+        "Contact httpish %3A%2F%2Fsafe@example.test",
+        "Contact httpish %3A%2F%2Fsafe@example.test"
       ]
     ]
 
@@ -596,6 +816,46 @@ RSpec.describe ReactOnRails::DiagnosticUrlRedactor do
       expected_url = "http:#{whitespace}%2F%2Fhost/path"
 
       sanitized_url = Timeout.timeout(1) { described_class.sanitize(configured_url) }
+      expect(sanitized_url).to eq(expected_url)
+    end
+
+    it "redacts long whitespace before an encoded colon and between encoded slashes in bounded time" do
+      whitespace = " " * 32_000
+      configured_url = "h%74tp#{whitespace}%3A%2F#{whitespace}%2Fbundle-user:synthetic-password%40host/path"
+      expected_url = "h%74tp#{whitespace}%3A%2F#{whitespace}%2Fhost/path"
+
+      sanitized_url = Timeout.timeout(1) { described_class.sanitize(configured_url) }
+
+      expect(sanitized_url).to eq(expected_url)
+    end
+
+    it "redacts long encoded whitespace around encoded authority separators in bounded time" do
+      whitespace = "%20" * 16_000
+      configured_url = "http:#{whitespace}%2F#{whitespace}%2Fbundle-user:synthetic-password%40host/path"
+      expected_url = "http:#{whitespace}%2F#{whitespace}%2Fhost/path"
+
+      sanitized_url = Timeout.timeout(1) { described_class.sanitize(configured_url) }
+
+      expect(sanitized_url).to eq(expected_url)
+    end
+
+    it "redacts a long mixed whitespace sequence before an encoded colon in bounded time" do
+      whitespace = "%20 " * 16_000
+      configured_url = "h%74tp#{whitespace}%3A%2F%2Fbundle-user:synthetic-password%40host/path"
+      expected_url = "h%74tp#{whitespace}%3A%2F%2Fhost/path"
+
+      sanitized_url = Timeout.timeout(1) { described_class.sanitize(configured_url) }
+
+      expect(sanitized_url).to eq(expected_url)
+    end
+
+    it "redacts an internal HTTP URL after a long encoded boundary prefix in bounded time" do
+      prefix = "%61%20" * 16_000
+      configured_url = "#{prefix}http %3A%2F%2Fbundle-user:synthetic-password%40host/path"
+      expected_url = "#{prefix}http %3A%2F%2Fhost/path"
+
+      sanitized_url = Timeout.timeout(1) { described_class.sanitize(configured_url) }
+
       expect(sanitized_url).to eq(expected_url)
     end
 

@@ -65,6 +65,8 @@ module ReactOnRails
     # Finds non-overlapping extended URL scheme starts without retrying a greedy
     # pattern at every byte.
     module NetworkUrlStartScanner
+      HTTP_SCHEME_BYTES = [104, 116, 116, 112].freeze
+
       module_function
 
       def spans(text)
@@ -119,18 +121,43 @@ module ReactOnRails
       def match_end_and_run_end(text, scheme_start, greedy: true)
         offset = scheme_start
         match_end = nil
+        terminal_state = [scheme_start, nil]
 
         while (token_length = scheme_continuation_token_length(text, offset))
           encoded_separator_end = encoded_separator_end(text, offset, scheme_start)
           return [encoded_separator_end, offset] if encoded_separator_end && !greedy
 
           match_end = encoded_separator_end if encoded_separator_end
+          if token_length == 3 || terminal_state[1]
+            update_terminal_candidate!(text, offset, token_length, terminal_state)
+          end
           offset += token_length
         end
 
-        literal_separator_end = literal_network_separator_end(text, offset, scheme_start)
-        match_end = literal_separator_end if literal_separator_end
+        terminal_separator_end = terminal_network_separator_end(text, offset, *terminal_state)
+        match_end = terminal_separator_end if terminal_separator_end
         [match_end, offset]
+      end
+
+      # Percent escapes stay in one raw run so encoded nested URLs can be found without
+      # rescanning. Track the last eligible HTTP(S) candidate and its encoded whitespace
+      # gap separately so a later literal whitespace token cannot hide the candidate.
+      def update_terminal_candidate!(text, offset, token_length, state)
+        encoded_byte = percent_decoded_byte_at(text, offset) if token_length == 3
+        if state[1]
+          return if ascii_whitespace_byte?(encoded_byte)
+
+          state[0] = offset
+          state[1] = nil
+        end
+        return unless encoded_byte
+        return if scheme_continuation_byte?(encoded_byte)
+
+        if ascii_whitespace_byte?(encoded_byte) && http_scheme_at?(text, state[0], offset)
+          state[1] = offset
+        else
+          state[0] = offset + token_length
+        end
       end
 
       def encoded_separator_end(text, offset, scheme_start)
@@ -146,23 +173,34 @@ module ReactOnRails
         slash_end = slash_token_end(text, slash_start)
         return nil unless slash_end
 
-        slash_token_end(text, slash_end)
+        slash_token_end(text, skip_ascii_whitespace(text, slash_end))
       end
 
-      def literal_network_separator_end(text, offset, scheme_start)
+      def terminal_network_separator_end(text, offset, scheme_start, encoded_whitespace_start)
         return network_separator_end(text, offset) if text.getbyte(offset) == 58
         return nil unless ascii_whitespace_byte?(text.getbyte(offset))
-        return nil unless http_scheme_at?(text, scheme_start, offset)
 
-        colon_offset = skip_ascii_whitespace(text, offset)
-        return nil unless text.getbyte(colon_offset) == 58
+        whitespace_start = encoded_whitespace_start || offset
+        return nil unless http_scheme_at?(text, scheme_start, whitespace_start)
+
+        colon_offset = skip_ascii_whitespace(text, whitespace_start)
+        return nil unless text.getbyte(colon_offset) == 58 || percent_encoded_colon_at?(text, colon_offset)
 
         network_separator_end(text, colon_offset)
       end
 
       def skip_ascii_whitespace(text, offset)
-        offset += 1 while ascii_whitespace_byte?(text.getbyte(offset))
+        while (token_length = ascii_whitespace_token_length(text, offset))
+          offset += token_length
+        end
         offset
+      end
+
+      def ascii_whitespace_token_length(text, offset)
+        return 1 if ascii_whitespace_byte?(text.getbyte(offset))
+        return nil unless percent_encoded_byte_at?(text, offset)
+
+        3 if ascii_whitespace_byte?(percent_decoded_byte_at(text, offset))
       end
 
       def slash_token_end(text, offset)
@@ -176,9 +214,13 @@ module ReactOnRails
         return 3 if percent_encoded_byte_at?(text, offset)
 
         byte = text.getbyte(offset)
-        return 1 if ascii_letter_byte?(byte) || digit_byte?(byte) || [43, 45, 46].include?(byte)
+        return 1 if scheme_continuation_byte?(byte)
 
         nil
+      end
+
+      def scheme_continuation_byte?(byte)
+        ascii_letter_byte?(byte) || digit_byte?(byte) || byte == 43 || byte == 45 || byte == 46
       end
 
       def percent_encoded_colon_at?(text, offset)
@@ -212,28 +254,51 @@ module ReactOnRails
       end
 
       def http_scheme_at?(text, start_offset, end_offset)
-        length = end_offset - start_offset
-        return false unless [4, 5].include?(length)
-
-        scheme_bytes = [104, 116, 116, 112]
-        return false unless scheme_bytes.each_with_index.all? do |byte, index|
-          case_insensitive_byte_match?(text.getbyte(start_offset + index), byte)
+        offset = start_offset
+        HTTP_SCHEME_BYTES.each do |byte|
+          offset = case_insensitive_scheme_token_end(text, offset, byte)
+          return false unless offset
         end
 
-        length == 4 || case_insensitive_byte_match?(text.getbyte(start_offset + 4), 115)
+        return true if offset == end_offset
+
+        case_insensitive_scheme_token_end(text, offset, 115) == end_offset
+      end
+
+      def case_insensitive_scheme_token_end(text, offset, lowercase_byte)
+        return offset + 1 if case_insensitive_byte_match?(text.getbyte(offset), lowercase_byte)
+        return nil unless percent_encoded_byte_at?(text, offset)
+        return nil unless case_insensitive_byte_match?(percent_decoded_byte_at(text, offset), lowercase_byte)
+
+        offset + 3
+      end
+
+      def percent_decoded_byte_at(text, offset)
+        (hex_value(text.getbyte(offset + 1)) * 16) + hex_value(text.getbyte(offset + 2))
+      end
+
+      def hex_value(byte)
+        return byte - 48 if (48..57).cover?(byte)
+        return byte - 65 + 10 if (65..70).cover?(byte)
+
+        byte - 97 + 10
       end
 
       def ascii_whitespace_byte?(byte)
         [9, 10, 11, 12, 13, 32].include?(byte)
       end
 
-      private_class_method :each_span, :next_scheme_start, :match_end_and_run_end, :encoded_separator_end,
-                           :network_separator_end, :literal_network_separator_end, :skip_ascii_whitespace,
+      private_class_method :each_span, :next_scheme_start, :match_end_and_run_end, :update_terminal_candidate!,
+                           :encoded_separator_end,
+                           :network_separator_end, :terminal_network_separator_end, :skip_ascii_whitespace,
+                           :ascii_whitespace_token_length,
                            :slash_token_end,
-                           :scheme_continuation_token_length,
+                           :scheme_continuation_token_length, :scheme_continuation_byte?,
                            :percent_encoded_colon_at?, :percent_encoded_slash_at?, :case_insensitive_byte_match?,
                            :digit_byte?, :percent_encoded_byte_at?, :hex_byte?, :ascii_letter_byte?, :http_scheme_at?,
+                           :case_insensitive_scheme_token_end, :percent_decoded_byte_at, :hex_value,
                            :ascii_whitespace_byte?
+      private_constant :HTTP_SCHEME_BYTES
     end
     private_constant :NetworkUrlStartScanner
 

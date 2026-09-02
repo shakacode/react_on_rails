@@ -466,6 +466,42 @@ module ReactOnRails
               "http : %2F%2Fhost/path"
             ],
             [
+              "whitespace before an encoded colon and encoded authority separators",
+              "http %3A%2F%2Fsynthetic-user:synthetic-secret%40host/path",
+              false,
+              "http %3A%2F%2Fhost/path"
+            ],
+            [
+              "a partially encoded HTTP scheme before a whitespace-delimited encoded colon",
+              "h%74tp %3A%2F%2Fsynthetic-user:synthetic-secret%40host/path",
+              false,
+              "h%74tp %3A%2F%2Fhost/path"
+            ],
+            [
+              "an encoded whitespace token before an internal HTTP scheme",
+              "%20http %3A%2F%2Fsynthetic-user:synthetic-secret%40host/path",
+              false,
+              "%20http %3A%2F%2Fhost/path"
+            ],
+            [
+              "encoded text and a boundary token before an internal HTTP scheme",
+              "%61%3Dhttp %3A%2F%2Fsynthetic-user:synthetic-secret%40host/path",
+              false,
+              "%61%3Dhttp %3A%2F%2Fhost/path"
+            ],
+            [
+              "invalid percent text and a boundary before a partially encoded HTTP scheme",
+              "%GG%20h%74tp %3A/%2Fsynthetic-user:synthetic-secret@host/path",
+              false,
+              "%GG%20h%74tp %3A/%2Fhost/path"
+            ],
+            [
+              "an internal HTTP scheme after an encoded boundary in an outer URL",
+              "http://outer.test/path?next=%61%20http %3A%2F%2Fnested-user:nested-secret%40nested.test/path",
+              true,
+              "http://outer.test/path?next=%61%20http %3A%2F%2Fnested.test/path"
+            ],
+            [
               "whitespace before fully encoded authority separators",
               "http: %2F%2Fsynthetic-user:synthetic-secret%40host/path",
               false,
@@ -482,6 +518,36 @@ module ReactOnRails
               "http: %2F/synthetic-user:synthetic-secret%40host/path",
               false,
               "http: %2F/host/path"
+            ],
+            [
+              "whitespace between encoded authority separators",
+              "http:%2F %2Fsynthetic-user:synthetic-secret%40host/path",
+              false,
+              "http:%2F %2Fhost/path"
+            ],
+            [
+              "encoded whitespace before encoded authority separators",
+              "http:%20%2F%2Fsynthetic-user:synthetic-secret%40host/path",
+              false,
+              "http:%20%2F%2Fhost/path"
+            ],
+            [
+              "encoded whitespace between encoded authority separators",
+              "http:%2F%20%2Fsynthetic-user:synthetic-secret%40host/path",
+              false,
+              "http:%2F%20%2Fhost/path"
+            ],
+            [
+              "mixed literal and encoded whitespace around mixed authority separators",
+              "h%74tp \t%20%3A%0A/%09%2Fsynthetic-user:synthetic-secret%40host/path",
+              false,
+              "h%74tp \t%20%3A%0A/%09%2Fhost/path"
+            ],
+            [
+              "encoded then literal whitespace before an encoded colon",
+              "%68%74%74%70%20 %3A%2F%2Fsynthetic-user:synthetic-secret%40host/path",
+              false,
+              "%68%74%74%70%20 %3A%2F%2Fhost/path"
             ],
             [
               "a percent-encoded authority delimiter",
