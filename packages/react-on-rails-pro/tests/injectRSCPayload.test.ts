@@ -498,6 +498,45 @@ describe('injectRSCPayload', () => {
     expect(resultStr).toContain(expectedPayloadPushScript('{"test": "data"}'));
   });
 
+  it.each([
+    ['an empty renderingError object', { hasErrors: false, renderingError: {} }],
+    ['a null renderingError', { hasErrors: false, renderingError: null }],
+    ['a non-object renderingError', { hasErrors: false, renderingError: 'malformed' }],
+    ['a non-boolean hasErrors value', { hasErrors: 'true' }],
+  ])('suppresses console replay in production for %s', async (_description, metadata) => {
+    const mockRSC = createMockRSCStreamWithMetadata('{"test": "data"}', {
+      ...metadata,
+      consoleReplayScript: 'console.error("malformed metadata secret")',
+    });
+    const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId, undefined, {
+      railsEnv: 'production',
+    });
+    const resultStr = await collectStreamData(result);
+
+    expect(resultStr).not.toContain('malformed metadata secret');
+    expect(resultStr).toContain(expectedPayloadPushScript('{"test": "data"}'));
+  });
+
+  it('preserves console replay for malformed metadata in development', async () => {
+    const mockRSC = createMockRSCStreamWithMetadata('{"test": "data"}', {
+      hasErrors: 'true',
+      renderingError: null,
+      consoleReplayScript: 'console.error("development malformed metadata replay")',
+    });
+    const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId, undefined, {
+      railsEnv: 'development',
+    });
+    const resultStr = await collectStreamData(result);
+
+    expect(resultStr).toContain('<script>console.error("development malformed metadata replay")</script>');
+  });
+
   it('redacts renderingError from diagnostic metadata in production', async () => {
     const mockRSC = createMockRSCStreamWithMetadata('{"test": "data"}', {
       hasErrors: true,

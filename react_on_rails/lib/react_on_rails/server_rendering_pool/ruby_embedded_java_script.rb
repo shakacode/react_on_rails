@@ -409,12 +409,16 @@ module ReactOnRails
         def sanitized_renderer_url(url)
           return url if url.nil? || url.empty?
 
-          scheme = url.match(%r{https?://}i)
+          # Treat whitespace around a scheme delimiter as a malformed HTTP(S) URL rather than a
+          # local path. Utils intentionally rejects that spelling, but the displayed diagnostic
+          # must still fail closed if the value contains credential-like userinfo.
+          scheme_pattern = %r{https?\s*:\s*//}i
+          scheme = url.match(scheme_pattern)
           return url unless scheme
 
           prefix = url[...scheme.begin(0)]
           configured_url = url[scheme.begin(0)..]
-          sanitized_url = if configured_url.match?(/[\r\n]/) || configured_url.scan(%r{https?://}i).length > 1
+          sanitized_url = if configured_url.match?(/[\r\n]/) || configured_url.scan(scheme_pattern).length > 1
                             strip_malformed_url_userinfo(configured_url)
                           else
                             sanitized_valid_http_url(configured_url) || strip_malformed_url_userinfo(configured_url)
@@ -489,13 +493,14 @@ module ReactOnRails
         end
 
         def strip_unprotected_userinfo(text)
-          text.gsub(%r{https?://(?:(?!https?://).)*@}im) { |span| strip_malformed_url_userinfo(span) }
+          scheme_pattern = %r{https?\s*:\s*//}i
+          text.gsub(/#{scheme_pattern}(?:(?!#{scheme_pattern}).)*@/m) { |span| strip_malformed_url_userinfo(span) }
         end
 
         # For malformed URLs or unprotected scheme-delimited spans, remove through the last @. The
         # retained suffix is best-effort context; ambiguous malformed diagnostics may lose text.
         def strip_malformed_url_userinfo(url)
-          scheme = url.match(%r{\Ahttps?://}i)
+          scheme = url.match(%r{\Ahttps?\s*:\s*//}i)
           userinfo_delimiter = url.rindex("@")
           return url unless scheme && userinfo_delimiter
 
@@ -518,10 +523,10 @@ module ReactOnRails
           # equals the destination (UTF-8). charset_from_content_type returns UTF-8 for three of
           # the four cases this method exists to handle (no Content-Type header, no charset
           # parameter, and an explicit charset=utf-8), so `.encode(Encoding::UTF_8)` alone would
-          # silently let invalid bytes through unchanged on those three paths — only a genuine
-          # cross-encoding transcode (e.g. a declared ISO-8859-1 body) actually validates via
-          # `encode`. valid_encoding? is therefore checked explicitly afterward so every path
-          # fails fast, not just the cross-encoding one.
+          # silently let invalid bytes through unchanged on those three paths. A genuine
+          # cross-encoding transcode can reject malformed input only when the source encoding has
+          # invalid byte sequences of its own (such as Shift_JIS). valid_encoding? is therefore
+          # checked explicitly afterward so every path fails fast, not just the cross-encoding one.
           #
           # An undecodable byte sequence (a charset that doesn't actually match the bytes) is
           # deliberately raised here rather than silently replaced with U+FFFD: this is source

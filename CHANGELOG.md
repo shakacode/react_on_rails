@@ -225,9 +225,11 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   bundle-load error naming the URL and status, instead of being returned as if it were JavaScript
   bundle source. Additionally, a `server_bundle_js_file` URL with embedded HTTP basic-auth
   credentials (e.g. `https://:password@host:3800/bundle.js`) no longer leaks that password into
-  raised errors or logs on a load failure. Fixes
-  [Issue 4584](https://github.com/shakacode/react_on_rails/issues/4584).
-  [PR 4817](https://github.com/shakacode/react_on_rails/pull/4817) by
+  raised errors or logs on a load failure, including malformed URLs with ambiguous userinfo. Fixes
+  [Issue 4584](https://github.com/shakacode/react_on_rails/issues/4584) and
+  [Issue 4825](https://github.com/shakacode/react_on_rails/issues/4825).
+  [PR 4817](https://github.com/shakacode/react_on_rails/pull/4817) and
+  [PR 4845](https://github.com/shakacode/react_on_rails/pull/4845) by
   [justin808](https://github.com/justin808).
 
 - **RailsContext now stays current across Turbo and Turbolinks navigation**: Parsed context is cached
