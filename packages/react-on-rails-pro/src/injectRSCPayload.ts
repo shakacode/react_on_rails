@@ -102,6 +102,20 @@ function hasMalformedHasErrors(metadata: Record<string, unknown>) {
   );
 }
 
+function hasMalformedRenderingError(metadata: Record<string, unknown>) {
+  if (!Object.prototype.hasOwnProperty.call(metadata, 'renderingError')) return false;
+
+  const { renderingError } = metadata;
+  if (typeof renderingError !== 'object' || renderingError === null) return true;
+
+  const hasMessage = Object.prototype.hasOwnProperty.call(renderingError, 'message');
+  const hasStack = Object.prototype.hasOwnProperty.call(renderingError, 'stack');
+  if (!hasMessage && !hasStack) return true;
+
+  const { message, stack } = renderingError as { message?: unknown; stack?: unknown };
+  return (hasMessage && typeof message !== 'string') || (hasStack && typeof stack !== 'string');
+}
+
 function shouldEmitConsoleReplay(metadata: Record<string, unknown>, railsEnv?: string) {
   // Console replay remains useful in development/test and for clean production chunks. On an
   // error-bearing chunk, however, it can repeat the same server-only message or stack path that
@@ -122,12 +136,12 @@ function createRSCDiagnosticScript(
   const showFullDiagnostics = railsEnv === 'development' || railsEnv === 'test';
   // `hasErrors` is a boolean per the server wire contract; renderingError only carries
   // a useful diagnostic when the server provided a non-blank message or stack. Outside
-  // development/test, a malformed hasErrors value fails closed to the same generic signal as
-  // the fetched RSC path instead of suppressing both the replay and the diagnostic.
+  // development/test, malformed values fail closed to the same generic signal as the fetched
+  // RSC path instead of suppressing both the replay and the diagnostic.
   const hasDiagnosticSignal =
     hasErrors === true ||
     hasRenderingErrorSignal(renderingError) ||
-    (!showFullDiagnostics && hasMalformedHasErrors(metadata));
+    (!showFullDiagnostics && (hasMalformedHasErrors(metadata) || hasMalformedRenderingError(metadata)));
   if (!hasDiagnosticSignal) return undefined;
   // Outside development/test, emit only the error signal without the server error message or stack.
   // Full diagnostics are reported server-side via the streaming error reporter (Sentry/Honeybadger).

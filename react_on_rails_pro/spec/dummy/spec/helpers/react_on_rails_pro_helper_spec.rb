@@ -878,6 +878,38 @@ describe ReactOnRailsProHelper do
       expect(wire).not_to include("Auth.server.tsx")
     end
 
+    it "fails closed in production for malformed renderingError shapes" do
+      stub_rails_env("production")
+      [{}, nil, "malformed"].each do |rendering_error|
+        malformed_metadata = {
+          "hasErrors" => false,
+          "renderingError" => rendering_error,
+          "consoleReplayScript" => synthetic_console_replay_script,
+          "diagnosticContext" => { "sourcePath" => "/srv/private/Auth.server.tsx" },
+          "html" => "payload"
+        }
+
+        wire = framed_wire_bytes(malformed_metadata)
+
+        aggregate_failures(rendering_error.inspect) do
+          expect(wire).to eq("{\"hasErrors\":true}\t00000007\npayload")
+          expect(wire).not_to include(synthetic_console_replay_script)
+          expect(wire).not_to include("Auth.server.tsx")
+        end
+      end
+    end
+
+    it "does not promote well-formed blank renderingError metadata to an error" do
+      stub_rails_env("production")
+      blank_rendering_error = { "message" => "   ", "stack" => "" }
+
+      wire = framed_wire_bytes(
+        "hasErrors" => false, "renderingError" => blank_rendering_error, "html" => "payload"
+      )
+
+      expect(wire).to eq("{\"hasErrors\":false}\t00000007\npayload")
+    end
+
     it "leaves a clean production chunk untouched" do
       stub_rails_env("production")
 

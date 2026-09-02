@@ -1480,11 +1480,20 @@ module ReactOnRailsProHelper
       return true if has_errors
     end
 
+    return false unless metadata.key?("renderingError")
+
     rendering_error = metadata["renderingError"]
-    return false unless rendering_error.is_a?(Hash)
+    return true if malformed_rsc_rendering_error?(rendering_error)
 
     non_blank_rsc_metadata_string?(rendering_error["message"]) ||
       non_blank_rsc_metadata_string?(rendering_error["stack"])
+  end
+
+  def malformed_rsc_rendering_error?(rendering_error)
+    return true unless rendering_error.is_a?(Hash)
+
+    diagnostic_fields = rendering_error.slice("message", "stack")
+    diagnostic_fields.empty? || diagnostic_fields.any? { |_key, value| !value.is_a?(String) }
   end
 
   def non_blank_rsc_metadata_string?(value)

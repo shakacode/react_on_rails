@@ -503,7 +503,7 @@ describe('injectRSCPayload', () => {
     ['a null renderingError', { hasErrors: false, renderingError: null }],
     ['a non-object renderingError', { hasErrors: false, renderingError: 'malformed' }],
     ['a non-boolean hasErrors value', { hasErrors: 'true' }],
-  ])('suppresses console replay in production for %s', async (_description, metadata) => {
+  ])('fails closed in production for %s', async (_description, metadata) => {
     const mockRSC = createMockRSCStreamWithMetadata('{"test": "data"}', {
       ...metadata,
       consoleReplayScript: 'console.error("malformed metadata secret")',
@@ -516,6 +516,9 @@ describe('injectRSCPayload', () => {
     });
     const resultStr = await collectStreamData(result);
 
+    expect(resultStr).toContain('REACT_ON_RAILS_RSC_ERRORS');
+    expect(resultStr).toContain('"hasErrors":true');
+    expect(resultStr).not.toContain('renderingError');
     expect(resultStr).not.toContain('malformed metadata secret');
     expect(resultStr).toContain(expectedPayloadPushScript('{"test": "data"}'));
   });
