@@ -11,10 +11,10 @@ require "erb"
 require "rbconfig"
 require "socket"
 require "tempfile"
-require "timeout"
 require "time"
 require "uri"
 require "yaml"
+require_relative "../node_renderer_procfile"
 require_relative "../packer_utils"
 require_relative "../shakapacker_config_helpers"
 require_relative "../system_checker"
@@ -70,12 +70,22 @@ module ReactOnRails
       DEV_SESSION_READ_FLAGS = File::RDONLY |
                                (defined?(File::NOFOLLOW) ? File::NOFOLLOW : 0) |
                                (defined?(File::NONBLOCK) ? File::NONBLOCK : 0)
-      # Bounded budget for an Overmind control command. The socket probe was
-      # already bounded; leaving the command that acts on it unbounded meant a
-      # wedged `overmind quit` blocked inside `action.call`, before
-      # `wait_until(grace)` ever started polling, so the KILL escalation was
-      # never reached. Mirrors ProcessManager::VERSION_CHECK_TIMEOUT.
+      # Bounded budget for an Overmind control command and for each cleanup
+      # phase after that budget expires. The launcher execs the selected
+      # Overmind binary so the isolated process-group leader is the real
+      # control client, not a wrapper that can die before reaping its child.
       OVERMIND_CONTROL_TIMEOUT_SECS = 10
+      # A phase controls every discovered socket under one shared deadline.
+      # Without this second bound, N wedged endpoints each consumed a fresh
+      # command timeout and made shutdown latency grow linearly with N.
+      OVERMIND_CONTROL_BATCH_TIMEOUT_SECS = 10
+      OVERMIND_CONTROL_TERMINATION_GRACE_SECS = 1
+      OVERMIND_CONTROL_RUNNER = <<~RUBY
+        require "react_on_rails/dev"
+
+        manager = ReactOnRails::Dev::ServerManager
+        exit(manager.send(:execute_overmind_command, ARGV) ? 0 : 1)
+      RUBY
       DEV_SESSION_CLAIM_ATTEMPTS = 2
 
       # Markers that identify an app root when a command is run from a
@@ -164,8 +174,9 @@ module ReactOnRails
         # derived ports when REACT_ON_RAILS_BASE_PORT / CONDUCTOR_PORT is set,
         # so `bin/dev kill` in a worktree on ports 5000/5001/5002 targets the
         # right ports instead of the 3000/3001 default. Falls back to
-        # [3000, 3001] when no base port is configured, plus the renderer port
-        # when Pro renderer support is active. Uses PortSelector's pure
+        # [3000, 3035] when no base port is configured, plus a renderer port
+        # when explicit configuration or an active generated Procfile identifies
+        # one. Uses PortSelector's pure
         # #base_port_hash so no "Base port detected" banner prints during a kill.
         #
         # In base-port mode we include base[:renderer] whenever the Pro gem is
@@ -177,8 +188,8 @@ module ReactOnRails
         # (development_processes / node.*react[-_]on[-_]rails) does NOT catch
         # the Pro renderer because it runs as `node renderer/node-renderer.js`
         # with no "react_on_rails" substring in the command line. Port-based
-        # killing is the only reliable path. The default-port branch keeps the
-        # tighter renderer_env_signal? guard via configured_renderer_port_for_kill
+        # killing is the only reliable path. The default-port branch requires an
+        # explicit renderer signal or an active recognized generated Procfile
         # because 3800 is a shared default that could belong to an unrelated process.
         def killable_ports
           base = PortSelector.base_port_hash
@@ -200,10 +211,7 @@ module ReactOnRails
 
         def default_killable_ports
           ports = [default_rails_kill_port, default_dev_server_kill_port]
-          if pro_renderer_active?
-            renderer_port = configured_renderer_port_for_kill
-            ports << renderer_port if renderer_port
-          end
+          ports.concat(configured_renderer_ports_for_kill)
           ports.uniq
         end
 
@@ -237,19 +245,48 @@ module ReactOnRails
           nil
         end
 
-        def configured_renderer_port_for_kill
+        def configured_renderer_ports_for_kill
           raw_port = ENV.fetch("RENDERER_PORT", nil)
-          return raw_port.strip.to_i if valid_port_string?(raw_port)
+          return [raw_port.strip.to_i] if valid_port_string?(raw_port)
 
           local_url_port = local_renderer_url_port_for_kill
-          return local_url_port if local_url_port
-          return nil if remote_renderer_url_configured?
+          return [local_url_port] if local_url_port
+          return [] if remote_renderer_url_configured?
 
-          # Only fall back to the default renderer port when the user has set
-          # at least one renderer env var. Without that signal (Pro gem loaded
-          # but no renderer ever started), `bin/dev kill` would otherwise
-          # target an unrelated process bound to 3800 in OSS+Pro-gem apps.
-          renderer_env_signal? ? 3800 : nil
+          procfile_ports = renderer_procfile_ports_for_kill
+          return procfile_ports if procfile_ports.any?
+
+          # Only fall back to the default renderer port when the user has set a
+          # renderer env var. An active generated Procfile is an independent,
+          # stronger signal and was handled above. Without either signal, 3800
+          # could belong to an unrelated process in an OSS+Pro-gem app.
+          renderer_env_signal? ? [3800] : []
+        end
+
+        # Read only the known bin/dev launchers and accept only active renderer
+        # commands that use the generated `${RENDERER_PORT:-PORT}` form. This
+        # establishes the effective local fallback without treating a loaded
+        # Pro gem, a comment, or an unrelated Procfile service as evidence.
+        def renderer_procfile_ports_for_kill(root = current_app_root)
+          ReactOnRails::NodeRendererProcfile::DEFAULT_COMMANDS.keys.flat_map do |procfile|
+            renderer_procfile_default_ports(File.join(root, procfile))
+          end.uniq
+        end
+
+        def renderer_procfile_default_ports(path)
+          return [] unless File.file?(path)
+
+          File.foreach(path).filter_map do |line|
+            next if line.match?(/^\s*#/)
+
+            active_command = line.sub(/\s+#.*$/, "")
+            next unless active_command.match?(ReactOnRails::NodeRendererProcfile::PROCESS_WITH_RENDERER_PORT_REGEX)
+
+            raw_port = active_command[/\bRENDERER_PORT=\$\{RENDERER_PORT:-(\d+)\}/, 1]
+            raw_port.to_i if valid_port_string?(raw_port)
+          end
+        rescue SystemCallError, IOError
+          []
         end
 
         def local_renderer_url_port_for_kill
@@ -1132,12 +1169,12 @@ module ReactOnRails
 
         def shutdown_live_owner(view)
           session = view[:session]
-          endpoint = live_overmind_endpoint(view[:root], session[:overmind_socket])
+          endpoints = live_overmind_endpoints(view[:root], session[:overmind_socket])
           pgid = signalable_pgid(session[:pgid])
-          return [:refused, [unreachable_owner_message(view, session)]] if endpoint.nil? && pgid.nil?
+          return [:refused, [unreachable_owner_message(view, session)]] if endpoints.empty? && pgid.nil?
 
-          request_owner_shutdown(view, pgid, endpoint)
-          verify_owner_shutdown(view, pgid, endpoint)
+          request_owner_shutdown(view, pgid, endpoints)
+          verify_owner_shutdown(view, pgid, endpoints)
         end
 
         def unreachable_owner_message(view, session)
@@ -1148,8 +1185,8 @@ module ReactOnRails
         # Escalation ladder: each step runs only if the previous one did not
         # produce a verified shutdown inside its grace window. TERM always
         # precedes KILL, and KILL only ever reaches whatever survived TERM.
-        def request_owner_shutdown(view, pgid, endpoint)
-          shutdown_steps(pgid, endpoint).each do |label, grace, action|
+        def request_owner_shutdown(view, pgid, endpoints)
+          shutdown_steps(pgid, endpoints).each do |label, grace, action|
             # Never escalate against state a newer `bin/dev` has taken over: both
             # the recorded pgid and the socket path can have been reused, so the
             # next signal would land on somebody else's session.
@@ -1157,7 +1194,7 @@ module ReactOnRails
 
             puts "   #{label}"
             action.call
-            return true if wait_until(grace) { shutdown_settled?(view, pgid, endpoint) }
+            return true if wait_until(grace) { shutdown_settled?(view, pgid, endpoints) }
           end
 
           false
@@ -1166,17 +1203,17 @@ module ReactOnRails
         # Stop waiting once the shutdown is complete OR the session has been
         # replaced - polling out the rest of the grace window changes nothing
         # and only delays the honest failure report.
-        def shutdown_settled?(view, pgid, endpoint)
-          session_replaced?(view) || owner_shutdown_complete?(view, pgid, endpoint)
+        def shutdown_settled?(view, pgid, endpoints)
+          session_replaced?(view) || owner_shutdown_complete?(view, pgid, endpoints)
         end
 
-        def shutdown_steps(pgid, endpoint)
+        def shutdown_steps(pgid, endpoints)
           steps = []
-          if endpoint
-            steps << ["🛑 Asking Overmind to quit via #{endpoint}", SHUTDOWN_TERM_GRACE_SECS,
-                      -> { overmind_control("quit", endpoint) }]
+          if endpoints.any?
+            steps << ["🛑 Asking Overmind to quit via #{endpoints.join(', ')}", SHUTDOWN_TERM_GRACE_SECS,
+                      -> { control_overmind_endpoints("quit", endpoints) }]
             steps << ["☠️  Overmind did not quit in time; running `overmind kill`", SHUTDOWN_KILL_GRACE_SECS,
-                      -> { overmind_control("kill", endpoint) }]
+                      -> { control_overmind_endpoints("kill", endpoints) }]
           end
           if pgid
             steps << ["🛑 Sending TERM to this app's process group (PGID #{pgid})", SHUTDOWN_TERM_GRACE_SECS,
@@ -1187,6 +1224,27 @@ module ReactOnRails
           steps
         end
 
+        def control_overmind_endpoints(subcommand, endpoints)
+          deadline = monotonic_now + OVERMIND_CONTROL_BATCH_TIMEOUT_SECS
+          all_succeeded = true
+
+          endpoints.each_with_index do |endpoint, index|
+            remaining = deadline - monotonic_now
+            unless remaining.positive?
+              skipped = endpoints.length - index
+              puts "   ⚠️  The shared Overmind control budget was exhausted; " \
+                   "skipping #{skipped} remaining endpoint(s)"
+              return false
+            end
+
+            timeout_secs = [OVERMIND_CONTROL_TIMEOUT_SECS, remaining].min
+            succeeded = overmind_control(subcommand, endpoint, timeout_secs:)
+            all_succeeded = succeeded && all_succeeded
+          end
+
+          all_succeeded
+        end
+
         # Cleanup runs only once verification has fully succeeded. Removing the
         # session file first destroyed the retry path: it carries the ports this
         # run actually selected, so deleting it on the way to reporting
@@ -1194,8 +1252,8 @@ module ReactOnRails
         # the fidelity `selected_session_ports` exists to provide, lost on the
         # one path where it matters most. It also made `print_kill_failure` tell
         # the user to remove a file that was already gone.
-        def verify_owner_shutdown(view, pgid, endpoint)
-          blockers = shutdown_blockers(view, pgid, endpoint)
+        def verify_owner_shutdown(view, pgid, endpoints)
+          blockers = shutdown_blockers(view, pgid, endpoints)
           return [:unverified, blockers] if blockers.any?
 
           leftover = outstanding_shutdown_blockers(view)
@@ -1223,17 +1281,17 @@ module ReactOnRails
         # not be scanned, and endpoints that could not be probed.
         def outstanding_shutdown_blockers(view)
           leftover_owned_listeners(view) +
-            unprobeable_endpoint_blockers(unprobeable_overmind_endpoints(view))
+            outstanding_overmind_endpoint_blockers(view)
         end
 
-        def owner_shutdown_complete?(view, pgid, endpoint)
-          shutdown_blockers(view, pgid, endpoint).empty?
+        def owner_shutdown_complete?(view, pgid, endpoints)
+          shutdown_blockers(view, pgid, endpoints).empty?
         end
 
-        def shutdown_blockers(view, pgid, endpoint)
+        def shutdown_blockers(view, pgid, endpoints)
           blockers = owner_state_blockers(view)
           blockers << "process group #{pgid} still has members" if pgid && process_group_alive?(pgid)
-          blockers.concat(endpoint_blockers(endpoint))
+          blockers.concat(endpoints.flat_map { |endpoint| endpoint_blockers(endpoint) })
           blockers
         end
 
@@ -1257,7 +1315,7 @@ module ReactOnRails
 
           case overmind_endpoint_state(endpoint)
           when :alive
-            ["the Overmind endpoint #{endpoint} is still accepting connections"]
+            [live_overmind_endpoint_message(endpoint)]
           when :unknown
             [unprobeable_endpoint_message(endpoint)]
           else
@@ -1350,8 +1408,8 @@ module ReactOnRails
         # ---- kill path: no live owner ----------------------------------
 
         def shutdown_without_owner(view)
-          endpoint = live_overmind_endpoint(view[:root], view.dig(:session, :overmind_socket))
-          return shutdown_orphaned_overmind(view, endpoint) if endpoint
+          endpoints = live_overmind_endpoints(view[:root], view.dig(:session, :overmind_socket))
+          return shutdown_orphaned_overmind(view, endpoints) if endpoints.any?
 
           cleaned = cleanup_socket_files
           killed = kill_port_processes(view[:ports])
@@ -1380,10 +1438,10 @@ module ReactOnRails
         # is gone (its terminal was closed, or it was SIGKILLed). Controlling it
         # natively is scoped; guessing at pids from the stale record is not, so
         # the recorded pgid is deliberately not used here.
-        def shutdown_orphaned_overmind(view, endpoint)
-          puts "   ℹ️  Found an orphaned Overmind endpoint for this app directory; controlling it directly."
-          request_owner_shutdown(view, nil, endpoint)
-          verify_owner_shutdown(view, nil, endpoint)
+        def shutdown_orphaned_overmind(view, endpoints)
+          puts "   ℹ️  Found orphaned Overmind endpoints for this app directory; controlling them directly."
+          request_owner_shutdown(view, nil, endpoints)
+          verify_owner_shutdown(view, nil, endpoints)
         end
 
         def shutdown_failed?(status)
@@ -1419,34 +1477,87 @@ module ReactOnRails
         # app root, still be a socket, and still answer.
         # Candidates in decreasing order of authority: what the session
         # recorded, what OVERMIND_SOCKET names in the killing shell (only when
-        # it lands inside this app root), then the default path. A configured
-        # value is a candidate, not an authority - each still has to clear the
-        # containment and realpath checks below.
+        # it lands inside this app root), the default path, then sockets found
+        # under tmp/sockets. A candidate is not an authority - each still has
+        # to clear the containment and realpath checks below.
         def live_overmind_endpoint(root, recorded)
-          scan_overmind_endpoints(root, recorded)[:alive]&.first
+          live_overmind_endpoints(root, recorded).first
         end
 
-        def overmind_endpoint_candidates(root, recorded)
-          [recorded, owned_overmind_socket_path(root), default_overmind_socket_path(root)].compact.uniq
+        def live_overmind_endpoints(root, recorded)
+          scan_overmind_endpoints(root, recorded)[:alive] || []
+        end
+
+        def overmind_endpoint_candidates(root, recorded, discovered = nil)
+          discovered ||= overmind_socket_discovery(root)[:paths]
+          [recorded, owned_overmind_socket_path(root), default_overmind_socket_path(root), *discovered].compact.uniq
+        end
+
+        # A missing or readable empty directory is positive evidence that no
+        # renamed endpoints are present. Any failure to inspect an existing
+        # directory is different: verification must retain a blocker rather
+        # than silently turning "could not look" into "nothing is running".
+        def overmind_socket_discovery(root)
+          directory = File.join(root, "tmp", "sockets")
+          begin
+            File.lstat(directory)
+          rescue Errno::ENOENT
+            return { paths: [], blockers: [] }
+          rescue SystemCallError => e
+            return failed_overmind_socket_discovery(directory, e)
+          end
+
+          resolved_directory = File.realpath(directory)
+          unless inside_dev_app_root?(resolved_directory, root)
+            blocker = "could not inspect #{directory} for Overmind endpoints because " \
+                      "it resolves outside this app root"
+            return {
+              paths: [],
+              blockers: [blocker]
+            }
+          end
+
+          paths = Dir.children(directory)
+                     .select { |name| name.start_with?("overmind") && name.end_with?(".sock") }
+                     .sort
+                     .map { |name| File.join(directory, name) }
+          { paths:, blockers: [] }
+        rescue SystemCallError => e
+          failed_overmind_socket_discovery(directory, e)
+        end
+
+        def failed_overmind_socket_discovery(directory, error)
+          {
+            paths: [],
+            blockers: ["could not inspect #{directory} for Overmind endpoints (#{error.class})"]
+          }
         end
 
         # Probes every in-root candidate once and groups them by state, so a
         # bounded connect runs at most once per candidate per pass.
         def scan_overmind_endpoints(root, recorded)
-          owned = overmind_endpoint_candidates(root, recorded).select do |path|
-            overmind_endpoint_owned?(path, root)
+          discovery = overmind_socket_discovery(root)
+          scan = { discovery_blockers: discovery[:blockers].dup }
+          overmind_endpoint_candidates(root, recorded, discovery[:paths]).each do |path|
+            case overmind_endpoint_ownership(path, root)
+            when :owned
+              state = overmind_endpoint_state(path)
+              (scan[state] ||= []) << path
+            when :unknown
+              scan[:discovery_blockers] << "could not inspect #{path} as an Overmind endpoint"
+            end
           end
-          owned.group_by { |path| overmind_endpoint_state(path) }
+          scan
         end
 
-        # In-root endpoints whose liveness could not be determined. An
-        # unprobeable endpoint is not an absent one: the Overmind session behind
-        # it may still be running, along with workers that hold no listening
-        # socket and so never appear in the port scan. Same rule as everywhere
-        # else here - never report success from an observation that could not be
-        # made.
-        def unprobeable_overmind_endpoints(view)
-          scan_overmind_endpoints(view[:root], view.dig(:session, :overmind_socket))[:unknown] || []
+        # Re-scan every candidate after shutdown. A newly discovered live socket
+        # or an endpoint whose state cannot be observed must block the verified
+        # claim, even when it was not part of the initial control set.
+        def outstanding_overmind_endpoint_blockers(view)
+          scan = scan_overmind_endpoints(view[:root], view.dig(:session, :overmind_socket))
+          Array(scan[:alive]).map { |path| live_overmind_endpoint_message(path) } +
+            unprobeable_endpoint_blockers(scan[:unknown]) +
+            Array(scan[:discovery_blockers])
         end
 
         def unprobeable_endpoint_blockers(endpoints)
@@ -1457,6 +1568,10 @@ module ReactOnRails
           "could not determine whether the Overmind endpoint #{path} is still live"
         end
 
+        def live_overmind_endpoint_message(path)
+          "the Overmind endpoint #{path} is still accepting connections"
+        end
+
         # Containment check for a control endpoint. The path is resolved before
         # comparing: `File.socket?` follows symlinks, so comparing the raw string
         # let `<root>/.overmind.sock` be a symlink pointing at ANOTHER checkout's
@@ -1464,13 +1579,22 @@ module ReactOnRails
         # then tear down that other checkout's session, with no session-file
         # tampering required because the default path is always a candidate.
         # Resolving also collapses `..` escapes in a recorded path.
-        def overmind_endpoint_owned?(path, root = current_app_root)
-          return false unless path.is_a?(String) && !path.empty?
-          return false unless File.socket?(path)
+        def overmind_endpoint_ownership(path, root = current_app_root)
+          return :foreign unless path.is_a?(String) && !path.empty?
 
-          inside_dev_app_root?(File.realpath(path), root)
-        rescue SystemCallError
-          false
+          File.lstat(path)
+          resolved = File.realpath(path)
+          return :foreign unless inside_dev_app_root?(resolved, root)
+
+          File.stat(resolved).socket? ? :owned : :gone
+        rescue Errno::ENOENT, Errno::ENOTDIR
+          :gone
+        rescue SystemCallError, IOError
+          :unknown
+        end
+
+        def overmind_endpoint_owned?(path, root = current_app_root)
+          overmind_endpoint_ownership(path, root) == :owned
         end
 
         # :alive, :gone, or :unknown. Same principle as the port probes: a
@@ -1478,7 +1602,7 @@ module ReactOnRails
         # probe that could not run is not, and verification must not read the
         # second as the first.
         def overmind_endpoint_state(path)
-          return :gone unless File.socket?(path)
+          return :gone unless File.stat(path).socket?
 
           begin
             sockaddr = Socket.sockaddr_un(path)
@@ -1489,6 +1613,10 @@ module ReactOnRails
           end
 
           probe_unix_socket(sockaddr)
+        rescue Errno::ENOENT, Errno::ENOTDIR
+          :gone
+        rescue SystemCallError, IOError
+          :unknown
         end
 
         # Bounded connect. A blocking `UNIXSocket.new` hangs indefinitely when
@@ -1523,13 +1651,15 @@ module ReactOnRails
         # Re-checks ownership immediately before handing control to Overmind,
         # so a socket that was replaced or removed between validation and use
         # cannot be acted on.
-        def overmind_control(subcommand, endpoint)
-          unless overmind_endpoint_owned?(endpoint)
-            puts "   ⚠️  Skipping `overmind #{subcommand}`: #{endpoint} is no longer this app's endpoint"
+        def overmind_control(subcommand, endpoint, timeout_secs: OVERMIND_CONTROL_TIMEOUT_SECS)
+          ownership = overmind_endpoint_ownership(endpoint)
+          unless ownership == :owned
+            reason = ownership == :unknown ? "could not be inspected" : "is no longer this app's endpoint"
+            puts "   ⚠️  Skipping `overmind #{subcommand}`: #{endpoint} #{reason}"
             return false
           end
 
-          return true if run_overmind_command([subcommand, "-s", endpoint])
+          return true if run_overmind_command([subcommand, "-s", endpoint], timeout_secs:)
 
           puts "   ⚠️  `overmind #{subcommand}` did not run successfully for #{endpoint}"
           false
@@ -1551,20 +1681,111 @@ module ReactOnRails
         # daemonizes to PPID 1 in its own process group, out of reach of any
         # group signal.
         #
-        # This deliberately reaches ProcessManager's private runner rather than
-        # reimplementing its Bundler API-compat shim here. The spec pins the
-        # coupling so a rename fails loudly instead of silently reverting to the
-        # broken path.
-        def run_overmind_command(args)
-          Timeout.timeout(OVERMIND_CONTROL_TIMEOUT_SECS) do
-            ProcessManager.send(:run_process_if_available, "overmind", args) == true
+        # The child launcher uses ProcessManager's availability checks and
+        # Bundler API-compat shim, then execs the selected binary. Exec keeps the
+        # real control client at the pid and process group this parent owns, so
+        # timeout cleanup can terminate and reap that process directly.
+        def run_overmind_command(args, timeout_secs: OVERMIND_CONTROL_TIMEOUT_SECS)
+          pid = spawn_overmind_command(args)
+          reaped = false
+          status = wait_for_overmind_command(pid, timeout_secs)
+          if status.is_a?(Process::Status)
+            reaped = true
+            return status.success? == true
           end
-        rescue Timeout::Error
+          if status == :reaped_without_status
+            reaped = true
+            puts "   ⚠️  `overmind #{args.first}` finished but its exit status was unavailable; " \
+                 "treating it as unsuccessful"
+            return false
+          end
+
+          terminate_overmind_command(pid)
+          reaped = true
           # Treated exactly like the runner reporting failure, so the escalation
           # ladder moves on to the next step instead of hanging here forever.
           puts "   ⚠️  `overmind #{args.first}` did not return within " \
-               "#{OVERMIND_CONTROL_TIMEOUT_SECS}s; moving on"
+               "#{timeout_secs}s; moving on"
           false
+        ensure
+          terminate_overmind_command(pid) if pid && !reaped
+        end
+
+        def spawn_overmind_command(args)
+          lib_dir = File.expand_path("../..", __dir__)
+          Process.spawn(
+            RbConfig.ruby, "-I", lib_dir, "-e", OVERMIND_CONTROL_RUNNER, "--", *args,
+            pgroup: true
+          )
+        end
+
+        def execute_overmind_command(args)
+          return exec("overmind", *args) if ProcessManager.installed?("overmind")
+          return false unless ProcessManager.send(:process_available_in_system?, "overmind")
+
+          env_overrides = ProcessManager.send(:preserve_runtime_env_vars)
+          ProcessManager.send(:with_unbundled_context) do
+            exec(env_overrides, "overmind", *args)
+          end
+        rescue Errno::ENOENT
+          false
+        end
+
+        def wait_for_overmind_command(pid, timeout_secs)
+          deadline = monotonic_now + timeout_secs
+          loop do
+            waited_pid, status = Process.wait2(pid, Process::WNOHANG)
+            return status if waited_pid
+
+            remaining = deadline - monotonic_now
+            return nil unless remaining.positive?
+
+            sleep([SHUTDOWN_POLL_INTERVAL_SECS, remaining].min)
+          end
+        rescue Errno::ECHILD, Errno::ESRCH
+          :reaped_without_status
+        end
+
+        def terminate_overmind_command(pid)
+          reaped = false
+          signal_process_group(pid, "TERM")
+          group_gone, reaped = wait_for_overmind_group_exit(
+            pid, OVERMIND_CONTROL_TERMINATION_GRACE_SECS, reaped
+          )
+          unless group_gone
+            signal_process_group(pid, "KILL")
+            _group_gone, reaped = wait_for_overmind_group_exit(
+              pid, OVERMIND_CONTROL_TERMINATION_GRACE_SECS, reaped
+            )
+          end
+        ensure
+          reap_overmind_command(pid) unless reaped
+        end
+
+        def wait_for_overmind_group_exit(pid, timeout_secs, reaped)
+          deadline = monotonic_now + timeout_secs
+          loop do
+            reaped ||= overmind_command_reaped?(pid)
+            return [true, reaped] unless process_group_alive?(pid)
+
+            remaining = deadline - monotonic_now
+            return [false, reaped] unless remaining.positive?
+
+            sleep([SHUTDOWN_POLL_INTERVAL_SECS, remaining].min)
+          end
+        end
+
+        def overmind_command_reaped?(pid)
+          waited_pid, = Process.wait2(pid, Process::WNOHANG)
+          !waited_pid.nil?
+        rescue Errno::ECHILD, Errno::ESRCH
+          true
+        end
+
+        def reap_overmind_command(pid)
+          Process.detach(pid).join(OVERMIND_CONTROL_TERMINATION_GRACE_SECS)
+        rescue Errno::ECHILD, Errno::ESRCH
+          nil
         end
 
         def signalable_pgid(pgid)
@@ -1723,8 +1944,8 @@ module ReactOnRails
         end
 
         def stale_cleanup_candidates(root)
-          overmind_sockets = Dir.glob(File.join(root, "tmp", "sockets", "overmind*.sock"))
-          [default_overmind_socket_path(root), *overmind_sockets, File.join(root, "tmp", "pids", "server.pid")].uniq
+          [default_overmind_socket_path(root), *overmind_socket_discovery(root)[:paths],
+           File.join(root, "tmp", "pids", "server.pid")].uniq
         end
 
         def wait_until(timeout_secs)
