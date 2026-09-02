@@ -494,6 +494,18 @@ module ReactOnRails
               expect(message).to include("#{prefix}//host/bundle.js")
             end
           end
+
+          [["bare", ""], ["prefixed", "URL="]].each do |description, prefix|
+            it "redacts #{description} credentials when whitespace follows the authority marker" do
+              server_bundle_path = "#{prefix}// bundle-user:synthetic-password@host/bundle.js"
+              stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)
+
+              message = bundle_load_error_message
+              expect(message).not_to include("bundle-user")
+              expect(message).not_to include("synthetic-password")
+              expect(message).to include("#{prefix}//host/bundle.js")
+            end
+          end
         end
 
         context "when malformed URL userinfo contains multiple at signs" do

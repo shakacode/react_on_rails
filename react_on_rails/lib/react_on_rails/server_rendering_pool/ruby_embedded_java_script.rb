@@ -431,11 +431,11 @@ module ReactOnRails
         end
 
         def sanitized_authority_relative_url(url)
-          authority = url.match(%r{//(?=\S)})
-          return url unless authority
+          authority_start = url.index("//")
+          return url unless authority_start
 
-          prefix = url[...authority.begin(0)]
-          authority_relative_url = url[authority.begin(0)..]
+          prefix = url[...authority_start]
+          authority_relative_url = url[authority_start..]
           sanitized_url = sanitized_valid_network_url(authority_relative_url) ||
                           strip_malformed_url_userinfo(authority_relative_url)
           "#{prefix}#{sanitized_url}"
