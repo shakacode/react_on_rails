@@ -1582,7 +1582,6 @@ module ReactOnRails
         def overmind_endpoint_ownership(path, root = current_app_root)
           return :foreign unless path.is_a?(String) && !path.empty?
 
-          File.lstat(path)
           resolved = File.realpath(path)
           return :foreign unless inside_dev_app_root?(resolved, root)
 
