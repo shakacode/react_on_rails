@@ -24,11 +24,19 @@ require "rails_helper"
 # globally, so this spec re-enables them and swaps in a memory cache for the example.
 RSpec.describe "Prerender-cached RSC streams with random dom ids", :server_rendering do
   let(:memory_store) { ActiveSupport::Cache::MemoryStore.new }
+  # /rsc_prerender_cache_probe streams RscEchoProps without an explicit id, so each request gets a
+  # fresh random mount id once random_dom_id is on (every other dummy page pins its id).
+  let(:path) { "/rsc_prerender_cache_probe" }
 
   before do
     allow(Rails).to receive(:cache).and_return(memory_store)
     allow(ReactOnRails.configuration).to receive(:random_dom_id).and_return(true)
     allow(ReactOnRailsPro.configuration).to receive(:prerender_caching).and_return(true)
+    # The dummy app's per-request CSP nonce is part of the prerender digest, so pin it (as
+    # rsc_payload_spec does) or the second request can never be a cache hit. Dom ids come from
+    # SecureRandom.uuid and stay random.
+    allow(SecureRandom).to receive(:base64).with(16).and_return("fixed-csp-nonce")
+    allow(ReactOnRailsPro::StreamCache).to receive(:wrap_and_cache).and_call_original
   end
 
   def mount_ids(body)
@@ -40,14 +48,14 @@ RSpec.describe "Prerender-cached RSC streams with random dom ids", :server_rende
   end
 
   it "rebinds the cached stream's embedded payload keys to each request's mount points" do
-    get "/rsc_echo_props"
+    get path
     expect(response).to have_http_status(:ok)
     first_body = response.body
     first_mount_ids = mount_ids(first_body)
     expect(first_mount_ids).not_to be_empty
     expect(embedded_payload_ids(first_body)).to match_array(first_mount_ids)
 
-    get "/rsc_echo_props"
+    get path
     expect(response).to have_http_status(:ok)
     second_body = response.body
     second_mount_ids = mount_ids(second_body)
@@ -60,5 +68,7 @@ RSpec.describe "Prerender-cached RSC streams with random dom ids", :server_rende
     expect(embedded_payload_ids(second_body)).to match_array(second_mount_ids)
     first_mount_ids.each { |dom_id| expect(second_body).not_to include(dom_id) }
     expect(second_body).not_to include("Error in RSC stream")
+    # Only the first request may render through the pool; the second must be a cache hit.
+    expect(ReactOnRailsPro::StreamCache).to have_received(:wrap_and_cache).once
   end
 end

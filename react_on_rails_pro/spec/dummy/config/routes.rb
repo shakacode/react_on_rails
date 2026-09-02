@@ -72,6 +72,7 @@ Rails.application.routes.draw do
   get "rsc_posts_page_over_redis" => "pages#rsc_posts_page_over_redis", as: :rsc_posts_page_over_redis
   get "rsc_echo_props" => "pages#rsc_echo_props", as: :rsc_echo_props
   get "rsc_fouc_probe" => "pages#rsc_fouc_probe", as: :rsc_fouc_probe
+  get "rsc_prerender_cache_probe" => "pages#rsc_prerender_cache_probe", as: :rsc_prerender_cache_probe
   get "activity_rsc_tabs" => "pages#activity_rsc_tabs", as: :activity_rsc_tabs
   get "client_side_fouc_probe" => "pages#client_side_fouc_probe", as: :client_side_fouc_probe
   get "async_on_server_sync_on_client" => "pages#async_on_server_sync_on_client", as: :async_on_server_sync_on_client
