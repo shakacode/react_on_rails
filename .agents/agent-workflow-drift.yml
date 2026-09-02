@@ -90,10 +90,21 @@ files:
   mode: identical
 - source: skills/post-merge-audit/bin/closeout-evidence-replay
   consumer: ".agents/skills/post-merge-audit/bin/closeout-evidence-replay"
-  mode: identical
+  mode: overlay
+  reason: React on Rails backports the merged qa-evidence v2 replay contract from
+    agent-workflows commit 162e1680 while retaining its reviewed shared-workflow
+    inventory boundary.
+  consumer_mode: '100755'
+  source_sha256: b2110347ace4cca5b39a03fddc054542b528aae8a6d45c37f445ee078a687d37
+  consumer_sha256: 5d87a68dd0fcb72dd6497be6e699aee89f2309bdcc2cc9a0bb3d2b553899bb8c
 - source: skills/post-merge-audit/bin/closeout-evidence-replay-test.rb
   consumer: ".agents/skills/post-merge-audit/bin/closeout-evidence-replay-test.rb"
-  mode: identical
+  mode: overlay
+  reason: React on Rails keeps the merged qa-evidence v2 replay regression suite
+    aligned with its backported runtime helper.
+  consumer_mode: '100755'
+  source_sha256: 35b3558bca3d49ac2032fc8b2a422877237e9f473f5d779f916e8ed8242bc60f
+  consumer_sha256: 53d22590ba1dbfdd58505610824d12d67b94a766e5f1b5f68b48f40881553185
 - source: skills/post-merge-audit/bin/post-merge-audit-scope
   consumer: ".agents/skills/post-merge-audit/bin/post-merge-audit-scope"
   mode: identical
@@ -201,18 +212,20 @@ files:
   consumer: ".agents/workflows/post-merge-audit.md"
   mode: overlay
   reason: React on Rails adds local helper resolution and release-branch changelog
-    routing.
+    routing, and backports the merged qa-evidence v2 audit gate from
+    agent-workflows commit 162e1680.
   consumer_mode: '100644'
   source_sha256: b290eded973c722015dbf4240a34a32734e59e69464dcf344bee113de17571f3
-  consumer_sha256: 7bd2418fc5b8bbe2b3385b86e82b09fd2f2cb0c39a3a493ac04f5a1e6d3ad195
+  consumer_sha256: b78a43aa154e936e56754331974bd8b4eab5186239612284e4e36f803d3866f8
 - source: workflows/pr-processing.md
   consumer: ".agents/workflows/pr-processing.md"
   mode: overlay
   reason: React on Rails adds release-train, hosted-CI, coordination, review-coverage,
-    changelog-routing, and installed-helper policy.
+    changelog-routing, and installed-helper policy, and backports the merged
+    qa-evidence v2 contract from agent-workflows commit 162e1680.
   consumer_mode: '100644'
   source_sha256: 7d0fbef62293d3a59e2c7a63abc6863be39ceb6883c6bc11b6a1c9747d9ad6c7
-  consumer_sha256: 8d18e7414e23587a977c752cf48eb7459ca4b95d40199d7deacde013cd6d33d0
+  consumer_sha256: d0385867d56600eb15fdecfab2e420e10be53b5b59867c35087188ad01417ee2
 - source: workflows/tdd.md
   consumer: ".agents/workflows/tdd.md"
   mode: overlay

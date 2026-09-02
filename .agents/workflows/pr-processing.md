@@ -642,6 +642,71 @@ only a caveated no-PR `park` disposition or a product-decision blocker.
 
 Workers should not turn product-decision blockers into speculative PRs. They should post or draft the evidence-backed question and stop that target.
 
+### Durable Visual Evidence Gate
+
+Apply this gate to every PR or no-PR handoff, not only coordinated batches.
+Classify whether the change alters user-visible rendered output, including
+layout, geometry, copy, color, iconography, loading/error/success states, or
+interaction behavior. A current user-visible UI change requires `qa-evidence
+v2`; a prose claim, an ephemeral scratchpad, a local/file path, or a `qa-evidence
+v1` marker cannot satisfy the current gate.
+
+For each user-visible UI change:
+
+1. Capture the relevant before and after states. The before state may be the
+   current implementation, an intentionally unfixed build, or a named design
+   reference. Inspect each capture: a blank or unpainted page is a failed
+   capture, not passing evidence.
+2. Put the artifacts where every intended reviewer can open them. For a public
+   or GitHub-only project, prefer GitHub PR attachments. When an authenticated
+   browser/file-upload capability is available, use GitHub's UI upload flow and
+   retain the stable `github.com/user-attachments/assets/...` URL; obtaining the
+   URL does not require submitting a comment. A configured linked tracker or
+   repo artifact destination is also valid when every intended reviewer has
+   access; link that evidence from the PR.
+   A `github_pr` destination must contain a reviewer-visible `github.com` URL.
+   A `linked_tracker` or `repo_artifact_store` destination must name that
+   destination and contain its reviewer-visible HTTPS URL.
+3. GitHub documents no public REST or GraphQL attachment-upload route. Do not
+   depend on an undocumented direct-upload endpoint unless the repository has
+   explicitly configured and verified that integration. If no authenticated UI
+   uploader or configured integration is available, prepare clearly named local
+   before/after artifacts and report their absolute paths, but record
+   `human_attachment_pending` and keep QA/release readiness `blocked` until a
+   human attaches them and the receipt contains the resulting durable GitHub
+   URL. A local absolute or relative path (`./`, `../`, `~/`, Windows
+   slash/backslash forms), a plain local media filename, `file:` URL,
+   inaccessible private blob/camo URL, “captured locally”, or any
+   blank/unpainted capture token never satisfies a durable visual-evidence
+   value, even when that value also contains an unrelated HTTPS URL. A media
+   filename inside the path component of the actual HTTPS URL is allowed.
+   The replay helper validates URL and destination shape; it does not fetch
+   evidence URLs or prove their authorization, retention, or liveness. Before
+   reporting readiness, an intended reviewer must open every evidence URL using
+   intended reviewer access and reject dead, inaccessible, private-only, or
+   expiring evidence.
+4. For hover, focus, drag, transition, loading, animation, or another
+   interaction change, link a short durable clip. When recording is unavailable,
+   use the exact labeled substitute
+   `measured_substitute: before_value=52px; after_value=0px; tolerance=1px`
+   (or the deterministic `baseline_value` / `candidate_value` aliases). Every
+   value and the tolerance require units. Stills or incidental numbers in URLs
+   do not satisfy an interaction claim.
+5. For a visual fix, exercise an intentionally unfixed negative control and
+   record the observed failing assertion or mismatch. If no visual fix is in
+   scope, give a reasoned `not applicable`.
+6. If the change can affect a rendered page, delivered asset, or bundle, follow
+   the repository's `AGENTS.md` / Agent Workflow Configuration performance seam
+   and use `$benchmark-verification` when it applies. Record the result as
+   `bundle_hygiene` when it only constrains size/shape, or `measured_metric` only
+   when a real runtime/user metric was measured; name that metric with
+   `metric_name=<runtime/user metric>`. Name non-byte hygiene values with
+   `metric_name=<bundle/asset shape metric>`. Either classification requires
+   `source=<stable command/report/ref>` naming the repo-seam output plus explicit
+   `baseline_value=<number><unit>` and `candidate_value=<number><unit>` fields
+   using the same unit. Incidental CI/report URL IDs do not count. `UNKNOWN`,
+   unavailable, missing, unmeasured, or N/A evidence blocks readiness.
+
 ### Batch QA Lane
 
 Convention: `UNKNOWN` in capitals means coordination/backend state could not be
@@ -704,6 +769,13 @@ includes this evidence block:
 - Tested at: <PR/head SHA(s), audited range, or "not applicable: no PR/code changes">
 - Automated checks: <commands, CI links, or "covered by worker validation: ...">
 - Manual checks: <workflow/app smoke checks, screenshots, or "not applicable: ...">
+- User-visible UI change: <yes | no>
+- Visual evidence: <durable before/after URL(s), destination, and paint check; blocked human-attachment paths; or reasoned "not applicable: no user-visible UI change">
+- Interaction change: <yes | no; yes requires clip/measured substitute, no requires reasoned not applicable>
+- Interaction evidence: <durable clip URL, exact measured_substitute with labeled before/after/tolerance values and units, or reasoned "not applicable: ...">
+- Visual fix: <yes | no; yes requires observed unfixed failure, no requires reasoned not applicable>
+- Negative control: <observed unfixed failure, or reasoned "not applicable: no visual fix">
+- Performance evidence: <repo performance-seam result with source=<stable command/report/ref>, baseline_value=<number><unit>, and candidate_value=<number><unit> plus bundle_hygiene/measured_metric classification; non-byte bundle_hygiene names metric_name=<bundle/asset shape metric>; measured_metric names metric_name=<runtime/user metric>; or reasoned "not applicable: ...">
 - Findings: <none, fixed in PR(s), waived with link, or follow-up recommended with tracking outcome/link>
 - QA required: <yes | no>
 - QA required rationale: <one-line reason for the decision and selected QA depth>
@@ -712,11 +784,11 @@ includes this evidence block:
 - Process-gap disposition: <script | schema | checklist+replay | park | not applicable>
 ```
 
-For replayable post-merge audit, append a hidden marker next to the human QA
-Evidence block whenever QA is required or explicitly not required:
+For replayable post-merge audit, append a hidden `qa-evidence v2` marker next to
+the human QA Evidence block whenever QA is required or explicitly not required:
 
 ```markdown
-<!-- qa-evidence v1
+<!-- qa-evidence v2
 required: <yes | no>
 status: <satisfied | blocked | waived | in_progress | unknown | not_applicable>
 head_sha: <full 40-character current PR or repository head SHA>
@@ -724,6 +796,16 @@ tested_at: <PR/head SHA(s), audited range, or no-PR reason anchored to repositor
 scope: <changed areas, PRs, or release phase covered>
 automated_checks: <commands, CI links, or covered-by-worker-validation note>
 manual_checks: <manual smoke checks or not applicable>
+user_visible_ui_change: <yes | no>
+visual_evidence_destination: <github_pr | linked_tracker | repo_artifact_store | human_attachment_pending | not_applicable>
+visual_evidence: <durable: before/after https URL(s) | blocked: human attachment required; prepared local artifacts: absolute paths | not applicable: reason>
+paint_check: <passed: painted/rendered target inspected | not applicable: reason>
+interaction_change: <yes | no>
+interaction_evidence: <clip: durable https URL | measured_substitute: before_value=52px; after_value=0px; tolerance=1px | not applicable: reason>
+visual_fix: <yes | no>
+negative_control: <observed_failure: failing unfixed assertion/mismatch | not applicable: reason>
+performance_impact: <not_applicable | bundle_hygiene | measured_metric>
+performance_evidence: <repo_seam: source=<stable command/report/ref>; metric_name=<runtime/user metric when measured_metric or bundle/asset shape metric for non-byte bundle_hygiene>; baseline_value=<number><unit>; candidate_value=<number><unit> | not applicable: reason>
 findings: <none, fixed, waived, blocked, or follow-up link>
 release_blocking: <clear | blocked | waived | not_applicable>
 process_gap_disposition: <script | schema | checklist+replay | park | not applicable>
@@ -733,6 +815,15 @@ process_gap_disposition: <script | schema | checklist+replay | park | not applic
 For `required: no`, record `status: not_applicable` and
 `release_blocking: not_applicable`. Replay treats any other terminal pair as an
 inconsistent omission record and returns `UNKNOWN`.
+
+Historical `qa-evidence v1` receipts remain replayable for backward
+compatibility. Do not emit v1 for new closeout evidence. The presence of any v2
+marker explicitly supersedes all v1 markers for that evidence input: a current
+valid v2 ignores legacy v1 history, while a stale or malformed v2 cannot be
+rescued by a current v1. When auditing a current user-visible UI change, run
+`closeout-evidence-replay --expected-head-sha <full-final-head-SHA>
+--require-visual-evidence-v2`; v1-only or stale evidence then fails closed
+rather than silently bypassing the durable visual gate.
 
 For priority review findings that feed a strict merge ledger or final handoff,
 append a hidden disposition marker without inventing a separate review-finding
@@ -1674,6 +1765,9 @@ The closeout lane is:
    evidence: rerun the affected automated and manual QA at the new head, then
    refresh `Tested at` and `head_sha`; never update the evidence marker alone.
    Run the helper separately for that PR or target with
+   `--expected-head-sha <full-final-head-SHA>`. Add
+   `--require-visual-evidence-v2` in the same invocation for every current
+   user-visible UI change; this flag is invalid without
    `--expected-head-sha <full-final-head-SHA>`. Add
    `--require-priority-dispositions` whenever the merge ledger or handoff relies
    on fixed, waived, or deferred priority findings. If the head changes again before
