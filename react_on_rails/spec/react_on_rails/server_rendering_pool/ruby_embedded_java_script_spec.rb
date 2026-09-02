@@ -482,6 +482,18 @@ module ReactOnRails
 
             expect(bundle_load_error_message).to include(server_bundle_path)
           end
+
+          [" ", "URL="].each do |prefix|
+            it "redacts credentials when #{prefix.inspect} precedes the authority marker" do
+              server_bundle_path = "#{prefix}//bundle-user:synthetic-password@host/bundle.js"
+              stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)
+
+              message = bundle_load_error_message
+              expect(message).not_to include("bundle-user")
+              expect(message).not_to include("synthetic-password")
+              expect(message).to include("#{prefix}//host/bundle.js")
+            end
+          end
         end
 
         context "when malformed URL userinfo contains multiple at signs" do
@@ -731,6 +743,20 @@ module ReactOnRails
           end
         end
 
+        context "when a bundle-load failure embeds credentials in a non-HTTP URL" do
+          %w[postgres redis ftp mongodb].each do |scheme|
+            it "redacts credentials from the #{scheme} URL" do
+              failure_message = "Failure loading #{scheme}://synthetic-user:synthetic-secret@host/path"
+              stub_http_bundle_failure(failure_message)
+
+              message = bundle_load_error_message
+              expect(message).not_to include("synthetic-user")
+              expect(message).not_to include("synthetic-secret")
+              expect(message).to include("Failure loading #{scheme}://host/path")
+            end
+          end
+        end
+
         context "when malformed userinfo looks like a valid host prefix in an ordinary error" do
           it "does not protect the prefix before the whitespace-delimited credential suffix" do
             failure_message = "Failure loading http://synthetic-user:123 secret-final@host/path"
@@ -949,6 +975,22 @@ module ReactOnRails
             expect(message).not_to include("synthetic-user")
             expect(message).not_to include("synthetic-secret")
             expect(message).to include("Failure loading //host/path")
+          end
+
+          [
+            ["whitespace", "//synthetic-user synthetic-secret@host/path"],
+            ["a quote", '//synthetic-user" synthetic-secret@host/path'],
+            ["an LF line break", "//synthetic-user\nsynthetic-secret@host/path"],
+            ["a CRLF line break", "//synthetic-user\r\nsynthetic-secret@host/path"]
+          ].each do |description, malformed_url|
+            it "fails closed when authority-relative userinfo spans #{description}" do
+              stub_local_bundle_failure("Failure loading #{malformed_url}")
+
+              message = bundle_load_error_message
+              expect(message).not_to include("synthetic-user")
+              expect(message).not_to include("synthetic-secret")
+              expect(message).to include("Failure loading //host/path")
+            end
           end
         end
 

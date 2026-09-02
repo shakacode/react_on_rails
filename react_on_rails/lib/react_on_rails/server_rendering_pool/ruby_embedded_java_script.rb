@@ -45,6 +45,9 @@ module ReactOnRails
         | error\son\srenderer\srequest
       /xi
 
+      HTTP_URL_SCHEME_PATTERN = %r{https?://}i
+      HTTP_URL_TOKEN_PATTERN = /#{HTTP_URL_SCHEME_PATTERN}(?:(?!#{HTTP_URL_SCHEME_PATTERN})[^\s"'])+/
+
       class << self
         def reset_pool
           @js_context_pool = ConnectionPool.new(
@@ -428,9 +431,14 @@ module ReactOnRails
         end
 
         def sanitized_authority_relative_url(url)
-          return url unless url.start_with?("//")
+          authority = url.match(%r{//(?=\S)})
+          return url unless authority
 
-          sanitized_valid_network_url(url) || strip_malformed_url_userinfo(url)
+          prefix = url[...authority.begin(0)]
+          authority_relative_url = url[authority.begin(0)..]
+          sanitized_url = sanitized_valid_network_url(authority_relative_url) ||
+                          strip_malformed_url_userinfo(authority_relative_url)
+          "#{prefix}#{sanitized_url}"
         end
 
         def sanitized_renderer_error_message(message, raw_url, sanitized_url = sanitized_renderer_url(raw_url))
@@ -455,7 +463,7 @@ module ReactOnRails
           sanitized = text.dup.clear
           unprotected_start = 0
 
-          text.to_enum(:scan, %r{https?://(?:(?!https?://)[^\s"'])+}i).each do
+          text.to_enum(:scan, HTTP_URL_TOKEN_PATTERN).each do
             match = Regexp.last_match
             protected_url = sanitized_valid_network_url(match[0])
             next unless protected_url
@@ -472,13 +480,13 @@ module ReactOnRails
 
         def userinfo_delimiter_before_next_scheme?(text, match)
           continuation = text[match.end(0)..]
-          boundary = continuation.match(%r{https?://}i)
+          boundary = continuation.match(HTTP_URL_SCHEME_PATTERN)
           continuation = continuation[...boundary.begin(0)] if boundary
           continuation.include?("@")
         end
 
         def sanitized_unprotected_prefix(text, raw_url, sanitized_url)
-          unresolved_scheme = text.match(%r{https?://}i)
+          unresolved_scheme = text.match(HTTP_URL_SCHEME_PATTERN)
           return strip_unprotected_userinfo(text) if raw_url == sanitized_url || unresolved_scheme.nil?
 
           text[...unresolved_scheme.begin(0)]
@@ -504,10 +512,20 @@ module ReactOnRails
           # A credential-bearing network-path reference can appear in an exception message even
           # when it is not the configured bundle URL. Require a non-whitespace token immediately
           # after // so ordinary prose such as "// contact dev@example" remains untouched.
-          authority_pattern = %r{(?<!:)//[^\s"']+}
-          text = text.gsub(authority_pattern) do |url|
+          authority_start_pattern = %r{//(?=\S)}
+          authority_token_pattern = /#{authority_start_pattern}[^\s"']+/
+          text = text.gsub(authority_token_pattern) do |url|
             sanitized_valid_network_url(url) || strip_malformed_url_userinfo(url)
           end
+
+          # Malformed userinfo can cross prose delimiters before its @. Keep scanning until the
+          # next URL-like start and fail closed through the last @ in that bounded span.
+          malformed_authority_pattern = /
+            #{authority_start_pattern}
+            (?:(?!#{HTTP_URL_SCHEME_PATTERN}|#{authority_start_pattern}).)*[\s"']
+            (?:(?!#{HTTP_URL_SCHEME_PATTERN}|#{authority_start_pattern}).)*@
+          /mx
+          text = text.gsub(malformed_authority_pattern) { |span| strip_malformed_url_userinfo(span) }
 
           scheme_pattern = %r{https?\s*:\s*//}i
           text.gsub(/#{scheme_pattern}(?:(?!#{scheme_pattern}).)*@/m) { |span| strip_malformed_url_userinfo(span) }
@@ -516,7 +534,7 @@ module ReactOnRails
         # For malformed URLs or unprotected scheme-delimited spans, remove through the last @. The
         # retained suffix is best-effort context; ambiguous malformed diagnostics may lose text.
         def strip_malformed_url_userinfo(url)
-          scheme = url.match(%r{\Ahttps?\s*:\s*//}i)
+          scheme = url.match(%r{\A[a-z][a-z0-9+.-]*\s*:\s*//}i)
           authority_prefix_end = scheme&.end(0) || (2 if url.start_with?("//"))
           userinfo_delimiter = url.rindex("@")
           return url unless authority_prefix_end && userinfo_delimiter

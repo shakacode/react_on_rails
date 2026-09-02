@@ -862,6 +862,22 @@ describe ReactOnRailsProHelper do
       expect(wire).not_to include("Auth.server.tsx")
     end
 
+    it "fails closed in production when hasErrors is not boolean" do
+      stub_rails_env("production")
+      malformed_metadata = {
+        "hasErrors" => "true",
+        "consoleReplayScript" => synthetic_console_replay_script,
+        "diagnosticContext" => { "sourcePath" => "/srv/private/Auth.server.tsx" },
+        "html" => "payload"
+      }
+
+      wire = framed_wire_bytes(malformed_metadata)
+
+      expect(wire).to eq("{\"hasErrors\":true}\t00000007\npayload")
+      expect(wire).not_to include(synthetic_console_replay_script)
+      expect(wire).not_to include("Auth.server.tsx")
+    end
+
     it "leaves a clean production chunk untouched" do
       stub_rails_env("production")
 

@@ -1474,7 +1474,11 @@ module ReactOnRailsProHelper
   end
 
   def rsc_payload_rendering_error_signal?(metadata)
-    return true if metadata["hasErrors"] == true
+    if metadata.key?("hasErrors")
+      has_errors = metadata["hasErrors"]
+      return true unless [true, false].include?(has_errors)
+      return true if has_errors
+    end
 
     rendering_error = metadata["renderingError"]
     return false unless rendering_error.is_a?(Hash)
