@@ -496,6 +496,18 @@ module ReactOnRails
               "URL=//host/path"
             ],
             [
+              "userinfo after an earlier authority-relative URL",
+              "URL= //safe/path//bundle-user:synthetic-password@host/bundle.js",
+              false,
+              "URL= //safe/path//host/bundle.js"
+            ],
+            [
+              "userinfo spanning a later authority marker",
+              "URL= //bundle-user:synthetic-password//suffix@host/bundle.js",
+              false,
+              "URL= //host/bundle.js"
+            ],
+            [
               "a nested non-HTTP URL",
               "http://outer.test/redirect?next=ftp://nested-user:nested-secret@nested.test/path",
               true,

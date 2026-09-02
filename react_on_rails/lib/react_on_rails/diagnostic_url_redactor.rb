@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "uri"
+require_relative "diagnostic_url_redactor/authority_relative_rewriter"
 
 module ReactOnRails
   # Removes URL userinfo from configured values and diagnostic prose before either is displayed.
@@ -18,7 +19,7 @@ module ReactOnRails
     FLEXIBLE_HTTP_URL_SCHEME_PATTERN = %r{https?\s*:\s*//}i
 
     CONFIGURED_URL_NOT_PROVIDED = Object.new.freeze
-    private_constant :CONFIGURED_URL_NOT_PROVIDED
+    private_constant :AuthorityRelativeRewriter, :CONFIGURED_URL_NOT_PROVIDED
 
     # Rewrites disjoint regex-delimited spans with byte offsets so multibyte prefixes do not
     # force Ruby to rescan the string for every match.
@@ -91,14 +92,9 @@ module ReactOnRails
       end
 
       def sanitized_authority_relative_url(url)
-        authority_start = url.index("//")
-        return url unless authority_start
-
-        prefix = url[...authority_start]
-        authority_relative_url = url[authority_start..]
-        sanitized_url = sanitized_valid_network_url(authority_relative_url) ||
-                        strip_malformed_url_userinfo(authority_relative_url)
-        "#{prefix}#{sanitized_url}"
+        AuthorityRelativeRewriter.rewrite(url, delimiter_pattern: ENCODED_USERINFO_DELIMITER_PATTERN) do |span|
+          sanitized_valid_network_url(span)
+        end
       end
 
       def sanitized_error_message(message, raw_url)
@@ -193,10 +189,9 @@ module ReactOnRails
       # Inspect only the encoded-or-literal scheme, authority terminator, and @ delimiter, then
       # remove the original encoded span without decoding or rewriting unrelated output.
       def strip_encoded_network_url_userinfo(url)
-        network_url = url.match(NETWORK_URL_START_PATTERN)
-        return nil unless network_url&.begin(0)&.zero?
+        authority_start = encoded_authority_start(url)
+        return nil unless authority_start
 
-        authority_start = network_url.end(0)
         authority_end_match = url.match(ENCODED_AUTHORITY_END_PATTERN, authority_start)
         authority_end = authority_end_match&.begin(0) || url.length
         authority = url[authority_start...authority_end]
@@ -204,6 +199,13 @@ module ReactOnRails
         return nil if delimiter.empty?
 
         "#{url[...authority_start]}#{host}#{url[authority_end..]}"
+      end
+
+      def encoded_authority_start(url)
+        network_url = url.match(NETWORK_URL_START_PATTERN)
+        return network_url.end(0) if network_url&.begin(0)&.zero?
+
+        2 if url.start_with?("//")
       end
 
       def sanitized_single_network_url(url)
@@ -264,10 +266,10 @@ module ReactOnRails
       def strip_malformed_url_userinfo(url)
         scheme = url.match(%r{\A[a-z][a-z0-9+.-]*\s*:\s*//}i)
         authority_prefix_end = scheme&.end(0) || (2 if url.start_with?("//"))
-        userinfo_delimiter = url.rindex("@")
-        return url unless authority_prefix_end && userinfo_delimiter
+        _userinfo, delimiter, suffix = url.rpartition(ENCODED_USERINFO_DELIMITER_PATTERN)
+        return url unless authority_prefix_end && !delimiter.empty?
 
-        "#{url[...authority_prefix_end]}#{url[(userinfo_delimiter + 1)..]}"
+        "#{url[...authority_prefix_end]}#{suffix}"
       end
     end
   end

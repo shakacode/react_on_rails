@@ -47,6 +47,26 @@ RSpec.describe ReactOnRails::DiagnosticUrlRedactor do
         "URL=//host/path"
       ],
       [
+        "userinfo after an earlier authority-relative URL",
+        "URL= //safe/path//bundle-user:synthetic-password@host/bundle.js",
+        "URL= //safe/path//host/bundle.js"
+      ],
+      [
+        "userinfo spanning a later authority marker",
+        "URL= //bundle-user:synthetic-password//suffix@host/bundle.js",
+        "URL= //host/bundle.js"
+      ],
+      [
+        "encoded userinfo after an earlier authority-relative URL",
+        "URL= //safe/path//bundle-user:synthetic-password%40host/bundle.js",
+        "URL= //safe/path//host/bundle.js"
+      ],
+      [
+        "encoded userinfo spanning a later authority marker",
+        "URL= //bundle-user:synthetic-password//suffix%40host/bundle.js",
+        "URL= //host/bundle.js"
+      ],
+      [
         "whitespace after a bare authority marker",
         "// synthetic-user:synthetic-secret@host/path",
         "//host/path"
@@ -130,6 +150,16 @@ RSpec.describe ReactOnRails::DiagnosticUrlRedactor do
         "an at sign only in an authority-relative path",
         "//host/assets/component@2.js",
         "//host/assets/component@2.js"
+      ],
+      [
+        "a percent-encoded at sign only in an authority-relative path",
+        "//host/assets/component%402.js",
+        "//host/assets/component%402.js"
+      ],
+      [
+        "multiple authority-relative URLs without userinfo",
+        "URL= //safe/path//cdn.test/bundle.js",
+        "URL= //safe/path//cdn.test/bundle.js"
       ],
       [
         "a local path with replacement metacharacters",
