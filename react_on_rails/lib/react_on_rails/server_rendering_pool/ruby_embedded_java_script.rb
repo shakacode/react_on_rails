@@ -46,7 +46,14 @@ module ReactOnRails
       /xi
 
       HTTP_URL_SCHEME_PATTERN = %r{https?://}i
-      NETWORK_URL_SCHEME_PATTERN = %r{[a-z][a-z0-9+.-]*://}i
+      NETWORK_URL_START_PATTERN = %r{
+        (?:[a-z]|%[0-9a-f]{2})
+        (?:[a-z0-9+.-]|%[0-9a-f]{2})*
+        (?::|%3a)
+        (?:/|%2f){2}
+      }ix
+      ENCODED_USERINFO_DELIMITER_PATTERN = /@|%40/i
+      ENCODED_AUTHORITY_END_PATTERN = %r{/|%2f|\?|%3f|\#|%23}i
       HTTP_URL_TOKEN_PATTERN = /#{HTTP_URL_SCHEME_PATTERN}(?:(?!#{HTTP_URL_SCHEME_PATTERN})[^\s"'])+/
 
       class << self
@@ -413,6 +420,8 @@ module ReactOnRails
         def sanitized_renderer_url(url)
           return url if url.nil? || url.empty?
 
+          url = valid_diagnostic_text(url)
+
           # Treat whitespace around a scheme delimiter as a malformed HTTP(S) URL rather than a
           # local path. Utils intentionally rejects that spelling, but the displayed diagnostic
           # must still fail closed if the value contains credential-like userinfo.
@@ -443,8 +452,11 @@ module ReactOnRails
         end
 
         def sanitized_renderer_error_message(message, raw_url, sanitized_url = sanitized_renderer_url(raw_url))
-          message = message.to_s
+          message = valid_diagnostic_text(message)
           return strip_userinfo(message) if raw_url.nil? || raw_url.empty?
+
+          raw_url = valid_diagnostic_text(raw_url)
+          sanitized_url = valid_diagnostic_text(sanitized_url)
 
           # URI::InvalidURIError embeds String#inspect, while other errors may embed the raw value.
           message = message.gsub(raw_url.inspect) { sanitized_url.inspect }
@@ -460,7 +472,7 @@ module ReactOnRails
         # independently rather than allowing one fallback match to consume through another scheme.
         # Ambiguous text may be over-redacted for safety.
         def strip_userinfo(text)
-          text = text.to_s
+          text = valid_diagnostic_text(text)
           sanitized = text.dup.clear
           unprotected_start = 0
 
@@ -483,7 +495,7 @@ module ReactOnRails
           continuation = text[match.end(0)..]
           boundary = continuation.match(HTTP_URL_SCHEME_PATTERN)
           continuation = continuation[...boundary.begin(0)] if boundary
-          continuation.include?("@")
+          continuation.match?(ENCODED_USERINFO_DELIMITER_PATTERN)
         end
 
         def sanitized_unprotected_prefix(text, raw_url, sanitized_url)
@@ -504,21 +516,47 @@ module ReactOnRails
         end
 
         def sanitized_nested_network_urls(sanitized_url)
-          # A valid outer URL can carry another credential URL in its path or query. Sanitize
-          # nested scheme spans from right to left so shortening one cannot invalidate the start
-          # offsets of earlier spans. The first scheme belongs to the outer URL and was handled
-          # structurally above.
-          nested_scheme_starts = sanitized_url.to_enum(:scan, NETWORK_URL_SCHEME_PATTERN)
+          # A valid outer URL can carry another credential URL in its path or query. Partition the
+          # input into disjoint scheme spans and assemble their replacements from left to right,
+          # keeping the work bounded by the input size even when a diagnostic has many URL starts.
+          # The first scheme belongs to the outer URL and was handled structurally above.
+          nested_scheme_starts = sanitized_url.to_enum(:scan, NETWORK_URL_START_PATTERN)
                                               .map { Regexp.last_match.begin(0) }
           nested_scheme_starts.shift if nested_scheme_starts.first&.zero?
-          nested_scheme_starts.reverse_each do |start|
-            token_end = sanitized_url.index(/[\s"']/, start) || sanitized_url.length
+          return sanitized_url if nested_scheme_starts.empty?
+
+          sanitized = sanitized_url.dup.clear
+          unprocessed_start = 0
+
+          nested_scheme_starts.each_with_index do |start, index|
+            token_end = nested_scheme_starts.fetch(index + 1, sanitized_url.length)
             nested_url = sanitized_url[start...token_end]
-            replacement = sanitized_single_network_url(nested_url) || strip_malformed_url_userinfo(nested_url)
-            sanitized_url[start...token_end] = replacement
+            replacement = strip_encoded_network_url_userinfo(nested_url) ||
+                          sanitized_single_network_url(nested_url) ||
+                          nested_url
+            sanitized << sanitized_url[unprocessed_start...start]
+            sanitized << replacement
+            unprocessed_start = token_end
           end
 
-          sanitized_url
+          sanitized << sanitized_url[unprocessed_start..]
+        end
+
+        # Percent encoding can hide the structural delimiters of a nested URL from URI.parse.
+        # Inspect only the encoded-or-literal scheme, authority terminator, and @ delimiter, then
+        # remove the original encoded span without decoding or rewriting unrelated output.
+        def strip_encoded_network_url_userinfo(url)
+          network_url = url.match(NETWORK_URL_START_PATTERN)
+          return nil unless network_url&.begin(0)&.zero?
+
+          authority_start = network_url.end(0)
+          authority_end_match = url.match(ENCODED_AUTHORITY_END_PATTERN, authority_start)
+          authority_end = authority_end_match&.begin(0) || url.length
+          authority = url[authority_start...authority_end]
+          _userinfo, delimiter, host = authority.rpartition(ENCODED_USERINFO_DELIMITER_PATTERN)
+          return nil if delimiter.empty?
+
+          "#{url[...authority_start]}#{host}#{url[authority_end..]}"
         end
 
         def sanitized_single_network_url(url)
@@ -534,7 +572,17 @@ module ReactOnRails
           nil
         end
 
+        def valid_diagnostic_text(text)
+          text = text.to_s
+          text.valid_encoding? ? text : text.scrub
+        end
+
         def strip_unprotected_userinfo(text)
+          # A protected HTTP token can end before a malformed nested credential delimiter.
+          # Reuse the bounded structural scan for the remaining prose span before applying the
+          # broader fail-closed patterns below.
+          text = sanitized_nested_network_urls(text.dup)
+
           # A credential-bearing network-path reference can appear in an exception message even
           # when it is not the configured bundle URL. Require a non-whitespace token immediately
           # after // so ordinary prose such as "// contact dev@example" remains untouched.

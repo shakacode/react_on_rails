@@ -642,6 +642,114 @@ module ReactOnRails
           end
         end
 
+        context "when a valid outer HTTP URL contains encoded nested credentials" do
+          encoded_nested_urls = [
+            ["a fully encoded nested URL",
+             "ftp%3A%2F%2Fnested-user%3Anested-secret%40nested.test%2Fpath",
+             "ftp%3A%2F%2Fnested.test%2Fpath"],
+            ["an encoded scheme and authority marker",
+             "ftp%3A%2F%2Fnested-user:nested-secret@nested.test/path",
+             "ftp%3A%2F%2Fnested.test/path"],
+            ["a partially encoded scheme",
+             "f%74p://nested-user:nested-secret@nested.test/path",
+             "f%74p://nested.test/path"],
+            ["a partially encoded scheme and encoded userinfo delimiter",
+             "f%74p%3A%2F%2Fnested-user:nested-secret%40nested.test/path",
+             "f%74p%3A%2F%2Fnested.test/path"],
+            ["an encoded userinfo delimiter",
+             "ftp://nested-user:nested-secret%40nested.test/path",
+             "ftp://nested.test/path"]
+          ]
+
+          encoded_nested_urls.each do |description, nested_url, sanitized_nested_url|
+            it "redacts #{description} from the configured bundle URL" do
+              server_bundle_url = "http://outer.test/redirect?next=#{nested_url}"
+              stub_http_bundle_failure("connection failed", bundle_url: server_bundle_url)
+
+              message = bundle_load_error_message
+              expect(message).not_to include("nested-user")
+              expect(message).not_to include("nested-secret")
+              expect(message).to include("http://outer.test/redirect?next=#{sanitized_nested_url}")
+            end
+
+            it "redacts #{description} from ordinary exception text" do
+              nested_outer_url = "http://outer.test/redirect?next=#{nested_url}"
+              stub_http_bundle_failure("Failure loading #{nested_outer_url}")
+
+              message = bundle_load_error_message
+              expect(message).not_to include("nested-user")
+              expect(message).not_to include("nested-secret")
+              expect(message).to include("Failure loading http://outer.test/redirect?next=#{sanitized_nested_url}")
+            end
+          end
+
+          [
+            ["path", "ftp%3A%2F%2Fnested.test%2Fcomponent%402.js"],
+            ["query", "ftp%3A%2F%2Fnested.test%3Fcontact%3Dsafe%40example.test"]
+          ].each do |location, nested_url|
+            it "preserves a configured encoded nested URL whose at sign is only in the #{location}" do
+              safe_outer_url = "http://outer.test/redirect?next=#{nested_url}"
+              stub_http_bundle_failure("connection failed", bundle_url: safe_outer_url)
+
+              expect(bundle_load_error_message).to include(safe_outer_url)
+            end
+
+            it "preserves an exception-text encoded nested URL whose at sign is only in the #{location}" do
+              safe_outer_url = "http://outer.test/redirect?next=#{nested_url}"
+              stub_http_bundle_failure("Failure loading #{safe_outer_url}")
+
+              expect(bundle_load_error_message).to include("Failure loading #{safe_outer_url}")
+            end
+          end
+
+          it "redacts a credential URL near the end of a large diagnostic with many nested URL starts" do
+            safe_part = "part=ftp%3A%2F%2Fnested.test%2Fchunk"
+            encoded_padding = Array.new(1_800, safe_part).join("&")
+            nested_url = "ftp%3A%2F%2Fnested-user%3Anested-secret%40nested.test%2Fpath"
+            outer_url = "http://outer.test/redirect?#{encoded_padding}&next=#{nested_url}"
+            failure_message = "Failure loading #{outer_url}"
+            expect(failure_message.bytesize).to be > 65_536
+            stub_http_bundle_failure(failure_message)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("nested-user")
+            expect(message).not_to include("nested-secret")
+            expect(message).to include("next=ftp%3A%2F%2Fnested.test%2Fpath")
+          end
+        end
+
+        context "when nested non-HTTP userinfo spans a prose delimiter" do
+          userinfo_delimiters = [["literal", "@"], ["encoded", "%40"]]
+          prose_delimiters = [["space", " "], ["double quote", '"'], ["single quote", "'"]]
+
+          userinfo_delimiters.each do |delimiter_encoding, userinfo_delimiter|
+            prose_delimiters.each do |description, prose_delimiter|
+              nested_url =
+                "ftp://nested-user#{prose_delimiter}nested-secret#{userinfo_delimiter}nested.test/path"
+
+              it "fails closed across a #{description} with the #{delimiter_encoding} at sign in the configured URL" do
+                server_bundle_url = "http://outer.test/redirect?next=#{nested_url}"
+                stub_http_bundle_failure("connection failed", bundle_url: server_bundle_url)
+
+                message = bundle_load_error_message
+                expect(message).not_to include("nested-user")
+                expect(message).not_to include("nested-secret")
+                expect(message).to include("nested.test/path")
+              end
+
+              it "fails closed across a #{description} with the #{delimiter_encoding} at sign in exception text" do
+                failure_message = "Failure loading http://outer.test/redirect?next=#{nested_url}"
+                stub_http_bundle_failure(failure_message)
+
+                message = bundle_load_error_message
+                expect(message).not_to include("nested-user")
+                expect(message).not_to include("nested-secret")
+                expect(message).to include("nested.test/path")
+              end
+            end
+          end
+        end
+
         unresolved_prefix_cases = [
           ["an invalid prefix before a valid credential URL",
            "http://synthetic-user:nonnumeric-prefixhttp://synthetic-secret@host/path",
@@ -757,7 +865,7 @@ module ReactOnRails
           end
         end
 
-        context "when URI parsing raises ArgumentError for malformed encoding" do
+        context "when URI parsing raises ArgumentError" do
           it "still raises a sanitized bundle-load error through the public entrypoint" do
             server_bundle_url = "http://synthetic-user:synthetic-secret@host/path"
             allow(URI).to receive(:parse).and_call_original
@@ -770,6 +878,19 @@ module ReactOnRails
             expect(message).not_to include("synthetic-secret")
             expect(message).to include("invalid byte sequence in UTF-8")
             expect(message).to include("http://host/path")
+          end
+        end
+
+        context "when the configured URL has invalid UTF-8 bytes" do
+          it "still raises a sanitized bundle-load error through the public entrypoint" do
+            server_bundle_url = "http://synthetic-user:synthetic-secret@host/path-\xFF".b
+                                                                                       .force_encoding(Encoding::UTF_8)
+            stub_http_bundle_failure("connection failed", bundle_url: server_bundle_url)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("http://host/path-")
           end
         end
 
