@@ -1254,6 +1254,10 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       File.join(root, "tmp", "react_on_rails", "dev-session.json")
     end
 
+    def session_lock_path(root)
+      File.join(root, "tmp", "react_on_rails", "dev-session.lock")
+    end
+
     # Stand-in for a running `bin/dev`: leads its own process group, holds the
     # session flock for its whole life, and has a child of its own so
     # descendant shutdown is genuinely exercised rather than asserted.
@@ -1347,13 +1351,21 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       it "records worktree-scoped state, holds its lock, and removes it afterwards" do
         root = app_root("start")
         path = session_path(root)
+        write_session(root)
+        previous_inode = File.stat(path).ino
         recorded = nil
+        recorded_inode = nil
         lock_taken = nil
+        claim_read_lock_taken = nil
 
         Dir.chdir(root) do
           described_class.send(:with_dev_session) do
             recorded = JSON.parse(File.read(path))
+            recorded_inode = File.stat(path).ino
             lock_taken = File.open(path, File::RDWR) { |file| file.flock(File::LOCK_EX | File::LOCK_NB) }
+            claim_read_lock_taken = File.open(session_lock_path(root), File::RDWR) do |file|
+              file.flock(File::LOCK_SH | File::LOCK_NB)
+            end
           end
         end
 
@@ -1361,10 +1373,72 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
           expect(recorded["schema"]).to eq(1)
           expect(recorded["app_root"]).to eq(root)
           expect(recorded["pid"]).to eq(Process.pid)
+          expect(recorded_inode).not_to eq(previous_inode)
           # Failing to take the lock is the liveness proof `bin/dev kill` relies on.
           expect(lock_taken).to be false
+          # Publication has completed before the wrapped command starts.
+          expect(claim_read_lock_taken).to eq(0)
           expect(File.exist?(path)).to be false
         end
+      end
+
+      it "opens an existing fixed lock writable before taking its exclusive lock" do
+        root = app_root("writable-existing-session-lock")
+        lock_path = session_lock_path(root)
+        File.write(lock_path, "")
+        process_manager_started = false
+
+        allow(File).to receive(:open).and_call_original
+        expect(File).to receive(:open)
+          .with(lock_path, satisfy { |flags| (flags & File::RDWR) == File::RDWR })
+          .and_call_original
+
+        Dir.chdir(root) do
+          described_class.send(:with_dev_session) { process_manager_started = true }
+        end
+
+        expect(process_manager_started).to be true
+      end
+
+      it "refuses to start while a kill owns the fixed lock, then claims normally after release" do
+        skip "file permissions are not enforceable for root" if Process.euid.zero?
+
+        root = app_root("start-during-kill")
+        fixed_lock_path = session_lock_path(root)
+        fixed_lock = File.open(fixed_lock_path, File::RDWR | File::CREAT, 0o644)
+        handles << fixed_lock
+        expect(fixed_lock.flock(File::LOCK_EX | File::LOCK_NB)).to eq(0)
+        File.chmod(0o444, fixed_lock_path)
+        process_manager_started = false
+        nonzero_exit = raise_error(SystemExit) { |error| expect(error.status).to eq(1) }
+
+        expect do
+          Dir.chdir(root) do
+            described_class.send(:with_dev_session) { process_manager_started = true }
+          end
+        end.to output(/Cannot start.*Wait for it to finish, then retry/m).to_stderr.and(nonzero_exit)
+
+        aggregate_failures do
+          expect(process_manager_started).to be false
+          expect(File.exist?(session_path(root))).to be false
+        end
+
+        fixed_lock.flock(File::LOCK_UN)
+        fixed_lock.close
+        recorded = nil
+
+        Dir.chdir(root) do
+          described_class.send(:with_dev_session) do
+            recorded = JSON.parse(File.read(session_path(root)))
+          end
+        end
+
+        aggregate_failures do
+          expect(recorded["app_root"]).to eq(root)
+          expect(File.exist?(session_path(root))).to be false
+        end
+      ensure
+        File.chmod(0o644, fixed_lock_path) if fixed_lock_path && File.exist?(fixed_lock_path)
       end
 
       it "records the Overmind endpoint it would use, and only when it is inside the app root" do
@@ -1431,6 +1505,22 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         expect(recorded["ports"]).to eq([4000, 4035])
       end
 
+      it "preserves a restrictive caller umask on the published session" do
+        root = app_root("restrictive-session-umask")
+        previous_umask = File.umask(0o077)
+        published_mode = nil
+
+        Dir.chdir(root) do
+          described_class.send(:with_dev_session) do
+            published_mode = File.stat(session_path(root)).mode & 0o777
+          end
+        end
+
+        expect(published_mode).to eq(0o600)
+      ensure
+        File.umask(previous_umask) unless previous_umask.nil?
+      end
+
       it "verifies the union of the recorded and derived ports" do
         allow(described_class).to receive(:killable_ports).and_return([3000, 3035])
 
@@ -1468,8 +1558,8 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         root = app_root("claim-detached")
         path = session_path(root)
         unlinked = false
-        allow(File).to receive(:open).and_wrap_original do |original, *args, &block|
-          handle = original.call(*args, &block)
+        allow(File).to receive(:open).and_wrap_original do |original, *args, **kwargs, &block|
+          handle = original.call(*args, **kwargs, &block)
           if !unlinked && args.first == path
             unlinked = true
             File.delete(path)
@@ -1502,6 +1592,231 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         end.to output(/Could not record dev session state/).to_stderr
 
         expect(File.read(target)).to eq("original")
+      end
+
+      it "refuses to claim through a symlink planted at the session lock path" do
+        root = app_root("symlinked-session-lock")
+        target = File.join(root, "target.lock")
+        File.write(target, "original")
+        File.symlink(target, session_lock_path(root))
+        process_manager_started = false
+        nonzero_exit = raise_error(SystemExit) { |error| expect(error.status).to eq(1) }
+
+        expect do
+          Dir.chdir(root) do
+            described_class.send(:with_dev_session) { process_manager_started = true }
+          end
+        end.to output(/Cannot start.*symlink/m).to_stderr.and(nonzero_exit)
+
+        aggregate_failures do
+          expect(process_manager_started).to be false
+          expect(File.read(target)).to eq("original")
+          expect(File.exist?(session_path(root))).to be false
+        end
+      end
+
+      it "refuses to start when the ownership-lock directory cannot be prepared" do
+        root = app_root("unpreparable-session-lock-directory")
+        session_directory = File.dirname(session_path(root))
+        allow(FileUtils).to receive(:mkdir_p).with(session_directory).and_raise(Errno::EACCES)
+        process_manager_started = false
+        nonzero_exit = raise_error(SystemExit) { |error| expect(error.status).to eq(1) }
+
+        expect do
+          Dir.chdir(root) do
+            described_class.send(:with_dev_session) { process_manager_started = true }
+          end
+        end.to output(/Cannot start.*directory.*Errno::EACCES/m).to_stderr.and(nonzero_exit)
+
+        aggregate_failures do
+          expect(process_manager_started).to be false
+          expect(File.exist?(session_path(root))).to be false
+        end
+      end
+
+      it "refuses to start when the session lock path is not a regular file" do
+        root = app_root("non-regular-session-lock")
+        FileUtils.mkdir_p(session_lock_path(root))
+        process_manager_started = false
+        nonzero_exit = raise_error(SystemExit) { |error| expect(error.status).to eq(1) }
+
+        expect do
+          Dir.chdir(root) do
+            described_class.send(:with_dev_session) { process_manager_started = true }
+          end
+        end.to output(/Cannot start.*not a regular file/m).to_stderr.and(nonzero_exit)
+
+        aggregate_failures do
+          expect(process_manager_started).to be false
+          expect(File.exist?(session_path(root))).to be false
+        end
+      end
+
+      it "refuses to start when the fixed session lock cannot be opened" do
+        root = app_root("unopenable-session-lock")
+        allow(described_class).to receive(:open_existing_or_create_dev_session_lock).and_raise(Errno::EACCES)
+        process_manager_started = false
+        nonzero_exit = raise_error(SystemExit) { |error| expect(error.status).to eq(1) }
+
+        expect do
+          Dir.chdir(root) do
+            described_class.send(:with_dev_session) { process_manager_started = true }
+          end
+        end.to output(/Cannot start.*Errno::EACCES/m).to_stderr.and(nonzero_exit)
+
+        aggregate_failures do
+          expect(process_manager_started).to be false
+          expect(File.exist?(session_path(root))).to be false
+        end
+      end
+
+      it "refuses to start when the fixed session lock cannot be acquired" do
+        root = app_root("unacquirable-session-lock")
+        claim_handle = File.open(session_lock_path(root), File::RDWR | File::CREAT, 0o644)
+        handles << claim_handle
+        allow(described_class).to receive(:open_dev_session_claim_lock).and_return(claim_handle)
+        allow(claim_handle).to receive(:flock).and_wrap_original do |original, operation|
+          raise Errno::EIO if operation == (File::LOCK_EX | File::LOCK_NB)
+
+          original.call(operation)
+        end
+        process_manager_started = false
+        nonzero_exit = raise_error(SystemExit) { |error| expect(error.status).to eq(1) }
+
+        expect do
+          Dir.chdir(root) do
+            described_class.send(:with_dev_session) { process_manager_started = true }
+          end
+        end.to output(/Cannot start.*Errno::EIO/m).to_stderr.and(nonzero_exit)
+
+        aggregate_failures do
+          expect(process_manager_started).to be false
+          expect(claim_handle).to be_closed
+          expect(File.exist?(session_path(root))).to be false
+        end
+      end
+
+      it "refuses to start when the fixed session lock is replaced during acquisition" do
+        root = app_root("replaced-session-lock")
+        allow(described_class).to receive(:dev_session_handle_detached?)
+          .with(session_lock_path(root), instance_of(File)).and_return(true)
+        process_manager_started = false
+        nonzero_exit = raise_error(SystemExit) { |error| expect(error.status).to eq(1) }
+
+        expect do
+          Dir.chdir(root) do
+            described_class.send(:with_dev_session) { process_manager_started = true }
+          end
+        end.to output(/Cannot start.*replaced/m).to_stderr.and(nonzero_exit)
+
+        aggregate_failures do
+          expect(process_manager_started).to be false
+          expect(File.exist?(session_path(root))).to be false
+        end
+      end
+
+      it "cleans up both session handles when publication is interrupted" do
+        root = app_root("interrupted-session-write")
+        path = session_path(root)
+        write_session(root, "pid" => 424_242)
+        original_handle = nil
+        temporary_handle = nil
+        view = nil
+        allow(File).to receive(:open).and_wrap_original do |original, *args, **kwargs, &block|
+          handle = original.call(*args, **kwargs, &block)
+          original_handle ||= handle if args.first == path
+          handle
+        end
+        allow(Tempfile).to receive(:create).and_wrap_original do |original, *args|
+          temporary_handle = original.call(*args)
+        end
+        allow(File).to receive(:rename).and_raise(Interrupt)
+
+        expect do
+          Dir.chdir(root) { described_class.send(:with_dev_session) { :ran } }
+        end.to raise_error(Interrupt)
+
+        view = described_class.send(:dev_session_view, root)
+        aggregate_failures do
+          expect(original_handle).to be_closed
+          expect(temporary_handle).to be_closed
+          expect(view[:kind]).not_to eq(:owner_alive)
+          expect(File.exist?(path)).to be false
+          expect(Dir.glob(File.join(File.dirname(path), "dev-session-*.json"))).to be_empty
+        end
+      ensure
+        described_class.send(:close_session_handle, view)
+      end
+
+      it "removes canonical state when interruption lands after atomic publication" do
+        root = app_root("interrupted-after-session-rename")
+        path = session_path(root)
+        write_session(root, "pid" => 424_242)
+        original_handle = nil
+        temporary_handle = nil
+        allow(File).to receive(:open).and_wrap_original do |original, *args, **kwargs, &block|
+          handle = original.call(*args, **kwargs, &block)
+          original_handle ||= handle if args.first == path
+          handle
+        end
+        allow(Tempfile).to receive(:create).and_wrap_original do |original, *args|
+          temporary_handle = original.call(*args)
+        end
+        allow(File).to receive(:rename).and_wrap_original do |original, *args|
+          original.call(*args)
+          raise Interrupt
+        end
+
+        expect do
+          Dir.chdir(root) { described_class.send(:with_dev_session) { :ran } }
+        end.to raise_error(Interrupt)
+
+        aggregate_failures do
+          expect(original_handle).to be_closed
+          expect(temporary_handle).to be_closed
+          expect(File.exist?(path)).to be false
+          expect(Dir.glob(File.join(File.dirname(path), "dev-session-*.json"))).to be_empty
+        end
+      end
+
+      it "cleans up the published session when releasing the previous handle is interrupted" do
+        root = app_root("interrupted-session-release")
+        path = session_path(root)
+        write_session(root, "pid" => 424_242)
+        original_handle = nil
+        published_handle = nil
+        allow(File).to receive(:open).and_wrap_original do |original, *args, **kwargs, &block|
+          handle = original.call(*args, **kwargs, &block)
+          if args.first == path && original_handle.nil?
+            original_handle = handle
+            handles << handle
+          end
+          handle
+        end
+        allow(described_class).to receive(:write_dev_session).and_wrap_original do |original, *args|
+          published_handle = original.call(*args)
+          handles << published_handle
+          published_handle
+        end
+        allow(described_class).to receive(:release_dev_session_lock).and_wrap_original do |original, handle|
+          raise Interrupt if handle.equal?(original_handle)
+
+          original.call(handle)
+        end
+
+        expect do
+          Dir.chdir(root) { described_class.send(:with_dev_session) { :ran } }
+        end.to raise_error(Interrupt)
+
+        aggregate_failures do
+          expect(original_handle).to be_closed
+          expect(published_handle).to be_closed
+          expect(File.exist?(path)).to be false
+          lock_free = File.open(path, File::RDWR | File::CREAT) do |file|
+            file.flock(File::LOCK_EX | File::LOCK_NB)
+          end
+          expect(lock_free).to eq(0)
+        end
       end
 
       it "leaves no held lock and no partial file when the session write fails" do
@@ -1551,6 +1866,25 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
     end
 
     describe ".kill_processes" do
+      it "releases both ownership handles when shutdown port derivation raises" do
+        root = app_root("shutdown-port-error")
+        session_handle = File.open(session_path(root), File::RDWR | File::CREAT, 0o644)
+        claim_handle = File.open(session_lock_path(root), File::RDWR | File::CREAT, 0o644)
+        handles.push(session_handle, claim_handle)
+        view = { kind: :absent, root:, path: session_path(root), handle: session_handle, claim_handle: }
+        allow(described_class).to receive(:dev_session_view).and_return(view)
+        allow(described_class).to receive(:shutdown_ports).and_raise("port derivation failed")
+
+        expect do
+          described_class.send(:shutdown_dev_session)
+        end.to raise_error(RuntimeError, "port derivation failed")
+
+        aggregate_failures do
+          expect(session_handle).to be_closed
+          expect(claim_handle).to be_closed
+        end
+      end
+
       it "stops this worktree's process tree and leaves another worktree running" do
         root_a = app_root("worktree-a")
         root_b = app_root("worktree-b")
@@ -1619,6 +1953,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         aggregate_failures do
           expect(output).to include("No development processes owned by this app directory")
           expect(output).not_to include("verified gone")
+          expect(File.exist?(session_lock_path(root))).to be false
         end
       end
 
@@ -1851,6 +2186,44 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         end
       end
 
+      it "refuses a symlinked session lock path before inspecting signal authority" do
+        root = app_root("symlink-read-lock")
+        unrelated = start_unrelated_process
+        write_session(root, "pid" => unrelated[:pid], "pgid" => unrelated[:pgid])
+        target = File.join(root, "planted.lock")
+        File.write(target, "not a lock")
+        File.symlink(target, session_lock_path(root))
+
+        expect(described_class).not_to receive(:signal_process_group)
+        expect(described_class).not_to receive(:kill_port_processes)
+
+        output = kill_in(root)
+
+        aggregate_failures do
+          expect(output).to include("Refusing to signal anything")
+          expect(output).to include("dev session lock must be a regular file")
+          expect(group_alive?(unrelated[:pgid])).to be true
+        end
+      end
+
+      it "stops a session when its existing ownership lock is not writable" do
+        skip "file permissions are not enforceable for root" if Process.euid.zero?
+
+        root = app_root("read-only-session-lock")
+        owner = start_owner(root)
+        File.write(session_lock_path(root), "")
+        File.chmod(0o444, session_lock_path(root))
+
+        output = kill_in(root)
+
+        aggregate_failures do
+          expect(output).to include("verified gone")
+          expect(wait_for { !group_alive?(owner[:pgid]) }).to be true
+        end
+      ensure
+        File.chmod(0o644, session_lock_path(root)) if root && File.exist?(session_lock_path(root))
+      end
+
       it "refuses a session path that is not a regular file" do
         root = app_root("dir-session")
         FileUtils.mkdir_p(session_path(root))
@@ -1879,10 +2252,51 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         end
       end
 
+      it "refuses an old payload while a replacement claimant holds the same session inode" do
+        root = app_root("same-inode-claim")
+        unrelated = start_unrelated_process
+        write_session(root, "pid" => unrelated[:pid], "pgid" => unrelated[:pgid])
+
+        session_handle = File.open(session_path(root), File::RDWR)
+        claim_handle = File.open(session_lock_path(root), File::RDWR | File::CREAT, 0o644)
+        handles.push(session_handle, claim_handle)
+        session_handle.flock(File::LOCK_EX)
+        claim_handle.flock(File::LOCK_EX)
+
+        expect(described_class).not_to receive(:signal_process_group)
+
+        output = kill_in(root)
+
+        aggregate_failures do
+          expect(output).to include("Refusing to signal anything")
+          expect(output).to include("another dev session operation is still in progress")
+          expect(group_alive?(unrelated[:pgid])).to be true
+        end
+      end
+
+      it "refuses a second kill reader while the first owns a stale session" do
+        root = app_root("concurrent-kill-readers")
+        unrelated = start_unrelated_process
+        write_session(root, "pid" => unrelated[:pid], "pgid" => unrelated[:pgid])
+        first_view = described_class.send(:dev_session_view, root)
+
+        expect(described_class).not_to receive(:open_dev_session)
+        second_view = described_class.send(:dev_session_view, root)
+
+        aggregate_failures do
+          expect(first_view[:kind]).to eq(:stale)
+          expect(second_view[:kind]).to eq(:refused)
+          expect(second_view).not_to have_key(:session)
+          expect(group_alive?(unrelated[:pgid])).to be true
+        end
+      ensure
+        described_class.send(:close_session_handle, second_view)
+        described_class.send(:close_session_handle, first_view)
+      end
+
       it "refuses when the payload changed under a freshly observed lock" do
-        # claim_dev_session locks, then truncates and writes, so a reader can
-        # see the previous owner's bytes while a NEW owner holds the lock. That
-        # must not turn a recycled pgid into proven-live signal authority.
+        # Keep the same-payload re-read as defense in depth: unexpected
+        # mutation while a held lock is being classified must still fail closed.
         root = app_root("payload-race")
         write_session(root, "pgid" => 4321)
         allow(described_class).to receive(:lock_dev_session).and_return(:held)
