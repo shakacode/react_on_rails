@@ -460,6 +460,30 @@ module ReactOnRails
           end
         end
 
+        context "when a credential URL is authority-relative" do
+          [
+            ["valid userinfo", "//bundle-user:synthetic-password@host/bundle.js"],
+            ["ambiguous userinfo", "//bundle-user:synthetic-password@credential-suffix@host/bundle.js"]
+          ].each do |description, server_bundle_path|
+            it "redacts #{description} even when the path is classified as a local bundle" do
+              stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)
+
+              message = bundle_load_error_message
+              expect(message).not_to include("bundle-user")
+              expect(message).not_to include("synthetic-password")
+              expect(message).not_to include("credential-suffix")
+              expect(message).to include("//host/bundle.js")
+            end
+          end
+
+          it "preserves an at sign in the path when the authority has no userinfo" do
+            server_bundle_path = "//host/assets/component@2.js"
+            stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)
+
+            expect(bundle_load_error_message).to include(server_bundle_path)
+          end
+        end
+
         context "when malformed URL userinfo contains multiple at signs" do
           it "redacts the entire userinfo while retaining the host and path" do
             server_bundle_url =

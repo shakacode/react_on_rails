@@ -414,17 +414,23 @@ module ReactOnRails
           # must still fail closed if the value contains credential-like userinfo.
           scheme_pattern = %r{https?\s*:\s*//}i
           scheme = url.match(scheme_pattern)
-          return url unless scheme
+          return sanitized_authority_relative_url(url) unless scheme
 
           prefix = url[...scheme.begin(0)]
           configured_url = url[scheme.begin(0)..]
           sanitized_url = if configured_url.match?(/[\r\n]/) || configured_url.scan(scheme_pattern).length > 1
                             strip_malformed_url_userinfo(configured_url)
                           else
-                            sanitized_valid_http_url(configured_url) || strip_malformed_url_userinfo(configured_url)
+                            sanitized_valid_network_url(configured_url) || strip_malformed_url_userinfo(configured_url)
                           end
 
           "#{prefix}#{sanitized_url}"
+        end
+
+        def sanitized_authority_relative_url(url)
+          return url unless url.start_with?("//")
+
+          sanitized_valid_network_url(url) || strip_malformed_url_userinfo(url)
         end
 
         def sanitized_renderer_error_message(message, raw_url, sanitized_url = sanitized_renderer_url(raw_url))
@@ -451,7 +457,7 @@ module ReactOnRails
 
           text.to_enum(:scan, %r{https?://(?:(?!https?://)[^\s"'])+}i).each do
             match = Regexp.last_match
-            protected_url = sanitized_valid_http_url(match[0])
+            protected_url = sanitized_valid_network_url(match[0])
             next unless protected_url
             next if userinfo_delimiter_before_next_scheme?(text, match)
 
@@ -478,10 +484,12 @@ module ReactOnRails
           text[...unresolved_scheme.begin(0)]
         end
 
-        # URI handles valid URLs structurally, so an @ in the path is never mistaken for userinfo.
-        # Returning nil for invalid input keeps that token unprotected for the fail-closed pass.
-        def sanitized_valid_http_url(url)
+        # URI handles valid network URLs structurally, so an @ in the path is never mistaken for
+        # userinfo. A missing host means an authority-shaped value was parsed as a path instead;
+        # returning nil keeps that ambiguous token unprotected for the fail-closed pass.
+        def sanitized_valid_network_url(url)
           uri = URI.parse(url)
+          return nil if uri.host.nil?
           return url if uri.userinfo.nil?
 
           # URI rejects a password without a user, so clear password first.
@@ -501,10 +509,11 @@ module ReactOnRails
         # retained suffix is best-effort context; ambiguous malformed diagnostics may lose text.
         def strip_malformed_url_userinfo(url)
           scheme = url.match(%r{\Ahttps?\s*:\s*//}i)
+          authority_prefix_end = scheme&.end(0) || (2 if url.start_with?("//"))
           userinfo_delimiter = url.rindex("@")
-          return url unless scheme && userinfo_delimiter
+          return url unless authority_prefix_end && userinfo_delimiter
 
-          "#{url[...scheme.end(0)]}#{url[(userinfo_delimiter + 1)..]}"
+          "#{url[...authority_prefix_end]}#{url[(userinfo_delimiter + 1)..]}"
         end
 
         def file_url_to_string(url)
