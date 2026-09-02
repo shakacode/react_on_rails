@@ -103,8 +103,13 @@ module ReactOnRails
         end
       end
 
+      # Every value reaching this module has an encoded authority separator, so URI cannot parse
+      # it and nothing structurally proves that a trailing :digits run is a port rather than a
+      # numeric password. Treating it as a port would make redaction depend on whether a password
+      # happens to be all digits, so any colon in the authority is ambiguous and fails closed.
+      # The literal path keeps its port handling, where URI.parse supplies that proof.
       def plausible_authority?(authority)
-        !authority.sub(ENCODED_PORT_SUFFIX_PATTERN, "").match?(ENCODED_AUTHORITY_USERINFO_HINT_PATTERN)
+        !authority.match?(ENCODED_AUTHORITY_USERINFO_HINT_PATTERN)
       end
 
       private_class_method :plausible_authority?

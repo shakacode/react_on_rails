@@ -14,7 +14,6 @@ module ReactOnRails
     # scan in AuthorityRelativeRewriter cannot see it.
     ENCODED_AUTHORITY_MARKER_PATTERN = %r{%2f(?:/|%2f)|/%2f}i
     ENCODED_AUTHORITY_TOKEN_PATTERN = /#{ENCODED_AUTHORITY_MARKER_PATTERN}[^\s"']+/
-    ENCODED_PORT_SUFFIX_PATTERN = /(?::|%3a)\d*\z/i
     ENCODED_AUTHORITY_USERINFO_HINT_PATTERN = /:|%3a|@|%40/i
     HTTP_URL_TOKEN_PATTERN = /#{HTTP_URL_SCHEME_PATTERN}(?:(?!#{HTTP_URL_SCHEME_PATTERN})[^\s"'])+/
     FLEXIBLE_HTTP_URL_SCHEME_PATTERN = %r{https?\s*:\s*//}i

@@ -32,6 +32,16 @@ RSpec.describe ReactOnRails::DiagnosticUrlRedactor do
         "http:%2F%2Fhost/bundle.js"
       ],
       [
+        "an all-numeric password that an encoded terminator cannot prove is a port",
+        "http:%2F%2Fbundle-user:1234%2Fsegment%40host/bundle.js",
+        "http:%2F%2Fhost/bundle.js"
+      ],
+      [
+        "an encoded authority whose colon cannot be proven to be a port",
+        "http:%2F%2Fhost:3000%2Fpath%40asset",
+        "http:%2F%2Fasset"
+      ],
+      [
         "a fully encoded authority-relative start",
         "%2F%2Fbundle-user:synthetic-password%40host/bundle.js",
         "%2F%2Fhost/bundle.js"
