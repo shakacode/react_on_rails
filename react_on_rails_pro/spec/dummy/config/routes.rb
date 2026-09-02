@@ -93,6 +93,9 @@ Rails.application.routes.draw do
   get "hybrid_metadata_streaming" => "pages#hybrid_metadata_streaming", as: :hybrid_metadata_streaming
   get "rsc_native_metadata" => "pages#rsc_native_metadata", as: :rsc_native_metadata
   get "cache_demo" => "pages#cache_demo", as: :cache_demo
+  # Spike for issue #4874 (Server Functions RFC)
+  get "spike_server_functions" => "pages#spike_server_functions", as: :spike_server_functions
+  post "spike_server_functions/call" => "spike_server_functions#execute", as: :spike_server_functions_call
   get "react_intl_rsc_demo(/:locale)" => "pages#react_intl_rsc_demo",
       as: :react_intl_rsc_demo,
       constraints: { locale: /en|ar|es/ }
