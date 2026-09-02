@@ -31,7 +31,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   completed, and terminates and reaps timed-out control clients under one shared deadline per phase. When no renderer
   port is exported, recognized generated Procfiles supply the local Node Renderer fallback without widening the kill
   scope to an unrelated listener on port 3800. Fixes
-  [Issue 4944](https://github.com/shakacode/react_on_rails/issues/4944).
+  [Issue 4944](https://github.com/shakacode/react_on_rails/issues/4944). [PR 4986](https://github.com/shakacode/react_on_rails/pull/4986) by
+  [justin808](https://github.com/justin808).
 
 - **Release failures now provide supervised, reason-specific recovery**: `script/release --evaluate-head`
   supports strict exact-HEAD CI evaluation for both preview and live retries, foreign claims identify the available
