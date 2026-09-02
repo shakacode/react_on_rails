@@ -173,9 +173,9 @@ module ReactOnRails
         # user has explicitly claimed this port range, and `bin/dev kill` is
         # usually invoked from a fresh shell where RENDERER_PORT / *_URL aren't
         # carried over from the dev session — so requiring env-var presence
-        # would let a stale renderer survive. Pattern-based killing
-        # (development_processes / node.*react[-_]on[-_]rails) does NOT catch
-        # the Pro renderer because it runs as `node renderer/node-renderer.js`
+        # would let a stale renderer survive. Pattern-based process discovery
+        # (`node.*react[-_]on[-_]rails`) does NOT catch the Pro renderer because
+        # it runs as `node renderer/node-renderer.js`
         # with no "react_on_rails" substring in the command line. Port-based
         # killing is the only reliable path. The default-port branch keeps the
         # tighter renderer_env_signal? guard via configured_renderer_port_for_kill
@@ -784,10 +784,9 @@ module ReactOnRails
         # the terminal's foreground process group and breaks Ctrl-C, which is
         # how people actually stop the dev server. When no group is owned (a
         # non-job-control invocation, e.g. a plain background job in a script),
-        # the pgid is recorded as null and shutdown falls back to the Overmind
-        # socket or to cwd-attributed port cleanup. That is the
-        # Foreman-without-job-control case: still cleanable through port
-        # attribution, and refusing to guess is fail-closed.
+        # the pgid is recorded as null. Shutdown can then use a recorded Overmind
+        # endpoint, but a live owner with neither a pgid nor an endpoint is
+        # refused outright. It does not guess at cwd-attributed ports.
         def owned_process_group
           pgid = Process.getpgrp
           # The `> 1` floor mirrors #valid_session_pgid? on the read side, and
@@ -797,8 +796,9 @@ module ReactOnRails
           # valid_dev_session_document? reject the whole document, so every
           # `bin/dev kill` printed "Refusing to signal anything". Group 1 is
           # unusable anyway - `Process.kill(sig, -1)` broadcasts rather than
-          # targeting a group - so a nil pgid is the honest record, and shutdown
-          # falls back to the Overmind socket or cwd-attributed ports.
+          # targeting a group - so a nil pgid is the honest record. Shutdown can
+          # then use a recorded Overmind endpoint; without one, a live owner is
+          # refused and only a released owner reaches cwd-attributed port cleanup.
           pgid == Process.pid && pgid > 1 ? pgid : nil
         rescue NotImplementedError, SystemCallError
           nil
@@ -840,10 +840,6 @@ module ReactOnRails
           end
         end
 
-        # Prefer the ports this session recorded at startup. The derived
-        # fallback only applies when there is no session to read them from, and
-        # a killing shell with a different base port must not override what the
-        # running session actually bound.
         # Union rather than "prefer recorded". Recorded ports capture what this
         # run actually selected, but they only cover variables present in the
         # parent environment - the generated Pro Procfile starts the renderer
@@ -1300,10 +1296,6 @@ module ReactOnRails
           :released
         rescue SystemCallError, IOError
           :held
-        end
-
-        def owner_released?(view)
-          owner_release_state(view) == :released
         end
 
         # True once a newer `bin/dev` has claimed the path this shutdown was
