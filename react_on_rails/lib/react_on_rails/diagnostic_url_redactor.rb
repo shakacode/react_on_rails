@@ -128,7 +128,7 @@ module ReactOnRails
           offset += token_length
         end
 
-        literal_separator_end = network_separator_end(text, offset) if text.getbyte(offset) == 58
+        literal_separator_end = literal_network_separator_end(text, offset, scheme_start)
         match_end = literal_separator_end if literal_separator_end
         [match_end, offset]
       end
@@ -142,10 +142,27 @@ module ReactOnRails
 
       def network_separator_end(text, offset)
         separator_length = text.getbyte(offset) == 58 ? 1 : 3
-        slash_end = slash_token_end(text, offset + separator_length)
+        slash_start = skip_ascii_whitespace(text, offset + separator_length)
+        slash_end = slash_token_end(text, slash_start)
         return nil unless slash_end
 
         slash_token_end(text, slash_end)
+      end
+
+      def literal_network_separator_end(text, offset, scheme_start)
+        return network_separator_end(text, offset) if text.getbyte(offset) == 58
+        return nil unless ascii_whitespace_byte?(text.getbyte(offset))
+        return nil unless http_scheme_at?(text, scheme_start, offset)
+
+        colon_offset = skip_ascii_whitespace(text, offset)
+        return nil unless text.getbyte(colon_offset) == 58
+
+        network_separator_end(text, colon_offset)
+      end
+
+      def skip_ascii_whitespace(text, offset)
+        offset += 1 while ascii_whitespace_byte?(text.getbyte(offset))
+        offset
       end
 
       def slash_token_end(text, offset)
@@ -194,10 +211,29 @@ module ReactOnRails
         byte && ((65..90).cover?(byte) || (97..122).cover?(byte))
       end
 
+      def http_scheme_at?(text, start_offset, end_offset)
+        length = end_offset - start_offset
+        return false unless [4, 5].include?(length)
+
+        scheme_bytes = [104, 116, 116, 112]
+        return false unless scheme_bytes.each_with_index.all? do |byte, index|
+          case_insensitive_byte_match?(text.getbyte(start_offset + index), byte)
+        end
+
+        length == 4 || case_insensitive_byte_match?(text.getbyte(start_offset + 4), 115)
+      end
+
+      def ascii_whitespace_byte?(byte)
+        [9, 10, 11, 12, 13, 32].include?(byte)
+      end
+
       private_class_method :each_span, :next_scheme_start, :match_end_and_run_end, :encoded_separator_end,
-                           :network_separator_end, :slash_token_end, :scheme_continuation_token_length,
+                           :network_separator_end, :literal_network_separator_end, :skip_ascii_whitespace,
+                           :slash_token_end,
+                           :scheme_continuation_token_length,
                            :percent_encoded_colon_at?, :percent_encoded_slash_at?, :case_insensitive_byte_match?,
-                           :digit_byte?, :percent_encoded_byte_at?, :hex_byte?, :ascii_letter_byte?
+                           :digit_byte?, :percent_encoded_byte_at?, :hex_byte?, :ascii_letter_byte?, :http_scheme_at?,
+                           :ascii_whitespace_byte?
     end
     private_constant :NetworkUrlStartScanner
 

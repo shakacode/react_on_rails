@@ -486,6 +486,7 @@ describe('injectRSCPayload', () => {
         message: '   ',
         stack: '',
       },
+      consoleReplayScript: 'console.log("blank rendering error replay")',
     });
     const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
@@ -495,6 +496,7 @@ describe('injectRSCPayload', () => {
 
     expect(resultStr).not.toContain(`(self.REACT_ON_RAILS_RSC_ERRORS||={})${rscPayloadKeyReference}||=`);
     expect(resultStr).not.toContain('renderingError');
+    expect(resultStr).toContain('<script>console.log("blank rendering error replay")</script>');
     expect(resultStr).toContain(expectedPayloadPushScript('{"test": "data"}'));
   });
 
@@ -502,6 +504,12 @@ describe('injectRSCPayload', () => {
     ['an empty renderingError object', { hasErrors: false, renderingError: {} }],
     ['a null renderingError', { hasErrors: false, renderingError: null }],
     ['a non-object renderingError', { hasErrors: false, renderingError: 'malformed' }],
+    ['a renderingError with a non-string message', { hasErrors: false, renderingError: { message: null } }],
+    ['a renderingError with a non-string stack', { hasErrors: false, renderingError: { stack: [] } }],
+    [
+      'a renderingError with a string message and non-string stack',
+      { hasErrors: false, renderingError: { message: 'private failure', stack: 1 } },
+    ],
     ['a non-boolean hasErrors value', { hasErrors: 'true' }],
   ])('fails closed in production for %s', async (_description, metadata) => {
     const mockRSC = createMockRSCStreamWithMetadata('{"test": "data"}', {

@@ -116,14 +116,23 @@ function hasMalformedRenderingError(metadata: Record<string, unknown>) {
   return (hasMessage && typeof message !== 'string') || (hasStack && typeof stack !== 'string');
 }
 
+function hasProductionErrorSignal(metadata: Record<string, unknown>) {
+  const { hasErrors, renderingError } = metadata;
+  return (
+    hasErrors === true ||
+    hasRenderingErrorSignal(renderingError) ||
+    hasMalformedHasErrors(metadata) ||
+    hasMalformedRenderingError(metadata)
+  );
+}
+
 function shouldEmitConsoleReplay(metadata: Record<string, unknown>, railsEnv?: string) {
   // Console replay remains useful in development/test and for clean production chunks. On an
   // error-bearing chunk, however, it can repeat the same server-only message or stack path that
   // diagnostic metadata redacts, so unknown and production-like environments fail closed.
   if (railsEnv === 'development' || railsEnv === 'test') return true;
 
-  const hasRenderingErrorMetadata = Object.prototype.hasOwnProperty.call(metadata, 'renderingError');
-  return metadata.hasErrors !== true && !hasRenderingErrorMetadata && !hasMalformedHasErrors(metadata);
+  return !hasProductionErrorSignal(metadata);
 }
 
 function createRSCDiagnosticScript(
@@ -138,10 +147,9 @@ function createRSCDiagnosticScript(
   // a useful diagnostic when the server provided a non-blank message or stack. Outside
   // development/test, malformed values fail closed to the same generic signal as the fetched
   // RSC path instead of suppressing both the replay and the diagnostic.
-  const hasDiagnosticSignal =
-    hasErrors === true ||
-    hasRenderingErrorSignal(renderingError) ||
-    (!showFullDiagnostics && (hasMalformedHasErrors(metadata) || hasMalformedRenderingError(metadata)));
+  const hasDiagnosticSignal = showFullDiagnostics
+    ? hasErrors === true || hasRenderingErrorSignal(renderingError)
+    : hasProductionErrorSignal(metadata);
   if (!hasDiagnosticSignal) return undefined;
   // Outside development/test, emit only the error signal without the server error message or stack.
   // Full diagnostics are reported server-side via the streaming error reporter (Sentry/Honeybadger).

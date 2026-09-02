@@ -880,7 +880,15 @@ describe ReactOnRailsProHelper do
 
     it "fails closed in production for malformed renderingError shapes" do
       stub_rails_env("production")
-      [{}, nil, "malformed"].each do |rendering_error|
+      malformed_rendering_errors = [
+        {},
+        nil,
+        "malformed",
+        { "message" => nil },
+        { "stack" => [] },
+        { "message" => "private failure", "stack" => 1 }
+      ]
+      malformed_rendering_errors.each do |rendering_error|
         malformed_metadata = {
           "hasErrors" => false,
           "renderingError" => rendering_error,
@@ -904,10 +912,19 @@ describe ReactOnRailsProHelper do
       blank_rendering_error = { "message" => "   ", "stack" => "" }
 
       wire = framed_wire_bytes(
-        "hasErrors" => false, "renderingError" => blank_rendering_error, "html" => "payload"
+        "hasErrors" => false,
+        "renderingError" => blank_rendering_error,
+        "consoleReplayScript" => synthetic_console_replay_script,
+        "html" => "payload"
       )
+      metadata = JSON.parse(wire.split("\t", 2).first)
 
-      expect(wire).to eq("{\"hasErrors\":false}\t00000007\npayload")
+      expect(metadata).to eq(
+        "hasErrors" => false,
+        "consoleReplayScript" => synthetic_console_replay_script
+      )
+      expect(wire).to end_with("\t00000007\npayload")
+      expect(wire).not_to include("renderingError")
     end
 
     it "leaves a clean production chunk untouched" do

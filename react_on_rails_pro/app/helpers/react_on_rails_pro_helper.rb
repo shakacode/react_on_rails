@@ -1467,6 +1467,10 @@ module ReactOnRailsProHelper
     error_signal = rsc_payload_rendering_error_signal?(metadata)
     return metadata unless error_signal || metadata.key?("renderingError")
 
+    # A structurally valid blank renderingError is not an error. Remove that inert server-only
+    # object, but preserve clean-chunk metadata such as console replay.
+    return metadata.except("renderingError") unless error_signal
+
     # Match the inline path's production allowlist exactly. Error chunks may carry sensitive
     # details in console replay or future metadata fields, so forwarding every field except the
     # known renderingError key would fail open as the producer evolves.

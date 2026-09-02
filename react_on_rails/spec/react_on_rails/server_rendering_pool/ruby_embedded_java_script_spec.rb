@@ -460,6 +460,30 @@ module ReactOnRails
               "http ://host/path"
             ],
             [
+              "whitespace around a literal colon before encoded authority separators",
+              "http : %2F%2Fsynthetic-user:synthetic-secret%40host/path",
+              false,
+              "http : %2F%2Fhost/path"
+            ],
+            [
+              "whitespace before fully encoded authority separators",
+              "http: %2F%2Fsynthetic-user:synthetic-secret%40host/path",
+              false,
+              "http: %2F%2Fhost/path"
+            ],
+            [
+              "whitespace before a literal and encoded authority separator",
+              "http: /%2Fsynthetic-user:synthetic-secret%40host/path",
+              false,
+              "http: /%2Fhost/path"
+            ],
+            [
+              "whitespace before an encoded and literal authority separator",
+              "http: %2F/synthetic-user:synthetic-secret%40host/path",
+              false,
+              "http: %2F/host/path"
+            ],
+            [
               "a percent-encoded authority delimiter",
               "http://bundle-user:synthetic-password%40host/bundle.js",
               true,
