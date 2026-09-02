@@ -3193,7 +3193,7 @@ class FleetValidationGeneratorTest < Minitest::Test
     assert_includes pack, "fallback_claim_repo: shakacode/react_on_rails"
     assert_includes pack, "adhoc:fleet-snapshot-RESOLVED_TAG"
     assert_includes pack, "Search the open `Release gate: react_on_rails X.Y.Z`"
-    assert_includes pack, "workflow=cpflow-review-app.yml, status_check=cpflow/review-app"
+    assert_includes pack, "workflow=.github/workflows/cpflow-deploy-review-app.yml, status_check=deploy / deploy"
     assert_includes pack, "one execution subagent for the assigned monorepo generator/install gate"
     assert_includes pack, "(cd react_on_rails && bundle exec rspec spec/react_on_rails/generators)"
     assert_includes pack, "create-react-on-rails-app@RESOLVED_NPM_VERSION fleet-standard --standard"
