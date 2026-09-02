@@ -466,6 +466,26 @@ module ReactOnRails
               "http://host/bundle.js"
             ],
             [
+              "fully encoded HTTP authority separators",
+              "http:%2F%2Fbundle-user:synthetic-password%40host/bundle.js",
+              false,
+              "http:%2F%2Fhost/bundle.js"
+            ],
+            [
+              "fully encoded outer and nested URL credentials",
+              "http%3A%2F%2Fouter-user%3Aouter-secret%40outer.test%2Fredirect%3Fnext%3D" \
+              "ftp%3A%2F%2Fnested-user%3Anested-secret%40nested.test%2Fpath",
+              false,
+              "http%3A%2F%2Fouter.test%2Fredirect%3Fnext%3Dftp%3A%2F%2Fnested.test%2Fpath"
+            ],
+            [
+              "literal outer and encoded nested authority separators",
+              "http%3A//bundle-user%3Asynthetic-password%40outer.test%2Fnext%3D" \
+              "ftp%3A%2F%2Fnested-user%3Anested-secret%40inner.test/path",
+              false,
+              "http%3A//outer.test%2Fnext%3Dftp%3A%2F%2Finner.test/path"
+            ],
+            [
               "mixed encoded and literal authority delimiters",
               "http://synthetic-user%40mail:synthetic-secret@host/path",
               true,

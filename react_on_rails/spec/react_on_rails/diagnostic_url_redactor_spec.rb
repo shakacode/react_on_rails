@@ -22,6 +22,37 @@ RSpec.describe ReactOnRails::DiagnosticUrlRedactor do
         "http://host/bundle.js"
       ],
       [
+        "fully encoded HTTP authority separators",
+        "http:%2F%2Fbundle-user:synthetic-password%40host/bundle.js",
+        "http:%2F%2Fhost/bundle.js"
+      ],
+      [
+        "fully encoded outer and nested URL credentials",
+        "http%3A%2F%2Fouter-user%3Aouter-secret%40outer.test%2Fredirect%3Fnext%3D" \
+        "ftp%3A%2F%2Fnested-user%3Anested-secret%40nested.test%2Fpath",
+        "http%3A%2F%2Fouter.test%2Fredirect%3Fnext%3Dftp%3A%2F%2Fnested.test%2Fpath"
+      ],
+      [
+        "literal outer and encoded nested authority separators",
+        "http%3A//bundle-user%3Asynthetic-password%40outer.test%2Fnext%3D" \
+        "ftp%3A%2F%2Fnested-user%3Anested-secret%40inner.test/path",
+        "http%3A//outer.test%2Fnext%3Dftp%3A%2F%2Finner.test/path"
+      ],
+      [
+        "authority-relative outer and encoded nested URL credentials",
+        "//bundle-user%3Asynthetic-password%40outer.test/path?next=" \
+        "ftp%3A%2F%2Fnested-user%3Anested-secret%40inner.test/path",
+        "//outer.test/path?next=ftp%3A%2F%2Finner.test/path"
+      ],
+      [
+        "a fully encoded chain of three credential URLs",
+        "http%3A%2F%2Fouter-user%3Aouter-secret%40outer.test%2Fnext%3D" \
+        "ftp%3A%2F%2Ffirst-user%3Afirst-secret%40first.test%2Fnext%3D" \
+        "redis%3A%2F%2Flast-user%3Alast-secret%40last.test%2Fpath",
+        "http%3A%2F%2Fouter.test%2Fnext%3Dftp%3A%2F%2Ffirst.test%2Fnext%3D" \
+        "redis%3A%2F%2Flast.test%2Fpath"
+      ],
+      [
         "mixed encoded and literal authority delimiters",
         "http://synthetic-user%40mail:synthetic-secret@host/path",
         "http://host/path"
@@ -145,6 +176,36 @@ RSpec.describe ReactOnRails::DiagnosticUrlRedactor do
         "a percent-encoded at sign only in the query",
         "http://host/bundle.js?contact=safe%40example.test",
         "http://host/bundle.js?contact=safe%40example.test"
+      ],
+      [
+        "an encoded at sign only in a fully encoded HTTP path",
+        "http:%2F%2Fhost%2Fassets%2Fcomponent%402.js",
+        "http:%2F%2Fhost%2Fassets%2Fcomponent%402.js"
+      ],
+      [
+        "an encoded at sign only in a fully encoded HTTP query",
+        "http:%2F%2Fhost%3Fcontact%3Dsafe%40example.test",
+        "http:%2F%2Fhost%3Fcontact%3Dsafe%40example.test"
+      ],
+      [
+        "an encoded at sign only in a fully encoded HTTP fragment",
+        "http:%2F%2Fhost%23contact-safe%40example.test",
+        "http:%2F%2Fhost%23contact-safe%40example.test"
+      ],
+      [
+        "an at sign after a literal path terminator in an encoded HTTP URL",
+        "http:%2F%2Fhost/assets/component@2.js",
+        "http:%2F%2Fhost/assets/component@2.js"
+      ],
+      [
+        "an at sign after a literal query terminator in an encoded HTTP URL",
+        "http:%2F%2Fhost?contact=safe@example.test",
+        "http:%2F%2Fhost?contact=safe@example.test"
+      ],
+      [
+        "an at sign after a literal fragment terminator in an encoded HTTP URL",
+        "http:%2F%2Fhost#contact-safe@example.test",
+        "http:%2F%2Fhost#contact-safe@example.test"
       ],
       [
         "an at sign only in an authority-relative path",
@@ -456,6 +517,28 @@ RSpec.describe ReactOnRails::DiagnosticUrlRedactor do
 
       sanitized = Timeout.timeout(1) { sanitize_error(message) }
       expect(sanitized).to eq(message)
+    end
+
+    it "processes a long encoded-authority near-match in bounded time" do
+      configured_url = "é#{'a' * 32_000}:/"
+      message = "Failure loading #{configured_url}"
+
+      sanitized_url, sanitized_message = Timeout.timeout(1) do
+        [described_class.sanitize(configured_url), sanitize_error(message, configured_url:)]
+      end
+      expect(sanitized_url).to eq(configured_url)
+      expect(sanitized_message).to eq(message)
+    end
+
+    it "redacts after repeated fully encoded authority separators in bounded time" do
+      [2, 4_000].each do |count|
+        prefix = "a%3A%2F%2F" * count
+        configured_url = "#{prefix}bundle-user:synthetic-password%40host/path"
+        expected_url = "#{prefix}host/path"
+
+        sanitized_url = Timeout.timeout(1) { described_class.sanitize(configured_url) }
+        expect(sanitized_url).to eq(expected_url)
+      end
     end
   end
 end

@@ -7,12 +7,6 @@ module ReactOnRails
   # Removes URL userinfo from configured values and diagnostic prose before either is displayed.
   module DiagnosticUrlRedactor
     HTTP_URL_SCHEME_PATTERN = %r{https?://}i
-    NETWORK_URL_START_PATTERN = %r{
-      (?:[a-z]|%[0-9a-f]{2})
-      (?:[a-z0-9+.-]|%[0-9a-f]{2})*
-      (?::|%3a)
-      (?:/|%2f){2}
-    }ix
     ENCODED_USERINFO_DELIMITER_PATTERN = /@|%40/i
     ENCODED_AUTHORITY_END_PATTERN = %r{/|%2f|\?|%3f|\#|%23}i
     HTTP_URL_TOKEN_PATTERN = /#{HTTP_URL_SCHEME_PATTERN}(?:(?!#{HTTP_URL_SCHEME_PATTERN})[^\s"'])+/
@@ -44,6 +38,20 @@ module ReactOnRails
         rewritten << text.byteslice(unprocessed_start, text.bytesize - unprocessed_start)
       end
 
+      def rewrite_at_offsets(text, offsets)
+        return text if offsets.empty?
+
+        rewritten = text.dup.clear
+        unprocessed_start = 0
+        offsets.each_with_index do |offset, index|
+          span_end = offsets[index + 1] || text.bytesize
+          rewritten << text.byteslice(unprocessed_start, offset - unprocessed_start)
+          rewritten << yield(text.byteslice(offset, span_end - offset))
+          unprocessed_start = span_end
+        end
+        rewritten << text.byteslice(unprocessed_start, text.bytesize - unprocessed_start)
+      end
+
       def first_match(binary_text, pattern, skip_initial)
         match = binary_text.match(pattern)
         return match unless skip_initial && match&.begin(0)&.zero?
@@ -53,6 +61,206 @@ module ReactOnRails
       private_class_method :first_match
     end
     private_constant :ByteSpanRewriter
+
+    # Finds non-overlapping extended URL scheme starts without retrying a greedy
+    # pattern at every byte.
+    module NetworkUrlStartScanner
+      module_function
+
+      def spans(text)
+        spans = []
+        each_span(text, greedy: true) { |scheme_start, match_end| spans << [scheme_start, match_end] }
+        spans
+      end
+
+      def first_span(text)
+        first = nil
+        each_span(text, greedy: false, stop_after_first: true) do |scheme_start, match_end|
+          first = [scheme_start, match_end]
+        end
+        first
+      end
+
+      def authority_starts(text)
+        starts = []
+        each_span(text, greedy: false) { |_scheme_start, match_end| starts << match_end }
+        starts
+      end
+
+      def each_span(text, greedy:, stop_after_first: false)
+        binary_text = text.b
+        search_offset = 0
+
+        while (scheme_start = next_scheme_start(binary_text, search_offset))
+          match_end, run_end = match_end_and_run_end(binary_text, scheme_start, greedy:)
+          if match_end
+            yield scheme_start, match_end
+            break if stop_after_first
+
+            search_offset = match_end
+          else
+            search_offset = run_end + 1
+          end
+        end
+      end
+
+      def next_scheme_start(text, offset)
+        while offset < text.bytesize
+          return offset if ascii_letter_byte?(text.getbyte(offset)) || percent_encoded_byte_at?(text, offset)
+
+          offset += 1
+        end
+
+        nil
+      end
+
+      # The former regex used a greedy scheme continuation, so an encoded colon
+      # is a separator only when it is the rightmost usable one in the run.
+      def match_end_and_run_end(text, scheme_start, greedy: true)
+        offset = scheme_start
+        match_end = nil
+
+        while (token_length = scheme_continuation_token_length(text, offset))
+          encoded_separator_end = encoded_separator_end(text, offset, scheme_start)
+          return [encoded_separator_end, offset] if encoded_separator_end && !greedy
+
+          match_end = encoded_separator_end if encoded_separator_end
+          offset += token_length
+        end
+
+        literal_separator_end = network_separator_end(text, offset) if text.getbyte(offset) == 58
+        match_end = literal_separator_end if literal_separator_end
+        [match_end, offset]
+      end
+
+      def encoded_separator_end(text, offset, scheme_start)
+        return nil if offset == scheme_start
+        return nil unless percent_encoded_colon_at?(text, offset)
+
+        network_separator_end(text, offset)
+      end
+
+      def network_separator_end(text, offset)
+        separator_length = text.getbyte(offset) == 58 ? 1 : 3
+        slash_end = slash_token_end(text, offset + separator_length)
+        return nil unless slash_end
+
+        slash_token_end(text, slash_end)
+      end
+
+      def slash_token_end(text, offset)
+        return offset + 1 if text.getbyte(offset) == 47
+        return offset + 3 if percent_encoded_slash_at?(text, offset)
+
+        nil
+      end
+
+      def scheme_continuation_token_length(text, offset)
+        return 3 if percent_encoded_byte_at?(text, offset)
+
+        byte = text.getbyte(offset)
+        return 1 if ascii_letter_byte?(byte) || digit_byte?(byte) || [43, 45, 46].include?(byte)
+
+        nil
+      end
+
+      def percent_encoded_colon_at?(text, offset)
+        text.getbyte(offset) == 37 && text.getbyte(offset + 1) == 51 &&
+          case_insensitive_byte_match?(text.getbyte(offset + 2), 97)
+      end
+
+      def percent_encoded_slash_at?(text, offset)
+        text.getbyte(offset) == 37 && text.getbyte(offset + 1) == 50 &&
+          case_insensitive_byte_match?(text.getbyte(offset + 2), 102)
+      end
+
+      def case_insensitive_byte_match?(byte, lowercase_byte)
+        byte == lowercase_byte || byte == lowercase_byte - 32
+      end
+
+      def digit_byte?(byte)
+        byte && (48..57).cover?(byte)
+      end
+
+      def percent_encoded_byte_at?(text, offset)
+        text.getbyte(offset) == 37 && hex_byte?(text.getbyte(offset + 1)) && hex_byte?(text.getbyte(offset + 2))
+      end
+
+      def hex_byte?(byte)
+        digit_byte?(byte) || (byte && ((65..70).cover?(byte) || (97..102).cover?(byte)))
+      end
+
+      def ascii_letter_byte?(byte)
+        byte && ((65..90).cover?(byte) || (97..122).cover?(byte))
+      end
+
+      private_class_method :each_span, :next_scheme_start, :match_end_and_run_end, :encoded_separator_end,
+                           :network_separator_end, :slash_token_end, :scheme_continuation_token_length,
+                           :percent_encoded_colon_at?, :percent_encoded_slash_at?, :case_insensitive_byte_match?,
+                           :digit_byte?, :percent_encoded_byte_at?, :hex_byte?, :ascii_letter_byte?
+    end
+    private_constant :NetworkUrlStartScanner
+
+    # Removes userinfo from every encoded-or-literal authority without decoding
+    # or rewriting unrelated path, query, and fragment text.
+    module EncodedNetworkUrlRewriter
+      module_function
+
+      def rewrite(url, authority_start: nil)
+        start_offset = authority_start || detected_authority_start(url)
+        return nil unless start_offset
+
+        removal_span = userinfo_removal_span(url, start_offset)
+        return nil unless removal_span
+
+        remove_byte_spans(url, [removal_span])
+      end
+
+      def rewrite_all(url)
+        removal_spans = NetworkUrlStartScanner.authority_starts(url).filter_map do |authority_start|
+          userinfo_removal_span(url, authority_start)
+        end
+        return nil if removal_spans.empty?
+
+        remove_byte_spans(url, removal_spans)
+      end
+
+      def authority_end(url, authority_start)
+        url.b.match(ENCODED_AUTHORITY_END_PATTERN, authority_start)&.begin(0) || url.bytesize
+      end
+
+      def detected_authority_start(url)
+        network_url = NetworkUrlStartScanner.spans(url).first
+        return network_url.last if network_url&.first&.zero?
+
+        2 if url.start_with?("//")
+      end
+
+      def userinfo_removal_span(url, authority_start)
+        end_offset = authority_end(url, authority_start)
+        authority = url.byteslice(authority_start, end_offset - authority_start)
+        _userinfo, delimiter, host = authority.rpartition(ENCODED_USERINFO_DELIMITER_PATTERN)
+        return nil if delimiter.empty?
+
+        [authority_start, end_offset - host.bytesize]
+      end
+
+      def remove_byte_spans(text, spans)
+        rewritten = text.dup.clear
+        unprocessed_start = 0
+
+        spans.each do |start_offset, end_offset|
+          if start_offset > unprocessed_start
+            rewritten << text.byteslice(unprocessed_start, start_offset - unprocessed_start)
+          end
+          unprocessed_start = [unprocessed_start, end_offset].max
+        end
+        rewritten << text.byteslice(unprocessed_start, text.bytesize - unprocessed_start)
+      end
+
+      private_class_method :authority_end, :detected_authority_start, :userinfo_removal_span, :remove_byte_spans
+    end
+    private_constant :EncodedNetworkUrlRewriter
 
     class << self
       # Sanitizes a configured URL when called with one argument. When sanitizing exception text,
@@ -77,7 +285,7 @@ module ReactOnRails
         # local path. URL classification may reject that spelling, but diagnostics must still
         # fail closed if the value contains credential-like userinfo.
         scheme = url.match(FLEXIBLE_HTTP_URL_SCHEME_PATTERN)
-        return sanitized_authority_relative_url(url) unless scheme
+        return sanitized_configured_url_without_http_scheme(url) unless scheme
 
         prefix = sanitized_configured_prefix(url[...scheme.begin(0)])
         configured_url = url[scheme.begin(0)..]
@@ -89,6 +297,20 @@ module ReactOnRails
                         end
 
         "#{prefix}#{sanitized_url}"
+      end
+
+      def sanitized_configured_url_without_http_scheme(url)
+        network_start = NetworkUrlStartScanner.first_span(url)
+        return sanitized_authority_relative_url(url) unless network_start
+
+        start_offset, end_offset = network_start
+        literal_authority_start = url.b.index("//")
+        return sanitized_authority_relative_url(url) if literal_authority_start && literal_authority_start < end_offset
+
+        prefix = sanitized_configured_prefix(url.byteslice(0, start_offset))
+        configured_url = url.byteslice(start_offset, url.bytesize - start_offset)
+        sanitized_url = EncodedNetworkUrlRewriter.rewrite_all(configured_url) || configured_url
+        "#{prefix}#{sanitized_nested_network_urls(sanitized_url)}"
       end
 
       def sanitized_authority_relative_url(url)
@@ -164,7 +386,10 @@ module ReactOnRails
       def sanitized_valid_network_url(url)
         sanitized_url = sanitized_single_network_url(url)&.dup
         if sanitized_url.nil? || sanitized_url == url
-          sanitized_url = strip_encoded_network_url_userinfo(url) || sanitized_url
+          # A bare outer // authority and an encoded nested scheme need independent passes.
+          rewritten_url = EncodedNetworkUrlRewriter.rewrite(url) || url
+          rewritten_url = EncodedNetworkUrlRewriter.rewrite_all(rewritten_url) || rewritten_url
+          sanitized_url = rewritten_url unless rewritten_url == url
         end
         return nil unless sanitized_url
 
@@ -176,36 +401,25 @@ module ReactOnRails
         # input into disjoint scheme spans and assemble their replacements from left to right,
         # keeping the work bounded by the input size even when a diagnostic has many URL starts.
         # The first scheme belongs to the outer URL and was handled structurally above.
-        ByteSpanRewriter.rewrite(sanitized_url, NETWORK_URL_START_PATTERN, skip_initial: true) do |nested_url|
-          next nested_url unless nested_url.match?(ENCODED_USERINFO_DELIMITER_PATTERN)
+        sanitized_network_url_spans(sanitized_url, skip_initial: true)
+      end
 
-          strip_encoded_network_url_userinfo(nested_url) ||
-            sanitized_single_network_url(nested_url) ||
-            nested_url
+      def sanitized_network_url_spans(text, skip_initial:)
+        network_start_offsets = NetworkUrlStartScanner.spans(text).map(&:first)
+        network_start_offsets.shift if skip_initial && network_start_offsets.first&.zero?
+
+        ByteSpanRewriter.rewrite_at_offsets(text, network_start_offsets) do |nested_url|
+          sanitized_nested_network_url(nested_url)
         end
       end
 
-      # Percent encoding can hide the structural delimiters of a nested URL from URI.parse.
-      # Inspect only the encoded-or-literal scheme, authority terminator, and @ delimiter, then
-      # remove the original encoded span without decoding or rewriting unrelated output.
-      def strip_encoded_network_url_userinfo(url)
-        authority_start = encoded_authority_start(url)
-        return nil unless authority_start
+      def sanitized_nested_network_url(nested_url)
+        return nested_url unless nested_url.match?(ENCODED_USERINFO_DELIMITER_PATTERN)
 
-        authority_end_match = url.match(ENCODED_AUTHORITY_END_PATTERN, authority_start)
-        authority_end = authority_end_match&.begin(0) || url.length
-        authority = url[authority_start...authority_end]
-        _userinfo, delimiter, host = authority.rpartition(ENCODED_USERINFO_DELIMITER_PATTERN)
-        return nil if delimiter.empty?
-
-        "#{url[...authority_start]}#{host}#{url[authority_end..]}"
-      end
-
-      def encoded_authority_start(url)
-        network_url = url.match(NETWORK_URL_START_PATTERN)
-        return network_url.end(0) if network_url&.begin(0)&.zero?
-
-        2 if url.start_with?("//")
+        EncodedNetworkUrlRewriter.rewrite_all(nested_url) ||
+          EncodedNetworkUrlRewriter.rewrite(nested_url) ||
+          sanitized_single_network_url(nested_url) ||
+          nested_url
       end
 
       def sanitized_single_network_url(url)
