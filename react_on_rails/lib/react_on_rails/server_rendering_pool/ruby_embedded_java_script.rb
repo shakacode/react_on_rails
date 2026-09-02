@@ -46,6 +46,7 @@ module ReactOnRails
       /xi
 
       HTTP_URL_SCHEME_PATTERN = %r{https?://}i
+      NETWORK_URL_SCHEME_PATTERN = %r{[a-z][a-z0-9+.-]*://}i
       HTTP_URL_TOKEN_PATTERN = /#{HTTP_URL_SCHEME_PATTERN}(?:(?!#{HTTP_URL_SCHEME_PATTERN})[^\s"'])+/
 
       class << self
@@ -496,6 +497,31 @@ module ReactOnRails
         # userinfo. A missing host means an authority-shaped value was parsed as a path instead;
         # returning nil keeps that ambiguous token unprotected for the fail-closed pass.
         def sanitized_valid_network_url(url)
+          sanitized_url = sanitized_single_network_url(url)&.dup
+          return nil unless sanitized_url
+
+          sanitized_nested_network_urls(sanitized_url)
+        end
+
+        def sanitized_nested_network_urls(sanitized_url)
+          # A valid outer URL can carry another credential URL in its path or query. Sanitize
+          # nested scheme spans from right to left so shortening one cannot invalidate the start
+          # offsets of earlier spans. The first scheme belongs to the outer URL and was handled
+          # structurally above.
+          nested_scheme_starts = sanitized_url.to_enum(:scan, NETWORK_URL_SCHEME_PATTERN)
+                                              .map { Regexp.last_match.begin(0) }
+          nested_scheme_starts.shift if nested_scheme_starts.first&.zero?
+          nested_scheme_starts.reverse_each do |start|
+            token_end = sanitized_url.index(/[\s"']/, start) || sanitized_url.length
+            nested_url = sanitized_url[start...token_end]
+            replacement = sanitized_single_network_url(nested_url) || strip_malformed_url_userinfo(nested_url)
+            sanitized_url[start...token_end] = replacement
+          end
+
+          sanitized_url
+        end
+
+        def sanitized_single_network_url(url)
           uri = URI.parse(url)
           return nil if uri.host.nil?
           return url if uri.userinfo.nil?
@@ -504,7 +530,7 @@ module ReactOnRails
           uri.password = nil
           uri.user = nil
           uri.to_s
-        rescue URI::Error
+        rescue URI::Error, ArgumentError
           nil
         end
 

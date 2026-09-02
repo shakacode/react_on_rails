@@ -611,6 +611,37 @@ module ReactOnRails
           end
         end
 
+        context "when a valid outer HTTP URL contains a nested non-HTTP URL" do
+          let(:nested_credential_url) do
+            "http://outer.test/redirect?next=ftp://nested-user:nested-secret@nested.test/path"
+          end
+
+          it "redacts nested credentials from the configured bundle URL" do
+            stub_http_bundle_failure("connection failed", bundle_url: nested_credential_url)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("nested-user")
+            expect(message).not_to include("nested-secret")
+            expect(message).to include("http://outer.test/redirect?next=ftp://nested.test/path")
+          end
+
+          it "redacts nested credentials from ordinary exception text" do
+            stub_http_bundle_failure("Failure loading #{nested_credential_url}")
+
+            message = bundle_load_error_message
+            expect(message).not_to include("nested-user")
+            expect(message).not_to include("nested-secret")
+            expect(message).to include("Failure loading http://outer.test/redirect?next=ftp://nested.test/path")
+          end
+
+          it "preserves a nested URL with an at sign only in its path" do
+            safe_nested_url = "http://outer.test/redirect?next=ftp://nested.test/component@2.js"
+            stub_http_bundle_failure("Failure loading #{safe_nested_url}")
+
+            expect(bundle_load_error_message).to include("Failure loading #{safe_nested_url}")
+          end
+        end
+
         unresolved_prefix_cases = [
           ["an invalid prefix before a valid credential URL",
            "http://synthetic-user:nonnumeric-prefixhttp://synthetic-secret@host/path",
@@ -723,6 +754,22 @@ module ReactOnRails
             expect(message).not_to include("synthetic-user")
             expect(message).not_to include("synthetic-secret")
             expect(message).to include("bad URI for http://host/path")
+          end
+        end
+
+        context "when URI parsing raises ArgumentError for malformed encoding" do
+          it "still raises a sanitized bundle-load error through the public entrypoint" do
+            server_bundle_url = "http://synthetic-user:synthetic-secret@host/path"
+            allow(URI).to receive(:parse).and_call_original
+            allow(URI).to receive(:parse).with(server_bundle_url)
+                                         .and_raise(ArgumentError, "invalid byte sequence in UTF-8")
+            stub_http_bundle_failure("connection failed", bundle_url: server_bundle_url)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("invalid byte sequence in UTF-8")
+            expect(message).to include("http://host/path")
           end
         end
 
