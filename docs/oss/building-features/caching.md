@@ -61,6 +61,13 @@ When a `react_component` call triggers SSR, React on Rails Pro computes a cache 
 
 If the cache contains an entry for that key, the cached HTML is returned without calling JavaScript. If not, the JS is evaluated, the result is cached, and then returned.
 
+The key ignores the random `id` React on Rails assigns to each mount point (the default
+`random_dom_id: true`), so one cached render serves every instance of a component. Streamed
+renders embed that id in their chunks (for example in the keys of inline React Server
+Component payloads), so a cached stream is rebound to the id of the node being rendered before
+it is replayed. Setting `random_dom_id = false` or passing an explicit `id:` is still the fastest
+option because the cache key then hashes the exact request.
+
 ### Setup
 
 One line in `config/initializers/react_on_rails_pro.rb`:

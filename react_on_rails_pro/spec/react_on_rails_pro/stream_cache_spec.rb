@@ -55,8 +55,9 @@ RSpec.describe ReactOnRailsPro::StreamCache, :caching do
       stream.each_chunk { |chunk| destructive_frame(chunk) }
 
       cached = Rails.cache.read(cache_key)
-      expect(cached).to be_an(Array)
-      expect(cached.first).to include("html" => "1:I[292]")
+      expect(cached).to include("dom_node_id" => nil)
+      expect(cached.fetch("chunks")).to be_an(Array)
+      expect(cached.fetch("chunks").first).to include("html" => "1:I[292]")
     end
 
     it "does not leak the destructive mutation back to the caller's chunk" do
@@ -65,7 +66,7 @@ RSpec.describe ReactOnRailsPro::StreamCache, :caching do
 
       # The consumer deleted "html" from the object it received; the cached copy
       # is a separate dup, so the cache still holds the payload.
-      expect(Rails.cache.read(cache_key).first).to have_key("html")
+      expect(Rails.cache.read(cache_key).fetch("chunks").first).to have_key("html")
     end
   end
 
@@ -108,8 +109,97 @@ RSpec.describe ReactOnRailsPro::StreamCache, :caching do
         .each_chunk { |_chunk| nil }
 
       cached = Rails.cache.read(cache_key)
-      expect(cached).to be_an(Array)
-      expect(cached.first).to include("html" => "ok")
+      expect(cached.fetch("chunks")).to be_an(Array)
+      expect(cached.fetch("chunks").first).to include("html" => "ok")
+    end
+  end
+
+  # Regression for https://github.com/shakacode/react_on_rails/issues/4984.
+  #
+  # The prerender cache key strips random dom ids so one cached render serves every mount
+  # point, but the renderer bakes the producing request's dom id into the streamed chunks
+  # (RSC payload keys, console replay scripts). A replay for another mount point must carry
+  # that mount point's id, or the browser never finds its embedded payload and refetches it.
+  describe "dom node id rebinding" do
+    let(:first_dom_id) { "HelloServer-react-component-11111111-1111-4111-8111-111111111111" }
+    let(:second_dom_id) { "HelloServer-react-component-22222222-2222-4222-8222-222222222222" }
+    let(:init_script) do
+      %(<script>(self.REACT_ON_RAILS_RSC_PAYLOADS||={})["HelloServer-abc-#{first_dom_id}"]||=[]</script>)
+    end
+    # Split the script in the middle of the dom id so the rewrite must survive a chunk boundary.
+    let(:cut) { init_script.index(first_dom_id) + 12 }
+    let(:payload_chunks) do
+      [
+        { "consoleReplayScript" => "console.log('#{first_dom_id}')", "hasErrors" => false,
+          "isShellReady" => true, "html" => init_script[0...cut] },
+        { "consoleReplayScript" => "", "hasErrors" => false, "isShellReady" => true, "html" => init_script[cut..] }
+      ]
+    end
+
+    def cache_chunks(chunks, dom_node_id:)
+      described_class
+        .wrap_and_cache(cache_key, upstream_yielding(chunks), dom_node_id:)
+        .each_chunk { |_chunk| nil }
+    end
+
+    it "persists the dom node id that produced the cached chunks" do
+      cache_chunks(payload_chunks, dom_node_id: first_dom_id)
+
+      cached = Rails.cache.read(cache_key)
+      expect(cached).to include("dom_node_id" => first_dom_id)
+      expect(cached.fetch("chunks").length).to eq(2)
+    end
+
+    it "rebinds cached chunks to the mount point of the render being served" do
+      cache_chunks(payload_chunks, dom_node_id: first_dom_id)
+
+      hit = described_class.fetch_stream(cache_key, dom_node_id: second_dom_id).each_chunk.to_a
+      html = hit.map { |chunk| chunk["html"] }.join
+
+      expect(hit.length).to eq(2)
+      expect(html).to eq(init_script.gsub(first_dom_id, second_dom_id))
+      expect(html).not_to include(first_dom_id)
+      expect(hit.map { |chunk| chunk["html"].bytesize }).to eq(payload_chunks.map { |chunk| chunk["html"].bytesize })
+      expect(hit.first["consoleReplayScript"]).to eq("console.log('#{second_dom_id}')")
+      expect(hit.first).to include("hasErrors" => false, "isShellReady" => true)
+    end
+
+    it "does not rewrite the cached copy itself" do
+      cache_chunks(payload_chunks, dom_node_id: first_dom_id)
+      described_class.fetch_stream(cache_key, dom_node_id: second_dom_id).each_chunk { |_chunk| nil }
+
+      expect(Rails.cache.read(cache_key).fetch("chunks").map { |chunk| chunk["html"] }.join).to eq(init_script)
+    end
+
+    it "leaves the chunks untouched when the mount point matches" do
+      cache_chunks(payload_chunks, dom_node_id: first_dom_id)
+
+      hit = described_class.fetch_stream(cache_key, dom_node_id: first_dom_id).each_chunk.to_a
+
+      expect(hit.map { |chunk| chunk["html"] }.join).to eq(init_script)
+    end
+
+    it "leaves the chunks untouched when no dom node id is known" do
+      cache_chunks(payload_chunks, dom_node_id: nil)
+
+      hit = described_class.fetch_stream(cache_key, dom_node_id: second_dom_id).each_chunk.to_a
+
+      expect(hit.map { |chunk| chunk["html"] }.join).to eq(init_script)
+    end
+
+    it "rebinds plain string chunks the same way" do
+      cache_chunks([init_script[0...cut], init_script[cut..]], dom_node_id: first_dom_id)
+
+      hit = described_class.fetch_stream(cache_key, dom_node_id: second_dom_id).each_chunk.to_a
+
+      expect(hit.length).to eq(2)
+      expect(hit.join).to eq(init_script.gsub(first_dom_id, second_dom_id))
+    end
+
+    it "treats a legacy bare chunk array as a cache miss" do
+      Rails.cache.write(cache_key, payload_chunks)
+
+      expect(described_class.fetch_stream(cache_key, dom_node_id: second_dom_id)).to be_nil
     end
   end
 

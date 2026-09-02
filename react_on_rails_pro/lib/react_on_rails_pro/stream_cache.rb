@@ -15,22 +15,38 @@
 
 module ReactOnRailsPro
   class StreamCache
+    CACHED_CHUNKS_KEY = "chunks"
+    CACHED_DOM_NODE_ID_KEY = "dom_node_id"
+
     class << self
       # Returns a stream-like object that responds to `each_chunk` and yields cached chunks
       # or nil if not present in cache. Pass the same cache_options given to wrap_and_cache
       # so key-altering options such as :namespace resolve to the written entry.
-      def fetch_stream(cache_key, cache_options: nil)
-        cached_chunks = Rails.cache.read(cache_key, cache_options)
-        return nil unless cached_chunks.is_a?(Array)
+      #
+      # `dom_node_id` is the mount point of the render being served. The prerender cache key
+      # deliberately ignores random dom ids (see ProRendering.without_random_values) so one
+      # cached render serves every mount point, but the cached chunks embed the dom id of the
+      # render that produced them (RSC payload keys, console replay scripts). Replaying them
+      # unchanged under another mount id leaves the browser without an embedded payload for
+      # its own node, so cached chunks are rebound to the current dom id on the way out.
+      # See https://github.com/shakacode/react_on_rails/issues/4984.
+      def fetch_stream(cache_key, cache_options: nil, dom_node_id: nil)
+        entry = cached_entry(Rails.cache.read(cache_key, cache_options))
+        return nil unless entry
 
-        build_stream_from_chunks(cached_chunks)
+        chunks = DomNodeIdRewriter.rewrite(
+          entry.fetch(CACHED_CHUNKS_KEY),
+          from: entry[CACHED_DOM_NODE_ID_KEY],
+          to: dom_node_id
+        )
+        build_stream_from_chunks(chunks)
       end
 
       # Wraps an upstream stream (responds to `each_chunk`), yields chunks downstream while
-      # buffering them, and writes the chunks array to Rails.cache on successful completion.
-      # Returns a stream-like object that responds to `each_chunk`.
-      def wrap_and_cache(cache_key, upstream_stream, cache_options: nil)
-        component = CachingComponent.new(upstream_stream, cache_key, cache_options)
+      # buffering them, and writes the chunks array plus the producing dom id to Rails.cache on
+      # successful completion. Returns a stream-like object that responds to `each_chunk`.
+      def wrap_and_cache(cache_key, upstream_stream, cache_options: nil, dom_node_id: nil)
+        component = CachingComponent.new(upstream_stream, cache_key, cache_options, dom_node_id)
         ReactOnRailsPro::StreamDecorator.new(component)
       end
 
@@ -38,6 +54,68 @@ module ReactOnRailsPro
       def build_stream_from_chunks(chunks)
         component = CachedChunksComponent.new(chunks)
         ReactOnRailsPro::StreamDecorator.new(component)
+      end
+
+      private
+
+      # Entries written before the producing dom id was retained were bare chunk arrays. They
+      # cannot be rebound safely, so they are treated as a miss and re-rendered into the current
+      # shape. (The base cache key also embeds the Pro version, so such entries are not normally
+      # reachable after an upgrade.)
+      def cached_entry(cached)
+        return nil unless cached.is_a?(Hash) && cached[CACHED_CHUNKS_KEY].is_a?(Array)
+
+        cached
+      end
+    end
+
+    # Rebinds the dom id embedded in cached chunks to the mount point of the current render.
+    # Chunks are either Strings or renderer Hashes whose "html" and "consoleReplayScript" values
+    # carry the markup. The html is rewritten as one document and re-split at the original chunk
+    # boundaries, so an id that straddles two chunks is still replaced and the frame count is kept.
+    module DomNodeIdRewriter
+      HTML_KEY = "html"
+      CONSOLE_REPLAY_SCRIPT_KEY = "consoleReplayScript"
+
+      module_function
+
+      def rewrite(chunks, from:, to:)
+        return chunks if from.to_s.empty? || to.to_s.empty? || from == to
+
+        if chunks.all?(String)
+          resplit(chunks.join, chunks.map(&:bytesize), from, to)
+        else
+          rewrite_hashes(chunks, from, to)
+        end
+      end
+
+      def rewrite_hashes(chunks, from, to)
+        html_pieces = chunks.map { |chunk| chunk.is_a?(Hash) ? chunk[HTML_KEY].to_s : "" }
+        rewritten_html = resplit(html_pieces.join, html_pieces.map(&:bytesize), from, to)
+
+        chunks.each_with_index.map do |chunk, index|
+          next chunk unless chunk.is_a?(Hash)
+
+          rebound = chunk.dup
+          rebound[HTML_KEY] = rewritten_html[index] if chunk.key?(HTML_KEY)
+          if chunk[CONSOLE_REPLAY_SCRIPT_KEY].is_a?(String)
+            rebound[CONSOLE_REPLAY_SCRIPT_KEY] = chunk[CONSOLE_REPLAY_SCRIPT_KEY].gsub(from, to)
+          end
+          rebound
+        end
+      end
+
+      # Splits `document` back into pieces sized like `sizes` (in bytes). Random dom ids share one
+      # format, so the substitution normally keeps every byte offset; any length change flows into
+      # the final piece so the concatenation stays identical to the rewritten document.
+      def resplit(document, sizes, from, to)
+        rewritten = document.gsub(from, to)
+        offset = 0
+        sizes.each_with_index.map do |size, index|
+          piece = index == sizes.length - 1 ? rewritten.byteslice(offset..) : rewritten.byteslice(offset, size)
+          offset += size
+          piece || ""
+        end
       end
     end
 
@@ -54,10 +132,11 @@ module ReactOnRailsPro
     end
 
     class CachingComponent
-      def initialize(upstream_stream, cache_key, cache_options)
+      def initialize(upstream_stream, cache_key, cache_options, dom_node_id = nil)
         @upstream_stream = upstream_stream
         @cache_key = cache_key
         @cache_options = cache_options
+        @dom_node_id = dom_node_id
       end
 
       def each_chunk(&block)
@@ -85,7 +164,11 @@ module ReactOnRailsPro
         # See https://github.com/shakacode/react_on_rails/issues/4581.
         return if stream_has_errors
 
-        Rails.cache.write(@cache_key, buffered_chunks, @cache_options || {})
+        Rails.cache.write(
+          @cache_key,
+          { CACHED_DOM_NODE_ID_KEY => @dom_node_id, CACHED_CHUNKS_KEY => buffered_chunks },
+          @cache_options || {}
+        )
       end
 
       private
