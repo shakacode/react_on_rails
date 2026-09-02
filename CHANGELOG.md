@@ -225,7 +225,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   bundle-load error naming the URL and status, instead of being returned as if it were JavaScript
   bundle source. Additionally, a `server_bundle_js_file` URL with embedded HTTP basic-auth
   credentials (e.g. `https://:password@host:3800/bundle.js`) no longer leaks that password into
-  raised errors or logs on a load failure, including malformed URLs with ambiguous userinfo. Fixes
+  raised errors or logs on a load failure, including malformed URLs with ambiguous userinfo.
+  Percent-encoded spellings are redacted wherever their literal spelling is, so values such as
+  `http:%2F%2Fuser:password%40host/bundle.js` and `%2F%2Fuser:password%40host/bundle.js` no longer
+  survive redaction. Safe encoded path, query, and fragment data is left intact. Fixes
   [Issue 4584](https://github.com/shakacode/react_on_rails/issues/4584) and
   [Issue 4825](https://github.com/shakacode/react_on_rails/issues/4825).
   [PR 4817](https://github.com/shakacode/react_on_rails/pull/4817) and
