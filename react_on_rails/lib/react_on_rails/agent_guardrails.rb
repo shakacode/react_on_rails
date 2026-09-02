@@ -71,7 +71,7 @@ module ReactOnRails
 
       def validate_settings_before_copy
         settings_path = File.join(destination_root, SETTINGS_REL)
-        return if skip_existing && File.exist?(settings_path)
+        return if skip_existing && path_entry_exists?(settings_path)
 
         read_settings(settings_path)
       end
@@ -79,11 +79,11 @@ module ReactOnRails
       def copy_file(source, dest_rel)
         source_path = File.join(TEMPLATES_DIR, source)
         dest_path = File.join(destination_root, dest_rel)
-        existed = File.exist?(dest_path)
+        existed = path_entry_exists?(dest_path)
         return "skipped    #{dest_rel} (already exists)" if skip_existing && existed
 
         new_content = File.read(source_path)
-        unchanged = existed && File.read(dest_path) == new_content
+        unchanged = File.exist?(dest_path) && File.read(dest_path) == new_content
 
         unless unchanged
           FileUtils.mkdir_p(File.dirname(dest_path))
@@ -98,16 +98,20 @@ module ReactOnRails
 
       def register_hook
         settings_path = File.join(destination_root, SETTINGS_REL)
-        return "skipped    #{SETTINGS_REL} (already exists)" if skip_existing && File.exist?(settings_path)
+        return "skipped    #{SETTINGS_REL} (already exists)" if skip_existing && path_entry_exists?(settings_path)
 
         settings = read_settings(settings_path)
         return "unchanged  #{SETTINGS_REL} (hook already registered)" if hook_registered?(settings)
 
         add_hook(settings)
         FileUtils.mkdir_p(File.dirname(settings_path))
-        existed = File.exist?(settings_path)
-        atomic_write(settings_path, "#{JSON.pretty_generate(settings)}\n")
+        existed = path_entry_exists?(settings_path)
+        atomic_write(write_path_for(settings_path), "#{JSON.pretty_generate(settings)}\n")
         existed ? "updated    #{SETTINGS_REL} (registered hook)" : "created    #{SETTINGS_REL} (registered hook)"
+      end
+
+      def path_entry_exists?(path)
+        File.exist?(path) || File.symlink?(path)
       end
 
       def write_path_for(path)

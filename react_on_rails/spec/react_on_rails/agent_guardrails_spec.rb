@@ -146,11 +146,28 @@ module ReactOnRails
       link_target = Pathname.new(shared_path).relative_path_from(Pathname.new(File.dirname(skill_path))).to_s
       File.symlink(link_target, skill_path)
 
-      described_class.install(@app_root)
+      actions = described_class.install(@app_root)
 
       expect(File.symlink?(skill_path)).to be true
       expect(File.readlink(skill_path)).to eq(link_target)
       expect(File.read(shared_path)).to eq(expected_content)
+      expect(actions).to include("updated    .claude/skills/rsc-app-safety/SKILL.md")
+    end
+
+    it "skips a guardrail destination that is a dangling symlink" do
+      described_class.install(@app_root)
+      skill_path = File.join(@app_root, ".claude/skills/rsc-app-safety/SKILL.md")
+      shared_path = File.join(@app_root, "shared/rsc-app-safety-skill.md")
+      FileUtils.mkdir_p(File.dirname(shared_path))
+      File.unlink(skill_path)
+      link_target = Pathname.new(shared_path).relative_path_from(Pathname.new(File.dirname(skill_path))).to_s
+      File.symlink(link_target, skill_path)
+
+      actions = described_class.install(@app_root, skip_existing: true)
+
+      expect(File.symlink?(skill_path)).to be true
+      expect(File.exist?(shared_path)).to be false
+      expect(actions).to include("skipped    .claude/skills/rsc-app-safety/SKILL.md (already exists)")
     end
 
     it "keeps the copy permissions contract when creating guardrail files" do
@@ -942,6 +959,23 @@ module ReactOnRails
       described_class.install(@app_root)
 
       expect(File.stat(settings_path).mode & 0o7777).to eq(0o600)
+      expect(rsc_hooks.size).to eq(1)
+    end
+
+    it "updates a symlinked settings.json target without replacing the symlink" do
+      settings_path = File.join(@app_root, ".claude/settings.json")
+      shared_path = File.join(@app_root, "shared/settings.json")
+      FileUtils.mkdir_p(File.dirname(settings_path))
+      FileUtils.mkdir_p(File.dirname(shared_path))
+      File.write(shared_path, "{}\n")
+      link_target = Pathname.new(shared_path).relative_path_from(Pathname.new(File.dirname(settings_path))).to_s
+      File.symlink(link_target, settings_path)
+
+      described_class.install(@app_root)
+
+      expect(File.symlink?(settings_path)).to be true
+      expect(File.readlink(settings_path)).to eq(link_target)
+      expect(JSON.parse(File.read(shared_path)).dig("hooks", "PostToolUse")).not_to be_empty
       expect(rsc_hooks.size).to eq(1)
     end
 
