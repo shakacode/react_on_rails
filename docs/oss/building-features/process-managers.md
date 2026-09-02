@@ -493,9 +493,10 @@ The renderer port must match on both sides: `RENDERER_PORT` is read by the Node 
 > session's recorded ports. For a manual default-port setup, export `RENDERER_PORT` (or a local
 > `REACT_RENDERER_URL`) in a fresh shell so the renderer port is scanned; base-port setups also
 > derive the renderer's `base + 2` port. A port candidate is signalled only when `lsof` finds a
-> `LISTEN` socket and the process working directory is inside this app root. Foreign listeners are
-> reported and left running. If ownership or shutdown cannot be verified, the command exits nonzero
-> instead of reporting success.
+> `LISTEN` socket and the process working directory is inside this app root. Foreign listeners that
+> are visible to the invoking user are reported and left running; a listener owned by another OS user
+> may be invisible to `lsof` and therefore go unreported. If ownership or shutdown cannot be verified,
+> the command exits nonzero instead of reporting success.
 
 ## See Also
 
