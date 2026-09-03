@@ -585,6 +585,14 @@ class CloseoutEvidenceReplayTest < Minitest::Test
     refute_includes qa.fetch("missing"), "visual_evidence.local_reference"
   end
 
+  def test_v2_allows_contextual_slash_separated_visual_mode_labels
+    evidence = "durable: before and after mobile/desktop screenshots https://github.com/example/repo/pull/123#visual"
+    qa = run_replay(v2_marker("visual_evidence" => evidence)).fetch("qa_evidence")
+
+    assert_equal "SATISFIED", qa.fetch("verdict")
+    refute_includes qa.fetch("missing"), "visual_evidence.local_reference"
+  end
+
   def test_v2_allows_documented_and_common_slash_separated_labels
     %w[before/after baseline/candidate pass/fail on/off yes/no].each do |label|
       evidence = "durable: before and after #{label} composite https://github.com/example/repo/pull/123#visual"
@@ -683,6 +691,7 @@ class CloseoutEvidenceReplayTest < Minitest::Test
   def test_v2_rejects_missing_baseline_or_candidate_artifacts
     invalid_evidence = [
       "durable: before was unavailable; after https://github.com/example/repo/pull/123#visual",
+      "durable: before wasn't available; after https://github.com/example/repo/pull/123#visual",
       "durable: before https://github.com/example/repo/pull/123#visual; after capture missing",
       "durable: baseline was not captured; candidate https://github.com/example/repo/pull/123#visual"
     ]

@@ -441,7 +441,7 @@ module CloseoutEvidenceReplay
 
   def missing_visual_artifact_claim?(value)
     value.match?(
-      /\b(?:baseline|before|candidate|after)\b#{CLAUSE_GAP}\b(?:unavailable|missing|not\s+(?:available|captured|recorded|provided|attached)|wasn['’]t\s+(?:captured|recorded|provided|attached))\b/i
+      /\b(?:baseline|before|candidate|after)\b#{CLAUSE_GAP}\b(?:unavailable|missing|not\s+(?:available|captured|recorded|provided|attached)|wasn['’]t\s+(?:available|captured|recorded|provided|attached))\b/i
     )
   end
 
@@ -481,7 +481,9 @@ module CloseoutEvidenceReplay
   end
 
   def without_schema_slash_labels(value)
-    value.gsub(%r{\b(?:before/after|baseline/candidate|light/dark|pass/fail|on/off|yes/no)\b}i, "")
+    value.gsub(
+      %r{(\b(?:before\s+and\s+after|baseline\s+and\s+candidate)\s+)[[:alpha:]]++/[[:alpha:]]++(?=\s+(?:screenshots?|captures?|images?|views?|layouts?|modes?|variants?|composites?)\b)}i
+    ) { Regexp.last_match(1) }
   end
 
   def failed_visual_artifact_claim?(value)
