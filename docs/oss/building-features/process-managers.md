@@ -489,10 +489,14 @@ REACT_RENDERER_URL=http://localhost:3801
 The renderer port must match on both sides: `RENDERER_PORT` is read by the Node process and
 `REACT_RENDERER_URL` is read by the Rails-side Pro initializer.
 
-> **Note:** `bin/dev kill` only stops the renderer when `RENDERER_PORT` (or `REACT_RENDERER_URL`)
-> is exported in the current shell. From a fresh terminal that hasn't sourced your worktree's
-> `.env`, run e.g. `RENDERER_PORT=3801 bin/dev kill`, or source `.env` first. Otherwise the
-> renderer process will silently keep running.
+> **Note:** `bin/dev kill` scopes cleanup to the current app directory. It first uses the running
+> session's recorded ports. For a manual default-port setup, export `RENDERER_PORT` (or a local
+> `REACT_RENDERER_URL`) in a fresh shell so the renderer port is scanned; base-port setups also
+> derive the renderer's `base + 2` port. A port candidate is signalled only when `lsof` finds a
+> `LISTEN` socket and the process working directory is inside this app root. Foreign listeners that
+> are visible to the invoking user are reported and left running; a listener owned by another OS user
+> may be invisible to `lsof` and therefore go unreported. If ownership or shutdown cannot be verified,
+> the command exits nonzero instead of reporting success.
 
 ## See Also
 

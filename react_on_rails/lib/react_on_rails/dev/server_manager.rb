@@ -53,13 +53,20 @@ module ReactOnRails
       # O_NOFOLLOW so a symlink planted at the session path fails loudly rather
       # than having its target silently truncated. `overmind_endpoint_owned?`
       # resolves realpath for the same reason on the read side.
-      DEV_SESSION_OPEN_FLAGS = File::RDWR | File::CREAT |
+      # Windows also requires binary mode before Ruby honors SHARE_DELETE. Both
+      # the old session handle and the tempfile remain open across the atomic
+      # rename, and the published handle remains open when its path is deleted.
+      DEV_SESSION_DELETE_SHARING_FLAGS = File::BINARY | File::SHARE_DELETE
+      DEV_SESSION_OPEN_FLAGS = File::RDWR | File::CREAT | DEV_SESSION_DELETE_SHARING_FLAGS |
                                (defined?(File::NOFOLLOW) ? File::NOFOLLOW : 0)
       # Opening an existing fixed lock must remain separate from creating one:
       # including CREAT here would bypass the bounded CREAT|EXCL race below.
       DEV_SESSION_LOCK_OPEN_FLAGS = File::RDWR |
                                     (defined?(File::NOFOLLOW) ? File::NOFOLLOW : 0) |
                                     (defined?(File::NONBLOCK) ? File::NONBLOCK : 0)
+      DEV_SESSION_LOCK_WRITE_FLAGS = File::WRONLY |
+                                     (defined?(File::NOFOLLOW) ? File::NOFOLLOW : 0) |
+                                     (defined?(File::NONBLOCK) ? File::NONBLOCK : 0)
       DEV_SESSION_LOCK_CREATE_FLAGS = DEV_SESSION_LOCK_OPEN_FLAGS | File::CREAT | File::EXCL
       # The read side needs the same O_NOFOLLOW guarantee as the write side: it
       # is the path that leads to signalling, so a symlink here is worth more to
@@ -67,7 +74,7 @@ module ReactOnRails
       # FIFO planted at this path from blocking the open forever - without it
       # the "must be a regular file" check below is unreachable, because the
       # open never returns.
-      DEV_SESSION_READ_FLAGS = File::RDONLY |
+      DEV_SESSION_READ_FLAGS = File::RDONLY | DEV_SESSION_DELETE_SHARING_FLAGS |
                                (defined?(File::NOFOLLOW) ? File::NOFOLLOW : 0) |
                                (defined?(File::NONBLOCK) ? File::NONBLOCK : 0)
       # Bounded budget for an Overmind control command. The socket probe was
@@ -669,13 +676,24 @@ module ReactOnRails
           return if file.nil? || file.closed?
 
           file.flock(File::LOCK_UN)
-          file.close
+        rescue SystemCallError, IOError
+          nil
+        ensure
+          close_dev_session_handle(file)
+        end
+
+        def close_dev_session_handle(file)
+          file.close unless file.nil? || file.closed?
         rescue SystemCallError, IOError
           nil
         end
 
         def write_dev_session(path, root)
-          file = Tempfile.create(["dev-session-", ".json"], File.dirname(path))
+          file = Tempfile.create(
+            ["dev-session-", ".json"],
+            File.dirname(path),
+            mode: DEV_SESSION_DELETE_SHARING_FLAGS
+          )
           file.write(JSON.pretty_generate(dev_session_payload(root)))
           file.flush
           raise IOError, "could not lock the published dev session" unless file.flock(File::LOCK_EX | File::LOCK_NB)
@@ -705,10 +723,14 @@ module ReactOnRails
           return if file.nil?
 
           File.delete(path) if File.exist?(path) && !dev_session_replaced?(path, file)
-          file.flock(File::LOCK_UN)
-          file.close
         rescue SystemCallError, IOError
           nil
+        ensure
+          begin
+            release_dev_session_lock(file)
+          ensure
+            close_dev_session_handle(file)
+          end
         end
 
         def warn_dev_session_unrecorded(reason)
@@ -823,9 +845,14 @@ module ReactOnRails
           path = claim[:path]
           handle = claim[:handle]
           File.delete(path) if File.exist?(path) && !dev_session_replaced?(path, handle)
-          release_dev_session_lock(handle)
         rescue SystemCallError, IOError
           nil
+        ensure
+          begin
+            release_dev_session_lock(handle)
+          ensure
+            close_dev_session_handle(handle)
+          end
         end
 
         # ---- kill path: reading and classifying the session ------------
@@ -927,15 +954,17 @@ module ReactOnRails
         rescue Errno::EISDIR
           [:refused, "#{path} is not a regular file, so dev session ownership cannot be trusted"]
         rescue SystemCallError, IOError => e
+          release_dev_session_lock(file)
           [:refused, "could not lock #{path} to determine dev session ownership (#{e.class})"]
         end
 
         # Existing ownership locks are coordination handles, not state we
         # mutate. Prefer a writable descriptor because Linux NFS emulates an
         # exclusive flock with fcntl and rejects read-only descriptors. If the
-        # lock is readable but not writable, retain the local-filesystem path
-        # that can still lock it read-only. O_EXCL keeps a concurrent creator a
-        # retry instead of silently creating through the existing-file path.
+        # lock is writable but not readable, keep the NFS-compatible write-only
+        # path; if it is only readable, retain the local-filesystem path that can
+        # still lock it read-only. O_EXCL keeps a concurrent creator a retry
+        # instead of silently creating through the existing-file path.
         def open_existing_or_create_dev_session_lock(path)
           DEV_SESSION_CLAIM_ATTEMPTS.times do
             return open_existing_dev_session_lock(path)
@@ -953,7 +982,11 @@ module ReactOnRails
         def open_existing_dev_session_lock(path)
           File.open(path, DEV_SESSION_LOCK_OPEN_FLAGS)
         rescue Errno::EACCES, Errno::EPERM, Errno::EROFS
-          File.open(path, DEV_SESSION_READ_FLAGS)
+          begin
+            File.open(path, DEV_SESSION_LOCK_WRITE_FLAGS)
+          rescue Errno::EACCES, Errno::EPERM, Errno::EROFS
+            File.open(path, DEV_SESSION_READ_FLAGS)
+          end
         end
 
         # Returns [:opened, File], [:absent, nil] or [:refused, message].
@@ -983,7 +1016,8 @@ module ReactOnRails
           [:refused, "#{path} is a symlink; dev session state must be a regular file"]
         rescue Errno::ENOENT
           [:absent, nil]
-        rescue SystemCallError => e
+        rescue SystemCallError, IOError => e
+          release_dev_session_lock(file)
           [:refused, "could not open #{path} to determine dev session ownership (#{e.class})"]
         end
 

@@ -26,6 +26,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **Prerender-cached streamed renders now hydrate on every request**: The automatic prerender cache key
+  deliberately ignores random dom ids so one cached render serves every mount point, but the cached
+  chunks still embedded the first request's dom id in their React Server Component payload keys.
+  Every cache hit therefore refetched the payload and failed hydration whenever the render was not
+  byte-identical. Cached streams are now rebound to the dom id of the render being served. Fixes
+  [Issue 4984](https://github.com/shakacode/react_on_rails/issues/4984). [PR 4987](https://github.com/shakacode/react_on_rails/pull/4987) by
+  [justin808](https://github.com/justin808).
+
 - **Release failures now provide supervised, reason-specific recovery**: `script/release --evaluate-head`
   supports strict exact-HEAD CI evaluation for both preview and live retries, foreign claims identify the available
   holder/task/session metadata and targeted status command, and npm readiness distinguishes stale dependencies,
