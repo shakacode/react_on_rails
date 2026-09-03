@@ -511,10 +511,11 @@ module ReactOnRails
         # equals the destination (UTF-8). charset_from_content_type returns UTF-8 for the three
         # "same-encoding" cases below (no Content-Type header, no charset parameter, and an
         # explicit charset=utf-8), so `.encode(Encoding::UTF_8)` alone would silently let an
-        # invalid byte through unchanged on each of them — only a genuine cross-encoding
-        # transcode (the ISO-8859-1 case above) actually validates via `encode`. Each of these
-        # three specs uses a body containing an invalid standalone byte (0xE9) to prove the
-        # explicit valid_encoding? check (not `encode` alone) is what catches it.
+        # invalid byte through unchanged on each of them. A genuine cross-encoding transcode can
+        # reject malformed input only when the source encoding has invalid byte sequences of its
+        # own (such as Shift_JIS). Each of these three specs uses a body containing an invalid
+        # standalone byte (0xE9) to prove the explicit valid_encoding? check (not `encode` alone) is
+        # what catches it.
         context "when the HTTP-served bundle response has no Content-Type header and the body is not valid UTF-8" do
           it "raises instead of silently passing corrupt bytes through" do
             server_bundle_url = "http://localhost:3035/webpack/development/server-bundle.js"
