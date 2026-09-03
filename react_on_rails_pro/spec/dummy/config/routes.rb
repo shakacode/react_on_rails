@@ -72,6 +72,7 @@ Rails.application.routes.draw do
   get "rsc_posts_page_over_redis" => "pages#rsc_posts_page_over_redis", as: :rsc_posts_page_over_redis
   get "rsc_echo_props" => "pages#rsc_echo_props", as: :rsc_echo_props
   get "rsc_fouc_probe" => "pages#rsc_fouc_probe", as: :rsc_fouc_probe
+  get "rsc_prerender_cache_probe" => "pages#rsc_prerender_cache_probe", as: :rsc_prerender_cache_probe
   get "activity_rsc_tabs" => "pages#activity_rsc_tabs", as: :activity_rsc_tabs
   get "client_side_fouc_probe" => "pages#client_side_fouc_probe", as: :client_side_fouc_probe
   get "async_on_server_sync_on_client" => "pages#async_on_server_sync_on_client", as: :async_on_server_sync_on_client
@@ -93,6 +94,9 @@ Rails.application.routes.draw do
   get "hybrid_metadata_streaming" => "pages#hybrid_metadata_streaming", as: :hybrid_metadata_streaming
   get "rsc_native_metadata" => "pages#rsc_native_metadata", as: :rsc_native_metadata
   get "cache_demo" => "pages#cache_demo", as: :cache_demo
+  # Spike for issue #4874 (Server Functions RFC)
+  get "spike_server_functions" => "pages#spike_server_functions", as: :spike_server_functions
+  post "spike_server_functions/call" => "spike_server_functions#execute", as: :spike_server_functions_call
   get "react_intl_rsc_demo(/:locale)" => "pages#react_intl_rsc_demo",
       as: :react_intl_rsc_demo,
       constraints: { locale: /en|ar|es/ }
