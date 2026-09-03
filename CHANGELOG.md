@@ -26,6 +26,12 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **RSC agent guardrail upgrades now preserve complete files and clean up their stale hook groups**:
+  The installer atomically replaces copied skill and hook files while preserving their existing permission behavior,
+  and removes `PostToolUse` groups only when removing a managed guardrail hook leaves the group empty. Unrelated
+  Claude settings and hook groups remain unchanged. Addresses items 1 and 2 of
+  [Issue 4815](https://github.com/shakacode/react_on_rails/issues/4815).
+
 - **Explicit `id: nil` now uses the configured automatic DOM id behavior**: Component rendering no longer omits the
   container id while still reporting that a random id is active. Fixes
   [Issue 4993](https://github.com/shakacode/react_on_rails/issues/4993).

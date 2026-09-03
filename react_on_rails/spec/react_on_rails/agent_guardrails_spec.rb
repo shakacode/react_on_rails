@@ -86,6 +86,66 @@ module ReactOnRails
       expect(actions).to all(match(/skipped/))
     end
 
+    it "rejects a skipped dangling hook before installing any other guardrail files" do
+      described_class.install(@app_root)
+      skill_path = File.join(@app_root, ".claude/skills/rsc-app-safety/SKILL.md")
+      hook_path = File.join(@app_root, ".claude/hooks/rsc-app-safety-check.rb")
+      settings_path = File.join(@app_root, ".claude/settings.json")
+      missing_hook_target = File.join(@app_root, "shared/rsc-app-safety-check.rb")
+      File.unlink(skill_path)
+      File.unlink(hook_path)
+      File.unlink(settings_path)
+      File.symlink(missing_hook_target, hook_path)
+
+      expect { described_class.install(@app_root, skip_existing: true) }
+        .to raise_error(described_class::Error, /dangling symlink/)
+
+      expect(File.exist?(skill_path)).to be false
+      expect(File.symlink?(hook_path)).to be true
+      expect(File.exist?(missing_hook_target)).to be false
+      expect(File.exist?(settings_path)).to be false
+    end
+
+    it "rejects a skipped dangling settings symlink before installing guardrail files" do
+      described_class.install(@app_root)
+      skill_path = File.join(@app_root, ".claude/skills/rsc-app-safety/SKILL.md")
+      hook_path = File.join(@app_root, ".claude/hooks/rsc-app-safety-check.rb")
+      settings_path = File.join(@app_root, ".claude/settings.json")
+      missing_settings_target = File.join(@app_root, "shared/settings.json")
+      FileUtils.mkdir_p(File.dirname(missing_settings_target))
+      File.unlink(skill_path)
+      File.unlink(hook_path)
+      File.unlink(settings_path)
+      File.symlink(missing_settings_target, settings_path)
+
+      expect { described_class.install(@app_root, skip_existing: true) }
+        .to raise_error(described_class::Error, /settings\.json is a dangling symlink/)
+
+      expect(File.exist?(skill_path)).to be false
+      expect(File.exist?(hook_path)).to be false
+      expect(File.symlink?(settings_path)).to be true
+      expect(File.exist?(missing_settings_target)).to be false
+    end
+
+    it "validates guardrail symlink targets before replacing any managed file" do
+      described_class.install(@app_root)
+      skill_path = File.join(@app_root, ".claude/skills/rsc-app-safety/SKILL.md")
+      hook_path = File.join(@app_root, ".claude/hooks/rsc-app-safety-check.rb")
+      settings_path = File.join(@app_root, ".claude/settings.json")
+      missing_hook_target = File.join(@app_root, "shared/missing/rsc-app-safety-check.rb")
+      File.write(skill_path, "existing skill\n")
+      File.unlink(hook_path)
+      File.symlink(missing_hook_target, hook_path)
+      original_settings = File.read(settings_path)
+
+      expect { described_class.install(@app_root) }.to raise_error(Errno::ENOENT)
+
+      expect(File.read(skill_path)).to eq("existing skill\n")
+      expect(File.symlink?(hook_path)).to be true
+      expect(File.exist?(missing_hook_target)).to be false
+      expect(File.read(settings_path)).to eq(original_settings)
+    end
+
     it "restores executable permissions when an unchanged hook is reinstalled" do
       described_class.install(@app_root)
       hook_path = File.join(@app_root, ".claude/hooks/rsc-app-safety-check.rb")
@@ -95,6 +155,277 @@ module ReactOnRails
 
       expect(File.stat(hook_path).mode & 0o111).not_to eq(0)
       expect(actions).to include("unchanged  .claude/hooks/rsc-app-safety-check.rb")
+    end
+
+    it "leaves an existing hook intact when its atomic replacement fails" do
+      described_class.install(@app_root)
+      hook_path = File.join(@app_root, ".claude/hooks/rsc-app-safety-check.rb")
+      File.write(hook_path, "existing hook\n")
+      File.chmod(0o700, hook_path)
+      allow(File).to receive(:rename).and_wrap_original do |original, source, destination|
+        raise Errno::EIO, destination if destination == hook_path
+
+        original.call(source, destination)
+      end
+
+      expect { described_class.install(@app_root) }.to raise_error(Errno::EIO)
+
+      expect(File.read(hook_path)).to eq("existing hook\n")
+      expect(File.stat(hook_path).mode & 0o7777).to eq(0o700)
+      expect(Dir.children(File.dirname(hook_path))).not_to include(a_string_matching(/\.tmp\z/))
+    end
+
+    it "preserves ownership when atomically replacing an existing guardrail" do
+      described_class.install(@app_root)
+      hook_path = File.join(@app_root, ".claude/hooks/rsc-app-safety-check.rb")
+      File.write(hook_path, "existing hook\n")
+      existing_stat = File.stat(hook_path)
+      allow(File).to receive(:chown).and_call_original
+
+      described_class.install(@app_root)
+
+      expect(File).to have_received(:chown).with(existing_stat.uid, existing_stat.gid, kind_of(String)).once
+      expect(File.stat(hook_path).uid).to eq(existing_stat.uid)
+      expect(File.stat(hook_path).gid).to eq(existing_stat.gid)
+    end
+
+    it "continues an atomic replacement when existing ownership cannot be applied" do
+      described_class.install(@app_root)
+      hook_path = File.join(@app_root, ".claude/hooks/rsc-app-safety-check.rb")
+      expected_content = File.read(hook_path)
+      File.write(hook_path, "existing hook\n")
+      allow(File).to receive(:chown).and_raise(Errno::EPERM)
+
+      expect { described_class.install(@app_root) }.not_to raise_error
+
+      expect(File.read(hook_path)).to eq(expected_content)
+      expect(Dir.children(File.dirname(hook_path))).not_to include(a_string_matching(/\.tmp\z/))
+    end
+
+    it "continues an atomic replacement when ownership changes are unsupported" do
+      described_class.install(@app_root)
+      hook_path = File.join(@app_root, ".claude/hooks/rsc-app-safety-check.rb")
+      expected_content = File.read(hook_path)
+      File.write(hook_path, "existing hook\n")
+      allow(File).to receive(:chown).and_raise(NotImplementedError)
+
+      expect { described_class.install(@app_root) }.not_to raise_error
+
+      expect(File.read(hook_path)).to eq(expected_content)
+      expect(Dir.children(File.dirname(hook_path))).not_to include(a_string_matching(/\.tmp\z/))
+    end
+
+    it "closes a temporary file before cleaning up a failed write" do
+      skill_directory = File.join(@app_root, ".claude/skills/rsc-app-safety")
+      write_error = Errno::EIO.new("failed guardrail write")
+      temporary_file = nil
+      allow(Tempfile).to receive(:create).and_wrap_original do |original, *args|
+        temporary_file = original.call(*args)
+        allow(temporary_file).to receive(:write).and_raise(write_error)
+        temporary_file
+      end
+      allow(FileUtils).to receive(:rm_f).and_wrap_original do |original, path|
+        expect(temporary_file).to be_closed
+        original.call(path)
+      end
+
+      expect { described_class.install(@app_root) }
+        .to raise_error(Errno::EIO) { |error| expect(error).to equal(write_error) }
+
+      expect(temporary_file).to be_closed
+      expect(Dir.children(skill_directory)).not_to include(a_string_matching(/\.tmp\z/))
+    end
+
+    it "updates a writable guardrail when its parent directory blocks atomic replacement" do
+      described_class.install(@app_root)
+      hook_path = File.join(@app_root, ".claude/hooks/rsc-app-safety-check.rb")
+      hook_directory = File.dirname(hook_path)
+      expected_content = File.read(hook_path)
+      File.write(hook_path, "existing hook\n")
+      File.chmod(0o700, hook_path)
+      File.chmod(0o555, hook_directory)
+
+      begin
+        expect { described_class.install(@app_root) }.not_to raise_error
+      ensure
+        File.chmod(0o755, hook_directory)
+      end
+
+      expect(File.read(hook_path)).to eq(expected_content)
+      expect(File.stat(hook_path).mode & 0o7777).to eq(0o755)
+      expect(Dir.children(hook_directory)).not_to include(a_string_matching(/\.tmp\z/))
+    end
+
+    it "does not replace a changed read-only guardrail through a writable parent" do
+      [
+        [".claude/skills/rsc-app-safety/SKILL.md", 0o444],
+        [".claude/hooks/rsc-app-safety-check.rb", 0o555]
+      ].each_with_index do |(relative_path, mode), index|
+        app_root = File.join(@app_root, index.to_s)
+        described_class.install(app_root)
+        path = File.join(app_root, relative_path)
+        original_content = "protected custom content\n"
+        original_mode = File.stat(path).mode & 0o7777
+        File.write(path, original_content)
+        File.chmod(mode, path)
+
+        begin
+          expect { described_class.install(app_root) }.to raise_error(Errno::EACCES)
+        ensure
+          File.chmod(original_mode, path)
+        end
+
+        expect(File.read(path)).to eq(original_content)
+        expect(Dir.children(File.dirname(path))).not_to include(a_string_matching(/\.tmp\z/))
+      end
+    end
+
+    it "leaves a writable hook unchanged when its executable mode cannot be prepared for fallback" do
+      described_class.install(@app_root)
+      hook_path = File.join(@app_root, ".claude/hooks/rsc-app-safety-check.rb")
+      hook_directory = File.dirname(hook_path)
+      File.write(hook_path, "existing hook\n")
+      File.chmod(0o555, hook_directory)
+      allow(File).to receive(:executable?).and_call_original
+      allow(File).to receive(:executable?).with(hook_path).and_return(false)
+      allow(File).to receive(:chmod).and_wrap_original do |original, mode, path|
+        raise Errno::EPERM, path if mode == 0o755 && path == hook_path
+
+        original.call(mode, path)
+      end
+
+      begin
+        expect { described_class.install(@app_root) }.to raise_error(Errno::EPERM)
+      ensure
+        File.chmod(0o755, hook_directory)
+      end
+
+      expect(File.read(hook_path)).to eq("existing hook\n")
+      expect(Dir.children(hook_directory)).not_to include(a_string_matching(/\.tmp\z/))
+    end
+
+    it "updates a symlinked guardrail target without replacing the symlink" do
+      described_class.install(@app_root)
+      skill_path = File.join(@app_root, ".claude/skills/rsc-app-safety/SKILL.md")
+      expected_content = File.read(skill_path)
+      shared_path = File.join(@app_root, "shared/rsc-app-safety-skill.md")
+      FileUtils.mkdir_p(File.dirname(shared_path))
+      File.write(shared_path, "stale shared content\n")
+      File.chmod(0o600, shared_path)
+      File.unlink(skill_path)
+      link_target = Pathname.new(shared_path).relative_path_from(Pathname.new(File.dirname(skill_path))).to_s
+      File.symlink(link_target, skill_path)
+
+      actions = described_class.install(@app_root)
+
+      expect(File.symlink?(skill_path)).to be true
+      expect(File.readlink(skill_path)).to eq(link_target)
+      expect(File.read(shared_path)).to eq(expected_content)
+      expect(File.stat(shared_path).mode & 0o7777).to eq(0o600)
+      expect(actions).to include("updated    .claude/skills/rsc-app-safety/SKILL.md")
+    end
+
+    it "rejects every managed symlink whose write target escapes the destination root" do
+      managed_paths = described_class::FILES.values + [described_class::SETTINGS_REL]
+
+      managed_paths.each_with_index do |relative_path, index|
+        app_root = File.join(@app_root, "app-#{index}")
+        destination_path = File.join(app_root, relative_path)
+        outside_path = File.join(@app_root, "outside-#{index}", File.basename(relative_path))
+        original_content = relative_path == described_class::SETTINGS_REL ? "{}\n" : "outside content\n"
+        FileUtils.mkdir_p(File.dirname(destination_path))
+        FileUtils.mkdir_p(File.dirname(outside_path))
+        File.write(outside_path, original_content)
+        File.symlink(outside_path, destination_path)
+
+        expect { described_class.install(app_root) }
+          .to raise_error(described_class::Error, /resolves outside the destination root/)
+
+        expect(File.symlink?(destination_path)).to be true
+        expect(File.read(outside_path)).to eq(original_content)
+      end
+    end
+
+    it "rejects a managed write through an ancestor symlink that escapes the destination root" do
+      app_root = File.join(@app_root, "app")
+      outside_claude_directory = File.join(@app_root, "outside-claude")
+      FileUtils.mkdir_p(app_root)
+      FileUtils.mkdir_p(outside_claude_directory)
+      File.symlink(outside_claude_directory, File.join(app_root, ".claude"))
+
+      expect { described_class.install(app_root) }
+        .to raise_error(described_class::Error, /resolves outside the destination root/)
+
+      expect(Dir.children(outside_claude_directory)).to be_empty
+    end
+
+    it "does not treat a different Windows volume as contained by a drive root" do
+      write_path = described_class.const_get(:WritePath)
+      allow(File).to receive(:dirname).with("C:/").and_return("C:/")
+
+      expect(write_path.send(:within_destination_root?, "D:/outside/settings.json", "C:/")).to be false
+    end
+
+    it "canonicalizes the casing of an existing symlink target before checking containment" do
+      write_path = described_class.const_get(:WritePath)
+      managed_path = "/tmp/App/.claude/settings.json"
+      differently_cased_target = "/tmp/app/shared/settings.json"
+      canonical_target = "/tmp/App/shared/settings.json"
+      allow(File).to receive(:symlink?).and_call_original
+      allow(File).to receive(:symlink?).with(managed_path).and_return(true)
+      allow(File).to receive(:realdirpath).with(managed_path).and_return(differently_cased_target)
+      allow(File).to receive(:exist?).with(differently_cased_target).and_return(true)
+      allow(File).to receive(:realpath).with(differently_cased_target).and_return(canonical_target)
+
+      expect(write_path.send(:resolve, managed_path)).to eq(canonical_target)
+    end
+
+    it "creates a missing symlink target without replacing the symlink" do
+      described_class.install(@app_root)
+      skill_path = File.join(@app_root, ".claude/skills/rsc-app-safety/SKILL.md")
+      expected_content = File.read(skill_path)
+      shared_path = File.join(@app_root, "shared/rsc-app-safety-skill.md")
+      FileUtils.mkdir_p(File.dirname(shared_path))
+      File.unlink(skill_path)
+      link_target = Pathname.new(shared_path).relative_path_from(Pathname.new(File.dirname(skill_path))).to_s
+      File.symlink(link_target, skill_path)
+
+      actions = described_class.install(@app_root)
+
+      expect(File.symlink?(skill_path)).to be true
+      expect(File.readlink(skill_path)).to eq(link_target)
+      expect(File.read(shared_path)).to eq(expected_content)
+      expect(actions).to include("updated    .claude/skills/rsc-app-safety/SKILL.md")
+    end
+
+    it "skips a guardrail destination that is a dangling symlink" do
+      described_class.install(@app_root)
+      skill_path = File.join(@app_root, ".claude/skills/rsc-app-safety/SKILL.md")
+      shared_path = File.join(@app_root, "shared/rsc-app-safety-skill.md")
+      FileUtils.mkdir_p(File.dirname(shared_path))
+      File.unlink(skill_path)
+      link_target = Pathname.new(shared_path).relative_path_from(Pathname.new(File.dirname(skill_path))).to_s
+      File.symlink(link_target, skill_path)
+
+      actions = described_class.install(@app_root, skip_existing: true)
+
+      expect(File.symlink?(skill_path)).to be true
+      expect(File.exist?(shared_path)).to be false
+      expect(actions).to include("skipped    .claude/skills/rsc-app-safety/SKILL.md (already exists)")
+    end
+
+    it "keeps the copy permissions contract when creating guardrail files" do
+      previous_umask = File.umask(0o077)
+      begin
+        described_class.install(@app_root)
+      ensure
+        File.umask(previous_umask)
+      end
+
+      skill_path = File.join(@app_root, ".claude/skills/rsc-app-safety/SKILL.md")
+      hook_path = File.join(@app_root, ".claude/hooks/rsc-app-safety-check.rb")
+      expect(File.stat(skill_path).mode & 0o7777).to eq(0o600)
+      expect(File.stat(hook_path).mode & 0o7777).to eq(0o755)
     end
 
     it "parses Claude hook input without requiring jq" do
@@ -732,6 +1063,53 @@ module ReactOnRails
       )
     end
 
+    it "removes hook groups emptied by an upgrade without changing unrelated settings" do
+      claude_dir = File.join(@app_root, ".claude")
+      settings_path = File.join(claude_dir, "settings.json")
+      FileUtils.mkdir_p(claude_dir)
+      unrelated_hook = { "type" => "command", "command" => "bin/unrelated-hook" }
+      pre_tool_use = [{ "matcher" => "Bash", "hooks" => [{ "type" => "command", "command" => "bin/pre-hook" }] }]
+      File.write(
+        settings_path,
+        JSON.pretty_generate(
+          "model" => "opus",
+          "hooks" => {
+            "PreToolUse" => pre_tool_use,
+            "PostToolUse" => [
+              {
+                "matcher" => "Bash",
+                "hooks" => [{ "type" => "command", "command" => described_class::LEGACY_HOOK_COMMAND }]
+              },
+              { "matcher" => "Read", "hooks" => [] },
+              {
+                "matcher" => "NotebookEdit",
+                "hooks" => [
+                  { "type" => "command", "command" => described_class::LEGACY_HOOK_COMMAND },
+                  unrelated_hook
+                ]
+              },
+              { "matcher" => "Edit|Write", "hooks" => [unrelated_hook] }
+            ]
+          }
+        )
+      )
+
+      described_class.install(@app_root)
+
+      expect(settings["model"]).to eq("opus")
+      expect(settings.dig("hooks", "PreToolUse")).to eq(pre_tool_use)
+      expect(settings.dig("hooks", "PostToolUse")).to include("matcher" => "Read", "hooks" => [])
+      expect(settings.dig("hooks", "PostToolUse")).not_to include(include("matcher" => "Bash"))
+      expect(settings.dig("hooks", "PostToolUse")).to include(
+        "matcher" => "NotebookEdit", "hooks" => [unrelated_hook]
+      )
+      expect(settings.dig("hooks", "PostToolUse").find { |entry| entry["matcher"] == "Edit|Write" }["hooks"])
+        .to include(unrelated_hook)
+      expect(rsc_hooks).to contain_exactly(
+        "type" => "command", "command" => described_class::HOOK_COMMAND, "args" => described_class::HOOK_ARGS
+      )
+    end
+
     it "merges into an existing settings.json without clobbering other hooks" do
       claude_dir = File.join(@app_root, ".claude")
       FileUtils.mkdir_p(claude_dir)
@@ -816,6 +1194,24 @@ module ReactOnRails
       expect(Dir.children(File.dirname(settings_path))).not_to include(a_string_matching(/\.tmp\z/))
     end
 
+    it "does not fall back to an in-place settings write when its parent blocks atomic replacement" do
+      described_class.install(@app_root)
+      settings_path = File.join(@app_root, ".claude/settings.json")
+      settings_directory = File.dirname(settings_path)
+      existing_content = "{\n  \"unrelated\": true\n}\n"
+      File.write(settings_path, existing_content)
+      File.chmod(0o555, settings_directory)
+
+      begin
+        expect { described_class.install(@app_root) }.to raise_error(Errno::EACCES)
+      ensure
+        File.chmod(0o755, settings_directory)
+      end
+
+      expect(File.read(settings_path)).to eq(existing_content)
+      expect(Dir.children(settings_directory)).not_to include(a_string_matching(/\.tmp\z/))
+    end
+
     it "preserves the permissions of an existing settings.json across an update" do
       settings_path = File.join(@app_root, ".claude/settings.json")
       FileUtils.mkdir_p(File.dirname(settings_path))
@@ -826,6 +1222,51 @@ module ReactOnRails
 
       expect(File.stat(settings_path).mode & 0o7777).to eq(0o600)
       expect(rsc_hooks.size).to eq(1)
+    end
+
+    it "updates a symlinked settings.json target without replacing the symlink" do
+      settings_path = File.join(@app_root, ".claude/settings.json")
+      shared_path = File.join(@app_root, "shared/settings.json")
+      FileUtils.mkdir_p(File.dirname(settings_path))
+      FileUtils.mkdir_p(File.dirname(shared_path))
+      File.write(shared_path, "{}\n")
+      link_target = Pathname.new(shared_path).relative_path_from(Pathname.new(File.dirname(settings_path))).to_s
+      File.symlink(link_target, settings_path)
+
+      described_class.install(@app_root)
+
+      expect(File.symlink?(settings_path)).to be true
+      expect(File.readlink(settings_path)).to eq(link_target)
+      expect(JSON.parse(File.read(shared_path)).dig("hooks", "PostToolUse")).not_to be_empty
+      expect(rsc_hooks.size).to eq(1)
+    end
+
+    it "uses the settings symlink target that was resolved before guardrail files were copied" do
+      settings_path = File.join(@app_root, ".claude/settings.json")
+      shared_path = File.join(@app_root, "shared/settings.json")
+      FileUtils.mkdir_p(File.dirname(settings_path))
+      FileUtils.mkdir_p(File.dirname(shared_path))
+      File.write(shared_path, "{}\n")
+      File.symlink(shared_path, settings_path)
+      allow(File).to receive(:realdirpath).and_call_original
+
+      described_class.install(@app_root)
+
+      expect(File).to have_received(:realdirpath).with(settings_path).once
+      expect(rsc_hooks.size).to eq(1)
+    end
+
+    it "validates a symlinked settings write target before copying guardrails" do
+      settings_path = File.join(@app_root, ".claude/settings.json")
+      shared_path = File.join(@app_root, "shared/config/settings.json")
+      FileUtils.mkdir_p(File.dirname(settings_path))
+      link_target = Pathname.new(shared_path).relative_path_from(Pathname.new(File.dirname(settings_path))).to_s
+      File.symlink(link_target, settings_path)
+
+      expect { described_class.install(@app_root) }.to raise_error(Errno::ENOENT)
+
+      expect(File.exist?(File.join(@app_root, ".claude/skills/rsc-app-safety/SKILL.md"))).to be false
+      expect(File.exist?(File.join(@app_root, ".claude/hooks/rsc-app-safety-check.rb"))).to be false
     end
 
     describe ".default_destination_root" do
