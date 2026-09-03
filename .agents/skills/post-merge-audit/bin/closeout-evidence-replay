@@ -34,6 +34,7 @@ module CloseoutEvidenceReplay
   MEASUREMENT_VALUE = %r{([-+]?\d+(?:\.\d+)?)([A-Za-z%]+(?:/[A-Za-z]+)?)}i
   EPHEMERAL_ARTIFACT_SCHEME = /\b(?:about|blob|chrome-extension|data|file|filesystem|ftp|http|mediastream|moz-extension):/i
   UNRESOLVED_PLACEHOLDER = %r{\b(?:missing|unavailable|unmeasured|unknown|not[ _](?:available|measured))\b|n/a}i
+  EVIDENCE_MODIFIERS = '(?:(?:actually|clearly|completely|entirely|fully|obviously|really|still|visibly)\s+){0,2}'
 
   def run(argv)
     options, parser = parse_options(argv)
@@ -451,7 +452,7 @@ module CloseoutEvidenceReplay
 
   def failed_visual_artifact_claim?(value)
     value.match?(
-      /\b(?:(?:blank|unpainted)\s+(?:capture|frame|image|page|screenshot)|(?:capture|frame|image|page|screenshot)\s+(?:(?:is|was|remained|looks?|appears?)\s+)?(?:blank|unpainted))\b/i
+      /\b(?:(?:blank|unpainted)\s+(?:capture|frame|image|page|screenshot)|(?:capture|frame|image|page|screenshot)\s+(?:(?:is|was|remained|looks?|appears?)\s+#{EVIDENCE_MODIFIERS})?(?:blank|unpainted))\b/i
     )
   end
 
@@ -460,12 +461,12 @@ module CloseoutEvidenceReplay
       value.match?(/\b(?:painted|rendered)\b/i) &&
       !affirmative_blank_or_unpainted_claim?(value) &&
       !value.match?(
-        /\b(?:not\s+(?:painted|rendered)|(?:did\s+not|never)\s+(?:paint|render)(?:ed)?|failed\s+to\s+(?:paint|render)|(?:paint|render)(?:ing)?\s+fail(?:ed|s|ure)?|(?:painted|rendered)\s+unsuccessfully|unsuccessfully\s+(?:painted|rendered))\b/i
+        /\b(?:not\s+#{EVIDENCE_MODIFIERS}(?:painted|rendered)|(?:did\s+not|never)\s+#{EVIDENCE_MODIFIERS}(?:paint|render)(?:ed)?|failed\s+to\s+(?:paint|render)|(?:paint|render)(?:ing)?\s+fail(?:ed|s|ure)?|(?:painted|rendered)\s+unsuccessfully|unsuccessfully\s+(?:painted|rendered))\b/i
       )
   end
 
   def affirmative_blank_or_unpainted_claim?(value)
-    value.gsub(/\b(?:not|never)\s+(?:blank|unpainted)\b/i, "")
+    value.gsub(/\b(?:not|never)\s+#{EVIDENCE_MODIFIERS}(?:blank|unpainted)\b/i, "")
          .match?(/\b(?:blank|unpainted)\b/i)
   end
 
@@ -544,7 +545,7 @@ module CloseoutEvidenceReplay
   end
 
   def negated_or_passing_failure_claim?(value)
-    value.match?(/\b(?:(?:did\s+not|didn['’]t|never)\s+(?:fail(?:ed)?|error|assert|mismatch)|not\s+fail(?:ed|ing)?|no\s+(?:failure|error|mismatch)s?|without\s+(?:failure|error|mismatch)s?)\b/i) ||
+    value.match?(/\b(?:(?:did\s+not|didn['’]t|never)\s+#{EVIDENCE_MODIFIERS}(?:fail(?:ed)?|error|assert|mismatch)|not\s+#{EVIDENCE_MODIFIERS}fail(?:ed|ing)?|no\s+(?:failure|error|mismatch)s?|without\s+(?:failure|error|mismatch)s?)\b/i) ||
       value.match?(/\b(?:no\s+longer\s+fail(?:ed|s|ing)?|stopp(?:ed|ing)\s+fail(?:ing)?|fail(?:ed|s)?\s+no\s+more)\b/i) ||
       value.match?(/\b(?:assert(?:ion)?|control|negative\s+control|run|test|check)\s+(?:(?:is|was|were|been)\s+)?(?:now\s+)?(?:pass(?:ed|es)?|succeed(?:ed|s)?|successful)\b/i) ||
       value.match?(/\A(?:pass(?:ed|es)?|succeed(?:ed|s)?|successful)\b/i)
