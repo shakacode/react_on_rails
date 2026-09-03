@@ -2206,6 +2206,22 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         end
       end
 
+      it "closes the fixed-lock handle when locking and unlocking it raise" do
+        root = app_root("fixed-lock-read-error")
+        fixed_lock = File.open(session_lock_path(root), File::RDWR | File::CREAT, 0o644)
+        handles << fixed_lock
+        allow(described_class).to receive(:open_existing_or_create_dev_session_lock).and_return(fixed_lock)
+        allow(fixed_lock).to receive(:flock).and_raise(Errno::EIO)
+
+        outcome, message = described_class.send(:open_dev_session_read_lock, root)
+
+        aggregate_failures do
+          expect(outcome).to eq(:refused)
+          expect(message).to include("Errno::EIO")
+          expect(fixed_lock).to be_closed
+        end
+      end
+
       it "stops a session when its existing ownership lock is not writable" do
         skip "file permissions are not enforceable for root" if Process.euid.zero?
 
@@ -2235,6 +2251,33 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         aggregate_failures do
           expect(output).to include("Refusing to signal anything")
           expect(output).to include("not a regular file")
+        end
+      end
+
+      it "releases both session handles when inspecting session state raises IOError" do
+        root = app_root("session-read-error")
+        write_session(root)
+        session_handle = File.open(session_path(root), File::RDONLY)
+        handles << session_handle
+        allow(session_handle).to receive(:stat).and_raise(IOError, "forced read failure")
+        allow(File).to receive(:open).and_wrap_original do |original, *args, **kwargs, &block|
+          if args.first == session_path(root)
+            session_handle
+          else
+            original.call(*args, **kwargs, &block)
+          end
+        end
+
+        output = kill_in(root)
+        fixed_lock_available = File.open(session_lock_path(root), File::RDWR) do |file|
+          file.flock(File::LOCK_EX | File::LOCK_NB)
+        end
+
+        aggregate_failures do
+          expect(output).to include("Refusing to signal anything")
+          expect(output).to include("IOError")
+          expect(session_handle).to be_closed
+          expect(fixed_lock_available).to eq(0)
         end
       end
 

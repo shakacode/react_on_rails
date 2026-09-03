@@ -669,9 +669,14 @@ module ReactOnRails
           return if file.nil? || file.closed?
 
           file.flock(File::LOCK_UN)
-          file.close
         rescue SystemCallError, IOError
           nil
+        ensure
+          begin
+            file.close unless file.nil? || file.closed?
+          rescue SystemCallError, IOError
+            nil
+          end
         end
 
         def write_dev_session(path, root)
@@ -931,6 +936,7 @@ module ReactOnRails
         rescue Errno::EISDIR
           [:refused, "#{path} is not a regular file, so dev session ownership cannot be trusted"]
         rescue SystemCallError, IOError => e
+          release_dev_session_lock(file)
           [:refused, "could not lock #{path} to determine dev session ownership (#{e.class})"]
         end
 
@@ -987,7 +993,8 @@ module ReactOnRails
           [:refused, "#{path} is a symlink; dev session state must be a regular file"]
         rescue Errno::ENOENT
           [:absent, nil]
-        rescue SystemCallError => e
+        rescue SystemCallError, IOError => e
+          release_dev_session_lock(file)
           [:refused, "could not open #{path} to determine dev session ownership (#{e.class})"]
         end
 
