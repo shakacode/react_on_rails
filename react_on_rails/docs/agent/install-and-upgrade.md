@@ -89,6 +89,9 @@ Review the generated initializer, Shakapacker configuration, scripts, routes, an
    `https://github.com/shakacode/react_on_rails/tree/v<GEM_TARGET_VERSION>`. Compare the complete
    `CURRENT_VERSION..GEM_TARGET_VERSION` release range before changing dependencies:
    `https://github.com/shakacode/react_on_rails/compare/v<CURRENT_VERSION>...v<GEM_TARGET_VERSION>`.
+   For Pro apps, treat `ReactOnRailsProHelper` methods as internal rather than stable extension points. If the app
+   prepends or overrides a Pro helper, compare its method signature between the exact tags and update the override
+   before running streamed SSR or RSC tests.
 
 ## JavaScript target matrix
 

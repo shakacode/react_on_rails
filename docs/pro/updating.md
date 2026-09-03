@@ -57,6 +57,22 @@ string directly into `Gemfile`), the install will fail because no package exists
 under that spelling. Substitute `.` for `-` (or `-` for `.`) when crossing the
 language boundary.
 
+### Compare exact prerelease tags
+
+When you upgrade between prereleases, review the changes between the exact tags. Use Ruby/tag dot notation for both
+placeholders in
+`https://github.com/shakacode/react_on_rails/compare/v<CURRENT_VERSION>...v<TARGET_VERSION>`.
+The release notes summarize the release line, but the tag comparison shows the RC-to-RC changes that apply to your
+current pin.
+
+### Custom overrides of Pro helpers
+
+Methods in `ReactOnRailsProHelper` are internal implementation details, not stable extension points. An application
+that uses `prepend` or otherwise overrides a Pro helper method must re-check the method signature for every upgrade.
+
+Prefer documented configuration and helper APIs. If an internal override is unavoidable, compare the exact release
+tags, update the override signature, and run the application's streamed SSR and RSC tests before deployment.
+
 ### Strict version pinning
 
 Use exact version constraints on both sides — never `^`, `~`, or `*`. Semver
