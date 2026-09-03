@@ -187,7 +187,7 @@ class CloseoutEvidenceReplayTest < Minitest::Test
 
     qa = data.fetch("qa_evidence")
     assert_equal "UNKNOWN", qa.fetch("verdict")
-    assert_includes qa.fetch("missing"), "qa-evidence v2 marker required for current user-visible UI evidence"
+    assert_equal ["qa-evidence v2 marker required for current user-visible UI evidence"], qa.fetch("missing")
   end
 
   def test_strict_v2_gate_rejects_marker_name_suffixes
@@ -593,6 +593,14 @@ class CloseoutEvidenceReplayTest < Minitest::Test
     refute_includes qa.fetch("missing"), "visual_evidence.local_reference"
   end
 
+  def test_v2_contextual_slash_label_handling_preserves_local_paths
+    evidence = "durable: before and after assets/baseline screenshots https://github.com/example/repo/pull/123#visual"
+    qa = run_replay(v2_marker("visual_evidence" => evidence)).fetch("qa_evidence")
+
+    assert_equal "UNKNOWN", qa.fetch("verdict")
+    assert_includes qa.fetch("missing"), "visual_evidence.local_reference"
+  end
+
   def test_v2_allows_documented_and_common_slash_separated_labels
     %w[before/after baseline/candidate pass/fail on/off yes/no].each do |label|
       evidence = "durable: before and after #{label} composite https://github.com/example/repo/pull/123#visual"
@@ -692,6 +700,7 @@ class CloseoutEvidenceReplayTest < Minitest::Test
     invalid_evidence = [
       "durable: before was unavailable; after https://github.com/example/repo/pull/123#visual",
       "durable: before wasn't available; after https://github.com/example/repo/pull/123#visual",
+      "durable: before and after screenshots weren't available https://github.com/example/repo/pull/123#visual",
       "durable: before https://github.com/example/repo/pull/123#visual; after capture missing",
       "durable: baseline was not captured; candidate https://github.com/example/repo/pull/123#visual"
     ]
@@ -745,6 +754,7 @@ class CloseoutEvidenceReplayTest < Minitest::Test
       "passed: rendered",
       "passed: painted successfully",
       "passed: target was unable to render; baseline rendered and inspected",
+      "passed: target wasn't able to render; baseline rendered and inspected",
       "passed: rendered screenshot could not be inspected",
       "passed: rendered screenshot wasn't inspected",
       "passed: rendered screenshot, inspection was skipped"
@@ -944,6 +954,8 @@ class CloseoutEvidenceReplayTest < Minitest::Test
       "observed_failure: run succeeded",
       "observed_failure: assertion was successful",
       "observed_failure: expected output matched",
+      "observed_failure: assertion expected 1 got 1",
+      "observed_failure: assertion expected 1 actual 1",
       "observed_failure: everything was okay"
     ]
 
@@ -999,7 +1011,9 @@ class CloseoutEvidenceReplayTest < Minitest::Test
   def test_v2_negative_control_accepts_assertion_failure_description
     valid_evidence = [
       "observed_failure: assertion expected 1 but got 2",
-      "observed_failure: assertion expected 1, got 2"
+      "observed_failure: assertion expected 1, got 2",
+      "observed_failure: assertions expected 1 but got 2",
+      "observed_failure: assertion expected 1 actual 2"
     ]
 
     valid_evidence.each do |evidence|

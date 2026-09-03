@@ -126,7 +126,13 @@ module CloseoutEvidenceReplay
       else
         replay_qa_markers(qa_v1_markers, expected_head_sha: expected_head_sha, version: 1)
       end
-    strict_qa_results = qa.fetch("markers", [qa])
+    strict_qa_results = if qa.key?("markers")
+                          qa.fetch("markers")
+                        elsif qa.fetch("fields", {}).any?
+                          [qa]
+                        else
+                          []
+                        end
     invalid_ui_marker_indexes = strict_qa_results.each_index.reject do |index|
       strict_qa_results.fetch(index).dig("fields", "user_visible_ui_change") == "yes"
     end
@@ -441,7 +447,7 @@ module CloseoutEvidenceReplay
 
   def missing_visual_artifact_claim?(value)
     value.match?(
-      /\b(?:baseline|before|candidate|after)\b#{CLAUSE_GAP}\b(?:unavailable|missing|not\s+(?:available|captured|recorded|provided|attached)|wasn['’]t\s+(?:available|captured|recorded|provided|attached))\b/i
+      /\b(?:baseline|before|candidate|after)\b#{CLAUSE_GAP}\b(?:unavailable|missing|not\s+(?:available|captured|recorded|provided|attached)|(?:is|are|was|were)n['’]t\s+(?:available|captured|recorded|provided|attached))\b/i
     )
   end
 
@@ -482,7 +488,7 @@ module CloseoutEvidenceReplay
 
   def without_schema_slash_labels(value)
     value.gsub(
-      %r{(\b(?:before\s+and\s+after|baseline\s+and\s+candidate)\s+)[[:alpha:]]++/[[:alpha:]]++(?=\s+(?:screenshots?|captures?|images?|views?|layouts?|modes?|variants?|composites?)\b)}i
+      %r{(\b(?:before\s+and\s+after|baseline\s+and\s+candidate)\s+)(?:light/dark|mobile/desktop|before/after|baseline/candidate|pass/fail|on/off|yes/no)(?=\s+(?:screenshots?|captures?|images?|views?|layouts?|modes?|variants?|composites?)\b)}i
     ) { Regexp.last_match(1) }
   end
 
@@ -493,7 +499,7 @@ module CloseoutEvidenceReplay
   end
 
   def valid_paint_check?(value)
-    paint_state_gap = "(?:\\s+(?:seem(?:ed)?|appear(?:ed)?|look(?:ed)?|to|be|have|been|[[:alpha:]]+ly))*\\s+"
+    paint_state_gap = "(?:\\s+(?:seem(?:ed)?|appear(?:ed)?|look(?:ed)?|to|be|have|been|able|[[:alpha:]]+ly))*\\s+"
     value.start_with?("passed:") &&
       value.match?(/\b(?:painted|rendered)\b/i) &&
       value.match?(/\b(?:inspected|reviewed|verified)\b/i) &&
@@ -669,7 +675,19 @@ module CloseoutEvidenceReplay
 
   def affirmative_failure_claim?(value)
     explicit_affirmative_failure_clause?(value) ||
-      value.match?(/\bassert(?:ion)?\b[^.!?;\n]*\bexpected\b[^.!?;\n]*\b(?:got|received|actual)\b/i)
+      assertion_value_mismatch_claim?(value)
+  end
+
+  def assertion_value_mismatch_claim?(value)
+    match = [
+      /\bassert(?:ion)?s?\b[^.!?;\n]*?\bexpected\s+(\S+?)(?:\s+but|,)?\s+(?:got|received)\s+(\S+)/i,
+      /\bassert(?:ion)?s?\b[^.!?;\n]*?\bexpected\s+(\S+?)(?:\s+but|,)?\s+actual(?:\s+(?:was|=))?\s+(\S+)/i
+    ].filter_map { |pattern| value.match(pattern) }.first
+    return false unless match
+
+    expected = match[1].sub(/[,.!?]+\z/, "")
+    actual = match[2].sub(/[,.!?]+\z/, "")
+    expected != actual
   end
 
   def valid_bundle_hygiene?(value)
