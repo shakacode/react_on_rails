@@ -57,7 +57,10 @@ string directly into `Gemfile`), the install will fail because no package exists
 under that spelling. Substitute `.` for `-` (or `-` for `.`) when crossing the
 language boundary.
 
-When you upgrade between prereleases, review the changes between the exact tags. Use
+### Compare exact prerelease tags
+
+When you upgrade between prereleases, review the changes between the exact tags. Use Ruby/tag dot notation for both
+placeholders in
 `https://github.com/shakacode/react_on_rails/compare/v<CURRENT_VERSION>...v<TARGET_VERSION>`.
 The release notes summarize the release line, but the tag comparison shows the RC-to-RC changes that apply to your
 current pin.
@@ -66,9 +69,6 @@ current pin.
 
 Methods in `ReactOnRailsProHelper` are internal implementation details, not stable extension points. An application
 that uses `prepend` or otherwise overrides a Pro helper method must re-check the method signature for every upgrade.
-For example, React on Rails Pro 17.1 added the `on_chunk_errors:` keyword to
-`build_react_component_result_for_server_streamed_content`. An override with the older signature raises
-`ArgumentError: unknown keyword: :on_chunk_errors` during streamed rendering.
 
 Prefer documented configuration and helper APIs. If an internal override is unavoidable, compare the exact release
 tags, update the override signature, and run the application's streamed SSR and RSC tests before deployment.
