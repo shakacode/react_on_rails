@@ -181,6 +181,24 @@ module ReactOnRails
       expect(Dir.children(File.dirname(hook_path))).not_to include(a_string_matching(/\.tmp\z/))
     end
 
+    it "updates a writable guardrail when its parent directory blocks atomic replacement" do
+      described_class.install(@app_root)
+      hook_path = File.join(@app_root, ".claude/hooks/rsc-app-safety-check.rb")
+      hook_directory = File.dirname(hook_path)
+      expected_content = File.read(hook_path)
+      File.write(hook_path, "existing hook\n")
+      File.chmod(0o555, hook_directory)
+
+      begin
+        expect { described_class.install(@app_root) }.not_to raise_error
+      ensure
+        File.chmod(0o755, hook_directory)
+      end
+
+      expect(File.read(hook_path)).to eq(expected_content)
+      expect(Dir.children(hook_directory)).not_to include(a_string_matching(/\.tmp\z/))
+    end
+
     it "updates a symlinked guardrail target without replacing the symlink" do
       described_class.install(@app_root)
       skill_path = File.join(@app_root, ".claude/skills/rsc-app-safety/SKILL.md")

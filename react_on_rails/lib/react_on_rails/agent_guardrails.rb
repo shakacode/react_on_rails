@@ -63,6 +63,34 @@ module ReactOnRails
     end
     private_constant :FileOwnership
 
+    module FileWriter
+      module_function
+
+      # Prefer rename over truncate-and-write so interrupted writes cannot leave a partial destination.
+      # Existing writable files retain the old in-place behavior when directory permissions block replacement.
+      def write(path, content, new_file_mode: 0o644)
+        existing_stat = File.stat(path) if File.exist?(path)
+        temp = Tempfile.create([".#{File.basename(path)}", ".tmp"], File.dirname(path))
+        begin
+          temp.write(content)
+          temp.flush
+          temp.fsync
+          temp.close
+          FileOwnership.preserve(existing_stat, temp.path)
+          File.chmod(existing_stat ? existing_stat.mode & 0o7777 : new_file_mode, temp.path)
+          File.rename(temp.path, path)
+        rescue StandardError
+          FileUtils.rm_f(temp.path)
+          raise
+        end
+      rescue Errno::EACCES, Errno::EPERM
+        raise unless existing_stat
+
+        File.write(path, content)
+      end
+    end
+    private_constant :FileWriter
+
     # Encapsulates a single install run against one app root.
     class Installer
       def initialize(destination_root, skip_existing: false)
@@ -113,8 +141,8 @@ module ReactOnRails
         unchanged = File.exist?(dest_path) && File.read(dest_path) == new_content
 
         unless unchanged
-          FileUtils.mkdir_p(File.dirname(dest_path))
-          atomic_write(write_path, new_content, new_file_mode: 0o666 & ~File.umask)
+          FileUtils.mkdir_p(File.dirname(write_path))
+          FileWriter.write(write_path, new_content, new_file_mode: 0o666 & ~File.umask)
         end
         File.chmod(0o755, write_path) if dest_rel == HOOK_REL
 
@@ -133,7 +161,7 @@ module ReactOnRails
         add_hook(settings)
         FileUtils.mkdir_p(File.dirname(settings_path))
         existed = path_entry_exists?(settings_path)
-        atomic_write(settings_write_path, "#{JSON.pretty_generate(settings)}\n")
+        FileWriter.write(settings_write_path, "#{JSON.pretty_generate(settings)}\n")
         existed ? "updated    #{SETTINGS_REL} (registered hook)" : "created    #{SETTINGS_REL} (registered hook)"
       end
 
@@ -145,25 +173,6 @@ module ReactOnRails
         return path unless File.symlink?(path)
 
         File.realdirpath(path)
-      end
-
-      # Files are replaced by rename rather than truncate-and-write so an interrupted or failed write
-      # can never leave a half-written or empty destination behind.
-      def atomic_write(path, content, new_file_mode: 0o644)
-        existing_stat = File.stat(path) if File.exist?(path)
-        temp = Tempfile.create([".#{File.basename(path)}", ".tmp"], File.dirname(path))
-        begin
-          temp.write(content)
-          temp.flush
-          temp.fsync
-          temp.close
-          FileOwnership.preserve(existing_stat, temp.path)
-          File.chmod(existing_stat ? existing_stat.mode & 0o7777 : new_file_mode, temp.path)
-          File.rename(temp.path, path)
-        rescue StandardError
-          FileUtils.rm_f(temp.path)
-          raise
-        end
       end
 
       def remove_legacy_hook
