@@ -57,7 +57,7 @@ module ReactOnRails
         return unless existing_stat
 
         File.chown(existing_stat.uid, existing_stat.gid, path)
-      rescue Errno::EPERM, Errno::EINVAL
+      rescue Errno::EPERM, Errno::EINVAL, NotImplementedError
         nil
       end
     end
@@ -88,7 +88,7 @@ module ReactOnRails
           File.rename(temp.path, path)
           :atomic
         rescue StandardError
-          FileUtils.rm_f(temp.path)
+          cleanup_tempfile(temp)
           raise
         end
       rescue Errno::EACCES, Errno::EPERM
@@ -112,7 +112,24 @@ module ReactOnRails
 
         File.chmod(0o755, path)
       end
-      private_class_method :prepare_in_place
+
+      def cleanup_tempfile(temp)
+        close_tempfile(temp)
+        remove_tempfile(temp.path)
+      end
+
+      def close_tempfile(temp)
+        temp.close unless temp.closed?
+      rescue StandardError
+        nil
+      end
+
+      def remove_tempfile(path)
+        FileUtils.rm_f(path)
+      rescue StandardError
+        nil
+      end
+      private_class_method :prepare_in_place, :cleanup_tempfile, :close_tempfile, :remove_tempfile
     end
     private_constant :FileWriter
 

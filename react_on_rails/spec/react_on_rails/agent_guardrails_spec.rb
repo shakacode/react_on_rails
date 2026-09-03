@@ -202,6 +202,40 @@ module ReactOnRails
       expect(Dir.children(File.dirname(hook_path))).not_to include(a_string_matching(/\.tmp\z/))
     end
 
+    it "continues an atomic replacement when ownership changes are unsupported" do
+      described_class.install(@app_root)
+      hook_path = File.join(@app_root, ".claude/hooks/rsc-app-safety-check.rb")
+      expected_content = File.read(hook_path)
+      File.write(hook_path, "existing hook\n")
+      allow(File).to receive(:chown).and_raise(NotImplementedError)
+
+      expect { described_class.install(@app_root) }.not_to raise_error
+
+      expect(File.read(hook_path)).to eq(expected_content)
+      expect(Dir.children(File.dirname(hook_path))).not_to include(a_string_matching(/\.tmp\z/))
+    end
+
+    it "closes a temporary file before cleaning up a failed write" do
+      skill_directory = File.join(@app_root, ".claude/skills/rsc-app-safety")
+      write_error = Errno::EIO.new("failed guardrail write")
+      temporary_file = nil
+      allow(Tempfile).to receive(:create).and_wrap_original do |original, *args|
+        temporary_file = original.call(*args)
+        allow(temporary_file).to receive(:write).and_raise(write_error)
+        temporary_file
+      end
+      allow(FileUtils).to receive(:rm_f).and_wrap_original do |original, path|
+        expect(temporary_file).to be_closed
+        original.call(path)
+      end
+
+      expect { described_class.install(@app_root) }
+        .to raise_error(Errno::EIO) { |error| expect(error).to equal(write_error) }
+
+      expect(temporary_file).to be_closed
+      expect(Dir.children(skill_directory)).not_to include(a_string_matching(/\.tmp\z/))
+    end
+
     it "updates a writable guardrail when its parent directory blocks atomic replacement" do
       described_class.install(@app_root)
       hook_path = File.join(@app_root, ".claude/hooks/rsc-app-safety-check.rb")
