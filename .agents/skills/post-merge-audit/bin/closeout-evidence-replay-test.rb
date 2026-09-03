@@ -718,6 +718,7 @@ class CloseoutEvidenceReplayTest < Minitest::Test
       "observed_failure: completed without mismatches",
       "observed_failure: assert did not error",
       "observed_failure: assertion never failed",
+      "observed_failure: failure not observed in this run",
       "observed_failure: completed without mismatch",
       "observed_failure: assertion no longer fails",
       "observed_failure: assertion stopped failing",

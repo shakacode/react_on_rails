@@ -546,6 +546,7 @@ module CloseoutEvidenceReplay
 
   def negated_or_passing_failure_claim?(value)
     value.match?(/\b(?:(?:did\s+not|didn['’]t|never)\s+#{EVIDENCE_MODIFIERS}(?:fail(?:ed)?|error|assert|mismatch)|not\s+#{EVIDENCE_MODIFIERS}fail(?:ed|ing)?|no\s+(?:failure|error|mismatch)s?|without\s+(?:failure|error|mismatch)s?)\b/i) ||
+      value.match?(/\b(?:failure|error|assertion|mismatch)s?\s+(?:(?:(?:was|were)\s+)?(?:not|never)\s+#{EVIDENCE_MODIFIERS}(?:observed|seen|recorded|encountered|triggered|reproduced|detected|present)|(?:did\s+not|didn['’]t|never)\s+#{EVIDENCE_MODIFIERS}(?:occur|happen|appear|surface|trigger))\b/i) ||
       value.match?(/\b(?:no\s+longer\s+fail(?:ed|s|ing)?|stopp(?:ed|ing)\s+fail(?:ing)?|fail(?:ed|s)?\s+no\s+more)\b/i) ||
       value.match?(/\b(?:assert(?:ion)?s?|controls?|negative\s+controls?|runs?|tests?|checks?)\s+(?:(?:is|was|were|been)\s+)?(?:now\s+)?(?:pass(?:ed|es)?|succeed(?:ed|s)?|successful)\b/i) ||
       value.match?(/\A(?:pass(?:ed|es)?|succeed(?:ed|s)?|successful)\b/i)
