@@ -171,7 +171,7 @@ GEM
     jbuilder (2.12.0)
       actionview (>= 5.0.0)
       activesupport (>= 5.0.0)
-    json (2.16.0)
+    json (2.19.9)
     jwt (3.2.0)
       base64
     logger (1.7.0)
