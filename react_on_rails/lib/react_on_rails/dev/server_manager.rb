@@ -679,11 +679,13 @@ module ReactOnRails
         rescue SystemCallError, IOError
           nil
         ensure
-          begin
-            file.close unless file.nil? || file.closed?
-          rescue SystemCallError, IOError
-            nil
-          end
+          close_dev_session_handle(file)
+        end
+
+        def close_dev_session_handle(file)
+          file.close unless file.nil? || file.closed?
+        rescue SystemCallError, IOError
+          nil
         end
 
         def write_dev_session(path, root)
@@ -721,10 +723,14 @@ module ReactOnRails
           return if file.nil?
 
           File.delete(path) if File.exist?(path) && !dev_session_replaced?(path, file)
-          file.flock(File::LOCK_UN)
-          file.close
         rescue SystemCallError, IOError
           nil
+        ensure
+          begin
+            release_dev_session_lock(file)
+          ensure
+            close_dev_session_handle(file)
+          end
         end
 
         def warn_dev_session_unrecorded(reason)
@@ -839,9 +845,14 @@ module ReactOnRails
           path = claim[:path]
           handle = claim[:handle]
           File.delete(path) if File.exist?(path) && !dev_session_replaced?(path, handle)
-          release_dev_session_lock(handle)
         rescue SystemCallError, IOError
           nil
+        ensure
+          begin
+            release_dev_session_lock(handle)
+          ensure
+            close_dev_session_handle(handle)
+          end
         end
 
         # ---- kill path: reading and classifying the session ------------

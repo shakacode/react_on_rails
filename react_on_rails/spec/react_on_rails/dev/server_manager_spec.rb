@@ -1861,6 +1861,48 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         end
       end
 
+      it "closes a discarded session handle when deleting its path fails" do
+        root = app_root("discard-delete-fails")
+        path = session_path(root)
+        File.write(path, "partial")
+        handle = File.open(path, File::RDWR)
+        handles << handle
+        allow(File).to receive(:delete).with(path).and_raise(Errno::EACCES)
+
+        described_class.send(:discard_partial_dev_session, handle, path)
+
+        expect(handle).to be_closed
+      end
+
+      it "closes a discarded session handle when unlocking it fails" do
+        root = app_root("discard-unlock-fails")
+        path = session_path(root)
+        File.write(path, "partial")
+        handle = File.open(path, File::RDWR)
+        handles << handle
+        allow(handle).to receive(:flock).with(File::LOCK_UN).and_raise(IOError, "forced unlock failure")
+
+        described_class.send(:discard_partial_dev_session, handle, path)
+
+        aggregate_failures do
+          expect(handle).to be_closed
+          expect(File.exist?(path)).to be false
+        end
+      end
+
+      it "closes a released session handle when deleting its path fails" do
+        root = app_root("release-delete-fails")
+        path = session_path(root)
+        File.write(path, "session")
+        handle = File.open(path, File::RDWR)
+        handles << handle
+        allow(File).to receive(:delete).with(path).and_raise(Errno::EACCES)
+
+        described_class.send(:release_dev_session, { path:, handle: })
+
+        expect(handle).to be_closed
+      end
+
       it "degrades to port-scoped cleanup after a failed session write" do
         root = app_root("write-fails-warns")
         allow(described_class).to receive(:write_dev_session).and_raise(Errno::ENOSPC)
