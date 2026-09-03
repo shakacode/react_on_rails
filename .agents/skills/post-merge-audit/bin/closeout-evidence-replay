@@ -451,7 +451,7 @@ module CloseoutEvidenceReplay
   end
 
   def failed_visual_artifact_claim?(value)
-    value.match?(
+    without_negated_visual_state_claims(value).match?(
       /\b(?:(?:blank|unpainted)\s+(?:captures?|frames?|images?|pages?|screenshots?)|(?:captures?|frames?|images?|pages?|screenshots?)\s+(?:(?:is|was|were|remained|looks?|appear(?:s|ed)?)\s+#{CLAUSE_GAP})?(?:blank|unpainted))\b/i
     )
   end
@@ -466,8 +466,14 @@ module CloseoutEvidenceReplay
   end
 
   def affirmative_blank_or_unpainted_claim?(value)
-    value.gsub(/\b(?:not|never)\b#{CLAUSE_GAP}\b(?:blank|unpainted)\b/i, "")
-         .match?(/\b(?:blank|unpainted)\b/i)
+    without_negated_visual_state_claims(value).match?(/\b(?:blank|unpainted)\b/i)
+  end
+
+  def without_negated_visual_state_claims(value)
+    value.gsub(
+      /\b(?:not|never)\b(?:(?!\b(?:blank|unpainted)\b)[^.!?;,\n])*\b(?:blank|unpainted)\b/i,
+      ""
+    )
   end
 
   def durable_clip?(value)

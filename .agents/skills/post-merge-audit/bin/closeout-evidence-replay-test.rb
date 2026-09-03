@@ -388,7 +388,9 @@ class CloseoutEvidenceReplayTest < Minitest::Test
       "blank screenshots" => "durable: before and after screenshots were blank https://github.com/example/repo/pull/123#visual",
       "hedged blank screenshot" => "durable: before screenshot was completely blank and after rendered https://github.com/example/repo/pull/123#visual",
       "unexpectedly blank screenshot" => "durable: before screenshot was unexpectedly blank and after rendered https://github.com/example/repo/pull/123#visual",
-      "unpainted page" => "durable: before page was unpainted and after rendered https://github.com/example/repo/pull/123#visual"
+      "unpainted page" => "durable: before page was unpainted and after rendered https://github.com/example/repo/pull/123#visual",
+      "negated then affirmative blank screenshot" =>
+        "durable: screenshot was not blank but later screenshot was blank https://github.com/example/repo/pull/123#visual"
     }
 
     bad_evidence.each do |label, evidence|
@@ -406,6 +408,24 @@ class CloseoutEvidenceReplayTest < Minitest::Test
 
     assert_equal "SATISFIED", qa.fetch("verdict")
     refute_includes qa.fetch("missing"), "visual_evidence.local_reference"
+  end
+
+  def test_v2_allows_negated_blank_and_unpainted_durable_visual_evidence
+    valid_evidence = [
+      "durable: before screenshot was not blank and after screenshot showed rendered page " \
+        "https://github.com/example/repo/pull/123#visual",
+      "durable: before screenshot was not entirely blank and after screenshot showed rendered page " \
+        "https://github.com/example/repo/pull/123#visual",
+      "durable: before page was never unpainted and after page showed rendered content " \
+        "https://github.com/example/repo/pull/123#visual"
+    ]
+
+    valid_evidence.each do |evidence|
+      qa = run_replay(v2_marker("visual_evidence" => evidence)).fetch("qa_evidence")
+
+      assert_equal "SATISFIED", qa.fetch("verdict"), evidence
+      refute_includes qa.fetch("missing"), "visual_evidence.local_reference", evidence
+    end
   end
 
   def test_v2_rejects_ephemeral_non_https_artifact_schemes_even_with_https
