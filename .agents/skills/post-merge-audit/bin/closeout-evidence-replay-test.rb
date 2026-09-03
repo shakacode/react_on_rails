@@ -387,6 +387,7 @@ class CloseoutEvidenceReplayTest < Minitest::Test
       "blank screenshot" => "durable: before screenshot was blank and after rendered https://github.com/example/repo/pull/123#visual",
       "blank screenshots" => "durable: before and after screenshots were blank https://github.com/example/repo/pull/123#visual",
       "hedged blank screenshot" => "durable: before screenshot was completely blank and after rendered https://github.com/example/repo/pull/123#visual",
+      "unexpectedly blank screenshot" => "durable: before screenshot was unexpectedly blank and after rendered https://github.com/example/repo/pull/123#visual",
       "unpainted page" => "durable: before page was unpainted and after rendered https://github.com/example/repo/pull/123#visual"
     }
 
@@ -590,6 +591,7 @@ class CloseoutEvidenceReplayTest < Minitest::Test
       "passed: target was not painted",
       "passed: target was not really painted correctly",
       "passed: target was not actually clearly obviously painted",
+      "passed: it did not seem painted, but rendered",
       "passed: target did not render",
       "passed: browser failed to paint target",
       "passed: browser failed to render target",
@@ -612,6 +614,7 @@ class CloseoutEvidenceReplayTest < Minitest::Test
       "passed: page rendered correctly, screenshot not blank, elements painted",
       "passed: page rendered correctly, screenshot not entirely blank, elements painted",
       "passed: page rendered correctly, screenshot not actually clearly obviously blank, elements painted",
+      "passed: page rendered correctly, screenshot not seemingly blank, elements painted",
       "passed: target rendered and was not unpainted"
     ]
 
@@ -714,6 +717,7 @@ class CloseoutEvidenceReplayTest < Minitest::Test
       "observed_failure: assertion did not fail",
       "observed_failure: assertion did not really fail",
       "observed_failure: assertion did not actually clearly obviously fail",
+      "observed_failure: the test did not seem to fail",
       "observed_failure: no failure was observed",
       "observed_failure: failure was expected but no failures occurred",
       "observed_failure: no error occurred",
