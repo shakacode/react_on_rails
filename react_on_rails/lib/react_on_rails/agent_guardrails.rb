@@ -136,15 +136,15 @@ module ReactOnRails
       # Files are replaced by rename rather than truncate-and-write so an interrupted or failed write
       # can never leave a half-written or empty destination behind.
       def atomic_write(path, content, new_file_mode: 0o644)
-        directory = File.dirname(path)
-        mode = File.exist?(path) ? File.stat(path).mode & 0o7777 : new_file_mode
-        temp = Tempfile.create([".#{File.basename(path)}", ".tmp"], directory)
+        existing_stat = File.stat(path) if File.exist?(path)
+        temp = Tempfile.create([".#{File.basename(path)}", ".tmp"], File.dirname(path))
         begin
           temp.write(content)
           temp.flush
           temp.fsync
           temp.close
-          File.chmod(mode, temp.path)
+          File.chown(existing_stat.uid, existing_stat.gid, temp.path) if existing_stat
+          File.chmod(existing_stat ? existing_stat.mode & 0o7777 : new_file_mode, temp.path)
           File.rename(temp.path, path)
         rescue StandardError
           FileUtils.rm_f(temp.path)

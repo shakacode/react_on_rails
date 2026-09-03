@@ -154,6 +154,20 @@ module ReactOnRails
       expect(Dir.children(File.dirname(hook_path))).not_to include(a_string_matching(/\.tmp\z/))
     end
 
+    it "preserves ownership when atomically replacing an existing guardrail" do
+      described_class.install(@app_root)
+      hook_path = File.join(@app_root, ".claude/hooks/rsc-app-safety-check.rb")
+      File.write(hook_path, "existing hook\n")
+      existing_stat = File.stat(hook_path)
+      allow(File).to receive(:chown).and_call_original
+
+      described_class.install(@app_root)
+
+      expect(File).to have_received(:chown).with(existing_stat.uid, existing_stat.gid, kind_of(String)).once
+      expect(File.stat(hook_path).uid).to eq(existing_stat.uid)
+      expect(File.stat(hook_path).gid).to eq(existing_stat.gid)
+    end
+
     it "updates a symlinked guardrail target without replacing the symlink" do
       described_class.install(@app_root)
       skill_path = File.join(@app_root, ".claude/skills/rsc-app-safety/SKILL.md")
