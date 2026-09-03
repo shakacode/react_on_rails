@@ -633,8 +633,7 @@ module CloseoutEvidenceReplay
 
   def affirmative_failure_claim?(value)
     explicit_affirmative_failure_clause?(value) ||
-      value.match?(/\bassert(?:ion)?\b#{CLAUSE_GAP}\bexpected\b#{CLAUSE_GAP}\b(?:got|received|actual)\b/i) ||
-      value.match?(/\bmismatch(?:es)?\b/i)
+      value.match?(/\bassert(?:ion)?\b#{CLAUSE_GAP}\bexpected\b#{CLAUSE_GAP}\b(?:got|received|actual)\b/i)
   end
 
   def valid_bundle_hygiene?(value)

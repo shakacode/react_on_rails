@@ -869,6 +869,7 @@ class CloseoutEvidenceReplayTest < Minitest::Test
       "observed_failure: the assertion was skipped",
       "observed_failure: the assertion was not executed",
       "observed_failure: assertion outcome was inconclusive",
+      "observed_failure: minor type mismatch",
       "observed_failure: assertion mismatch scenario; all regression checks passed successfully afterward",
       "observed_failure: negative control passes",
       "observed_failure: run succeeded",
@@ -928,6 +929,18 @@ class CloseoutEvidenceReplayTest < Minitest::Test
 
   def test_v2_negative_control_accepts_assertion_failure_description
     evidence = "observed_failure: assertion expected 1 but got 2"
+    qa = run_replay(
+      v2_marker(
+        "visual_fix" => "yes",
+        "negative_control" => evidence
+      )
+    ).fetch("qa_evidence")
+
+    assert_equal "SATISFIED", qa.fetch("verdict")
+  end
+
+  def test_v2_negative_control_accepts_observed_mismatch_description
+    evidence = "observed_failure: minor type mismatch was observed"
     qa = run_replay(
       v2_marker(
         "visual_fix" => "yes",
