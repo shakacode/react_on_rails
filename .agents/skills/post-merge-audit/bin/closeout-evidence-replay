@@ -388,7 +388,7 @@ module CloseoutEvidenceReplay
     when "yes"
       payload = evidence.delete_prefix("observed_failure:").strip
       observed_failure = evidence.start_with?("observed_failure:") &&
-                         payload.match?(/\b(?:fail(?:ed|s|ing|ure)?|error|assert(?:ion)?|mismatch)\b/i) &&
+                         affirmative_failure_claim?(payload) &&
                          !negated_or_passing_failure_claim?(payload)
       missing << "negative_control" unless observed_failure
     when "no"
@@ -422,7 +422,15 @@ module CloseoutEvidenceReplay
 
   def baseline_and_candidate?(value)
     non_url_text = without_https_urls(value)
-    non_url_text.match?(/\b(?:baseline|before)\b/i) && non_url_text.match?(/\b(?:candidate|after)\b/i)
+    non_url_text.match?(/\b(?:baseline|before)\b/i) &&
+      non_url_text.match?(/\b(?:candidate|after)\b/i) &&
+      !missing_visual_artifact_claim?(non_url_text)
+  end
+
+  def missing_visual_artifact_claim?(value)
+    value.match?(
+      /\b(?:baseline|before|candidate|after)\b#{CLAUSE_GAP}\b(?:unavailable|missing|not\s+(?:available|captured|recorded|provided|attached)|wasn['’]t\s+(?:captured|recorded|provided|attached))\b/i
+    )
   end
 
   def http_url?(value)
@@ -474,9 +482,16 @@ module CloseoutEvidenceReplay
     value.start_with?("passed:") &&
       value.match?(/\b(?:painted|rendered)\b/i) &&
       !affirmative_blank_or_unpainted_claim?(value) &&
+      !failed_inspection_claim?(value) &&
       !value.match?(
         /\b(?:(?:did\s+not|didn['’]t|not|never)\b#{CLAUSE_GAP}\b(?:paint|render)(?:ed)?|(?:(?:was|were|is|are|has|have|had|does|do)n['’]t)\b#{CLAUSE_GAP}\b(?:paint|render)(?:ed)?|failed\s+to\s+(?:paint|render)|(?:paint|render)(?:ing)?\s+fail(?:ed|s|ure)?|(?:painted|rendered)\s+unsuccessfully|unsuccessfully\s+(?:painted|rendered))\b/i
       )
+  end
+
+  def failed_inspection_claim?(value)
+    value.match?(
+      /\b(?:unable\s+to|could(?:\s+not|n['’]t)(?:\s+be)?|was(?:\s+not|n['’]t)|were(?:\s+not|n['’]t)|not|never)#{CLAUSE_GAP}\b(?:inspect(?:ed|ion)?|reviewed|verified)\b/i
+    ) || value.match?(/\b(?:inspection|review|verification)#{CLAUSE_GAP}\b(?:skipped|omitted|not\s+performed)\b/i)
   end
 
   def affirmative_blank_or_unpainted_claim?(value)
@@ -614,6 +629,12 @@ module CloseoutEvidenceReplay
     value.match?(
       /\b(?:fail(?:ed|s|ing)|errors?\s+(?:occurred|raised|observed)|(?:failure|mismatch(?:es)?)\s+(?:was\s+)?(?:observed|reproduced|detected|occurred))\b/i
     )
+  end
+
+  def affirmative_failure_claim?(value)
+    explicit_affirmative_failure_clause?(value) ||
+      value.match?(/\bassert(?:ion)?\b#{CLAUSE_GAP}\bexpected\b#{CLAUSE_GAP}\b(?:got|received|actual)\b/i) ||
+      value.match?(/\bmismatch(?:es)?\b/i)
   end
 
   def valid_bundle_hygiene?(value)
