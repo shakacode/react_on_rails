@@ -66,6 +66,13 @@ module ReactOnRails
     module FileWriter
       module_function
 
+      def ensure_existing_writable!(path)
+        return unless File.exist?(path)
+        return if File.writable?(path)
+
+        raise Errno::EACCES, path
+      end
+
       # Prefer rename over truncate-and-write so interrupted writes cannot leave a partial destination.
       # Copied guardrails may retain the old in-place behavior when directory permissions block replacement.
       def write(path, content, new_file_mode: 0o644, allow_in_place_fallback: false, ensure_executable: false)
@@ -129,7 +136,12 @@ module ReactOnRails
 
       def validate_settings_before_copy
         settings_path = File.join(destination_root, SETTINGS_REL)
-        return settings_path if skip_existing && path_entry_exists?(settings_path)
+        if skip_existing && path_entry_exists?(settings_path)
+          raise Error, "#{SETTINGS_REL} is a dangling symlink, so it cannot be skipped safely" unless
+            File.exist?(settings_path)
+
+          return settings_path
+        end
 
         read_settings(settings_path)
         write_path_for(settings_path)
@@ -161,6 +173,10 @@ module ReactOnRails
         write_strategy = nil
 
         unless unchanged
+          # File.write previously required an existing guardrail target to be writable even when its parent
+          # directory could replace it. Preserve that protection before selecting the atomic replacement path.
+          FileWriter.ensure_existing_writable!(write_path)
+
           FileUtils.mkdir_p(File.dirname(write_path))
           write_strategy = FileWriter.write(
             write_path,

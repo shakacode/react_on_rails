@@ -106,6 +106,27 @@ module ReactOnRails
       expect(File.exist?(settings_path)).to be false
     end
 
+    it "rejects a skipped dangling settings symlink before installing guardrail files" do
+      described_class.install(@app_root)
+      skill_path = File.join(@app_root, ".claude/skills/rsc-app-safety/SKILL.md")
+      hook_path = File.join(@app_root, ".claude/hooks/rsc-app-safety-check.rb")
+      settings_path = File.join(@app_root, ".claude/settings.json")
+      missing_settings_target = File.join(@app_root, "shared/settings.json")
+      FileUtils.mkdir_p(File.dirname(missing_settings_target))
+      File.unlink(skill_path)
+      File.unlink(hook_path)
+      File.unlink(settings_path)
+      File.symlink(missing_settings_target, settings_path)
+
+      expect { described_class.install(@app_root, skip_existing: true) }
+        .to raise_error(described_class::Error, /settings\.json is a dangling symlink/)
+
+      expect(File.exist?(skill_path)).to be false
+      expect(File.exist?(hook_path)).to be false
+      expect(File.symlink?(settings_path)).to be true
+      expect(File.exist?(missing_settings_target)).to be false
+    end
+
     it "validates guardrail symlink targets before replacing any managed file" do
       described_class.install(@app_root)
       skill_path = File.join(@app_root, ".claude/skills/rsc-app-safety/SKILL.md")
@@ -197,6 +218,30 @@ module ReactOnRails
 
       expect(File.read(hook_path)).to eq(expected_content)
       expect(Dir.children(hook_directory)).not_to include(a_string_matching(/\.tmp\z/))
+    end
+
+    it "does not replace a changed read-only guardrail through a writable parent" do
+      [
+        [".claude/skills/rsc-app-safety/SKILL.md", 0o444],
+        [".claude/hooks/rsc-app-safety-check.rb", 0o555]
+      ].each_with_index do |(relative_path, mode), index|
+        app_root = File.join(@app_root, index.to_s)
+        described_class.install(app_root)
+        path = File.join(app_root, relative_path)
+        original_content = "protected custom content\n"
+        original_mode = File.stat(path).mode & 0o7777
+        File.write(path, original_content)
+        File.chmod(mode, path)
+
+        begin
+          expect { described_class.install(app_root) }.to raise_error(Errno::EACCES)
+        ensure
+          File.chmod(original_mode, path)
+        end
+
+        expect(File.read(path)).to eq(original_content)
+        expect(Dir.children(File.dirname(path))).not_to include(a_string_matching(/\.tmp\z/))
+      end
     end
 
     it "leaves a writable hook unchanged when its executable mode cannot be prepared for fallback" do
