@@ -599,6 +599,11 @@ This affects render, streaming render, and asset upload requests.
 Before upgrading:
 
 - Run Ruby 3.3 or newer. The `async-http` dependency requires Ruby 3.3+.
+- Audit Rails console detection that calls `Rails.const_defined?(:Console)`. The `console` gem arrives through Pro's
+  `async` dependency, which was already present in Pro 16.x, and defines top-level `::Console`. Pro 17 loads `async` on
+  the ordinary render path, while Pro 16 loaded it only for streaming or async rendering, so the default lookup inherits
+  through `Object` and silently returns `true` outside a Rails console. Use `Rails.const_defined?(:Console, false)` to
+  set `inherit: false`.
 - Remove direct application assumptions about HTTPX-specific response or error classes in Pro renderer request paths.
 - Treat `config.ssr_timeout` as a per-read socket timeout. With the async-http client, this is applied as the
   read timeout on each renderer socket. It no longer wraps the entire request as a single task-level timeout.
@@ -614,6 +619,12 @@ Before upgrading:
 - Expect renderer connection drops to surface immediately as `ReactOnRailsPro::Error`/connection failures. HTTPX
   previously performed one implicit transport retry for some connection drops; the async-http adapter uses
   `retries: 0` and leaves retry policy to the existing bundle-upload retry loop and caller behavior.
+- If your Rails application uses OpenTelemetry, run `OpenTelemetry::SDK.configure` before the first renderer request
+  so both the tracer provider and W3C propagator are registered. HTTPX instrumentation no longer observes the
+  async-http transport. React on Rails Pro now creates the replacement CLIENT span itself and injects W3C trace
+  context for regular, streaming, incremental, raw-render, and asset-upload requests. Configure the Node Renderer
+  with `fastify: true` so its server spans extract that context. No OpenTelemetry dependency is added by the Pro gem;
+  when the SDK is absent or no provider is registered, renderer requests remain uninstrumented.
 - Run the node renderer client from the normal Rails request path. **Note for Falcon/async-rails users:** the earlier
   advisory to keep Falcon deployments on the HTTPX renderer client is superseded; HTTPX has been removed and async-http
   now handles Falcon natively. Async Rails servers (Falcon, Puma with an async scheduler) are supported: the async-http
@@ -630,11 +641,14 @@ Before upgrading:
 
 ##### JWT gem requirement
 
-`react_on_rails_pro` uses `jwt` for offline license validation. Current versions require `jwt >= 2.5, < 4`, so apps still pinned to a compatible jwt 2.x release can bundle without upgrading. Apps that can resolve `jwt 3.2.0` or newer in the 3.x line will continue to do so; jwt 4.x is not supported. If your Gemfile pins `jwt` below 2.5 (e.g., `2.2.x` for compatibility with OAuth gems), you will need to upgrade it. Check for conflicts with:
+`react_on_rails_pro` uses `jwt` for offline license validation. Current versions require `jwt >= 2.8, < 4`, so apps still pinned to a compatible jwt 2.x release can bundle without upgrading. Apps that can resolve `jwt 3.2.0` or newer in the 3.x line will continue to do so; jwt 4.x is not supported. If your Gemfile pins `jwt` below 2.8 (e.g., `2.2.x` for compatibility with OAuth gems), you will need to upgrade it. Check for conflicts with:
 
 ```bash
 bundle update jwt
 ```
+
+> **Why the floor is 2.8.** jwt 2.8.0 began declaring `base64` as a runtime dependency. That declaration
+> keeps offline license validation reliable on Ruby 3.4+, where `base64` is a bundled gem.
 
 ##### Node renderer config: `bundlePath` → `serverBundleCachePath`
 
@@ -780,7 +794,7 @@ Server Components execute on the server and stream HTML to the client—no serve
   - **62% reduction** in client‑side bundle size
   - **63% improvement** in Google Speed Index
   - Total blocking time: **from 110 ms to 1 ms**
-- [geekyants.com Case Study](https://geekyants.com/en-gb/blog/boosting-performance-with-nextjs-and-react-server-components-a-geekyantscom-case-study):
+- [geekyants.com Case Study](https://web.archive.org/web/20260306053730/https://geekyants.com/en-gb/blog/boosting-performance-with-nextjs-and-react-server-components-a-geekyantscom-case-study):
   - **52% smaller** JavaScript and TypeScript codebase
   - Lighthouse scores improved **from ~50 to ~90**
 
@@ -1988,6 +2002,26 @@ _Timings are illustrative, not benchmarks — the point is **when** the first pa
 React on Rails detects whether the installed React DOM server provides `renderToPipeableStream`. This keeps
 `stream_react_component` on the synchronous path for React 16 and 17 while selecting progressive streaming
 automatically on React 18 and 19. The React 16/17 path is suitable only when the rendered tree does not suspend.
+
+### React 19.2 Suspense reveal batching
+
+[React 19.2 briefly batches some server-rendered Suspense boundary reveals](https://react.dev/blog/2025/10/01/react-19-2#batching-suspense-boundaries-for-ssr)
+so boundaries that finish near one another can become visible together. React controls this with heuristics and backs
+off when batching could hurt Core Web Vitals. React on Rails Pro does not add or expose a batching-delay setting.
+
+Keep these two checkpoints separate when observing a streamed page:
+
+- **Server chunk delivery:** React decides when resolved boundary markup enters its server stream. React on Rails Pro
+  forwards those emitted chunks in order. For RSC streams, each combined flush preserves the required order: payload
+  initialization and stylesheet prerequisites, then the HTML, then the matching payload-push scripts.
+- **Browser-visible reveal:** Network buffering, compression, HTML parsing, and React's reveal batching can make DOM
+  updates appear later or in larger groups than the chunks observed by Rails or the Node Renderer. A server chunk is
+  therefore not a guaranteed paint boundary.
+
+Make streaming tests state-based rather than timer-based. Assert the shell and fallbacks while data is unresolved,
+then resolve one or more sources and use retrying assertions for the final DOM state, element order, and the rule that
+resolved content does not return to its fallback. Do not assume one resolved boundary equals one output chunk, use an
+arbitrary sleep, or depend on a fixed batching delay such as 300 ms; React's timing is deliberately heuristic.
 
 ## React 18 Streaming Without RSC
 
@@ -3265,13 +3299,15 @@ The contrast in one picture — the old way runs JavaScript inside Rails, while 
 
 | Metric               | ExecJS                      | Node Renderer            |
 | -------------------- | --------------------------- | ------------------------ |
-| SSR throughput       | Baseline                    | 10-100x faster           |
+| SSR throughput       | Baseline                    | Workload-dependent       |
 | Memory isolation     | Shared with Ruby            | Separate process         |
 | Worker concurrency   | Single-threaded per request | Configurable worker pool |
 | Profiling            | Not available               | Full Node.js tooling     |
 | Memory leak recovery | Crashes Ruby                | Rolling worker restarts  |
 
 At [Popmenu](https://www.shakacode.com/recent-work/popmenu/) (a ShakaCode client), switching to the Node Renderer contributed to a 73% decrease in average response times and 20-25% lower Heroku costs across tens of millions of daily SSR requests.
+
+Because results depend on application code, traffic, and deployment topology, [benchmark your own pages](../oss/core-concepts/performance-benchmarks.md) rather than relying on a universal multiplier.
 
 ## How It Works
 
@@ -3545,6 +3581,14 @@ See [Rolling-Deploy Adapters](./rolling-deploy-adapters.md) for the full protoco
 
 The Node Renderer ships an optional OpenTelemetry integration for distributed tracing. When enabled, every SSR request becomes a trace you can inspect in any OTLP-compatible backend (Jaeger, Honeycomb, Datadog, Grafana Tempo, New Relic, etc.).
 
+### Continue Rails traces into the Node Renderer
+
+React on Rails Pro creates a CLIENT span for every Rails request to the Node Renderer and injects the active W3C trace context into the request headers. With `fastify: true` in the renderer's OpenTelemetry configuration, its server spans extract that context and continue the Rails trace instead of starting a separate root trace.
+
+Run `OpenTelemetry::SDK.configure` in the Rails application before the first renderer request so both the tracer provider and W3C propagator are registered. The Pro gem does not add an OpenTelemetry dependency or initialize an exporter for the application. If OpenTelemetry is not loaded, or only the API's default proxy provider is present, renderer requests remain uninstrumented.
+
+This covers regular and streaming renders, incremental async-props renders, raw-render requests, asset uploads, and other requests sent through the renderer HTTP client. The Rails CLIENT span records only `http.request.method`, `url.path`, `http.response.status_code`, `http.request.body.size`, and `http.response.body.size`.
+
 ### Install the OpenTelemetry packages (peer dependencies)
 
 **npm:**
@@ -3613,7 +3657,52 @@ await reactOnRailsProNodeRenderer().catch((e) => {
 ```
 
 > [!NOTE]
-> With `fastify: true`, OpenTelemetry patches the HTTP and Fastify modules process-wide. If a later init step fails after those patches are installed, OpenTelemetry does not provide a rollback API; the patched modules remain installed and use a no-op tracer until the process restarts.
+> With `fastify: true` or a nonempty `instrumentations` list, OpenTelemetry patches modules process-wide. If a later init step fails, the renderer disables every registered instrumentation before cleaning up the provider. It also disables them during normal renderer-managed shutdown so they stop creating spans.
+
+After renderer-managed initialization succeeds, the renderer owns the provider lifecycle, including any supplied `spanProcessor` or `exporter`, and shuts those components down with the provider. Failed initialization preserves a caller-supplied `spanProcessor`: the renderer force-flushes it when supported but does not shut it down. A supplied `exporter` has a different contract because the renderer creates and owns its wrapping processor; if initialization later fails, shutting down that processor also shuts down the exporter.
+
+### Add instrumentations and resource detectors
+
+Pass one or more additional OpenTelemetry instrumentations through `instrumentations`. The renderer appends them after its built-in `HttpInstrumentation` and `FastifyOtelInstrumentation` instances, so the custom list extends rather than replaces the renderer defaults. A nonempty list registers the full combined list even when `fastify` is not set separately and therefore requires `@opentelemetry/instrumentation`, `@opentelemetry/instrumentation-http`, and `@fastify/otel` to be installed. An empty list is inert and does not load or register the built-in instrumentations. Passing an instrumentation instance gives the renderer lifecycle ownership of its activation: the renderer disables that instance after failed initialization and during normal shutdown.
+
+Pass OpenTelemetry resource detectors through `resourceDetectors`. For example, an ECS deployment can install `@opentelemetry/resource-detector-aws` and let the AWS ECS detector discover container and cloud attributes. Extra instrumentation packages and detector packages remain application-owned optional dependencies.
+
+```js
+import { AwsInstrumentation } from '@opentelemetry/instrumentation-aws-sdk';
+import { awsEcsDetector } from '@opentelemetry/resource-detector-aws';
+import { init as initOpenTelemetry } from 'react-on-rails-pro-node-renderer/integrations/opentelemetry';
+
+initOpenTelemetry({
+  tracing: true,
+  instrumentations: [new AwsInstrumentation()],
+  resourceDetectors: [awsEcsDetector],
+});
+```
+
+Detected resource attributes are merged below the existing resource configuration. Explicit `resourceAttributes` override detected attributes, and service naming keeps its existing priority: `OTEL_SERVICE_NAME`, then `init({ serviceName })`, then `resourceAttributes['service.name']`, then the renderer default. Empty service-name values are treated as unset. A detector-provided `service.name` does not override that chain.
+
+### Attach renderer spans to an existing provider
+
+By default, `init()` still stops without installing renderer tracing adapters when another SDK already owns the global tracer provider. This avoids patching modules under a provider whose lifecycle the renderer does not own.
+
+If the application deliberately initializes its own provider first, opt in to using it with `useExistingGlobalProvider: true` and `tracing: true`:
+
+```js
+// This module must register the application's provider before renderer init.
+import './configure-opentelemetry.js';
+import { init as initOpenTelemetry } from 'react-on-rails-pro-node-renderer/integrations/opentelemetry';
+
+initOpenTelemetry({
+  tracing: true,
+  useExistingGlobalProvider: true,
+});
+```
+
+The renderer verifies that a global tracer provider and a working context manager have been registered before it installs `setupTracing` and `setupSubSpan`, preserving the renderer's nested `ror.*` spans. Register the application SDK with `provider.register()` before calling renderer `init()`. Calling only `trace.setGlobalTracerProvider()` is insufficient because it does not install context propagation. If either prerequisite is unavailable, `init()` logs a retryable warning without installing adapters. Register the SDK, then call `init()` again to attach renderer tracing.
+
+The application continues to own exporters, processors, resources, instrumentations, propagators, flushing, and provider shutdown. Renderer-managed options such as `fastify`, `instrumentations`, `resourceDetectors`, `exporter`, `spanProcessor`, and `shutdownTimeoutMs` are ignored in this mode and produce a warning when supplied, including explicit false, zero, or empty values. Non-service-name `resourceAttributes` are also ignored and warned about; only `resourceAttributes['service.name']` participates in tracer-scope naming. These warnings are emitted even when the provider or context-manager prerequisite is still missing. Configure those features on the application-owned SDK before starting the renderer. In particular, register HTTP and Fastify instrumentation before the Fastify server loads so incoming `traceparent` context from Rails becomes the parent of the renderer's `ror.*` spans. The renderer does not add a shutdown hook for an external provider, so the host must flush and shut down its SDK during application shutdown.
+
+`serviceName`, or `resourceAttributes['service.name']` when no higher-priority name is set, selects the tracer instrumentation scope for renderer spans. It does not change the existing provider's resource. Configure the resource `service.name` on the host-owned SDK.
 
 ### Configuration via standard OpenTelemetry environment variables
 
@@ -3629,7 +3718,7 @@ await reactOnRailsProNodeRenderer().catch((e) => {
 
 | Span                                 | Where                                                             | Attributes                                                                |
 | ------------------------------------ | ----------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| `ror.ssr.request`                    | Root span for each SSR render request                             | (none — root)                                                             |
+| `ror.ssr.request`                    | Entry span for each SSR render request                            | (none)                                                                    |
 | `ror.bundle.build_execution_context` | Loading a bundle into the VM                                      | `bundle.timestamp`, `bundle.paths.count`, `cache.strategy`                |
 | `ror.bundle.upload`                  | When new bundles are uploaded mid-request or via `/upload-assets` | `bundle.count`, `assets.count`, `bytes.total` (sum of upload source size) |
 | `ror.vm.execute`                     | The actual SSR JS execution inside the VM                         | `bundle.timestamp`                                                        |
@@ -3641,7 +3730,7 @@ Outbound HTTP calls inside your SSR bundle are automatically captured by `HttpIn
 
 **Cache-miss note:** On a cache-miss path `ror.bundle.build_execution_context` appears twice. The first span has `cache.strategy=cache-first` and can end with ERROR status when the VM cache probe misses. The second span has `cache.strategy=cache-miss` for the real VM build after bundle upload or bundle discovery. Scope error alerts to exclude `cache.strategy=cache-first` when that miss is expected.
 
-As a trace, the spans nest under the root `ror.ssr.request`. On the warm path `ror.bundle.build_execution_context` (`cache-first`) fires first to load the bundle into the VM, then `ror.result.prepare` opens and runs `ror.vm.execute` **inside it** (`vm.execute` is a child of `result.prepare`, not a sibling after it). Cold-path spans (upload and `cache-miss` build) appear only after the `cache-first` probe and before `result.prepare`; outbound `fetch` calls from your bundle are captured automatically as HTTP child spans under `vm.execute`; and incremental (async-props) renders add their own stream/chunk spans:
+The renderer spans nest under `ror.ssr.request`. With `fastify: true`, that entry span is a child of the Rails CLIENT span; otherwise it is a renderer-side root. On the warm path `ror.bundle.build_execution_context` (`cache-first`) fires first to load the bundle into the VM, then `ror.result.prepare` opens and runs `ror.vm.execute` **inside it** (`vm.execute` is a child of `result.prepare`, not a sibling after it). Cold-path spans (upload and `cache-miss` build) appear only after the `cache-first` probe and before `result.prepare`; outbound `fetch` calls from your bundle are captured automatically as HTTP child spans under `vm.execute`; and incremental (async-props) renders add their own stream/chunk spans:
 
 [Diagram: OpenTelemetry span tree rooted at one server-render request: the cache-first build probe runs first, then (on a cache miss) a cold start adds bundle-upload and cache-miss build spans, then ror.result.prepare opens and wraps ror.vm.execute as its child; outbound fetches appear as HTTP child spans under vm.execute; and streaming async-props renders add their own stream and per-chunk spans.]
 
@@ -3649,11 +3738,11 @@ As a trace, the spans nest under the root `ror.ssr.request`. On the warm path `r
 
 - **Span processor**: `BatchSpanProcessor` in production (`NODE_ENV=production` or `RAILS_ENV=production`), `SimpleSpanProcessor` otherwise. Override with `init({ spanProcessor })`.
 - **Exporter**: OTLP HTTP. Override with `init({ exporter })`.
-- **Graceful shutdown**: Pending batched spans are flushed when Fastify's `onClose` hook fires (during worker shutdown), so traces are not lost on rolling restarts. The renderer waits up to 5000ms by default before continuing worker shutdown; override with `init({ shutdownTimeoutMs })`. The worker also has a 10s `app.close()` watchdog, so keep custom OTel shutdown timeouts below that window.
+- **Graceful shutdown**: For a renderer-managed provider, pending batched spans are flushed when Fastify's `onClose` hook fires (during worker shutdown), so traces are not lost on rolling restarts. The renderer waits up to 5000ms by default before continuing worker shutdown; override with `init({ shutdownTimeoutMs })`. The worker also has a 10s `app.close()` watchdog, so keep custom OTel shutdown timeouts below that window. For `useExistingGlobalProvider`, the host application must flush and shut down its own provider.
 
 ### Privacy note
 
-The `renderingRequest` payload and rendered response body are **never** included in span attributes. Only bundle hashes, counts, and byte sizes (`bytes.total`, `response.bytes`) are recorded. This matches the renderer's existing logging policy.
+The `renderingRequest` payload and rendered response body are **never** included in span attributes. Rails CLIENT spans contain only the request method, a normalized path without bundle or props digests, response status, and request/response byte sizes. Only W3C `traceparent` and `tracestate` fields are forwarded; baggage is not sent to the renderer. Renderer spans contain only bundle hashes, counts, and byte sizes (`bytes.total`, `response.bytes`). This matches the renderer's existing logging policy.
 
 ## Further Reading
 
@@ -9666,17 +9755,17 @@ This guide walks you through adding React Server Components to an existing React
 
 Before running the generator, verify your environment:
 
-| Requirement              | Check command                                                                                                                  | Expected                    |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------ | --------------------------- |
-| React on Rails Pro gem   | `bundle show react_on_rails_pro`                                                                                               | v16.4.0+                    |
-| React on Rails gem       | `bundle show react_on_rails`                                                                                                   | v16.4.0+                    |
-| React on Rails Pro npm   | `npm ls react-on-rails-pro` / `yarn why react-on-rails-pro` / `pnpm list react-on-rails-pro` / `bun pm why react-on-rails-pro` | Matches gem version         |
-| React version            | `npm ls react` / `yarn why react` / `pnpm list react` / `bun pm why react`                                                     | 19.2.x with patch >= 19.2.7 |
-| React DOM version        | `npm ls react-dom` / `yarn why react-dom` / `pnpm list react-dom` / `bun pm why react-dom`                                     | Must match `react` version  |
-| `react-on-rails-rsc`     | `npm ls react-on-rails-rsc` / `yarn why react-on-rails-rsc` / `pnpm list react-on-rails-rsc` / `bun pm why react-on-rails-rsc` | 19.2.x with patch >= 19.2.1 |
-| Node.js                  | `node --version`                                                                                                               | 18+                         |
-| Pro initializer exists   | `ls config/initializers/react_on_rails_pro.rb`                                                                                 | File exists                 |
-| Node renderer configured | Check `react_on_rails_pro.rb` for `server_renderer = "NodeRenderer"`                                                           | NodeRenderer enabled        |
+| Requirement              | Check command                                                                                                                  | Expected                                                                                   |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
+| React on Rails Pro gem   | `bundle show react_on_rails_pro`                                                                                               | v16.4.0+                                                                                   |
+| React on Rails gem       | `bundle show react_on_rails`                                                                                                   | v16.4.0+                                                                                   |
+| React on Rails Pro npm   | `npm ls react-on-rails-pro` / `yarn why react-on-rails-pro` / `pnpm list react-on-rails-pro` / `bun pm why react-on-rails-pro` | Matches gem version                                                                        |
+| React version            | `npm ls react` / `yarn why react` / `pnpm list react` / `bun pm why react`                                                     | 19.2.x with patch >= 19.2.7                                                                |
+| React DOM version        | `npm ls react-dom` / `yarn why react-dom` / `pnpm list react-dom` / `bun pm why react-dom`                                     | Must match `react` version                                                                 |
+| `react-on-rails-rsc`     | `npm ls react-on-rails-rsc` / `yarn why react-on-rails-rsc` / `pnpm list react-on-rails-rsc` / `bun pm why react-on-rails-rsc` | 19.2.x with patch >= 19.2.1                                                                |
+| Node.js                  | `node --version`                                                                                                               | Node 20+ by default (Fastify 5); >= 18.19.0 with documented Fastify 4-compatible overrides |
+| Pro initializer exists   | `ls config/initializers/react_on_rails_pro.rb`                                                                                 | File exists                                                                                |
+| Node renderer configured | Check `react_on_rails_pro.rb` for `server_renderer = "NodeRenderer"`                                                           | NodeRenderer enabled                                                                       |
 
 If React is outside the supported 19.2.x range or below 19.2.7, upgrade it first:
 
@@ -11720,7 +11809,7 @@ Let’s make your apps faster—together.
 4. styled‑components v3.1.0: introduced streaming SSR support as the next generation of React rendering. ([medium.com][4])
 
 [1]: https://frigade.com/blog/bundle-size-reduction-with-rsc-and-frigade
-[2]: https://geekyants.com/en-gb/blog/boosting-performance-with-nextjs-and-react-server-components-a-geekyantscom-case-study
+[2]: https://web.archive.org/web/20260306053730/https://geekyants.com/en-gb/blog/boosting-performance-with-nextjs-and-react-server-components-a-geekyantscom-case-study
 [3]: https://www.compilenrun.com/docs/framework/nextjs/nextjs-ecosystem/nextjs-case-studies/#case-study-3-hulus-streaming-platform
 [4]: https://medium.com/styled-components/v3-1-0-such-perf-wow-many-streams-c45c434dbd03
 

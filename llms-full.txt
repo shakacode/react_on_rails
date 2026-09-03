@@ -314,7 +314,8 @@ Read the full **[React on Rails Doctrine](./misc/doctrine.md)** for our design p
 
 - **Rails 7.0+** (Ruby 3.3+ is incompatible with Rails < 7.0; CI tests against Rails 7.1)
 - **Ruby 3.3+**
-- **Node.js 18+**
+- **Node.js 18+** (React on Rails Pro's Node renderer defaults to Fastify 5 and requires **Node.js 20+** at startup;
+  its **Node.js 18.19.0+** `engines.node` floor applies with the documented Fastify 4-compatible dependency overrides)
 - **Shakapacker 6+** (7+ recommended for React on Rails v17)
 
 ## Need Help?
@@ -1199,9 +1200,13 @@ Use this path when you already have a Rails application and want React on Rails 
 ## 1. Add the gems
 
 ```bash
-bundle add shakapacker --strict
 bundle add react_on_rails --strict
+SHAKAPACKER_VERSION="$(bundle exec ruby -rreact_on_rails -e 'print ReactOnRails::PackerUtils.shakapacker_version')"
+bundle add shakapacker --version="${SHAKAPACKER_VERSION}" --strict
 ```
+
+Adding React on Rails first lets Bundler select a compatible Shakapacker release. Pinning that resolved version when
+adding Shakapacker directly prevents an older globally installed gem from replacing it.
 
 React on Rails attempts to install the matching `react-on-rails` JavaScript package during the generator run. In some existing apps, dependency installation can fail (or required package-manager tooling may be unavailable), and the generator prints manual install commands. Run those commands before starting the app.
 
@@ -1940,7 +1945,7 @@ React on Rails Pro extends the open-source gem with performance optimizations an
 | ------------------------------------ | :--------: | :---------------: | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | React in Rails views                 |     ✓      |         ✓         | Render React components directly in ERB/Haml views via `react_component` helper                                                                                                                                                                             |
 | Hot Module Replacement               |     ✓      |         ✓         | Instant feedback during development with [Shakapacker](https://github.com/shakacode/shakapacker) integration                                                                                                                                                |
-| Server-side rendering                | ✓ (ExecJS) | ✓ (Node renderer) | OSS uses [ExecJS](../core-concepts/execjs-limitations.md) (auto-detects Node.js, mini_racer, or Bun); Pro adds a dedicated [Node renderer](../building-features/node-renderer/basics.md) for [3-10x faster SSR](../core-concepts/performance-benchmarks.md) |
+| Server-side rendering                | ✓ (ExecJS) | ✓ (Node renderer) | OSS uses [ExecJS](../core-concepts/execjs-limitations.md) (auto-detects Node.js, mini_racer, or Bun); Pro has [a Node renderer](../building-features/node-renderer/basics.md); [performance varies by workload](../core-concepts/performance-benchmarks.md) |
 | Auto-bundling                        |     ✓      |         ✓         | [File-system-based automated bundle generation](../core-concepts/auto-bundling-file-system-based-automated-bundle-generation.md) — no manual `javascript_pack_tags` needed                                                                                  |
 | Rspack support                       |     ✓      |         ✓         | [~20x faster builds](../api-reference/generator-details.md#rspack-support) using Rspack instead of Webpack                                                                                                                                                  |
 | Redux integration                    |     ✓      |         ✓         | [Redux store registration](../building-features/react-and-redux.md) with server-side rendering support                                                                                                                                                      |
@@ -2747,7 +2752,7 @@ Server rendering is used for either SEO or performance reasons.
 For a comprehensive list of ExecJS constraints, see [ExecJS Limitations](./execjs-limitations.md).
 
 :::tip Pro Upgrade
-React on Rails Pro includes a [dedicated Node.js renderer](../../pro/node-renderer.md) that eliminates ExecJS limitations and improves SSR performance by 3-10x. It also supports [streaming SSR](../../pro/streaming-ssr.md) with React 18/19's `renderToPipeableStream` for faster Time to First Byte. [Learn more →](../../pro/upgrading-to-pro.md)
+React on Rails Pro includes a [dedicated Node.js renderer](../../pro/node-renderer.md) that eliminates ExecJS limitations and uses persistent worker processes for concurrent SSR. Performance gains are workload-dependent, so [benchmark your own pages](./performance-benchmarks.md). It also supports [streaming SSR](../../pro/streaming-ssr.md) with React 18/19's `renderToPipeableStream` for faster Time to First Byte. [Learn more →](../../pro/upgrading-to-pro.md)
 :::
 
 ================================================================================
@@ -7687,6 +7692,13 @@ When a `react_component` call triggers SSR, React on Rails Pro computes a cache 
 
 If the cache contains an entry for that key, the cached HTML is returned without calling JavaScript. If not, the JS is evaluated, the result is cached, and then returned.
 
+The key ignores the random `id` React on Rails assigns to each mount point (the default
+`random_dom_id: true`), so one cached render serves every instance of a component. Streamed
+renders embed that id in their chunks (for example in the keys of inline React Server
+Component payloads), so a cached stream is rebound to the id of the node being rendered before
+it is replayed. Setting `random_dom_id = false` or passing an explicit `id:` is still the fastest
+option because the cache key then hashes the exact request.
+
 ### Setup
 
 One line in `config/initializers/react_on_rails_pro.rb`:
@@ -11951,15 +11963,15 @@ Most `bin/dev` commands are intentionally conservative: they start, watch, rebui
 
 The exact output directories come from `config/shakapacker.yml`. The paths below use the defaults shown in this guide.
 
-| Command                              | Generated bundles it uses or writes                                                                        | What it clears automatically                                                                                                                                                                                       |
-| ------------------------------------ | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `bin/dev` (HMR, default)             | Browser bundles are served from webpack-dev-server memory, not from `public/webpack/development/`.         | No generated bundle directories or build caches. Existing disk outputs are left alone.                                                                                                                             |
-| `bin/dev static`                     | Writes development bundles to the development `public_output_path`, usually `public/webpack/development/`. | No output directories or build caches. Watch rebuilds update known outputs but do not remove stale files from old branches.                                                                                        |
-| `bin/dev test-watch`                 | Writes test bundles to the test `public_output_path`, usually `public/webpack/test/`.                      | No output directories or build caches. Watch rebuilds update known outputs but do not remove stale files from old branches.                                                                                        |
-| TestHelper / `build_test_command`    | Writes test bundles when assets are stale.                                                                 | No output directories or build caches unless your custom `build_test_command` deletes them.                                                                                                                        |
-| `bin/dev prod` / `production-assets` | Runs `rails assets:precompile` with production bundler optimizations.                                      | No `public/assets`, `public/webpack/*`, or build-cache cleanup unless your Rails tasks do it.                                                                                                                      |
-| `bin/dev kill`                       | Does not build bundles.                                                                                    | Stops known dev processes and removes process/socket files such as Overmind sockets and `tmp/pids/server.pid`; it does not delete bundles, `tmp/cache`, `node_modules/.cache`, or renderer bundle caches.          |
-| `bin/dev clean`                      | Does not build bundles.                                                                                    | Runs the `kill` cleanup, reads `config/shakapacker.yml` or `SHAKAPACKER_CONFIG`, removes configured Shakapacker output/cache paths, and clears common build caches. Unsafe paths outside the app root are skipped. |
+| Command                              | Generated bundles it uses or writes                                                                        | What it clears automatically                                                                                                                                                                                                                                                                                       |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `bin/dev` (HMR, default)             | Browser bundles are served from webpack-dev-server memory, not from `public/webpack/development/`.         | No generated bundle directories or build caches. Existing disk outputs are left alone.                                                                                                                                                                                                                             |
+| `bin/dev static`                     | Writes development bundles to the development `public_output_path`, usually `public/webpack/development/`. | No output directories or build caches. Watch rebuilds update known outputs but do not remove stale files from old branches.                                                                                                                                                                                        |
+| `bin/dev test-watch`                 | Writes test bundles to the test `public_output_path`, usually `public/webpack/test/`.                      | No output directories or build caches. Watch rebuilds update known outputs but do not remove stale files from old branches.                                                                                                                                                                                        |
+| TestHelper / `build_test_command`    | Writes test bundles when assets are stale.                                                                 | No output directories or build caches unless your custom `build_test_command` deletes them.                                                                                                                                                                                                                        |
+| `bin/dev prod` / `production-assets` | Runs `rails assets:precompile` with production bundler optimizations.                                      | No `public/assets`, `public/webpack/*`, or build-cache cleanup unless your Rails tasks do it.                                                                                                                                                                                                                      |
+| `bin/dev kill`                       | Does not build bundles.                                                                                    | Stops only processes attributed to this app root, verifies shutdown before reporting success, and removes stale session/socket/pid state only on trusted cleanup paths. A refusal or unverified shutdown exits nonzero. It does not delete bundles, `tmp/cache`, `node_modules/.cache`, or renderer bundle caches. |
+| `bin/dev clean`                      | Does not build bundles.                                                                                    | Runs the `kill` cleanup, reads `config/shakapacker.yml` or `SHAKAPACKER_CONFIG`, removes configured Shakapacker output/cache paths, and clears common build caches. Unsafe paths outside the app root are skipped.                                                                                                 |
 
 If a branch switch or package update leaves confusing asset errors, stop watchers and clear generated outputs first, then reinstall packages if the lockfile changed before rebuilding:
 
@@ -14407,10 +14419,14 @@ REACT_RENDERER_URL=http://localhost:3801
 The renderer port must match on both sides: `RENDERER_PORT` is read by the Node process and
 `REACT_RENDERER_URL` is read by the Rails-side Pro initializer.
 
-> **Note:** `bin/dev kill` only stops the renderer when `RENDERER_PORT` (or `REACT_RENDERER_URL`)
-> is exported in the current shell. From a fresh terminal that hasn't sourced your worktree's
-> `.env`, run e.g. `RENDERER_PORT=3801 bin/dev kill`, or source `.env` first. Otherwise the
-> renderer process will silently keep running.
+> **Note:** `bin/dev kill` scopes cleanup to the current app directory. It first uses the running
+> session's recorded ports. For a manual default-port setup, export `RENDERER_PORT` (or a local
+> `REACT_RENDERER_URL`) in a fresh shell so the renderer port is scanned; base-port setups also
+> derive the renderer's `base + 2` port. A port candidate is signalled only when `lsof` finds a
+> `LISTEN` socket and the process working directory is inside this app root. Foreign listeners that
+> are visible to the invoking user are reported and left running; a listener owned by another OS user
+> may be invisible to `lsof` and therefore go unreported. If ownership or shutdown cannot be verified,
+> the command exits nonzero instead of reporting success.
 
 ## See Also
 
@@ -22336,7 +22352,7 @@ SOURCE: docs/oss/deployment/server-rendering-tips.md
 # Server Rendering Tips
 
 :::tip Pro Upgrade
-For the best SSR performance, React on Rails Pro provides a [dedicated Node.js renderer](../../pro/node-renderer.md) (10-100x faster than ExecJS), [streaming SSR](../../pro/streaming-ssr.md) for faster TTFB, and [fragment caching](../../pro/fragment-caching.md) to skip redundant rendering entirely. [Learn more →](../../pro/upgrading-to-pro.md)
+React on Rails Pro provides a [dedicated Node.js renderer](../../pro/node-renderer.md) with persistent workers for concurrent SSR, [streaming SSR](../../pro/streaming-ssr.md) for faster TTFB, and [fragment caching](../../pro/fragment-caching.md) to skip redundant rendering entirely. Performance gains are workload-dependent, so [benchmark your own pages](../core-concepts/performance-benchmarks.md). [Learn more →](../../pro/upgrading-to-pro.md)
 :::
 
 ## General Tips
@@ -23386,7 +23402,7 @@ install.
 
 Before changing versions, check these first:
 
-1. **Ruby and Node requirements**: React on Rails v17 requires Ruby 3.3+ and Node 18+. React on Rails v16 remains the upgrade path for apps that need older Ruby versions.
+1. **Ruby and Node requirements**: React on Rails v17 requires Ruby 3.3+ and Node 18+. The default React on Rails Pro Node renderer resolves Fastify 5 and requires Node 20+ at startup. Its `engines.node` floor of Node 18.19.0+ applies only when you use the documented Fastify 4-compatible dependency overrides. React on Rails v16 remains the upgrade path for apps that need older Ruby versions.
 2. **Bundler age**: legacy apps may have lockfiles created by Bundler 1.x. Those lockfiles can fail on modern Ruby before the React on Rails upgrade even starts.
 3. **Rails version**: current `react_on_rails` requires Ruby 3.3+, which is incompatible with Rails < 7.0. Older Rails apps need a Rails upgrade first.
 4. **Asset stack**: if the app still uses `webpacker`, upgrade to `shakapacker` first.
@@ -23568,7 +23584,8 @@ This is a minor release - update your gem and npm package versions, then run `bu
 - **Webpacker support completely removed**. Shakapacker >= 6.0 is now required.
 - **Updated runtime requirements**:
   - Minimum Ruby version: 3.0 (v16 minimum; v17 requires 3.3+)
-  - Minimum Node.js version: 18
+  - Minimum Node.js version: 18 (the Pro Node renderer defaults to Fastify 5 and requires Node 20+; its
+    `engines.node` floor of >= 18.19.0 applies with documented Fastify 4-compatible dependency overrides)
   - CI tests against newer Ruby and Node.js versions than these minimums; CI targets are not support floors
 - **Install generator now validates prerequisites** and requires at least one JavaScript package manager
 
@@ -24917,10 +24934,14 @@ If the app uses `vite_rails` plus a custom Rails-side React wrapper, the first c
 ## 1. Add React on Rails and Shakapacker
 
 ```bash
-bundle add shakapacker --strict
 bundle add react_on_rails --strict
+SHAKAPACKER_VERSION="$(bundle exec ruby -rreact_on_rails -e 'print ReactOnRails::PackerUtils.shakapacker_version')"
+bundle add shakapacker --version="${SHAKAPACKER_VERSION}" --strict
 bundle exec rails generate react_on_rails:install
 ```
+
+Adding React on Rails first lets Bundler select a compatible Shakapacker release. Pinning that resolved version when
+adding Shakapacker directly prevents an older globally installed gem from replacing it.
 
 The generator adds the React on Rails initializer, `bin/dev`, Shakapacker config, example routes, and the server bundle entrypoint.
 
@@ -32205,7 +32226,8 @@ Build speed is only part of the picture. Here's how the two approaches compare a
 
 - **React Server Components** — full RSC support with Rails integration
 - **Streaming SSR and Rails async props** — progressive rendering with `renderToPipeableStream`, including Rails-owned query results that resolve independent Suspense boundaries
-- **Node renderer** — dedicated Node.js server for 3-10x faster SSR (replaces ExecJS)
+- **Node renderer** — dedicated Node.js server with persistent workers for concurrent SSR;
+  [performance gains are workload-dependent](../core-concepts/performance-benchmarks.md)
 - **Fragment caching** — cache rendered components with `cached_react_component`
 - **Code splitting with SSR** — route-based splitting via Loadable Components
 - **TanStack Router SSR** — type-safe routing with server rendering
