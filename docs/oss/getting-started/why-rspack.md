@@ -87,7 +87,7 @@ Our control-tier measurement could not confirm a winner: browser-observed HMR me
 
 ### "Vite's plugin ecosystem is bigger"
 
-For app-level tooling, both ecosystems are large. Rspack targets compatibility with the webpack plugin and loader API, which is the API the Rails/Shakapacker world has built against for years — so the relevant comparison for a React on Rails app is less "Vite plugins vs Rspack plugins" than "does the webpack-contract tooling you already use carry over" (check the [Rspack compatibility documentation](https://rspack.dev/guide/compatibility/plugin) for specific plugins). The plugin that decides our architecture is the RSC manifest/loader tooling described above, and that exists for webpack and rspack only.
+For app-level tooling, both ecosystems are large. Rspack targets compatibility with the webpack plugin and loader API, which is the API the Rails/Shakapacker world has built against for years — so the relevant comparison for a React on Rails app is less "Vite plugins vs Rspack plugins" than "does the webpack-contract tooling you already use carry over" (check the [Rspack compatibility documentation](https://www.rspack.dev/plugins/community-plugin-compatibility) for specific plugins). The plugin that decides our architecture is the RSC manifest/loader tooling described above, and that exists for webpack and rspack only.
 
 ### "Everyone uses Vite — you're swimming upstream"
 

@@ -95,16 +95,24 @@ module ReactOnRailsPro
         end
 
         def render_streaming_with_cache(prerender_cache_key, js_code, render_options)
-          # Streaming path: try to serve from cache; otherwise wrap upstream stream
+          # Streaming path: try to serve from cache; otherwise wrap upstream stream.
+          # The cache key ignores random dom ids, so a cached stream may have been produced for
+          # another mount point; StreamCache rebinds it to this render's dom id (issue #4984).
           cache_options = render_options.internal_option(:cache_options)
-          cached_stream = ReactOnRailsPro::StreamCache.fetch_stream(prerender_cache_key, cache_options:)
+          dom_node_id = render_options.dom_id
+          cached_stream = ReactOnRailsPro::StreamCache.fetch_stream(
+            prerender_cache_key,
+            cache_options:,
+            dom_node_id:
+          )
           return cached_stream if cached_stream
 
           upstream = render_on_pool(js_code, render_options)
           ReactOnRailsPro::StreamCache.wrap_and_cache(
             prerender_cache_key,
             upstream,
-            cache_options:
+            cache_options:,
+            dom_node_id:
           )
         end
 
