@@ -33,7 +33,7 @@ module CloseoutEvidenceReplay
   LOCAL_MEDIA_EXTENSION = /\.(?:avi|avif|bmp|gif|heic|heif|ico|jpe?g|m4v|mov|mp4|png|svg|tiff?|webm|webp)\b/i
   MEASUREMENT_VALUE = %r{([-+]?\d+(?:\.\d+)?)([A-Za-z%]+(?:/[A-Za-z]+)?)}i
   EPHEMERAL_ARTIFACT_SCHEME = /\b(?:about|blob|chrome-extension|data|file|filesystem|ftp|http|mediastream|moz-extension):/i
-  UNRESOLVED_PLACEHOLDER = %r{\b(?:missing|unavailable|unmeasured|unknown|not[ _](?:available|measured))\b|n/a}i
+  UNRESOLVED_PLACEHOLDER = %r{\b(?:missing|unavailable|unmeasured|unknown|not[ _](?:available|measured))\b|\bn/a\b}i
   CLAUSE_GAP = '[^.!?;,\n]*'
 
   def run(argv)
@@ -409,7 +409,7 @@ module CloseoutEvidenceReplay
     measured = evidence.start_with?("repo_seam:") &&
                valid_repo_seam_source?(evidence) &&
                labeled_measurement_pair?(evidence, "baseline_value", "candidate_value") &&
-               !evidence.match?(%r{\b(?:unavailable|missing|unknown|not[ _]measured|not[ _]applicable)\b|n/a}i)
+               !evidence.match?(%r{\b(?:unavailable|missing|unknown|not[ _]measured|not[ _]applicable)\b|\bn/a\b}i)
     measured &&= valid_measured_metric?(evidence) if classification == "measured_metric"
     measured &&= valid_bundle_hygiene?(evidence) if classification == "bundle_hygiene"
     missing << "performance_evidence" unless measured
@@ -421,7 +421,8 @@ module CloseoutEvidenceReplay
   end
 
   def baseline_and_candidate?(value)
-    value.match?(/\b(?:baseline|before)\b/i) && value.match?(/\b(?:candidate|after)\b/i)
+    non_url_text = without_https_urls(value)
+    non_url_text.match?(/\b(?:baseline|before)\b/i) && non_url_text.match?(/\b(?:candidate|after)\b/i)
   end
 
   def http_url?(value)
@@ -566,10 +567,16 @@ module CloseoutEvidenceReplay
   def negated_or_passing_failure_claim?(value)
     failure_term = "(?:fail(?:ed|s|ing|ures?)?|errors?|assert(?:ion)?s?|mismatch(?:es)?)"
     negation = "(?:did\\s+not|didn['’]t|never|not|no|without)"
-    reverse_negation = "(?:(?:not|never)#{CLAUSE_GAP}(?:observed|reproduced|detected|occurred|seen|present)|" \
-                       "(?:did\\s+not|didn['’]t)#{CLAUSE_GAP}(?:occur|happen|appear|manifest|get\\s+(?:observed|reproduced|detected)))"
+    contracted_negation = "(?:(?:was|were|is|are|has|have|had|does|do)n['’]t)"
+    absence_outcome = "(?:observed|reproduced|detected|occur(?:red|s|ring)?|happen(?:ed|s|ing)?|seen|present|" \
+                      "appear(?:ed|s|ing)?|manifest(?:ed|s|ing)?|get\\s+(?:observed|reproduced|detected))"
+    reverse_negation = "(?:(?:not|never|#{contracted_negation})#{CLAUSE_GAP}#{absence_outcome}|" \
+                       "(?:did\\s+not|didn['’]t)#{CLAUSE_GAP}#{absence_outcome})"
     value.match?(/\b#{negation}\b#{CLAUSE_GAP}\b#{failure_term}\b/i) ||
       value.match?(/\b#{failure_term}\b#{CLAUSE_GAP}\b#{reverse_negation}\b/i) ||
+      value.match?(
+        /\b(?:unable\s+to|can(?:not|['’]t)|could(?:\s+not|n['’]t))#{CLAUSE_GAP}\b(?:reproduce|observe|detect|trigger|cause|demonstrate)\b/i
+      ) ||
       value.match?(/\b(?:no\s+longer\s+fail(?:ed|s|ing)?|stopp(?:ed|ing)\s+fail(?:ing)?|fail(?:ed|s)?\s+no\s+more)\b/i) ||
       value.match?(/\b(?:assert(?:ion)?s?|controls?|negative\s+controls?|runs?|tests?|checks?)\s+(?:(?:is|was|were|been)\s+)?(?:now\s+)?(?:pass(?:ed|es)?|succeed(?:ed|s)?|successful)\b/i) ||
       value.match?(/\A(?:pass(?:ed|es)?|succeed(?:ed|s)?|successful)\b/i)

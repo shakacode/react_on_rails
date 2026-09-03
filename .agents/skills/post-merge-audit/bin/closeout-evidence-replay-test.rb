@@ -493,6 +493,17 @@ class CloseoutEvidenceReplayTest < Minitest::Test
     end
   end
 
+  def test_v2_requires_before_and_after_words_outside_visual_evidence_urls
+    qa = run_replay(
+      v2_marker(
+        "visual_evidence" => "durable: https://github.com/example/repo/pull/123#before-after"
+      )
+    ).fetch("qa_evidence")
+
+    assert_equal "UNKNOWN", qa.fetch("verdict")
+    assert_includes qa.fetch("missing"), "visual_evidence.before_after"
+  end
+
   def test_v2_rejects_ephemeral_non_https_artifact_schemes_even_with_https
     schemes = [
       "blob:https://example.test/transient-id",
@@ -815,6 +826,9 @@ class CloseoutEvidenceReplayTest < Minitest::Test
       "observed_failure: assertion FAILED but not observed",
       "observed_failure: failure did not occur",
       "observed_failure: failure didn't happen",
+      "observed_failure: assertion failure wasn't observed",
+      "observed_failure: failure hasn't occurred",
+      "observed_failure: negative control was unable to reproduce the assertion failure",
       "observed_failure: completed without mismatch",
       "observed_failure: assertion no longer fails",
       "observed_failure: assertion stopped failing",
@@ -937,6 +951,18 @@ class CloseoutEvidenceReplayTest < Minitest::Test
         assert_includes qa.fetch("missing"), "performance_evidence", assertion_label
       end
     end
+  end
+
+  def test_v2_performance_source_allows_analyze_path_segment
+    qa = run_replay(
+      v2_marker(
+        "performance_impact" => "bundle_hygiene",
+        "performance_evidence" =>
+          "repo_seam: source=bin/analyze-bundle; baseline_value=100KB; candidate_value=90KB"
+      )
+    ).fetch("qa_evidence")
+
+    assert_equal "SATISFIED", qa.fetch("verdict")
   end
 
   def test_v2_measured_metric_requires_named_non_size_runtime_or_user_metric
