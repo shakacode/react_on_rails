@@ -67,8 +67,8 @@ module ReactOnRails
       module_function
 
       # Prefer rename over truncate-and-write so interrupted writes cannot leave a partial destination.
-      # Existing writable files retain the old in-place behavior when directory permissions block replacement.
-      def write(path, content, new_file_mode: 0o644)
+      # Copied guardrails may retain the old in-place behavior when directory permissions block replacement.
+      def write(path, content, new_file_mode: 0o644, allow_in_place_fallback: false, ensure_executable: false)
         existing_stat = File.stat(path) if File.exist?(path)
         temp = Tempfile.create([".#{File.basename(path)}", ".tmp"], File.dirname(path))
         begin
@@ -79,15 +79,33 @@ module ReactOnRails
           FileOwnership.preserve(existing_stat, temp.path)
           File.chmod(existing_stat ? existing_stat.mode & 0o7777 : new_file_mode, temp.path)
           File.rename(temp.path, path)
+          :atomic
         rescue StandardError
           FileUtils.rm_f(temp.path)
           raise
         end
       rescue Errno::EACCES, Errno::EPERM
-        raise unless existing_stat
+        raise unless existing_stat && allow_in_place_fallback
 
+        prepare_in_place(path, ensure_executable)
         File.write(path, content)
+        :in_place
       end
+
+      def finish_copy(path, ensure_executable:, strategy:)
+        return unless ensure_executable
+        return if strategy == :in_place
+
+        File.chmod(0o755, path)
+      end
+
+      def prepare_in_place(path, ensure_executable)
+        return unless ensure_executable
+        return if File.executable?(path)
+
+        File.chmod(0o755, path)
+      end
+      private_class_method :prepare_in_place
     end
     private_constant :FileWriter
 
@@ -134,17 +152,25 @@ module ReactOnRails
       def copy_file(source, dest_rel, write_path)
         source_path = File.join(TEMPLATES_DIR, source)
         dest_path = File.join(destination_root, dest_rel)
+        hook = dest_rel == HOOK_REL
         existed = path_entry_exists?(dest_path)
         return "skipped    #{dest_rel} (already exists)" if skip_existing && existed
 
         new_content = File.read(source_path)
         unchanged = File.exist?(dest_path) && File.read(dest_path) == new_content
+        write_strategy = nil
 
         unless unchanged
           FileUtils.mkdir_p(File.dirname(write_path))
-          FileWriter.write(write_path, new_content, new_file_mode: 0o666 & ~File.umask)
+          write_strategy = FileWriter.write(
+            write_path,
+            new_content,
+            new_file_mode: 0o666 & ~File.umask,
+            allow_in_place_fallback: true,
+            ensure_executable: hook
+          )
         end
-        File.chmod(0o755, write_path) if dest_rel == HOOK_REL
+        FileWriter.finish_copy(write_path, ensure_executable: hook, strategy: write_strategy)
 
         return "unchanged  #{dest_rel}" if unchanged
 

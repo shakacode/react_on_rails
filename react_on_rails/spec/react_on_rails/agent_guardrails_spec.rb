@@ -199,6 +199,30 @@ module ReactOnRails
       expect(Dir.children(hook_directory)).not_to include(a_string_matching(/\.tmp\z/))
     end
 
+    it "leaves a writable hook unchanged when its executable mode cannot be prepared for fallback" do
+      described_class.install(@app_root)
+      hook_path = File.join(@app_root, ".claude/hooks/rsc-app-safety-check.rb")
+      hook_directory = File.dirname(hook_path)
+      File.write(hook_path, "existing hook\n")
+      File.chmod(0o555, hook_directory)
+      allow(File).to receive(:executable?).and_call_original
+      allow(File).to receive(:executable?).with(hook_path).and_return(false)
+      allow(File).to receive(:chmod).and_wrap_original do |original, mode, path|
+        raise Errno::EPERM, path if mode == 0o755 && path == hook_path
+
+        original.call(mode, path)
+      end
+
+      begin
+        expect { described_class.install(@app_root) }.to raise_error(Errno::EPERM)
+      ensure
+        File.chmod(0o755, hook_directory)
+      end
+
+      expect(File.read(hook_path)).to eq("existing hook\n")
+      expect(Dir.children(hook_directory)).not_to include(a_string_matching(/\.tmp\z/))
+    end
+
     it "updates a symlinked guardrail target without replacing the symlink" do
       described_class.install(@app_root)
       skill_path = File.join(@app_root, ".claude/skills/rsc-app-safety/SKILL.md")
@@ -1032,6 +1056,24 @@ module ReactOnRails
 
       expect(JSON.parse(File.read(settings_path))).to eq(original)
       expect(Dir.children(File.dirname(settings_path))).not_to include(a_string_matching(/\.tmp\z/))
+    end
+
+    it "does not fall back to an in-place settings write when its parent blocks atomic replacement" do
+      described_class.install(@app_root)
+      settings_path = File.join(@app_root, ".claude/settings.json")
+      settings_directory = File.dirname(settings_path)
+      existing_content = "{\n  \"unrelated\": true\n}\n"
+      File.write(settings_path, existing_content)
+      File.chmod(0o555, settings_directory)
+
+      begin
+        expect { described_class.install(@app_root) }.to raise_error(Errno::EACCES)
+      ensure
+        File.chmod(0o755, settings_directory)
+      end
+
+      expect(File.read(settings_path)).to eq(existing_content)
+      expect(Dir.children(settings_directory)).not_to include(a_string_matching(/\.tmp\z/))
     end
 
     it "preserves the permissions of an existing settings.json across an update" do
