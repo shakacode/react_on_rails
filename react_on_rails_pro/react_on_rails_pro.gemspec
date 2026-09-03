@@ -55,7 +55,9 @@ Gem::Specification.new do |s|
   s.add_runtime_dependency "io-endpoint", "~> 0.17.0"
   # Pro's only JWT call site (LicenseValidator) pins algorithm: "RS256" with
   # public-key verification, which is safe on jwt 2.x as well as 3.x.
-  s.add_runtime_dependency "jwt", ">= 2.5", "< 4"
+  # jwt 2.8 first declares `base64` as a runtime dependency. This keeps offline
+  # license validation reliable on Ruby 3.4+, where base64 is a bundled gem.
+  s.add_runtime_dependency "jwt", ">= 2.8", "< 4"
   s.add_runtime_dependency "nokogiri", ">= 1.12", "< 2"
   s.add_runtime_dependency "react_on_rails", ReactOnRails::VERSION
   # rubocop:disable Gemspec/DevelopmentDependencies

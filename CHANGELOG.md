@@ -26,6 +26,12 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **Explicit `id: nil` now uses the configured automatic DOM id behavior**: Component rendering no longer omits the
+  container id while still reporting that a random id is active. Fixes
+  [Issue 4993](https://github.com/shakacode/react_on_rails/issues/4993).
+  [PR 4998](https://github.com/shakacode/react_on_rails/pull/4998) by
+  [justin808](https://github.com/justin808).
+
 - **[Pro]** **Prerender-cached streamed renders now hydrate on every request**: The automatic prerender cache key
   deliberately ignores random dom ids so one cached render serves every mount point, but the cached
   chunks still embedded the first request's dom id in their React Server Component payload keys.
@@ -168,6 +174,15 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   that previously fell back to the default now fail fast during renderer startup. Fixes
   [Issue 4810](https://github.com/shakacode/react_on_rails/issues/4810).
   [PR 4811](https://github.com/shakacode/react_on_rails/pull/4811) by
+  [justin808](https://github.com/justin808).
+
+- **[Pro]** **Raised the `jwt` floor to `>= 2.8` for reliable offline license validation on Ruby 3.4+**:
+  jwt 2.8 first declares `base64` as a runtime dependency, so the gemspec now requires `jwt >= 2.8, < 4`.
+  jwt 3.x remains supported and 4.x remains unsupported. Documentation now distinguishes the Pro Node renderer's
+  default Fastify 5 setup, which requires Node 20+ at startup, from its `engines.node` floor of Node 18.19.0+
+  when applications use the documented Fastify 4-compatible dependency overrides. Fixes
+  [Issue 4730](https://github.com/shakacode/react_on_rails/issues/4730).
+  [PR 4864](https://github.com/shakacode/react_on_rails/pull/4864) by
   [justin808](https://github.com/justin808).
 
 - **Routine startup diagnostics no longer appear in default `INFO` logs**: Successful package validation, valid
