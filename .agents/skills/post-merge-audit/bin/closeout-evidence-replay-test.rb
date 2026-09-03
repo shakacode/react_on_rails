@@ -90,6 +90,28 @@ class CloseoutEvidenceReplayTest < Minitest::Test
     assert_includes out, "--require-visual-evidence-v2 requires --expected-head-sha"
   end
 
+  def test_strict_visual_gate_requires_ui_change_yes
+    data = run_replay(
+      v2_marker(
+        "required" => "no",
+        "status" => "not_applicable",
+        "user_visible_ui_change" => "no",
+        "visual_evidence_destination" => "not_applicable",
+        "visual_evidence" => "not applicable: no user-visible UI change",
+        "paint_check" => "not applicable: no rendered target",
+        "interaction_evidence" => "not applicable: no interaction change",
+        "negative_control" => "not applicable: no visual fix",
+        "release_blocking" => "not_applicable"
+      ),
+      expected_head_sha: "1111111111111111111111111111111111111111",
+      require_visual_evidence_v2: true
+    )
+
+    qa = data.fetch("qa_evidence")
+    assert_equal "UNKNOWN", qa.fetch("verdict")
+    assert_includes qa.fetch("missing"), "user_visible_ui_change"
+  end
+
   def test_historical_v1_remains_replayable_without_visual_fields
     data = run_replay(<<~MARKDOWN)
       <!-- qa-evidence v1
@@ -735,6 +757,7 @@ class CloseoutEvidenceReplayTest < Minitest::Test
   def test_v2_negative_control_rejects_negated_failure_and_passing_claims
     invalid_claims = [
       "observed_failure: assertion did not fail",
+      "observed_failure: Assertion Did Not Fail",
       "observed_failure: assertion did not really fail",
       "observed_failure: assertion did not actually clearly obviously fail",
       "observed_failure: the test did not seem to fail",
@@ -746,6 +769,7 @@ class CloseoutEvidenceReplayTest < Minitest::Test
       "observed_failure: assert did not error",
       "observed_failure: assertion never failed",
       "observed_failure: failure not observed in this run",
+      "observed_failure: assertion FAILED but not observed",
       "observed_failure: completed without mismatch",
       "observed_failure: assertion no longer fails",
       "observed_failure: assertion stopped failing",
@@ -774,6 +798,18 @@ class CloseoutEvidenceReplayTest < Minitest::Test
 
   def test_v2_negative_control_allows_historical_pass_word_when_outcome_failed
     evidence = "observed_failure: the control that used to pass validation now fails the assertion"
+    qa = run_replay(
+      v2_marker(
+        "visual_fix" => "yes",
+        "negative_control" => evidence
+      )
+    ).fetch("qa_evidence")
+
+    assert_equal "SATISFIED", qa.fetch("verdict")
+  end
+
+  def test_v2_negative_control_allows_unrelated_no_after_failure
+    evidence = "observed_failure: assertion failed no matter the retry count"
     qa = run_replay(
       v2_marker(
         "visual_fix" => "yes",

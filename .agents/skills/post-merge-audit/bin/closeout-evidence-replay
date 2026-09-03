@@ -125,6 +125,11 @@ module CloseoutEvidenceReplay
       else
         replay_qa_markers(qa_v1_markers, expected_head_sha: expected_head_sha, version: 1)
       end
+    if require_visual_evidence_v2 && qa.dig("fields", "user_visible_ui_change") != "yes"
+      qa.fetch("missing") << "user_visible_ui_change"
+      qa.fetch("missing").uniq!
+      qa["verdict"] = "UNKNOWN"
+    end
     priority = replay_priority_markers(
       marker_bodies(text, "priority-finding-dispositions v1"),
       expected_head_sha:,
@@ -551,10 +556,11 @@ module CloseoutEvidenceReplay
   end
 
   def negated_or_passing_failure_claim?(value)
-    failure_term = /(?:fail(?:ed|s|ing|ure)?|errors?|assert(?:ion)?s?|mismatch(?:es)?)/
-    negation = /(?:did\s+not|didn['’]t|never|not|no|without)/
+    failure_term = "(?:fail(?:ed|s|ing|ures?)?|errors?|assert(?:ion)?s?|mismatch(?:es)?)"
+    negation = "(?:did\\s+not|didn['’]t|never|not|no|without)"
+    reverse_negation = "(?:not|never)#{CLAUSE_GAP}(?:observed|reproduced|detected|occurred|seen|present)"
     value.match?(/\b#{negation}\b#{CLAUSE_GAP}\b#{failure_term}\b/i) ||
-      value.match?(/\b#{failure_term}\b#{CLAUSE_GAP}\b#{negation}\b/i) ||
+      value.match?(/\b#{failure_term}\b#{CLAUSE_GAP}\b#{reverse_negation}\b/i) ||
       value.match?(/\b(?:no\s+longer\s+fail(?:ed|s|ing)?|stopp(?:ed|ing)\s+fail(?:ing)?|fail(?:ed|s)?\s+no\s+more)\b/i) ||
       value.match?(/\b(?:assert(?:ion)?s?|controls?|negative\s+controls?|runs?|tests?|checks?)\s+(?:(?:is|was|were|been)\s+)?(?:now\s+)?(?:pass(?:ed|es)?|succeed(?:ed|s)?|successful)\b/i) ||
       value.match?(/\A(?:pass(?:ed|es)?|succeed(?:ed|s)?|successful)\b/i)
