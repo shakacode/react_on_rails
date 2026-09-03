@@ -440,7 +440,12 @@ Before upgrading:
 
 ##### JWT gem requirement
 
-`react_on_rails_pro` uses `jwt` for offline license validation. Current versions require `jwt >= 2.8, < 4`, so apps still pinned to a compatible jwt 2.x release can bundle without upgrading. Apps that can resolve `jwt 3.2.0` or newer in the 3.x line will continue to do so; jwt 4.x is not supported. If your Gemfile pins `jwt` below 2.8 (e.g., `2.2.x` for compatibility with OAuth gems), you will need to upgrade it. Check for conflicts with:
+`react_on_rails_pro` uses `jwt` for offline license validation. The first release containing
+[PR 4864](https://github.com/shakacode/react_on_rails/pull/4864), and later releases, require `jwt >= 2.8, < 4`;
+earlier React on Rails Pro releases retain the dependency range declared by their gemspec. Apps still pinned to a
+compatible jwt 2.x release can bundle without upgrading. Apps that can resolve `jwt 3.2.0` or newer in the 3.x line
+will continue to do so; jwt 4.x is not supported. If your Gemfile pins `jwt` below 2.8 (e.g., `2.2.x` for compatibility
+with OAuth gems), you will need to upgrade it. Check for conflicts with:
 
 ```bash
 bundle update jwt

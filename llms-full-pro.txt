@@ -641,7 +641,12 @@ Before upgrading:
 
 ##### JWT gem requirement
 
-`react_on_rails_pro` uses `jwt` for offline license validation. Current versions require `jwt >= 2.8, < 4`, so apps still pinned to a compatible jwt 2.x release can bundle without upgrading. Apps that can resolve `jwt 3.2.0` or newer in the 3.x line will continue to do so; jwt 4.x is not supported. If your Gemfile pins `jwt` below 2.8 (e.g., `2.2.x` for compatibility with OAuth gems), you will need to upgrade it. Check for conflicts with:
+`react_on_rails_pro` uses `jwt` for offline license validation. The first release containing
+[PR 4864](https://github.com/shakacode/react_on_rails/pull/4864), and later releases, require `jwt >= 2.8, < 4`;
+earlier React on Rails Pro releases retain the dependency range declared by their gemspec. Apps still pinned to a
+compatible jwt 2.x release can bundle without upgrading. Apps that can resolve `jwt 3.2.0` or newer in the 3.x line
+will continue to do so; jwt 4.x is not supported. If your Gemfile pins `jwt` below 2.8 (e.g., `2.2.x` for compatibility
+with OAuth gems), you will need to upgrade it. Check for conflicts with:
 
 ```bash
 bundle update jwt
@@ -9766,6 +9771,34 @@ Before running the generator, verify your environment:
 | Node.js                  | `node --version`                                                                                                               | Node 20+ by default (Fastify 5); >= 18.19.0 with documented Fastify 4-compatible overrides |
 | Pro initializer exists   | `ls config/initializers/react_on_rails_pro.rb`                                                                                 | File exists                                                                                |
 | Node renderer configured | Check `react_on_rails_pro.rb` for `server_renderer = "NodeRenderer"`                                                           | NodeRenderer enabled                                                                       |
+
+For Node 18.19, override the renderer's Fastify dependencies according to your package manager. Yarn uses
+`resolutions`, as shown in the [Node Renderer 4.0 release notes](../release-notes/4.0.md#node-version-requirements).
+npm and Bun use the same dependency map under `overrides`:
+
+```json
+{
+  "overrides": {
+    "@fastify/formbody": "^7.4.0",
+    "fastify-favicon": "^4.3.0",
+    "fastify": "^4.29.0"
+  }
+}
+```
+
+pnpm uses that map under `pnpm.overrides`:
+
+```json
+{
+  "pnpm": {
+    "overrides": {
+      "@fastify/formbody": "^7.4.0",
+      "fastify-favicon": "^4.3.0",
+      "fastify": "^4.29.0"
+    }
+  }
+}
+```
 
 If React is outside the supported 19.2.x range or below 19.2.7, upgrade it first:
 

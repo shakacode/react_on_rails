@@ -20,6 +20,34 @@ Before running the generator, verify your environment:
 | Pro initializer exists   | `ls config/initializers/react_on_rails_pro.rb`                                                                                 | File exists                                                                                |
 | Node renderer configured | Check `react_on_rails_pro.rb` for `server_renderer = "NodeRenderer"`                                                           | NodeRenderer enabled                                                                       |
 
+For Node 18.19, override the renderer's Fastify dependencies according to your package manager. Yarn uses
+`resolutions`, as shown in the [Node Renderer 4.0 release notes](../release-notes/4.0.md#node-version-requirements).
+npm and Bun use the same dependency map under `overrides`:
+
+```json
+{
+  "overrides": {
+    "@fastify/formbody": "^7.4.0",
+    "fastify-favicon": "^4.3.0",
+    "fastify": "^4.29.0"
+  }
+}
+```
+
+pnpm uses that map under `pnpm.overrides`:
+
+```json
+{
+  "pnpm": {
+    "overrides": {
+      "@fastify/formbody": "^7.4.0",
+      "fastify-favicon": "^4.3.0",
+      "fastify": "^4.29.0"
+    }
+  }
+}
+```
+
 If React is outside the supported 19.2.x range or below 19.2.7, upgrade it first:
 
 ```bash
