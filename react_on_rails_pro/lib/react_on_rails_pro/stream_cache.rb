@@ -82,40 +82,57 @@ module ReactOnRailsPro
       def rewrite(chunks, from:, to:)
         return chunks if from.to_s.empty? || to.to_s.empty? || from == to
 
-        if chunks.all?(String)
-          resplit(chunks.join, chunks.map(&:bytesize), from, to)
-        else
-          rewrite_hashes(chunks, from, to)
-        end
+        html_pieces = chunks.map { |chunk| markup_of(chunk) }
+        rewritten_html = resplit(html_pieces.join, html_pieces.map(&:bytesize), from, to)
+        chunks.each_with_index.map { |chunk, index| rebind_chunk(chunk, rewritten_html[index], from, to) }
       end
 
-      def rewrite_hashes(chunks, from, to)
-        html_pieces = chunks.map { |chunk| chunk.is_a?(Hash) ? chunk[HTML_KEY].to_s : "" }
-        rewritten_html = resplit(html_pieces.join, html_pieces.map(&:bytesize), from, to)
+      # Every chunk contributes its markup to one joined document: a String chunk is the markup
+      # itself, a Hash chunk contributes its "html", anything else contributes nothing.
+      def markup_of(chunk)
+        return chunk if chunk.is_a?(String)
+        return chunk[HTML_KEY] if chunk.is_a?(Hash) && chunk[HTML_KEY].is_a?(String)
 
-        chunks.each_with_index.map do |chunk, index|
-          next chunk unless chunk.is_a?(Hash)
+        ""
+      end
 
-          rebound = chunk.dup
-          rebound[HTML_KEY] = rewritten_html[index] if chunk.key?(HTML_KEY)
-          if chunk[CONSOLE_REPLAY_SCRIPT_KEY].is_a?(String)
-            rebound[CONSOLE_REPLAY_SCRIPT_KEY] = chunk[CONSOLE_REPLAY_SCRIPT_KEY].gsub(from, to)
-          end
-          rebound
+      def rebind_chunk(chunk, rewritten_html, from, to)
+        return rewritten_html if chunk.is_a?(String)
+        return chunk unless chunk.is_a?(Hash)
+
+        rebind_hash(chunk, rewritten_html, from, to)
+      end
+
+      def rebind_hash(chunk, rewritten_html, from, to)
+        rebound = chunk.dup
+        rebound[HTML_KEY] = rewritten_html if chunk[HTML_KEY].is_a?(String)
+        if chunk[CONSOLE_REPLAY_SCRIPT_KEY].is_a?(String)
+          rebound[CONSOLE_REPLAY_SCRIPT_KEY] = replace_literal(chunk[CONSOLE_REPLAY_SCRIPT_KEY], from, to)
         end
+        rebound
       end
 
       # Splits `document` back into pieces sized like `sizes` (in bytes). Random dom ids share one
-      # format, so the substitution normally keeps every byte offset; any length change flows into
-      # the final piece so the concatenation stays identical to the rewritten document.
+      # format, so the substitution keeps every byte offset and the original boundaries are exact.
+      # If the ids ever differ in length, byte offsets would no longer align (and could cut a
+      # multibyte character), so the whole rewritten document is delivered in the first piece and
+      # the remaining pieces are empty; the concatenation is identical either way.
       def resplit(document, sizes, from, to)
-        rewritten = document.gsub(from, to)
+        rewritten = replace_literal(document, from, to)
+        return [rewritten] + Array.new([sizes.length - 1, 0].max, "") if from.bytesize != to.bytesize
+
         offset = 0
         sizes.each_with_index.map do |size, index|
           piece = index == sizes.length - 1 ? rewritten.byteslice(offset..) : rewritten.byteslice(offset, size)
           offset += size
           piece || ""
         end
+      end
+
+      # The block form keeps `to` literal: a String replacement would interpret backreference
+      # sequences such as `\0` or `\\`.
+      def replace_literal(text, from, to)
+        text.gsub(from) { to }
       end
     end
 

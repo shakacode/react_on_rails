@@ -26,7 +26,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
-- **[Pro] Prerender-cached streamed renders now hydrate on every request**: The prerender cache key
+- **[Pro]** **Prerender-cached streamed renders now hydrate on every request**: The automatic prerender cache key
   deliberately ignores random dom ids so one cached render serves every mount point, but the cached
   chunks still embedded the first request's dom id in their React Server Component payload keys.
   Every cache hit therefore refetched the payload and failed hydration whenever the render was not

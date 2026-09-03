@@ -196,6 +196,49 @@ RSpec.describe ReactOnRailsPro::StreamCache, :caching do
       expect(hit.join).to eq(init_script.gsub(first_dom_id, second_dom_id))
     end
 
+    it "rebinds a mixed array of string and hash chunks" do
+      cache_chunks([init_script[0...cut], payload_chunks.last], dom_node_id: first_dom_id)
+
+      hit = described_class.fetch_stream(cache_key, dom_node_id: second_dom_id).each_chunk.to_a
+
+      expect(hit.first).to be_a(String)
+      expect(hit.last).to be_a(Hash)
+      expect(hit.first + hit.last["html"]).to eq(init_script.gsub(first_dom_id, second_dom_id))
+    end
+
+    it "leaves a nil html value nil and skips non-string chunks" do
+      chunks = [{ "html" => nil, "hasErrors" => false }, 42, payload_chunks.first.merge("html" => init_script)]
+      cache_chunks(chunks, dom_node_id: first_dom_id)
+
+      hit = described_class.fetch_stream(cache_key, dom_node_id: second_dom_id).each_chunk.to_a
+
+      expect(hit.first["html"]).to be_nil
+      expect(hit[1]).to eq(42)
+      expect(hit.last["html"]).to eq(init_script.gsub(first_dom_id, second_dom_id))
+    end
+
+    it "keeps the replacement literal when the new id contains backreference sequences" do
+      odd_dom_id = "HelloServer-react-component-\\0-\\\\"
+      cache_chunks([init_script], dom_node_id: first_dom_id)
+
+      hit = described_class.fetch_stream(cache_key, dom_node_id: odd_dom_id).each_chunk.to_a
+
+      expect(hit.join).to eq(init_script.gsub(first_dom_id) { odd_dom_id })
+    end
+
+    it "delivers the whole rewritten document in the first piece when the ids differ in length" do
+      short_dom_id = "HelloServer-react-component-short"
+      multibyte_chunks = ["<p>café #{init_script[0...cut]}", "#{init_script[cut..]}é</p>"]
+      cache_chunks(multibyte_chunks, dom_node_id: first_dom_id)
+
+      hit = described_class.fetch_stream(cache_key, dom_node_id: short_dom_id).each_chunk.to_a
+
+      expect(hit.length).to eq(2)
+      expect(hit.join).to eq(multibyte_chunks.join.gsub(first_dom_id, short_dom_id))
+      expect(hit.last).to eq("")
+      expect(hit.all?(&:valid_encoding?)).to be(true)
+    end
+
     it "treats a legacy bare chunk array as a cache miss" do
       Rails.cache.write(cache_key, payload_chunks)
 
