@@ -113,7 +113,8 @@ Read the full **[React on Rails Doctrine](./misc/doctrine.md)** for our design p
 
 - **Rails 7.0+** (Ruby 3.3+ is incompatible with Rails < 7.0; CI tests against Rails 7.1)
 - **Ruby 3.3+**
-- **Node.js 18+**
+- **Node.js 18+** (React on Rails Pro's Node renderer defaults to Fastify 5 and requires **Node.js 20+** at startup;
+  its **Node.js 18.19.0+** `engines.node` floor applies with the documented Fastify 4-compatible dependency overrides)
 - **Shakapacker 6+** (7+ recommended for React on Rails v17)
 
 ## Need Help?
