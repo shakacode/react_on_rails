@@ -106,6 +106,25 @@ module ReactOnRails
       expect(File.exist?(settings_path)).to be false
     end
 
+    it "validates guardrail symlink targets before replacing any managed file" do
+      described_class.install(@app_root)
+      skill_path = File.join(@app_root, ".claude/skills/rsc-app-safety/SKILL.md")
+      hook_path = File.join(@app_root, ".claude/hooks/rsc-app-safety-check.rb")
+      settings_path = File.join(@app_root, ".claude/settings.json")
+      missing_hook_target = File.join(@app_root, "shared/missing/rsc-app-safety-check.rb")
+      File.write(skill_path, "existing skill\n")
+      File.unlink(hook_path)
+      File.symlink(missing_hook_target, hook_path)
+      original_settings = File.read(settings_path)
+
+      expect { described_class.install(@app_root) }.to raise_error(Errno::ENOENT)
+
+      expect(File.read(skill_path)).to eq("existing skill\n")
+      expect(File.symlink?(hook_path)).to be true
+      expect(File.exist?(missing_hook_target)).to be false
+      expect(File.read(settings_path)).to eq(original_settings)
+    end
+
     it "restores executable permissions when an unchanged hook is reinstalled" do
       described_class.install(@app_root)
       hook_path = File.join(@app_root, ".claude/hooks/rsc-app-safety-check.rb")

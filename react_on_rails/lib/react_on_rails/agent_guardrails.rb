@@ -58,26 +58,15 @@ module ReactOnRails
       end
 
       def install
-        validate_skip_existing_hook_target
+        copy_write_paths = validate_copy_paths_before_copy
         settings_write_path = validate_settings_before_copy
-        actions = FILES.map { |source, dest_rel| copy_file(source, dest_rel) }
-        actions << register_hook(settings_write_path)
-        actions << remove_legacy_hook
-        actions.compact
+        actions = FILES.map { |source, dest_rel| copy_file(source, dest_rel, copy_write_paths.fetch(dest_rel)) }
+        actions.push(register_hook(settings_write_path), remove_legacy_hook).compact
       end
 
       private
 
       attr_reader :destination_root, :skip_existing
-
-      def validate_skip_existing_hook_target
-        return unless skip_existing
-
-        hook_path = File.join(destination_root, HOOK_REL)
-        return unless File.symlink?(hook_path) && !File.exist?(hook_path)
-
-        raise Error, "#{HOOK_REL} is a dangling symlink, so its missing target cannot be skipped safely"
-      end
 
       def validate_settings_before_copy
         settings_path = File.join(destination_root, SETTINGS_REL)
@@ -87,7 +76,20 @@ module ReactOnRails
         write_path_for(settings_path)
       end
 
-      def copy_file(source, dest_rel)
+      def validate_copy_paths_before_copy
+        FILES.values.to_h do |dest_rel|
+          dest_path = File.join(destination_root, dest_rel)
+          if skip_existing && path_entry_exists?(dest_path)
+            raise Error, "#{HOOK_REL} is a dangling symlink, so its missing target cannot be skipped safely" if
+              dest_rel == HOOK_REL && !File.exist?(dest_path)
+
+            next [dest_rel, dest_path]
+          end
+          [dest_rel, write_path_for(dest_path)]
+        end
+      end
+
+      def copy_file(source, dest_rel, write_path)
         source_path = File.join(TEMPLATES_DIR, source)
         dest_path = File.join(destination_root, dest_rel)
         existed = path_entry_exists?(dest_path)
@@ -98,7 +100,7 @@ module ReactOnRails
 
         unless unchanged
           FileUtils.mkdir_p(File.dirname(dest_path))
-          atomic_write(write_path_for(dest_path), new_content, new_file_mode: 0o666 & ~File.umask)
+          atomic_write(write_path, new_content, new_file_mode: 0o666 & ~File.umask)
         end
         File.chmod(0o755, dest_path) if dest_rel == HOOK_REL
 
