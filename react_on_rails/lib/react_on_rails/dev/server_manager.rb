@@ -64,6 +64,9 @@ module ReactOnRails
       DEV_SESSION_LOCK_OPEN_FLAGS = File::RDWR |
                                     (defined?(File::NOFOLLOW) ? File::NOFOLLOW : 0) |
                                     (defined?(File::NONBLOCK) ? File::NONBLOCK : 0)
+      DEV_SESSION_LOCK_WRITE_FLAGS = File::WRONLY |
+                                     (defined?(File::NOFOLLOW) ? File::NOFOLLOW : 0) |
+                                     (defined?(File::NONBLOCK) ? File::NONBLOCK : 0)
       DEV_SESSION_LOCK_CREATE_FLAGS = DEV_SESSION_LOCK_OPEN_FLAGS | File::CREAT | File::EXCL
       # The read side needs the same O_NOFOLLOW guarantee as the write side: it
       # is the path that leads to signalling, so a symlink here is worth more to
@@ -951,9 +954,10 @@ module ReactOnRails
         # Existing ownership locks are coordination handles, not state we
         # mutate. Prefer a writable descriptor because Linux NFS emulates an
         # exclusive flock with fcntl and rejects read-only descriptors. If the
-        # lock is readable but not writable, retain the local-filesystem path
-        # that can still lock it read-only. O_EXCL keeps a concurrent creator a
-        # retry instead of silently creating through the existing-file path.
+        # lock is writable but not readable, keep the NFS-compatible write-only
+        # path; if it is only readable, retain the local-filesystem path that can
+        # still lock it read-only. O_EXCL keeps a concurrent creator a retry
+        # instead of silently creating through the existing-file path.
         def open_existing_or_create_dev_session_lock(path)
           DEV_SESSION_CLAIM_ATTEMPTS.times do
             return open_existing_dev_session_lock(path)
@@ -971,7 +975,11 @@ module ReactOnRails
         def open_existing_dev_session_lock(path)
           File.open(path, DEV_SESSION_LOCK_OPEN_FLAGS)
         rescue Errno::EACCES, Errno::EPERM, Errno::EROFS
-          File.open(path, DEV_SESSION_READ_FLAGS)
+          begin
+            File.open(path, DEV_SESSION_LOCK_WRITE_FLAGS)
+          rescue Errno::EACCES, Errno::EPERM, Errno::EROFS
+            File.open(path, DEV_SESSION_READ_FLAGS)
+          end
         end
 
         # Returns [:opened, File], [:absent, nil] or [:refused, message].
