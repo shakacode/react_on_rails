@@ -50,6 +50,19 @@ module ReactOnRails
       rails_root ? rails_root.to_s : Dir.pwd
     end
 
+    module FileOwnership
+      module_function
+
+      def preserve(existing_stat, path)
+        return unless existing_stat
+
+        File.chown(existing_stat.uid, existing_stat.gid, path)
+      rescue Errno::EPERM, Errno::EINVAL
+        nil
+      end
+    end
+    private_constant :FileOwnership
+
     # Encapsulates a single install run against one app root.
     class Installer
       def initialize(destination_root, skip_existing: false)
@@ -80,6 +93,7 @@ module ReactOnRails
         FILES.values.to_h do |dest_rel|
           dest_path = File.join(destination_root, dest_rel)
           if skip_existing && path_entry_exists?(dest_path)
+            # A missing skipped hook would still be registered; a missing skill remains intentionally skipped.
             raise Error, "#{HOOK_REL} is a dangling symlink, so its missing target cannot be skipped safely" if
               dest_rel == HOOK_REL && !File.exist?(dest_path)
 
@@ -102,7 +116,7 @@ module ReactOnRails
           FileUtils.mkdir_p(File.dirname(dest_path))
           atomic_write(write_path, new_content, new_file_mode: 0o666 & ~File.umask)
         end
-        File.chmod(0o755, dest_path) if dest_rel == HOOK_REL
+        File.chmod(0o755, write_path) if dest_rel == HOOK_REL
 
         return "unchanged  #{dest_rel}" if unchanged
 
@@ -143,7 +157,7 @@ module ReactOnRails
           temp.flush
           temp.fsync
           temp.close
-          File.chown(existing_stat.uid, existing_stat.gid, temp.path) if existing_stat
+          FileOwnership.preserve(existing_stat, temp.path)
           File.chmod(existing_stat ? existing_stat.mode & 0o7777 : new_file_mode, temp.path)
           File.rename(temp.path, path)
         rescue StandardError
