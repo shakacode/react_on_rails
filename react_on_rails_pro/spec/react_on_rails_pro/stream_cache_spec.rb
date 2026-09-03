@@ -239,6 +239,18 @@ RSpec.describe ReactOnRailsPro::StreamCache, :caching do
       expect(hit.all?(&:valid_encoding?)).to be(true)
     end
 
+    it "lands the whole rewritten document on the first markup-bearing chunk when ids differ in length" do
+      short_dom_id = "HelloServer-react-component-short"
+      chunks = [{ "html" => nil, "hasErrors" => false }, payload_chunks.first, payload_chunks.last]
+      cache_chunks(chunks, dom_node_id: first_dom_id)
+
+      hit = described_class.fetch_stream(cache_key, dom_node_id: short_dom_id).each_chunk.to_a
+
+      expect(hit.first["html"]).to be_nil
+      expect(hit[1]["html"]).to eq(init_script.gsub(first_dom_id, short_dom_id))
+      expect(hit.last["html"]).to eq("")
+    end
+
     it "treats a legacy bare chunk array as a cache miss" do
       Rails.cache.write(cache_key, payload_chunks)
 

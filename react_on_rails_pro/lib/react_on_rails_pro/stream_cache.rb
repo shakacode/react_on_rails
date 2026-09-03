@@ -83,8 +83,15 @@ module ReactOnRailsPro
         return chunks if from.to_s.empty? || to.to_s.empty? || from == to
 
         html_pieces = chunks.map { |chunk| markup_of(chunk) }
-        rewritten_html = resplit(html_pieces.join, html_pieces.map(&:bytesize), from, to)
+        rewritten_html = resplit(
+          html_pieces.join, html_pieces.map(&:bytesize), from, to,
+          landing_index: chunks.index { |chunk| markup?(chunk) } || 0
+        )
         chunks.each_with_index.map { |chunk, index| rebind_chunk(chunk, rewritten_html[index], from, to) }
+      end
+
+      def markup?(chunk)
+        chunk.is_a?(String) || (chunk.is_a?(Hash) && chunk[HTML_KEY].is_a?(String))
       end
 
       # Every chunk contributes its markup to one joined document: a String chunk is the markup
@@ -115,11 +122,16 @@ module ReactOnRailsPro
       # Splits `document` back into pieces sized like `sizes` (in bytes). Random dom ids share one
       # format, so the substitution keeps every byte offset and the original boundaries are exact.
       # If the ids ever differ in length, byte offsets would no longer align (and could cut a
-      # multibyte character), so the whole rewritten document is delivered in the first piece and
-      # the remaining pieces are empty; the concatenation is identical either way.
-      def resplit(document, sizes, from, to)
+      # multibyte character), so the whole rewritten document is delivered in the first piece that
+      # carries markup (`landing_index`) and every other piece is empty; the concatenation is
+      # identical either way.
+      def resplit(document, sizes, from, to, landing_index: 0)
         rewritten = replace_literal(document, from, to)
-        return [rewritten] + Array.new([sizes.length - 1, 0].max, "") if from.bytesize != to.bytesize
+        if from.bytesize != to.bytesize
+          pieces = Array.new(sizes.length, "")
+          pieces[landing_index] = rewritten unless pieces.empty?
+          return pieces
+        end
 
         offset = 0
         sizes.each_with_index.map do |size, index|
