@@ -741,6 +741,7 @@ class CloseoutEvidenceReplayTest < Minitest::Test
       "passed: target rendered unsuccessfully",
       "passed: target was unsuccessfully painted",
       "passed: target rendered but paint failed",
+      "passed: target failed during rendering; baseline rendered and inspected",
       "passed: rendered",
       "passed: painted successfully",
       "passed: target was unable to render; baseline rendered and inspected",
@@ -1031,6 +1032,9 @@ class CloseoutEvidenceReplayTest < Minitest::Test
       "not applicable: unavailable",
       "not applicable: evidence missing",
       "not applicable: N/A",
+      "not applicable: TODO",
+      "not applicable: TBD",
+      "not applicable: pending",
       "not applicable: unmeasured",
       "not applicable: not measured",
       "not_applicable: not available"

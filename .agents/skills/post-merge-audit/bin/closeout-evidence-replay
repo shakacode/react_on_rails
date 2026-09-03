@@ -33,7 +33,7 @@ module CloseoutEvidenceReplay
   LOCAL_MEDIA_EXTENSION = /\.(?:avi|avif|bmp|gif|heic|heif|ico|jpe?g|m4v|mov|mp4|png|svg|tiff?|webm|webp)\b/i
   MEASUREMENT_VALUE = %r{([-+]?\d+(?:\.\d+)?)([A-Za-z%]+(?:/[A-Za-z]+)?)}i
   EPHEMERAL_ARTIFACT_SCHEME = /\b(?:about|blob|chrome-extension|data|file|filesystem|ftp|http|mediastream|moz-extension):/i
-  UNRESOLVED_PLACEHOLDER = %r{\b(?:missing|unavailable|unmeasured|unknown|not[ _](?:available|measured))\b|\bn/a\b}i
+  UNRESOLVED_PLACEHOLDER = %r{\b(?:missing|pending|tbd|todo|unavailable|unmeasured|unknown|not[ _](?:available|measured))\b|\bn/a\b}i
   CLAUSE_GAP = '[^.!?;,\n]*'
   MAX_EVIDENCE_FIELD_BYTES = 4096
 
@@ -500,7 +500,7 @@ module CloseoutEvidenceReplay
       !affirmative_blank_or_unpainted_claim?(value) &&
       !failed_inspection_claim?(value) &&
       !value.match?(
-        /\b(?:(?:did\s+not|didn['’]t|not|never)\b#{paint_state_gap}\b(?:paint|render)(?:ed)?|(?:(?:was|were|is|are|has|have|had|does|do)n['’]t)\b#{paint_state_gap}\b(?:paint|render)(?:ed)?|(?:unable\s+to|can(?:not|['’]t)|could(?:\s+not|n['’]t))\s+(?:paint|render)|failed\s+to\s+(?:paint|render)|(?:paint|render)(?:ing)?\s+fail(?:ed|s|ure)?|(?:painted|rendered)\s+unsuccessfully|unsuccessfully\s+(?:painted|rendered))\b/i
+        /\b(?:(?:did\s+not|didn['’]t|not|never)\b#{paint_state_gap}\b(?:paint|render)(?:ed)?|(?:(?:was|were|is|are|has|have|had|does|do)n['’]t)\b#{paint_state_gap}\b(?:paint|render)(?:ed)?|(?:unable\s+to|can(?:not|['’]t)|could(?:\s+not|n['’]t))\s+(?:paint|render)|failed\s+(?:to\s+(?:paint|render)|(?:during|while)\s+(?:paint|render)(?:ing)?)|(?:paint|render)(?:ing)?\s+fail(?:ed|s|ure)?|(?:painted|rendered)\s+unsuccessfully|unsuccessfully\s+(?:painted|rendered))\b/i
       )
   end
 
