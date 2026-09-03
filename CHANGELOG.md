@@ -26,6 +26,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **Prerender-cached streamed renders now hydrate on every request**: The automatic prerender cache key
+  deliberately ignores random dom ids so one cached render serves every mount point, but the cached
+  chunks still embedded the first request's dom id in their React Server Component payload keys.
+  Every cache hit therefore refetched the payload and failed hydration whenever the render was not
+  byte-identical. Cached streams are now rebound to the dom id of the render being served. Fixes
+  [Issue 4984](https://github.com/shakacode/react_on_rails/issues/4984). [PR 4987](https://github.com/shakacode/react_on_rails/pull/4987) by
+  [justin808](https://github.com/justin808).
+
 - **Release failures now provide supervised, reason-specific recovery**: `script/release --evaluate-head`
   supports strict exact-HEAD CI evaluation for both preview and live retries, foreign claims identify the available
   holder/task/session metadata and targeted status command, and npm readiness distinguishes stale dependencies,
@@ -47,8 +55,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   client connection belonging to a different checkout — then printed "All processes terminated"
   without checking that anything had actually stopped. `bin/dev` now claims a worktree-scoped,
   `flock`-backed session file (`tmp/react_on_rails/dev-session.json`) recording the app root it
-  belongs to, the process group it leads, and the Overmind endpoint it would use. `bin/dev kill`
-  shuts that session down through its own Overmind control socket or its own process group,
+  belongs to, the process group it leads, and the Overmind endpoint it would use. Session
+  publication and kill-reader ownership are serialized through a fixed
+  `tmp/react_on_rails/dev-session.lock`: writers publish a same-directory temporary file with an
+  atomic rename while retaining the JSON file's lifetime lock, and a kill reader retains both locks
+  through shutdown cleanup so another reader cannot authenticate a stale or recycled process group.
+  A concurrent `bin/dev` start now exits non-zero with retry guidance instead of running unrecorded
+  while that shutdown lock is held.
+  `bin/dev kill` shuts that session down through its own Overmind control socket or its own process group,
   escalating from `TERM` to `KILL` only for survivors, and reports success only after positively
   observing that the owner, its process group, and its listeners are gone. Fallback port discovery
   is restricted to LISTEN sockets whose process working directory is inside the current app root;
@@ -69,7 +83,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   those listeners other than pid ≤ 1 and the calling process, and does **not** filter by app root —
   attribution happens in the kill path). Fixes
   [Issue 4846](https://github.com/shakacode/react_on_rails/issues/4846).
-  [PR 4937](https://github.com/shakacode/react_on_rails/pull/4937) by
+  [PR 4937](https://github.com/shakacode/react_on_rails/pull/4937) and
+  [PR 4964](https://github.com/shakacode/react_on_rails/pull/4964) by
   [justin808](https://github.com/justin808).
 
 - **[Pro]** **Surfaced missing RSC loadable stats in Node Renderer logs**: The first missing

@@ -96,8 +96,13 @@ defaults:
   build: bin/shakapacker
   branch_prefix: chore/demo-fleet
   review_app:
-    workflow: cpflow-review-app.yml
-    status_check: cpflow/review-app
+    # Every public demo with a review-app pipeline uses the control-plane-flow
+    # reusable workflow; its check-run is named `deploy / deploy` (there is no
+    # `cpflow/review-app` commit status). The first deploy for a PR must be
+    # requested with a `+review-app-deploy` comment or `workflow_dispatch`;
+    # `pull_request` runs only skip until an app exists.
+    workflow: .github/workflows/cpflow-deploy-review-app.yml
+    status_check: deploy / deploy
     cpflow_app_name: null
   age_gate:
     npm_min_days: 7
@@ -159,15 +164,16 @@ repos:
       - { ecosystem: npm, name: shakapacker }
       # No cpflow package until a CPFlow review-app pipeline exists for this repo.
     needs_pro: true
-    package_manager: npm
+    package_manager: npm # packageManager npm@11.6.0; .npmrc legacy-peer-deps=true is part of the lock contract
     ruby_test: ALLOW_DEMO_RENDERER_PASSWORD=true bin/rails test
-    build: bin/rails react_on_rails:generate_packs && bin/shakapacker
-    # Recorded for future review-app wiring; skipped while cpflow_app_name is null.
+    js_test: npm run typecheck
+    # bin/rails fails closed without the demo renderer password.
+    build: ALLOW_DEMO_RENDERER_PASSWORD=true bin/rails react_on_rails:generate_packs && ALLOW_DEMO_RENDERER_PASSWORD=true bin/shakapacker
+    # Recorded for future review-app wiring; unreachable while review_app is null.
     smoke: [/]
-    review_app:
-      workflow: cpflow-review-app.yml
-      status_check: cpflow/review-app
-      cpflow_app_name: null # Set after a CPFlow review-app pipeline exists.
+    # Staging-only Control Plane config (.controlplane/controlplane.yml); no review-app
+    # workflow has ever existed in this repo. Re-add the block if one is wired up.
+    review_app: null
     verify: true
 
   - name: shakacode/react-on-rails-demo-hacker-news-rsc
@@ -187,9 +193,17 @@ repos:
       - { ecosystem: gem, name: shakapacker }
       - { ecosystem: npm, name: shakapacker }
     needs_pro: true
-    ruby_test: bin/rails test && bin/rails test:system
+    package_manager: pnpm # packageManager pnpm@10.22.0
+    ruby_test: RAILS_ENV=test bin/rails db:prepare && bin/rails test && bin/rails test:system
+    js_test: pnpm exec tsc --noEmit
     build: bin/rails react_on_rails:generate_packs && bin/shakapacker
     smoke: [/, /news/1]
+    review_app:
+      workflow: .github/workflows/cpflow-deploy-review-app.yml
+      status_check: deploy / deploy
+      # Prefix is react-on-rails-demo-hacker-news-rsc-review, but no review app has ever
+      # deployed and the caller has no +review-app-deploy trigger (see that repo's issue #93).
+      cpflow_app_name: null
     verify: true
 
   - name: shakacode/react-on-rails-demo-marketplace-rsc
@@ -209,8 +223,15 @@ repos:
       - { ecosystem: gem, name: shakapacker }
       - { ecosystem: npm, name: shakapacker }
     needs_pro: true
-    build: bin/rails react_on_rails:generate_packs && bin/shakapacker
+    package_manager: pnpm # packageManager pnpm@9.15.2; .npmrc node-linker=hoisted
+    ruby_test: bin/rails db:test:prepare && bundle exec rspec spec/requests spec/routing
+    # Wraps rake react_on_rails:generate_packs + bin/shakapacker (rspack) + artifact checks.
+    build: SECRET_KEY_BASE=dummy_secret_key_base_for_demo_fleet bin/build-production
     smoke: [/, /products]
+    review_app:
+      workflow: .github/workflows/cpflow-deploy-review-app.yml
+      status_check: deploy / deploy
+      cpflow_app_name: react-server-components-demo-review # per-PR app: <name>-<PR#>
     verify: true
 
   - name: shakacode/react-on-rails-demo-gumroad-rsc
@@ -229,8 +250,15 @@ repos:
       - { ecosystem: npm, name: react-on-rails-rsc }
       - { ecosystem: gem, name: shakapacker }
     needs_pro: true
-    package_manager: npm
-    smoke: [/]
+    package_manager: npm # packageManager npm@10.8.2; Node 20.19.0; no npm shakapacker (rspack)
+    # CI runs only the demo specs, not the full upstream Gumroad suite.
+    ruby_test: bundle exec rspec spec/controllers/dashboard_controller_spec.rb spec/controllers/dashboard_rsc_demo_controller_spec.rb spec/controllers/public_product_rsc_demo_controller_spec.rb spec/requests/dashboard_demo_smoke_spec.rb spec/requests/public_product_demo_smoke_spec.rb
+    build: npm run setup && RAILS_ENV=test NODE_ENV=test bin/shakapacker && npm run build:rsc-demo:test
+    smoke: [/, /rsc-demo]
+    review_app:
+      workflow: .github/workflows/cpflow-deploy-review-app.yml
+      status_check: deploy / deploy
+      cpflow_app_name: react-on-rails-demo-gumroad-rsc-review-pr # per-PR app: <name>-<PR#>
     verify: true
 
   - name: shakacode/react-webpack-rails-tutorial
@@ -251,9 +279,16 @@ repos:
       - { ecosystem: npm, name: shakapacker }
       - { ecosystem: gem, name: cpflow }
     needs_pro: true
-    package_manager: yarn_classic
-    build: bin/rails react_on_rails:generate_packs && bin/shakapacker
+    package_manager: yarn_classic # default branch is master; run tooling via bin/conductor-exec
+    ruby_test: bundle exec rake ci:rspec
+    js_test: bundle exec rake ci:js
+    # = rm -rf public/packs && yarn res:build && rails react_on_rails:locale && rake react_on_rails:generate_packs && bin/shakapacker
+    build: yarn build:dev
     smoke: [/]
+    review_app:
+      workflow: .github/workflows/cpflow-deploy-review-app.yml
+      status_check: deploy / deploy
+      cpflow_app_name: qa-react-webpack-rails-tutorial # per-PR app: <name>-<PR#>; broken since 2026-07-13 (that repo's issue #784)
     verify: true
 
   - name: shakacode/react-on-rails-starter-tanstack
@@ -274,7 +309,15 @@ repos:
       - { ecosystem: npm, name: shakapacker }
       - { ecosystem: npm, name: shakapacker-rspack }
     needs_pro: true
-    smoke: [/]
+    package_manager: pnpm # packageManager pnpm@11.2.2 via corepack
+    ruby_test: bin/test rspec
+    js_test: pnpm run test:router-shim
+    build: RAILS_ENV=production SECRET_KEY_BASE_DUMMY=1 REACT_ON_RAILS_STARTER_TANSTACK_DATABASE_PASSWORD=dummy bin/rails assets:precompile
+    smoke: [/, /rsc-showcase, /hello_server]
+    review_app:
+      workflow: .github/workflows/cpflow-deploy-review-app.yml
+      status_check: deploy / deploy
+      cpflow_app_name: react-on-rails-starter-tanstack-review-pr # per-PR app: <name>-<PR#>; rollout unproven (that repo's issue #194)
     verify: true
 
   # ---------- Shelved / non-gating ----------

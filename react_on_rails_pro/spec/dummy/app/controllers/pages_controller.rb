@@ -154,6 +154,12 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     stream_view_containing_react_components(template: "/pages/rsc_fouc_probe")
   end
 
+  # Streams an RSC component WITHOUT an explicit id so request specs can exercise random dom ids
+  # against the prerender cache (regression for https://github.com/shakacode/react_on_rails/issues/4984).
+  def rsc_prerender_cache_probe
+    stream_view_containing_react_components(template: "/pages/rsc_prerender_cache_probe")
+  end
+
   # React 19.2 <Activity> inside a streamed RSC tree (issue #3883, Phase 2a).
   # artificial_delay slows the hidden tab's server component so E2E can prove
   # visible-tab interactivity while the hidden row is still streaming; clamped
@@ -406,6 +412,11 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
 
   def cache_demo
     stream_view_containing_react_components(template: "/pages/cache_demo")
+  end
+
+  # Spike for issue #4874 (Server Functions RFC): RSC page hosting the demo form.
+  def spike_server_functions
+    stream_view_containing_react_components(template: "/pages/spike_server_functions")
   end
 
   # Demo page showing 10 async components rendering concurrently
