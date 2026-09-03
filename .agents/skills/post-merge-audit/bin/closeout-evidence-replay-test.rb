@@ -551,17 +551,17 @@ class CloseoutEvidenceReplayTest < Minitest::Test
 
   def test_v2_local_reference_detection_handles_pathological_separator_runs
     pathological_tokens = {
-      "unterminated backslash path" => ["segment\\" * 25_000, "SATISFIED"],
-      "long slash path" => ["segment/" * 25_000, "UNKNOWN"]
+      "unterminated backslash path" => "segment\\" * 25_000,
+      "long slash path" => "segment/" * 25_000
     }
 
     Timeout.timeout(3) do
-      pathological_tokens.each do |label, (token, expected_verdict)|
+      pathological_tokens.each do |label, token|
         evidence = "durable: before #{token} and after https://github.com/example/repo/pull/123#visual"
         qa = run_replay(v2_marker("visual_evidence" => evidence)).fetch("qa_evidence")
 
-        assert_equal expected_verdict, qa.fetch("verdict"), label
-        assert_includes qa.fetch("missing"), "visual_evidence.local_reference", label if expected_verdict == "UNKNOWN"
+        assert_equal "UNKNOWN", qa.fetch("verdict"), label
+        assert_includes qa.fetch("missing"), "visual_evidence.length", label
       end
     end
   end
@@ -717,6 +717,8 @@ class CloseoutEvidenceReplayTest < Minitest::Test
       "passed: target rendered unsuccessfully",
       "passed: target was unsuccessfully painted",
       "passed: target rendered but paint failed",
+      "passed: rendered",
+      "passed: painted successfully",
       "passed: rendered screenshot could not be inspected",
       "passed: rendered screenshot wasn't inspected",
       "passed: rendered screenshot, inspection was skipped"
@@ -732,14 +734,14 @@ class CloseoutEvidenceReplayTest < Minitest::Test
 
   def test_v2_accepts_negated_blank_and_unpainted_paint_claims
     valid_claims = [
-      "passed: page rendered correctly, screenshot not blank, elements painted",
-      "passed: page rendered correctly, screenshot not entirely blank, elements painted",
-      "passed: page rendered correctly, screenshot not actually clearly obviously blank, elements painted",
-      "passed: page rendered correctly, screenshot not seemingly blank, elements painted",
-      "passed: page rendered correctly, screenshot wasn't blank, elements painted",
-      "passed: page rendered correctly, screenshots weren't unpainted, elements painted",
-      "passed: page rendered correctly, screenshot no longer blank, elements painted",
-      "passed: target rendered and was not unpainted"
+      "passed: page rendered correctly, screenshot not blank, elements painted and inspected",
+      "passed: page rendered correctly, screenshot not entirely blank, elements painted and inspected",
+      "passed: page rendered correctly, screenshot not actually clearly obviously blank, elements painted and inspected",
+      "passed: page rendered correctly, screenshot not seemingly blank, elements painted and inspected",
+      "passed: page rendered correctly, screenshot wasn't blank, elements painted and inspected",
+      "passed: page rendered correctly, screenshots weren't unpainted, elements painted and inspected",
+      "passed: page rendered correctly, screenshot no longer blank, elements painted and inspected",
+      "passed: target rendered and was not unpainted; capture inspected"
     ]
 
     valid_claims.each do |paint_check|
@@ -783,6 +785,14 @@ class CloseoutEvidenceReplayTest < Minitest::Test
       {
         "interaction_change" => "yes",
         "interaction_evidence" => "clip: https://github.com/example/repo/pull/123#clip .\\hover.mov"
+      },
+      {
+        "interaction_change" => "yes",
+        "interaction_evidence" => "clip: https://github.com/example/repo/pull/123#clip unavailable"
+      },
+      {
+        "interaction_change" => "yes",
+        "interaction_evidence" => "clip: https://github.com/example/repo/pull/123#clip expired"
       }
     ]
 
@@ -791,6 +801,22 @@ class CloseoutEvidenceReplayTest < Minitest::Test
 
       assert_equal "UNKNOWN", qa.fetch("verdict")
       assert_includes qa.fetch("missing"), "interaction_evidence"
+    end
+  end
+
+  def test_v2_rejects_oversized_evidence_fields_without_unbounded_regex_work
+    oversized_negative_control = "observed_failure: assertion failed #{'word ' * 10_000}"
+
+    Timeout.timeout(3) do
+      qa = run_replay(
+        v2_marker(
+          "visual_fix" => "yes",
+          "negative_control" => oversized_negative_control
+        )
+      ).fetch("qa_evidence")
+
+      assert_equal "UNKNOWN", qa.fetch("verdict")
+      assert_includes qa.fetch("missing"), "negative_control.length"
     end
   end
 

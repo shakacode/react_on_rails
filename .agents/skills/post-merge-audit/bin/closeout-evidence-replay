@@ -35,6 +35,7 @@ module CloseoutEvidenceReplay
   EPHEMERAL_ARTIFACT_SCHEME = /\b(?:about|blob|chrome-extension|data|file|filesystem|ftp|http|mediastream|moz-extension):/i
   UNRESOLVED_PLACEHOLDER = %r{\b(?:missing|unavailable|unmeasured|unknown|not[ _](?:available|measured))\b|\bn/a\b}i
   CLAUSE_GAP = '[^.!?;,\n]*'
+  MAX_EVIDENCE_FIELD_BYTES = 4096
 
   def run(argv)
     options, parser = parse_options(argv)
@@ -269,16 +270,19 @@ module CloseoutEvidenceReplay
     ]
     missing.concat(missing_fields(fields, visual_fields))
 
-    ui_change = fields.fetch("user_visible_ui_change", "")
-    destination = fields.fetch("visual_evidence_destination", "")
-    visual_evidence = fields.fetch("visual_evidence", "")
-    paint_check = fields.fetch("paint_check", "")
-    interaction_change = fields.fetch("interaction_change", "")
-    interaction_evidence = fields.fetch("interaction_evidence", "")
-    visual_fix = fields.fetch("visual_fix", "")
-    negative_control = fields.fetch("negative_control", "")
-    performance_impact = fields.fetch("performance_impact", "")
-    performance_evidence = fields.fetch("performance_evidence", "")
+    bounded_fields = visual_fields.to_h do |field|
+      [field, bounded_evidence_field(fields, field, missing)]
+    end
+    ui_change = bounded_fields.fetch("user_visible_ui_change")
+    destination = bounded_fields.fetch("visual_evidence_destination")
+    visual_evidence = bounded_fields.fetch("visual_evidence")
+    paint_check = bounded_fields.fetch("paint_check")
+    interaction_change = bounded_fields.fetch("interaction_change")
+    interaction_evidence = bounded_fields.fetch("interaction_evidence")
+    visual_fix = bounded_fields.fetch("visual_fix")
+    negative_control = bounded_fields.fetch("negative_control")
+    performance_impact = bounded_fields.fetch("performance_impact")
+    performance_evidence = bounded_fields.fetch("performance_evidence")
 
     missing << "user_visible_ui_change" unless ui_change.empty? || VALID_QA_REQUIRED.include?(ui_change)
     unless destination.empty? || VALID_VISUAL_DESTINATIONS.include?(destination)
@@ -420,6 +424,14 @@ module CloseoutEvidenceReplay
     match && !match[1].match?(UNRESOLVED_PLACEHOLDER)
   end
 
+  def bounded_evidence_field(fields, field, missing)
+    value = fields.fetch(field, "").to_s
+    return value if value.bytesize <= MAX_EVIDENCE_FIELD_BYTES
+
+    missing << "#{field}.length"
+    ""
+  end
+
   def baseline_and_candidate?(value)
     non_url_text = without_https_urls(value)
     non_url_text.match?(/\b(?:baseline|before)\b/i) &&
@@ -481,6 +493,7 @@ module CloseoutEvidenceReplay
   def valid_paint_check?(value)
     value.start_with?("passed:") &&
       value.match?(/\b(?:painted|rendered)\b/i) &&
+      value.match?(/\b(?:inspected|reviewed|verified)\b/i) &&
       !affirmative_blank_or_unpainted_claim?(value) &&
       !failed_inspection_claim?(value) &&
       !value.match?(
@@ -508,7 +521,14 @@ module CloseoutEvidenceReplay
   def durable_clip?(value)
     value.start_with?("clip:") &&
       http_url?(value) &&
+      !unavailable_artifact_claim?(value) &&
       !disallowed_durable_reference?(value)
+  end
+
+  def unavailable_artifact_claim?(value)
+    without_https_urls(value).match?(
+      /\b(?:unavailable|missing|expired|inaccessible|not\s+available|access\s+denied|could\s+not\s+be\s+accessed)\b/i
+    )
   end
 
   def measured_substitute?(value)
