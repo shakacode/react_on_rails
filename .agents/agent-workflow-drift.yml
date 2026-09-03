@@ -96,7 +96,7 @@ files:
     evidence claims, and retains its reviewed shared-workflow inventory boundary.
   consumer_mode: '100755'
   source_sha256: b2110347ace4cca5b39a03fddc054542b528aae8a6d45c37f445ee078a687d37
-  consumer_sha256: b49c1b21e88026bba4896a59cc77d1d8bdfd932376eb0205c0091395ccbd6209
+  consumer_sha256: 8bf58e92dab51355a2fb59a7a71aa838f9ebcb65ce77cca410a8f61f55896e6f
 - source: skills/post-merge-audit/bin/closeout-evidence-replay-test.rb
   consumer: ".agents/skills/post-merge-audit/bin/closeout-evidence-replay-test.rb"
   mode: overlay
@@ -104,7 +104,7 @@ files:
     aligned with its backported runtime helper and reviewed follow-up hardening.
   consumer_mode: '100755'
   source_sha256: 35b3558bca3d49ac2032fc8b2a422877237e9f473f5d779f916e8ed8242bc60f
-  consumer_sha256: a6d42e5123aafff3edfab897e6770cb2b68e60c2ea264a71359847e984e278c0
+  consumer_sha256: 58056319a7d16fc02729dea61dd83a4793ebae78c2073b6d85aa779ddd675dc7
 - source: skills/post-merge-audit/bin/post-merge-audit-scope
   consumer: ".agents/skills/post-merge-audit/bin/post-merge-audit-scope"
   mode: identical

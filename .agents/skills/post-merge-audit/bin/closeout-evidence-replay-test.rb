@@ -689,6 +689,8 @@ class CloseoutEvidenceReplayTest < Minitest::Test
       "passed: target was not actually clearly obviously painted",
       "passed: it did not seem painted, but rendered",
       "passed: target did not render",
+      "passed: the screenshot wasn't rendered",
+      "passed: the screenshot isn't painted",
       "passed: browser failed to paint target",
       "passed: browser failed to render target",
       "passed: target was never rendered",
@@ -829,6 +831,8 @@ class CloseoutEvidenceReplayTest < Minitest::Test
       "observed_failure: assertion failure wasn't observed",
       "observed_failure: failure hasn't occurred",
       "observed_failure: negative control was unable to reproduce the assertion failure",
+      "observed_failure: assertion failed; assertion passed",
+      "observed_failure: assertion failed; failure did not occur",
       "observed_failure: completed without mismatch",
       "observed_failure: assertion no longer fails",
       "observed_failure: assertion stopped failing",
@@ -869,6 +873,18 @@ class CloseoutEvidenceReplayTest < Minitest::Test
 
   def test_v2_negative_control_allows_unrelated_no_after_failure
     evidence = "observed_failure: assertion failed no matter the retry count"
+    qa = run_replay(
+      v2_marker(
+        "visual_fix" => "yes",
+        "negative_control" => evidence
+      )
+    ).fetch("qa_evidence")
+
+    assert_equal "SATISFIED", qa.fetch("verdict")
+  end
+
+  def test_v2_negative_control_allows_unrelated_clean_followup_clause
+    evidence = "observed_failure: assertion failed as expected; cleanup completed without errors"
     qa = run_replay(
       v2_marker(
         "visual_fix" => "yes",

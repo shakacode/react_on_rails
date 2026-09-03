@@ -475,7 +475,7 @@ module CloseoutEvidenceReplay
       value.match?(/\b(?:painted|rendered)\b/i) &&
       !affirmative_blank_or_unpainted_claim?(value) &&
       !value.match?(
-        /\b(?:(?:did\s+not|didn['’]t|not|never)\b#{CLAUSE_GAP}\b(?:paint|render)(?:ed)?|failed\s+to\s+(?:paint|render)|(?:paint|render)(?:ing)?\s+fail(?:ed|s|ure)?|(?:painted|rendered)\s+unsuccessfully|unsuccessfully\s+(?:painted|rendered))\b/i
+        /\b(?:(?:did\s+not|didn['’]t|not|never)\b#{CLAUSE_GAP}\b(?:paint|render)(?:ed)?|(?:(?:was|were|is|are|has|have|had|does|do)n['’]t)\b#{CLAUSE_GAP}\b(?:paint|render)(?:ed)?|failed\s+to\s+(?:paint|render)|(?:paint|render)(?:ing)?\s+fail(?:ed|s|ure)?|(?:painted|rendered)\s+unsuccessfully|unsuccessfully\s+(?:painted|rendered))\b/i
       )
   end
 
@@ -565,6 +565,18 @@ module CloseoutEvidenceReplay
   end
 
   def negated_or_passing_failure_claim?(value)
+    clauses = value.split(/[.!?;,\n]+/).map(&:strip).reject(&:empty?)
+    if clauses.length > 1
+      affirmative_failure = clauses.any? do |clause|
+        explicit_affirmative_failure_clause?(clause) && !negated_or_passing_failure_claim?(clause)
+      end
+      related_clean_outcome = clauses.any? do |clause|
+        clause.match?(/\b(?:assert(?:ion)?s?|controls?|negative\s+controls?|runs?|tests?|checks?|failures?)\b/i) &&
+          negated_or_passing_failure_claim?(clause)
+      end
+      return false if affirmative_failure && !related_clean_outcome
+    end
+
     failure_term = "(?:fail(?:ed|s|ing|ures?)?|errors?|assert(?:ion)?s?|mismatch(?:es)?)"
     negation = "(?:did\\s+not|didn['’]t|never|not|no|without)"
     contracted_negation = "(?:(?:was|were|is|are|has|have|had|does|do)n['’]t)"
@@ -580,6 +592,12 @@ module CloseoutEvidenceReplay
       value.match?(/\b(?:no\s+longer\s+fail(?:ed|s|ing)?|stopp(?:ed|ing)\s+fail(?:ing)?|fail(?:ed|s)?\s+no\s+more)\b/i) ||
       value.match?(/\b(?:assert(?:ion)?s?|controls?|negative\s+controls?|runs?|tests?|checks?)\s+(?:(?:is|was|were|been)\s+)?(?:now\s+)?(?:pass(?:ed|es)?|succeed(?:ed|s)?|successful)\b/i) ||
       value.match?(/\A(?:pass(?:ed|es)?|succeed(?:ed|s)?|successful)\b/i)
+  end
+
+  def explicit_affirmative_failure_clause?(value)
+    value.match?(
+      /\b(?:fail(?:ed|s|ing)|errors?\s+(?:occurred|raised|observed)|(?:failure|mismatch(?:es)?)\s+(?:was\s+)?(?:observed|reproduced|detected|occurred))\b/i
+    )
   end
 
   def valid_bundle_hygiene?(value)
