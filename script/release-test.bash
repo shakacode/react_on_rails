@@ -275,6 +275,33 @@ case "${command_name}" in
           claim_instance_id="foreign-instance"
           claim_machine_id="foreign-machine"
           ;;
+        foreign-unknown)
+          claim_agent_id="UNKNOWN"
+          claim_instance_id="UNKNOWN"
+          claim_machine_id="foreign-machine"
+          ;;
+        foreign-empty)
+          claim_agent_id=""
+          claim_instance_id="foreign-instance"
+          claim_machine_id="foreign-machine"
+          ;;
+        foreign-padded-unknown)
+          claim_agent_id=" UNKNOWN "
+          claim_instance_id="foreign-instance"
+          claim_machine_id="foreign-machine"
+          ;;
+        foreign-non-string)
+          claim_agent_id="foreign-agent"
+          claim_instance_id="foreign-instance"
+          claim_machine_id="foreign-machine"
+          include_heartbeat=0
+          ;;
+        foreign-newline | foreign-control-character)
+          claim_agent_id="foreign-agent"
+          claim_instance_id="foreign-instance"
+          claim_machine_id="foreign-machine"
+          include_heartbeat=0
+          ;;
       esac
     fi
     if test "${count}" -gt "${FAKE_STATUS_CHANGE_AFTER:-1}" &&
@@ -301,8 +328,19 @@ case "${command_name}" in
     printf '"degraded":["not checked in target scope"],'
     printf '"claims":[{"status":"%s","repo":"%s","target":"%s",' \
       "${claim_status}" "${TEST_REPO}" "${TEST_TARGET}"
-    printf '"branch":"%s","agent_id":"%s","instance_id":"%s",' \
-      "${TEST_BRANCH}" "${claim_agent_id}" "${claim_instance_id}"
+    if test "${FAKE_PREFLIGHT_STATUS_MODE:-}" = foreign-non-string && test "${count}" = 1; then
+      printf '"branch":"%s","agent_id":["foreign-agent"],"instance_id":{"value":"foreign-instance"},' \
+        "${TEST_BRANCH}"
+    elif test "${FAKE_PREFLIGHT_STATUS_MODE:-}" = foreign-newline && test "${count}" = 1; then
+      printf '"branch":"%s","agent_id":"foreign\\nagent","instance_id":"foreign-instance",' \
+        "${TEST_BRANCH}"
+    elif test "${FAKE_PREFLIGHT_STATUS_MODE:-}" = foreign-control-character && test "${count}" = 1; then
+      printf '"branch":"%s","agent_id":"foreign\\u001b[2J","instance_id":"foreign-instance",' \
+        "${TEST_BRANCH}"
+    else
+      printf '"branch":"%s","agent_id":"%s","instance_id":"%s",' \
+        "${TEST_BRANCH}" "${claim_agent_id}" "${claim_instance_id}"
+    fi
     printf '"machine_id":"%s","expires_at":"%s",' "${claim_machine_id}" "${claim_expiry}"
     printf '"host":"codex","operator":"release-operator","phase":"publishing",'
     printf '"thread_handle":"release-task-123","session_id":"release-session-456"}],'
@@ -1077,7 +1115,7 @@ pass "live mode acquires and cleans up a process-owned release lease"
 setup_case managed-cleanup-failure-guidance
 unset RELEASE_COORDINATOR_ID RELEASE_COORDINATOR_INSTANCE_ID
 export FAKE_RELEASE_FAIL=1
-if FAKE_BUNDLE_MODE=success run_release; then
+if FAKE_BUNDLE_MODE=success run_release --evaluate-head; then
   fail "managed release ignored lease cleanup failure"
 fi
 release_agent_id="$(sed -n '1p' "${claim_state_file}")"
@@ -1085,7 +1123,7 @@ release_instance_id="$(sed -n '2p' "${claim_state_file}")"
 assert_contains "${output_log}" "release-line lease cleanup failed"
 assert_contains "${output_log}" \
   "script/release-claim --release --agent-id ${release_agent_id} --instance-id ${release_instance_id} --repo shakacode/react_on_rails --target release-line:17.1.0"
-assert_contains "${output_log}" "script/release"
+assert_contains "${output_log}" "script/release --evaluate-head"
 assert_secret_absent
 pass "managed cleanup failure prints the exact lease release and restart commands"
 
@@ -1152,7 +1190,7 @@ for foreign_mode in dead expired missing-heartbeat; do
   setup_case "managed-acquisition-foreign-${foreign_mode}"
   unset RELEASE_COORDINATOR_ID RELEASE_COORDINATOR_INSTANCE_ID
   export FAKE_PREFLIGHT_STATUS_MODE="foreign-${foreign_mode}"
-  if run_release; then
+  if run_release --reconcile-accelerated-rc; then
     fail "managed release acquired over a foreign ${foreign_mode} claim"
   fi
   assert_contains "${coord_log}" $'status|'
@@ -1167,9 +1205,24 @@ for foreign_mode in dead expired missing-heartbeat; do
     "agent-coord status --repo shakacode/react_on_rails --target release-line:17.1.0 --json"
   assert_contains "${output_log}" \
     "script/release-claim --release --agent-id foreign-agent --instance-id foreign-instance --repo shakacode/react_on_rails --target release-line:17.1.0"
-  assert_contains "${output_log}" "script/release"
+  assert_contains "${output_log}" "script/release --reconcile-accelerated-rc"
   assert_secret_absent
   pass "foreign ${foreign_mode} claims block managed acquisition without takeover"
+done
+
+for malformed_identity_mode in unknown empty padded-unknown non-string newline control-character; do
+  setup_case "managed-acquisition-foreign-${malformed_identity_mode}"
+  unset RELEASE_COORDINATOR_ID RELEASE_COORDINATOR_INSTANCE_ID
+  export FAKE_PREFLIGHT_STATUS_MODE="foreign-${malformed_identity_mode}"
+  if run_release; then
+    fail "managed release acquired over a foreign claim with a malformed identity"
+  fi
+  assert_contains "${output_log}" "release line already has an active foreign claim"
+  assert_contains "${output_log}" \
+    "agent-coord status --repo shakacode/react_on_rails --target release-line:17.1.0 --json"
+  assert_not_contains "${output_log}" "script/release-claim --release"
+  assert_secret_absent
+  pass "foreign ${malformed_identity_mode} identities omit unusable recovery commands"
 done
 
 setup_case managed-acquisition-status-unavailable

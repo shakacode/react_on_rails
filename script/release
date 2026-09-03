@@ -595,19 +595,26 @@ class ReleaseSupervisor
 
         lines << "    #{field}: #{JSON.generate(claim[field])}"
       end
-      agent_id = claim["agent_id"].to_s
-      instance_id = claim["instance_id"].to_s
-      next if agent_id.empty? || instance_id.empty?
+      agent_id = claim["agent_id"]
+      instance_id = claim["instance_id"]
+      next unless usable_release_identity?(agent_id, instance_id)
 
       lines << "    After proving this claim's release process group is dead, release its exact lease with:"
       lines << "      #{lease_release_shell_command(scope, agent_id:, instance_id:)}"
       lines << "    Then restart the release with:"
-      lines << "      script/release"
+      lines << "      #{release_restart_shell_command}"
     end
     lines.concat(
       foreign_claim_inspection_guidance(scope)
     )
     lines.join("\n")
+  end
+
+  def usable_release_identity?(*values)
+    values.all? do |value|
+      value.is_a?(String) && !value.empty? && value.match?(/\A[\x20-\x7E]+\z/) && value == value.strip &&
+        !value.casecmp?("UNKNOWN")
+    end
   end
 
   def atomic_claim_refusal_guidance(scope, identity, coordination_timeout:, termination_grace:)
@@ -664,7 +671,14 @@ class ReleaseSupervisor
     @stderr.puts "After proving every reported release process group is dead, release this exact lease with:"
     @stderr.puts "  #{command}"
     @stderr.puts "Then restart the release with:"
-    @stderr.puts "  script/release"
+    @stderr.puts "  #{release_restart_shell_command}"
+  end
+
+  def release_restart_shell_command
+    command = ["script/release"]
+    command << "--reconcile-accelerated-rc" if @options.fetch(:reconcile_accelerated_rc)
+    command << "--evaluate-head" if @options.fetch(:evaluate_head)
+    Shellwords.join(command)
   end
 
   def lease_release_shell_command(scope, agent_id:, instance_id:)

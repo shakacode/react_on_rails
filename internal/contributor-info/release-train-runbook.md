@@ -193,6 +193,41 @@ Inspect and coordinate with the recorded holder. Never infer takeover safety
 from lease expiry or heartbeat age alone; the wrapper does not provide or
 attempt an automatic takeover.
 
+#### Recover a retained publication lease
+
+If managed lease cleanup fails, `script/release` prints the exact recovery
+command for the lease that it acquired. A foreign-claim refusal prints the same
+command when the backend supplies a usable exact identity. Before running the
+command, prove that every process group reported by the failed release is dead.
+Do not use lease expiry or heartbeat age as that proof.
+
+Run the printed command from the repository root with the release-machine
+coordination environment loaded. Its shape is:
+
+```bash
+script/release-claim --release \
+  --agent-id <printed-agent-id> \
+  --instance-id <printed-instance-id> \
+  --repo shakacode/react_on_rails \
+  --target release-line:X.Y.Z
+```
+
+The helper releases only the exact active `agent_id` and `instance_id` at the
+observed backend version. It refuses a replacement lease, even if the new lease
+reuses the agent ID. Repeating the command is safe when the first release write
+succeeded but its response was lost. If the backend reports a missing,
+malformed, or `UNKNOWN` identity, the wrapper omits the release command. Inspect
+the authoritative status and coordinate with the holder instead of constructing
+a command manually.
+
+After the exact lease release succeeds, keep the interrupted version first
+after `### [Unreleased]` and run the printed restart command. It preserves
+applicable command modifiers such as `--evaluate-head` or
+`--reconcile-accelerated-rc`; reapply any required `RELEASE_TRACKER` value in
+the environment.
+The release task's registry, tag, and GitHub-release checks resume an interrupted
+publication without republishing artifacts that already exist.
+
 #### Advanced automation compatibility
 
 Automation that already coordinates a broader sequence of release-line writes
