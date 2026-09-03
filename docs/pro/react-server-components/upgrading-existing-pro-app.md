@@ -21,7 +21,8 @@ Before running the generator, verify your environment:
 | Node renderer configured | Check `react_on_rails_pro.rb` for `server_renderer = "NodeRenderer"`                                                           | NodeRenderer enabled                                                                       |
 
 For Node 18.19, override the renderer's Fastify dependencies according to your package manager. Yarn uses
-`resolutions`, as shown in the [Node Renderer 4.0 release notes](../release-notes/4.0.md#node-version-requirements).
+`resolutions`, as shown in the
+[Node Renderer 4.0 release notes](../release-notes/4.0.md#packagejson-resolutions-for-node--20).
 npm and Bun use the same dependency map under `overrides`:
 
 ```json
