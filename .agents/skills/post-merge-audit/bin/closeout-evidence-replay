@@ -370,6 +370,7 @@ module CloseoutEvidenceReplay
   def validate_durable_visual_evidence(evidence, destination, missing)
     missing << "visual_evidence.url" unless http_url?(evidence)
     missing << "visual_evidence.before_after" unless baseline_and_candidate?(evidence)
+    missing << "visual_evidence.artifact_available" if unavailable_artifact_claim?(evidence)
     missing << "visual_evidence.local_reference" if disallowed_durable_reference?(evidence)
 
     case destination
@@ -488,8 +489,9 @@ module CloseoutEvidenceReplay
 
   def without_schema_slash_labels(value)
     value.gsub(
-      %r{(\b(?:before\s+and\s+after|baseline\s+and\s+candidate)\s+)(?:light/dark|mobile/desktop|before/after|baseline/candidate|pass/fail|on/off|yes/no)(?=\s+(?:screenshots?|captures?|images?|views?|layouts?|modes?|variants?|composites?)\b)}i
-    ) { Regexp.last_match(1) }
+      %r{(?<![[:alnum:]_])(?:light/dark|mobile/desktop|before/after|baseline/candidate|pass/fail|on/off|yes/no)(?![[:alnum:]_])}i,
+      ""
+    )
   end
 
   def failed_visual_artifact_claim?(value)
@@ -656,6 +658,7 @@ module CloseoutEvidenceReplay
     reverse_negation = "(?:(?:not|never|#{contracted_negation})#{CLAUSE_GAP}#{absence_outcome}|" \
                        "(?:did\\s+not|didn['’]t)#{CLAUSE_GAP}#{absence_outcome})"
     value.match?(/\b#{negation}\b#{CLAUSE_GAP}\b#{failure_term}\b/i) ||
+      value.match?(/\b(?:could|might|may)\s+have#{CLAUSE_GAP}\b#{failure_term}\b/i) ||
       value.match?(/\b#{failure_term}\b#{CLAUSE_GAP}\b#{reverse_negation}\b/i) ||
       value.match?(
         /\b(?:unable\s+to|can(?:not|['’]t)|could(?:\s+not|n['’]t))#{CLAUSE_GAP}\b(?:reproduce|observe|detect|trigger|cause|demonstrate)\b/i

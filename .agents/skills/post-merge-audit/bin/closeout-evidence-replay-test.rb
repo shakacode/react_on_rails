@@ -611,6 +611,16 @@ class CloseoutEvidenceReplayTest < Minitest::Test
     end
   end
 
+  def test_v2_allows_bare_documented_slash_separated_labels
+    %w[before/after baseline/candidate].each do |label|
+      evidence = "durable: #{label} https://github.com/example/repo/pull/123#visual"
+      qa = run_replay(v2_marker("visual_evidence" => evidence)).fetch("qa_evidence")
+
+      assert_equal "SATISFIED", qa.fetch("verdict"), label
+      refute_includes qa.fetch("missing"), "visual_evidence.local_reference", label
+    end
+  end
+
   def test_v2_github_destination_requires_a_github_url
     data = run_replay(
       v2_marker(
@@ -694,6 +704,20 @@ class CloseoutEvidenceReplayTest < Minitest::Test
     assert_includes visual.fetch("missing"), "visual_evidence.url"
     assert_equal "UNKNOWN", interaction.fetch("verdict")
     assert_includes interaction.fetch("missing"), "interaction_evidence"
+  end
+
+  def test_v2_rejects_explicitly_unavailable_durable_visual_artifacts
+    invalid_evidence = [
+      "durable: before and after https://github.com/example/repo/pull/123#visual expired",
+      "durable: before and after https://github.com/example/repo/pull/123#visual; access denied"
+    ]
+
+    invalid_evidence.each do |evidence|
+      qa = run_replay(v2_marker("visual_evidence" => evidence)).fetch("qa_evidence")
+
+      assert_equal "UNKNOWN", qa.fetch("verdict"), evidence
+      assert_includes qa.fetch("missing"), "visual_evidence.artifact_available", evidence
+    end
   end
 
   def test_v2_rejects_missing_baseline_or_candidate_artifacts
@@ -948,6 +972,9 @@ class CloseoutEvidenceReplayTest < Minitest::Test
       "observed_failure: the assertion was skipped",
       "observed_failure: the assertion was not executed",
       "observed_failure: assertion outcome was inconclusive",
+      "observed_failure: the control could have failed under load",
+      "observed_failure: the control might have failed under load",
+      "observed_failure: the control may have failed under load",
       "observed_failure: minor type mismatch",
       "observed_failure: assertion mismatch scenario; all regression checks passed successfully afterward",
       "observed_failure: negative control passes",
