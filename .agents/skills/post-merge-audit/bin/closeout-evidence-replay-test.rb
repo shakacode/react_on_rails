@@ -574,6 +574,14 @@ class CloseoutEvidenceReplayTest < Minitest::Test
     refute_includes qa.fetch("missing"), "visual_evidence.local_reference"
   end
 
+  def test_v2_allows_slash_separated_visual_mode_labels
+    evidence = "durable: before and after light/dark screenshots https://github.com/example/repo/pull/123#visual"
+    qa = run_replay(v2_marker("visual_evidence" => evidence)).fetch("qa_evidence")
+
+    assert_equal "SATISFIED", qa.fetch("verdict")
+    refute_includes qa.fetch("missing"), "visual_evidence.local_reference"
+  end
+
   def test_v2_allows_documented_and_common_slash_separated_labels
     %w[before/after baseline/candidate pass/fail on/off yes/no].each do |label|
       evidence = "durable: before and after #{label} composite https://github.com/example/repo/pull/123#visual"
@@ -741,7 +749,8 @@ class CloseoutEvidenceReplayTest < Minitest::Test
       "passed: page rendered correctly, screenshot wasn't blank, elements painted and inspected",
       "passed: page rendered correctly, screenshots weren't unpainted, elements painted and inspected",
       "passed: page rendered correctly, screenshot no longer blank, elements painted and inspected",
-      "passed: target rendered and was not unpainted; capture inspected"
+      "passed: target rendered and was not unpainted; capture inspected",
+      "passed: target inspected and not blank and rendered"
     ]
 
     valid_claims.each do |paint_check|
@@ -970,15 +979,21 @@ class CloseoutEvidenceReplayTest < Minitest::Test
   end
 
   def test_v2_negative_control_accepts_assertion_failure_description
-    evidence = "observed_failure: assertion expected 1 but got 2"
-    qa = run_replay(
-      v2_marker(
-        "visual_fix" => "yes",
-        "negative_control" => evidence
-      )
-    ).fetch("qa_evidence")
+    valid_evidence = [
+      "observed_failure: assertion expected 1 but got 2",
+      "observed_failure: assertion expected 1, got 2"
+    ]
 
-    assert_equal "SATISFIED", qa.fetch("verdict")
+    valid_evidence.each do |evidence|
+      qa = run_replay(
+        v2_marker(
+          "visual_fix" => "yes",
+          "negative_control" => evidence
+        )
+      ).fetch("qa_evidence")
+
+      assert_equal "SATISFIED", qa.fetch("verdict"), evidence
+    end
   end
 
   def test_v2_negative_control_accepts_observed_mismatch_description

@@ -468,7 +468,7 @@ module CloseoutEvidenceReplay
     path_candidate_text = without_schema_slash_labels(non_url_text)
     local_path = absolute_local_path?(non_url_text) ||
                  path_candidate_text.match?(
-                   %r{(?:\A|[\s("'=;])(?:\./\S++|\.\./\S++|~[/\\]\S++|[A-Za-z]:[^/\\\s]++|[^/\s]++/\S++)}
+                   %r{(?:\A|[\s("'=;])(?:\./\S++|\.\./\S++|~[/\\]\S++|[A-Za-z]:[^/\\\s]++)}
                  ) ||
                  path_candidate_text.match?(
                    /(?:\A|[\s("'=;])(?:\\\\[^\\\s]++\\[^\\\s]++|(?:[^\\\s]++\\)++[^\\\s]++)/
@@ -491,13 +491,14 @@ module CloseoutEvidenceReplay
   end
 
   def valid_paint_check?(value)
+    paint_state_gap = "(?:\\s+(?:seem(?:ed)?|appear(?:ed)?|look(?:ed)?|to|be|have|been|[[:alpha:]]+ly))*\\s+"
     value.start_with?("passed:") &&
       value.match?(/\b(?:painted|rendered)\b/i) &&
       value.match?(/\b(?:inspected|reviewed|verified)\b/i) &&
       !affirmative_blank_or_unpainted_claim?(value) &&
       !failed_inspection_claim?(value) &&
       !value.match?(
-        /\b(?:(?:did\s+not|didn['’]t|not|never)\b#{CLAUSE_GAP}\b(?:paint|render)(?:ed)?|(?:(?:was|were|is|are|has|have|had|does|do)n['’]t)\b#{CLAUSE_GAP}\b(?:paint|render)(?:ed)?|failed\s+to\s+(?:paint|render)|(?:paint|render)(?:ing)?\s+fail(?:ed|s|ure)?|(?:painted|rendered)\s+unsuccessfully|unsuccessfully\s+(?:painted|rendered))\b/i
+        /\b(?:(?:did\s+not|didn['’]t|not|never)\b#{paint_state_gap}\b(?:paint|render)(?:ed)?|(?:(?:was|were|is|are|has|have|had|does|do)n['’]t)\b#{paint_state_gap}\b(?:paint|render)(?:ed)?|failed\s+to\s+(?:paint|render)|(?:paint|render)(?:ing)?\s+fail(?:ed|s|ure)?|(?:painted|rendered)\s+unsuccessfully|unsuccessfully\s+(?:painted|rendered))\b/i
       )
   end
 
@@ -655,7 +656,7 @@ module CloseoutEvidenceReplay
 
   def affirmative_failure_claim?(value)
     explicit_affirmative_failure_clause?(value) ||
-      value.match?(/\bassert(?:ion)?\b#{CLAUSE_GAP}\bexpected\b#{CLAUSE_GAP}\b(?:got|received|actual)\b/i)
+      value.match?(/\bassert(?:ion)?\b[^.!?;\n]*\bexpected\b[^.!?;\n]*\b(?:got|received|actual)\b/i)
   end
 
   def valid_bundle_hygiene?(value)
