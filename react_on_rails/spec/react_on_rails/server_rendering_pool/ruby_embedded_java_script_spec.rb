@@ -121,6 +121,31 @@ module ReactOnRails
           end
         end
 
+        context "when a wrapper names only a scheme-less renderer authority" do
+          let(:error) do
+            StandardError.new(
+              "Connection error on renderer request: synthetic-user:synthetic-secret@renderer.internal:3800"
+            )
+          end
+
+          it "redacts credentials from the entire public connection diagnostic" do
+            message = render_error_for(error).message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("renderer.internal:3800")
+          end
+
+          it "redacts token-style userinfo from the entire public connection diagnostic" do
+            token_error = StandardError.new(
+              "Connection error on renderer request: synthetic-token@renderer.internal:3800"
+            )
+
+            message = render_error_for(token_error).message
+            expect(message).not_to include("synthetic-token")
+            expect(message).to include("renderer.internal:3800")
+          end
+        end
+
         context "when the connection Errno survives only as the error's #cause" do
           # The Pro renderer client wraps the original Errno (ReactOnRailsPro::Error ->
           # ConnectionError -> Errno::ECONNREFUSED). The wrapper message here carries no
@@ -178,6 +203,294 @@ module ReactOnRails
             expect(message).to include("could not connect to the Node renderer")
             expect(message).not_to include("Check your webpack configuration")
           end
+
+          it "uses the configured renderer authority instead of the wrapped request path" do
+            ENV["REACT_RENDERER_URL"] = "http://renderer.internal:3800"
+
+            message = render_error_for(error).message
+            expect(message).to include("could not connect to the Node renderer at http://renderer.internal:3800")
+            expect(message).to include("renderer process is running and listening on http://renderer.internal:3800")
+            expect(message).not_to include("Node renderer at /bundles/abc123/render")
+          end
+        end
+
+        context "when a timeout wrapper names only a token-style scheme-less renderer authority" do
+          let(:error) do
+            StandardError.new(
+              "Time out error on renderer request: synthetic-token@renderer.internal:3800"
+            )
+          end
+
+          it "redacts the token from the entire public connection diagnostic" do
+            message = render_error_for(error).message
+            expect(message).not_to include("synthetic-token")
+            expect(message).to include("renderer.internal:3800")
+          end
+        end
+
+        context "when the renderer-request wrapper has no target" do
+          ["error on renderer request", "error on renderer request:", "error on renderer request:   "].each do |marker|
+            it "classifies #{marker.inspect} as a connection failure" do
+              message = render_error_for(StandardError.new(marker)).message
+              expect(message).to include("could not connect to the Node renderer")
+              expect(message).to include("Caught error:\n#{marker}")
+              expect(message).not_to include("Check your webpack configuration")
+            end
+          end
+        end
+
+        context "when a renderer-request wrapper embeds an untrusted scheme-less authority" do
+          [
+            [
+              "a quote-bearing target",
+              "Connection error on renderer request: synthetic-user:sec\"ret@renderer.internal:3800",
+              ["synthetic-user", "sec\"ret"]
+            ],
+            [
+              "a quote-bearing HTTP target",
+              "Connection error on renderer request: https://synthetic-user:sec\"ret@renderer.internal:3800",
+              ["synthetic-user", "sec\"ret"]
+            ],
+            [
+              "the generic lowercase wrapper",
+              "error on renderer request: synthetic-user:synthetic-secret@renderer.internal:3800",
+              %w[synthetic-user synthetic-secret]
+            ],
+            [
+              "a prefixed connection wrapper",
+              "transport failure: Connection error on renderer request: " \
+              "synthetic-user:synthetic-secret@renderer.internal:3800",
+              %w[synthetic-user synthetic-secret]
+            ],
+            [
+              "a connection wrapper with trailing context",
+              "Connection error on renderer request: " \
+              "synthetic-user:synthetic-secret@renderer.internal:3800 while retrying",
+              %w[synthetic-user synthetic-secret]
+            ],
+            [
+              "wrapper context before a later credential URL",
+              "Connection error on renderer request: " \
+              "synthetic-secret,https://synthetic-user:synthetic-password@renderer.internal:3800",
+              %w[synthetic-secret synthetic-user synthetic-password]
+            ]
+          ].each do |description, wrapper_message, canaries|
+            it "redacts #{description} from the entire public connection diagnostic" do
+              message = render_error_for(StandardError.new(wrapper_message)).message
+              canaries.each { |canary| expect(message).not_to include(canary) }
+              expect(message).to include("renderer.internal:3800")
+            end
+          end
+        end
+
+        context "when a renderer error message contains mixed target prefixes" do
+          it "sanitizes an earlier wrapper target before a later connect(2) target" do
+            error = StandardError.new(
+              "Connection error on renderer request: " \
+              "synthetic-user:synthetic-secret@renderer-a.internal:3800; " \
+              "connect(2) for renderer-b.internal:3800"
+            )
+
+            message = render_error_for(error).message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("renderer-a.internal:3800")
+            expect(message).to include("renderer-b.internal:3800")
+          end
+
+          [
+            [
+              "connect(2) before a wrapper",
+              "connect(2) for synthetic-user:synthetic-secret@renderer-a.internal:3800; " \
+              "Connection error on renderer request: renderer-b.internal:3800"
+            ],
+            [
+              "a wrapper before TCP",
+              "Connection error on renderer request: " \
+              "synthetic-user:synthetic-secret@renderer-a.internal:3800; " \
+              "Failed to open TCP connection to renderer-b.internal:3800"
+            ],
+            [
+              "TCP before a wrapper",
+              "Failed to open TCP connection to synthetic-user:synthetic-secret@renderer-a.internal:3800; " \
+              "Connection error on renderer request: renderer-b.internal:3800"
+            ]
+          ].each do |description, error_message|
+            it "sanitizes #{description} in textual order" do
+              message = render_error_for(StandardError.new(error_message)).message
+              expect(message).not_to include("synthetic-user")
+              expect(message).not_to include("synthetic-secret")
+              expect(message).to include("renderer-a.internal:3800")
+              expect(message).to include("renderer-b.internal:3800")
+            end
+          end
+
+          it "does not let an unrelated earlier URL mask a later credentialed wrapper" do
+            error = StandardError.new(
+              "See https://docs.example/help; Connection error on renderer request: " \
+              "synthetic-user:synthetic-secret@renderer.internal:3800"
+            )
+
+            message = render_error_for(error).message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("https://docs.example/help")
+            expect(message).to include("renderer.internal:3800")
+          end
+
+          it "continues past a request-path wrapper to sanitize a later credentialed wrapper" do
+            error = StandardError.new(
+              "Connection error on renderer request: /bundles/x; " \
+              "Connection error on renderer request: " \
+              "synthetic-user:synthetic-secret@renderer-a.internal:3800; " \
+              "connect(2) for renderer-b.internal:3800"
+            )
+
+            message = render_error_for(error).message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("renderer-a.internal:3800")
+            expect(message).to include("renderer-b.internal:3800")
+          end
+        end
+
+        context "when a prefix-aware target and a generic URL start together" do
+          [
+            "connect(2) for ",
+            "Failed to open TCP connection to ",
+            "Connection error on renderer request: "
+          ].each do |target_prefix|
+            it "keeps the prefix-aware span for #{target_prefix.strip}" do
+              target = "http://synthetic-user synthetic-secret@renderer.internal:3800"
+              message = "#{target_prefix}#{target}"
+
+              extracted_target, target_range = described_class.send(:target_with_range_from_message, message)
+              expect(extracted_target).to eq(target)
+              expect(message[target_range]).to eq(target)
+            end
+          end
+        end
+
+        context "when repeated same-family prefixes contain later credentials" do
+          it "keeps an earlier safe connect(2) target while sanitizing the later target" do
+            error_message =
+              "connect(2) for renderer-a.internal:3800; " \
+              "connect(2) for synthetic-user:synthetic-secret@renderer-b.internal:3800"
+
+            message = render_error_for(StandardError.new(error_message)).message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("could not connect to the Node renderer at renderer-a.internal:3800")
+            expect(message).to include(
+              "Caught error:\nconnect(2) for renderer-a.internal:3800; connect(2) for renderer-b.internal:3800"
+            )
+          end
+
+          it "keeps an earlier safe TCP target while sanitizing the later target" do
+            error_message =
+              "Failed to open TCP connection to renderer-a.internal:3800; " \
+              "Failed to open TCP connection to synthetic-user:synthetic-secret@renderer-b.internal:3800"
+
+            message = render_error_for(StandardError.new(error_message)).message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("could not connect to the Node renderer at renderer-a.internal:3800")
+            expect(message).to include(
+              "Caught error:\nFailed to open TCP connection to renderer-a.internal:3800; " \
+              "Failed to open TCP connection to renderer-b.internal:3800"
+            )
+          end
+
+          it "keeps an earlier safe wrapper target while sanitizing the later target" do
+            error_message =
+              "Connection error on renderer request: renderer-a.internal:3800; " \
+              "Connection error on renderer request: " \
+              "synthetic-user:synthetic-secret@renderer-b.internal:3800"
+
+            message = render_error_for(StandardError.new(error_message)).message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("could not connect to the Node renderer at renderer-a.internal:3800")
+            expect(message).to include(
+              "Caught error:\nConnection error on renderer request: renderer-a.internal:3800; " \
+              "Connection error on renderer request: renderer-b.internal:3800"
+            )
+          end
+
+          it "does not treat delimiter-free repeated family prefixes as safe boundaries" do
+            prefixes = [
+              "connect(2) for ",
+              "Failed to open TCP connection to ",
+              "Connection error on renderer request: "
+            ]
+
+            prefixes.each do |prefix|
+              error_message =
+                "#{prefix}http://synthetic-user " \
+                "#{prefix}synthetic-secret@renderer.internal:3800"
+              message = render_error_for(StandardError.new(error_message)).message
+
+              aggregate_failures(prefix.strip) do
+                expect(message).not_to include("synthetic-user")
+                expect(message).not_to include("synthetic-secret")
+                expect(message).to include("renderer.internal:3800")
+              end
+            end
+          end
+        end
+
+        context "when malformed renderer-request wrapper userinfo contains punctuation" do
+          credential_canaries = %w[synthetic-user sec ret]
+
+          ["Connection", "Time out"].each do |wrapper_type|
+            it "redacts right-parenthesis-separated credentials from the #{wrapper_type} wrapper" do
+              error = StandardError.new(
+                "#{wrapper_type} error on renderer request: " \
+                "synthetic-user:sec)ret@renderer.internal:3800"
+              )
+
+              message = render_error_for(error).message
+              credential_canaries.each { |canary| expect(message).not_to include(canary) }
+              expect(message).to include("renderer.internal:3800")
+            end
+
+            it "redacts comma-separated credentials from the #{wrapper_type} wrapper" do
+              error = StandardError.new(
+                "#{wrapper_type} error on renderer request: " \
+                "synthetic-user:sec,ret@renderer.internal:3800"
+              )
+
+              message = render_error_for(error).message
+              credential_canaries.each { |canary| expect(message).not_to include(canary) }
+              expect(message).to include("renderer.internal:3800")
+            end
+          end
+
+          [",", ", while retrying"].each do |trailing_context|
+            it "keeps #{trailing_context.inspect} outside the credential-bearing authority" do
+              error = StandardError.new(
+                "Connection error on renderer request: " \
+                "synthetic-user:synthetic-secret@renderer.internal:3800#{trailing_context}"
+              )
+
+              message = render_error_for(error).message
+              expect(message).not_to include("synthetic-user")
+              expect(message).not_to include("synthetic-secret")
+              expect(message).to include("renderer.internal:3800#{trailing_context}")
+            end
+          end
+
+          it "keeps a right parenthesis outside the credential-bearing authority" do
+            error = StandardError.new(
+              "Connection error on renderer request: " \
+              "synthetic-user:synthetic-secret@renderer.internal:3800)"
+            )
+
+            message = render_error_for(error).message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("renderer.internal:3800)")
+          end
         end
 
         context "when the error uses the Net::HTTP 'Failed to open TCP connection' format" do
@@ -216,6 +529,93 @@ module ReactOnRails
           end
         end
 
+        context "when REACT_RENDERER_URL is a scheme-less credential authority" do
+          let(:error) { Errno::ECONNREFUSED.new }
+
+          before do
+            ENV["REACT_RENDERER_URL"] =
+              "synthetic-user:synthetic-secret@renderer.internal:3800"
+          end
+
+          it "fails closed through the userinfo delimiter while retaining the host and port" do
+            message = render_error_for(error).message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("could not connect to the Node renderer at renderer.internal:3800")
+            expect(message).to include('REACT_RENDERER_URL is currently "renderer.internal:3800"')
+          end
+        end
+
+        context "when scheme-less renderer credentials contain a scheme-like substring" do
+          let(:error) { Errno::ECONNREFUSED.new }
+
+          before do
+            ENV["REACT_RENDERER_URL"] =
+              "synthetic-user:synthetic-secrethttps://suffix@renderer.internal:3800"
+          end
+
+          it "does not mistake the userinfo substring for a leading URL scheme" do
+            message = render_error_for(error).message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("could not connect to the Node renderer at renderer.internal:3800")
+            expect(message).to include('REACT_RENDERER_URL is currently "renderer.internal:3800"')
+          end
+        end
+
+        context "when scheme-less renderer credentials precede a separate URL" do
+          let(:error) { Errno::ECONNREFUSED.new }
+
+          before do
+            ENV["REACT_RENDERER_URL"] =
+              "u:leaked_secret@stray_context http://renderer-host:3800"
+          end
+
+          it "fails closed across the entire ambiguous prefix" do
+            message = render_error_for(error).message
+            expect(message).not_to include("leaked_secret")
+            expect(message).not_to include("stray_context")
+            expect(message).to include("could not connect to the Node renderer at http://renderer-host:3800")
+            expect(message).to include('REACT_RENDERER_URL is currently "http://renderer-host:3800"')
+          end
+        end
+
+        context "when malformed renderer credentials resemble filesystem or custom-scheme values" do
+          let(:error) { Errno::ECONNREFUSED.new }
+
+          [
+            "/http://synthetic-user:synthetic-secret@renderer.internal:3800",
+            "synthetic-user:synthetic-secretx://suffix@renderer.internal:3800"
+          ].each do |renderer_url|
+            it "fails closed for #{renderer_url.inspect}" do
+              ENV["REACT_RENDERER_URL"] = renderer_url
+
+              message = render_error_for(error).message
+              expect(message).not_to include("synthetic-user")
+              expect(message).not_to include("synthetic-secret")
+              expect(message).to include("could not connect to the Node renderer at renderer.internal:3800")
+              expect(message).to include('REACT_RENDERER_URL is currently "renderer.internal:3800"')
+            end
+          end
+        end
+
+        context "when a configured typo-scheme renderer authority has multiple at signs" do
+          let(:error) { Errno::ECONNREFUSED.new }
+
+          before do
+            ENV["REACT_RENDERER_URL"] =
+              "htps://synthetic-user:synthetic-prefix@synthetic-secret@renderer.example.com:3800/path"
+          end
+
+          it "fails closed through the final at sign while retaining the host and path" do
+            message = render_error_for(error).message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-prefix")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("renderer.example.com:3800/path")
+          end
+        end
+
         context "when the error message itself names a renderer URL with embedded credentials" do
           let(:error) do
             StandardError.new(
@@ -224,13 +624,340 @@ module ReactOnRails
             )
           end
 
-          it "redacts credentials from the target named in the headline" do
+          it "redacts credentials from the full connection diagnostic" do
             message = render_error_for(error).message
             expect(message).to include("could not connect to the Node renderer at https://renderer.example.com:3800")
-            # The credentialed form must not appear in the target position. (The raw exception
-            # text is still echoed verbatim under "Caught error:" — pre-existing behavior for
-            # every error type in this file — so the password can survive there.)
-            expect(message).not_to include("at https://user:sekret@")
+            expect(message).not_to include("user")
+            expect(message).not_to include("sekret")
+          end
+        end
+
+        context "when the error message names a scheme-less renderer authority with credentials" do
+          let(:error) do
+            Errno::ECONNREFUSED.new("connect(2) for synthetic-user:synthetic-secret@renderer.example.com:3800")
+          end
+
+          it "redacts credentials from the full connection diagnostic" do
+            message = render_error_for(error).message
+            expect(message).to include("could not connect to the Node renderer at renderer.example.com:3800")
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+          end
+        end
+
+        context "when the error message names a token-style scheme-less renderer authority" do
+          let(:error) do
+            Errno::ECONNREFUSED.new("connect(2) for synthetic-token@renderer.internal:3800")
+          end
+
+          it "redacts the token from the entire public connection diagnostic" do
+            message = render_error_for(error).message
+            expect(message).not_to include("synthetic-token")
+            expect(message).to include("renderer.internal:3800")
+          end
+        end
+
+        context "when connection-target userinfo contains malformed punctuation" do
+          credential_canaries = %w[synthetic-user sec ret]
+          punctuation_marks = [")", ","]
+
+          [
+            ["connect(2)", Errno::ECONNREFUSED, "connect(2) for"],
+            ["TCP", StandardError, "Failed to open TCP connection to"]
+          ].each do |target_type, error_class, target_prefix|
+            punctuation_marks.each do |punctuation|
+              it "redacts #{punctuation.inspect} inside #{target_type} target userinfo" do
+                error = error_class.new(
+                  "#{target_prefix} synthetic-user:sec#{punctuation}ret@renderer.internal:3800"
+                )
+
+                message = render_error_for(error).message
+                credential_canaries.each { |canary| expect(message).not_to include(canary) }
+                expect(message).to include("renderer.internal:3800")
+              end
+
+              it "keeps #{punctuation.inspect} after the #{target_type} authority" do
+                error = error_class.new(
+                  "#{target_prefix} synthetic-user:synthetic-secret@renderer.internal:3800#{punctuation}"
+                )
+
+                message = render_error_for(error).message
+                expect(message).not_to include("synthetic-user")
+                expect(message).not_to include("synthetic-secret")
+                expect(message).to include("could not connect to the Node renderer at renderer.internal:3800.")
+                expect(message).to include("#{target_prefix} renderer.internal:3800#{punctuation}")
+              end
+            end
+          end
+        end
+
+        context "when connection-target userinfo spans whitespace" do
+          credential_canaries = %w[synthetic-user synthetic-secret part@]
+
+          [
+            ["connect(2)", Errno::ECONNREFUSED, "connect(2) for"],
+            ["TCP", StandardError, "Failed to open TCP connection to"],
+            ["Connection wrapper", StandardError, "Connection error on renderer request:"],
+            ["Time out wrapper", StandardError, "Time out error on renderer request:"]
+          ].each do |target_type, error_class, target_prefix|
+            it "redacts credentials through a later authority in a #{target_type} target" do
+              error = error_class.new(
+                "#{target_prefix} synthetic-user:synthetic-secret part@renderer.internal:3800"
+              )
+
+              message = render_error_for(error).message
+              credential_canaries.each { |canary| expect(message).not_to include(canary) }
+              expect(message).to include("renderer.internal:3800")
+            end
+
+            it "keeps a valid #{target_type} target ahead of unrelated later at-sign prose" do
+              caught_error = "#{target_prefix} renderer.internal:3800 while notifying ops@example.com"
+
+              message = render_error_for(error_class.new(caught_error)).message
+              expect(message).to include("could not connect to the Node renderer at renderer.internal:3800.")
+              expect(message).to include(caught_error)
+            end
+          end
+        end
+
+        context "when a safe renderer URL target precedes unrelated email prose" do
+          it "preserves the exact HTTP(S) wrapper text in the caught error" do
+            aggregate_failures do
+              %w[http https].each do |scheme|
+                caught_error =
+                  "Connection error on renderer request: " \
+                  "#{scheme}://renderer.internal:3800/render?x=1#frag while notifying ops@example.com"
+
+                message = render_error_for(StandardError.new(caught_error)).message
+                expect(message).to include("Caught error:\n#{caught_error}\n====")
+              end
+            end
+          end
+
+          it "still redacts HTTP(S) target credentials before preserving the later prose" do
+            aggregate_failures do
+              %w[http https].each do |scheme|
+                caught_error =
+                  "Connection error on renderer request: " \
+                  "#{scheme}://synthetic-user:synthetic-secret@renderer.internal:3800/render?x=1#frag " \
+                  "while notifying ops@example.com"
+                sanitized_caught_error =
+                  "Connection error on renderer request: " \
+                  "#{scheme}://renderer.internal:3800/render?x=1#frag while notifying ops@example.com"
+
+                message = render_error_for(StandardError.new(caught_error)).message
+                expect(message).not_to include("synthetic-user")
+                expect(message).not_to include("synthetic-secret")
+                expect(message).to include("Caught error:\n#{sanitized_caught_error}\n====")
+              end
+            end
+          end
+
+          it "protects the wrapper target rather than an earlier duplicate URL" do
+            aggregate_failures do
+              %w[http https].each do |scheme|
+                target = "#{scheme}://renderer.internal:3800/render?x=1#frag"
+                caught_error =
+                  "Previous attempt to #{target} failed; " \
+                  "Connection error on renderer request: #{target} while notifying ops@example.com"
+
+                message = render_error_for(StandardError.new(caught_error)).message
+                expect(message).to include("Caught error:\n#{caught_error}\n====")
+              end
+            end
+          end
+
+          it "still fails closed when renderer credentials cross the target boundary" do
+            aggregate_failures do
+              %w[http https].each do |scheme|
+                caught_error =
+                  "Connection error on renderer request: " \
+                  "#{scheme}://synthetic-user synthetic-secret@renderer.internal:3800"
+
+                message = render_error_for(StandardError.new(caught_error)).message
+                expect(message).not_to include("synthetic-user")
+                expect(message).not_to include("synthetic-secret")
+                expect(message).to include("renderer.internal:3800")
+              end
+            end
+          end
+
+          it "fails closed when the later credential authority has no explicit port" do
+            aggregate_failures do
+              %w[http https].product(["renderer.internal", "renderer.internal/render"]).each do |scheme, authority|
+                caught_error =
+                  "Connection error on renderer request: " \
+                  "#{scheme}://synthetic-user synthetic-secret@#{authority}"
+
+                message = render_error_for(StandardError.new(caught_error)).message
+                expect(message).not_to include("synthetic-user")
+                expect(message).not_to include("synthetic-secret")
+                expect(message).to include(authority)
+              end
+            end
+          end
+
+          it "sanitizes a later credential-bearing renderer wrapper" do
+            caught_error =
+              "Connection error on renderer request: http://renderer-a.internal:3800\n" \
+              "Connection error on renderer request: " \
+              "synthetic-user:synthetic-secret@renderer-b.internal:3800"
+
+            message = render_error_for(StandardError.new(caught_error)).message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("renderer-b.internal:3800")
+          end
+
+          it "does not mistake renderer credentials for notification email prose" do
+            caught_error =
+              "Connection error on renderer request: http://renderer-a.internal:3800/render " \
+              "while notifying synthetic-user:synthetic-secret@renderer-b.internal"
+
+            message = render_error_for(StandardError.new(caught_error)).message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("renderer-b.internal")
+          end
+
+          it "does not protect a malformed HTTP target from credentials on the next line" do
+            caught_error =
+              "Connection error on renderer request: http://synthetic-user:synthetic-secret\n" \
+              "part@renderer.internal:3800"
+
+            message = render_error_for(StandardError.new(caught_error)).message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).not_to include("part@")
+            expect(message).to include("renderer.internal:3800")
+          end
+
+          it "does not protect a later malformed HTTP target from its delayed userinfo" do
+            caught_error =
+              "Connection error on renderer request: http://renderer-a.internal:3800\n" \
+              "http://synthetic-user synthetic-secret@renderer-b.internal:3800"
+
+            message = render_error_for(StandardError.new(caught_error)).message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("renderer-b.internal:3800")
+          end
+
+          it "sanitizes a long diagnostic without recursive stack growth" do
+            caught_error =
+              "Connection error on renderer request: http://renderer.internal:3800 " \
+              "#{'http://other-renderer.internal:3800 ' * 5000}"
+
+            expect { render_error_for(StandardError.new(caught_error)) }.not_to raise_error
+          end
+        end
+
+        context "when whitespace-spanning userinfo starts with an apparent URL" do
+          it "does not accept a typo scheme as the renderer-target boundary" do
+            error = Errno::ECONNREFUSED.new(
+              "connect(2) for synthetic-secrethtps://decoy part@renderer.internal:3800"
+            )
+
+            message = render_error_for(error).message
+            expect(message).not_to include("synthetic-secret")
+            expect(message).not_to include("part@")
+            expect(message).to include("renderer.internal:3800")
+          end
+
+          it "redacts through a later authority with a request path" do
+            error = StandardError.new(
+              "Connection error on renderer request: " \
+              "synthetic-user:synthetic-secret part@renderer.internal:3800/render"
+            )
+
+            message = render_error_for(error).message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).not_to include("part@")
+            expect(message).to include("renderer.internal:3800/render")
+          end
+        end
+
+        context "when a renderer-request wrapper target starts after a line break" do
+          wrapper_types = ["Connection", "Time out"]
+          line_breaks = ["\n", "\r", "\r\n"]
+
+          wrapper_types.each do |wrapper_type|
+            line_breaks.each do |line_break|
+              it "redacts #{wrapper_type} credentials after #{line_break.inspect}" do
+                error = StandardError.new(
+                  "#{wrapper_type} error on renderer request:#{line_break}" \
+                  "synthetic-user:synthetic-secret@renderer.internal:3800"
+                )
+
+                message = render_error_for(error).message
+                expect(message).not_to include("synthetic-user")
+                expect(message).not_to include("synthetic-secret")
+                expect(message).to include("renderer.internal:3800")
+              end
+            end
+          end
+        end
+
+        context "when a targetless socket prefix precedes a credential-bearing prefix" do
+          ["connect(2) for", "Failed to open TCP connection to"].each do |target_prefix|
+            it "continues to the later #{target_prefix} target" do
+              error = StandardError.new(
+                "#{target_prefix} \n#{target_prefix} " \
+                "synthetic-user:synthetic-secret@renderer.internal:3800"
+              )
+
+              message = render_error_for(error).message
+              expect(message).not_to include("synthetic-user")
+              expect(message).not_to include("synthetic-secret")
+              expect(message).to include("renderer.internal:3800")
+            end
+          end
+        end
+
+        context "when an error target absorbs credential text into an apparent scheme" do
+          let(:error) do
+            Errno::ECONNREFUSED.new(
+              "connect(2) for synthetic-secrethttps://apikey@renderer.internal:3800"
+            )
+          end
+
+          it "redacts the credential from the entire public connection diagnostic" do
+            message = render_error_for(error).message
+            expect(message).not_to include("synthetic-secret")
+            expect(message).not_to include("apikey")
+            expect(message).to include("https://renderer.internal:3800")
+          end
+        end
+
+        context "when a wrapped connection error absorbs credential text into an apparent scheme" do
+          let(:error) do
+            StandardError.new(
+              "Connection error on renderer request: synthetic-secrethttps://apikey@renderer.internal:3800"
+            )
+          end
+
+          it "redacts the credential from the entire public connection diagnostic" do
+            message = render_error_for(error).message
+            expect(message).not_to include("synthetic-secret")
+            expect(message).not_to include("apikey")
+            expect(message).to include("https://renderer.internal:3800")
+          end
+        end
+
+        context "when a cause has unrelated token text before a URL without userinfo" do
+          let(:error) do
+            wrapped_error(
+              Errno::ECONNREFUSED,
+              "transport metadata=synthetic-tokenhttps://renderer.internal:3800",
+              "renderer request failed"
+            )
+          end
+
+          it "does not promote the unrelated token into the public connection target" do
+            message = render_error_for(error).message
+            expect(message).not_to include("synthetic-token")
+            expect(message).to include("https://renderer.internal:3800")
           end
         end
 
@@ -248,6 +975,94 @@ module ReactOnRails
             message = render_error_for(error).message
             expect(message).to include('RENDERER_URL is currently "http://legacy-host:3800"')
             expect(message).not_to include("REACT_RENDERER_URL is not set")
+          end
+        end
+
+        context "when only RENDERER_URL is a scheme-less credential authority" do
+          let(:error) { Errno::ECONNREFUSED.new }
+
+          before do
+            ENV["RENDERER_URL"] =
+              "synthetic-user:synthetic-secret@renderer.internal:3800"
+          end
+
+          it "fails closed through the userinfo delimiter while retaining the host and port" do
+            message = render_error_for(error).message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("could not connect to the Node renderer at renderer.internal:3800")
+            expect(message).to include('RENDERER_URL is currently "renderer.internal:3800"')
+          end
+        end
+
+        context "when scheme-less RENDERER_URL credentials contain a scheme-like substring" do
+          let(:error) { Errno::ECONNREFUSED.new }
+
+          before do
+            ENV["RENDERER_URL"] =
+              "synthetic-user:synthetic-secrethttps://suffix@renderer.internal:3800"
+          end
+
+          it "does not mistake the userinfo substring for a leading URL scheme" do
+            message = render_error_for(error).message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("could not connect to the Node renderer at renderer.internal:3800")
+            expect(message).to include('RENDERER_URL is currently "renderer.internal:3800"')
+          end
+        end
+
+        context "when a renderer env value has token-style scheme-less userinfo" do
+          let(:error) { Errno::ECONNREFUSED.new }
+
+          %w[REACT_RENDERER_URL RENDERER_URL].each do |renderer_env|
+            it "fails closed through the userinfo delimiter for #{renderer_env}" do
+              ENV[renderer_env] = "synthetic-token@renderer.internal:3800"
+
+              message = render_error_for(error).message
+              expect(message).not_to include("synthetic-token")
+              expect(message).to include("could not connect to the Node renderer at renderer.internal:3800")
+              expect(message).to include(%(#{renderer_env} is currently "renderer.internal:3800"))
+            end
+          end
+        end
+
+        context "when renderer env credentials are absorbed into an apparent scheme" do
+          let(:error) { Errno::ECONNREFUSED.new }
+
+          %w[REACT_RENDERER_URL RENDERER_URL].each do |renderer_env|
+            it "redacts the apparent-scheme credential for #{renderer_env}" do
+              ENV[renderer_env] = "synthetic-secrethttps://apikey@renderer.internal:3800"
+
+              message = render_error_for(error).message
+              expect(message).not_to include("synthetic-secret")
+              expect(message).not_to include("apikey")
+              expect(message).to include("renderer.internal:3800")
+            end
+
+            it "redacts the apparent-scheme credential before empty userinfo for #{renderer_env}" do
+              ENV[renderer_env] = "synthetic-secrethttps://@renderer.internal:3800"
+
+              message = render_error_for(error).message
+              expect(message).not_to include("synthetic-secret")
+              expect(message).to include("renderer.internal:3800")
+            end
+          end
+        end
+
+        context "when renderer env credentials are absorbed into an unknown apparent scheme" do
+          let(:error) { Errno::ECONNREFUSED.new }
+
+          %w[REACT_RENDERER_URL RENDERER_URL].each do |renderer_env|
+            it "fails closed through the userinfo delimiter for #{renderer_env}" do
+              ENV[renderer_env] = "synthetic-secrethtps://apikey@renderer.internal:3800"
+
+              message = render_error_for(error).message
+              expect(message).not_to include("synthetic-secret")
+              expect(message).not_to include("apikey")
+              expect(message).to include("could not connect to the Node renderer at renderer.internal:3800")
+              expect(message).to include(%(#{renderer_env} is currently "renderer.internal:3800"))
+            end
           end
         end
 
@@ -596,12 +1411,14 @@ module ReactOnRails
           end
         end
 
-        context "when a configured URL has an at sign only in its path" do
-          it "preserves the URL because the configured value parses without userinfo" do
+        context "when a configured URL has an at sign after the authority" do
+          it "fails closed because the path could contain delayed userinfo" do
             server_bundle_url = "http://host/path@example"
             stub_http_bundle_failure("connection failed", bundle_url: server_bundle_url)
 
-            expect(bundle_load_error_message).to include(server_bundle_url)
+            message = bundle_load_error_message
+            expect(message).not_to include("host/path")
+            expect(message).to include("http://example")
           end
         end
 
@@ -633,6 +1450,187 @@ module ReactOnRails
                 expect(message).not_to include("synthetic-secret")
                 expect(message).to include(sanitized_url)
               end
+            end
+          end
+
+          it "preserves a safe label before a credential-bearing URL" do
+            server_bundle_path = "URL=https://synthetic-user:synthetic-secret@host/path"
+            stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("URL=https://host/path")
+          end
+        end
+
+        context "when configured credential material precedes the URL scheme" do
+          it "fails closed across the pre-scheme userinfo delimiter" do
+            server_bundle_path =
+              "synthetic-user:synthetic-secret@https://renderer-host:3800"
+            stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("https://renderer-host:3800")
+          end
+
+          it "fails closed when a nested scheme hides the userinfo delimiter from the prefix" do
+            server_bundle_path =
+              "synthetic-user:synthetic-secretx:y://token@renderer.example/bundle.js"
+            stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("renderer.example/bundle.js")
+          end
+
+          it "fails closed when malformed characters split a nested credential prefix" do
+            server_bundle_path =
+              "synthetic-user:prefix/secret:y://token@renderer.example/bundle.js"
+            stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("prefix/secret")
+            expect(message).to include("renderer.example/bundle.js")
+          end
+
+          it "fails closed when a separator leaves one colon before a nested scheme" do
+            server_bundle_path =
+              "synthetic-user:synthetic-secret/y://token@renderer.example/bundle.js"
+            stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("renderer.example/bundle.js")
+          end
+        end
+
+        context "when the same token appears only in unrelated reporter text" do
+          it "preserves the free-form token byte for byte" do
+            failure_message =
+              "Failure loading synthetic-user:synthetic-secret@https://renderer-host:3800"
+            stub_local_bundle_failure(failure_message, bundle_path: "/tmp/server.js")
+
+            expect(bundle_load_error_message).to include(failure_message)
+          end
+
+          it "preserves a scheme-less credential-shaped token byte for byte" do
+            failure_message =
+              "Failure loading synthetic-user:synthetic-secret@renderer.internal:3800"
+            stub_local_bundle_failure(failure_message, bundle_path: "/tmp/server.js")
+
+            expect(bundle_load_error_message).to include(failure_message)
+          end
+
+          it "preserves an unsupported nested-scheme token byte for byte" do
+            failure_message =
+              "Failure loading synthetic-user:synthetic-secretx:y://token@renderer.example/bundle.js"
+            stub_local_bundle_failure(failure_message, bundle_path: "/tmp/server.js")
+
+            expect(bundle_load_error_message).to include(failure_message)
+          end
+
+          it "keeps apparent-scheme text on the existing free-form scanning path" do
+            failure_message =
+              "Failure loading synthetic-secrethttps://apikey@renderer.internal:3800"
+            stub_local_bundle_failure(failure_message, bundle_path: "/tmp/server.js")
+
+            message = bundle_load_error_message
+            expect(message).to include("Failure loading synthetic-secrethttps://renderer.internal:3800")
+            expect(message).not_to include("apikey")
+          end
+        end
+
+        context "when a configured bundle URL absorbs credential text into an apparent scheme" do
+          it "redacts the credential while retaining the safe URL context" do
+            server_bundle_url =
+              "synthetic-secrethttps://apikey@renderer.internal:3800/bundle.js"
+            stub_http_bundle_failure("connection failed", bundle_url: server_bundle_url)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("synthetic-secret")
+            expect(message).not_to include("apikey")
+            expect(message).to include("https://renderer.internal:3800/bundle.js")
+          end
+
+          it "preserves a safe label while redacting the absorbed credential" do
+            server_bundle_url =
+              "URL=synthetic-secrethttps://apikey@renderer.internal:3800/bundle.js"
+            stub_http_bundle_failure("connection failed", bundle_url: server_bundle_url)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("synthetic-secret")
+            expect(message).not_to include("apikey")
+            expect(message).to include("URL=https://renderer.internal:3800/bundle.js")
+          end
+        end
+
+        context "when a configured local bundle value is a scheme-less credential authority" do
+          it "redacts token-style userinfo while retaining the host and path" do
+            server_bundle_path = "apikey@cdn.example.com/bundle.js"
+            stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("apikey")
+            expect(message).to include("cdn.example.com/bundle.js")
+          end
+
+          it "redacts credentials while retaining the host and path" do
+            server_bundle_path =
+              "synthetic-user:synthetic-secret@cdn.example.com/bundle.js"
+            stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("cdn.example.com/bundle.js")
+          end
+
+          it "fails closed when a slash appears before the userinfo delimiter" do
+            server_bundle_path =
+              "synthetic-user:synthetic-secret/part@cdn.example/bundle.js"
+            stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).not_to include("part@")
+            expect(message).to include("cdn.example/bundle.js")
+          end
+        end
+
+        context "when an ordinary local bundle path contains an at sign" do
+          [
+            ["an absolute POSIX path", "/tmp/releases/build@2026/server-bundle.js"],
+            ["a dot-relative POSIX path", "./releases/build@2026/server-bundle.js"],
+            ["a parent-relative POSIX path", "../releases/build@2026/server-bundle.js"],
+            ["a Windows drive path", "C:\\releases\\build@2026\\server-bundle.js"],
+            ["a dot-relative Windows path", ".\\releases\\build@2026\\server-bundle.js"],
+            ["a parent-relative Windows path", "..\\releases\\build@2026\\server-bundle.js"],
+            ["a Windows UNC path", "\\\\server\\share\\build@2026\\server-bundle.js"]
+          ].each do |description, server_bundle_path|
+            it "preserves #{description} byte for byte" do
+              stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)
+
+              expect(bundle_load_error_message).to include(server_bundle_path)
+            end
+          end
+        end
+
+        context "when a configured local bundle uses a scoped-package path" do
+          [
+            ["a node_modules scoped-package path", "node_modules/@org/pkg/dist/server-bundle.js"],
+            ["a direct scoped-package path", "@org/pkg/server-bundle.js"]
+          ].each do |description, server_bundle_path|
+            it "preserves #{description} byte for byte" do
+              stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)
+
+              expect(bundle_load_error_message).to include(server_bundle_path)
             end
           end
         end
@@ -832,6 +1830,26 @@ module ReactOnRails
           end
         end
 
+        context "when unrelated reporter text contains an empty-userinfo URL" do
+          it "preserves the empty-userinfo token" do
+            failure_message = "Failure loading http://@host/path"
+            stub_local_bundle_failure(failure_message, bundle_path: "/tmp/server.js")
+
+            expect(bundle_load_error_message).to include(failure_message)
+          end
+
+          it "does not let the token protect unresolved credentials before it" do
+            failure_message =
+              "Failure loading http://synthetic-user:synthetic-secret-prefixhttp://@host/path"
+            stub_local_bundle_failure(failure_message, bundle_path: "/tmp/server.js")
+
+            message = bundle_load_error_message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret-prefix")
+            expect(message).to include("Failure loading http://@host/path")
+          end
+        end
+
         context "when a bundle-load failure contains two valid URLs" do
           it "preserves both URLs, including an at sign in the second URL's path" do
             failure_message = "Failure loading http://first-host/path http://second-host/path@example"
@@ -910,6 +1928,125 @@ module ReactOnRails
             stub_http_bundle_failure(failure_message)
 
             expect(bundle_load_error_message).to include(failure_message)
+          end
+        end
+
+        context "when a configured typo-scheme bundle authority embeds credentials" do
+          it "redacts the credentials while retaining the host and path" do
+            server_bundle_path =
+              "htps://synthetic-user:synthetic-secret@renderer.example/bundle.js"
+            stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("renderer.example/bundle.js")
+          end
+
+          ["/", "?", "#"].each do |delimiter|
+            it "fails closed when #{delimiter.inspect} precedes a delayed userinfo delimiter" do
+              server_bundle_path =
+                "htps://synthetic-user#{delimiter}synthetic-secret@renderer.example/bundle.js"
+              stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)
+
+              message = bundle_load_error_message
+              expect(message).not_to include("synthetic-user")
+              expect(message).not_to include("synthetic-secret")
+              expect(message).to include("renderer.example/bundle.js")
+            end
+          end
+
+          it "fails closed when parsed userinfo precedes another delayed userinfo delimiter" do
+            server_bundle_path =
+              "htps://synthetic-user:synthetic-prefix@synthetic-middle/synthetic-secret@renderer.example/path"
+            stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-prefix")
+            expect(message).not_to include("synthetic-middle")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("renderer.example/path")
+          end
+
+          it "fails closed when a path at sign could be delayed userinfo" do
+            server_bundle_path = "htps://renderer.example/bundle@example.js"
+            stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("renderer.example")
+            expect(message).not_to include("renderer.example/bundle")
+            expect(message).to include("example.js")
+          end
+
+          it "preserves a scheme-only value without masking the bundle-load diagnostic" do
+            server_bundle_path = "htps://"
+            stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)
+
+            expect(bundle_load_error_message).to include(server_bundle_path)
+          end
+        end
+
+        context "when a configured bundle authority uses an invalid scheme spelling" do
+          it "redacts credentials after an underscore in the scheme" do
+            server_bundle_path =
+              "http_://synthetic-user:synthetic-secret@renderer.example/bundle.js"
+            stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("renderer.example/bundle.js")
+          end
+
+          [["a percent sign", "http%"], ["only digits", "123"]].each do |description, scheme|
+            it "redacts credentials when the scheme contains #{description}" do
+              server_bundle_path =
+                "#{scheme}://synthetic-user:synthetic-secret@renderer.example/bundle.js"
+              stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)
+
+              message = bundle_load_error_message
+              expect(message).not_to include("synthetic-user")
+              expect(message).not_to include("synthetic-secret")
+              expect(message).to include("renderer.example/bundle.js")
+            end
+          end
+
+          it "redacts credentials when URI parsing treats the value as opaque" do
+            server_bundle_path =
+              "x:y://synthetic-user:synthetic-secret@renderer.example/bundle.js"
+            stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("renderer.example/bundle.js")
+          end
+        end
+
+        context "when the configured scheme parser discards userinfo" do
+          it "uses the parser's sanitized value rather than returning the raw credentials" do
+            server_bundle_path = "file://synthetic-user:synthetic-secret@renderer.example/bundle.js"
+            stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("file://renderer.example/bundle.js")
+          end
+        end
+
+        context "when a configured typo-scheme value contains another authority scheme" do
+          it "fails closed across the ambiguous prefix while retaining the credential authority's host and path" do
+            server_bundle_path =
+              "htps://outer.example/pathcustom://synthetic-user:synthetic-secret@renderer.example/bundle.js"
+            stub_local_bundle_failure(Errno::ENOENT.new(server_bundle_path), bundle_path: server_bundle_path)
+
+            message = bundle_load_error_message
+            expect(message).not_to include("outer.example")
+            expect(message).not_to include("synthetic-user")
+            expect(message).not_to include("synthetic-secret")
+            expect(message).to include("renderer.example/bundle.js")
           end
         end
 
