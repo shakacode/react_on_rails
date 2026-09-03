@@ -28,7 +28,7 @@ npm and Bun use the same dependency map under `overrides`:
 {
   "overrides": {
     "@fastify/formbody": "^7.4.0",
-    "fastify-favicon": "^4.3.0",
+    "@fastify/multipart": "^8.3.1",
     "fastify": "^4.29.0"
   }
 }
@@ -41,7 +41,7 @@ pnpm uses that map under `pnpm.overrides`:
   "pnpm": {
     "overrides": {
       "@fastify/formbody": "^7.4.0",
-      "fastify-favicon": "^4.3.0",
+      "@fastify/multipart": "^8.3.1",
       "fastify": "^4.29.0"
     }
   }
