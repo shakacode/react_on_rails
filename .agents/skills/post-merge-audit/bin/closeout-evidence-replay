@@ -468,7 +468,7 @@ module CloseoutEvidenceReplay
     path_candidate_text = without_schema_slash_labels(non_url_text)
     local_path = absolute_local_path?(non_url_text) ||
                  path_candidate_text.match?(
-                   %r{(?:\A|[\s("'=;])(?:\./\S++|\.\./\S++|~[/\\]\S++|[A-Za-z]:[^/\\\s]++)}
+                   %r{(?:\A|[\s("'=;])(?:\./\S++|\.\./\S++|~[/\\]\S++|[A-Za-z]:[^/\\\s]++|[^/\s]++/\S++)}
                  ) ||
                  path_candidate_text.match?(
                    /(?:\A|[\s("'=;])(?:\\\\[^\\\s]++\\[^\\\s]++|(?:[^\\\s]++\\)++[^\\\s]++)/
@@ -481,7 +481,7 @@ module CloseoutEvidenceReplay
   end
 
   def without_schema_slash_labels(value)
-    value.gsub(%r{\b(?:before/after|baseline/candidate|pass/fail|on/off|yes/no)\b}i, "")
+    value.gsub(%r{\b(?:before/after|baseline/candidate|light/dark|pass/fail|on/off|yes/no)\b}i, "")
   end
 
   def failed_visual_artifact_claim?(value)
@@ -498,7 +498,7 @@ module CloseoutEvidenceReplay
       !affirmative_blank_or_unpainted_claim?(value) &&
       !failed_inspection_claim?(value) &&
       !value.match?(
-        /\b(?:(?:did\s+not|didn['’]t|not|never)\b#{paint_state_gap}\b(?:paint|render)(?:ed)?|(?:(?:was|were|is|are|has|have|had|does|do)n['’]t)\b#{paint_state_gap}\b(?:paint|render)(?:ed)?|failed\s+to\s+(?:paint|render)|(?:paint|render)(?:ing)?\s+fail(?:ed|s|ure)?|(?:painted|rendered)\s+unsuccessfully|unsuccessfully\s+(?:painted|rendered))\b/i
+        /\b(?:(?:did\s+not|didn['’]t|not|never)\b#{paint_state_gap}\b(?:paint|render)(?:ed)?|(?:(?:was|were|is|are|has|have|had|does|do)n['’]t)\b#{paint_state_gap}\b(?:paint|render)(?:ed)?|(?:unable\s+to|can(?:not|['’]t)|could(?:\s+not|n['’]t))\s+(?:paint|render)|failed\s+to\s+(?:paint|render)|(?:paint|render)(?:ing)?\s+fail(?:ed|s|ure)?|(?:painted|rendered)\s+unsuccessfully|unsuccessfully\s+(?:painted|rendered))\b/i
       )
   end
 
@@ -593,6 +593,7 @@ module CloseoutEvidenceReplay
     normalized_host = uri.host.downcase
     return if normalized_host == "private-user-images.githubusercontent.com"
     return if normalized_host == "localhost" || normalized_host.end_with?(".localhost")
+    return if noncanonical_numeric_ipv4_host?(normalized_host)
     return if normalized_host.match?(/\A127(?:\.\d{1,3}){3}\z/) || normalized_host == "0.0.0.0"
     return if private_or_link_local_ipv4_host?(normalized_host)
 
@@ -601,12 +602,22 @@ module CloseoutEvidenceReplay
     nil
   end
 
-  def private_or_link_local_ipv4_host?(host)
-    octets = host.split(".")
-    return false unless octets.length == 4 && octets.all? { |octet| octet.match?(/\A\d{1,3}\z/) }
+  def noncanonical_numeric_ipv4_host?(host)
+    numeric = host.match?(/\A(?:0x[0-9a-f]+|\d[\d.]*)\z/i)
+    numeric && !canonical_ipv4_host?(host)
+  end
 
-    numbers = octets.map(&:to_i)
-    return false unless numbers.all? { |number| number.between?(0, 255) }
+  def canonical_ipv4_host?(host)
+    octets = host.split(".")
+    octets.length == 4 && octets.all? do |octet|
+      octet.match?(/\A(?:0|[1-9]\d{0,2})\z/) && octet.to_i.between?(0, 255)
+    end
+  end
+
+  def private_or_link_local_ipv4_host?(host)
+    return false unless canonical_ipv4_host?(host)
+
+    numbers = host.split(".").map(&:to_i)
 
     numbers[0] == 10 ||
       (numbers[0] == 172 && numbers[1].between?(16, 31)) ||
@@ -797,6 +808,10 @@ module CloseoutEvidenceReplay
     }
     if results.any? { |result| result.key?("findings") }
       aggregate["findings"] = results.flat_map { |result| result.fetch("findings", []) }
+    end
+    %w[marker_version supersedes_marker_version].each do |key|
+      values = results.filter_map { |result| result[key] }.uniq
+      aggregate[key] = values.first if values.length == 1
     end
     aggregate
   end

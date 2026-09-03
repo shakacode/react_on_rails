@@ -122,6 +122,8 @@ class CloseoutEvidenceReplayTest < Minitest::Test
 
     assert_equal "SATISFIED", qa.fetch("verdict")
     assert_equal 2, qa.fetch("marker_count")
+    assert_equal 2, qa.fetch("marker_version")
+    assert_equal 1, qa.fetch("supersedes_marker_version")
   end
 
   def test_strict_visual_gate_rejects_any_non_ui_current_head_marker
@@ -534,6 +536,7 @@ class CloseoutEvidenceReplayTest < Minitest::Test
       "C:before.png",
       "C:before",
       "assets/before.png",
+      "artifacts/baseline",
       "before.png",
       "local-screenshot.webp",
       "local-screenshot.heic",
@@ -631,6 +634,10 @@ class CloseoutEvidenceReplayTest < Minitest::Test
       https://localhost/artifact
       https://127.0.0.1/artifact
       https://0.0.0.0/artifact
+      https://127.1/artifact
+      https://2130706433/artifact
+      https://0177.0.0.1/artifact
+      https://0x7f000001/artifact
       https://10.0.0.5/artifact
       https://172.16.0.5/artifact
       https://172.31.255.254/artifact
@@ -727,6 +734,7 @@ class CloseoutEvidenceReplayTest < Minitest::Test
       "passed: target rendered but paint failed",
       "passed: rendered",
       "passed: painted successfully",
+      "passed: target was unable to render; baseline rendered and inspected",
       "passed: rendered screenshot could not be inspected",
       "passed: rendered screenshot wasn't inspected",
       "passed: rendered screenshot, inspection was skipped"
