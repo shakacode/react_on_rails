@@ -125,8 +125,16 @@ module CloseoutEvidenceReplay
       else
         replay_qa_markers(qa_v1_markers, expected_head_sha: expected_head_sha, version: 1)
       end
-    if require_visual_evidence_v2 && qa.dig("fields", "user_visible_ui_change") != "yes"
-      qa.fetch("missing") << "user_visible_ui_change"
+    strict_qa_results = qa.fetch("markers", [qa])
+    invalid_ui_marker_indexes = strict_qa_results.each_index.reject do |index|
+      strict_qa_results.fetch(index).dig("fields", "user_visible_ui_change") == "yes"
+    end
+    if require_visual_evidence_v2 && invalid_ui_marker_indexes.any?
+      if qa.key?("markers")
+        invalid_ui_marker_indexes.each { |index| qa.fetch("missing") << "marker[#{index}].user_visible_ui_change" }
+      else
+        qa.fetch("missing") << "user_visible_ui_change"
+      end
       qa.fetch("missing").uniq!
       qa["verdict"] = "UNKNOWN"
     end
@@ -476,7 +484,7 @@ module CloseoutEvidenceReplay
 
   def without_negated_visual_state_claims(value)
     value.gsub(
-      /\b(?:not|never)\b(?:(?!\b(?:blank|unpainted)\b)[^.!?;,\n])*\b(?:blank|unpainted)\b/i,
+      /\b(?:not|never)\b(?:\s+(?:(?!(?:only|merely)\b)[[:alpha:]]+ly|at\s+all|even))*\s+\b(?:blank|unpainted)\b/i,
       ""
     )
   end
@@ -558,7 +566,8 @@ module CloseoutEvidenceReplay
   def negated_or_passing_failure_claim?(value)
     failure_term = "(?:fail(?:ed|s|ing|ures?)?|errors?|assert(?:ion)?s?|mismatch(?:es)?)"
     negation = "(?:did\\s+not|didn['’]t|never|not|no|without)"
-    reverse_negation = "(?:not|never)#{CLAUSE_GAP}(?:observed|reproduced|detected|occurred|seen|present)"
+    reverse_negation = "(?:(?:not|never)#{CLAUSE_GAP}(?:observed|reproduced|detected|occurred|seen|present)|" \
+                       "(?:did\\s+not|didn['’]t)#{CLAUSE_GAP}(?:occur|happen|appear|manifest|get\\s+(?:observed|reproduced|detected)))"
     value.match?(/\b#{negation}\b#{CLAUSE_GAP}\b#{failure_term}\b/i) ||
       value.match?(/\b#{failure_term}\b#{CLAUSE_GAP}\b#{reverse_negation}\b/i) ||
       value.match?(/\b(?:no\s+longer\s+fail(?:ed|s|ing)?|stopp(?:ed|ing)\s+fail(?:ing)?|fail(?:ed|s)?\s+no\s+more)\b/i) ||

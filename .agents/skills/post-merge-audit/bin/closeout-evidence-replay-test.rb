@@ -112,6 +112,40 @@ class CloseoutEvidenceReplayTest < Minitest::Test
     assert_includes qa.fetch("missing"), "user_visible_ui_change"
   end
 
+  def test_strict_visual_gate_accepts_multiple_current_head_ui_markers
+    body = v2_marker + v2_marker("scope" => "second current-head UI check")
+    qa = run_replay(
+      body,
+      expected_head_sha: "1111111111111111111111111111111111111111",
+      require_visual_evidence_v2: true
+    ).fetch("qa_evidence")
+
+    assert_equal "SATISFIED", qa.fetch("verdict")
+    assert_equal 2, qa.fetch("marker_count")
+  end
+
+  def test_strict_visual_gate_rejects_any_non_ui_current_head_marker
+    body = v2_marker + v2_marker(
+      "required" => "no",
+      "status" => "not_applicable",
+      "user_visible_ui_change" => "no",
+      "visual_evidence_destination" => "not_applicable",
+      "visual_evidence" => "not applicable: no user-visible UI change",
+      "paint_check" => "not applicable: no rendered target",
+      "interaction_evidence" => "not applicable: no interaction change",
+      "negative_control" => "not applicable: no visual fix",
+      "release_blocking" => "not_applicable"
+    )
+    qa = run_replay(
+      body,
+      expected_head_sha: "1111111111111111111111111111111111111111",
+      require_visual_evidence_v2: true
+    ).fetch("qa_evidence")
+
+    assert_equal "UNKNOWN", qa.fetch("verdict")
+    assert_includes qa.fetch("missing"), "marker[1].user_visible_ui_change"
+  end
+
   def test_historical_v1_remains_replayable_without_visual_fields
     data = run_replay(<<~MARKDOWN)
       <!-- qa-evidence v1
@@ -412,7 +446,16 @@ class CloseoutEvidenceReplayTest < Minitest::Test
       "unexpectedly blank screenshot" => "durable: before screenshot was unexpectedly blank and after rendered https://github.com/example/repo/pull/123#visual",
       "unpainted page" => "durable: before page was unpainted and after rendered https://github.com/example/repo/pull/123#visual",
       "negated then affirmative blank screenshot" =>
-        "durable: screenshot was not blank but later screenshot was blank https://github.com/example/repo/pull/123#visual"
+        "durable: screenshot was not blank but later screenshot was blank https://github.com/example/repo/pull/123#visual",
+      "unrelated negation before blank screenshot" =>
+        "durable: before screenshot was not uploaded because it was blank and after rendered " \
+        "https://github.com/example/repo/pull/123#visual",
+      "not-only blank screenshot" =>
+        "durable: before screenshot was not only blank but corrupted and after rendered " \
+        "https://github.com/example/repo/pull/123#visual",
+      "not-merely blank screenshot" =>
+        "durable: before screenshot was not merely blank but corrupted and after rendered " \
+        "https://github.com/example/repo/pull/123#visual"
     }
 
     bad_evidence.each do |label, evidence|
@@ -770,6 +813,8 @@ class CloseoutEvidenceReplayTest < Minitest::Test
       "observed_failure: assertion never failed",
       "observed_failure: failure not observed in this run",
       "observed_failure: assertion FAILED but not observed",
+      "observed_failure: failure did not occur",
+      "observed_failure: failure didn't happen",
       "observed_failure: completed without mismatch",
       "observed_failure: assertion no longer fails",
       "observed_failure: assertion stopped failing",
