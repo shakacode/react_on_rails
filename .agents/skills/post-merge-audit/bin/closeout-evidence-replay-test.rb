@@ -385,6 +385,7 @@ class CloseoutEvidenceReplayTest < Minitest::Test
       "file URL" => "durable: before file:///tmp/before.png and after https://github.com/example/repo/pull/123#visual",
       "captured locally" => "durable: before captured locally and after https://github.com/example/repo/pull/123#visual",
       "blank screenshot" => "durable: before screenshot was blank and after rendered https://github.com/example/repo/pull/123#visual",
+      "blank screenshots" => "durable: before and after screenshots were blank https://github.com/example/repo/pull/123#visual",
       "hedged blank screenshot" => "durable: before screenshot was completely blank and after rendered https://github.com/example/repo/pull/123#visual",
       "unpainted page" => "durable: before page was unpainted and after rendered https://github.com/example/repo/pull/123#visual"
     }
@@ -722,6 +723,7 @@ class CloseoutEvidenceReplayTest < Minitest::Test
       "observed_failure: assertion stopped failing",
       "observed_failure: assertion fails no more",
       "observed_failure: assertion passed",
+      "observed_failure: assertion mismatch scenario; all regression checks passed successfully afterward",
       "observed_failure: negative control passes",
       "observed_failure: run succeeded",
       "observed_failure: assertion was successful",
