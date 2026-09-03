@@ -527,7 +527,7 @@ rg -q 'credential bytes found in run output' "$tmp/immutable-credential-snapshot
 
 printf '%s' 'prefix:rotated-credential-store-value:suffix' >"$tmp/credential-output/rotated.txt"
 if printf '%s' 'original-credential-snapshot-value' |
-  "$eval_dir/bin/assert-brokered-credential-absent" codex "$tmp/credential-output" \
+  "$eval_dir/bin/assert-brokered-credential-absent" codex native "$tmp/credential-output" \
     "$tmp/model-credential" 2>"$tmp/rotated-credential-error"; then
   echo "rotated Codex credential leak was accepted in run output" >&2
   exit 1
@@ -539,6 +539,20 @@ if rg -Fq 'rotated-credential-store-value' "$tmp/rotated-credential-error" ||
   exit 1
 fi
 : >"$tmp/credential-output/rotated.txt"
+
+# A native Claude credential must not inherit the OAuth metadata exemptions.
+native_claude_credential="$tmp/native-claude-credential.json"
+printf '%s\n' '{"claudeAiOauth":{"subscriptionType":"native-metadata-canary"}}' \
+  >"$native_claude_credential"
+printf '%s\n' 'native-metadata-canary' >"$tmp/credential-output/native-claude.txt"
+if printf '%s' '{"claudeAiOauth":{"subscriptionType":"native-metadata-canary"}}' |
+  "$eval_dir/bin/assert-brokered-credential-absent" claude native "$tmp/credential-output" \
+    "$native_claude_credential" 2>"$tmp/native-claude-credential-error"; then
+  echo "native Claude credential was scanned with OAuth metadata exemptions" >&2
+  exit 1
+fi
+rg -q 'credential bytes found in run output' "$tmp/native-claude-credential-error"
+: >"$tmp/credential-output/native-claude.txt"
 
 printf '%s' safe >"$tmp/symlink-target"
 ln -s "$tmp/symlink-target" "$tmp/credential-output/dependency-link"
@@ -929,7 +943,7 @@ test ! -e "$oauth_source_symlink_dir/.credentials.json"
 oauth_original_snapshot="$(<"$oauth_store")"
 printf '%s' 'synthetic-oauth-access-token' >"$tmp/credential-output/oauth-original.txt"
 if printf '%s' "$oauth_original_snapshot" |
-  "$eval_dir/bin/assert-brokered-credential-absent" claude "$tmp/credential-output" \
+  "$eval_dir/bin/assert-brokered-credential-absent" claude claude-oauth "$tmp/credential-output" \
     "$oauth_store" 2>"$tmp/oauth-original-leak-error"; then
   echo "original Claude OAuth token leak was accepted" >&2
   exit 1
@@ -948,7 +962,7 @@ chmod 600 "$oauth_rotated_store"
 mv "$oauth_rotated_store" "$oauth_store"
 printf '%s' 'rotated-oauth-refresh-token' >"$tmp/credential-output/oauth-rotated.txt"
 if printf '%s' "$oauth_original_snapshot" |
-  "$eval_dir/bin/assert-brokered-credential-absent" claude "$tmp/credential-output" \
+  "$eval_dir/bin/assert-brokered-credential-absent" claude claude-oauth "$tmp/credential-output" \
     "$oauth_store" 2>"$tmp/oauth-rotated-leak-error"; then
   echo "rotated Claude OAuth token leak was accepted" >&2
   exit 1
@@ -959,7 +973,7 @@ mv "$oauth_store" "$oauth_home/.claude/.credentials.target"
 ln -s "$oauth_home/.claude/.credentials.target" "$oauth_store"
 set +e
 printf '%s' "$oauth_original_snapshot" |
-  "$eval_dir/bin/assert-brokered-credential-absent" claude "$tmp/credential-output" \
+  "$eval_dir/bin/assert-brokered-credential-absent" claude claude-oauth "$tmp/credential-output" \
     "$oauth_store" 2>"$tmp/oauth-symlink-current-error"
 oauth_symlink_current_exit=$?
 set -e
@@ -1072,6 +1086,30 @@ test "$(jq -r 'select(.item.type == "agent_message") | .item.text | fromjson | .
 test "$(wc -c <"$tmp/codex-events.normalized.jsonl" | tr -d ' ')" -lt 1048576
 test "$(ruby -e 'printf "%o", File.stat(ARGV.fetch(0)).mode & 0777' \
   "$tmp/codex-events.normalized.jsonl")" = 600
+
+jq -cn \
+  '{type:"item.completed",item:{type:"command_execution",command:"npm run build",exit_code:0,status:"completed",aggregated_output:"SECRET_KEY_BASE=$(bin/rails secret) npm run build\nSECRET_KEY_BASE=\"<GENERATED_AT_RUNTIME>\" npm run build"}}' \
+  >"$tmp/codex-runtime-secret-events.jsonl"
+node "$eval_dir/bin/normalize-codex-events.mjs" \
+  "$tmp/codex-runtime-secret-events.jsonl" "$tmp/codex-runtime-secret-events.normalized.jsonl"
+rg -Fq 'SECRET_KEY_BASE=$(bin/rails secret) npm run build' \
+  "$tmp/codex-runtime-secret-events.normalized.jsonl"
+perl "$eval_dir/bin/sanitize-events.pl" --jsonl \
+  "$tmp/codex-runtime-secret-events.normalized.jsonl" \
+  >"$tmp/codex-runtime-secret-events.safe.jsonl"
+test "$(jq -r '.item.aggregated_output' "$tmp/codex-runtime-secret-events.safe.jsonl")" = \
+  $'SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>" npm run build\nSECRET_KEY_BASE="[REDACTED]" npm run build'
+
+ruby -rtimeout -e '
+  Timeout.timeout(5) { exit(system(*ARGV) ? 0 : 1) }
+' node --input-type=module -e '
+  import { pathToFileURL } from "node:url";
+  const { redactSensitiveValues } = await import(pathToFileURL(process.argv[1]));
+  const raw = `${"__ROR_EVAL_DEFERRED_RUNTIME_SECRET__"}${"_".repeat(20000)}${
+    " SECRET_KEY_BASE=$(bin/rails secret);".repeat(10000)
+  }`;
+  if (redactSensitiveValues(raw, { runtimeGeneratedSecretMode: "defer" }) !== raw) process.exit(1);
+' "$eval_dir/bin/sensitive-values.mjs"
 
 ruby -rjson -e '
   secret = "SYNTHETIC-TRUNCATION-CANARY-9384"
@@ -7392,6 +7430,32 @@ node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v9-scaffold-events.jsonl" 
 test "$(jq -r '.items[] | select(.id == "install.pro") | .status' \
   "$tmp/claude-v9-scaffold-output/rubric-results.json")" = pass
 
+quote_spliced_scaffold_command=$'/bin/bash -lc \'set -o pipefail\nnpx --yes create-react-on-rails-app@latest eval_app --rsc --package-manager npm --no-agent-files 2>&1 | tee \'"\'"\'<LOCAL_PATH>/scaffold.log\'"\'"\' | tail -c 4096\necho "PIPE_EXIT_STATUS=$?"\''
+jq -cn --arg command "$quote_spliced_scaffold_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"✓ Done!\nCreated eval_app with React on Rails!\nPIPE_EXIT_STATUS=0"}}' \
+  >"$tmp/quote-spliced-scaffold-events.jsonl"
+mkdir "$tmp/quote-spliced-scaffold-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/quote-spliced-scaffold-events.jsonl" \
+  "$tmp/claude-v8-form-workspace" "$tmp/quote-spliced-scaffold-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+test "$(jq -r '.items[] | select(.id == "install.pro") | .status' \
+  "$tmp/quote-spliced-scaffold-output/rubric-results.json")" = pass
+
+node -e '
+  const fs = require("node:fs");
+  const command = `! 2>&1 | tee \"$A${"0$A".repeat(100000)}`;
+  fs.writeFileSync(process.argv[1], `${JSON.stringify({
+    type: "item.completed",
+    item: { type: "command_execution", command, exit_code: 0, status: "completed", aggregated_output: "" },
+  })}\n`);
+' "$tmp/adversarial-tee-events.jsonl"
+mkdir "$tmp/adversarial-tee-output"
+ruby -rtimeout -e '
+  Timeout.timeout(5) { exit(system(*ARGV) ? 0 : 1) }
+' node "$eval_dir/bin/derive-evidence.mjs" "$tmp/adversarial-tee-events.jsonl" \
+  "$tmp/claude-v8-form-workspace" "$tmp/adversarial-tee-output" \
+  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+
 claude_v9_test_command=$'source /workspace/pgtools/env.sh\ncd <LOCAL_PATH>/eval_app\nRAILS_ENV=test bin/rails test 2>&1 | tail -20\necho "FINAL_TEST_EXIT=${PIPESTATUS[0]}"'
 jq -cn --arg command "$claude_v9_test_command" \
   '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"8 runs, 43 assertions, 0 failures, 0 errors, 0 skips\nFINAL_TEST_EXIT=0"}}' \
@@ -10752,7 +10816,6 @@ fresh_claude_positive_selector_constraints=(
   '    assert_select "#error_explanation", 1...3'
   '    assert_select "#error_explanation", 1 .. 3'
   '    assert_select "#error_explanation", 1..1'
-  '    assert_select "#error_explanation", 1...1'
   '    assert_select("#error_explanation", 1..3)'
   '    assert_select "#error_explanation", 1..3, "expected errors"'
   '    assert_select ".errors", text: /invalid/, count: 1'
@@ -10843,6 +10906,7 @@ fresh_claude_html_selector_rejections=(
   '    assert_select ".errors", -1..3'
   '    assert_select ".errors", 3..1'
   '    assert_select ".errors", 1..0'
+  '    assert_select ".errors", 1...1'
   '    assert_select ".errors", minimum..maximum'
   '    assert_select ".errors", 1..expected_maximum'
   '    assert_select ".errors", 1..'

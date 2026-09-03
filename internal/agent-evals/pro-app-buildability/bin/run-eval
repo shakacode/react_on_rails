@@ -376,7 +376,7 @@ normalize_agent_events() {
 assert_credential_absent() {
   local scan_target="$1"
   local symlink_policy="${2:-}"
-  local scan_args=("$agent" "$scan_target" "$brokered_credential")
+  local scan_args=("$agent" "$model_credential_format" "$scan_target" "$brokered_credential")
   [[ -z "$symlink_policy" ]] || scan_args+=("$symlink_policy")
   printf '%s' "$credential_snapshot" |
     "$eval_dir/bin/assert-brokered-credential-absent" "${scan_args[@]}"

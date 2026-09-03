@@ -156,29 +156,111 @@ const artifactCitations = (matched) => matched.map((artifact) => `artifact-evide
 const commandCitations = (matched) => matched.map((command) => `command-evidence.json#${command.id}`);
 const unwrapShellCommand = (command) => {
   const match = command.match(/^\/(?:usr\/)?bin\/(?:zsh|bash|sh) -lc (['"])([\s\S]*)\1$/);
-  return (match?.[2] ?? command).trim();
+  if (!match) return command.trim();
+  return match[2].replaceAll(`'"'"'`, "'").replaceAll(`'"'`, "'").trim();
 };
 const isHelpOrVersion = (command) => /(?:^|\s)(?:--help|--version|-h|-V)(?:\s|$)/.test(command);
-const boundedLogPipeline =
-  /^(.*\S)\s+2>&1\s*\|\s*tee\s+(?:--\s+)?(?:"<LOCAL_PATH>"|'<LOCAL_PATH>'|<LOCAL_PATH>|<LOCAL_PATH>\/\.ror-eval-state\/create-app\.log|"(?:[A-Za-z0-9_./-]|\$(?:[A-Za-z_][A-Za-z0-9_]*|\{[A-Za-z_][A-Za-z0-9_]*\}))*"|'[A-Za-z0-9_./${}-]+'|[A-Za-z0-9_./${}-]+)\s*\|\s*tail\s+(?:-n\s+|-)([1-9][0-9]{0,4})$/;
-const completedScaffoldLogPipeline =
-  /^(.*\S)\s+2>&1\s*\|\s*tee\s+(?:--\s+)?(?:"<LOCAL_PATH>"|'<LOCAL_PATH>'|<LOCAL_PATH>|<LOCAL_PATH>\/\.create-app\.log|<LOCAL_PATH>\/\.ror-eval-state\/create-app\.log|"(?:[A-Za-z0-9_./-]|\$(?:[A-Za-z_][A-Za-z0-9_]*|\{[A-Za-z_][A-Za-z0-9_]*\}))*"|'[A-Za-z0-9_./${}-]+'|[A-Za-z0-9_./${}-]+)\s*\|\s*tail\s+(?:-n\s+|-)([1-9][0-9]{0,4})$/;
-const statusMarkedScaffoldPipeline =
-  /^(.*\S)\s+2>&1\s*\|\s*tee\s+<LOCAL_PATH>\/scaffold\.log\s*\|\s*tail\s+(?:-n\s+|-)([1-9][0-9]{0,4})$/;
+const localPathPlaceholder = '<LOCAL_PATH>';
+const safeUnquotedLogPathCharacter = /[A-Za-z0-9_./-]/;
+const safeSingleQuotedLogPathCharacter = /[A-Za-z0-9_./${}-]/;
+const safeLiteralLogPath = (value, allowDollarBraces = false) => {
+  if (!value) return false;
+  const safeCharacter = allowDollarBraces ? safeSingleQuotedLogPathCharacter : safeUnquotedLogPathCharacter;
+  let index = 0;
+  while (index < value.length) {
+    if (safeCharacter.test(value[index])) index += 1;
+    else if (value.startsWith(localPathPlaceholder, index)) index += localPathPlaceholder.length;
+    else return false;
+  }
+  return true;
+};
+const safePlainLogPath = (value) => safeLiteralLogPath(value);
+const safeDoubleQuotedLogPath = (value) => {
+  let index = 0;
+  while (index < value.length) {
+    const character = value[index];
+    if (safeUnquotedLogPathCharacter.test(character)) index += 1;
+    else if (value.startsWith(localPathPlaceholder, index)) index += localPathPlaceholder.length;
+    else {
+      if (character !== '$') return false;
+
+      let cursor = index + 1;
+      const braced = value[cursor] === '{';
+      if (braced) cursor += 1;
+      if (!/[A-Za-z_]/.test(value[cursor] ?? '')) return false;
+      cursor += 1;
+      while (/[A-Za-z0-9_]/.test(value[cursor] ?? '')) cursor += 1;
+      if (braced) {
+        if (value[cursor] !== '}') return false;
+        cursor += 1;
+      }
+      index = cursor;
+    }
+  }
+  return value.length > 0;
+};
+const safeLogTarget = (target, exactTargets, allowPlaceholderSequences = false) => {
+  if (exactTargets.has(target)) return true;
+  if (target.startsWith('"') && target.endsWith('"')) {
+    const value = target.slice(1, -1);
+    return (
+      (allowPlaceholderSequences || !value.includes(localPathPlaceholder)) && safeDoubleQuotedLogPath(value)
+    );
+  }
+  if (target.startsWith("'") && target.endsWith("'")) {
+    const value = target.slice(1, -1);
+    return (
+      (allowPlaceholderSequences || !value.includes(localPathPlaceholder)) && safeLiteralLogPath(value, true)
+    );
+  }
+  return (allowPlaceholderSequences || !target.includes(localPathPlaceholder)) && safePlainLogPath(target);
+};
+const quotedTargetVariants = (target) => [target, `"${target}"`, `'${target}'`];
+const baseScaffoldLogTargets = new Set([
+  ...quotedTargetVariants('<LOCAL_PATH>'),
+  ...quotedTargetVariants('<LOCAL_PATH>/.ror-eval-state/create-app.log'),
+]);
+const completedScaffoldLogTargets = new Set([
+  ...baseScaffoldLogTargets,
+  ...quotedTargetVariants('<LOCAL_PATH>/.create-app.log'),
+]);
+const statusMarkedScaffoldLogTargets = new Set(quotedTargetVariants('<LOCAL_PATH>/scaffold.log'));
+const boundedStatusLogTargets = new Set(quotedTargetVariants('<LOCAL_PATH>'));
+const matchBoundedLogPipeline = (
+  line,
+  exactTargets = baseScaffoldLogTargets,
+  allowPlaceholderSequences = false,
+) => {
+  const tail = line.match(/\s*\|\s*tail\s+(?:-n\s+|-)([1-9][0-9]{0,4})$/);
+  if (!tail) return null;
+  const beforeTail = line.slice(0, tail.index);
+  const tee = beforeTail.match(/\s+2>&1\s*\|\s*tee\s+(?:--\s+)?(\S+)$/);
+  if (!tee || !safeLogTarget(tee[1], exactTargets, allowPlaceholderSequences)) return null;
+  const target = beforeTail.slice(0, tee.index);
+  if (!target || target !== target.trimEnd()) return null;
+  return [line, target, tail[1]];
+};
+const boundedLogPipeline = (line) => matchBoundedLogPipeline(line);
+const completedScaffoldLogPipeline = (line) => matchBoundedLogPipeline(line, completedScaffoldLogTargets);
+const statusMarkedScaffoldPipeline = (line) => matchBoundedLogPipeline(line, statusMarkedScaffoldLogTargets);
 const safeOutputRedirection = /^(.*\S)\s+>\s+(?:"<LOCAL_PATH>"|'<LOCAL_PATH>'|<LOCAL_PATH>)\s+2>&1$/;
 const boundedPlaceholderTail =
   /^tail\s+(?:-n\s+|-)([1-9][0-9]{0,4})\s+(?:"<LOCAL_PATH>"|'<LOCAL_PATH>'|<LOCAL_PATH>)$/;
 const boundedTailPipeline = /^(.*\S)\s+2>&1\s*\|\s*tail\s+(?:-n\s+|-)([1-9][0-9]{0,4})$/;
-const boundedStatusPipeline =
-  /^(.*\S)\s+2>&1\s*(?:\|\s*tee\s+(?:(?:<LOCAL_PATH>)|[A-Za-z0-9_./-])+\s*)?\|\s*tail\s+(?:-n\s+|-)([1-9][0-9]{0,4})$/;
+const boundedStatusPipeline = (line) => {
+  const directTail = line.match(/^(.*\S)\s+2>&1\s*\|\s*tail\s+(?:-n\s+|-)([1-9][0-9]{0,4})$/);
+  return directTail ?? matchBoundedLogPipeline(line, boundedStatusLogTargets, true);
+};
 const boundedStdoutStatusPipeline = /^(.*\S)\s+\|\s*tail\s+(?:-n\s+|-)([1-9][0-9]{0,4})$/;
 const exactScaffoldTailSuffix = /[ \t]*\|[ \t]*tail[ \t]+-c[ \t]+4096$/;
 const canonicalizeExactScaffoldTail = (line) => {
   const suffix = line.match(exactScaffoldTailSuffix);
   return suffix ? `${line.slice(0, suffix.index).trimEnd()} | tail -n 1` : null;
 };
-const matchExactScaffoldPipeline = (line, pattern) =>
-  canonicalizeExactScaffoldTail(line)?.match(pattern) ?? null;
+const matchExactScaffoldPipeline = (line, matcher) => {
+  const canonical = canonicalizeExactScaffoldTail(line);
+  return canonical ? matcher(canonical) : null;
+};
 const normalizedStateSourceLines = new Set([
   'source <LOCAL_PATH>/.ror-eval-state/pgenv.sh',
   'source <LOCAL_PATH>/.ror-eval-state/env.sh',
@@ -247,7 +329,7 @@ const immediatePhaseStatusTarget = (
   }
 
   const pipelineMatch =
-    proofLines[0].match(boundedStatusPipeline) ??
+    boundedStatusPipeline(proofLines[0]) ??
     (allowStdoutOnly && proofLines.length === 3 ? proofLines[0].match(boundedStdoutStatusPipeline) : null) ??
     (allowExactByteTail ? matchExactScaffoldPipeline(proofLines[0], boundedStatusPipeline) : null);
   const directMarkerMatch =
@@ -527,7 +609,7 @@ const topLevelShellLines = (command) => {
   }
   return executableLines;
 };
-const pipefailPipelineTargets = (lines, pipelineMatcher = (line) => line.match(boundedLogPipeline)) =>
+const pipefailPipelineTargets = (lines, pipelineMatcher = boundedLogPipeline) =>
   lines.flatMap((line, index) => {
     const pipelineMatch = pipelineMatcher(line);
     const hasTopLevelPipefail = lines.length === 2 && index === 1 && lines[0] === 'set -o pipefail';
@@ -3282,8 +3364,12 @@ const semanticFormIntegrationTest = (artifact, uncommentedRuby) => {
     if (method === 'select' && (comparator === 'true' || positiveInteger.test(comparator))) return true;
     if (method === 'select' && literalKind(comparator)) return true;
     const rangeMatch =
-      method === 'select' && comparator.match(/^([1-9][0-9]{0,4})[ \t]*\.\.\.?[ \t]*(0|[1-9][0-9]{0,4})$/);
-    if (rangeMatch) return Number(rangeMatch[1]) <= Number(rangeMatch[2]);
+      method === 'select' && comparator.match(/^([1-9][0-9]{0,4})[ \t]*(\.\.\.?)[ \t]*(0|[1-9][0-9]{0,4})$/);
+    if (rangeMatch) {
+      const lowerBound = Number(rangeMatch[1]);
+      const upperBound = Number(rangeMatch[3]);
+      return rangeMatch[2] === '...' ? lowerBound < upperBound : lowerBound <= upperBound;
+    }
     if (parts.length > 3) return false;
     let contentFilter = null;
     let count = null;

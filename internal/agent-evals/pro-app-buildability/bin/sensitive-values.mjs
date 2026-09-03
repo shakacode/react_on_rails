@@ -92,6 +92,7 @@ const redactRuntimeGeneratedSecret = (value) =>
 const sanitizeRuntimeGeneratedSecret = (value, mode) => {
   if (mode === 'trusted') return preserveRuntimeGeneratedSecret(value);
   if (mode === 'redact') return redactRuntimeGeneratedSecret(value);
+  if (mode === 'defer') return String(value);
   return canonicalizeRuntimeGeneratedSecret(value);
 };
 
@@ -137,10 +138,8 @@ const redactStructuredSensitiveValues = (value) => {
   return output + input.slice(cursor);
 };
 
-export const redactSensitiveValues = (value, { runtimeGeneratedSecretMode = 'canonicalize' } = {}) =>
-  redactStructuredSensitiveValues(
-    redactCredentialsInWebUrls(sanitizeRuntimeGeneratedSecret(value, runtimeGeneratedSecretMode)),
-  )
+const redactSensitiveValuesCore = (value) =>
+  redactStructuredSensitiveValues(redactCredentialsInWebUrls(value))
     .replace(quotedNamedValue, (match, name, separator, doubleQuotedValue, singleQuotedValue) => {
       const doubleQuoted = doubleQuotedValue !== undefined;
       const quote = doubleQuoted ? '"' : "'";
@@ -161,6 +160,28 @@ export const redactSensitiveValues = (value, { runtimeGeneratedSecretMode = 'can
     .replace(privateKeyBlock, '[REDACTED]')
     .replace(privateKeyRemainder, '[REDACTED]')
     .replace(bearerToken, 'Bearer [REDACTED]');
+
+const redactWithDeferredRuntimeSecrets = (value) => {
+  const input = String(value);
+  let output = '';
+  let cursor = 0;
+  runtimeGeneratedSecretExpression.lastIndex = 0;
+  while (true) {
+    const match = runtimeGeneratedSecretExpression.exec(input);
+    if (match === null) break;
+    const assignmentStart = match.index + match[1].length;
+    output += redactSensitiveValuesCore(input.slice(cursor, assignmentStart));
+    output += match[0].slice(match[1].length);
+    cursor = match.index + match[0].length;
+  }
+  runtimeGeneratedSecretExpression.lastIndex = 0;
+  return output + redactSensitiveValuesCore(input.slice(cursor));
+};
+
+export const redactSensitiveValues = (value, { runtimeGeneratedSecretMode = 'canonicalize' } = {}) => {
+  if (runtimeGeneratedSecretMode === 'defer') return redactWithDeferredRuntimeSecrets(value);
+  return redactSensitiveValuesCore(sanitizeRuntimeGeneratedSecret(value, runtimeGeneratedSecretMode));
+};
 
 export const containsSensitiveValues = (value) =>
   redactSensitiveValues(value) !== canonicalizeRuntimeGeneratedSecret(String(value));

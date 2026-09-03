@@ -130,7 +130,9 @@ for await (const line of rl) {
         command,
         exit_code: exitCode ?? null,
         status: status ?? 'unknown',
-        aggregated_output: truncateOutput(redactSensitiveValues(rawOutput)),
+        aggregated_output: truncateOutput(
+          redactSensitiveValues(rawOutput, { runtimeGeneratedSecretMode: 'defer' }),
+        ),
       },
     });
   } else if (event.item.type === 'agent_message') {
