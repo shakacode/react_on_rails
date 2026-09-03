@@ -737,6 +737,16 @@ class CloseoutEvidenceReplayTest < Minitest::Test
     end
   end
 
+  def test_v2_allows_missing_ui_state_when_visual_artifacts_are_available
+    evidence = "durable: before screenshot shows the missing icon; after screenshot shows it restored " \
+               "https://github.com/example/repo/pull/123#visual"
+    qa = run_replay(v2_marker("visual_evidence" => evidence)).fetch("qa_evidence")
+
+    assert_equal "SATISFIED", qa.fetch("verdict")
+    refute_includes qa.fetch("missing"), "visual_evidence.before_after"
+    refute_includes qa.fetch("missing"), "visual_evidence.artifact_available"
+  end
+
   def test_v2_github_destination_accepts_current_and_legacy_attachment_hosts
     hosts = %w[
       github.com/example/repo/pull/123#visual
@@ -781,7 +791,10 @@ class CloseoutEvidenceReplayTest < Minitest::Test
       "passed: target wasn't able to render; baseline rendered and inspected",
       "passed: rendered screenshot could not be inspected",
       "passed: rendered screenshot wasn't inspected",
-      "passed: rendered screenshot, inspection was skipped"
+      "passed: rendered screenshot, inspection was skipped",
+      "passed: target rendered and was inspected, but inspection failed",
+      "passed: target rendered and was reviewed, but review was unsuccessful",
+      "passed: target rendered and was verified, but failed verification"
     ]
 
     invalid_claims.each do |paint_check|

@@ -370,7 +370,7 @@ module CloseoutEvidenceReplay
   def validate_durable_visual_evidence(evidence, destination, missing)
     missing << "visual_evidence.url" unless http_url?(evidence)
     missing << "visual_evidence.before_after" unless baseline_and_candidate?(evidence)
-    missing << "visual_evidence.artifact_available" if unavailable_artifact_claim?(evidence)
+    missing << "visual_evidence.artifact_available" if unavailable_visual_artifact_claim?(evidence)
     missing << "visual_evidence.local_reference" if disallowed_durable_reference?(evidence)
 
     case destination
@@ -447,9 +447,20 @@ module CloseoutEvidenceReplay
   end
 
   def missing_visual_artifact_claim?(value)
-    value.match?(
-      /\b(?:baseline|before|candidate|after)\b#{CLAUSE_GAP}\b(?:unavailable|missing|not\s+(?:available|captured|recorded|provided|attached)|(?:is|are|was|were)n['’]t\s+(?:available|captured|recorded|provided|attached))\b/i
-    )
+    label = "(?:baseline|before|candidate|after)"
+    artifact = "(?:artifacts?|captures?|frames?|images?|recordings?|screenshots?|attachments?)"
+    unavailable = "(?:unavailable|not\\s+(?:available|captured|recorded|provided|attached)|" \
+                  "(?:is|are|was|were)n['’]t\\s+(?:available|captured|recorded|provided|attached))"
+    value.match?(/\b#{label}\b#{CLAUSE_GAP}\b#{unavailable}\b/i) ||
+      value.match?(
+        /\b#{label}\b#{CLAUSE_GAP}\b#{artifact}\b(?:\s+(?:is|are|was|were))?\s+(?:missing|#{unavailable})\b/i
+      )
+  end
+
+  def unavailable_visual_artifact_claim?(value)
+    non_url_text = without_https_urls(value)
+    missing_visual_artifact_claim?(non_url_text) ||
+      non_url_text.match?(/\b(?:expired|inaccessible|access\s+denied|could\s+not\s+be\s+accessed)\b/i)
   end
 
   def http_url?(value)
@@ -515,7 +526,9 @@ module CloseoutEvidenceReplay
   def failed_inspection_claim?(value)
     value.match?(
       /\b(?:unable\s+to|could(?:\s+not|n['’]t)(?:\s+be)?|was(?:\s+not|n['’]t)|were(?:\s+not|n['’]t)|not|never)(?!\s+(?:only|merely)\b)#{CLAUSE_GAP}\b(?:inspect(?:ed|ion)?|reviewed|verified)\b/i
-    ) || value.match?(/\b(?:inspection|review|verification)#{CLAUSE_GAP}\b(?:skipped|omitted|not\s+performed)\b/i)
+    ) || value.match?(
+      /\b(?:inspection|review|verification)\s+(?:failed|was\s+unsuccessful|skipped|omitted|not\s+performed)\b|\bfailed\s+(?:inspection|review|verification)\b/i
+    )
   end
 
   def affirmative_blank_or_unpainted_claim?(value)
