@@ -108,7 +108,6 @@ module ReactOnRails
 
       def prepare_in_place(path, ensure_executable)
         return unless ensure_executable
-        return if File.executable?(path)
 
         File.chmod(0o755, path)
       end
@@ -133,10 +132,78 @@ module ReactOnRails
     end
     private_constant :FileWriter
 
+    module WritePath
+      module_function
+
+      def resolve_root(path)
+        resolve(path)
+      end
+
+      def resolve_within(path, destination_root, resolved_destination_root)
+        resolved_path = resolve(path)
+        raise Error, "#{path} resolves outside the destination root" unless
+          within_destination_root?(resolved_path, resolved_destination_root)
+
+        managed_path_has_symlink?(path, destination_root) ? resolved_path : path
+      end
+
+      def resolve(path)
+        path = File.realdirpath(path) if File.symlink?(path)
+
+        existing_path = path
+        missing_components = []
+        until path_entry_exists?(existing_path)
+          parent = File.dirname(existing_path)
+          raise Errno::ENOENT, path if parent == existing_path
+
+          missing_components.unshift(File.basename(existing_path))
+          existing_path = parent
+        end
+
+        resolved_existing_path = if File.symlink?(existing_path)
+                                   File.realdirpath(existing_path)
+                                 else
+                                   File.realpath(existing_path)
+                                 end
+        File.join(resolved_existing_path, *missing_components)
+      end
+
+      def within_destination_root?(path, resolved_destination_root)
+        return true if path == resolved_destination_root
+
+        root_prefix = if resolved_destination_root.end_with?(File::SEPARATOR)
+                        resolved_destination_root
+                      else
+                        "#{resolved_destination_root}#{File::SEPARATOR}"
+                      end
+        path.start_with?(root_prefix)
+      end
+
+      def managed_path_has_symlink?(path, destination_root)
+        current_path = path
+        until current_path == destination_root
+          return true if File.symlink?(current_path)
+
+          parent = File.dirname(current_path)
+          return false if parent == current_path
+
+          current_path = parent
+        end
+        false
+      end
+
+      def path_entry_exists?(path)
+        File.exist?(path) || File.symlink?(path)
+      end
+      private_class_method :resolve, :within_destination_root?, :managed_path_has_symlink?, :path_entry_exists?
+    end
+    private_constant :WritePath
+
     # Encapsulates a single install run against one app root.
     class Installer
       def initialize(destination_root, skip_existing: false)
         @destination_root = File.expand_path(destination_root.to_s)
+        @resolved_destination_root = WritePath.resolve_root(@destination_root)
         @skip_existing = skip_existing
       end
 
@@ -149,7 +216,7 @@ module ReactOnRails
 
       private
 
-      attr_reader :destination_root, :skip_existing
+      attr_reader :destination_root, :resolved_destination_root, :skip_existing
 
       def validate_settings_before_copy
         settings_path = File.join(destination_root, SETTINGS_REL)
@@ -160,8 +227,9 @@ module ReactOnRails
           return settings_path
         end
 
+        settings_write_path = write_path_for(settings_path)
         read_settings(settings_path)
-        write_path_for(settings_path)
+        settings_write_path
       end
 
       def validate_copy_paths_before_copy
@@ -218,7 +286,7 @@ module ReactOnRails
         return "unchanged  #{SETTINGS_REL} (hook already registered)" if hook_registered?(settings)
 
         add_hook(settings)
-        FileUtils.mkdir_p(File.dirname(settings_path))
+        FileUtils.mkdir_p(File.dirname(settings_write_path))
         existed = path_entry_exists?(settings_path)
         FileWriter.write(settings_write_path, "#{JSON.pretty_generate(settings)}\n")
         existed ? "updated    #{SETTINGS_REL} (registered hook)" : "created    #{SETTINGS_REL} (registered hook)"
@@ -229,9 +297,7 @@ module ReactOnRails
       end
 
       def write_path_for(path)
-        return path unless File.symlink?(path)
-
-        File.realdirpath(path)
+        WritePath.resolve_within(path, destination_root, resolved_destination_root)
       end
 
       def remove_legacy_hook

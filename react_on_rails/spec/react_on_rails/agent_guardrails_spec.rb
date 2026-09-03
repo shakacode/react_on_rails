@@ -242,6 +242,7 @@ module ReactOnRails
       hook_directory = File.dirname(hook_path)
       expected_content = File.read(hook_path)
       File.write(hook_path, "existing hook\n")
+      File.chmod(0o700, hook_path)
       File.chmod(0o555, hook_directory)
 
       begin
@@ -251,6 +252,7 @@ module ReactOnRails
       end
 
       expect(File.read(hook_path)).to eq(expected_content)
+      expect(File.stat(hook_path).mode & 0o7777).to eq(0o755)
       expect(Dir.children(hook_directory)).not_to include(a_string_matching(/\.tmp\z/))
     end
 
@@ -321,6 +323,61 @@ module ReactOnRails
       expect(File.read(shared_path)).to eq(expected_content)
       expect(File.stat(shared_path).mode & 0o7777).to eq(0o600)
       expect(actions).to include("updated    .claude/skills/rsc-app-safety/SKILL.md")
+    end
+
+    it "rejects every managed symlink whose write target escapes the destination root" do
+      managed_paths = described_class::FILES.values + [described_class::SETTINGS_REL]
+
+      managed_paths.each_with_index do |relative_path, index|
+        app_root = File.join(@app_root, "app-#{index}")
+        destination_path = File.join(app_root, relative_path)
+        outside_path = File.join(@app_root, "outside-#{index}", File.basename(relative_path))
+        original_content = relative_path == described_class::SETTINGS_REL ? "{}\n" : "outside content\n"
+        FileUtils.mkdir_p(File.dirname(destination_path))
+        FileUtils.mkdir_p(File.dirname(outside_path))
+        File.write(outside_path, original_content)
+        File.symlink(outside_path, destination_path)
+
+        expect { described_class.install(app_root) }
+          .to raise_error(described_class::Error, /resolves outside the destination root/)
+
+        expect(File.symlink?(destination_path)).to be true
+        expect(File.read(outside_path)).to eq(original_content)
+      end
+    end
+
+    it "rejects a managed write through an ancestor symlink that escapes the destination root" do
+      app_root = File.join(@app_root, "app")
+      outside_claude_directory = File.join(@app_root, "outside-claude")
+      FileUtils.mkdir_p(app_root)
+      FileUtils.mkdir_p(outside_claude_directory)
+      File.symlink(outside_claude_directory, File.join(app_root, ".claude"))
+
+      expect { described_class.install(app_root) }
+        .to raise_error(described_class::Error, /resolves outside the destination root/)
+
+      expect(Dir.children(outside_claude_directory)).to be_empty
+    end
+
+    it "does not treat a different Windows volume as contained by a drive root" do
+      write_path = described_class.const_get(:WritePath)
+      allow(File).to receive(:dirname).with("C:/").and_return("C:/")
+
+      expect(write_path.send(:within_destination_root?, "D:/outside/settings.json", "C:/")).to be false
+    end
+
+    it "canonicalizes the casing of an existing symlink target before checking containment" do
+      write_path = described_class.const_get(:WritePath)
+      managed_path = "/tmp/App/.claude/settings.json"
+      differently_cased_target = "/tmp/app/shared/settings.json"
+      canonical_target = "/tmp/App/shared/settings.json"
+      allow(File).to receive(:symlink?).and_call_original
+      allow(File).to receive(:symlink?).with(managed_path).and_return(true)
+      allow(File).to receive(:realdirpath).with(managed_path).and_return(differently_cased_target)
+      allow(File).to receive(:exist?).with(differently_cased_target).and_return(true)
+      allow(File).to receive(:realpath).with(differently_cased_target).and_return(canonical_target)
+
+      expect(write_path.send(:resolve, managed_path)).to eq(canonical_target)
     end
 
     it "creates a missing symlink target without replacing the symlink" do
