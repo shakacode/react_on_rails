@@ -20,6 +20,7 @@ RSpec.describe ReactOnRailsPro::ServerRenderingPool::ProRendering do
   let(:render_options_class) do
     Struct.new(
       :request_digest,
+      :dom_id,
       :random_dom_id,
       :streaming,
       :prerender,
@@ -49,9 +50,10 @@ RSpec.describe ReactOnRailsPro::ServerRenderingPool::ProRendering do
   end
 
   def build_render_options(request_digest: nil, random_dom_id: true, streaming: false, prerender: true,
-                           internal_options: {})
+                           internal_options: {}, dom_id: "CacheProbe-react-component-1")
     render_options_class.new(
       request_digest:,
+      dom_id:,
       random_dom_id:,
       streaming:,
       prerender:,
@@ -310,11 +312,11 @@ RSpec.describe ReactOnRailsPro::ServerRenderingPool::ProRendering do
         expect(result).to eq(wrapped_stream)
         expect(ReactOnRailsPro::StreamCache).to have_received(:fetch_stream)
           .with(["ror_pro_rendered_html", "test", render_options.request_digest],
-                cache_options:)
+                cache_options:, dom_node_id: render_options.dom_id)
         expect(ReactOnRailsPro::StreamCache).to have_received(:wrap_and_cache)
           .with(["ror_pro_rendered_html", "test", render_options.request_digest],
                 upstream_stream,
-                cache_options:)
+                cache_options:, dom_node_id: render_options.dom_id)
         expect(pool).to have_received(:exec_server_render_js).with(js_code, render_options).once
       end
 
@@ -331,6 +333,38 @@ RSpec.describe ReactOnRailsPro::ServerRenderingPool::ProRendering do
         second_options = build_render_options(streaming: true, internal_options: { cache_options: })
         second = described_class.exec_server_render_js(js_code, second_options)
         expect(second.each_chunk.to_a).to eq(%w[chunk-1 chunk-2])
+        expect(pool).to have_received(:exec_server_render_js).once
+      end
+
+      # Regression for https://github.com/shakacode/react_on_rails/issues/4984: the cache key strips
+      # random dom ids, so the second render is a hit even though its mount point differs; the
+      # replayed chunks must reference the mount point of the render being served.
+      it "rebinds a cached stream to the dom id of the render being served" do
+        memory_store = ActiveSupport::Cache::MemoryStore.new
+        allow(Rails).to receive(:cache).and_return(memory_store)
+        first_dom_id = "CacheProbe-react-component-11111111-1111-4111-8111-111111111111"
+        second_dom_id = "CacheProbe-react-component-22222222-2222-4222-8222-222222222222"
+        payload_chunk = {
+          "consoleReplayScript" => "",
+          "hasErrors" => false,
+          "isShellReady" => true,
+          "html" => %(<script>(self.REACT_ON_RAILS_RSC_PAYLOADS||={})["CacheProbe-abc-#{first_dom_id}"]||=[]</script>)
+        }
+        allow(pool).to receive(:exec_server_render_js).and_return(fake_stream_class.new([payload_chunk]))
+
+        first = described_class.exec_server_render_js(
+          render_js(dom_node_id: first_dom_id, quote: :double),
+          build_render_options(streaming: true, dom_id: first_dom_id)
+        )
+        expect(first.each_chunk.to_a.first["html"]).to include(first_dom_id)
+
+        second = described_class.exec_server_render_js(
+          render_js(dom_node_id: second_dom_id, quote: :double),
+          build_render_options(streaming: true, dom_id: second_dom_id)
+        )
+        second_html = second.each_chunk.to_a.first["html"]
+        expect(second_html).to include(second_dom_id)
+        expect(second_html).not_to include(first_dom_id)
         expect(pool).to have_received(:exec_server_render_js).once
       end
 
