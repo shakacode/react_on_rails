@@ -58,9 +58,10 @@ module ReactOnRails
       end
 
       def install
-        validate_settings_before_copy
+        validate_skip_existing_hook_target
+        settings_write_path = validate_settings_before_copy
         actions = FILES.map { |source, dest_rel| copy_file(source, dest_rel) }
-        actions << register_hook
+        actions << register_hook(settings_write_path)
         actions << remove_legacy_hook
         actions.compact
       end
@@ -69,9 +70,18 @@ module ReactOnRails
 
       attr_reader :destination_root, :skip_existing
 
+      def validate_skip_existing_hook_target
+        return unless skip_existing
+
+        hook_path = File.join(destination_root, HOOK_REL)
+        return unless File.symlink?(hook_path) && !File.exist?(hook_path)
+
+        raise Error, "#{HOOK_REL} is a dangling symlink, so its missing target cannot be skipped safely"
+      end
+
       def validate_settings_before_copy
         settings_path = File.join(destination_root, SETTINGS_REL)
-        return if skip_existing && path_entry_exists?(settings_path)
+        return settings_path if skip_existing && path_entry_exists?(settings_path)
 
         read_settings(settings_path)
         write_path_for(settings_path)
@@ -97,7 +107,7 @@ module ReactOnRails
         existed ? "updated    #{dest_rel}" : "created    #{dest_rel}"
       end
 
-      def register_hook
+      def register_hook(settings_write_path)
         settings_path = File.join(destination_root, SETTINGS_REL)
         return "skipped    #{SETTINGS_REL} (already exists)" if skip_existing && path_entry_exists?(settings_path)
 
@@ -107,7 +117,7 @@ module ReactOnRails
         add_hook(settings)
         FileUtils.mkdir_p(File.dirname(settings_path))
         existed = path_entry_exists?(settings_path)
-        atomic_write(write_path_for(settings_path), "#{JSON.pretty_generate(settings)}\n")
+        atomic_write(settings_write_path, "#{JSON.pretty_generate(settings)}\n")
         existed ? "updated    #{SETTINGS_REL} (registered hook)" : "created    #{SETTINGS_REL} (registered hook)"
       end
 

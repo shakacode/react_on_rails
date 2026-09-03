@@ -86,6 +86,26 @@ module ReactOnRails
       expect(actions).to all(match(/skipped/))
     end
 
+    it "rejects a skipped dangling hook before installing any other guardrail files" do
+      described_class.install(@app_root)
+      skill_path = File.join(@app_root, ".claude/skills/rsc-app-safety/SKILL.md")
+      hook_path = File.join(@app_root, ".claude/hooks/rsc-app-safety-check.rb")
+      settings_path = File.join(@app_root, ".claude/settings.json")
+      missing_hook_target = File.join(@app_root, "shared/rsc-app-safety-check.rb")
+      File.unlink(skill_path)
+      File.unlink(hook_path)
+      File.unlink(settings_path)
+      File.symlink(missing_hook_target, hook_path)
+
+      expect { described_class.install(@app_root, skip_existing: true) }
+        .to raise_error(described_class::Error, /dangling symlink/)
+
+      expect(File.exist?(skill_path)).to be false
+      expect(File.symlink?(hook_path)).to be true
+      expect(File.exist?(missing_hook_target)).to be false
+      expect(File.exist?(settings_path)).to be false
+    end
+
     it "restores executable permissions when an unchanged hook is reinstalled" do
       described_class.install(@app_root)
       hook_path = File.join(@app_root, ".claude/hooks/rsc-app-safety-check.rb")
@@ -976,6 +996,21 @@ module ReactOnRails
       expect(File.symlink?(settings_path)).to be true
       expect(File.readlink(settings_path)).to eq(link_target)
       expect(JSON.parse(File.read(shared_path)).dig("hooks", "PostToolUse")).not_to be_empty
+      expect(rsc_hooks.size).to eq(1)
+    end
+
+    it "uses the settings symlink target that was resolved before guardrail files were copied" do
+      settings_path = File.join(@app_root, ".claude/settings.json")
+      shared_path = File.join(@app_root, "shared/settings.json")
+      FileUtils.mkdir_p(File.dirname(settings_path))
+      FileUtils.mkdir_p(File.dirname(shared_path))
+      File.write(shared_path, "{}\n")
+      File.symlink(shared_path, settings_path)
+      allow(File).to receive(:realdirpath).and_call_original
+
+      described_class.install(@app_root)
+
+      expect(File).to have_received(:realdirpath).with(settings_path).once
       expect(rsc_hooks.size).to eq(1)
     end
 
