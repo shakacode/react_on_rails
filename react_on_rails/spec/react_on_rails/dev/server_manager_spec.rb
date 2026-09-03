@@ -1546,6 +1546,30 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         expect(ports).to include(3800)
       end
 
+      it "opens session publication handles with Windows delete sharing" do
+        root = app_root("delete-sharing-session")
+        path = session_path(root)
+        delete_sharing_flags = described_class.const_get(:DEV_SESSION_DELETE_SHARING_FLAGS)
+        session_open_flags = nil
+        tempfile_mode = nil
+        allow(File).to receive(:open).and_wrap_original do |original, *args, **kwargs, &block|
+          session_open_flags ||= args.fetch(1) if args.first == path
+          original.call(*args, **kwargs, &block)
+        end
+        allow(Tempfile).to receive(:create).and_wrap_original do |original, *args, **kwargs|
+          tempfile_mode = kwargs[:mode]
+          original.call(*args, **kwargs)
+        end
+
+        Dir.chdir(root) { described_class.send(:with_dev_session) { :ran } }
+
+        aggregate_failures do
+          expect(delete_sharing_flags).to eq(File::BINARY | File::SHARE_DELETE)
+          expect(session_open_flags & delete_sharing_flags).to eq(delete_sharing_flags)
+          expect(tempfile_mode).to eq(delete_sharing_flags)
+        end
+      end
+
       it "derives no ports at all for a refused session" do
         expect(described_class).not_to receive(:killable_ports)
 
@@ -1727,8 +1751,8 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
           original_handle ||= handle if args.first == path
           handle
         end
-        allow(Tempfile).to receive(:create).and_wrap_original do |original, *args|
-          temporary_handle = original.call(*args)
+        allow(Tempfile).to receive(:create).and_wrap_original do |original, *args, **kwargs|
+          temporary_handle = original.call(*args, **kwargs)
         end
         allow(File).to receive(:rename).and_raise(Interrupt)
 
@@ -1759,8 +1783,8 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
           original_handle ||= handle if args.first == path
           handle
         end
-        allow(Tempfile).to receive(:create).and_wrap_original do |original, *args|
-          temporary_handle = original.call(*args)
+        allow(Tempfile).to receive(:create).and_wrap_original do |original, *args, **kwargs|
+          temporary_handle = original.call(*args, **kwargs)
         end
         allow(File).to receive(:rename).and_wrap_original do |original, *args|
           original.call(*args)
@@ -1835,6 +1859,48 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
           end
           expect(lock_free).to eq(0)
         end
+      end
+
+      it "closes a discarded session handle when deleting its path fails" do
+        root = app_root("discard-delete-fails")
+        path = session_path(root)
+        File.write(path, "partial")
+        handle = File.open(path, File::RDWR)
+        handles << handle
+        allow(File).to receive(:delete).with(path).and_raise(Errno::EACCES)
+
+        described_class.send(:discard_partial_dev_session, handle, path)
+
+        expect(handle).to be_closed
+      end
+
+      it "closes a discarded session handle when unlocking it fails" do
+        root = app_root("discard-unlock-fails")
+        path = session_path(root)
+        File.write(path, "partial")
+        handle = File.open(path, File::RDWR)
+        handles << handle
+        allow(handle).to receive(:flock).with(File::LOCK_UN).and_raise(IOError, "forced unlock failure")
+
+        described_class.send(:discard_partial_dev_session, handle, path)
+
+        aggregate_failures do
+          expect(handle).to be_closed
+          expect(File.exist?(path)).to be false
+        end
+      end
+
+      it "closes a released session handle when deleting its path fails" do
+        root = app_root("release-delete-fails")
+        path = session_path(root)
+        File.write(path, "session")
+        handle = File.open(path, File::RDWR)
+        handles << handle
+        allow(File).to receive(:delete).with(path).and_raise(Errno::EACCES)
+
+        described_class.send(:release_dev_session, { path:, handle: })
+
+        expect(handle).to be_closed
       end
 
       it "degrades to port-scoped cleanup after a failed session write" do
@@ -2206,6 +2272,22 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         end
       end
 
+      it "closes the fixed-lock handle when locking and unlocking it raise" do
+        root = app_root("fixed-lock-read-error")
+        fixed_lock = File.open(session_lock_path(root), File::RDWR | File::CREAT, 0o644)
+        handles << fixed_lock
+        allow(described_class).to receive(:open_existing_or_create_dev_session_lock).and_return(fixed_lock)
+        allow(fixed_lock).to receive(:flock).and_raise(Errno::EIO)
+
+        outcome, message = described_class.send(:open_dev_session_read_lock, root)
+
+        aggregate_failures do
+          expect(outcome).to eq(:refused)
+          expect(message).to include("Errno::EIO")
+          expect(fixed_lock).to be_closed
+        end
+      end
+
       it "stops a session when its existing ownership lock is not writable" do
         skip "file permissions are not enforceable for root" if Process.euid.zero?
 
@@ -2213,6 +2295,24 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         owner = start_owner(root)
         File.write(session_lock_path(root), "")
         File.chmod(0o444, session_lock_path(root))
+
+        output = kill_in(root)
+
+        aggregate_failures do
+          expect(output).to include("verified gone")
+          expect(wait_for { !group_alive?(owner[:pgid]) }).to be true
+        end
+      ensure
+        File.chmod(0o644, session_lock_path(root)) if root && File.exist?(session_lock_path(root))
+      end
+
+      it "stops a session when its existing ownership lock is not readable" do
+        skip "file permissions are not enforceable for root" if Process.euid.zero?
+
+        root = app_root("write-only-session-lock")
+        owner = start_owner(root)
+        File.write(session_lock_path(root), "")
+        File.chmod(0o200, session_lock_path(root))
 
         output = kill_in(root)
 
@@ -2235,6 +2335,33 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         aggregate_failures do
           expect(output).to include("Refusing to signal anything")
           expect(output).to include("not a regular file")
+        end
+      end
+
+      it "releases both session handles when inspecting session state raises IOError" do
+        root = app_root("session-read-error")
+        write_session(root)
+        session_handle = File.open(session_path(root), File::RDONLY)
+        handles << session_handle
+        allow(session_handle).to receive(:stat).and_raise(IOError, "forced read failure")
+        allow(File).to receive(:open).and_wrap_original do |original, *args, **kwargs, &block|
+          if args.first == session_path(root)
+            session_handle
+          else
+            original.call(*args, **kwargs, &block)
+          end
+        end
+
+        output = kill_in(root)
+        fixed_lock_available = File.open(session_lock_path(root), File::RDWR) do |file|
+          file.flock(File::LOCK_EX | File::LOCK_NB)
+        end
+
+        aggregate_failures do
+          expect(output).to include("Refusing to signal anything")
+          expect(output).to include("IOError")
+          expect(session_handle).to be_closed
+          expect(fixed_lock_available).to eq(0)
         end
       end
 
