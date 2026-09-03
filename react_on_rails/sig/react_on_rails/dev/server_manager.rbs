@@ -21,6 +21,10 @@ module ReactOnRails
       # port => pids, :unavailable is a list of ports whose probe failed.
       type port_listener_scan = Hash[Symbol, untyped]
 
+      # Enumerated in-root Overmind socket paths plus any reason the directory
+      # could not be inspected safely.
+      type overmind_socket_discovery = { paths: Array[String], blockers: Array[String] }
+
       def self.start: (mode, String?, ?verbose: bool, ?route: String?, ?rails_env: String?) -> void
       def self.kill_processes: () -> Symbol
       def self.clean_generated_assets_and_caches: () -> bool
@@ -104,13 +108,14 @@ module ReactOnRails
       def self.close_session_handle: (dev_session_view?) -> void
       def self.shutdown_live_owner: (dev_session_view) -> shutdown_result
       def self.unreachable_owner_message: (dev_session_view, dev_session) -> String
-      def self.request_owner_shutdown: (dev_session_view, Integer?, String?) -> bool
-      def self.shutdown_steps: (Integer?, String?) -> Array[untyped]
-      def self.verify_owner_shutdown: (dev_session_view, Integer?, String?) -> shutdown_result
+      def self.request_owner_shutdown: (dev_session_view, Integer?, Array[String]) -> bool
+      def self.shutdown_steps: (Integer?, Array[String]) -> Array[untyped]
+      def self.control_overmind_endpoints: (String, Array[String]) -> bool
+      def self.verify_owner_shutdown: (dev_session_view, Integer?, Array[String]) -> shutdown_result
       def self.outstanding_shutdown_blockers: (dev_session_view) -> Array[String]
-      def self.owner_shutdown_complete?: (dev_session_view, Integer?, String?) -> bool
-      def self.shutdown_settled?: (dev_session_view, Integer?, String?) -> bool
-      def self.shutdown_blockers: (dev_session_view, Integer?, String?) -> Array[String]
+      def self.owner_shutdown_complete?: (dev_session_view, Integer?, Array[String]) -> bool
+      def self.shutdown_settled?: (dev_session_view, Integer?, Array[String]) -> bool
+      def self.shutdown_blockers: (dev_session_view, Integer?, Array[String]) -> Array[String]
       def self.owner_release_state: (dev_session_view) -> Symbol
       def self.owner_released?: (dev_session_view) -> bool
       def self.session_replaced?: (dev_session_view) -> bool
@@ -120,20 +125,32 @@ module ReactOnRails
       def self.leftover_owned_listeners: (dev_session_view) -> Array[String]
       def self.remove_dev_session_file: (dev_session_view) -> bool
       def self.shutdown_without_owner: (dev_session_view) -> shutdown_result
-      def self.shutdown_orphaned_overmind: (dev_session_view, String) -> shutdown_result
+      def self.shutdown_orphaned_overmind: (dev_session_view, Array[String]) -> shutdown_result
       def self.print_kill_failure: (Symbol, Array[String]) -> void
       def self.live_overmind_endpoint: (String, String?) -> String?
-      def self.overmind_endpoint_candidates: (String, String?) -> Array[String]
+      def self.live_overmind_endpoints: (String, String?) -> Array[String]
+      def self.overmind_endpoint_candidates: (String, String?, ?Array[String]) -> Array[String]
+      def self.overmind_socket_discovery: (String) -> overmind_socket_discovery
+      def self.failed_overmind_socket_discovery: (String, SystemCallError) -> overmind_socket_discovery
       def self.scan_overmind_endpoints: (String, String?) -> Hash[Symbol, Array[String]]
-      def self.unprobeable_overmind_endpoints: (dev_session_view) -> Array[String]
+      def self.outstanding_overmind_endpoint_blockers: (dev_session_view) -> Array[String]
       def self.unprobeable_endpoint_blockers: (Array[String]?) -> Array[String]
       def self.unprobeable_endpoint_message: (String) -> String
+      def self.live_overmind_endpoint_message: (String) -> String
+      def self.overmind_endpoint_ownership: (String, ?String) -> Symbol
       def self.overmind_endpoint_owned?: (String, ?String) -> bool
       def self.overmind_endpoint_state: (String) -> Symbol
       def self.probe_unix_socket: (String) -> Symbol
       def self.overmind_endpoint_alive?: (String) -> bool
-      def self.overmind_control: (String, String) -> bool
-      def self.run_overmind_command: (Array[String]) -> bool
+      def self.overmind_control: (String, String, ?timeout_secs: Numeric) -> bool
+      def self.run_overmind_command: (Array[String], ?timeout_secs: Numeric) -> bool
+      def self.spawn_overmind_command: (Array[String]) -> Integer
+      def self.execute_overmind_command: (Array[String]) -> bool
+      def self.wait_for_overmind_command: (Integer, Numeric) -> (Process::Status | Symbol)?
+      def self.terminate_overmind_command: (Integer) -> void
+      def self.wait_for_overmind_group_exit: (Integer, Numeric, bool) -> [bool, bool]
+      def self.overmind_command_reaped?: (Integer) -> bool
+      def self.reap_overmind_command: (Integer) -> untyped
       def self.signalable_pgid: (untyped) -> Integer?
       def self.own_process_group: () -> Integer?
       def self.signal_process_group: (Integer, String) -> bool
@@ -152,6 +169,9 @@ module ReactOnRails
       def self.default_rails_kill_port: () -> Integer
       def self.default_dev_server_kill_port: () -> Integer
       def self.configured_dev_server_port: () -> Integer?
+      def self.configured_renderer_ports_for_kill: () -> Array[Integer]
+      def self.renderer_procfile_ports_for_kill: (?String) -> Array[Integer]
+      def self.renderer_procfile_default_ports: (String) -> Array[Integer]
       def self.stale_cleanup_candidates: (String) -> Array[String]
       def self.wait_until: (Numeric) { () -> untyped } -> bool
       def self.monotonic_now: () -> Float

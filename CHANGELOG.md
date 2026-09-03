@@ -26,6 +26,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **`bin/dev kill` now verifies every app-scoped Overmind endpoint within a bounded control budget**:
+  shutdown discovers all `tmp/sockets/overmind*.sock` endpoints, fails closed when discovery or probing cannot be
+  completed, and terminates and reaps timed-out control clients under one shared deadline per phase. When no renderer
+  port is exported, recognized generated Procfiles supply the local Node Renderer fallback without widening the kill
+  scope to an unrelated listener on port 3800. Fixes
+  [Issue 4944](https://github.com/shakacode/react_on_rails/issues/4944). [PR 4986](https://github.com/shakacode/react_on_rails/pull/4986) by
+  [justin808](https://github.com/justin808).
+
 - **[Pro]** **Prerender-cached streamed renders now hydrate on every request**: The automatic prerender cache key
   deliberately ignores random dom ids so one cached render serves every mount point, but the cached
   chunks still embedded the first request's dom id in their React Server Component payload keys.

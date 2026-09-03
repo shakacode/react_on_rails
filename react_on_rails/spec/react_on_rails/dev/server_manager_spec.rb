@@ -2662,6 +2662,201 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         end
       end
 
+      it "controls a discovered live Overmind endpoint under tmp/sockets" do
+        root = app_root("discovered-endpoint")
+        sockets_dir = File.join(root, "tmp", "sockets")
+        FileUtils.mkdir_p(sockets_dir)
+        socket_path = File.join(sockets_dir, "overmind-renamed.sock")
+        server = UNIXServer.new(socket_path)
+        servers << server
+
+        allow(described_class).to receive(:overmind_control) do |_subcommand, endpoint|
+          expect(endpoint).to eq(socket_path)
+          server.close
+          File.delete(socket_path)
+          true
+        end
+
+        output = kill_in(root)
+
+        aggregate_failures do
+          expect(described_class).to have_received(:overmind_control)
+            .with("quit", socket_path, timeout_secs: kind_of(Numeric))
+          expect(output).to include("orphaned Overmind endpoint")
+          expect(output).to include("verified gone")
+        end
+      end
+
+      it "controls and verifies every discovered live Overmind endpoint" do
+        root = app_root("multiple-discovered-endpoints")
+        sockets_dir = File.join(root, "tmp", "sockets")
+        FileUtils.mkdir_p(sockets_dir)
+        socket_paths = %w[overmind-a.sock overmind-b.sock].map { |name| File.join(sockets_dir, name) }
+        servers_by_path = socket_paths.to_h do |socket_path|
+          server = UNIXServer.new(socket_path)
+          servers << server
+          [socket_path, server]
+        end
+
+        allow(described_class).to receive(:overmind_control) do |_subcommand, endpoint|
+          servers_by_path.fetch(endpoint).close
+          File.delete(endpoint)
+          true
+        end
+
+        output = kill_in(root)
+
+        aggregate_failures do
+          socket_paths.each do |socket_path|
+            expect(described_class).to have_received(:overmind_control)
+              .with("quit", socket_path, timeout_secs: kind_of(Numeric))
+            expect(File.exist?(socket_path)).to be false
+          end
+          expect(output).to include("verified gone")
+        end
+      end
+
+      it "discovers sockets when the app root contains glob metacharacters" do
+        root = app_root("discovered-[literal]-root")
+        sockets_dir = File.join(root, "tmp", "sockets")
+        FileUtils.mkdir_p(sockets_dir)
+        socket_path = File.join(sockets_dir, "overmind-renamed.sock")
+        server = UNIXServer.new(socket_path)
+        servers << server
+
+        allow(described_class).to receive(:overmind_control) do |_subcommand, endpoint|
+          server.close
+          File.delete(endpoint)
+          true
+        end
+
+        output = kill_in(root)
+
+        aggregate_failures do
+          expect(described_class).to have_received(:overmind_control)
+            .with("quit", socket_path, timeout_secs: kind_of(Numeric))
+          expect(output).to include("verified gone")
+        end
+      end
+
+      it "keeps realpath containment on discovered Overmind endpoints" do
+        root = app_root("discovered-symlink")
+        other = app_root("discovered-symlink-target")
+        sockets_dir = File.join(root, "tmp", "sockets")
+        FileUtils.mkdir_p(sockets_dir)
+        victim_socket = File.join(other, ".overmind.sock")
+        discovered = File.join(sockets_dir, "overmind-escape.sock")
+        servers << UNIXServer.new(victim_socket)
+        File.symlink(victim_socket, discovered)
+
+        candidates = Dir.chdir(root) { described_class.send(:overmind_endpoint_candidates, root, nil) }
+
+        aggregate_failures do
+          expect(candidates).to include(discovered)
+          expect(Dir.chdir(root) { described_class.send(:overmind_endpoint_owned?, discovered) }).to be false
+          expect(Dir.chdir(root) { described_class.send(:live_overmind_endpoint, root, nil) }).to be_nil
+        end
+      end
+
+      it "blocks verification on an unprobeable discovered Overmind endpoint" do
+        root = app_root("discovered-unknown")
+        sockets_dir = File.join(root, "tmp", "sockets")
+        FileUtils.mkdir_p(sockets_dir)
+        socket_path = File.join(sockets_dir, "overmind-unknown.sock")
+        servers << UNIXServer.new(socket_path)
+        allow(described_class).to receive(:overmind_endpoint_state) do |path|
+          path == socket_path ? :unknown : :gone
+        end
+
+        output = kill_in(root)
+
+        aggregate_failures do
+          expect(output).to include("Shutdown could not be verified")
+          expect(output).to include("could not determine whether the Overmind endpoint #{socket_path} is still live")
+          expect(output).not_to include("verified gone")
+        end
+      end
+
+      it "fails closed when a live orphan endpoint is hidden by an unreadable socket directory" do
+        root = app_root("discovered-unreadable-orphan")
+        sockets_dir = File.join(root, "tmp", "sockets")
+        FileUtils.mkdir_p(sockets_dir)
+        socket_path = File.join(sockets_dir, "overmind-hidden.sock")
+        servers << UNIXServer.new(socket_path)
+        File.chmod(0o111, sockets_dir)
+
+        output = kill_in(root)
+
+        aggregate_failures do
+          expect(output).to include("Shutdown could not be verified")
+          expect(output).to include("could not inspect #{sockets_dir} for Overmind endpoints")
+          expect(output).not_to include("No development processes owned by this app directory")
+          expect(output).not_to include("verified gone")
+          expect(File.socket?(socket_path)).to be true
+        end
+      ensure
+        File.chmod(0o755, sockets_dir) if sockets_dir && File.exist?(sockets_dir)
+      end
+
+      it "fails closed after stopping an owner when its socket directory cannot be inspected" do
+        root = app_root("discovered-unreadable-owner")
+        sockets_dir = File.join(root, "tmp", "sockets")
+        FileUtils.mkdir_p(sockets_dir)
+        socket_path = File.join(sockets_dir, "overmind-hidden.sock")
+        servers << UNIXServer.new(socket_path)
+        owner = start_owner(root)
+        File.chmod(0o111, sockets_dir)
+
+        output = kill_in(root)
+
+        aggregate_failures do
+          expect(wait_for { !group_alive?(owner[:pgid]) }).to be true
+          expect(output).to include("Shutdown could not be verified")
+          expect(output).to include("could not inspect #{sockets_dir} for Overmind endpoints")
+          expect(output).not_to include("verified gone")
+          expect(File.socket?(socket_path)).to be true
+        end
+      ensure
+        File.chmod(0o755, sockets_dir) if sockets_dir && File.exist?(sockets_dir)
+      end
+
+      it "fails closed when a discovered endpoint name is readable but cannot be inspected" do
+        skip "file permissions are not enforceable for root" if Process.euid.zero?
+
+        root = app_root("discovered-readable-unsearchable")
+        sockets_dir = File.join(root, "tmp", "sockets")
+        FileUtils.mkdir_p(sockets_dir)
+        socket_path = File.join(sockets_dir, "overmind-hidden.sock")
+        servers << UNIXServer.new(socket_path)
+        File.chmod(0o444, sockets_dir)
+        expect(Dir.children(sockets_dir)).to include("overmind-hidden.sock")
+
+        output = kill_in(root)
+        File.chmod(0o755, sockets_dir)
+
+        aggregate_failures do
+          expect(output).to include("Shutdown could not be verified")
+          expect(output).to include("could not inspect #{socket_path} as an Overmind endpoint")
+          expect(output).not_to include("No development processes owned by this app directory")
+          expect(output).not_to include("verified gone")
+          expect(File.socket?(socket_path)).to be true
+        end
+      ensure
+        File.chmod(0o755, sockets_dir) if sockets_dir && File.exist?(sockets_dir)
+      end
+
+      it "treats a readable empty socket directory as an observed absence" do
+        root = app_root("discovered-empty")
+        FileUtils.mkdir_p(File.join(root, "tmp", "sockets"))
+
+        output = kill_in(root)
+
+        aggregate_failures do
+          expect(output).to include("No development processes owned by this app directory")
+          expect(output).not_to include("Shutdown could not be verified")
+        end
+      end
+
       it "rejects an endpoint that symlinks outside this app root" do
         # `File.socket?` follows symlinks, so comparing the unresolved string
         # let <root>/.overmind.sock point at another checkout's live endpoint
@@ -2714,25 +2909,67 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       # project. A bare `system("overmind", ...)` here repeats the context that
       # already failed, and the process-group fallback cannot reach an Overmind
       # session because its tmux server daemonizes to PPID 1.
-      it "controls Overmind through the same runner startup uses" do
+      it "executes Overmind in the bundled context when startup finds it there" do
         root = app_root("runner")
         socket_path = File.join(root, "r.sock")
         servers << UNIXServer.new(socket_path)
 
-        expect(ReactOnRails::Dev::ProcessManager)
-          .to receive(:run_process_if_available)
-          .with("overmind", ["quit", "-s", socket_path])
-          .and_return(true)
+        allow(ReactOnRails::Dev::ProcessManager).to receive(:installed?).with("overmind").and_return(true)
+        expect(described_class).to receive(:exec).with("overmind", "quit", "-s", socket_path).and_return(true)
 
-        expect(Dir.chdir(root) { described_class.send(:overmind_control, "quit", socket_path) }).to be true
+        expect(described_class.send(:execute_overmind_command, ["quit", "-s", socket_path])).to be true
       end
 
-      # The socket probe was bounded but the command acting on it was not, so a
-      # wedged `overmind quit` blocked inside action.call before wait_until ever
-      # started polling, and the KILL escalation was never reached.
-      it "gives up on a wedged Overmind control command so the ladder can proceed" do
-        stub_const("#{described_class}::OVERMIND_CONTROL_TIMEOUT_SECS", 0.2)
-        allow(ReactOnRails::Dev::ProcessManager).to receive(:run_process_if_available) { sleep 30 }
+      it "executes Overmind outside Bundler when startup finds it only there" do
+        env_overrides = { "PORT" => "4321" }
+        allow(ReactOnRails::Dev::ProcessManager).to receive(:installed?).with("overmind").and_return(false)
+        allow(ReactOnRails::Dev::ProcessManager)
+          .to receive(:process_available_in_system?).with("overmind").and_return(true)
+        allow(ReactOnRails::Dev::ProcessManager).to receive(:preserve_runtime_env_vars).and_return(env_overrides)
+        allow(ReactOnRails::Dev::ProcessManager).to receive(:with_unbundled_context).and_yield
+        expect(described_class).to receive(:exec)
+          .with(env_overrides, "overmind", "kill", "-s", "/tmp/overmind.sock").and_return(true)
+
+        result = described_class.send(:execute_overmind_command, ["kill", "-s", "/tmp/overmind.sock"])
+
+        expect(result).to be true
+      end
+
+      # The timeout must bound the process, not only Ruby's wait for it. A
+      # control client left running can race the next escalation step against
+      # the same live socket, and an unreaped client remains a zombie.
+      it "terminates a wedged Overmind control process so the ladder can proceed" do
+        root = app_root("wedged-overmind")
+        fake_bin = File.join(root, "fake-bin")
+        pid_path = File.join(root, "overmind-control.pid")
+        overmind = File.join(fake_bin, "overmind")
+        FileUtils.mkdir_p(fake_bin)
+        File.write(
+          overmind,
+          <<~SH
+            #!/bin/sh
+            [ "$1" = "--version" ] && exit 0
+
+            echo $$ > "$OVERMIND_CONTROL_PID_PATH"
+            trap '' TERM
+            exec sleep 30
+          SH
+        )
+        File.chmod(0o755, overmind)
+        previous_path = ENV.fetch("PATH")
+        previous_pid_path = ENV.fetch("OVERMIND_CONTROL_PID_PATH", nil)
+        ENV["PATH"] = "#{fake_bin}:#{previous_path}"
+        ENV["OVERMIND_CONTROL_PID_PATH"] = pid_path
+        stub_const("#{described_class}::OVERMIND_CONTROL_TIMEOUT_SECS", 1.0)
+        stub_const("#{described_class}::OVERMIND_CONTROL_TERMINATION_GRACE_SECS", 0.1)
+        allow(Process).to receive(:fork).and_raise(NotImplementedError, "fork is unavailable")
+        runner_pid = nil
+        # Spawn the real fake client directly so this regression measures its
+        # process-group supervision, not a busy machine's Ruby CLI load time.
+        # Launcher routing and exec selection are covered by the examples above.
+        allow(described_class).to receive(:spawn_overmind_command) do |arguments|
+          runner_pid = Process.spawn(overmind, *arguments, pgroup: true)
+        end
 
         result = nil
         started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
@@ -2740,11 +2977,139 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
           result = described_class.send(:run_overmind_command, ["quit", "-s", "/tmp/none.sock"])
         end
         elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started
+        control_pid = Integer(File.read(pid_path), 10) if File.exist?(pid_path)
 
         aggregate_failures do
           expect(result).to be false
           expect(elapsed).to be < 5
           expect(output).to include("did not return within")
+          expect(control_pid).not_to be_nil
+          expect(control_pid).to eq(runner_pid)
+          expect(alive?(control_pid)).to be false if control_pid
+          expect(runner_pid).not_to be_nil
+          expect { Process.waitpid(runner_pid, Process::WNOHANG) }.to raise_error(Errno::ECHILD) if runner_pid
+        end
+      ensure
+        ENV["PATH"] = previous_path if previous_path
+        ENV["OVERMIND_CONTROL_PID_PATH"] = previous_pid_path
+        if pid_path && File.exist?(pid_path)
+          control_pid = Integer(File.read(pid_path), 10)
+          begin
+            Process.kill("KILL", control_pid)
+            Process.waitpid(control_pid)
+          rescue Errno::ESRCH, Errno::ECHILD
+            nil
+          end
+        end
+      end
+
+      it "bounds a batch of wedged Overmind control processes with one deadline per phase" do
+        root = app_root("wedged-overmind-batch")
+        sockets_dir = File.join(root, "tmp", "sockets")
+        fake_bin = File.join(root, "fake-bin")
+        overmind = File.join(fake_bin, "overmind")
+        FileUtils.mkdir_p([sockets_dir, fake_bin])
+        socket_paths = Array.new(4) do |index|
+          socket_path = File.join(sockets_dir, "overmind-#{index}.sock")
+          servers << UNIXServer.new(socket_path)
+          socket_path
+        end
+        File.write(
+          overmind,
+          <<~SH
+            #!/bin/sh
+            [ "$1" = "--version" ] && exit 0
+
+            trap '' TERM
+            exec sleep 30
+          SH
+        )
+        File.chmod(0o755, overmind)
+        previous_path = ENV.fetch("PATH")
+        ENV["PATH"] = "#{fake_bin}:#{previous_path}"
+        stub_const("#{described_class}::OVERMIND_CONTROL_TIMEOUT_SECS", 0.2)
+        stub_const("#{described_class}::OVERMIND_CONTROL_BATCH_TIMEOUT_SECS", 0.25)
+        stub_const("#{described_class}::OVERMIND_CONTROL_TERMINATION_GRACE_SECS", 0.05)
+        runner_pids = []
+        allow(described_class).to receive(:spawn_overmind_command) do |arguments|
+          pid = Process.spawn(overmind, *arguments, pgroup: true)
+          runner_pids << pid
+          pid
+        end
+
+        steps = described_class.send(:shutdown_steps, nil, socket_paths).first(2)
+        started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+        output = capture_stdout do
+          Dir.chdir(root) { steps.each { |_label, _grace, action| action.call } }
+        end
+        elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started
+        blockers = described_class.send(
+          :outstanding_overmind_endpoint_blockers,
+          { root:, session: nil, ports: [] }
+        )
+
+        aggregate_failures do
+          expect(elapsed).to be < 1.2
+          expect(output).to include("shared Overmind control budget was exhausted")
+          expect(runner_pids.length).to eq(2)
+          runner_pids.each do |pid|
+            expect(alive?(pid)).to be false
+            expect { Process.waitpid(pid, Process::WNOHANG) }.to raise_error(Errno::ECHILD)
+          end
+          socket_paths.each do |socket_path|
+            expect(blockers).to include("the Overmind endpoint #{socket_path} is still accepting connections")
+          end
+        end
+      ensure
+        ENV["PATH"] = previous_path if previous_path
+        runner_pids&.each do |pid|
+          Process.kill("KILL", -pid)
+          Process.waitpid(pid)
+        rescue Errno::ESRCH, Errno::ECHILD
+          nil
+        end
+      end
+
+      it "fails closed when the control process was already reaped" do
+        allow(described_class).to receive(:spawn_overmind_command).and_return(42_424)
+        allow(Process).to receive(:wait2).with(42_424, Process::WNOHANG).and_raise(Errno::ECHILD)
+        expect(described_class).not_to receive(:terminate_overmind_command)
+
+        result = nil
+        output = capture_stdout do
+          result = described_class.send(:run_overmind_command, ["quit", "-s", "/tmp/none.sock"])
+        end
+
+        aggregate_failures do
+          expect(result).to be false
+          expect(output).to include("exit status was unavailable")
+        end
+      end
+
+      it "reaps a control process that exits on TERM without spending the KILL grace" do
+        stub_const("#{described_class}::OVERMIND_CONTROL_TERMINATION_GRACE_SECS", 0.5)
+        control_pid = Process.spawn(RbConfig.ruby, "-e", "sleep 30", pgroup: true)
+        allow(described_class).to receive(:signal_process_group).and_call_original
+
+        started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+        output = capture_stdout { described_class.send(:terminate_overmind_command, control_pid) }
+        elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started
+
+        aggregate_failures do
+          expect(elapsed).to be < 0.5
+          expect(output).not_to include("Permission denied")
+          expect(described_class).to have_received(:signal_process_group).with(control_pid, "TERM").once
+          expect(described_class).not_to have_received(:signal_process_group).with(control_pid, "KILL")
+          expect { Process.waitpid(control_pid, Process::WNOHANG) }.to raise_error(Errno::ECHILD)
+        end
+      ensure
+        if control_pid
+          begin
+            Process.kill("KILL", -control_pid)
+            Process.waitpid(control_pid)
+          rescue Errno::ESRCH, Errno::ECHILD
+            nil
+          end
         end
       end
 
@@ -2752,9 +3117,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         root = app_root("runner-fail")
         socket_path = File.join(root, "rf.sock")
         servers << UNIXServer.new(socket_path)
-        # nil is what the runner returns when the binary is unusable in both
-        # the bundled and unbundled contexts.
-        allow(ReactOnRails::Dev::ProcessManager).to receive(:run_process_if_available).and_return(nil)
+        allow(described_class).to receive(:run_overmind_command).and_return(false)
 
         result = nil
         output = capture_stdout do
@@ -2765,13 +3128,6 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
           expect(result).to be false
           expect(output).to include("`overmind kill` did not run successfully")
         end
-      end
-
-      # Pins the cross-class coupling: if ProcessManager renames this runner,
-      # this fails loudly instead of silently reverting to the broken bare
-      # `system` call.
-      it "depends on a runner ProcessManager still provides" do
-        expect(ReactOnRails::Dev::ProcessManager.respond_to?(:run_process_if_available, true)).to be true
       end
 
       it "refuses to control an endpoint outside this app root" do
@@ -3215,6 +3571,21 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
   describe ".killable_ports" do
     include_context "with clean port env"
 
+    def killable_ports_for_procfile(contents)
+      Dir.mktmpdir("react-on-rails-kill-ports") do |root|
+        File.write(File.join(root, "Gemfile"), "# fixture app root\n")
+        File.write(File.join(root, "Procfile.dev"), contents)
+        return Dir.chdir(root) { described_class.killable_ports }
+      end
+    end
+
+    let(:active_default_renderer_procfile) do
+      <<~PROCFILE
+        rails: bundle exec rails server
+        node-renderer: RENDERER_PORT=${RENDERER_PORT:-3800} node renderer/node-renderer.js
+      PROCFILE
+    end
+
     it "targets base-port-derived ports when REACT_ON_RAILS_BASE_PORT is active" do
       # Without base-port awareness, `bin/dev kill` in a worktree running on
       # 5000/5001/5002 would fall back to 3000/3001 and leave the actual ports
@@ -3287,7 +3658,14 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       allow(ReactOnRails::Dev::PortSelector).to receive(:base_port_hash).and_return(nil)
       allow(described_class).to receive(:pro_renderer_active?).and_return(true)
 
-      expect(described_class.killable_ports).to eq([3000, 3035])
+      expect(killable_ports_for_procfile("rails: bundle exec rails server\n")).to eq([3000, 3035])
+    end
+
+    it "targets the generated renderer default when an active Procfile starts it without exported env" do
+      allow(ReactOnRails::Dev::PortSelector).to receive(:base_port_hash).and_return(nil)
+      allow(described_class).to receive(:pro_renderer_active?).and_return(true)
+
+      expect(killable_ports_for_procfile(active_default_renderer_procfile)).to eq([3000, 3035, 3800])
     end
 
     it "targets 3800 when a localhost REACT_RENDERER_URL is set without an explicit port" do
@@ -3303,14 +3681,14 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       allow(ReactOnRails::Dev::PortSelector).to receive(:base_port_hash).and_return(nil)
       allow(described_class).to receive(:pro_renderer_active?).and_return(true)
 
-      expect(described_class.killable_ports).to eq([3000, 3035, 3900])
+      expect(killable_ports_for_procfile(active_default_renderer_procfile)).to eq([3000, 3035, 3900])
     end
 
     it "does not target the default renderer port for a remote renderer URL" do
       ENV["REACT_RENDERER_URL"] = "https://renderer.internal:3800"
       allow(ReactOnRails::Dev::PortSelector).to receive(:base_port_hash).and_return(nil)
 
-      expect(described_class.killable_ports).to eq([3000, 3035])
+      expect(killable_ports_for_procfile(active_default_renderer_procfile)).to eq([3000, 3035])
     end
 
     it "targets the local renderer URL port when RENDERER_PORT is not set" do
