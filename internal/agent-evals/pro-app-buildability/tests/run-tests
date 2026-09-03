@@ -7419,16 +7419,30 @@ for manifest_variant in missing no-production-env one-production-env truncated; 
     "$tmp/claude-v8-build-$manifest_variant-output/rubric-results.json")" = unknown
 done
 
-claude_v9_scaffold_command=$'set -o pipefail\nnpx --yes create-react-on-rails-app@latest eval_app --rsc --package-manager npm --no-agent-files 2>&1 | tee <LOCAL_PATH>/scaffold.log | tail -c 4096\necho "PIPE_EXIT_STATUS=$?"'
-jq -cn --arg command "$claude_v9_scaffold_command" \
-  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"✓ Done!\nCreated eval_app with React on Rails!\nPIPE_EXIT_STATUS=0"}}' \
-  >"$tmp/claude-v9-scaffold-events.jsonl"
-mkdir "$tmp/claude-v9-scaffold-output"
-node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v9-scaffold-events.jsonl" \
-  "$tmp/claude-v8-form-workspace" "$tmp/claude-v9-scaffold-output" \
-  "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
-test "$(jq -r '.items[] | select(.id == "install.pro") | .status' \
-  "$tmp/claude-v9-scaffold-output/rubric-results.json")" = pass
+claude_v9_scaffold_log_targets=(
+  '<LOCAL_PATH>/scaffold.log'
+  '"<LOCAL_PATH>/scaffold.log"'
+  "'<LOCAL_PATH>/scaffold.log'"
+)
+claude_v9_scaffold_target_index=0
+for scaffold_log_target in "${claude_v9_scaffold_log_targets[@]}"; do
+  claude_v9_scaffold_target_index=$((claude_v9_scaffold_target_index + 1))
+  claude_v9_scaffold_command="$(printf '%s\n' \
+    'set -o pipefail' \
+    "npx --yes create-react-on-rails-app@latest eval_app --rsc --package-manager npm --no-agent-files 2>&1 | tee $scaffold_log_target | tail -c 4096" \
+    'echo "PIPE_EXIT_STATUS=$?"')"
+  jq -cn --arg command "$claude_v9_scaffold_command" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"✓ Done!\nCreated eval_app with React on Rails!\nPIPE_EXIT_STATUS=0"}}' \
+    >"$tmp/claude-v9-scaffold-target-$claude_v9_scaffold_target_index-events.jsonl"
+  mkdir "$tmp/claude-v9-scaffold-target-$claude_v9_scaffold_target_index-output"
+  node "$eval_dir/bin/derive-evidence.mjs" \
+    "$tmp/claude-v9-scaffold-target-$claude_v9_scaffold_target_index-events.jsonl" \
+    "$tmp/claude-v8-form-workspace" \
+    "$tmp/claude-v9-scaffold-target-$claude_v9_scaffold_target_index-output" \
+    "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+  test "$(jq -r '.items[] | select(.id == "install.pro") | .status' \
+    "$tmp/claude-v9-scaffold-target-$claude_v9_scaffold_target_index-output/rubric-results.json")" = pass
+done
 
 quote_spliced_scaffold_command=$'/bin/bash -lc \'set -o pipefail\nnpx --yes create-react-on-rails-app@latest eval_app --rsc --package-manager npm --no-agent-files 2>&1 | tee \'"\'"\'<LOCAL_PATH>/scaffold.log\'"\'"\' | tail -c 4096\necho "PIPE_EXIT_STATUS=$?"\''
 jq -cn --arg command "$quote_spliced_scaffold_command" \
@@ -7485,6 +7499,8 @@ claude_v9_scaffold_rejections=(
   $'true\nset -o pipefail\nnpx --yes create-react-on-rails-app@latest eval_app --rsc --package-manager npm --no-agent-files 2>&1 | tee <LOCAL_PATH>/scaffold.log | tail -c 4096\necho "PIPE_EXIT_STATUS=$?"'
   $'set -o pipefail\ntrue\nnpx --yes create-react-on-rails-app@latest eval_app --rsc --package-manager npm --no-agent-files 2>&1 | tee <LOCAL_PATH>/scaffold.log | tail -c 4096\necho "PIPE_EXIT_STATUS=$?"'
   $'set -o pipefail\nnpx --yes create-react-on-rails-app@latest eval_app --rsc --package-manager npm --no-agent-files 2>&1 | tee <LOCAL_PATH>/other.log | tail -c 4096\necho "PIPE_EXIT_STATUS=$?"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app@latest eval_app --rsc --package-manager npm --no-agent-files 2>&1 | tee other.log | tail -c 4096\necho "PIPE_EXIT_STATUS=$?"'
+  $'set -o pipefail\nnpx --yes create-react-on-rails-app@latest eval_app --rsc --package-manager npm --no-agent-files 2>&1 | tee ./other.log | tail -c 4096\necho "PIPE_EXIT_STATUS=$?"'
   $'set -o pipefail\nnpx --yes create-react-on-rails-app@latest eval_app --rsc --package-manager npm --no-agent-files 2>&1 | tee <LOCAL_PATH>/scaffold.log | tail -n 1001\necho "PIPE_EXIT_STATUS=$?"'
   $'set -o pipefail\nnpx --yes create-react-on-rails-app@latest eval_app --rsc --package-manager npm --no-agent-files 2>&1 | tee <LOCAL_PATH>/scaffold.log | tail -c 4096\ntrue\necho "PIPE_EXIT_STATUS=$?"'
   $'set -o pipefail\nnpx --yes create-react-on-rails-app@latest eval_app --rsc --package-manager npm --no-agent-files 2>&1 | tee <LOCAL_PATH>/scaffold.log | tail -c 4096\necho "PIPE_EXIT_STATUS=0"'
@@ -7667,7 +7683,7 @@ for manifest_variant in missing no-production-env one-production-env truncated; 
     "$tmp/claude-v9-build-$manifest_variant-output/rubric-results.json")" = unknown
 done
 
-cat "$tmp/claude-v9-scaffold-events.jsonl" "$tmp/claude-v9-test-events.jsonl" \
+cat "$tmp/claude-v9-scaffold-target-1-events.jsonl" "$tmp/claude-v9-test-events.jsonl" \
   "$tmp/claude-v9-build-events.jsonl" >"$tmp/claude-v9-events.jsonl"
 mkdir "$tmp/claude-v9-output"
 node "$eval_dir/bin/derive-evidence.mjs" "$tmp/claude-v9-events.jsonl" \

@@ -199,8 +199,9 @@ const safeDoubleQuotedLogPath = (value) => {
   }
   return value.length > 0;
 };
-const safeLogTarget = (target, exactTargets, allowPlaceholderSequences = false) => {
+const safeLogTarget = (target, exactTargets, allowPlaceholderSequences = false, exactTargetsOnly = false) => {
   if (exactTargets.has(target)) return true;
+  if (exactTargetsOnly) return false;
   if (target.startsWith('"') && target.endsWith('"')) {
     const value = target.slice(1, -1);
     return (
@@ -230,19 +231,21 @@ const matchBoundedLogPipeline = (
   line,
   exactTargets = baseScaffoldLogTargets,
   allowPlaceholderSequences = false,
+  exactTargetsOnly = false,
 ) => {
   const tail = line.match(/\s*\|\s*tail\s+(?:-n\s+|-)([1-9][0-9]{0,4})$/);
   if (!tail) return null;
   const beforeTail = line.slice(0, tail.index);
   const tee = beforeTail.match(/\s+2>&1\s*\|\s*tee\s+(?:--\s+)?(\S+)$/);
-  if (!tee || !safeLogTarget(tee[1], exactTargets, allowPlaceholderSequences)) return null;
+  if (!tee || !safeLogTarget(tee[1], exactTargets, allowPlaceholderSequences, exactTargetsOnly)) return null;
   const target = beforeTail.slice(0, tee.index);
   if (!target || target !== target.trimEnd()) return null;
   return [line, target, tail[1]];
 };
 const boundedLogPipeline = (line) => matchBoundedLogPipeline(line);
 const completedScaffoldLogPipeline = (line) => matchBoundedLogPipeline(line, completedScaffoldLogTargets);
-const statusMarkedScaffoldPipeline = (line) => matchBoundedLogPipeline(line, statusMarkedScaffoldLogTargets);
+const statusMarkedScaffoldPipeline = (line) =>
+  matchBoundedLogPipeline(line, statusMarkedScaffoldLogTargets, false, true);
 const safeOutputRedirection = /^(.*\S)\s+>\s+(?:"<LOCAL_PATH>"|'<LOCAL_PATH>'|<LOCAL_PATH>)\s+2>&1$/;
 const boundedPlaceholderTail =
   /^tail\s+(?:-n\s+|-)([1-9][0-9]{0,4})\s+(?:"<LOCAL_PATH>"|'<LOCAL_PATH>'|<LOCAL_PATH>)$/;
