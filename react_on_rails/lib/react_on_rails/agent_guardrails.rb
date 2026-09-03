@@ -74,6 +74,7 @@ module ReactOnRails
         return if skip_existing && path_entry_exists?(settings_path)
 
         read_settings(settings_path)
+        write_path_for(settings_path)
       end
 
       def copy_file(source, dest_rel)

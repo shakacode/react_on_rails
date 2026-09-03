@@ -979,6 +979,19 @@ module ReactOnRails
       expect(rsc_hooks.size).to eq(1)
     end
 
+    it "validates a symlinked settings write target before copying guardrails" do
+      settings_path = File.join(@app_root, ".claude/settings.json")
+      shared_path = File.join(@app_root, "shared/config/settings.json")
+      FileUtils.mkdir_p(File.dirname(settings_path))
+      link_target = Pathname.new(shared_path).relative_path_from(Pathname.new(File.dirname(settings_path))).to_s
+      File.symlink(link_target, settings_path)
+
+      expect { described_class.install(@app_root) }.to raise_error(Errno::ENOENT)
+
+      expect(File.exist?(File.join(@app_root, ".claude/skills/rsc-app-safety/SKILL.md"))).to be false
+      expect(File.exist?(File.join(@app_root, ".claude/hooks/rsc-app-safety-check.rb"))).to be false
+    end
+
     describe ".default_destination_root" do
       it "prefers an explicit destination" do
         expect(described_class.default_destination_root("/explicit/root")).to eq("/explicit/root")
