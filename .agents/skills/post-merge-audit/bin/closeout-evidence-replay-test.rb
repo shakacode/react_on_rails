@@ -603,6 +603,19 @@ class CloseoutEvidenceReplayTest < Minitest::Test
     end
   end
 
+  def test_v2_accepts_negated_blank_and_unpainted_paint_claims
+    valid_claims = [
+      "passed: page rendered correctly, screenshot not blank, elements painted",
+      "passed: target rendered and was not unpainted"
+    ]
+
+    valid_claims.each do |paint_check|
+      qa = run_replay(v2_marker("paint_check" => paint_check)).fetch("qa_evidence")
+
+      assert_equal "SATISFIED", qa.fetch("verdict"), paint_check
+    end
+  end
+
   def test_v2_interaction_classifier_is_fail_closed
     invalid_cases = [
       {
@@ -694,7 +707,10 @@ class CloseoutEvidenceReplayTest < Minitest::Test
     invalid_claims = [
       "observed_failure: assertion did not fail",
       "observed_failure: no failure was observed",
+      "observed_failure: failure was expected but no failures occurred",
       "observed_failure: no error occurred",
+      "observed_failure: completed without errors",
+      "observed_failure: completed without mismatches",
       "observed_failure: assert did not error",
       "observed_failure: assertion never failed",
       "observed_failure: completed without mismatch",

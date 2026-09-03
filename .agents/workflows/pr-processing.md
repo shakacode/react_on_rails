@@ -817,10 +817,11 @@ For `required: no`, record `status: not_applicable` and
 inconsistent omission record and returns `UNKNOWN`.
 
 Historical `qa-evidence v1` receipts remain replayable for backward
-compatibility. Do not emit v1 for new closeout evidence. The presence of any v2
-marker explicitly supersedes all v1 markers for that evidence input: a current
-valid v2 ignores legacy v1 history, while a stale or malformed v2 cannot be
-rescued by a current v1. When auditing a current user-visible UI change, run
+compatibility. Do not emit v1 for new closeout evidence. Under the strict v2
+forward gate, the presence of any v2 marker explicitly supersedes all v1
+markers for that evidence input: a current valid v2 ignores legacy v1 history,
+while a stale or malformed v2 cannot be rescued by a current v1. When auditing
+a current user-visible UI change, run
 `closeout-evidence-replay --expected-head-sha <full-final-head-SHA>
 --require-visual-evidence-v2`; v1-only or stale evidence then fails closed
 rather than silently bypassing the durable visual gate.

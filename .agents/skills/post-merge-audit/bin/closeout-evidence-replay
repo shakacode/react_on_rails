@@ -458,10 +458,15 @@ module CloseoutEvidenceReplay
   def valid_paint_check?(value)
     value.start_with?("passed:") &&
       value.match?(/\b(?:painted|rendered)\b/i) &&
-      !value.match?(/\b(?:blank|unpainted)\b/i) &&
+      !affirmative_blank_or_unpainted_claim?(value) &&
       !value.match?(
         /\b(?:not\s+(?:painted|rendered)|(?:did\s+not|never)\s+(?:paint|render)(?:ed)?|failed\s+to\s+(?:paint|render)|(?:paint|render)(?:ing)?\s+fail(?:ed|s|ure)?|(?:painted|rendered)\s+unsuccessfully|unsuccessfully\s+(?:painted|rendered))\b/i
       )
+  end
+
+  def affirmative_blank_or_unpainted_claim?(value)
+    value.gsub(/\b(?:not|never)\s+(?:blank|unpainted)\b/i, "")
+         .match?(/\b(?:blank|unpainted)\b/i)
   end
 
   def durable_clip?(value)
@@ -539,7 +544,7 @@ module CloseoutEvidenceReplay
   end
 
   def negated_or_passing_failure_claim?(value)
-    value.match?(/\b(?:(?:did\s+not|didn['’]t|never)\s+(?:fail(?:ed)?|error|assert|mismatch)|not\s+fail(?:ed|ing)?|no\s+(?:failure|error|mismatch)|without\s+(?:failure|error|mismatch))\b/i) ||
+    value.match?(/\b(?:(?:did\s+not|didn['’]t|never)\s+(?:fail(?:ed)?|error|assert|mismatch)|not\s+fail(?:ed|ing)?|no\s+(?:failure|error|mismatch)s?|without\s+(?:failure|error|mismatch)s?)\b/i) ||
       value.match?(/\b(?:no\s+longer\s+fail(?:ed|s|ing)?|stopp(?:ed|ing)\s+fail(?:ing)?|fail(?:ed|s)?\s+no\s+more)\b/i) ||
       value.match?(/\b(?:assert(?:ion)?|control|negative\s+control|run|test|check)\s+(?:(?:is|was|were|been)\s+)?(?:now\s+)?(?:pass(?:ed|es)?|succeed(?:ed|s)?|successful)\b/i) ||
       value.match?(/\A(?:pass(?:ed|es)?|succeed(?:ed|s)?|successful)\b/i)
