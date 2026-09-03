@@ -110,8 +110,10 @@ set -euo pipefail
 } >>"${TEST_COORD_LOG}"
 
 renew_mode=0
+release_mode=0
 for argument in "$@"; do
   test "${argument}" != --renew || renew_mode=1
+  test "${argument}" != --release || release_mode=1
 done
 
 if test "${renew_mode}" = 1; then
@@ -126,6 +128,24 @@ if test "${renew_mode}" = 1; then
       ;;
     unavailable) exit 91 ;;
   esac
+fi
+
+if test "${release_mode}" = 1; then
+  test "${FAKE_RELEASE_FAIL:-0}" != 1 || exit 93
+  release_agent_id=""
+  release_instance_id=""
+  while test "$#" -gt 0; do
+    case "$1" in
+      --agent-id) release_agent_id="$2"; shift 2 ;;
+      --instance-id) release_instance_id="$2"; shift 2 ;;
+      *) shift ;;
+    esac
+  done
+  test -s "${TEST_CLAIM_STATE_FILE}" || exit 96
+  test "${release_agent_id}" = "$(sed -n '1p' "${TEST_CLAIM_STATE_FILE}")" || exit 3
+  test "${release_instance_id}" = "$(sed -n '2p' "${TEST_CLAIM_STATE_FILE}")" || exit 3
+  : >"${TEST_CLAIM_STATE_FILE}"
+  exit 0
 fi
 
 case "${FAKE_ATOMIC_CLAIM_MODE:-${FAKE_CLAIM_FAIL:-success}}" in
@@ -1048,17 +1068,32 @@ assert_contains "${coord_log}" $'claim-atomic|'
 assert_not_contains "${coord_log}" $'claim|'
 assert_contains "${coord_log}" $'heartbeat|'
 assert_contains "${coord_log}" $'status|'
-assert_contains "${coord_log}" $'release|'
+assert_contains "${coord_log}" $'claim-atomic|--release|'
 assert_contains "${bundle_log}" 'args|exec|rake|release[17.1.0.rc.0]'
 assert_contains "${bundle_log}" 'supervised:true'
 assert_secret_absent
 pass "live mode acquires and cleans up a process-owned release lease"
 
+setup_case managed-cleanup-failure-guidance
+unset RELEASE_COORDINATOR_ID RELEASE_COORDINATOR_INSTANCE_ID
+export FAKE_RELEASE_FAIL=1
+if FAKE_BUNDLE_MODE=success run_release; then
+  fail "managed release ignored lease cleanup failure"
+fi
+release_agent_id="$(sed -n '1p' "${claim_state_file}")"
+release_instance_id="$(sed -n '2p' "${claim_state_file}")"
+assert_contains "${output_log}" "release-line lease cleanup failed"
+assert_contains "${output_log}" \
+  "script/release-claim --release --agent-id ${release_agent_id} --instance-id ${release_instance_id} --repo shakacode/react_on_rails --target release-line:17.1.0"
+assert_contains "${output_log}" "script/release"
+assert_secret_absent
+pass "managed cleanup failure prints the exact lease release and restart commands"
+
 setup_case evaluate-head-live
 unset RELEASE_COORDINATOR_ID RELEASE_COORDINATOR_INSTANCE_ID
 FAKE_BUNDLE_MODE=success run_release --evaluate-head || fail "evaluate-head live release failed"
 assert_contains "${coord_log}" $'claim-atomic|'
-assert_contains "${coord_log}" $'release|'
+assert_contains "${coord_log}" $'claim-atomic|--release|'
 assert_contains "${bundle_log}" 'args|exec|rake|release[17.1.0.rc.0]'
 assert_contains "${bundle_log}" 'evaluate-head:true'
 assert_secret_absent
@@ -1092,6 +1127,9 @@ assert_contains "${output_log}" 'thread_handle: "release-task-123"'
 assert_contains "${output_log}" 'session_id: "release-session-456"'
 assert_contains "${output_log}" \
   "agent-coord status --repo shakacode/react_on_rails --target release-line:17.1.0 --json"
+assert_contains "${output_log}" \
+  "script/release-claim --release --agent-id foreign-agent --instance-id foreign-instance --repo shakacode/react_on_rails --target release-line:17.1.0"
+assert_contains "${output_log}" "script/release"
 assert_secret_absent
 pass "managed acquisition atomically refuses an intervening foreign claim"
 
@@ -1127,6 +1165,9 @@ for foreign_mode in dead expired missing-heartbeat; do
   assert_contains "${output_log}" 'session_id: "release-session-456"'
   assert_contains "${output_log}" \
     "agent-coord status --repo shakacode/react_on_rails --target release-line:17.1.0 --json"
+  assert_contains "${output_log}" \
+    "script/release-claim --release --agent-id foreign-agent --instance-id foreign-instance --repo shakacode/react_on_rails --target release-line:17.1.0"
+  assert_contains "${output_log}" "script/release"
   assert_secret_absent
   pass "foreign ${foreign_mode} claims block managed acquisition without takeover"
 done
@@ -1164,7 +1205,9 @@ unset RELEASE_COORDINATOR_ID RELEASE_COORDINATOR_INSTANCE_ID
 FAKE_BUNDLE_MODE=success run_release || fail "first automatically coordinated release failed"
 FAKE_BUNDLE_MODE=success run_release || fail "second automatically coordinated release failed"
 claim_instances="$(
-  awk -F'|' '$1 == "claim-atomic" { for (i = 1; i <= NF; i += 1) if ($i == "--instance-id") print $(i + 1) }' \
+  awk -F'|' '$1 == "claim-atomic" && $2 != "--release" && $2 != "--renew" {
+    for (i = 1; i <= NF; i += 1) if ($i == "--instance-id") print $(i + 1)
+  }' \
     "${coord_log}"
 )"
 test "$(printf '%s\n' "${claim_instances}" | sed '/^$/d' | wc -l | tr -d ' ')" = 2 || \
@@ -1228,7 +1271,7 @@ if wait "${wrapper_pid}"; then
   fail "release continued after an accepted claim response was lost"
 fi
 assert_contains "${coord_log}" $'claim-atomic|'
-assert_contains "${coord_log}" $'release|'
+assert_contains "${coord_log}" $'claim-atomic|--release|'
 assert_not_contains "${coord_log}" $'--force|'
 assert_empty "${bundle_log}"
 assert_contains "${output_log}" "release-line atomic claim is unavailable or UNKNOWN"
@@ -1258,7 +1301,7 @@ if wait "${wrapper_pid}"; then
   fail "signal during claim acquisition exited successfully"
 fi
 assert_contains "${coord_log}" $'claim-atomic|'
-assert_contains "${coord_log}" $'release|'
+assert_contains "${coord_log}" $'claim-atomic|--release|'
 assert_empty "${bundle_log}"
 assert_contains "${output_log}" "release-line atomic claim is unavailable or UNKNOWN"
 assert_secret_absent
@@ -1271,8 +1314,9 @@ if run_release; then
   fail "failed release command exited successfully"
 fi
 assert_contains "${coord_log}" $'claim-atomic|'
-assert_contains "${coord_log}" $'release|'
-test "$(tail -n 1 "${coord_log}" | cut -d'|' -f1)" = release || fail "failed release did not clean up last"
+assert_contains "${coord_log}" $'claim-atomic|--release|'
+test "$(tail -n 1 "${coord_log}" | cut -d'|' -f1-2)" = 'claim-atomic|--release' ||
+  fail "failed release did not clean up last"
 assert_secret_absent
 pass "failed release work cleans up its process-owned claim"
 
@@ -1540,7 +1584,7 @@ fi
 process_group="$(cat "${exception_group_log}")"
 assert_group_dead "${process_group}"
 assert_contains "${coord_log}" $'claim-atomic|'
-assert_contains "${coord_log}" $'release|'
+assert_contains "${coord_log}" $'claim-atomic|--release|'
 assert_contains "${output_log}" "lost child process ownership"
 assert_secret_absent
 pass "lost child ownership closes supervision channels and terminates the release group"
@@ -1656,8 +1700,8 @@ if supervisor_case_enabled death-watch-startup-failure; then
   ! kill -0 "${watcher_pid}" 2>/dev/null || fail "failed death watch was not reaped"
   assert_contains "${output_log}" "release death watch did not become ready"
   assert_contains "${coord_log}" $'claim-atomic|'
-  assert_contains "${coord_log}" $'release|'
-  test "$(tail -n 1 "${coord_log}" | cut -d'|' -f1)" = release ||
+  assert_contains "${coord_log}" $'claim-atomic|--release|'
+  test "$(tail -n 1 "${coord_log}" | cut -d'|' -f1-2)" = 'claim-atomic|--release' ||
     fail "death-watch startup failure did not finish with claim cleanup"
   assert_secret_absent
   pass "death-watch startup failure keeps the release child blocked and cleans up boundedly"
@@ -1683,7 +1727,7 @@ fi
 kill -TERM "${wrapper_pid}"
 wait_for_process_exit "${wrapper_pid}" || cleanup_stalled_wrapper "${wrapper_pid}"
 wait "${wrapper_pid}" || true
-assert_contains "${coord_log}" $'release|'
+assert_contains "${coord_log}" $'claim-atomic|--release|'
 assert_secret_absent
 pass "managed release renews its exact claim during long-running work"
 
@@ -1700,7 +1744,7 @@ process_group="$(awk -F: '/^bundle:/ { print $3; exit }' "${bundle_log}")"
 test -n "${process_group}" || fail "managed renewal-failure case never started the release group"
 assert_group_dead "${process_group}"
 assert_contains "${coord_log}" $'claim-atomic|--renew|'
-assert_contains "${coord_log}" $'release|'
+assert_contains "${coord_log}" $'claim-atomic|--release|'
 assert_contains "${output_log}" "Release lease refresh failed"
 assert_contains "${bundle_log}" "liveness:eof"
 assert_contains "${bundle_log}" "termination:signal"
@@ -1840,8 +1884,9 @@ assert_contains "${output_log}" "process group ${process_group}"
 assert_contains "${bundle_log}" "liveness:eof"
 assert_contains "${bundle_log}" "termination:signal"
 assert_contains "${coord_log}" $'claim-atomic|'
-assert_contains "${coord_log}" $'release|'
-test "$(tail -n 1 "${coord_log}" | cut -d'|' -f1)" = release || fail "signal cleanup was not last"
+assert_contains "${coord_log}" $'claim-atomic|--release|'
+test "$(tail -n 1 "${coord_log}" | cut -d'|' -f1-2)" = 'claim-atomic|--release' ||
+  fail "signal cleanup was not last"
 assert_secret_absent
 pass "signals terminate the release group and clean up the process-owned claim"
 
