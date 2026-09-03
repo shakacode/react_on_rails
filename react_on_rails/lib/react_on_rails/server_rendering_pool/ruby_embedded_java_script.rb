@@ -437,10 +437,10 @@ module ReactOnRails
           # equals the destination (UTF-8). charset_from_content_type returns UTF-8 for three of
           # the four cases this method exists to handle (no Content-Type header, no charset
           # parameter, and an explicit charset=utf-8), so `.encode(Encoding::UTF_8)` alone would
-          # silently let invalid bytes through unchanged on those three paths — only a genuine
-          # cross-encoding transcode (e.g. a declared ISO-8859-1 body) actually validates via
-          # `encode`. valid_encoding? is therefore checked explicitly afterward so every path
-          # fails fast, not just the cross-encoding one.
+          # silently let invalid bytes through unchanged on those three paths. A genuine
+          # cross-encoding transcode can reject malformed input only when the source encoding has
+          # invalid byte sequences of its own (such as Shift_JIS). valid_encoding? is therefore
+          # checked explicitly afterward so every path fails fast, not just the cross-encoding one.
           #
           # An undecodable byte sequence (a charset that doesn't actually match the bytes) is
           # deliberately raised here rather than silently replaced with U+FFFD: this is source
