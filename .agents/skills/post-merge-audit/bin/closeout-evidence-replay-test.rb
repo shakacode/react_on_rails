@@ -749,6 +749,19 @@ class CloseoutEvidenceReplayTest < Minitest::Test
     end
   end
 
+  def test_v2_accepts_contrastive_inspection_claims
+    valid_claims = [
+      "passed: rendered screenshot was not only inspected but reviewed",
+      "passed: painted target was not merely inspected but verified"
+    ]
+
+    valid_claims.each do |paint_check|
+      qa = run_replay(v2_marker("paint_check" => paint_check)).fetch("qa_evidence")
+
+      assert_equal "SATISFIED", qa.fetch("verdict"), paint_check
+    end
+  end
+
   def test_v2_interaction_classifier_is_fail_closed
     invalid_cases = [
       {
@@ -858,6 +871,9 @@ class CloseoutEvidenceReplayTest < Minitest::Test
       "observed_failure: failure hasn't occurred",
       "observed_failure: negative control was unable to reproduce the assertion failure",
       "observed_failure: assertion failed; assertion passed",
+      "observed_failure: unfixed build failed the assertion; the build now passes",
+      "observed_failure: unfixed bundle failed the assertion; the bundle unexpectedly passed",
+      "observed_failure: implementation failed the assertion; implementation succeeded",
       "observed_failure: assertion failed; failure did not occur",
       "observed_failure: completed without mismatch",
       "observed_failure: assertion no longer fails",

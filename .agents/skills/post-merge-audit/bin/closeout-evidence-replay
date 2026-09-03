@@ -490,7 +490,7 @@ module CloseoutEvidenceReplay
 
   def failed_inspection_claim?(value)
     value.match?(
-      /\b(?:unable\s+to|could(?:\s+not|n['’]t)(?:\s+be)?|was(?:\s+not|n['’]t)|were(?:\s+not|n['’]t)|not|never)#{CLAUSE_GAP}\b(?:inspect(?:ed|ion)?|reviewed|verified)\b/i
+      /\b(?:unable\s+to|could(?:\s+not|n['’]t)(?:\s+be)?|was(?:\s+not|n['’]t)|were(?:\s+not|n['’]t)|not|never)(?!\s+(?:only|merely)\b)#{CLAUSE_GAP}\b(?:inspect(?:ed|ion)?|reviewed|verified)\b/i
     ) || value.match?(/\b(?:inspection|review|verification)#{CLAUSE_GAP}\b(?:skipped|omitted|not\s+performed)\b/i)
   end
 
@@ -600,7 +600,9 @@ module CloseoutEvidenceReplay
         explicit_affirmative_failure_clause?(clause) && !negated_or_passing_failure_claim?(clause)
       end
       related_clean_outcome = clauses.any? do |clause|
-        clause.match?(/\b(?:assert(?:ion)?s?|controls?|negative\s+controls?|runs?|tests?|checks?|failures?)\b/i) &&
+        clause.match?(
+          /\b(?:assert(?:ion)?s?|builds?|bundles?|implementations?|controls?|negative\s+controls?|runs?|tests?|checks?|failures?)\b/i
+        ) &&
           negated_or_passing_failure_claim?(clause)
       end
       return false if affirmative_failure && !related_clean_outcome
@@ -620,7 +622,7 @@ module CloseoutEvidenceReplay
       ) ||
       value.match?(/\b(?:no\s+longer\s+fail(?:ed|s|ing)?|stopp(?:ed|ing)\s+fail(?:ing)?|fail(?:ed|s)?\s+no\s+more)\b/i) ||
       value.match?(
-        /\b(?:assert(?:ion)?s?|controls?|negative\s+controls?|runs?|tests?|checks?)\s+(?:(?:is|was|were|been)\s+)?(?:(?!(?:previously|formerly|historically)\b)[[:alpha:]]+ly\s+){0,4}(?:now\s+)?(?:(?!(?:previously|formerly|historically)\b)[[:alpha:]]+ly\s+){0,4}(?:pass(?:ed|es)?|succeed(?:ed|s)?|successful)\b/i
+        /\b(?:assert(?:ion)?s?|builds?|bundles?|implementations?|controls?|negative\s+controls?|runs?|tests?|checks?)\s+(?:(?:is|was|were|been)\s+)?(?:(?!(?:previously|formerly|historically)\b)[[:alpha:]]+ly\s+){0,4}(?:now\s+)?(?:(?!(?:previously|formerly|historically)\b)[[:alpha:]]+ly\s+){0,4}(?:pass(?:ed|es)?|succeed(?:ed|s)?|successful)\b/i
       ) ||
       value.match?(/\A(?:pass(?:ed|es)?|succeed(?:ed|s)?|successful)\b/i)
   end
