@@ -738,13 +738,22 @@ class CloseoutEvidenceReplayTest < Minitest::Test
   end
 
   def test_v2_allows_missing_ui_state_when_visual_artifacts_are_available
-    evidence = "durable: before screenshot shows the missing icon; after screenshot shows it restored " \
-               "https://github.com/example/repo/pull/123#visual"
-    qa = run_replay(v2_marker("visual_evidence" => evidence)).fetch("qa_evidence")
+    valid_evidence = [
+      "durable: before screenshot shows the missing icon; after screenshot shows it restored " \
+      "https://github.com/example/repo/pull/123#visual",
+      "durable: before screenshot shows the Access Denied screen; after screenshot shows the dashboard " \
+      "https://github.com/example/repo/pull/123#visual",
+      "durable: before screenshot shows the expired-session banner; after screenshot shows the dashboard " \
+      "https://github.com/example/repo/pull/123#visual"
+    ]
 
-    assert_equal "SATISFIED", qa.fetch("verdict")
-    refute_includes qa.fetch("missing"), "visual_evidence.before_after"
-    refute_includes qa.fetch("missing"), "visual_evidence.artifact_available"
+    valid_evidence.each do |evidence|
+      qa = run_replay(v2_marker("visual_evidence" => evidence)).fetch("qa_evidence")
+
+      assert_equal "SATISFIED", qa.fetch("verdict"), evidence
+      refute_includes qa.fetch("missing"), "visual_evidence.before_after", evidence
+      refute_includes qa.fetch("missing"), "visual_evidence.artifact_available", evidence
+    end
   end
 
   def test_v2_github_destination_accepts_current_and_legacy_attachment_hosts
@@ -794,7 +803,11 @@ class CloseoutEvidenceReplayTest < Minitest::Test
       "passed: rendered screenshot, inspection was skipped",
       "passed: target rendered and was inspected, but inspection failed",
       "passed: target rendered and was reviewed, but review was unsuccessful",
-      "passed: target rendered and was verified, but failed verification"
+      "passed: target rendered and was verified, but failed verification",
+      "passed: target rendered and was inspected, but inspection did not complete",
+      "passed: target rendered and was inspected, but inspection errored",
+      "passed: target rendered and was verified, but verification timed out",
+      "passed: target rendered and was reviewed, but review was aborted"
     ]
 
     invalid_claims.each do |paint_check|
@@ -988,6 +1001,14 @@ class CloseoutEvidenceReplayTest < Minitest::Test
       "observed_failure: the control could have failed under load",
       "observed_failure: the control might have failed under load",
       "observed_failure: the control may have failed under load",
+      "observed_failure: the control would have failed under load",
+      "observed_failure: the control should have failed under load",
+      "observed_failure: the control possibly failed under load",
+      "observed_failure: the control perhaps failed under load",
+      "observed_failure: the control allegedly failed under load",
+      "observed_failure: the control likely failed under load",
+      "observed_failure: the control probably failed under load",
+      "observed_failure: the control apparently failed under load",
       "observed_failure: minor type mismatch",
       "observed_failure: assertion mismatch scenario; all regression checks passed successfully afterward",
       "observed_failure: negative control passes",
@@ -1204,6 +1225,18 @@ class CloseoutEvidenceReplayTest < Minitest::Test
     assert_includes timing.fetch("missing"), "performance_evidence"
   end
 
+  def test_v2_measured_metric_allows_asset_load_time_with_runtime_units
+    qa = run_replay(
+      v2_marker(
+        "performance_impact" => "measured_metric",
+        "performance_evidence" =>
+          "repo_seam: source=bin/perf-report; metric_name=asset load time; baseline_value=2.4s; candidate_value=2.1s"
+      )
+    ).fetch("qa_evidence")
+
+    assert_equal "SATISFIED", qa.fetch("verdict")
+  end
+
   def test_v2_bundle_hygiene_does_not_require_metric_name
     qa = run_replay(
       v2_marker(
@@ -1259,6 +1292,10 @@ class CloseoutEvidenceReplayTest < Minitest::Test
     invalid_sources = [
       "repo_seam: metric_name=LCP; baseline_value=2.4s; candidate_value=2.1s",
       "repo_seam: source=report; metric_name=LCP; baseline_value=2.4s; candidate_value=2.1s",
+      "repo_seam: source=none; metric_name=LCP; baseline_value=2.4s; candidate_value=2.1s",
+      "repo_seam: source=not_run; metric_name=LCP; baseline_value=2.4s; candidate_value=2.1s",
+      "repo_seam: source=not-run; metric_name=LCP; baseline_value=2.4s; candidate_value=2.1s",
+      "repo_seam: source=skipped; metric_name=LCP; baseline_value=2.4s; candidate_value=2.1s",
       "repo_seam: source=UNKNOWN; metric_name=LCP; baseline_value=2.4s; candidate_value=2.1s",
       "repo_seam: source=https://; metric_name=LCP; baseline_value=2.4s; candidate_value=2.1s",
       "repo_seam: source=http://report.example.test/run; metric_name=LCP; baseline_value=2.4s; candidate_value=2.1s",
