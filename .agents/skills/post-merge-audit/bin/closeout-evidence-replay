@@ -485,7 +485,7 @@ module CloseoutEvidenceReplay
 
   def without_negated_visual_state_claims(value)
     value.gsub(
-      /\b(?:not|never)\b(?:\s+(?:(?!(?:only|merely)\b)[[:alpha:]]+ly|at\s+all|even))*\s+\b(?:blank|unpainted)\b/i,
+      /\b(?:not|never|no\s+longer|(?:is|are|was|were)n['’]t)\b(?:\s+(?:(?!(?:only|merely)\b)[[:alpha:]]+ly|at\s+all|even))*\s+\b(?:blank|unpainted)\b/i,
       ""
     )
   end
@@ -558,10 +558,24 @@ module CloseoutEvidenceReplay
     return if normalized_host == "private-user-images.githubusercontent.com"
     return if normalized_host == "localhost" || normalized_host.end_with?(".localhost")
     return if normalized_host.match?(/\A127(?:\.\d{1,3}){3}\z/) || normalized_host == "0.0.0.0"
+    return if private_or_link_local_ipv4_host?(normalized_host)
 
     uri
   rescue URI::Error
     nil
+  end
+
+  def private_or_link_local_ipv4_host?(host)
+    octets = host.split(".")
+    return false unless octets.length == 4 && octets.all? { |octet| octet.match?(/\A\d{1,3}\z/) }
+
+    numbers = octets.map(&:to_i)
+    return false unless numbers.all? { |number| number.between?(0, 255) }
+
+    numbers[0] == 10 ||
+      (numbers[0] == 172 && numbers[1].between?(16, 31)) ||
+      (numbers[0] == 192 && numbers[1] == 168) ||
+      (numbers[0] == 169 && numbers[1] == 254)
   end
 
   def negated_or_passing_failure_claim?(value)
@@ -590,7 +604,9 @@ module CloseoutEvidenceReplay
         /\b(?:unable\s+to|can(?:not|['’]t)|could(?:\s+not|n['’]t))#{CLAUSE_GAP}\b(?:reproduce|observe|detect|trigger|cause|demonstrate)\b/i
       ) ||
       value.match?(/\b(?:no\s+longer\s+fail(?:ed|s|ing)?|stopp(?:ed|ing)\s+fail(?:ing)?|fail(?:ed|s)?\s+no\s+more)\b/i) ||
-      value.match?(/\b(?:assert(?:ion)?s?|controls?|negative\s+controls?|runs?|tests?|checks?)\s+(?:(?:is|was|were|been)\s+)?(?:now\s+)?(?:pass(?:ed|es)?|succeed(?:ed|s)?|successful)\b/i) ||
+      value.match?(
+        /\b(?:assert(?:ion)?s?|controls?|negative\s+controls?|runs?|tests?|checks?)\s+(?:(?:is|was|were|been)\s+)?(?:(?!(?:previously|formerly|historically)\b)[[:alpha:]]+ly\s+){0,4}(?:now\s+)?(?:(?!(?:previously|formerly|historically)\b)[[:alpha:]]+ly\s+){0,4}(?:pass(?:ed|es)?|succeed(?:ed|s)?|successful)\b/i
+      ) ||
       value.match?(/\A(?:pass(?:ed|es)?|succeed(?:ed|s)?|successful)\b/i)
   end
 

@@ -623,6 +623,11 @@ class CloseoutEvidenceReplayTest < Minitest::Test
       https://localhost/artifact
       https://127.0.0.1/artifact
       https://0.0.0.0/artifact
+      https://10.0.0.5/artifact
+      https://172.16.0.5/artifact
+      https://172.31.255.254/artifact
+      https://192.168.1.10/artifact
+      https://169.254.20.30/artifact
       https://private-user-images.githubusercontent.com/1/clip.mp4?jwt=signed
     ].each do |url|
       %w[linked_tracker repo_artifact_store].each do |destination|
@@ -713,6 +718,9 @@ class CloseoutEvidenceReplayTest < Minitest::Test
       "passed: page rendered correctly, screenshot not entirely blank, elements painted",
       "passed: page rendered correctly, screenshot not actually clearly obviously blank, elements painted",
       "passed: page rendered correctly, screenshot not seemingly blank, elements painted",
+      "passed: page rendered correctly, screenshot wasn't blank, elements painted",
+      "passed: page rendered correctly, screenshots weren't unpainted, elements painted",
+      "passed: page rendered correctly, screenshot no longer blank, elements painted",
       "passed: target rendered and was not unpainted"
     ]
 
@@ -838,6 +846,8 @@ class CloseoutEvidenceReplayTest < Minitest::Test
       "observed_failure: assertion stopped failing",
       "observed_failure: assertion fails no more",
       "observed_failure: assertion passed",
+      "observed_failure: assertion unexpectedly passed",
+      "observed_failure: the negative control apparently now passed",
       "observed_failure: assertion mismatch scenario; all regression checks passed successfully afterward",
       "observed_failure: negative control passes",
       "observed_failure: run succeeded",
