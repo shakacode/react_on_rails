@@ -589,6 +589,7 @@ class CloseoutEvidenceReplayTest < Minitest::Test
     invalid_claims = [
       "passed: target was not painted",
       "passed: target was not really painted correctly",
+      "passed: target was not actually clearly obviously painted",
       "passed: target did not render",
       "passed: browser failed to paint target",
       "passed: browser failed to render target",
@@ -610,6 +611,7 @@ class CloseoutEvidenceReplayTest < Minitest::Test
     valid_claims = [
       "passed: page rendered correctly, screenshot not blank, elements painted",
       "passed: page rendered correctly, screenshot not entirely blank, elements painted",
+      "passed: page rendered correctly, screenshot not actually clearly obviously blank, elements painted",
       "passed: target rendered and was not unpainted"
     ]
 
@@ -711,6 +713,7 @@ class CloseoutEvidenceReplayTest < Minitest::Test
     invalid_claims = [
       "observed_failure: assertion did not fail",
       "observed_failure: assertion did not really fail",
+      "observed_failure: assertion did not actually clearly obviously fail",
       "observed_failure: no failure was observed",
       "observed_failure: failure was expected but no failures occurred",
       "observed_failure: no error occurred",
