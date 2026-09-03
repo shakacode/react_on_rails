@@ -1546,6 +1546,30 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         expect(ports).to include(3800)
       end
 
+      it "opens session publication handles with Windows delete sharing" do
+        root = app_root("delete-sharing-session")
+        path = session_path(root)
+        delete_sharing_flags = described_class.const_get(:DEV_SESSION_DELETE_SHARING_FLAGS)
+        session_open_flags = nil
+        tempfile_mode = nil
+        allow(File).to receive(:open).and_wrap_original do |original, *args, **kwargs, &block|
+          session_open_flags ||= args.fetch(1) if args.first == path
+          original.call(*args, **kwargs, &block)
+        end
+        allow(Tempfile).to receive(:create).and_wrap_original do |original, *args, **kwargs|
+          tempfile_mode = kwargs[:mode]
+          original.call(*args, **kwargs)
+        end
+
+        Dir.chdir(root) { described_class.send(:with_dev_session) { :ran } }
+
+        aggregate_failures do
+          expect(delete_sharing_flags).to eq(File::BINARY | File::SHARE_DELETE)
+          expect(session_open_flags & delete_sharing_flags).to eq(delete_sharing_flags)
+          expect(tempfile_mode).to eq(delete_sharing_flags)
+        end
+      end
+
       it "derives no ports at all for a refused session" do
         expect(described_class).not_to receive(:killable_ports)
 
@@ -1727,8 +1751,8 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
           original_handle ||= handle if args.first == path
           handle
         end
-        allow(Tempfile).to receive(:create).and_wrap_original do |original, *args|
-          temporary_handle = original.call(*args)
+        allow(Tempfile).to receive(:create).and_wrap_original do |original, *args, **kwargs|
+          temporary_handle = original.call(*args, **kwargs)
         end
         allow(File).to receive(:rename).and_raise(Interrupt)
 
@@ -1759,8 +1783,8 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
           original_handle ||= handle if args.first == path
           handle
         end
-        allow(Tempfile).to receive(:create).and_wrap_original do |original, *args|
-          temporary_handle = original.call(*args)
+        allow(Tempfile).to receive(:create).and_wrap_original do |original, *args, **kwargs|
+          temporary_handle = original.call(*args, **kwargs)
         end
         allow(File).to receive(:rename).and_wrap_original do |original, *args|
           original.call(*args)

@@ -53,7 +53,11 @@ module ReactOnRails
       # O_NOFOLLOW so a symlink planted at the session path fails loudly rather
       # than having its target silently truncated. `overmind_endpoint_owned?`
       # resolves realpath for the same reason on the read side.
-      DEV_SESSION_OPEN_FLAGS = File::RDWR | File::CREAT |
+      # Windows also requires binary mode before Ruby honors SHARE_DELETE. Both
+      # the old session handle and the tempfile remain open across the atomic
+      # rename, and the published handle remains open when its path is deleted.
+      DEV_SESSION_DELETE_SHARING_FLAGS = File::BINARY | File::SHARE_DELETE
+      DEV_SESSION_OPEN_FLAGS = File::RDWR | File::CREAT | DEV_SESSION_DELETE_SHARING_FLAGS |
                                (defined?(File::NOFOLLOW) ? File::NOFOLLOW : 0)
       # Opening an existing fixed lock must remain separate from creating one:
       # including CREAT here would bypass the bounded CREAT|EXCL race below.
@@ -67,7 +71,7 @@ module ReactOnRails
       # FIFO planted at this path from blocking the open forever - without it
       # the "must be a regular file" check below is unreachable, because the
       # open never returns.
-      DEV_SESSION_READ_FLAGS = File::RDONLY |
+      DEV_SESSION_READ_FLAGS = File::RDONLY | DEV_SESSION_DELETE_SHARING_FLAGS |
                                (defined?(File::NOFOLLOW) ? File::NOFOLLOW : 0) |
                                (defined?(File::NONBLOCK) ? File::NONBLOCK : 0)
       # Bounded budget for an Overmind control command. The socket probe was
@@ -680,7 +684,11 @@ module ReactOnRails
         end
 
         def write_dev_session(path, root)
-          file = Tempfile.create(["dev-session-", ".json"], File.dirname(path))
+          file = Tempfile.create(
+            ["dev-session-", ".json"],
+            File.dirname(path),
+            mode: DEV_SESSION_DELETE_SHARING_FLAGS
+          )
           file.write(JSON.pretty_generate(dev_session_payload(root)))
           file.flush
           raise IOError, "could not lock the published dev session" unless file.flock(File::LOCK_EX | File::LOCK_NB)
