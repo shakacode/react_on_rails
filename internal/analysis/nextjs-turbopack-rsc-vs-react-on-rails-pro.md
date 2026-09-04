@@ -96,7 +96,7 @@ Next's Turbopack docs say Turbopack is a Rust incremental bundler built into Nex
 
 Next's current Cache Components docs say caching can happen at the data or UI level, uncached dynamic data should stream behind Suspense, and the build can produce a static shell containing HTML plus serialized RSC payload for client navigation. See [Next Caching](https://nextjs.org/docs/app/getting-started/caching).
 
-Rspack's public model is different from Turbopack. Rspack is a high-performance Rust bundler with a webpack-compatible API and support for most webpack loaders and many plugin patterns. See [Rspack](https://www.rspack.dev/) and [Rspack loader compatibility](https://rspack.dev/guide/features/loader).
+Rspack's public model is different from Turbopack. Rspack is a high-performance Rust bundler with a webpack-compatible API and support for most webpack loaders and many plugin patterns. See [Rspack](https://rspack.rs/) and [Rspack loader compatibility](https://rspack.rs/guide/features/loader).
 
 ## Next.js First Request: Browser Hits a URL
 

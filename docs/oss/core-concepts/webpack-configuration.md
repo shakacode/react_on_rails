@@ -13,7 +13,7 @@ To get a deeper understanding of Shakapacker, watch [RailsConf 2020 CE - Webpack
 
 ## Rspack vs. Webpack
 
-[Rspack](https://rspack.dev/) is a high-performance JavaScript bundler written in Rust that provides significantly faster builds than Webpack (~20x improvement). React on Rails supports both bundlers through unified configuration.
+[Rspack](https://rspack.rs/) is a high-performance JavaScript bundler written in Rust that provides significantly faster builds than Webpack (~20x improvement). React on Rails supports both bundlers through unified configuration.
 
 ### Using Rspack
 
