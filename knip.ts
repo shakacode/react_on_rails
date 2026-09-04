@@ -31,7 +31,12 @@ const config: KnipConfig = {
         // Local binaries
         'bin/.*',
       ],
-      ignore: ['react_on_rails_pro/**', 'react_on_rails/vendor/**'],
+      ignore: [
+        'react_on_rails_pro/**',
+        'react_on_rails/vendor/**',
+        // Standalone starter apps use their own dependencies and TypeScript aliases.
+        'benchmarks/rspack-vite-rails-dx/starters/**',
+      ],
       ignoreDependencies: [
         // Required for TypeScript compilation, but we don't depend on Turbolinks itself.
         '@types/turbolinks',
