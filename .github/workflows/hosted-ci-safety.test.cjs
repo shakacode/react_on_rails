@@ -528,11 +528,7 @@ assertMatches(
   benchmarkWorkflow,
   /pnpm --dir starters\/rspack exec tsc --project tsconfig\.json/,
 );
-assertMatches(
-  'Rails DX benchmark Vite type-check',
-  benchmarkWorkflow,
-  /pnpm --dir starters\/vite run check/,
-);
+assertMatches('Rails DX benchmark Vite type-check', benchmarkWorkflow, /pnpm --dir starters\/vite run check/);
 assertMatches(
   'Rails DX benchmark replay',
   benchmarkWorkflow,
