@@ -102,11 +102,14 @@ To test RSC with Rspack in your project:
 
 ## Known Limitations
 
-1. **React on Rails does not use Rspack's experimental native RSC system**:
+1. **React on Rails does not use Rspack's native RSC system**:
    As of Rspack v2, Rspack ships its own [built-in RSC
-   support](https://rspack.rs/guide/integrations/rsc) (driven by `builtin:swc-loader` and
-   `rspackExperiments.reactServerComponents`). React on Rails Pro does **not** use that
-   experimental path. Its RSC integration is built on the `react-on-rails-rsc` package:
+   support](https://rspack.rs/guide/integrations/rsc), which its docs describe as full
+   support rather than experimental (the API is still namespaced under `experiments.rsc`
+   and `rspackExperiments.reactServerComponents`, with `builtin:swc-loader` applying the
+   directive transform, and it renders through React's separate `react-server-dom-rspack`
+   bindings). React on Rails Pro does **not** use that path. Its RSC integration is built
+   on the `react-on-rails-rsc` package:
    manifest generation uses the native **`RSCRspackPlugin`** (standard rspack public APIs,
    not Rspack's webpack-compatibility layer), while the RSC bundle still uses the
    `react-server-dom-webpack` loader and runtime.
@@ -117,8 +120,9 @@ To test RSC with Rspack in your project:
    node loader) under both bundlers. This loader is compatible with rspack.
 
 3. **No official React Rspack support**: The React team has not officially tested or
-   endorsed the `react-server-dom-webpack` runtime with Rspack. The native
-   `RSCRspackPlugin` is maintained by ShakaCode in `react-on-rails-rsc`.
+   endorsed the `react-server-dom-webpack` runtime with Rspack; the React repo ships a
+   separate, still pre-1.0 `react-server-dom-rspack` binding for Rspack's own RSC path.
+   The native `RSCRspackPlugin` is maintained by ShakaCode in `react-on-rails-rsc`.
 
 ## CSS / FOUC Status
 
