@@ -1849,8 +1849,8 @@ describe ProGenerator, type: :generator do
       end
     end
 
-    it "still migrates when unsupported declarations appear only in comments" do
-      comments = "// async function extractLoader() {}\n/*\nfunction* getLoaderPath() {}\n*/\n"
+    it "still migrates when unsupported declarations appear only in line comments" do
+      comments = "// async function extractLoader() {}\n/* ordinary migration notes */\n"
       simulate_existing_file(webpack_config, "#{comments}#{base_server_webpack_content}")
       simulate_existing_file(server_client_config, "const serverWebpackConfig = require('./serverWebpackConfig');\n")
 
@@ -1860,6 +1860,62 @@ describe ProGenerator, type: :generator do
       expect(File.read(File.join(destination_root,
                                  server_client_config))).to include("{ default: serverWebpackConfig }")
       expect(GeneratorMessages.messages.join("\n")).not_to include("synchronous helpers")
+    end
+  end
+
+  describe "#update_webpack_config_for_pro with ambiguous comment masking" do
+    let(:generator) { described_class.new }
+    let(:webpack_config) { "config/webpack/serverWebpackConfig.js" }
+    let(:server_client_config) { "config/webpack/ServerClientOrBoth.js" }
+
+    before do
+      prepare_destination
+      allow(generator).to receive(:destination_root).and_return(destination_root)
+    end
+
+    it "still migrates an ordinary base config" do
+      simulate_existing_file(webpack_config, base_server_webpack_content)
+      simulate_existing_file(server_client_config, "const serverWebpackConfig = require('./serverWebpackConfig');\n")
+
+      generator.send(:update_webpack_config_for_pro)
+
+      expect(File.read(File.join(destination_root, webpack_config))).to include("default: configureServer")
+      expect(File.read(File.join(destination_root,
+                                 server_client_config))).to include("{ default: serverWebpackConfig }")
+      expect(GeneratorMessages.messages.join("\n")).not_to include("comment masking is ambiguous")
+    end
+
+    {
+      "a glob string masks a live helper" => <<~JS,
+        const copyPatterns = ['app/assets/images/*'];
+        function extractLoader() { return 'custom-extractor'; }
+        /* unrelated later comment */
+      JS
+      "a multiline template masks a live helper" => <<~JS,
+        const banner = `example
+        /*
+        `;
+        function getLoaderPath() { return 'custom-path'; }
+        /* unrelated later comment */
+      JS
+      "a genuine block comment mentions a helper" => <<~JS
+        /*
+        const extractLoader = () => null;
+        */
+      JS
+    }.each do |description, source|
+      it "preserves both configs when #{description}" do
+        content = "#{source}#{base_server_webpack_content}"
+        import_content = "const serverWebpackConfig = require('./serverWebpackConfig');\n"
+        simulate_existing_file(webpack_config, content)
+        simulate_existing_file(server_client_config, import_content)
+
+        generator.send(:update_webpack_config_for_pro)
+
+        expect(File.read(File.join(destination_root, webpack_config))).to eq(content)
+        expect(File.read(File.join(destination_root, server_client_config))).to eq(import_content)
+        expect(GeneratorMessages.messages.join("\n")).to include("comment masking is ambiguous", "Update it manually")
+      end
     end
   end
 

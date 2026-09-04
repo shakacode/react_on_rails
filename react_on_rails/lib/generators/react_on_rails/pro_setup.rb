@@ -473,6 +473,7 @@ module ReactOnRails
         end
 
         content = File.read(webpack_config_path)
+        return if skip_ambiguous_webpack_comments?(webpack_config, content)
         return if skip_unsupported_webpack_helpers?(webpack_config, content)
         return if skip_ambiguous_webpack_helpers?(webpack_config, content)
 
@@ -688,6 +689,24 @@ module ReactOnRails
 
       def javascript_without_block_comments(content)
         content.gsub(%r{/\*.*?\*/}m) { |comment| comment.gsub(/[^\r\n]/, " ") }
+      end
+
+      def skip_ambiguous_webpack_comments?(webpack_config, content)
+        # A comment opener may actually be inside a string or template literal.
+        # Even genuine commented-out helpers require manual migration: masking
+        # their names cannot safely distinguish those cases without a JS parser.
+        masks_helper = content.scan(%r{/\*.*?\*/}m).any? do |comment|
+          comment.match?(/\b(?:extractLoader|getLoaderPath)\b/)
+        end
+        return false unless masks_helper
+
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          Skipped Pro webpack updates because comment masking is ambiguous in #{webpack_config}.
+          A possible block comment contains a helper name, which may belong to live code or a comment.
+          Both webpack configs were left unchanged. Update it manually using the Pro setup guide:
+          https://reactonrails.com/docs/pro/upgrading-to-pro/
+        MSG
+        true
       end
 
       def skip_unsupported_webpack_helpers?(webpack_config, content)
