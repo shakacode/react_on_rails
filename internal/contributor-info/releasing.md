@@ -948,6 +948,16 @@ If the release fails partway through (e.g., during NPM publish):
    `script/release` after the supervisor has acquired the required claim and the artifact evidence is exact; if lease state
    or any remote/artifact identity is `UNKNOWN`, remain stopped.
 
+If the wrapper cannot clean up its managed release-line lease, it prints the
+exact `script/release-claim --release ...` command followed by the restart
+command. First prove that every process group reported by the failed release is
+dead. Then run the printed release command from the repository root with the
+release-machine coordination environment loaded. Do not edit or reconstruct its
+agent ID, instance ID, repository, or target arguments. The command is fenced to
+that exact lease and safely refuses a replacement lease. See
+[Recover a retained publication lease](release-train-runbook.md#recover-a-retained-publication-lease)
+for the complete procedure.
+
 ## Version History
 
 A dry-run preview with `bundle exec rake "release[X.Y.Z,true]"` shows the generated commit, which looks

@@ -6,6 +6,7 @@ require "io/wait"
 require "open3"
 require "optparse"
 require "securerandom"
+require "shellwords"
 require "tempfile"
 require "rubygems/version"
 require_relative "../rakelib/release_changelog_selector"
@@ -152,12 +153,11 @@ class ReleaseSupervisor
     ensure
       if managed_claim_cleanup_required && @managed_claim_release_safe
         cleanup_succeeded = release_managed_lease!(scope, identity, coordination_timeout:, termination_grace:)
-        unless cleanup_succeeded
-          @stderr.puts "ERROR: release-line lease cleanup failed; verify coordination state before retrying"
-        end
+        report_managed_lease_cleanup_failure(scope, identity) unless cleanup_succeeded
       elsif managed_claim_cleanup_required
         cleanup_succeeded = false
         @stderr.puts "ERROR: retaining release-line lease because process-group termination was not proven"
+        report_managed_lease_recovery(scope, identity)
       end
       restore_signal_handlers(previous_signal_handlers)
     end
@@ -595,11 +595,26 @@ class ReleaseSupervisor
 
         lines << "    #{field}: #{JSON.generate(claim[field])}"
       end
+      agent_id = claim["agent_id"]
+      instance_id = claim["instance_id"]
+      next unless usable_release_identity?(agent_id, instance_id)
+
+      lines << "    After proving this claim's release process group is dead, release its exact lease with:"
+      lines << "      #{lease_release_shell_command(scope, agent_id:, instance_id:)}"
+      lines << "    Then restart the release with:"
+      lines << "      #{release_restart_shell_command}"
     end
     lines.concat(
       foreign_claim_inspection_guidance(scope)
     )
     lines.join("\n")
+  end
+
+  def usable_release_identity?(*values)
+    values.all? do |value|
+      value.is_a?(String) && !value.empty? && value.match?(/\A[\x20-\x7E]+\z/) && value == value.strip &&
+        !value.casecmp?("UNKNOWN")
+    end
   end
 
   def atomic_claim_refusal_guidance(scope, identity, coordination_timeout:, termination_grace:)
@@ -633,12 +648,10 @@ class ReleaseSupervisor
   end
 
   def release_managed_lease!(scope, identity, coordination_timeout:, termination_grace:)
-    _stdout, status = run_agent_coord(
-      "release",
-      "--agent-id", identity.agent_id,
-      "--instance-id", identity.instance_id,
-      "--repo", scope.repo,
-      "--target", scope.target,
+    _stdout, status = run_coordination_command(
+      release_claim_helper!,
+      "--release",
+      *lease_release_arguments(scope, agent_id: identity.agent_id, instance_id: identity.instance_id),
       timeout: coordination_timeout,
       termination_grace:,
       ignore_received_signal: true
@@ -646,6 +659,41 @@ class ReleaseSupervisor
     status&.success? || false
   rescue SystemCallError
     false
+  end
+
+  def report_managed_lease_cleanup_failure(scope, identity)
+    @stderr.puts "ERROR: release-line lease cleanup failed; verify coordination state before retrying"
+    report_managed_lease_recovery(scope, identity)
+  end
+
+  def report_managed_lease_recovery(scope, identity)
+    command = lease_release_shell_command(scope, agent_id: identity.agent_id, instance_id: identity.instance_id)
+    @stderr.puts "After proving every reported release process group is dead, release this exact lease with:"
+    @stderr.puts "  #{command}"
+    @stderr.puts "Then restart the release with:"
+    @stderr.puts "  #{release_restart_shell_command}"
+  end
+
+  def release_restart_shell_command
+    command = ["script/release"]
+    command << "--reconcile-accelerated-rc" if @options.fetch(:reconcile_accelerated_rc)
+    command << "--evaluate-head" if @options.fetch(:evaluate_head)
+    Shellwords.join(command)
+  end
+
+  def lease_release_shell_command(scope, agent_id:, instance_id:)
+    Shellwords.join(
+      ["script/release-claim", "--release", *lease_release_arguments(scope, agent_id:, instance_id:)]
+    )
+  end
+
+  def lease_release_arguments(scope, agent_id:, instance_id:)
+    [
+      "--agent-id", agent_id,
+      "--instance-id", instance_id,
+      "--repo", scope.repo,
+      "--target", scope.target
+    ]
   end
 
   def supervise_release(scope, identity, heartbeat_interval:, claim_renewal_interval:, termination_grace:,
