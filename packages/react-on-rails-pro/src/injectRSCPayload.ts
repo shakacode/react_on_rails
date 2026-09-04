@@ -96,6 +96,15 @@ function hasRenderingErrorSignal(renderingError: unknown) {
   return nonEmptyMetadataString(message) || nonEmptyMetadataString(stack);
 }
 
+function shouldEmitConsoleReplay(metadata: Record<string, unknown>, railsEnv?: string) {
+  // Console replay remains useful in development/test and for clean production chunks. On an
+  // error-bearing chunk, however, it can repeat the same server-only message or stack path that
+  // diagnostic metadata redacts, so unknown and production-like environments fail closed.
+  if (railsEnv === 'development' || railsEnv === 'test') return true;
+
+  return metadata.hasErrors !== true && !hasRenderingErrorSignal(metadata.renderingError);
+}
+
 function createRSCDiagnosticScript(
   metadata: Record<string, unknown>,
   cacheKey: string,
@@ -2082,7 +2091,7 @@ export default function injectRSCPayload(
 
               // Emit console replay as a separate <script> tag (not inside the payload)
               const consoleScript = metadata.consoleReplayScript as string;
-              if (consoleScript) {
+              if (consoleScript && shouldEmitConsoleReplay(metadata, railsEnv)) {
                 rscPayloadBuffers.push(Buffer.from(createScriptTag(consoleScript, sanitizedNonce)));
               }
               // Primary flush is handled by React's flush() callback (see above).
