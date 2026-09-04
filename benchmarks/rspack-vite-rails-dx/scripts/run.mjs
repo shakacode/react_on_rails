@@ -259,20 +259,48 @@ async function waitForHttp(url, child, readLog) {
 }
 
 async function stopProcess(child) {
-  if (child.exitCode !== null || child.signalCode !== null) return;
-  const exited = new Promise((resolve) => child.once('exit', resolve));
-  try {
-    process.kill(process.platform === 'win32' ? child.pid : -child.pid, 'SIGTERM');
-  } catch (error) {
-    if (error.code !== 'ESRCH') throw error;
+  const alreadyExited = child.exitCode !== null || child.signalCode !== null;
+  if (process.platform === 'win32' && alreadyExited) return;
+
+  const exited = alreadyExited ? Promise.resolve() : new Promise((resolve) => child.once('exit', resolve));
+  const target = process.platform === 'win32' ? child.pid : -child.pid;
+  signalProcess(target, 'SIGTERM');
+
+  if (process.platform !== 'win32') {
+    if (!(await waitForProcessGroupExit(child.pid, 10_000))) {
+      signalProcess(target, 'SIGKILL');
+      if (!(await waitForProcessGroupExit(child.pid, 10_000)))
+        throw new Error(`process group ${child.pid} did not exit`);
+    }
+    await exited;
+    return;
   }
+
   if (await Promise.race([exited.then(() => true), delay(10_000).then(() => false)])) return;
+  signalProcess(target, 'SIGKILL');
+  await exited;
+}
+
+function signalProcess(target, signal) {
   try {
-    process.kill(process.platform === 'win32' ? child.pid : -child.pid, 'SIGKILL');
+    process.kill(target, signal);
   } catch (error) {
     if (error.code !== 'ESRCH') throw error;
   }
-  await exited;
+}
+
+async function waitForProcessGroupExit(pid, timeout) {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    try {
+      process.kill(-pid, 0);
+    } catch (error) {
+      if (error.code === 'ESRCH') return true;
+      throw error;
+    }
+    await delay(50);
+  }
+  return false;
 }
 
 async function waitForClosedPorts(ports) {
