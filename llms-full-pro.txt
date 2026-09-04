@@ -6030,7 +6030,7 @@ the same arguments.
 import { unstable_cache } from 'react-on-rails-pro/cache';
 
 const ProductCard = unstable_cache(
-  async (productId: string) => {
+  async ({ productId }: { productId: string }) => {
     const product = await loadProduct(productId);
     return <ProductCardView product={product} />;
   },
@@ -6080,6 +6080,10 @@ const ProductCard = unstable_cache(renderProductCard, {
 You can also implement the exported `CacheHandler` interface and register it with
 `registerCacheHandler(kind, handler)`. A handler implements asynchronous `get(key)` and
 `set(key, entry)` methods. `TieredCacheHandler` can compose handlers as L1 and L2 caches.
+
+Custom handlers must enforce the entry lifetime: return `null` from `get` for stale entries based on
+`entry.timestamp` and `entry.revalidate`, or enforce expiry with the storage backend's TTL.
+`unstable_cache` replays any non-null entry returned by `get`; it does not check expiry itself.
 
 ## Invalidation Limits
 
