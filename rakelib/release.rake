@@ -14,6 +14,7 @@ require "time"
 require "tmpdir"
 require "uri"
 require_relative "release_changelog_selector"
+require_relative "release_commit_classifier"
 require_relative "release_lease_guard"
 require_relative "task_helpers"
 require_relative "../react_on_rails/lib/react_on_rails/version_syntax_converter"
@@ -7764,28 +7765,7 @@ end
 # "unknown" with "runtime-bearing" is the safe direction for a release gate: the
 # walk stops and the current commit is evaluated rather than skipped on a guess.
 def commit_non_runtime_only?(monorepo_root:, sha:)
-  detector = File.join(monorepo_root, "script", "ci-changes-detector")
-  return false unless File.executable?(detector)
-
-  Dir.mktmpdir("ror-ci-detector") do |dir|
-    output_file = File.join(dir, "github_output")
-    File.write(output_file, "")
-    # The detector writes `non_runtime_only=true|false` to $GITHUB_OUTPUT — the
-    # same machine interface CI consumes — so we reuse its path classification
-    # instead of re-deriving paths-ignore rules here. `<sha>^ <sha>` diffs just
-    # that commit; a non-HEAD current ref means no uncommitted folding.
-    _stdout, status = Open3.capture2e(
-      { "GITHUB_OUTPUT" => output_file }, detector, "#{sha}^", sha, chdir: monorepo_root
-    )
-    return false unless status.success?
-
-    flag = File.read(output_file).lines.reverse.find { |line| line.start_with?("non_runtime_only=") }
-    return false if flag.nil?
-
-    flag.split("=", 2).last.strip == "true"
-  end
-rescue StandardError
-  false
+  ReleaseCommitClassifier.non_runtime_only?(monorepo_root:, sha:)
 end
 
 def release_finalization_metadata_commit?(monorepo_root:, sha:)

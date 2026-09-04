@@ -158,6 +158,10 @@ setup_release_repo() {
   git remote add origin "$origin_dir"
 
   mkdir -p react_on_rails/lib/react_on_rails
+  mkdir -p script/lib
+  cp "$SCRIPT_DIR/ci-changes-detector" script/ci-changes-detector
+  cp "$SCRIPT_DIR/lib/git-diff-base" script/lib/git-diff-base
+  chmod +x script/ci-changes-detector
   printf 'module ReactOnRails\n  VERSION = "1.0.0"\nend\n' > react_on_rails/lib/react_on_rails/version.rb
   printf 'core\n' > app.txt
   printf '# Change Log\n\n### [Unreleased]\n\n### [1.0.0.rc.0]\n\n#### Fixed\n\n- Fix something\n' > CHANGELOG.md
@@ -257,15 +261,46 @@ test_promote_aborts_when_not_on_release_branch() {
 test_promote_aborts_when_tip_drifted_from_rc_tag() {
   setup_release_repo
   # Add a content commit after the rc tag so the tip no longer matches v1.0.0.rc.0
-  # (different commit AND different tree). The identity check fires first.
-  printf 'drift\n' > drift.txt
+  # and changes shipped Ruby runtime content.
+  printf '\nmodule RuntimeDrift; end\n' >> react_on_rails/lib/react_on_rails/version.rb
   git add .
   git commit -qm "post-rc drift"
+  git push -q origin release/1.0.0
   run_rf promote 1.0.0 --dry-run
 
   assert_status 1 "$RF_STATUS" "promote drift status"
   assert_contains "$RF_OUT" "is not the accepted RC commit v1.0.0.rc.0" "promote drift"
   assert_not_contains "$RF_OUT" "would run: bundle exec rake release" "promote drift should stop before release"
+}
+
+test_promote_accepts_changelog_commit_atop_rc() {
+  setup_release_repo
+  printf '\n## [1.0.0]\n- Stable release notes\n' >> CHANGELOG.md
+  git add CHANGELOG.md
+  git commit -qm "Finalize changelog for 1.0.0"
+  git push -q origin release/1.0.0
+  run_rf promote 1.0.0 --dry-run
+
+  assert_status 0 "$RF_STATUS" "promote changelog-only status"
+  assert_contains "$RF_OUT" "1 non-runtime-only commit after v1.0.0.rc.0" "promote changelog-only classification"
+  assert_contains "$RF_OUT" 'DRY RUN: would run: bundle exec rake release[1.0.0]' "promote changelog-only release"
+}
+
+test_promote_aborts_when_local_release_branch_is_stale() {
+  setup_release_repo
+  printf '\n## [1.0.0]\n- Stable release notes\n' >> CHANGELOG.md
+  git add CHANGELOG.md
+  git commit -qm "Finalize changelog for 1.0.0"
+  git push -q origin release/1.0.0
+  git reset -q --hard v1.0.0.rc.0
+
+  run_rf promote 1.0.0 --dry-run
+
+  assert_status 1 "$RF_STATUS" "promote stale release branch status"
+  assert_contains "$RF_OUT" "local release/1.0.0 is not in sync with origin/release/1.0.0" \
+    "promote stale release branch message"
+  assert_not_contains "$RF_OUT" "would run: bundle exec rake release" \
+    "promote stale release branch stops before release"
 }
 
 # #3: an EMPTY (or metadata-only) commit layered on top of the RC has the SAME
@@ -274,6 +309,7 @@ test_promote_aborts_when_tip_drifted_from_rc_tag() {
 test_promote_aborts_on_empty_commit_atop_rc_despite_equal_tree() {
   setup_release_repo
   git commit -q --allow-empty -m "empty commit on top of the RC"
+  git push -q origin release/1.0.0
   # Sanity: the tree is unchanged vs the rc tag (the gap the old check missed).
   if [ -n "$(git diff --stat v1.0.0.rc.0)" ]; then
     fail "fixture invalid: expected an empty tree diff vs the rc tag"
@@ -362,18 +398,17 @@ test_promote_selects_highest_rc_tag() {
 
 # --- promote: confirmation safety (no --yes, no TTY) ------------------------
 
-# Without --dry-run and without a TTY, an outward op (the rake release) must NOT
-# run: confirm? aborts because there is no TTY and --yes was not given. This is
-# the guard that keeps `rake release` from ever firing unattended.
-test_promote_without_tty_and_without_yes_aborts_before_release() {
+# Live promotion is owned by script/release, so release-finish refuses it before
+# any repository or network probe.
+test_promote_without_dry_run_is_blocked() {
   setup_release_repo
   run_rf promote 1.0.0
 
-  assert_status 1 "$RF_STATUS" "promote no-tty status"
-  assert_contains "$RF_OUT" "no TTY for confirmation" "promote no-tty"
-  # Real promotion never happened: no final tag.
+  assert_status 1 "$RF_STATUS" "promote live status"
+  assert_contains "$RF_OUT" "script/release-finish promote is preview-only" "promote live guidance"
+  assert_not_contains "$RF_OUT" "+ git fetch" "promote live stops before fetch"
   if git rev-parse -q --verify refs/tags/v1.0.0 >/dev/null 2>&1; then
-    fail "promote without TTY created the final tag v1.0.0"
+    fail "blocked release-finish promotion created the final tag v1.0.0"
   fi
 }
 
@@ -654,8 +689,9 @@ test_close_out_dry_run_fetches_before_main_sync_check() {
 
 prepare_post_check_remote_revert_wrapper() {
   local wrapper_dir="$PWD/../race-bin"
-  mkdir -p "$wrapper_dir"
+  mkdir -p "$wrapper_dir" "$wrapper_dir/../rakelib"
   cp "$RELEASE_FINISH" "$wrapper_dir/release-finish"
+  cp "$SCRIPT_DIR/../rakelib/release_commit_classifier.rb" "$wrapper_dir/../rakelib/"
   cp "$SCRIPT_DIR/release-forward-port" "$wrapper_dir/release-forward-port-real"
 
   cat > "$wrapper_dir/release-forward-port" <<'WRAPPER'
@@ -694,8 +730,9 @@ WRAPPER
 
 prepare_post_check_source_advance_wrapper() {
   local wrapper_dir="$PWD/../source-race-bin"
-  mkdir -p "$wrapper_dir"
+  mkdir -p "$wrapper_dir" "$wrapper_dir/../rakelib"
   cp "$RELEASE_FINISH" "$wrapper_dir/release-finish"
+  cp "$SCRIPT_DIR/../rakelib/release_commit_classifier.rb" "$wrapper_dir/../rakelib/"
   cp "$SCRIPT_DIR/release-forward-port" "$wrapper_dir/release-forward-port-real"
 
   cat > "$wrapper_dir/release-forward-port" <<'WRAPPER'
@@ -1193,6 +1230,8 @@ run_test test_promote_dry_run_treats_option_like_remote_as_remote_name
 run_test test_promote_accepts_explicit_rc_tag
 run_test test_promote_aborts_when_not_on_release_branch
 run_test test_promote_aborts_when_tip_drifted_from_rc_tag
+run_test test_promote_accepts_changelog_commit_atop_rc
+run_test test_promote_aborts_when_local_release_branch_is_stale
 run_test test_promote_aborts_on_empty_commit_atop_rc_despite_equal_tree
 run_test test_promote_aborts_on_dirty_worktree
 run_test test_promote_aborts_when_no_rc_tag_found
@@ -1200,7 +1239,7 @@ run_test test_promote_aborts_when_explicit_rc_tag_absent
 run_test test_promote_dry_run_fetches_remote_only_rc_tag
 run_test test_promote_dry_run_uses_newer_remote_rc_tag
 run_test test_promote_selects_highest_rc_tag
-run_test test_promote_without_tty_and_without_yes_aborts_before_release
+run_test test_promote_without_dry_run_is_blocked
 run_test test_close_out_dry_run_prints_plan_and_runs_nothing
 run_test test_close_out_dry_run_does_not_delete_branch
 run_test test_close_out_yes_non_dry_run_deletes_branch_when_forward_port_pushed

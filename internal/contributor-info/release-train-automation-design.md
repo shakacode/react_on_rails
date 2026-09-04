@@ -213,11 +213,10 @@ uses `*-test.bash` harnesses, e.g. `ci-changes-detector-test.bash`).
 `script/release-finish` orchestrates the runbook's steps 4–5, wrapping the existing
 rake promotion guards with confirmations:
 
-- **Promote (step 4):** `git checkout release/X.Y.Z`; verify the tip equals the
-  accepted RC (`git diff --stat` against `vX.Y.Z.rc.N` is empty); collapse rc →
-  stable changelog (`$react-on-rails-update-changelog release`);
-  `bundle exec rake release[X.Y.Z]`
-  (all promotion guards already enforced in `release.rake`).
+- **Promote preview (step 4):** `git checkout release/X.Y.Z`; fetch and require the local release tip to exactly match the
+  remote release tip; verify the accepted RC is an ancestor and every later commit is positively classified as non-runtime;
+  preview the rc → stable changelog and release command. Live promotion is supported only through
+  `script/release`, which owns the release-line lease and all authoritative promotion guards.
 - **Close out (step 5):** forward-port remaining commits to `main` (uses PR 3),
   then atomically move the checked source tip to a temporary recovery branch while deleting
   `release/X.Y.Z` with a source lease. Re-fetch `main`; if it raced, atomically restore the release
