@@ -99,6 +99,7 @@ const shakaperfReleaseGateWorkflow = read('.github/workflows/shakaperf-release-g
 const proIntegrationWorkflow = read('.github/workflows/pro-integration-tests.yml');
 const waitForH2cServiceAction = read('.github/actions/wait-for-h2c-service/action.yml');
 const rspackViteDxWorkflow = read('.github/workflows/rspack-vite-dx.yml');
+const benchmarkWorkflow = read('.github/workflows/benchmark.yml');
 const gemTestsWorkflow = read('.github/workflows/gem-tests.yml');
 const hostedWorkflowFiles = [
   'lint-js-and-ruby.yml',
@@ -514,6 +515,17 @@ assertMatches(
   'Rspack/Vite DX isolated working directory',
   rspackViteDxWorkflow,
   /working-directory: benchmarks\/rspack-vite-dx/,
+);
+assertMatches('Rails DX benchmark path trigger', benchmarkWorkflow, /pull_request:[\s\S]*benchmarks\/\*\*/);
+assertMatches(
+  'Rails DX benchmark frozen install',
+  benchmarkWorkflow,
+  /working-directory: benchmarks\/rspack-vite-rails-dx[\s\S]*pnpm install --ignore-workspace --frozen-lockfile/,
+);
+assertMatches(
+  'Rails DX benchmark replay',
+  benchmarkWorkflow,
+  /rspack-vite-rails-dx-check[\s\S]*pnpm run check/,
 );
 
 console.log('hosted CI workflow safety tests passed');

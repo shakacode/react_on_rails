@@ -95,6 +95,29 @@ jobs:
       - name: Run benchmark script specs
         run: bundle exec rspec benchmarks/spec
 
+  rails-dx-benchmark-check:
+    name: rspack-vite-rails-dx-check
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: benchmarks/rspack-vite-rails-dx
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .tool-versions
+      - name: Enable pinned pnpm
+        run: corepack enable && corepack prepare pnpm@10.33.4 --activate
+      - name: Install isolated benchmark dependencies
+        run: pnpm install --ignore-workspace --frozen-lockfile
+      - name: Replay Rails DX benchmark artifact checks
+        run: pnpm run check
+
   prepare-benchmark-matrix:
     if: github.event_name == 'workflow_dispatch'
     permissions:
