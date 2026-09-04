@@ -1668,6 +1668,12 @@ describe ProGenerator, type: :generator do
       expect(generator.send(:extract_loader_declared?, source)).to be(false)
     end
 
+    it "does not manufacture a module-scope declaration when removing a block comment" do
+      source = "function outer() {\n/* comment\nspans multiple lines */const extractLoader = () => {};\n}\n"
+
+      expect(generator.send(:extract_loader_declared?, source)).to be(false)
+    end
+
     it "does not treat a nested getLoaderPath declaration as module-scoped" do
       source = <<~JS
         function configureServer() {
@@ -1699,6 +1705,19 @@ describe ProGenerator, type: :generator do
       expect(declarations.size).to eq(1)
       expect(result).to include("const extractLoader = (rule, loaderName) =>")
       expect(result).not_to include(ReactOnRails::Generators::ProSetup::EXTRACT_LOADER_JS)
+    end
+
+    it "reuses a split getLoaderPath declaration without redeclaring it" do
+      split_helper = "let getLoaderPath;\ngetLoaderPath = (item) => item.loader;"
+      content = base_server_webpack_content.sub(ReactOnRails::Generators::ProSetup::GET_LOADER_PATH_JS, split_helper)
+      simulate_existing_file(webpack_config, content)
+
+      generator.send(:add_extract_loader_to_server_config, webpack_config, content)
+
+      result = File.read(File.join(destination_root, webpack_config))
+      expect(result).to include(split_helper)
+      expect(result).not_to include(ReactOnRails::Generators::ProSetup::GET_LOADER_PATH_JS)
+      expect(result).to include(ReactOnRails::Generators::ProSetup::EXTRACT_LOADER_JS)
     end
 
     it "inserts a live helper when the only existing mention is a line comment" do
@@ -1765,6 +1784,39 @@ describe ProGenerator, type: :generator do
       content = "/*\nfunction extractLoader(rule, loaderName) {}\n*/\n"
 
       expect(generator.send(:missing_server_config_transforms, content)).to include("extractLoader declaration")
+    end
+  end
+
+  describe "#update_webpack_config_for_pro with an ambiguous helper declaration" do
+    let(:generator) { described_class.new }
+    let(:webpack_config) { "config/webpack/serverWebpackConfig.js" }
+    let(:server_client_config) { "config/webpack/ServerClientOrBoth.js" }
+
+    before do
+      prepare_destination
+      allow(generator).to receive(:destination_root).and_return(destination_root)
+    end
+
+    {
+      "a customized top-level extractLoader is indented" =>
+        "  const extractLoader = (rule, loaderName) => rule.use.find(Boolean);\n",
+      "a customized top-level getLoaderPath is indented" => "  const getLoaderPath = (item) => item.loader;\n",
+      "an indented helper is nested" => "function outer() {\n  const extractLoader = () => {};\n}\n",
+      "a nested helper follows a multiline block comment" =>
+        "function outer() {\n/* comment\nspans multiple lines */const extractLoader = () => {};\n}\n"
+    }.each do |description, helper_source|
+      it "preserves both configs when #{description}" do
+        content = base_server_webpack_content.sub(ReactOnRails::Generators::ProSetup::GET_LOADER_PATH_JS, helper_source)
+        import_content = "const serverWebpackConfig = require('./serverWebpackConfig');\n"
+        simulate_existing_file(webpack_config, content)
+        simulate_existing_file(server_client_config, import_content)
+
+        generator.send(:update_webpack_config_for_pro)
+
+        expect(File.read(File.join(destination_root, webpack_config))).to eq(content)
+        expect(File.read(File.join(destination_root, server_client_config))).to eq(import_content)
+        expect(GeneratorMessages.messages.join("\n")).to include("helper scope is ambiguous", "Update it manually")
+      end
     end
   end
 

@@ -64,7 +64,7 @@ module ReactOnRails
       # declaration: `function` next to an existing `const` is a SyntaxError, not a
       # silent shadow, and the generated config would fail to parse in Node.
       GET_LOADER_PATH_DECLARATION =
-        /^(?:function\s+getLoaderPath\s*\(|(?:const|let|var)\s+getLoaderPath\s*=)/
+        /^(?:function\s+getLoaderPath\s*\(|(?:const|let|var)\s+getLoaderPath\b)/
 
       # Matches a module-scope declaration line for extractLoader, including customized lexical forms.
       # The generated config keeps module declarations at column zero. This narrow anchor excludes
@@ -469,6 +469,8 @@ module ReactOnRails
         end
 
         content = File.read(webpack_config_path)
+        return if skip_ambiguous_webpack_helpers?(webpack_config, content)
+
         server_config_ready = pro_server_config_ready?(content)
         import_ready = server_client_import_ready?
 
@@ -680,7 +682,26 @@ module ReactOnRails
       end
 
       def javascript_without_block_comments(content)
-        content.gsub(%r{/\*.*?\*/}m, "")
+        content.gsub(%r{/\*.*?\*/}m) { |comment| comment.gsub(/[^\r\n]/, " ") }
+      end
+
+      def webpack_helper_scope_ambiguous?(content)
+        source = javascript_without_block_comments(content)
+        [EXTRACT_LOADER_DECLARATION, GET_LOADER_PATH_DECLARATION].any? do |declaration|
+          !source.match?(declaration) && source.each_line.any? { |line| line.lstrip.match?(declaration) }
+        end
+      end
+
+      def skip_ambiguous_webpack_helpers?(webpack_config, content)
+        return false unless webpack_helper_scope_ambiguous?(content)
+
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          Skipped Pro webpack updates because helper scope is ambiguous in #{webpack_config}.
+          An indented extractLoader or getLoaderPath declaration may be module-scoped or nested.
+          Both webpack configs were left unchanged. Update it manually using the Pro setup guide:
+          https://reactonrails.com/docs/pro/upgrading-to-pro/
+        MSG
+        true
       end
 
       def pro_gem_auto_install_command
