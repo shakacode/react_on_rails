@@ -73,8 +73,12 @@ export `unstable_revalidateTag`, expose a Node Renderer tag-invalidation endpoin
 `ReactOnRailsPro::RSCCache` bridge. The `CacheHandler` interface also has no delete method.
 
 Use a finite `revalidate` interval when data can change. Include all data that distinguishes the
-rendered result in the cached function arguments. A new application build uses a new build-scoped
-cache key, but it does not invalidate entries within the running build.
+rendered result in the cached function arguments. The build ID comes from the RSC artifact ID
+(`rscBundleHash`), which is derived from the RSC bundle and its companion files. Automatic
+build-scoped cache separation occurs only when that artifact ID changes; rebuilding or deploying
+with unchanged RSC artifacts does not rotate it. Changes to Rails code, data, or configuration still
+need a finite lifetime or an explicit version in the function `id` or arguments to separate cached
+results. Changing the namespace does not delete old entries from shared storage.
 
 React on Rails Pro's Ruby fragment-caching helpers have a separate `cache_tags:` and
 `ReactOnRailsPro.revalidate_tag` API. That API invalidates Rails fragment-cache entries; it does not
