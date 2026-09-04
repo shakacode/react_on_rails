@@ -1034,9 +1034,9 @@ casing):
 ### Helper signature changes
 
 When a `ReactOnRailsHelper` or `ReactOnRailsProHelper` method gains, loses, or renames a parameter, the
-CHANGELOG entry must name **both the method and the parameter** — even when the method is considered
-internal — so apps with a prepended override of that method can grep the changelog for it. Describing
-only the surrounding behavior is not enough:
+CHANGELOG entry must name **both the method and the parameter** — even when the method is private or
+undocumented — so apps with a prepended override of that method can grep the changelog for it.
+Describing only the surrounding behavior is not enough:
 
 - **Miss** (the actual 17.1.0.rc.0 entry): "Streaming caches no longer persist error-containing renders"
   described the caching behavior of `build_react_component_result_for_server_streamed_content` but never
