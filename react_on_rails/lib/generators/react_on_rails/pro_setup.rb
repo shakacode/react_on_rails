@@ -723,8 +723,9 @@ module ReactOnRails
 
       def webpack_helper_scope_ambiguous?(content)
         source = javascript_without_block_comments(content)
+        unindented_source = source.gsub(/^[ \t]+/, "")
         [EXTRACT_LOADER_DECLARATION, GET_LOADER_PATH_DECLARATION].any? do |declaration|
-          !source.match?(declaration) && source.each_line.any? { |line| line.lstrip.match?(declaration) }
+          !source.match?(declaration) && unindented_source.match?(declaration)
         end
       end
 

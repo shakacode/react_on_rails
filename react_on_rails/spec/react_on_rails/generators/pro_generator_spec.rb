@@ -1801,7 +1801,12 @@ describe ProGenerator, type: :generator do
       "a customized top-level extractLoader is indented" =>
         "  const extractLoader = (rule, loaderName) => rule.use.find(Boolean);\n",
       "a customized top-level getLoaderPath is indented" => "  const getLoaderPath = (item) => item.loader;\n",
+      "a customized extractLoader declaration is indented and split" =>
+        "  const\n    extractLoader = () => 'custom-extractor';\n",
+      "a customized getLoaderPath declaration is indented and split" =>
+        "  let\n    getLoaderPath = () => 'custom-path';\n",
       "an indented helper is nested" => "function outer() {\n  const extractLoader = () => {};\n}\n",
+      "an indented split helper is nested" => "function outer() {\n  const\n    extractLoader = () => {};\n}\n",
       "a nested helper follows a multiline block comment" =>
         "function outer() {\n/* comment\nspans multiple lines */const extractLoader = () => {};\n}\n"
     }.each do |description, helper_source|
