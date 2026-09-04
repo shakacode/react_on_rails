@@ -691,7 +691,9 @@ For each user-visible UI change:
    and matching destination, or `measured_substitute` with explicit baseline,
    candidate, and tolerance fields. Every measured value requires the same
    unit, and the tolerance must be non-negative. Stills or incidental numbers
-   in URLs do not satisfy an interaction claim.
+   in URLs do not satisfy an interaction claim. A clip awaiting attachment uses
+   `human_attachment_pending`, a `not_applicable` URL and measurements, and
+   blocked QA/release status even when the still-image evidence is complete.
 5. For a visual fix, exercise an intentionally unfixed negative control and
    record the observed failing assertion or mismatch. If no visual fix is in
    scope, give a reasoned `not applicable`.
@@ -699,8 +701,10 @@ For each user-visible UI change:
    the repository's `AGENTS.md` / Agent Workflow Configuration performance seam
    and use `$benchmark-verification` when it applies. Classify the impact as
    `bundle_hygiene` or `measured_metric`; select a compatible metric kind and a
-   stable repo command, repo report, or GitHub release artifact source. Record
-   same-unit baseline and candidate values. `bundle_size` and `memory` require
+   stable repo command, repo report, or GitHub release artifact source. Use
+   repository-relative report paths without URI schemes, absolute
+   paths, or `.`/`..` segments; remote artifacts use `github_artifact` instead.
+   Record same-unit baseline and candidate values. `bundle_size` and `memory` require
    byte units; `bundle_shape` requires a count noun such as `chunks`, `files`,
    or `modules`; and `runtime` requires a time, rate, frequency, or percentage
    unit such as `ms`, `s`, `fps`, `req/s`, or `%`. Incidental CI/report URL IDs
@@ -804,7 +808,7 @@ visual_candidate_status: <captured | pending | not_applicable>
 paint_check_status: <passed | blocked | not_applicable>
 interaction_change: <yes | no>
 interaction_evidence_kind: <clip | measured_substitute | not_applicable>
-interaction_evidence_destination: <github_pr | linear_tracker | github_release | not_applicable>
+interaction_evidence_destination: <github_pr | linear_tracker | github_release | human_attachment_pending | not_applicable>
 interaction_evidence_url: <destination-bound durable https URL | not_applicable>
 interaction_baseline_value: <number><unit> | not_applicable
 interaction_candidate_value: <number><unit> | not_applicable

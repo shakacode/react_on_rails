@@ -455,7 +455,7 @@ module CloseoutEvidenceReplay
 
     validate_structured_qa_state(fields, missing)
     validate_structured_visual_evidence(values, fields, missing)
-    validate_structured_interaction_evidence(values, missing)
+    validate_structured_interaction_evidence(values, fields, missing)
     validate_structured_negative_control(values, missing)
     validate_structured_performance_evidence(values, missing)
 
@@ -523,7 +523,7 @@ module CloseoutEvidenceReplay
     end
   end
 
-  def validate_structured_interaction_evidence(values, missing)
+  def validate_structured_interaction_evidence(values, fields, missing)
     change = values.fetch("interaction_change")
     kind = values.fetch("interaction_evidence_kind")
     destination = values.fetch("interaction_evidence_destination")
@@ -542,8 +542,14 @@ module CloseoutEvidenceReplay
         "interaction_tolerance" => tolerance
       }.each { |field, value| missing << field unless value == "not_applicable" }
     elsif change == "yes" && kind == "clip"
-      missing << "interaction_evidence_destination" unless durable_structured_destination?(destination)
-      missing << "interaction_evidence_url.destination" unless structured_destination_url?(destination, url)
+      if destination == "human_attachment_pending"
+        missing << "status" unless fields.fetch("status", "") == "blocked"
+        missing << "release_blocking" unless fields.fetch("release_blocking", "") == "blocked"
+        missing << "interaction_evidence_url" unless url == "not_applicable"
+      else
+        missing << "interaction_evidence_destination" unless durable_structured_destination?(destination)
+        missing << "interaction_evidence_url.destination" unless structured_destination_url?(destination, url)
+      end
       %w[interaction_baseline_value interaction_candidate_value interaction_tolerance].each do |field|
         missing << field unless values.fetch(field) == "not_applicable"
       end
@@ -625,7 +631,9 @@ module CloseoutEvidenceReplay
     when "repo_command"
       valid_repo_command_ref?(value)
     when "repo_report"
-      !value.match?(UNRESOLVED_PLACEHOLDER) && value.match?(%r{\A[A-Za-z0-9][A-Za-z0-9._:#@/-]*\z})
+      !value.match?(UNRESOLVED_PLACEHOLDER) && value.split("/", -1).all? do |component|
+        component.match?(/\A[A-Za-z0-9._@-]+\z/) && !%w[. ..].include?(component)
+      end
     when "github_artifact"
       structured_destination_url?("github_release", value)
     else

@@ -488,6 +488,29 @@ class CloseoutEvidenceReplayTest < Minitest::Test
     assert_includes qa.fetch("missing"), "performance_evidence"
   end
 
+  def test_v3_repo_report_rejects_non_repository_paths
+    %w[
+      https://unrelated.example/report.json http://example.com/report.json file:report.json
+      /tmp/report.json C:/reports/report.json ../report.json reports/../../report.json
+      reports/./report.json reports//report.json reports/
+    ].each do |source_ref|
+      qa = run_replay(
+        v3_marker(
+          "performance_impact" => "measured_metric",
+          "performance_evidence_status" => "measured",
+          "performance_source_kind" => "repo_report",
+          "performance_source_ref" => source_ref,
+          "performance_metric_kind" => "runtime",
+          "performance_baseline_value" => "240ms",
+          "performance_candidate_value" => "210ms"
+        )
+      ).fetch("qa_evidence")
+
+      assert_equal "UNKNOWN", qa.fetch("verdict"), source_ref
+      assert_includes qa.fetch("missing"), "performance_source_ref", source_ref
+    end
+  end
+
   def test_v3_interaction_clip_uses_the_same_destination_binding
     qa = run_replay(
       v3_marker(
@@ -500,6 +523,67 @@ class CloseoutEvidenceReplayTest < Minitest::Test
 
     assert_equal "UNKNOWN", qa.fetch("verdict")
     assert_includes qa.fetch("missing"), "interaction_evidence_url.destination"
+  end
+
+  def test_v3_pending_interaction_clip_is_blocked_with_complete_stills
+    qa = run_replay(
+      v3_marker(
+        "status" => "blocked",
+        "release_blocking" => "blocked",
+        "interaction_change" => "yes",
+        "interaction_evidence_kind" => "clip",
+        "interaction_evidence_destination" => "human_attachment_pending"
+      )
+    ).fetch("qa_evidence")
+
+    assert_equal "BLOCKED", qa.fetch("verdict")
+    assert_empty qa.fetch("missing")
+  end
+
+  def test_v3_pending_interaction_clip_is_blocked_with_pending_stills
+    qa = run_replay(
+      v3_marker(
+        "status" => "blocked",
+        "release_blocking" => "blocked",
+        "visual_evidence_status" => "blocked",
+        "visual_evidence_destination" => "human_attachment_pending",
+        "visual_evidence_url" => "not_applicable",
+        "visual_baseline_status" => "pending",
+        "visual_candidate_status" => "pending",
+        "paint_check_status" => "blocked",
+        "interaction_change" => "yes",
+        "interaction_evidence_kind" => "clip",
+        "interaction_evidence_destination" => "human_attachment_pending"
+      )
+    ).fetch("qa_evidence")
+
+    assert_equal "BLOCKED", qa.fetch("verdict")
+    assert_empty qa.fetch("missing")
+  end
+
+  def test_v3_pending_interaction_clip_rejects_contradictory_evidence
+    {
+      "status" => "satisfied",
+      "release_blocking" => "clear",
+      "interaction_evidence_url" => "https://github.com/example/repo/pull/123#clip",
+      "interaction_baseline_value" => "52px",
+      "interaction_candidate_value" => "0px",
+      "interaction_tolerance" => "1px"
+    }.each do |field, value|
+      qa = run_replay(
+        v3_marker(
+          "status" => "blocked",
+          "release_blocking" => "blocked",
+          "interaction_change" => "yes",
+          "interaction_evidence_kind" => "clip",
+          "interaction_evidence_destination" => "human_attachment_pending",
+          field => value
+        )
+      ).fetch("qa_evidence")
+
+      assert_equal "UNKNOWN", qa.fetch("verdict"), field
+      assert_includes qa.fetch("missing"), field
+    end
   end
 
   def test_v3_measured_values_require_matching_units
