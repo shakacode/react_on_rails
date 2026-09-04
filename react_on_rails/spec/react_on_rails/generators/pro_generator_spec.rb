@@ -1634,6 +1634,22 @@ describe ProGenerator, type: :generator do
       expect(source).to match(ReactOnRails::Generators::ProSetup::EXTRACT_LOADER_DECLARATION)
     end
 
+    it "recognizes a split lexical declaration" do
+      source = "let extractLoader;\nextractLoader = (rule, loaderName) => rule.use.find(Boolean);\n"
+
+      expect(source).to match(ReactOnRails::Generators::ProSetup::EXTRACT_LOADER_DECLARATION)
+    end
+
+    it "does not treat a nested lexical declaration as module-scoped" do
+      source = <<~JS
+        function configureServer() {
+          const extractLoader = (rule, loaderName) => rule.use.find(Boolean);
+        }
+      JS
+
+      expect(source).not_to match(ReactOnRails::Generators::ProSetup::EXTRACT_LOADER_DECLARATION)
+    end
+
     it "does not treat a line-comment-only function as a declaration" do
       source = "// function extractLoader(rule, loaderName) { return null; }\n"
 

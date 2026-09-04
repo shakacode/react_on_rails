@@ -65,10 +65,11 @@ module ReactOnRails
       # silent shadow, and the generated config would fail to parse in Node.
       GET_LOADER_PATH_DECLARATION = /(?:function\s+getLoaderPath\s*\(|(?:const|let|var)\s+getLoaderPath\s*=)/
 
-      # Matches a live declaration line for extractLoader, including customized lexical forms.
-      # Anchoring excludes line-comment-only mentions without pretending to parse JavaScript.
+      # Matches a module-scope declaration line for extractLoader, including customized lexical forms.
+      # The generated config keeps module declarations at column zero. This narrow anchor excludes
+      # line-comment-only and nested mentions without pretending to parse JavaScript.
       EXTRACT_LOADER_DECLARATION =
-        /^\s*(?:function\s+extractLoader\s*\(|(?:const|let|var)\s+extractLoader\s*=)/
+        /^(?:function\s+extractLoader\s*\(|(?:const|let|var)\s+extractLoader\b)/
 
       # Main entry point for Pro setup.
       # Orchestrates creation of all Pro-related files and configuration.
