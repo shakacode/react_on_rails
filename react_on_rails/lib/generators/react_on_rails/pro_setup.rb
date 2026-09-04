@@ -59,11 +59,12 @@ module ReactOnRails
       BUNDLER_REQUIRE_PATTERN =
         %r{(const bundler = config\.assets_bundler.*\n.*require\('@rspack/core'\).*\n.*: require\('webpack'\);)}
 
-      # Matches any declaration of the getLoaderPath symbol, however it is written. The
+      # Matches a module-scope declaration line for getLoaderPath, however it is written. The
       # emitted extractLoader calls getLoaderPath, so we must never add a second
       # declaration: `function` next to an existing `const` is a SyntaxError, not a
       # silent shadow, and the generated config would fail to parse in Node.
-      GET_LOADER_PATH_DECLARATION = /(?:function\s+getLoaderPath\s*\(|(?:const|let|var)\s+getLoaderPath\s*=)/
+      GET_LOADER_PATH_DECLARATION =
+        /^(?:function\s+getLoaderPath\s*\(|(?:const|let|var)\s+getLoaderPath\s*=)/
 
       # Matches a module-scope declaration line for extractLoader, including customized lexical forms.
       # The generated config keeps module declarations at column zero. This narrow anchor excludes
@@ -524,13 +525,13 @@ module ReactOnRails
 
       def add_extract_loader_to_server_config(webpack_config, content)
         # Skip if extractLoader already exists
-        return if content.match?(EXTRACT_LOADER_DECLARATION)
+        return if extract_loader_declared?(content)
 
         if content.include?(GET_LOADER_PATH_JS)
           # Config rendered by the current base template: append extractLoader directly after
           # the shared getLoaderPath helper so the result matches the template's Pro output.
           gsub_file(webpack_config, GET_LOADER_PATH_JS, "#{GET_LOADER_PATH_JS}\n#{EXTRACT_LOADER_JS}")
-        elsif content.match?(GET_LOADER_PATH_DECLARATION)
+        elsif get_loader_path_declared?(content)
           # The app already declares getLoaderPath but has customized it (reformatted, recommented,
           # or rewritten as an arrow function). Reuse whatever is there and emit extractLoader only.
           # Emitting our own copy would redeclare the identifier, which is a SyntaxError next to an
@@ -599,7 +600,7 @@ module ReactOnRails
       def missing_server_config_transforms(content)
         checks = [
           ["libraryTarget: 'commonjs2',", content.include?("libraryTarget: 'commonjs2',")],
-          ["extractLoader declaration", content.match?(EXTRACT_LOADER_DECLARATION)],
+          ["extractLoader declaration", extract_loader_declared?(content)],
           [
             "babelLoader.options.caller = { ssr: true }",
             content.include?("babelLoader.options.caller = { ssr: true }")
@@ -654,7 +655,7 @@ module ReactOnRails
         # Check for the Pro-specific comment marker (written by the transform) to avoid
         # false-negatives when commented-out lines also contain the pattern string.
         content.include?("// Required for React on Rails Pro Node Renderer") &&
-          content.match?(EXTRACT_LOADER_DECLARATION) &&
+          extract_loader_declared?(content) &&
           content.include?("babelLoader.options.caller = { ssr: true }") &&
           content.include?("serverWebpackConfig.target = 'node'") &&
           content.include?("serverWebpackConfig.node = false") &&
@@ -668,6 +669,18 @@ module ReactOnRails
 
         content = File.read(File.join(destination_root, server_client_path))
         content.include?("{ default: serverWebpackConfig }")
+      end
+
+      def extract_loader_declared?(content)
+        javascript_without_block_comments(content).match?(EXTRACT_LOADER_DECLARATION)
+      end
+
+      def get_loader_path_declared?(content)
+        javascript_without_block_comments(content).match?(GET_LOADER_PATH_DECLARATION)
+      end
+
+      def javascript_without_block_comments(content)
+        content.gsub(%r{/\*.*?\*/}m, "")
       end
 
       def pro_gem_auto_install_command

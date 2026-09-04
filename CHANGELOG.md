@@ -28,8 +28,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 - **[Pro]** **Standalone upgrades now preserve customized `extractLoader` helpers**: The Pro generator recognizes
   function and lexical declarations before it patches `serverWebpackConfig.js`. This prevents duplicate declarations
-  when an app provides its own helper and ignores line-comment-only mentions during insertion and verification. Fixes
-  [Issue 4789](https://github.com/shakacode/react_on_rails/issues/4789).
+  when an app provides its own helper, while ignoring declarations that exist only in line or block comments or nested
+  scopes. Fixes [Issue 4789](https://github.com/shakacode/react_on_rails/issues/4789).
 
 - **RSC agent guardrail upgrades now preserve complete files and clean up their stale hook groups**:
   The installer atomically replaces copied skill and hook files while preserving their existing permission behavior,

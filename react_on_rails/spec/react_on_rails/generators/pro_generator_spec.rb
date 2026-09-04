@@ -1628,6 +1628,8 @@ describe ProGenerator, type: :generator do
   end
 
   describe "extractLoader declaration detection" do
+    let(:generator) { described_class.new }
+
     it "recognizes a lexical declaration" do
       source = "const extractLoader = (rule, loaderName) => rule.use.find(Boolean);\n"
 
@@ -1654,6 +1656,26 @@ describe ProGenerator, type: :generator do
       source = "// function extractLoader(rule, loaderName) { return null; }\n"
 
       expect(source).not_to match(ReactOnRails::Generators::ProSetup::EXTRACT_LOADER_DECLARATION)
+    end
+
+    it "does not treat a block-comment-only declaration as live" do
+      source = <<~JS
+        /*
+        const extractLoader = (rule, loaderName) => rule.use.find(Boolean);
+        */
+      JS
+
+      expect(generator.send(:extract_loader_declared?, source)).to be(false)
+    end
+
+    it "does not treat a nested getLoaderPath declaration as module-scoped" do
+      source = <<~JS
+        function configureServer() {
+          const getLoaderPath = (item) => item.loader;
+        }
+      JS
+
+      expect(generator.send(:get_loader_path_declared?, source)).to be(false)
     end
   end
 
@@ -1693,6 +1715,41 @@ describe ProGenerator, type: :generator do
       expect(declarations.size).to eq(1)
       expect(result).to include(ReactOnRails::Generators::ProSetup::EXTRACT_LOADER_JS)
     end
+
+    it "inserts a live helper when the only existing declaration is in a block comment" do
+      content = base_server_webpack_content.sub(
+        ReactOnRails::Generators::ProSetup::GET_LOADER_PATH_JS,
+        <<~JS.chomp
+          #{ReactOnRails::Generators::ProSetup::GET_LOADER_PATH_JS}
+          /*
+          const extractLoader = (rule, loaderName) => rule.use.find(Boolean);
+          */
+        JS
+      )
+      simulate_existing_file(webpack_config, content)
+
+      generator.send(:add_extract_loader_to_server_config, webpack_config, content)
+
+      result = File.read(File.join(destination_root, webpack_config))
+      expect(generator.send(:extract_loader_declared?, result)).to be(true)
+      expect(result).to include(ReactOnRails::Generators::ProSetup::EXTRACT_LOADER_JS)
+    end
+
+    it "does not reuse a getLoaderPath helper that is only nested" do
+      nested_helper = <<~JS.chomp
+        function configureLoader() {
+          const getLoaderPath = (item) => item.loader;
+        }
+      JS
+      content = base_server_webpack_content.sub(ReactOnRails::Generators::ProSetup::GET_LOADER_PATH_JS, nested_helper)
+      simulate_existing_file(webpack_config, content)
+
+      generator.send(:add_extract_loader_to_server_config, webpack_config, content)
+
+      result = File.read(File.join(destination_root, webpack_config))
+      expect(result).to include(ReactOnRails::Generators::ProSetup::GET_LOADER_PATH_JS)
+      expect(result).to include(ReactOnRails::Generators::ProSetup::EXTRACT_LOADER_JS)
+    end
   end
 
   describe "#missing_server_config_transforms" do
@@ -1700,6 +1757,12 @@ describe ProGenerator, type: :generator do
 
     it "reports a line-comment-only extractLoader mention as missing" do
       content = "// function extractLoader(rule, loaderName) {}\n"
+
+      expect(generator.send(:missing_server_config_transforms, content)).to include("extractLoader declaration")
+    end
+
+    it "reports a block-comment-only extractLoader declaration as missing" do
+      content = "/*\nfunction extractLoader(rule, loaderName) {}\n*/\n"
 
       expect(generator.send(:missing_server_config_transforms, content)).to include("extractLoader declaration")
     end
