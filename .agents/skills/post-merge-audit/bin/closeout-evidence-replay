@@ -21,6 +21,17 @@ module CloseoutEvidenceReplay
   VALID_VISUAL_DESTINATIONS = %w[
     github_pr linked_tracker repo_artifact_store human_attachment_pending not_applicable
   ].freeze
+  VALID_VISUAL_EVIDENCE_STATUSES = %w[complete blocked not_applicable].freeze
+  VALID_STRUCTURED_VISUAL_DESTINATIONS = %w[
+    github_pr linear_tracker github_release human_attachment_pending not_applicable
+  ].freeze
+  VALID_CAPTURE_STATUSES = %w[captured pending not_applicable].freeze
+  VALID_PAINT_CHECK_STATUSES = %w[passed blocked not_applicable].freeze
+  VALID_INTERACTION_EVIDENCE_KINDS = %w[clip measured_substitute not_applicable].freeze
+  VALID_NEGATIVE_CONTROL_STATUSES = %w[observed_failure not_applicable].freeze
+  VALID_PERFORMANCE_EVIDENCE_STATUSES = %w[measured not_applicable].freeze
+  VALID_PERFORMANCE_SOURCE_KINDS = %w[repo_command repo_report github_artifact not_applicable].freeze
+  VALID_PERFORMANCE_METRIC_KINDS = %w[bundle_size bundle_shape runtime memory not_applicable].freeze
   # private-user-images.githubusercontent.com is deliberately excluded because copied signed URLs expire.
   DURABLE_GITHUB_EVIDENCE_HOSTS = %w[
     github.com
@@ -58,7 +69,8 @@ module CloseoutEvidenceReplay
         text,
         expected_head_sha: options[:expected_head_sha],
         require_priority_dispositions: options.fetch(:require_priority_dispositions, false),
-        require_visual_evidence_v2: options.fetch(:require_visual_evidence_v2, false)
+        require_visual_evidence_v2: options.fetch(:require_visual_evidence_v2, false),
+        require_structured_visual_evidence_v3: options.fetch(:require_structured_visual_evidence_v3, false)
       )
     )
     0
@@ -73,9 +85,10 @@ module CloseoutEvidenceReplay
   def parse_options(argv)
     options = {}
     parser = OptionParser.new do |opts|
-      opts.banner = "Usage: closeout-evidence-replay [--expected-head-sha SHA] [--require-priority-dispositions] [--require-visual-evidence-v2] <path|->"
+      opts.banner = "Usage: closeout-evidence-replay [--expected-head-sha SHA] [--require-priority-dispositions] " \
+                    "[--require-visual-evidence-v2] [--require-structured-visual-evidence-v3] <path|->"
       opts.separator ""
-      opts.separator "Parse `qa-evidence v1|v2` and `priority-finding-dispositions v1` markers from"
+      opts.separator "Parse `qa-evidence v1|v2|v3` and `priority-finding-dispositions v1` markers from"
       opts.separator "a PR body, issue comment, handoff, or stdin and emit replay JSON."
       opts.separator ""
       opts.on("--expected-head-sha SHA", "Require QA and priority evidence for this full final-head SHA") do |sha|
@@ -91,6 +104,12 @@ module CloseoutEvidenceReplay
       opts.on("--require-visual-evidence-v2", "Fail when current UI evidence lacks the durable visual-evidence v2 contract") do
         options[:require_visual_evidence_v2] = true
       end
+      opts.on(
+        "--require-structured-visual-evidence-v3",
+        "Fail when current UI evidence lacks the structured visual-evidence v3 contract"
+      ) do
+        options[:require_structured_visual_evidence_v3] = true
+      end
       opts.on("-h", "--help", "Show this help") { options[:help] = true }
     end
     parser.parse!(argv)
@@ -98,25 +117,49 @@ module CloseoutEvidenceReplay
       raise OptionParser::MissingArgument,
             "--require-visual-evidence-v2 requires --expected-head-sha"
     end
+    if options[:require_structured_visual_evidence_v3] && !options[:expected_head_sha]
+      raise OptionParser::MissingArgument,
+            "--require-structured-visual-evidence-v3 requires --expected-head-sha"
+    end
 
     [options, parser]
   end
 
-  def replay(text, expected_head_sha: nil, require_priority_dispositions: false, require_visual_evidence_v2: false)
+  def replay(
+    text,
+    expected_head_sha: nil,
+    require_priority_dispositions: false,
+    require_visual_evidence_v2: false,
+    require_structured_visual_evidence_v3: false
+  )
     qa_v1_markers = marker_bodies(text, "qa-evidence v1")
     qa_v2_markers = marker_bodies(text, "qa-evidence v2")
+    qa_v3_markers = marker_bodies(text, "qa-evidence v3")
+    applicable_v3_markers = qa_v3_markers.select do |marker|
+      fields, = parse_fields(marker)
+      head_sha = fields.fetch("head_sha", "").to_s.downcase
+      full_head_sha?(head_sha) && (!expected_head_sha || head_sha == expected_head_sha)
+    end
     applicable_v2_markers = qa_v2_markers.select do |marker|
       fields, = parse_fields(marker)
       head_sha = fields.fetch("head_sha", "").to_s.downcase
       full_head_sha?(head_sha) && (!expected_head_sha || head_sha == expected_head_sha)
     end
     qa =
-      if require_visual_evidence_v2 && expected_head_sha.nil?
+      if require_structured_visual_evidence_v3 && expected_head_sha.nil?
+        unknown("--require-structured-visual-evidence-v3 requires expected_head_sha")
+      elsif require_structured_visual_evidence_v3 && qa_v3_markers.any?
+        replay_qa_markers(qa_v3_markers, expected_head_sha: expected_head_sha, version: 3)
+      elsif require_structured_visual_evidence_v3
+        unknown("qa-evidence v3 marker required for current user-visible UI evidence")
+      elsif require_visual_evidence_v2 && expected_head_sha.nil?
         unknown("--require-visual-evidence-v2 requires expected_head_sha")
       elsif require_visual_evidence_v2 && qa_v2_markers.any?
         replay_qa_markers(qa_v2_markers, expected_head_sha: expected_head_sha, version: 2)
       elsif require_visual_evidence_v2
         unknown("qa-evidence v2 marker required for current user-visible UI evidence")
+      elsif applicable_v3_markers.any?
+        replay_qa_markers(applicable_v3_markers, expected_head_sha: expected_head_sha, version: 3)
       elsif applicable_v2_markers.any?
         replay_qa_markers(applicable_v2_markers, expected_head_sha: expected_head_sha, version: 2)
       elsif qa_v1_markers.any?
@@ -136,7 +179,7 @@ module CloseoutEvidenceReplay
     invalid_ui_marker_indexes = strict_qa_results.each_index.reject do |index|
       strict_qa_results.fetch(index).dig("fields", "user_visible_ui_change") == "yes"
     end
-    if require_visual_evidence_v2 && invalid_ui_marker_indexes.any?
+    if (require_visual_evidence_v2 || require_structured_visual_evidence_v3) && invalid_ui_marker_indexes.any?
       if qa.key?("markers")
         invalid_ui_marker_indexes.each { |index| qa.fetch("missing") << "marker[#{index}].user_visible_ui_change" }
       else
@@ -167,7 +210,9 @@ module CloseoutEvidenceReplay
     markers = current_head_markers(markers, expected_head_sha) if expected_head_sha
     aggregate_marker_results(
       markers.map do |marker|
-        if version == 2
+        if version == 3
+          replay_qa_v3(marker, expected_head_sha: expected_head_sha)
+        elsif version == 2
           replay_qa_v2(marker, expected_head_sha: expected_head_sha)
         else
           replay_qa(marker, expected_head_sha: expected_head_sha).merge("marker_version" => 1)
@@ -254,6 +299,8 @@ module CloseoutEvidenceReplay
   end
 
   def replay_qa_v2(marker, expected_head_sha: nil)
+    # v2 remains replayable history. New receipts use v3 so eligibility does not
+    # depend on prose parsing or generic HTTPS destinations.
     result = replay_qa(marker, expected_head_sha: expected_head_sha)
     fields = result.fetch("fields")
     errors = result.fetch("errors")
@@ -332,6 +379,244 @@ module CloseoutEvidenceReplay
     result["supersedes_marker_version"] = 1
     result["verdict"] = "UNKNOWN" if errors.any? || missing.any?
     result
+  end
+
+  def replay_qa_v3(marker, expected_head_sha: nil)
+    result = replay_qa(marker, expected_head_sha: expected_head_sha)
+    fields = result.fetch("fields")
+    errors = result.fetch("errors")
+    missing = result.fetch("missing")
+    head_sha = fields.fetch("head_sha", "").to_s.downcase
+    tested_at = fields.fetch("tested_at", "").to_s
+    missing << "head_sha" unless full_head_sha?(head_sha)
+    missing << "tested_at.head_sha" unless full_head_sha?(head_sha) && tested_at_matches_head?(tested_at, head_sha)
+
+    structured_fields = %w[
+      user_visible_ui_change
+      visual_evidence_status
+      visual_evidence_destination
+      visual_evidence_url
+      visual_baseline_status
+      visual_candidate_status
+      paint_check_status
+      interaction_change
+      interaction_evidence_kind
+      interaction_evidence_destination
+      interaction_evidence_url
+      interaction_baseline_value
+      interaction_candidate_value
+      interaction_tolerance
+      visual_fix
+      negative_control_status
+      performance_impact
+      performance_evidence_status
+      performance_source_kind
+      performance_source_ref
+      performance_metric_kind
+      performance_baseline_value
+      performance_candidate_value
+    ]
+    missing.concat(missing_fields(fields, structured_fields))
+    values = structured_fields.to_h { |field| [field, bounded_evidence_field(fields, field, missing)] }
+
+    validate_enum(values, "user_visible_ui_change", VALID_QA_REQUIRED, missing)
+    validate_enum(values, "visual_evidence_status", VALID_VISUAL_EVIDENCE_STATUSES, missing)
+    validate_enum(values, "visual_evidence_destination", VALID_STRUCTURED_VISUAL_DESTINATIONS, missing)
+    validate_enum(values, "visual_baseline_status", VALID_CAPTURE_STATUSES, missing)
+    validate_enum(values, "visual_candidate_status", VALID_CAPTURE_STATUSES, missing)
+    validate_enum(values, "paint_check_status", VALID_PAINT_CHECK_STATUSES, missing)
+    validate_enum(values, "interaction_change", VALID_QA_REQUIRED, missing)
+    validate_enum(values, "interaction_evidence_kind", VALID_INTERACTION_EVIDENCE_KINDS, missing)
+    validate_enum(values, "interaction_evidence_destination", VALID_STRUCTURED_VISUAL_DESTINATIONS, missing)
+    validate_enum(values, "visual_fix", VALID_QA_REQUIRED, missing)
+    validate_enum(values, "negative_control_status", VALID_NEGATIVE_CONTROL_STATUSES, missing)
+    validate_enum(values, "performance_impact", VALID_PERFORMANCE_IMPACTS, missing)
+    validate_enum(values, "performance_evidence_status", VALID_PERFORMANCE_EVIDENCE_STATUSES, missing)
+    validate_enum(values, "performance_source_kind", VALID_PERFORMANCE_SOURCE_KINDS, missing)
+    validate_enum(values, "performance_metric_kind", VALID_PERFORMANCE_METRIC_KINDS, missing)
+
+    validate_structured_visual_evidence(values, fields, missing)
+    validate_structured_interaction_evidence(values, missing)
+    validate_structured_negative_control(values, missing)
+    validate_structured_performance_evidence(values, missing)
+
+    missing.uniq!
+    result["marker_version"] = 3
+    result["supersedes_marker_version"] = 2
+    result["verdict"] = "UNKNOWN" if errors.any? || missing.any?
+    result
+  end
+
+  def validate_enum(values, field, allowed, missing)
+    value = values.fetch(field)
+    missing << field unless value.empty? || allowed.include?(value)
+  end
+
+  def validate_structured_visual_evidence(values, fields, missing)
+    ui_change = values.fetch("user_visible_ui_change")
+    status = values.fetch("visual_evidence_status")
+    destination = values.fetch("visual_evidence_destination")
+    url = values.fetch("visual_evidence_url")
+    baseline = values.fetch("visual_baseline_status")
+    candidate = values.fetch("visual_candidate_status")
+    paint = values.fetch("paint_check_status")
+
+    if ui_change == "no"
+      {
+        "visual_evidence_status" => status,
+        "visual_evidence_destination" => destination,
+        "visual_evidence_url" => url,
+        "visual_baseline_status" => baseline,
+        "visual_candidate_status" => candidate,
+        "paint_check_status" => paint
+      }.each { |field, value| missing << field unless value == "not_applicable" }
+    elsif ui_change == "yes" && status == "complete"
+      missing << "visual_evidence_destination" unless durable_structured_destination?(destination)
+      missing << "visual_evidence_url.destination" unless structured_destination_url?(destination, url)
+      missing << "visual_baseline_status" unless baseline == "captured"
+      missing << "visual_candidate_status" unless candidate == "captured"
+      missing << "paint_check_status" unless paint == "passed"
+    elsif ui_change == "yes" && status == "blocked"
+      missing << "visual_evidence_destination" unless destination == "human_attachment_pending"
+      missing << "visual_evidence_url" unless url == "not_applicable"
+      missing << "visual_baseline_status" unless baseline == "pending"
+      missing << "visual_candidate_status" unless candidate == "pending"
+      missing << "paint_check_status" unless paint == "blocked"
+      missing << "status" unless fields.fetch("status", "") == "blocked"
+      missing << "release_blocking" unless fields.fetch("release_blocking", "") == "blocked"
+    elsif ui_change == "yes"
+      missing << "visual_evidence_status"
+    end
+  end
+
+  def validate_structured_interaction_evidence(values, missing)
+    change = values.fetch("interaction_change")
+    kind = values.fetch("interaction_evidence_kind")
+    destination = values.fetch("interaction_evidence_destination")
+    url = values.fetch("interaction_evidence_url")
+    baseline = values.fetch("interaction_baseline_value")
+    candidate = values.fetch("interaction_candidate_value")
+    tolerance = values.fetch("interaction_tolerance")
+
+    if change == "no"
+      {
+        "interaction_evidence_kind" => kind,
+        "interaction_evidence_destination" => destination,
+        "interaction_evidence_url" => url,
+        "interaction_baseline_value" => baseline,
+        "interaction_candidate_value" => candidate,
+        "interaction_tolerance" => tolerance
+      }.each { |field, value| missing << field unless value == "not_applicable" }
+    elsif change == "yes" && kind == "clip"
+      missing << "interaction_evidence_destination" unless durable_structured_destination?(destination)
+      missing << "interaction_evidence_url.destination" unless structured_destination_url?(destination, url)
+      %w[interaction_baseline_value interaction_candidate_value interaction_tolerance].each do |field|
+        missing << field unless values.fetch(field) == "not_applicable"
+      end
+    elsif change == "yes" && kind == "measured_substitute"
+      missing << "interaction_evidence_destination" unless destination == "not_applicable"
+      missing << "interaction_evidence_url" unless url == "not_applicable"
+      validate_measurement_triple(baseline, candidate, tolerance, "interaction_evidence", missing)
+    elsif change == "yes"
+      missing << "interaction_evidence_kind"
+    end
+  end
+
+  def validate_structured_negative_control(values, missing)
+    visual_fix = values.fetch("visual_fix")
+    negative_control = values.fetch("negative_control_status")
+    return if (visual_fix == "yes" && negative_control == "observed_failure") ||
+              (visual_fix == "no" && negative_control == "not_applicable")
+
+    missing << "negative_control_status"
+  end
+
+  def validate_structured_performance_evidence(values, missing)
+    impact = values.fetch("performance_impact")
+    status = values.fetch("performance_evidence_status")
+    source_kind = values.fetch("performance_source_kind")
+    source_ref = values.fetch("performance_source_ref")
+    metric_kind = values.fetch("performance_metric_kind")
+    baseline = values.fetch("performance_baseline_value")
+    candidate = values.fetch("performance_candidate_value")
+
+    if impact == "not_applicable"
+      {
+        "performance_evidence_status" => status,
+        "performance_source_kind" => source_kind,
+        "performance_source_ref" => source_ref,
+        "performance_metric_kind" => metric_kind,
+        "performance_baseline_value" => baseline,
+        "performance_candidate_value" => candidate
+      }.each { |field, value| missing << field unless value == "not_applicable" }
+      return
+    end
+    return unless %w[bundle_hygiene measured_metric].include?(impact)
+
+    missing << "performance_evidence_status" unless status == "measured"
+    missing << "performance_source_kind" unless %w[repo_command repo_report github_artifact].include?(source_kind)
+    missing << "performance_source_ref" unless valid_structured_source_ref?(source_kind, source_ref)
+    allowed_metric_kinds = impact == "bundle_hygiene" ? %w[bundle_size bundle_shape] : %w[runtime memory]
+    missing << "performance_metric_kind" unless allowed_metric_kinds.include?(metric_kind)
+    validate_measurement_pair(baseline, candidate, "performance_evidence", missing, metric_kind: metric_kind)
+  end
+
+  def durable_structured_destination?(destination)
+    %w[github_pr linear_tracker github_release].include?(destination)
+  end
+
+  def structured_destination_url?(destination, value)
+    uri = parse_https_url(value)
+    return false unless uri
+
+    host = uri.host.downcase
+    path = uri.path.to_s
+    case destination
+    when "github_pr"
+      return !path.empty? && path != "/" if host == "user-images.githubusercontent.com"
+      return false unless %w[github.com www.github.com].include?(host)
+
+      path.match?(%r{\A/user-attachments/assets/[^/]+\z}) || path.match?(%r{\A/[^/]+/[^/]+/pull/\d+(?:/.*)?\z})
+    when "linear_tracker"
+      host == "linear.app" && path.match?(%r{\A/[^/]+/issue/[^/]+(?:/.*)?\z})
+    when "github_release"
+      %w[github.com www.github.com].include?(host) && path.match?(%r{\A/[^/]+/[^/]+/releases/(?:download|tag)/.+\z})
+    else
+      false
+    end
+  end
+
+  def valid_structured_source_ref?(kind, value)
+    case kind
+    when "repo_command", "repo_report"
+      !value.match?(UNRESOLVED_PLACEHOLDER) && value.match?(%r{\A[A-Za-z0-9][A-Za-z0-9._:#@/-]*\z})
+    when "github_artifact"
+      structured_destination_url?("github_release", value)
+    else
+      false
+    end
+  end
+
+  def validate_measurement_triple(baseline, candidate, tolerance, field, missing)
+    measurements = [baseline, candidate, tolerance].map { |value| parse_measurement(value) }
+    missing << field unless measurements.all? && measurements.map { |measurement| measurement.fetch(1) }.uniq.one?
+  end
+
+  def validate_measurement_pair(baseline, candidate, field, missing, metric_kind:)
+    measurements = [baseline, candidate].map { |value| parse_measurement(value) }
+    valid = measurements.all? && measurements.map { |measurement| measurement.fetch(1) }.uniq.one?
+    if valid
+      unit = measurements.first.fetch(1)
+      byte_unit = unit.match?(/\A(?:[kmgt]i?)?b(?:ytes?)?\z/i)
+      valid &&= byte_unit if %w[bundle_size memory].include?(metric_kind)
+      valid &&= !byte_unit if %w[bundle_shape runtime].include?(metric_kind)
+    end
+    missing << field unless valid
+  end
+
+  def parse_measurement(value)
+    match = value.match(%r{\A([-+]?\d+(?:\.\d+)?)([A-Za-z%]+(?:/[A-Za-z]+)?)\z})
+    match && [match[1], match[2].downcase]
   end
 
   def validate_visual_evidence_v2(

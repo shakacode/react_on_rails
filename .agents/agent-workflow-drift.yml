@@ -92,19 +92,19 @@ files:
   consumer: ".agents/skills/post-merge-audit/bin/closeout-evidence-replay"
   mode: overlay
   reason: React on Rails backports the merged qa-evidence v2 replay contract from
-    agent-workflows commit 162e1680, applies reviewed follow-up hardening for negated
-    evidence claims, and retains its reviewed shared-workflow inventory boundary.
+    agent-workflows commit 162e1680, adds the reviewed structured v3 forward gate,
+    and retains its reviewed shared-workflow inventory boundary.
   consumer_mode: '100755'
   source_sha256: b2110347ace4cca5b39a03fddc054542b528aae8a6d45c37f445ee078a687d37
-  consumer_sha256: 62170162a274319f9acc80104c9d55e294f4ec55b58aaac4c360888a27742384
+  consumer_sha256: 19797ad600ad0dcb3944c14f3b49454d3171e6928ee91b36a64e35b6cabed1e9
 - source: skills/post-merge-audit/bin/closeout-evidence-replay-test.rb
   consumer: ".agents/skills/post-merge-audit/bin/closeout-evidence-replay-test.rb"
   mode: overlay
-  reason: React on Rails keeps the merged qa-evidence v2 replay regression suite
-    aligned with its backported runtime helper and reviewed follow-up hardening.
+  reason: React on Rails keeps historical qa-evidence replay regression coverage
+    and adds structured v3 forward-gate contract tests.
   consumer_mode: '100755'
   source_sha256: 35b3558bca3d49ac2032fc8b2a422877237e9f473f5d779f916e8ed8242bc60f
-  consumer_sha256: dbe5667ad17918284872e23e182d10d089503328068648aeb905cefd20d0f430
+  consumer_sha256: 57d0bb85829722c6ef61f6bfb161f83f494bd0125885582f4ee612461425aa7c
 - source: skills/post-merge-audit/bin/post-merge-audit-scope
   consumer: ".agents/skills/post-merge-audit/bin/post-merge-audit-scope"
   mode: identical
@@ -212,21 +212,20 @@ files:
   consumer: ".agents/workflows/post-merge-audit.md"
   mode: overlay
   reason: React on Rails adds local helper resolution and release-branch changelog
-    routing, and backports the merged qa-evidence v2 audit gate from
-    agent-workflows commit 162e1680.
+    routing, backports the merged qa-evidence v2 audit gate, and documents the
+    structured v3 forward gate.
   consumer_mode: '100644'
   source_sha256: b290eded973c722015dbf4240a34a32734e59e69464dcf344bee113de17571f3
-  consumer_sha256: b78a43aa154e936e56754331974bd8b4eab5186239612284e4e36f803d3866f8
+  consumer_sha256: a7d8fb8ac383ff7aa1e69e61fdc7182d7b9be3e2e6c4998fc3f1e3ef6c2427cb
 - source: workflows/pr-processing.md
   consumer: ".agents/workflows/pr-processing.md"
   mode: overlay
   reason: React on Rails adds release-train, hosted-CI, coordination, review-coverage,
     changelog-routing, and installed-helper policy, and backports the merged
-    qa-evidence v2 contract from agent-workflows commit 162e1680 with reviewed
-    strict-v2 scope clarification.
+    qa-evidence v2 contract with a reviewed structured v3 forward-gate overlay.
   consumer_mode: '100644'
   source_sha256: 7d0fbef62293d3a59e2c7a63abc6863be39ceb6883c6bc11b6a1c9747d9ad6c7
-  consumer_sha256: e8e677cf22cf321d383a017d8695ba767ed7c138a50dbb468fc6ce08ffa70675
+  consumer_sha256: 613a30bbec558c68c67f60fda497b181124ec5329ee84e7d5c57f375d3e195df
 - source: workflows/tdd.md
   consumer: ".agents/workflows/tdd.md"
   mode: overlay

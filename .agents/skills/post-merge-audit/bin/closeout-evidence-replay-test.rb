@@ -10,7 +10,13 @@ require "minitest/autorun"
 SCRIPT = File.expand_path("closeout-evidence-replay", __dir__)
 
 class CloseoutEvidenceReplayTest < Minitest::Test
-  def run_replay(body, expected_head_sha: nil, require_priority_dispositions: false, require_visual_evidence_v2: false)
+  def run_replay(
+    body,
+    expected_head_sha: nil,
+    require_priority_dispositions: false,
+    require_visual_evidence_v2: false,
+    require_structured_visual_evidence_v3: false
+  )
     Tempfile.create("closeout-evidence") do |file|
       file.write(body)
       file.flush
@@ -18,11 +24,52 @@ class CloseoutEvidenceReplayTest < Minitest::Test
       command.concat(["--expected-head-sha", expected_head_sha]) if expected_head_sha
       command << "--require-priority-dispositions" if require_priority_dispositions
       command << "--require-visual-evidence-v2" if require_visual_evidence_v2
+      command << "--require-structured-visual-evidence-v3" if require_structured_visual_evidence_v3
       command << file.path
       out, status = Open3.capture2e(*command)
       assert status.success?, out
       JSON.parse(out)
     end
+  end
+
+  def v3_marker(overrides = {})
+    fields = {
+      "required" => "yes",
+      "status" => "satisfied",
+      "head_sha" => "1111111111111111111111111111111111111111",
+      "tested_at" => "PR #123 head 1111111111111111111111111111111111111111",
+      "scope" => "current UI change",
+      "automated_checks" => "bin/validate",
+      "manual_checks" => "browser path",
+      "user_visible_ui_change" => "yes",
+      "visual_evidence_status" => "complete",
+      "visual_evidence_destination" => "github_pr",
+      "visual_evidence_url" => "https://github.com/user-attachments/assets/11111111-1111-1111-1111-111111111111",
+      "visual_baseline_status" => "captured",
+      "visual_candidate_status" => "captured",
+      "paint_check_status" => "passed",
+      "interaction_change" => "no",
+      "interaction_evidence_kind" => "not_applicable",
+      "interaction_evidence_destination" => "not_applicable",
+      "interaction_evidence_url" => "not_applicable",
+      "interaction_baseline_value" => "not_applicable",
+      "interaction_candidate_value" => "not_applicable",
+      "interaction_tolerance" => "not_applicable",
+      "visual_fix" => "no",
+      "negative_control_status" => "not_applicable",
+      "performance_impact" => "not_applicable",
+      "performance_evidence_status" => "not_applicable",
+      "performance_source_kind" => "not_applicable",
+      "performance_source_ref" => "not_applicable",
+      "performance_metric_kind" => "not_applicable",
+      "performance_baseline_value" => "not_applicable",
+      "performance_candidate_value" => "not_applicable",
+      "findings" => "none",
+      "release_blocking" => "clear",
+      "process_gap_disposition" => "checklist+replay"
+    }.merge(overrides.transform_keys(&:to_s))
+    body = fields.map { |key, value| "#{key}: #{value}" }.join("\n")
+    "<!-- qa-evidence v3\n#{body}\n-->\n"
   end
 
   def v2_marker(overrides = {})
@@ -75,6 +122,258 @@ class CloseoutEvidenceReplayTest < Minitest::Test
     assert status.success?, out
     assert_includes out, "Fail when priority evidence is missing or explicitly not_applicable"
     assert_includes out, "Fail when current UI evidence lacks the durable visual-evidence v2 contract"
+    assert_includes out, "Fail when current UI evidence lacks the structured visual-evidence v3 contract"
+  end
+
+  def test_strict_v3_visual_gate_requires_expected_head_sha
+    out, status = Open3.capture2e(
+      "ruby",
+      SCRIPT,
+      "--require-structured-visual-evidence-v3",
+      "-",
+      stdin_data: v3_marker
+    )
+
+    assert_equal 64, status.exitstatus
+    assert_includes out, "--require-structured-visual-evidence-v3 requires --expected-head-sha"
+  end
+
+  def test_strict_v3_visual_gate_rejects_v2_only_evidence
+    head_sha = "1111111111111111111111111111111111111111"
+    qa = run_replay(
+      v2_marker,
+      expected_head_sha: head_sha,
+      require_structured_visual_evidence_v3: true
+    ).fetch("qa_evidence")
+
+    assert_equal "UNKNOWN", qa.fetch("verdict")
+    assert_includes qa.fetch("missing"), "qa-evidence v3 marker required for current user-visible UI evidence"
+  end
+
+  def test_strict_v3_visual_gate_accepts_closed_vocabulary_evidence
+    qa = run_replay(
+      v3_marker,
+      expected_head_sha: "1111111111111111111111111111111111111111",
+      require_structured_visual_evidence_v3: true
+    ).fetch("qa_evidence")
+
+    assert_equal "SATISFIED", qa.fetch("verdict")
+    assert_equal 3, qa.fetch("marker_version")
+    assert_equal 2, qa.fetch("supersedes_marker_version")
+  end
+
+  def test_v3_destination_enum_binds_each_destination_to_an_exact_url_shape
+    cases = {
+      "github PR rejects another host" => {
+        "visual_evidence_destination" => "github_pr",
+        "visual_evidence_url" => "https://example.test/user-attachments/assets/111"
+      },
+      "Linear tracker rejects another host" => {
+        "visual_evidence_destination" => "linear_tracker",
+        "visual_evidence_url" => "https://example.test/acme/issue/UI-123"
+      },
+      "GitHub release rejects a non-release path" => {
+        "visual_evidence_destination" => "github_release",
+        "visual_evidence_url" => "https://github.com/example/repo/pull/123"
+      },
+      "generic legacy destination is not forward-valid" => {
+        "visual_evidence_destination" => "repo_artifact_store",
+        "visual_evidence_url" => "https://artifacts.example.test/ui-123"
+      }
+    }
+
+    cases.each do |label, overrides|
+      qa = run_replay(v3_marker(overrides)).fetch("qa_evidence")
+
+      assert_equal "UNKNOWN", qa.fetch("verdict"), label
+      assert_includes qa.fetch("missing"), "visual_evidence_url.destination", label
+    end
+  end
+
+  def test_v3_accepts_linear_tracker_and_github_release_destinations
+    cases = {
+      "linear_tracker" => "https://linear.app/example/issue/UI-123",
+      "github_release" => "https://github.com/example/repo/releases/download/evidence/ui-comparison.html"
+    }
+
+    cases.each do |destination, url|
+      qa = run_replay(
+        v3_marker(
+          "visual_evidence_destination" => destination,
+          "visual_evidence_url" => url
+        )
+      ).fetch("qa_evidence")
+
+      assert_equal "SATISFIED", qa.fetch("verdict"), destination
+    end
+  end
+
+  def test_v3_rejects_prose_in_gate_critical_status_fields
+    cases = {
+      "paint_check_status" => "passed: apparently rendered",
+      "negative_control_status" => "failure maybe observed",
+      "performance_evidence_status" => "not run",
+      "visual_evidence_status" => "complete enough"
+    }
+
+    cases.each do |field, value|
+      qa = run_replay(v3_marker(field => value)).fetch("qa_evidence")
+
+      assert_equal "UNKNOWN", qa.fetch("verdict"), field
+      assert_includes qa.fetch("missing"), field, field
+    end
+  end
+
+  def test_v3_measured_interaction_and_performance_use_typed_fields
+    qa = run_replay(
+      v3_marker(
+        "interaction_change" => "yes",
+        "interaction_evidence_kind" => "measured_substitute",
+        "interaction_baseline_value" => "52px",
+        "interaction_candidate_value" => "0px",
+        "interaction_tolerance" => "1px",
+        "visual_fix" => "yes",
+        "negative_control_status" => "observed_failure",
+        "performance_impact" => "measured_metric",
+        "performance_evidence_status" => "measured",
+        "performance_source_kind" => "repo_command",
+        "performance_source_ref" => "bin/perf-report",
+        "performance_metric_kind" => "runtime",
+        "performance_baseline_value" => "2.4s",
+        "performance_candidate_value" => "2.1s",
+        "negative_control_note" => "Any descriptive prose, including maybe and reportedly, is context only."
+      )
+    ).fetch("qa_evidence")
+
+    assert_equal "SATISFIED", qa.fetch("verdict")
+  end
+
+  def test_v3_human_attachment_state_is_explicitly_blocked
+    qa = run_replay(
+      v3_marker(
+        "status" => "blocked",
+        "visual_evidence_status" => "blocked",
+        "visual_evidence_destination" => "human_attachment_pending",
+        "visual_evidence_url" => "not_applicable",
+        "visual_baseline_status" => "pending",
+        "visual_candidate_status" => "pending",
+        "paint_check_status" => "blocked",
+        "findings" => "durable attachment pending",
+        "release_blocking" => "blocked"
+      )
+    ).fetch("qa_evidence")
+
+    assert_equal "BLOCKED", qa.fetch("verdict")
+    assert_empty qa.fetch("missing")
+  end
+
+  def test_v3_non_ui_omission_uses_explicit_not_applicable_values
+    qa = run_replay(
+      v3_marker(
+        "required" => "no",
+        "status" => "not_applicable",
+        "user_visible_ui_change" => "no",
+        "visual_evidence_status" => "not_applicable",
+        "visual_evidence_destination" => "not_applicable",
+        "visual_evidence_url" => "not_applicable",
+        "visual_baseline_status" => "not_applicable",
+        "visual_candidate_status" => "not_applicable",
+        "paint_check_status" => "not_applicable",
+        "release_blocking" => "not_applicable",
+        "process_gap_disposition" => "not applicable"
+      )
+    ).fetch("qa_evidence")
+
+    assert_equal "NOT_APPLICABLE", qa.fetch("verdict")
+    assert_empty qa.fetch("missing")
+  end
+
+  def test_v3_non_ui_change_can_still_require_bundle_evidence
+    qa = run_replay(
+      v3_marker(
+        "user_visible_ui_change" => "no",
+        "visual_evidence_status" => "not_applicable",
+        "visual_evidence_destination" => "not_applicable",
+        "visual_evidence_url" => "not_applicable",
+        "visual_baseline_status" => "not_applicable",
+        "visual_candidate_status" => "not_applicable",
+        "paint_check_status" => "not_applicable",
+        "performance_impact" => "bundle_hygiene",
+        "performance_evidence_status" => "measured",
+        "performance_source_kind" => "repo_report",
+        "performance_source_ref" => "reports/bundle-shape.json",
+        "performance_metric_kind" => "bundle_size",
+        "performance_baseline_value" => "120KB",
+        "performance_candidate_value" => "118KB"
+      )
+    ).fetch("qa_evidence")
+
+    assert_equal "SATISFIED", qa.fetch("verdict")
+    assert_empty qa.fetch("missing")
+  end
+
+  def test_v3_interaction_clip_uses_the_same_destination_binding
+    qa = run_replay(
+      v3_marker(
+        "interaction_change" => "yes",
+        "interaction_evidence_kind" => "clip",
+        "interaction_evidence_destination" => "linear_tracker",
+        "interaction_evidence_url" => "https://unrelated.example/organization/issue/UI-123"
+      )
+    ).fetch("qa_evidence")
+
+    assert_equal "UNKNOWN", qa.fetch("verdict")
+    assert_includes qa.fetch("missing"), "interaction_evidence_url.destination"
+  end
+
+  def test_v3_measured_values_require_matching_units
+    qa = run_replay(
+      v3_marker(
+        "interaction_change" => "yes",
+        "interaction_evidence_kind" => "measured_substitute",
+        "interaction_baseline_value" => "52px",
+        "interaction_candidate_value" => "0rem",
+        "interaction_tolerance" => "1px"
+      )
+    ).fetch("qa_evidence")
+
+    assert_equal "UNKNOWN", qa.fetch("verdict")
+    assert_includes qa.fetch("missing"), "interaction_evidence"
+  end
+
+  def test_strict_v3_gate_rejects_marker_name_suffixes
+    head_sha = "1111111111111111111111111111111111111111"
+
+    %w[v30 v3draft].each do |version|
+      body = v3_marker.sub("qa-evidence v3", "qa-evidence #{version}")
+      qa = run_replay(
+        body,
+        expected_head_sha: head_sha,
+        require_structured_visual_evidence_v3: true
+      ).fetch("qa_evidence")
+
+      assert_equal "UNKNOWN", qa.fetch("verdict"), version
+      assert_includes qa.fetch("missing"),
+                      "qa-evidence v3 marker required for current user-visible UI evidence",
+                      version
+    end
+  end
+
+  def test_strict_v3_gate_does_not_fall_back_to_v2_when_v3_is_stale
+    current_head = "1111111111111111111111111111111111111111"
+    stale_v3 = v3_marker(
+      "head_sha" => "2222222222222222222222222222222222222222",
+      "tested_at" => "PR #123 head 2222222222222222222222222222222222222222"
+    )
+    qa = run_replay(
+      stale_v3 + v2_marker,
+      expected_head_sha: current_head,
+      require_structured_visual_evidence_v3: true
+    ).fetch("qa_evidence")
+
+    assert_equal "UNKNOWN", qa.fetch("verdict")
+    assert_equal 3, qa.fetch("marker_version")
+    assert_includes qa.fetch("missing"), "head_sha"
   end
 
   def test_strict_visual_gate_requires_expected_head_sha
