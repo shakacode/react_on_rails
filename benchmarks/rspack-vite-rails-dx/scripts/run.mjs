@@ -155,6 +155,11 @@ async function startApp(tool, label) {
   try {
     const url = `http://127.0.0.1:${webPort}${tool === 'rspack' ? '/hello_world' : '/'}`;
     await waitForHttp(url, child, () => logTail);
+    const assetUrl =
+      tool === 'rspack'
+        ? `http://127.0.0.1:${assetPort}/packs/js/runtime.js`
+        : `http://127.0.0.1:${assetPort}/vite-dev/@vite/client`;
+    await waitForHttp(assetUrl, child, () => logTail);
     page = await browser.newPage();
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
     await page.locator('[data-benchmark-marker]').filter({ hasText: marker }).waitFor({ timeout: 30_000 });

@@ -3,6 +3,7 @@ import path from 'node:path';
 
 const temporaryDirectoryName = '.work';
 const excludedNames = new Set(['.bundle', '.overmind.sock', 'log', 'node_modules', 'tmp', 'vendor']);
+const excludedRelativePaths = ['public/packs', 'public/vite', 'public/vite-dev', 'ssr-generated'];
 
 export async function prepareWorkspaces(root) {
   await rm(path.join(root, temporaryDirectoryName), { recursive: true, force: true });
@@ -15,7 +16,12 @@ export async function createWorkspace(root, tool, nonce) {
   await cp(source, destination, {
     recursive: true,
     filter(candidate) {
-      return candidate === source || !excludedNames.has(path.basename(candidate));
+      if (candidate === source) return true;
+      const relative = path.relative(source, candidate);
+      if (excludedNames.has(path.basename(candidate))) return false;
+      return !excludedRelativePaths.some(
+        (excluded) => relative === excluded || relative.startsWith(`${excluded}${path.sep}`),
+      );
     },
   });
   const dependencyPath = path.join(source, 'node_modules');
