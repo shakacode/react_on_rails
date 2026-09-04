@@ -170,6 +170,8 @@ module CloseoutEvidenceReplay
         unknown("qa-evidence v3 marker required for current user-visible UI evidence")
       elsif require_visual_evidence_v2 && expected_head_sha.nil?
         unknown("--require-visual-evidence-v2 requires expected_head_sha")
+      elsif require_visual_evidence_v2 && applicable_v3_markers.any?
+        replay_qa_markers(applicable_v3_markers, expected_head_sha: expected_head_sha, version: 3)
       elsif require_visual_evidence_v2 && qa_v2_markers.any?
         replay_qa_markers(qa_v2_markers, expected_head_sha: expected_head_sha, version: 2)
       elsif require_visual_evidence_v2

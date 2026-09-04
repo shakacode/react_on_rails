@@ -580,6 +580,51 @@ class CloseoutEvidenceReplayTest < Minitest::Test
     assert_includes out, "--require-visual-evidence-v2 requires --expected-head-sha"
   end
 
+  def test_strict_v2_visual_gate_accepts_current_v3_evidence
+    qa = run_replay(
+      v3_marker,
+      expected_head_sha: "1111111111111111111111111111111111111111",
+      require_visual_evidence_v2: true
+    ).fetch("qa_evidence")
+
+    assert_equal "SATISFIED", qa.fetch("verdict")
+    assert_equal 3, qa.fetch("marker_version")
+    assert_empty qa.fetch("missing")
+  end
+
+  def test_strict_v2_visual_gate_validates_v3_instead_of_rescuing_it_with_v2
+    qa = run_replay(
+      v3_marker("paint_check_status" => "not_run") + v2_marker,
+      expected_head_sha: "1111111111111111111111111111111111111111",
+      require_visual_evidence_v2: true
+    ).fetch("qa_evidence")
+
+    assert_equal "UNKNOWN", qa.fetch("verdict")
+    assert_equal 3, qa.fetch("marker_version")
+    assert_includes qa.fetch("missing"), "paint_check_status"
+  end
+
+  def test_strict_v2_visual_gate_rejects_stale_v3_only_evidence
+    qa = run_replay(
+      v3_marker("head_sha" => "2222222222222222222222222222222222222222"),
+      expected_head_sha: "1111111111111111111111111111111111111111",
+      require_visual_evidence_v2: true
+    ).fetch("qa_evidence")
+
+    assert_equal "UNKNOWN", qa.fetch("verdict")
+  end
+
+  def test_strict_v2_visual_gate_rejects_non_ui_v3_evidence
+    qa = run_replay(
+      v3_marker("user_visible_ui_change" => "no"),
+      expected_head_sha: "1111111111111111111111111111111111111111",
+      require_visual_evidence_v2: true
+    ).fetch("qa_evidence")
+
+    assert_equal "UNKNOWN", qa.fetch("verdict")
+    assert_includes qa.fetch("missing"), "user_visible_ui_change"
+  end
+
   def test_strict_visual_gate_requires_ui_change_yes
     data = run_replay(
       v2_marker(
