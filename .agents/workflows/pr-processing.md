@@ -690,8 +690,8 @@ For each user-visible UI change:
    interaction change, use `interaction_evidence_kind: clip` with a durable URL
    and matching destination, or `measured_substitute` with explicit baseline,
    candidate, and tolerance fields. Every measured value requires the same
-   unit. Stills or incidental numbers in URLs do not satisfy an interaction
-   claim.
+   unit, and the tolerance must be non-negative. Stills or incidental numbers
+   in URLs do not satisfy an interaction claim.
 5. For a visual fix, exercise an intentionally unfixed negative control and
    record the observed failing assertion or mismatch. If no visual fix is in
    scope, give a reasoned `not applicable`.

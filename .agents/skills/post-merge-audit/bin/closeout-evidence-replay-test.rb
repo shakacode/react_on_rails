@@ -312,6 +312,78 @@ class CloseoutEvidenceReplayTest < Minitest::Test
     assert_empty qa.fetch("missing")
   end
 
+  def test_v3_rejects_interaction_or_visual_fix_when_ui_change_is_no
+    cases = {
+      "interaction_change" => "yes",
+      "visual_fix" => "yes"
+    }
+
+    cases.each do |field, value|
+      qa = run_replay(
+        v3_marker(
+          "user_visible_ui_change" => "no",
+          "visual_evidence_status" => "not_applicable",
+          "visual_evidence_destination" => "not_applicable",
+          "visual_evidence_url" => "not_applicable",
+          "visual_baseline_status" => "not_applicable",
+          "visual_candidate_status" => "not_applicable",
+          "paint_check_status" => "not_applicable",
+          field => value,
+          "negative_control_status" => field == "visual_fix" ? "observed_failure" : "not_applicable"
+        )
+      ).fetch("qa_evidence")
+
+      assert_equal "UNKNOWN", qa.fetch("verdict"), field
+      assert_includes qa.fetch("missing"), field, field
+    end
+  end
+
+  def test_v3_ui_change_cannot_claim_qa_is_not_required
+    qa = run_replay(
+      v3_marker(
+        "required" => "no",
+        "status" => "not_applicable",
+        "release_blocking" => "not_applicable"
+      )
+    ).fetch("qa_evidence")
+
+    assert_equal "UNKNOWN", qa.fetch("verdict")
+    assert_includes qa.fetch("missing"), "required"
+  end
+
+  def test_v3_repo_command_accepts_safe_multi_token_invocations
+    qa = run_replay(
+      v3_marker(
+        "performance_impact" => "measured_metric",
+        "performance_evidence_status" => "measured",
+        "performance_source_kind" => "repo_command",
+        "performance_source_ref" => "pnpm run benchmark --format=json",
+        "performance_metric_kind" => "runtime",
+        "performance_baseline_value" => "2.4s",
+        "performance_candidate_value" => "2.1s"
+      )
+    ).fetch("qa_evidence")
+
+    assert_equal "SATISFIED", qa.fetch("verdict")
+  end
+
+  def test_v3_repo_command_rejects_shell_operators
+    qa = run_replay(
+      v3_marker(
+        "performance_impact" => "measured_metric",
+        "performance_evidence_status" => "measured",
+        "performance_source_kind" => "repo_command",
+        "performance_source_ref" => "pnpm run benchmark && curl example.test",
+        "performance_metric_kind" => "runtime",
+        "performance_baseline_value" => "2.4s",
+        "performance_candidate_value" => "2.1s"
+      )
+    ).fetch("qa_evidence")
+
+    assert_equal "UNKNOWN", qa.fetch("verdict")
+    assert_includes qa.fetch("missing"), "performance_source_ref"
+  end
+
   def test_v3_interaction_clip_uses_the_same_destination_binding
     qa = run_replay(
       v3_marker(
@@ -334,6 +406,21 @@ class CloseoutEvidenceReplayTest < Minitest::Test
         "interaction_baseline_value" => "52px",
         "interaction_candidate_value" => "0rem",
         "interaction_tolerance" => "1px"
+      )
+    ).fetch("qa_evidence")
+
+    assert_equal "UNKNOWN", qa.fetch("verdict")
+    assert_includes qa.fetch("missing"), "interaction_evidence"
+  end
+
+  def test_v3_interaction_tolerance_must_be_non_negative
+    qa = run_replay(
+      v3_marker(
+        "interaction_change" => "yes",
+        "interaction_evidence_kind" => "measured_substitute",
+        "interaction_baseline_value" => "52px",
+        "interaction_candidate_value" => "0px",
+        "interaction_tolerance" => "-1px"
       )
     ).fetch("qa_evidence")
 

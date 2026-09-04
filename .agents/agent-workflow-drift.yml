@@ -96,7 +96,7 @@ files:
     and retains its reviewed shared-workflow inventory boundary.
   consumer_mode: '100755'
   source_sha256: b2110347ace4cca5b39a03fddc054542b528aae8a6d45c37f445ee078a687d37
-  consumer_sha256: 19797ad600ad0dcb3944c14f3b49454d3171e6928ee91b36a64e35b6cabed1e9
+  consumer_sha256: 013fb0f9cd2f37a13de1b628c78dc6bac4f922d750e058e1a6df1a7671d18389
 - source: skills/post-merge-audit/bin/closeout-evidence-replay-test.rb
   consumer: ".agents/skills/post-merge-audit/bin/closeout-evidence-replay-test.rb"
   mode: overlay
@@ -104,7 +104,7 @@ files:
     and adds structured v3 forward-gate contract tests.
   consumer_mode: '100755'
   source_sha256: 35b3558bca3d49ac2032fc8b2a422877237e9f473f5d779f916e8ed8242bc60f
-  consumer_sha256: 57d0bb85829722c6ef61f6bfb161f83f494bd0125885582f4ee612461425aa7c
+  consumer_sha256: 3921a7cdb102d1176f77164ca62bf7dd76013815daadc7be763c2db3dd2cd133
 - source: skills/post-merge-audit/bin/post-merge-audit-scope
   consumer: ".agents/skills/post-merge-audit/bin/post-merge-audit-scope"
   mode: identical
@@ -225,7 +225,7 @@ files:
     qa-evidence v2 contract with a reviewed structured v3 forward-gate overlay.
   consumer_mode: '100644'
   source_sha256: 7d0fbef62293d3a59e2c7a63abc6863be39ceb6883c6bc11b6a1c9747d9ad6c7
-  consumer_sha256: 613a30bbec558c68c67f60fda497b181124ec5329ee84e7d5c57f375d3e195df
+  consumer_sha256: 24ceb84ef558ede1b8fdffee6537680ea8568ddbc6bf748f5bd5a599e31c7017
 - source: workflows/tdd.md
   consumer: ".agents/workflows/tdd.md"
   mode: overlay

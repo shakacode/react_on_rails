@@ -460,6 +460,7 @@ module CloseoutEvidenceReplay
     baseline = values.fetch("visual_baseline_status")
     candidate = values.fetch("visual_candidate_status")
     paint = values.fetch("paint_check_status")
+    missing << "required" if ui_change == "yes" && fields.fetch("required", "") != "yes"
 
     if ui_change == "no"
       {
@@ -470,6 +471,8 @@ module CloseoutEvidenceReplay
         "visual_candidate_status" => candidate,
         "paint_check_status" => paint
       }.each { |field, value| missing << field unless value == "not_applicable" }
+      missing << "interaction_change" unless values.fetch("interaction_change") == "no"
+      missing << "visual_fix" unless values.fetch("visual_fix") == "no"
     elsif ui_change == "yes" && status == "complete"
       missing << "visual_evidence_destination" unless durable_structured_destination?(destination)
       missing << "visual_evidence_url.destination" unless structured_destination_url?(destination, url)
@@ -588,7 +591,9 @@ module CloseoutEvidenceReplay
 
   def valid_structured_source_ref?(kind, value)
     case kind
-    when "repo_command", "repo_report"
+    when "repo_command"
+      valid_repo_command_ref?(value)
+    when "repo_report"
       !value.match?(UNRESOLVED_PLACEHOLDER) && value.match?(%r{\A[A-Za-z0-9][A-Za-z0-9._:#@/-]*\z})
     when "github_artifact"
       structured_destination_url?("github_release", value)
@@ -599,7 +604,16 @@ module CloseoutEvidenceReplay
 
   def validate_measurement_triple(baseline, candidate, tolerance, field, missing)
     measurements = [baseline, candidate, tolerance].map { |value| parse_measurement(value) }
-    missing << field unless measurements.all? && measurements.map { |measurement| measurement.fetch(1) }.uniq.one?
+    valid = measurements.all? && measurements.map { |measurement| measurement.fetch(1) }.uniq.one?
+    valid &&= !measurements.last.fetch(0).start_with?("-") if valid
+    missing << field unless valid
+  end
+
+  def valid_repo_command_ref?(value)
+    return false if value.match?(UNRESOLVED_PLACEHOLDER)
+
+    command_token = %r{(?:[A-Za-z0-9][A-Za-z0-9._:@=,+%/-]*|--?[A-Za-z0-9][A-Za-z0-9._:@=,+%/-]*)}
+    value.match?(/\A#{command_token}(?: #{command_token})*\z/)
   end
 
   def validate_measurement_pair(baseline, candidate, field, missing, metric_kind:)
