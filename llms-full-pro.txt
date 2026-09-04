@@ -6041,17 +6041,24 @@ const ProductCard = unstable_cache(
 );
 ```
 
+The example assumes the product output is shared across callers. A cache hit returns the stored
+payload without running the callback, including `loadProduct`. Run authorization checks on every
+request **before** invoking the cached function, not inside its callback. Derive tenant or user scope
+from authenticated server context, and include any scope or personalization that changes the rendered
+output in the function arguments. Cache-key scoping does not replace authorization.
+
 The options are:
 
-- `id` (required): a stable identifier for the cached function.
+- `id` (required): a stable identifier that is unique to each cached function sharing a handler within
+  a build. Two functions with the same ID and arguments produce the same cache key.
 - `revalidate`: the entry lifetime in seconds. The default `0` means that the cache handler does not
   expire the entry by time.
 - `kind`: the registered cache-handler name. The default is `default`, which uses an in-memory LRU
   cache in each Node Renderer worker.
 
 The cache key includes the build ID, function ID, and function arguments. Arguments must use the
-supported deterministic value types. Circular references, functions, symbols, and class instances
-are not supported.
+supported deterministic value types. Supported built-in instances include `Date`, `Map`, and `Set`.
+Circular references, functions, symbols, and arbitrary custom class instances are not supported.
 
 ## Use Shared Storage
 
