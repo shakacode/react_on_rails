@@ -302,6 +302,29 @@ module ReactOnRails
       end
 
       describe ".read_bundle_js_code" do
+        def stub_http_bundle_failure(error, bundle_url: "http://localhost:3035/webpack/development/server-bundle.js")
+          allow(ReactOnRails::Utils).to receive_messages(
+            server_bundle_js_file_path: bundle_url,
+            server_bundle_path_is_http?: true
+          )
+          allow(Net::HTTP).to receive(:get_response).and_raise(error)
+        end
+
+        def stub_local_bundle_failure(error, bundle_path: "/tmp/server-bundle.js")
+          allow(ReactOnRails::Utils).to receive_messages(
+            server_bundle_js_file_path: bundle_path,
+            server_bundle_path_is_http?: false
+          )
+          allow(File).to receive(:read).with(bundle_path).and_raise(error)
+        end
+
+        def bundle_load_error_message
+          described_class.read_bundle_js_code
+          raise "expected read_bundle_js_code to raise"
+        rescue ReactOnRails::ServerBundleLoadError => e
+          e.message
+        end
+
         it "raises a bundle-load error when an HTTP server bundle cannot be read" do
           server_bundle_url = "http://localhost:3035/webpack/development/server-bundle.js"
 
@@ -393,55 +416,439 @@ module ReactOnRails
         context "when the HTTP-served bundle URL embeds credentials and the connection fails" do
           it "does not leak the credential into the raised error message" do
             server_bundle_url = "http://bundle-user:s3cr3t@localhost:3035/webpack/development/server-bundle.js"
-
-            allow(ReactOnRails::Utils).to receive_messages(
-              server_bundle_js_file_path: server_bundle_url,
-              server_bundle_path_is_http?: true
-            )
-            allow(Net::HTTP).to receive(:get_response).and_raise(
-              Errno::ECONNREFUSED.new("connect(2) for localhost:3035")
+            stub_http_bundle_failure(
+              Errno::ECONNREFUSED.new("connect(2) for localhost:3035"),
+              bundle_url: server_bundle_url
             )
 
-            expect do
-              described_class.read_bundle_js_code
-            end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
-              expect(error.message).not_to include("s3cr3t")
-              expect(error.message).not_to include("bundle-user")
-              expect(error.message).to include("localhost:3035")
-              expect(error.message).to include("cannot be read")
-            }
+            message = bundle_load_error_message
+            expect(message).not_to include("s3cr3t")
+            expect(message).not_to include("bundle-user")
+            expect(message).to include("localhost:3035")
+            expect(message).to include("cannot be read")
           end
         end
 
         # A URL malformed enough that URI.parse itself raises (e.g. a space in the host) fails
-        # before sanitized_renderer_url is ever applied to the `url` variable at the raise site —
+        # before DiagnosticUrlRedactor is ever applied to the `url` variable at the raise site —
         # URI::InvalidURIError's own message embeds the original credential-bearing string
         # verbatim, so that message must be scrubbed independently of the url variable.
         context "when the HTTP-served bundle URL embeds credentials and is malformed enough to fail URI parsing" do
           it "does not leak the credential into the raised error message" do
             server_bundle_url = "http://bundle-user:s3cr3t@bad host/webpack/development/server-bundle.js"
+            stub_http_bundle_failure("connection failed", bundle_url: server_bundle_url)
 
-            allow(ReactOnRails::Utils).to receive_messages(
-              server_bundle_js_file_path: server_bundle_url,
-              server_bundle_path_is_http?: true
-            )
+            message = bundle_load_error_message
+            expect(message).not_to include("s3cr3t")
+            expect(message).not_to include("bundle-user")
+            # The error must still say the URL was malformed and show enough of it (host/path
+            # minus credentials) for an operator to identify which configured URL failed.
+            expect(message).to include("bad URI")
+            expect(message).to include("bad host")
+          end
+        end
 
-            expect do
-              described_class.read_bundle_js_code
-            end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
-              expect(error.message).not_to include("s3cr3t")
-              expect(error.message).not_to include("bundle-user")
-              # The error must still say the URL was malformed and show enough of it (host/path
-              # minus credentials) for an operator to identify which configured URL failed.
-              expect(error.message).to include("bad URI")
-              expect(error.message).to include("bad host")
-            }
+        # Keep one public-entry integration pass for each confirmed leak class. The exhaustive
+        # sanitizer permutations live with DiagnosticUrlRedactor; these examples verify that
+        # read_bundle_js_code routes configured values and wrapped errors through that seam.
+        context "when configured bundle values exercise credential-redaction boundaries" do
+          [
+            [
+              "whitespace in the HTTP scheme delimiter",
+              "http ://synthetic-user:synthetic-secret@host/path",
+              false,
+              "http ://host/path"
+            ],
+            [
+              "whitespace around a literal colon before encoded authority separators",
+              "http : %2F%2Fsynthetic-user:synthetic-secret%40host/path",
+              false,
+              "http : %2F%2Fhost/path"
+            ],
+            [
+              "whitespace before an encoded colon and encoded authority separators",
+              "http %3A%2F%2Fsynthetic-user:synthetic-secret%40host/path",
+              false,
+              "http %3A%2F%2Fhost/path"
+            ],
+            [
+              "a partially encoded HTTP scheme before a whitespace-delimited encoded colon",
+              "h%74tp %3A%2F%2Fsynthetic-user:synthetic-secret%40host/path",
+              false,
+              "h%74tp %3A%2F%2Fhost/path"
+            ],
+            [
+              "an encoded whitespace token before an internal HTTP scheme",
+              "%20http %3A%2F%2Fsynthetic-user:synthetic-secret%40host/path",
+              false,
+              "%20http %3A%2F%2Fhost/path"
+            ],
+            [
+              "encoded text and a boundary token before an internal HTTP scheme",
+              "%61%3Dhttp %3A%2F%2Fsynthetic-user:synthetic-secret%40host/path",
+              false,
+              "%61%3Dhttp %3A%2F%2Fhost/path"
+            ],
+            [
+              "invalid percent text and a boundary before a partially encoded HTTP scheme",
+              "%GG%20h%74tp %3A/%2Fsynthetic-user:synthetic-secret@host/path",
+              false,
+              "%GG%20h%74tp %3A/%2Fhost/path"
+            ],
+            [
+              "an internal HTTP scheme after an encoded boundary in an outer URL",
+              "http://outer.test/path?next=%61%20http %3A%2F%2Fnested-user:nested-secret%40nested.test/path",
+              true,
+              "http://outer.test/path?next=%61%20http %3A%2F%2Fnested.test/path"
+            ],
+            [
+              "whitespace before fully encoded authority separators",
+              "http: %2F%2Fsynthetic-user:synthetic-secret%40host/path",
+              false,
+              "http: %2F%2Fhost/path"
+            ],
+            [
+              "whitespace before a literal and encoded authority separator",
+              "http: /%2Fsynthetic-user:synthetic-secret%40host/path",
+              false,
+              "http: /%2Fhost/path"
+            ],
+            [
+              "whitespace before an encoded and literal authority separator",
+              "http: %2F/synthetic-user:synthetic-secret%40host/path",
+              false,
+              "http: %2F/host/path"
+            ],
+            [
+              "whitespace between encoded authority separators",
+              "http:%2F %2Fsynthetic-user:synthetic-secret%40host/path",
+              false,
+              "http:%2F %2Fhost/path"
+            ],
+            [
+              "encoded whitespace before encoded authority separators",
+              "http:%20%2F%2Fsynthetic-user:synthetic-secret%40host/path",
+              false,
+              "http:%20%2F%2Fhost/path"
+            ],
+            [
+              "encoded whitespace between encoded authority separators",
+              "http:%2F%20%2Fsynthetic-user:synthetic-secret%40host/path",
+              false,
+              "http:%2F%20%2Fhost/path"
+            ],
+            [
+              "mixed literal and encoded whitespace around mixed authority separators",
+              "h%74tp \t%20%3A%0A/%09%2Fsynthetic-user:synthetic-secret%40host/path",
+              false,
+              "h%74tp \t%20%3A%0A/%09%2Fhost/path"
+            ],
+            [
+              "encoded then literal whitespace before an encoded colon",
+              "%68%74%74%70%20 %3A%2F%2Fsynthetic-user:synthetic-secret%40host/path",
+              false,
+              "%68%74%74%70%20 %3A%2F%2Fhost/path"
+            ],
+            [
+              "a percent-encoded authority delimiter",
+              "http://bundle-user:synthetic-password%40host/bundle.js",
+              true,
+              "http://host/bundle.js"
+            ],
+            [
+              "fully encoded HTTP authority separators",
+              "http:%2F%2Fbundle-user:synthetic-password%40host/bundle.js",
+              false,
+              "http:%2F%2Fhost/bundle.js"
+            ],
+            [
+              "fully encoded outer and nested URL credentials",
+              "http%3A%2F%2Fouter-user%3Aouter-secret%40outer.test%2Fredirect%3Fnext%3D" \
+              "ftp%3A%2F%2Fnested-user%3Anested-secret%40nested.test%2Fpath",
+              false,
+              "http%3A%2F%2Fouter.test%2Fredirect%3Fnext%3Dftp%3A%2F%2Fnested.test%2Fpath"
+            ],
+            [
+              "literal outer and encoded nested authority separators",
+              "http%3A//bundle-user%3Asynthetic-password%40outer.test%2Fnext%3D" \
+              "ftp%3A%2F%2Fnested-user%3Anested-secret%40inner.test/path",
+              false,
+              "http%3A//outer.test%2Fnext%3Dftp%3A%2F%2Finner.test/path"
+            ],
+            [
+              "mixed encoded and literal authority delimiters",
+              "http://synthetic-user%40mail:synthetic-secret@host/path",
+              true,
+              "http://host/path"
+            ],
+            [
+              "whitespace after a bare authority marker",
+              "// synthetic-user:synthetic-secret@host/path",
+              false,
+              "//host/path"
+            ],
+            [
+              "bare authority-relative userinfo",
+              "//synthetic-user:synthetic-secret@host/path",
+              false,
+              "//host/path"
+            ],
+            [
+              "a prefix and whitespace before authority-relative userinfo",
+              "URL=// synthetic-user:synthetic-secret@host/path",
+              false,
+              "URL=//host/path"
+            ],
+            [
+              "prefixed authority-relative userinfo",
+              "URL=//synthetic-user:synthetic-secret@host/path",
+              false,
+              "URL=//host/path"
+            ],
+            [
+              "userinfo after an earlier authority-relative URL",
+              "URL= //safe/path//bundle-user:synthetic-password@host/bundle.js",
+              false,
+              "URL= //safe/path//host/bundle.js"
+            ],
+            [
+              "userinfo spanning a later authority marker",
+              "URL= //bundle-user:synthetic-password//suffix@host/bundle.js",
+              false,
+              "URL= //host/bundle.js"
+            ],
+            [
+              "a nested non-HTTP URL",
+              "http://outer.test/redirect?next=ftp://nested-user:nested-secret@nested.test/path",
+              true,
+              "http://outer.test/redirect?next=ftp://nested.test/path"
+            ],
+            [
+              "a fully encoded nested URL",
+              "http://outer.test/redirect?next=" \
+              "ftp%3A%2F%2Fnested-user%3Anested-secret%40nested.test%2Fpath",
+              true,
+              "http://outer.test/redirect?next=ftp%3A%2F%2Fnested.test%2Fpath"
+            ],
+            [
+              "an encoded nested scheme and authority marker",
+              "http://outer.test/redirect?next=" \
+              "ftp%3A%2F%2Fnested-user:nested-secret@nested.test/path",
+              true,
+              "http://outer.test/redirect?next=ftp%3A%2F%2Fnested.test/path"
+            ],
+            [
+              "a partially encoded nested URL and encoded at sign",
+              "http://outer.test/redirect?next=" \
+              "f%74p%3A%2F%2Fnested-user:nested-secret%40nested.test/path",
+              true,
+              "http://outer.test/redirect?next=f%74p%3A%2F%2Fnested.test/path"
+            ],
+            [
+              "a nested URL with only the at sign encoded",
+              "http://outer.test/redirect?next=" \
+              "ftp://nested-user:nested-secret%40nested.test/path",
+              true,
+              "http://outer.test/redirect?next=ftp://nested.test/path"
+            ],
+            [
+              "nested userinfo spanning a quote",
+              'http://outer.test/redirect?next=ftp://nested-user"nested-secret@nested.test/path',
+              true,
+              "nested.test/path"
+            ],
+            [
+              "nested userinfo spanning whitespace",
+              "http://outer.test/redirect?next=ftp://nested-user nested-secret@nested.test/path",
+              true,
+              "nested.test/path"
+            ],
+            [
+              "nested userinfo spanning a single quote",
+              "http://outer.test/redirect?next=ftp://nested-user'nested-secret@nested.test/path",
+              true,
+              "nested.test/path"
+            ],
+            [
+              "nested userinfo spanning whitespace before an encoded at sign",
+              "http://outer.test/redirect?next=ftp://nested-user nested-secret%40nested.test/path",
+              true,
+              "nested.test/path"
+            ],
+            [
+              "malformed userinfo spanning a line break",
+              "http://synthetic-user\nsynthetic-secret@host/path",
+              false,
+              "http://host/path"
+            ],
+            [
+              "an unresolved scheme before a credential URL",
+              "http://synthetic-user:nonnumeric-prefixhttp://synthetic-secret@host/path",
+              true,
+              "http://host/path"
+            ],
+            [
+              "credential-like text before a later HTTP URL",
+              "synthetic-user:synthetic-secret@host http://actual-host/path",
+              false,
+              "host http://actual-host/path"
+            ]
+          ].each do |description, configured_value, http_path, expected|
+            it "redacts #{description}" do
+              if http_path
+                stub_http_bundle_failure("connection failed", bundle_url: configured_value)
+              else
+                stub_local_bundle_failure(Errno::ENOENT.new(configured_value), bundle_path: configured_value)
+              end
+
+              message = bundle_load_error_message
+              expect(message).not_to match(/(?:synthetic|nested|bundle)-(?:user|secret|password)/)
+              expect(message).to include(expected)
+            end
+          end
+        end
+
+        context "when wrapped errors exercise credential-redaction boundaries" do
+          [
+            [
+              "a non-HTTP URL",
+              "Failure loading postgres://synthetic-user:synthetic-secret@host/path",
+              "Failure loading postgres://host/path"
+            ],
+            [
+              "a nested non-HTTP URL",
+              "Failure loading http://outer.test/redirect?next=" \
+              "ftp://nested-user:nested-secret@nested.test/path",
+              "Failure loading http://outer.test/redirect?next=ftp://nested.test/path"
+            ],
+            [
+              "a fully encoded nested URL",
+              "Failure loading http://outer.test/redirect?next=" \
+              "ftp%3A%2F%2Fnested-user%3Anested-secret%40nested.test%2Fpath",
+              "Failure loading http://outer.test/redirect?next=ftp%3A%2F%2Fnested.test%2Fpath"
+            ],
+            [
+              "nested userinfo spanning a quote before an encoded at sign",
+              "Failure loading http://outer.test/redirect?next=" \
+              'ftp://nested-user"nested-secret%40nested.test/path',
+              "nested.test/path"
+            ],
+            [
+              "authority-relative userinfo spanning whitespace",
+              "Failure loading //synthetic-user synthetic-secret@host/path",
+              "Failure loading //host/path"
+            ],
+            [
+              "authority-relative userinfo spanning a double quote",
+              'Failure loading //synthetic-user" synthetic-secret@host/path',
+              "Failure loading //host/path"
+            ],
+            [
+              "authority-relative userinfo spanning a single quote",
+              "Failure loading //synthetic-user' synthetic-secret@host/path",
+              "Failure loading //host/path"
+            ],
+            [
+              "authority-relative userinfo spanning a line break",
+              "Failure loading //synthetic-user\nsynthetic-secret@host/path",
+              "Failure loading //host/path"
+            ]
+          ].each do |description, failure_message, expected|
+            it "redacts #{description}" do
+              stub_local_bundle_failure(failure_message)
+
+              message = bundle_load_error_message
+              expect(message).not_to match(/(?:synthetic|nested)-(?:user|secret)/)
+              expect(message).to include(expected)
+            end
+          end
+        end
+
+        context "when URI parsing raises another URI::Error subtype" do
+          it "redacts configured credentials through the public entrypoint" do
+            server_bundle_url = "http://synthetic-user:synthetic-secret@host/path"
+            allow(URI).to receive(:parse).and_call_original
+            allow(URI).to receive(:parse).with(server_bundle_url)
+                                         .and_raise(URI::BadURIError, "bad URI for #{server_bundle_url}")
+            stub_http_bundle_failure("connection failed", bundle_url: server_bundle_url)
+
+            message = bundle_load_error_message
+            expect(message).not_to match(/synthetic-(?:user|secret)/)
+            expect(message).to include("bad URI for http://host/path")
+          end
+        end
+
+        context "when URI parsing raises ArgumentError" do
+          it "still raises a sanitized bundle-load error through the public entrypoint" do
+            server_bundle_url = "http://synthetic-user:synthetic-secret@host/path"
+            allow(URI).to receive(:parse).and_call_original
+            allow(URI).to receive(:parse).with(server_bundle_url)
+                                         .and_raise(ArgumentError, "invalid byte sequence in UTF-8")
+            stub_http_bundle_failure("connection failed", bundle_url: server_bundle_url)
+
+            message = bundle_load_error_message
+            expect(message).not_to match(/synthetic-(?:user|secret)/)
+            expect(message).to include("invalid byte sequence in UTF-8")
+            expect(message).to include("http://host/path")
+          end
+        end
+
+        context "when the configured URL has invalid UTF-8 bytes" do
+          it "still raises a sanitized bundle-load error through the public entrypoint" do
+            server_bundle_url = "http://synthetic-user:synthetic-secret@host/path-\xFF".b
+                                                                                       .force_encoding(Encoding::UTF_8)
+            stub_http_bundle_failure("connection failed", bundle_url: server_bundle_url)
+
+            message = bundle_load_error_message
+            expect(message).not_to match(/synthetic-(?:user|secret)/)
+            expect(message).to include("http://host/path-")
+          end
+        end
+
+        it "redacts a credential URL near the end of a large wrapped diagnostic" do
+          safe_part = "part=ftp%3A%2F%2Fnested.test%2Fchunk"
+          encoded_padding = Array.new(1_800, safe_part).join("&")
+          nested_url = "ftp%3A%2F%2Fnested-user%3Anested-secret%40nested.test%2Fpath"
+          failure_message = "Failure loading http://outer.test/redirect?#{encoded_padding}&next=#{nested_url}"
+          expect(failure_message.bytesize).to be > 65_536
+          stub_http_bundle_failure(failure_message)
+
+          message = bundle_load_error_message
+          expect(message).not_to match(/nested-(?:user|secret)/)
+          expect(message).to include("next=ftp%3A%2F%2Fnested.test%2Fpath")
+        end
+
+        it "preserves replacement metacharacters while sanitizing the wrapped error" do
+          server_bundle_path = %q(/tmp/\k<foo>-\1-\&-\0-literal\backslash/server-bundle.js)
+          failure_message = "raw=#{server_bundle_path} inspected=#{server_bundle_path.inspect} " \
+                            "credential=http://synthetic-user:synthetic-secret@host/path"
+          stub_local_bundle_failure(failure_message, bundle_path: server_bundle_path)
+
+          message = bundle_load_error_message
+          expect(message).to include(server_bundle_path)
+          expect(message).not_to match(/synthetic-(?:user|secret)/)
+          expect(message).to include("http://host/path")
+        end
+
+        context "when diagnostics contain safe at signs or double slashes" do
+          it "preserves an at sign that appears only in a configured URL path" do
+            configured_value = "http://host/path@example"
+            stub_http_bundle_failure("connection failed", bundle_url: configured_value)
+
+            expect(bundle_load_error_message).to include(configured_value)
+          end
+
+          it "preserves non-URL double-slash text" do
+            failure_message = "// contact dev@example"
+            stub_local_bundle_failure(failure_message)
+
+            expect(bundle_load_error_message).to include(failure_message)
           end
         end
 
         # read_bundle_js_code also serves the local (non-HTTP) bundle path, where
         # server_bundle_js_file is a plain filesystem path rather than a URL.
-        # sanitized_renderer_url must pass such paths through unchanged (no embedded userinfo to
+        # DiagnosticUrlRedactor must pass such paths through unchanged (no embedded userinfo to
         # strip) so this fix doesn't regress the diagnostic message for the far more common
         # local-file configuration.
         context "when the local (non-HTTP) bundle file cannot be read" do

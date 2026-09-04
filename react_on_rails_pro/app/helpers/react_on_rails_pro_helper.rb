@@ -1467,22 +1467,37 @@ module ReactOnRailsProHelper
     error_signal = rsc_payload_rendering_error_signal?(metadata)
     return metadata unless error_signal || metadata.key?("renderingError")
 
-    redacted = metadata.except("renderingError")
-    # Preserve a generic failure signal so client error boundaries still fire. `hasErrors` is
-    # forced true when only a non-blank message/stack indicated the failure, matching the
-    # inline path's redacted branch.
-    redacted["hasErrors"] = true if error_signal
-    redacted
+    # A structurally valid blank renderingError is not an error. Remove that inert server-only
+    # object, but preserve clean-chunk metadata such as console replay.
+    return metadata.except("renderingError") unless error_signal
+
+    # Match the inline path's production allowlist exactly. Error chunks may carry sensitive
+    # details in console replay or future metadata fields, so forwarding every field except the
+    # known renderingError key would fail open as the producer evolves.
+    { "hasErrors" => error_signal }
   end
 
   def rsc_payload_rendering_error_signal?(metadata)
-    return true if metadata["hasErrors"] == true
+    if metadata.key?("hasErrors")
+      has_errors = metadata["hasErrors"]
+      return true unless [true, false].include?(has_errors)
+      return true if has_errors
+    end
+
+    return false unless metadata.key?("renderingError")
 
     rendering_error = metadata["renderingError"]
-    return false unless rendering_error.is_a?(Hash)
+    return true if malformed_rsc_rendering_error?(rendering_error)
 
     non_blank_rsc_metadata_string?(rendering_error["message"]) ||
       non_blank_rsc_metadata_string?(rendering_error["stack"])
+  end
+
+  def malformed_rsc_rendering_error?(rendering_error)
+    return true unless rendering_error.is_a?(Hash)
+
+    diagnostic_fields = rendering_error.slice("message", "stack")
+    diagnostic_fields.empty? || diagnostic_fields.any? { |_key, value| !value.is_a?(String) }
   end
 
   def non_blank_rsc_metadata_string?(value)

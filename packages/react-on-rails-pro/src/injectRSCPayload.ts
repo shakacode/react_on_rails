@@ -96,6 +96,45 @@ function hasRenderingErrorSignal(renderingError: unknown) {
   return nonEmptyMetadataString(message) || nonEmptyMetadataString(stack);
 }
 
+function hasMalformedHasErrors(metadata: Record<string, unknown>) {
+  return (
+    Object.prototype.hasOwnProperty.call(metadata, 'hasErrors') && typeof metadata.hasErrors !== 'boolean'
+  );
+}
+
+function hasMalformedRenderingError(metadata: Record<string, unknown>) {
+  if (!Object.prototype.hasOwnProperty.call(metadata, 'renderingError')) return false;
+
+  const { renderingError } = metadata;
+  if (typeof renderingError !== 'object' || renderingError === null) return true;
+
+  const hasMessage = Object.prototype.hasOwnProperty.call(renderingError, 'message');
+  const hasStack = Object.prototype.hasOwnProperty.call(renderingError, 'stack');
+  if (!hasMessage && !hasStack) return true;
+
+  const { message, stack } = renderingError as { message?: unknown; stack?: unknown };
+  return (hasMessage && typeof message !== 'string') || (hasStack && typeof stack !== 'string');
+}
+
+function hasProductionErrorSignal(metadata: Record<string, unknown>) {
+  const { hasErrors, renderingError } = metadata;
+  return (
+    hasErrors === true ||
+    hasRenderingErrorSignal(renderingError) ||
+    hasMalformedHasErrors(metadata) ||
+    hasMalformedRenderingError(metadata)
+  );
+}
+
+function shouldEmitConsoleReplay(metadata: Record<string, unknown>, railsEnv?: string) {
+  // Console replay remains useful in development/test and for clean production chunks. On an
+  // error-bearing chunk, however, it can repeat the same server-only message or stack path that
+  // diagnostic metadata redacts, so unknown and production-like environments fail closed.
+  if (railsEnv === 'development' || railsEnv === 'test') return true;
+
+  return !hasProductionErrorSignal(metadata);
+}
+
 function createRSCDiagnosticScript(
   metadata: Record<string, unknown>,
   cacheKey: string,
@@ -103,13 +142,18 @@ function createRSCDiagnosticScript(
   railsEnv?: string,
 ) {
   const { hasErrors, renderingError } = metadata;
+  const showFullDiagnostics = railsEnv === 'development' || railsEnv === 'test';
   // `hasErrors` is a boolean per the server wire contract; renderingError only carries
-  // a useful diagnostic when the server provided a non-blank message or stack.
-  if (hasErrors !== true && !hasRenderingErrorSignal(renderingError)) return undefined;
+  // a useful diagnostic when the server provided a non-blank message or stack. Outside
+  // development/test, malformed values fail closed to the same generic signal as the fetched
+  // RSC path instead of suppressing both the replay and the diagnostic.
+  const hasDiagnosticSignal = showFullDiagnostics
+    ? hasErrors === true || hasRenderingErrorSignal(renderingError)
+    : hasProductionErrorSignal(metadata);
+  if (!hasDiagnosticSignal) return undefined;
   // Outside development/test, emit only the error signal without the server error message or stack.
   // Full diagnostics are reported server-side via the streaming error reporter (Sentry/Honeybadger).
   // Fail-closed: unknown or missing railsEnv defaults to redacted (safe for a security gate).
-  const showFullDiagnostics = railsEnv === 'development' || railsEnv === 'test';
   // The two branches normalize `hasErrors` differently on purpose. The redacted (production)
   // branch forces `hasErrors: true` so a chunk that only tripped `hasRenderingErrorSignal`
   // (server sent `hasErrors: false` but a non-blank message/stack) still emits a positive
@@ -2082,7 +2126,7 @@ export default function injectRSCPayload(
 
               // Emit console replay as a separate <script> tag (not inside the payload)
               const consoleScript = metadata.consoleReplayScript as string;
-              if (consoleScript) {
+              if (consoleScript && shouldEmitConsoleReplay(metadata, railsEnv)) {
                 rscPayloadBuffers.push(Buffer.from(createScriptTag(consoleScript, sanitizedNonce)));
               }
               // Primary flush is handled by React's flush() callback (see above).

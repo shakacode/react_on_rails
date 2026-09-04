@@ -417,7 +417,7 @@ describe('injectRSCPayload', () => {
         message: 'useState is not a function',
         stack: 'TypeError: useState is not a function\n    at Broken (/app/components/Broken.server.tsx:7:3)',
       },
-      consoleReplayScript: '<script>console.log("replay")</script>',
+      consoleReplayScript: 'console.log("test diagnostic replay")',
       serializedProps: { token: 'do-not-serialize' },
     });
     const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
@@ -439,6 +439,7 @@ describe('injectRSCPayload', () => {
     expect(resultStr).not.toContain('serializedProps');
     expect(resultStr).not.toContain('do-not-serialize');
     expect(resultStr).not.toContain('consoleReplayScript');
+    expect(resultStr).toContain('<script>console.log("test diagnostic replay")</script>');
   });
 
   it('keeps the first RSC diagnostic metadata for a payload key', async () => {
@@ -485,6 +486,7 @@ describe('injectRSCPayload', () => {
         message: '   ',
         stack: '',
       },
+      consoleReplayScript: 'console.log("blank rendering error replay")',
     });
     const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
@@ -494,7 +496,74 @@ describe('injectRSCPayload', () => {
 
     expect(resultStr).not.toContain(`(self.REACT_ON_RAILS_RSC_ERRORS||={})${rscPayloadKeyReference}||=`);
     expect(resultStr).not.toContain('renderingError');
+    expect(resultStr).toContain('<script>console.log("blank rendering error replay")</script>');
     expect(resultStr).toContain(expectedPayloadPushScript('{"test": "data"}'));
+  });
+
+  it.each([
+    ['an empty renderingError object', { hasErrors: false, renderingError: {} }],
+    ['a null renderingError', { hasErrors: false, renderingError: null }],
+    ['a non-object renderingError', { hasErrors: false, renderingError: 'malformed' }],
+    ['a renderingError with a non-string message', { hasErrors: false, renderingError: { message: null } }],
+    ['a renderingError with a non-string stack', { hasErrors: false, renderingError: { stack: [] } }],
+    [
+      'a renderingError with a string message and non-string stack',
+      { hasErrors: false, renderingError: { message: 'private failure', stack: 1 } },
+    ],
+    ['a non-boolean hasErrors value', { hasErrors: 'true' }],
+  ])('fails closed in production for %s', async (_description, metadata) => {
+    const mockRSC = createMockRSCStreamWithMetadata('{"test": "data"}', {
+      ...metadata,
+      consoleReplayScript: 'console.error("malformed metadata secret")',
+    });
+    const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId, undefined, {
+      railsEnv: 'production',
+    });
+    const resultStr = await collectStreamData(result);
+
+    expect(resultStr).toContain('REACT_ON_RAILS_RSC_ERRORS');
+    expect(resultStr).toContain('"hasErrors":true');
+    expect(resultStr).not.toContain('renderingError');
+    expect(resultStr).not.toContain('malformed metadata secret');
+    expect(resultStr).toContain(expectedPayloadPushScript('{"test": "data"}'));
+  });
+
+  it('emits a generic production diagnostic when hasErrors is not boolean', async () => {
+    const mockRSC = createMockRSCStreamWithMetadata('{"test": "data"}', {
+      hasErrors: 'true',
+      consoleReplayScript: 'console.error("malformed metadata secret")',
+    });
+    const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId, undefined, {
+      railsEnv: 'production',
+    });
+    const resultStr = await collectStreamData(result);
+
+    expect(resultStr).toContain('REACT_ON_RAILS_RSC_ERRORS');
+    expect(resultStr).toContain('"hasErrors":true');
+    expect(resultStr).not.toContain('malformed metadata secret');
+  });
+
+  it('preserves console replay for malformed metadata in development', async () => {
+    const mockRSC = createMockRSCStreamWithMetadata('{"test": "data"}', {
+      hasErrors: 'true',
+      renderingError: null,
+      consoleReplayScript: 'console.error("development malformed metadata replay")',
+    });
+    const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId, undefined, {
+      railsEnv: 'development',
+    });
+    const resultStr = await collectStreamData(result);
+
+    expect(resultStr).toContain('<script>console.error("development malformed metadata replay")</script>');
   });
 
   it('redacts renderingError from diagnostic metadata in production', async () => {
@@ -504,6 +573,8 @@ describe('injectRSCPayload', () => {
         message: 'User 48213 not authorized for org 77',
         stack: 'Error: User 48213 not authorized\n    at Auth (/app/components/Auth.server.tsx:12:5)',
       },
+      consoleReplayScript:
+        'console.error("RSC inline failed for User 48213 at /srv/private/Auth.server.tsx:12:5")',
     });
     const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
@@ -519,6 +590,8 @@ describe('injectRSCPayload', () => {
     expect(resultStr).not.toContain('not authorized');
     expect(resultStr).not.toContain('Auth.server.tsx');
     expect(resultStr).not.toContain('renderingError');
+    expect(resultStr).not.toContain('RSC inline failed');
+    expect(resultStr).not.toContain('/srv/private/Auth.server.tsx');
   });
 
   it('redacts renderingError in non-development/test environments like staging', async () => {
@@ -528,6 +601,7 @@ describe('injectRSCPayload', () => {
         message: 'Internal server failure',
         stack: 'Error: Internal server failure\n    at Server (/app/lib/server.ts:42:7)',
       },
+      consoleReplayScript: 'console.error("staging secret at /srv/private/server.ts:42:7")',
     });
     const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
@@ -542,6 +616,7 @@ describe('injectRSCPayload', () => {
     expect(resultStr).not.toContain('Internal server failure');
     expect(resultStr).not.toContain('server.ts');
     expect(resultStr).not.toContain('renderingError');
+    expect(resultStr).not.toContain('staging secret');
   });
 
   it('redacts renderingError when railsEnv is not provided (undefined)', async () => {
@@ -551,6 +626,7 @@ describe('injectRSCPayload', () => {
         message: 'Database connection refused at 10.0.3.42:5432',
         stack: 'Error: Database connection refused\n    at Pool (/app/lib/db.ts:18:11)',
       },
+      consoleReplayScript: 'console.error("unknown-env secret at /srv/private/db.ts:18:11")',
     });
     const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
@@ -563,6 +639,7 @@ describe('injectRSCPayload', () => {
     expect(resultStr).not.toContain('10.0.3.42');
     expect(resultStr).not.toContain('db.ts');
     expect(resultStr).not.toContain('renderingError');
+    expect(resultStr).not.toContain('unknown-env secret');
   });
 
   it('forces hasErrors:true in production even when metadata has hasErrors:false with renderingError signal', async () => {
@@ -572,6 +649,7 @@ describe('injectRSCPayload', () => {
         message: 'Internal server failure',
         stack: 'Error: Internal server failure\n    at Server (/app/lib/server.ts:42:7)',
       },
+      consoleReplayScript: 'console.error("secondary inline secret at /srv/private/server.ts:42:7")',
     });
     const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
@@ -585,6 +663,24 @@ describe('injectRSCPayload', () => {
     expect(resultStr).not.toContain('Internal server failure');
     expect(resultStr).not.toContain('server.ts');
     expect(resultStr).not.toContain('renderingError');
+    expect(resultStr).not.toContain('secondary inline secret');
+    expect(resultStr).not.toContain('/srv/private/server.ts');
+  });
+
+  it('preserves console replay for clean production chunks', async () => {
+    const mockRSC = createMockRSCStreamWithMetadata('{"test": "data"}', {
+      hasErrors: false,
+      consoleReplayScript: 'console.log("clean production replay")',
+    });
+    const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId, undefined, {
+      railsEnv: 'production',
+    });
+    const resultStr = await collectStreamData(result);
+
+    expect(resultStr).toContain('<script>console.log("clean production replay")</script>');
   });
 
   it('includes full renderingError in diagnostic metadata in development', async () => {
@@ -594,6 +690,7 @@ describe('injectRSCPayload', () => {
         message: 'useState is not a function',
         stack: 'TypeError: useState is not a function\n    at Broken (/app/components/Broken.server.tsx:7:3)',
       },
+      consoleReplayScript: 'console.error("development diagnostic replay")',
     });
     const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
@@ -607,6 +704,7 @@ describe('injectRSCPayload', () => {
     expect(resultStr).toContain('useState is not a function');
     expect(resultStr).toContain('Broken.server.tsx');
     expect(resultStr).toContain('renderingError');
+    expect(resultStr).toContain('<script>console.error("development diagnostic replay")</script>');
   });
 
   it('promotes streamed RSC client chunk stylesheet preloads to gate reveal', async () => {

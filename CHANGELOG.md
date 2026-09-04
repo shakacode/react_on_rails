@@ -235,18 +235,19 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4833](https://github.com/shakacode/react_on_rails/pull/4833) by
   [justin808](https://github.com/justin808).
 
-- **[Pro]** **RSC render-error details are no longer sent to the browser on the fetched payload path**:
-  The RSC payload fetched during client-side navigation (via `rsc_payload_generation_url_path`) included
-  the server's rendering-error message and source-mapped stack — which contains server file paths — in its
-  metadata, in every environment. The inline (first-paint) payload path was already redacted, so error
-  detail that was hidden on first paint could still reach the browser on a client navigation. The fetched
-  path now applies the same fail-closed gate: full detail only in `development` and `test`, while
-  `production`, `staging`, and any unrecognized environment receive a generic `hasErrors: true` signal so
-  client error boundaries still fire. Server-side error handling is unaffected — `raise_prerender_error`
-  still receives the full message and stack, because redaction happens at the browser-facing boundary
-  after the server's own error transform runs. Fixes
-  [Issue 4736](https://github.com/shakacode/react_on_rails/issues/4736).
-  [PR 4821](https://github.com/shakacode/react_on_rails/pull/4821) by
+- **[Pro]** **RSC render-error details no longer reach browser-facing payloads in production-like
+  environments**: Fetched RSC payload metadata now uses a fail-closed allowlist that exposes only the
+  generic `hasErrors` signal needed by client error boundaries. Inline error-bearing payload chunks now
+  also suppress console replay in `production`, `staging`, and unrecognized environments, closing a path
+  that could repeat the server error message or source-mapped file paths after diagnostic metadata was
+  redacted. Full diagnostics and console replay remain available in `development` and `test`, clean
+  production chunks retain console replay, and server-side reporting still receives the original error
+  details before the browser-boundary redaction runs. Fixes
+  [Issue 4736](https://github.com/shakacode/react_on_rails/issues/4736),
+  [Issue 4822](https://github.com/shakacode/react_on_rails/issues/4822), and
+  [Issue 4827](https://github.com/shakacode/react_on_rails/issues/4827).
+  [PR 4821](https://github.com/shakacode/react_on_rails/pull/4821) and
+  [PR 4856](https://github.com/shakacode/react_on_rails/pull/4856) by
   [justin808](https://github.com/justin808).
 
 - **HTTP-served SSR bundle loading now honors the response charset, rejects non-2xx responses,
@@ -260,9 +261,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   bundle-load error naming the URL and status, instead of being returned as if it were JavaScript
   bundle source. Additionally, a `server_bundle_js_file` URL with embedded HTTP basic-auth
   credentials (e.g. `https://:password@host:3800/bundle.js`) no longer leaks that password into
-  raised errors or logs on a load failure. Fixes
-  [Issue 4584](https://github.com/shakacode/react_on_rails/issues/4584).
-  [PR 4817](https://github.com/shakacode/react_on_rails/pull/4817) by
+  raised errors or logs on a load failure, including malformed URLs with ambiguous userinfo.
+  Percent-encoded spellings are redacted wherever their literal spelling is, so values such as
+  `http:%2F%2Fuser:password%40host/bundle.js` and `%2F%2Fuser:password%40host/bundle.js` no longer
+  survive redaction. Safe encoded path, query, and fragment data is left intact. Fixes
+  [Issue 4584](https://github.com/shakacode/react_on_rails/issues/4584) and
+  [Issue 4825](https://github.com/shakacode/react_on_rails/issues/4825).
+  [PR 4817](https://github.com/shakacode/react_on_rails/pull/4817) and
+  [PR 4845](https://github.com/shakacode/react_on_rails/pull/4845) by
   [justin808](https://github.com/justin808).
 
 - **RailsContext now stays current across Turbo and Turbolinks navigation**: Parsed context is cached
