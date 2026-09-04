@@ -410,6 +410,14 @@ describe InstallGenerator, type: :generator do
         expect(content).to include("react_on_rails:doctor FORMAT=json")
         expect(content).to include("`id`, `severity`, `message`, and `remediation.prompt`")
         expect(content).to include("Component '<Name>' Not Registered")
+        expect(content).to include("bundle show react_on_rails")
+        expect(content).to include("canonical, reliable lookup")
+        expect(content).to include("optional direct-dependency path")
+        expect(content).to include("Do not assume it exists")
+        expect(content.index("bundle show react_on_rails")).to be < content.index("node_modules/react-on-rails/")
+        %w[doctor-fix-loop install-and-upgrade rsc-adoption streaming-debug].each do |skill_name|
+          expect(content).to include("skills/#{skill_name}/SKILL.md")
+        end
       end
 
       assert_file "CLAUDE.md" do |content|
@@ -461,18 +469,15 @@ describe InstallGenerator, type: :generator do
       end
     end
 
-    it "creates the shakapacker watch wrapper and uses it in Procfiles" do
-      assert_file "bin/shakapacker-watch" do |content|
-        expect(content).to include('bin/shakapacker "$@" &')
-        expect(content).to include("trap cleanup INT TERM")
-      end
+    it "uses the standard Shakapacker command when the optional watch binstub is absent" do
+      assert_no_file "bin/shakapacker-watch"
 
       assert_file "Procfile.dev" do |content|
-        expect(content).to include("server-bundle: SERVER_BUNDLE_ONLY=true bin/shakapacker-watch --watch")
+        expect(content).to include("server-bundle: SERVER_BUNDLE_ONLY=true bin/shakapacker --watch")
       end
 
       assert_file "Procfile.dev-static-assets" do |content|
-        expect(content).to include("js: bin/shakapacker-watch --watch")
+        expect(content).to include("js: bin/shakapacker --watch")
       end
     end
 
@@ -509,6 +514,38 @@ describe InstallGenerator, type: :generator do
     it "sets shakapacker test compile to false by default" do
       assert_file "config/shakapacker.yml" do |content|
         expect(content).to match(/^test:.*?^\s+compile:\s*false/m)
+      end
+    end
+  end
+
+  context "when the Shakapacker watch binstub is already installed" do
+    shakapacker_watch = <<~RUBY
+      #!/usr/bin/env ruby
+      puts "Shakapacker-owned watcher"
+    RUBY
+
+    before(:all) do
+      run_generator_test_with_args(%w[], package_json: true) do
+        simulate_preinstalled_shakapacker(source_path: "app/javascript", source_entry_path: "packs")
+        simulate_existing_file("bin/shakapacker-watch", shakapacker_watch)
+        File.chmod(0o750, File.join(destination_root, "bin/shakapacker-watch"))
+      end
+    end
+
+    it "preserves Shakapacker's binstub under --force" do
+      assert_file "bin/shakapacker-watch" do |content|
+        expect(content).to eq(shakapacker_watch)
+      end
+      expect(File.stat(File.join(destination_root, "bin/shakapacker-watch")).mode & 0o777).to eq(0o750)
+    end
+
+    it "uses Shakapacker's binstub in generated Procfiles" do
+      assert_file "Procfile.dev" do |content|
+        expect(content).to include("server-bundle: SERVER_BUNDLE_ONLY=true bin/shakapacker-watch --watch")
+      end
+
+      assert_file "Procfile.dev-static-assets" do |content|
+        expect(content).to include("js: bin/shakapacker-watch --watch")
       end
     end
   end
@@ -3580,7 +3617,7 @@ describe InstallGenerator, type: :generator do
       assert_file "Procfile.dev" do |content|
         expect(content).to include("RSC_BUNDLE_ONLY=true")
         expect(content).to include("rsc-bundle:")
-        expect(content).to include("bin/shakapacker-watch --watch")
+        expect(content).to include("bin/shakapacker --watch")
       end
     end
 
@@ -4706,11 +4743,13 @@ describe InstallGenerator, type: :generator do
       # ignore_warnings: true is required so handle_shakapacker_gemfile_error logs
       # the error instead of raising Thor::Error, which lets this example inspect output.
       install_generator = install_generator_fixture(rspack: true, pro: true, ignore_warnings: true)
+      allow(ReactOnRails::PackerUtils).to receive(:shakapacker_version).and_return("10.3.1")
 
       install_generator.send(:handle_shakapacker_gemfile_error)
       output_text = GeneratorMessages.output.join("\n")
 
       expect(output_text).to include("clean up your working tree before rerunning")
+      expect(output_text).to include("bundle add shakapacker --version 10.3.1 --strict")
       expect(output_text).to include("Then re-run: rails generate react_on_rails:install --rspack --pro")
     end
 
@@ -5504,9 +5543,12 @@ describe InstallGenerator, type: :generator do
     let(:webpack_install_env) { { "SHAKAPACKER_ASSETS_BUNDLER" => "webpack" } }
     let(:rspack_install_env) { { "SHAKAPACKER_ASSETS_BUNDLER" => "rspack" } }
 
-    it "clears BUNDLE_GEMFILE when running bundle add" do
+    it "clears BUNDLE_GEMFILE and preserves the resolved Shakapacker version when running bundle add" do
       allow(install_generator).to receive(:shakapacker_in_gemfile?).and_return(false)
-      allow(install_generator).to receive(:system).with("bundle add shakapacker --strict").and_return(true)
+      allow(ReactOnRails::PackerUtils).to receive(:shakapacker_version).and_return("10.3.1")
+      allow(install_generator).to receive(:system)
+        .with("bundle", "add", "shakapacker", "--version", "10.3.1", "--strict")
+        .and_return(true)
 
       expect(Bundler).to receive(:with_unbundled_env).and_yield
 

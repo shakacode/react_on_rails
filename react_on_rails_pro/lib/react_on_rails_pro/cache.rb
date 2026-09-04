@@ -189,7 +189,7 @@ module ReactOnRailsPro
 
       def rsc_bundle_cache_key
         ReactOnRailsPro::Utils.rsc_bundle_hash
-      rescue Errno::ENOENT
+      rescue ReactOnRailsPro::MissingRendererBundleError
         RSC_BUNDLE_MISSING_CACHE_KEY
       end
     end

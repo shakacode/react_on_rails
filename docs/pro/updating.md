@@ -57,6 +57,22 @@ string directly into `Gemfile`), the install will fail because no package exists
 under that spelling. Substitute `.` for `-` (or `-` for `.`) when crossing the
 language boundary.
 
+### Compare exact prerelease tags
+
+When you upgrade between prereleases, review the changes between the exact tags. Use Ruby/tag dot notation for both
+placeholders in
+`https://github.com/shakacode/react_on_rails/compare/v<CURRENT_VERSION>...v<TARGET_VERSION>`.
+The release notes summarize the release line, but the tag comparison shows the RC-to-RC changes that apply to your
+current pin.
+
+### Custom overrides of Pro helpers
+
+Methods in `ReactOnRailsProHelper` are internal implementation details, not stable extension points. An application
+that uses `prepend` or otherwise overrides a Pro helper method must re-check the method signature for every upgrade.
+
+Prefer documented configuration and helper APIs. If an internal override is unavoidable, compare the exact release
+tags, update the override signature, and run the application's streamed SSR and RSC tests before deployment.
+
 ### Strict version pinning
 
 Use exact version constraints on both sides — never `^`, `~`, or `*`. Semver
@@ -398,6 +414,11 @@ This affects render, streaming render, and asset upload requests.
 Before upgrading:
 
 - Run Ruby 3.3 or newer. The `async-http` dependency requires Ruby 3.3+.
+- Audit Rails console detection that calls `Rails.const_defined?(:Console)`. The `console` gem arrives through Pro's
+  `async` dependency, which was already present in Pro 16.x, and defines top-level `::Console`. Pro 17 loads `async` on
+  the ordinary render path, while Pro 16 loaded it only for streaming or async rendering, so the default lookup inherits
+  through `Object` and silently returns `true` outside a Rails console. Use `Rails.const_defined?(:Console, false)` to
+  set `inherit: false`.
 - Remove direct application assumptions about HTTPX-specific response or error classes in Pro renderer request paths.
 - Treat `config.ssr_timeout` as a per-read socket timeout. With the async-http client, this is applied as the
   read timeout on each renderer socket. It no longer wraps the entire request as a single task-level timeout.
@@ -413,6 +434,12 @@ Before upgrading:
 - Expect renderer connection drops to surface immediately as `ReactOnRailsPro::Error`/connection failures. HTTPX
   previously performed one implicit transport retry for some connection drops; the async-http adapter uses
   `retries: 0` and leaves retry policy to the existing bundle-upload retry loop and caller behavior.
+- If your Rails application uses OpenTelemetry, run `OpenTelemetry::SDK.configure` before the first renderer request
+  so both the tracer provider and W3C propagator are registered. HTTPX instrumentation no longer observes the
+  async-http transport. React on Rails Pro now creates the replacement CLIENT span itself and injects W3C trace
+  context for regular, streaming, incremental, raw-render, and asset-upload requests. Configure the Node Renderer
+  with `fastify: true` so its server spans extract that context. No OpenTelemetry dependency is added by the Pro gem;
+  when the SDK is absent or no provider is registered, renderer requests remain uninstrumented.
 - Run the node renderer client from the normal Rails request path. **Note for Falcon/async-rails users:** the earlier
   advisory to keep Falcon deployments on the HTTPX renderer client is superseded; HTTPX has been removed and async-http
   now handles Falcon natively. Async Rails servers (Falcon, Puma with an async scheduler) are supported: the async-http
@@ -429,11 +456,19 @@ Before upgrading:
 
 ##### JWT gem requirement
 
-`react_on_rails_pro` uses `jwt` for offline license validation. Current versions require `jwt >= 2.7` (relaxed from the `16.7.0.rc.0` floor of `jwt >= 3.2.0`), so apps still pinned to jwt 2.x can bundle without upgrading. Apps that can resolve `jwt 3.2.0` or newer will continue to do so. If your Gemfile pins `jwt` below 2.7 (e.g., `2.2.x` for compatibility with OAuth gems), you will need to upgrade it. Check for conflicts with:
+`react_on_rails_pro` uses `jwt` for offline license validation. The first release containing
+[PR 4864](https://github.com/shakacode/react_on_rails/pull/4864), and later releases, require `jwt >= 2.8, < 4`;
+earlier React on Rails Pro releases retain the dependency range declared by their gemspec. Apps still pinned to a
+compatible jwt 2.x release can bundle without upgrading. Apps that can resolve `jwt 3.2.0` or newer in the 3.x line
+will continue to do so; jwt 4.x is not supported. If your Gemfile pins `jwt` below 2.8 (e.g., `2.2.x` for compatibility
+with OAuth gems), you will need to upgrade it. Check for conflicts with:
 
 ```bash
 bundle update jwt
 ```
+
+> **Why the floor is 2.8.** jwt 2.8.0 began declaring `base64` as a runtime dependency. That declaration
+> keeps offline license validation reliable on Ruby 3.4+, where `base64` is a bundled gem.
 
 ##### Node renderer config: `bundlePath` → `serverBundleCachePath`
 

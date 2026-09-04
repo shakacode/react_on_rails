@@ -1,3 +1,6 @@
+> **Superseded by [`internal/planning/ppr-plan.md`](./ppr-plan.md) (2026-08-13).**
+> Kept for reasoning history.
+
 # React 19.2.x and Partial Pre-Rendering Plan
 
 ## Purpose

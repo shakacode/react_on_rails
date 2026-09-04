@@ -175,9 +175,12 @@ Some operations require a working Rails environment:
 
 | react_on_rails | Shakapacker | Webpack | Node.js |
 | -------------- | ----------- | ------- | ------- |
+| v17.x          | >= 6.0      | v5      | 20-22   |
 | v16.x          | >= 6.0      | v5      | 20-22   |
 | v14.x          | >= 6.0      | v5      | 18-20   |
 | v13.x          | >= 6.0      | v5      | 16-18   |
+
+The Webpack column lists Webpack compatibility only. React on Rails v17 also supports Rspack as the assets bundler via Shakapacker's `assets_bundler: 'rspack'`.
 
 ### Common Upgrade Issues
 

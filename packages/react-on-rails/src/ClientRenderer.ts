@@ -21,6 +21,10 @@ import { convertToError } from './errorUtils.ts';
 import { isThenable } from './isThenable.ts';
 
 const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
+// Emitted by generate_component_script in lib/react_on_rails/pro_helper.rb
+// (`render_options.store_dependencies&.to_json`); the react_component helper defaults it to
+// every store registered in its request, so Rails-rendered islands declare the stores they use.
+const STORE_DEPENDENCIES_ATTRIBUTE = 'data-store-dependencies';
 
 type RendererResult = ReturnType<RendererFunction>;
 type RegisteredComponentEntry = RegisteredComponent<RegisteredComponentValue>;
@@ -114,6 +118,19 @@ function teardownErrorLabel(entry: RenderedEntry, domNodeId: string): string {
 
 function initializeStore(el: Element, railsContext: RailsContext): void {
   const name = el.getAttribute(REACT_ON_RAILS_STORE_ATTRIBUTE) || '';
+
+  // Guard: don't re-create an already-hydrated store.
+  // Before hydrate_on scheduling (#4037), all components hydrated in one synchronous pass, so every
+  // component read the same store instance created in that pass. Deferred hydration (visible/idle)
+  // breaks that invariant: forEachStore can run again (e.g. via reactOnRailsComponentLoaded for a
+  // Turbo Frame), re-creating the store while an already-hydrated :immediate sibling keeps the old
+  // instance and a not-yet-mounted :visible sibling will get the new one — divergent shared state.
+  // Skipping re-initialization restores the one-instance-per-name-per-page-lifetime invariant.
+  // See: https://github.com/shakacode/react_on_rails/issues/4572
+  if (StoreRegistry.getStore(name, false) !== undefined) {
+    return;
+  }
+
   const props = el.textContent !== null ? (JSON.parse(el.textContent) as Record<string, unknown>) : {};
   const storeGenerator = StoreRegistry.getStoreGenerator(name);
   const store = storeGenerator(props, railsContext);
@@ -125,6 +142,44 @@ function forEachStore(railsContext: RailsContext): void {
   for (let i = 0; i < els.length; i += 1) {
     initializeStore(els[i], railsContext);
   }
+}
+
+/**
+ * Initializes a single named store from its DOM element. A name with no matching element is
+ * left alone: the full-page sweep cannot initialize an element-less store either, and if the
+ * island actually reads it, getStore surfaces the missing store by name during render.
+ */
+function initializeStoreByName(name: string, railsContext: RailsContext): void {
+  // Compare attribute values directly so store names do not need CSS-selector escaping.
+  const els = document.querySelectorAll(`[${REACT_ON_RAILS_STORE_ATTRIBUTE}]`);
+  for (let i = 0; i < els.length; i += 1) {
+    if (els[i].getAttribute(REACT_ON_RAILS_STORE_ATTRIBUTE) === name) {
+      initializeStore(els[i], railsContext);
+      return;
+    }
+  }
+}
+
+/**
+ * Reads the island's declared store dependencies. Returns null when the attribute is absent —
+ * hand-written markup, or markup rendered by a request that registered no stores — or
+ * malformed; callers fall back to the legacy initialize-every-store sweep in that case.
+ */
+function storeDependenciesForEl(el: Element): string[] | null {
+  const raw = el.getAttribute(STORE_DEPENDENCIES_ATTRIBUTE);
+  if (raw === null) return null;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (Array.isArray(parsed) && parsed.every((name): name is string => typeof name === 'string')) {
+      return parsed;
+    }
+  } catch {
+    // fall through to the warning below
+  }
+  console.warn(
+    `[react-on-rails] Ignoring malformed ${STORE_DEPENDENCIES_ATTRIBUTE} (${raw}); initializing all stores on the page instead.`,
+  );
+  return null;
 }
 
 function domNodeIdForEl(el: Element): string {
@@ -503,12 +558,41 @@ export function renderComponent(domId: string): void {
   // If no react on rails context
   if (!railsContext) return;
 
-  // Initialize stores first
-  forEachStore(railsContext);
-
-  // Find the element with the matching data-dom-id
-  const el = document.querySelector(`[data-dom-id="${domId}"]`);
+  // Compare attribute values directly so valid DOM IDs do not need CSS-selector escaping.
+  let el: Element | null = null;
+  const componentElements = document.querySelectorAll('[data-dom-id]');
+  for (let index = 0; index < componentElements.length; index += 1) {
+    if (componentElements[index].getAttribute('data-dom-id') === domId) {
+      el = componentElements[index];
+      break;
+    }
+  }
+  // No store work when the requested island does not exist (matching the Pro renderer).
   if (!el) return;
+
+  // Initialize only the stores this island declares, so rendering one island on demand cannot
+  // touch — or be broken by — unrelated store elements elsewhere on the page (#4862). Islands
+  // without the attribute keep the legacy initialize-every-store sweep; initializeStore's
+  // hydrated-store guard protects live state on both paths.
+  const storeDependencies = storeDependenciesForEl(el);
+  if (storeDependencies) {
+    storeDependencies.forEach((name) => {
+      try {
+        initializeStoreByName(name, railsContext);
+      } catch (error) {
+        // Islands routinely over-declare dependencies (the helper defaults to every store
+        // registered in the request), so a store that cannot initialize — e.g. its generator's
+        // bundle has not registered yet — must not abort the requested render. If the island
+        // actually reads the store, getStore raises during render with the store's name.
+        console.error(
+          `[react-on-rails] Could not initialize store "${name}" (a declared dependency of dom node "${domId}"):`,
+          error,
+        );
+      }
+    });
+  } else {
+    forEachStore(railsContext);
+  }
 
   renderElement(el, railsContext);
 }
@@ -557,5 +641,16 @@ function unmountAllComponents(): void {
   renderedRoots.clear();
 }
 
+/**
+ * Clear all hydrated stores on page unload so navigation to a new page re-initializes stores
+ * with the new page's props. Without this, the initializeStore guard (which prevents duplicate
+ * store creation within a single page lifecycle) would skip re-initialization on navigation,
+ * leaving components bound to stale state from the previous page.
+ */
+function clearAllStores(): void {
+  StoreRegistry.clearHydratedStores();
+}
+
 // Register cleanup on page unload
 onPageUnloaded(unmountAllComponents);
+onPageUnloaded(clearAllStores);

@@ -35,13 +35,155 @@ _Timings are illustrative, not benchmarks — the point is **when** the first pa
 ## Prerequisites
 
 - React on Rails Pro
-- React 18 or 19 for `stream_react_component`; React 19.2.x with patch 19.2.7 or newer for async props and React Server Components
+- React 18 or 19 for progressive `stream_react_component`; React 16/17 use synchronous SSR fallback
+- React 19.2.x with patch 19.2.7 or newer for async props and React Server Components
 - React on Rails v16.0.0 or higher
 - Node Renderer running (streaming requires Node.js, not ExecJS)
 - For async props (streaming each slow prop independently): React Server Components enabled — `config.enable_rsc_support = true`
 
-React 18 support is scoped to non-RSC `stream_react_component` with synchronous props. Async props,
-`stream_react_component_with_async_props`, and React Server Components require React 19.2.x with patch 19.2.7 or newer.
+### Compatibility by React Version
+
+| React version | `stream_react_component` behavior                                                                                                                                               | Async props and RSC                                                                                              |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| React 16/17   | Synchronous SSR fallback for trees that do not suspend. If a child actually suspends, `renderToString` cannot complete SSR; the React 18 example below will not work unchanged. | Not available                                                                                                    |
+| React 18      | Progressive streaming for ordinary, non-RSC components with synchronous props. Suspense boundaries can reveal independently through `renderToPipeableStream`.                   | Not available; do not install `react-on-rails-rsc` or enable RSC support                                         |
+| React 19      | Progressive streaming for ordinary components, including the same non-RSC path as React 18.                                                                                     | Async props and RSC require React/React DOM 19.2.x with patch 19.2.7+ and compatible `react-on-rails-rsc` 19.2.x |
+
+React on Rails detects whether the installed React DOM server provides `renderToPipeableStream`. This keeps
+`stream_react_component` on the synchronous path for React 16 and 17 while selecting progressive streaming
+automatically on React 18 and 19. The React 16/17 path is suitable only when the rendered tree does not suspend.
+
+### React 19.2 Suspense reveal batching
+
+[React 19.2 briefly batches some server-rendered Suspense boundary reveals](https://react.dev/blog/2025/10/01/react-19-2#batching-suspense-boundaries-for-ssr)
+so boundaries that finish near one another can become visible together. React controls this with heuristics and backs
+off when batching could hurt Core Web Vitals. React on Rails Pro does not add or expose a batching-delay setting.
+
+Keep these two checkpoints separate when observing a streamed page:
+
+- **Server chunk delivery:** React decides when resolved boundary markup enters its server stream. React on Rails Pro
+  forwards those emitted chunks in order. For RSC streams, each combined flush preserves the required order: payload
+  initialization and stylesheet prerequisites, then the HTML, then the matching payload-push scripts.
+- **Browser-visible reveal:** Network buffering, compression, HTML parsing, and React's reveal batching can make DOM
+  updates appear later or in larger groups than the chunks observed by Rails or the Node Renderer. A server chunk is
+  therefore not a guaranteed paint boundary.
+
+Make streaming tests state-based rather than timer-based. Assert the shell and fallbacks while data is unresolved,
+then resolve one or more sources and use retrying assertions for the final DOM state, element order, and the rule that
+resolved content does not return to its fallback. Do not assume one resolved boundary equals one output chunk, use an
+arbitrary sleep, or depend on a fixed batching delay such as 300 ms; React's timing is deliberately heuristic.
+
+## React 18 Streaming Without RSC
+
+React 18 applications can use progressive SSR before adopting React Server Components. Keep all Rails props
+synchronous, register an ordinary React component, and render it with `stream_react_component`. You do not need
+`react-on-rails-rsc`, `config.enable_rsc_support`, `registerServerComponent`, or an RSC bundle.
+
+For a Suspense boundary to reveal progressively, something below it must suspend during the server render. One
+straightforward React 18 case is a lazily loaded component:
+
+:::note Node Renderer module support
+This example assumes the server bundle can resolve its dynamic import. If your bundler's lazy or loadable component
+runtime needs Node.js globals, enable `supportModules: true` in the Node Renderer launcher. Because that option changes
+the renderer VM's runtime capabilities, review the
+[supportModules configuration and security notes](../oss/building-features/node-renderer/js-configuration.md#node-renderer-javascript-configuration)
+before enabling it.
+:::
+
+```jsx
+// app/javascript/components/ProductPage.jsx
+import React, { lazy, Suspense } from 'react';
+
+const ProductReviews = lazy(() => import('./ProductReviews'));
+
+const ProductPage = ({ product, reviews }) => (
+  <main>
+    <h1>{product.name}</h1>
+    <p>{product.description}</p>
+
+    <Suspense fallback={<p>Loading reviews...</p>}>
+      <ProductReviews reviews={reviews} />
+    </Suspense>
+  </main>
+);
+
+export default ProductPage;
+```
+
+The lazy module itself remains an ordinary synchronous React component:
+
+```jsx
+// app/javascript/components/ProductReviews.jsx
+import React from 'react';
+
+const ProductReviews = ({ reviews }) => (
+  <ul>
+    {reviews.map((review) => (
+      <li key={review.id}>{review.summary}</li>
+    ))}
+  </ul>
+);
+
+export default ProductReviews;
+```
+
+Register it through the normal, non-RSC API. With manual bundling, import this shared registration module from both
+the browser and server bundle entrypoints so the browser can hydrate the streamed component:
+
+```js
+// app/javascript/packs/react-on-rails-components.js
+import ReactOnRails from 'react-on-rails-pro';
+import ProductPage from '../components/ProductPage';
+
+ReactOnRails.register({ ProductPage });
+```
+
+```js
+// app/javascript/packs/application.js
+import './react-on-rails-components';
+
+// app/javascript/packs/server-bundle.js
+import './react-on-rails-components';
+```
+
+If you use auto-bundling, its generated client and server packs perform the equivalent ordinary component
+registration.
+
+Pass the already-loaded Rails data as ordinary props:
+
+```erb
+<%= stream_react_component(
+      'ProductPage',
+      props: {
+        product: @product.as_json(only: %i[id name description]),
+        reviews: @reviews.as_json(only: %i[id summary])
+      }
+    ) %>
+```
+
+Render the containing view through the streaming controller concern:
+
+```ruby
+class ProductsController < ApplicationController
+  include ActionController::Live
+  include ReactOnRails::Controller
+  include ReactOnRailsPro::Stream
+
+  def show
+    @product = Product.find(params[:id])
+    @reviews = @product.reviews
+    stream_view_containing_react_components(template: "products/show")
+  end
+end
+```
+
+The browser receives the product shell and `Loading reviews...` fallback first. When the lazy module resolves on the
+server, React streams the reviews HTML and replaces that fallback. Existing React 18 data libraries that suspend during
+SSR can use the same boundary pattern.
+
+This path provides progressive **HTML streaming**, but all Rails props are still loaded before React begins rendering.
+To stream Rails data as each slow query finishes, use [async props](#progressive-data-with-async-props), which require
+React/React DOM 19.2.x with patch 19.2.7 or newer and RSC.
 
 ## Progressive Data with Async Props
 
@@ -52,7 +194,7 @@ This is the recommended answer to "my component needs Rails data during render":
 > [!NOTE]
 > A Server Component _can_ `fetch` a Rails API directly, but the renderer's VM has no `fetch`, `Headers`, `Request`, or `Response` by default — you must bundle an HTTP client or inject them via `additionalContext`. That call leaves the active Rails controller request and must re-establish or explicitly forward auth, tenancy, caching, and tracing context through the API endpoint. `'use server'` Server Actions are **not** supported (the renderer has no DB/session/cookie access). Prefer props / async props. See [RSC data fetching patterns](../oss/migrating/rsc-data-fetching.md).
 
-Under the hood, Rails opens a bidirectional HTTP/2 NDJSON stream to the renderer and feeds props in as it resolves them. Each update runs in that request's isolated `sharedExecutionContext` and resolves a Promise, which lets React flush the corresponding HTML back to Rails for forwarding to the browser:
+Under the hood, Rails opens a bidirectional NDJSON stream to the renderer over h2c by default, or direct HTTP/1.1 when both sides are configured for it, and feeds props in as it resolves them. Each update runs in that request's isolated `sharedExecutionContext` and resolves a Promise, which lets React flush the corresponding HTML back to Rails for forwarding to the browser:
 
 <p>
   <img src="images/async-props-sequence.svg" alt="Sequence diagram across three lanes — Browser, Rails, and the Node Renderer. The browser asks for a page, Rails starts the page with placeholders, the renderer returns an HTML shell with loading states, and the browser shows the shell. Then a loop runs for each slow data value: Rails sends the value, the renderer returns the HTML for that section, and the browser replaces the loading state." width="840" />

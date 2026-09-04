@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "tmpdir"
 require_relative "spec_helper"
 require_relative "../bench-node-renderer"
 
@@ -12,6 +13,97 @@ require_relative "../bench-node-renderer"
 RSpec.describe "bench-node-renderer" do
   def process_status(success:, exitstatus: nil, termsig: nil)
     instance_double(Process::Status, success?: success, exitstatus:, termsig:)
+  end
+
+  def create_renderer_bundle(bundles_dir, entry, mtime:, payload: true)
+    entry_dir = File.join(bundles_dir, entry)
+    FileUtils.mkdir_p(entry_dir)
+    File.write(File.join(entry_dir, "#{entry}.js"), "") if payload
+    File.utime(mtime, mtime, entry_dir)
+  end
+
+  describe "#find_all_production_bundles" do
+    it "finds only the newest renderer-ready v2 bundle for each encoded role" do
+      Dir.mktmpdir do |root|
+        bundles_dir = File.join(root, "react_on_rails_pro/spec/dummy/.node-renderer-bundles")
+        old_server = "rorp-v2-s-#{'a' * 64}"
+        old_rsc = "rorp-v2-r-#{'b' * 64}"
+        new_server = "rorp-v2-s-#{'c' * 64}"
+        new_rsc = "rorp-v2-r-#{'d' * 64}"
+        legacy = "#{'e' * 32}-production"
+        bundle_mtimes = {
+          old_server => 10, new_rsc => 40, "not-a-bundle" => 80,
+          new_server => 50, legacy => 30,
+          "rorp-v2-x-#{'0' * 64}" => 70, "rorp-v2-s-#{'1' * 63}" => 90, old_rsc => 20
+        }
+        bundle_mtimes.each do |entry, mtime|
+          create_renderer_bundle(bundles_dir, entry, mtime: Time.at(mtime))
+        end
+
+        allow(self).to receive(:workspace_root).and_return(root)
+
+        expect(find_all_production_bundles).to eq([new_server, new_rsc])
+      end
+    end
+
+    it "raises when the newest v2 candidate for a role is missing its payload" do
+      Dir.mktmpdir do |root|
+        bundles_dir = File.join(root, "react_on_rails_pro/spec/dummy/.node-renderer-bundles")
+        old_server = "rorp-v2-s-#{'a' * 64}"
+        old_rsc = "rorp-v2-r-#{'b' * 64}"
+        new_server = "rorp-v2-s-#{'c' * 64}"
+        new_rsc = "rorp-v2-r-#{'d' * 64}"
+        { old_server => 10, old_rsc => 20, new_server => 50, new_rsc => 40 }.each do |entry, mtime|
+          create_renderer_bundle(bundles_dir, entry, mtime: Time.at(mtime), payload: entry != new_server)
+        end
+        allow(self).to receive(:workspace_root).and_return(root)
+        expected_payload = File.join(bundles_dir, new_server, "#{new_server}.js")
+
+        expect { find_all_production_bundles }
+          .to raise_error("Newest node renderer bundle for role s is missing its payload: #{expected_payload}")
+      end
+    end
+
+    it "raises when multiple v2 candidates for a role share the newest mtime" do
+      Dir.mktmpdir do |root|
+        bundles_dir = File.join(root, "react_on_rails_pro/spec/dummy/.node-renderer-bundles")
+        first_server = "rorp-v2-s-#{'a' * 64}"
+        second_server = "rorp-v2-s-#{'b' * 64}"
+        create_renderer_bundle(bundles_dir, first_server, mtime: Time.at(50))
+        create_renderer_bundle(bundles_dir, second_server, mtime: Time.at(50))
+        allow(self).to receive(:workspace_root).and_return(root)
+
+        expect { find_all_production_bundles }
+          .to raise_error(/Ambiguous newest node renderer bundles for role s: #{first_server}, #{second_server}/)
+      end
+    end
+
+    it "keeps legacy production bundles newest-first when no v2 candidates exist" do
+      Dir.mktmpdir do |root|
+        bundles_dir = File.join(root, "react_on_rails_pro/spec/dummy/.node-renderer-bundles")
+        old_legacy = "#{'a' * 32}-production"
+        new_legacy = "#{'b' * 32}-production"
+        create_renderer_bundle(bundles_dir, old_legacy, mtime: Time.at(10))
+        create_renderer_bundle(bundles_dir, "not-a-bundle", mtime: Time.at(30))
+        create_renderer_bundle(bundles_dir, new_legacy, mtime: Time.at(20))
+        allow(self).to receive(:workspace_root).and_return(root)
+
+        expect(find_all_production_bundles).to eq([new_legacy, old_legacy])
+      end
+    end
+
+    it "does not add eager payload validation to legacy discovery" do
+      Dir.mktmpdir do |root|
+        bundles_dir = File.join(root, "react_on_rails_pro/spec/dummy/.node-renderer-bundles")
+        old_legacy = "#{'a' * 32}-production"
+        new_legacy = "#{'b' * 32}-production"
+        create_renderer_bundle(bundles_dir, old_legacy, mtime: Time.at(10), payload: false)
+        create_renderer_bundle(bundles_dir, new_legacy, mtime: Time.at(20))
+        allow(self).to receive(:workspace_root).and_return(root)
+
+        expect(find_all_production_bundles).to eq([new_legacy, old_legacy])
+      end
+    end
   end
 
   describe "#validate_node_renderer_benchmark_config!" do
@@ -141,6 +233,32 @@ RSpec.describe "bench-node-renderer" do
   end
 
   describe "#run_vegeta_benchmark" do
+    it "sends the rendering request verbatim using the raw renderer protocol" do
+      stub_const("CONNECTIONS", 1)
+      stub_const("MAX_CONNECTIONS", 1)
+      stub_const("RATE", "max")
+      stub_const("DURATION", "1s")
+
+      writes = {}
+      allow(File).to receive(:write) { |path, contents| writes[path] = contents }
+      allow(FileUtils).to receive(:rm_f)
+      allow(Process).to receive_messages(spawn: 1, wait2: [1, process_status(success: true)])
+      allow(self).to receive_messages(system: true, parse_json_file: { "throughput" => 1,
+                                                                       "latencies" => { "50th" => 1_000_000,
+                                                                                        "90th" => 2_000_000 },
+                                                                       "status_codes" => { "200" => 1 } })
+
+      rendering_request = 'render({quoted: "value & more"})'
+      run_vegeta_benchmark({ name: "raw_request", request: rendering_request }, "bundleX", shard_count: 1)
+
+      expect(writes.fetch("#{OUTDIR}/raw_request_vegeta_body.txt")).to eq(rendering_request)
+      expect(writes.fetch("#{OUTDIR}/raw_request_vegeta_targets.txt")).to include(
+        "Content-Type: #{RAW_RENDER_CONTENT_TYPE}",
+        "#{RAW_RENDER_PROTOCOL_HEADER}: #{PROTOCOL_VERSION}",
+        "Authorization: Bearer #{PASSWORD}"
+      )
+    end
+
     it "runs all shards concurrently before merging their result streams into one Vegeta report" do
       stub_const("CONNECTIONS", 10)
       stub_const("MAX_CONNECTIONS", 10)

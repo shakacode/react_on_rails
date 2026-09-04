@@ -14,6 +14,7 @@
 # https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
 
 class PagesController < ApplicationController # rubocop:disable Metrics/ClassLength
+  include ActionController::Live
   include ReactOnRailsPro::RSCPayloadRenderer
   include RscPostsPageOverRedisHelper
   include ReactOnRailsPro::AsyncRendering
@@ -57,6 +58,13 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
 
   before_action :initialize_shared_store, only: %i[client_side_hello_world_shared_store_controller
                                                    server_side_hello_world_shared_store_controller]
+
+  # The stale-store probe page (issue #4861) opts out of the strict per-request-nonce CSP:
+  # after a Turbolinks soft navigation the document keeps the first page's policy, so the
+  # next page's nonced inline scripts (including this app's own immediate-hydration scripts)
+  # would be blocked. That interaction is orthogonal to the store-registry behavior the page
+  # exists to probe.
+  content_security_policy false, only: :stale_store_probe
 
   # Used for testing streamed html pages
   # Capybara doesn't support streaming, so we need to navigate to an empty page first
@@ -144,6 +152,21 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
 
   def rsc_fouc_probe
     stream_view_containing_react_components(template: "/pages/rsc_fouc_probe")
+  end
+
+  # Streams an RSC component WITHOUT an explicit id so request specs can exercise random dom ids
+  # against the prerender cache (regression for https://github.com/shakacode/react_on_rails/issues/4984).
+  def rsc_prerender_cache_probe
+    stream_view_containing_react_components(template: "/pages/rsc_prerender_cache_probe")
+  end
+
+  # React 19.2 <Activity> inside a streamed RSC tree (issue #3883, Phase 2a).
+  # artificial_delay slows the hidden tab's server component so E2E can prove
+  # visible-tab interactivity while the hidden row is still streaming; clamped
+  # so a crafted query param cannot pin the streaming connection.
+  def activity_rsc_tabs
+    @artificial_delay = params[:artificial_delay].to_i.clamp(0, 8_000)
+    stream_view_containing_react_components(template: "/pages/activity_rsc_tabs")
   end
 
   def client_side_fouc_probe
@@ -296,6 +319,54 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     render "/pages/posts_page"
   end
 
+  def selective_hydration_demo
+    stream_view_containing_react_components(template: "/pages/selective_hydration_demo")
+  end
+
+  def selective_hydration_cached # rubocop:disable Metrics/AbcSize
+    # Stream pre-cached section files with delays using ActionController::Live
+    # This simulates serving cached SSR content with progressive streaming
+    delay_seconds = (params[:delay] || 5).to_i
+    cache_dir = Rails.root.join("public", "cache", "selective_hydration_demo")
+
+    # Find all section files
+    section_files = Dir.glob(cache_dir.join("section*.html")).sort_by do |f|
+      f.match(/section(\d+)/)[1].to_i
+    end
+
+    if section_files.empty?
+      response.stream.write "No cached sections found. Run: rake section_cache:generate[/selective_hydration_demo,4,5]"
+      response.stream.close
+      return
+    end
+
+    # Get current CSP nonce for this request
+    current_nonce = content_security_policy_nonce
+
+    # Set headers for streaming
+    response.headers["Content-Type"] = "text/html; charset=utf-8"
+    response.headers["Cache-Control"] = "no-cache"
+    response.headers["X-Accel-Buffering"] = "no"
+
+    # Stream sections with delays using Live streaming
+    section_files.each_with_index do |section_path, index|
+      # Wait before sending this section (except first)
+      sleep(delay_seconds) if index.positive?
+
+      # Read section content and replace cached nonce with current nonce
+      content = File.read(section_path)
+      # Replace any nonce="..." with the current request's nonce
+      content = content.gsub(/nonce="[^"]*"/, "nonce=\"#{current_nonce}\"")
+
+      # Stream the content immediately
+      response.stream.write(content)
+
+      Rails.logger.info "[SectionCache] Sent section #{index}: #{File.basename(section_path)}"
+    end
+  ensure
+    response.stream.close
+  end
+
   def loadable_component
     render "/pages/pro/loadable_component"
   end
@@ -343,10 +414,29 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     stream_view_containing_react_components(template: "/pages/cache_demo")
   end
 
+  # Spike for issue #4874 (Server Functions RFC): RSC page hosting the demo form.
+  def spike_server_functions
+    stream_view_containing_react_components(template: "/pages/spike_server_functions")
+  end
+
   # Demo page showing 10 async components rendering concurrently
   # Each component delays 1 second - sequential would take ~10s, concurrent takes ~1s
   def async_components_demo
     render "/pages/pro/async_components_demo"
+  end
+
+  # Probe page for the stale hydrated-store regression after a Turbolinks/Turbo soft
+  # navigation (issue #4861). Two variants of the same page (?variant=one|two) declare a
+  # DEFERRED SharedReduxStore whose props embed the variant, so each soft navigation between
+  # them is a page whose store data differs from the previous page's. See the view and
+  # e2e-tests/stale_store_after_navigation.spec.ts.
+  def stale_store_probe
+    @variant = params[:variant] == "two" ? "two" : "one"
+    @stale_store_probe_props = {
+      helloWorldData: {
+        name: "variant-#{@variant}"
+      }
+    }
   end
 
   # See files in spec/dummy/app/views/pages

@@ -76,7 +76,9 @@ RSpec.describe "rolling-deploy auto routes", type: :request do
       adapter: ReactOnRailsPro::RollingDeployAdapters::Http,
       mount_path: default_path
     )
-    allow(ReactOnRailsPro::RendererCacheHelpers).to receive(:bundle_sources).and_return([])
+    allow(ReactOnRailsPro::Utils).to receive(:renderer_artifacts)
+      .with(action_description: "serving rolling-deploy tarball")
+      .and_return([])
 
     get "#{default_path}/manifest", headers: { "Authorization" => "Bearer #{token}" }
 

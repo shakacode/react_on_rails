@@ -32,6 +32,8 @@ module ReactOnRailsPro
 
     SCHEDULER_CLIENTS_KEY: Symbol
 
+    def self.transport_config_description: () -> String
+
     class ConnectTimeoutWrapper
       def initialize: (connect_timeout: Numeric?, ?read_timeout: Numeric?) -> void
 
@@ -54,6 +56,8 @@ module ReactOnRailsPro
       def read: () -> String?
 
       def close: () -> nil
+
+      def bytesize: () -> Integer?
     end
 
     class MultipartBody
@@ -62,6 +66,20 @@ module ReactOnRailsPro
       def read: () -> String?
 
       def close: (?StandardError? error) -> untyped
+
+      def bytesize: () -> Integer?
+    end
+
+    class WritableBody
+      attr_reader bytesize: Integer
+
+      def initialize: () -> void
+
+      def write: (String chunk) -> untyped
+
+      def trace=: (OpenTelemetry::ClientSpan trace) -> untyped
+
+      def close_write: (*untyped) -> untyped
     end
 
     class PersistentThreadClient

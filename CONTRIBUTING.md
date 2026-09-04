@@ -497,8 +497,8 @@ That fallback comes from `CI_PNPM_FALLBACK_VERSION` in [`react_on_rails/lib/gene
 **Verification:**
 
 ```sh
-bundle exec rspec react_on_rails/spec/react_on_rails/generators/install_generator_spec.rb \
-  -e "keeps the fallback pin tied to a version-specific pnpm release note"
+(cd react_on_rails && bundle exec rspec spec/react_on_rails/generators/install_generator_spec.rb \
+  -e "keeps the fallback pin tied to a version-specific pnpm release note")
 ```
 
 Users who want exact reproducibility in their generated CI can commit a `packageManager: pnpm@<version>` field to their own `package.json`; the generator then omits the fallback `version:` entirely.
@@ -898,7 +898,8 @@ bundle install
 git clean -fd && git reset --hard generator_testing_base && git clean -fd
 
 # Add Shakapacker to Gemfile
-bundle add shakapacker --strict
+SHAKAPACKER_VERSION="$(bin/read-tool-version .ci-dependency-versions latest-shakapacker)"
+bundle add shakapacker --version="${SHAKAPACKER_VERSION}" --strict
 
 # Run Shakapacker installer first
 ./bin/rails shakapacker:install

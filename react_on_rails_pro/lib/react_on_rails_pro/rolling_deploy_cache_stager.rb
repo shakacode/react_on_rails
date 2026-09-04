@@ -167,22 +167,10 @@ module ReactOnRailsPro
       # clear "Failed to seed previous bundle hash" attribution rather than as a
       # downstream copy/symlink failure inside `stage_previous_file`.
       FileUtils.mkdir_p(staging_dir)
-      stage_previous_file(
-        payload[:bundle],
-        File.join(staging_dir, "#{hash}.js"),
-        bundle_dir,
-        mode,
-        "Seeded previous bundle file"
-      )
-
-      Array(payload[:assets]).each do |asset_path|
-        stage_previous_file(
-          asset_path,
-          File.join(staging_dir, File.basename(asset_path)),
-          bundle_dir,
-          mode,
-          "Seeded previous asset"
-        )
+      if payload[:verified_artifact]
+        stage_verified_artifact(payload.fetch(:verified_artifact), staging_dir, hash)
+      else
+        stage_legacy_payload(payload, staging_dir, bundle_dir, hash, mode)
       end
 
       replace_bundle_directory(staging_dir, bundle_dir)
@@ -207,9 +195,14 @@ module ReactOnRailsPro
       end
 
       asset_paths = Array(payload[:assets]).map(&:to_s)
-      return nil unless valid_bundle_payload?(payload, hash)
-      return nil unless valid_required_rsc_payload?(asset_paths, hash)
-      return nil unless valid_asset_payload?(asset_paths, hash)
+      return nil unless valid_payload?(payload, asset_paths, hash)
+
+      if RendererArtifact.versioned_id?(hash)
+        verified_artifact = verified_v2_artifact(payload, asset_paths, hash)
+        return nil unless verified_artifact
+
+        payload = payload.merge(verified_artifact:)
+      end
 
       # Attribute PackerUtils / RendererCacheHelpers failures to the loadable-stats
       # lookup rather than letting the outer adapter#fetch rescue blame the adapter
@@ -235,6 +228,13 @@ module ReactOnRailsPro
     end
     private_class_method :fetch_payload
 
+    def self.valid_payload?(payload, asset_paths, hash)
+      valid_bundle_payload?(payload, hash) &&
+        valid_required_rsc_payload?(asset_paths, hash) &&
+        valid_asset_payload?(asset_paths, hash)
+    end
+    private_class_method :valid_payload?
+
     def self.valid_bundle_payload?(payload, hash)
       return true if payload[:bundle] && File.file?(payload[:bundle])
 
@@ -243,6 +243,64 @@ module ReactOnRailsPro
       false
     end
     private_class_method :valid_bundle_payload?
+
+    def self.verified_v2_artifact(payload, asset_paths, hash)
+      role = RendererArtifact.role_from_id(hash)
+      companions = asset_paths.each_with_object({}) do |path, mapping|
+        mapping[File.basename(path)] = path
+      end
+      artifact = RendererArtifact.new(role:, bundle: payload[:bundle], companions:)
+      return artifact if artifact.id == hash
+
+      warn "[ReactOnRailsPro] rolling_deploy_adapter#fetch(#{hash.inspect}) payload does not match advertised " \
+           "v2 artifact ID. Skipping this hash before cache promotion."
+      nil
+    rescue StandardError => e
+      warn "[ReactOnRailsPro] Could not verify v2 artifact ID for #{hash.inspect}: #{e.class}: #{e.message}. " \
+           "Skipping this hash before cache promotion."
+      nil
+    end
+    private_class_method :verified_v2_artifact
+
+    def self.stage_verified_artifact(artifact, staging_dir, hash)
+      RendererCacheHelpers.write_content_atomically(
+        artifact.bundle_body,
+        File.join(staging_dir, "#{hash}.js"),
+        log_prefix: "Seeded verified previous bundle file",
+        source_label: artifact.bundle
+      )
+      artifact.companions.each do |basename, source|
+        source_label = source.is_a?(RendererArtifact::InlineCompanion) ? source.url : source
+        RendererCacheHelpers.write_content_atomically(
+          artifact.companion_bodies.fetch(basename),
+          File.join(staging_dir, basename),
+          log_prefix: "Seeded verified previous asset",
+          source_label:
+        )
+      end
+    end
+    private_class_method :stage_verified_artifact
+
+    def self.stage_legacy_payload(payload, staging_dir, bundle_dir, hash, mode)
+      stage_previous_file(
+        payload[:bundle],
+        File.join(staging_dir, "#{hash}.js"),
+        bundle_dir,
+        mode,
+        "Seeded previous bundle file"
+      )
+
+      Array(payload[:assets]).each do |asset_path|
+        stage_previous_file(
+          asset_path,
+          File.join(staging_dir, File.basename(asset_path)),
+          bundle_dir,
+          mode,
+          "Seeded previous asset"
+        )
+      end
+    end
+    private_class_method :stage_legacy_payload
 
     def self.valid_asset_payload?(asset_paths, hash)
       # Stricter than upload-side filtering: a partial payload in the store means

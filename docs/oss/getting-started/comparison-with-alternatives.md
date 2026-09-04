@@ -157,7 +157,7 @@ Build speed is only part of the picture. Here's how the two approaches compare a
 
 ### React on Rails (OSS)
 
-[React on Rails](https://github.com/shakacode/react_on_rails) provides full React integration with Rails views. Components render directly in ERB/Haml templates via the `react_component` helper, with props passed from Rails. Server-side rendering uses ExecJS (via mini_racer).
+[React on Rails](https://github.com/shakacode/react_on_rails) provides full React integration with Rails views. Components render directly in ERB/Haml templates via the `react_component` helper, with props passed from Rails. Server-side rendering uses ExecJS, which auto-detects an available JavaScript runtime (Node.js, mini_racer, or Bun).
 
 **Strengths:**
 
@@ -178,7 +178,8 @@ Build speed is only part of the picture. Here's how the two approaches compare a
 
 - **React Server Components** — full RSC support with Rails integration
 - **Streaming SSR and Rails async props** — progressive rendering with `renderToPipeableStream`, including Rails-owned query results that resolve independent Suspense boundaries
-- **Node renderer** — dedicated Node.js server for 3-10x faster SSR (replaces ExecJS)
+- **Node renderer** — dedicated Node.js server with persistent workers for concurrent SSR;
+  [performance gains are workload-dependent](../core-concepts/performance-benchmarks.md)
 - **Fragment caching** — cache rendered components with `cached_react_component`
 - **Code splitting with SSR** — route-based splitting via Loadable Components
 - **TanStack Router SSR** — type-safe routing with server rendering

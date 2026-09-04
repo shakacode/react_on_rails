@@ -7,11 +7,11 @@ slug: existing-rails-app
 Use this path when you already have a Rails application and want React on Rails to generate the missing integration files for you.
 
 > [!NOTE]
-> **Summary for AI agents:** Use this page when the user has an existing Rails app and wants to add React. For new apps, use [Quick Start](./quick-start.md). If the app still uses Webpacker, expect a two-step migration (Webpacker → Shakapacker → React on Rails). Rails 7+ is recommended.
+> **Summary for AI agents:** Use this page when the user has an existing Rails app and wants to add React. For new apps, use [Quick Start](./quick-start.md). If the app still uses Webpacker, expect a two-step migration (Webpacker → Shakapacker → React on Rails). Rails 7.0+ is required (Ruby 3.3+ is incompatible with older Rails).
 
 ## Preflight
 
-- Rails 7+ is recommended. Rails 5.2+ can work, but Webpacker-era apps usually need an incremental upgrade first.
+- Rails 7.0+ is required (Ruby 3.3+ is incompatible with Rails < 7.0).
 - If your app still uses `webpacker`, expect this to be a two-step migration: move to `shakapacker`, then install React on Rails.
 - If your app is Rails 5 API-only, first [convert it to a standard Rails app](../migrating/convert-rails-5-api-only-app.md).
 - Commit or stash your current work if you want the generated diff to be easier to review. The generator updates files like `bin/dev`, `config/shakapacker.yml`, routes, initializers, and sample views/controllers.
@@ -19,9 +19,13 @@ Use this path when you already have a Rails application and want React on Rails 
 ## 1. Add the gems
 
 ```bash
-bundle add shakapacker --strict
 bundle add react_on_rails --strict
+SHAKAPACKER_VERSION="$(bundle exec ruby -rreact_on_rails -e 'print ReactOnRails::PackerUtils.shakapacker_version')"
+bundle add shakapacker --version="${SHAKAPACKER_VERSION}" --strict
 ```
+
+Adding React on Rails first lets Bundler select a compatible Shakapacker release. Pinning that resolved version when
+adding Shakapacker directly prevents an older globally installed gem from replacing it.
 
 React on Rails attempts to install the matching `react-on-rails` JavaScript package during the generator run. In some existing apps, dependency installation can fail (or required package-manager tooling may be unavailable), and the generator prints manual install commands. Run those commands before starting the app.
 

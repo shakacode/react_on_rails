@@ -213,14 +213,15 @@ uses `*-test.bash` harnesses, e.g. `ci-changes-detector-test.bash`).
 `script/release-finish` orchestrates the runbook's steps 4–5, wrapping the existing
 rake promotion guards with confirmations:
 
-- **Promote (step 4):** `git checkout release/X.Y.Z`; fetch and require the local release tip to exactly match the
+- **Promote preview (step 4):** `git checkout release/X.Y.Z`; fetch and require the local release tip to exactly match the
   remote release tip; verify the accepted RC is an ancestor and every later commit is positively classified as non-runtime;
-  confirm the rc → stable changelog was collapsed and committed after the RC
-  (`$react-on-rails-update-changelog release`);
-  `bundle exec rake release[X.Y.Z]`
-  (all promotion guards already enforced in `release.rake`).
+  preview the rc → stable changelog and release command. Live promotion is supported only through
+  `script/release`, which owns the release-line lease and all authoritative promotion guards.
 - **Close out (step 5):** forward-port remaining commits to `main` (uses PR 3),
-  then `git push origin --delete release/X.Y.Z` (tags are the durable record).
+  then atomically move the checked source tip to a temporary recovery branch while deleting
+  `release/X.Y.Z` with a source lease. Re-fetch `main`; if it raced, atomically restore the release
+  branch before aborting. If the release branch reappears, retain recovery and abort; otherwise atomically
+  prove it remains absent while deleting the recovery branch (tags remain the durable release record).
 
 Surface to pin at PR-4 design: one script with `promote` / `close-out`
 subcommands vs a single linear flow with a confirmation between phases. This PR is

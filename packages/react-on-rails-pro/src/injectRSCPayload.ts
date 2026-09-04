@@ -100,13 +100,24 @@ function createRSCDiagnosticScript(
   metadata: Record<string, unknown>,
   cacheKey: string,
   sanitizedNonce?: string,
+  railsEnv?: string,
 ) {
   const { hasErrors, renderingError } = metadata;
   // `hasErrors` is a boolean per the server wire contract; renderingError only carries
   // a useful diagnostic when the server provided a non-blank message or stack.
   if (hasErrors !== true && !hasRenderingErrorSignal(renderingError)) return undefined;
+  // Outside development/test, emit only the error signal without the server error message or stack.
+  // Full diagnostics are reported server-side via the streaming error reporter (Sentry/Honeybadger).
+  // Fail-closed: unknown or missing railsEnv defaults to redacted (safe for a security gate).
+  const showFullDiagnostics = railsEnv === 'development' || railsEnv === 'test';
+  // The two branches normalize `hasErrors` differently on purpose. The redacted (production)
+  // branch forces `hasErrors: true` so a chunk that only tripped `hasRenderingErrorSignal`
+  // (server sent `hasErrors: false` but a non-blank message/stack) still emits a positive
+  // generic signal for error boundaries. The development/test branch instead passes the raw
+  // metadata through unchanged to preserve the exact historical dev payload shape for debugging.
+  const clientPayload = showFullDiagnostics ? { hasErrors, renderingError } : { hasErrors: true };
   return createScriptTag(
-    `${cacheKeyDiagnosticObject(cacheKey)}||=${JSON.stringify({ hasErrors, renderingError })}`,
+    `${cacheKeyDiagnosticObject(cacheKey)}||=${JSON.stringify(clientPayload)}`,
     sanitizedNonce,
     true,
   );
@@ -119,6 +130,12 @@ const LOADABLE_STATS_FILE_NAME = 'loadable-stats.json';
 const LOADABLE_STATS_INITIAL_READ_RETRY_DELAY_MS = 100;
 const LOADABLE_STATS_MAX_READ_RETRY_DELAY_MS = 30_000;
 const LOADABLE_STATS_UNEXPECTED_WARNING_INTERVAL_MS = LOADABLE_STATS_MAX_READ_RETRY_DELAY_MS;
+// The Node Renderer injects the host callback under this VM-global key. Keep its test probes in
+// packages/react-on-rails-pro-node-renderer/tests/vm.test.ts and
+// packages/react-on-rails-pro/tests/loadClientChunkStylesheetHrefs.test.ts in sync too.
+// MIRROR VALUES OF: packages/react-on-rails-pro-node-renderer/src/worker/vm.ts
+const LOADABLE_STATS_MISSING_DIAGNOSTIC_CONTEXT_KEY = '__reactOnRailsProReportMissingLoadableStats';
+// MIRROR VALUES END
 const RSC_CLIENT_STYLESHEET_INFERENCE_TIMEOUT_MS = 100;
 const STACK_FILE_LOCATION = /\(?((?:file:\/\/\/.+)|(?:\/.+)|(?:[A-Za-z]:[\\/].+)):\d+:\d+\)?\s*$/;
 
@@ -159,8 +176,16 @@ function isFileNotFoundError(error: unknown) {
   return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT';
 }
 
+function reportMissingLoadableStats(loadableStatsPath: string) {
+  const hostDiagnostic = Reflect.get(globalThis, LOADABLE_STATS_MISSING_DIAGNOSTIC_CONTEXT_KEY) as unknown;
+  if (typeof hostDiagnostic === 'function') hostDiagnostic(loadableStatsPath);
+}
+
 function warnIfUnexpectedLoadableStatsFailure(error: unknown, loadableStatsPath: string) {
-  if (isFileNotFoundError(error)) return;
+  if (isFileNotFoundError(error)) {
+    reportMissingLoadableStats(loadableStatsPath);
+    return;
+  }
 
   const warningKey = `${loadableStatsPath}\n${error instanceof Error ? `${error.name}:${error.message}` : String(error)}`;
   const nowMs = rscClientChunkStylesheetHrefsRetryClockMs();
@@ -1596,6 +1621,7 @@ type InjectRSCPayloadOptions = {
   rscClientManifestStylesheetHrefs?: ReadonlySet<string>;
   rscClientChunkStylesheetHrefsByChunkName?: RSCClientChunkStylesheetHrefsByChunkName;
   rscStreamObservability?: boolean;
+  railsEnv?: string;
 };
 
 /**
@@ -1635,6 +1661,7 @@ export default function injectRSCPayload(
     rscClientManifestStylesheetHrefs = new Set<string>(),
     rscClientChunkStylesheetHrefsByChunkName = loadRSCClientChunkStylesheetHrefsByChunkName(),
     rscStreamObservability = false,
+    railsEnv,
   } = options;
   const sanitizedNonce = sanitizeNonce(cspNonce);
   const htmlStream = new PassThrough();
@@ -2010,7 +2037,12 @@ export default function injectRSCPayload(
             const handleParsedChunk = (content: Uint8Array, metadata: Record<string, unknown>) => {
               const flightData = textDecoder.decode(content);
               if (!hasEmittedDiagnosticScript) {
-                const diagnosticScript = createRSCDiagnosticScript(metadata, rscPayloadKey, sanitizedNonce);
+                const diagnosticScript = createRSCDiagnosticScript(
+                  metadata,
+                  rscPayloadKey,
+                  sanitizedNonce,
+                  railsEnv,
+                );
                 if (diagnosticScript) {
                   rscPayloadBuffers.push(Buffer.from(diagnosticScript));
                   hasEmittedDiagnosticScript = true;

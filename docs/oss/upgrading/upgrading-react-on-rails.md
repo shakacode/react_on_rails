@@ -46,13 +46,13 @@ install.
 
 Before changing versions, check these first:
 
-1. **Ruby and Node requirements**: React on Rails v17 requires Ruby 3.3+ and Node 18+. React on Rails v16 remains the upgrade path for apps that need older Ruby versions.
+1. **Ruby and Node requirements**: React on Rails v17 requires Ruby 3.3+ and Node 18+. The default React on Rails Pro Node renderer resolves Fastify 5 and requires Node 20+ at startup. Its `engines.node` floor of Node 18.19.0+ applies only when you use the documented Fastify 4-compatible dependency overrides. React on Rails v16 remains the upgrade path for apps that need older Ruby versions.
 2. **Bundler age**: legacy apps may have lockfiles created by Bundler 1.x. Those lockfiles can fail on modern Ruby before the React on Rails upgrade even starts.
-3. **Rails version**: current `react_on_rails` requires Rails 5.2+. Rails 5.1 apps need a Rails upgrade before they can bundle v17.
+3. **Rails version**: current `react_on_rails` requires Ruby 3.3+, which is incompatible with Rails < 7.0. Older Rails apps need a Rails upgrade first.
 4. **Asset stack**: if the app still uses `webpacker`, upgrade to `shakapacker` first.
 5. **Version pinning**: use exact gem and npm package versions for React on Rails-related packages. Avoid `^`, `~`, or `*`.
 
-If your app is both Ruby/Bundler-old and Webpacker-old, do those upgrades first. Trying to jump directly from a Rails 5 / Webpacker 3 / Bundler 1 stack to current React on Rails is usually more than one migration.
+If your app is both Ruby/Bundler-old and Webpacker-old, do those upgrades first. Trying to jump directly from an older Rails / Webpacker 3 / Bundler 1 stack to current React on Rails is usually more than one migration.
 
 If the first failure is a Bundler 1.x lockfile, refresh that lockfile with Bundler 2.x before changing React on Rails:
 
@@ -109,13 +109,20 @@ In CI, run precompile preparation explicitly once before webpack compilation or 
 
 - **Ruby 3.3+ is required.** Upgrade Ruby before moving to React on Rails v17. React on Rails v16 remains the supported line for applications that must stay on Ruby 3.2 or older.
 - **React on Rails Pro already required Ruby 3.3+.** v17 aligns the open-source gem, Pro gem, create-app validator, and CI minimum matrix on the same Ruby floor.
-- **Three deprecated configuration options were removed.** They were deprecated in v16 and are gone in v17. Setting any of them in `config/initializers/react_on_rails.rb` now raises `NoMethodError` at boot. Run `bin/rake react_on_rails:doctor` to detect any that remain in your initializer.
+- **Four configuration options were removed.** Three were deprecated in v16, while `config.server_render_method` was inert. All four are gone in v17. Setting any of them in `config/initializers/react_on_rails.rb` now raises `NoMethodError` at boot. Run `bin/rake react_on_rails:doctor` to detect any that remain in your initializer.
   - `config.generated_assets_dirs` — delete the line. Public asset paths are determined automatically from `public_output_path` in `config/shakapacker.yml`.
   - `config.skip_display_none` — delete the line. It had no runtime effect.
   - `config.defer_generated_component_packs` — replaced by `config.generated_component_packs_loading_strategy`:
     - `config.defer_generated_component_packs = true` → `config.generated_component_packs_loading_strategy = :defer`
     - `config.defer_generated_component_packs = false` → **delete the line.** The old option was truthy-gated — only `= true` did anything (it set `:defer`); `= false` was a no-op that fell through to the default strategy. Deleting the line preserves that behavior. Set `config.generated_component_packs_loading_strategy = :sync` explicitly only if you specifically relied on synchronous (blocking) pack loading.
     - The default strategy (when you don't set one) is `:async` for Pro or `:defer` for non-Pro on Shakapacker 8.2.0+, and `:sync` on older Shakapacker.
+  - `config.server_render_method` — delete the line. The open-source gem always renders with ExecJS, so this option never selected a server render method — its validator only raised at boot for any non-blank, non-`"ExecJS"` value. Leaving it in place now raises `NoMethodError` at boot (`bin/rake react_on_rails:doctor` also flags the stale line). For a standalone Node rendering process, use React on Rails Pro's Node renderer, configured via `ReactOnRailsPro.configure`.
+- **[Pro] Removed the undocumented `ReactOnRailsPro::Cache.fetch_react_component` class API.** Pro apps should use the supported cached helper APIs (`cached_react_component`, `cached_react_component_hash`, and related helpers) instead of calling the low-level cache class directly.
+- **[Pro] React Server Components now require the stable React 19.2.x RSC line.** Pro RSC apps on v17 require `react-on-rails-rsc >= 19.2.1 < 19.3`, React >= 19.2.7, and matching React DOM. Non-RSC Pro apps retain React 18 support. Set `REACT_ON_RAILS_PRO_DISABLE_VERSION_CHECK=1` only as an emergency escape hatch.
+- **Removed the never-wired `RenderRequest` / `JsCodeBuilder` / `RenderingStrategy` rendering layer.** These internal classes were built for a strategy-pattern refactor that was never connected. Remove any application references to `ReactOnRails::RenderRequest`, `ReactOnRails::JsCodeBuilder`, `ReactOnRails::RenderingStrategy`, or Pro equivalents.
+- **Removed undocumented `ReactOnRails::Utils` helpers.** `ReactOnRails::Utils.server_rendering_is_enabled?` and `ReactOnRails::Utils.rails_version_less_than` are gone. Remove any application calls.
+- **[Pro] Node Renderer now requires Ruby 3.3+ for the async-http transport.** The `react-on-rails-pro` gem now requires Ruby >= 3.3 (raised from >= 3.0) because `async-http` depends on Ruby 3.3 features. Upgrade Ruby before moving to this release.
+- **[Pro] `config.renderer_http_pool_size` semantics changed.** Existing numeric values now cap concurrent async-http connections for each renderer client instead of sizing a persistent process-wide connection pool. HTTP/2 may multiplex request streams over those pooled connections. Setting `nil` keeps the default connection limit and does not make the async-http client unlimited. See the [Renderer Performance Tuning](../configuration/configuration-pro.md#renderer-performance-tuning-for-streamed-rsc) section.
 
 ### Migration Steps
 
@@ -135,12 +142,47 @@ In CI, run precompile preparation explicitly once before webpack compilation or 
    npm install   # or: yarn install / pnpm install
    ```
 
-4. Run RuboCop, your app's test suite, and asset build after the Ruby and package updates. The Ruby
+4. Before booting, run the doctor task to find removed configuration options:
+
+   ```bash
+   bin/rake react_on_rails:doctor
+   ```
+
+   Remove or replace every option it reports in `config/initializers/react_on_rails.rb`. Any remaining option listed in the Breaking Changes above (`config.generated_assets_dirs`, `config.skip_display_none`, `config.defer_generated_component_packs`, `config.server_render_method`) raises `NoMethodError` at boot.
+
+5. Run RuboCop, your app's test suite, and asset build after the Ruby and package updates. The Ruby
    baseline bump can activate cops that were previously inactive:
 
    ```bash
    bundle exec rubocop
    ```
+
+## Upgrading to v16.6.0 (from v16.5.x)
+
+### Breaking Changes
+
+- **Removed `immediate_hydration` completely.** The `immediate_hydration` config option, helper parameter, `data-immediate-hydration` HTML attribute, and `redux_store` `immediate_hydration:` keyword argument have been removed. Immediate hydration is now always enabled for Pro users and disabled for non-Pro users, with no per-component override.
+
+### Migration Steps
+
+1. Remove `config.immediate_hydration` from `config/initializers/react_on_rails.rb` (or `react_on_rails_pro.rb`)
+2. Remove any `immediate_hydration:` keyword arguments from `react_component`, `react_component_hash`, `stream_react_component`, and `redux_store` calls in your views
+3. Update gem and npm package versions to 16.6.0, then run `bundle install` and your package manager's install command
+
+See the [v16.6.0 Release Notes](release-notes/16.6.0.md) for all changes.
+
+## Upgrading to v16.5.0 (from v16.4.0)
+
+### Breaking Changes
+
+- **[Pro] `RENDERER_PASSWORD` now required in production-like environments.** Existing staging/production deployments using NodeRenderer without a password will fail to start after upgrading. Set `RENDERER_PASSWORD` in the environment and configure `config.renderer_password = ENV.fetch("RENDERER_PASSWORD")` in your Rails initializer before upgrading.
+- **[Pro] Minimum `async` gem version bumped to 2.29.** The streaming helper now requires `async >= 2.29` (previously `>= 2.6`) due to the migration from `Async::Variable` to `Async::Promise`. Run `bundle update async` if your Gemfile pins below 2.29.
+
+### Changes
+
+- **[Pro] Canonical env var for worker count is now `RENDERER_WORKERS_COUNT`.** The previous `NODE_RENDERER_CONCURRENCY` is still supported as a fallback. Update deployment configs and documentation to use the new name.
+
+See the [v16.5.0 Release Notes](release-notes/16.5.0.md) for all changes.
 
 ## Upgrading to v16.4.0 (from v16.3.x)
 
@@ -185,26 +227,28 @@ This is a minor release - update your gem and npm package versions, then run `bu
 
 - **Webpacker support completely removed**. Shakapacker >= 6.0 is now required.
 - **Updated runtime requirements**:
-  - Minimum Ruby version: 3.2 (v16 minimum; v17 requires 3.3+)
-  - Minimum Node.js version: 20
+  - Minimum Ruby version: 3.0 (v16 minimum; v17 requires 3.3+)
+  - Minimum Node.js version: 18 (the Pro Node renderer defaults to Fastify 5 and requires Node 20+; its
+    `engines.node` floor of >= 18.19.0 applies with documented Fastify 4-compatible dependency overrides)
+  - CI tests against newer Ruby and Node.js versions than these minimums; CI targets are not support floors
 - **Install generator now validates prerequisites** and requires at least one JavaScript package manager
 
 ### Migration Steps
 
 1. **Update Dependencies**
 
-   > **Note**: The versions below are examples. Check the [changelog](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) for the latest stable release and substitute accordingly.
+   > **Note**: The versions below are examples. Check the [changelog](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md) for the latest stable release and substitute accordingly.
 
    ```ruby
    # Gemfile
-   gem "react_on_rails", "16.4.0"
+   gem "react_on_rails", "16.6.0"
    ```
 
    ```json
    // package.json — use the npm equivalent of the same release
    {
      "dependencies": {
-       "react-on-rails": "16.4.0"
+       "react-on-rails": "16.6.0"
      }
    }
    ```

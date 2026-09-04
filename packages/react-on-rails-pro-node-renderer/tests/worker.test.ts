@@ -14,7 +14,6 @@
  */
 
 import fs from 'fs';
-import FormData from 'form-data';
 import path from 'path';
 import querystring from 'querystring';
 import { PassThrough, Readable } from 'stream';
@@ -155,18 +154,19 @@ describe('worker', () => {
     const httpErrorLogSpy = jest.spyOn(app.log, 'error');
 
     try {
-      const form = new FormData();
-      form.append('gemVersion', gemVersion);
-      form.append('protocolVersion', protocolVersion);
-      form.append('railsEnv', railsEnv);
-      form.append('renderingRequest', 'ReactOnRails.dummy');
-      form.append('bundle', fs.readFileSync(getFixtureBundle()), {
-        contentType: 'text/javascript',
-        filename: 'bundle.js',
-      });
-      form.append('asset1', Buffer.from('{}'), {
-        contentType: 'application/json',
-        filepath: '../../loadable-stats.json',
+      const { form } = formAutoContent({
+        gemVersion,
+        protocolVersion,
+        railsEnv,
+        renderingRequest: 'ReactOnRails.dummy',
+        bundle: {
+          value: fs.readFileSync(getFixtureBundle()),
+          options: { contentType: 'text/javascript', filename: 'bundle.js' },
+        },
+        asset1: {
+          value: Buffer.from('{}'),
+          options: { contentType: 'application/json', filepath: '../../loadable-stats.json' },
+        },
       });
 
       const res = await app
@@ -212,6 +212,123 @@ describe('worker', () => {
     expect(fs.existsSync(assetPathOther(testName, String(BUNDLE_TIMESTAMP)))).toBe(true);
     expect(fs.existsSync(assetPath(testName, String(SECONDARY_BUNDLE_TIMESTAMP)))).toBe(true);
     expect(fs.existsSync(assetPathOther(testName, String(SECONDARY_BUNDLE_TIMESTAMP)))).toBe(true);
+  });
+
+  test('POST raw render request normalizes headers and executes the JavaScript body verbatim', async () => {
+    await createVmBundleForTest();
+    const app = createWorker({ password: 'my_password' });
+    const renderingRequest = "ReactOnRails.dummy // quotes: '\"' and unicode: ✓";
+
+    const res = await app
+      .inject()
+      .post(`/bundles/${BUNDLE_TIMESTAMP}/render/d41d8cd98f00b204e9800998ecf8427e`)
+      .headers({
+        'content-type': 'application/vnd.react-on-rails.render-request+javascript',
+        authorization: 'Bearer my_password',
+        'x-react-on-rails-pro-protocol-version': protocolVersion,
+        'x-react-on-rails-pro-gem-version': gemVersion,
+        'x-react-on-rails-pro-rails-env': railsEnv,
+        'x-react-on-rails-pro-dependency-bundle-timestamps': JSON.stringify([String(BUNDLE_TIMESTAMP)]),
+        'x-react-on-rails-pro-rsc-stream-observability': 'false',
+      })
+      .payload(renderingRequest)
+      .end();
+
+    expect(res.statusCode).toBe(200);
+    expect(res.payload).toBe('{"html":"Dummy Object"}');
+  });
+
+  test('POST raw render request rejects malformed dependency metadata', async () => {
+    const app = createWorker();
+
+    const res = await app
+      .inject()
+      .post(`/bundles/${BUNDLE_TIMESTAMP}/render/d41d8cd98f00b204e9800998ecf8427e`)
+      .headers({
+        'content-type': 'application/vnd.react-on-rails.render-request+javascript',
+        'x-react-on-rails-pro-protocol-version': protocolVersion,
+        'x-react-on-rails-pro-dependency-bundle-timestamps': 'not-json',
+      })
+      .payload('ReactOnRails.dummy')
+      .end();
+
+    expect(res.statusCode).toBe(400);
+    expect(res.payload).toContain('expected a JSON array');
+  });
+
+  test('POST raw render request authenticates before validating header shape', async () => {
+    const app = createWorker({ password: 'my_password' });
+
+    const res = await app
+      .inject()
+      .post(`/bundles/${BUNDLE_TIMESTAMP}/render/d41d8cd98f00b204e9800998ecf8427e`)
+      .headers({
+        'content-type': 'application/vnd.react-on-rails.render-request+javascript',
+        authorization: 'Bearer wrong_password',
+        'x-react-on-rails-pro-protocol-version': protocolVersion,
+        'x-react-on-rails-pro-dependency-bundle-timestamps': 'not-json',
+      })
+      .payload('ReactOnRails.dummy')
+      .end();
+
+    expect(res.statusCode).toBe(401);
+    expect(res.payload).toBe('Wrong password');
+  });
+
+  test('POST raw render request rejects a mismatched gem version outside production', async () => {
+    const app = createWorker();
+
+    const res = await app
+      .inject()
+      .post(`/bundles/${BUNDLE_TIMESTAMP}/render/d41d8cd98f00b204e9800998ecf8427e`)
+      .headers({
+        'content-type': 'application/vnd.react-on-rails.render-request+javascript',
+        'x-react-on-rails-pro-protocol-version': protocolVersion,
+        'x-react-on-rails-pro-gem-version': '0.0.1',
+        'x-react-on-rails-pro-rails-env': railsEnv,
+      })
+      .payload('ReactOnRails.dummy')
+      .end();
+
+    expect(res.statusCode).toBe(412);
+    expect(res.payload).toContain('does not match node renderer version');
+  });
+
+  test('POST raw render request reports no received fields when metadata headers are missing', async () => {
+    const app = createWorker();
+
+    const res = await app
+      .inject()
+      .post(`/bundles/${BUNDLE_TIMESTAMP}/render/d41d8cd98f00b204e9800998ecf8427e`)
+      .headers({ 'content-type': 'application/vnd.react-on-rails.render-request+javascript' })
+      .payload('ReactOnRails.dummy')
+      .end();
+
+    expect(res.statusCode).toBe(412);
+    expect(res.payload).toContain('MISSING (received fields: (none))');
+  });
+
+  test('POST render request still accepts application/x-www-form-urlencoded bodies from older gems', async () => {
+    await createVmBundleForTest();
+    const app = createWorker({ password: 'my_password' });
+
+    const res = await app
+      .inject()
+      .post(`/bundles/${BUNDLE_TIMESTAMP}/render/d41d8cd98f00b204e9800998ecf8427e`)
+      .headers({ 'content-type': 'application/x-www-form-urlencoded' })
+      .payload(
+        querystring.stringify({
+          renderingRequest: 'ReactOnRails.dummy',
+          protocolVersion,
+          gemVersion,
+          railsEnv,
+          password: 'my_password',
+        }),
+      )
+      .end();
+
+    expect(res.statusCode).toBe(200);
+    expect(res.payload).toBe('{"html":"Dummy Object"}');
   });
 
   test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest returns actionable error when renderingRequest is missing', async () => {
@@ -455,15 +572,16 @@ describe('worker', () => {
     const app = createWorker({
       password: 'password',
     });
-    const form = new FormData();
-    form.append('gemVersion', gemVersion);
-    form.append('protocolVersion', protocolVersion);
-    form.append('railsEnv', railsEnv);
-    form.append('renderingRequest', 'ReactOnRails.dummy');
-    form.append('password', 'wrong');
-    form.append('bundle', Buffer.from('untrusted bundle'), {
-      contentType: 'text/javascript',
-      filename: 'bundle.js',
+    const { form } = formAutoContent({
+      gemVersion,
+      protocolVersion,
+      railsEnv,
+      renderingRequest: 'ReactOnRails.dummy',
+      password: 'wrong',
+      bundle: {
+        value: Buffer.from('untrusted bundle'),
+        options: { contentType: 'text/javascript', filename: 'bundle.js' },
+      },
     });
 
     const res = await app
@@ -717,19 +835,20 @@ describe('worker', () => {
       uploadDirDuringResponse = req.uploadDir;
       done(null, payload);
     });
-    const form = new FormData();
-    form.append(`bundle_${bundleHash}`, fs.readFileSync(getFixtureBundle()), {
-      contentType: 'text/javascript',
-      filename: 'bundle.js',
+    const { form } = formAutoContent({
+      [`bundle_${bundleHash}`]: {
+        value: fs.readFileSync(getFixtureBundle()),
+        options: { contentType: 'text/javascript', filename: 'bundle.js' },
+      },
+      password: 'my_password',
+      'asset-after-password': {
+        value: fs.readFileSync(getFixtureAsset()),
+        options: { contentType: 'application/json', filename: 'asset-after-password.json' },
+      },
+      gemVersion,
+      protocolVersion,
+      railsEnv,
     });
-    form.append('password', 'my_password');
-    form.append('asset-after-password', fs.readFileSync(getFixtureAsset()), {
-      contentType: 'application/json',
-      filename: 'asset-after-password.json',
-    });
-    form.append('gemVersion', gemVersion);
-    form.append('protocolVersion', protocolVersion);
-    form.append('railsEnv', railsEnv);
 
     const payload = form.getBuffer();
     const passwordFieldOffset = payload.indexOf(Buffer.from('name="password"'));
@@ -764,21 +883,23 @@ describe('worker', () => {
     const app = createWorker({
       password: 'my_password',
     });
-    const form = new FormData();
-    form.append('gemVersion', gemVersion);
-    form.append('protocolVersion', protocolVersion);
-    form.append('railsEnv', railsEnv);
-    form.append('password', 'my_password');
-    form.append('bundle_too-many-files', Buffer.from('bundle'), {
-      contentType: 'text/javascript',
-      filename: 'bundle.js',
-    });
+    const fields: Record<string, unknown> = {
+      gemVersion,
+      protocolVersion,
+      railsEnv,
+      password: 'my_password',
+      'bundle_too-many-files': {
+        value: Buffer.from('bundle'),
+        options: { contentType: 'text/javascript', filename: 'bundle.js' },
+      },
+    };
     for (let index = 0; index < 996; index += 1) {
-      form.append(`asset${index}`, Buffer.from('{}'), {
-        contentType: 'application/json',
-        filename: `asset-${index}.json`,
-      });
+      fields[`asset${index}`] = {
+        value: Buffer.from('{}'),
+        options: { contentType: 'application/json', filename: `asset-${index}.json` },
+      };
     }
+    const { form } = formAutoContent(fields);
 
     const res = await app
       .inject()
@@ -799,18 +920,19 @@ describe('worker', () => {
     const httpErrorLogSpy = jest.spyOn(app.log, 'error');
 
     try {
-      const form = new FormData();
-      form.append('gemVersion', gemVersion);
-      form.append('protocolVersion', protocolVersion);
-      form.append('railsEnv', railsEnv);
-      form.append('password', 'my_password');
-      form.append(`bundle_${bundleHash}`, Buffer.from('bundle'), {
-        contentType: 'text/javascript',
-        filename: `${bundleHash}.js`,
-      });
-      form.append('asset1', Buffer.from('{}'), {
-        contentType: 'application/json',
-        filepath: '../../loadable-stats.json',
+      const { form } = formAutoContent({
+        gemVersion,
+        protocolVersion,
+        railsEnv,
+        password: 'my_password',
+        [`bundle_${bundleHash}`]: {
+          value: Buffer.from('bundle'),
+          options: { contentType: 'text/javascript', filename: `${bundleHash}.js` },
+        },
+        asset1: {
+          value: Buffer.from('{}'),
+          options: { contentType: 'application/json', filepath: '../../loadable-stats.json' },
+        },
       });
 
       const res = await app

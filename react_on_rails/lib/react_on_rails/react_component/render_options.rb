@@ -105,13 +105,11 @@ module ReactOnRails
       end
 
       def dom_id
-        @dom_id ||= options.fetch(:id) do
-          if random_dom_id
-            generate_unique_dom_id
-          else
-            base_dom_id
-          end
-        end
+        @dom_id ||= if options[:id].nil?
+                      random_dom_id ? generate_unique_dom_id : base_dom_id
+                    else
+                      options[:id]
+                    end
       end
 
       def random_dom_id?
@@ -123,7 +121,7 @@ module ReactOnRails
       end
 
       def html_options
-        options[:html_options].to_h
+        options[:html_options].to_h.dup
       end
 
       def prerender

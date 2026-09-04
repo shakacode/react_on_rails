@@ -29,6 +29,18 @@ RequestDetails = Struct.new(:original_url, :env)
 module StreamingTestHelpers
   def render_to_string(*args); end
   def response; end
+
+  def test_server_artifact_id
+    "rorp-v2-s-#{'a' * 64}"
+  end
+
+  def test_rsc_artifact_id
+    "rorp-v2-r-#{'b' * 64}"
+  end
+
+  def test_server_render_url_pattern
+    %r{\Ahttp://localhost:3800/bundles/#{Regexp.escape(test_server_artifact_id)}/render/[a-f0-9]{32}\z}
+  end
 end
 
 describe ReactOnRailsProHelper do
@@ -736,23 +748,155 @@ describe ReactOnRailsProHelper do
   end
 
   describe "#internal_rsc_payload_react_component" do
-    it "frames the payload without removing html from the input chunk" do
-      input_chunk = { "hasErrors" => false, "html" => "payload" }
+    # Obviously-synthetic stand-ins for server-internal error text. These deliberately mirror the
+    # fixtures in packages/react-on-rails-pro/tests/injectRSCPayload.test.ts so the inline and
+    # fetched redaction paths can be compared case-for-case.
+    let(:synthetic_message) { "User 48213 not authorized for org 77" }
+    let(:synthetic_stack) do
+      "Error: User 48213 not authorized\n    at Auth (/app/components/Auth.server.tsx:12:5)"
+    end
+    let(:rendering_error) { { "message" => synthetic_message, "stack" => synthetic_stack } }
+    let(:error_chunk) do
+      { "hasErrors" => true, "renderingError" => rendering_error, "html" => "payload" }
+    end
+
+    def stub_rails_env(name)
+      allow(Rails).to receive(:env).and_return(ActiveSupport::StringInquirer.new(name))
+    end
+
+    # Runs `chunk` through the real helper transform chain and returns the wire bytes a browser
+    # would receive. An optional block mirrors the raise-transform that
+    # `server_rendered_react_component` installs (react_on_rails/lib/react_on_rails/helper.rb),
+    # which always runs BEFORE the framing transform added here.
+    def framed_wire_bytes(chunk, &inner_transform)
       upstream_stream = Struct.new(:input) do
         def each_chunk
           yield input
         end
-      end.new(input_chunk)
+      end.new(chunk)
       json_stream = ReactOnRailsPro::StreamDecorator.new(upstream_stream)
+      json_stream.transform(&inner_transform) if inner_transform
       render_options = instance_double(ReactOnRails::ReactComponent::RenderOptions)
 
       allow(self).to receive(:create_render_options).and_return(render_options)
       allow(self).to receive(:server_rendered_react_component).with(render_options).and_return(json_stream)
 
-      framed_stream = send(:internal_rsc_payload_react_component, "RscEchoProps")
+      send(:internal_rsc_payload_react_component, "RscEchoProps").each_chunk.to_a.join
+    end
 
-      expect(framed_stream.each_chunk.to_a).to eq(["{\"hasErrors\":false}\t00000007\npayload"])
+    it "frames the payload without removing html from the input chunk" do
+      input_chunk = { "hasErrors" => false, "html" => "payload" }
+
+      expect(framed_wire_bytes(input_chunk)).to eq("{\"hasErrors\":false}\t00000007\npayload")
       expect(input_chunk).to include("html" => "payload")
+    end
+
+    it "redacts renderingError from the fetched payload metadata in production" do
+      stub_rails_env("production")
+
+      wire = framed_wire_bytes(error_chunk)
+
+      expect(wire).to include("\"hasErrors\":true")
+      expect(wire).not_to include("renderingError")
+      expect(wire).not_to include("User 48213")
+      expect(wire).not_to include("not authorized")
+      expect(wire).not_to include("Auth.server.tsx")
+    end
+
+    it "redacts renderingError in non-development/test environments like staging" do
+      stub_rails_env("staging")
+
+      wire = framed_wire_bytes(error_chunk)
+
+      expect(wire).to include("\"hasErrors\":true")
+      expect(wire).not_to include("renderingError")
+      expect(wire).not_to include("User 48213")
+      expect(wire).not_to include("Auth.server.tsx")
+    end
+
+    it "redacts renderingError in an unrecognized environment (fail-closed)" do
+      stub_rails_env("qa-sandbox")
+
+      wire = framed_wire_bytes(error_chunk)
+
+      expect(wire).to include("\"hasErrors\":true")
+      expect(wire).not_to include("renderingError")
+      expect(wire).not_to include("User 48213")
+      expect(wire).not_to include("Auth.server.tsx")
+    end
+
+    it "forces hasErrors:true in production when the chunk reports hasErrors:false with an error signal" do
+      stub_rails_env("production")
+
+      wire = framed_wire_bytes(error_chunk.merge("hasErrors" => false))
+
+      expect(wire).to include("\"hasErrors\":true")
+      expect(wire).not_to include("renderingError")
+      expect(wire).not_to include("Auth.server.tsx")
+    end
+
+    it "leaves a clean production chunk untouched" do
+      stub_rails_env("production")
+
+      wire = framed_wire_bytes({ "hasErrors" => false, "html" => "payload" })
+
+      expect(wire).to eq("{\"hasErrors\":false}\t00000007\npayload")
+    end
+
+    it "includes the full renderingError in development" do
+      stub_rails_env("development")
+
+      wire = framed_wire_bytes(error_chunk)
+
+      expect(wire).to include("renderingError")
+      expect(wire).to include(synthetic_message)
+      expect(wire).to include("Auth.server.tsx")
+    end
+
+    it "includes the full renderingError in test" do
+      stub_rails_env("test")
+
+      wire = framed_wire_bytes(error_chunk)
+
+      expect(wire).to include("renderingError")
+      expect(wire).to include(synthetic_message)
+    end
+
+    it "does not mutate the upstream chunk when redacting, so StreamCache buffers the full payload" do
+      stub_rails_env("production")
+      input_chunk = error_chunk
+
+      wire = framed_wire_bytes(input_chunk)
+
+      expect(wire).not_to include("renderingError")
+      # StreamCache buffers a reference to this Hash and writes it to Rails.cache after the stream
+      # completes; mutating it here would persist a torn payload.
+      # See https://github.com/shakacode/react_on_rails/issues/4550.
+      expect(input_chunk).to eq(
+        "hasErrors" => true,
+        "renderingError" => { "message" => synthetic_message, "stack" => synthetic_stack },
+        "html" => "payload"
+      )
+    end
+
+    it "leaves renderingError intact for the server-side raise that runs before framing" do
+      stub_rails_env("production")
+      seen_by_server = nil
+
+      wire = framed_wire_bytes(error_chunk) do |chunk|
+        seen_by_server = chunk
+        chunk
+      end
+
+      # The browser-facing bytes are redacted...
+      expect(wire).not_to include("Auth.server.tsx")
+      # ...but raise_prerender_error/rendering_error_from_result still receive full detail.
+      expect(seen_by_server["renderingError"]).to eq(
+        "message" => synthetic_message, "stack" => synthetic_stack
+      )
+      server_side_error = send(:rendering_error_from_result, seen_by_server)
+      expect(server_side_error.message).to eq(synthetic_message)
+      expect(server_side_error.backtrace).to include("at Auth (/app/components/Auth.server.tsx:12:5)")
     end
   end
 
@@ -819,8 +963,7 @@ describe ReactOnRailsProHelper do
       stub_pro_bundle_hashes
 
       chunks_read.clear
-      mock_streaming_response(%r{http://localhost:3800/bundles/[a-f0-9]{32}-test/render/[a-f0-9]{32}}, 200,
-                              count:) do |yielder|
+      mock_streaming_response(test_server_render_url_pattern, 200, count:) do |yielder|
         if mock_chunks.is_a?(Async::Queue)
           loop do
             chunk = mock_chunks.dequeue
@@ -840,9 +983,15 @@ describe ReactOnRailsProHelper do
 
     def stub_pro_bundle_hashes
       allow(ReactOnRailsPro::Utils).to receive_messages(
-        bundle_hash: "#{'a' * 32}-test",
-        rsc_bundle_hash: "#{'b' * 32}-test"
+        bundle_hash: test_server_artifact_id,
+        rsc_bundle_hash: test_rsc_artifact_id
       )
+    end
+
+    def simulate_cache_store_ignoring_skip_nil
+      allow(Rails.cache).to receive(:fetch).and_wrap_original do |original, key, options = nil, &fetch_block|
+        original.call(key, options&.except(:skip_nil), &fetch_block)
+      end
     end
 
     it "redacts parser failures from the StreamRequest helper wrapper" do
@@ -1479,6 +1628,59 @@ describe ReactOnRailsProHelper do
         expect(second_run_chunks).to eq(first_run_chunks)
       end
 
+      # Regression for https://github.com/shakacode/react_on_rails/issues/4581.
+      #
+      # A shell-ready render whose async boundary errors emits a chunk with
+      # hasErrors: true but still completes "normally" under production defaults
+      # (raise_non_shell_server_rendering_errors: false, set in the dummy app).
+      # The broken fragment must NOT be written to the view-level stream cache.
+      context "when a streamed chunk reports render errors" do # rubocop:disable RSpec/MultipleMemoizedHelpers
+        let(:error_chunks) do
+          [
+            { html: "<div>Chunk 1: shell ok</div>", consoleReplayScript: "",
+              hasErrors: false, isShellReady: true },
+            { html: "<div>Chunk 2: broken boundary</div>", consoleReplayScript: "",
+              hasErrors: true, isShellReady: true }
+          ]
+        end
+
+        it "does not write the error-containing stream to the cache" do
+          mock_request_and_response(error_chunks)
+          render_with_cached_stream
+
+          run_stream
+
+          # The whole stream was consumed (no exception aborted it) ...
+          expect(chunks_read.count).to eq(error_chunks.count)
+          # ... yet nothing was cached because a chunk reported hasErrors.
+          expect(cache_data).to be_empty
+        end
+
+        it "re-renders on the next request instead of serving a cached broken fragment" do
+          mock_request_and_response(error_chunks, count: 2)
+          render_with_cached_stream
+
+          run_stream
+          expect(chunks_read.count).to eq(error_chunks.count)
+
+          # Second request: because the first render was not cached, this is a
+          # MISS again and hits Node rather than replaying the broken fragment.
+          reset_stream_buffers
+          @rendered_rails_context = nil
+          run_stream
+          expect(chunks_read.count).to eq(error_chunks.count)
+        end
+
+        it "still caches a clean stream (control)" do
+          mock_request_and_response
+          render_with_cached_stream
+
+          run_stream
+
+          expect(cache_data).not_to be_empty
+        end
+      end
+
       it "serves a HIT on the second render when cache_options includes a namespace" do
         # The second mocked response only feeds a regression (second Node call),
         # letting the chunks_read assertion below fail legibly instead of erroring.
@@ -1978,6 +2180,111 @@ describe ReactOnRailsProHelper do
       end
     end
 
+    describe "#fetch_cache_entry", :caching do
+      around do |example|
+        Rails.cache.clear
+        example.run
+      ensure
+        Rails.cache.clear
+      end
+
+      it "returns a rejected nil result and leaves no cache entry" do
+        cache_key = "rejected-nil-#{SecureRandom.hex(4)}"
+        simulate_cache_store_ignoring_skip_nil
+
+        result = send(:fetch_cache_entry, cache_key, nil, cache_write_if: -> { false }) { nil }
+
+        expect(result).to eq([nil, false, true])
+        expect(Rails.cache.exist?(cache_key)).to be(false)
+      end
+
+      it "preserves ordinary nil cache writes without a rejection predicate" do
+        cache_key = "ordinary-nil-#{SecureRandom.hex(4)}"
+
+        result = send(:fetch_cache_entry, cache_key, nil, cache_write_if: nil) { nil }
+
+        expect(result).to eq([nil, false, false])
+        expect(Rails.cache.exist?(cache_key)).to be(true)
+      end
+
+      it "keeps nested rejected cache fetches isolated" do
+        outer_key = "rejected-outer-#{SecureRandom.hex(4)}"
+        inner_key = "rejected-inner-#{SecureRandom.hex(4)}"
+        inner_result = nil
+        simulate_cache_store_ignoring_skip_nil
+
+        outer_result = send(:fetch_cache_entry, outer_key, nil, cache_write_if: -> { false }) do
+          inner_result = send(:fetch_cache_entry, inner_key, nil, cache_write_if: -> { false }) do
+            "inner rejected"
+          end
+          "outer rejected"
+        end
+
+        expect(inner_result).to eq(["inner rejected", false, true])
+        expect(outer_result).to eq(["outer rejected", false, true])
+        expect(Rails.cache.exist?(inner_key)).to be(false)
+        expect(Rails.cache.exist?(outer_key)).to be(false)
+      end
+
+      it "emits cache generation without a cache write for rejected misses" do
+        cache_key = "rejected-notifications-#{SecureRandom.hex(4)}"
+        notifications = []
+        simulate_cache_store_ignoring_skip_nil
+        subscriber = ActiveSupport::Notifications.subscribe(
+          /cache_(?:generate|write)\.active_support/
+        ) do |event_name, _started, _finished, _event_id, payload|
+          notifications << event_name if payload[:key] == cache_key
+        end
+
+        result = send(:fetch_cache_entry, cache_key, nil, cache_write_if: -> { false }) { "rejected" }
+
+        expect(result).to eq(["rejected", false, true])
+        expect(notifications).to include("cache_generate.active_support")
+        expect(notifications).not_to include("cache_write.active_support")
+      ensure
+        ActiveSupport::Notifications.unsubscribe(subscriber) if subscriber
+      end
+
+      it "does not register cache tags for rejected misses" do
+        options = {
+          cache_key: "rejected-tags-#{SecureRandom.hex(4)}",
+          cache_tags: ["rejected-tag"],
+          prerender: false
+        }
+        expected_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(component_name, options)
+        simulate_cache_store_ignoring_skip_nil
+        allow(ReactOnRailsPro::Cache).to receive(:register_normalized_tags)
+
+        result = send(:fetch_react_component, component_name, options, cache_write_if: -> { false }) do
+          "rejected"
+        end
+
+        expect(result).to eq("rejected")
+        expect(Rails.cache.exist?(expected_cache_key)).to be(false)
+        expect(ReactOnRailsPro::Cache).not_to have_received(:register_normalized_tags)
+      end
+
+      it "preserves the stale race-condition entry while rejecting the fresh result" do
+        cache_key = "rejected-race-condition-#{SecureRandom.hex(4)}"
+        started_at = Time.now
+        Rails.cache.write(cache_key, "stale", expires_in: 1)
+        allow(Time).to receive(:now).and_return(started_at + 2)
+        simulate_cache_store_ignoring_skip_nil
+
+        result = send(
+          :fetch_cache_entry,
+          cache_key,
+          { race_condition_ttl: 5 },
+          cache_write_if: -> { false }
+        ) { "fresh error" }
+
+        expect(result).to eq(["fresh error", false, true])
+        expect(Rails.cache.read(cache_key)).to eq("stale")
+        allow(Time).to receive(:now).and_return(started_at + 8)
+        expect(Rails.cache.exist?(cache_key)).to be(false)
+      end
+    end
+
     describe "#cached_buffered_stream_react_component", :caching do
       around do |example|
         Rails.cache.clear
@@ -2009,8 +2316,7 @@ describe ReactOnRailsProHelper do
               component_name,
               cache_key: ["buffered-stream-cache-spec", component_name],
               id: "#{component_name}-react-component-0",
-              trace: true,
-              cache_options: { expires_in: 60 }
+              trace: true
             ) do
               props_calls += 1
               props
@@ -2033,6 +2339,40 @@ describe ReactOnRailsProHelper do
         expect(cached_miss_result).to eq(first_result)
         expect(props_calls).to eq(1)
         expect(chunks_read.count).to eq(chunks.count)
+      end
+
+      it "does not cache a buffered render when any chunk reports errors" do
+        error_chunks = [
+          { html: "<div>Chunk 1: shell ok</div>", consoleReplayScript: "",
+            hasErrors: false, isShellReady: true },
+          { html: "<div>Chunk 2: broken boundary</div>", consoleReplayScript: "",
+            hasErrors: true, isShellReady: true }
+        ]
+        user_cache_key = ["buffered-stream-cache-errors", component_name]
+        expected_cache_key = nil
+        result = nil
+
+        simulate_cache_store_ignoring_skip_nil
+
+        Sync do
+          mock_request_and_response(error_chunks)
+          expected_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(
+            component_name,
+            cache_key: ["buffered_stream_react_component", user_cache_key],
+            prerender: true
+          )
+          result = cached_buffered_stream_react_component(
+            component_name,
+            cache_key: user_cache_key,
+            id: "#{component_name}-react-component-0"
+          ) do
+            props
+          end
+        end
+
+        expect(result).to include("broken boundary")
+        expect(chunks_read.count).to eq(error_chunks.count)
+        expect(Rails.cache.exist?(expected_cache_key)).to be(false)
       end
 
       it "respects explicit auto_load_bundle false on cache misses" do
@@ -2267,6 +2607,40 @@ describe ReactOnRailsProHelper do
         HTML
       end
 
+      it "does not cache static RSC HTML when any chunk reports errors" do
+        error_chunks = [
+          { html: "<div>Chunk 1: shell ok</div>", consoleReplayScript: "",
+            hasErrors: false, isShellReady: true },
+          { html: "<div>Chunk 2: broken boundary</div>", consoleReplayScript: "",
+            hasErrors: true, isShellReady: true }
+        ]
+        user_cache_key = ["static-rsc-cache-errors", component_name]
+        expected_cache_key = nil
+        result = nil
+
+        simulate_cache_store_ignoring_skip_nil
+
+        Sync do
+          mock_request_and_response(error_chunks)
+          expected_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(
+            component_name,
+            cache_key: ["static_rsc_component", user_cache_key],
+            prerender: true
+          )
+          result = cached_static_rsc_component(
+            component_name,
+            cache_key: user_cache_key,
+            id: "#{component_name}-react-component-0"
+          ) do
+            props
+          end
+        end
+
+        expect(result).to include("broken boundary")
+        expect(chunks_read.count).to eq(error_chunks.count)
+        expect(Rails.cache.exist?(expected_cache_key)).to be(false)
+      end
+
       it "replaces cached static RSC attribution once per request" do
         stale_comment = "<!-- Powered by React on Rails Pro (c) ShakaCode | Invalid License -->"
         fresh_comment = "<!-- Powered by React on Rails Pro (c) ShakaCode | Licensed -->"
@@ -2309,8 +2683,7 @@ describe ReactOnRailsProHelper do
           result = cached_static_rsc_component(
             component_name,
             cache_key: ["static-rsc-cache-spec", component_name],
-            id: "#{component_name}-react-component-0",
-            cache_options: { expires_in: 60 }
+            id: "#{component_name}-react-component-0"
           ) do
             props_calls += 1
             props
@@ -2930,12 +3303,13 @@ describe ReactOnRailsProHelper do
       mocked_response = instance_double(ActionDispatch::Response)
       allow(mocked_response).to receive(:stream).and_return(mocked_stream)
       allow(self).to receive(:response).and_return(mocked_response)
+      allow(ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool)
+        .to receive_messages(server_bundle_hash: test_server_artifact_id, rsc_bundle_hash: test_rsc_artifact_id)
 
       install_renderer_http_client_mock("http://localhost:3800")
       clear_stream_mocks
 
-      mock_streaming_response(%r{http://localhost:3800/bundles/[a-f0-9]{32}-test/render/[a-f0-9]{32}}, 200,
-                              count: 1) do |yielder|
+      mock_streaming_response(test_server_render_url_pattern, 200, count: 1) do |yielder|
         chunks.each do |chunk|
           yielder.call(to_length_prefixed(chunk))
         end

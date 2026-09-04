@@ -63,7 +63,7 @@ body:
         - [ ] `react_on_rails` generator/install smoke
           - RC/final version:
           - Commands:
-            - `bundle exec rspec react_on_rails/spec/react_on_rails/generators`
+            - `(cd react_on_rails && bundle exec rspec spec/react_on_rails/generators)`
             - `pnpm run build`
             - `CREATE_ROR_SMOKE_SCOPE=oss packages/create-react-on-rails-app/scripts/smoke-test-local-gems.sh`
           - Result:

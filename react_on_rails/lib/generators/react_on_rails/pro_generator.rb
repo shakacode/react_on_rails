@@ -40,9 +40,11 @@ module ReactOnRails
           )
 
           setup_pro
-          add_pro_npm_dependencies
-          update_imports_to_pro_package unless options[:invoked_by_install]
-          print_success_message unless options[:invoked_by_install]
+          unless options[:invoked_by_install]
+            add_pro_npm_dependencies
+            update_imports_to_pro_package
+            print_success_message
+          end
         else
           GeneratorMessages.add_error(<<~MSG.strip)
             🚫 React on Rails Pro generator prerequisites not met!

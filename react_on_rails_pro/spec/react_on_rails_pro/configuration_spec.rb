@@ -112,6 +112,16 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
     end
 
     describe ".rolling_deploy_adapter" do
+      it "accepts plural previous URLs" do
+        config = described_class.new(
+          rolling_deploy_adapter: ReactOnRailsPro::RollingDeployAdapters::Http,
+          rolling_deploy_token: "t" * 32,
+          rolling_deploy_previous_urls: ["https://new.example.com/rolling"]
+        )
+
+        expect { config.setup_config_values }.not_to raise_error
+      end
+
       it "throws if upload does not accept bundle and assets keyword arguments" do
         adapter = Class.new do
           def self.previous_bundle_hashes = []
@@ -1071,6 +1081,34 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
           end
         end.to raise_error(ReactOnRailsPro::Error,
                            /must be a finite positive number or nil/)
+      end
+    end
+
+    describe ".renderer_http_force_http2" do
+      it "defaults to true" do
+        expect(described_class.new.renderer_http_force_http2).to be(true)
+      end
+
+      it "accepts false to select HTTP/1.1" do
+        ReactOnRailsPro.configure do |config|
+          config.renderer_http_force_http2 = false
+        end
+
+        expect(ReactOnRailsPro.configuration.renderer_http_force_http2).to be(false)
+      end
+
+      it "rejects non-boolean values" do
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.renderer_http_force_http2 = nil
+          end
+        end.to raise_error(ReactOnRailsPro::Error, /must be true or false/)
+      end
+
+      it "validates constructor values before storing them" do
+        expect do
+          described_class.new(renderer_http_force_http2: "false")
+        end.to raise_error(ReactOnRailsPro::Error, /must be true or false/)
       end
     end
 

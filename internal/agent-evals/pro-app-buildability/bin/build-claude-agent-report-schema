@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+[[ "$#" == 0 ]] || { echo "usage: $0" >&2; exit 64; }
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+
+# Claude Code 2.1.210 validates this Draft 2020-12-compatible schema with an
+# Ajv build that does not register the draft URI. Removing only the declaration
+# keeps the canonical schema unchanged for artifact validation while preserving
+# every structural constraint passed to Claude.
+jq -c 'del(."$schema")' "$script_dir/../schemas/agent-report.schema.json"

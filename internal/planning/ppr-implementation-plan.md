@@ -1,3 +1,6 @@
+> **Superseded by [`internal/planning/ppr-plan.md`](./ppr-plan.md) (2026-08-13).**
+> Kept for reasoning history.
+
 # PPR Implementation Plan for React on Rails
 
 **Status:** Planning — answers the open questions in §10 of
@@ -65,19 +68,36 @@ Static generation needs two passes with intentionally opposite timing
 requirements:
 
 1. **Prospective pass (unbounded).** Renders the tree purely to warm caches.
-   Gated by a coordination signal that resolves only once every in-flight
-   `"use cache"` read settles and no new reads arrive within a full
+   Gated by a coordination signal (CacheSignal) that resolves only once every
+   in-flight cache read settles and no new reads arrive within a full
    event-loop turn. Once the signal resolves, the pass is aborted and **its
    output is discarded**. Slow by design — it has to wait for real cache fills.
 2. **Final pass (bounded).** Renders again with caches now warm. Aborted after
-   a single task (`setImmediate`). Whatever resolved within that window
+   a fixed task schedule (a small number of sequential `setTimeout(0)` calls,
+   typically 4 macrotask windows). Whatever resolved within that window
    becomes the static shell / prelude; whatever was still suspended on
-   dynamic-data hanging promises becomes a streaming hole.
+   dynamic-data hanging promises becomes a streaming hole. Warm cache reads
+   resolve via already-fulfilled promises (microtask-fast), so every cacheable
+   component resolves within the first rendering task. The fixed schedule is
+   only safe **because** the Resume Data Cache is an in-process JavaScript
+   `Map` — cross-process reads would take real wall-clock time and be missed
+   by the task-schedule abort. (See §"Settle Criterion Design" for the
+   empirical proof.)
 
 A single bounded cold pass would lose cached content (the fill cannot finish
 within the deadline). A single unbounded pass would deadlock on the hanging
 dynamic boundaries. The two passes resolve the contradiction by splitting the
 two jobs.
+
+**The unclosing stream bridge.** Between the RSC pass and the HTML pass, the
+collected RSC (Flight) stream is replayed as an "unclosing stream" — a
+`ReadableStream` that delivers all buffered chunks but intentionally never
+calls `controller.close()`. This prevents React from erroring on unresolved
+Flight references (dynamic holes): missing chunks stay as pending thenables
+that cause clean Suspense-style suspension rather than "connection closed"
+errors. The HTML renderer then converts those suspensions into postponed
+boundaries in the prelude. This is the mechanism that propagates dynamic holes
+from the RSC layer to the HTML layer without loss of information.
 
 ### The coordination signal (a faithful port required)
 
@@ -92,12 +112,45 @@ needs exactly two rules:
    resets the readiness clock; the signal does not declare ready until a full
    turn passes with no new reads.
 
+**Why two event-loop turns.** The deferred check uses `setImmediate` followed
+by `setTimeout(0)` because React schedules follow-up rendering work in two
+different ways: microtasks during prerender, and `setImmediate` during
+rendering. When a cache read completes and React processes the result, it may
+discover new components that start their own cache reads. The two-level timing
+ensures those follow-on reads have time to call `beginRead()` before the
+settle check fires. Empirically validated on React 19.2.8: a single
+`setImmediate` also works for microtask-fast cache reads, but the extra
+`setTimeout(0)` provides a safety margin for React's `setImmediate`-based
+rendering scheduler.
+
+**The cancellation dance.** When the count drops to zero and a settle timer is
+scheduled, a subsequent `beginRead()` cancels the pending timer immediately.
+When that new read's `endRead()` fires and count returns to zero, a fresh
+timer is scheduled. This loop continues until no more reads start during the
+settle window — only then does `cacheReady()` resolve.
+
+**Two-tier resolution.** CacheSignal offers two resolution speeds:
+
+- **`inputReady()`** — fast tier (`queueMicrotask(() => process.nextTick(…))`).
+  Used to abort hanging promise inputs to cached functions when all cache
+  inputs are ready. Fires quickly, essentially same-tick.
+- **`cacheReady()`** — standard tier (`setImmediate(() => setTimeout(0))`).
+  Used for the main prerender abort decision. The extra delay ensures React
+  has fully processed resolved data before the settle check runs.
+
 A separate process-global signal tracks **in-flight dynamic module loads**
 (code-split chunks that may, when loaded, expose more caches). The prospective
-prerender subscribes its cache signal to this module-loading signal so that
-slow lazy imports also hold readiness open. This is the only kind of "slow
-async" the prospective pass waits for; bare uncached I/O is intentionally
-treated as a dynamic boundary (it becomes a streamed hole).
+prerender subscribes its cache signal to this module-loading signal via
+`subscribeToReads()` so that slow lazy imports also hold readiness open.
+
+**Module load subscription.** `subscribeToReads(subscriber)` adds the
+per-render CacheSignal as a subscriber to the global module-loading signal.
+Every `beginRead()`/`endRead()` on the global signal is forwarded to all
+subscribers. On subscription, existing in-flight counts are transferred
+(each already-pending read triggers a `beginRead()` on the subscriber). The
+subscription auto-unsubscribes when `cacheReady()` resolves. This is the only
+kind of "slow async" the prospective pass waits for; bare uncached I/O is
+intentionally treated as a dynamic boundary (it becomes a streamed hole).
 
 The full port of these two pieces is ~150 lines of plain JavaScript; see the
 reference repo.
@@ -111,10 +164,36 @@ component suspends. When the bounded final pass aborts after one task, those
 suspended boundaries become Suspense placeholders in the prelude — no errors
 thrown, abort gracefully turns them into holes.
 
-For React on Rails this means we need a small `makeHangingPromise(signal)`
-helper and routing every Rails-side "request data" API (current_user, locale,
-session, params we want treated as dynamic) through it during the prerender
-phase. At request time the same APIs return real values.
+The critical design property: **hanging promises are NOT tracked by
+CacheSignal.** CacheSignal only counts work that will eventually resolve
+(cache reads, module loads). Hanging promises are invisible to it. This is
+what prevents deadlock: CacheSignal settles when all _resolvable_ work is
+done, regardless of how many hanging promises are still pending.
+
+For React on Rails this means two APIs:
+
+1. **`makeHangingPromise(signal)`** — a helper that creates a promise which
+   never resolves, only rejects when the abort signal fires. Used internally
+   to implement dynamic-boundary markers.
+
+2. **`connection()`** — a user-facing API that components call to declare
+   "this component needs a real request." During prerender it returns a hanging
+   promise (the component suspends, becoming a dynamic hole). At request time
+   it returns immediately. This is the explicit opt-in to dynamic rendering.
+
+   ```jsx
+   async function UserGreeting() {
+     await connection(); // ← hangs during prerender, no-op at request time
+     const user = getCurrentUser();
+     return <p>Hello, {user.name}!</p>;
+   }
+   ```
+
+   Every Rails-side "request data" API (current_user, locale, session, params
+   we want treated as dynamic) should be routed through `connection()` during
+   the prerender phase. Components that call any of these APIs automatically
+   become dynamic holes without the user needing to understand hanging
+   promises.
 
 ---
 
@@ -363,6 +442,31 @@ signal })` returns `{ prelude, postponed }`. We persist the prelude (the
   shell is served from cache; the resumed tail is appended in the same HTTP
   response.
 
+### HTML pass settle criterion
+
+The HTML/Fizz prerender uses the same task-schedule abort as the RSC final
+pass — a fixed sequence of macrotasks (typically 2: start the prerender, then
+abort). This is safe because the HTML pass's input — the RSC Flight stream —
+is already fully produced and buffered. There are no pending data reads. React
+DOM's `prerender()` is just converting the Flight data to HTML: resolved
+subtrees become markup, unresolved Flight chunks (propagated via the unclosing
+stream) become postponed Suspense boundaries in the prelude.
+
+**What CacheSignal tracks in the HTML pass.** The HTML pass sets
+`cacheSignal: null` — cache tracking is not needed because all caches are
+warm. The only tracked activity is **module/chunk loading**: client component
+references in the Flight stream trigger chunk loads during SSR, and those are
+tracked by a separate per-pass CacheSignal dedicated to module loading. This
+prevents aborting the HTML pass while client component modules are still being
+loaded and evaluated.
+
+**Client component async work is untracked.** If a React 19 async client
+component does async work during SSR (e.g., `await` expressions in the
+component body), that work is invisible to any CacheSignal. If it doesn't
+resolve within the task-schedule window, it becomes a dynamic hole. This is
+correct behavior — client component async work is expected to complete during
+hydration on the client.
+
 Treat `postponedState` as **opaque** — never parse, never modify. It is a
 React-internal serialization of the postponed Fizz state.
 
@@ -434,6 +538,209 @@ refs), and identical per-request behavior under counters and timing.
 
 ---
 
+## Settle Criterion Design
+
+> **Evidence base.** This section is backed by source-code analysis of the
+> Next.js canary (August 2026) and 15 empirical experiments run on React
+> 19.2.8. The findings are documented in full at:
+>
+> - [`internal/analysis/ppr-settle-criterion-findings.md`](../analysis/ppr-settle-criterion-findings.md)
+> - [`internal/analysis/ppr-settle-by-example.md`](../analysis/ppr-settle-by-example.md)
+> - [`internal/analysis/ppr-rsc-payload-by-example.md`](../analysis/ppr-rsc-payload-by-example.md)
+
+### The core problem
+
+When React prerenders a page, it needs to render as much of the static shell
+as possible, then stop and leave holes for dynamic content. React provides one
+control: the abort signal. **React never tells the framework "I'm done with
+all static work."** There is no `onAllStaticWorkComplete()` callback. The
+framework must decide when to fire the signal.
+
+Aborting too early produces a shallower shell (the user sees coarse spinners
+instead of fine-grained skeletons). Aborting too late deadlocks on hanging
+promises. Both failures are silent — the output is valid HTML, just worse.
+
+### The three abort points
+
+| #   | Abort point              | Settle criterion           | Mechanism                          | Window                         |
+| --- | ------------------------ | -------------------------- | ---------------------------------- | ------------------------------ |
+| 1   | **RSC prospective pass** | `CacheSignal.cacheReady()` | Reference counter + deferred check | Until all tracked work settles |
+| 2   | **RSC final pass**       | `runInSequentialTasks`     | Fixed task schedule                | ~4 macrotask turns             |
+| 3   | **HTML/Fizz prerender**  | `runInSequentialTasks`     | Fixed task schedule                | ~2 macrotask turns             |
+
+The prospective pass is the only one with an open-ended wait. The final pass
+and HTML pass use fixed schedules because their inputs are already resolved
+(warm caches / complete Flight stream respectively).
+
+### User-facing APIs
+
+Two user-facing APIs form the contract between application code and the settle
+criterion:
+
+#### `cacheRead(fn)` — "wait for this before aborting"
+
+A wrapper function that users place around any async work they want the
+framework to wait for. Internally calls `beginRead()` before the work starts
+and `endRead()` when it settles:
+
+```jsx
+import { cacheRead } from 'react-on-rails-pro';
+
+async function ProductList() {
+  const products = await cacheRead(() => db.query('SELECT * FROM products'));
+  return (
+    <ul>
+      {products.map((p) => (
+        <li key={p.id}>{p.name}</li>
+      ))}
+    </ul>
+  );
+}
+```
+
+Without this wrapper, async work is invisible to the settle criterion and may
+be aborted prematurely, causing the component's entire subtree to fall behind
+the nearest ancestor Suspense boundary's fallback.
+
+**Why explicit wrapping is needed.** Unlike Next.js, which uses a compiler
+transform (`"use cache"` directive) to inject `beginRead()`/`endRead()`
+automatically, and monkey-patches `fetch()` to track it, React on Rails does
+not have a compiler transform for this purpose. The explicit wrapper is the
+equivalent mechanism without requiring SWC/Babel integration. If we later add
+a `"use cache"` directive with compiler support, the wrapper becomes its
+compiled output — the runtime mechanism is the same.
+
+**What `cacheRead` does.** `cacheRead` is both a **tracker** and a **caching
+wrapper**. It calls `beginRead()` before the work starts, executes `fn`,
+stores the result in the Resume Data Cache (RDC) keyed by a stable identifier,
+and calls `endRead()` when the work settles. On subsequent calls with the same
+key, it returns the cached result from the RDC instead of re-executing `fn`.
+
+If `fn` does multiple internal awaits, they are all covered by the single
+`beginRead()`/`endRead()` pair. Nested `cacheRead()` calls are also
+supported — each gets its own pair, and the settle criterion waits for all of
+them.
+
+**Interaction with the two-pass system.** During the prospective pass,
+`cacheRead` registers the work with CacheSignal and populates the RDC with the
+result. During the final pass, `cacheSignal` is null — `cacheRead` reads from
+the already-populated RDC, returning an already-fulfilled promise
+(microtask-fast). This is what makes the final pass's fixed task-schedule
+abort safe: every `cacheRead` call resolves within a microtask because the
+data is already in the in-process RDC.
+
+**Relationship to `"use cache"`.** `cacheRead` is the runtime primitive that
+`"use cache"` compiles down to. The `"use cache"` directive adds build-time
+key derivation (stable ID from filename + export name), argument serialization
+via `encodeReply`, and storage via the full `CacheHandler` interface.
+`cacheRead` is a simpler entry point for users who need tracking without the
+full `"use cache"` infrastructure — it uses the RDC directly with a
+user-provided or auto-derived key.
+
+#### `connection()` — "this component needs a real request"
+
+A function that components call to declare themselves dynamic. During
+prerender it returns a hanging promise; at request time it returns
+immediately:
+
+```jsx
+import { connection } from 'react-on-rails-pro';
+
+async function UserProfile() {
+  await connection(); // hangs during prerender → dynamic hole
+  const user = await getCurrentUser();
+  return <div>{user.name}</div>;
+}
+```
+
+**Design properties:**
+
+- The hanging promise is **NOT** tracked by CacheSignal. It is invisible to
+  the settle criterion. This is what prevents deadlock.
+- At request time, `connection()` resolves immediately (a no-op).
+- Every Rails-side request-data API (`current_user`, `session`, `locale`,
+  `request`, etc.) should internally call `connection()` so that components
+  using them automatically become dynamic holes.
+
+### Tracked vs untracked work
+
+| Async operation                               | Tracked by CacheSignal?              | Makes it into the shell?   |
+| --------------------------------------------- | ------------------------------------ | -------------------------- |
+| `await cacheRead(() => ...)`                  | ✅ Yes                               | ✅ Yes — CacheSignal waits |
+| `await cachedFunction()` (with `"use cache"`) | ✅ Yes                               | ✅ Yes                     |
+| Module/chunk loads (`import()`, `React.lazy`) | ✅ Yes (module loading subscription) | ✅ Yes                     |
+| `await connection()`                          | ❌ No (by design)                    | ❌ No — becomes a hole     |
+| `await rawFetch(url)` (untracked)             | ❌ No                                | ⚠️ Only if microtask-fast  |
+| `await db.query()` (untracked)                | ❌ No                                | ⚠️ Only if microtask-fast  |
+| Client component async during SSR             | ❌ No                                | ⚠️ Only if microtask-fast  |
+| Third-party `throw promise` / `React.use(p)`  | ❌ No                                | ⚠️ Only if microtask-fast  |
+
+**The "microtask-fast" cutoff.** Untracked async work that resolves via
+`Promise.resolve()` (already-fulfilled promise) always makes it into the shell
+because React processes resolved promises via microtasks, which run before any
+macrotask. Untracked work that takes real wall-clock time (≥5ms) is missed by
+the task-schedule abort. This was proven in experiments 7–9.
+
+**The gap users need to understand.** Any raw `await` without `cacheRead()`
+wrapping is a gamble on timing. If it resolves within a microtask, it works.
+If it takes real time (database query, network call, cross-process
+communication), it's missed and the component becomes a dynamic hole. The
+documentation must make this clear.
+
+### Budget and escape hatch
+
+A hard timeout cap prevents pathological applications from stalling builds:
+
+```js
+const settled = await Promise.race([
+  cacheSignal.cacheReady(),
+  timeout(SETTLE_TIMEOUT_MS).then(() => 'TIMEOUT'),
+]);
+
+if (settled === 'TIMEOUT') {
+  log.warn('Prerender settle timeout — aborting with partial shell');
+}
+controller.abort();
+```
+
+When the timeout trips, the result is a shallower shell (more dynamic holes),
+not a build failure. The page still works — it just has more content streaming
+in dynamically. The timeout should be configurable, with a sensible default
+(e.g., 10 seconds for the prospective pass). Note: the findings doc uses 5s
+in its illustrative code snippet; the actual default is an implementation
+decision for #3571 — the key property is that the timeout exists, is
+configurable, and degrades gracefully rather than failing the build.
+
+### Determinism
+
+A timing-based settle criterion introduces non-determinism: the same page
+might produce different shells on different builds if component resolution
+times vary. Three constraints ensure determinism:
+
+1. **The Resume Data Cache must be in-process** (a JavaScript `Map`). This
+   guarantees that final-pass cache reads resolve via already-fulfilled
+   promises (microtask-fast), making the task-schedule abort deterministic.
+   Cross-process reads (Node → Ruby via HTTP) would introduce timing
+   variation.
+
+2. **The settle criterion must be event-driven** (CacheSignal), not
+   time-based. CacheSignal fires when all tracked work finishes, regardless
+   of how long it took. Two runs with different wall-clock timings produce
+   the same settle point as long as the same work is tracked.
+
+3. **Build validation.** Prerender the same page twice and diff the shells.
+   If the shell differs between runs, it indicates non-deterministic async
+   work leaking into the prerender. This can be automated as a CI check.
+
+### Ordering constraint
+
+The `postponed` state must be serialized only **after** the prelude has fully
+flushed (see react#36779 and P6 spike finding #3). Any settle design must
+preserve this: abort the React render first, collect the prelude, then
+serialize `postponed`.
+
+---
+
 ## Implementation Phasing
 
 Each phase ends with tests + a working demo and can be merged independently.
@@ -497,4 +804,11 @@ runtime/cache/coordination).
   (PR #3314) — the upstream investigation this plan builds on.
 - Reference implementation:
   <https://github.com/AbanoubGhadban/ppr-from-scratch>
+- Settle criterion research (PR #4852):
+  - [`internal/analysis/ppr-settle-criterion-findings.md`](../analysis/ppr-settle-criterion-findings.md)
+    — Next.js CacheSignal mechanism analysis + experiment results
+  - [`internal/analysis/ppr-settle-by-example.md`](../analysis/ppr-settle-by-example.md)
+    — component-level "if you write this, you get that" patterns
+  - [`internal/analysis/ppr-rsc-payload-by-example.md`](../analysis/ppr-rsc-payload-by-example.md)
+    — RSC payload lifecycle in the PPR pipeline
 - Closes #3315.

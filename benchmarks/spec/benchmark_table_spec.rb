@@ -98,6 +98,20 @@ RSpec.describe BenchmarkTable do
     expect(markdown).to include("| /foo | **80.0** 🔴 20.0% (100.0) | **4.0** 🟢 20.0% (5.0) | 6.0 | 200=100 |")
   end
 
+  it "renders an unconfirmed crossing with ⚠️ plus the plain arrow, unbolded" do
+    report = fake_report(
+      verdicts: { ["/foo", "rps"] => :unconfirmed, ["/foo", "p50_latency"] => :unconfirmed },
+      baselines: { ["/foo", "rps"] => 100.0, ["/foo", "p50_latency"] => 5.0 }
+    )
+    markdown = render(
+      rows: [row(name: "/foo", rps: 80.0, p50: 7.0, p90: 6.0, status: "200=100")],
+      report:
+    )
+
+    expect(markdown).to include("| /foo | 80.0 ⚠️ ▼20.0% (100.0) | 7.0 ⚠️ ▲40.0% (5.0) | 6.0 | 200=100 |")
+    expect(markdown).to include("⚠️ crossed threshold but base/head samples overlap (unconfirmed)")
+  end
+
   it "shows a p90 delta when a baseline exists but never marks it significant (p90 is untracked)" do
     # Even if the report somehow returned a verdict for p90, the p90 column has no
     # direction, so the renderer must not consult significance for it — only the baseline.

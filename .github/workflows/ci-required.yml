@@ -57,6 +57,25 @@ jobs:
           fetch-depth: 50
           persist-credentials: false
 
+      - name: Check out pinned agent workflows
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+        with:
+          repository: shakacode/agent-workflows
+          ref: 1958648b70a450aa67c15b833428485d17021045
+          path: .agent-workflows-source
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Validate pinned agent workflow copies
+        # yamllint disable rule:line-length
+        run: |
+          ruby .agents/bin/agent-workflow-drift-manifest-test.rb --source-root .agent-workflows-source
+          .agent-workflows-source/bin/check-agent-workflow-drift \
+            --manifest .agents/agent-workflow-drift.yml \
+            --source-root .agent-workflows-source \
+            --consumer-root .
+        # yamllint enable rule:line-length
+
       - name: Validate workflow YAML
         run: |
           ruby -e "require 'yaml'; Dir['.github/workflows/*.{yml,yaml}'].sort.each { |f| YAML.safe_load_file(f, permitted_classes: [], aliases: false); puts f }"
@@ -68,6 +87,8 @@ jobs:
             bin/ci-rerun-failures \
             bin/request-hosted-ci \
             script/ci-changes-detector \
+            script/ci-required-diff-base \
+            script/ci-required-diff-base-test.bash \
             script/ci-required-hosted-gate
           do
             bash -n "$script"
@@ -77,10 +98,13 @@ jobs:
       - name: Run CI gate tests
         run: |
           bash script/ci-required-hosted-gate-test.bash
+          bash script/ci-required-diff-base-test.bash
           bash script/lint-mirrored-blocks-test.bash
           ruby script/ci_required_merge_group_gate_test.rb
+          node --test .github/workflows/ci-commands.test.cjs
           node .github/workflows/hosted-ci-safety.test.cjs
           ruby script/pr_merge_ledger_test.rb
+          ruby .agents/bin/agent_workflow_drift_manifest_test_test.rb
           ruby .agents/skills/pr-batch/bin/pr-ci-readiness-test.rb
 
       - name: Check mirrored blocks
@@ -103,12 +127,14 @@ jobs:
         id: changes
         env:
           PULL_REQUEST_BASE_SHA: ${{ github.event.inputs.pull_request_base_sha || '' }}
-        run: |
-          base_ref="${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before || 'origin/main' }}"
-          if [ -n "${PULL_REQUEST_BASE_SHA}" ]; then
-            base_ref="${PULL_REQUEST_BASE_SHA}"
-          fi
-          script/ci-changes-detector "$base_ref"
+          PULL_REQUEST_HEAD_SHA: ${{ github.event.pull_request.head.sha || '' }}
+          # Keep this expression on one line. It is the merge-queue base-ref
+          # contract asserted by react_on_rails/spec/react_on_rails/ruby_version_support_spec.rb,
+          # which matches the raw file text, and a folded scalar would preserve
+          # the newlines rather than fold them (the continuation lines are more
+          # indented than the first).
+          EVENT_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before || 'origin/main' }}
+        run: script/ci-required-diff-base
 
       - name: Enforce hosted CI for generator changes
         env:

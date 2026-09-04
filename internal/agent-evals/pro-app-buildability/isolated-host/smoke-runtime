@@ -1,0 +1,157 @@
+#!/usr/bin/env bash
+# Non-network runtime smoke for the isolated image. This prepares the exact
+# package state used by run-eval, starts CLI help/version surfaces, and checks
+# Claude schema parsing with a synthetic invalid key against a loopback stub.
+# It never reaches a model API or reads an operator credential.
+set -euo pipefail
+umask 077
+
+eval_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+workspace=/workspace/runtime-smoke
+private_dir=/run/eval-private/runtime-smoke
+state_dir="$workspace/.ror-eval-state"
+runner_home="$private_dir/runner-home"
+agent_home="$private_dir/agent-home"
+claude_stub_pid=""
+
+cleanup() {
+  if [[ -n "$claude_stub_pid" ]]; then
+    kill "$claude_stub_pid" 2>/dev/null || true
+    wait "$claude_stub_pid" 2>/dev/null || true
+  fi
+  chmod -R u+rwX "$workspace" "$private_dir" 2>/dev/null || true
+  rm -rf "$workspace" "$private_dir"
+}
+trap cleanup EXIT
+trap 'exit 130' INT TERM
+
+mkdir -p "$workspace" "$runner_home" "$agent_home" "$private_dir/tmp"
+chmod 700 "$workspace" "$private_dir" "$runner_home" "$agent_home" "$private_dir/tmp"
+safe_path="$(SAFE_PATH_SOURCE="$PATH" BASH_ENV=/dev/null "$eval_dir/bin/build-safe-path" \
+  claude codex env node npm ruby sh)"
+safe_path="$("$eval_dir/bin/prepare-agent-state" \
+  "$state_dir" "$runner_home" "$agent_home" "$safe_path")"
+
+expected_environment_names=$'CODEX_EVAL\nHOME\nLANG\nLC_ALL\nPATH\nSHELL\nTMPDIR'
+for private_home in "$runner_home" "$agent_home"; do
+  minimal_env=(env -i "PATH=$safe_path" "HOME=$private_home" "TMPDIR=$private_dir/tmp" LANG=C LC_ALL=C SHELL=/bin/sh CODEX_EVAL=1)
+  actual_environment_names="$("${minimal_env[@]}" env | cut -d= -f1 | LC_ALL=C sort)"
+  [[ "$actual_environment_names" == "$expected_environment_names" ]] || {
+    echo "isolated runtime environment allowlist changed" >&2
+    exit 1
+  }
+
+  bundle_path="$("${minimal_env[@]}" ruby -rbundler -e 'print Bundler.bundle_path')"
+  case "$bundle_path/" in
+    "$state_dir/bundle"/*) ;;
+    *) echo "Bundler path escaped writable agent state" >&2; exit 1 ;;
+  esac
+  [[ -d "$bundle_path" && -w "$bundle_path" ]] || {
+    echo "Bundler path is not writable" >&2
+    exit 1
+  }
+
+  [[ "$("${minimal_env[@]}" npm config get cache)" == "$state_dir/npm-cache" ]] || {
+    echo "npm cache escaped writable agent state" >&2
+    exit 1
+  }
+done
+
+cache_executable="$state_dir/npm-cache/runtime-smoke-command"
+printf '%s\n' '#!/bin/sh' 'exit 0' >"$cache_executable"
+chmod 700 "$cache_executable"
+"$cache_executable"
+
+minimal_env=(env -i "PATH=$safe_path" "HOME=$runner_home" "TMPDIR=$private_dir/tmp" LANG=C LC_ALL=C SHELL=/bin/sh CODEX_EVAL=1)
+synthetic_gem_dir="$workspace/synthetic-gem"
+mkdir -p "$synthetic_gem_dir/bin" "$synthetic_gem_dir/lib"
+printf '%s\n' \
+  'Gem::Specification.new do |spec|' \
+  '  spec.name = "ror-eval-runtime-smoke"' \
+  '  spec.version = "0.0.1"' \
+  '  spec.summary = "Local runtime smoke fixture"' \
+  '  spec.authors = ["ShakaCode"]' \
+  '  spec.files = ["bin/ror-eval-runtime-smoke", "lib/ror_eval_runtime_smoke.rb"]' \
+  '  spec.bindir = "bin"' \
+  '  spec.executables = ["ror-eval-runtime-smoke"]' \
+  '  spec.require_paths = ["lib"]' \
+  'end' >"$synthetic_gem_dir/ror-eval-runtime-smoke.gemspec"
+printf '%s\n' '#!/usr/bin/env ruby' 'puts "synthetic gem executable passed"' \
+  >"$synthetic_gem_dir/bin/ror-eval-runtime-smoke"
+printf '%s\n' 'module RorEvalRuntimeSmoke; end' >"$synthetic_gem_dir/lib/ror_eval_runtime_smoke.rb"
+chmod 700 "$synthetic_gem_dir/bin/ror-eval-runtime-smoke"
+(cd "$synthetic_gem_dir" && "${minimal_env[@]}" gem build --output "$state_dir/ror-eval-runtime-smoke.gem" \
+  ror-eval-runtime-smoke.gemspec >/dev/null)
+"${minimal_env[@]}" gem install --local "$state_dir/ror-eval-runtime-smoke.gem" >/dev/null
+"${minimal_env[@]}" ror-eval-runtime-smoke | grep -Fxq 'synthetic gem executable passed'
+
+"${minimal_env[@]}" codex exec --help 2>&1 | grep -q -- '--dangerously-bypass-approvals-and-sandbox'
+"${minimal_env[@]}" claude --version >/dev/null
+
+claude_schema="$("$eval_dir/bin/build-claude-agent-report-schema")"
+printf '%s' synthetic-invalid-never-valid >"$private_dir/model-credential"
+"$eval_dir/bin/build-claude-credential-helper" "$private_dir/credential-helper"
+claude_settings="$private_dir/claude-settings.json"
+jq -n --arg helper '/bin/sh "$TMPDIR/../credential-helper"' '{apiKeyHelper:$helper}' \
+  >"$claude_settings"
+claude_stub_port_file="$private_dir/claude-loopback-port"
+claude_stub_request_file="$private_dir/claude-loopback-request"
+node --input-type=module - "$claude_stub_port_file" "$claude_stub_request_file" <<'NODE' &
+import fs from 'node:fs';
+import http from 'node:http';
+
+const [portFile, requestFile] = process.argv.slice(2);
+const server = http.createServer((request, response) => {
+  const brokeredAuth = request.headers['x-api-key'] === 'synthetic-invalid-never-valid' ? 'yes' : 'no';
+  fs.appendFileSync(requestFile, `${request.method} ${request.url} brokered_auth=${brokeredAuth}\n`, {
+    mode: 0o600,
+  });
+  request.resume();
+  response.writeHead(503, { 'content-type': 'application/json' });
+  response.end(JSON.stringify({ error: { type: 'offline_smoke', message: 'loopback only' } }));
+});
+server.listen(0, '127.0.0.1', () => {
+  fs.writeFileSync(portFile, String(server.address().port), { mode: 0o600 });
+});
+NODE
+claude_stub_pid=$!
+for _ in {1..50}; do
+  [[ -s "$claude_stub_port_file" ]] && break
+  sleep 0.1
+done
+[[ -s "$claude_stub_port_file" ]] || {
+  echo "Claude loopback stub failed to start" >&2
+  exit 1
+}
+claude_stub_port="$(<"$claude_stub_port_file")"
+set +e
+env -i "PATH=$safe_path" "HOME=$agent_home" "TMPDIR=$private_dir/tmp" LANG=C LC_ALL=C SHELL=/bin/sh \
+  CODEX_EVAL=1 \
+  ANTHROPIC_BASE_URL="http://127.0.0.1:$claude_stub_port" timeout 8 claude -p --model sonnet \
+  --settings "$claude_settings" --output-format json --json-schema "$claude_schema" \
+  'schema parser and credential helper compatibility only' \
+  >"$private_dir/claude-schema-output" 2>"$private_dir/claude-schema-error"
+claude_schema_exit=$?
+set -e
+[[ "$claude_schema_exit" != 0 ]] || {
+  echo "Claude schema smoke unexpectedly completed a model call" >&2
+  exit 1
+}
+[[ -s "$claude_stub_request_file" ]] || {
+  echo "Claude did not attempt the loopback endpoint after schema parsing" >&2
+  exit 1
+}
+grep -Eq '^POST /v1/messages([?].*)? brokered_auth=yes$' "$claude_stub_request_file" || {
+  echo "Claude did not issue the expected authenticated loopback model request" >&2
+  exit 1
+}
+if grep -Fq 'no schema with key or ref' \
+  "$private_dir/claude-schema-output" "$private_dir/claude-schema-error"; then
+  echo "Claude rejected its compatible agent-report schema" >&2
+  exit 1
+fi
+kill "$claude_stub_pid" 2>/dev/null || true
+wait "$claude_stub_pid" 2>/dev/null || true
+claude_stub_pid=""
+
+echo "isolated runtime smoke passed"

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "json"
+require "react_on_rails/lenient_json"
 
 module ReactOnRails
   # Parses the length-prefixed wire format used between Node renderer and Ruby.
@@ -118,7 +119,9 @@ module ReactOnRails
       raise ParseError, "Malformed length-prefixed header: negative content length" if @content_len.negative?
 
       begin
-        @metadata = JSON.parse(meta_json.force_encoding(Encoding::UTF_8))
+        # LenientJson tolerates lone UTF-16 surrogates that the JS renderer can emit
+        # (e.g. from truncating a string mid-emoji) which stock JSON.parse rejects. See #4710.
+        @metadata = LenientJson.parse(meta_json.force_encoding(Encoding::UTF_8))
       rescue JSON::ParserError
         raise ParseError, "Malformed length-prefixed header: invalid metadata JSON", cause: nil
       end
@@ -161,7 +164,8 @@ module ReactOnRails
     end
 
     def parse_object_payload(raw_content)
-      JSON.parse(raw_content)
+      # See the metadata parse above: LenientJson repairs lone-surrogate escapes (#4710).
+      LenientJson.parse(raw_content)
     rescue JSON::ParserError
       raise ParseError, "Malformed length-prefixed object payload JSON", cause: nil
     end

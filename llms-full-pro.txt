@@ -599,6 +599,11 @@ This affects render, streaming render, and asset upload requests.
 Before upgrading:
 
 - Run Ruby 3.3 or newer. The `async-http` dependency requires Ruby 3.3+.
+- Audit Rails console detection that calls `Rails.const_defined?(:Console)`. The `console` gem arrives through Pro's
+  `async` dependency, which was already present in Pro 16.x, and defines top-level `::Console`. Pro 17 loads `async` on
+  the ordinary render path, while Pro 16 loaded it only for streaming or async rendering, so the default lookup inherits
+  through `Object` and silently returns `true` outside a Rails console. Use `Rails.const_defined?(:Console, false)` to
+  set `inherit: false`.
 - Remove direct application assumptions about HTTPX-specific response or error classes in Pro renderer request paths.
 - Treat `config.ssr_timeout` as a per-read socket timeout. With the async-http client, this is applied as the
   read timeout on each renderer socket. It no longer wraps the entire request as a single task-level timeout.
@@ -614,6 +619,12 @@ Before upgrading:
 - Expect renderer connection drops to surface immediately as `ReactOnRailsPro::Error`/connection failures. HTTPX
   previously performed one implicit transport retry for some connection drops; the async-http adapter uses
   `retries: 0` and leaves retry policy to the existing bundle-upload retry loop and caller behavior.
+- If your Rails application uses OpenTelemetry, run `OpenTelemetry::SDK.configure` before the first renderer request
+  so both the tracer provider and W3C propagator are registered. HTTPX instrumentation no longer observes the
+  async-http transport. React on Rails Pro now creates the replacement CLIENT span itself and injects W3C trace
+  context for regular, streaming, incremental, raw-render, and asset-upload requests. Configure the Node Renderer
+  with `fastify: true` so its server spans extract that context. No OpenTelemetry dependency is added by the Pro gem;
+  when the SDK is absent or no provider is registered, renderer requests remain uninstrumented.
 - Run the node renderer client from the normal Rails request path. **Note for Falcon/async-rails users:** the earlier
   advisory to keep Falcon deployments on the HTTPX renderer client is superseded; HTTPX has been removed and async-http
   now handles Falcon natively. Async Rails servers (Falcon, Puma with an async scheduler) are supported: the async-http
@@ -630,11 +641,19 @@ Before upgrading:
 
 ##### JWT gem requirement
 
-`react_on_rails_pro` uses `jwt` for offline license validation. Current versions require `jwt >= 2.7` (relaxed from the `16.7.0.rc.0` floor of `jwt >= 3.2.0`), so apps still pinned to jwt 2.x can bundle without upgrading. Apps that can resolve `jwt 3.2.0` or newer will continue to do so. If your Gemfile pins `jwt` below 2.7 (e.g., `2.2.x` for compatibility with OAuth gems), you will need to upgrade it. Check for conflicts with:
+`react_on_rails_pro` uses `jwt` for offline license validation. The first release containing
+[PR 4864](https://github.com/shakacode/react_on_rails/pull/4864), and later releases, require `jwt >= 2.8, < 4`;
+earlier React on Rails Pro releases retain the dependency range declared by their gemspec. Apps still pinned to a
+compatible jwt 2.x release can bundle without upgrading. Apps that can resolve `jwt 3.2.0` or newer in the 3.x line
+will continue to do so; jwt 4.x is not supported. If your Gemfile pins `jwt` below 2.8 (e.g., `2.2.x` for compatibility
+with OAuth gems), you will need to upgrade it. Check for conflicts with:
 
 ```bash
 bundle update jwt
 ```
+
+> **Why the floor is 2.8.** jwt 2.8.0 began declaring `base64` as a runtime dependency. That declaration
+> keeps offline license validation reliable on Ruby 3.4+, where `base64` is a bundled gem.
 
 ##### Node renderer config: `bundlePath` → `serverBundleCachePath`
 
@@ -780,7 +799,7 @@ Server Components execute on the server and stream HTML to the client—no serve
   - **62% reduction** in client‑side bundle size
   - **63% improvement** in Google Speed Index
   - Total blocking time: **from 110 ms to 1 ms**
-- [geekyants.com Case Study](https://geekyants.com/en-gb/blog/boosting-performance-with-nextjs-and-react-server-components-a-geekyantscom-case-study):
+- [geekyants.com Case Study](https://web.archive.org/web/20260306053730/https://geekyants.com/en-gb/blog/boosting-performance-with-nextjs-and-react-server-components-a-geekyantscom-case-study):
   - **52% smaller** JavaScript and TypeScript codebase
   - Lighthouse scores improved **from ~50 to ~90**
 
@@ -1303,7 +1322,9 @@ const config = {
   supportModules: true,
 
   // workersCount defaults to the number of CPUs minus 1
-  workersCount: Number(env.NODE_RENDERER_CONCURRENCY || 3),
+  // RENDERER_WORKERS_COUNT is the canonical name since v16.5.0.
+  // NODE_RENDERER_CONCURRENCY is still supported as a fallback.
+  workersCount: Number(env.RENDERER_WORKERS_COUNT || env.NODE_RENDERER_CONCURRENCY || 3),
 
   // Optional: Automatic worker restarting (for memory leak mitigation)
   // allWorkersRestartInterval: 15, // minutes between restarting all workers
@@ -1969,13 +1990,155 @@ _Timings are illustrative, not benchmarks — the point is **when** the first pa
 ## Prerequisites
 
 - React on Rails Pro
-- React 18 or 19 for `stream_react_component`; React 19.2.x with patch 19.2.7 or newer for async props and React Server Components
+- React 18 or 19 for progressive `stream_react_component`; React 16/17 use synchronous SSR fallback
+- React 19.2.x with patch 19.2.7 or newer for async props and React Server Components
 - React on Rails v16.0.0 or higher
 - Node Renderer running (streaming requires Node.js, not ExecJS)
 - For async props (streaming each slow prop independently): React Server Components enabled — `config.enable_rsc_support = true`
 
-React 18 support is scoped to non-RSC `stream_react_component` with synchronous props. Async props,
-`stream_react_component_with_async_props`, and React Server Components require React 19.2.x with patch 19.2.7 or newer.
+### Compatibility by React Version
+
+| React version | `stream_react_component` behavior                                                                                                                                               | Async props and RSC                                                                                              |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| React 16/17   | Synchronous SSR fallback for trees that do not suspend. If a child actually suspends, `renderToString` cannot complete SSR; the React 18 example below will not work unchanged. | Not available                                                                                                    |
+| React 18      | Progressive streaming for ordinary, non-RSC components with synchronous props. Suspense boundaries can reveal independently through `renderToPipeableStream`.                   | Not available; do not install `react-on-rails-rsc` or enable RSC support                                         |
+| React 19      | Progressive streaming for ordinary components, including the same non-RSC path as React 18.                                                                                     | Async props and RSC require React/React DOM 19.2.x with patch 19.2.7+ and compatible `react-on-rails-rsc` 19.2.x |
+
+React on Rails detects whether the installed React DOM server provides `renderToPipeableStream`. This keeps
+`stream_react_component` on the synchronous path for React 16 and 17 while selecting progressive streaming
+automatically on React 18 and 19. The React 16/17 path is suitable only when the rendered tree does not suspend.
+
+### React 19.2 Suspense reveal batching
+
+[React 19.2 briefly batches some server-rendered Suspense boundary reveals](https://react.dev/blog/2025/10/01/react-19-2#batching-suspense-boundaries-for-ssr)
+so boundaries that finish near one another can become visible together. React controls this with heuristics and backs
+off when batching could hurt Core Web Vitals. React on Rails Pro does not add or expose a batching-delay setting.
+
+Keep these two checkpoints separate when observing a streamed page:
+
+- **Server chunk delivery:** React decides when resolved boundary markup enters its server stream. React on Rails Pro
+  forwards those emitted chunks in order. For RSC streams, each combined flush preserves the required order: payload
+  initialization and stylesheet prerequisites, then the HTML, then the matching payload-push scripts.
+- **Browser-visible reveal:** Network buffering, compression, HTML parsing, and React's reveal batching can make DOM
+  updates appear later or in larger groups than the chunks observed by Rails or the Node Renderer. A server chunk is
+  therefore not a guaranteed paint boundary.
+
+Make streaming tests state-based rather than timer-based. Assert the shell and fallbacks while data is unresolved,
+then resolve one or more sources and use retrying assertions for the final DOM state, element order, and the rule that
+resolved content does not return to its fallback. Do not assume one resolved boundary equals one output chunk, use an
+arbitrary sleep, or depend on a fixed batching delay such as 300 ms; React's timing is deliberately heuristic.
+
+## React 18 Streaming Without RSC
+
+React 18 applications can use progressive SSR before adopting React Server Components. Keep all Rails props
+synchronous, register an ordinary React component, and render it with `stream_react_component`. You do not need
+`react-on-rails-rsc`, `config.enable_rsc_support`, `registerServerComponent`, or an RSC bundle.
+
+For a Suspense boundary to reveal progressively, something below it must suspend during the server render. One
+straightforward React 18 case is a lazily loaded component:
+
+:::note Node Renderer module support
+This example assumes the server bundle can resolve its dynamic import. If your bundler's lazy or loadable component
+runtime needs Node.js globals, enable `supportModules: true` in the Node Renderer launcher. Because that option changes
+the renderer VM's runtime capabilities, review the
+[supportModules configuration and security notes](../oss/building-features/node-renderer/js-configuration.md#node-renderer-javascript-configuration)
+before enabling it.
+:::
+
+```jsx
+// app/javascript/components/ProductPage.jsx
+import React, { lazy, Suspense } from 'react';
+
+const ProductReviews = lazy(() => import('./ProductReviews'));
+
+const ProductPage = ({ product, reviews }) => (
+  <main>
+    <h1>{product.name}</h1>
+    <p>{product.description}</p>
+
+    <Suspense fallback={<p>Loading reviews...</p>}>
+      <ProductReviews reviews={reviews} />
+    </Suspense>
+  </main>
+);
+
+export default ProductPage;
+```
+
+The lazy module itself remains an ordinary synchronous React component:
+
+```jsx
+// app/javascript/components/ProductReviews.jsx
+import React from 'react';
+
+const ProductReviews = ({ reviews }) => (
+  <ul>
+    {reviews.map((review) => (
+      <li key={review.id}>{review.summary}</li>
+    ))}
+  </ul>
+);
+
+export default ProductReviews;
+```
+
+Register it through the normal, non-RSC API. With manual bundling, import this shared registration module from both
+the browser and server bundle entrypoints so the browser can hydrate the streamed component:
+
+```js
+// app/javascript/packs/react-on-rails-components.js
+import ReactOnRails from 'react-on-rails-pro';
+import ProductPage from '../components/ProductPage';
+
+ReactOnRails.register({ ProductPage });
+```
+
+```js
+// app/javascript/packs/application.js
+import './react-on-rails-components';
+
+// app/javascript/packs/server-bundle.js
+import './react-on-rails-components';
+```
+
+If you use auto-bundling, its generated client and server packs perform the equivalent ordinary component
+registration.
+
+Pass the already-loaded Rails data as ordinary props:
+
+```erb
+<%= stream_react_component(
+      'ProductPage',
+      props: {
+        product: @product.as_json(only: %i[id name description]),
+        reviews: @reviews.as_json(only: %i[id summary])
+      }
+    ) %>
+```
+
+Render the containing view through the streaming controller concern:
+
+```ruby
+class ProductsController < ApplicationController
+  include ActionController::Live
+  include ReactOnRails::Controller
+  include ReactOnRailsPro::Stream
+
+  def show
+    @product = Product.find(params[:id])
+    @reviews = @product.reviews
+    stream_view_containing_react_components(template: "products/show")
+  end
+end
+```
+
+The browser receives the product shell and `Loading reviews...` fallback first. When the lazy module resolves on the
+server, React streams the reviews HTML and replaces that fallback. Existing React 18 data libraries that suspend during
+SSR can use the same boundary pattern.
+
+This path provides progressive **HTML streaming**, but all Rails props are still loaded before React begins rendering.
+To stream Rails data as each slow query finishes, use [async props](#progressive-data-with-async-props), which require
+React/React DOM 19.2.x with patch 19.2.7 or newer and RSC.
 
 ## Progressive Data with Async Props
 
@@ -1986,7 +2149,7 @@ This is the recommended answer to "my component needs Rails data during render":
 > [!NOTE]
 > A Server Component _can_ `fetch` a Rails API directly, but the renderer's VM has no `fetch`, `Headers`, `Request`, or `Response` by default — you must bundle an HTTP client or inject them via `additionalContext`. That call leaves the active Rails controller request and must re-establish or explicitly forward auth, tenancy, caching, and tracing context through the API endpoint. `'use server'` Server Actions are **not** supported (the renderer has no DB/session/cookie access). Prefer props / async props. See [RSC data fetching patterns](../oss/migrating/rsc-data-fetching.md).
 
-Under the hood, Rails opens a bidirectional HTTP/2 NDJSON stream to the renderer and feeds props in as it resolves them. Each update runs in that request's isolated `sharedExecutionContext` and resolves a Promise, which lets React flush the corresponding HTML back to Rails for forwarding to the browser:
+Under the hood, Rails opens a bidirectional NDJSON stream to the renderer over h2c by default, or direct HTTP/1.1 when both sides are configured for it, and feeds props in as it resolves them. Each update runs in that request's isolated `sharedExecutionContext` and resolves a Promise, which lets React flush the corresponding HTML back to Rails for forwarding to the browser:
 
 [Diagram: Sequence diagram across three lanes — Browser, Rails, and the Node Renderer. The browser asks for a page, Rails starts the page with placeholders, the renderer returns an HTML shell with loading states, and the browser shows the shell. Then a loop runs for each slow data value: Rails sends the value, the renderer returns the HTML for that section, and the browser replaces the loading state.]
 
@@ -2880,6 +3043,8 @@ SOURCE: docs/pro/async-props-database-queries.md
 
 This guide covers how to safely run ActiveRecord queries inside `stream_react_component_with_async_props` blocks. It explains when you need special configuration and when you don't.
 
+> **Prerequisites:** `stream_react_component_with_async_props` requires Pro RSC support to be enabled — set `config.enable_rsc_support = true` in `config/initializers/react_on_rails_pro.rb` (it defaults to `false`) — and it must be rendered inside a [`stream_view_containing_react_components`](./streaming-ssr.md#4-render-the-view-using-the-stream_view_containing_react_components-helper) view. Without RSC support enabled the helper raises `ReactOnRailsPro::Error`; outside a streaming view it raises `ReactOnRails::Error`. The database/fiber configuration below is separate from these prerequisites.
+
 ## Quick Decision Guide
 
 | Your usage pattern                                                 | Configuration needed?                              |
@@ -2955,7 +3120,7 @@ Each concurrent fiber checks out its own connection. Size the pool to accommodat
 # config/database.yml
 default: &default
   adapter: postgresql
-  pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } * (1 + ENV.fetch("MAX_CONCURRENT_FIBERS_PER_REQUEST") { 3 }.to_i) %>
+  pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 }.to_i * (1 + ENV.fetch("MAX_CONCURRENT_FIBERS_PER_REQUEST") { 3 }.to_i) %>
 ```
 
 **Formula:** `pool >= threads × (1 + max_concurrent_fibers_per_request)`
@@ -3081,7 +3246,7 @@ Both blocks run concurrently (Pro spawns an `Async::Task` for each). Without `is
 
 ## Summary Checklist
 
-For **one component, sequential queries** — nothing to configure:
+For **one component, sequential queries** — no extra database/fiber configuration (beyond the prerequisites above):
 
 - [x] Use ActiveRecord normally in the `emit` block
 
@@ -3139,13 +3304,15 @@ The contrast in one picture — the old way runs JavaScript inside Rails, while 
 
 | Metric               | ExecJS                      | Node Renderer            |
 | -------------------- | --------------------------- | ------------------------ |
-| SSR throughput       | Baseline                    | 10-100x faster           |
+| SSR throughput       | Baseline                    | Workload-dependent       |
 | Memory isolation     | Shared with Ruby            | Separate process         |
 | Worker concurrency   | Single-threaded per request | Configurable worker pool |
 | Profiling            | Not available               | Full Node.js tooling     |
 | Memory leak recovery | Crashes Ruby                | Rolling worker restarts  |
 
 At [Popmenu](https://www.shakacode.com/recent-work/popmenu/) (a ShakaCode client), switching to the Node Renderer contributed to a 73% decrease in average response times and 20-25% lower Heroku costs across tens of millions of daily SSR requests.
+
+Because results depend on application code, traffic, and deployment topology, [benchmark your own pages](../oss/core-concepts/performance-benchmarks.md) rather than relying on a universal multiplier.
 
 ## How It Works
 
@@ -3347,7 +3514,7 @@ The `pre_seed_renderer_cache` rake task stages compiled server bundles directly 
 It supports two modes, both producing the same on-disk cache layout (`<cache>/<bundleHash>/<bundleHash>.js`):
 
 - **`MODE=copy`** (default) — copies files. Use in Docker/image builds so the cache is baked into an immutable artifact.
-- **`MODE=symlink`** — creates relative symlinks. For same-filesystem workflows (local dev, CI, Heroku-style same-dyno deploys, bundle-caching restores).
+- **`MODE=symlink`** — creates relative symlinks to immutable per-artifact snapshots. For same-filesystem workflows (local dev, CI, Heroku-style same-dyno deploys, bundle-caching restores).
 
 ```dockerfile
 # After webpack/assets build step (Docker image build)
@@ -3356,6 +3523,8 @@ RUN bundle exec rake react_on_rails_pro:pre_seed_renderer_cache
 ```
 
 Both modes stage the server bundle, any configured `assets_to_copy`, and (when RSC is enabled) the RSC bundle and its companion manifests.
+
+Symlink mode stores its persistent targets in a sibling directory named `<cache>.artifact-snapshots/<artifact-id>/` rather than linking directly to mutable webpack outputs. This keeps the bytes behind an artifact ID stable even if a watcher rebuilds the source files. A snapshot is pruned after its corresponding `<cache>/<artifact-id>/` directory is removed and pre-seeding runs again. Pre-seeding also leaves a sibling `<cache>.preseed.lock` file in place so concurrent build processes continue to coordinate on one lock inode. If deployment cleanup removes the whole renderer cache manually, remove the sibling `.artifact-snapshots` directory at the same time; only remove the lock file when no pre-seed process is running. Moving only the cache directory without its sibling snapshots will leave dangling links.
 
 The `pre_seed_renderer_cache` task is also invoked automatically at the end of `assets:precompile`, defaulting to `MODE=symlink` so the local/CI/Heroku path has zero new configuration. To bake the cache into a Docker image when `assets:precompile` is the final asset step (rather than calling the rake task explicitly), set `ASSETS_PRECOMPILE_RENDERER_CACHE_MODE=copy` in the build environment:
 
@@ -3416,6 +3585,14 @@ See [Rolling-Deploy Adapters](./rolling-deploy-adapters.md) for the full protoco
 ## Observability with OpenTelemetry
 
 The Node Renderer ships an optional OpenTelemetry integration for distributed tracing. When enabled, every SSR request becomes a trace you can inspect in any OTLP-compatible backend (Jaeger, Honeycomb, Datadog, Grafana Tempo, New Relic, etc.).
+
+### Continue Rails traces into the Node Renderer
+
+React on Rails Pro creates a CLIENT span for every Rails request to the Node Renderer and injects the active W3C trace context into the request headers. With `fastify: true` in the renderer's OpenTelemetry configuration, its server spans extract that context and continue the Rails trace instead of starting a separate root trace.
+
+Run `OpenTelemetry::SDK.configure` in the Rails application before the first renderer request so both the tracer provider and W3C propagator are registered. The Pro gem does not add an OpenTelemetry dependency or initialize an exporter for the application. If OpenTelemetry is not loaded, or only the API's default proxy provider is present, renderer requests remain uninstrumented.
+
+This covers regular and streaming renders, incremental async-props renders, raw-render requests, asset uploads, and other requests sent through the renderer HTTP client. The Rails CLIENT span records only `http.request.method`, `url.path`, `http.response.status_code`, `http.request.body.size`, and `http.response.body.size`.
 
 ### Install the OpenTelemetry packages (peer dependencies)
 
@@ -3485,7 +3662,52 @@ await reactOnRailsProNodeRenderer().catch((e) => {
 ```
 
 > [!NOTE]
-> With `fastify: true`, OpenTelemetry patches the HTTP and Fastify modules process-wide. If a later init step fails after those patches are installed, OpenTelemetry does not provide a rollback API; the patched modules remain installed and use a no-op tracer until the process restarts.
+> With `fastify: true` or a nonempty `instrumentations` list, OpenTelemetry patches modules process-wide. If a later init step fails, the renderer disables every registered instrumentation before cleaning up the provider. It also disables them during normal renderer-managed shutdown so they stop creating spans.
+
+After renderer-managed initialization succeeds, the renderer owns the provider lifecycle, including any supplied `spanProcessor` or `exporter`, and shuts those components down with the provider. Failed initialization preserves a caller-supplied `spanProcessor`: the renderer force-flushes it when supported but does not shut it down. A supplied `exporter` has a different contract because the renderer creates and owns its wrapping processor; if initialization later fails, shutting down that processor also shuts down the exporter.
+
+### Add instrumentations and resource detectors
+
+Pass one or more additional OpenTelemetry instrumentations through `instrumentations`. The renderer appends them after its built-in `HttpInstrumentation` and `FastifyOtelInstrumentation` instances, so the custom list extends rather than replaces the renderer defaults. A nonempty list registers the full combined list even when `fastify` is not set separately and therefore requires `@opentelemetry/instrumentation`, `@opentelemetry/instrumentation-http`, and `@fastify/otel` to be installed. An empty list adds no instrumentations; when `fastify` is not enabled, it is inert and does not load or register the renderer's built-in instrumentations. Passing an instrumentation instance gives the renderer lifecycle ownership of its activation: the renderer disables that instance after failed initialization and during normal shutdown.
+
+Pass OpenTelemetry resource detectors through `resourceDetectors`. For example, an ECS deployment can install `@opentelemetry/resource-detector-aws` and let the AWS ECS detector discover container and cloud attributes. Extra instrumentation packages and detector packages remain application-owned optional dependencies.
+
+```js
+import { AwsInstrumentation } from '@opentelemetry/instrumentation-aws-sdk';
+import { awsEcsDetector } from '@opentelemetry/resource-detector-aws';
+import { init as initOpenTelemetry } from 'react-on-rails-pro-node-renderer/integrations/opentelemetry';
+
+initOpenTelemetry({
+  tracing: true,
+  instrumentations: [new AwsInstrumentation()],
+  resourceDetectors: [awsEcsDetector],
+});
+```
+
+Detected resource attributes are merged below the existing resource configuration. Explicit `resourceAttributes` override detected attributes, and service naming keeps its existing priority: `OTEL_SERVICE_NAME`, then `init({ serviceName })`, then `resourceAttributes['service.name']`, then the renderer default. Empty service-name values are treated as unset. A detector-provided `service.name` does not override that chain.
+
+### Attach renderer spans to an existing provider
+
+By default, `init()` still stops without installing renderer tracing adapters when another SDK already owns the global tracer provider. This avoids patching modules under a provider whose lifecycle the renderer does not own.
+
+If the application deliberately initializes its own provider first, opt in to using it with `useExistingGlobalProvider: true` and `tracing: true`:
+
+```js
+// This module must register the application's provider before renderer init.
+import './configure-opentelemetry.js';
+import { init as initOpenTelemetry } from 'react-on-rails-pro-node-renderer/integrations/opentelemetry';
+
+initOpenTelemetry({
+  tracing: true,
+  useExistingGlobalProvider: true,
+});
+```
+
+The renderer verifies that a global tracer provider and a working context manager have been registered before it installs `setupTracing` and `setupSubSpan`, preserving the renderer's nested `ror.*` spans. Register the application SDK with `provider.register()` before calling renderer `init()`. Calling only `trace.setGlobalTracerProvider()` is insufficient because it does not install context propagation. If either prerequisite is unavailable, `init()` logs a retryable warning without installing adapters. Register the SDK, then call `init()` again to attach renderer tracing.
+
+The application continues to own exporters, processors, resources, instrumentations, propagators, flushing, and provider shutdown. Renderer-managed options such as `fastify`, `instrumentations`, `resourceDetectors`, `exporter`, `spanProcessor`, and `shutdownTimeoutMs` are ignored in this mode and produce a warning when supplied, including explicit false, zero, or empty values. Non-service-name `resourceAttributes` are also ignored and warned about; only `resourceAttributes['service.name']` participates in tracer-scope naming. These warnings are emitted even when the provider or context-manager prerequisite is still missing. Configure those features on the application-owned SDK before starting the renderer. In particular, register HTTP and Fastify instrumentation before the Fastify server loads so incoming `traceparent` context from Rails becomes the parent of the renderer's `ror.*` spans. The renderer does not add a shutdown hook for an external provider, so the host must flush and shut down its SDK during application shutdown.
+
+`serviceName`, or `resourceAttributes['service.name']` when no higher-priority name is set, selects the tracer instrumentation scope for renderer spans. It does not change the existing provider's resource. Configure the resource `service.name` on the host-owned SDK.
 
 ### Configuration via standard OpenTelemetry environment variables
 
@@ -3501,7 +3723,7 @@ await reactOnRailsProNodeRenderer().catch((e) => {
 
 | Span                                 | Where                                                             | Attributes                                                                |
 | ------------------------------------ | ----------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| `ror.ssr.request`                    | Root span for each SSR render request                             | (none — root)                                                             |
+| `ror.ssr.request`                    | Entry span for each SSR render request                            | (none)                                                                    |
 | `ror.bundle.build_execution_context` | Loading a bundle into the VM                                      | `bundle.timestamp`, `bundle.paths.count`, `cache.strategy`                |
 | `ror.bundle.upload`                  | When new bundles are uploaded mid-request or via `/upload-assets` | `bundle.count`, `assets.count`, `bytes.total` (sum of upload source size) |
 | `ror.vm.execute`                     | The actual SSR JS execution inside the VM                         | `bundle.timestamp`                                                        |
@@ -3513,7 +3735,7 @@ Outbound HTTP calls inside your SSR bundle are automatically captured by `HttpIn
 
 **Cache-miss note:** On a cache-miss path `ror.bundle.build_execution_context` appears twice. The first span has `cache.strategy=cache-first` and can end with ERROR status when the VM cache probe misses. The second span has `cache.strategy=cache-miss` for the real VM build after bundle upload or bundle discovery. Scope error alerts to exclude `cache.strategy=cache-first` when that miss is expected.
 
-As a trace, the spans nest under the root `ror.ssr.request`. On the warm path `ror.bundle.build_execution_context` (`cache-first`) fires first to load the bundle into the VM, then `ror.result.prepare` opens and runs `ror.vm.execute` **inside it** (`vm.execute` is a child of `result.prepare`, not a sibling after it). Cold-path spans (upload and `cache-miss` build) appear only after the `cache-first` probe and before `result.prepare`; outbound `fetch` calls from your bundle are captured automatically as HTTP child spans under `vm.execute`; and incremental (async-props) renders add their own stream/chunk spans:
+The renderer spans nest under `ror.ssr.request`. With `fastify: true`, that entry span is a child of the Rails CLIENT span; otherwise it is a renderer-side root. On the warm path `ror.bundle.build_execution_context` (`cache-first`) fires first to load the bundle into the VM, then `ror.result.prepare` opens and runs `ror.vm.execute` **inside it** (`vm.execute` is a child of `result.prepare`, not a sibling after it). Cold-path spans (upload and `cache-miss` build) appear only after the `cache-first` probe and before `result.prepare`; outbound `fetch` calls from your bundle are captured automatically as HTTP child spans under `vm.execute`; and incremental (async-props) renders add their own stream/chunk spans:
 
 [Diagram: OpenTelemetry span tree rooted at one server-render request: the cache-first build probe runs first, then (on a cache miss) a cold start adds bundle-upload and cache-miss build spans, then ror.result.prepare opens and wraps ror.vm.execute as its child; outbound fetches appear as HTTP child spans under vm.execute; and streaming async-props renders add their own stream and per-chunk spans.]
 
@@ -3521,11 +3743,11 @@ As a trace, the spans nest under the root `ror.ssr.request`. On the warm path `r
 
 - **Span processor**: `BatchSpanProcessor` in production (`NODE_ENV=production` or `RAILS_ENV=production`), `SimpleSpanProcessor` otherwise. Override with `init({ spanProcessor })`.
 - **Exporter**: OTLP HTTP. Override with `init({ exporter })`.
-- **Graceful shutdown**: Pending batched spans are flushed when Fastify's `onClose` hook fires (during worker shutdown), so traces are not lost on rolling restarts. The renderer waits up to 5000ms by default before continuing worker shutdown; override with `init({ shutdownTimeoutMs })`. The worker also has a 10s `app.close()` watchdog, so keep custom OTel shutdown timeouts below that window.
+- **Graceful shutdown**: For a renderer-managed provider, pending batched spans are flushed when Fastify's `onClose` hook fires (during worker shutdown), so traces are not lost on rolling restarts. The renderer waits up to 5000ms by default before continuing worker shutdown; override with `init({ shutdownTimeoutMs })`. The worker also has a 10s `app.close()` watchdog, so keep custom OTel shutdown timeouts below that window. For `useExistingGlobalProvider`, the host application must flush and shut down its own provider.
 
 ### Privacy note
 
-The `renderingRequest` payload and rendered response body are **never** included in span attributes. Only bundle hashes, counts, and byte sizes (`bytes.total`, `response.bytes`) are recorded. This matches the renderer's existing logging policy.
+The `renderingRequest` payload and rendered response body are **never** included in span attributes. Rails CLIENT spans contain only the request method, a normalized path without bundle or props digests, response status, and request/response byte sizes. Only W3C `traceparent` and `tracestate` fields are forwarded; baggage is not sent to the renderer. Renderer spans contain only bundle hashes, counts, and byte sizes (`bytes.total`, `response.bytes`). This matches the renderer's existing logging policy.
 
 ## Further Reading
 
@@ -3575,6 +3797,9 @@ A **rolling-deploy adapter** makes new renderer instances start warm for **every
 
 The built-in HTTP adapter is the simplest way to get there, and it's covered next. If your build can't reach the previous deployment, or you'd rather keep bundles in your own store, you can [write a custom adapter](./rolling-deploy-custom-adapters.md) instead.
 
+> [!NOTE]
+> Pre-seeding runs at **image-build time**, in the environment that builds the image. That is sufficient when the image is built and deployed in the **same** environment. If you **promote** an image between environments — build once on staging, then promote that same image to production — build-time seeding alone is not enough. See [Promotion deploys need a boot seed](#promotion-deploys-need-a-release-time-boot-seed).
+
 ## Set up the HTTP adapter
 
 > Introduced as a scaffold in PR [#3379](https://github.com/shakacode/react_on_rails/pull/3379) — part 1 of a multi-PR series. A hard HTTPS gate, streaming download, and additional hardening land in follow-ups; see [Security](#security) below.
@@ -3588,15 +3813,17 @@ The currently-deployed Rails server already has every bundle and companion asset
 ```ruby
 # config/initializers/react_on_rails_pro.rb
 ReactOnRailsPro.configure do |config|
-  config.rolling_deploy_adapter      = ReactOnRailsPro::RollingDeployAdapters::Http
-  config.rolling_deploy_token        = ENV.fetch("ROLLING_DEPLOY_TOKEN")    # shared secret, ≥ 32 bytes
-  config.rolling_deploy_previous_url = ENV["ROLLING_DEPLOY_PREVIOUS_URL"]   # base URL of the still-running deployment
+  config.rolling_deploy_adapter       = ReactOnRailsPro::RollingDeployAdapters::Http
+  config.rolling_deploy_token         = ENV.fetch("ROLLING_DEPLOY_TOKEN")    # shared secret, ≥ 32 bytes
+  config.rolling_deploy_previous_urls = ENV["ROLLING_DEPLOY_PREVIOUS_URLS"] # comma-delimited or an Array
 end
 ```
 
 - **`rolling_deploy_token`** — the shared bearer token ("password"). Generate one with `SecureRandom.hex(32)` and set the **same** value on both the running server (which authenticates incoming pulls) and the build CI (which sends it). The config validator rejects tokens shorter than 32 bytes.
-- **`rolling_deploy_previous_url`** — the base URL where the previous deployment is reachable **from the build CI**, e.g. `https://app.example.com/react_on_rails_pro/rolling_deploy`. The adapter appends `/manifest` and `/bundles/:hash`. Leave it unset (or empty) to disable discovery on that build.
+- **`rolling_deploy_previous_urls`** — one or more previous-deployment URLs reachable **from the build CI** or release-time seed step. It accepts an Array, a comma-delimited String, or one String. Use a bare origin such as `https://old.example.com` to inherit `rolling_deploy_mount_path`, or include an explicit path such as `https://old.example.com/internal/rolling-deploy` to preserve that path. Order is retained and duplicates are removed. Pass more than one to seed from several environments at once (e.g. staging + production — see [Multi-source seeding](./rolling-deploy-custom-adapters.md#multi-source-seeding)). Leave it unset (or empty) to disable discovery.
 - **`rolling_deploy_mount_path`** — the Rails path where the Pro engine auto-mounts the bundle-serving endpoint when the built-in HTTP adapter is configured. Defaults to `/react_on_rails_pro/rolling_deploy`. Set it to a custom path when your previous deployment is reachable elsewhere, or set it to `nil`/blank to opt out of auto-mounting and draw the routes yourself.
+
+Previous URLs must use HTTP or HTTPS and include a host. Credentials, query strings, and fragments are rejected. A bare origin also requires a nonblank `rolling_deploy_mount_path`; use an explicit path when the local engine mount is disabled.
 
 ### 2. Server endpoint auto-mount
 
@@ -3613,10 +3840,10 @@ end
 
 That exposes two authenticated endpoints under the mount path (default `/react_on_rails_pro/rolling_deploy`):
 
-| Endpoint             | Returns                                                                                                                   |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `GET /manifest`      | JSON: `{ hashes: [...], rsc_enabled: true\|false, generated_at: "ISO8601", protocol_version: 1 }` for the current deploy. |
-| `GET /bundles/:hash` | `application/gzip` tarball containing `bundle.js` plus that hash's companion assets.                                      |
+| Endpoint             | Returns                                                                                                                                                                                                          |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /manifest`      | JSON with `hashes`, `rsc_enabled`, `generated_at`, `protocol_version: 2`, and `artifact_identity: { scheme: "rorp-v2-sha256", version: 2 }` for the current deploy. Older protocol-v1 manifests remain readable. |
+| `GET /bundles/:hash` | `application/gzip` tarball containing `bundle.js` plus that artifact ID's exact companion assets.                                                                                                                |
 
 The auto-mounted routes are prepended ahead of application routes, so terminal catch-all routes do not shadow the endpoint. They also use an internal route-helper prefix, so apps that still have an older manual mount at the default path keep booting while you remove the redundant manual route.
 
@@ -3661,15 +3888,89 @@ ReactOnRailsPro::RollingDeploy::BundlesController.draw_routes(
 - The `:hash` parameter is matched against an **allowlist** of the current deployment's real bundle hashes — anything else returns `404` before touching the filesystem.
 - Responses carry `Cache-Control: no-store`, `Pragma: no-cache`, and `X-Content-Type-Options: nosniff`.
 - Tarball extraction is **path-traversal-proofed**, accepts regular files only, and enforces a 200 MB uncompressed cap (zip-bomb guard).
+- Discovery and download use monotonic overall deadlines as well as capped per-request connection/read timeouts, so a slow sequence of origins cannot reset the operation's wall-clock budget.
 
 > [!WARNING]
-> **Use HTTPS in production.** The token is a bearer credential. Over plain HTTP to a non-loopback host the adapter logs a warning that the token is being sent over an unencrypted connection; a hard HTTPS gate is planned for a follow-up release. Until then, ensure `rolling_deploy_previous_url` always uses `https://` in production environments.
+> **Use HTTPS in production.** The token is a bearer credential. Over plain HTTP to a non-loopback host the adapter logs a warning that the token is being sent over an unencrypted connection; a hard HTTPS gate is planned for a follow-up release. Until then, ensure every `rolling_deploy_previous_urls` entry uses `https://` in production environments.
 
 ### Companion assets are handled automatically
 
 Each bundle hash ships with the companion assets built alongside it — `loadable-stats.json`, plus `react-client-manifest.json` and `react-server-client-manifest.json` when RSC is enabled. They map chunk and component IDs to the exact asset URLs that hash's build produced, so serving a draining hash with the **wrong** build's manifests would break client-side hydration. The HTTP adapter packs each hash's companions into the same tarball, so this stays correct with no work on your part. (Custom adapters must return them explicitly — see [Companion assets](./rolling-deploy-custom-adapters.md#companion-assets).)
 
+Current Pro artifact IDs begin with `rorp-v2-` and identify the role, bundle bytes, companion destination names, and companion bytes together. Changing only a manifest or `loadable-stats.json` therefore produces a new ID and invalidates fragment and renderer caches consistently. With multiple previous origins, duplicate legacy/protocol-v1 hashes are omitted because their payload provenance is ambiguous. Duplicate v2 IDs are safe to try in configured order because every downloaded payload is recomputed and rejected unless it matches the requested ID.
+
+Verified v2 previous-deploy payloads are always staged as captured files, even when pre-seeding uses `MODE=symlink`, because the adapter's source paths may change or disappear after their bytes are verified. Legacy/protocol-v1 payloads continue to honor symlink mode.
+
+## Promotion deploys need a release-time (boot) seed
+
+Pre-seeding runs during `assets:precompile` — at **image-build time**, in the environment that builds the image. That is right when the image is built and deployed in the same environment, but not when you **promote** an image between environments.
+
+### Why promotion breaks build-time seeding
+
+- The staging build captures only the bundles advertised by its configured previous URLs at build time.
+- A multi-source configuration can capture staging and production's then-advertised bundles, but it cannot know which production bundle will be draining when a later promotion occurs.
+
+Across **two pending promotions**, both candidate images can snapshot `P0`; after `C1` promotes production from `P0` to `C1`, promoting `C2` needs the draining `C1` bundle, which `C2` never seeded.
+
+### The fix: seed at release time
+
+The seed is a Rails/Rake task, so it must run in a Ruby-capable step that uses the promoted app artifact and production configuration:
+
+```bash
+bundle exec rake react_on_rails_pro:pre_seed_renderer_cache
+```
+
+- A combined Ruby+Node application image can run it before starting Node.
+- A Node-only renderer needs a Ruby-capable init, release, or sidecar step using the promoted app artifact/config. That step and the renderer must mount the same writable shared volume at `RENDERER_SERVER_BUNDLE_CACHE_PATH`, or the completed cache must be copied or synced into the renderer before it starts. Gate renderer start and readiness on that step completing.
+- Without a Ruby-capable step that makes the completed cache available to the renderer, this Rake seed cannot run for that renderer. Keep the multi-source build-time fallback and 410 recovery, or use a combined application shape.
+
+When the release-time step runs before new Rails takes traffic, production's live endpoint is still served by draining old pods and advertises the exact bundle the new renderer needs.
+
+Keep build-time seeding too; the layers are complementary:
+
+- **Build-time seed** — ideally [multi-source](./rolling-deploy-custom-adapters.md#multi-source-seeding) (staging + production) — is the failure floor if the boot seed cannot reach the live endpoint.
+- **Boot seed** is the correctness path: it resolves the live draining bundle at promotion time.
+
+> [!IMPORTANT]
+> Gate renderer start and readiness on the boot seed **completing, not succeeding**. A failed seed must degrade to the 410 fallback rather than wedge the deploy; the task already warns and continues on fetch failures.
+
+## Pre-seeding declares and prewarms the new renderer revision
+
+The adapter and `pre_seed_renderer_cache` populate the renderer's **disk cache** with old and new bundle files plus companion manifests, so requests avoid `410 Gone`, upload, and retry. The seed also emits a content-addressed declaration containing only the new revision's server artifact and optional RSC artifact. Configure the new renderer revision with the exact emitted path:
+
+```bash
+RENDERER_CURRENT_GENERATION_MANIFEST=/app/.node-renderer-bundles/.current-generations/rorp-generation-v1-<digest>.json
+```
+
+Each cluster worker validates that immutable declaration and its artifact roots, compiles the complete declared set, and pins it as current before listening. In supported `MODE=symlink` deployments, it compiles the validated immutable snapshot target and aliases the renderer-facing cache path to that same VM identity in memory, so the first request is a hit without request-time `realpath` work. Do not use a shared mutable `current` file or symlink: old and new workload revisions can race to rewrite a shared volume.
+
+Keep the declared current contexts plus draining request generations resident during the overlap with:
+
+```text
+maxVMPoolSize >= simultaneous bundle generations × contexts per generation
+```
+
+SSR-only has one context per generation. RSC has two: server plus RSC. The common old/new RSC rollout therefore needs `2 × 2 = 4` contexts per worker, which is the default. `maxVMPoolSize` is always a hard cap on pooled contexts; setting it to `2` during that four-context overlap causes least-recently-used eviction and can recreate the old/new rebuild loop even when every file was pre-seeded successfully.
+
+Inactive nonmatching bundle sets drain after `vmPoolRolloutDrainTimeout` (60 seconds by default). The declared current set remains pinned across an arbitrarily long old-only request gap; old traffic cannot demote it. The cleanup timer runs without waiting for another request, and shared paths stay pooled while referenced. The hard cap bounds pooled contexts and prefers declared current contexts, but an in-flight old request can keep an unpooled execution context and source-map registration alive until release, so transient memory also requires concurrency headroom.
+
+If `maxVMPoolSize` cannot hold the complete declared set, startup fails before the worker listens and `/ready` cannot pass. Additional draining contexts may be used by active requests without entering the shared pool, but the absolute pooled-context cap is never exceeded.
+
+The fleet-wide pooled-context upper bound is:
+
+```text
+overlapping renderer replicas × effective workers per replica × maxVMPoolSize
+```
+
+Include old replicas and rollout surge in the replica count. Use one effective worker for `workersCount: 0`. Size each renderer replica's memory request and limit from its worker/pooled-context count plus measured process, V8 heap, bundle-buffer, and safety overhead, including source maps and evicted execution contexts held by concurrent in-flight requests; multiply the per-replica request by overlapping replicas for total cluster capacity.
+
+The built-in `/ready` signal means the answering worker's complete declared current set is compiled when `RENDERER_CURRENT_GENERATION_MANIFEST` is configured. Application-owned, authenticated Rails smoke requests remain valuable end-to-end checks, but are not needed to target every worker for VM compilation. Without a configured declaration, the backward-compatible behavior remains request-driven and `/ready` means only that some VM exists.
+
+For configuration details, pressure log events, and topology-specific minimums, see [Sizing and draining the VM pool](../oss/building-features/node-renderer/js-configuration.md#sizing-and-draining-the-vm-pool) and [Rollout VM capacity and memory tradeoff](../oss/building-features/node-renderer/container-deployment.md#rollout-vm-capacity-and-memory-tradeoff).
+
 ## Deploy the renderer before Rails
+
+**This ordering requirement applies only when the renderer is a _separate workload_ from Rails** — Option 3 in [Container deployment](../oss/building-features/node-renderer/container-deployment.md#architecture-options). If Rails and the renderer share one workload — a single container or sidecar containers (Options 1–2) — they deploy on one atomic lifecycle. A Ruby-capable startup step can run the [boot seed](#promotion-deploys-need-a-release-time-boot-seed) before Node serves traffic.
 
 > [!IMPORTANT]
 > During a rolling deploy, the new Node Renderer must be live and cache-warm **before** the new Rails server starts serving traffic. If Rails goes first, the adapter's warm-cache guarantee doesn't hold for that window — you get exactly the 410 storm it's meant to prevent.
@@ -3688,10 +3989,13 @@ Rails and the Node Renderer are **separate workloads** with independent deploy l
 Make the ordering explicit in your pipeline rather than relying on timing:
 
 1. Deploy/promote the **Node Renderer** workload (new image, cache pre-seeded during its build).
-2. Wait until its new revision is **live and healthy** — readiness passing and all new renderer instances up.
-3. Only then deploy/promote the **Rails** workload.
+2. Keep it on private service networking with renderer password authentication.
+3. Wait until its new revision is **live and healthy** — readiness passing and all new renderer instances up.
+4. Only then deploy/promote the **Rails** workload; use a non-public candidate smoke gate for SSR/RSC when available.
 
-The invariant to enforce is **renderer-ready-before-Rails-live**: gate the Rails workload's release on the renderer workload's release completing (sequence them as separate steps in your deploy pipeline), and/or tune the renderer's readiness probe and Rails' startup so Rails does not accept traffic until the renderer reports ready. The exact wiring depends on your deploy tooling.
+The invariant to enforce is **renderer-ready-before-Rails-live**: gate the Rails workload's release on the renderer workload's release completing (sequence them as separate steps in your deploy pipeline), and/or tune the renderer's readiness probe and Rails' startup so Rails does not accept traffic until the renderer reports ready. Prefer a readiness gate over a fixed sleep — it tracks actual state. The exact wiring depends on your deploy tooling.
+
+This ordering is also what makes the [boot seed](#promotion-deploys-need-a-release-time-boot-seed) correct. The release-time step fetches the draining bundle from the target environment's live endpoint; that endpoint advertises the draining hash while old pods are still serving it. If new Rails cut over first, the endpoint would advertise the new hash and the seed would miss the bundle it needs.
 
 ## Verify your setup with `react_on_rails:doctor`
 
@@ -3702,8 +4006,10 @@ The invariant to enforce is **renderer-ready-before-Rails-live**: gate the Rails
 - ⚠️ Empty-list returns (often indicates the upload side has never run on a prior deploy).
 - ℹ️ The resolved renderer cache dir and how many bundle-hash subdirectories are present.
 - ℹ️ Whether `PREVIOUS_BUNDLE_HASHES` env override is set.
+- ✅/⚠️ The conservative old/new VM-cap formula per worker, including RSC context count.
+- ℹ️ Whether both capacity and the current-generation declaration are `observed` or `unverified`; separate workloads and ambiguous loopback sidecars stay unverified rather than producing a false warm pass.
 
-Doctor never calls `fetch` or `upload` — those have side effects.
+Doctor never calls `fetch` or `upload` and does not query the live Node Renderer process — those have side effects or would require a new privileged diagnostics channel.
 
 ## Need your own artifact store?
 
@@ -3756,18 +4062,18 @@ Each deploy plays two roles. It **publishes** its own bundles so a _future_ depl
 
 ## Companion assets
 
-Each bundle hash has **companion assets** built in lockstep:
+Each renderer artifact ID has **companion assets** built in lockstep:
 
 - `loadable-stats.json` — maps chunk IDs → asset URLs.
 - `react-client-manifest.json`, `react-server-client-manifest.json` (when RSC enabled) — map component IDs → chunk paths.
 
 If the renderer handles a request for bundle `abc` but reads the **new** build's manifests, it emits HTML referencing chunk URLs that the old deployment's asset pipeline never produced → client-side hydration breakage, chunk 404s.
 
-**Therefore: each seeded bundle hash must carry its own companion assets.** The adapter's `fetch(hash)` method returns bundle + assets together so the caller can't forget.
+**Therefore: each seeded artifact ID must carry its own companion assets.** The adapter's `fetch(hash)` method returns bundle + assets together so the caller can't forget. Current `rorp-v2-*` IDs identify the role, bundle bytes, companion destination basenames, and companion bytes as one value; a companion-only change creates a new ID.
 
 ## The adapter protocol
 
-Each **bundle hash** is a single cache entry. A deploy that has both a server bundle and an RSC bundle contributes **two** hashes — `server_bundle_hash` and `rsc_bundle_hash`. The protocol is opaque about which kind of bundle a hash represents; the adapter just stores and retrieves files keyed by hash.
+Each **artifact ID** is a single cache entry. A deploy that has both a server bundle and an RSC bundle contributes **two** IDs through the compatibility APIs `server_bundle_hash` and `rsc_bundle_hash`. Adapters must treat each value as an opaque safe cache key and store the bundle plus its complete companion set under it.
 
 When RSC is enabled, publication calls `upload` once for the server bundle hash and once for the RSC bundle hash. Both calls receive the same companion `assets:` list from that build (`loadable-stats.json` plus RSC manifests). Store those files with each hash; do not filter the assets by bundle type, because `fetch(hash)` must return a complete local cache entry for whichever hash is requested.
 
@@ -3835,7 +4141,7 @@ end
 For CI and testing, set `PREVIOUS_BUNDLE_HASHES` as a comma-separated list to skip `previous_bundle_hashes` discovery:
 
 ```bash
-PREVIOUS_BUNDLE_HASHES=abc123,def456 rake react_on_rails_pro:pre_seed_renderer_cache
+PREVIOUS_BUNDLE_HASHES=abc123,def456 bundle exec rake react_on_rails_pro:pre_seed_renderer_cache
 ```
 
 This runs the adapter's `fetch(hash)` for each listed hash but skips discovery. The adapter is still required to fetch the actual bundle files; setting the env var without configuring `config.rolling_deploy_adapter` produces a warning and skips seeding.
@@ -3847,6 +4153,27 @@ This runs the adapter's `fetch(hash)` for each listed hash but skips discovery. 
 `assets:precompile` invokes `upload` for the current build's bundle hashes whenever an adapter is configured **and** `Rails.env` is anything other than `development` or `test`. That includes `staging`, `production`, custom envs like `qa` or `preview`, and any other non-dev/non-test value.
 
 In practice this means a `staging` deploy hits the same artifact store as production — it must have the same credentials and write access. This is intentional: a `staging` → `staging` rolling deploy needs the previous staging hash seeded, and a `staging` → `production` promotion benefits from staging having warmed the store. If you need to keep `staging` out of the artifact store entirely, set `config.rolling_deploy_adapter = nil` in a `staging`-specific initializer rather than relying on env-based skipping at the gem level.
+
+> [!NOTE]
+> This section is about the **upload** (publish) side. Promotion has a second, independent gap on the **seed** side: build-time seeding captures only then-advertised bundles. See [Promotion deploys need a boot seed](./rolling-deploy-adapters.md#promotion-deploys-need-a-release-time-boot-seed) and [Multi-source seeding](#multi-source-seeding) below.
+
+## Multi-source seeding
+
+The built-in HTTP adapter's `rolling_deploy_previous_urls` accepts **more than one** endpoint. When you **promote** an image between environments (build on staging, promote to production), pass both the build environment and the promotion target so the built image carries bundles then advertised by **both**. This improves fallback warmth, but only the release-time boot seed resolves the target's current draining bundle:
+
+```ruby
+# config/initializers/react_on_rails_pro.rb
+config.rolling_deploy_adapter = ReactOnRailsPro::RollingDeployAdapters::Http
+# a single URL, a comma-separated string, or an Array — all three are accepted:
+config.rolling_deploy_previous_urls = ENV["ROLLING_DEPLOY_PREVIOUS_URLS"]
+# e.g. ROLLING_DEPLOY_PREVIOUS_URLS="https://staging.example.com/react_on_rails_pro/rolling_deploy,https://app.example.com/react_on_rails_pro/rolling_deploy"
+```
+
+Discovery collects hashes from every reachable endpoint, with provenance checks. A hash advertised by only one endpoint is eligible. If more than one endpoint advertises a legacy/protocol-v1 hash, the adapter omits it because it cannot prove which payload is authoritative. A duplicated v2 artifact ID remains eligible only when every advertising endpoint reports the v2 manifest protocol; each downloaded payload is recomputed and rejected when it does not match the requested ID.
+
+For an eligible hash, fetch tries its allowed origins in configured order. A missing, failed, or rejected payload lets the adapter try the next allowed origin within its overall deadline; it uses the first response that passes the applicable identity check. A single unreachable endpoint therefore does not abort discovery or prevent another eligible source from seeding the bundle.
+
+This is the build-time **failure floor**; the correctness path is the [boot seed](./rolling-deploy-adapters.md#promotion-deploys-need-a-release-time-boot-seed). Use both.
 
 ## Edge cases and error handling
 
@@ -4149,6 +4476,40 @@ end %>
 ```
 
 A `cached_react_component_hash` variant is also available for cases where you need to extract metadata (like `<title>`) from the rendered output.
+
+### Additional Cached Helpers
+
+React on Rails Pro provides additional cached helpers for streaming, async, and RSC rendering. All share the same caching options (`cache_key`, `cache_tags`, `cache_options`, `:if`/`:unless`) as `cached_react_component`:
+
+| Helper                                   | Use case                                                                 | Prerequisites                                                        |
+| ---------------------------------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------- |
+| `cached_stream_react_component`          | Cache streamed React 18 components with Suspense                         | Requires `stream_view_containing_react_components`                   |
+| `cached_buffered_stream_react_component` | Cache streamed output as buffered HTML (no streaming setup needed)       | —                                                                    |
+| `cached_static_rsc_component`            | Cache static RSC pages with sidecar packs (strips RSC bootstrap scripts) | Requires `enable_rsc_support = true`                                 |
+| `cached_async_react_component`           | Cache async-rendered components                                          | Requires `AsyncRendering` concern and `enable_async_react_rendering` |
+
+```erb
+<%# Streaming with caching %>
+<%= cached_stream_react_component("StreamedApp", cache_key: [@user]) do
+  { user: @user.to_props }
+end %>
+
+<%# Buffered streaming (no ActionController::Live needed) %>
+<%= cached_buffered_stream_react_component("BufferedApp", cache_key: [@post]) do
+  { post: @post.to_props }
+end %>
+
+<%# Static RSC (strips RSC bootstrap scripts for fully static pages) %>
+<%= cached_static_rsc_component("StaticPage", cache_key: [@page]) do
+  { page: @page.to_props }
+end %>
+
+<%# Async rendering with caching (cache hits return immediately) %>
+<% card = cached_async_react_component("ProductCard", cache_key: [@product]) { @product.to_props } %>
+<%= card.value %>
+```
+
+> **Note:** `cached_static_rsc_component` strips only the embedded RSC payload bootstrap scripts, not general component pack scripts. For fully static pages with no client interactivity, also pass `auto_load_bundle: false` and load your explicit sidecar pack separately.
 
 ### Rails Context And Render Order
 
@@ -4590,6 +4951,11 @@ If you are using **v4.0.0** or later, enable the profiler by setting `profile_se
 ```ruby
 config.profile_server_rendering_js_code = true
 ```
+
+> **Prerequisites:**
+>
+> - **ExecJS renderer only**: This setting only applies when `server_renderer == "ExecJS"` (the default). If you're using the Pro Node Renderer, this setting has no effect — use the [Chrome DevTools profiling method](#profiling-the-pro-node-renderer) above instead.
+> - **Node or V8 ExecJS runtime**: The ExecJS runtime must be Node or V8. Set this via the `EXECJS_RUNTIME` environment variable (e.g., `EXECJS_RUNTIME=Node`). Other runtimes will raise a configuration error.
 
 Then, run the app you are profiling and open some pages in it. You will find log files named `isolate-0x*.log` in the root of your app. Use the following command to analyze the log files:
 
@@ -5371,9 +5737,9 @@ This entry indicates that the `ToggleContainer` client component is included in 
 
 ### CSS Links for `'use client'` Boundaries
 
-React on Rails Pro reads CSS metadata from the RSC client manifest and emits `<link rel="stylesheet" data-precedence="rsc-css">` entries into the RSC payload. React hoists those stylesheet links into `<head>` and delays committing the corresponding streamed content until the stylesheets are ready, which prevents a flash of unstyled content for client components behind RSC boundaries.
+React on Rails Pro emits `<link rel="stylesheet" data-precedence="rsc-css">` entries into the streamed RSC payload for the CSS of client components rendered behind RSC boundaries. Those links are flushed ahead of the streamed content that needs them, so the browser normally loads the stylesheet before that content is revealed; React on Rails Pro's hydration prep then moves the links into `<head>`. The linked pipeline covers the 100ms fail-open case.
 
-The current resolver works from the manifest alone, so it emits CSS for every `'use client'` module entry in the manifest instead of only the client references encountered by one render. This is intentional for now: CSS modules and component-scoped styles remain safe, but global CSS imported by a client component can apply on an RSC page that did not render that component. Because these stylesheet links are render-blocking, avoid importing page-specific global CSS from broad client-component entry points until `react-on-rails-rsc` can attach CSS at the rendered client-reference boundary.
+React on Rails Pro discovers those stylesheet hrefs through two complementary mechanisms that converge on the same `rsc-css` link format: a manifest-backed `preinit` hint emitted during Flight rendering, and a per-render scan of the Flight chunks that maps the referenced `clientN` chunks to their CSS assets from the client build's `loadable-stats.json`. Either way the emission is request/chunk driven: a stylesheet is linked only when the current render references the corresponding client chunk — not for every `'use client'` module in the manifest. Shared or broad chunks can still pull shared/global CSS into that page's render-blocking `rsc-css` group, so keep client boundaries thin. See [CSS and Styling in RSC](./css-and-styling.md#where-the-late-css-comes-from-two-paths-one-bucket) for the full FOUC-prevention pipeline.
 
 If you want to change the file name of the `react-client-manifest.json` file, you can do so by setting the `clientManifestFilename` option in the `react-on-rails-rsc/WebpackPlugin` plugin as follows:
 
@@ -5391,8 +5757,8 @@ config.plugins.push(
 And because React on Rails Pro uploads the `react-client-manifest.json` file to the renderer while uploading the server bundle and it expects it to be named `react-client-manifest.json`, you need to tell React on Rails Pro that the name is changed to `client-components-webpack-manifest.json`.
 
 ```ruby
-# config/initializers/react_on_rails.rb
-ReactOnRails.configure do |config|
+# config/initializers/react_on_rails_pro.rb
+ReactOnRailsPro.configure do |config|
   config.react_client_manifest_file = "client-components-webpack-manifest.json"
 end
 ```
@@ -5500,7 +5866,7 @@ end
 If you customize the route path, ensure the `rsc_payload_generation_url_path` config matches:
 
 ```ruby
-# config/initializers/react_on_rails.rb
+# config/initializers/react_on_rails_pro.rb
 ReactOnRailsPro.configure do |config|
   config.rsc_payload_generation_url_path = "flight-payload"
 end
@@ -7440,7 +7806,11 @@ Create a new file `config/webpack/rscWebpackConfig.js`:
 // use the same config as serverWebpackConfig.js but add the RSC loader
 const { existsSync } = require('fs');
 const { dirname, resolve } = require('path');
-const serverWebpackConfig = require('./serverWebpackConfig');
+const serverWebpackModule = require('./serverWebpackConfig');
+// Backward compatibility:
+// - New Pro config exports: { default: configureServer, extractLoader }
+// - Legacy config exports: module.exports = configureServer
+const serverWebpackConfig = serverWebpackModule.default || serverWebpackModule;
 const reactPackageRoot = dirname(require.resolve('react/package.json'));
 // React 19+ ships these react-server entry files alongside the standard entries.
 const resolveReactServerEntry = (entryFilename) => {
@@ -7454,23 +7824,21 @@ const resolveReactServerEntry = (entryFilename) => {
   return entryPath;
 };
 
-// Function that extracts a specific loader from a webpack rule
-function extractLoader(rule, loaderName) {
-  return rule.use.find((item) => {
-    let testValue;
-
-    if (typeof item === 'string') {
-      testValue = item;
-    } else if (typeof item.loader === 'string') {
-      testValue = item.loader;
-    }
-
-    return testValue.includes(loaderName);
+// Function that extracts a specific loader from a webpack rule.
+// Prefer the helper exported by the Pro server config when present; otherwise fall back.
+const extractLoader =
+  serverWebpackModule.extractLoader ||
+  ((rule, loaderName) => {
+    if (!Array.isArray(rule.use)) return null;
+    return rule.use.find((item) => {
+      const testValue = typeof item === 'string' ? item : item.loader;
+      return testValue && testValue.includes(loaderName);
+    });
   });
-}
 
 const configureRsc = () => {
-  const rscConfig = serverWebpackConfig();
+  // Pass true to skip the RSC manifest plugin - the RSC bundle doesn't need it.
+  const rscConfig = serverWebpackConfig(true);
 
   // Update the entry name to be `rsc-bundle` instead of `server-bundle`
   const rscEntry = {
@@ -7478,14 +7846,31 @@ const configureRsc = () => {
   };
   rscConfig.entry = rscEntry;
 
-  // Add the RSC loader before the babel loader
+  // Add the RSC WebpackLoader to the JS rule's loader chain.
+  // This loader replaces 'use client' files with registerClientReference proxies in the RSC bundle.
+  // Webpack loaders execute right-to-left, so appending makes the RSC loader run first (before babel/swc).
   const rules = rscConfig.module.rules;
   rules.forEach((rule) => {
-    if (Array.isArray(rule.use)) {
-      // Ensure this loader runs before the JS loader (Babel loader in this case) to properly exclude client components from the RSC bundle.
-      // If your project uses a different JS loader, insert it before that loader instead.
-      const babelLoader = extractLoader(rule, 'babel-loader');
-      if (babelLoader) {
+    if (typeof rule.use === 'function') {
+      // SWC transpiler defines rule.use as a function: use: ({ resource }) => getSwcLoaderConfig(resource)
+      // Wrap it to append the RSC WebpackLoader to the returned loader(s).
+      const originalUse = rule.use;
+      // Must use `function` (not arrow) so `.call(this, data)` forwards webpack's context.
+      rule.use = function rscLoaderWrapper(data) {
+        const result = originalUse.call(this, data);
+        const resultArray = Array.isArray(result) ? result : result ? [result] : [];
+        const resolvedRule = { use: resultArray };
+        const jsLoader =
+          extractLoader(resolvedRule, 'babel-loader') || extractLoader(resolvedRule, 'swc-loader');
+        if (jsLoader) {
+          return [...resultArray, { loader: 'react-on-rails-rsc/WebpackLoader' }];
+        }
+        return result;
+      };
+    } else if (Array.isArray(rule.use)) {
+      // Babel transpiler defines rule.use as a static array.
+      const jsLoader = extractLoader(rule, 'babel-loader') || extractLoader(rule, 'swc-loader');
+      if (jsLoader) {
         rule.use.push({
           loader: 'react-on-rails-rsc/WebpackLoader',
         });
@@ -7530,6 +7915,10 @@ const configureRsc = () => {
 module.exports = configureRsc;
 ```
 
+> **Note:** This config uses the same core RSC webpack patterns as the template that ships with the `react_on_rails:rsc` generator, which is the canonical, maintained version. Two details matter here: `serverWebpackConfig(true)` skips the RSC manifest plugin (the RSC bundle must not inherit it — this requires the `rscBundle` guard added to `serverWebpackConfig.js` in step 5), and the loader insertion handles both `babel-loader` and `swc-loader` (including SWC's function-form `rule.use`) so SWC projects still get the RSC loader. If your project transpiles JS with a loader other than Babel or SWC, add its name to the `extractLoader(...)` checks — otherwise the RSC loader is silently not inserted for that rule and the RSC bundle will not exclude `'use client'` modules.
+>
+> These minimal snippets intentionally omit **scoped client-reference discovery**. Because `RSCWebpackPlugin` is used without a `clientReferences` option, it falls back to a **broad scan** of every `'use client'` module — the original, working behavior. The generator additionally wires the reference-discovery build (`bin/shakapacker-precompile-hook` generates a scoped `ssr-generated/rsc-client-references.json`) so only the client references actually reachable through the server-component graph are bundled. Scoped discovery is a build-time optimization, not a correctness requirement for this manual setup. For that production-grade wiring, generate the config with `react_on_rails:rsc` or follow [Upgrading an Existing Pro App to RSC](./upgrading-existing-pro-app.md).
+
 Add the new RSC Webpack configuration to the bundle configuration returned by `webpackConfig` function in `config/webpack/ServerClientOrBoth.js` file:
 
 ```js
@@ -7570,7 +7959,7 @@ This change will make the bundling process generate a new bundle named `rsc-bund
 Then, we need to tell React on Rails to upload the `rsc-bundle.js` file to the renderer while uploading the server bundle.
 
 ```ruby
-# config/initializers/react_on_rails.rb
+# config/initializers/react_on_rails_pro.rb
 ReactOnRailsPro.configure do |config|
   config.rsc_bundle_js_file = "rsc-bundle.js"
 end
@@ -7601,16 +7990,26 @@ module.exports = configureClient;
 const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
 // existing code...
 
-const configureServer = () => {
+// Accept an `rscBundle` flag so the RSC bundle can reuse this config without the
+// client-manifest plugin. `rscWebpackConfig.js` calls `serverWebpackConfig(true)`;
+// the regular server build calls it with no argument (`rscBundle` defaults to `false`).
+const configureServer = (rscBundle = false) => {
   // existing code...
 
-  config.plugins.push(new RSCWebpackPlugin({ isServer: true }));
+  // The RSC bundle must not inherit the client-manifest plugin, so only add it
+  // for the actual server bundle. Without this guard the `serverWebpackConfig(true)`
+  // call in `rscWebpackConfig.js` has no effect and the RSC bundle still gets the plugin.
+  if (!rscBundle) {
+    config.plugins.push(new RSCWebpackPlugin({ isServer: true }));
+  }
 
   return config;
 };
 
 module.exports = configureServer;
 ```
+
+> **Note:** The `react_on_rails:rsc` generator's Pro config exports `{ default: configureServer, extractLoader }` and updates its importers to destructure that shape, but this minimal manual snippet keeps the simple function export so existing `serverWebpackConfig()` consumers (such as your `ServerClientOrBoth.js`) keep working. The `rscWebpackConfig.js` snippet above already tolerates both export shapes.
 
 ## Create a React Server Component
 
@@ -8595,14 +8994,9 @@ This happens because React on Rails by default adds the scripts that hydrate com
 
 This default behavior was kept for backward compatibility, as there were previously race conditions that could occur when using `async` scripts before the page fully loaded. However, these race conditions have been fixed in the latest React on Rails release.
 
-To enable true selective hydration, we need to configure React on Rails to load scripts as `async` scripts by setting `generated_component_packs_loading_strategy: :async` in the initializer:
+To enable selective hydration for streamed Pro/RSC pages, generated component packs need to load with `async` script loading (`generated_component_packs_loading_strategy: :async`). In React on Rails Pro apps on Shakapacker ≥ 8.2.0, this is already the default when the setting is unset, so no initializer change is needed for the Pro/RSC setup in this guide.
 
-```ruby
-# config/initializers/react_on_rails.rb
-ReactOnRails.configure do |config|
-  config.generated_component_packs_loading_strategy = :async
-end
-```
+> **Note:** `:async` script loading is a Pro capability in React on Rails' supported configuration. In non-Pro apps, `bin/rails react_on_rails:doctor` reports explicit `config.generated_component_packs_loading_strategy = :async` as unsupported and recommends upgrading to Pro or using `:defer` / `:sync`. On Shakapacker < 8.2.0, async script loading is unavailable; setting `:async` raises during configuration validation, so upgrade Shakapacker first.
 
 Now, when you run the page, you can see that while the Long Waiting Component is loading ⏳, the other components are interactive ✨🖱️
 
@@ -8613,6 +9007,132 @@ Selective hydration is a powerful feature that allows React to become interactiv
 ## Next Steps
 
 Now that you understand how to use selective hydration in React Server Components, you can proceed to the next article: [How React Server Components Work](how-react-server-components-work.md) to learn about the technical details and underlying mechanisms of React Server Components.
+
+================================================================================
+PAGE: https://reactonrails.com/docs/pro/react-server-components/activity-inside-rsc
+SOURCE: docs/pro/react-server-components/activity-inside-rsc.md
+================================================================================
+
+# React 19.2 `<Activity>` Inside Streamed RSC Trees
+
+React 19.2's [`<Activity>`](https://react.dev/reference/react/Activity) lets you hide part of the UI without unmounting it — hidden subtrees keep their state and DOM (`display: none`) while their effects are deactivated and their updates deferred to idle time. The [OSS guide](../../oss/building-features/react-19-activity.md) covers the basics with `react_component`; this page covers what changes when `<Activity>` boundaries live inside a **streamed React Server Component tree** (`stream_react_component`).
+
+Everything here is verified by the Pro dummy app's working example and tests — see [Working example](#working-example).
+
+## The one rule: host `<Activity>` in a client component
+
+The `react-server` condition build of React — the one your RSC bundle resolves — **does not export `Activity`**. A server component that does `import { Activity } from 'react'` gets `undefined` and the render fails with:
+
+```text
+Element type is invalid: expected a string (for built-in components) or a
+class/function (for composite components) but got: undefined.
+```
+
+Instead, put the `<Activity>` boundaries in a `'use client'` component and pass server-rendered content into them as props:
+
+```jsx
+// ActivityTabsClient.jsx — client component
+'use client';
+
+import React, { Activity, useState } from 'react';
+
+export default function ActivityTabsClient({ profileContent, draftsContent }) {
+  const [activeTab, setActiveTab] = useState('profile');
+  const content = { profile: profileContent, drafts: draftsContent };
+
+  return (
+    <>
+      {/* tab buttons ... */}
+      {['profile', 'drafts'].map((tab) => (
+        <Activity key={tab} mode={tab === activeTab ? 'visible' : 'hidden'}>
+          <div>{content[tab]}</div>
+        </Activity>
+      ))}
+    </>
+  );
+}
+```
+
+```jsx
+// RSCActivityTabsPage.jsx — server component (no directive)
+import React, { Suspense } from 'react';
+import ActivityTabsClient from './ActivityTabsClient';
+import ProfileServerContent from './ProfileServerContent';
+import SlowDraftsServerContent from './SlowDraftsServerContent';
+
+export default function RSCActivityTabsPage() {
+  return (
+    <ActivityTabsClient
+      profileContent={<ProfileServerContent />}
+      draftsContent={
+        <Suspense fallback={<p>Loading drafts…</p>}>
+          <SlowDraftsServerContent />
+        </Suspense>
+      }
+    />
+  );
+}
+```
+
+This is the standard server-content-through-client-component pattern (see [RSC Inside Client Components](./inside-client-components.md)). Note that in this pattern the `<Activity>` element never crosses the RSC (Flight) boundary at all: `ActivityTabsClient` travels as a client reference, and the `<Activity>` boundaries are constructed inside its own render during SSR and hydration — only the server-rendered content props cross the boundary. React on Rails needs no configuration for any of this.
+
+## Hidden is not free on the server
+
+"Hidden" is a client-rendering concept. The Flight render on the Node renderer executes **all** server components eagerly, hidden or not:
+
+- Data fetching inside a hidden tab's server components runs on every request that renders the page.
+- The hidden content's output ships in the RSC payload bytes embedded in the page.
+- Client components referenced inside hidden boundaries still emit their module references, so the browser preloads their chunks — that's the "pre-render likely-next content" benefit, but it's bandwidth you should budget.
+
+Wrap slow hidden content in `<Suspense>` (in the server tree, as above) so it streams in a later chunk instead of delaying the shell.
+
+## Hidden content is omitted from the rendered HTML
+
+During SSR of the RSC tree, React's streaming renderer:
+
+- wraps **visible** Activity content in `<!--&-->` / `<!--/&-->` comment markers (the Activity analog of Suspense's `<!--$-->` markers), and
+- emits **no HTML at all** for `mode="hidden"` boundaries.
+
+Consequences:
+
+- Hidden content is invisible to SEO and no-JS users. Put anything that must be in the initial HTML in a visible boundary.
+- Hidden content **is** present in the page's bytes — inside the embedded RSC payload scripts (`REACT_ON_RAILS_RSC_PAYLOADS`) — just not in the rendered DOM. Search engines index neither.
+- After hydration, React mounts hidden subtrees client-side at background priority, with no hydration mismatch.
+
+## Revealing a hidden tab needs no network request
+
+React on Rails embeds the full RSC payload into the page as it streams. When the user reveals a hidden boundary, React renders it from that already-delivered payload — flipping `mode` to `visible` issues **no** `/rsc_payload/` request. If the hidden content's server row hasn't streamed in yet (slow data), the user sees its `<Suspense>` fallback until the row lands — still from the same open stream.
+
+## Selective hydration bonus
+
+Like Suspense boundaries, Activity boundaries divide the tree into independently hydratable units. With [async script loading](./selective-hydration-in-streamed-components.md) (the default on Shakapacker ≥ 8.2), the visible tab's buttons become interactive while a slow hidden tab's content is still streaming — hidden trees never compete with urgent hydration work.
+
+> [!NOTE]
+> One browser caveat, unrelated to React: WebKit (Safari) defers executing scripts — including the client bundle — until a streamed document finishes parsing, so mid-stream interactivity only materializes in Chromium/Firefox. The page still hydrates and works normally in Safari once the stream completes.
+
+## Effects and Turbo caveats
+
+The [OSS guide's gotchas](../../oss/building-features/react-19-activity.md) apply unchanged on the RSC path:
+
+- Effects in hidden subtrees are deactivated (cleanups run) and re-run on reveal — sockets, timers, and analytics "view" events behave accordingly.
+- `<Activity>` preserves state only within a persistent React root. Turbo Drive page visits tear the root down; Activity does not help across them.
+
+## Working example
+
+The Pro dummy app contains a complete, tested example:
+
+- Page (server component): `react_on_rails_pro/spec/dummy/client/app/ror-auto-load-components/RSCActivityTabsPage.jsx`
+- Client host + probes: `react_on_rails_pro/spec/dummy/client/app/components/ActivityRSC/`
+- Route: `/activity_rsc_tabs` (optionally `?artificial_delay=5000` to slow the hidden tab's server content)
+- Streamed-HTML shape: `react_on_rails_pro/spec/dummy/spec/requests/activity_rsc_spec.rb`
+- Browser behavior (reveal without refetch, state preservation, selective hydration): `react_on_rails_pro/spec/dummy/e2e-tests/activity_rsc.spec.ts`
+
+## References
+
+- [React docs: `<Activity>`](https://react.dev/reference/react/Activity)
+- [React 19.2 release post](https://react.dev/blog/2025/10/01/react-19-2)
+- [React 19.2 `<Activity>` with React on Rails (OSS guide)](../../oss/building-features/react-19-activity.md)
+- [Selective Hydration in React Server Components](./selective-hydration-in-streamed-components.md)
 
 ================================================================================
 PAGE: https://reactonrails.com/docs/pro/react-server-components/client-reference-diagnostics
@@ -9240,17 +9760,46 @@ This guide walks you through adding React Server Components to an existing React
 
 Before running the generator, verify your environment:
 
-| Requirement              | Check command                                                                                                                  | Expected                    |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------ | --------------------------- |
-| React on Rails Pro gem   | `bundle show react_on_rails_pro`                                                                                               | v16.4.0+                    |
-| React on Rails gem       | `bundle show react_on_rails`                                                                                                   | v16.4.0+                    |
-| React on Rails Pro npm   | `npm ls react-on-rails-pro` / `yarn why react-on-rails-pro` / `pnpm list react-on-rails-pro` / `bun pm why react-on-rails-pro` | Matches gem version         |
-| React version            | `npm ls react` / `yarn why react` / `pnpm list react` / `bun pm why react`                                                     | 19.2.x with patch >= 19.2.7 |
-| React DOM version        | `npm ls react-dom` / `yarn why react-dom` / `pnpm list react-dom` / `bun pm why react-dom`                                     | Must match `react` version  |
-| `react-on-rails-rsc`     | `npm ls react-on-rails-rsc` / `yarn why react-on-rails-rsc` / `pnpm list react-on-rails-rsc` / `bun pm why react-on-rails-rsc` | 19.2.x with patch >= 19.2.1 |
-| Node.js                  | `node --version`                                                                                                               | 18+                         |
-| Pro initializer exists   | `ls config/initializers/react_on_rails_pro.rb`                                                                                 | File exists                 |
-| Node renderer configured | Check `react_on_rails_pro.rb` for `server_renderer = "NodeRenderer"`                                                           | NodeRenderer enabled        |
+| Requirement              | Check command                                                                                                                  | Expected                                                                                   |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
+| React on Rails Pro gem   | `bundle show react_on_rails_pro`                                                                                               | v16.4.0+                                                                                   |
+| React on Rails gem       | `bundle show react_on_rails`                                                                                                   | v16.4.0+                                                                                   |
+| React on Rails Pro npm   | `npm ls react-on-rails-pro` / `yarn why react-on-rails-pro` / `pnpm list react-on-rails-pro` / `bun pm why react-on-rails-pro` | Matches gem version                                                                        |
+| React version            | `npm ls react` / `yarn why react` / `pnpm list react` / `bun pm why react`                                                     | 19.2.x with patch >= 19.2.7                                                                |
+| React DOM version        | `npm ls react-dom` / `yarn why react-dom` / `pnpm list react-dom` / `bun pm why react-dom`                                     | Must match `react` version                                                                 |
+| `react-on-rails-rsc`     | `npm ls react-on-rails-rsc` / `yarn why react-on-rails-rsc` / `pnpm list react-on-rails-rsc` / `bun pm why react-on-rails-rsc` | 19.2.x with patch >= 19.2.1                                                                |
+| Node.js                  | `node --version`                                                                                                               | Node 20+ by default (Fastify 5); >= 18.19.0 with documented Fastify 4-compatible overrides |
+| Pro initializer exists   | `ls config/initializers/react_on_rails_pro.rb`                                                                                 | File exists                                                                                |
+| Node renderer configured | Check `react_on_rails_pro.rb` for `server_renderer = "NodeRenderer"`                                                           | NodeRenderer enabled                                                                       |
+
+For Node 18.19, override the renderer's Fastify dependencies according to your package manager. Yarn uses
+`resolutions`, as shown in the
+[Node Renderer 4.0 release notes](../release-notes/4.0.md#packagejson-resolutions-for-node--20).
+npm and Bun use the same dependency map under `overrides`:
+
+```json
+{
+  "overrides": {
+    "@fastify/formbody": "^7.4.0",
+    "@fastify/multipart": "^8.3.1",
+    "fastify": "^4.29.0"
+  }
+}
+```
+
+pnpm uses that map under `pnpm.overrides`:
+
+```json
+{
+  "pnpm": {
+    "overrides": {
+      "@fastify/formbody": "^7.4.0",
+      "@fastify/multipart": "^8.3.1",
+      "fastify": "^4.29.0"
+    }
+  }
+}
+```
 
 If React is outside the supported 19.2.x range or below 19.2.7, upgrade it first:
 
@@ -10348,7 +10897,7 @@ SOURCE: docs/pro/react-server-components/rspack-compatibility.md
 
 # Rspack Compatibility with React Server Components
 
-> **Status**: Experimental — the generator scaffolds the native Rspack plugin and the proven runtime path, but the end-to-end gate is not yet wired into this repo's CI. See [issue #3488](https://github.com/shakacode/react_on_rails/issues/3488).
+> **Status**: Supported as of React on Rails Pro 17.0.0. Rspack is the default bundler for fresh installs, the generator scaffolds the native `RSCRspackPlugin`, and RSC-on-Rspack is covered end-to-end by a CI gate — the `dummy-app-rspack-rsc-runtime-gate` job in [`.github/workflows/pro-integration-tests.yml`](https://github.com/shakacode/react_on_rails/blob/main/.github/workflows/pro-integration-tests.yml), which builds the client/server/RSC bundles with Rspack, boots Rails plus the Pro Node renderer, and runs the RSC Playwright suite so RSC routes are proven to render and hydrate under Rspack. Further production hardening is tracked in [issue #3488](https://github.com/shakacode/react_on_rails/issues/3488). The remaining known limitations below (no official React endorsement of the `react-server-dom-webpack` runtime under Rspack; production-posture streamed-CSS coverage) are genuine and still apply.
 
 This page documents the compatibility status of [Rspack](https://rspack.dev/) with React on Rails Pro's React Server Components (RSC) implementation.
 
@@ -10416,9 +10965,11 @@ two plugins share the same `{ isServer, clientReferences }` options.
 > A/B on a real app showed the webpack-plugin path producing valid-looking manifests that
 > still failed ~7/11 RSC routes at runtime under Rspack, while the native `RSCRspackPlugin`
 > rendered and hydrated every route. The native plugin is therefore the supported Rspack
-> path. The remaining work to drop the "experimental" label — wiring the demo
-> route-hydration gate into this repo's CI — is tracked in [issue #3488](https://github.com/shakacode/react_on_rails/issues/3488)
-> (superseding the abandoned manifest-helper approach in
+> path. That route-hydration coverage is now wired into this repo's CI as the
+> `dummy-app-rspack-rsc-runtime-gate` job (it builds the three bundles with Rspack, boots
+> Rails plus the Pro Node renderer, and runs the RSC Playwright suite on every qualifying
+> change). Further production hardening is tracked in [issue #3488](https://github.com/shakacode/react_on_rails/issues/3488)
+> (which superseded the abandoned manifest-helper approach in
 > [PR #3385](https://github.com/shakacode/react_on_rails/pull/3385)).
 
 ## How the RSC Bundle Avoids the Plugin
@@ -10450,7 +11001,7 @@ To test RSC with Rspack in your project:
 
 1. **React on Rails does not use Rspack's experimental native RSC system**:
    As of Rspack v2, Rspack ships its own [built-in RSC
-   support](https://v2.rspack.rs/guide/tech/rsc) (driven by `builtin:swc-loader` and
+   support](https://rspack.rs/blog/announcing-2-0) (driven by `builtin:swc-loader` and
    `rspackExperiments.reactServerComponents`). React on Rails Pro does **not** use that
    experimental path. Its RSC integration is built on the `react-on-rails-rsc` package:
    manifest generation uses the native **`RSCRspackPlugin`** (standard rspack public APIs,
@@ -10500,7 +11051,7 @@ builds; production-posture coverage is tracked in
 - [Issue #3488: Rspack RSC path to production-ready (native RSCRspackPlugin)](https://github.com/shakacode/react_on_rails/issues/3488)
 - [Issue #1828: Rspack support for RSC](https://github.com/shakacode/react_on_rails/issues/1828)
 - [PR #3385: Manifest-helper approach for Rspack builds (superseded by the native plugin)](https://github.com/shakacode/react_on_rails/pull/3385)
-- [Rspack v2 React Server Components guide](https://v2.rspack.rs/guide/tech/rsc)
+- [Rspack 2.0 React Server Components announcement](https://rspack.rs/blog/announcing-2-0)
 - [Three-bundle architecture](./how-react-server-components-work.md)
 - [Upgrading an existing Pro app to RSC](./upgrading-existing-pro-app.md)
 
@@ -11269,13 +11820,6 @@ SSR Streaming sends HTML to the browser in chunks as it’s generated, enabling 
 - **30% faster** full‑page load times at Hulu by combining streaming SSR with Server Components [[3]]
 - Popular libraries like styled‑components v3.1.0 have introduced streaming SSR support as the next generation of React app rendering [[4]]
 
-## 📊 Core Web Vitals & TTI Improvements
-
-- **60% faster** Time to Interactive on Meta’s developer portal after adopting RSC (from 3.5 s to \~1.4 s) [[5]]
-- **45% quicker** First Contentful Paint in the same migration [[5]]
-- **50% lower** server response time with Server Components [[5]]
-- **15% improvement** in Core Web Vitals and **23% reduction** in Time to First Byte at Airbnb after RSC migration [[5]]
-
 > **React on Rails note:** These performance benefits carry over to React on Rails Pro. In React on Rails, data delivery is prop-based — Rails controllers handle database queries, authentication, and caching, then pass data to components as [props](../../oss/migrating/rsc-data-fetching.md#data-fetching-in-react-on-rails-pro). Components do not fetch data directly. See [RSC Migration: Data Fetching Patterns](../../oss/migrating/rsc-data-fetching.md).
 
 ---
@@ -11297,11 +11841,9 @@ Let’s make your apps faster—together.
 2. GeekyAnts.com case study: 52% code reduction, Lighthouse 50→90+ ([geekyants.com][2])
 3. Hulu—30% faster full‑page loads with streaming SSR + RSC ([questlab.pro][3])
 4. styled‑components v3.1.0: introduced streaming SSR support as the next generation of React rendering. ([medium.com][4])
-5. QuestLab: Meta’s RSC migration—30% JS reduction, 60% faster TTI, 45% faster FCP, 50% lower server response ([questlab.pro][5])
 
 [1]: https://frigade.com/blog/bundle-size-reduction-with-rsc-and-frigade
-[2]: https://geekyants.com/en-gb/blog/boosting-performance-with-nextjs-and-react-server-components-a-geekyantscom-case-study
+[2]: https://web.archive.org/web/20260306053730/https://geekyants.com/en-gb/blog/boosting-performance-with-nextjs-and-react-server-components-a-geekyantscom-case-study
 [3]: https://www.compilenrun.com/docs/framework/nextjs/nextjs-ecosystem/nextjs-case-studies/#case-study-3-hulus-streaming-platform
 [4]: https://medium.com/styled-components/v3-1-0-such-perf-wow-many-streams-c45c434dbd03
-[5]: https://web.archive.org/web/20250908030148/https://questlab.pro/blog-posts/web-development/wd-pl-2024-articleId912i1h212818
 

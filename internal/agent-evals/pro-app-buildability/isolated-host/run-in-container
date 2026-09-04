@@ -1,0 +1,192 @@
+#!/usr/bin/env bash
+set -euo pipefail
+umask 077
+
+usage() {
+  echo "usage: $0 --agent codex|claude --model MODEL --timeout SECONDS --model-credential-file FILE --output ABSOLUTE_PATH" >&2
+}
+
+agent=""
+model=""
+timeout_seconds=""
+model_credential_file=""
+model_credential_fd=9
+output=""
+while (($#)); do
+  case "$1" in
+    --agent) agent="${2:-}"; shift 2 ;;
+    --model) model="${2:-}"; shift 2 ;;
+    --timeout) timeout_seconds="${2:-}"; shift 2 ;;
+    --model-credential-file) model_credential_file="${2:-}"; shift 2 ;;
+    --output) output="${2:-}"; shift 2 ;;
+    *) usage; exit 64 ;;
+  esac
+done
+
+[[ "$agent" == codex || "$agent" == claude ]] || { usage; exit 64; }
+[[ -n "$model" && "$timeout_seconds" =~ ^[1-9][0-9]*$ && "$output" = /* ]] || {
+  usage
+  exit 64
+}
+[[ ! -L "$model_credential_file" && -f "$model_credential_file" && -s "$model_credential_file" ]] || {
+  echo "model credential must be a nonempty regular file, not a symbolic link" >&2
+  exit 65
+}
+eval_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+[[ ! -L "$output" && ! -e "$output" ]] || {
+  echo "output must not already exist or be a symbolic link" >&2
+  exit 65
+}
+
+for command_name in docker find git perl realpath; do
+  command -v "$command_name" >/dev/null || {
+    echo "missing required command: $command_name" >&2
+    exit 69
+  }
+done
+
+root="$(realpath "$(git rev-parse --show-toplevel)")"
+credential_real="$(realpath "$model_credential_file")"
+git_common_dir="$(realpath "$(git -C "$root" rev-parse --path-format=absolute --git-common-dir)")"
+case "$credential_real" in
+  "$root"|"$root"/*)
+    echo "model credential must be outside the repository" >&2
+    exit 65
+    ;;
+esac
+case "$credential_real" in
+  "$git_common_dir"|"$git_common_dir"/*)
+    echo "model credential must be outside Git metadata" >&2
+    exit 65
+    ;;
+esac
+[[ -z "$(git -C "$root" status --porcelain=v1)" ]] || {
+  echo "repository must be clean so the recorded revision identifies the harness exactly" >&2
+  exit 65
+}
+output_parent="$(dirname "$output")"
+[[ -d "$output_parent" ]] || { echo "output parent must exist" >&2; exit 65; }
+output_parent="$(realpath "$output_parent")"
+output="$output_parent/$(basename "$output")"
+[[ ! -L "$output" && ! -e "$output" ]] || {
+  echo "output must not already exist or be a symbolic link" >&2
+  exit 65
+}
+run_id="$(basename "$output")"
+[[ "$run_id" =~ ^[A-Za-z0-9._-]+$ ]] || {
+  echo "output basename must match ^[A-Za-z0-9._-]+$" >&2
+  exit 65
+}
+image="${EVAL_HARNESS_IMAGE:-react-on-rails-pro-app-eval:local}"
+host_uid="$(id -u)"
+host_gid="$(id -g)"
+staging_parent="$(mktemp -d "$output_parent/.ror-eval-output.XXXXXX")"
+publication_lock="$output.lock"
+lock_acquired=false
+publication_started=false
+published=false
+cleanup_staging() {
+  if [[ "$publication_started" == true && "$published" == false && -e "$output" ]]; then
+    chmod -R u+rwX "$output" 2>/dev/null || true
+    find "$output" -depth -delete 2>/dev/null || true
+  fi
+  if [[ -d "$staging_parent" ]]; then
+    chmod -R u+rwX "$staging_parent" 2>/dev/null || true
+    find "$staging_parent" -depth -delete 2>/dev/null || true
+  fi
+  if [[ "$lock_acquired" == true ]]; then
+    rmdir "$publication_lock" 2>/dev/null || true
+  fi
+}
+trap cleanup_staging EXIT
+trap 'exit 130' INT TERM
+
+mkdir "$publication_lock" 2>/dev/null || {
+  echo "another publisher holds the output lock" >&2
+  exit 1
+}
+lock_acquired=true
+
+docker_args=(
+  run --rm --interactive
+  --read-only
+  --cap-drop ALL
+  --pids-limit 4096
+  --security-opt no-new-privileges
+  --user "$host_uid:$host_gid"
+  --mount "type=bind,source=$root,target=/repo,readonly"
+  --mount "type=bind,source=$staging_parent,target=/evidence"
+  --tmpfs "/tmp:rw,noexec,nosuid,nodev,mode=1777,uid=$host_uid,gid=$host_gid"
+  --tmpfs "/run/eval-private:rw,noexec,nosuid,nodev,mode=0700,uid=$host_uid,gid=$host_gid"
+  --tmpfs "/workspace:rw,exec,nosuid,nodev,mode=0700,uid=$host_uid,gid=$host_gid"
+  --env TMPDIR=/run/eval-private
+  --env EVAL_HARNESS_DEPENDENCY_ROOT=/opt/pro-app-buildability
+  --env EVAL_ISOLATED_PID_NAMESPACE=1
+  --env EVAL_AGENT_CONTAINMENT_TEST_MODE=0
+  --workdir /repo
+)
+case "$git_common_dir/" in
+  "$root/"*) ;;
+  *) docker_args+=(--mount "type=bind,source=$git_common_dir,target=$git_common_dir,readonly") ;;
+esac
+
+exec 9<"$credential_real" || {
+  echo "cannot open model credential" >&2
+  exit 65
+}
+credential_metadata="$("$eval_dir/bin/file-descriptor-metadata" "$model_credential_fd")" || {
+  echo "cannot inspect model credential" >&2
+  exit 65
+}
+IFS=: read -r credential_kind credential_mode credential_size <<<"$credential_metadata"
+[[ "$credential_kind" == regular && "$credential_size" =~ ^[1-9][0-9]*$ ]] || {
+  echo "model credential must be a nonempty regular file" >&2
+  exit 65
+}
+[[ "$credential_size" -le 1048576 ]] || {
+  echo "model credential exceeds 1048576-byte limit" >&2
+  exit 65
+}
+[[ "$credential_mode" =~ ^[0-7]{4}$ ]] || { echo "unexpected model credential mode" >&2; exit 65; }
+(( (8#$credential_mode & 077) == 0 )) || {
+  echo "model credential must not be group- or world-accessible" >&2
+  exit 65
+}
+docker "${docker_args[@]}" \
+  "$image" \
+  internal/agent-evals/pro-app-buildability/bin/run-eval \
+    --agent "$agent" \
+    --model "$model" \
+    --timeout "$timeout_seconds" \
+    --workspace /workspace/run \
+    --output /evidence/run \
+    --run-id "$run_id" \
+    --model-credential-stdin \
+    --ack-disposable-secret-free-host \
+  <&"$model_credential_fd"
+exec 9<&-
+
+staged_entry_count=0
+expected_run_found=false
+unexpected_staged_evidence=false
+while IFS= read -r -d '' staged_entry; do
+  staged_entry_count=$((staged_entry_count + 1))
+  if [[ "$staged_entry" == "$staging_parent/run" && -d "$staged_entry" && ! -L "$staged_entry" ]]; then
+    expected_run_found=true
+  else
+    unexpected_staged_evidence=true
+  fi
+done < <(find "$staging_parent" -mindepth 1 -maxdepth 1 -print0)
+[[ "$staged_entry_count" == 1 && "$expected_run_found" == true && \
+  "$unexpected_staged_evidence" == false && ! -e "$output" ]] || {
+  echo "container produced missing or unexpected staged evidence" >&2
+  exit 1
+}
+"$eval_dir/bin/validate-evidence-entries" "$staging_parent/run"
+publication_started=true
+mv "$staging_parent/run" "$output"
+published=true
+rmdir "$staging_parent"
+rmdir "$publication_lock"
+lock_acquired=false
+trap - EXIT

@@ -22,7 +22,7 @@ describe ReactOnRailsPro::PrepareNodeRenderBundles do # rubocop:disable RSpec/Fi
   let(:asset_filename2) { "loadable-stats3.json" }
   let(:fixture_path) { File.expand_path("./spec/fixtures/#{asset_filename}") }
   let(:fixture_path2) { File.expand_path("./spec/fixtures/#{asset_filename2}") }
-  let(:bundle_hash) { "test-bundle-hash-abc123" }
+  let(:bundle_hash) { ReactOnRailsPro::Utils.bundle_hash }
   let(:cache_dir) { Rails.root.join(".node-renderer-bundles").to_s }
   let(:bundle_dir) { File.join(cache_dir, bundle_hash) }
   let(:server_bundle_path) { Rails.root.join("public", "webpack", "production", "server-bundle.js").to_s }
@@ -42,9 +42,6 @@ describe ReactOnRailsPro::PrepareNodeRenderBundles do # rubocop:disable RSpec/Fi
     allow(ReactOnRailsPro).to receive(:configuration).and_return(dbl_configuration)
     allow(ReactOnRails::Utils).to receive(:server_bundle_js_file_path).and_return(server_bundle_path)
 
-    pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
-    allow(pool).to receive(:server_bundle_hash).and_return(bundle_hash)
-
     FileUtils.mkdir_p(File.dirname(server_bundle_path))
     File.write(server_bundle_path, "// server bundle content")
 
@@ -58,6 +55,8 @@ describe ReactOnRailsPro::PrepareNodeRenderBundles do # rubocop:disable RSpec/Fi
 
   after do
     FileUtils.rm_rf(cache_dir)
+    FileUtils.rm_rf("#{cache_dir}.artifact-snapshots")
+    FileUtils.rm_f("#{cache_dir}.preseed.lock")
     FileUtils.rm_f(server_bundle_path)
     FileUtils.rm_f(path_in_webpack_folder(asset_filename))
     FileUtils.rm_f(path_in_webpack_folder(asset_filename2))
@@ -83,7 +82,8 @@ describe ReactOnRailsPro::PrepareNodeRenderBundles do # rubocop:disable RSpec/Fi
       dest_file = File.join(bundle_dir, "#{bundle_hash}.js")
       expect(File.exist?(dest_file)).to be(true)
       expect(File.symlink?(dest_file)).to be(true)
-      expect(File.realpath(dest_file)).to eq(server_bundle_path)
+      expect(File.realpath(dest_file)).to include(".artifact-snapshots/#{bundle_hash}/#{bundle_hash}.js")
+      expect(File.read(dest_file)).to eq("// server bundle content")
     end
 
     it "symlinks assets into the bundle-hash subdirectory" do
@@ -95,7 +95,8 @@ describe ReactOnRailsPro::PrepareNodeRenderBundles do # rubocop:disable RSpec/Fi
       expect(File.exist?(first_asset)).to be(true)
       expect(File.exist?(second_asset)).to be(true)
       expect(File.symlink?(first_asset)).to be(true)
-      expect(File.realpath(first_asset)).to eq(path_in_webpack_folder(asset_filename).to_s)
+      expect(File.realpath(first_asset)).to include(".artifact-snapshots/#{bundle_hash}/#{asset_filename}")
+      expect(File.binread(first_asset)).to eq(File.binread(fixture_path))
     end
   end
 
@@ -143,7 +144,11 @@ describe ReactOnRailsPro::PrepareNodeRenderBundles do # rubocop:disable RSpec/Fi
       allow(ReactOnRailsPro.configuration).to receive(:assets_to_copy).and_return(nil)
     end
 
-    after { FileUtils.rm_rf(custom_cache_dir) }
+    after do
+      FileUtils.rm_rf(custom_cache_dir)
+      FileUtils.rm_rf("#{custom_cache_dir}.artifact-snapshots")
+      FileUtils.rm_f("#{custom_cache_dir}.preseed.lock")
+    end
 
     it "uses the env var path" do
       pre_stage_cache
@@ -151,7 +156,8 @@ describe ReactOnRailsPro::PrepareNodeRenderBundles do # rubocop:disable RSpec/Fi
       dest_file = File.join(custom_cache_dir, bundle_hash, "#{bundle_hash}.js")
       expect(File.exist?(dest_file)).to be(true)
       expect(File.symlink?(dest_file)).to be(true)
-      expect(File.realpath(dest_file)).to eq(server_bundle_path)
+      expect(File.realpath(dest_file)).to include(".artifact-snapshots/#{bundle_hash}/#{bundle_hash}.js")
+      expect(File.read(dest_file)).to eq("// server bundle content")
     end
   end
 
@@ -163,7 +169,11 @@ describe ReactOnRailsPro::PrepareNodeRenderBundles do # rubocop:disable RSpec/Fi
       allow(ReactOnRailsPro.configuration).to receive(:assets_to_copy).and_return(nil)
     end
 
-    after { FileUtils.rm_rf(custom_cache_dir) }
+    after do
+      FileUtils.rm_rf(custom_cache_dir)
+      FileUtils.rm_rf("#{custom_cache_dir}.artifact-snapshots")
+      FileUtils.rm_f("#{custom_cache_dir}.preseed.lock")
+    end
 
     it "uses the deprecated env var with a warning" do
       expect { pre_stage_cache }.to output(/RENDERER_BUNDLE_PATH is deprecated/).to_stderr
@@ -175,7 +185,7 @@ describe ReactOnRailsPro::PrepareNodeRenderBundles do # rubocop:disable RSpec/Fi
 
   context "when RSC support is enabled" do
     let(:rsc_bundle_path) { Rails.root.join("public", "webpack", "production", "rsc-bundle.js").to_s }
-    let(:rsc_bundle_hash) { "rsc-bundle-hash-xyz789" }
+    let(:rsc_bundle_hash) { ReactOnRailsPro::Utils.rsc_bundle_hash }
     let(:client_manifest_path) { path_in_webpack_folder("react-client-manifest.json") }
     let(:server_client_manifest_path) { path_in_webpack_folder("react-server-client-manifest.json") }
 
@@ -193,12 +203,6 @@ describe ReactOnRailsPro::PrepareNodeRenderBundles do # rubocop:disable RSpec/Fi
         rsc_bundle_js_file_path: rsc_bundle_path,
         react_client_manifest_file_path: client_manifest_path,
         react_server_client_manifest_file_path: server_client_manifest_path
-      )
-
-      pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
-      allow(pool).to receive_messages(
-        server_bundle_hash: bundle_hash,
-        rsc_bundle_hash:
       )
 
       FileUtils.mkdir_p(File.dirname(rsc_bundle_path))
@@ -223,7 +227,8 @@ describe ReactOnRailsPro::PrepareNodeRenderBundles do # rubocop:disable RSpec/Fi
       expect(File.exist?(rsc_dest)).to be(true)
       expect(File.symlink?(server_dest)).to be(true)
       expect(File.symlink?(rsc_dest)).to be(true)
-      expect(File.realpath(rsc_dest)).to eq(rsc_bundle_path)
+      expect(File.realpath(rsc_dest)).to include(".artifact-snapshots/#{rsc_bundle_hash}/#{rsc_bundle_hash}.js")
+      expect(File.read(rsc_dest)).to eq("// rsc bundle content")
     end
 
     it "symlinks RSC manifests into both bundle directories" do

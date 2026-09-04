@@ -30,11 +30,12 @@ if ! MERGE_BASE=$(git_diff_base_resolve "$BASE_REF" "$CURRENT_REF" strict); then
   exit 1
 fi
 
-# Get list of changed files (committed + uncommitted). A failed git diff is now
-# fatal so CI does not silently skip every job when diff detection breaks.
-# Note: bash 'set -e' does NOT trigger on a failed command substitution in an
-# assignment, so the explicit '|| { exit 1 }' is required to catch errors here.
-# Do not "simplify" this away — removing it reintroduces the silent-failure bug.
+# Get list of changed files (committed + uncommitted). A failed git diff is fatal
+# so CI does not silently skip every job when diff detection breaks. In a plain
+# assignment, `set -e` already aborts on a failed command substitution (the
+# masking applies to declaration assignments such as `local x=$(false)`). Keep
+# the guard so the failure names the refs being diffed, not as the sole failure
+# mechanism.
 CHANGED_FILES=$(git diff --name-only "$MERGE_BASE" "$CURRENT_REF") || {
   echo -e "${RED}Error: git diff failed for $MERGE_BASE..$CURRENT_REF${NC}" >&2
   exit 1
@@ -70,6 +71,7 @@ BENCHMARKS_CHANGED=false
 SPEC_DUMMY_CHANGED=false
 JS_CHANGED=false
 GENERATORS_CHANGED=false
+GEM_GENERATOR_SPECS_INPUT_CHANGED=false
 PRO_RUBY_CORE_CHANGED=false
 PRO_RSPEC_CHANGED=false
 PRO_JS_CHANGED=false
@@ -78,6 +80,7 @@ PRO_NODE_RENDERER_CHANGED=false
 UNCATEGORIZED_CHANGED=false
 CI_INFRA_CHANGED=false
 RELEASE_TOOLING_CHANGED=false
+RUN_RELEASE_SUPERVISOR_TESTS=false
 SOURCE_COMMENT_ONLY_CHANGED=false
 PRO_SOURCE_COMMENT_ONLY_CHANGED=false
 # Benchmark relevance, tracked separately from the test-selection flags above.
@@ -93,7 +96,7 @@ BENCH_PRO_NODE_RENDERER_CHANGED=false
 
 is_release_tooling_path() {
   case "$1" in
-    rakelib/release.rake|script/release-forward-port|script/release-forward-port-test.bash|script/release-finish|script/release-finish-test.bash)
+    rakelib/release.rake|rakelib/release_lease_guard.rb|rakelib/release_atomic_claim.rb|rakelib/release_changelog_selector.rb|script/release|script/release-claim|script/release-test.bash|script/release-forward-port|script/release-forward-port-test.bash|script/release-finish|script/release-finish-test.bash)
       return 0
       ;;
     *)
@@ -104,10 +107,10 @@ is_release_tooling_path() {
 
 release_tooling_heredoc_language() {
   case "$1" in
-    rakelib/release.rake|script/release-forward-port|script/release-finish)
+    rakelib/release.rake|rakelib/release_lease_guard.rb|rakelib/release_atomic_claim.rb|rakelib/release_changelog_selector.rb|script/release|script/release-claim|script/release-forward-port|script/release-finish)
       printf '%s\n' "ruby"
       ;;
-    script/release-forward-port-test.bash|script/release-finish-test.bash)
+    script/release-test.bash|script/release-forward-port-test.bash|script/release-finish-test.bash)
       printf '%s\n' "bash"
       ;;
     *)
@@ -462,12 +465,12 @@ while IFS= read -r file; do
   # otherwise an empty diff would fall into the catch-all below and trigger every job.
   [ -z "$file" ] && continue
 
-  # Release tooling (rake release tasks + their helper scripts). The ONLY
-  # automated coverage for these paths is the release rspec suite
-  # (react_on_rails/spec/react_on_rails/release_rake_helpers_spec.rb and
-  # release_forward_port_script_spec.rb), so route them to RSPEC_CHANGED (runs
-  # those specs) plus RELEASE_TOOLING_CHANGED (runs rubocop) rather than the
-  # CI-infrastructure arm below. That arm's catch-all-equivalent behavior set
+# Release tooling (rake release tasks + their helper scripts) needs the release
+# RSpec suite (react_on_rails/spec/react_on_rails/release_rake_helpers_spec.rb
+# and release_forward_port_script_spec.rb) *and* the supervised wrapper
+# integration harness (script/release-test.bash). Route it to RSPEC_CHANGED,
+# RELEASE_TOOLING_CHANGED, and the dedicated harness selector rather than the
+# CI-infrastructure arm below. That arm's catch-all-equivalent behavior set
   # RUN_GENERATORS=true, which makes required-pr-gate force the full hosted
   # matrix (Generator/Playwright/Integration/JS) — none of which exercise
   # release tooling (see script/ci-required-hosted-gate). This branch is
@@ -479,11 +482,8 @@ while IFS= read -r file; do
   # core/Pro spec-only changes. It must run before the script/* CI-infra arm
   # (which would otherwise swallow script/release-*). Sets no BENCH_* flag:
   # release tooling is never shipped in the gem and cannot move runtime
-  # performance. NOTE: the bare `script/release` stub (a 3-line
-  # `echo "See rake -D release"`) is intentionally NOT included in
-  # is_release_tooling_path — it has no release-spec coverage, so it stays in the
-  # script/* CI-infra arm rather than claiming a test suite that does not
-  # exercise it.
+  # performance. `script/release` and its guard/test are included because the
+  # release specs and supervisor integration harness exercise their contract.
   if is_release_tooling_path "$file"; then
     DOCS_ONLY=false
     if source_file_comment_only_change "$file"; then
@@ -491,6 +491,7 @@ while IFS= read -r file; do
     else
       RSPEC_CHANGED=true
       RELEASE_TOOLING_CHANGED=true
+      RUN_RELEASE_SUPERVISOR_TESTS=true
     fi
     continue
   fi
@@ -578,6 +579,18 @@ while IFS= read -r file; do
         SOURCE_COMMENT_ONLY_CHANGED=true
       else
         RSPEC_CHANGED=true
+        case "$file" in
+          .github/workflows/gem-tests.yml|\
+          react_on_rails/spec/react_on_rails/simplecov_helper.rb|\
+          react_on_rails/spec/react_on_rails/spec_helper.rb|\
+          react_on_rails/spec/react_on_rails/support/generated_tree_approval.rb|\
+          react_on_rails/spec/react_on_rails/support/generator_spec_helper.rb|\
+          react_on_rails/spec/react_on_rails/support/version_test_helpers.rb|\
+          react_on_rails/spec/react_on_rails/support/shared_examples/*|\
+          react_on_rails/spec/react_on_rails/support/shared_examples/**/*)
+            GEM_GENERATOR_SPECS_INPUT_CHANGED=true
+            ;;
+        esac
         # Spec-only changes set no BENCH_* flag: specs are never shipped in the
         # gem, so they cannot move runtime performance (e.g. #3854 changed only
         # CI-config specs yet ran the core+pro suites). Benchmarks are driven by
@@ -783,6 +796,8 @@ if [ "$DOCS_ONLY" = true ]; then
     "non_runtime_only:true"
     "run_lint:false"
     "run_ruby_tests:false"
+    "run_gem_generator_specs:false"
+    "run_release_supervisor_tests:false"
     "run_js_tests:false"
     "run_dummy_tests:false"
     "run_generators:false"
@@ -854,6 +869,7 @@ echo "Recommended CI jobs:"
 # Determine which jobs to run
 RUN_LINT=false
 RUN_RUBY_TESTS=false
+RUN_GEM_GENERATOR_SPECS=false
 RUN_JS_TESTS=false
 RUN_DUMMY_TESTS=false
 RUN_GENERATORS=false
@@ -873,6 +889,19 @@ fi
 
 if [ "$RUBY_CORE_CHANGED" = true ] || [ "$RSPEC_CHANGED" = true ] || [ "$GENERATORS_CHANGED" = true ]; then
   RUN_RUBY_TESTS=true
+fi
+
+# Gem generator specs are much slower than the unit shard, so select them
+# independently from generic RSpec coverage. Keep the selector conservative for
+# shared/core/JS/unknown CI inputs while excluding isolated specs and the
+# release-tooling paths classified above.
+if [ "$GENERATORS_CHANGED" = true ] ||
+  [ "$GEM_GENERATOR_SPECS_INPUT_CHANGED" = true ] ||
+  [ "$RUBY_CORE_CHANGED" = true ] ||
+  [ "$JS_CHANGED" = true ] ||
+  [ "$CI_INFRA_CHANGED" = true ] ||
+  [ "$UNCATEGORIZED_CHANGED" = true ]; then
+  RUN_GEM_GENERATOR_SPECS=true
 fi
 
 # Benchmark scripts live outside the gem: they're linted by rubocop and covered
@@ -939,6 +968,7 @@ fi
 if [ "$CI_INFRA_CHANGED" = true ]; then
   RUN_LINT=true
   RUN_RUBY_TESTS=true
+  RUN_RELEASE_SUPERVISOR_TESTS=true
   RUN_JS_TESTS=true
   RUN_DUMMY_TESTS=true
   RUN_GENERATORS=true
@@ -953,6 +983,7 @@ fi
 if [ "$UNCATEGORIZED_CHANGED" = true ]; then
   RUN_LINT=true
   RUN_RUBY_TESTS=true
+  RUN_RELEASE_SUPERVISOR_TESTS=true
   RUN_JS_TESTS=true
   RUN_DUMMY_TESTS=true
   RUN_GENERATORS=true
@@ -975,6 +1006,8 @@ RUN_PRO_NODE_RENDERER_BENCHMARKS=$BENCH_PRO_NODE_RENDERER_CHANGED
 
 [ "$RUN_LINT" = true ] && echo "  ✓ Lint (Ruby + JS)"
 [ "$RUN_RUBY_TESTS" = true ] && echo "  ✓ RSpec gem tests"
+[ "$RUN_GEM_GENERATOR_SPECS" = true ] && echo "  ✓ RSpec gem generator specs"
+[ "$RUN_RELEASE_SUPERVISOR_TESTS" = true ] && echo "  ✓ Release supervisor integration tests"
 [ "$RUN_JS_TESTS" = true ] && echo "  ✓ JS unit tests"
 [ "$RUN_DUMMY_TESTS" = true ] && echo "  ✓ Dummy app integration tests"
 [ "$RUN_GENERATORS" = true ] && echo "  ✓ Generator tests"
@@ -994,6 +1027,8 @@ if [ -n "${GITHUB_OUTPUT:-}" ]; then
     echo "non_runtime_only=$NON_RUNTIME_ONLY"
     echo "run_lint=$RUN_LINT"
     echo "run_ruby_tests=$RUN_RUBY_TESTS"
+    echo "run_release_supervisor_tests=$RUN_RELEASE_SUPERVISOR_TESTS"
+    echo "run_gem_generator_specs=$RUN_GEM_GENERATOR_SPECS"
     echo "run_js_tests=$RUN_JS_TESTS"
     echo "run_dummy_tests=$RUN_DUMMY_TESTS"
     echo "run_generators=$RUN_GENERATORS"
@@ -1017,6 +1052,8 @@ if [ "${CI_JSON_OUTPUT:-}" = "1" ]; then
   "non_runtime_only": $NON_RUNTIME_ONLY,
   "run_lint": $RUN_LINT,
   "run_ruby_tests": $RUN_RUBY_TESTS,
+  "run_release_supervisor_tests": $RUN_RELEASE_SUPERVISOR_TESTS,
+  "run_gem_generator_specs": $RUN_GEM_GENERATOR_SPECS,
   "run_js_tests": $RUN_JS_TESTS,
   "run_dummy_tests": $RUN_DUMMY_TESTS,
   "run_generators": $RUN_GENERATORS,

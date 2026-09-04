@@ -55,6 +55,78 @@ Use this prompt to update the demo fleet for an RC or final release. It compleme
 [`demo-fleet.yml`](demo-fleet.yml) block final release readiness, while soft-track repos are
 inspected and filed as follow-up unless a maintainer explicitly promotes them.
 
+For a coordinated candidate run, prefer the repo-local `$run-fleet-validation` lifecycle pack.
+That pack owns candidate snapshotting, the release-wide preflight barrier, complete hard/soft
+inventory, capability and baseline probes, the public-safe result ledger, independent audit,
+authorized merge, default reachability/tree parity, and tracker-matrix rendering. The long-form
+prompt below remains the behavioral depth contract and a manual fallback; its evidence must still
+land in the generated ledger before closeout.
+
+The ledger binds each hard-gate check to an immutable audited/reviewed/current target revision,
+normalizes product gem/npm versions to the selected candidate, retains replayable independent-audit
+evidence, and records merge/reachability proof per mutable target. Its derived aggregate therefore
+represents partial fleet merges without discarding proof for lanes that already landed.
+Distributed app work additionally requires a `preflight.public_marker` record with unique status,
+exact pack/candidate/commit/fingerprint/opened-at identity, and replayable public-safe evidence.
+Closeout validation receives the expected pack ID, generated release selector, candidate tag,
+candidate source commit, policy commit, and tracker mode independently rather than trusting the
+ledger to redefine its own snapshot identity.
+
+A failed required release path closes as `BLOCKED` with lane evidence and an owned blocker reference;
+it must never be relabeled as passed or waived merely to satisfy closeout. Waived and deferred
+blockers require structured authority, evidence URL, and reason fields in addition to any durable
+owner.
+
+An owned release-wide preflight defect may also close the candidate as `BLOCKED` without fabricating
+an app run. Keep `APP_WORK_ALLOWED` false, retain the preflight blocker ID and public-safe evidence,
+leave every app target untouched, keep the public marker pristine and unpublished, record no maker
+identities in the independent audit, and mark aggregate merge/reachability plus tracker promotion
+`blocked` (not merely `hold`). Report-only
+targets that do run must retain their inspected package versions/sources and terminal exact-head
+check evidence; their observed locks need not match the candidate snapshot. Candidate matching
+applies only to candidate-managed packages on hard gates, including the separately resolved RSC
+package, not independently versioned Shakapacker or Control Plane Flow dependencies.
+Untouched app rows may retain read-only package-lock probes, and the validation-only generator gate
+must bind its revision and check evidence to the pack's exact candidate commit.
+
+This candidate-scoped orchestration does not replace standing fleet-health/currency automation,
+which detects drift between releases. Hosted-CI dispatch and generator-CI routing improvements are
+also dependencies, not substitutes: they shorten individual gates but do not own blocker
+identities, combined audit, merge authority, or promotion closeout.
+
+After stable publication, update `standing_health.stable_release` and `standing_health.rsc_version`
+in `demo-fleet.yml` and commit that manifest change. Generate evidence only from a clean working
+tree so the policy commit names the exact checked-in manifest:
+
+```bash
+test -z "$(git status --porcelain)" || {
+  echo "Commit the manifest and clean the working tree before generating fleet evidence." >&2
+  exit 1
+}
+POLICY_COMMIT="$(git rev-parse HEAD)"
+bundle exec ruby .agents/skills/run-fleet-validation/scripts/check_fleet_health.rb \
+  --live \
+  --pack-id "fleet-health-stable-$(date -u +%Y%m%dT%H%M%SZ)" \
+  --policy-commit "$POLICY_COMMIT" \
+  --output-dir tmp/fleet-health-stable
+```
+
+The command verifies those
+exact public registry artifacts across both gems, all four unified-version npm packages, and the
+independently versioned RSC package. Direct-lock currency comes only from root `DEPENDS_ON` SPDX
+relationships; mixed direct versions block and missing root identity fails closed. npm
+prereleases use ecosystem-normalized hyphen notation. Default CI stays bound to the public default
+head. Smoke passes only after the workflow containing the shared smoke contract succeeds for that
+exact head, with nonblank required commands and every required stage successful. PR-only
+review-app capability uses the exact `standing_health.review_app_workflow` public path and a recent
+`pull_request` run whose base branch, head branch, and head SHA agree with its PR metadata. Staging,
+cleanup, delete, help, and promotion workflows never substitute for that path. GitHub archival of
+an active target blocks as manifest drift. Dependabot requires one enabled weekly root entry per
+required ecosystem; separate disabled, non-root, or differently scheduled entries cannot combine
+into a pass. Keep soft-track and archived findings report-only. This pack is evidence for fleet
+currency and capability drift; it is not a replacement for the candidate ledger or a
+release-promotion signal.
+
 ```text
 You are updating the React on Rails demo fleet for {{RELEASE_REF}}.
 
@@ -100,6 +172,8 @@ Repos:
 - Prioritize every `hard_gate` repo first; hard-gate failures block final release readiness.
 - Then inspect every `soft_track` repo; do not let soft-track failures block final unless a
   maintainer promotes that repo.
+- Keep an owned blocker referenced exclusively by soft tracks as non-gating `PARTIAL` follow-up.
+  The same blocker is release-gating if preflight, a hard gate, or a required path also references it.
 - Treat `shakacode/hichee` and Pro details as private: public tracker comments may say
   install/build/smoke/CI passed or failed, but must not expose private logs, URLs, screenshots,
   customer data, secrets, or proprietary Pro source details.
