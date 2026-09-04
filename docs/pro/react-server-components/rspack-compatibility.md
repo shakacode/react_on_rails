@@ -2,7 +2,7 @@
 
 > **Status**: Supported as of React on Rails Pro 17.0.0. Rspack is the default bundler for fresh installs, the generator scaffolds the native `RSCRspackPlugin`, and RSC-on-Rspack is covered end-to-end by a CI gate — the `dummy-app-rspack-rsc-runtime-gate` job in [`.github/workflows/pro-integration-tests.yml`](https://github.com/shakacode/react_on_rails/blob/main/.github/workflows/pro-integration-tests.yml), which builds the client/server/RSC bundles with Rspack, boots Rails plus the Pro Node renderer, and runs the RSC Playwright suite so RSC routes are proven to render and hydrate under Rspack. Further production hardening is tracked in [issue #3488](https://github.com/shakacode/react_on_rails/issues/3488). The remaining known limitations below (no official React endorsement of the `react-server-dom-webpack` runtime under Rspack; production-posture streamed-CSS coverage) are genuine and still apply.
 
-This page documents the compatibility status of [Rspack](https://rspack.dev/) with React on Rails Pro's React Server Components (RSC) implementation.
+This page documents the compatibility status of [Rspack](https://rspack.rs/) with React on Rails Pro's React Server Components (RSC) implementation.
 
 ## Overview
 
@@ -104,7 +104,7 @@ To test RSC with Rspack in your project:
 
 1. **React on Rails does not use Rspack's experimental native RSC system**:
    As of Rspack v2, Rspack ships its own [built-in RSC
-   support](https://rspack.rs/blog/announcing-2-0) (driven by `builtin:swc-loader` and
+   support](https://rspack.rs/guide/integrations/rsc) (driven by `builtin:swc-loader` and
    `rspackExperiments.reactServerComponents`). React on Rails Pro does **not** use that
    experimental path. Its RSC integration is built on the `react-on-rails-rsc` package:
    manifest generation uses the native **`RSCRspackPlugin`** (standard rspack public APIs,
@@ -154,6 +154,6 @@ builds; production-posture coverage is tracked in
 - [Issue #3488: Rspack RSC path to production-ready (native RSCRspackPlugin)](https://github.com/shakacode/react_on_rails/issues/3488)
 - [Issue #1828: Rspack support for RSC](https://github.com/shakacode/react_on_rails/issues/1828)
 - [PR #3385: Manifest-helper approach for Rspack builds (superseded by the native plugin)](https://github.com/shakacode/react_on_rails/pull/3385)
-- [Rspack 2.0 React Server Components announcement](https://rspack.rs/blog/announcing-2-0)
+- [Rspack React Server Components guide](https://rspack.rs/guide/integrations/rsc)
 - [Three-bundle architecture](./how-react-server-components-work.md)
 - [Upgrading an existing Pro app to RSC](./upgrading-existing-pro-app.md)
