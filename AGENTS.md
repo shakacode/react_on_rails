@@ -1043,6 +1043,8 @@ Describing only the surrounding behavior is not enough:
   named the method or its new `on_chunk_errors:` keyword. A downstream app with a prepended override of
   that method broke with `ArgumentError: unknown keyword: :on_chunk_errors` and had to read the gem
   source to find the cause ([Issue 5006](https://github.com/shakacode/react_on_rails/issues/5006)).
+  That entry is quoted as it shipped and is left unamended as the historical record of the release; the
+  correction for upgraders lives in `docs/oss/upgrading/release-notes/17.1.0.md`.
 - **Correct**: add a sentence naming the method, the parameter, and the required action, e.g.
   `build_react_component_result_for_server_streamed_content` (`ReactOnRailsProHelper`) gains a new
   `on_chunk_errors:` keyword argument; apps with a prepended override of this method must add the
