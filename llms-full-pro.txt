@@ -6065,6 +6065,11 @@ Circular references, functions, symbols, and arbitrary custom class instances ar
 The default cache is process-local. Separate Node Renderer workers do not share its entries. For a
 shared cache, install the optional `ioredis` peer dependency and register `RedisCacheHandler`:
 
+In this example, `REDIS_URL` must identify a Redis database or instance dedicated to this application
+and environment. Cache keys do not include application or environment identifiers automatically.
+If you share a Redis database, instead pass an `ioredis` `RedisOptions` object as `redisUrl`, with an
+application-and-environment-specific `keyPrefix` alongside its connection settings.
+
 ```tsx
 import { RedisCacheHandler, registerCacheHandler, unstable_cache } from 'react-on-rails-pro/cache';
 
