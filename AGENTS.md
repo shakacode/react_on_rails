@@ -1053,9 +1053,9 @@ Describing only the surrounding behavior is not enough:
 ### Action-required placement
 
 A CHANGELOG entry with deploy-order (e.g., the Node renderer must deploy before or with the gem),
-memory/retention, or startup-failure (e.g., new fail-fast validation) implications must also surface
-under a top "Action required" bullet for that release, in addition to its normal category entry —
-don't let it hide only inside a "Fixed"/"Changed" paragraph. Use both of the following, established by
+memory/retention, or startup-failure (e.g., new fail-fast validation) implications must call the
+required action out explicitly, rather than leaving it buried in a "Fixed"/"Changed" paragraph. The
+entry stays in its normal category section; it is tagged in place. Do both of the following, established by
 [Issue 5007](https://github.com/shakacode/react_on_rails/issues/5007) and its fix in
 `docs/oss/upgrading/release-notes/17.1.0.md`:
 

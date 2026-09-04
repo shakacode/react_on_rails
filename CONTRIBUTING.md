@@ -12,7 +12,7 @@ When contributing:
 ---
 
 - [internal/contributor-info/Releasing](./internal/contributor-info/releasing.md) for instructions on releasing. Key workflow: update CHANGELOG.md **before** releasing (run `/update-changelog release`), then `rake release` reads the version and auto-creates the GitHub release.
-- See `AGENTS.md` → "Changelog" for entry conventions, including the "Helper signature changes" rule (name the method and parameter when a `ReactOnRailsHelper`/`ReactOnRailsProHelper` method's parameters change) and the "Action-required placement" rule (deploy-order/memory/startup-failure entries also need a top "Action required" bullet for that release).
+- See `AGENTS.md` → "Changelog" for entry conventions, including the "Helper signature changes" rule (name the method and parameter when a `ReactOnRailsHelper`/`ReactOnRailsProHelper` method's parameters change) and the "Action-required placement" rule (deploy-order/memory/startup-failure entries carry an inline `**Action required for upgraders:**` tag, and are repeated in the release-notes page's "Action required" section when the release has one).
 - [internal/contributor-info/pull-requests](./internal/contributor-info/pull-requests.md)
 - [internal/contributor-info/rbs-type-signatures](./internal/contributor-info/rbs-type-signatures.md) for information on RBS type signatures
 - See other docs in [internal/contributor-info](./internal/contributor-info)

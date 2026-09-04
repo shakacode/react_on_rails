@@ -817,8 +817,9 @@ Before running the release command, verify:
 
 1. **Changelog conventions**: Confirm every entry that changes a `ReactOnRailsHelper`/
    `ReactOnRailsProHelper` method's parameters names the method and the parameter, and that every
-   entry with deploy-order, memory/retention, or startup-failure implications also surfaces under a
-   top "Action required" bullet for that release. See `AGENTS.md` → "Changelog" → "Helper signature
+   entry with deploy-order, memory/retention, or startup-failure implications carries an inline
+   `**Action required for upgraders:**` tag, and is repeated in the release-notes page's "Action
+   required" section when this release has one. See `AGENTS.md` → "Changelog" → "Helper signature
    changes" and "Action-required placement".
 
 2. **One-time coordination setup**: Load `AGENT_COORD_API_URL`, the secret
