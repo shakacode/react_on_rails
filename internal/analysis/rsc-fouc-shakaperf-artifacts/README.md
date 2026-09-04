@@ -4,14 +4,14 @@ These files support `../rsc-fouc-shakaperf-investigation.md`.
 
 ## ShakaPerf setup and tests
 
-| Area                                    | Files                                                                                                                |
-| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| Setup/test bundle                       | [setup/README.md](setup/README.md)                                                                                   |
-| Deterministic first-paint AB test       | [setup/ab-tests/rsc-fouc.abtest.ts](setup/ab-tests/rsc-fouc.abtest.ts)                                               |
-| Natural first-visible assertion AB test | [setup/ab-tests/natural-first-visible-assertion.abtest.ts](setup/ab-tests/natural-first-visible-assertion.abtest.ts) |
-| Main config                             | [setup/config/abtests.config.ts](setup/config/abtests.config.ts)                                                     |
-| Twin server Dockerfile                  | [setup/twin-servers/Dockerfile](setup/twin-servers/Dockerfile)                                                       |
-| Generated ShakaPerf instructions        | [setup/generated-shakaperf-skills/](setup/generated-shakaperf-skills/)                                               |
+| Area                                    | Files                                                                                                             |
+| --------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Setup/test bundle                       | [setup/README.md](setup/README.md)                                                                                |
+| Deterministic first-paint AB test       | [test/shakaperf/rsc-fouc release gate](../../../test/shakaperf/rsc-fouc/ab-tests/rsc-fouc-release-gate.abtest.ts) |
+| Natural first-visible assertion AB test | [test/shakaperf/rsc-fouc release gate](../../../test/shakaperf/rsc-fouc/ab-tests/rsc-fouc-release-gate.abtest.ts) |
+| Main config                             | [setup/config/abtests.config.ts](setup/config/abtests.config.ts)                                                  |
+| Twin server Dockerfile                  | [setup/twin-servers/Dockerfile](setup/twin-servers/Dockerfile)                                                    |
+| Generated ShakaPerf instructions        | [setup/generated-shakaperf-skills/](setup/generated-shakaperf-skills/)                                            |
 
 ## Screenshots
 

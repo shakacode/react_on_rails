@@ -99,14 +99,14 @@ Artifact index: [rsc-fouc-shakaperf-artifacts/README.md](rsc-fouc-shakaperf-arti
 
 ### ShakaPerf setup and tests
 
-| Area                                      | Artifacts                                                                                                                                      |
-| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| Setup/test bundle                         | [README](rsc-fouc-shakaperf-artifacts/setup/README.md)                                                                                         |
-| Deterministic first-paint AB test         | [rsc-fouc.abtest.ts](rsc-fouc-shakaperf-artifacts/setup/ab-tests/rsc-fouc.abtest.ts)                                                           |
-| Natural first-visible assertion AB test   | [natural-first-visible-assertion.abtest.ts](rsc-fouc-shakaperf-artifacts/setup/ab-tests/natural-first-visible-assertion.abtest.ts)             |
-| Main ShakaPerf config                     | [abtests.config.ts](rsc-fouc-shakaperf-artifacts/setup/config/abtests.config.ts)                                                               |
-| Twin server setup                         | [Dockerfile](rsc-fouc-shakaperf-artifacts/setup/twin-servers/Dockerfile), [Procfile](rsc-fouc-shakaperf-artifacts/setup/twin-servers/Procfile) |
-| Generated ShakaPerf instructions followed | [setup/generated-shakaperf-skills/](rsc-fouc-shakaperf-artifacts/setup/generated-shakaperf-skills/)                                            |
+| Area                                      | Artifacts                                                                                                                                           |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Setup/test bundle                         | [README](rsc-fouc-shakaperf-artifacts/setup/README.md)                                                                                              |
+| Deterministic first-paint AB test         | [test/shakaperf/rsc-fouc release gate](../../test/shakaperf/rsc-fouc/ab-tests/rsc-fouc-release-gate.abtest.ts) (productized; archived copy removed) |
+| Natural first-visible assertion AB test   | [test/shakaperf/rsc-fouc release gate](../../test/shakaperf/rsc-fouc/ab-tests/rsc-fouc-release-gate.abtest.ts) (productized; archived copy removed) |
+| Main ShakaPerf config                     | [abtests.config.ts](rsc-fouc-shakaperf-artifacts/setup/config/abtests.config.ts)                                                                    |
+| Twin server setup                         | [Dockerfile](rsc-fouc-shakaperf-artifacts/setup/twin-servers/Dockerfile), [Procfile](rsc-fouc-shakaperf-artifacts/setup/twin-servers/Procfile)      |
+| Generated ShakaPerf instructions followed | [setup/generated-shakaperf-skills/](rsc-fouc-shakaperf-artifacts/setup/generated-shakaperf-skills/)                                                 |
 
 ### Key ShakaPerf reports
 
