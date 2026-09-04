@@ -70,6 +70,7 @@ const config = defineConfig([
     '**/bundle/',
     // Self-contained benchmark with its own pinned toolchain and checks.
     'benchmarks/rspack-vite-dx/',
+    'benchmarks/rspack-vite-rails-dx/',
     // dependencies
     '**/node_modules/',
     // fixtures

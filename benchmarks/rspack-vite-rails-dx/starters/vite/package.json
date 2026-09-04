@@ -1,0 +1,23 @@
+{
+  "name": "vite-rails-benchmark-starter",
+  "private": true,
+  "packageManager": "pnpm@10.33.4",
+  "devDependencies": {
+    "@inertiajs/core": "^3.7.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.2",
+    "vite-plugin-ruby": "^5.2.3"
+  },
+  "scripts": {
+    "check": "tsc -p tsconfig.app.json && tsc -p tsconfig.node.json"
+  },
+  "dependencies": {
+    "@inertiajs/react": "^3.7.0",
+    "@inertiajs/vite": "^3.7.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "react": "^19.0.4",
+    "react-dom": "^19.0.4"
+  }
+}

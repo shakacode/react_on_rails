@@ -32,6 +32,8 @@ AllCops:
     # exclusions here so the root sweep does not fail on files package CI exempts.
     - 'react_on_rails/spec/react_on_rails/dummy-for-generators/**/*'
     - 'react_on_rails/spike/**/*'
+    # Pinned generated Rails fixtures use their own application toolchains.
+    - 'benchmarks/rspack-vite-rails-dx/starters/**/*'
     - 'react_on_rails_pro/spec/dummy/db/schema.rb'
     - 'react_on_rails_pro/spec/dummy/db/seeds.rb'
     - 'react_on_rails/spec/dummy/bin/**/*'

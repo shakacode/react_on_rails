@@ -23,8 +23,13 @@ updates:
     directories:
       - "/"
       - "/benchmarks/rspack-vite-dx"
+      - "/benchmarks/rspack-vite-rails-dx"
+      - "/benchmarks/rspack-vite-rails-dx/starters/rspack"
+      - "/benchmarks/rspack-vite-rails-dx/starters/vite"
       - "/react_on_rails/spec/dummy"
       - "/react_on_rails_pro/spec/dummy"
+      - "/benchmarks/rspack-vite-rails-dx/starters/rspack"
+      - "/benchmarks/rspack-vite-rails-dx/starters/vite"
       - "/internal/agent-evals/pro-app-buildability"
     schedule:
       interval: "weekly"
