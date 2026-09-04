@@ -518,6 +518,11 @@ assertMatches(
 );
 assertMatches('Rails DX benchmark path trigger', benchmarkWorkflow, /pull_request:[\s\S]*benchmarks\/\*\*/);
 assertMatches(
+  'Rails DX benchmark refreshes Corepack trust data',
+  benchmarkWorkflow,
+  /npm install --global --ignore-scripts corepack@0\.34\.7 && corepack enable && corepack prepare pnpm@10\.33\.4 --activate/,
+);
+assertMatches(
   'Rails DX benchmark frozen install',
   benchmarkWorkflow,
   /working-directory: benchmarks\/rspack-vite-rails-dx[\s\S]*pnpm install --ignore-workspace --frozen-lockfile/,

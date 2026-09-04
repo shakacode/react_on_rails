@@ -112,7 +112,8 @@ jobs:
         with:
           node-version-file: .tool-versions
       - name: Enable pinned pnpm
-        run: corepack enable && corepack prepare pnpm@10.33.4 --activate
+        # Node 22.12.0 bundles Corepack 0.29.4, whose stale signing keys reject pnpm 10.33.4.
+        run: npm install --global --ignore-scripts corepack@0.34.7 && corepack enable && corepack prepare pnpm@10.33.4 --activate
       - name: Install isolated benchmark dependencies
         run: pnpm install --ignore-workspace --frozen-lockfile
       - name: Install pinned starter dependencies
