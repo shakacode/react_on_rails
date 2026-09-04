@@ -32,6 +32,22 @@ module CloseoutEvidenceReplay
   VALID_PERFORMANCE_EVIDENCE_STATUSES = %w[measured not_applicable].freeze
   VALID_PERFORMANCE_SOURCE_KINDS = %w[repo_command repo_report github_artifact not_applicable].freeze
   VALID_PERFORMANCE_METRIC_KINDS = %w[bundle_size bundle_shape runtime memory not_applicable].freeze
+  QA_RELEASE_BLOCKING_BY_STATUS = {
+    "satisfied" => "clear",
+    "blocked" => "blocked",
+    "waived" => "waived",
+    "in_progress" => "blocked",
+    "unknown" => "blocked",
+    "not_applicable" => "not_applicable"
+  }.freeze
+  BUNDLE_SHAPE_UNITS = %w[
+    asset assets chunk chunks count counts dependency dependencies entry entries export exports
+    file files import imports item items module modules package packages route routes
+  ].freeze
+  RUNTIME_UNITS = %w[
+    % fps h hour hours hr hrs hz min mins minute minutes ms ns op/s ops/s qps req/s requests/s
+    rpm rps s sec second seconds secs us
+  ].freeze
   # private-user-images.githubusercontent.com is deliberately excluded because copied signed URLs expire.
   DURABLE_GITHUB_EVIDENCE_HOSTS = %w[
     github.com
@@ -435,6 +451,7 @@ module CloseoutEvidenceReplay
     validate_enum(values, "performance_source_kind", VALID_PERFORMANCE_SOURCE_KINDS, missing)
     validate_enum(values, "performance_metric_kind", VALID_PERFORMANCE_METRIC_KINDS, missing)
 
+    validate_structured_qa_state(fields, missing)
     validate_structured_visual_evidence(values, fields, missing)
     validate_structured_interaction_evidence(values, missing)
     validate_structured_negative_control(values, missing)
@@ -450,6 +467,18 @@ module CloseoutEvidenceReplay
   def validate_enum(values, field, allowed, missing)
     value = values.fetch(field)
     missing << field unless value.empty? || allowed.include?(value)
+  end
+
+  def validate_structured_qa_state(fields, missing)
+    required = fields.fetch("required", "")
+    status = fields.fetch("status", "")
+    release_blocking = fields.fetch("release_blocking", "")
+    expected_release_blocking = QA_RELEASE_BLOCKING_BY_STATUS[status]
+    missing << "release_blocking" if expected_release_blocking && release_blocking != expected_release_blocking
+    return unless required == "no"
+
+    missing << "status" unless status == "not_applicable"
+    missing << "release_blocking" unless release_blocking == "not_applicable"
   end
 
   def validate_structured_visual_evidence(values, fields, missing)
@@ -621,11 +650,23 @@ module CloseoutEvidenceReplay
     valid = measurements.all? && measurements.map { |measurement| measurement.fetch(1) }.uniq.one?
     if valid
       unit = measurements.first.fetch(1)
-      byte_unit = unit.match?(/\A(?:[kmgt]i?)?b(?:ytes?)?\z/i)
-      valid &&= byte_unit if %w[bundle_size memory].include?(metric_kind)
-      valid &&= !byte_unit if %w[bundle_shape runtime].include?(metric_kind)
+      valid &&= measurements.none? { |measurement| measurement.fetch(0).start_with?("-") }
+      valid &&= valid_performance_unit?(metric_kind, unit)
     end
     missing << field unless valid
+  end
+
+  def valid_performance_unit?(metric_kind, unit)
+    case metric_kind
+    when "bundle_size", "memory"
+      unit.match?(/\A(?:[kmgt]i?)?b(?:ytes?)?\z/i)
+    when "bundle_shape"
+      BUNDLE_SHAPE_UNITS.include?(unit)
+    when "runtime"
+      RUNTIME_UNITS.include?(unit)
+    else
+      false
+    end
   end
 
   def parse_measurement(value)

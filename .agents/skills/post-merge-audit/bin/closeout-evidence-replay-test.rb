@@ -224,6 +224,41 @@ class CloseoutEvidenceReplayTest < Minitest::Test
     end
   end
 
+  def test_v3_requires_exact_qa_status_and_release_blocking_pairs
+    cases = {
+      "satisfied" => "waived",
+      "blocked" => "clear",
+      "waived" => "clear",
+      "in_progress" => "clear",
+      "unknown" => "clear",
+      "not_applicable" => "clear"
+    }
+
+    cases.each do |status, release_blocking|
+      qa = run_replay(
+        v3_marker(
+          "status" => status,
+          "release_blocking" => release_blocking
+        )
+      ).fetch("qa_evidence")
+
+      assert_equal "UNKNOWN", qa.fetch("verdict"), status
+      assert_includes qa.fetch("missing"), "release_blocking", status
+    end
+  end
+
+  def test_v3_accepts_matching_waived_qa_state
+    qa = run_replay(
+      v3_marker(
+        "status" => "waived",
+        "release_blocking" => "waived"
+      )
+    ).fetch("qa_evidence")
+
+    assert_equal "WAIVED", qa.fetch("verdict")
+    assert_empty qa.fetch("missing")
+  end
+
   def test_v3_measured_interaction_and_performance_use_typed_fields
     qa = run_replay(
       v3_marker(
@@ -382,6 +417,75 @@ class CloseoutEvidenceReplayTest < Minitest::Test
 
     assert_equal "UNKNOWN", qa.fetch("verdict")
     assert_includes qa.fetch("missing"), "performance_source_ref"
+  end
+
+  def test_v3_performance_units_must_match_the_metric_kind
+    cases = {
+      "runtime rejects geometry" => %w[runtime 10px 9px],
+      "bundle shape rejects time" => %w[bundle_shape 10ms 9ms],
+      "bundle size rejects counts" => %w[bundle_size 10chunks 9chunks],
+      "memory rejects time" => %w[memory 10ms 9ms]
+    }
+
+    cases.each do |label, (metric_kind, baseline, candidate)|
+      impact = %w[bundle_size bundle_shape].include?(metric_kind) ? "bundle_hygiene" : "measured_metric"
+      qa = run_replay(
+        v3_marker(
+          "performance_impact" => impact,
+          "performance_evidence_status" => "measured",
+          "performance_source_kind" => "repo_report",
+          "performance_source_ref" => "reports/performance.json",
+          "performance_metric_kind" => metric_kind,
+          "performance_baseline_value" => baseline,
+          "performance_candidate_value" => candidate
+        )
+      ).fetch("qa_evidence")
+
+      assert_equal "UNKNOWN", qa.fetch("verdict"), label
+      assert_includes qa.fetch("missing"), "performance_evidence", label
+    end
+  end
+
+  def test_v3_accepts_each_metric_unit_family
+    cases = {
+      "bundle_size" => %w[bundle_hygiene 120KiB 118KiB],
+      "bundle_shape" => %w[bundle_hygiene 12chunks 11chunks],
+      "runtime" => %w[measured_metric 240ms 210ms],
+      "memory" => %w[measured_metric 512MB 500MB]
+    }
+
+    cases.each do |metric_kind, (impact, baseline, candidate)|
+      qa = run_replay(
+        v3_marker(
+          "performance_impact" => impact,
+          "performance_evidence_status" => "measured",
+          "performance_source_kind" => "repo_report",
+          "performance_source_ref" => "reports/performance.json",
+          "performance_metric_kind" => metric_kind,
+          "performance_baseline_value" => baseline,
+          "performance_candidate_value" => candidate
+        )
+      ).fetch("qa_evidence")
+
+      assert_equal "SATISFIED", qa.fetch("verdict"), metric_kind
+    end
+  end
+
+  def test_v3_performance_measurements_must_be_non_negative
+    qa = run_replay(
+      v3_marker(
+        "performance_impact" => "measured_metric",
+        "performance_evidence_status" => "measured",
+        "performance_source_kind" => "repo_report",
+        "performance_source_ref" => "reports/performance.json",
+        "performance_metric_kind" => "runtime",
+        "performance_baseline_value" => "-240ms",
+        "performance_candidate_value" => "210ms"
+      )
+    ).fetch("qa_evidence")
+
+    assert_equal "UNKNOWN", qa.fetch("verdict")
+    assert_includes qa.fetch("missing"), "performance_evidence"
   end
 
   def test_v3_interaction_clip_uses_the_same_destination_binding

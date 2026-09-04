@@ -318,7 +318,7 @@ durable before/after URLs, captured baseline and candidate states, a passed
 paint check, interaction clip or same-unit measured substitute when applicable,
 an observed unfixed negative control for a visual fix, and repository
 performance-seam evidence with a compatible impact, source, metric kind, and
-same-unit baseline/candidate pair. Descriptive notes do not satisfy these
+metric-compatible same-unit baseline/candidate pair. Descriptive notes do not satisfy these
 fields, and incidental CI URL IDs do not count.
 Local/file paths and “captured locally” do not qualify; a GitHub-only handoff
 remains blocked until an authenticated UI upload or human attachment puts the

@@ -701,9 +701,10 @@ For each user-visible UI change:
    `bundle_hygiene` or `measured_metric`; select a compatible metric kind and a
    stable repo command, repo report, or GitHub release artifact source. Record
    same-unit baseline and candidate values. `bundle_size` and `memory` require
-   byte units; `bundle_shape` and `runtime` require non-byte units. Incidental
-   CI/report URL IDs do not count. Missing or unmeasured evidence blocks
-   readiness.
+   byte units; `bundle_shape` requires a count noun such as `chunks`, `files`,
+   or `modules`; and `runtime` requires a time, rate, frequency, or percentage
+   unit such as `ms`, `s`, `fps`, `req/s`, or `%`. Incidental CI/report URL IDs
+   do not count. Missing or unmeasured evidence blocks readiness.
 
 ### Batch QA Lane
 
@@ -815,8 +816,8 @@ performance_evidence_status: <measured | not_applicable>
 performance_source_kind: <repo_command | repo_report | github_artifact | not_applicable>
 performance_source_ref: <stable repo command/report ref or GitHub release URL | not_applicable>
 performance_metric_kind: <bundle_size | bundle_shape | runtime | memory | not_applicable>
-performance_baseline_value: <number><unit> | not_applicable
-performance_candidate_value: <number><unit> | not_applicable
+performance_baseline_value: <non-negative number><metric-compatible unit> | not_applicable
+performance_candidate_value: <non-negative number><metric-compatible unit> | not_applicable
 findings: <none, fixed, waived, blocked, or follow-up link>
 release_blocking: <clear | blocked | waived | not_applicable>
 process_gap_disposition: <script | schema | checklist+replay | park | not applicable>
