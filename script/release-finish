@@ -767,11 +767,6 @@ class ReleaseFinish
     git("rev-parse", "--verify", "#{tag}^{commit}").strip
   end
 
-  def commit_reachable_from?(commit, ref)
-    _stdout, _stderr, status = capture_git("merge-base", "--is-ancestor", commit, ref)
-    status.success?
-  end
-
   def git_lines(*)
     git(*).lines.map(&:strip).reject(&:empty?)
   end
