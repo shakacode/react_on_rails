@@ -72,6 +72,10 @@ module ReactOnRails
       EXTRACT_LOADER_DECLARATION =
         /^(?:function\s+extractLoader\s*\(|(?:const|let|var)\s+extractLoader\b)/
 
+      # Generated callers require synchronous helpers, not promises or iterators.
+      UNSUPPORTED_WEBPACK_HELPER_DECLARATION =
+        /^[ \t]*(?:(?:async[ \t]+)?function\s*\*\s*|async[ \t]+function\s+)(?:extractLoader|getLoaderPath)\s*\(/
+
       # Main entry point for Pro setup.
       # Orchestrates creation of all Pro-related files and configuration.
       #
@@ -469,6 +473,7 @@ module ReactOnRails
         end
 
         content = File.read(webpack_config_path)
+        return if skip_unsupported_webpack_helpers?(webpack_config, content)
         return if skip_ambiguous_webpack_helpers?(webpack_config, content)
 
         server_config_ready = pro_server_config_ready?(content)
@@ -683,6 +688,18 @@ module ReactOnRails
 
       def javascript_without_block_comments(content)
         content.gsub(%r{/\*.*?\*/}m) { |comment| comment.gsub(/[^\r\n]/, " ") }
+      end
+
+      def skip_unsupported_webpack_helpers?(webpack_config, content)
+        source = javascript_without_block_comments(content)
+        return false unless source.match?(UNSUPPORTED_WEBPACK_HELPER_DECLARATION)
+
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          Skipped Pro webpack updates because generated callers require synchronous helpers in #{webpack_config}.
+          Both webpack configs were left unchanged. Update it manually using the Pro setup guide:
+          https://reactonrails.com/docs/pro/upgrading-to-pro/
+        MSG
+        true
       end
 
       def webpack_helper_scope_ambiguous?(content)

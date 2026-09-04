@@ -1820,6 +1820,49 @@ describe ProGenerator, type: :generator do
     end
   end
 
+  describe "#update_webpack_config_for_pro with an unsupported helper declaration" do
+    let(:generator) { described_class.new }
+    let(:webpack_config) { "config/webpack/serverWebpackConfig.js" }
+    let(:server_client_config) { "config/webpack/ServerClientOrBoth.js" }
+
+    before do
+      prepare_destination
+      allow(generator).to receive(:destination_root).and_return(destination_root)
+    end
+
+    [
+      "async function extractLoader()", "function* extractLoader()", "async function* extractLoader()",
+      "async function getLoaderPath()", "function *getLoaderPath()", "  async function * getLoaderPath()",
+      "async function\nextractLoader()", "function*\ngetLoaderPath()"
+    ].each do |declaration|
+      it "preserves both configs for a custom #{declaration} declaration" do
+        content = "#{declaration} { return null; }\n#{base_server_webpack_content}"
+        import_content = "const serverWebpackConfig = require('./serverWebpackConfig');\n"
+        simulate_existing_file(webpack_config, content)
+        simulate_existing_file(server_client_config, import_content)
+
+        generator.send(:update_webpack_config_for_pro)
+
+        expect(File.read(File.join(destination_root, webpack_config))).to eq(content)
+        expect(File.read(File.join(destination_root, server_client_config))).to eq(import_content)
+        expect(GeneratorMessages.messages.join("\n")).to include("synchronous helpers", "Update it manually")
+      end
+    end
+
+    it "still migrates when unsupported declarations appear only in comments" do
+      comments = "// async function extractLoader() {}\n/*\nfunction* getLoaderPath() {}\n*/\n"
+      simulate_existing_file(webpack_config, "#{comments}#{base_server_webpack_content}")
+      simulate_existing_file(server_client_config, "const serverWebpackConfig = require('./serverWebpackConfig');\n")
+
+      generator.send(:update_webpack_config_for_pro)
+
+      expect(File.read(File.join(destination_root, webpack_config))).to include("default: configureServer")
+      expect(File.read(File.join(destination_root,
+                                 server_client_config))).to include("{ default: serverWebpackConfig }")
+      expect(GeneratorMessages.messages.join("\n")).not_to include("synchronous helpers")
+    end
+  end
+
   # Integration test for standalone happy path
   # Uses before (not before(:all)) to allow mocking the Pro gem check
 
