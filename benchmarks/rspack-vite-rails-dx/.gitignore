@@ -1,4 +1,5 @@
 .work/
+results/latest.json
 results/local*.json
 RESULTS.local.md
 node_modules/
