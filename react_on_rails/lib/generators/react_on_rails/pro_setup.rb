@@ -65,6 +65,11 @@ module ReactOnRails
       # silent shadow, and the generated config would fail to parse in Node.
       GET_LOADER_PATH_DECLARATION = /(?:function\s+getLoaderPath\s*\(|(?:const|let|var)\s+getLoaderPath\s*=)/
 
+      # Matches a live declaration line for extractLoader, including customized lexical forms.
+      # Anchoring excludes line-comment-only mentions without pretending to parse JavaScript.
+      EXTRACT_LOADER_DECLARATION =
+        /^\s*(?:function\s+extractLoader\s*\(|(?:const|let|var)\s+extractLoader\s*=)/
+
       # Main entry point for Pro setup.
       # Orchestrates creation of all Pro-related files and configuration.
       #
@@ -518,7 +523,7 @@ module ReactOnRails
 
       def add_extract_loader_to_server_config(webpack_config, content)
         # Skip if extractLoader already exists
-        return if content.include?("function extractLoader")
+        return if content.match?(EXTRACT_LOADER_DECLARATION)
 
         if content.include?(GET_LOADER_PATH_JS)
           # Config rendered by the current base template: append extractLoader directly after
@@ -592,16 +597,19 @@ module ReactOnRails
 
       def missing_server_config_transforms(content)
         checks = [
-          "libraryTarget: 'commonjs2',",
-          "function extractLoader",
-          "babelLoader.options.caller = { ssr: true }",
-          "serverWebpackConfig.target = 'node'",
-          "serverWebpackConfig.node = false",
-          "default: configureServer",
-          "extractLoader,"
+          ["libraryTarget: 'commonjs2',", content.include?("libraryTarget: 'commonjs2',")],
+          ["extractLoader declaration", content.match?(EXTRACT_LOADER_DECLARATION)],
+          [
+            "babelLoader.options.caller = { ssr: true }",
+            content.include?("babelLoader.options.caller = { ssr: true }")
+          ],
+          ["serverWebpackConfig.target = 'node'", content.include?("serverWebpackConfig.target = 'node'")],
+          ["serverWebpackConfig.node = false", content.include?("serverWebpackConfig.node = false")],
+          ["default: configureServer", content.include?("default: configureServer")],
+          ["extractLoader,", content.include?("extractLoader,")]
         ]
 
-        checks.reject { |pattern| content.include?(pattern) }
+        checks.filter_map { |label, present| label unless present }
       end
 
       def missing_server_client_import_transform
@@ -645,7 +653,7 @@ module ReactOnRails
         # Check for the Pro-specific comment marker (written by the transform) to avoid
         # false-negatives when commented-out lines also contain the pattern string.
         content.include?("// Required for React on Rails Pro Node Renderer") &&
-          content.include?("function extractLoader") &&
+          content.match?(EXTRACT_LOADER_DECLARATION) &&
           content.include?("babelLoader.options.caller = { ssr: true }") &&
           content.include?("serverWebpackConfig.target = 'node'") &&
           content.include?("serverWebpackConfig.node = false") &&

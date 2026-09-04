@@ -359,6 +359,21 @@ def customized_base_server_webpack_content
   )
 end
 
+# A base install whose extractLoader helper has been customized by the app owner.
+# Declared as a const arrow function so emitting the template's function declaration would
+# redeclare the identifier and make the generated config invalid JavaScript.
+def customized_extract_loader_base_server_webpack_content
+  base_server_webpack_content.sub(
+    ReactOnRails::Generators::ProSetup::GET_LOADER_PATH_JS,
+    <<~JS
+      #{ReactOnRails::Generators::ProSetup::GET_LOADER_PATH_JS.chomp}
+
+      // Project-specific rule traversal.
+      const extractLoader = (rule, loaderName) => rule.use.find((item) => getLoaderPath(item).endsWith(loaderName));
+    JS
+  )
+end
+
 # A base install generated before the shared getLoaderPath helper was extracted.
 # Kept deliberately stale so the standalone Pro upgrade path stays covered for apps
 # installed with an older React on Rails, where extractLoader cannot assume the

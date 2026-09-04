@@ -1627,6 +1627,68 @@ describe ProGenerator, type: :generator do
     end
   end
 
+  describe "extractLoader declaration detection" do
+    it "recognizes a lexical declaration" do
+      source = "const extractLoader = (rule, loaderName) => rule.use.find(Boolean);\n"
+
+      expect(source).to match(ReactOnRails::Generators::ProSetup::EXTRACT_LOADER_DECLARATION)
+    end
+
+    it "does not treat a line-comment-only function as a declaration" do
+      source = "// function extractLoader(rule, loaderName) { return null; }\n"
+
+      expect(source).not_to match(ReactOnRails::Generators::ProSetup::EXTRACT_LOADER_DECLARATION)
+    end
+  end
+
+  describe "#add_extract_loader_to_server_config" do
+    let(:generator) { described_class.new }
+    let(:webpack_config) { "config/webpack/serverWebpackConfig.js" }
+
+    before do
+      prepare_destination
+      allow(generator).to receive(:destination_root).and_return(destination_root)
+    end
+
+    it "reuses a customized lexical helper instead of emitting a second declaration" do
+      content = customized_extract_loader_base_server_webpack_content
+      simulate_existing_file(webpack_config, content)
+
+      generator.send(:add_extract_loader_to_server_config, webpack_config, content)
+
+      result = File.read(File.join(destination_root, webpack_config))
+      declarations = result.scan(ReactOnRails::Generators::ProSetup::EXTRACT_LOADER_DECLARATION)
+      expect(declarations.size).to eq(1)
+      expect(result).to include("const extractLoader = (rule, loaderName) =>")
+      expect(result).not_to include(ReactOnRails::Generators::ProSetup::EXTRACT_LOADER_JS)
+    end
+
+    it "inserts a live helper when the only existing mention is a line comment" do
+      content = base_server_webpack_content.sub(
+        ReactOnRails::Generators::ProSetup::GET_LOADER_PATH_JS,
+        "#{ReactOnRails::Generators::ProSetup::GET_LOADER_PATH_JS}\n// function extractLoader(rule, loaderName) {}\n"
+      )
+      simulate_existing_file(webpack_config, content)
+
+      generator.send(:add_extract_loader_to_server_config, webpack_config, content)
+
+      result = File.read(File.join(destination_root, webpack_config))
+      declarations = result.scan(ReactOnRails::Generators::ProSetup::EXTRACT_LOADER_DECLARATION)
+      expect(declarations.size).to eq(1)
+      expect(result).to include(ReactOnRails::Generators::ProSetup::EXTRACT_LOADER_JS)
+    end
+  end
+
+  describe "#missing_server_config_transforms" do
+    let(:generator) { described_class.new }
+
+    it "reports a line-comment-only extractLoader mention as missing" do
+      content = "// function extractLoader(rule, loaderName) {}\n"
+
+      expect(generator.send(:missing_server_config_transforms, content)).to include("extractLoader declaration")
+    end
+  end
+
   # Integration test for standalone happy path
   # Uses before (not before(:all)) to allow mocking the Pro gem check
 
