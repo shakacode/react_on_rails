@@ -115,6 +115,12 @@ jobs:
         run: corepack enable && corepack prepare pnpm@10.33.4 --activate
       - name: Install isolated benchmark dependencies
         run: pnpm install --ignore-workspace --frozen-lockfile
+      - name: Install pinned starter dependencies
+        run: pnpm run prepare:starters
+      - name: Type-check the Rspack starter
+        run: pnpm --dir starters/rspack exec tsc --project tsconfig.json
+      - name: Type-check the Vite starter
+        run: pnpm --dir starters/vite run check
       - name: Replay Rails DX benchmark artifact checks
         run: pnpm run check
 

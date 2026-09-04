@@ -522,6 +522,17 @@ assertMatches(
   benchmarkWorkflow,
   /working-directory: benchmarks\/rspack-vite-rails-dx[\s\S]*pnpm install --ignore-workspace --frozen-lockfile/,
 );
+assertMatches('Rails DX benchmark starter install', benchmarkWorkflow, /pnpm run prepare:starters/);
+assertMatches(
+  'Rails DX benchmark Rspack type-check',
+  benchmarkWorkflow,
+  /pnpm --dir starters\/rspack exec tsc --project tsconfig\.json/,
+);
+assertMatches(
+  'Rails DX benchmark Vite type-check',
+  benchmarkWorkflow,
+  /pnpm --dir starters\/vite run check/,
+);
 assertMatches(
   'Rails DX benchmark replay',
   benchmarkWorkflow,

@@ -243,8 +243,10 @@ async function portsAvailable(ports) {
 async function waitForHttp(url, child, readLog) {
   const deadline = Date.now() + 60_000;
   while (Date.now() < deadline) {
-    if (child.exitCode !== null)
-      throw new Error(`process exited ${child.exitCode}: ${readLog().slice(-2_000)}`);
+    if (child.exitCode !== null || child.signalCode !== null) {
+      const result = child.exitCode === null ? `after ${child.signalCode}` : child.exitCode;
+      throw new Error(`process exited ${result}: ${readLog().slice(-2_000)}`);
+    }
     try {
       const response = await fetch(url, { signal: AbortSignal.timeout(1_000) });
       if (response.ok) return;
@@ -257,7 +259,7 @@ async function waitForHttp(url, child, readLog) {
 }
 
 async function stopProcess(child) {
-  if (child.exitCode !== null) return;
+  if (child.exitCode !== null || child.signalCode !== null) return;
   const exited = new Promise((resolve) => child.once('exit', resolve));
   try {
     process.kill(process.platform === 'win32' ? child.pid : -child.pid, 'SIGTERM');
