@@ -437,6 +437,38 @@ module ReactOnRails
               expect(error.message).to include("bad host")
             }
           end
+
+          it "does not leak a password that contains an @" do
+            server_bundle_url = "http://bundle-user:s3cr3t@still-secret@bad host/webpack/development/server-bundle.js"
+
+            allow(ReactOnRails::Utils).to receive_messages(
+              server_bundle_js_file_path: server_bundle_url,
+              server_bundle_path_is_http?: true
+            )
+
+            expect do
+              described_class.read_bundle_js_code
+            end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
+              expect(error.message).not_to include("bundle-user")
+              expect(error.message).not_to include("s3cr3t")
+              expect(error.message).not_to include("still-secret")
+            }
+          end
+
+          it "preserves @ characters in the path and query string" do
+            server_bundle_url = "http://bad host/webpack/server@bundle.js?source=@config"
+
+            allow(ReactOnRails::Utils).to receive_messages(
+              server_bundle_js_file_path: server_bundle_url,
+              server_bundle_path_is_http?: true
+            )
+
+            expect do
+              described_class.read_bundle_js_code
+            end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
+              expect(error.message).to include("/webpack/server@bundle.js?source=@config")
+            }
+          end
         end
 
         # read_bundle_js_code also serves the local (non-HTTP) bundle path, where
