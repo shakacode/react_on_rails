@@ -159,6 +159,91 @@ RSpec.describe ReleaseAtomicClaim::Client do
     expect { client.renew!(**claim_args) }.to raise_error(ReleaseAtomicClaim::ClaimRefused)
   end
 
+  it "releases only the exact active identity with an exact-version conditional write" do
+    claim_data = {
+      "status" => "active",
+      "repo" => "shakacode/react_on_rails",
+      "target" => "release-line:17.1.0",
+      "agent_id" => "release-17.1.0-uuid",
+      "instance_id" => "uuid",
+      "machine_id" => "release-machine",
+      "branch" => "release/17.1.0"
+    }
+    responses.push(
+      response_class.new(code: "200", body: JSON.generate("version" => 12, "data" => claim_data)),
+      response_class.new(code: "200", body: "{}")
+    )
+
+    expect(client.release!(**claim_args.slice(:repo, :target, :agent_id, :instance_id, :now))).to be(true)
+
+    put = requests.fetch(1)
+    expect(put.fetch(:headers)).to include("If-Match" => "12")
+    payload = JSON.parse(put.fetch(:body)).fetch("data")
+    expect(payload).to include(
+      "status" => "released",
+      "agent_id" => "release-17.1.0-uuid",
+      "instance_id" => "uuid",
+      "released_at" => "2026-08-25T06:30:00Z"
+    )
+  end
+
+  it "treats an already-released exact identity as a successful retry" do
+    responses << response_class.new(
+      code: "200",
+      body: JSON.generate(
+        "version" => 13,
+        "data" => {
+          "status" => "released",
+          "repo" => "shakacode/react_on_rails",
+          "target" => "release-line:17.1.0",
+          "agent_id" => "release-17.1.0-uuid",
+          "instance_id" => "uuid"
+        }
+      )
+    )
+
+    release_args = claim_args.slice(:repo, :target, :agent_id, :instance_id, :now)
+    expect(client.release!(**release_args)).to be(true)
+    expect(requests.length).to eq(1)
+  end
+
+  it "refuses to release a replacement claim with the same agent and a new instance" do
+    responses << response_class.new(
+      code: "200",
+      body: JSON.generate(
+        "version" => 13,
+        "data" => {
+          "status" => "active",
+          "repo" => "shakacode/react_on_rails",
+          "target" => "release-line:17.1.0",
+          "agent_id" => "release-17.1.0-uuid",
+          "instance_id" => "replacement-uuid"
+        }
+      )
+    )
+
+    release_args = claim_args.slice(:repo, :target, :agent_id, :instance_id, :now)
+    expect { client.release!(**release_args) }.to raise_error(ReleaseAtomicClaim::ClaimRefused)
+    expect(requests.length).to eq(1)
+  end
+
+  it "maps a release conditional-write conflict to claim refusal" do
+    claim_data = {
+      "status" => "active",
+      "repo" => "shakacode/react_on_rails",
+      "target" => "release-line:17.1.0",
+      "agent_id" => "release-17.1.0-uuid",
+      "instance_id" => "uuid"
+    }
+    responses.push(
+      response_class.new(code: "200", body: JSON.generate("version" => 14, "data" => claim_data)),
+      response_class.new(code: "409", body: '{"error":"conflict"}')
+    )
+
+    release_args = claim_args.slice(:repo, :target, :agent_id, :instance_id, :now)
+    expect { client.release!(**release_args) }.to raise_error(ReleaseAtomicClaim::ClaimRefused)
+  end
+
   it "rejects malformed backend records without exposing the token" do
     responses << response_class.new(code: "200", body: '["secret-token"]')
 
