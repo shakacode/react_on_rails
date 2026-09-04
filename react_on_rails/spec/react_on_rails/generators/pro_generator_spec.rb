@@ -1837,11 +1837,25 @@ describe ProGenerator, type: :generator do
 
     [
       "async function extractLoader()", "function* extractLoader()", "async function* extractLoader()",
+      "const extractLoader = async () =>",
+      "let extractLoader = async function()", "var extractLoader = function*()",
+      "const extractLoader = async function*()",
+      "const getLoaderPath = async (item) =>", "let getLoaderPath = async function(item)",
+      "var getLoaderPath = function*(item)", "const getLoaderPath = async function*(item)",
+      "let extractLoader;\nextractLoader =\n  async () =>",
+      "let extractLoader;\nextractLoader =\n  async function()",
+      "let extractLoader;\nextractLoader =\n  function*()",
+      "let getLoaderPath;\ngetLoaderPath =\n  async item =>",
+      "let getLoaderPath;\ngetLoaderPath =\n  async function(item)",
+      "let getLoaderPath;\ngetLoaderPath =\n  function*(item)",
       "async function getLoaderPath()", "function *getLoaderPath()", "  async function * getLoaderPath()",
       "async function\nextractLoader()", "function*\ngetLoaderPath()"
     ].each do |declaration|
       it "preserves both configs for a custom #{declaration} declaration" do
         content = "#{declaration} { return null; }\n#{base_server_webpack_content}"
+        if declaration.include?("getLoaderPath")
+          content = content.sub(ReactOnRails::Generators::ProSetup::GET_LOADER_PATH_JS, "")
+        end
         import_content = "const serverWebpackConfig = require('./serverWebpackConfig');\n"
         simulate_existing_file(webpack_config, content)
         simulate_existing_file(server_client_config, import_content)
@@ -1865,6 +1879,50 @@ describe ProGenerator, type: :generator do
       expect(File.read(File.join(destination_root,
                                  server_client_config))).to include("{ default: serverWebpackConfig }")
       expect(GeneratorMessages.messages.join("\n")).not_to include("synchronous helpers")
+    end
+
+    [
+      "const extractLoader = (async () => null);",
+      "let getLoaderPath;\ngetLoaderPath = (\n  (function*(item) { return item.loader; })\n);"
+    ].each do |helper|
+      it "preserves both configs for a parenthesized unsupported helper: #{helper.lines.first.strip}" do
+        content = base_server_webpack_content.sub(ReactOnRails::Generators::ProSetup::GET_LOADER_PATH_JS, helper)
+        import_content = "const serverWebpackConfig = require('./serverWebpackConfig');\n"
+        simulate_existing_file(webpack_config, content)
+        simulate_existing_file(server_client_config, import_content)
+
+        generator.send(:update_webpack_config_for_pro)
+
+        expect(File.read(File.join(destination_root, webpack_config))).to eq(content)
+        expect(File.read(File.join(destination_root, server_client_config))).to eq(import_content)
+        expect(GeneratorMessages.messages.join("\n")).to include("synchronous helpers", "Update it manually")
+      end
+    end
+
+    [
+      "const extractLoader = () => null;",
+      "const extractLoader = ((() => null));",
+      "let extractLoader;\nextractLoader =\n  function() { return null; };",
+      "const getLoaderPath = (item) => item.loader;",
+      "const getLoaderPath = (\n  ((item) => item.loader)\n);",
+      "let getLoaderPath;\ngetLoaderPath =\n  function(item) { return item.loader; };"
+    ].each do |helper|
+      it "still migrates a synchronous lexical helper: #{helper.lines.first.strip}" do
+        content = if helper.include?("getLoaderPath")
+                    base_server_webpack_content.sub(ReactOnRails::Generators::ProSetup::GET_LOADER_PATH_JS, helper)
+                  else
+                    "#{helper}\n#{base_server_webpack_content}"
+                  end
+        simulate_existing_file(webpack_config, content)
+        simulate_existing_file(server_client_config, "const serverWebpackConfig = require('./serverWebpackConfig');\n")
+
+        generator.send(:update_webpack_config_for_pro)
+
+        expect(File.read(File.join(destination_root, webpack_config))).to include("default: configureServer")
+        expect(File.read(File.join(destination_root,
+                                   server_client_config))).to include("{ default: serverWebpackConfig }")
+        expect(GeneratorMessages.messages.join("\n")).not_to include("synchronous helpers")
+      end
     end
   end
 

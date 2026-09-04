@@ -76,6 +76,11 @@ module ReactOnRails
       UNSUPPORTED_WEBPACK_HELPER_DECLARATION =
         /^[ \t]*(?:(?:async[ \t]+)?function\s*\*\s*|async[ \t]+function\s+)(?:extractLoader|getLoaderPath)\s*\(/
 
+      UNSUPPORTED_WEBPACK_HELPER_ASSIGNMENT = /
+        ^[ \t]*(?:(?:const|let|var)\s+)?(?:extractLoader|getLoaderPath)\s*=\s*
+        (?:\(\s*)*(?:async\b|function\s*\*)
+      /x
+
       # Main entry point for Pro setup.
       # Orchestrates creation of all Pro-related files and configuration.
       #
@@ -711,7 +716,8 @@ module ReactOnRails
 
       def skip_unsupported_webpack_helpers?(webpack_config, content)
         source = javascript_without_block_comments(content)
-        return false unless source.match?(UNSUPPORTED_WEBPACK_HELPER_DECLARATION)
+        return false unless source.match?(UNSUPPORTED_WEBPACK_HELPER_DECLARATION) ||
+                            source.match?(UNSUPPORTED_WEBPACK_HELPER_ASSIGNMENT)
 
         GeneratorMessages.add_warning(<<~MSG.strip)
           Skipped Pro webpack updates because generated callers require synchronous helpers in #{webpack_config}.
