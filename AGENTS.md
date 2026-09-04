@@ -1030,3 +1030,37 @@ casing):
 - `perf-reliability`: runtime performance/reliability fixes, benchmark/regression systems, crash recovery, and failure classification. Applies regardless of result.
 - `release-process`: release tasks, CI selection, dependency pins used only for releasing/testing, changelog mechanics, PR batch mechanics, agent skills, GitHub Actions, and maintainer workflow.
 - `internal`: docs/planning, tests, fixtures, refactors, cleanup, diagnostics, and non-user-facing maintenance.
+
+### Helper signature changes
+
+When a `ReactOnRailsHelper` or `ReactOnRailsProHelper` method gains, loses, or renames a parameter, the
+CHANGELOG entry must name **both the method and the parameter** — even when the method is private or
+undocumented — so apps with a prepended override of that method can grep the changelog for it.
+Describing only the surrounding behavior is not enough:
+
+- **Miss** (the actual 17.1.0.rc.0 entry): "Streaming caches no longer persist error-containing renders"
+  described the caching behavior of `build_react_component_result_for_server_streamed_content` but never
+  named the method or its new `on_chunk_errors:` keyword. A downstream app with a prepended override of
+  that method broke with `ArgumentError: unknown keyword: :on_chunk_errors` and had to read the gem
+  source to find the cause ([Issue 5006](https://github.com/shakacode/react_on_rails/issues/5006)).
+  That entry is quoted as it shipped and is left unamended as the historical record of the release; the
+  correction for upgraders lives in `docs/oss/upgrading/release-notes/17.1.0.md`.
+- **Correct**: add a sentence naming the method, the parameter, and the required action, e.g.
+  `build_react_component_result_for_server_streamed_content` (`ReactOnRailsProHelper`) gains a new
+  `on_chunk_errors:` keyword argument; apps with a prepended override of this method must add the
+  parameter to their override's signature.
+
+### Action-required placement
+
+A CHANGELOG entry with deploy-order (e.g., the Node renderer must deploy before or with the gem),
+memory/retention, or startup-failure (e.g., new fail-fast validation) implications must call the
+required action out explicitly, rather than leaving it buried in a "Fixed"/"Changed" paragraph. The
+entry stays in its normal category section; it is tagged in place. Do both of the following, established by
+[Issue 5007](https://github.com/shakacode/react_on_rails/issues/5007) and its fix in
+`docs/oss/upgrading/release-notes/17.1.0.md`:
+
+- Tag the CHANGELOG entry itself inline with **Action required for upgraders:** followed by the concrete
+  step (see the `Migrated Node Renderer HTTP transport` and `PreSeedRendererCache` entries in
+  `CHANGELOG.md` for the pattern).
+- When the release has (or needs) a `docs/oss/upgrading/release-notes/X.Y.Z.md` page, list the same item
+  under that page's top "Action required" section — see `docs/oss/upgrading/release-notes/17.1.0.md`.

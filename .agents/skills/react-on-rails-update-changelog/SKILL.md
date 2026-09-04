@@ -85,7 +85,10 @@ For a resolved `release/X.Y.Z` target:
    ```
 
 4. Add or curate entries in `CHANGELOG.md` under `### [Unreleased]`, using the
-   classification taxonomy and entry format from `AGENTS.md`.
+   classification taxonomy and entry format from `AGENTS.md`. Apply each rule in `AGENTS.md` →
+   "Changelog" only to entries that trigger it: "Helper signature changes" when an entry changes a
+   `ReactOnRailsHelper`/`ReactOnRailsProHelper` method's parameters, and "Action-required placement"
+   when an entry has deploy-order, memory/retention, or startup-failure implications.
 5. Run the repo's version-stamping task when requested:
 
    ```bash
