@@ -1,0 +1,12 @@
+/.bundle/
+/.env
+/config/master.key
+/log/*
+!/log/.keep
+/node_modules/
+/public/vite*
+/tmp/*
+!/tmp/.keep
+!/tmp/pids/
+!/tmp/pids/.keep
+/vendor/bundle/

@@ -244,6 +244,7 @@ const sidebars: SidebarsConfig = {
             'pro/react-server-components/success-stories',
             'pro/react-server-components/how-react-server-components-work',
             'pro/react-server-components/rendering-flow',
+            'pro/react-server-components/unstable-cache',
             'pro/react-server-components/critical-resource-hints',
             'pro/react-server-components/css-and-styling',
             'pro/react-server-components/static-shell-global-js-opt-out',
