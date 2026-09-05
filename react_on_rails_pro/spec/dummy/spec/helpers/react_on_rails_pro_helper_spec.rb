@@ -2658,7 +2658,8 @@ describe ReactOnRailsProHelper do
 
           # The degradation counter fired.
           expect(pre_flush_events.length).to eq(1)
-          expect(pre_flush_events.first.payload[:error]).to include("deliberate pre-flush test failure")
+          # Redacted: payload carries only the error class name, never the raw message (#4966)
+          expect(pre_flush_events.first.payload[:error]).to eq("RuntimeError")
 
           # The fallback's cache-miss path wrote a fresh envelope (the old entry was evicted
           # first, then the fresh prerender wrote a new one). Verify the new entry is valid.
@@ -2703,7 +2704,8 @@ describe ReactOnRailsProHelper do
 
           # The degradation counter fired.
           expect(post_flush_events.length).to eq(1)
-          expect(post_flush_events.first.payload[:error]).to include("deliberate post-flush test failure")
+          # Redacted: payload carries only the error class name, never the raw message (#4966)
+          expect(post_flush_events.first.payload[:error]).to eq("RuntimeError")
 
           # The cache entry was evicted so the next request prerenders cleanly.
           expect(Rails.cache.read(computed_ppr_cache_key)).to be_nil
@@ -2788,7 +2790,8 @@ describe ReactOnRailsProHelper do
 
           expect(read_error_events.length).to eq(1)
           expect(read_error_events.first.payload[:component_name]).to eq(component_name)
-          expect(read_error_events.first.payload[:error]).to include("deliberate test failure")
+          # Redacted: payload carries only the error class name, never the raw message (#4966)
+          expect(read_error_events.first.payload[:error]).to eq("Redis::ConnectionError")
         ensure
           ActiveSupport::Notifications.unsubscribe(subscription)
         end

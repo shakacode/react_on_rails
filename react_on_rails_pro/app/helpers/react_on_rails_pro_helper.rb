@@ -990,7 +990,7 @@ module ReactOnRailsProHelper
     log_static_rsc_render_diagnostics(summary, diagnostics_config)
   rescue StandardError => e
     Rails.logger.warn(
-      "[ReactOnRailsPro] Failed to emit static RSC diagnostics: #{e.class}: #{e.message}"
+      "[ReactOnRailsPro] Failed to emit static RSC diagnostics: #{ReactOnRailsPro::Ppr.redacted_error_class_name(e)}"
     )
   end
 
@@ -1081,7 +1081,7 @@ module ReactOnRailsProHelper
           {
             pack: component_name.to_s,
             type: :generated_component_pack,
-            reason: "#{e.class}: #{e.message}"
+            reason: ReactOnRailsPro::Ppr.redacted_error_class_name(e)
           }
         )
       end
@@ -1099,7 +1099,7 @@ module ReactOnRailsProHelper
     diagnostics[:unavailable] << {
       pack: pack_name,
       type:,
-      reason: "#{e.class}: #{e.message}"
+      reason: ReactOnRailsPro::Ppr.redacted_error_class_name(e)
     }
   end
 
@@ -1191,7 +1191,7 @@ module ReactOnRailsProHelper
     entries = static_rsc_client_reference_entries(static_rsc_client_reference_manifest(manifest))
     { count: entries.size, entries: }
   rescue StandardError => e
-    { count: nil, entries: [], unavailable_reason: "#{e.class}: #{e.message}" }
+    { count: nil, entries: [], unavailable_reason: ReactOnRailsPro::Ppr.redacted_error_class_name(e) }
   end
 
   def static_rsc_client_reference_manifest(manifest)
@@ -1385,7 +1385,7 @@ module ReactOnRailsProHelper
       nil
     end
   rescue StandardError => e
-    Rails.logger.warn("[ReactOnRailsPro] PPR cache read failed (treating as miss): #{e.class}: #{e.message}")
+    Rails.logger.warn("[ReactOnRailsPro] PPR cache read failed (treating as miss): #{ppr_redacted_error_for_log(e)}")
     ppr_instrument_non_fatal(component_name, :read_error, e)
     nil
   end
@@ -1424,7 +1424,7 @@ module ReactOnRailsProHelper
   rescue StandardError => e
     # Eviction instrumentation must not mask the original miss path.
     Rails.logger.debug do
-      "[ReactOnRailsPro] PPR eviction instrumentation failed: #{e.class}: #{e.message}"
+      "[ReactOnRailsPro] PPR eviction instrumentation failed: #{ppr_redacted_error_for_log(e)}"
     end
   end
 
@@ -1614,7 +1614,7 @@ module ReactOnRailsProHelper
     rescue StandardError => e
       Rails.logger.warn do
         "[ReactOnRailsPro] PPR cache write failed (non-fatal, this request still serves): " \
-          "#{e.class}: #{e.message}"
+          "#{ppr_redacted_error_for_log(e)}"
       end
       ppr_instrument_non_fatal(component_name, :write_refused, "store_error")
     end
@@ -1811,13 +1811,13 @@ module ReactOnRailsProHelper
     Rails.cache.delete(cache_key, cache_write_options)
     ReactOnRailsPro::Ppr.instrument_degraded_pre_flush(component_name:, error:)
     Rails.logger.warn do
-      safe_msg = ppr_sanitize_for_log(error.message)
-      "[ReactOnRailsPro] PPR pre-flush degradation for #{component_name}: #{error.class}: #{safe_msg}. " \
+      "[ReactOnRailsPro] PPR pre-flush degradation for #{component_name}: " \
+        "#{ppr_redacted_error_for_log(error)}. " \
         "Evicted #{cache_key.inspect} and falling back to full SSR."
     end
   rescue StandardError => e
     Rails.logger.debug do
-      "[ReactOnRailsPro] PPR pre-flush degradation handler failed: #{e.class}: #{e.message}"
+      "[ReactOnRailsPro] PPR pre-flush degradation handler failed: #{ppr_redacted_error_for_log(e)}"
     end
   end
 
@@ -1832,21 +1832,23 @@ module ReactOnRailsProHelper
     end
     ReactOnRailsPro::Ppr.instrument_degraded_post_flush(component_name:, error:)
     Rails.logger.warn do
-      safe_msg = ppr_sanitize_for_log(error.message)
-      "[ReactOnRailsPro] PPR post-flush degradation for #{component_name}: #{error.class}: #{safe_msg}. " \
+      "[ReactOnRailsPro] PPR post-flush degradation for #{component_name}: " \
+        "#{ppr_redacted_error_for_log(error)}. " \
         "Stream terminated; entry evicted. Next request will prerender cleanly."
     end
   rescue StandardError => e
     Rails.logger.debug do
-      "[ReactOnRailsPro] PPR post-flush degradation handler failed: #{e.class}: #{e.message}"
+      "[ReactOnRailsPro] PPR post-flush degradation handler failed: #{ppr_redacted_error_for_log(e)}"
     end
   end
 
-  # Sanitizes a string for safe interpolation into log messages. Strips newlines (which could
-  # inject fake log lines) and truncates to a reasonable length (preventing oversized log entries
-  # from error messages that dump full payloads).
-  def ppr_sanitize_for_log(value, max_length: 1024)
-    value.to_s.tr("\n\r", " ")[0, max_length]
+  # Redacted error summary for safe interpolation into log messages (issue #4966).
+  #
+  # Delegates to Ppr.redacted_error_class_name — single source of truth for the
+  # error-class-name-only redaction policy across both AS::Notifications payloads
+  # and log messages.
+  def ppr_redacted_error_for_log(error)
+    ReactOnRailsPro::Ppr.redacted_error_class_name(error)
   end
 
   # Async version of fetch_react_component. Handles cache lookup synchronously,
