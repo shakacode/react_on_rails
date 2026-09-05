@@ -99,7 +99,7 @@ Both bundles passed structural and security validation, but later manual review
 found protocol violations. Neither counts as a completion. New harness results
 therefore require explicit semantic review; bounded command and artifact facts
 do not receive an automatic pass or fail. See the
-[internal eval README](../../../internal/agent-evals/pro-app-buildability/README.md#diagnostic-history)
+[internal eval README on GitHub](https://github.com/shakacode/react_on_rails/blob/main/internal/agent-evals/pro-app-buildability/README.md#diagnostic-history)
 for the diagnostic history and review rules. Fresh compliant Codex and Claude
 runs are required before making either a single-agent or two-agent completion
 claim.
