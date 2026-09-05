@@ -10,9 +10,7 @@ credential is absent, stop safely and report that exact blocker.
 The initial public scaffold command itself must propagate generator failures
 and preserve bounded terminal completion evidence. When piping its output, use
 one shell invocation with `set -o pipefail` as the exact top-level line
-immediately before a single bounded `tee | tail` scaffold pipeline.
-Use exactly `tail -c 4096` for this scaffold proof so its terminal completion
-and status marker fit within the immutable command-evidence limit. Do not use
+immediately before a single bounded `tee | tail` scaffold pipeline. Do not use
 `bash -c`, a subshell, or a background process for this proof; run it in the
 foreground so its completed event proves the generator itself finished. Do not use
 later generated files or manifests as a substitute for the scaffold command's
@@ -41,9 +39,6 @@ echo "ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT"
 ```
 
 Prefer a bounded tail-only pipeline when no persistent log is needed.
-If `npm run build` needs a secret, use exactly
-`SECRET_KEY_BASE=$(bin/rails secret) npm run build` as the bounded pipeline target.
-Do not use `SECRET_KEY_BASE_DUMMY`, a literal secret, or another command substitution.
 Do not source a workspace or model-created shell file in a final proof invocation.
 Complete setup in an earlier command, and express any required non-sensitive environment
 assignments explicitly in the final proof invocation.

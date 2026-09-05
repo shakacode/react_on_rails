@@ -140,6 +140,9 @@
         "timeout_kill_grace_seconds": { "type": "integer", "minimum": 0 },
         "maximum_agent_call_wall_clock_seconds": { "type": "integer", "minimum": 2 },
         "sandbox_network_access": { "type": "boolean" },
+        "agent_configuration_mode": {
+          "enum": ["codex-native", "claude-bare", "claude-safe-mode"]
+        },
         "isolated_host_attestation": { "type": "boolean" },
         "network_probe_artifact": { "const": "sandbox-network-probe.json" },
         "exit_code": { "type": "integer" },
@@ -161,7 +164,7 @@
       "additionalProperties": false,
       "required": ["classification", "reason", "tutorial_claims_supported"],
       "properties": {
-        "classification": { "enum": ["pass", "fail", "incomplete"] },
+        "classification": { "enum": ["pass", "fail", "incomplete", "needs-review"] },
         "reason": { "type": "string" },
         "tutorial_claims_supported": { "const": false }
       }
@@ -190,6 +193,83 @@
             "type": "object",
             "properties": { "execution_boundary": { "const": "isolated-host-attested" } },
             "required": ["execution_boundary"]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "runner": {
+            "type": "object",
+            "properties": { "agent_configuration_mode": { "const": "claude-safe-mode" } },
+            "required": ["agent_configuration_mode"]
+          }
+        },
+        "required": ["runner"]
+      },
+      "then": {
+        "properties": {
+          "agent": {
+            "type": "object",
+            "properties": { "name": { "const": "claude" } },
+            "required": ["name"]
+          },
+          "security": {
+            "type": "object",
+            "properties": {
+              "auth_material_available": { "const": true },
+              "auth_source": { "const": "operator-attested-file-broker" }
+            },
+            "required": ["auth_material_available", "auth_source"]
+          },
+          "runner": {
+            "type": "object",
+            "properties": { "isolated_host_attestation": { "const": true } },
+            "required": ["isolated_host_attestation"]
+          }
+        },
+        "required": ["agent", "runner"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "agent": {
+            "type": "object",
+            "properties": { "name": { "const": "codex" } },
+            "required": ["name"]
+          }
+        },
+        "required": ["agent"]
+      },
+      "then": {
+        "properties": {
+          "runner": {
+            "type": "object",
+            "properties": { "agent_configuration_mode": { "const": "codex-native" } }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "agent": {
+            "type": "object",
+            "properties": { "name": { "const": "claude" } },
+            "required": ["name"]
+          }
+        },
+        "required": ["agent"]
+      },
+      "then": {
+        "properties": {
+          "runner": {
+            "type": "object",
+            "properties": {
+              "agent_configuration_mode": { "enum": ["claude-bare", "claude-safe-mode"] }
+            }
           }
         }
       }

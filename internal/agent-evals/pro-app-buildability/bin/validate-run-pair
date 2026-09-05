@@ -12,6 +12,7 @@ jq -e --slurpfile invocation "$invocation_file" \
   '.agent.name == ($invocation[0].agent // "codex") and
     .agent.model == $invocation[0].model and
     .security.credential_store == $invocation[0].credential_store and
+    .runner.agent_configuration_mode == $invocation[0].agent_configuration_mode and
     .security.auth_material_available == $invocation[0].auth_material_available and
     (.security.auth_source // "none") == ($invocation[0].auth_source // "none") and
     (

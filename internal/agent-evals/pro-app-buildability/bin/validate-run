@@ -92,7 +92,10 @@ if [[ "$probe_result" == pass ]]; then
   [[ "$scaffold_invoked" == true ]] || { echo "passing network probe must start scaffold attempt" >&2; exit 1; }
 else
   [[ "$scaffold_invoked" == false ]] || { echo "failed network probe must block scaffold attempt" >&2; exit 1; }
-  [[ "$run_classification" == incomplete ]] || { echo "failed network probe must be incomplete" >&2; exit 1; }
+  [[ "$run_classification" == incomplete || "$run_classification" == needs-review ]] || {
+    echo "failed network probe must be incomplete or require review" >&2
+    exit 1
+  }
 fi
 
 echo "run artifacts valid: $run_dir"

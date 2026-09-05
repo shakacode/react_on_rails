@@ -17,10 +17,18 @@ file is mounted into the container. The private copy is used as the agent's
 native file-backed credential source:
 
 - Codex expects a complete `auth.json` JSON object.
-- Claude expects a single-line Anthropic API key without control bytes. The
-  broker removes one optional trailing newline before Claude `--bare` reads the
-  effective bytes through the private `apiKeyHelper` script. The private tmpfs
-  remains `noexec`; the reviewed setting invokes that script through `/bin/sh`.
+- Claude's default `native` format expects a single-line Anthropic API key
+  without control bytes. The broker removes one optional trailing newline
+  before Claude `--bare` reads the effective bytes through the private
+  `apiKeyHelper` script. The private tmpfs remains `noexec`; the reviewed setting
+  invokes that script through `/bin/sh`.
+- Claude's explicit `claude-oauth` format expects its bounded native OAuth JSON.
+  The broker rejects unknown fields, malformed types and controls, drops the
+  unrelated `mcpOAuth` store, and exclusively creates only a minimized
+  mode-`0600` `.claude/.credentials.json` beneath the mode-`0700` runner home.
+  It removes the raw streamed source before invoking Claude. OAuth runs use
+  `--safe-mode` rather than `--bare`, retain the explicit tool, settings, model,
+  and schema restrictions, and keep the strict empty MCP configuration.
 
 Codex cannot create the namespaces required by its inner bubblewrap
 `workspace-write` sandbox under the container's deliberately restricted flags.
@@ -62,15 +70,17 @@ The private directory is removed by the harness traps. Exact credential bytes
 are snapshotted in runner memory before the agent starts, then searched as a
 binary stream in the workspace after each agent call and in the completed
 output after checksums are written. The evidence output path remains absent
-while either agent call runs. After each call, the PID-1 runner rejects any
-agent-created output path or process left in the container PID namespace; only
-then does it construct evidence in runner-private storage, validate the exact
-top-level regular-file manifest, and publish it. The unchanged original snapshot remains
-authoritative even if the CLI rotates or replaces its writable credential
-store; when Codex's current store still exists, its final bytes are scanned as
-a second independent needle. For Codex JSON credentials, sensitive
-token/key/secret leaf values from both generations are searched independently
-as well. A match, nonregular current store, unreadable artifact, or output
+while either agent call runs. After each call, the namespace-init-supervised
+runner rejects any agent-created output path, performs bounded cleanup and
+reaping of agent descendants, and independently rejects any process that still
+remains; only then does it construct evidence in runner-private storage,
+validate the exact top-level regular-file manifest, and publish it. The
+unchanged original snapshot remains authoritative even if the CLI rotates or
+replaces its writable credential store; when either CLI's current store still
+exists, its final bytes are scanned as a second independent needle. For JSON
+credentials, sensitive token/key/secret leaf values from both generations are
+searched independently as well. A match, nonregular current store,
+unreadable artifact, or output
 symlink fails closed. Workspace scans skip dependency symlinks without following
 them, while continuing to inspect every regular file; completed-output scans
 reject all symlinks. The committed output continues to record
@@ -91,10 +101,11 @@ through the final rename. Concurrent wrapper invocations for the same output
 therefore fail rather than nesting or overwriting evidence. Unrelated writers
 must not mutate the selected output parent while an eval is running.
 
-Process containment is deliberately conservative: any residual process-table
-entry other than the PID-1 runner and the active inspector, including a zombie,
-rejects the run. Discard the contaminated container rather than publishing
-evidence from it.
+Process containment is deliberately conservative: cleanup excludes only the
+namespace init, its directly supervised runner, and the active cleanup or
+inspection process. After bounded TERM-then-KILL cleanup and init reaping, any
+other residual process-table entry, including a zombie, rejects the run.
+Discard the contaminated container rather than publishing evidence from it.
 
 No React on Rails Pro license token is required for evaluation, development, or CI.
 The real eval requires only the operator model credential. Do not provision a Pro license token in this harness.
@@ -113,6 +124,12 @@ docker build \
 
 The build takes no credentials. Agent CLI and pnpm versions are pinned as
 Docker build arguments so a version update remains reviewable.
+
+The wrapper requires a Docker runtime that supports `docker run --init`. The
+namespace init is PID 1, reaps exited descendants, and supervises the eval
+runner. After each agent call, the runner performs bounded TERM-then-KILL
+cleanup of every remaining non-runner process and independently requires the
+PID namespace to be quiescent before it reads or publishes evidence.
 
 ## Run
 
@@ -146,7 +163,9 @@ internal/agent-evals/pro-app-buildability/isolated-host/run-in-container \
   --output /absolute/path/to/eval-output/local-codex
 ```
 
-For Claude, use `--agent claude`, a Claude model name, and a mode-`0600`
-single-line API key file. Never paste either credential into the terminal. The
-wrapper reads the file directly and does not run a real eval during image
-build or harness tests.
+For a Claude API key, use `--agent claude`, a Claude model name, and a
+mode-`0600` single-line file; `native` is the default credential format. For a
+native OAuth store, also pass `--model-credential-format claude-oauth`. The
+explicit selector is required and a missing source fails closed. Never paste
+either credential into the terminal. The wrapper reads the file directly and
+does not run a real eval during image build or harness tests.

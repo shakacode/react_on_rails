@@ -1,0 +1,194 @@
+{
+  "schema_version": "1.0",
+  "limits": {
+    "max_file_bytes": 65536,
+    "max_files": 256,
+    "max_total_bytes": 2097152,
+    "max_visited_entries": 5000,
+    "max_depth": 64,
+    "visited_entries": 287,
+    "selected_files": 25,
+    "included_files": 25,
+    "included_bytes": 18300,
+    "omitted_files": 0,
+    "exceeded": false,
+    "reasons": []
+  },
+  "artifacts": [
+    {
+      "path": "eval_app/app/controllers/application_controller.rb",
+      "sha256": "f024678107f8bf0b4fa4db19e45c007c6900389be6e6bcbbceaa46c48f05e8d6",
+      "size": 204,
+      "excerpt": "class ApplicationController < ActionController::Base\n  # Only allow modern browsers supporting webp images, web push, badges, import maps, CSS nesting, and CSS :has.\n  allow_browser versions: :modern\nend\n",
+      "excerpt_truncated": false
+    },
+    {
+      "path": "eval_app/app/controllers/hello_server_controller.rb",
+      "sha256": "602a8fbf5a3ee75b737f71f24927198eee3711fc4c58b9a14939c02d57585119",
+      "size": 1510,
+      "excerpt": "# frozen_string_literal: true\n\n# HelloServer Controller - React Server Components\n# This controller demonstrates how to render RSC pages with streaming SSR.\n# It's the RSC counterpart to HelloWorldController.\n#\n# ReactOnRailsPro::Stream provides:\n# - stream_view_containing_react_components: Streams the view with RSC support\n# - Streaming HTML chunks as components render\n# - Automatic hydration on the client\n#\n# For more information, see:\n# https://reactonrails.com/docs/pro/react-server-components/\n\nclass HelloServerController < ApplicationController\n  layout \"react_on_rails_default\"\n\n  include ReactOnRailsPro::Stream\n\n  def index\n    @hello_server_props = {\n      title: \"Summer tasting room briefing\",\n      generatedAt: Time.zone.now.strftime(\"%B %-d, %Y at %H:%M %Z\"),\n      highlights: [\n        \"Oak Reserve has the strongest pre-orders for the weekend pickup window.\",\n        \"Citrus Bloom is the only small-batch release with fewer than 20 cases left.\",\n        \"The patio playlist switches to the sunset set at 7:30 PM.\"\n      ],\n      metrics: [\n        { label: \"Walk-in reservations\", value: \"18\" },\n        { label: \"Cases ready for pickup\", value: \"42\" },\n        { label: \"Featured flight\", value: \"Citrus Bloom\" }\n      ],\n      featuredGuest: {\n        name: \"Mina Ortega\",\n        hometown: \"Santa Barbara, CA\",\n        request: \"Looking for a bright white and a cellar-worthy red.\"\n      }\n    }\n\n    stream_view_containing_react_components(template: \"hello_server/index\")\n  end\nend\n",
+      "excerpt_truncated": false
+    },
+    {
+      "path": "eval_app/app/controllers/home_controller.rb",
+      "sha256": "0f26a7ad47b0f52dc4e9a625966203a93a8c6e4ce9d7cee5314f55f5e7364efb",
+      "size": 138,
+      "excerpt": "# frozen_string_literal: true\n\nclass HomeController < ApplicationController\n  protect_from_forgery with: :exception\n\n  def index; end\nend\n",
+      "excerpt_truncated": false
+    },
+    {
+      "path": "eval_app/app/controllers/tasting_requests_controller.rb",
+      "sha256": "3be98c0e829e07060c4791017facfec8b13aab071e01345e3ce39bfa9f456421",
+      "size": 696,
+      "excerpt": "# frozen_string_literal: true\n\nclass TastingRequestsController < ApplicationController\n  def new\n    @tasting_request = TastingRequest.new\n    @recent_requests = TastingRequest.order(created_at: :desc).limit(5)\n  end\n\n  def create\n    @tasting_request = TastingRequest.new(tasting_request_params)\n\n    if @tasting_request.save\n      redirect_to new_tasting_request_path, notice: \"Request received for #{@tasting_request.name}.\"\n    else\n      @recent_requests = TastingRequest.order(created_at: :desc).limit(5)\n      render :new, status: :unprocessable_entity\n    end\n  end\n\n  private\n\n  def tasting_request_params\n    params.expect(tasting_request: [ :name, :email, :occasion_notes ])\n  end\nend\n",
+      "excerpt_truncated": false
+    },
+    {
+      "path": "eval_app/app/helpers/application_helper.rb",
+      "sha256": "f77fac5ea412dbed92c4524fe0ed180acb2b7239f84daf758da989032301f5c8",
+      "size": 29,
+      "excerpt": "module ApplicationHelper\nend\n",
+      "excerpt_truncated": false
+    },
+    {
+      "path": "eval_app/app/javascript/generated/server-bundle-generated.js",
+      "sha256": "49f3ae33754b894861dfdb325a2bb1c53a8c10f1d5872754ba2ac940626dadb6",
+      "size": 256,
+      "excerpt": "import ReactOnRails from 'react-on-rails-pro';\n\nimport HelloServer from '../src/HelloServer/ror_components/HelloServer.tsx';\n\nimport registerServerComponent from 'react-on-rails-pro/registerServerComponent/server';\nregisterServerComponent({HelloServer});\n\n",
+      "excerpt_truncated": false
+    },
+    {
+      "path": "eval_app/app/javascript/generated/server-component-registration-entry.js",
+      "sha256": "d31af71ee2dea99f4977ed13e60c50e79220c8c7e1ead8f9fe78bdb873125a83",
+      "size": 209,
+      "excerpt": "import HelloServer from '../src/HelloServer/ror_components/HelloServer.tsx';\n\nimport registerServerComponent from 'react-on-rails-pro/registerServerComponent/server';\nregisterServerComponent({ HelloServer });\n",
+      "excerpt_truncated": false
+    },
+    {
+      "path": "eval_app/app/javascript/packs/application.js",
+      "sha256": "f30f6e6ba8f0b8c291882955949a95dc466e5e17955a5772f073ed57207c02ec",
+      "size": 802,
+      "excerpt": "/* eslint no-console:0 */\n// This file is automatically compiled by Webpack, along with any other files\n// present in this directory. You're encouraged to place your actual application logic in\n// a relevant structure within app/javascript and only use these pack files to reference\n// that code so it'll be compiled.\n//\n// To reference this file, add <%= javascript_pack_tag 'application' %> to the appropriate\n// layout file, like app/views/layouts/application.html.erb\n\n// Uncomment to copy all static images under ./images to the output folder and reference\n// them with the image_pack_tag helper in views (e.g <%= image_pack_tag 'rails.png' %>)\n// or the `imagePath` JavaScript helper below.\n//\n// const images = require.context('./images', true)\n// const imagePath = (name) => images(name, true)\n",
+      "excerpt_truncated": false
+    },
+    {
+      "path": "eval_app/app/javascript/packs/generated/HelloServer.js",
+      "sha256": "43b7da4d93966afed33914576c53e8721533bf0f1525d7fb73f6e9cc2defdb6d",
+      "size": 129,
+      "excerpt": "import registerServerComponent from 'react-on-rails-pro/registerServerComponent/client';\n\nregisterServerComponent(\"HelloServer\");",
+      "excerpt_truncated": false
+    },
+    {
+      "path": "eval_app/app/javascript/packs/server-bundle.js",
+      "sha256": "3091e3b923049a328a7182d3e163f4febef3f35e10036d92c1ae3ed8e85ff763",
+      "size": 220,
+      "excerpt": "// import statement added by react_on_rails:generate_packs rake task\nimport '../generated/server-bundle-generated';\n// Placeholder comment - auto-generated imports will be prepended here by react_on_rails:generate_packs\n",
+      "excerpt_truncated": false
+    },
+    {
+      "path": "eval_app/app/javascript/src/HelloServer/components/HelloServer.tsx",
+      "sha256": "8f294b63cf6b1c4feff31bbd9df40662f54698498e9c4426b833dd3b7582cc63",
+      "size": 3233,
+      "excerpt": "// HelloServer - React Server Component\n//\n// This component runs ONLY on the server. No JavaScript for it is sent to the browser.\n// It demonstrates key RSC capabilities:\n//\n// 1. Async data fetching — use await directly in the component (no useEffect needed)\n// 2. Server-only code — access databases, file systems, or secrets safely\n// 3. Zero client JS — heavy libraries used here don't increase your bundle size\n// 4. Streaming — wrapped in <Suspense>, this component streams HTML as it resolves\n//\n// For more information, see:\n// https://reactonrails.com/docs/pro/react-server-components/\n\nimport React from 'react';\nimport LikeButton from './LikeButton';\n\ninterface Metric {\n  label: string;\n  value: string;\n}\n\ninterface FeaturedGuest {\n  hometown: string;\n  name: string;\n  request: string;\n}\n\ninterface HelloServerProps {\n  featuredGuest: FeaturedGuest;\n  generatedAt: string;\n  highlights: string[];\n  metrics: Metric[];\n  title: string;\n}\n\nconst HelloServer = async ({\n  featuredGuest,\n  generatedAt,\n  highlights,\n  metrics,\n  title,\n}: HelloServerProps) => {\n  return (\n    <div style={{ fontFamily: '\"Avenir Next\", Avenir, sans-serif', maxWidth: 720, margin: '0 auto' }}>\n      <h2 style={{ fontSize: '2rem', marginBottom: 8 }}>{title}</h2>\n      <p style={{ color: '#4d5b6a', fontSize: '0.95rem' }}>Generated in Rails at: {generatedAt}</p>\n\n      <div\n        style={{\n          display: 'grid',\n          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',\n          gap: 12,\n          margin: '24px 0',\n        }}\n      >\n        {metrics.map((metric) => (\n          <div\n            key=[REDACTED]\n            style={{\n              background: '#fffdf8',\n              border: '1px solid rgba(17, 32, 49, 0.12)',\n              borderRadius: 16,\n              padding: 16,\n            }}\n          >\n            <p style={{ margin: 0, color: '#4d5b6a', fontSize: '0.85rem', textTransform: 'uppercase' }}>\n              {metric.label}\n            </p>\n            <p style={{ margin: '10px 0 0', fontSize: '1.4rem', fontWeight: 700 }}>{metric.value}</p>\n          </div>\n        ))}\n      </div>\n\n      <div\n        style={{\n          background: '#fff7ed',\n          border: '1px solid #fed7aa',\n          borderRadius: 18,\n          padding: 16,\n          margin: '16px 0',\n        }}\n      >\n        <h3 style={{ margin: '0 0 12px' }}>Server-provided highlights</h3>\n        <ul style={{ margin: 0, paddingLeft: 20 }}>\n          {highlights.map((highlight) => (\n            <li key=[REDACTED]\n              {highlight}\n            </li>\n          ))}\n        </ul>\n      </div>\n\n      <div\n        style={{\n          background: '#eef6ff',\n          border: '1px solid #bfdbfe',\n          borderRadius: 18,\n          padding: 16,\n          marginBottom: 20,\n        }}\n      >\n        <h3 style={{ margin: '0 0 8px' }}>Featured guest request</h3>\n        <p style={{ margin: 0, fontWeight: 700 }}>{featuredGuest.name}</p>\n        <p style={{ margin: '4px 0', color: '#4d5b6a' }}>{featuredGuest.hometown}</p>\n        <p style={{ margin: '8px 0 0' }}>{featuredGuest.request}</p>\n      </div>\n\n      <LikeButton />\n    </div>\n  );\n};\n\nexport default HelloServer;\n",
+      "excerpt_truncated": false
+    },
+    {
+      "path": "eval_app/app/javascript/src/HelloServer/components/LikeButton.tsx",
+      "sha256": "84ac3169588bf5ef827fbe82da4c5f04cd68bd667ed914bc895e13445042434b",
+      "size": 1474,
+      "excerpt": "'use client';\n\n// LikeButton - Client Component\n//\n// This component has the 'use client' directive, so its JavaScript IS sent to the browser.\n// It demonstrates how client components work alongside server components:\n//\n// - Only this component's JS is included in the client bundle\n// - The parent HelloServer component sends ZERO JS to the browser\n// - React hydrates just this interactive island within the server-rendered HTML\n\nimport React, { useState } from 'react';\n\nconst LikeButton: React.FC = () => {\n  const [likes, setLikes] = useState(0);\n\n  return (\n    <div\n      style={{\n        display: 'flex',\n        alignItems: 'center',\n        gap: 12,\n        marginTop: 16,\n        padding: '12px 16px',\n        background: '#fefce8',\n        border: '1px solid #fde68a',\n        borderRadius: 8,\n      }}\n    >\n      <button\n        type=\"button\"\n        onClick={() => setLikes((prev) => prev + 1)}\n        style={{\n          padding: '8px 16px',\n          fontSize: '1em',\n          cursor: 'pointer',\n          borderRadius: 6,\n          border: '1px solid #d1d5db',\n          background: '#fff',\n        }}\n      >\n        👍 Like\n      </button>\n      <span>\n        {likes} {likes === 1 ? 'like' : 'likes'}\n      </span>\n      <span style={{ color: '#92400e', fontSize: '0.85em' }}>\n        ← This button is a client component (check your browser&apos;s Network tab — only its JS was sent)\n      </span>\n    </div>\n  );\n};\n\nexport default LikeButton;\n",
+      "excerpt_truncated": false
+    },
+    {
+      "path": "eval_app/app/javascript/src/HelloServer/ror_components/HelloServer.tsx",
+      "sha256": "9a57c3c82181eebb9384348861541e0d0ce0bf2a819bf7e25dbfb00e34917eb9",
+      "size": 458,
+      "excerpt": "// HelloServer Entry Point - Re-exports the server component for auto_load_bundle\n// This file is discovered by React on Rails' auto_load_bundle feature\n// and registered automatically in both client and server bundles.\n//\n// Note: No 'use client' directive here - this is a Server Component.\n// The actual component in ../components/HelloServer.tsx runs only on the server.\n\nimport HelloServer from '../components/HelloServer';\n\nexport default HelloServer;\n",
+      "excerpt_truncated": false
+    },
+    {
+      "path": "eval_app/app/javascript/types/css-modules.d.ts",
+      "sha256": "f7797a263e0b4dcbccda18b2c9c897198a795b2b6b31e3ac95a5b0fd61c359e2",
+      "size": 357,
+      "excerpt": "// TypeScript definitions for CSS modules\ndeclare module \"*.module.css\" {\n  const classes: { [key: string]: string };\n  export default classes;\n}\n\ndeclare module \"*.module.scss\" {\n  const classes: { [key: string]: string };\n  export default classes;\n}\n\ndeclare module \"*.module.sass\" {\n  const classes: { [key: string]: string };\n  export default classes;\n}",
+      "excerpt_truncated": false
+    },
+    {
+      "path": "eval_app/app/jobs/application_job.rb",
+      "sha256": "d51e125007521b0f59765422cf3cf949b59b2054cdac6567a95b4a7aeaf1d722",
+      "size": 269,
+      "excerpt": "class ApplicationJob < ActiveJob::Base\n  # Automatically retry jobs that encountered a deadlock\n  # retry_on ActiveRecord::Deadlocked\n\n  # Most jobs are safe to ignore if the underlying records are no longer available\n  # discard_on ActiveJob::DeserializationError\nend\n",
+      "excerpt_truncated": false
+    },
+    {
+      "path": "eval_app/app/mailers/application_mailer.rb",
+      "sha256": "51b58ee6215d29f50f4f35b309e849766e40f584016e48ec9ea66558ab352fa7",
+      "size": 102,
+      "excerpt": "class ApplicationMailer < ActionMailer::Base\n  default from: \"from@example.com\"\n  layout \"mailer\"\nend\n",
+      "excerpt_truncated": false
+    },
+    {
+      "path": "eval_app/app/models/application_record.rb",
+      "sha256": "12bf7d0eaefce4d50e0719991e19b48a36a7865aeb7ac745980584806155fdc1",
+      "size": 74,
+      "excerpt": "class ApplicationRecord < ActiveRecord::Base\n  primary_abstract_class\nend\n",
+      "excerpt_truncated": false
+    },
+    {
+      "path": "eval_app/app/models/tasting_request.rb",
+      "sha256": "82980879d07a9aa1dec60a58617a9cf25cfbb8c82dfcfb67f75be1e185a4249a",
+      "size": 283,
+      "excerpt": "# frozen_string_literal: true\n\nclass TastingRequest < ApplicationRecord\n  validates :name, presence: true, length: { minimum: 2 }\n  validates :email, presence: true, format: { with: URI::MailTo::EMAIL_REGEXP }\n  validates :occasion_notes, presence: true, length: { minimum: 12 }\nend\n",
+      "excerpt_truncated": false
+    },
+    {
+      "path": "eval_app/app/views/pwa/service-worker.js",
+      "sha256": "54bba97f108ac8d65af816aab152cc1860c9d9809641ba845231131db56d59bf",
+      "size": 876,
+      "excerpt": "// Add a service worker for processing Web Push notifications:\n//\n// self.addEventListener(\"push\", async (event) => {\n//   const { title, options } = await event.data.json()\n//   event.waitUntil(self.registration.showNotification(title, options))\n// })\n//\n// self.addEventListener(\"notificationclick\", function(event) {\n//   event.notification.close()\n//   event.waitUntil(\n//     clients.matchAll({ type: \"window\" }).then((clientList) => {\n//       for (let i = 0; i < clientList.length; i++) {\n//         let client = clientList[i]\n//         let clientPath = (new URL(client.url)).pathname\n//\n//         if (clientPath == event.notification.data.path && \"focus\" in client) {\n//           return client.focus()\n//         }\n//       }\n//\n//       if (clients.openWindow) {\n//         return clients.openWindow(event.notification.data.path)\n//       }\n//     })\n//   )\n// })\n",
+      "excerpt_truncated": false
+    },
+    {
+      "path": "eval_app/config/routes.rb",
+      "sha256": "bf67b341ecfb4342c480665c32d8faa0fda5e0146d6b01930a2e92f954163e97",
+      "size": 831,
+      "excerpt": "Rails.application.routes.draw do\n  get \"hello_server\", to: \"hello_server#index\"\n  resources :tasting_requests, only: [ :new, :create ]\n  rsc_payload_route\n  root to: \"home#index\"\n  # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html\n\n  # Reveal health status on /up that returns 200 if the app boots with no exceptions, otherwise 500.\n  # Can be used by load balancers and uptime monitors to verify that the app is live.\n  get \"up\" => \"rails/health#show\", as: :rails_health_check\n\n  # Render dynamic PWA files from app/views/pwa/* (remember to link manifest in application.html.erb)\n  # get \"manifest\" => \"rails/pwa#manifest\", as: :pwa_manifest\n  # get \"service-worker\" => \"rails/pwa#service_worker\", as: :pwa_service_worker\n\n  # Defines the root path route (\"/\")\n  # root \"posts#index\"\nend\n",
+      "excerpt_truncated": false
+    },
+    {
+      "path": "eval_app/Gemfile",
+      "sha256": "0122f9f26597610ea9e452341db1ef92b734451ca0fbb49d0ae00e03db4361b7",
+      "size": 2341,
+      "excerpt": "source \"https://rubygems.org\"\n\n# Bundle edge Rails instead: gem \"rails\", github: \"rails/rails\", branch: \"main\"\ngem \"rails\", \"~> 8.1.3\", \">= 8.1.3.1\"\n# The modern asset pipeline for Rails [https://github.com/rails/propshaft]\ngem \"propshaft\"\n# Use SQLite as the database for Active Record in this local build environment\ngem \"sqlite3\", \">= 2.1\"\n# Use the Puma web server [https://github.com/puma/puma]\ngem \"puma\", \">= 5.0\"\n# Build JSON APIs with ease [https://github.com/rails/jbuilder]\ngem \"jbuilder\"\n\n# Use Active Model has_secure_password [https://guides.rubyonrails.org/active_model_basics.html#securepassword]\n# gem \"bcrypt\", \"~> 3.1.7\"\n\n# Windows does not include zoneinfo files, so bundle the tzinfo-data gem\ngem \"tzinfo-data\", platforms: %i[ windows jruby ]\n\n# Use the database-backed adapters for Rails.cache, Active Job, and Action Cable\ngem \"solid_cache\"\ngem \"solid_queue\"\ngem \"solid_cable\"\n\n# Reduces boot times through caching; required in config/boot.rb\ngem \"bootsnap\", require: false\n\n# Deploy this application anywhere as a Docker container [https://kamal-deploy.org]\ngem \"kamal\", require: false\n\n# Add HTTP asset caching/compression and X-Sendfile acceleration to Puma [https://github.com/basecamp/thruster/]\ngem \"thruster\", require: false\n\n# Use Active Storage variants [https://guides.rubyonrails.org/active_storage_overview.html#transforming-images]\ngem \"image_processing\", \"~> 1.2\"\n\ngroup :development, :test do\n  # See https://guides.rubyonrails.org/debugging_rails_applications.html#debugging-with-the-debug-gem\n  gem \"debug\", platforms: %i[ mri windows ], require: \"debug/prelude\"\n\n  # Audits gems for known security defects (use config/bundler-audit.yml to ignore issues)\n  gem \"bundler-audit\", require: false\n\n  # Static analysis for security vulnerabilities [https://brakemanscanner.org/]\n  gem \"brakeman\", require: false\n\n  # Omakase Ruby styling [https://github.com/rails/rubocop-rails-omakase/]\n  gem \"rubocop-rails-omakase\", require: false\nend\n\ngroup :development do\n  # Use console on exceptions pages [https://github.com/rails/web-console]\n  gem \"web-console\"\nend\n\ngroup :test do\n  # Use system testing [https://guides.rubyonrails.org/testing.html#system-testing]\n  gem \"capybara\"\n  gem \"selenium-webdriver\"\nend\n\ngem \"react_on_rails\", \"= 17.0\"\n\ngem \"react_on_rails_pro\", \"~> 17.0\"\n\ngem \"shakapacker\", \"= 10.3\"\n",
+      "excerpt_truncated": false
+    },
+    {
+      "path": "eval_app/package.json",
+      "sha256": "166ded716c2fc30c7b6cf45540d737580df847ccab4e537cc3dac3155d15dc7b",
+      "size": 1384,
+      "excerpt": "{\n  \"packageManager\": \"npm@10.9.8\",\n  \"name\": \"app\",\n  \"private\": true,\n  \"version\": \"0.1.0\",\n  \"browserslist\": [\n    \"defaults\"\n  ],\n  \"dependencies\": {\n    \"@rspack/core\": \"2.1.9\",\n    \"compression-webpack-plugin\": \"^12.0.0\",\n    \"css-loader\": \"7.1.4\",\n    \"css-minimizer-webpack-plugin\": \"8.0.0\",\n    \"mini-css-extract-plugin\": \"2.10.2\",\n    \"prop-types\": \"15.8.1\",\n    \"react\": \"19.2.8\",\n    \"react-dom\": \"19.2.8\",\n    \"react-on-rails-pro\": \"17.0.0\",\n    \"react-on-rails-pro-node-renderer\": \"17.0.0\",\n    \"react-on-rails-rsc\": \"19.2.1\",\n    \"rspack-manifest-plugin\": \"5.2.2\",\n    \"sass\": \"^1.102.0\",\n    \"sass-loader\": \"^16.0.8\",\n    \"shakapacker\": \"10.3.0\",\n    \"style-loader\": \"4.0.0\"\n  },\n  \"devDependencies\": {\n    \"@rspack/cli\": \"2.1.9\",\n    \"@rspack/dev-server\": \"2.2.0\",\n    \"@rspack/plugin-react-refresh\": \"2.0.2\",\n    \"@swc/core\": \"1.15.47\",\n    \"@types/react\": \"19.2.18\",\n    \"@types/react-dom\": \"19.2.4\",\n    \"react-refresh\": \"0.18.0\",\n    \"swc-loader\": \"0.2.7\",\n    \"typescript\": \"6.0.3\"\n  },\n  \"scripts\": {\n    \"build\": \"RAILS_ENV=production NODE_ENV=production bin/shakapacker-precompile-hook && SHAKAPACKER_SKIP_PRECOMPILE_HOOK=true RAILS_ENV=production NODE_ENV=production bin/shakapacker\",\n    \"build:test\": \"RAILS_ENV=test NODE_ENV=test bin/shakapacker-precompile-hook && SHAKAPACKER_SKIP_PRECOMPILE_HOOK=true RAILS_ENV=test NODE_ENV=test bin/shakapacker\"\n  }\n}\n",
+      "excerpt_truncated": false
+    },
+    {
+      "path": "eval_app/test/integration/hello_server_page_test.rb",
+      "sha256": "46e54422c2b116f402b22123543708607fd6377c40f5496ceb28cf8fdc726211",
+      "size": 494,
+      "excerpt": "# frozen_string_literal: true\n\nrequire \"test_helper\"\n\nclass HelloServerPageTest < ActionDispatch::IntegrationTest\n  test \"renders the tasting room briefing with rails-provided content\" do\n    get hello_server_url\n\n    assert_response :success\n    assert_includes response.body, \"Server-rendered tasting room dashboard\"\n    assert_includes response.body, \"Summer tasting room briefing\"\n    assert_includes response.body, \"Mina Ortega\"\n    assert_includes response.body, \"Citrus Bloom\"\n  end\nend\n",
+      "excerpt_truncated": false
+    },
+    {
+      "path": "eval_app/test/integration/tasting_requests_test.rb",
+      "sha256": "fa2cddd506e5a93d72b9dc21ea145915b6ab0e825c3ca12bd547f51a22c2a96d",
+      "size": 1377,
+      "excerpt": "# frozen_string_literal: true\n\nrequire \"test_helper\"\n\nclass TastingRequestsTest < ActionDispatch::IntegrationTest\n  test \"invalid submission re-renders and valid submission persists\" do\n    get new_tasting_request_url\n\n    assert_response :success\n    assert_includes response.body, \"New tasting request\"\n\n    assert_no_difference(\"TastingRequest.count\") do\n      post tasting_requests_url, params: {\n        tasting_request: {\n          name: \"\",\n          email: \"not-an-email\",\n          occasion_notes: \"short\"\n        }\n      }\n    end\n\n    assert_response :unprocessable_entity\n    assert_includes response.body, \"Submission could not be saved.\"\n    assert_includes response.body, \"Name can&#39;t be blank\"\n    assert_includes response.body, \"Email is invalid\"\n\n    assert_difference(\"TastingRequest.count\", 1) do\n      post tasting_requests_url, params: {\n        tasting_request: {\n          name: \"Avery Stone\",\n          email: \"avery@example.com\",\n          occasion_notes: \"Please prepare a bright white and a structured red for a birthday visit.\"\n        }\n      }\n    end\n\n    assert_redirected_to new_tasting_request_url\n    follow_redirect!\n    assert_response :success\n    assert_includes response.body, \"Request received for Avery Stone.\"\n    assert_includes response.body, \"Please prepare a bright white and a structured red for a birthday visit.\"\n  end\nend\n",
+      "excerpt_truncated": false
+    },
+    {
+      "path": "eval_app/test/test_helper.rb",
+      "sha256": "df95525943d213fdeb317ef58c5bc45b76d181fb0e8f75a3198321fdbe1f211e",
+      "size": 554,
+      "excerpt": "ENV[\"RAILS_ENV\"] ||= \"test\"\nrequire_relative \"../config/environment\"\nrequire \"rails/test_help\"\n\nmodule ActiveSupport\n  class TestCase\n    # Run tests in parallel with specified workers\n    parallelize(workers: :number_of_processors)\n\n    # Setup all fixtures in test/fixtures/*.yml for all tests in alphabetical order.\n    fixtures :all\n\n    # Add more helper methods to be used by all tests here...\n  end\nend\n\n\n# Ensure that tests run against fresh webpack assets.\nActiveSupport::TestCase.setup do\n  ReactOnRails::TestHelper.ensure_assets_compiled\nend\n\n",
+      "excerpt_truncated": false
+    }
+  ]
+}

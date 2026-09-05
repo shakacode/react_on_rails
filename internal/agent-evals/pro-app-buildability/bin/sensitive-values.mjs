@@ -1,5 +1,7 @@
-const quotedNamedValue = /([a-z0-9_-]+)(["']?\s*[:=]\s*)(["'])((?:\\.|(?!\3)[^\n])*)\3/gi;
-const unterminatedQuotedNamedValue = /([a-z0-9_-]+)(["']?\s*[:=]\s*)(["'])((?:\\.|(?!\3)[^\n])*)$/gim;
+const quotedNamedValue =
+  /([a-z0-9_-]+)(["']?\s*[:=]\s*)(?:"((?:\\[^\n]|[^"\\\n])*)"|'((?:\\[^\n]|[^'\\\n])*)')/gi;
+const unterminatedQuotedNamedValue =
+  /([a-z0-9_-]+)(["']?\s*[:=]\s*)(?:"((?:\\[^\n]|[^"\\\n])*\\?)$|'((?:\\[^\n]|[^'\\\n])*\\?)$)/gim;
 const unquotedNamedValue = /([a-z0-9_-]+)(["']?\s*[:=]\s*)([^"'\s\n][^\n]*)/gi;
 const sensitiveName =
   /^(?:authorization|cookie)$|(?:api[_-]?key|access[_-]?key|secret|token|password|passwd|credential|private[_-]?key|license[_-]?key)|(?:^|[_-])key(?:$|[_-])/i;
@@ -8,13 +10,16 @@ const privateKeyRemainder = /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*/gi;
 const bearerToken = /bearer\s+[a-z0-9._~+/=-]{12,}/gi;
 const nonSecretValues = new Set(['auto', 'false', 'file', 'keyring', 'none', 'null', 'true', 'unknown']);
 const looksLikeCredentialValue = (value) => {
-  const candidate = String(value).trim();
+  const rawValue = String(value);
+  if (rawValue === '<GENERATED_AT_RUNTIME>') return false;
+  const candidate = rawValue.trim();
   if (!candidate || candidate === '[REDACTED]') {
     return false;
   }
   return !nonSecretValues.has(candidate.toLowerCase());
 };
-const shouldRedact = (name, value) => sensitiveName.test(name) && looksLikeCredentialValue(value);
+export const containsSensitiveNamedValue = (name, value) =>
+  sensitiveName.test(String(name)) && looksLikeCredentialValue(value);
 
 const decodeUrlName = (value) =>
   String(value)
@@ -61,6 +66,32 @@ const redactUrlCredentials = (url) => {
 const redactCredentialsInWebUrls = (value) =>
   String(value).replace(/https?:\/\/[^\s"']+/gi, (url) => redactUrlCredentials(url));
 
+const runtimeGeneratedSecretPrefix = String.raw`(^|[ \t\x60]|^\/(?:usr\/)?bin\/(?:zsh|bash|sh) -lc ')`;
+const runtimeGeneratedSecretBoundary = String.raw`(?=[ \t;|&<>()\x60]|$)`;
+const runtimeGeneratedSecretExpression = new RegExp(
+  `${runtimeGeneratedSecretPrefix}SECRET_KEY_BASE=\\$\\(bin/rails secret\\)${runtimeGeneratedSecretBoundary}`,
+  'gm',
+);
+const replaceRuntimeGeneratedSecret = (value, replacement, preserveExistingMarker = false) => {
+  // Raw text cannot assert marker provenance, regardless of its surrounding syntax.
+  const demoted = preserveExistingMarker
+    ? String(value)
+    : String(value).replaceAll('<GENERATED_AT_RUNTIME>', '[REDACTED]');
+  return demoted.replace(runtimeGeneratedSecretExpression, `$1${replacement}`);
+};
+const canonicalizeRuntimeGeneratedSecret = (value) =>
+  replaceRuntimeGeneratedSecret(value, 'SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>"');
+const preserveRuntimeGeneratedSecret = (value) =>
+  replaceRuntimeGeneratedSecret(value, 'SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>"', true);
+const redactRuntimeGeneratedSecret = (value) =>
+  replaceRuntimeGeneratedSecret(value, 'SECRET_KEY_BASE="[REDACTED]"');
+const sanitizeRuntimeGeneratedSecret = (value, mode) => {
+  if (mode === 'trusted') return preserveRuntimeGeneratedSecret(value);
+  if (mode === 'redact') return redactRuntimeGeneratedSecret(value);
+  if (mode === 'defer') return String(value);
+  return canonicalizeRuntimeGeneratedSecret(value);
+};
+
 const structuredValueEnd = (value, start) => {
   const stack = [value[start] === '{' ? '}' : ']'];
   let quote = null;
@@ -103,19 +134,50 @@ const redactStructuredSensitiveValues = (value) => {
   return output + input.slice(cursor);
 };
 
-export const redactSensitiveValues = (value) =>
+const redactSensitiveValuesCore = (value) =>
   redactStructuredSensitiveValues(redactCredentialsInWebUrls(value))
-    .replace(quotedNamedValue, (match, name, separator, quote, quotedValue) =>
-      shouldRedact(name, quotedValue) ? `${name}${separator}${quote}[REDACTED]${quote}` : match,
-    )
-    .replace(unterminatedQuotedNamedValue, (match, name, separator, quote, quotedValue) =>
-      shouldRedact(name, quotedValue) ? `${name}${separator}${quote}[REDACTED]` : match,
-    )
+    .replace(quotedNamedValue, (match, name, separator, doubleQuotedValue, singleQuotedValue) => {
+      const doubleQuoted = doubleQuotedValue !== undefined;
+      const quote = doubleQuoted ? '"' : "'";
+      const quotedValue = doubleQuoted ? doubleQuotedValue : singleQuotedValue;
+      return containsSensitiveNamedValue(name, quotedValue)
+        ? `${name}${separator}${quote}[REDACTED]${quote}`
+        : match;
+    })
+    .replace(unterminatedQuotedNamedValue, (match, name, separator, doubleQuotedValue, singleQuotedValue) => {
+      const doubleQuoted = doubleQuotedValue !== undefined;
+      const quote = doubleQuoted ? '"' : "'";
+      const quotedValue = doubleQuoted ? doubleQuotedValue : singleQuotedValue;
+      return containsSensitiveNamedValue(name, quotedValue) ? `${name}${separator}${quote}[REDACTED]` : match;
+    })
     .replace(unquotedNamedValue, (match, name, separator, unquotedValue) =>
-      shouldRedact(name, unquotedValue) ? `${name}${separator}[REDACTED]` : match,
+      containsSensitiveNamedValue(name, unquotedValue) ? `${name}${separator}[REDACTED]` : match,
     )
     .replace(privateKeyBlock, '[REDACTED]')
     .replace(privateKeyRemainder, '[REDACTED]')
     .replace(bearerToken, 'Bearer [REDACTED]');
 
-export const containsSensitiveValues = (value) => redactSensitiveValues(value) !== String(value);
+const redactWithDeferredRuntimeSecrets = (value) => {
+  const input = String(value).replaceAll('<GENERATED_AT_RUNTIME>', '[REDACTED]');
+  let output = '';
+  let cursor = 0;
+  runtimeGeneratedSecretExpression.lastIndex = 0;
+  while (true) {
+    const match = runtimeGeneratedSecretExpression.exec(input);
+    if (match === null) break;
+    const assignmentStart = match.index + match[1].length;
+    output += redactSensitiveValuesCore(input.slice(cursor, assignmentStart));
+    output += match[0].slice(match[1].length);
+    cursor = match.index + match[0].length;
+  }
+  runtimeGeneratedSecretExpression.lastIndex = 0;
+  return output + redactSensitiveValuesCore(input.slice(cursor));
+};
+
+export const redactSensitiveValues = (value, { runtimeGeneratedSecretMode = 'canonicalize' } = {}) => {
+  if (runtimeGeneratedSecretMode === 'defer') return redactWithDeferredRuntimeSecrets(value);
+  return redactSensitiveValuesCore(sanitizeRuntimeGeneratedSecret(value, runtimeGeneratedSecretMode));
+};
+
+export const containsSensitiveValues = (value) =>
+  redactSensitiveValues(value) !== canonicalizeRuntimeGeneratedSecret(String(value));
