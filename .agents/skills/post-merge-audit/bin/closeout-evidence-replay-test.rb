@@ -4,18 +4,27 @@
 require "json"
 require "open3"
 require "tempfile"
+require "timeout"
 require "minitest/autorun"
 
 SCRIPT = File.expand_path("closeout-evidence-replay", __dir__)
 
 class CloseoutEvidenceReplayTest < Minitest::Test
-  def run_replay(body, expected_head_sha: nil, require_priority_dispositions: false)
+  def run_replay(
+    body,
+    expected_head_sha: nil,
+    require_priority_dispositions: false,
+    require_visual_evidence_v2: false,
+    require_structured_visual_evidence_v3: false
+  )
     Tempfile.create("closeout-evidence") do |file|
       file.write(body)
       file.flush
       command = ["ruby", SCRIPT]
       command.concat(["--expected-head-sha", expected_head_sha]) if expected_head_sha
       command << "--require-priority-dispositions" if require_priority_dispositions
+      command << "--require-visual-evidence-v2" if require_visual_evidence_v2
+      command << "--require-structured-visual-evidence-v3" if require_structured_visual_evidence_v3
       command << file.path
       out, status = Open3.capture2e(*command)
       assert status.success?, out
@@ -23,11 +32,2146 @@ class CloseoutEvidenceReplayTest < Minitest::Test
     end
   end
 
+  def v3_marker(overrides = {})
+    fields = {
+      "required" => "yes",
+      "status" => "satisfied",
+      "head_sha" => "1111111111111111111111111111111111111111",
+      "tested_at" => "PR #123 head 1111111111111111111111111111111111111111",
+      "scope" => "current UI change",
+      "automated_checks" => "bin/validate",
+      "manual_checks" => "browser path",
+      "user_visible_ui_change" => "yes",
+      "visual_evidence_status" => "complete",
+      "visual_evidence_destination" => "github_pr",
+      "visual_evidence_url" => "https://github.com/user-attachments/assets/11111111-1111-1111-1111-111111111111",
+      "visual_baseline_status" => "captured",
+      "visual_candidate_status" => "captured",
+      "paint_check_status" => "passed",
+      "interaction_change" => "no",
+      "interaction_evidence_kind" => "not_applicable",
+      "interaction_evidence_destination" => "not_applicable",
+      "interaction_evidence_url" => "not_applicable",
+      "interaction_baseline_value" => "not_applicable",
+      "interaction_candidate_value" => "not_applicable",
+      "interaction_tolerance" => "not_applicable",
+      "visual_fix" => "no",
+      "negative_control_status" => "not_applicable",
+      "performance_impact" => "not_applicable",
+      "performance_evidence_status" => "not_applicable",
+      "performance_source_kind" => "not_applicable",
+      "performance_source_ref" => "not_applicable",
+      "performance_metric_kind" => "not_applicable",
+      "performance_baseline_value" => "not_applicable",
+      "performance_candidate_value" => "not_applicable",
+      "findings" => "none",
+      "release_blocking" => "clear",
+      "process_gap_disposition" => "checklist+replay"
+    }.merge(overrides.transform_keys(&:to_s))
+    body = fields.map { |key, value| "#{key}: #{value}" }.join("\n")
+    "<!-- qa-evidence v3\n#{body}\n-->\n"
+  end
+
+  def v2_marker(overrides = {})
+    fields = {
+      "required" => "yes",
+      "status" => "satisfied",
+      "head_sha" => "1111111111111111111111111111111111111111",
+      "tested_at" => "PR #123 head 1111111111111111111111111111111111111111",
+      "scope" => "current UI change",
+      "automated_checks" => "bin/validate",
+      "manual_checks" => "browser path",
+      "user_visible_ui_change" => "yes",
+      "visual_evidence_destination" => "github_pr",
+      "visual_evidence" => "durable: before and after https://github.com/example/repo/pull/123#visual",
+      "paint_check" => "passed: rendered target inspected",
+      "interaction_change" => "no",
+      "interaction_evidence" => "not applicable: no interaction behavior changed",
+      "visual_fix" => "no",
+      "negative_control" => "not applicable: no visual fix",
+      "performance_impact" => "not_applicable",
+      "performance_evidence" => "not applicable: no rendered-page, asset-delivery, or bundle impact",
+      "findings" => "none",
+      "release_blocking" => "clear",
+      "process_gap_disposition" => "checklist+replay"
+    }.merge(overrides.transform_keys(&:to_s))
+    body = fields.map { |key, value| "#{key}: #{value}" }.join("\n")
+    "<!-- qa-evidence v2\n#{body}\n-->\n"
+  end
+
+  def v1_marker(head_sha:, status: "satisfied", release_blocking: "clear")
+    <<~MARKDOWN
+      <!-- qa-evidence v1
+      required: yes
+      status: #{status}
+      head_sha: #{head_sha}
+      tested_at: PR #123 head #{head_sha}
+      scope: legacy UI evidence
+      automated_checks: bin/validate
+      manual_checks: browser path
+      findings: none
+      release_blocking: #{release_blocking}
+      process_gap_disposition: schema
+      -->
+    MARKDOWN
+  end
+
   def test_help_describes_required_priority_evidence
     out, status = Open3.capture2e("ruby", SCRIPT, "--help")
 
     assert status.success?, out
     assert_includes out, "Fail when priority evidence is missing or explicitly not_applicable"
+    assert_includes out, "Fail when current UI evidence lacks the durable visual-evidence v2 contract"
+    assert_includes out, "Fail when current UI evidence lacks the structured visual-evidence v3 contract"
+  end
+
+  def test_strict_v3_visual_gate_requires_expected_head_sha
+    out, status = Open3.capture2e(
+      "ruby",
+      SCRIPT,
+      "--require-structured-visual-evidence-v3",
+      "-",
+      stdin_data: v3_marker
+    )
+
+    assert_equal 64, status.exitstatus
+    assert_includes out, "--require-structured-visual-evidence-v3 requires --expected-head-sha"
+  end
+
+  def test_strict_v3_visual_gate_rejects_v2_only_evidence
+    head_sha = "1111111111111111111111111111111111111111"
+    qa = run_replay(
+      v2_marker,
+      expected_head_sha: head_sha,
+      require_structured_visual_evidence_v3: true
+    ).fetch("qa_evidence")
+
+    assert_equal "UNKNOWN", qa.fetch("verdict")
+    assert_includes qa.fetch("missing"), "qa-evidence v3 marker required for current user-visible UI evidence"
+  end
+
+  def test_strict_v3_visual_gate_accepts_closed_vocabulary_evidence
+    qa = run_replay(
+      v3_marker,
+      expected_head_sha: "1111111111111111111111111111111111111111",
+      require_structured_visual_evidence_v3: true
+    ).fetch("qa_evidence")
+
+    assert_equal "SATISFIED", qa.fetch("verdict")
+    assert_equal 3, qa.fetch("marker_version")
+    assert_equal 2, qa.fetch("supersedes_marker_version")
+  end
+
+  def test_v3_destination_enum_binds_each_destination_to_an_exact_url_shape
+    cases = {
+      "github PR rejects another host" => {
+        "visual_evidence_destination" => "github_pr",
+        "visual_evidence_url" => "https://example.test/user-attachments/assets/111"
+      },
+      "Linear tracker rejects another host" => {
+        "visual_evidence_destination" => "linear_tracker",
+        "visual_evidence_url" => "https://example.test/acme/issue/UI-123"
+      },
+      "GitHub release rejects a non-release path" => {
+        "visual_evidence_destination" => "github_release",
+        "visual_evidence_url" => "https://github.com/example/repo/pull/123"
+      },
+      "generic legacy destination is not forward-valid" => {
+        "visual_evidence_destination" => "repo_artifact_store",
+        "visual_evidence_url" => "https://artifacts.example.test/ui-123"
+      }
+    }
+
+    cases.each do |label, overrides|
+      qa = run_replay(v3_marker(overrides)).fetch("qa_evidence")
+
+      assert_equal "UNKNOWN", qa.fetch("verdict"), label
+      assert_includes qa.fetch("missing"), "visual_evidence_url.destination", label
+    end
+  end
+
+  def test_v3_accepts_linear_tracker_and_github_release_destinations
+    cases = {
+      "linear_tracker" => "https://linear.app/example/issue/UI-123",
+      "github_release" => "https://github.com/example/repo/releases/download/evidence/ui-comparison.html"
+    }
+
+    cases.each do |destination, url|
+      qa = run_replay(
+        v3_marker(
+          "visual_evidence_destination" => destination,
+          "visual_evidence_url" => url
+        )
+      ).fetch("qa_evidence")
+
+      assert_equal "SATISFIED", qa.fetch("verdict"), destination
+    end
+  end
+
+  def test_v3_rejects_prose_in_gate_critical_status_fields
+    cases = {
+      "paint_check_status" => "passed: apparently rendered",
+      "negative_control_status" => "failure maybe observed",
+      "performance_evidence_status" => "not run",
+      "visual_evidence_status" => "complete enough"
+    }
+
+    cases.each do |field, value|
+      qa = run_replay(v3_marker(field => value)).fetch("qa_evidence")
+
+      assert_equal "UNKNOWN", qa.fetch("verdict"), field
+      assert_includes qa.fetch("missing"), field, field
+    end
+  end
+
+  def test_v3_requires_exact_qa_status_and_release_blocking_pairs
+    cases = {
+      "satisfied" => "waived",
+      "blocked" => "clear",
+      "waived" => "clear",
+      "in_progress" => "clear",
+      "unknown" => "clear",
+      "not_applicable" => "clear"
+    }
+
+    cases.each do |status, release_blocking|
+      qa = run_replay(
+        v3_marker(
+          "status" => status,
+          "release_blocking" => release_blocking
+        )
+      ).fetch("qa_evidence")
+
+      assert_equal "UNKNOWN", qa.fetch("verdict"), status
+      assert_includes qa.fetch("missing"), "release_blocking", status
+    end
+  end
+
+  def test_v3_accepts_matching_waived_qa_state
+    qa = run_replay(
+      v3_marker(
+        "status" => "waived",
+        "release_blocking" => "waived"
+      )
+    ).fetch("qa_evidence")
+
+    assert_equal "WAIVED", qa.fetch("verdict")
+    assert_empty qa.fetch("missing")
+  end
+
+  def test_v3_measured_interaction_and_performance_use_typed_fields
+    qa = run_replay(
+      v3_marker(
+        "interaction_change" => "yes",
+        "interaction_evidence_kind" => "measured_substitute",
+        "interaction_baseline_value" => "52px",
+        "interaction_candidate_value" => "0px",
+        "interaction_tolerance" => "1px",
+        "visual_fix" => "yes",
+        "negative_control_status" => "observed_failure",
+        "performance_impact" => "measured_metric",
+        "performance_evidence_status" => "measured",
+        "performance_source_kind" => "repo_command",
+        "performance_source_ref" => "bin/perf-report",
+        "performance_metric_kind" => "runtime",
+        "performance_baseline_value" => "2.4s",
+        "performance_candidate_value" => "2.1s",
+        "negative_control_note" => "Any descriptive prose, including maybe and reportedly, is context only."
+      )
+    ).fetch("qa_evidence")
+
+    assert_equal "SATISFIED", qa.fetch("verdict")
+  end
+
+  def test_v3_human_attachment_state_is_explicitly_blocked
+    qa = run_replay(
+      v3_marker(
+        "status" => "blocked",
+        "visual_evidence_status" => "blocked",
+        "visual_evidence_destination" => "human_attachment_pending",
+        "visual_evidence_url" => "not_applicable",
+        "visual_baseline_status" => "pending",
+        "visual_candidate_status" => "pending",
+        "paint_check_status" => "blocked",
+        "findings" => "durable attachment pending",
+        "release_blocking" => "blocked"
+      )
+    ).fetch("qa_evidence")
+
+    assert_equal "BLOCKED", qa.fetch("verdict")
+    assert_empty qa.fetch("missing")
+  end
+
+  def test_v3_captured_visuals_awaiting_attachment_are_blocked
+    qa = run_replay(
+      v3_marker(
+        "status" => "blocked",
+        "release_blocking" => "blocked",
+        "visual_evidence_status" => "blocked",
+        "visual_evidence_destination" => "human_attachment_pending",
+        "visual_evidence_url" => "not_applicable"
+      ),
+      expected_head_sha: "1111111111111111111111111111111111111111",
+      require_structured_visual_evidence_v3: true
+    ).fetch("qa_evidence")
+
+    assert_equal "BLOCKED", qa.fetch("verdict")
+    assert_empty qa.fetch("missing")
+  end
+
+  def test_v3_captured_visuals_awaiting_attachment_reject_contradictory_states
+    {
+      "status" => "satisfied",
+      "release_blocking" => "clear",
+      "visual_evidence_status" => "complete",
+      "visual_evidence_destination" => "github_pr",
+      "visual_evidence_url" => "https://github.com/example/repo/pull/123#visual",
+      "visual_baseline_status" => "pending",
+      "visual_candidate_status" => "pending",
+      "paint_check_status" => "blocked"
+    }.each do |field, value|
+      qa = run_replay(
+        v3_marker(
+          "status" => "blocked",
+          "release_blocking" => "blocked",
+          "visual_evidence_status" => "blocked",
+          "visual_evidence_destination" => "human_attachment_pending",
+          "visual_evidence_url" => "not_applicable",
+          field => value
+        ),
+        expected_head_sha: "1111111111111111111111111111111111111111",
+        require_structured_visual_evidence_v3: true
+      ).fetch("qa_evidence")
+
+      assert_equal "UNKNOWN", qa.fetch("verdict"), field
+      refute_empty qa.fetch("missing"), field
+    end
+  end
+
+  def test_v3_non_ui_omission_uses_explicit_not_applicable_values
+    qa = run_replay(
+      v3_marker(
+        "required" => "no",
+        "status" => "not_applicable",
+        "user_visible_ui_change" => "no",
+        "visual_evidence_status" => "not_applicable",
+        "visual_evidence_destination" => "not_applicable",
+        "visual_evidence_url" => "not_applicable",
+        "visual_baseline_status" => "not_applicable",
+        "visual_candidate_status" => "not_applicable",
+        "paint_check_status" => "not_applicable",
+        "release_blocking" => "not_applicable",
+        "process_gap_disposition" => "not applicable"
+      )
+    ).fetch("qa_evidence")
+
+    assert_equal "NOT_APPLICABLE", qa.fetch("verdict")
+    assert_empty qa.fetch("missing")
+  end
+
+  def test_v3_non_ui_change_can_still_require_bundle_evidence
+    qa = run_replay(
+      v3_marker(
+        "user_visible_ui_change" => "no",
+        "visual_evidence_status" => "not_applicable",
+        "visual_evidence_destination" => "not_applicable",
+        "visual_evidence_url" => "not_applicable",
+        "visual_baseline_status" => "not_applicable",
+        "visual_candidate_status" => "not_applicable",
+        "paint_check_status" => "not_applicable",
+        "performance_impact" => "bundle_hygiene",
+        "performance_evidence_status" => "measured",
+        "performance_source_kind" => "repo_report",
+        "performance_source_ref" => "reports/bundle-shape.json",
+        "performance_metric_kind" => "bundle_size",
+        "performance_baseline_value" => "120KB",
+        "performance_candidate_value" => "118KB"
+      )
+    ).fetch("qa_evidence")
+
+    assert_equal "SATISFIED", qa.fetch("verdict")
+    assert_empty qa.fetch("missing")
+  end
+
+  def test_v3_rejects_interaction_or_visual_fix_when_ui_change_is_no
+    cases = {
+      "interaction_change" => "yes",
+      "visual_fix" => "yes"
+    }
+
+    cases.each do |field, value|
+      qa = run_replay(
+        v3_marker(
+          "user_visible_ui_change" => "no",
+          "visual_evidence_status" => "not_applicable",
+          "visual_evidence_destination" => "not_applicable",
+          "visual_evidence_url" => "not_applicable",
+          "visual_baseline_status" => "not_applicable",
+          "visual_candidate_status" => "not_applicable",
+          "paint_check_status" => "not_applicable",
+          field => value,
+          "negative_control_status" => field == "visual_fix" ? "observed_failure" : "not_applicable"
+        )
+      ).fetch("qa_evidence")
+
+      assert_equal "UNKNOWN", qa.fetch("verdict"), field
+      assert_includes qa.fetch("missing"), field, field
+    end
+  end
+
+  def test_v3_ui_change_cannot_claim_qa_is_not_required
+    qa = run_replay(
+      v3_marker(
+        "required" => "no",
+        "status" => "not_applicable",
+        "release_blocking" => "not_applicable"
+      )
+    ).fetch("qa_evidence")
+
+    assert_equal "UNKNOWN", qa.fetch("verdict")
+    assert_includes qa.fetch("missing"), "required"
+  end
+
+  def test_v3_repo_command_accepts_safe_multi_token_invocations
+    qa = run_replay(
+      v3_marker(
+        "performance_impact" => "measured_metric",
+        "performance_evidence_status" => "measured",
+        "performance_source_kind" => "repo_command",
+        "performance_source_ref" => "pnpm run benchmark --format=json",
+        "performance_metric_kind" => "runtime",
+        "performance_baseline_value" => "2.4s",
+        "performance_candidate_value" => "2.1s"
+      )
+    ).fetch("qa_evidence")
+
+    assert_equal "SATISFIED", qa.fetch("verdict")
+  end
+
+  %w[repo_command repo_report].each do |source_kind|
+    ["none", "skipped", "not_run", "NONE", "SKIPPED", "NOT_RUN", "not-run", "not run"].each do |source_ref|
+      define_method("test_v3_#{source_kind}_rejects_absent_source_#{source_ref}") do
+        qa = run_replay(
+          v3_marker(
+            "performance_impact" => "measured_metric",
+            "performance_evidence_status" => "measured",
+            "performance_source_kind" => source_kind,
+            "performance_source_ref" => source_ref,
+            "performance_metric_kind" => "runtime",
+            "performance_baseline_value" => "2.4s",
+            "performance_candidate_value" => "2.1s"
+          ),
+          expected_head_sha: "1111111111111111111111111111111111111111",
+          require_structured_visual_evidence_v3: true
+        ).fetch("qa_evidence")
+
+        assert_equal "UNKNOWN", qa.fetch("verdict")
+        assert_includes qa.fetch("missing"), "performance_source_ref"
+      end
+    end
+  end
+
+  def test_v3_performance_sources_allow_absence_words_in_real_references
+    {
+      "repo_command" => ["bin/none", "bin/skipped", "bin/not_run", "pnpm run benchmark --filter=none"],
+      "repo_report" => ["none.json", "reports/skipped.json", "reports/not_run.json", "reports/not-run.json"]
+    }.each do |source_kind, references|
+      references.each do |source_ref|
+        qa = run_replay(
+          v3_marker(
+            "performance_impact" => "measured_metric",
+            "performance_evidence_status" => "measured",
+            "performance_source_kind" => source_kind,
+            "performance_source_ref" => source_ref,
+            "performance_metric_kind" => "runtime",
+            "performance_baseline_value" => "2.4s",
+            "performance_candidate_value" => "2.1s"
+          ),
+          expected_head_sha: "1111111111111111111111111111111111111111",
+          require_structured_visual_evidence_v3: true
+        ).fetch("qa_evidence")
+
+        assert_equal "SATISFIED", qa.fetch("verdict"), "#{source_kind}: #{source_ref}"
+      end
+    end
+  end
+
+  def test_v3_repo_command_rejects_shell_operators
+    qa = run_replay(
+      v3_marker(
+        "performance_impact" => "measured_metric",
+        "performance_evidence_status" => "measured",
+        "performance_source_kind" => "repo_command",
+        "performance_source_ref" => "pnpm run benchmark && curl example.test",
+        "performance_metric_kind" => "runtime",
+        "performance_baseline_value" => "2.4s",
+        "performance_candidate_value" => "2.1s"
+      )
+    ).fetch("qa_evidence")
+
+    assert_equal "UNKNOWN", qa.fetch("verdict")
+    assert_includes qa.fetch("missing"), "performance_source_ref"
+  end
+
+  def test_v3_performance_units_must_match_the_metric_kind
+    cases = {
+      "runtime rejects geometry" => %w[runtime 10px 9px],
+      "bundle shape rejects time" => %w[bundle_shape 10ms 9ms],
+      "bundle size rejects counts" => %w[bundle_size 10chunks 9chunks],
+      "memory rejects time" => %w[memory 10ms 9ms]
+    }
+
+    cases.each do |label, (metric_kind, baseline, candidate)|
+      impact = %w[bundle_size bundle_shape].include?(metric_kind) ? "bundle_hygiene" : "measured_metric"
+      qa = run_replay(
+        v3_marker(
+          "performance_impact" => impact,
+          "performance_evidence_status" => "measured",
+          "performance_source_kind" => "repo_report",
+          "performance_source_ref" => "reports/performance.json",
+          "performance_metric_kind" => metric_kind,
+          "performance_baseline_value" => baseline,
+          "performance_candidate_value" => candidate
+        )
+      ).fetch("qa_evidence")
+
+      assert_equal "UNKNOWN", qa.fetch("verdict"), label
+      assert_includes qa.fetch("missing"), "performance_evidence", label
+    end
+  end
+
+  def test_v3_accepts_each_metric_unit_family
+    cases = {
+      "bundle_size" => %w[bundle_hygiene 120KiB 118KiB],
+      "bundle_shape" => %w[bundle_hygiene 12chunks 11chunks],
+      "runtime" => %w[measured_metric 240ms 210ms],
+      "memory" => %w[measured_metric 512MB 500MB]
+    }
+
+    cases.each do |metric_kind, (impact, baseline, candidate)|
+      qa = run_replay(
+        v3_marker(
+          "performance_impact" => impact,
+          "performance_evidence_status" => "measured",
+          "performance_source_kind" => "repo_report",
+          "performance_source_ref" => "reports/performance.json",
+          "performance_metric_kind" => metric_kind,
+          "performance_baseline_value" => baseline,
+          "performance_candidate_value" => candidate
+        )
+      ).fetch("qa_evidence")
+
+      assert_equal "SATISFIED", qa.fetch("verdict"), metric_kind
+    end
+  end
+
+  %w[bundle_size memory].each do |metric_kind|
+    [
+      %w[100MB 90Mb UNKNOWN],
+      %w[100Mb 90Mb UNKNOWN],
+      %w[100B 90b UNKNOWN],
+      %w[100b 90b UNKNOWN],
+      %w[100KiB 90Kib UNKNOWN],
+      %w[100Kib 90Kib UNKNOWN],
+      %w[100B 90B SATISFIED],
+      %w[100MB 90MB SATISFIED],
+      %w[100KiB 90KiB SATISFIED],
+      %w[100bytes 90bytes SATISFIED],
+      %w[100KB 90kB SATISFIED],
+      %w[100KIB 90KiB SATISFIED],
+      %w[100BYTES 90bytes SATISFIED]
+    ].each do |baseline, candidate, verdict|
+      define_method("test_v3_byte_units_#{metric_kind}_#{baseline}_#{candidate}") do
+        qa = run_replay(
+          v3_marker(
+            "performance_impact" => metric_kind == "bundle_size" ? "bundle_hygiene" : "measured_metric",
+            "performance_evidence_status" => "measured",
+            "performance_source_kind" => "repo_report",
+            "performance_source_ref" => "reports/performance.json",
+            "performance_metric_kind" => metric_kind,
+            "performance_baseline_value" => baseline,
+            "performance_candidate_value" => candidate
+          ),
+          expected_head_sha: "1111111111111111111111111111111111111111",
+          require_structured_visual_evidence_v3: true
+        ).fetch("qa_evidence")
+
+        assert_equal verdict, qa.fetch("verdict")
+        if verdict == "UNKNOWN"
+          assert_includes qa.fetch("missing"), "performance_evidence"
+        else
+          assert_empty qa.fetch("missing")
+        end
+      end
+    end
+  end
+
+  def test_v3_non_byte_measurements_preserve_case_normalization
+    {
+      "runtime" => %w[measured_metric 240MS 210ms],
+      "bundle_shape" => %w[bundle_hygiene 12CHUNKS 11chunks]
+    }.each do |metric_kind, (impact, baseline, candidate)|
+      qa = run_replay(
+        v3_marker(
+          "performance_impact" => impact,
+          "performance_evidence_status" => "measured",
+          "performance_source_kind" => "repo_report",
+          "performance_source_ref" => "reports/performance.json",
+          "performance_metric_kind" => metric_kind,
+          "performance_baseline_value" => baseline,
+          "performance_candidate_value" => candidate,
+          "interaction_change" => "yes",
+          "interaction_evidence_kind" => "measured_substitute",
+          "interaction_baseline_value" => "52PX",
+          "interaction_candidate_value" => "0px",
+          "interaction_tolerance" => "1Px"
+        ),
+        expected_head_sha: "1111111111111111111111111111111111111111",
+        require_structured_visual_evidence_v3: true
+      ).fetch("qa_evidence")
+
+      assert_equal "SATISFIED", qa.fetch("verdict"), metric_kind
+      assert_empty qa.fetch("missing")
+    end
+  end
+
+  def test_v3_performance_measurements_must_be_non_negative
+    qa = run_replay(
+      v3_marker(
+        "performance_impact" => "measured_metric",
+        "performance_evidence_status" => "measured",
+        "performance_source_kind" => "repo_report",
+        "performance_source_ref" => "reports/performance.json",
+        "performance_metric_kind" => "runtime",
+        "performance_baseline_value" => "-240ms",
+        "performance_candidate_value" => "210ms"
+      )
+    ).fetch("qa_evidence")
+
+    assert_equal "UNKNOWN", qa.fetch("verdict")
+    assert_includes qa.fetch("missing"), "performance_evidence"
+  end
+
+  def test_v3_repo_report_rejects_non_repository_paths
+    %w[
+      https://unrelated.example/report.json http://example.com/report.json file:report.json
+      /tmp/report.json C:/reports/report.json ../report.json reports/../../report.json
+      reports/./report.json reports//report.json reports/
+    ].each do |source_ref|
+      qa = run_replay(
+        v3_marker(
+          "performance_impact" => "measured_metric",
+          "performance_evidence_status" => "measured",
+          "performance_source_kind" => "repo_report",
+          "performance_source_ref" => source_ref,
+          "performance_metric_kind" => "runtime",
+          "performance_baseline_value" => "240ms",
+          "performance_candidate_value" => "210ms"
+        )
+      ).fetch("qa_evidence")
+
+      assert_equal "UNKNOWN", qa.fetch("verdict"), source_ref
+      assert_includes qa.fetch("missing"), "performance_source_ref", source_ref
+    end
+  end
+
+  def test_v3_interaction_clip_uses_the_same_destination_binding
+    qa = run_replay(
+      v3_marker(
+        "interaction_change" => "yes",
+        "interaction_evidence_kind" => "clip",
+        "interaction_evidence_destination" => "linear_tracker",
+        "interaction_evidence_url" => "https://unrelated.example/organization/issue/UI-123"
+      )
+    ).fetch("qa_evidence")
+
+    assert_equal "UNKNOWN", qa.fetch("verdict")
+    assert_includes qa.fetch("missing"), "interaction_evidence_url.destination"
+  end
+
+  def test_v3_pending_interaction_clip_is_blocked_with_complete_stills
+    qa = run_replay(
+      v3_marker(
+        "status" => "blocked",
+        "release_blocking" => "blocked",
+        "interaction_change" => "yes",
+        "interaction_evidence_kind" => "clip",
+        "interaction_evidence_destination" => "human_attachment_pending"
+      )
+    ).fetch("qa_evidence")
+
+    assert_equal "BLOCKED", qa.fetch("verdict")
+    assert_empty qa.fetch("missing")
+  end
+
+  def test_v3_pending_interaction_clip_is_blocked_with_pending_stills
+    qa = run_replay(
+      v3_marker(
+        "status" => "blocked",
+        "release_blocking" => "blocked",
+        "visual_evidence_status" => "blocked",
+        "visual_evidence_destination" => "human_attachment_pending",
+        "visual_evidence_url" => "not_applicable",
+        "visual_baseline_status" => "pending",
+        "visual_candidate_status" => "pending",
+        "paint_check_status" => "blocked",
+        "interaction_change" => "yes",
+        "interaction_evidence_kind" => "clip",
+        "interaction_evidence_destination" => "human_attachment_pending"
+      )
+    ).fetch("qa_evidence")
+
+    assert_equal "BLOCKED", qa.fetch("verdict")
+    assert_empty qa.fetch("missing")
+  end
+
+  def test_v3_pending_interaction_clip_rejects_contradictory_evidence
+    {
+      "status" => "satisfied",
+      "release_blocking" => "clear",
+      "interaction_evidence_url" => "https://github.com/example/repo/pull/123#clip",
+      "interaction_baseline_value" => "52px",
+      "interaction_candidate_value" => "0px",
+      "interaction_tolerance" => "1px"
+    }.each do |field, value|
+      qa = run_replay(
+        v3_marker(
+          "status" => "blocked",
+          "release_blocking" => "blocked",
+          "interaction_change" => "yes",
+          "interaction_evidence_kind" => "clip",
+          "interaction_evidence_destination" => "human_attachment_pending",
+          field => value
+        )
+      ).fetch("qa_evidence")
+
+      assert_equal "UNKNOWN", qa.fetch("verdict"), field
+      assert_includes qa.fetch("missing"), field
+    end
+  end
+
+  def test_v3_measured_values_require_matching_units
+    qa = run_replay(
+      v3_marker(
+        "interaction_change" => "yes",
+        "interaction_evidence_kind" => "measured_substitute",
+        "interaction_baseline_value" => "52px",
+        "interaction_candidate_value" => "0rem",
+        "interaction_tolerance" => "1px"
+      )
+    ).fetch("qa_evidence")
+
+    assert_equal "UNKNOWN", qa.fetch("verdict")
+    assert_includes qa.fetch("missing"), "interaction_evidence"
+  end
+
+  def test_v3_interaction_tolerance_must_be_non_negative
+    qa = run_replay(
+      v3_marker(
+        "interaction_change" => "yes",
+        "interaction_evidence_kind" => "measured_substitute",
+        "interaction_baseline_value" => "52px",
+        "interaction_candidate_value" => "0px",
+        "interaction_tolerance" => "-1px"
+      )
+    ).fetch("qa_evidence")
+
+    assert_equal "UNKNOWN", qa.fetch("verdict")
+    assert_includes qa.fetch("missing"), "interaction_evidence"
+  end
+
+  def test_strict_v3_gate_rejects_marker_name_suffixes
+    head_sha = "1111111111111111111111111111111111111111"
+
+    %w[v30 v3draft].each do |version|
+      body = v3_marker.sub("qa-evidence v3", "qa-evidence #{version}")
+      qa = run_replay(
+        body,
+        expected_head_sha: head_sha,
+        require_structured_visual_evidence_v3: true
+      ).fetch("qa_evidence")
+
+      assert_equal "UNKNOWN", qa.fetch("verdict"), version
+      assert_includes qa.fetch("missing"),
+                      "qa-evidence v3 marker required for current user-visible UI evidence",
+                      version
+    end
+  end
+
+  def test_strict_v3_gate_does_not_fall_back_to_v2_when_v3_is_stale
+    current_head = "1111111111111111111111111111111111111111"
+    stale_v3 = v3_marker(
+      "head_sha" => "2222222222222222222222222222222222222222",
+      "tested_at" => "PR #123 head 2222222222222222222222222222222222222222"
+    )
+    qa = run_replay(
+      stale_v3 + v2_marker,
+      expected_head_sha: current_head,
+      require_structured_visual_evidence_v3: true
+    ).fetch("qa_evidence")
+
+    assert_equal "UNKNOWN", qa.fetch("verdict")
+    assert_equal 3, qa.fetch("marker_version")
+    assert_includes qa.fetch("missing"), "head_sha"
+  end
+
+  def test_strict_visual_gate_requires_expected_head_sha
+    out, status = Open3.capture2e(
+      "ruby",
+      SCRIPT,
+      "--require-visual-evidence-v2",
+      "-",
+      stdin_data: v2_marker
+    )
+
+    assert_equal 64, status.exitstatus
+    assert_includes out, "--require-visual-evidence-v2 requires --expected-head-sha"
+  end
+
+  def test_strict_v2_visual_gate_accepts_current_v3_evidence
+    qa = run_replay(
+      v3_marker,
+      expected_head_sha: "1111111111111111111111111111111111111111",
+      require_visual_evidence_v2: true
+    ).fetch("qa_evidence")
+
+    assert_equal "SATISFIED", qa.fetch("verdict")
+    assert_equal 3, qa.fetch("marker_version")
+    assert_empty qa.fetch("missing")
+  end
+
+  def test_strict_v2_visual_gate_validates_v3_instead_of_rescuing_it_with_v2
+    qa = run_replay(
+      v3_marker("paint_check_status" => "not_run") + v2_marker,
+      expected_head_sha: "1111111111111111111111111111111111111111",
+      require_visual_evidence_v2: true
+    ).fetch("qa_evidence")
+
+    assert_equal "UNKNOWN", qa.fetch("verdict")
+    assert_equal 3, qa.fetch("marker_version")
+    assert_includes qa.fetch("missing"), "paint_check_status"
+  end
+
+  def test_strict_v2_visual_gate_rejects_stale_v3_only_evidence
+    qa = run_replay(
+      v3_marker("head_sha" => "2222222222222222222222222222222222222222"),
+      expected_head_sha: "1111111111111111111111111111111111111111",
+      require_visual_evidence_v2: true
+    ).fetch("qa_evidence")
+
+    assert_equal "UNKNOWN", qa.fetch("verdict")
+  end
+
+  def test_strict_v2_visual_gate_rejects_non_ui_v3_evidence
+    qa = run_replay(
+      v3_marker("user_visible_ui_change" => "no"),
+      expected_head_sha: "1111111111111111111111111111111111111111",
+      require_visual_evidence_v2: true
+    ).fetch("qa_evidence")
+
+    assert_equal "UNKNOWN", qa.fetch("verdict")
+    assert_includes qa.fetch("missing"), "user_visible_ui_change"
+  end
+
+  def test_strict_visual_gate_requires_ui_change_yes
+    data = run_replay(
+      v2_marker(
+        "required" => "no",
+        "status" => "not_applicable",
+        "user_visible_ui_change" => "no",
+        "visual_evidence_destination" => "not_applicable",
+        "visual_evidence" => "not applicable: no user-visible UI change",
+        "paint_check" => "not applicable: no rendered target",
+        "interaction_evidence" => "not applicable: no interaction change",
+        "negative_control" => "not applicable: no visual fix",
+        "release_blocking" => "not_applicable"
+      ),
+      expected_head_sha: "1111111111111111111111111111111111111111",
+      require_visual_evidence_v2: true
+    )
+
+    qa = data.fetch("qa_evidence")
+    assert_equal "UNKNOWN", qa.fetch("verdict")
+    assert_includes qa.fetch("missing"), "user_visible_ui_change"
+  end
+
+  def test_strict_visual_gate_accepts_multiple_current_head_ui_markers
+    body = v2_marker + v2_marker("scope" => "second current-head UI check")
+    qa = run_replay(
+      body,
+      expected_head_sha: "1111111111111111111111111111111111111111",
+      require_visual_evidence_v2: true
+    ).fetch("qa_evidence")
+
+    assert_equal "SATISFIED", qa.fetch("verdict")
+    assert_equal 2, qa.fetch("marker_count")
+    assert_equal 2, qa.fetch("marker_version")
+    assert_equal 1, qa.fetch("supersedes_marker_version")
+  end
+
+  def test_strict_visual_gate_rejects_any_non_ui_current_head_marker
+    body = v2_marker + v2_marker(
+      "required" => "no",
+      "status" => "not_applicable",
+      "user_visible_ui_change" => "no",
+      "visual_evidence_destination" => "not_applicable",
+      "visual_evidence" => "not applicable: no user-visible UI change",
+      "paint_check" => "not applicable: no rendered target",
+      "interaction_evidence" => "not applicable: no interaction change",
+      "negative_control" => "not applicable: no visual fix",
+      "release_blocking" => "not_applicable"
+    )
+    qa = run_replay(
+      body,
+      expected_head_sha: "1111111111111111111111111111111111111111",
+      require_visual_evidence_v2: true
+    ).fetch("qa_evidence")
+
+    assert_equal "UNKNOWN", qa.fetch("verdict")
+    assert_includes qa.fetch("missing"), "marker[1].user_visible_ui_change"
+  end
+
+  def test_historical_v1_remains_replayable_without_visual_fields
+    data = run_replay(<<~MARKDOWN)
+      <!-- qa-evidence v1
+      required: yes
+      status: satisfied
+      head_sha: 1111111111111111111111111111111111111111
+      tested_at: PR #123 head 1111111111111111111111111111111111111111
+      scope: historical UI change
+      automated_checks: bin/validate
+      manual_checks: browser smoke
+      findings: none
+      release_blocking: clear
+      process_gap_disposition: schema
+      -->
+    MARKDOWN
+
+    assert_equal "SATISFIED", data.fetch("qa_evidence").fetch("verdict")
+    assert_equal 1, data.fetch("qa_evidence").fetch("marker_version")
+  end
+
+  def test_current_ui_gate_rejects_v1_only_evidence
+    head_sha = "1111111111111111111111111111111111111111"
+    data = run_replay(<<~MARKDOWN, expected_head_sha: head_sha, require_visual_evidence_v2: true)
+      <!-- qa-evidence v1
+      required: yes
+      status: satisfied
+      head_sha: #{head_sha}
+      tested_at: PR #123 head #{head_sha}
+      scope: current UI change
+      automated_checks: bin/validate
+      manual_checks: screenshots captured locally
+      findings: none
+      release_blocking: clear
+      process_gap_disposition: schema
+      -->
+    MARKDOWN
+
+    qa = data.fetch("qa_evidence")
+    assert_equal "UNKNOWN", qa.fetch("verdict")
+    assert_equal ["qa-evidence v2 marker required for current user-visible UI evidence"], qa.fetch("missing")
+  end
+
+  def test_strict_v2_gate_rejects_marker_name_suffixes
+    head_sha = "1111111111111111111111111111111111111111"
+
+    %w[v20 v2draft].each do |version|
+      body = v2_marker.sub("qa-evidence v2", "qa-evidence #{version}")
+      qa = run_replay(
+        body,
+        expected_head_sha: head_sha,
+        require_visual_evidence_v2: true
+      ).fetch("qa_evidence")
+
+      assert_equal "UNKNOWN", qa.fetch("verdict"), version
+      assert_includes qa.fetch("missing"), "qa-evidence v2 marker required for current user-visible UI evidence", version
+    end
+  end
+
+  def test_v2_accepts_durable_tracker_visual_clip_negative_control_and_metric_evidence
+    head_sha = "1111111111111111111111111111111111111111"
+    data = run_replay(<<~MARKDOWN, expected_head_sha: head_sha, require_visual_evidence_v2: true)
+      <!-- qa-evidence v2
+      required: yes
+      status: satisfied
+      head_sha: #{head_sha}
+      tested_at: PR #123 head #{head_sha}
+      scope: map marker geometry and hover state
+      automated_checks: bin/validate
+      manual_checks: browser geometry and hover path
+      user_visible_ui_change: yes
+      visual_evidence_destination: linked_tracker
+      visual_evidence: durable: before and after composite https://linear.app/example/issue/UI-123#attachment
+      paint_check: passed: rendered target inspected
+      interaction_change: yes
+      interaction_evidence: clip: https://linear.app/example/issue/UI-123#hover-recording
+      visual_fix: yes
+      negative_control: observed_failure: unfixed bundle failed assertion; expected 0 within 1 of 104
+      performance_impact: measured_metric
+      performance_evidence: repo_seam: source=bin/perf-report; metric_name=LCP; baseline_value=2.4s; candidate_value=2.1s
+      findings: none
+      release_blocking: clear
+      process_gap_disposition: checklist+replay
+      -->
+    MARKDOWN
+
+    qa = data.fetch("qa_evidence")
+    assert_equal "SATISFIED", qa.fetch("verdict")
+    assert_equal 2, qa.fetch("marker_version")
+    assert_empty qa.fetch("missing")
+  end
+
+  def test_v2_accepts_measured_interaction_substitute_and_hygiene_claim
+    data = run_replay(<<~MARKDOWN)
+      <!-- qa-evidence v2
+      required: yes
+      status: satisfied
+      head_sha: 1111111111111111111111111111111111111111
+      tested_at: PR #123 head 1111111111111111111111111111111111111111
+      scope: map marker geometry and hover state
+      automated_checks: bin/validate
+      manual_checks: browser geometry and hover path
+      user_visible_ui_change: yes
+      visual_evidence_destination: github_pr
+      visual_evidence: durable: before and after images https://github.com/example/repo/pull/123#issue-attachment
+      paint_check: passed: painted marker and map tiles inspected
+      interaction_change: yes
+      interaction_evidence: measured_substitute: before_value=52px; after_value=0px; tolerance=1px
+      visual_fix: yes
+      negative_control: observed_failure: unfixed bundle failed the geometry assertion
+      performance_impact: bundle_hygiene
+      performance_evidence: repo_seam: source=bin/bundle-report; baseline_value=120kB; candidate_value=121kB
+      findings: none
+      release_blocking: clear
+      process_gap_disposition: checklist+replay
+      -->
+    MARKDOWN
+
+    assert_equal "SATISFIED", data.fetch("qa_evidence").fetch("verdict")
+  end
+
+  def test_v2_github_only_prepared_artifacts_are_blocked_until_human_attachment
+    data = run_replay(<<~MARKDOWN)
+      <!-- qa-evidence v2
+      required: yes
+      status: blocked
+      head_sha: 1111111111111111111111111111111111111111
+      tested_at: PR #123 head 1111111111111111111111111111111111111111
+      scope: current UI change
+      automated_checks: bin/validate
+      manual_checks: browser path complete; durable attachment pending
+      user_visible_ui_change: yes
+      visual_evidence_destination: human_attachment_pending
+      visual_evidence: blocked: human attachment required; prepared local artifacts: /tmp/before.png /tmp/after.png
+      paint_check: passed: rendered screenshots inspected
+      interaction_change: no
+      interaction_evidence: not applicable: no interaction behavior changed
+      visual_fix: yes
+      negative_control: observed_failure: unfixed implementation failed the visual assertion
+      performance_impact: not_applicable
+      performance_evidence: not applicable: no rendered-page, asset-delivery, or bundle impact
+      findings: blocked on human attachment
+      release_blocking: blocked
+      process_gap_disposition: checklist+replay
+      -->
+    MARKDOWN
+
+    assert_equal "BLOCKED", data.fetch("qa_evidence").fetch("verdict")
+  end
+
+  def test_v2_rejects_local_paths_as_durable_visual_or_interaction_evidence
+    data = run_replay(<<~MARKDOWN)
+      <!-- qa-evidence v2
+      required: yes
+      status: satisfied
+      head_sha: 1111111111111111111111111111111111111111
+      tested_at: PR #123 head 1111111111111111111111111111111111111111
+      scope: current UI change
+      automated_checks: bin/validate
+      manual_checks: captured locally
+      user_visible_ui_change: yes
+      visual_evidence_destination: github_pr
+      visual_evidence: durable: before /tmp/before.png and after /tmp/after.png
+      paint_check: passed: rendered screenshots inspected
+      interaction_change: yes
+      interaction_evidence: clip: /tmp/hover.mov
+      visual_fix: yes
+      negative_control: observed_failure: unfixed implementation failed the visual assertion
+      performance_impact: not_applicable
+      performance_evidence: not applicable: no rendered-page, asset-delivery, or bundle impact
+      findings: none
+      release_blocking: clear
+      process_gap_disposition: checklist+replay
+      -->
+    MARKDOWN
+
+    qa = data.fetch("qa_evidence")
+    assert_equal "UNKNOWN", qa.fetch("verdict")
+    assert_includes qa.fetch("missing"), "visual_evidence.url"
+    assert_includes qa.fetch("missing"), "interaction_evidence"
+  end
+
+  def test_v2_rejects_blank_paint_check_unreasoned_na_and_missing_negative_control
+    data = run_replay(<<~MARKDOWN)
+      <!-- qa-evidence v2
+      required: yes
+      status: satisfied
+      head_sha: 1111111111111111111111111111111111111111
+      tested_at: PR #123 head 1111111111111111111111111111111111111111
+      scope: current UI fix
+      automated_checks: bin/validate
+      manual_checks: browser path
+      user_visible_ui_change: yes
+      visual_evidence_destination: repo_artifact_store
+      visual_evidence: durable: before and after https://artifacts.example.test/ui-123
+      paint_check: passed: blank screenshot
+      interaction_change: no
+      interaction_evidence: not applicable
+      visual_fix: yes
+      negative_control: captured locally
+      performance_impact: not_applicable
+      performance_evidence: not applicable
+      findings: none
+      release_blocking: clear
+      process_gap_disposition: checklist+replay
+      -->
+    MARKDOWN
+
+    qa = data.fetch("qa_evidence")
+    assert_equal "UNKNOWN", qa.fetch("verdict")
+    %w[paint_check interaction_evidence negative_control performance_evidence].each do |field|
+      assert_includes qa.fetch("missing"), field
+    end
+  end
+
+  def test_v2_non_ui_change_requires_reasoned_not_applicable_values
+    data = run_replay(<<~MARKDOWN)
+      <!-- qa-evidence v2
+      required: no
+      status: not_applicable
+      head_sha: 1111111111111111111111111111111111111111
+      tested_at: repository head 1111111111111111111111111111111111111111
+      scope: documentation-only change
+      automated_checks: bin/validate
+      manual_checks: not applicable: no runtime behavior
+      user_visible_ui_change: no
+      visual_evidence_destination: not_applicable
+      visual_evidence: not applicable: no user-visible UI change
+      paint_check: not applicable: no rendered target
+      interaction_change: no
+      interaction_evidence: not applicable: no interaction change
+      visual_fix: no
+      negative_control: not applicable: no visual fix
+      performance_impact: not_applicable
+      performance_evidence: not applicable: no rendered-page, asset-delivery, or bundle impact
+      findings: none
+      release_blocking: not_applicable
+      process_gap_disposition: not applicable
+      -->
+    MARKDOWN
+
+    assert_equal "NOT_APPLICABLE", data.fetch("qa_evidence").fetch("verdict")
+  end
+
+  def test_v2_non_ui_change_allows_required_bundle_performance_evidence
+    qa = run_replay(
+      v2_marker(
+        "user_visible_ui_change" => "no",
+        "visual_evidence_destination" => "not_applicable",
+        "visual_evidence" => "not applicable: no user-visible UI change",
+        "paint_check" => "not applicable: no rendered target",
+        "interaction_change" => "no",
+        "interaction_evidence" => "not applicable: no interaction change",
+        "visual_fix" => "no",
+        "negative_control" => "not applicable: no visual fix",
+        "performance_impact" => "bundle_hygiene",
+        "performance_evidence" => "repo_seam: source=bin/bundle-report; baseline_value=100KB; candidate_value=90KB"
+      )
+    ).fetch("qa_evidence")
+
+    assert_equal "SATISFIED", qa.fetch("verdict")
+  end
+
+  def test_v2_non_ui_change_rejects_legacy_head_placeholder_without_expected_head
+    body = v2_marker(
+      "required" => "no",
+      "status" => "not_applicable",
+      "head_sha" => "not_applicable",
+      "tested_at" => "no PR created",
+      "user_visible_ui_change" => "no",
+      "visual_evidence_destination" => "not_applicable",
+      "visual_evidence" => "not applicable: no user-visible UI change",
+      "paint_check" => "not applicable: no rendered target",
+      "interaction_change" => "no",
+      "interaction_evidence" => "not applicable: no interaction change",
+      "visual_fix" => "no",
+      "negative_control" => "not applicable: no visual fix",
+      "performance_impact" => "not_applicable",
+      "performance_evidence" => "not applicable: no rendered-page impact",
+      "release_blocking" => "not_applicable"
+    )
+
+    qa = run_replay(body).fetch("qa_evidence")
+
+    assert_equal "UNKNOWN", qa.fetch("verdict")
+    assert_includes qa.fetch("missing"), "head_sha"
+    assert_includes qa.fetch("missing"), "tested_at.head_sha"
+  end
+
+  def test_v2_rejects_disallowed_local_and_failed_capture_tokens_even_with_https
+    bad_evidence = {
+      "absolute path" => "durable: before /tmp/before.png and after https://github.com/example/repo/pull/123#visual",
+      "Windows path" => "durable: before C:\\tmp\\before.png and after https://github.com/example/repo/pull/123#visual",
+      "file URL" => "durable: before file:///tmp/before.png and after https://github.com/example/repo/pull/123#visual",
+      "captured locally" => "durable: before captured locally and after https://github.com/example/repo/pull/123#visual",
+      "blank screenshot" => "durable: before screenshot was blank and after rendered https://github.com/example/repo/pull/123#visual",
+      "blank screenshots" => "durable: before and after screenshots were blank https://github.com/example/repo/pull/123#visual",
+      "hedged blank screenshot" => "durable: before screenshot was completely blank and after rendered https://github.com/example/repo/pull/123#visual",
+      "unexpectedly blank screenshot" => "durable: before screenshot was unexpectedly blank and after rendered https://github.com/example/repo/pull/123#visual",
+      "unpainted page" => "durable: before page was unpainted and after rendered https://github.com/example/repo/pull/123#visual",
+      "negated then affirmative blank screenshot" =>
+        "durable: screenshot was not blank but later screenshot was blank https://github.com/example/repo/pull/123#visual",
+      "unrelated negation before blank screenshot" =>
+        "durable: before screenshot was not uploaded because it was blank and after rendered " \
+        "https://github.com/example/repo/pull/123#visual",
+      "not-only blank screenshot" =>
+        "durable: before screenshot was not only blank but corrupted and after rendered " \
+        "https://github.com/example/repo/pull/123#visual",
+      "not-merely blank screenshot" =>
+        "durable: before screenshot was not merely blank but corrupted and after rendered " \
+        "https://github.com/example/repo/pull/123#visual"
+    }
+
+    bad_evidence.each do |label, evidence|
+      data = run_replay(v2_marker("visual_evidence" => evidence))
+      qa = data.fetch("qa_evidence")
+
+      assert_equal "UNKNOWN", qa.fetch("verdict"), label
+      assert_includes qa.fetch("missing"), "visual_evidence.local_reference", label
+    end
+  end
+
+  def test_v2_allows_blank_as_a_legitimate_before_state_description
+    evidence = "durable: before blank search results and after populated results https://github.com/example/repo/pull/123#visual"
+    qa = run_replay(v2_marker("visual_evidence" => evidence)).fetch("qa_evidence")
+
+    assert_equal "SATISFIED", qa.fetch("verdict")
+    refute_includes qa.fetch("missing"), "visual_evidence.local_reference"
+  end
+
+  def test_v2_allows_negated_blank_and_unpainted_durable_visual_evidence
+    valid_evidence = [
+      "durable: before screenshot was not blank and after screenshot showed rendered page " \
+        "https://github.com/example/repo/pull/123#visual",
+      "durable: before screenshot was not entirely blank and after screenshot showed rendered page " \
+        "https://github.com/example/repo/pull/123#visual",
+      "durable: before page was never unpainted and after page showed rendered content " \
+        "https://github.com/example/repo/pull/123#visual"
+    ]
+
+    valid_evidence.each do |evidence|
+      qa = run_replay(v2_marker("visual_evidence" => evidence)).fetch("qa_evidence")
+
+      assert_equal "SATISFIED", qa.fetch("verdict"), evidence
+      refute_includes qa.fetch("missing"), "visual_evidence.local_reference", evidence
+    end
+  end
+
+  def test_v2_requires_before_and_after_words_outside_visual_evidence_urls
+    qa = run_replay(
+      v2_marker(
+        "visual_evidence" => "durable: https://github.com/example/repo/pull/123#before-after"
+      )
+    ).fetch("qa_evidence")
+
+    assert_equal "UNKNOWN", qa.fetch("verdict")
+    assert_includes qa.fetch("missing"), "visual_evidence.before_after"
+  end
+
+  def test_v2_rejects_ephemeral_non_https_artifact_schemes_even_with_https
+    schemes = [
+      "blob:https://example.test/transient-id",
+      "data:image/png;base64,AAAA",
+      "filesystem:https://example.test/temporary/before.png",
+      "http://example.test/before.png",
+      "ftp://example.test/before.png",
+      "mediastream:transient-id"
+    ]
+
+    schemes.each do |artifact|
+      evidence = "durable: before #{artifact} and after https://github.com/example/repo/pull/123#visual"
+      qa = run_replay(v2_marker("visual_evidence" => evidence)).fetch("qa_evidence")
+
+      assert_equal "UNKNOWN", qa.fetch("verdict"), artifact
+      assert_includes qa.fetch("missing"), "visual_evidence.local_reference", artifact
+    end
+  end
+
+  def test_v2_rejects_relative_local_artifact_tokens_even_with_https
+    bad_tokens = [
+      "./before.png",
+      "../before.png",
+      "~/before.png",
+      "screenshots\\before.png",
+      ".\\before.png",
+      "..\\before.png",
+      "C:before.png",
+      "C:before",
+      "assets/before.png",
+      "artifacts/baseline",
+      "before.png",
+      "local-screenshot.webp",
+      "local-screenshot.heic",
+      "\\\\server\\share\\before"
+    ]
+
+    bad_tokens.each do |token|
+      evidence = "durable: before #{token} and after https://github.com/example/repo/pull/123#visual"
+      qa = run_replay(v2_marker("visual_evidence" => evidence)).fetch("qa_evidence")
+
+      assert_equal "UNKNOWN", qa.fetch("verdict"), token
+      assert_includes qa.fetch("missing"), "visual_evidence.local_reference", token
+    end
+  end
+
+  def test_v2_local_reference_detection_handles_pathological_separator_runs
+    pathological_tokens = {
+      "unterminated backslash path" => "segment\\" * 25_000,
+      "long slash path" => "segment/" * 25_000
+    }
+
+    Timeout.timeout(3) do
+      pathological_tokens.each do |label, token|
+        evidence = "durable: before #{token} and after https://github.com/example/repo/pull/123#visual"
+        qa = run_replay(v2_marker("visual_evidence" => evidence)).fetch("qa_evidence")
+
+        assert_equal "UNKNOWN", qa.fetch("verdict"), label
+        assert_includes qa.fetch("missing"), "visual_evidence.length", label
+      end
+    end
+  end
+
+  def test_v2_does_not_treat_https_path_component_as_a_local_artifact
+    evidence = "durable: before and after https://github.com/example/repo/blob/main/screenshots/before.png"
+    qa = run_replay(v2_marker("visual_evidence" => evidence)).fetch("qa_evidence")
+
+    assert_equal "SATISFIED", qa.fetch("verdict")
+    refute_includes qa.fetch("missing"), "visual_evidence.local_reference"
+  end
+
+  def test_v2_allows_slash_separated_visual_mode_labels
+    evidence = "durable: before and after light/dark screenshots https://github.com/example/repo/pull/123#visual"
+    qa = run_replay(v2_marker("visual_evidence" => evidence)).fetch("qa_evidence")
+
+    assert_equal "SATISFIED", qa.fetch("verdict")
+    refute_includes qa.fetch("missing"), "visual_evidence.local_reference"
+  end
+
+  def test_v2_allows_contextual_slash_separated_visual_mode_labels
+    evidence = "durable: before and after mobile/desktop screenshots https://github.com/example/repo/pull/123#visual"
+    qa = run_replay(v2_marker("visual_evidence" => evidence)).fetch("qa_evidence")
+
+    assert_equal "SATISFIED", qa.fetch("verdict")
+    refute_includes qa.fetch("missing"), "visual_evidence.local_reference"
+  end
+
+  def test_v2_contextual_slash_label_handling_preserves_local_paths
+    evidence = "durable: before and after assets/baseline screenshots https://github.com/example/repo/pull/123#visual"
+    qa = run_replay(v2_marker("visual_evidence" => evidence)).fetch("qa_evidence")
+
+    assert_equal "UNKNOWN", qa.fetch("verdict")
+    assert_includes qa.fetch("missing"), "visual_evidence.local_reference"
+  end
+
+  def test_v2_allows_documented_and_common_slash_separated_labels
+    %w[before/after baseline/candidate pass/fail on/off yes/no].each do |label|
+      evidence = "durable: before and after #{label} composite https://github.com/example/repo/pull/123#visual"
+      qa = run_replay(v2_marker("visual_evidence" => evidence)).fetch("qa_evidence")
+
+      assert_equal "SATISFIED", qa.fetch("verdict"), label
+      refute_includes qa.fetch("missing"), "visual_evidence.local_reference", label
+    end
+  end
+
+  def test_v2_allows_bare_documented_slash_separated_labels
+    %w[before/after baseline/candidate].each do |label|
+      evidence = "durable: #{label} https://github.com/example/repo/pull/123#visual"
+      qa = run_replay(v2_marker("visual_evidence" => evidence)).fetch("qa_evidence")
+
+      assert_equal "SATISFIED", qa.fetch("verdict"), label
+      refute_includes qa.fetch("missing"), "visual_evidence.local_reference", label
+    end
+  end
+
+  def test_v2_github_destination_requires_a_github_url
+    data = run_replay(
+      v2_marker(
+        "visual_evidence" => "durable: before and after https://artifacts.example.test/ui-123"
+      )
+    )
+
+    qa = data.fetch("qa_evidence")
+    assert_equal "UNKNOWN", qa.fetch("verdict")
+    assert_includes qa.fetch("missing"), "visual_evidence.github_url"
+  end
+
+  def test_v2_github_destination_rejects_bare_github_host
+    qa = run_replay(
+      v2_marker(
+        "visual_evidence" => "durable: before and after https://github.com"
+      )
+    ).fetch("qa_evidence")
+
+    assert_equal "UNKNOWN", qa.fetch("verdict")
+    assert_includes qa.fetch("missing"), "visual_evidence.github_url"
+  end
+
+  def test_v2_github_destination_rejects_github_url_nested_in_tracker_query
+    nested = "https://tracker.example.test/artifact?next=https://github.com/example/repo/pull/123#visual"
+    evidence = "durable: before and after #{nested}"
+    qa = run_replay(v2_marker("visual_evidence" => evidence)).fetch("qa_evidence")
+
+    assert_equal "UNKNOWN", qa.fetch("verdict")
+    assert_includes qa.fetch("missing"), "visual_evidence.github_url"
+  end
+
+  def test_v2_rejects_https_evidence_without_a_valid_host
+    %w[
+      https://;
+      https://example.test:bad/path
+      https://localhost/artifact
+      https://127.0.0.1/artifact
+      https://0.0.0.0/artifact
+      https://127.1/artifact
+      https://2130706433/artifact
+      https://0177.0.0.1/artifact
+      https://0x7f000001/artifact
+      https://10.0.0.5/artifact
+      https://172.16.0.5/artifact
+      https://172.31.255.254/artifact
+      https://192.168.1.10/artifact
+      https://169.254.20.30/artifact
+      https://private-user-images.githubusercontent.com/1/clip.mp4?jwt=signed
+    ].each do |url|
+      %w[linked_tracker repo_artifact_store].each do |destination|
+        qa = run_replay(
+          v2_marker(
+            "visual_evidence_destination" => destination,
+            "visual_evidence" => "durable: before and after #{url}"
+          )
+        ).fetch("qa_evidence")
+
+        assert_equal "UNKNOWN", qa.fetch("verdict"), "#{destination}: #{url}"
+        assert_includes qa.fetch("missing"), "visual_evidence.url", "#{destination}: #{url}"
+      end
+    end
+  end
+
+  def test_v2_rejects_invalid_artifact_urls_even_beside_a_valid_url
+    expiring_url = "https://private-user-images.githubusercontent.com/1/before.png?jwt=signed"
+    valid_url = "https://github.com/example/repo/pull/123#after"
+    visual = run_replay(
+      v2_marker(
+        "visual_evidence" => "durable: before #{expiring_url} after #{valid_url}"
+      )
+    ).fetch("qa_evidence")
+    interaction = run_replay(
+      v2_marker(
+        "interaction_change" => "yes",
+        "interaction_evidence" => "clip: #{expiring_url} #{valid_url}"
+      )
+    ).fetch("qa_evidence")
+
+    assert_equal "UNKNOWN", visual.fetch("verdict")
+    assert_includes visual.fetch("missing"), "visual_evidence.url"
+    assert_equal "UNKNOWN", interaction.fetch("verdict")
+    assert_includes interaction.fetch("missing"), "interaction_evidence"
+  end
+
+  def test_v2_rejects_explicitly_unavailable_durable_visual_artifacts
+    invalid_evidence = [
+      "durable: before and after https://github.com/example/repo/pull/123#visual expired",
+      "durable: before and after https://github.com/example/repo/pull/123#visual; access denied"
+    ]
+
+    invalid_evidence.each do |evidence|
+      qa = run_replay(v2_marker("visual_evidence" => evidence)).fetch("qa_evidence")
+
+      assert_equal "UNKNOWN", qa.fetch("verdict"), evidence
+      assert_includes qa.fetch("missing"), "visual_evidence.artifact_available", evidence
+    end
+  end
+
+  def test_v2_rejects_missing_baseline_or_candidate_artifacts
+    invalid_evidence = [
+      "durable: before was unavailable; after https://github.com/example/repo/pull/123#visual",
+      "durable: before wasn't available; after https://github.com/example/repo/pull/123#visual",
+      "durable: before and after screenshots weren't available https://github.com/example/repo/pull/123#visual",
+      "durable: before https://github.com/example/repo/pull/123#visual; after capture missing",
+      "durable: baseline was not captured; candidate https://github.com/example/repo/pull/123#visual"
+    ]
+
+    invalid_evidence.each do |visual_evidence|
+      qa = run_replay(v2_marker("visual_evidence" => visual_evidence)).fetch("qa_evidence")
+
+      assert_equal "UNKNOWN", qa.fetch("verdict"), visual_evidence
+      assert_includes qa.fetch("missing"), "visual_evidence.before_after", visual_evidence
+    end
+  end
+
+  def test_v2_allows_missing_ui_state_when_visual_artifacts_are_available
+    valid_evidence = [
+      "durable: before screenshot shows the missing icon; after screenshot shows it restored " \
+      "https://github.com/example/repo/pull/123#visual",
+      "durable: before screenshot shows the Access Denied screen; after screenshot shows the dashboard " \
+      "https://github.com/example/repo/pull/123#visual",
+      "durable: before screenshot shows the expired-session banner; after screenshot shows the dashboard " \
+      "https://github.com/example/repo/pull/123#visual"
+    ]
+
+    valid_evidence.each do |evidence|
+      qa = run_replay(v2_marker("visual_evidence" => evidence)).fetch("qa_evidence")
+
+      assert_equal "SATISFIED", qa.fetch("verdict"), evidence
+      refute_includes qa.fetch("missing"), "visual_evidence.before_after", evidence
+      refute_includes qa.fetch("missing"), "visual_evidence.artifact_available", evidence
+    end
+  end
+
+  def test_v2_github_destination_accepts_current_and_legacy_attachment_hosts
+    hosts = %w[
+      github.com/example/repo/pull/123#visual
+      user-images.githubusercontent.com/123/before.png
+    ]
+
+    hosts.each do |host_and_path|
+      evidence = "durable: before and after https://#{host_and_path}"
+      qa = run_replay(v2_marker("visual_evidence" => evidence)).fetch("qa_evidence")
+
+      assert_equal "SATISFIED", qa.fetch("verdict"), host_and_path
+    end
+  end
+
+  def test_v2_github_destination_rejects_expiring_private_attachment_host
+    evidence = "durable: before and after https://private-user-images.githubusercontent.com/123/after.png?jwt=signed"
+    qa = run_replay(v2_marker("visual_evidence" => evidence)).fetch("qa_evidence")
+
+    assert_equal "UNKNOWN", qa.fetch("verdict")
+    assert_includes qa.fetch("missing"), "visual_evidence.github_url"
+  end
+
+  def test_v2_rejects_negated_paint_claims
+    invalid_claims = [
+      "passed: target was not painted",
+      "passed: target was not really painted correctly",
+      "passed: target was not actually clearly obviously painted",
+      "passed: it did not seem painted, but rendered",
+      "passed: target did not render",
+      "passed: the screenshot wasn't rendered",
+      "passed: the screenshot isn't painted",
+      "passed: browser failed to paint target",
+      "passed: browser failed to render target",
+      "passed: target was never rendered",
+      "passed: target rendered unsuccessfully",
+      "passed: target was unsuccessfully painted",
+      "passed: target rendered but paint failed",
+      "passed: target failed during rendering; baseline rendered and inspected",
+      "passed: rendered",
+      "passed: painted successfully",
+      "passed: target was unable to render; baseline rendered and inspected",
+      "passed: target wasn't able to render; baseline rendered and inspected",
+      "passed: rendered screenshot could not be inspected",
+      "passed: rendered screenshot wasn't inspected",
+      "passed: rendered screenshot, inspection was skipped",
+      "passed: target rendered and was inspected, but inspection failed",
+      "passed: target rendered and was reviewed, but review was unsuccessful",
+      "passed: target rendered and was verified, but failed verification",
+      "passed: target rendered and was inspected, but inspection did not complete",
+      "passed: target rendered and was inspected, but inspection errored",
+      "passed: target rendered and was verified, but verification timed out",
+      "passed: target rendered and was reviewed, but review was aborted"
+    ]
+
+    invalid_claims.each do |paint_check|
+      qa = run_replay(v2_marker("paint_check" => paint_check)).fetch("qa_evidence")
+
+      assert_equal "UNKNOWN", qa.fetch("verdict"), paint_check
+      assert_includes qa.fetch("missing"), "paint_check", paint_check
+    end
+  end
+
+  def test_v2_accepts_negated_blank_and_unpainted_paint_claims
+    valid_claims = [
+      "passed: page rendered correctly, screenshot not blank, elements painted and inspected",
+      "passed: page rendered correctly, screenshot not entirely blank, elements painted and inspected",
+      "passed: page rendered correctly, screenshot not actually clearly obviously blank, elements painted and inspected",
+      "passed: page rendered correctly, screenshot not seemingly blank, elements painted and inspected",
+      "passed: page rendered correctly, screenshot wasn't blank, elements painted and inspected",
+      "passed: page rendered correctly, screenshots weren't unpainted, elements painted and inspected",
+      "passed: page rendered correctly, screenshot no longer blank, elements painted and inspected",
+      "passed: target rendered and was not unpainted; capture inspected",
+      "passed: target inspected and not blank and rendered"
+    ]
+
+    valid_claims.each do |paint_check|
+      qa = run_replay(v2_marker("paint_check" => paint_check)).fetch("qa_evidence")
+
+      assert_equal "SATISFIED", qa.fetch("verdict"), paint_check
+    end
+  end
+
+  def test_v2_accepts_contrastive_inspection_claims
+    valid_claims = [
+      "passed: rendered screenshot was not only inspected but reviewed",
+      "passed: painted target was not merely inspected but verified"
+    ]
+
+    valid_claims.each do |paint_check|
+      qa = run_replay(v2_marker("paint_check" => paint_check)).fetch("qa_evidence")
+
+      assert_equal "SATISFIED", qa.fetch("verdict"), paint_check
+    end
+  end
+
+  def test_v2_interaction_classifier_is_fail_closed
+    invalid_cases = [
+      {
+        "interaction_change" => "yes",
+        "interaction_evidence" => "not applicable: recorder unavailable"
+      },
+      {
+        "interaction_change" => "no",
+        "interaction_evidence" => "clip: https://github.com/example/repo/pull/123#clip"
+      },
+      {
+        "interaction_change" => "yes",
+        "interaction_evidence" => "clip: https://github.com/example/repo/pull/123#clip /tmp/local.mov"
+      },
+      {
+        "interaction_change" => "yes",
+        "interaction_evidence" => "clip: https://github.com/example/repo/pull/123#clip hover.mov"
+      },
+      {
+        "interaction_change" => "yes",
+        "interaction_evidence" => "clip: https://github.com/example/repo/pull/123#clip .\\hover.mov"
+      },
+      {
+        "interaction_change" => "yes",
+        "interaction_evidence" => "clip: https://github.com/example/repo/pull/123#clip unavailable"
+      },
+      {
+        "interaction_change" => "yes",
+        "interaction_evidence" => "clip: https://github.com/example/repo/pull/123#clip expired"
+      }
+    ]
+
+    invalid_cases.each do |overrides|
+      qa = run_replay(v2_marker(overrides)).fetch("qa_evidence")
+
+      assert_equal "UNKNOWN", qa.fetch("verdict")
+      assert_includes qa.fetch("missing"), "interaction_evidence"
+    end
+  end
+
+  def test_v2_rejects_oversized_evidence_fields_without_unbounded_regex_work
+    oversized_negative_control = "observed_failure: assertion failed #{'word ' * 10_000}"
+
+    Timeout.timeout(3) do
+      qa = run_replay(
+        v2_marker(
+          "visual_fix" => "yes",
+          "negative_control" => oversized_negative_control
+        )
+      ).fetch("qa_evidence")
+
+      assert_equal "UNKNOWN", qa.fetch("verdict")
+      assert_includes qa.fetch("missing"), "negative_control.length"
+    end
+  end
+
+  def test_v2_measured_interaction_substitute_requires_exact_values_units_and_tolerance
+    invalid_values = [
+      "measured_substitute: before 52px; after 0px",
+      "measured_substitute: before_value=52px; after_value=0px",
+      "measured_substitute: before_value=52; after_value=0; tolerance=1",
+      "measured_substitute: before_value=52px; after_value=0px; tolerance=1ms",
+      "measured_substitute: https://example.test/run/52/0/1",
+      "measured_substitute: before_value=https://example.test/52px; after_value=0px; tolerance=1px"
+    ]
+
+    invalid_values.each do |evidence|
+      qa = run_replay(
+        v2_marker(
+          "interaction_change" => "yes",
+          "interaction_evidence" => evidence
+        )
+      ).fetch("qa_evidence")
+
+      assert_equal "UNKNOWN", qa.fetch("verdict"), evidence
+      assert_includes qa.fetch("missing"), "interaction_evidence", evidence
+    end
+  end
+
+  def test_v2_measured_interaction_substitute_accepts_deterministic_alias_pair
+    evidence = "measured_substitute: baseline_value=52px; candidate_value=0px; tolerance=1px"
+    qa = run_replay(
+      v2_marker(
+        "interaction_change" => "yes",
+        "interaction_evidence" => evidence
+      )
+    ).fetch("qa_evidence")
+
+    assert_equal "SATISFIED", qa.fetch("verdict")
+  end
+
+  def test_v2_visual_fix_classifier_is_fail_closed
+    invalid_cases = [
+      {
+        "visual_fix" => "yes",
+        "negative_control" => "not applicable: unfixed build unavailable"
+      },
+      {
+        "visual_fix" => "no",
+        "negative_control" => "observed_failure: unfixed implementation failed assertion"
+      }
+    ]
+
+    invalid_cases.each do |overrides|
+      qa = run_replay(v2_marker(overrides)).fetch("qa_evidence")
+
+      assert_equal "UNKNOWN", qa.fetch("verdict")
+      assert_includes qa.fetch("missing"), "negative_control"
+    end
+  end
+
+  def test_v2_negative_control_rejects_negated_failure_and_passing_claims
+    invalid_claims = [
+      "observed_failure: assertion did not fail",
+      "observed_failure: Assertion Did Not Fail",
+      "observed_failure: assertion did not really fail",
+      "observed_failure: assertion did not actually clearly obviously fail",
+      "observed_failure: the test did not seem to fail",
+      "observed_failure: no failure was observed",
+      "observed_failure: failure was expected but no failures occurred",
+      "observed_failure: no error occurred",
+      "observed_failure: completed without errors",
+      "observed_failure: completed without mismatches",
+      "observed_failure: assert did not error",
+      "observed_failure: assertion never failed",
+      "observed_failure: failure not observed in this run",
+      "observed_failure: assertion FAILED but not observed",
+      "observed_failure: failure did not occur",
+      "observed_failure: failure didn't happen",
+      "observed_failure: assertion failure wasn't observed",
+      "observed_failure: failure hasn't occurred",
+      "observed_failure: negative control was unable to reproduce the assertion failure",
+      "observed_failure: assertion failed; assertion passed",
+      "observed_failure: unfixed build failed the assertion; the build now passes",
+      "observed_failure: unfixed bundle failed the assertion; the bundle unexpectedly passed",
+      "observed_failure: implementation failed the assertion; implementation succeeded",
+      "observed_failure: assertion failed; failure did not occur",
+      "observed_failure: completed without mismatch",
+      "observed_failure: assertion no longer fails",
+      "observed_failure: assertion stopped failing",
+      "observed_failure: assertion fails no more",
+      "observed_failure: assertion passed",
+      "observed_failure: assertion unexpectedly passed",
+      "observed_failure: the negative control apparently now passed",
+      "observed_failure: the assertion was skipped",
+      "observed_failure: the assertion was not executed",
+      "observed_failure: assertion outcome was inconclusive",
+      "observed_failure: the control could have failed under load",
+      "observed_failure: the control might have failed under load",
+      "observed_failure: the control may have failed under load",
+      "observed_failure: the control would have failed under load",
+      "observed_failure: the control should have failed under load",
+      "observed_failure: the control possibly failed under load",
+      "observed_failure: the control perhaps failed under load",
+      "observed_failure: the control allegedly failed under load",
+      "observed_failure: the control likely failed under load",
+      "observed_failure: the control probably failed under load",
+      "observed_failure: the control apparently failed under load",
+      "observed_failure: minor type mismatch",
+      "observed_failure: assertion mismatch scenario; all regression checks passed successfully afterward",
+      "observed_failure: negative control passes",
+      "observed_failure: run succeeded",
+      "observed_failure: assertion was successful",
+      "observed_failure: expected output matched",
+      "observed_failure: assertion expected 1 got 1",
+      "observed_failure: assertion expected 1 actual 1",
+      "observed_failure: everything was okay"
+    ]
+
+    invalid_claims.each do |negative_control|
+      qa = run_replay(
+        v2_marker(
+          "visual_fix" => "yes",
+          "negative_control" => negative_control
+        )
+      ).fetch("qa_evidence")
+
+      assert_equal "UNKNOWN", qa.fetch("verdict"), negative_control
+      assert_includes qa.fetch("missing"), "negative_control", negative_control
+    end
+  end
+
+  def test_v2_negative_control_allows_historical_pass_word_when_outcome_failed
+    evidence = "observed_failure: the control that used to pass validation now fails the assertion"
+    qa = run_replay(
+      v2_marker(
+        "visual_fix" => "yes",
+        "negative_control" => evidence
+      )
+    ).fetch("qa_evidence")
+
+    assert_equal "SATISFIED", qa.fetch("verdict")
+  end
+
+  def test_v2_negative_control_allows_unrelated_no_after_failure
+    evidence = "observed_failure: assertion failed no matter the retry count"
+    qa = run_replay(
+      v2_marker(
+        "visual_fix" => "yes",
+        "negative_control" => evidence
+      )
+    ).fetch("qa_evidence")
+
+    assert_equal "SATISFIED", qa.fetch("verdict")
+  end
+
+  def test_v2_negative_control_allows_unrelated_clean_followup_clause
+    evidence = "observed_failure: assertion failed as expected; cleanup completed without errors"
+    qa = run_replay(
+      v2_marker(
+        "visual_fix" => "yes",
+        "negative_control" => evidence
+      )
+    ).fetch("qa_evidence")
+
+    assert_equal "SATISFIED", qa.fetch("verdict")
+  end
+
+  def test_v2_negative_control_accepts_assertion_failure_description
+    valid_evidence = [
+      "observed_failure: assertion expected 1 but got 2",
+      "observed_failure: assertion expected 1, got 2",
+      "observed_failure: assertions expected 1 but got 2",
+      "observed_failure: assertion expected 1 actual 2"
+    ]
+
+    valid_evidence.each do |evidence|
+      qa = run_replay(
+        v2_marker(
+          "visual_fix" => "yes",
+          "negative_control" => evidence
+        )
+      ).fetch("qa_evidence")
+
+      assert_equal "SATISFIED", qa.fetch("verdict"), evidence
+    end
+  end
+
+  def test_v2_negative_control_accepts_observed_mismatch_description
+    evidence = "observed_failure: minor type mismatch was observed"
+    qa = run_replay(
+      v2_marker(
+        "visual_fix" => "yes",
+        "negative_control" => evidence
+      )
+    ).fetch("qa_evidence")
+
+    assert_equal "SATISFIED", qa.fetch("verdict")
+  end
+
+  def test_v2_reasoned_not_applicable_rejects_unresolved_placeholders
+    invalid_reasons = [
+      "not applicable: UNKNOWN",
+      "not applicable: unavailable",
+      "not applicable: evidence missing",
+      "not applicable: N/A",
+      "not applicable: TODO",
+      "not applicable: TBD",
+      "not applicable: pending",
+      "not applicable: unmeasured",
+      "not applicable: not measured",
+      "not_applicable: not available"
+    ]
+
+    invalid_reasons.each do |reason|
+      interaction_qa = run_replay(
+        v2_marker(
+          "interaction_change" => "no",
+          "interaction_evidence" => reason
+        )
+      ).fetch("qa_evidence")
+      negative_qa = run_replay(
+        v2_marker(
+          "visual_fix" => "no",
+          "negative_control" => reason
+        )
+      ).fetch("qa_evidence")
+
+      assert_equal "UNKNOWN", interaction_qa.fetch("verdict"), reason
+      assert_includes interaction_qa.fetch("missing"), "interaction_evidence", reason
+      assert_equal "UNKNOWN", negative_qa.fetch("verdict"), reason
+      assert_includes negative_qa.fetch("missing"), "negative_control", reason
+    end
+  end
+
+  def test_v2_performance_claim_requires_measured_baseline_and_candidate_values
+    invalid_evidence = [
+      "repo_seam: baseline unavailable; candidate 2.1s",
+      "repo_seam: baseline 2.4s; candidate not measured",
+      "repo_seam: baseline unknown; candidate missing",
+      "repo_seam: baseline and candidate report",
+      "repo_seam: candidate 2.1s only",
+      "not applicable: no performance command",
+      "repo_seam: report https://ci.example.test/run/120/121",
+      "repo_seam: report https://ci.example.test/run?baseline_value=120kB;candidate_value=121kB",
+      "repo_seam: report; baseline_value=120; candidate_value=121",
+      "repo_seam: report; baseline_value=120kB; candidate_value=121ms"
+    ]
+
+    %w[bundle_hygiene measured_metric].each do |classification|
+      invalid_evidence.each do |evidence|
+        qa = run_replay(
+          v2_marker(
+            "performance_impact" => classification,
+            "performance_evidence" => evidence
+          )
+        ).fetch("qa_evidence")
+
+        assertion_label = "#{classification}: #{evidence}"
+        assert_equal "UNKNOWN", qa.fetch("verdict"), assertion_label
+        assert_includes qa.fetch("missing"), "performance_evidence", assertion_label
+      end
+    end
+  end
+
+  def test_v2_performance_source_allows_analyze_path_segment
+    qa = run_replay(
+      v2_marker(
+        "performance_impact" => "bundle_hygiene",
+        "performance_evidence" =>
+          "repo_seam: source=bin/analyze-bundle; baseline_value=100KB; candidate_value=90KB"
+      )
+    ).fetch("qa_evidence")
+
+    assert_equal "SATISFIED", qa.fetch("verdict")
+  end
+
+  def test_v2_measured_metric_requires_named_non_size_runtime_or_user_metric
+    invalid_evidence = [
+      "repo_seam: source=bin/perf-report; baseline_value=2.4s; candidate_value=2.1s",
+      "repo_seam: source=bin/perf-report; metric_name=bundle_size; baseline_value=120kB; candidate_value=121kB",
+      "repo_seam: source=bin/perf-report; metric_name=asset bytes; baseline_value=120kB; candidate_value=121kB",
+      "repo_seam: source=bin/perf-report; metric_name=score; baseline_value=120kB; candidate_value=121kB",
+      "repo_seam: source=bin/perf-report; metric_name=performance_score; baseline_value=120kB; candidate_value=121kB",
+      "repo_seam: source=bin/perf-report; metric_name=LCP; metric_name=INP; baseline_value=2.4s; candidate_value=2.1s",
+      "repo_seam: source=bin/perf-report; metric_name=test_count; baseline_value=100tests; candidate_value=110tests",
+      "repo_seam: source=bin/perf-report; metric_name=placeholder; baseline_value=1ms; candidate_value=2ms",
+      "repo_seam: source=bin/perf-report; metric_name=widgets_clicked; baseline_value=5x; candidate_value=3x",
+      "repo_seam: source=bin/perf-report; metric_name=active_user_count; baseline_value=5users; candidate_value=3users",
+      "repo_seam: source=bin/perf-report; metric_name=power_user_score; baseline_value=5x; candidate_value=3x"
+    ]
+
+    invalid_evidence.each do |evidence|
+      qa = run_replay(
+        v2_marker(
+          "performance_impact" => "measured_metric",
+          "performance_evidence" => evidence
+        )
+      ).fetch("qa_evidence")
+
+      assert_equal "UNKNOWN", qa.fetch("verdict"), evidence
+      assert_includes qa.fetch("missing"), "performance_evidence", evidence
+    end
+  end
+
+  def test_v2_measured_metric_allows_byte_valued_memory_but_not_byte_valued_timing
+    memory = run_replay(
+      v2_marker(
+        "performance_impact" => "measured_metric",
+        "performance_evidence" => "repo_seam: source=bin/perf-report; metric_name=memory; baseline_value=100MB; candidate_value=90MB"
+      )
+    ).fetch("qa_evidence")
+    timing = run_replay(
+      v2_marker(
+        "performance_impact" => "measured_metric",
+        "performance_evidence" => "repo_seam: source=bin/perf-report; metric_name=LCP; baseline_value=100MB; candidate_value=90MB"
+      )
+    ).fetch("qa_evidence")
+
+    assert_equal "SATISFIED", memory.fetch("verdict")
+    assert_equal "UNKNOWN", timing.fetch("verdict")
+    assert_includes timing.fetch("missing"), "performance_evidence"
+  end
+
+  def test_v2_measured_metric_allows_asset_load_time_with_runtime_units
+    qa = run_replay(
+      v2_marker(
+        "performance_impact" => "measured_metric",
+        "performance_evidence" =>
+          "repo_seam: source=bin/perf-report; metric_name=asset load time; baseline_value=2.4s; candidate_value=2.1s"
+      )
+    ).fetch("qa_evidence")
+
+    assert_equal "SATISFIED", qa.fetch("verdict")
+  end
+
+  def test_v2_bundle_hygiene_does_not_require_metric_name
+    qa = run_replay(
+      v2_marker(
+        "performance_impact" => "bundle_hygiene",
+        "performance_evidence" => "repo_seam: source=bin/bundle-report; baseline_value=120kB; candidate_value=121kB"
+      )
+    ).fetch("qa_evidence")
+
+    assert_equal "SATISFIED", qa.fetch("verdict")
+  end
+
+  def test_v2_measurements_require_exact_unit_case
+    evidence = "repo_seam: source=bin/bundle-report; baseline_value=100Kb; candidate_value=90KB"
+    qa = run_replay(
+      v2_marker(
+        "performance_impact" => "bundle_hygiene",
+        "performance_evidence" => evidence
+      )
+    ).fetch("qa_evidence")
+    substitute = run_replay(
+      v2_marker(
+        "interaction_change" => "yes",
+        "interaction_evidence" => "measured_substitute: before_value=1ms; after_value=2MS; tolerance=1ms"
+      )
+    ).fetch("qa_evidence")
+
+    assert_equal "UNKNOWN", qa.fetch("verdict")
+    assert_includes qa.fetch("missing"), "performance_evidence"
+    assert_equal "UNKNOWN", substitute.fetch("verdict")
+    assert_includes substitute.fetch("missing"), "interaction_evidence"
+  end
+
+  def test_v2_bundle_hygiene_rejects_unrelated_counts_and_accepts_labeled_shape
+    invalid = run_replay(
+      v2_marker(
+        "performance_impact" => "bundle_hygiene",
+        "performance_evidence" => "repo_seam: source=bin/test-report; baseline_value=100tests; candidate_value=110tests"
+      )
+    ).fetch("qa_evidence")
+    valid = run_replay(
+      v2_marker(
+        "performance_impact" => "bundle_hygiene",
+        "performance_evidence" => "repo_seam: source=bin/bundle-report; metric_name=asset_count; baseline_value=10files; candidate_value=11files"
+      )
+    ).fetch("qa_evidence")
+
+    assert_equal "UNKNOWN", invalid.fetch("verdict")
+    assert_includes invalid.fetch("missing"), "performance_evidence"
+    assert_equal "SATISFIED", valid.fetch("verdict")
+  end
+
+  def test_v2_performance_evidence_requires_named_repo_seam_source
+    invalid_sources = [
+      "repo_seam: metric_name=LCP; baseline_value=2.4s; candidate_value=2.1s",
+      "repo_seam: source=report; metric_name=LCP; baseline_value=2.4s; candidate_value=2.1s",
+      "repo_seam: source=none; metric_name=LCP; baseline_value=2.4s; candidate_value=2.1s",
+      "repo_seam: source=not_run; metric_name=LCP; baseline_value=2.4s; candidate_value=2.1s",
+      "repo_seam: source=not-run; metric_name=LCP; baseline_value=2.4s; candidate_value=2.1s",
+      "repo_seam: source=skipped; metric_name=LCP; baseline_value=2.4s; candidate_value=2.1s",
+      "repo_seam: source=UNKNOWN; metric_name=LCP; baseline_value=2.4s; candidate_value=2.1s",
+      "repo_seam: source=https://; metric_name=LCP; baseline_value=2.4s; candidate_value=2.1s",
+      "repo_seam: source=http://report.example.test/run; metric_name=LCP; baseline_value=2.4s; candidate_value=2.1s",
+      "repo_seam: https://ci.example.test/run?a=1;source=fake/report; source missing; metric_name=LCP; baseline_value=2.4s; candidate_value=2.1s"
+    ]
+
+    invalid_sources.each do |evidence|
+      qa = run_replay(
+        v2_marker(
+          "performance_impact" => "measured_metric",
+          "performance_evidence" => evidence
+        )
+      ).fetch("qa_evidence")
+
+      assert_equal "UNKNOWN", qa.fetch("verdict"), evidence
+      assert_includes qa.fetch("missing"), "performance_evidence", evidence
+    end
+  end
+
+  def test_v2_not_applicable_performance_rejects_unmeasured_placeholder
+    qa = run_replay(
+      v2_marker(
+        "performance_impact" => "not_applicable",
+        "performance_evidence" => "not applicable: performance was unmeasured"
+      )
+    ).fetch("qa_evidence")
+
+    assert_equal "UNKNOWN", qa.fetch("verdict")
+    assert_includes qa.fetch("missing"), "performance_evidence"
+  end
+
+  def test_current_v2_supersedes_legacy_v1_including_same_head_blocked_v1
+    head_sha = "1111111111111111111111111111111111111111"
+    body = [
+      v1_marker(head_sha: "0000000000000000000000000000000000000000"),
+      v1_marker(head_sha: head_sha, status: "blocked", release_blocking: "blocked"),
+      v2_marker
+    ].join("\n")
+    qa = run_replay(
+      body,
+      expected_head_sha: head_sha,
+      require_visual_evidence_v2: true
+    ).fetch("qa_evidence")
+
+    assert_equal "SATISFIED", qa.fetch("verdict")
+    assert_equal 2, qa.fetch("marker_version")
+    assert_equal 1, qa.fetch("supersedes_marker_version")
+    assert_equal 1, qa.fetch("marker_count")
+  end
+
+  def test_default_replay_ignores_quoted_v2_template_beside_current_v1_evidence
+    head_sha = "1111111111111111111111111111111111111111"
+    quoted_v2 = v2_marker(
+      "head_sha" => "<full commit SHA>",
+      "tested_at" => "PR head <full commit SHA>"
+    )
+    qa = run_replay(
+      "#{v1_marker(head_sha: head_sha)}\n#{quoted_v2}",
+      expected_head_sha: head_sha
+    ).fetch("qa_evidence")
+
+    assert_equal "SATISFIED", qa.fetch("verdict")
+    assert_equal 1, qa.fetch("marker_version")
+  end
+
+  def test_stale_v2_cannot_be_rescued_by_current_v1
+    current_head = "1111111111111111111111111111111111111111"
+    stale_head = "2222222222222222222222222222222222222222"
+    stale_v2 = v2_marker(
+      "head_sha" => stale_head,
+      "tested_at" => "PR #123 head #{stale_head}"
+    )
+    qa = run_replay(
+      "#{v1_marker(head_sha: current_head)}\n#{stale_v2}",
+      expected_head_sha: current_head,
+      require_visual_evidence_v2: true
+    ).fetch("qa_evidence")
+
+    assert_equal "UNKNOWN", qa.fetch("verdict")
+    assert_includes qa.fetch("missing"), "head_sha"
+  end
+
+  def test_malformed_v2_cannot_be_rescued_by_current_v1
+    head_sha = "1111111111111111111111111111111111111111"
+    malformed_v2 = v2_marker("visual_evidence" => "captured locally")
+    qa = run_replay(
+      "#{v1_marker(head_sha: head_sha)}\n#{malformed_v2}",
+      expected_head_sha: head_sha,
+      require_visual_evidence_v2: true
+    ).fetch("qa_evidence")
+
+    assert_equal "UNKNOWN", qa.fetch("verdict")
+    assert_includes qa.fetch("missing"), "visual_evidence"
   end
 
   def test_required_priority_dispositions_reject_missing_marker
@@ -434,6 +2578,79 @@ class CloseoutEvidenceReplayTest < Minitest::Test
     assert_equal "UNKNOWN", qa.fetch("verdict")
     assert_equal 2, qa.fetch("marker_count")
     assert_includes qa.fetch("errors"), "marker[1].duplicate scalar key: head_sha"
+  end
+
+  [[2, 2], [3, 3], [2, 3], [1, 2]].each do |valid_version, ambiguous_version|
+    [false, true].each do |current_first|
+      define_method("test_duplicate_head_applicability_v#{valid_version}_v#{ambiguous_version}_current_first_#{current_first}") do
+        head = "1111111111111111111111111111111111111111"
+        stale = "2222222222222222222222222222222222222222"
+        valid = valid_version == 1 ? v1_marker(head_sha: head) : public_send("v#{valid_version}_marker")
+        first, second = current_first ? [head, stale] : [stale, head]
+        ambiguous = public_send(
+          "v#{ambiguous_version}_marker", "head_sha" => first, "status" => "blocked", "release_blocking" => "blocked"
+        ).sub("tested_at:", "head_sha: #{second}\ntested_at:")
+        modes = [{}, { require_visual_evidence_v2: true }]
+        modes << { require_structured_visual_evidence_v3: true } if ambiguous_version == 3
+
+        modes.each do |mode|
+          [valid + ambiguous, ambiguous + valid].each do |body|
+            data = run_replay(body, expected_head_sha: head, **mode)
+            qa = data.fetch("qa_evidence")
+
+            assert_equal "UNKNOWN", data.fetch("overall_verdict"), mode.inspect
+            assert_equal ambiguous_version, qa.fetch("marker_version")
+            assert qa.fetch("errors").any? { |error| error.include?("duplicate scalar key: head_sha") }, qa.inspect
+          end
+        end
+      end
+    end
+  end
+
+  def test_duplicate_head_repair_keeps_unambiguous_stale_history_ignorable
+    head = "1111111111111111111111111111111111111111"
+    stale = "2222222222222222222222222222222222222222"
+    [[2, 2], [3, 3], [2, 3], [1, 2]].each do |current_version, stale_version|
+      current = current_version == 1 ? v1_marker(head_sha: head) : public_send("v#{current_version}_marker")
+      history = public_send("v#{stale_version}_marker", "head_sha" => stale, "tested_at" => "PR #123 head #{stale}")
+      qa = run_replay(history + current, expected_head_sha: head).fetch("qa_evidence")
+
+      assert_equal "SATISFIED", qa.fetch("verdict")
+      assert_equal current_version, qa.fetch("marker_version")
+      assert_equal 1, qa.fetch("marker_count")
+    end
+  end
+
+  def test_duplicate_head_applicability_keeps_malformed_first_head_ambiguous
+    head = "1111111111111111111111111111111111111111"
+    [2, 3].each do |version|
+      valid = version == 2 ? v1_marker(head_sha: head) : v2_marker
+      ambiguous = public_send("v#{version}_marker", "head_sha" => "invalid")
+                  .sub("tested_at:", "head_sha: #{head}\ntested_at:")
+      qa = run_replay(valid + ambiguous, expected_head_sha: head).fetch("qa_evidence")
+
+      assert_equal "UNKNOWN", qa.fetch("verdict")
+      assert_equal version, qa.fetch("marker_version")
+      assert qa.fetch("errors").any? { |error| error.include?("duplicate scalar key: head_sha") }, qa.inspect
+    end
+  end
+
+  def test_duplicate_head_repair_keeps_current_blocked_receipts_in_aggregate
+    [2, 3].each do |version|
+      current = public_send("v#{version}_marker")
+      blocked = public_send("v#{version}_marker", "status" => "blocked", "release_blocking" => "blocked")
+      mode = version == 3 ? { require_structured_visual_evidence_v3: true } : { require_visual_evidence_v2: true }
+      data = run_replay(
+        current + blocked,
+        expected_head_sha: "1111111111111111111111111111111111111111",
+        **mode
+      )
+      qa = data.fetch("qa_evidence")
+
+      assert_equal "BLOCKED", data.fetch("overall_verdict")
+      assert_equal 2, qa.fetch("marker_count")
+      assert_empty qa.fetch("errors")
+    end
   end
 
   def test_expected_final_head_aggregates_all_current_head_priority_markers

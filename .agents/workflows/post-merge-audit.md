@@ -302,15 +302,31 @@ states, not verified batch subsets.
 After the scope algorithm identifies the batch or reports an `UNKNOWN` scope,
 collect any QA lane and QA Evidence block for that batch. Do not use missing QA
 state to shrink the worked-issue scope; report it as a QA coverage finding or
-`UNKNOWN` fact instead. When the handoff includes `qa-evidence v1` or
+`UNKNOWN` fact instead. When the handoff includes `qa-evidence v1`,
+`qa-evidence v2`, `qa-evidence v3`, or
 `priority-finding-dispositions v1` markers, resolve
 `POST_MERGE_AUDIT_SKILL_DIR` with the env-var / loaded-skill / repo-local chain,
 then run `"${POST_MERGE_AUDIT_SKILL_DIR}/bin/closeout-evidence-replay"` separately
 for each PR body, handoff comment, or saved evidence file with
 `--expected-head-sha <full-merged-head-SHA>`. Add
 `--require-priority-dispositions` when the audit relies on fixed, waived, or
-deferred priority findings. Carry `BLOCKED` / `UNKNOWN` replay as a QA or
-priority-disposition finding.
+deferred priority findings. For every current user-visible UI change, run the
+combined gate `--expected-head-sha <full-merged-head-SHA>
+--require-structured-visual-evidence-v3`; the strict v3 flag is invalid without
+the expected head. Verify the v3 closed-vocabulary fields, destination-bound
+durable before/after URLs, captured baseline and candidate states, a passed
+paint check, interaction clip or same-unit measured substitute when applicable,
+an observed unfixed negative control for a visual fix, and repository
+performance-seam evidence with a compatible impact, source, metric kind, and
+metric-compatible same-unit baseline/candidate pair. Descriptive notes do not satisfy these
+fields, and incidental CI URL IDs do not count.
+Local/file paths and “captured locally” do not qualify; a GitHub-only handoff
+remains blocked until an authenticated UI upload or human attachment puts the
+resulting durable GitHub URL in the receipt. Historical `qa-evidence v1` and v2
+remain replayable when the v3 forward gate is not required. Under the strict v3
+forward gate, explicit v3 presence supersedes older history, so stale or
+malformed v3 cannot be rescued by v2 or v1. Carry `BLOCKED` / `UNKNOWN` replay
+as a QA or priority-disposition finding.
 
 Show the included/excluded worked issues, collected QA lanes and QA Evidence
 blocks, advisory `codex-claim` rows, excluded range PRs, audit coverage
