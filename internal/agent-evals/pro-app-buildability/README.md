@@ -2,8 +2,8 @@
 
 This eval asks one coding agent to create and verify a small React on Rails Pro
 application without human intervention. It is an evidence surface, not a
-product claim. A run only supports a claim when its independently captured
-artifacts satisfy the rubric.
+product claim. The harness captures bounded command and artifact facts; a human
+must review their semantic coverage before a run can support a claim.
 
 ## Clean-start prerequisites
 
@@ -43,7 +43,7 @@ captures:
 - the agent's schema-constrained final report;
 - independently captured, sanitized command output;
 - selected generated manifests/source excerpts with hashes;
-- a conservative machine-derived rubric whose citations point to those two
+- a `needs-review` rubric whose semantic rows point reviewers to those two
   evidence files; and
 - hashes covering every run artifact and every executable, schema, prompt,
   dependency manifest, and lockfile input.
@@ -150,15 +150,15 @@ and the final current store are scanned so neither generation can reach
 workspace or output artifacts.
 
 If timeout terminates Claude with a Bash call still pending, normalization
-records that call as failed with exit `124` and continues to the incomplete,
-checksummed run evidence. The same unmatched call remains fatal for every
+records that call as failed with exit `124` and continues to checksummed evidence
+that requires review. The same unmatched call remains fatal for every
 non-timeout exit. Only an unterminated final JSON fragment may be discarded on
 timeout; malformed complete events remain fatal even when the exit is `124`.
 
 Evidence parsing is bounded before JSON parsing or file reads. Event bytes and
 event count, visited/selected artifact counts, recursion depth, per-file bytes,
-and aggregate artifact bytes are recorded in evidence metadata. Any exceeded
-budget omits the affected evidence and forces an `incomplete` rubric result.
+and aggregate artifact bytes are recorded in evidence metadata. An exceeded
+budget omits the affected evidence and is recorded for mandatory review.
 
 ## Replay and validate
 
@@ -176,24 +176,41 @@ internal/agent-evals/pro-app-buildability/bin/validate-run \
 
 Validation uses pinned Ajv 8 in Draft 2020-12 mode for `run.json`,
 `agent-report.json`, both independent evidence documents, and the derived
-rubric and sandbox-network probe. It also verifies input/output hashes, rejects raw capture files, and
+review status and sandbox-network probe. It also verifies input/output hashes, rejects raw capture files, and
 scans for local paths and credential-shaped content. Self-reported success is
 never sufficient.
 
 ## Interpretation
 
-- **Pass:** every required rubric item has independent evidence, the application
-  tests and production build pass, no human rescue occurred, and manual review
-  confirms that the command evidence complied with the immutable prompt.
-- **Fail:** the agent completed its attempt, but one or more required rubric
-  items failed.
-- **Incomplete:** infrastructure, credentials, network, time, or runner failure
-  prevented a meaningful end-to-end attempt.
+Every new run is **Needs review**. Review each rubric row against the captured
+commands, exit codes, output truncation flags, selected source excerpts, and
+collection-limit metadata. Record the review outside the immutable bundle. An
+unsupported language or framework pattern is not an observed application
+failure; likewise, an exit code alone does not establish that the requested
+behavior is correct.
 
-One passing run supports only the exact agent, versions, platform, and scenario
-recorded. Claims about Claude and Codex require separate passing runs. Tutorial
-or marketing wording must link to the supporting run artifacts and preserve
+Historical bundles can still contain **Pass**, **Fail**, or **Incomplete** so
+their bytes and schemas remain replayable. Those values came from the retired
+custom Ruby, JavaScript, English, and shell-pattern classifier. Treat them as
+historical diagnostics, not current semantic verdicts.
+
+Claims about Claude and Codex require separate reviewed runs. Tutorial or
+marketing wording must link to the supporting run artifacts and preserve
 environment caveats and observed friction.
+
+## Diagnostic history
+
+The August 13, 2026 Claude and Codex bundles initially passed the retired
+nine-row classifier. Manual protocol review later found that both agents read
+outside the assigned workspace, contrary to the immutable prompt, so neither
+counts as a completion. The files remain unchanged as examples of why captured
+facts and semantic judgment must stay separate.
+
+Those runs also surfaced environment-specific friction: Rails was not initially
+installed, PostgreSQL was unavailable, route tests needed the generated Pro
+Node renderer, and generated fixtures conflicted with a unique database
+constraint. These observations are diagnostic only. Fresh compliant runs and
+manual semantic review are required before making an agent-completion claim.
 
 ## Redaction
 

@@ -522,7 +522,7 @@ git -C "$workspace" status --short --untracked-files=normal >"$evidence_dir/work
 
 finished_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 classification="$(jq -r .overall "$evidence_dir/rubric-results.json")"
-reason="Machine-derived rubric result: $classification; see rubric-results.json"
+reason="Semantic review status: $classification; review the captured evidence and rubric-results.json"
 
 jq -n \
   --arg run_id "$run_id" --arg started "$started_at" --arg finished "$finished_at" \

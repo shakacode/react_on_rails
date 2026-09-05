@@ -87,41 +87,22 @@ success from generated files.
 
 On August 13, 2026, Codex and Claude each attempted this exercise from an empty
 repository at React on Rails revision
-`06d962d089f34dc1ec2963a50c233508ecbc7103`. Both isolated runs passed the
-machine-derived nine-row rubric: Pro installation, RSC route, server-side form
-validation, page and form tests, production build, green tests, unaided
-execution, and complete evidence. Manual protocol review later found that
-neither run complied with the immutable evaluation prompt.
+`06d962d089f34dc1ec2963a50c233508ecbc7103`. Their immutable evidence bundles
+remain available as diagnostic records:
 
 | Run                                                                                                                                                                                        | Agent and model             | Review result                                                 | Recorded environment                                                                |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
 | [Claude evidence bundle](https://github.com/shakacode/react_on_rails/tree/deee3f55bebb7ffeebf24219fe9fd6751db54c73/internal/agent-evals/pro-app-buildability/runs/final-claude-06d962d0-1) | Claude Code 2.1.210, Sonnet | Protocol-noncompliant diagnostic; not counted as a completion | Linux 7.0.0-28-generic aarch64; Ruby 3.4.10; Node 22.23.2; npm 10.9.8; pnpm 10.33.4 |
 | [Codex evidence bundle](https://github.com/shakacode/react_on_rails/tree/deee3f55bebb7ffeebf24219fe9fd6751db54c73/internal/agent-evals/pro-app-buildability/runs/final-codex-06d962d0-1)   | Codex CLI 0.144.4, GPT-5.4  | Protocol-noncompliant diagnostic; not counted as a completion | Linux 7.0.0-28-generic aarch64; Ruby 3.4.10; Node 22.23.2; npm 10.9.8; pnpm 10.33.4 |
 
-Both bundles passed the structural and security validation gate and came from a
-network-enabled, isolated, ephemeral host with an empty inherited environment.
-Authentication was available to the agent runner but was not persisted in
-either result. No human follow-up was sent during either run.
-
-Manual protocol review invalidated both machine-derived rubric results. The
-Codex command evidence included a root-level filesystem search and a read of
-`/etc/os-release`; the Claude evidence included those classes of access and
-additional host-wide inspection. All were outside the assigned workspace,
-contrary to the immutable evaluation prompt. The bundles remain useful as
-diagnostic records, but neither counts as a completion. Fresh compliant Codex
-and Claude runs are required before making either a single-agent or two-agent
-completion claim.
-
-The runs also surfaced environment-specific friction:
-
-- Rails was not preinstalled, so the first scaffold attempt failed until Rails
-  was installed and the scaffold was rerun successfully.
-- No PostgreSQL service was available. One run provisioned an isolated
-  workspace-local PostgreSQL process; the other intentionally adapted its app to
-  SQLite before rerunning verification.
-- Tests that exercised the RSC route needed the generated Pro Node renderer.
-- One run corrected generated fixture values that conflicted with a unique
-  database constraint.
+Both bundles passed structural and security validation, but later manual review
+found protocol violations. Neither counts as a completion. New harness results
+therefore require explicit semantic review; bounded command and artifact facts
+do not receive an automatic pass or fail. See the
+[internal eval README](../../../internal/agent-evals/pro-app-buildability/README.md#diagnostic-history)
+for the diagnostic history and review rules. Fresh compliant Codex and Claude
+runs are required before making either a single-agent or two-agent completion
+claim.
 
 These bundles are point-in-time observations, not a compatibility guarantee for
 other versions, platforms, databases, or network conditions. In particular,

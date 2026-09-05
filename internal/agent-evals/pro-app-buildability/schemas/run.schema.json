@@ -164,7 +164,7 @@
       "additionalProperties": false,
       "required": ["classification", "reason", "tutorial_claims_supported"],
       "properties": {
-        "classification": { "enum": ["pass", "fail", "incomplete"] },
+        "classification": { "enum": ["pass", "fail", "incomplete", "needs-review"] },
         "reason": { "type": "string" },
         "tutorial_claims_supported": { "const": false }
       }
