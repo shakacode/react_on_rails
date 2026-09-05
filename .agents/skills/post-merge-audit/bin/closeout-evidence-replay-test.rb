@@ -2580,6 +2580,79 @@ class CloseoutEvidenceReplayTest < Minitest::Test
     assert_includes qa.fetch("errors"), "marker[1].duplicate scalar key: head_sha"
   end
 
+  [[2, 2], [3, 3], [2, 3], [1, 2]].each do |valid_version, ambiguous_version|
+    [false, true].each do |current_first|
+      define_method("test_duplicate_head_applicability_v#{valid_version}_v#{ambiguous_version}_current_first_#{current_first}") do
+        head = "1111111111111111111111111111111111111111"
+        stale = "2222222222222222222222222222222222222222"
+        valid = valid_version == 1 ? v1_marker(head_sha: head) : public_send("v#{valid_version}_marker")
+        first, second = current_first ? [head, stale] : [stale, head]
+        ambiguous = public_send(
+          "v#{ambiguous_version}_marker", "head_sha" => first, "status" => "blocked", "release_blocking" => "blocked"
+        ).sub("tested_at:", "head_sha: #{second}\ntested_at:")
+        modes = [{}, { require_visual_evidence_v2: true }]
+        modes << { require_structured_visual_evidence_v3: true } if ambiguous_version == 3
+
+        modes.each do |mode|
+          [valid + ambiguous, ambiguous + valid].each do |body|
+            data = run_replay(body, expected_head_sha: head, **mode)
+            qa = data.fetch("qa_evidence")
+
+            assert_equal "UNKNOWN", data.fetch("overall_verdict"), mode.inspect
+            assert_equal ambiguous_version, qa.fetch("marker_version")
+            assert qa.fetch("errors").any? { |error| error.include?("duplicate scalar key: head_sha") }, qa.inspect
+          end
+        end
+      end
+    end
+  end
+
+  def test_duplicate_head_repair_keeps_unambiguous_stale_history_ignorable
+    head = "1111111111111111111111111111111111111111"
+    stale = "2222222222222222222222222222222222222222"
+    [[2, 2], [3, 3], [2, 3], [1, 2]].each do |current_version, stale_version|
+      current = current_version == 1 ? v1_marker(head_sha: head) : public_send("v#{current_version}_marker")
+      history = public_send("v#{stale_version}_marker", "head_sha" => stale, "tested_at" => "PR #123 head #{stale}")
+      qa = run_replay(history + current, expected_head_sha: head).fetch("qa_evidence")
+
+      assert_equal "SATISFIED", qa.fetch("verdict")
+      assert_equal current_version, qa.fetch("marker_version")
+      assert_equal 1, qa.fetch("marker_count")
+    end
+  end
+
+  def test_duplicate_head_applicability_keeps_malformed_first_head_ambiguous
+    head = "1111111111111111111111111111111111111111"
+    [2, 3].each do |version|
+      valid = version == 2 ? v1_marker(head_sha: head) : v2_marker
+      ambiguous = public_send("v#{version}_marker", "head_sha" => "invalid")
+                  .sub("tested_at:", "head_sha: #{head}\ntested_at:")
+      qa = run_replay(valid + ambiguous, expected_head_sha: head).fetch("qa_evidence")
+
+      assert_equal "UNKNOWN", qa.fetch("verdict")
+      assert_equal version, qa.fetch("marker_version")
+      assert qa.fetch("errors").any? { |error| error.include?("duplicate scalar key: head_sha") }, qa.inspect
+    end
+  end
+
+  def test_duplicate_head_repair_keeps_current_blocked_receipts_in_aggregate
+    [2, 3].each do |version|
+      current = public_send("v#{version}_marker")
+      blocked = public_send("v#{version}_marker", "status" => "blocked", "release_blocking" => "blocked")
+      mode = version == 3 ? { require_structured_visual_evidence_v3: true } : { require_visual_evidence_v2: true }
+      data = run_replay(
+        current + blocked,
+        expected_head_sha: "1111111111111111111111111111111111111111",
+        **mode
+      )
+      qa = data.fetch("qa_evidence")
+
+      assert_equal "BLOCKED", data.fetch("overall_verdict")
+      assert_equal 2, qa.fetch("marker_count")
+      assert_empty qa.fetch("errors")
+    end
+  end
+
   def test_expected_final_head_aggregates_all_current_head_priority_markers
     final_head_sha = "2222222222222222222222222222222222222222"
     data = run_replay(<<~MARKDOWN, expected_head_sha: final_head_sha)

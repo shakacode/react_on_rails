@@ -152,14 +152,10 @@ module CloseoutEvidenceReplay
     qa_v2_markers = marker_bodies(text, "qa-evidence v2")
     qa_v3_markers = marker_bodies(text, "qa-evidence v3")
     applicable_v3_markers = qa_v3_markers.select do |marker|
-      fields, = parse_fields(marker)
-      head_sha = fields.fetch("head_sha", "").to_s.downcase
-      full_head_sha?(head_sha) && (!expected_head_sha || head_sha == expected_head_sha)
+      applicable_qa_marker?(marker, expected_head_sha)
     end
     applicable_v2_markers = qa_v2_markers.select do |marker|
-      fields, = parse_fields(marker)
-      head_sha = fields.fetch("head_sha", "").to_s.downcase
-      full_head_sha?(head_sha) && (!expected_head_sha || head_sha == expected_head_sha)
+      applicable_qa_marker?(marker, expected_head_sha)
     end
     qa =
       if require_structured_visual_evidence_v3 && expected_head_sha.nil?
@@ -220,6 +216,14 @@ module CloseoutEvidenceReplay
 
   def marker_bodies(text, name)
     text.scan(/<!--\s*#{Regexp.escape(name)}(?=\s|-->)\s*(.*?)-->/m).map(&:first)
+  end
+
+  def applicable_qa_marker?(marker, expected_head_sha)
+    fields, duplicate_keys = parse_fields(marker)
+    return true if duplicate_keys.include?("head_sha")
+
+    head_sha = fields.fetch("head_sha", "").to_s.downcase
+    full_head_sha?(head_sha) && (!expected_head_sha || head_sha == expected_head_sha)
   end
 
   def replay_qa_markers(markers, expected_head_sha: nil, version: 1)
