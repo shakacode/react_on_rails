@@ -2,6 +2,7 @@
 
 require "securerandom"
 require_relative "generator_messages"
+require_relative "generated_webpack_config_pair"
 require "react_on_rails/node_renderer_procfile"
 require "react_on_rails/pro_migration"
 
@@ -36,9 +37,8 @@ module ReactOnRails
       # Loader helpers emitted by
       # templates/base/base/config/webpack/serverWebpackConfig.js.tt.
       #
-      # Keep both blocks byte-identical to that template: a fresh `--pro` install renders
-      # the template while a standalone Pro upgrade patches an existing base config, and
-      # the two must produce the same source text so drift is detectable (issue #4786).
+      # Keep these parity-test anchors byte-identical to the template (issue #4786).
+      # Migration recognition uses the entire rendered pair, never these snippets.
       GET_LOADER_PATH_JS = <<~JS
         // Normalizes an entry of a webpack/rspack `rule.use` array to its loader path.
         // Entries may be a bare string, a `{ loader, options }` object, or null.
@@ -55,31 +55,6 @@ module ReactOnRails
           return rule.use.find((item) => getLoaderPath(item).includes(loaderName));
         }
       JS
-
-      BUNDLER_REQUIRE_PATTERN =
-        %r{(const bundler = config\.assets_bundler.*\n.*require\('@rspack/core'\).*\n.*: require\('webpack'\);)}
-
-      # Matches a module-scope declaration line for getLoaderPath, however it is written. The
-      # emitted extractLoader calls getLoaderPath, so we must never add a second
-      # declaration: `function` next to an existing `const` is a SyntaxError, not a
-      # silent shadow, and the generated config would fail to parse in Node.
-      GET_LOADER_PATH_DECLARATION =
-        /^(?:function\s+getLoaderPath\s*\(|(?:const|let|var)\s+getLoaderPath\b)/
-
-      # Matches a module-scope declaration line for extractLoader, including customized lexical forms.
-      # The generated config keeps module declarations at column zero. This narrow anchor excludes
-      # line-comment-only and nested mentions without pretending to parse JavaScript.
-      EXTRACT_LOADER_DECLARATION =
-        /^(?:function\s+extractLoader\s*\(|(?:const|let|var)\s+extractLoader\b)/
-
-      # Generated callers require synchronous helpers, not promises or iterators.
-      UNSUPPORTED_WEBPACK_HELPER_DECLARATION =
-        /^[ \t]*(?:(?:async[ \t]+)?function\s*\*\s*|async[ \t]+function\s+)(?:extractLoader|getLoaderPath)\s*\(/
-
-      UNSUPPORTED_WEBPACK_HELPER_ASSIGNMENT = /
-        ^[ \t]*(?:(?:const|let|var)\s+)?(?:extractLoader|getLoaderPath)\s*=\s*
-        (?:\(\s*)*(?:async\b|function\s*\*)
-      /x
 
       # Main entry point for Pro setup.
       # Orchestrates creation of all Pro-related files and configuration.
@@ -455,296 +430,63 @@ module ReactOnRails
         say "✅ Added Node Renderer to #{procfile}", :green
       end
 
-      # Update webpack configs to enable Pro settings.
-      # This is needed for standalone Pro upgrades where the base install
-      # created webpack configs without Pro settings enabled.
-      #
-      # Updates serverWebpackConfig.js:
-      # - Adds extractLoader helper function (required by rscWebpackConfig.js)
-      # - Adds Babel SSR caller setup (required for correct SSR compilation)
-      # - Enables libraryTarget: 'commonjs2' (required for Node Renderer)
-      # - Enables serverWebpackConfig.target = 'node' (required for Node.js modules)
-      # - Disables Node.js polyfills via node = false (required for real __dirname)
-      # - Changes module.exports to Pro style (required by rscWebpackConfig.js)
-      #
-      # Updates ServerClientOrBoth.js:
-      # - Changes import to destructured style (required for Pro object export)
+      # Only replace complete, unchanged generated pairs. Inspecting declarations or
+      # individual markers cannot establish that customized JavaScript is safe to rewrite.
       def update_webpack_config_for_pro
-        webpack_config, webpack_config_path = webpack_config_paths
-
-        unless File.exist?(webpack_config_path)
-          say "ℹ️  serverWebpackConfig.js not found, skipping webpack update", :yellow
+        paths = generated_webpack_pair_paths
+        contents = read_generated_webpack_pair(paths) if paths
+        replacement = GeneratedWebpackConfigPair.pro_upgrade(contents) if contents
+        unless replacement
+          warn_unknown_webpack_pair
           return
         end
 
-        content = File.read(webpack_config_path)
-        return if skip_ambiguous_webpack_comments?(webpack_config, content)
-        return if skip_unsupported_webpack_helpers?(webpack_config, content)
-        return if skip_ambiguous_webpack_helpers?(webpack_config, content)
-
-        server_config_ready = pro_server_config_ready?(content)
-        import_ready = server_client_import_ready?
-
-        # Skip only when both server config and import style are already updated.
-        if server_config_ready && import_ready
+        if replacement == contents
           say "ℹ️  Webpack config already has Pro settings enabled, skipping", :yellow
           return
         end
 
-        say "📝 Updating serverWebpackConfig.js for Pro...", :yellow
-
-        unless server_config_ready
-          # Add extractLoader helper function after bundler require
-          add_extract_loader_to_server_config(webpack_config, content)
-
-          # Add Babel SSR caller setup (uses extractLoader, so must come after)
-          add_babel_ssr_caller_to_server_config(webpack_config, content)
-
-          # Uncomment libraryTarget: 'commonjs2'
-          library_target_pattern = %r{// If using the React on Rails Pro.*\n\s*// libraryTarget: 'commonjs2',}
-          library_target_replacement = "// Required for React on Rails Pro Node Renderer\n    " \
-                                       "libraryTarget: 'commonjs2',"
-          gsub_file(webpack_config, library_target_pattern, library_target_replacement)
-
-          # Replace stale comments and uncomment target = 'node', add node = false
-          # The base template has 4 lines: 2 explanatory comments + "uncomment" hint + commented code
-          # Replace with clean Pro output matching the template's use_pro? branch
-          # rubocop:disable Layout/LineLength
-          target_node_pattern = %r{\s*// If using the default 'web',.*\n\s*// break with SSR\..*\n\s*// If using the React on Rails Pro.*\n\s*// serverWebpackConfig\.target = 'node'}
-          # rubocop:enable Layout/LineLength
-          target_node_replacement = "\n\n  " \
-                                    "// React on Rails Pro uses Node renderer, so target must be 'node'\n  " \
-                                    "// This fixes issues with libraries like Emotion and loadable-components\n  " \
-                                    "serverWebpackConfig.target = 'node';\n\n  " \
-                                    "// Disable Node.js polyfills - not needed when targeting Node\n  " \
-                                    "serverWebpackConfig.node = false;"
-          gsub_file(webpack_config, target_node_pattern, target_node_replacement)
-
-          # Change module.exports to Pro style (exports object with default and extractLoader)
-          update_server_config_exports(webpack_config)
+        paths.zip(replacement).each do |path, content|
+          create_file(path, content, force: true)
         end
-
-        # Update ServerClientOrBoth.js import style
-        update_server_client_or_both_import
-
-        verify_pro_webpack_transforms(webpack_config)
         say "✅ Updated webpack configs for Pro", :green
       end
 
-      def webpack_config_paths
-        config = destination_config_path("config/webpack/serverWebpackConfig.js")
-        [config, File.join(destination_root, config)]
-      end
-
-      def add_extract_loader_to_server_config(webpack_config, content)
-        # Skip if extractLoader already exists
-        return if extract_loader_declared?(content)
-
-        if content.include?(GET_LOADER_PATH_JS)
-          # Config rendered by the current base template: append extractLoader directly after
-          # the shared getLoaderPath helper so the result matches the template's Pro output.
-          gsub_file(webpack_config, GET_LOADER_PATH_JS, "#{GET_LOADER_PATH_JS}\n#{EXTRACT_LOADER_JS}")
-        elsif get_loader_path_declared?(content)
-          # The app already declares getLoaderPath but has customized it (reformatted, recommented,
-          # or rewritten as an arrow function). Reuse whatever is there and emit extractLoader only.
-          # Emitting our own copy would redeclare the identifier, which is a SyntaxError next to an
-          # existing const/let and silent shadowing next to another function declaration.
-          gsub_file(webpack_config, BUNDLER_REQUIRE_PATTERN, "\\1\n\n#{EXTRACT_LOADER_JS}".chomp)
-        else
-          # Base config generated before getLoaderPath existed: emit both helpers after the
-          # bundler require so extractLoader's dependency is present.
-          gsub_file(
-            webpack_config,
-            BUNDLER_REQUIRE_PATTERN,
-            "\\1\n\n#{GET_LOADER_PATH_JS}\n#{EXTRACT_LOADER_JS}".chomp
-          )
+      # Unlike resolve_server_client_or_both_path, discovery must not rename files
+      # or edit environment imports before the entire pair has been recognized.
+      def generated_webpack_pair_paths
+        server = destination_config_path("config/webpack/serverWebpackConfig.js")
+        companions = %w[ServerClientOrBoth.js generateWebpackConfigs.js].map do |name|
+          destination_config_path("config/webpack/#{name}")
         end
-      end
-
-      def add_babel_ssr_caller_to_server_config(webpack_config, content)
-        return if content.include?("babelLoader.options.caller")
-
-        babel_ssr_code = "\n\n      " \
-                         "// Set SSR caller for Babel (if using Babel instead of SWC)\n      " \
-                         "const babelLoader = extractLoader(rule, 'babel-loader');\n      " \
-                         "if (babelLoader && babelLoader.options) {\n        " \
-                         "babelLoader.options.caller = { ssr: true };\n      " \
-                         "}"
-
-        # Insert after cssLoader.options.modules; [\s\S]*? covers both single-line and spread syntax patterns.
-        gsub_file(
-          webpack_config,
-          /(cssLoader\.options\.modules = \{[\s\S]*?exportOnlyLocals: true[\s\S]*?\};\s*\n\s*\})/,
-          "\\1#{babel_ssr_code}"
-        )
-        new_content = File.read(File.join(destination_root, webpack_config))
-        return if new_content.include?("babelLoader.options.caller")
-
-        say_status :warning, "Babel SSR caller insertion failed in #{webpack_config}; manual edit required.", :yellow
-      end
-
-      def update_server_config_exports(webpack_config)
-        # Change from: module.exports = configureServer;
-        # To: module.exports = { default: configureServer, extractLoader };
-        gsub_file(
-          webpack_config,
-          /^module\.exports = configureServer;\s*$/,
-          "module.exports = {\n  default: configureServer,\n  extractLoader,\n};\n"
-        )
-      end
-
-      def verify_pro_webpack_transforms(webpack_config)
-        content = File.read(File.join(destination_root, webpack_config))
-        missing = missing_server_config_transforms(content)
-        missing.concat(missing_server_client_import_transform)
-        return if missing.empty?
-
-        GeneratorMessages.add_warning(<<~MSG.strip)
-          ⚠️  Some Pro webpack transforms may not have applied correctly.
-
-          The following expected patterns were not found in #{webpack_config}:
-          #{missing.map { |m| "  - #{m}" }.join("\n")}
-
-          This can happen if your webpack config has been customized.
-          Please verify #{webpack_config} manually.
-        MSG
-      end
-
-      def missing_server_config_transforms(content)
-        checks = [
-          ["libraryTarget: 'commonjs2',", content.include?("libraryTarget: 'commonjs2',")],
-          ["extractLoader declaration", extract_loader_declared?(content)],
-          [
-            "babelLoader.options.caller = { ssr: true }",
-            content.include?("babelLoader.options.caller = { ssr: true }")
-          ],
-          ["serverWebpackConfig.target = 'node'", content.include?("serverWebpackConfig.target = 'node'")],
-          ["serverWebpackConfig.node = false", content.include?("serverWebpackConfig.node = false")],
-          ["default: configureServer", content.include?("default: configureServer")],
-          ["extractLoader,", content.include?("extractLoader,")]
-        ]
-
-        checks.filter_map { |label, present| label unless present }
-      end
-
-      def missing_server_client_import_transform
-        server_client_path = resolve_server_client_or_both_path
-        return [] unless server_client_path
-
-        content = File.read(File.join(destination_root, server_client_path))
-        return [] if content.include?("{ default: serverWebpackConfig }")
-
-        ["{ default: serverWebpackConfig }"]
-      end
-
-      def update_server_client_or_both_import
-        server_client_path = resolve_server_client_or_both_path
-        return unless server_client_path
-
-        content = File.read(File.join(destination_root, server_client_path))
-
-        # Skip if already using destructured import
-        return if content.include?("{ default: serverWebpackConfig }")
-
-        # Change from: const serverWebpackConfig = require('./serverWebpackConfig');
-        # To: const { default: serverWebpackConfig } = require('./serverWebpackConfig');
-        gsub_file(
-          server_client_path,
-          %r{^const serverWebpackConfig = require\('\./serverWebpackConfig'\);$},
-          "const { default: serverWebpackConfig } = require('./serverWebpackConfig');"
-        )
-
-        new_content = File.read(File.join(destination_root, server_client_path))
-        return if new_content.include?("{ default: serverWebpackConfig }")
-
-        say_status(
-          :warning,
-          "ServerClientOrBoth import update failed in #{server_client_path}; manual edit required.",
-          :yellow
-        )
-      end
-
-      def pro_server_config_ready?(content)
-        # Check for the Pro-specific comment marker (written by the transform) to avoid
-        # false-negatives when commented-out lines also contain the pattern string.
-        content.include?("// Required for React on Rails Pro Node Renderer") &&
-          extract_loader_declared?(content) &&
-          content.include?("babelLoader.options.caller = { ssr: true }") &&
-          content.include?("serverWebpackConfig.target = 'node'") &&
-          content.include?("serverWebpackConfig.node = false") &&
-          content.include?("default: configureServer") &&
-          content.include?("extractLoader,")
-      end
-
-      def server_client_import_ready?
-        server_client_path = resolve_server_client_or_both_path
-        return true unless server_client_path
-
-        content = File.read(File.join(destination_root, server_client_path))
-        content.include?("{ default: serverWebpackConfig }")
-      end
-
-      def extract_loader_declared?(content)
-        javascript_without_block_comments(content).match?(EXTRACT_LOADER_DECLARATION)
-      end
-
-      def get_loader_path_declared?(content)
-        javascript_without_block_comments(content).match?(GET_LOADER_PATH_DECLARATION)
-      end
-
-      def javascript_without_block_comments(content)
-        content.gsub(%r{/\*.*?\*/}m) { |comment| comment.gsub(/[^\r\n]/, " ") }
-      end
-
-      def skip_ambiguous_webpack_comments?(webpack_config, content)
-        # A comment opener may actually be inside a string or template literal.
-        # Even genuine commented-out helpers require manual migration: masking
-        # their names cannot safely distinguish those cases without a JS parser.
-        masks_helper = content.scan(%r{/\*.*?\*/}m).any? do |comment|
-          comment.match?(/\b(?:extractLoader|getLoaderPath)\b/)
+        existing = companions.select do |path|
+          absolute = File.join(destination_root, path)
+          File.exist?(absolute) || File.symlink?(absolute)
         end
-        return false unless masks_helper
+        return unless existing.one?
 
+        paths = [server, existing.first]
+        return unless paths.all? do |path|
+          absolute = File.join(destination_root, path)
+          File.file?(absolute) && !File.symlink?(absolute)
+        end
+
+        paths
+      end
+
+      def read_generated_webpack_pair(paths)
+        paths.map { |path| File.binread(File.join(destination_root, path)) }
+      rescue SystemCallError, IOError
+        nil
+      end
+
+      def warn_unknown_webpack_pair
         GeneratorMessages.add_warning(<<~MSG.strip)
-          Skipped Pro webpack updates because comment masking is ambiguous in #{webpack_config}.
-          A possible block comment contains a helper name, which may belong to live code or a comment.
-          Both webpack configs were left unchanged. Update it manually using the Pro setup guide:
+          Skipped Pro webpack updates: the config pair is missing, ambiguous, customized,
+          or does not match a supported current generated pair.
+          Both webpack configs and their paths were left unchanged. Update them manually using the Pro setup guide:
           https://reactonrails.com/docs/pro/upgrading-to-pro/
         MSG
-        true
-      end
-
-      def skip_unsupported_webpack_helpers?(webpack_config, content)
-        source = javascript_without_block_comments(content)
-        return false unless source.match?(UNSUPPORTED_WEBPACK_HELPER_DECLARATION) ||
-                            source.match?(UNSUPPORTED_WEBPACK_HELPER_ASSIGNMENT)
-
-        GeneratorMessages.add_warning(<<~MSG.strip)
-          Skipped Pro webpack updates because generated callers require synchronous helpers in #{webpack_config}.
-          Both webpack configs were left unchanged. Update it manually using the Pro setup guide:
-          https://reactonrails.com/docs/pro/upgrading-to-pro/
-        MSG
-        true
-      end
-
-      def webpack_helper_scope_ambiguous?(content)
-        source = javascript_without_block_comments(content)
-        unindented_source = source.gsub(/^[ \t]+/, "")
-        [EXTRACT_LOADER_DECLARATION, GET_LOADER_PATH_DECLARATION].any? do |declaration|
-          !source.match?(declaration) && unindented_source.match?(declaration)
-        end
-      end
-
-      def skip_ambiguous_webpack_helpers?(webpack_config, content)
-        return false unless webpack_helper_scope_ambiguous?(content)
-
-        GeneratorMessages.add_warning(<<~MSG.strip)
-          Skipped Pro webpack updates because helper scope is ambiguous in #{webpack_config}.
-          An indented extractLoader or getLoaderPath declaration may be module-scoped or nested.
-          Both webpack configs were left unchanged. Update it manually using the Pro setup guide:
-          https://reactonrails.com/docs/pro/upgrading-to-pro/
-        MSG
-        true
       end
 
       def pro_gem_auto_install_command

@@ -191,13 +191,20 @@ def assert_directory_with_keep_file(dir)
   assert_file File.join(dir, ".keep")
 end
 
-# Simulates base-install webpack configs (use_pro? = false, use_rsc? = false).
-# Contains all structural elements that Pro gsub transforms target.
-# Used by Pro generator tests to verify standalone upgrade transforms.
+# Render through the real base generator independently of Pro pair recognition.
+def generated_webpack_pair_contents(pro: false, rsc: false, rspack: false, shakapacker9: true)
+  renderer = ReactOnRails::Generators::BaseGenerator.new([], { pro:, rsc:, rspack: })
+  allow(renderer).to receive(:shakapacker_version_9_or_higher?).and_return(shakapacker9)
+  %w[serverWebpackConfig.js ServerClientOrBoth.js].map do |filename|
+    renderer.send(:rendered_template_for_cleanup, "base/base/config/webpack/#{filename}.tt")
+  end
+end
+
+# Positive Pro upgrade fixtures must be entire generated files, not structural approximations.
 def simulate_base_webpack_files
-  simulate_existing_file("config/webpack/serverWebpackConfig.js", base_server_webpack_content)
-  simulate_existing_file("config/webpack/ServerClientOrBoth.js",
-                         server_client_or_both_content(destructured_import: false))
+  server, companion = generated_webpack_pair_contents
+  simulate_existing_file("config/webpack/serverWebpackConfig.js", server)
+  simulate_existing_file("config/webpack/ServerClientOrBoth.js", companion)
 end
 
 # Simulates a base install produced before the shared getLoaderPath helper existed.
@@ -211,7 +218,7 @@ def simulate_legacy_base_webpack_files
 end
 
 # Simulates a base install whose getLoaderPath helper the app owner has rewritten.
-# Used to verify the Pro upgrade reuses an existing declaration instead of redeclaring it.
+# Used to verify the Pro upgrade preserves customized files without rewriting them.
 def simulate_customized_base_webpack_files
   simulate_existing_file("config/webpack/serverWebpackConfig.js", customized_base_server_webpack_content)
   simulate_existing_file("config/webpack/ServerClientOrBoth.js",
@@ -242,9 +249,9 @@ end
 # Used by standalone generator tests (e.g. ProGenerator) on existing rspack projects.
 def simulate_rspack_base_webpack_files
   simulate_rspack_shakapacker_yml
-  simulate_existing_file("config/rspack/serverWebpackConfig.js", base_server_webpack_content)
-  simulate_existing_file("config/rspack/ServerClientOrBoth.js",
-                         server_client_or_both_content(destructured_import: false))
+  server, companion = generated_webpack_pair_contents(rspack: true)
+  simulate_existing_file("config/rspack/serverWebpackConfig.js", server)
+  simulate_existing_file("config/rspack/ServerClientOrBoth.js", companion)
 end
 
 # Simulates Pro-transformed webpack configs for an rspack project.
