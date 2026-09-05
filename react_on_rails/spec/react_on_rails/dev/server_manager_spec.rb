@@ -3066,7 +3066,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
         aggregate_failures do
           expect(second_fd_result).to be false
-          expect(described_class.send(:owner_released?, { path: session_path(root), handle: })).to be true
+          expect(described_class.send(:owner_release_state, { path: session_path(root), handle: })).to eq(:released)
         end
       end
 
@@ -3076,13 +3076,13 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         handle = File.open(session_path(root), File::RDONLY)
         handles << handle
 
-        expect(described_class.send(:owner_released?, { path: session_path(root), handle: })).to be false
+        expect(described_class.send(:owner_release_state, { path: session_path(root), handle: })).to eq(:held)
       end
 
       it "treats a removed session file as released" do
         root = app_root("gone-lock")
 
-        expect(described_class.send(:owner_released?, { path: session_path(root), handle: nil })).to be true
+        expect(described_class.send(:owner_release_state, { path: session_path(root), handle: nil })).to eq(:released)
       end
     end
 

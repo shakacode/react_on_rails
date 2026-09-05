@@ -112,7 +112,6 @@ module ReactOnRails
       def self.shutdown_settled?: (dev_session_view, Integer?, String?) -> bool
       def self.shutdown_blockers: (dev_session_view, Integer?, String?) -> Array[String]
       def self.owner_release_state: (dev_session_view) -> Symbol
-      def self.owner_released?: (dev_session_view) -> bool
       def self.session_replaced?: (dev_session_view) -> bool
       def self.session_replaced_blocker: (dev_session_view) -> String
       def self.owner_state_blockers: (dev_session_view) -> Array[String]
