@@ -513,9 +513,10 @@ module CloseoutEvidenceReplay
     elsif ui_change == "yes" && status == "blocked"
       missing << "visual_evidence_destination" unless destination == "human_attachment_pending"
       missing << "visual_evidence_url" unless url == "not_applicable"
-      missing << "visual_baseline_status" unless baseline == "pending"
-      missing << "visual_candidate_status" unless candidate == "pending"
-      missing << "paint_check_status" unless paint == "blocked"
+      expected_capture_status = paint == "passed" ? "captured" : "pending"
+      missing << "visual_baseline_status" unless baseline == expected_capture_status
+      missing << "visual_candidate_status" unless candidate == expected_capture_status
+      missing << "paint_check_status" unless %w[blocked passed].include?(paint)
       missing << "status" unless fields.fetch("status", "") == "blocked"
       missing << "release_blocking" unless fields.fetch("release_blocking", "") == "blocked"
     elsif ui_change == "yes"

@@ -302,6 +302,52 @@ class CloseoutEvidenceReplayTest < Minitest::Test
     assert_empty qa.fetch("missing")
   end
 
+  def test_v3_captured_visuals_awaiting_attachment_are_blocked
+    qa = run_replay(
+      v3_marker(
+        "status" => "blocked",
+        "release_blocking" => "blocked",
+        "visual_evidence_status" => "blocked",
+        "visual_evidence_destination" => "human_attachment_pending",
+        "visual_evidence_url" => "not_applicable"
+      ),
+      expected_head_sha: "1111111111111111111111111111111111111111",
+      require_structured_visual_evidence_v3: true
+    ).fetch("qa_evidence")
+
+    assert_equal "BLOCKED", qa.fetch("verdict")
+    assert_empty qa.fetch("missing")
+  end
+
+  def test_v3_captured_visuals_awaiting_attachment_reject_contradictory_states
+    {
+      "status" => "satisfied",
+      "release_blocking" => "clear",
+      "visual_evidence_status" => "complete",
+      "visual_evidence_destination" => "github_pr",
+      "visual_evidence_url" => "https://github.com/example/repo/pull/123#visual",
+      "visual_baseline_status" => "pending",
+      "visual_candidate_status" => "pending",
+      "paint_check_status" => "blocked"
+    }.each do |field, value|
+      qa = run_replay(
+        v3_marker(
+          "status" => "blocked",
+          "release_blocking" => "blocked",
+          "visual_evidence_status" => "blocked",
+          "visual_evidence_destination" => "human_attachment_pending",
+          "visual_evidence_url" => "not_applicable",
+          field => value
+        ),
+        expected_head_sha: "1111111111111111111111111111111111111111",
+        require_structured_visual_evidence_v3: true
+      ).fetch("qa_evidence")
+
+      assert_equal "UNKNOWN", qa.fetch("verdict"), field
+      refute_empty qa.fetch("missing"), field
+    end
+  end
+
   def test_v3_non_ui_omission_uses_explicit_not_applicable_values
     qa = run_replay(
       v3_marker(
