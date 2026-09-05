@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "ripper"
+require "open3"
 require_relative "../support/generator_spec_helper"
 
 describe ProGenerator, type: :generator do
@@ -1627,6 +1628,328 @@ describe ProGenerator, type: :generator do
     end
   end
 
+  describe "whole generated webpack pair migration" do
+    let(:generator) { described_class.new }
+    # Execute only trusted generated output, with external dependencies stubbed.
+    # Loading the module and invoking configureServer catches errors that --check misses.
+    let(:generated_pair_evaluation_script) do
+      <<~JS
+        const fs = require('fs');
+        const vm = require('vm');
+        const [serverSource, companionSource] = JSON.parse(fs.readFileSync(0, 'utf8'));
+        const babel = { loader: 'babel-loader', options: {} };
+        const common = () => ({
+          entry: { 'server-bundle': './server-bundle.js' },
+          module: { rules: [{ use: [babel] }] },
+          plugins: [],
+        });
+        class Plugin {}
+        const dependencies = {
+          shakapacker: { config: { privateOutputPath: '/ssr', source_path: '/src' } },
+          './commonWebpackConfig': common,
+          webpack: { optimize: { LimitChunkCountPlugin: Plugin } },
+          '@rspack/core': { optimize: { LimitChunkCountPlugin: Plugin } },
+          'react-on-rails-rsc/WebpackPlugin': { RSCWebpackPlugin: Plugin },
+          'react-on-rails-rsc/RspackPlugin': { RSCRspackPlugin: Plugin },
+          path: require('path'),
+          fs: { existsSync: () => true },
+        };
+        const load = (source, extras = {}) => {
+          const context = {
+            module: { exports: {} }, process: { env: {} }, __dirname: '/config/webpack',
+            console: { log() {}, warn() {} },
+            require: (name) => {
+              const dependency = { ...dependencies, ...extras }[name];
+              if (!dependency) throw new Error('Unexpected dependency: ' + name);
+              return dependency;
+            },
+          };
+          vm.runInNewContext(source, context);
+          return context.module.exports;
+        };
+        const server = load(serverSource);
+        const config = server.default();
+        const companion = load(companionSource, {
+          './serverWebpackConfig': server,
+          './clientWebpackConfig': () => ({ client: true }),
+          './rscWebpackConfig': () => ({ rsc: true }),
+        });
+        process.stdout.write(JSON.stringify({
+          caller: babel.options.caller,
+          target: config.target,
+          libraryTarget: config.output.libraryTarget,
+          bundles: companion().length,
+        }));
+      JS
+    end
+    let(:config_dir) { "config/webpack" }
+    let(:server_path) { "#{config_dir}/serverWebpackConfig.js" }
+    let(:companion_path) { "#{config_dir}/ServerClientOrBoth.js" }
+
+    before do
+      prepare_destination
+      allow(generator).to receive(:destination_root).and_return(destination_root)
+    end
+
+    def write_pair(contents, companion: companion_path)
+      [server_path, companion].zip(contents).each do |path, content|
+        absolute = File.join(destination_root, path)
+        FileUtils.mkdir_p(File.dirname(absolute))
+        File.binwrite(absolute, content)
+      end
+    end
+
+    def read_pair(companion: companion_path)
+      [server_path, companion].map { |path| File.binread(File.join(destination_root, path)) }
+    end
+
+    def expect_manual_migration
+      expect(GeneratorMessages.messages.join("\n")).to include(
+        "Both webpack configs and their paths were left unchanged",
+        "Update them manually",
+        "https://reactonrails.com/docs/pro/upgrading-to-pro/"
+      )
+    end
+
+    def evaluate_generated_pair(contents)
+      stdout, stderr, status = Open3.capture3(
+        "node", "-e", generated_pair_evaluation_script, stdin_data: JSON.generate(contents)
+      )
+      expect(status.success?).to be(true), stderr
+      JSON.parse(stdout)
+    end
+
+    [false, true].product([false, true]).each do |rspack, shakapacker9|
+      context "with rspack=#{rspack}, shakapacker9=#{shakapacker9}" do
+        let(:config_dir) { rspack ? "config/rspack" : "config/webpack" }
+
+        before do
+          allow(generator).to receive(:using_rspack?).and_return(rspack)
+        end
+
+        it "migrates a complete OSS pair to fresh Pro output and preserves it on rerun" do
+          write_pair(generated_webpack_pair_contents(rspack:, shakapacker9:))
+
+          generator.send(:update_webpack_config_for_pro)
+
+          expected = generated_webpack_pair_contents(pro: true, rspack:, shakapacker9:).map(&:b)
+          expect(read_pair).to eq(expected)
+          expect(evaluate_generated_pair(read_pair)).to eq(
+            "caller" => { "ssr" => true }, "target" => "node", "libraryTarget" => "commonjs2", "bundles" => 2
+          )
+
+          expect(generator).not_to receive(:create_file)
+          generator.send(:update_webpack_config_for_pro)
+          expect(read_pair).to eq(expected)
+        end
+
+        [false, true].each do |rsc|
+          it "preserves an already generated Pro pair with rsc=#{rsc}" do
+            original = generated_webpack_pair_contents(pro: true, rsc:, rspack:, shakapacker9:)
+            write_pair(original)
+
+            expect(generator).not_to receive(:create_file)
+            generator.send(:update_webpack_config_for_pro)
+
+            expect(read_pair).to eq(original.map(&:b))
+            expect(evaluate_generated_pair(read_pair)).to include(
+              "caller" => { "ssr" => true }, "bundles" => (rsc ? 3 : 2)
+            )
+          end
+        end
+      end
+    end
+
+    companion_names = %w[ServerClientOrBoth.js generateWebpackConfigs.js]
+    {
+      "synchronous customized control" =>
+        "const extractLoader = (rule, name) => rule.use.find((item) => getLoaderPath(item).includes(name));",
+      "multi-declarator binding" =>
+        "const marker = 1, extractLoader = (rule, name) => rule.use.find(Boolean);",
+      "template literal mention" => "const snippet = `\nconst extractLoader = () => null;\n`;",
+      "comment-hidden async assignment" =>
+        "const extractLoader // custom helper\n  = async (rule, name) => rule.use.find(Boolean);",
+      "column-zero nested binding" => "function outer() {\nconst extractLoader = () => null;\n}",
+      "split synchronous binding" => "let extractLoader;\nextractLoader = (rule, name) => rule.use.find(Boolean);",
+      "indented binding" => "  const extractLoader = () => null;",
+      "block comment mention" => "/*\nconst extractLoader = () => null;\n*/",
+      "line comment mention" => "// async function extractLoader() {}",
+      "async function" => "async function extractLoader() { return null; }",
+      "generator function" => "function* extractLoader() { yield null; }",
+      "unrelated customization" => "// Keep my deployment instructions."
+    }.each do |description, source|
+      companion_names.each do |companion_name|
+        it "preserves both files and paths for #{description} with #{companion_name}" do
+          companion = "#{config_dir}/#{companion_name}"
+          original = generated_webpack_pair_contents
+          original[0] = "#{source}\n#{original[0]}"
+          write_pair(original, companion:)
+          environment = "const configs = require('./#{companion_name.delete_suffix('.js')}');\n"
+          simulate_existing_file("#{config_dir}/development.js", environment)
+
+          generator.send(:update_webpack_config_for_pro)
+
+          expect(read_pair(companion:)).to eq(original.map(&:b))
+          expect(File.binread(File.join(destination_root, "#{config_dir}/development.js"))).to eq(environment.b)
+          if companion_name == "generateWebpackConfigs.js"
+            expect(File).not_to exist(File.join(destination_root, companion_path))
+          end
+          expect_manual_migration
+        end
+      end
+    end
+
+    %w[const let var].product(%w[extractLoader getLoaderPath]).each do |kind, name|
+      it "preserves grouped customized #{kind} #{name} declarations" do
+        original = generated_webpack_pair_contents
+        original[0] = original[0].sub(
+          ReactOnRails::Generators::ProSetup::GET_LOADER_PATH_JS,
+          "#{kind} marker = 1, #{name} = () => null;\n"
+        )
+        write_pair(original)
+
+        generator.send(:update_webpack_config_for_pro)
+
+        expect(read_pair).to eq(original.map(&:b))
+        expect_manual_migration
+      end
+    end
+
+    it "preserves the server when only the companion is customized" do
+      original = generated_webpack_pair_contents
+      original[1] += "\n// Custom companion configuration\n"
+      write_pair(original)
+
+      generator.send(:update_webpack_config_for_pro)
+
+      expect(read_pair).to eq(original.map(&:b))
+      expect_manual_migration
+    end
+
+    it "rejects mixed generated variants as a pair" do
+      original = [
+        generated_webpack_pair_contents.first,
+        generated_webpack_pair_contents(pro: true).last
+      ]
+      write_pair(original)
+
+      generator.send(:update_webpack_config_for_pro)
+
+      expect(read_pair).to eq(original.map(&:b))
+      expect_manual_migration
+    end
+
+    it "does not normalize line endings" do
+      original = generated_webpack_pair_contents(shakapacker9: false).map { |content| content.gsub("\n", "\r\n") }
+      write_pair(original)
+
+      generator.send(:update_webpack_config_for_pro)
+
+      expect(read_pair).to eq(original.map(&:b))
+      expect_manual_migration
+    end
+
+    it "does not normalize whitespace inside a string literal" do
+      original = generated_webpack_pair_contents
+      original[0] = original[0].sub("Create a pack named", "Create  a pack named")
+      write_pair(original)
+
+      generator.send(:update_webpack_config_for_pro)
+
+      expect(read_pair).to eq(original.map(&:b))
+      expect_manual_migration
+    end
+
+    [0, 1].each do |missing_index|
+      it "preserves the remaining file when pair member #{missing_index} is missing" do
+        paths = [server_path, companion_path]
+        original = generated_webpack_pair_contents
+        present_index = 1 - missing_index
+        simulate_existing_file(paths[present_index], original[present_index])
+
+        generator.send(:update_webpack_config_for_pro)
+
+        expect(File.binread(File.join(destination_root, paths[present_index]))).to eq(original[present_index].b)
+        expect(File).not_to exist(File.join(destination_root, paths[missing_index]))
+        expect_manual_migration
+      end
+    end
+
+    it "preserves ambiguous canonical and legacy companions without renaming either" do
+      original = generated_webpack_pair_contents
+      write_pair(original)
+      legacy = "#{config_dir}/generateWebpackConfigs.js"
+      simulate_existing_file(legacy, original.last)
+
+      generator.send(:update_webpack_config_for_pro)
+
+      expect(read_pair).to eq(original.map(&:b))
+      expect(File.binread(File.join(destination_root, legacy))).to eq(original.last.b)
+      expect_manual_migration
+    end
+
+    it "migrates a recognized pair at its legacy filename without editing environment imports" do
+      companion = "#{config_dir}/generateWebpackConfigs.js"
+      write_pair(generated_webpack_pair_contents, companion:)
+      environment = "const configs = require('./generateWebpackConfigs');\n"
+      simulate_existing_file("#{config_dir}/development.js", environment)
+
+      generator.send(:update_webpack_config_for_pro)
+
+      expect(read_pair(companion:)).to eq(generated_webpack_pair_contents(pro: true).map(&:b))
+      expect(File).not_to exist(File.join(destination_root, companion_path))
+      expect(File.binread(File.join(destination_root, "#{config_dir}/development.js"))).to eq(environment.b)
+    end
+
+    it "preserves both files when template rendering fails" do
+      original = generated_webpack_pair_contents
+      write_pair(original)
+      allow(ERB).to receive(:new).and_raise(ArgumentError, "unavailable template dependency")
+
+      generator.send(:update_webpack_config_for_pro)
+
+      expect(read_pair).to eq(original.map(&:b))
+      expect_manual_migration
+    end
+
+    it "preserves both files when reading the companion fails" do
+      original = generated_webpack_pair_contents
+      write_pair(original)
+      allow(File).to receive(:binread).and_call_original
+      allow(File).to receive(:binread).with(File.join(destination_root, companion_path)).and_raise(IOError)
+
+      generator.send(:update_webpack_config_for_pro)
+
+      expect(File.read(File.join(destination_root, server_path))).to eq(original.first)
+      expect(File.read(File.join(destination_root, companion_path))).to eq(original.last)
+      expect_manual_migration
+    end
+
+    it "preserves a pair without terminal newlines byte for byte" do
+      original = generated_webpack_pair_contents.map(&:chomp)
+      write_pair(original)
+
+      generator.send(:update_webpack_config_for_pro)
+
+      expect(read_pair).to eq(original.map(&:b))
+      expect_manual_migration
+    end
+
+    it "preserves a legacy pair when a dangling canonical symlink makes the path ambiguous" do
+      original = generated_webpack_pair_contents
+      legacy = "#{config_dir}/generateWebpackConfigs.js"
+      write_pair(original, companion: legacy)
+      canonical = File.join(destination_root, companion_path)
+      File.symlink("missing-custom-config.js", canonical)
+
+      generator.send(:update_webpack_config_for_pro)
+
+      expect(read_pair(companion: legacy)).to eq(original.map(&:b))
+      expect(File.readlink(canonical)).to eq("missing-custom-config.js")
+      expect_manual_migration
+    end
+  end
+
   # Integration test for standalone happy path
   # Uses before (not before(:all)) to allow mocking the Pro gem check
 
@@ -1733,8 +2056,7 @@ describe ProGenerator, type: :generator do
     end
   end
 
-  # Upgrade path for apps that already declare getLoaderPath but have customized it. Redeclaring
-  # the identifier would be a SyntaxError next to the app's const, so the transform must reuse it.
+  # Customized and historical configs require manual migration, even when a helper is synchronous.
   context "when prerequisites are met on a base install with a customized getLoaderPath helper" do
     before do
       prepare_destination
@@ -1754,21 +2076,14 @@ describe ProGenerator, type: :generator do
       end
     end
 
-    it "reuses the customized helper instead of emitting a second getLoaderPath declaration" do
-      assert_file "config/webpack/serverWebpackConfig.js" do |content|
-        # Counted via the declaration matcher, so a redeclaration is caught whether it is
-        # emitted as `function getLoaderPath(` or as `const getLoaderPath =`.
-        declarations = content.scan(ReactOnRails::Generators::ProSetup::GET_LOADER_PATH_DECLARATION)
-        expect(declarations.size).to eq(1)
-        expect(content).to include("const getLoaderPath = (item) =>")
-        expect(content).not_to include(ReactOnRails::Generators::ProSetup::GET_LOADER_PATH_JS)
-        expect(content).to include(ReactOnRails::Generators::ProSetup::EXTRACT_LOADER_JS)
-      end
+    it "preserves both customized configs without rewriting helpers" do
+      assert_file "config/webpack/serverWebpackConfig.js", customized_base_server_webpack_content
+      assert_file "config/webpack/ServerClientOrBoth.js", server_client_or_both_content(destructured_import: false)
+      expect(GeneratorMessages.messages.join("\n")).to include("Update them manually")
     end
   end
 
-  # Upgrade path for apps installed before the shared getLoaderPath helper existed:
-  # the emitted extractLoader calls it, so ProSetup must supply it too.
+  # Unsupported historical templates are not recognized through partial structural matches.
   context "when prerequisites are met on a base install predating the getLoaderPath helper" do
     before do
       prepare_destination
@@ -1788,15 +2103,10 @@ describe ProGenerator, type: :generator do
       end
     end
 
-    it "adds getLoaderPath alongside extractLoader so the emitted helper call resolves" do
-      assert_file "config/webpack/serverWebpackConfig.js" do |content|
-        expect(content).to include(ReactOnRails::Generators::ProSetup::GET_LOADER_PATH_JS)
-        expect(content).to include(ReactOnRails::Generators::ProSetup::EXTRACT_LOADER_JS)
-        expect(content.scan("function getLoaderPath(item) {").size).to eq(1)
-        expect(content).to match(
-          /function getLoaderPath\(item\) \{.*?\n\}\n\nfunction extractLoader\(rule, loaderName\) \{/m
-        )
-      end
+    it "preserves both historical configs and requests manual migration" do
+      assert_file "config/webpack/serverWebpackConfig.js", legacy_base_server_webpack_content_pre_get_loader_path
+      assert_file "config/webpack/ServerClientOrBoth.js", server_client_or_both_content(destructured_import: false)
+      expect(GeneratorMessages.messages.join("\n")).to include("Update them manually")
     end
   end
 
@@ -2204,18 +2514,12 @@ describe ProGenerator, type: :generator do
       end
     end
 
-    it "applies remaining Pro transforms instead of skipping as fully configured" do
-      assert_file "config/webpack/serverWebpackConfig.js" do |content|
-        expect(content).to include("function extractLoader")
-        expect(content).to include("babelLoader.options.caller = { ssr: true };")
-        expect(content).to include("serverWebpackConfig.target = 'node';")
-        expect(content).to include("serverWebpackConfig.node = false;")
-        expect(content).to include("module.exports = {")
-      end
-
-      assert_file "config/webpack/ServerClientOrBoth.js" do |content|
-        expect(content).to include("{ default: serverWebpackConfig }")
-      end
+    it "preserves the customized pair and requests manual migration" do
+      expected = generated_webpack_pair_contents
+      expected[0] = expected[0].sub("// libraryTarget: 'commonjs2',", "libraryTarget: 'commonjs2',")
+      assert_file "config/webpack/serverWebpackConfig.js", expected[0]
+      assert_file "config/webpack/ServerClientOrBoth.js", expected[1]
+      expect(GeneratorMessages.messages.join("\n")).to include("Update them manually")
     end
   end
 

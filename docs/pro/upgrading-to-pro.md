@@ -79,9 +79,72 @@ The Pro package re-exports everything from core, so no other import changes are 
 bundle exec rails generate react_on_rails:pro
 ```
 
-This adds the Pro initializer, configures webpack for Pro features, and sets up the Node renderer entry point and configuration.
+This adds the Pro initializer and sets up the Node renderer entry point and configuration. It automatically upgrades webpack/Rspack configuration only when both files exactly match a supported current generated pair. If it reports that the pair was left unchanged, complete the manual edits below; rerunning the generator does not migrate customized or unsupported files.
 
-After the generator runs, verify everything works:
+#### Complete a skipped webpack/Rspack migration manually
+
+Start with a commit or backup of your configuration. Locate `serverWebpackConfig.js` and its companion `ServerClientOrBoth.js` in your app's active `config/webpack/` or `config/rspack/` directory. Older apps may use `generateWebpackConfigs.js` as the companion. Follow the file imported by your environment configs; if both names exist, resolve which is active before editing. Keep existing filenames and application customizations.
+
+Use the installed templates as references: run `bundle show react_on_rails`, then inspect `lib/generators/react_on_rails/templates/base/base/config/webpack/{serverWebpackConfig,ServerClientOrBoth}.js.tt` under that directory. Their Pro branches show the intended configuration; retain your app's Shakapacker output-path choices and any RSC plugin setup. Do not replace customized files wholesale with the templates.
+
+1. In `serverWebpackConfig.js`, inside `configureServer`, set these values after the existing output configuration and before returning it. Preserve the other output settings, including its filename and path:
+
+   ```javascript
+   serverWebpackConfig.output.libraryTarget = 'commonjs2';
+   serverWebpackConfig.target = 'node';
+   serverWebpackConfig.node = false;
+   ```
+
+2. Ensure these helpers are available at module scope. Add only missing helpers; do not paste a second declaration over an existing `const`, `let`, `var`, or function. Existing helpers must be synchronous: `getLoaderPath` returns a string, and `extractLoader` returns a matching `rule.use` entry or no match, never a Promise or iterator. Adapt customized helpers and their callers deliberately:
+
+   ```javascript
+   function getLoaderPath(item) {
+     if (typeof item === 'string') return item;
+     if (item && typeof item.loader === 'string') return item.loader;
+     return '';
+   }
+
+   function extractLoader(rule, loaderName) {
+     if (!Array.isArray(rule.use)) return null;
+     return rule.use.find((item) => getLoaderPath(item).includes(loaderName));
+   }
+   ```
+
+3. If the server bundle uses Babel, set its SSR caller inside the existing `rules.forEach((rule) => { ... })` loop and `Array.isArray(rule.use)` guard, alongside the CSS loader handling. Give the Babel loader entry an `options` object first if it currently uses a bare string or omits options. Preserve existing caller metadata while setting `ssr: true`. Apps using SWC do not need this Babel block:
+
+   ```javascript
+   const babelLoader = extractLoader(rule, 'babel-loader');
+   if (babelLoader && babelLoader.options) {
+     babelLoader.options.caller = { ...babelLoader.options.caller, ssr: true };
+   }
+   ```
+
+4. Update the server export and companion import together. At module scope, export the server configuration function as `default` and expose `extractLoader`, retaining any additional exports your app uses:
+
+   ```javascript
+   module.exports = {
+     default: configureServer,
+     extractLoader,
+   };
+   ```
+
+   In the active `ServerClientOrBoth.js` or `generateWebpackConfigs.js`, replace the old direct function import with:
+
+   ```javascript
+   const { default: serverWebpackConfig } = require('./serverWebpackConfig');
+   ```
+
+   Keep its existing `serverWebpackConfig()` invocation and client/RSC bundle handling. Update any other direct consumers of the old function export to use `.default` too.
+
+After an automatic or manual migration, check both files and build the bundles. Adjust the two paths below for Rspack or the legacy companion filename:
+
+```bash
+node --check config/webpack/serverWebpackConfig.js
+node --check config/webpack/ServerClientOrBoth.js
+RAILS_ENV=production bin/shakapacker
+```
+
+Syntax checks alone do not execute the configuration. Confirm the build completes, then start the app and request a page that uses server rendering (`prerender: true`). Check that the response contains server-rendered markup and that the Node renderer logs contain no loader or export errors:
 
 ```bash
 bundle exec rails react_on_rails:doctor

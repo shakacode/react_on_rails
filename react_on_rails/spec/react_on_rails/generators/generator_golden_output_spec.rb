@@ -9,12 +9,9 @@ require_relative "../support/generated_tree_approval"
 #
 # Why this exists
 # ---------------
-# The Pro and RSC standalone upgrades do not render this template. They `gsub_file` an
-# existing base-install config, and their patterns are exercised in specs only against the
-# hand-written simulation fixtures in support/generator_spec_helper.rb. Nothing tied those
-# fixtures to what the template actually emits, so the template could move and every spec
-# would stay green while real upgrades silently stopped matching (see PR #2489, which
-# updated the template and one fixture and left a second fixture on the old implementation).
+# RSC standalone upgrades patch existing files, so their structural anchors must stay
+# aligned with generated output. Pro upgrades recognize entire current generated pairs
+# and render the matching Pro output; their coverage below exercises that complete path.
 #
 # This spec pins every file in the final generated config tree for each meaningful variant.
 # It separately pins the structural anchors the upgrade transforms match on so those anchors
@@ -183,27 +180,17 @@ module GeneratorGoldenOutput
   end
 end
 
-# The exact patterns the standalone Pro and RSC upgrades match on inside an existing
-# serverWebpackConfig.js. Derived from the transforms themselves, not from prose:
-#
-#   ProSetup#add_extract_loader_to_server_config      GET_LOADER_PATH_* / BUNDLER_REQUIRE_PATTERN
-#   ProSetup#update_server_webpack_config_for_pro     LIBRARY_TARGET_COMMENT / TARGET_NODE_COMMENT
-#   ProSetup#add_babel_ssr_caller_to_server_config    CSS_LOADER_MODULES_BLOCK
-#   ProSetup#update_server_config_exports             BASE_MODULE_EXPORTS -> PRO_MODULE_EXPORTS
-#   RscSetup#update_server_webpack_config_for_rsc     CONFIGURE_SERVER_SIGNATURE / LIMIT_CHUNK_COUNT_UNSHIFT
+# RSC transformation anchors and shared generated helper source. Pro migration recognizes
+# whole pairs; its helper snippets below remain source-parity checks only.
 module GeneratorTransformAnchors
   GENERATOR_ROOT = File.expand_path("../../../lib/generators/react_on_rails", __dir__)
 
   # Patterns that are literals inside generator methods and cannot be referenced as
   # constants, so they are copied here. The copies are pinned by the
   # "byte-identical to the generator source" example below.
-  LIBRARY_TARGET_COMMENT = %r{// If using the React on Rails Pro.*\n\s*// libraryTarget: 'commonjs2',}
   # rubocop:disable Layout/LineLength
-  TARGET_NODE_COMMENT = %r{\s*// If using the default 'web',.*\n\s*// break with SSR\..*\n\s*// If using the React on Rails Pro.*\n\s*// serverWebpackConfig\.target = 'node'}
   LIMIT_CHUNK_COUNT_UNSHIFT = /(serverWebpackConfig\.plugins\.unshift\(new bundler\.optimize\.LimitChunkCountPlugin.*\);)/
   # rubocop:enable Layout/LineLength
-  CSS_LOADER_MODULES_BLOCK = /(cssLoader\.options\.modules = \{[\s\S]*?exportOnlyLocals: true[\s\S]*?\};\s*\n\s*\})/
-  BASE_MODULE_EXPORTS = /^module\.exports = configureServer;\s*$/
   CONFIGURE_SERVER_SIGNATURE = /^const configureServer = \(\) => \{/
 
   # Not gsub patterns: the scope the babel-caller insertion lands in. `extractLoader(rule, …)`
@@ -213,39 +200,19 @@ module GeneratorTransformAnchors
   RULES_FOREACH = /rules\.forEach\(\(rule\) => \{/
   RULE_USE_ARRAY_GUARD = /if \(Array\.isArray\(rule\.use\)\) \{/
 
-  # What ProSetup#add_babel_ssr_caller_to_server_config inserts, and the marker its own
-  # read-back check looks for.
+  # Generated Babel SSR behavior, whose enclosing rule scope is checked below.
   BABEL_CALLER_INSERTION = "const babelLoader = extractLoader(rule, 'babel-loader');"
   BABEL_CALLER_MARKER = "babelLoader.options.caller = { ssr: true }"
 
-  # The export shape update_server_config_exports writes, which RscSetup's
-  # ServerClientOrBoth import rewrite then assumes.
+  # The generated export shape assumed by RscSetup's companion import rewrite.
   PRO_MODULE_EXPORTS = "module.exports = {\n  default: configureServer,\n  extractLoader,\n};"
 
   OUTPUT_PATH_ASSIGNMENT = /^\s*path: (?<identifier>[A-Za-z_$][\w$]*),$/
 
   BASE_INSTALL_ANCHORS = [
-    { name: "bundler require block",
-      matcher: ReactOnRails::Generators::ProSetup::BUNDLER_REQUIRE_PATTERN,
-      source: "ProSetup::BUNDLER_REQUIRE_PATTERN" },
     { name: "shared getLoaderPath helper",
       matcher: ReactOnRails::Generators::ProSetup::GET_LOADER_PATH_JS,
       source: "ProSetup::GET_LOADER_PATH_JS" },
-    { name: "getLoaderPath declaration",
-      matcher: ReactOnRails::Generators::ProSetup::GET_LOADER_PATH_DECLARATION,
-      source: "ProSetup::GET_LOADER_PATH_DECLARATION" },
-    { name: "commented-out libraryTarget",
-      matcher: LIBRARY_TARGET_COMMENT,
-      source: "ProSetup#update_server_webpack_config_for_pro", source_file: "pro_setup.rb" },
-    { name: "commented-out target = 'node' block",
-      matcher: TARGET_NODE_COMMENT,
-      source: "ProSetup#update_server_webpack_config_for_pro", source_file: "pro_setup.rb" },
-    { name: "cssLoader.options.modules block",
-      matcher: CSS_LOADER_MODULES_BLOCK,
-      source: "ProSetup#add_babel_ssr_caller_to_server_config", source_file: "pro_setup.rb" },
-    { name: "base module.exports shape",
-      matcher: BASE_MODULE_EXPORTS,
-      source: "ProSetup#update_server_config_exports", source_file: "pro_setup.rb" },
     { name: "configureServer signature",
       matcher: CONFIGURE_SERVER_SIGNATURE,
       source: "RscSetup#update_server_webpack_config_for_rsc", source_file: "rsc_setup.rb" },
@@ -255,9 +222,6 @@ module GeneratorTransformAnchors
   ].freeze
 
   PRO_INSTALL_ANCHORS = [
-    { name: "bundler require block",
-      matcher: ReactOnRails::Generators::ProSetup::BUNDLER_REQUIRE_PATTERN,
-      source: "ProSetup::BUNDLER_REQUIRE_PATTERN" },
     { name: "shared getLoaderPath helper",
       matcher: ReactOnRails::Generators::ProSetup::GET_LOADER_PATH_JS,
       source: "ProSetup::GET_LOADER_PATH_JS" },
@@ -266,7 +230,7 @@ module GeneratorTransformAnchors
       source: "ProSetup::EXTRACT_LOADER_JS" },
     { name: "Pro module.exports shape",
       matcher: PRO_MODULE_EXPORTS,
-      source: "ProSetup#update_server_config_exports", source_file: "pro_setup.rb" },
+      source: "generated Pro module.exports" },
     { name: "configureServer signature",
       matcher: CONFIGURE_SERVER_SIGNATURE,
       source: "RscSetup#update_server_webpack_config_for_rsc", source_file: "rsc_setup.rb" },
@@ -388,26 +352,30 @@ module GeneratorJsStructure
   end
 end
 
-# Drives the real standalone Pro transforms over arbitrary config content, so the spec tests
-# what ProSetup actually does to a file rather than asserting on a proxy for it.
+# Drives the complete standalone Pro migration, including rejection of unsupported sources.
 module GeneratorProTransform
   module_function
 
   RELATIVE_CONFIG = "config/webpack/serverWebpackConfig.js"
 
-  # Applies ProSetup's two rule-scope-sensitive transforms and returns the patched file.
+  # Run the complete pair migration with a real generated companion.
   def apply(content)
     Dir.mktmpdir("ror-pro-transform") do |destination|
       path = File.join(destination, RELATIVE_CONFIG)
       FileUtils.mkdir_p(File.dirname(path))
       File.write(path, content)
+      companion_path = File.join(destination, "config/webpack/ServerClientOrBoth.js")
+      companion_source = File.join(
+        GeneratorGoldenOutput.approved_root(GeneratorGoldenOutput.variant("webpack_base")),
+        "webpack/ServerClientOrBoth.js"
+      )
+      FileUtils.cp(companion_source, companion_path)
 
       generator = ReactOnRails::Generators::ProGenerator.new([], {}, { destination_root: destination })
       generator.instance_variable_set(:@shell, Thor::Shell::Basic.new)
 
       GeneratorGoldenOutput.silence_output do
-        generator.__send__(:add_extract_loader_to_server_config, RELATIVE_CONFIG, content)
-        generator.__send__(:add_babel_ssr_caller_to_server_config, RELATIVE_CONFIG, File.read(path))
+        generator.__send__(:update_webpack_config_for_pro)
       end
 
       File.read(path)
@@ -474,10 +442,8 @@ RSpec.describe "generator golden output", type: :generator do
   # stand-ins for a pre-existing user file, and some deliberately represent OLDER installs.
   # They are therefore NOT asserted to match the golden output byte for byte.
   #
-  # What must not drift is narrower: the exact patterns the Pro and RSC standalone upgrades
-  # match on. Each anchor is asserted against both the real generated file and the fixture the
-  # corresponding transform is exercised against, so a template change that moves an anchor is
-  # red even though the fixtures stay simplified.
+  # RSC transformation anchors must remain shared with its historical simulation fixtures.
+  # Pro helper source parity remains covered, but Pro recognition requires the whole pair.
   describe "structural anchors shared by the golden output and the simulation fixtures" do
     def expect_anchor(anchor, subjects)
       subjects.each do |label, content|
@@ -526,8 +492,7 @@ RSpec.describe "generator golden output", type: :generator do
     # keeps the tokens in order while putting `rule` out of scope at the insertion point.
     # See GeneratorJsStructure for the full rationale.
     {
-      "golden webpack_base" => -> { GeneratorGoldenOutput.golden("webpack_base") },
-      "base_server_webpack_content" => -> { base_server_webpack_content }
+      "golden webpack_base" => -> { GeneratorGoldenOutput.golden("webpack_base") }
     }.each do |label, source|
       it "inserts the Pro babel caller inside the rule scope when transforming #{label}" do
         patched = GeneratorProTransform.apply(instance_exec(&source))
@@ -552,25 +517,18 @@ RSpec.describe "generator golden output", type: :generator do
       end
     end
 
-    describe "getLoaderPath fallback branches" do
-      # add_extract_loader_to_server_config picks one of three branches. Each simulation fixture
-      # exists to exercise a specific branch, so pin which branch each one lands in.
-      it "routes base_server_webpack_content through the exact-helper branch" do
-        expect(base_server_webpack_content).to include(ReactOnRails::Generators::ProSetup::GET_LOADER_PATH_JS)
-      end
+    describe "unsupported simulation configurations" do
+      %i[
+        base_server_webpack_content
+        customized_base_server_webpack_content
+        legacy_base_server_webpack_content_pre_get_loader_path
+      ].each do |fixture|
+        it "preserves the complete #{fixture} instead of recognizing individual anchors" do
+          content = send(fixture)
 
-      it "routes customized_base_server_webpack_content through the reuse-declaration branch" do
-        content = customized_base_server_webpack_content
-
-        expect(content).not_to include(ReactOnRails::Generators::ProSetup::GET_LOADER_PATH_JS)
-        expect(content).to match(ReactOnRails::Generators::ProSetup::GET_LOADER_PATH_DECLARATION)
-      end
-
-      it "routes legacy_base_server_webpack_content_pre_get_loader_path through the emit-both branch" do
-        content = legacy_base_server_webpack_content_pre_get_loader_path
-
-        expect(content).not_to match(ReactOnRails::Generators::ProSetup::GET_LOADER_PATH_DECLARATION)
-        expect(content).to match(ReactOnRails::Generators::ProSetup::BUNDLER_REQUIRE_PATTERN)
+          expect(GeneratorProTransform.apply(content)).to eq(content)
+          expect(GeneratorMessages.messages.join("\n")).to include("Update them manually")
+        end
       end
     end
   end
