@@ -35,7 +35,7 @@ module ReactOnRails
     end
 
     let(:expected_error_info) do
-      input_error_info.merge(props: "[REDACTED]", js_code: "[REDACTED]")
+      input_error_info.merge(props: "[REDACTED]", js_code: "[REDACTED]", console_messages: "[REDACTED]")
     end
 
     let(:sensitive_props) { { email: "person@example.com", access_token: "top-secret" } }
@@ -122,17 +122,23 @@ module ReactOnRails
       end
     end
 
-    it "does not retain raw props or generated JavaScript on the exception" do
+    it "does not retain raw props, generated JavaScript, or console messages on the exception" do
       expect(expected_error.props).to eq("[REDACTED]")
       expect(expected_error.js_code).to eq("[REDACTED]")
+      expect(expected_error.console_messages).to eq("[REDACTED]")
     end
 
     describe "error message formatting" do
-      it "does not include props or generated JavaScript" do
-        error = described_class.new(props: sensitive_props, js_code: sensitive_js_code)
+      it "does not include props, generated JavaScript, or console messages" do
+        sensitive_console = "User session abc-secret-token-123 rendered component"
+        error = described_class.new(
+          props: sensitive_props,
+          js_code: sensitive_js_code,
+          console_messages: sensitive_console
+        )
 
         expect(error.message).to include("[REDACTED]")
-        expect(error.message).not_to include("person@example.com", "top-secret")
+        expect(error.message).not_to include("person@example.com", "top-secret", "abc-secret-token-123")
       end
 
       context "when FULL_TEXT_ERRORS is true" do

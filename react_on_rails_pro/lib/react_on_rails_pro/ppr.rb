@@ -142,7 +142,7 @@ module ReactOnRailsPro
         ActiveSupport::Notifications.instrument(
           DEGRADED_PRE_FLUSH_NOTIFICATION,
           component_name:,
-          error: safe_error_summary(error)
+          error: redacted_error_class_name(error)
         )
       end
 
@@ -150,7 +150,7 @@ module ReactOnRailsPro
         ActiveSupport::Notifications.instrument(
           DEGRADED_POST_FLUSH_NOTIFICATION,
           component_name:,
-          error: safe_error_summary(error)
+          error: redacted_error_class_name(error)
         )
       end
 
@@ -174,18 +174,25 @@ module ReactOnRailsPro
         ActiveSupport::Notifications.instrument(
           CACHE_READ_ERROR_NOTIFICATION,
           component_name:,
-          error: safe_error_summary(error)
+          error: redacted_error_class_name(error)
         )
       end
 
-      private
-
-      # Bounded, newline-stripped summary of an error for AS::Notifications payloads.
-      # PrerenderError#message can include renderer console output with request-derived values;
-      # truncating prevents PII from propagating through APM/logging subscribers.
-      def safe_error_summary(error)
-        error.message.to_s.tr("\n\r", " ")[0, 256]
+      # Redacted error identifier for AS::Notifications payloads and log messages (#4966).
+      #
+      # Returns only `error.class.name` — safe, always available, and sufficient for APM
+      # triage (e.g. "PrerenderError", "Redis::ConnectionError", "JSON::ParserError").
+      # Falls back to the superclass name for anonymous exception classes (where
+      # Class#name returns nil).
+      #
+      # Raw error.message is never published: PrerenderError#message can include renderer
+      # console output with request-derived PII, and arbitrary StandardError messages
+      # (store errors, parse errors) flow through the same handlers.
+      def redacted_error_class_name(error)
+        error.class.name || error.class.superclass&.name || "StandardError"
       end
+
+      private
 
       def detect_react_version_cache_key
         package_json_path = react_dom_package_json_path
@@ -194,7 +201,9 @@ module ReactOnRailsPro
         version = JSON.parse(File.read(package_json_path))["version"]
         version.present? ? "react-#{version}" : UNKNOWN_REACT_VERSION_CACHE_KEY
       rescue StandardError => e
-        Rails.logger.debug { "[ReactOnRailsPro] Could not detect react-dom version for PPR cache key: #{e.message}" }
+        Rails.logger.debug do
+          "[ReactOnRailsPro] Could not detect react-dom version for PPR cache key: #{redacted_error_class_name(e)}"
+        end
         UNKNOWN_REACT_VERSION_CACHE_KEY
       end
 
