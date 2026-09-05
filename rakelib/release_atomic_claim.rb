@@ -72,6 +72,33 @@ module ReleaseAtomicClaim
       raise Error, "coordination backend atomic claim renewal failed (HTTP #{response.code})"
     end
 
+    def release!(repo:, target:, agent_id:, instance_id:, now: Time.now.utc)
+      validate_release_inputs!(repo:, target:, agent_id:, instance_id:)
+      path = "claims/#{repo}/#{target}.json"
+      current = read_claim(path)
+      release_status = verify_release_identity!(current, repo:, target:, agent_id:, instance_id:)
+      return true if release_status == "released"
+
+      timestamp = now.utc.iso8601
+      payload = current.fetch(:data).merge(
+        "status" => "released",
+        "released_by" => agent_id,
+        "released_at" => timestamp,
+        "updated_at" => timestamp,
+        "expires_at" => timestamp
+      )
+      response = request(
+        method: Net::HTTP::Put,
+        path: state_path(path),
+        headers: { "If-Match" => current.fetch(:version) },
+        body: JSON.generate("data" => payload)
+      )
+      return true if SUCCESS_CODES.include?(response.code.to_s)
+      raise ClaimRefused, "release-line claim changed during atomic release" if response.code.to_s == "409"
+
+      raise Error, "coordination backend atomic claim release failed (HTTP #{response.code})"
+    end
+
     private
 
     def validated_base_uri(base_url)
@@ -101,6 +128,15 @@ module ReleaseAtomicClaim
         raise Error, "release claim #{label} is missing" if value.to_s.empty? || value.to_s.casecmp?("UNKNOWN")
       end
       raise Error, "release claim TTL must be positive" unless ttl.is_a?(Integer) && ttl.positive?
+    end
+
+    def validate_release_inputs!(repo:, target:, agent_id:, instance_id:)
+      raise Error, "release claim repository is invalid" unless repo.match?(REPOSITORY_PATTERN)
+      raise Error, "release claim target is invalid" unless target.match?(TARGET_PATTERN)
+
+      { "agent id" => agent_id, "instance id" => instance_id }.each do |label, value|
+        raise Error, "release claim #{label} is missing" if value.to_s.empty? || value.to_s.casecmp?("UNKNOWN")
+      end
     end
 
     def read_claim(path)
@@ -146,6 +182,21 @@ module ReleaseAtomicClaim
       return if expected.all? { |field, value| current.fetch(:data)[field] == value }
 
       raise ClaimRefused, "release-line claim identity changed during renewal"
+    end
+
+    def verify_release_identity!(current, repo:, target:, agent_id:, instance_id:)
+      raise ClaimRefused, "release-line claim is absent during release" unless current
+
+      expected = {
+        "repo" => repo,
+        "target" => target,
+        "agent_id" => agent_id,
+        "instance_id" => instance_id
+      }
+      data = current.fetch(:data)
+      return data.fetch("status") if expected.all? { |field, value| data[field] == value }
+
+      raise ClaimRefused, "release-line claim identity changed during release"
     end
 
     def claim_payload(repo:, target:, agent_id:, instance_id:, machine_id:, branch:, ttl:, now:)

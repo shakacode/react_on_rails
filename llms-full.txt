@@ -2319,7 +2319,7 @@ Our control-tier measurement could not confirm a winner: browser-observed HMR me
 
 ### "Vite's plugin ecosystem is bigger"
 
-For app-level tooling, both ecosystems are large. Rspack targets compatibility with the webpack plugin and loader API, which is the API the Rails/Shakapacker world has built against for years — so the relevant comparison for a React on Rails app is less "Vite plugins vs Rspack plugins" than "does the webpack-contract tooling you already use carry over" (check the [Rspack compatibility documentation](https://www.rspack.dev/plugins/community-plugin-compatibility) for specific plugins). The plugin that decides our architecture is the RSC manifest/loader tooling described above, and that exists for webpack and rspack only.
+For app-level tooling, both ecosystems are large. Rspack targets compatibility with the webpack plugin and loader API, which is the API the Rails/Shakapacker world has built against for years — so the relevant comparison for a React on Rails app is less "Vite plugins vs Rspack plugins" than "does the webpack-contract tooling you already use carry over" (check the [Rspack compatibility documentation](https://rspack.rs/plugins/community-plugin-compatibility) for specific plugins). The plugin that decides our architecture is the RSC manifest/loader tooling described above, and that exists for webpack and rspack only.
 
 ### "Everyone uses Vite — you're swimming upstream"
 
@@ -4497,7 +4497,7 @@ To get a deeper understanding of Shakapacker, watch [RailsConf 2020 CE - Webpack
 
 ## Rspack vs. Webpack
 
-[Rspack](https://rspack.dev/) is a high-performance JavaScript bundler written in Rust that provides significantly faster builds than Webpack (~20x improvement). React on Rails supports both bundlers through unified configuration.
+[Rspack](https://rspack.rs/) is a high-performance JavaScript bundler written in Rust that provides significantly faster builds than Webpack (~20x improvement). React on Rails supports both bundlers through unified configuration.
 
 ### Using Rspack
 
@@ -23996,6 +23996,7 @@ This archive keeps the major React on Rails OSS release notes easy to browse wit
 
 ## Recent OSS Release Notes
 
+- [17.1.0](./17.1.0.md)
 - [17.0.1](./17.0.1.md)
 - [17.0.0](./17.0.0.md)
 - [16.6.0](./16.6.0.md)
@@ -33267,7 +33268,7 @@ This is a major release with significant new features for both open-source and P
 - **HTTP rolling-deploy adapter + auto-mount**: `ReactOnRailsPro::RollingDeployAdapters::Http` serves previously-deployed bundles directly from the Rails server — no S3 required. Auto-mounts at `config.rolling_deploy_mount_path`. See [Rolling Deploy Adapters](../../../pro/rolling-deploy-adapters.md). [PR 3379](https://github.com/shakacode/react_on_rails/pull/3379), [PR 3504](https://github.com/shakacode/react_on_rails/pull/3504).
 - **`<RSCRoute>` imperative refetch**: `ref` exposes `refetch()` via `RSCRouteHandle`; `useCurrentRSCRoute()` hook for client components inside the RSC subtree. [PR 3552](https://github.com/shakacode/react_on_rails/pull/3552).
 - **`<RSCRoute ssr={false}>`**: Defers initial RSC payload generation — the server streams the Suspense fallback and the client fetches the payload. [PR 3318](https://github.com/shakacode/react_on_rails/pull/3318).
-- **`unstable_cache` for RSC**: Experimental fragment caching with `CacheHandler` interface, in-memory LRU default, `RedisCacheHandler` for L2, `TieredCacheHandler` for L1/L2, and `unstable_revalidateTag` across workers. [PR 3325](https://github.com/shakacode/react_on_rails/pull/3325), [PR 3705](https://github.com/shakacode/react_on_rails/pull/3705).
+- **`unstable_cache` for RSC**: Experimental fragment caching with a `CacheHandler` interface, an in-memory LRU default, `RedisCacheHandler` for shared storage, and `TieredCacheHandler` for L1/L2 composition. Expiration uses the `revalidate` interval or custom handler policy. Tag-based invalidation and a Ruby-to-Node invalidation bridge are not available for this API. [PR 3325](https://github.com/shakacode/react_on_rails/pull/3325), [PR 3705](https://github.com/shakacode/react_on_rails/pull/3705).
 - **RSC manifest client reference discovery**: Generated RSC configs run `RSCReferenceDiscoveryPlugin` during precompile to emit `rsc-client-references.json`. [PR 3556](https://github.com/shakacode/react_on_rails/pull/3556).
 
 ### Changes
@@ -33316,4 +33317,49 @@ Then run `bundle install` and your package manager's install command.
 ## Fix
 
 - **Corrected the OSS npm package license metadata and packed license**: `react-on-rails` now declares `MIT`, includes a package-local MIT license in the published tarball, and verifies the packed artifact cannot inherit React on Rails Pro commercial terms. [PR 4792](https://github.com/shakacode/react_on_rails/pull/4792) by [justin808](https://github.com/justin808).
+
+================================================================================
+PAGE: https://reactonrails.com/docs/upgrading/release-notes/17.1.0
+SOURCE: docs/oss/upgrading/release-notes/17.1.0.md
+================================================================================
+
+# React on Rails 17.1.0 Release Notes
+
+The 17.1.0 release line is currently available as a release candidate. Use the exact matching gem and npm prerelease
+versions. For example, Ruby uses `17.1.0.rc.1`, while npm uses `17.1.0-rc.1`.
+
+For the complete list of changes, see the [CHANGELOG](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md).
+When you upgrade from an earlier release candidate, also compare the exact tags. Both placeholders use Ruby/tag dot
+notation, such as `17.1.0.rc.1`:
+`https://github.com/shakacode/react_on_rails/compare/v<CURRENT_VERSION>...v<TARGET_VERSION>`.
+
+## Action required for Pro applications
+
+### Deploy the Node Renderer first
+
+Render requests now use a raw JavaScript request body. The upgraded Node Renderer accepts both the old form-encoded
+body and the new content type, but an older renderer rejects requests from an upgraded gem. Deploy the Node Renderer
+before the Rails gem. A simultaneous deployment is safe only when an atomic rollout prevents upgraded gem requests
+from reaching an old renderer. See
+[PR 4579](https://github.com/shakacode/react_on_rails/pull/4579).
+
+### Re-check Node Renderer memory limits
+
+The default `maxVMPoolSize` increased from 2 to 4 for each renderer worker. This prevents old and new RSC bundle
+generations from rebuilding repeatedly during rolling deploys, but it can retain twice as many VM contexts. Re-check
+memory requests and limits across every worker and replica. If you set `MAX_VM_POOL_SIZE`, it must be a positive
+integer; invalid values now stop renderer startup instead of falling back to the default. See
+[PR 4811](https://github.com/shakacode/react_on_rails/pull/4811).
+
+### Update custom Pro helper overrides
+
+`ReactOnRailsProHelper` methods are internal and are not stable extension points. The 17.1 release line added the
+`on_chunk_errors:` keyword to `build_react_component_result_for_server_streamed_content`. An application override
+with the older signature raises `ArgumentError: unknown keyword: :on_chunk_errors` during streamed rendering.
+
+If your application prepends or overrides a Pro helper, compare the helper signatures between the exact tags. Update
+the override and run the application's streamed SSR and RSC tests before deployment. See
+[PR 4722](https://github.com/shakacode/react_on_rails/pull/4722).
+
+For the coupled gem and npm upgrade procedure, see the [Pro upgrade guide](../../../pro/updating.md).
 
