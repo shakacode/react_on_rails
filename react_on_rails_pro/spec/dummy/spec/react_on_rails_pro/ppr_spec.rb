@@ -311,4 +311,35 @@ describe ReactOnRailsPro::Ppr do
       expect(events.first.payload[:error]).not_to include("should not appear")
     end
   end
+
+  describe ".redacted_error_class_name" do
+    it "returns the class name for a named error" do
+      error = RuntimeError.new("user@example.com session token abc123")
+      expect(described_class.redacted_error_class_name(error)).to eq("RuntimeError")
+    end
+
+    it "returns the full namespaced class name" do
+      klass = Class.new(StandardError)
+      stub_const("MyApp::CustomError", klass)
+      error = MyApp::CustomError.new("sensitive data")
+      expect(described_class.redacted_error_class_name(error)).to eq("MyApp::CustomError")
+    end
+
+    it "falls back to superclass name for anonymous classes" do
+      error = Class.new(ArgumentError).new("should not leak")
+      expect(described_class.redacted_error_class_name(error)).to eq("ArgumentError")
+    end
+
+    it "falls back to 'StandardError' for double-anonymous classes" do
+      error = Class.new(Class.new(StandardError)).new("deeply nested")
+      result = described_class.redacted_error_class_name(error)
+      expect(result).to eq("StandardError").or eq(error.class.superclass.name)
+      expect(result).not_to include("deeply nested")
+    end
+
+    it "never returns nil" do
+      error = StandardError.new("anything")
+      expect(described_class.redacted_error_class_name(error)).not_to be_nil
+    end
+  end
 end

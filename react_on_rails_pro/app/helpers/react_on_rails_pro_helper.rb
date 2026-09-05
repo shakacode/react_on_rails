@@ -990,7 +990,7 @@ module ReactOnRailsProHelper
     log_static_rsc_render_diagnostics(summary, diagnostics_config)
   rescue StandardError => e
     Rails.logger.warn(
-      "[ReactOnRailsPro] Failed to emit static RSC diagnostics: #{e.class}: #{e.message}"
+      "[ReactOnRailsPro] Failed to emit static RSC diagnostics: #{ReactOnRailsPro::Ppr.redacted_error_class_name(e)}"
     )
   end
 
@@ -1081,7 +1081,7 @@ module ReactOnRailsProHelper
           {
             pack: component_name.to_s,
             type: :generated_component_pack,
-            reason: "#{e.class}: #{e.message}"
+            reason: ReactOnRailsPro::Ppr.redacted_error_class_name(e)
           }
         )
       end
@@ -1099,7 +1099,7 @@ module ReactOnRailsProHelper
     diagnostics[:unavailable] << {
       pack: pack_name,
       type:,
-      reason: "#{e.class}: #{e.message}"
+      reason: ReactOnRailsPro::Ppr.redacted_error_class_name(e)
     }
   end
 
@@ -1191,7 +1191,7 @@ module ReactOnRailsProHelper
     entries = static_rsc_client_reference_entries(static_rsc_client_reference_manifest(manifest))
     { count: entries.size, entries: }
   rescue StandardError => e
-    { count: nil, entries: [], unavailable_reason: "#{e.class}: #{e.message}" }
+    { count: nil, entries: [], unavailable_reason: ReactOnRailsPro::Ppr.redacted_error_class_name(e) }
   end
 
   def static_rsc_client_reference_manifest(manifest)
@@ -1842,15 +1842,13 @@ module ReactOnRailsProHelper
     end
   end
 
-  # Redacted error summary for safe interpolation into PPR log messages (issue #4966).
+  # Redacted error summary for safe interpolation into log messages (issue #4966).
   #
-  # Logs only the error class name — never raw error.message content, which can contain
-  # request-derived PII (console output from SSR, user data in props, external service
-  # responses). Consistent with the AS::Notifications redaction in Ppr.safe_error_summary.
-  # Falls back to the superclass name for anonymous exception classes (where
-  # Class#name returns nil).
+  # Delegates to Ppr.redacted_error_class_name — single source of truth for the
+  # error-class-name-only redaction policy across both AS::Notifications payloads
+  # and log messages.
   def ppr_redacted_error_for_log(error)
-    error.class.name || error.class.superclass&.name || "StandardError"
+    ReactOnRailsPro::Ppr.redacted_error_class_name(error)
   end
 
   # Async version of fetch_react_component. Handles cache lookup synchronously,

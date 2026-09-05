@@ -142,7 +142,7 @@ module ReactOnRailsPro
         ActiveSupport::Notifications.instrument(
           DEGRADED_PRE_FLUSH_NOTIFICATION,
           component_name:,
-          error: safe_error_summary(error)
+          error: redacted_error_class_name(error)
         )
       end
 
@@ -150,7 +150,7 @@ module ReactOnRailsPro
         ActiveSupport::Notifications.instrument(
           DEGRADED_POST_FLUSH_NOTIFICATION,
           component_name:,
-          error: safe_error_summary(error)
+          error: redacted_error_class_name(error)
         )
       end
 
@@ -174,27 +174,25 @@ module ReactOnRailsPro
         ActiveSupport::Notifications.instrument(
           CACHE_READ_ERROR_NOTIFICATION,
           component_name:,
-          error: safe_error_summary(error)
+          error: redacted_error_class_name(error)
         )
       end
 
-      private
-
-      # Redacted summary of an error for AS::Notifications payloads (issue #4966).
+      # Redacted error identifier for AS::Notifications payloads and log messages (#4966).
       #
-      # PrerenderError#message can include renderer console output with request-derived
-      # values (user data logged during SSR), and arbitrary StandardError messages (store
-      # errors, parse errors) flow through the same handlers. Publishing raw error.message
-      # into AS::Notifications would propagate PII through APM/logging subscribers that
-      # forward data to external services beyond the operator's log access controls.
-      #
-      # Publishes only `error.class.name` — safe, always available, and sufficient for APM
+      # Returns only `error.class.name` — safe, always available, and sufficient for APM
       # triage (e.g. "PrerenderError", "Redis::ConnectionError", "JSON::ParserError").
       # Falls back to the superclass name for anonymous exception classes (where
       # Class#name returns nil).
-      def safe_error_summary(error)
+      #
+      # Raw error.message is never published: PrerenderError#message can include renderer
+      # console output with request-derived PII, and arbitrary StandardError messages
+      # (store errors, parse errors) flow through the same handlers.
+      def redacted_error_class_name(error)
         error.class.name || error.class.superclass&.name || "StandardError"
       end
+
+      private
 
       def detect_react_version_cache_key
         package_json_path = react_dom_package_json_path
@@ -203,7 +201,9 @@ module ReactOnRailsPro
         version = JSON.parse(File.read(package_json_path))["version"]
         version.present? ? "react-#{version}" : UNKNOWN_REACT_VERSION_CACHE_KEY
       rescue StandardError => e
-        Rails.logger.debug { "[ReactOnRailsPro] Could not detect react-dom version for PPR cache key: #{e.message}" }
+        Rails.logger.debug do
+          "[ReactOnRailsPro] Could not detect react-dom version for PPR cache key: #{redacted_error_class_name(e)}"
+        end
         UNKNOWN_REACT_VERSION_CACHE_KEY
       end
 
