@@ -627,6 +627,8 @@ module CloseoutEvidenceReplay
   end
 
   def valid_structured_source_ref?(kind, value)
+    return false if value.match?(/\A(?:none|skipped|not[-_ ]run)\z/i)
+
     case kind
     when "repo_command"
       valid_repo_command_ref?(value)

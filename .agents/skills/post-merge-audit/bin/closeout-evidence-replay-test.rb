@@ -402,6 +402,54 @@ class CloseoutEvidenceReplayTest < Minitest::Test
     assert_equal "SATISFIED", qa.fetch("verdict")
   end
 
+  %w[repo_command repo_report].each do |source_kind|
+    ["none", "skipped", "not_run", "NONE", "SKIPPED", "NOT_RUN", "not-run", "not run"].each do |source_ref|
+      define_method("test_v3_#{source_kind}_rejects_absent_source_#{source_ref}") do
+        qa = run_replay(
+          v3_marker(
+            "performance_impact" => "measured_metric",
+            "performance_evidence_status" => "measured",
+            "performance_source_kind" => source_kind,
+            "performance_source_ref" => source_ref,
+            "performance_metric_kind" => "runtime",
+            "performance_baseline_value" => "2.4s",
+            "performance_candidate_value" => "2.1s"
+          ),
+          expected_head_sha: "1111111111111111111111111111111111111111",
+          require_structured_visual_evidence_v3: true
+        ).fetch("qa_evidence")
+
+        assert_equal "UNKNOWN", qa.fetch("verdict")
+        assert_includes qa.fetch("missing"), "performance_source_ref"
+      end
+    end
+  end
+
+  def test_v3_performance_sources_allow_absence_words_in_real_references
+    {
+      "repo_command" => ["bin/none", "bin/skipped", "bin/not_run", "pnpm run benchmark --filter=none"],
+      "repo_report" => ["none.json", "reports/skipped.json", "reports/not_run.json", "reports/not-run.json"]
+    }.each do |source_kind, references|
+      references.each do |source_ref|
+        qa = run_replay(
+          v3_marker(
+            "performance_impact" => "measured_metric",
+            "performance_evidence_status" => "measured",
+            "performance_source_kind" => source_kind,
+            "performance_source_ref" => source_ref,
+            "performance_metric_kind" => "runtime",
+            "performance_baseline_value" => "2.4s",
+            "performance_candidate_value" => "2.1s"
+          ),
+          expected_head_sha: "1111111111111111111111111111111111111111",
+          require_structured_visual_evidence_v3: true
+        ).fetch("qa_evidence")
+
+        assert_equal "SATISFIED", qa.fetch("verdict"), "#{source_kind}: #{source_ref}"
+      end
+    end
+  end
+
   def test_v3_repo_command_rejects_shell_operators
     qa = run_replay(
       v3_marker(
