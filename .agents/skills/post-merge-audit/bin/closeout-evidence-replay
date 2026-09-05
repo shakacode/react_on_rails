@@ -659,7 +659,8 @@ module CloseoutEvidenceReplay
   end
 
   def validate_measurement_pair(baseline, candidate, field, missing, metric_kind:)
-    measurements = [baseline, candidate].map { |value| parse_measurement(value) }
+    byte_metric = %w[bundle_size memory].include?(metric_kind)
+    measurements = [baseline, candidate].map { |value| parse_measurement(value, preserve_byte_case: byte_metric) }
     valid = measurements.all? && measurements.map { |measurement| measurement.fetch(1) }.uniq.one?
     if valid
       unit = measurements.first.fetch(1)
@@ -672,7 +673,7 @@ module CloseoutEvidenceReplay
   def valid_performance_unit?(metric_kind, unit)
     case metric_kind
     when "bundle_size", "memory"
-      unit.match?(/\A(?:[kmgt]i?)?b(?:ytes?)?\z/i)
+      unit.match?(/\A(?:[kmgt]i?)?(?:B|bytes?)\z/)
     when "bundle_shape"
       BUNDLE_SHAPE_UNITS.include?(unit)
     when "runtime"
@@ -682,9 +683,13 @@ module CloseoutEvidenceReplay
     end
   end
 
-  def parse_measurement(value)
+  def parse_measurement(value, preserve_byte_case: false)
     match = value.match(%r{\A([-+]?\d+(?:\.\d+)?)([A-Za-z%]+(?:/[A-Za-z]+)?)\z})
-    match && [match[1], match[2].downcase]
+    return unless match
+
+    unit = match[2].downcase
+    unit[-1] = "B" if preserve_byte_case && match[2].end_with?("B")
+    [match[1], unit]
   end
 
   def validate_visual_evidence_v2(

@@ -565,6 +565,76 @@ class CloseoutEvidenceReplayTest < Minitest::Test
     end
   end
 
+  %w[bundle_size memory].each do |metric_kind|
+    [
+      %w[100MB 90Mb UNKNOWN],
+      %w[100Mb 90Mb UNKNOWN],
+      %w[100B 90b UNKNOWN],
+      %w[100b 90b UNKNOWN],
+      %w[100KiB 90Kib UNKNOWN],
+      %w[100Kib 90Kib UNKNOWN],
+      %w[100B 90B SATISFIED],
+      %w[100MB 90MB SATISFIED],
+      %w[100KiB 90KiB SATISFIED],
+      %w[100bytes 90bytes SATISFIED],
+      %w[100KB 90kB SATISFIED],
+      %w[100KIB 90KiB SATISFIED],
+      %w[100BYTES 90bytes SATISFIED]
+    ].each do |baseline, candidate, verdict|
+      define_method("test_v3_byte_units_#{metric_kind}_#{baseline}_#{candidate}") do
+        qa = run_replay(
+          v3_marker(
+            "performance_impact" => metric_kind == "bundle_size" ? "bundle_hygiene" : "measured_metric",
+            "performance_evidence_status" => "measured",
+            "performance_source_kind" => "repo_report",
+            "performance_source_ref" => "reports/performance.json",
+            "performance_metric_kind" => metric_kind,
+            "performance_baseline_value" => baseline,
+            "performance_candidate_value" => candidate
+          ),
+          expected_head_sha: "1111111111111111111111111111111111111111",
+          require_structured_visual_evidence_v3: true
+        ).fetch("qa_evidence")
+
+        assert_equal verdict, qa.fetch("verdict")
+        if verdict == "UNKNOWN"
+          assert_includes qa.fetch("missing"), "performance_evidence"
+        else
+          assert_empty qa.fetch("missing")
+        end
+      end
+    end
+  end
+
+  def test_v3_non_byte_measurements_preserve_case_normalization
+    {
+      "runtime" => %w[measured_metric 240MS 210ms],
+      "bundle_shape" => %w[bundle_hygiene 12CHUNKS 11chunks]
+    }.each do |metric_kind, (impact, baseline, candidate)|
+      qa = run_replay(
+        v3_marker(
+          "performance_impact" => impact,
+          "performance_evidence_status" => "measured",
+          "performance_source_kind" => "repo_report",
+          "performance_source_ref" => "reports/performance.json",
+          "performance_metric_kind" => metric_kind,
+          "performance_baseline_value" => baseline,
+          "performance_candidate_value" => candidate,
+          "interaction_change" => "yes",
+          "interaction_evidence_kind" => "measured_substitute",
+          "interaction_baseline_value" => "52PX",
+          "interaction_candidate_value" => "0px",
+          "interaction_tolerance" => "1Px"
+        ),
+        expected_head_sha: "1111111111111111111111111111111111111111",
+        require_structured_visual_evidence_v3: true
+      ).fetch("qa_evidence")
+
+      assert_equal "SATISFIED", qa.fetch("verdict"), metric_kind
+      assert_empty qa.fetch("missing")
+    end
+  end
+
   def test_v3_performance_measurements_must_be_non_negative
     qa = run_replay(
       v3_marker(
