@@ -6,7 +6,7 @@ require "rainbow"
 module ReactOnRails
   class PrerenderError < ::ReactOnRails::Error
     REDACTED_VALUE = "[REDACTED]"
-    SENSITIVE_CONTEXT_KEYS = %w[props js_code json].freeze
+    SENSITIVE_CONTEXT_KEYS = %w[props js_code json console_messages].freeze
     # TODO: Consider remove providing original `err` as already have access to `self.cause`
     # http://blog.honeybadger.io/nested-errors-in-ruby-with-exception-cause/
     attr_reader :component_name, :err, :props, :js_code, :console_messages
@@ -18,7 +18,7 @@ module ReactOnRails
       @err = err
       @props = redacted_value(props)
       @js_code = redacted_value(js_code)
-      @console_messages = console_messages
+      @console_messages = redacted_value(console_messages)
 
       backtrace, message = calc_message(component_name, console_messages, err, js_code, props)
 
@@ -102,7 +102,7 @@ module ReactOnRails
 
       if console_messages && console_messages.strip.present?
         message << Rainbow("Console Output:").magenta.bright << "\n"
-        message << "#{console_messages}\n\n"
+        message << "#{redacted_value(console_messages)}\n\n"
       end
 
       # Add actionable suggestions

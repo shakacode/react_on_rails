@@ -168,7 +168,7 @@ module ReactOnRailsPro
         classify(path, status, counts, details)
       rescue StandardError => e
         PathResult.new(path:, status: :failed, http_status: nil, writes: 0,
-                       detail: "#{e.class}: #{e.message.to_s.tr("\n\r", ' ')[0, 200]}")
+                       detail: ReactOnRailsPro::Ppr.redacted_error_class_name(e))
       end
 
       # A fresh session per path keeps cookie/session state from leaking between paths, so a

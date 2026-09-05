@@ -150,7 +150,7 @@ describe ReactOnRailsPro::Ppr do
   end
 
   describe ".instrument_degraded_pre_flush" do
-    it "emits the ppr.resume.degraded_pre_flush notification with the error message" do
+    it "emits the ppr.resume.degraded_pre_flush notification with redacted error (class name only)" do
       events = []
       subscription = ActiveSupport::Notifications.subscribe(
         described_class::DEGRADED_PRE_FLUSH_NOTIFICATION
@@ -159,19 +159,20 @@ describe ReactOnRailsPro::Ppr do
       begin
         described_class.instrument_degraded_pre_flush(
           component_name: "TestComponent",
-          error: RuntimeError.new("test failure")
+          error: RuntimeError.new("test failure with user@email.com")
         )
       ensure
         ActiveSupport::Notifications.unsubscribe(subscription)
       end
 
       expect(events.length).to eq(1)
-      expect(events.first.payload).to include(component_name: "TestComponent", error: "test failure")
+      expect(events.first.payload).to include(component_name: "TestComponent", error: "RuntimeError")
+      expect(events.first.payload[:error]).not_to include("user@email.com")
     end
   end
 
   describe ".instrument_degraded_post_flush" do
-    it "emits the ppr.resume.degraded_post_flush notification with the error message" do
+    it "emits the ppr.resume.degraded_post_flush notification with redacted error (class name only)" do
       events = []
       subscription = ActiveSupport::Notifications.subscribe(
         described_class::DEGRADED_POST_FLUSH_NOTIFICATION
@@ -180,14 +181,15 @@ describe ReactOnRailsPro::Ppr do
       begin
         described_class.instrument_degraded_post_flush(
           component_name: "TestComponent",
-          error: RuntimeError.new("resume exploded")
+          error: RuntimeError.new("resume exploded with secret-token-123")
         )
       ensure
         ActiveSupport::Notifications.unsubscribe(subscription)
       end
 
       expect(events.length).to eq(1)
-      expect(events.first.payload).to include(component_name: "TestComponent", error: "resume exploded")
+      expect(events.first.payload).to include(component_name: "TestComponent", error: "RuntimeError")
+      expect(events.first.payload[:error]).not_to include("secret-token-123")
     end
   end
 
@@ -242,7 +244,7 @@ describe ReactOnRailsPro::Ppr do
   end
 
   describe ".instrument_cache_read_error" do
-    it "emits the ppr.cache.read_error notification with component_name and error message" do
+    it "emits the ppr.cache.read_error notification with redacted error (class name only)" do
       events = []
       subscription = ActiveSupport::Notifications.subscribe(
         described_class::CACHE_READ_ERROR_NOTIFICATION
@@ -251,7 +253,7 @@ describe ReactOnRailsPro::Ppr do
       begin
         described_class.instrument_cache_read_error(
           component_name: "TestComponent",
-          error: RuntimeError.new("Redis connection refused")
+          error: RuntimeError.new("Redis connection refused at redis://internal:6379")
         )
       ensure
         ActiveSupport::Notifications.unsubscribe(subscription)
@@ -260,8 +262,84 @@ describe ReactOnRailsPro::Ppr do
       expect(events.length).to eq(1)
       expect(events.first.payload).to include(
         component_name: "TestComponent",
-        error: "Redis connection refused"
+        error: "RuntimeError"
       )
+      expect(events.first.payload[:error]).not_to include("redis://")
+    end
+
+    it "publishes the full namespaced class name for custom error classes" do
+      custom_error_class = Class.new(StandardError)
+      stub_const("ReactOnRailsPro::CustomCacheError", custom_error_class)
+      custom_error = ReactOnRailsPro::CustomCacheError.new("connection refused to redis://internal:6379")
+
+      events = []
+      subscription = ActiveSupport::Notifications.subscribe(
+        described_class::CACHE_READ_ERROR_NOTIFICATION
+      ) { |event| events << event }
+
+      begin
+        described_class.instrument_cache_read_error(
+          component_name: "TestComponent",
+          error: custom_error
+        )
+      ensure
+        ActiveSupport::Notifications.unsubscribe(subscription)
+      end
+
+      expect(events.first.payload[:error]).to eq("ReactOnRailsPro::CustomCacheError")
+      expect(events.first.payload[:error]).not_to include("redis://")
+    end
+
+    it "falls back to the superclass name for anonymous exception classes" do
+      anonymous_error = Class.new(StandardError).new("should not appear in payload")
+
+      events = []
+      subscription = ActiveSupport::Notifications.subscribe(
+        described_class::CACHE_READ_ERROR_NOTIFICATION
+      ) { |event| events << event }
+
+      begin
+        described_class.instrument_cache_read_error(
+          component_name: "TestComponent",
+          error: anonymous_error
+        )
+      ensure
+        ActiveSupport::Notifications.unsubscribe(subscription)
+      end
+
+      expect(events.first.payload[:error]).to eq("StandardError")
+      expect(events.first.payload[:error]).not_to include("should not appear")
+    end
+  end
+
+  describe ".redacted_error_class_name" do
+    it "returns the class name for a named error" do
+      error = RuntimeError.new("user@example.com session token abc123")
+      expect(described_class.redacted_error_class_name(error)).to eq("RuntimeError")
+    end
+
+    it "returns the full namespaced class name" do
+      klass = Class.new(StandardError)
+      stub_const("MyApp::CustomError", klass)
+      error = MyApp::CustomError.new("sensitive data")
+      expect(described_class.redacted_error_class_name(error)).to eq("MyApp::CustomError")
+    end
+
+    it "falls back to superclass name for anonymous classes" do
+      error = Class.new(ArgumentError).new("should not leak")
+      expect(described_class.redacted_error_class_name(error)).to eq("ArgumentError")
+    end
+
+    it "falls back to 'StandardError' for double-anonymous classes" do
+      error = Class.new(Class.new(StandardError)).new("deeply nested")
+      result = described_class.redacted_error_class_name(error)
+      expect(result).to eq("StandardError").or eq(error.class.superclass.name)
+      expect(result).not_to include("deeply nested")
+    end
+
+    it "never returns nil" do
+      error = StandardError.new("anything")
+      expect(described_class.redacted_error_class_name(error)).not_to be_nil
     end
   end
 end
