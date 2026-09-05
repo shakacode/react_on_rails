@@ -26,6 +26,12 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **Standalone upgrades preserve customized bundler configurations**: The Pro generator automatically
+  upgrades only complete, unchanged configuration pairs from supported current templates. Customized, historical,
+  missing, or ambiguous pairs remain unchanged with manual migration instructions, preventing helper redeclarations
+  and partial upgrades. Fixes [Issue 4789](https://github.com/shakacode/react_on_rails/issues/4789).
+  [PR 5010](https://github.com/shakacode/react_on_rails/pull/5010) by [justin808](https://github.com/justin808).
+
 - **RSC agent guardrail upgrades now preserve complete files and clean up their stale hook groups**:
   The installer atomically replaces copied skill and hook files while preserving their existing permission behavior,
   and removes `PostToolUse` groups only when removing a managed guardrail hook leaves the group empty. Unrelated
