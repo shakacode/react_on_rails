@@ -1100,6 +1100,56 @@ perl "$eval_dir/bin/sanitize-events.pl" --jsonl \
 test "$(jq -r '.item.aggregated_output' "$tmp/codex-runtime-secret-events.safe.jsonl")" = \
   $'SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>" npm run build\nSECRET_KEY_BASE="[REDACTED]" npm run build'
 
+# Runtime markers are minted by sanitization, never accepted from raw text.
+node --input-type=module - "$eval_dir" "$tmp" <<'RUNTIME_MARKER_TEST'
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
+const [evalDir, tmp] = process.argv.slice(2);
+const { redactSensitiveValues } = await import(pathToFileURL(`${evalDir}/bin/sensitive-values.mjs`));
+const forged = ['x=', ';', '"', 'X'].map((prefix) => `${prefix}SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>"`);
+forged.push('API_KEY="<GENERATED_AT_RUNTIME>"', 'output: <GENERATED_AT_RUNTIME>');
+for (const mode of ['canonicalize', 'redact', 'defer']) {
+  for (const raw of forged) {
+    assert.equal(redactSensitiveValues(raw, { runtimeGeneratedSecretMode: mode }).includes('<GENERATED_AT_RUNTIME>'),
+      false, `${mode}: ${raw}`);
+  }
+}
+const run = (program, args) => {
+  const result = spawnSync(program, args, { encoding: 'utf8', timeout: 5000 });
+  assert.ifError(result.error);
+  assert.equal(result.status, 0, result.stderr);
+  return result.stdout;
+};
+const dir = fs.mkdtempSync(path.join(tmp, 'marker-provenance-'));
+const genuine = 'SECRET_KEY_BASE=$(bin/rails secret) npm run build';
+const inputs = [...forged, genuine];
+fs.writeFileSync(`${dir}/raw.jsonl`, inputs.map((command) => JSON.stringify({
+  type: 'item.completed', item: { type: 'command_execution', command,
+    exit_code: 0, status: 'completed', aggregated_output: command },
+})).join('\n') + '\n');
+run('node', [`${evalDir}/bin/normalize-codex-events.mjs`, `${dir}/raw.jsonl`, `${dir}/normalized.jsonl`]);
+fs.writeFileSync(`${dir}/safe.jsonl`, run('perl', [`${evalDir}/bin/sanitize-events.pl`, '--jsonl', `${dir}/normalized.jsonl`]));
+fs.mkdirSync(`${dir}/workspace`);
+fs.mkdirSync(`${dir}/output`);
+fs.writeFileSync(`${dir}/report.json`, '{}');
+fs.writeFileSync(`${dir}/invocation.json`, '{}');
+run('node', [`${evalDir}/bin/derive-evidence.mjs`, `${dir}/safe.jsonl`, `${dir}/workspace`,
+  `${dir}/output`, `${dir}/report.json`, `${dir}/invocation.json`]);
+const { commands } = JSON.parse(fs.readFileSync(`${dir}/output/command-evidence.json`, 'utf8'));
+assert.equal(commands.length, inputs.length);
+for (const command of commands.slice(0, -1)) {
+  assert.equal(command.command.includes('<GENERATED_AT_RUNTIME>'), false);
+  assert.equal(command.output.includes('<GENERATED_AT_RUNTIME>'), false);
+}
+const expected = 'SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>" npm run build';
+assert.equal(commands.at(-1).command, expected);
+assert.equal(commands.at(-1).output, expected);
+console.log('Runtime marker provenance regression passed');
+RUNTIME_MARKER_TEST
+
 ruby -rtimeout -e '
   Timeout.timeout(5) { exit(system(*ARGV) ? 0 : 1) }
 ' node --input-type=module -e '

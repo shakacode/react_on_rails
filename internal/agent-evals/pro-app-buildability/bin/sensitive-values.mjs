@@ -68,19 +68,15 @@ const redactCredentialsInWebUrls = (value) =>
 
 const runtimeGeneratedSecretPrefix = String.raw`(^|[ \t\x60]|^\/(?:usr\/)?bin\/(?:zsh|bash|sh) -lc ')`;
 const runtimeGeneratedSecretBoundary = String.raw`(?=[ \t;|&<>()\x60]|$)`;
-const runtimeGeneratedSecretMarker = new RegExp(
-  // A marker is trusted only when this helper is explicitly called in trusted mode.
-  `${runtimeGeneratedSecretPrefix}SECRET_KEY_BASE="<GENERATED_AT_RUNTIME>"`,
-  'gm',
-);
 const runtimeGeneratedSecretExpression = new RegExp(
   `${runtimeGeneratedSecretPrefix}SECRET_KEY_BASE=\\$\\(bin/rails secret\\)${runtimeGeneratedSecretBoundary}`,
   'gm',
 );
 const replaceRuntimeGeneratedSecret = (value, replacement, preserveExistingMarker = false) => {
+  // Raw text cannot assert marker provenance, regardless of its surrounding syntax.
   const demoted = preserveExistingMarker
     ? String(value)
-    : String(value).replace(runtimeGeneratedSecretMarker, '$1SECRET_KEY_BASE="[REDACTED]"');
+    : String(value).replaceAll('<GENERATED_AT_RUNTIME>', '[REDACTED]');
   return demoted.replace(runtimeGeneratedSecretExpression, `$1${replacement}`);
 };
 const canonicalizeRuntimeGeneratedSecret = (value) =>
@@ -162,7 +158,7 @@ const redactSensitiveValuesCore = (value) =>
     .replace(bearerToken, 'Bearer [REDACTED]');
 
 const redactWithDeferredRuntimeSecrets = (value) => {
-  const input = String(value);
+  const input = String(value).replaceAll('<GENERATED_AT_RUNTIME>', '[REDACTED]');
   let output = '';
   let cursor = 0;
   runtimeGeneratedSecretExpression.lastIndex = 0;
