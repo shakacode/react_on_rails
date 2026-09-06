@@ -74,6 +74,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   toggles its nonce generator. This also stops serving one request's nonce value to other users from shared cache
   entries, which mattered for session-derived nonce generators. Fixes
   [Issue 5021](https://github.com/shakacode/react_on_rails/issues/5021).
+  [PR 5025](https://github.com/shakacode/react_on_rails/pull/5025) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 - **Console replay can no longer swallow the rest of the page, and replayed messages are no longer altered**:
   A server-side `console.log` argument containing `<!--` could switch the browser's HTML parser into a state where
