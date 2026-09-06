@@ -45,6 +45,18 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   runtime behavior. Fixes [Issue 5036](https://github.com/shakacode/react_on_rails/issues/5036)
   by [justin808](https://github.com/justin808).
 
+- **[Pro]** **Fragment-cached components no longer serve stale CSP nonces**: The `cached_*` helpers
+  (`cached_react_component`, `cached_react_component_hash`, `cached_stream_react_component`,
+  `cached_buffered_stream_react_component`, `cached_static_rsc_component`, `cached_async_react_component`) cached
+  the rendered HTML with the originating request's CSP nonce baked into every executable inline script — immediate
+  hydration, console replay, and React's streaming runtime scripts — so under a nonce-enforcing `script-src` every
+  cache hit served scripts the browser refused to run. Cache hits now re-stamp every cached `nonce` attribute with
+  the serving request's nonce (per chunk on streamed replays), and the component cache key gains a `csp-nonce`
+  segment so entries rendered with a nonce are never shared with nonce-free requests (and vice versa) when an app
+  toggles its nonce generator. This also stops serving one request's nonce value to other users from shared cache
+  entries, which mattered for session-derived nonce generators. Fixes
+  [Issue 5021](https://github.com/shakacode/react_on_rails/issues/5021).
+
 - **[Pro]** **Standalone upgrades preserve customized bundler configurations**: The Pro generator automatically
   upgrades only complete, unchanged configuration pairs from supported current templates. Customized, historical,
   missing, or ambiguous pairs remain unchanged with manual migration instructions, preventing helper redeclarations

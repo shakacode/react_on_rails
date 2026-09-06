@@ -86,6 +86,10 @@ Fragment-cached helpers cache the final rendered HTML. That HTML includes the Ra
 
 Keep a stable render order for pages that share a cached component key. If a component may be the only React root on some pages and not others, use distinct cache keys for those layouts or render an uncached React root first so the Rails context ownership is explicit.
 
+### CSP Nonces
+
+The `cached_*` helpers are safe to combine with a nonce-enforcing `script-src`: cache hits re-stamp every cached `nonce` attribute with the serving request's nonce, and cache keys segregate nonce-rendered entries from nonce-free ones. Plain Rails `cache do … end` blocks around `react_component` or `redux_store` do **not** get this treatment — see [Strict CSP → Caching Caveats](./strict-csp.md#caching-caveats).
+
 ## Tag-Based Revalidation
 
 Cache keys handle "is this entry still current?" at read time. For the write side — "this record changed, bust every cached component that depends on it" — tag the entries and revalidate by tag (the React on Rails Pro analog of Next.js `revalidateTag`):
