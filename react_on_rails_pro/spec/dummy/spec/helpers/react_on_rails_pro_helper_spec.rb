@@ -663,6 +663,67 @@ describe ReactOnRailsProHelper do
 
       expect(second_result).to include('nonce="hit-nonce-BBB="')
       expect(second_result).not_to include("miss-nonce-AAA=")
+      # The cache-write marker never leaks into served markup.
+      expect(first_result).not_to include("rorp-cached-csp-nonce")
+      expect(second_result).not_to include("rorp-cached-csp-nonce")
+    end
+
+    it "re-stamps only attributes carrying the entry's originating nonce" do
+      # Cached SSR output can embed attacker-influenced raw markup (via an app-level HTML
+      # injection sink). A guessed nonce must never be promoted to the live nonce; only
+      # the framework-recorded originating value is re-stamped.
+      expected_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(
+        "App", cache_key: "csp-nonce-exact", csp_nonce_active: true
+      )
+      cached_html = "<div>cached</div>" \
+                    '<script nonce="attacker-guess">evil()</script>' \
+                    '<script nonce="origin-AAA=">framework()</script>' \
+                    "<!--rorp-cached-csp-nonce:origin-AAA=-->"
+      Rails.cache.write(expected_cache_key, cached_html.html_safe)
+      allow(self).to receive(:csp_nonce).and_return("live-BBB=")
+
+      result = cached_react_component("App", cache_key: "csp-nonce-exact", auto_load_bundle: false) do
+        raise "props block must not run on a cache hit"
+      end
+
+      expect(result).to include('<script nonce="live-BBB=">framework()</script>')
+      expect(result).to include('<script nonce="attacker-guess">evil()</script>')
+      expect(result).not_to include("origin-AAA=")
+      expect(result).not_to include("rorp-cached-csp-nonce")
+    end
+
+    it "does not rewrite when the current nonce is only valid after stripping" do
+      allow(self).to receive(:csp_nonce).and_return("strip-orig-AAA=")
+
+      cached_react_component("App", cache_key: "csp-nonce-strip", auto_load_bundle: false) do
+        { name: "first" }
+      end
+
+      # "abc!" would become the valid-looking "abc" if sanitized by stripping, but the
+      # response header still carries "abc!" — splicing "abc" would mismatch every script.
+      allow(self).to receive(:csp_nonce).and_return("abc!")
+
+      second_result = cached_react_component("App", cache_key: "csp-nonce-strip", auto_load_bundle: false) do
+        raise "props block must not run on a cache hit"
+      end
+
+      expect(second_result).not_to include('nonce="abc"')
+      expect(second_result).to include('nonce="strip-orig-AAA="')
+    end
+
+    it "serves cached markup unchanged when the nonce is stable across requests" do
+      allow(self).to receive(:csp_nonce).and_return("stable-AAA=")
+
+      cached_react_component("App", cache_key: "csp-nonce-stable", auto_load_bundle: false) do
+        { name: "first" }
+      end
+
+      second_result = cached_react_component("App", cache_key: "csp-nonce-stable", auto_load_bundle: false) do
+        raise "props block must not run on a cache hit"
+      end
+
+      expect(second_result).to include('nonce="stable-AAA="')
+      expect(second_result).not_to include("rorp-cached-csp-nonce")
     end
 
     it "does not reuse entries cached without a nonce once a nonce generator is active" do
@@ -3072,7 +3133,8 @@ describe ReactOnRailsProHelper do
             prerender: true,
             csp_nonce_active: true
           )
-          stale_html = '<div>static</div><script nonce="static-miss-AAA=">reveal()</script>'
+          stale_html = '<div>static</div><script nonce="static-miss-AAA=">reveal()</script>' \
+                       "<!--rorp-cached-csp-nonce:static-miss-AAA=-->"
           Rails.cache.write(nonce_keyed_cache_key, stale_html, expires_in: 60)
 
           result = cached_static_rsc_component(
