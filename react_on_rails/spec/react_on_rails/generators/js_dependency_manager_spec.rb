@@ -840,7 +840,7 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       expect(info).to include("stable react-on-rails-rsc@19.1.0")
       expect(info).not_to include("stable react-on-rails-rsc@19.0.5")
       expect(warning).to include("pinned react-on-rails-rsc@19.1.0-rc.1")
-      expect(warning).to include("react-on-rails-rsc/WebpackPlugin")
+      expect(warning).to include("client-export parsing")
       expect(warning).to include("react-on-rails-rsc/RspackPlugin")
       expect(warning).to include("stable 19.1.0")
       expect(warning).not_to include("stable 19.0.5")
@@ -891,7 +891,7 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       expect(warnings.size).to eq(1)
       expect(warning_text).to include("Could not install the pinned react-on-rails-rsc@19.3.0-rc.1")
       expect(warning_text).to include("left the version pin in package.json")
-      expect(warning_text).to include("react-on-rails-rsc/WebpackPlugin")
+      expect(warning_text).to include("client-export parsing")
       expect(warning_text).to include("react-on-rails-rsc/RspackPlugin")
       manual_command = "npm install --save-exact react-on-rails-rsc@19.3.0-rc.1"
       expect(warning_text).to include(manual_command)

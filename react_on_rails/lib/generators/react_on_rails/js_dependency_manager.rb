@@ -451,8 +451,8 @@ module ReactOnRails
         if rsc_package_version_prerelease?
           "React Server Components package pin: all --rsc installs temporarily use " \
             "react-on-rails-rsc@#{RSC_PACKAGE_VERSION_PIN}, including Webpack projects. " \
-            "This prerelease keeps react-on-rails-rsc/WebpackPlugin compatible while adding " \
-            "react-on-rails-rsc/RspackPlugin. Keep the pin until stable " \
+            "This prerelease includes the qualified client-export parsing fixes and " \
+            "react-on-rails-rsc/RspackPlugin splitChunks fix. Keep the pin until stable " \
             "react-on-rails-rsc@#{rsc_stable_package_version_target} " \
             "is published and tagged latest."
         else
@@ -466,9 +466,9 @@ module ReactOnRails
       def rsc_dependency_pin_failed_warning
         if rsc_package_version_prerelease?
           "Warning: Could not install the pinned react-on-rails-rsc@#{RSC_PACKAGE_VERSION_PIN}. " \
-            "All RSC projects are temporarily pinned to that version: the prerelease keeps " \
-            "react-on-rails-rsc/WebpackPlugin compatible while adding react-on-rails-rsc/RspackPlugin, " \
-            "and the unversioned `latest` tag may not include both until stable " \
+            "All RSC projects are temporarily pinned to that version for its client-export parsing " \
+            "and react-on-rails-rsc/RspackPlugin splitChunks fixes. The unversioned `latest` tag " \
+            "does not include these fixes until stable " \
             "#{rsc_stable_package_version_target} " \
             "is published, so the generator left the version pin in package.json rather than " \
             "install a potentially incompatible version."
