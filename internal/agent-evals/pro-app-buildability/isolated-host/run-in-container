@@ -3,7 +3,7 @@ set -euo pipefail
 umask 077
 
 usage() {
-  echo "usage: $0 --agent codex|claude --model MODEL --timeout SECONDS --model-credential-file FILE --output ABSOLUTE_PATH" >&2
+  echo "usage: $0 --agent codex|claude --model MODEL --timeout SECONDS --model-credential-file FILE [--model-credential-format native|claude-oauth] --output ABSOLUTE_PATH" >&2
 }
 
 agent=""
@@ -11,6 +11,7 @@ model=""
 timeout_seconds=""
 model_credential_file=""
 model_credential_fd=9
+model_credential_format=native
 output=""
 while (($#)); do
   case "$1" in
@@ -18,12 +19,18 @@ while (($#)); do
     --model) model="${2:-}"; shift 2 ;;
     --timeout) timeout_seconds="${2:-}"; shift 2 ;;
     --model-credential-file) model_credential_file="${2:-}"; shift 2 ;;
+    --model-credential-format) model_credential_format="${2:-}"; shift 2 ;;
     --output) output="${2:-}"; shift 2 ;;
     *) usage; exit 64 ;;
   esac
 done
 
 [[ "$agent" == codex || "$agent" == claude ]] || { usage; exit 64; }
+[[ "$model_credential_format" == native || \
+  ( "$agent" == claude && "$model_credential_format" == claude-oauth ) ]] || {
+  echo "unsupported model credential format" >&2
+  exit 64
+}
 [[ -n "$model" && "$timeout_seconds" =~ ^[1-9][0-9]*$ && "$output" = /* ]] || {
   usage
   exit 64
@@ -109,6 +116,7 @@ lock_acquired=true
 
 docker_args=(
   run --rm --interactive
+  --init
   --read-only
   --cap-drop ALL
   --pids-limit 4096
@@ -162,6 +170,7 @@ docker "${docker_args[@]}" \
     --output /evidence/run \
     --run-id "$run_id" \
     --model-credential-stdin \
+    --model-credential-format "$model_credential_format" \
     --ack-disposable-secret-free-host \
   <&"$model_credential_fd"
 exec 9<&-
