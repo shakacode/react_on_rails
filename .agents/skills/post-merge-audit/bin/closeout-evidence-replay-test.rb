@@ -765,6 +765,66 @@ class CloseoutEvidenceReplayTest < Minitest::Test
     assert_includes qa.fetch("missing"), "interaction_evidence"
   end
 
+  [
+    %w[100MB 90Mb 1MB UNKNOWN],
+    %w[100Mb 90MB 1Mb UNKNOWN],
+    %w[100MB 90MB 1Mb UNKNOWN],
+    %w[100Mb 90Mb 1MB UNKNOWN],
+    %w[100MB 90MB 1MB SATISFIED],
+    %w[100Mb 90Mb 1Mb SATISFIED],
+    %w[52PX 0px 1Px SATISFIED],
+    %w[52MS 0ms 1Ms SATISFIED],
+    %w[100MB/s 90Mb/s 1MB/s UNKNOWN],
+    %w[100Mb/s 90MB/s 1MB/s UNKNOWN],
+    %w[100MB/s 90MB/s 1Mb/s UNKNOWN],
+    %w[100Mb/s 90Mb/s 1MB/s UNKNOWN],
+    %w[100MB/s 90MB/s 1MB/s SATISFIED],
+    %w[100Mb/s 90Mb/s 1Mb/s SATISFIED],
+    %w[100MB/S 90MB/s 1MB/s SATISFIED],
+    %w[100MB/MS 90MB/ms 1MB/Ms SATISFIED],
+    %w[52PX/S 0px/s 1Px/s SATISFIED],
+    %w[100ms/MB 90ms/Mb 1ms/MB UNKNOWN],
+    %w[100ms/MB 90ms/MB 1ms/Mb UNKNOWN],
+    %w[100ms/MB 90MS/MB 1Ms/MB SATISFIED],
+    %w[100ms/Mb 90MS/Mb 1Ms/Mb SATISFIED],
+    %w[100MBps 90Mbps 1MBps UNKNOWN],
+    %w[100Mbps 90MBps 1MBps UNKNOWN],
+    %w[100MBps 90MBps 1Mbps UNKNOWN],
+    %w[100MiBps 90Mibps 1MiBps UNKNOWN],
+    %w[100Mibps 90MiBps 1MiBps UNKNOWN],
+    %w[100MiBps 90MiBps 1Mibps UNKNOWN],
+    %w[100MBps 90MBps 1MBps SATISFIED],
+    %w[100Mbps 90Mbps 1Mbps SATISFIED],
+    %w[100MiBps 90MiBps 1MiBps SATISFIED],
+    %w[100Mibps 90Mibps 1Mibps SATISFIED],
+    %w[100MBPS 90MBps 1MBPs SATISFIED],
+    %w[100MibPS 90Mibps 1MibPs SATISFIED],
+    %w[100BYTES 90bytes 1Bytes SATISFIED],
+    %w[100BPM 90bpm 1Bpm SATISFIED]
+  ].each do |baseline, candidate, tolerance, verdict|
+    define_method("test_v3_interaction_unit_case_#{baseline}_#{candidate}_#{tolerance}".tr("/", "_")) do
+      body = v3_marker(
+        "interaction_change" => "yes",
+        "interaction_evidence_kind" => "measured_substitute",
+        "interaction_baseline_value" => baseline,
+        "interaction_candidate_value" => candidate,
+        "interaction_tolerance" => tolerance
+      )
+      qa = run_replay(
+        body,
+        expected_head_sha: "1111111111111111111111111111111111111111",
+        require_structured_visual_evidence_v3: true
+      ).fetch("qa_evidence")
+
+      assert_equal verdict, qa.fetch("verdict")
+      if verdict == "SATISFIED"
+        assert_empty qa.fetch("missing")
+      else
+        assert_includes qa.fetch("missing"), "interaction_evidence"
+      end
+    end
+  end
+
   def test_v3_interaction_tolerance_must_be_non_negative
     qa = run_replay(
       v3_marker(
@@ -2604,6 +2664,61 @@ class CloseoutEvidenceReplayTest < Minitest::Test
           end
         end
       end
+    end
+  end
+
+  [[2, 2], [3, 3], [2, 3], [1, 2]].product(%w[missing invalid]).each do |(valid_version, ambiguous_version), head_kind|
+    define_method("test_current_tested_at_retains_#{head_kind}_head_v#{valid_version}_v#{ambiguous_version}") do
+      head = "1111111111111111111111111111111111111111"
+      valid = valid_version == 1 ? v1_marker(head_sha: head) : public_send("v#{valid_version}_marker")
+      ambiguous = public_send(
+        "v#{ambiguous_version}_marker", "head_sha" => "invalid", "status" => "blocked", "release_blocking" => "blocked"
+      )
+      ambiguous = ambiguous.lines.reject { |line| line.start_with?("head_sha:") }.join if head_kind == "missing"
+      modes = [{}, { require_visual_evidence_v2: true }]
+      modes << { require_structured_visual_evidence_v3: true } if ambiguous_version == 3
+
+      modes.each do |mode|
+        [valid + ambiguous, ambiguous + valid, ambiguous].each do |body|
+          data = run_replay(body, expected_head_sha: head, **mode)
+          qa = data.fetch("qa_evidence")
+
+          assert_equal "UNKNOWN", data.fetch("overall_verdict"), mode.inspect
+          assert_equal ambiguous_version, qa.fetch("marker_version")
+          assert qa.fetch("missing").any? { |field| field.end_with?("head_sha") }, qa.inspect
+          expected_count = body != ambiguous && valid_version == ambiguous_version ? 2 : 1
+          assert_equal expected_count, qa.fetch("marker_count")
+        end
+      end
+    end
+  end
+
+  def test_current_tested_at_repair_preserves_stale_history_and_version_precedence
+    head = "1111111111111111111111111111111111111111"
+    stale = "2222222222222222222222222222222222222222"
+    [2, 3].each do |version|
+      current = public_send("v#{version}_marker")
+      history = public_send(
+        "v#{version}_marker", "head_sha" => stale, "tested_at" => "PR #123 head #{stale}",
+                              "status" => "blocked", "release_blocking" => "blocked"
+      )
+      strict = version == 3 ? { require_structured_visual_evidence_v3: true } : { require_visual_evidence_v2: true }
+      [{}, strict].each do |mode|
+        [history + current, current + history].each do |body|
+          qa = run_replay(body, expected_head_sha: head, **mode).fetch("qa_evidence")
+
+          assert_equal "SATISFIED", qa.fetch("verdict")
+          assert_equal 1, qa.fetch("marker_count")
+        end
+      end
+    end
+
+    malformed_v2 = v2_marker("head_sha" => "invalid", "status" => "blocked", "release_blocking" => "blocked")
+    [v3_marker + malformed_v2, malformed_v2 + v3_marker].each do |body|
+      qa = run_replay(body, expected_head_sha: head).fetch("qa_evidence")
+
+      assert_equal "SATISFIED", qa.fetch("verdict")
+      assert_equal 3, qa.fetch("marker_version")
     end
   end
 
