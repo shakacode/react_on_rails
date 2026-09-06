@@ -50,10 +50,12 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   `cached_buffered_stream_react_component`, `cached_static_rsc_component`, `cached_async_react_component`) cached
   the rendered HTML with the originating request's CSP nonce baked into every executable inline script — immediate
   hydration, console replay, and React's streaming runtime scripts — so under a nonce-enforcing `script-src` every
-  cache hit served scripts the browser refused to run. Cache hits now re-stamp every cached `nonce` attribute with
-  the serving request's nonce (per chunk on streamed replays), and the component cache key gains a `csp-nonce`
-  segment so entries rendered with a nonce are never shared with nonce-free requests (and vice versa) when an app
-  toggles its nonce generator. This also stops serving one request's nonce value to other users from shared cache
+  cache hit served scripts the browser refused to run. The cache write now records the originating request's nonce
+  in a trailing framework marker, and cache hits re-stamp exactly the attributes carrying that originating value
+  with the serving request's nonce (per chunk on streamed replays) — matching the exact per-request secret means
+  markup that arrived with any other nonce value is never promoted to the live nonce. The component cache key also
+  gains a `csp-nonce` segment so entries rendered with a nonce are never shared with nonce-free requests (and vice
+  versa) when an app toggles its nonce generator. This also stops serving one request's nonce value to other users from shared cache
   entries, which mattered for session-derived nonce generators. Fixes
   [Issue 5021](https://github.com/shakacode/react_on_rails/issues/5021).
   [PR 5025](https://github.com/shakacode/react_on_rails/pull/5025) by
