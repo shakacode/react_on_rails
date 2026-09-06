@@ -56,6 +56,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   toggles its nonce generator. This also stops serving one request's nonce value to other users from shared cache
   entries, which mattered for session-derived nonce generators. Fixes
   [Issue 5021](https://github.com/shakacode/react_on_rails/issues/5021).
+  [PR 5025](https://github.com/shakacode/react_on_rails/pull/5025) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 - **[Pro]** **Standalone upgrades preserve customized bundler configurations**: The Pro generator automatically
   upgrades only complete, unchanged configuration pairs from supported current templates. Customized, historical,
