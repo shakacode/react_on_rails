@@ -223,13 +223,20 @@ module CloseoutEvidenceReplay
     return true if duplicate_keys.include?("head_sha")
 
     head_sha = fields.fetch("head_sha", "").to_s.downcase
+    if expected_head_sha && !full_head_sha?(head_sha)
+      return tested_at_matches_head?(fields.fetch("tested_at", "").to_s, expected_head_sha)
+    end
+
     full_head_sha?(head_sha) && (!expected_head_sha || head_sha == expected_head_sha)
   end
 
   def replay_qa_markers(markers, expected_head_sha: nil, version: 1)
     return unknown("qa-evidence marker missing") if markers.empty?
 
-    markers = current_head_markers(markers, expected_head_sha) if expected_head_sha
+    if expected_head_sha
+      matching = markers.select { |marker| applicable_qa_marker?(marker, expected_head_sha) }
+      markers = matching unless matching.empty?
+    end
     aggregate_marker_results(
       markers.map do |marker|
         if version == 3
@@ -649,7 +656,7 @@ module CloseoutEvidenceReplay
   end
 
   def validate_measurement_triple(baseline, candidate, tolerance, field, missing)
-    measurements = [baseline, candidate, tolerance].map { |value| parse_measurement(value) }
+    measurements = [baseline, candidate, tolerance].map { |value| parse_measurement(value, preserve_byte_case: true) }
     valid = measurements.all? && measurements.map { |measurement| measurement.fetch(1) }.uniq.one?
     valid &&= !measurements.last.fetch(0).start_with?("-") if valid
     missing << field unless valid
