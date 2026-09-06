@@ -786,7 +786,21 @@ class CloseoutEvidenceReplayTest < Minitest::Test
     %w[100ms/MB 90ms/Mb 1ms/MB UNKNOWN],
     %w[100ms/MB 90ms/MB 1ms/Mb UNKNOWN],
     %w[100ms/MB 90MS/MB 1Ms/MB SATISFIED],
-    %w[100ms/Mb 90MS/Mb 1Ms/Mb SATISFIED]
+    %w[100ms/Mb 90MS/Mb 1Ms/Mb SATISFIED],
+    %w[100MBps 90Mbps 1MBps UNKNOWN],
+    %w[100Mbps 90MBps 1MBps UNKNOWN],
+    %w[100MBps 90MBps 1Mbps UNKNOWN],
+    %w[100MiBps 90Mibps 1MiBps UNKNOWN],
+    %w[100Mibps 90MiBps 1MiBps UNKNOWN],
+    %w[100MiBps 90MiBps 1Mibps UNKNOWN],
+    %w[100MBps 90MBps 1MBps SATISFIED],
+    %w[100Mbps 90Mbps 1Mbps SATISFIED],
+    %w[100MiBps 90MiBps 1MiBps SATISFIED],
+    %w[100Mibps 90Mibps 1Mibps SATISFIED],
+    %w[100MBPS 90MBps 1MBPs SATISFIED],
+    %w[100MibPS 90Mibps 1MibPs SATISFIED],
+    %w[100BYTES 90bytes 1Bytes SATISFIED],
+    %w[100BPM 90bpm 1Bpm SATISFIED]
   ].each do |baseline, candidate, tolerance, verdict|
     define_method("test_v3_interaction_unit_case_#{baseline}_#{candidate}_#{tolerance}".tr("/", "_")) do
       body = v3_marker(

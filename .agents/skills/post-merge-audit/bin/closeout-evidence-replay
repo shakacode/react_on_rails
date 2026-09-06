@@ -701,6 +701,7 @@ module CloseoutEvidenceReplay
     unit = match[2].split("/").map do |component|
       normalized = component.downcase
       normalized[-1] = "B" if preserve_byte_case && component.end_with?("B")
+      normalized[-3] = "B" if preserve_byte_case && normalized.end_with?("bps") && component[-3] == "B"
       normalized
     end.join("/")
     [match[1], unit]
