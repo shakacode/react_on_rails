@@ -80,15 +80,16 @@ This guarantee covers `script-src`. Strict `style-src` policies (nonced styles) 
 
 Nonces are per-request values; caching renders per-request markup. Two distinct mechanisms interact differently with nonces:
 
-### Fragment caching helpers bake the nonce into the cached fragment
+### Fragment caching helpers re-stamp the nonce on every cache hit
 
-`cached_react_component`, `cached_react_component_hash`, `cached_stream_react_component`, `cached_buffered_stream_react_component`, and `cached_async_react_component` cache the **final rendered HTML** (for streaming: the full chunk array) under a cache key built from your `cache_key` option plus bundle digests. The cached markup includes the executable inline scripts **with the nonce of the request that populated the cache**, and the cache key does **not** include the nonce.
+`cached_react_component`, `cached_react_component_hash`, `cached_stream_react_component`, `cached_buffered_stream_react_component`, `cached_static_rsc_component`, and `cached_async_react_component` cache the **final rendered HTML** (for streaming: the full chunk array) under a cache key built from your `cache_key` option plus bundle digests. The cached markup includes executable inline scripts whose `nonce` attribute was stamped by the request that populated the cache.
 
-`cached_static_rsc_component` strips embedded RSC payload/bootstrap scripts that reference `REACT_ON_RAILS_RSC_PAYLOADS` before caching, so those payload scripts are not served with stale nonces. Any other executable inline scripts preserved in the cached HTML still follow this nonce caveat.
+Since [issue #5021](https://github.com/shakacode/react_on_rails/issues/5021) was fixed, a cache hit **rewrites every cached `nonce="…"` attribute to the serving request's nonce** on the way out of the cache (for streamed replays, per chunk), so cached fragments execute under the response's own `script-src 'nonce-…'` policy. The component cache key also carries a `csp-nonce` segment whenever the request has a nonce, so entries rendered with a nonce are never shared with nonce-free requests (and vice versa) — flipping a nonce generator on or off faults the cache instead of serving unusable markup. `cached_static_rsc_component` additionally strips embedded RSC payload/bootstrap scripts that reference `REACT_ON_RAILS_RSC_PAYLOADS` before caching.
 
-A cache hit therefore serves a stale nonce to a different request, whose CSP header carries a different nonce — the browser blocks those inline scripts and immediate hydration/console replay silently degrade (components still hydrate via the client bundle's normal page-load path, but the strict-CSP guarantee of "zero violations" no longer holds).
+Two related cautions remain:
 
-**Recommendation**: do not combine the fragment-caching helpers with a nonce-enforcing `script-src` until this is addressed. If you need both, exclude fragment-cached components from strict enforcement (e.g., `content_security_policy_report_only` while migrating) and watch your CSP violation reports.
+- **Wrapping `redux_store` or `react_component` in a plain Rails `cache do … end` block** bypasses the Pro helpers' normalization entirely: the cached fragment keeps the originating request's nonce (and rails-context script) verbatim. Use the `cached_*` helpers instead of raw fragment caching around React on Rails helpers when nonces are enforced.
+- **Third-party page/CDN caches** that store whole responses still serve stale nonces; that is outside the framework's control.
 
 ### Prerender caching never serves a stale nonce — but stops hitting
 

@@ -21,6 +21,7 @@ module ReactOnRailsPro
     ACTIVE_SUPPORT_EXPIRES_AT_VERSION = Gem::Version.new("7.0.0")
     EXPIRED_CACHE_WRITE_TTL = 1 # seconds; minimum positive TTL for race-expired writes
     RSC_BUNDLE_MISSING_CACHE_KEY = "rsc-bundle-missing"
+    CSP_NONCE_CACHE_KEY_SEGMENT = "csp-nonce"
 
     class << self
       # Registers cache tags for an already-written cache entry so a later
@@ -168,6 +169,13 @@ module ReactOnRailsPro
           ).hexdigest
       end
 
+      # options[:csp_nonce_active] distinguishes entries rendered with a CSP nonce from
+      # entries rendered without one. Cached markup written under a nonce carries nonce
+      # attributes that get re-stamped per request on the way out (issue #5021), while
+      # markup written without a nonce has no attribute to re-stamp — so the two must never
+      # share an entry when an app toggles its nonce generator. Only the boolean goes into
+      # the key: keying on the nonce VALUE would give every request its own entry and
+      # defeat the cache.
       def react_component_cache_key(component_name, options)
         cache_key_option = options[:cache_key]
         cache_key_value = if cache_key_option.respond_to?(:call)
@@ -181,7 +189,8 @@ module ReactOnRailsPro
           *base_cache_key("ror_component", prerender: options[:prerender]),
           dependencies_cache_key,
           component_name,
-          cache_key_value
+          cache_key_value,
+          (CSP_NONCE_CACHE_KEY_SEGMENT if options[:csp_nonce_active])
         ].compact
       end
 

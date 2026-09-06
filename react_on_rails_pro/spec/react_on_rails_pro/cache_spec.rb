@@ -378,6 +378,17 @@ describe ReactOnRailsPro::Cache, :caching do
     ensure
       ReactOnRailsPro.configuration.enable_rsc_support = original_enable_rsc_support
     end
+
+    it "appends the CSP nonce segment when csp_nonce_active is set (issue #5021)" do
+      allow(ReactOnRailsPro::Utils).to receive(:bundle_hash).and_return("123456")
+
+      nonce_free_key = described_class.react_component_cache_key("Foobar", cache_key: "abc", prerender: true)
+      nonce_active_key = described_class.react_component_cache_key("Foobar", cache_key: "abc", prerender: true,
+                                                                             csp_nonce_active: true)
+
+      expect(nonce_free_key).not_to include(described_class::CSP_NONCE_CACHE_KEY_SEGMENT)
+      expect(nonce_active_key).to eq(nonce_free_key + [described_class::CSP_NONCE_CACHE_KEY_SEGMENT])
+    end
   end
 
   describe ".dependencies_cache_key" do

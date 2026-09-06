@@ -643,6 +643,132 @@ describe ReactOnRailsProHelper do
     end
   end
 
+  # Regression coverage for https://github.com/shakacode/react_on_rails/issues/5021:
+  # cached component HTML must not serve the originating request's CSP nonce to
+  # later requests whose responses carry a different nonce.
+  describe "CSP nonce on cache hits", :caching do
+    it "re-stamps the immediate-hydration script with the current request's nonce" do
+      allow(self).to receive(:csp_nonce).and_return("miss-nonce-AAA=")
+
+      first_result = cached_react_component("App", cache_key: "csp-nonce-restamp", auto_load_bundle: false) do
+        { name: "first" }
+      end
+      expect(first_result).to include('nonce="miss-nonce-AAA="')
+
+      allow(self).to receive(:csp_nonce).and_return("hit-nonce-BBB=")
+
+      second_result = cached_react_component("App", cache_key: "csp-nonce-restamp", auto_load_bundle: false) do
+        raise "props block must not run on a cache hit"
+      end
+
+      expect(second_result).to include('nonce="hit-nonce-BBB="')
+      expect(second_result).not_to include("miss-nonce-AAA=")
+    end
+
+    it "does not reuse entries cached without a nonce once a nonce generator is active" do
+      first_result = cached_react_component("App", cache_key: "csp-nonce-keying", auto_load_bundle: false) do
+        { name: "first" }
+      end
+      expect(first_result).not_to include("nonce=")
+
+      allow(self).to receive(:csp_nonce).and_return("late-nonce-CCC=")
+      second_props_evaluated = false
+
+      second_result = cached_react_component("App", cache_key: "csp-nonce-keying", auto_load_bundle: false) do
+        second_props_evaluated = true
+        { name: "second" }
+      end
+
+      expect(second_props_evaluated).to be(true)
+      expect(second_result).to include('nonce="late-nonce-CCC="')
+    end
+
+    it "re-stamps nonces inside cached_react_component_hash componentHtml", :requires_webpack_assets do
+      allow(self).to receive(:csp_nonce).and_return("hash-miss-AAA=")
+
+      first_result = cached_react_component_hash("ReactHelmetApp", cache_key: "csp-nonce-hash") do
+        { helloWorldData: { name: "CSP" } }
+      end
+      expect(first_result["componentHtml"]).to include('nonce="hash-miss-AAA="')
+
+      allow(self).to receive(:csp_nonce).and_return("hash-hit-BBB=")
+
+      second_result = cached_react_component_hash("ReactHelmetApp", cache_key: "csp-nonce-hash") do
+        raise "props block must not run on a cache hit"
+      end
+
+      expect(second_result["componentHtml"]).to include('nonce="hash-hit-BBB="')
+      expect(second_result["componentHtml"]).not_to include("hash-miss-AAA=")
+    end
+
+    it "leaves nonce-like text inside the cached props JSON untouched" do
+      allow(self).to receive(:csp_nonce).and_return("props-miss-AAA=")
+
+      cached_react_component("App", cache_key: "csp-nonce-props", auto_load_bundle: false) do
+        { embedded: 'literal nonce="prop-embedded-value" text' }
+      end
+
+      allow(self).to receive(:csp_nonce).and_return("props-hit-BBB=")
+
+      second_result = cached_react_component("App", cache_key: "csp-nonce-props", auto_load_bundle: false) do
+        raise "props block must not run on a cache hit"
+      end
+
+      # The JSON-escaped prop text (nonce=\"...\") must survive the re-stamp verbatim;
+      # only the executable script's attribute changes.
+      expect(second_result).to include('nonce=\"prop-embedded-value\"')
+      expect(second_result).to include('nonce="props-hit-BBB="')
+    end
+
+    it "never splices a malformed nonce into cached markup" do
+      allow(self).to receive(:csp_nonce).and_return("good-nonce-AAA=")
+
+      cached_react_component("App", cache_key: "csp-nonce-malformed", auto_load_bundle: false) do
+        { name: "first" }
+      end
+
+      allow(self).to receive(:csp_nonce).and_return('evil" onload="alert(1)')
+
+      second_result = cached_react_component("App", cache_key: "csp-nonce-malformed", auto_load_bundle: false) do
+        raise "props block must not run on a cache hit"
+      end
+
+      expect(second_result).not_to include("onload")
+      # The rewrite is skipped entirely rather than risking attribute injection.
+      expect(second_result).to include('nonce="good-nonce-AAA="')
+    end
+
+    context "with async context" do
+      around do |example|
+        Sync do
+          @react_on_rails_async_barrier = Async::Barrier.new
+          example.run
+        ensure
+          @react_on_rails_async_barrier = nil
+        end
+      end
+
+      it "re-stamps nonces on cached_async_react_component cache hits" do
+        allow(self).to receive(:csp_nonce).and_return("async-miss-AAA=")
+
+        first_result = cached_async_react_component("App", cache_key: "csp-nonce-async", auto_load_bundle: false) do
+          { name: "first" }
+        end
+        expect(first_result.value).to include('nonce="async-miss-AAA="')
+
+        allow(self).to receive(:csp_nonce).and_return("async-hit-BBB=")
+
+        second_result = cached_async_react_component("App", cache_key: "csp-nonce-async", auto_load_bundle: false) do
+          raise "props block must not run on a cache hit"
+        end
+
+        expect(second_result).to be_a(ReactOnRailsPro::ImmediateAsyncValue)
+        expect(second_result.value).to include('nonce="async-hit-BBB="')
+        expect(second_result.value).not_to include("async-miss-AAA=")
+      end
+    end
+  end
+
   describe "caching react_component", :caching do
     shared_examples "prerender caching behavior" do |enable_rsc_support:|
       around do |example|
@@ -1655,6 +1781,34 @@ describe ReactOnRailsProHelper do
         second_run_chunks = run_stream
         expect(chunks_read.count).to eq(0)
         expect(second_run_chunks).to eq(first_run_chunks)
+      end
+
+      # Regression coverage for issue #5021 on the chunk-replay path: every cached chunk
+      # (not just the first) can carry nonce-stamped inline scripts — the immediate-hydration
+      # script in the first chunk and console-replay scripts in later chunks here.
+      it "re-stamps nonces in every replayed chunk on a cache HIT" do
+        mock_request_and_response
+        render_with_cached_stream
+
+        allow(self).to receive(:csp_nonce).and_return("stream-miss-AAA=")
+        first_run_chunks = run_stream
+        expect(first_run_chunks.join).to include('nonce="stream-miss-AAA="')
+
+        # Simulate a fresh request lifecycle with a different per-request nonce
+        reset_stream_buffers
+        @rendered_rails_context = nil
+        @rails_context = nil
+        allow(self).to receive(:csp_nonce).and_return("stream-hit-BBB=")
+
+        second_run_chunks = run_stream
+        expect(chunks_read.count).to eq(0)
+
+        expect(second_run_chunks.join).not_to include("stream-miss-AAA=")
+        nonce_carrying_chunks = second_run_chunks.select { |chunk| chunk.include?('nonce="') }
+        expect(nonce_carrying_chunks.length).to be >= 2
+        nonce_carrying_chunks.each do |chunk|
+          expect(chunk.scan(/nonce="([^"]*)"/).flatten.uniq).to eq(["stream-hit-BBB="])
+        end
       end
 
       # Regression for https://github.com/shakacode/react_on_rails/issues/4581.
@@ -2901,6 +3055,39 @@ describe ReactOnRailsProHelper do
         expect(captured_auto_load_bundle).to be(false)
       ensure
         ReactOnRails.configuration.auto_load_bundle = original_auto_load_bundle
+      end
+
+      # Regression coverage for issue #5021 on the static RSC hit path: React's own
+      # Suspense-reveal runtime scripts survive the payload strip and stay in the cached
+      # HTML, so their nonces must be re-stamped per request.
+      it "re-stamps nonces in cached static RSC HTML on cache hits" do
+        result = nil
+
+        Sync do
+          stub_pro_bundle_hashes
+          allow(self).to receive(:csp_nonce).and_return("static-hit-BBB=")
+          nonce_keyed_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(
+            component_name,
+            cache_key: ["static_rsc_component", ["static-rsc-cache-spec", component_name]],
+            prerender: true,
+            csp_nonce_active: true
+          )
+          stale_html = '<div>static</div><script nonce="static-miss-AAA=">reveal()</script>'
+          Rails.cache.write(nonce_keyed_cache_key, stale_html, expires_in: 60)
+
+          result = cached_static_rsc_component(
+            component_name,
+            cache_key: ["static-rsc-cache-spec", component_name],
+            auto_load_bundle: false,
+            id: "#{component_name}-react-component-0",
+            cache_options: { expires_in: 60 }
+          ) do
+            raise "props block should not run on cache hit"
+          end
+        end
+
+        expect(result).to include('nonce="static-hit-BBB="')
+        expect(result).not_to include("static-miss-AAA=")
       end
 
       it "respects explicit auto_load_bundle false on cache misses" do

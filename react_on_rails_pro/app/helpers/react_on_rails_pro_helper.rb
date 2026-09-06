@@ -40,6 +40,18 @@ module ReactOnRailsProHelper
   PRO_ATTRIBUTION_MARKER = "Powered by React on Rails Pro"
   PRO_ATTRIBUTION_COMMENT_PREFIX = "Powered by React on Rails Pro (c) ShakaCode"
   RAILS_CONTEXT_MARKER = "js-react-on-rails-context"
+  # CSP nonces are per-request values, so any nonce baked into cached markup is stale on a
+  # cache hit and the browser refuses to run the script (issue #5021). Every emitter in the
+  # rendering pipeline writes the attribute in the double-quoted form ` nonce="..."` (Rails
+  # content_tag, injectRSCPayload.ts, RenderUtils.ts, and React's renderToPipeableStream
+  # runtime scripts), and nonce values are pre-sanitized to the base64/base64url alphabet,
+  # so this exact-form match is what gets re-stamped on the way out of the cache. Escaped
+  # content never matches: JSON data blocks and JS string literals escape the inner quote
+  # (nonce=\"...\") and HTML-escaped text renders it as &quot;.
+  CACHED_NONCE_ATTRIBUTE_REGEX = %r{(?<=\s)nonce="[a-zA-Z0-9+/=_-]*"}
+  # Mirrors sanitizeNonce in packages/react-on-rails/src/sanitizeNonce.ts: base64/base64url
+  # characters with optional trailing `=` padding.
+  CSP_NONCE_VALUE_PATTERN = %r{\A[a-zA-Z0-9+/_-]+={0,2}\z}
   @static_rsc_asset_diagnostic_cache = {}
 
   class << self
@@ -465,10 +477,19 @@ module ReactOnRailsProHelper
     end
   end
 
+  # All view-level component cache keys must segregate nonce-rendered entries from
+  # nonce-free ones (issue #5021), so every cached_* helper builds its key through here.
+  def pro_component_cache_key(component_name, options)
+    ReactOnRailsPro::Cache.react_component_cache_key(
+      component_name,
+      options.merge(csp_nonce_active: csp_nonce.present?)
+    )
+  end
+
   def fetch_react_component(component_name, options, cache_write_if: nil)
     return yield unless ReactOnRailsPro::Cache.use_cache?(options)
 
-    cache_key = ReactOnRailsPro::Cache.react_component_cache_key(component_name, options)
+    cache_key = pro_component_cache_key(component_name, options)
     Rails.logger.debug { "React on Rails Pro cache_key is #{cache_key.inspect}" }
     cache_write_options = ReactOnRailsPro::Cache.cache_write_options(options[:cache_options])
     if ReactOnRailsPro::Cache.cache_write_expired?(options[:cache_options])
@@ -523,15 +544,49 @@ module ReactOnRailsProHelper
   end
 
   def normalize_cached_pro_attribution_html(html)
-    return html if @rendered_rails_context && !html.include?(PRO_ATTRIBUTION_MARKER) &&
-                   !html.include?(RAILS_CONTEXT_MARKER)
-
     was_html_safe = html.html_safe?
-    normalized_html = strip_leading_pro_attribution_comments(html)
+    normalized_html = rewrite_cached_csp_nonces(html)
+
+    if @rendered_rails_context && !normalized_html.include?(PRO_ATTRIBUTION_MARKER) &&
+       !normalized_html.include?(RAILS_CONTEXT_MARKER)
+      # Preserve the fast path's identity contract: cached content that needed no rewrite
+      # and no attribution normalization is returned as the same object.
+      return html if normalized_html.equal?(html)
+
+      return was_html_safe ? normalized_html.html_safe : normalized_html
+    end
+
+    normalized_html = strip_leading_pro_attribution_comments(normalized_html)
     normalized_html = strip_leading_rails_context_script(normalized_html)
     normalized_html = prepend_render_rails_context(normalized_html)
 
     was_html_safe ? normalized_html : String.new(normalized_html)
+  end
+
+  # Re-stamps every cached `nonce="..."` script attribute with the current request's CSP
+  # nonce so cache hits execute under the response's own `script-src 'nonce-...'` policy
+  # (issue #5021). No-op when the current request has no usable nonce: entries written
+  # with nonces are only served to nonce-carrying requests (see the cache-key segment in
+  # ReactOnRailsPro::Cache.react_component_cache_key), and without a CSP header a leftover
+  # stale attribute is inert.
+  def rewrite_cached_csp_nonces(html)
+    return html unless html.include?('nonce="')
+
+    current_nonce = current_csp_nonce_for_cached_html
+    return html unless current_nonce
+
+    html.gsub(CACHED_NONCE_ATTRIBUTE_REGEX) { %(nonce="#{current_nonce}") }
+  end
+
+  # Returns the current request's CSP nonce constrained to the safe attribute alphabet
+  # (mirroring sanitizeNonce.ts), or nil when absent or malformed — a malformed nonce is
+  # never spliced into cached markup.
+  def current_csp_nonce_for_cached_html
+    nonce = csp_nonce
+    return nil if nonce.blank?
+
+    sanitized_nonce = nonce.gsub(%r{[^a-zA-Z0-9+/=_-]}, "")
+    CSP_NONCE_VALUE_PATTERN.match?(sanitized_nonce) ? sanitized_nonce : nil
   end
 
   def strip_leading_pro_attribution_comments(html)
@@ -688,7 +743,7 @@ module ReactOnRailsProHelper
 
     return yield unless cache_enabled
 
-    cache_key = ReactOnRailsPro::Cache.react_component_cache_key(component_name, cache_options)
+    cache_key = pro_component_cache_key(component_name, cache_options)
     raw_cache_options = cache_options[:cache_options]
     write_expired = ReactOnRailsPro::Cache.cache_write_expired?(raw_cache_options)
     if diagnostics_enabled
@@ -1151,7 +1206,7 @@ module ReactOnRailsProHelper
 
     # Compose a cache key consistent with non-stream helper semantics.
     key_options = raw_options.merge(prerender: true)
-    view_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(component_name, key_options)
+    view_cache_key = pro_component_cache_key(component_name, key_options)
 
     cache_write_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
     # Attempt HIT without evaluating props block
@@ -1267,7 +1322,7 @@ module ReactOnRailsProHelper
       return render_async_react_component_uncached(component_name, raw_options, &)
     end
 
-    cache_key = ReactOnRailsPro::Cache.react_component_cache_key(component_name, cache_options)
+    cache_key = pro_component_cache_key(component_name, cache_options)
     raw_cache_options = cache_options[:cache_options] || {}
     if ReactOnRailsPro::Cache.cache_write_expired?(raw_cache_options)
       return render_async_react_component_uncached(component_name, raw_options, &)
