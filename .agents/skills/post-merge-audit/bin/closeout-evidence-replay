@@ -698,8 +698,11 @@ module CloseoutEvidenceReplay
     match = value.match(%r{\A([-+]?\d+(?:\.\d+)?)([A-Za-z%]+(?:/[A-Za-z]+)?)\z})
     return unless match
 
-    unit = match[2].downcase
-    unit[-1] = "B" if preserve_byte_case && match[2].end_with?("B")
+    unit = match[2].split("/").map do |component|
+      normalized = component.downcase
+      normalized[-1] = "B" if preserve_byte_case && component.end_with?("B")
+      normalized
+    end.join("/")
     [match[1], unit]
   end
 

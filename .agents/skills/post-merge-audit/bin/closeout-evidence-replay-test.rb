@@ -773,9 +773,22 @@ class CloseoutEvidenceReplayTest < Minitest::Test
     %w[100MB 90MB 1MB SATISFIED],
     %w[100Mb 90Mb 1Mb SATISFIED],
     %w[52PX 0px 1Px SATISFIED],
-    %w[52MS 0ms 1Ms SATISFIED]
+    %w[52MS 0ms 1Ms SATISFIED],
+    %w[100MB/s 90Mb/s 1MB/s UNKNOWN],
+    %w[100Mb/s 90MB/s 1MB/s UNKNOWN],
+    %w[100MB/s 90MB/s 1Mb/s UNKNOWN],
+    %w[100Mb/s 90Mb/s 1MB/s UNKNOWN],
+    %w[100MB/s 90MB/s 1MB/s SATISFIED],
+    %w[100Mb/s 90Mb/s 1Mb/s SATISFIED],
+    %w[100MB/S 90MB/s 1MB/s SATISFIED],
+    %w[100MB/MS 90MB/ms 1MB/Ms SATISFIED],
+    %w[52PX/S 0px/s 1Px/s SATISFIED],
+    %w[100ms/MB 90ms/Mb 1ms/MB UNKNOWN],
+    %w[100ms/MB 90ms/MB 1ms/Mb UNKNOWN],
+    %w[100ms/MB 90MS/MB 1Ms/MB SATISFIED],
+    %w[100ms/Mb 90MS/Mb 1Ms/Mb SATISFIED]
   ].each do |baseline, candidate, tolerance, verdict|
-    define_method("test_v3_interaction_unit_case_#{baseline}_#{candidate}_#{tolerance}") do
+    define_method("test_v3_interaction_unit_case_#{baseline}_#{candidate}_#{tolerance}".tr("/", "_")) do
       body = v3_marker(
         "interaction_change" => "yes",
         "interaction_evidence_kind" => "measured_substitute",
