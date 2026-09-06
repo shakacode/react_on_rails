@@ -4,6 +4,24 @@ This guide walks you through adding React Server Components to an existing React
 
 > **For React-side migration patterns** (restructuring components, Context, data fetching, etc.), see the [RSC Migration Guide series](../../oss/migrating/migrating-to-rsc.md). This page covers only the infrastructure upgrade.
 
+> **17.1 RC soak:** the generator now pins `react-on-rails-rsc@19.3.0-rc.1` with matching
+> React/React DOM 19.2.8. Upgrade the Pro gem and npm packages together to a 17.1 candidate that
+> includes this support before changing RSC; earlier Pro releases reject it at startup.
+> The stable 19.2.1 / React 19.2.7 combination below remains supported for existing apps.
+> RSC package version 19.3 does not mean React 19.3: the runtime stays on React 19.2.x.
+
+For that 17.1 candidate's generated defaults:
+
+```bash
+pnpm add react@~19.2.8 react-dom@~19.2.8 react-on-rails-rsc@19.3.0-rc.1
+```
+
+The RC loader accepts raw JSX/TSX and supports `parserPlugins` for proposal syntax already
+handled by your application transpiler. A `"use client"` module must expose at least one runtime
+ES-module export; type-only modules and CommonJS-style exports now produce a file-specific build
+error. Add an ES-module export or remove the directive. Rspack builds now honor application
+`splitChunks` settings while retaining the sibling chunk metadata needed for hydration.
+
 ## Prerequisites
 
 Before running the generator, verify your environment:
@@ -31,7 +49,7 @@ pnpm add react@~19.2.7 react-dom@~19.2.7 react-on-rails-rsc@19.2.1
 > **React 19.2.x with patch >= 19.2.7** is required for the React on Rails Pro 17 RSC path. React 19.0.x is no longer a supported Pro RSC runtime line in v17.
 
 > [!NOTE]
-> The RSC generator uses the coordinated React 19.2.7 / stable `react-on-rails-rsc@19.2.1` package set. Later stable 19.2.x packages with patch >= 19.2.1 remain on the supported package line.
+> The 17.0 generator uses the coordinated React 19.2.7 / stable `react-on-rails-rsc@19.2.1` package set. Later stable 19.2.x packages with patch >= 19.2.1 remain supported. See the 17.1 RC defaults above for new candidate apps.
 
 > [!NOTE]
 > Keep React, React DOM, and `react-on-rails-rsc` upgraded as a coordinated set. The RSC bundler APIs are version-coupled, so do not bump `react-on-rails-rsc` by itself.
@@ -39,7 +57,12 @@ pnpm add react@~19.2.7 react-dom@~19.2.7 react-on-rails-rsc@19.2.1
 The generator-managed RSC version is what goes in your app's `package.json`. Separately, the Pro package itself declares an optional peer range, which is broader on purpose:
 
 > [!NOTE]
-> The Pro package's optional `react-on-rails-rsc` peer range is `>= 19.2.1 < 20.0.0`; prereleases do not satisfy this stable floor. The Pro node renderer also checks the installed `react-on-rails-rsc`, React, and React DOM versions at startup and hard-errors on unsupported combinations. Set `REACT_ON_RAILS_PRO_DISABLE_VERSION_CHECK=1` only as an emergency rollout escape hatch; it downgrades that startup error to a warning.
+> During the 17.1 soak, the Pro package's optional `react-on-rails-rsc` peer range is
+> `>=19.2.1 <19.4.0 || ~19.3.0-rc.1`. Only the 19.3.0 prerelease tuple from rc.1 onward is
+> admitted. Doctor and the Node Renderer enforce React/React DOM 19.2.7+ for RSC 19.2, and
+> 19.2.8+ for RSC 19.3, with matching React/DOM versions. Set
+> `REACT_ON_RAILS_PRO_DISABLE_VERSION_CHECK=1` only as an emergency rollout escape hatch;
+> it downgrades startup errors to warnings.
 
 ## Pre-Migration: Audit Components for Client API Usage
 
@@ -269,7 +292,7 @@ Then run `bundle install` before retrying the generator.
 If the RSC bundle build fails but server and client builds succeed, the issue is likely in `rscWebpackConfig.js`. Common causes:
 
 - **Missing `react-on-rails-rsc` package**: Run `npm install react-on-rails-rsc@19.2.1` / `yarn add react-on-rails-rsc@19.2.1` / `pnpm add react-on-rails-rsc@19.2.1`, or install a later stable 19.2.x package with patch >= 19.2.1.
-- **React or `react-on-rails-rsc` version mismatch**: RSC currently requires React 19.2.x with patch >= 19.2.7 and `react-on-rails-rsc` 19.2.x with patch >= 19.2.1. Check with `npm ls react react-dom react-on-rails-rsc`, `yarn why react` / `yarn why react-dom` / `yarn why react-on-rails-rsc`, or `pnpm list react react-dom react-on-rails-rsc`
+- **React or `react-on-rails-rsc` version mismatch**: Stable RSC 19.2.1+ requires React/React DOM 19.2.7+; the 17.1 RSC 19.3 RC soak requires 19.2.8+. React and React DOM must match and stay on the 19.2.x runtime line. Check with `npm ls react react-dom react-on-rails-rsc`, `yarn why react` / `yarn why react-dom` / `yarn why react-on-rails-rsc`, or `pnpm list react react-dom react-on-rails-rsc`.
 - **Custom webpack config incompatibility**: If your `serverWebpackConfig.js` was heavily customized, the generator's transforms may not apply cleanly. See [Preparing Your App: Step 4](../../oss/migrating/rsc-preparing-app.md#step-4-set-up-the-rsc-webpack-bundle) for the underlying intent of each webpack change
 
 ### Manifest Files Not Generated

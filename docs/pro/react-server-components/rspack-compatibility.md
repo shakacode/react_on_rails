@@ -17,15 +17,19 @@ The RSC implementation depends on the `react-on-rails-rsc` npm package, which pr
 
 ## React and Package Version Policy
 
-Generated RSC apps on React on Rails Pro 17 use React 19.2.x: `react@~19.2.7`
-and `react-dom@~19.2.7`. React 19.0.x is no longer a supported Pro RSC runtime
-line in v17 because the generator, peer metadata, and node-renderer startup check
-now target the coordinated React 19.2.7 / `react-on-rails-rsc` 19.2.1 package
-line.
+During the 17.1 RC soak, generated RSC apps pin `react-on-rails-rsc@19.3.0-rc.1`
+with `react@~19.2.8` and `react-dom@~19.2.8` for both webpack and rspack projects.
+RSC 19.3 still uses the React 19.2 runtime. Existing apps using stable RSC 19.2.1+
+and matching React/React DOM 19.2.7+ remain supported. React 19.0.x and 19.3.x
+are outside the supported runtime line.
 
-The React on Rails Pro 17 generator pins stable `react-on-rails-rsc@19.2.1`
-for both webpack and rspack projects. Keep React, React DOM, and
-`react-on-rails-rsc` upgraded as a coordinated set.
+The RSC RC honors application `splitChunks` settings for generated client-reference
+chunks and preserves their complete sibling chunk metadata for hydration. Its shared
+loader parses raw JSX/TSX, and modules marked `"use client"` without a runtime ES-module
+export fail the build with a file-specific error.
+
+Upgrade the Pro gem/npm packages, React, React DOM, and `react-on-rails-rsc` as a
+coordinated set; see the [17.1 candidate upgrade guidance](upgrading-existing-pro-app.md).
 
 ## Compatibility Matrix
 

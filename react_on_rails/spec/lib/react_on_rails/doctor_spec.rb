@@ -8948,6 +8948,35 @@ RSpec.describe ReactOnRails::Doctor do
     let(:doctor) { described_class.new(verbose: false, fix: false) }
     let(:checker) { doctor.instance_variable_get(:@checker) }
 
+    ["19.3.0-rc.1", "19.3.0-rc.2", "19.3.0"].each do |version|
+      it "accepts qualified RSC #{version}" do
+        expect(doctor.send(:rsc_package_version_at_or_above_minimum?, version)).to be true
+      end
+    end
+
+    ["19.3.0-rc.0", "19.3.1-rc.0", "19.4.0-rc.0", "19.4.0"].each do |version|
+      it "rejects unqualified RSC #{version}" do
+        expect(doctor.send(:rsc_package_version_at_or_above_minimum?, version)).to be false
+      end
+    end
+
+    before do
+      # RSpec runs before hooks inside the chdir around hooks below, so Dir.pwd is the per-example tmpdir.
+      stub_package_root(Dir.pwd)
+    end
+
+    it "enforces the RSC 19.3 React floor even when package peers are overly broad" do
+      package = { "version" => "19.3.0-rc.1" }
+      expect(doctor.send(:check_rsc_supported_react_version_for_package, package, "react", "19.2.7"))
+        .to be false
+      expect(doctor.send(:check_rsc_supported_react_version_for_package, package, "react-dom", "19.2.7"))
+        .to be false
+      expect(doctor.send(:check_rsc_supported_react_version_for_package, package, "react", "19.2.8"))
+        .to be true
+      expect(doctor.send(:check_rsc_supported_react_version_for_package, package, "react", "19.3.0"))
+        .to be false
+    end
+
     def install_react(version)
       FileUtils.mkdir_p("node_modules/react")
       File.write("node_modules/react/package.json", "{\"version\":\"#{version}\"}")
@@ -8955,11 +8984,6 @@ RSpec.describe ReactOnRails::Doctor do
 
     def stub_package_root(path)
       allow(doctor).to receive(:resolved_package_root).and_return(path)
-    end
-
-    before do
-      # RSpec runs before hooks inside the chdir around hooks below, so Dir.pwd is the per-example tmpdir.
-      stub_package_root(Dir.pwd)
     end
 
     it "keeps Doctor RSC support constants in sync with the node-renderer peer support window" do
@@ -8984,7 +9008,12 @@ RSpec.describe ReactOnRails::Doctor do
       expect(described_class::RSC_SUPPORTED_PACKAGE_MAJOR).to eq(
         rsc_support.match(/supportedMajor:\s*(?<major>\d+)/)[:major].to_i
       )
-      expect(described_class::RSC_SUPPORTED_PACKAGE_MINORS).to eq([react_support[:rsc_minor].to_i])
+      supported_pairs = support_source.scan(/rscMinor:\s*(\d+),\s*minor:\s*(\d+),\s*minPatch:\s*(\d+)/)
+      expected_minimums = supported_pairs.to_h do |rsc_minor, minor, patch|
+        [rsc_minor.to_i, "19.#{minor}.#{patch}"]
+      end
+      expect(described_class::RSC_REACT_MINIMUM_BY_PACKAGE_MINOR).to eq(expected_minimums)
+      expect(described_class::RSC_SUPPORTED_PACKAGE_MINORS).to eq(expected_minimums.keys)
       expect(described_class::RSC_MINIMUM_REACT_VERSION).to eq(
         "#{described_class::RSC_SUPPORTED_PACKAGE_MAJOR}.#{react_support[:minor]}.#{react_support[:min_patch]}"
       )
@@ -9327,7 +9356,7 @@ RSpec.describe ReactOnRails::Doctor do
                 "dependencies" => {
                   "react" => "19.2.7",
                   "react-dom" => "19.2.7",
-                  "react-on-rails-rsc" => "19.3.0"
+                  "react-on-rails-rsc" => "19.4.0"
                 }
               )
             )
@@ -9335,8 +9364,8 @@ RSpec.describe ReactOnRails::Doctor do
             install_package("react-dom", "version" => "19.2.7")
             install_package(
               "react-on-rails-rsc",
-              "version" => "19.3.0",
-              "peerDependencies" => { "react" => "^19.3.0", "react-dom" => "^19.3.0" }
+              "version" => "19.4.0",
+              "peerDependencies" => { "react" => "^19.4.0", "react-dom" => "^19.4.0" }
             )
             stub_package_root(Dir.pwd)
             allow(doctor).to receive(:capture_rsc_dist_tags)
@@ -9346,8 +9375,8 @@ RSpec.describe ReactOnRails::Doctor do
             error_msgs = checker.messages.select { |m| m[:type] == :error }.map { |m| m[:content] }
             expect(error_msgs).to include(
               a_string_including(
-                "react-on-rails-rsc 19.3.0 is not supported by React on Rails Pro 17 RSC",
-                "supported 19.2.x package line"
+                "react-on-rails-rsc 19.4.0 is not supported by React on Rails Pro 17 RSC",
+                "supported 19.2.x or 19.3.x package line"
               )
             )
             expect(doctor).not_to have_received(:capture_rsc_dist_tags)

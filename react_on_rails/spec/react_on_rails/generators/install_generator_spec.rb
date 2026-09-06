@@ -6156,11 +6156,11 @@ describe InstallGenerator, type: :generator do
     end
   end
 
-  context "when using --rsc with React 19.2.7" do
+  context "when using --rsc with React 19.2.8" do
     let(:install_generator) { install_generator_fixture(rsc: true) }
 
     specify "warn_about_react_version_for_rsc does not add warning" do
-      allow(install_generator).to receive(:detect_react_version).and_return("19.2.7")
+      allow(install_generator).to receive(:detect_react_version).and_return("19.2.8")
 
       install_generator.send(:warn_about_react_version_for_rsc)
       expect(GeneratorMessages.messages.join("\n")).not_to include("⚠️")
@@ -6201,7 +6201,7 @@ describe InstallGenerator, type: :generator do
       install_generator.send(:warn_about_react_version_for_rsc)
       warning_text = GeneratorMessages.messages.join("\n")
       expect(warning_text).to include("below the recommended minimum")
-      expect(warning_text).to include("React 19.2.7")
+      expect(warning_text).to include("React 19.2.8")
     end
   end
 

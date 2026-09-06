@@ -4301,7 +4301,9 @@ module ReactOnRails
     RSC_PACKAGE_NAME = "react-on-rails-rsc"
     RSC_MINIMUM_PACKAGE_VERSION = "19.2.1"
     RSC_SUPPORTED_PACKAGE_MAJOR = 19
-    RSC_SUPPORTED_PACKAGE_MINORS = [2].freeze
+    # Package and React minors differ: RSC 19.3 uses the React 19.2.8 runtime.
+    RSC_REACT_MINIMUM_BY_PACKAGE_MINOR = { 2 => "19.2.7", 3 => "19.2.8" }.freeze
+    RSC_SUPPORTED_PACKAGE_MINORS = RSC_REACT_MINIMUM_BY_PACKAGE_MINOR.keys.freeze
     RSC_SUPPORTED_PACKAGE_LINE = RSC_SUPPORTED_PACKAGE_MINORS.map do |minor|
       "#{RSC_SUPPORTED_PACKAGE_MAJOR}.#{minor}.x"
     end.join(" or ")
@@ -4313,7 +4315,10 @@ module ReactOnRails
     RSC_MINIMUM_REACT_VERSION = "19.2.7"
     RSC_MINIMUM_REACT_VERSION_TUPLE = RSC_MINIMUM_REACT_VERSION.split(".").map(&:to_i).freeze
     RSC_SUPPORTED_REACT_MAJOR = RSC_MINIMUM_REACT_VERSION_TUPLE.fetch(0)
-    RSC_SUPPORTED_REACT_LINE = RSC_SUPPORTED_PACKAGE_MINORS.map do |minor|
+    RSC_SUPPORTED_REACT_MINORS = RSC_REACT_MINIMUM_BY_PACKAGE_MINOR.values.map do |version|
+      version.split(".").fetch(1).to_i
+    end.uniq.freeze
+    RSC_SUPPORTED_REACT_LINE = RSC_SUPPORTED_REACT_MINORS.map do |minor|
       "#{RSC_SUPPORTED_REACT_MAJOR}.#{minor}.x"
     end.join(" or ")
     RSC_DIST_TAGS_TO_CHECK = %w[next rc].freeze
@@ -4625,7 +4630,7 @@ module ReactOnRails
       return true if rsc_package_version_at_or_above_minimum?(rsc_version)
 
       prerelease_requirement = if RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION.present?
-                                 "\n(or #{RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION} during the 17.0 RC soak)"
+                                 "\n(or #{RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION} during the RC soak)"
                                else
                                  ""
                                end
@@ -4637,7 +4642,7 @@ module ReactOnRails
         on the supported #{RSC_SUPPORTED_PACKAGE_LINE} package line
         with React/React DOM #{RSC_MINIMUM_REACT_VERSION}+.
 
-        Fix: npm install react@~#{RSC_MINIMUM_REACT_VERSION} react-dom@~#{RSC_MINIMUM_REACT_VERSION} #{RSC_PACKAGE_NAME}@#{RSC_PACKAGE_INSTALL_VERSION} --save-exact
+        Fix: npm install react@#{ReactOnRails::Generators::JsDependencyManager::RSC_REACT_VERSION_RANGE} react-dom@#{ReactOnRails::Generators::JsDependencyManager::RSC_REACT_VERSION_RANGE} #{RSC_PACKAGE_NAME}@#{RSC_PACKAGE_INSTALL_VERSION}
       MSG
       false
     end
@@ -4671,7 +4676,7 @@ module ReactOnRails
 
     def supported_rsc_react_line?(react_version)
       major, minor, = npm_version_tuple(react_version)
-      major == RSC_SUPPORTED_REACT_MAJOR && RSC_SUPPORTED_PACKAGE_MINORS.include?(minor)
+      major == RSC_SUPPORTED_REACT_MAJOR && RSC_SUPPORTED_REACT_MINORS.include?(minor)
     end
 
     def rsc_react_major_or_newer?(react_version)
@@ -4690,17 +4695,21 @@ module ReactOnRails
 
     def check_rsc_supported_react_version_for_package(rsc_package, package_name, package_version)
       return true if package_version.blank?
-      return true unless unsupported_rsc_react_version?(package_version)
+
+      rsc_minor = npm_version_tuple(rsc_package["version"])[1]
+      minimum_version = RSC_REACT_MINIMUM_BY_PACKAGE_MINOR.fetch(rsc_minor)
+      return true if supported_rsc_react_line?(package_version) &&
+                     !npm_version_less_than?(package_version, minimum_version)
 
       package_label = package_name == "react" ? "React" : "React DOM"
 
       checker.add_error(<<~MSG.strip)
         🚫 #{RSC_PACKAGE_NAME} #{rsc_package['version']} is installed with unsupported #{package_label} #{package_version}.
 
-        React on Rails Pro 17 RSC currently supports React/React DOM #{RSC_SUPPORTED_REACT_LINE} with patch >= #{RSC_MINIMUM_REACT_VERSION}.
+        React on Rails Pro 17 RSC currently supports React/React DOM #{RSC_SUPPORTED_REACT_LINE} with patch >= #{minimum_version}.
         The node renderer enforces the same support window at startup.
 
-        Fix: npm install react@~#{RSC_MINIMUM_REACT_VERSION} react-dom@~#{RSC_MINIMUM_REACT_VERSION} --save-exact
+        Fix: npm install react@~#{minimum_version} react-dom@~#{minimum_version}
       MSG
       false
     end

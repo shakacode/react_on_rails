@@ -102,7 +102,7 @@ module ReactOnRails
             Please upgrade to at least React #{RSC_MINIMUM_REACT_VERSION}:
               #{manual_add_packages_command(["react@#{RSC_MINIMUM_REACT_VERSION}", "react-dom@#{RSC_MINIMUM_REACT_VERSION}"])}
 
-            react-on-rails-rsc 19.2.x with patch >= 19.2.1 is coordinated with
+            react-on-rails-rsc #{JsDependencyManager::RSC_PACKAGE_VERSION_PIN} is coordinated with
             React/React DOM #{RSC_MINIMUM_REACT_VERSION}+ for the React on Rails Pro 17 RSC runtime.
           MSG
         end
