@@ -133,10 +133,18 @@ export class TieredCacheHandler implements CacheHandler {
     // are unaffected — their expiry never depends on the timestamp.
     if (hasFiniteLifetime && entry.timestamp > now) return null;
 
-    const remainingSeconds = hasFiniteLifetime ? entry.revalidate - (now - entry.timestamp) / 1000 : Infinity;
-
-    // Already expired (possible via L2 TTL rounding or cross-worker clock skew):
-    // writing it to L1 would only create an entry the next get deletes.
+    // Floor the remaining lifetime to whole seconds: a TTL-on-write L1 (Redis
+    // EX) rounds the TTL up with Math.ceil, so a fractional value could outlive
+    // the ORIGINAL expiry by up to a second. Only the remaining-lifetime term
+    // is floored — the cap below is applied unfloored, so sub-second caps keep
+    // working (exceeding the cap itself by Redis's <1s rounding never passes
+    // the entry's own expiry, because ceil(cap) <= floor(remaining) here).
+    // Expired or under one whole second of life left (also possible via L2 TTL
+    // rounding or cross-worker clock skew): skip L1 — writing the entry would
+    // only create one the next get deletes.
+    const remainingSeconds = hasFiniteLifetime
+      ? Math.floor(entry.revalidate - (now - entry.timestamp) / 1000)
+      : Infinity;
     if (remainingSeconds <= 0) return null;
 
     const cappedSeconds =
@@ -147,12 +155,6 @@ export class TieredCacheHandler implements CacheHandler {
     // Indefinite entry with no cap: nothing to bound.
     if (!Number.isFinite(cappedSeconds)) return entry;
 
-    // Floor to whole seconds: a TTL-on-write L1 (Redis EX) rounds the TTL up
-    // with Math.ceil, so a fractional value could outlive the original expiry
-    // by up to a second. Under one whole second of life left, skip L1.
-    const flooredSeconds = Math.floor(cappedSeconds);
-    if (flooredSeconds <= 0) return null;
-
-    return { ...entry, timestamp: now, revalidate: flooredSeconds };
+    return { ...entry, timestamp: now, revalidate: cappedSeconds };
   }
 }

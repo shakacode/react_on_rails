@@ -360,6 +360,21 @@ describe('TieredCacheHandler', () => {
       expect(promoted.timestamp).toBeLessThanOrEqual(Date.now());
     });
 
+    test('a sub-second cap still promotes (flooring must not zero out the cap)', async () => {
+      // Flooring exists to stop Redis EX ceil from passing the ORIGINAL expiry,
+      // so only the remaining-lifetime term is floored; the cap itself is
+      // applied unfloored. A 0.5s cap must keep repopulating L1, not silently
+      // disable promotion forever.
+      const capped = new TieredCacheHandler(l1, l2, { l1MaxTtlSeconds: 0.5 });
+      await l2.set('key', makeEntry({ revalidate: 0, timestamp: Date.now() - 60_000 }));
+      const l1SetSpy = jest.spyOn(l1, 'set');
+
+      await capped.get('key');
+
+      expect(l1SetSpy).toHaveBeenCalledTimes(1);
+      expect(l1SetSpy.mock.calls[0][1].revalidate).toBe(0.5);
+    });
+
     test('an Infinity cap behaves as "no cap", not as disabled L1', async () => {
       // Infinity means "unbounded", the same as leaving the option undefined:
       // L1 stays in use and promoted entries keep their own expiry.
