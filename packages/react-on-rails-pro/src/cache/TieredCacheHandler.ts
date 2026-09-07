@@ -84,8 +84,9 @@ export class TieredCacheHandler implements CacheHandler {
 
   // A cap of 0, negative, or NaN cannot be expressed as a revalidate value —
   // revalidate <= 0 (and NaN via Math.min) means "never expires" in both L1
-  // backends — so any defined non-positive/non-finite cap disables L1 entirely
-  // instead of inverting into immortal entries. `!(x > 0)` is true for NaN.
+  // backends — so those caps disable L1 entirely instead of inverting into
+  // immortal entries. `!(x > 0)` is true for NaN. An Infinity cap is NOT
+  // disabled: it means "unbounded", the same as leaving the option undefined.
   private l1Disabled(): boolean {
     return this.l1MaxTtlSeconds !== undefined && !(this.l1MaxTtlSeconds > 0);
   }
@@ -120,10 +121,15 @@ export class TieredCacheHandler implements CacheHandler {
     if (this.l1Disabled()) return null;
 
     const now = Date.now();
-    // Clamp elapsed at >= 0: a producer clock ahead of ours would otherwise
-    // make the remaining lifetime exceed the entry's own revalidate.
+
+    // A future timestamp means the producer's clock is ahead of ours. Any
+    // lifetime computed from it overshoots the entry's true expiry (a Redis L2
+    // started its EX at the producer's write), so serve from L2 and skip the
+    // promotion rather than clamping.
+    if (entry.timestamp > now) return null;
+
     const remainingSeconds =
-      entry.revalidate > 0 ? entry.revalidate - Math.max(0, now - entry.timestamp) / 1000 : Infinity;
+      entry.revalidate > 0 ? entry.revalidate - (now - entry.timestamp) / 1000 : Infinity;
 
     // Already expired (possible via L2 TTL rounding or cross-worker clock skew):
     // writing it to L1 would only create an entry the next get deletes.

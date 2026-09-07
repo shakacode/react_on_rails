@@ -322,9 +322,10 @@ describe('TieredCacheHandler', () => {
       expect(await l2.get('key')).not.toBeNull();
     });
 
-    test('a producer clock ahead of ours cannot inflate the promoted lifetime past the original revalidate', async () => {
-      // Cross-worker skew: the L2 writer's clock is 5s fast, so elapsed looks
-      // negative here. The promoted entry must never outlive the original TTL.
+    test('a future-stamped entry (producer clock ahead) is served from L2 but not promoted', async () => {
+      // Cross-worker skew: any lifetime computed from a future timestamp
+      // overshoots a Redis L2's EX (which started at the producer's write), so
+      // promotion is skipped entirely instead of clamped.
       const skewed = makeEntry({ revalidate: 10, timestamp: Date.now() + 5_000 });
       const stubL2: InMemoryLRUCacheHandler = {
         get: jest.fn().mockResolvedValue(skewed),
@@ -333,10 +334,26 @@ describe('TieredCacheHandler', () => {
       const capped = new TieredCacheHandler(l1, stubL2, { l1MaxTtlSeconds: 60 });
       const l1SetSpy = jest.spyOn(l1, 'set');
 
-      await capped.get('key');
+      const result = await capped.get('key');
 
-      expect(l1SetSpy).toHaveBeenCalledTimes(1);
-      expect(l1SetSpy.mock.calls[0][1].revalidate).toBeLessThanOrEqual(10);
+      expect(result).not.toBeNull(); // L2 value still served
+      expect(l1SetSpy).not.toHaveBeenCalled();
+    });
+
+    test('an Infinity cap behaves as "no cap", not as disabled L1', async () => {
+      // Infinity means "unbounded", the same as leaving the option undefined:
+      // L1 stays in use and promoted entries keep their own expiry.
+      const uncapped = new TieredCacheHandler(l1, l2, { l1MaxTtlSeconds: Infinity });
+      const originalTimestamp = Date.now() - 60_000;
+      await l2.set('key', makeEntry({ revalidate: 3600, timestamp: originalTimestamp }));
+
+      await uncapped.get('key');
+
+      const l1Entry = await l1.get('key');
+      expect(l1Entry).not.toBeNull();
+      const promotedExpiry = l1Entry!.timestamp + l1Entry!.revalidate * 1000;
+      expect(promotedExpiry).toBeLessThanOrEqual(originalTimestamp + 3600 * 1000 + 1);
+      expect(promotedExpiry).toBeGreaterThan(Date.now());
     });
 
     test('promoted entries are re-stamped so TTL-on-write L1 handlers apply only the remaining lifetime', async () => {
