@@ -270,6 +270,30 @@ describe('TieredCacheHandler', () => {
       expect(promotedExpiry).toBeGreaterThan(Date.now());
     });
 
+    test('l1MaxTtlSeconds of 0 disables L1 writes on set instead of writing immortal entries', async () => {
+      // revalidate <= 0 means "never expires" in both L1 backends, so capping
+      // to 0 must not fall through to Math.min — it would make entries
+      // permanent, the opposite of a stricter cap.
+      const capped = new TieredCacheHandler(l1, l2, { l1MaxTtlSeconds: 0 });
+      const l1SetSpy = jest.spyOn(l1, 'set');
+
+      await capped.set('key', makeEntry({ revalidate: 600 }));
+
+      expect(l1SetSpy).not.toHaveBeenCalled();
+      expect(await l2.get('key')).not.toBeNull(); // L2 still written normally
+    });
+
+    test('a non-positive l1MaxTtlSeconds disables L1 promotion writes', async () => {
+      const capped = new TieredCacheHandler(l1, l2, { l1MaxTtlSeconds: -5 });
+      await l2.set('key', makeEntry({ revalidate: 600 }));
+      const l1SetSpy = jest.spyOn(l1, 'set');
+
+      const result = await capped.get('key');
+
+      expect(result).not.toBeNull(); // L2 value still served
+      expect(l1SetSpy).not.toHaveBeenCalled();
+    });
+
     test('promoted entries are re-stamped so TTL-on-write L1 handlers apply only the remaining lifetime', async () => {
       // RedisCacheHandler.set starts EX ceil(revalidate) at write time and its
       // get never checks entry.timestamp, so a promoted entry carrying an old

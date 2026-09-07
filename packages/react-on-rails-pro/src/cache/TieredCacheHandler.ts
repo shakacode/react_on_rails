@@ -20,6 +20,7 @@ export interface TieredCacheHandlerOptions {
    * Maximum TTL (in seconds) for entries promoted to L1.
    * Bounds how long a stale L1 entry can persist after L2 is updated by another worker.
    * Defaults to undefined (use the entry's original revalidate value).
+   * A value <= 0 disables L1 writes entirely (all reads go to L2).
    */
   l1MaxTtlSeconds?: number;
 }
@@ -67,11 +68,23 @@ export class TieredCacheHandler implements CacheHandler {
       console.error('TieredCacheHandler: L2 set failed', err);
     });
 
+    if (this.l1Disabled()) {
+      await l2Write;
+      return;
+    }
+
     const l1Entry = this.applyL1TtlForFreshEntry(entry);
     const l1Write = this.l1.set(key, l1Entry).catch((err: unknown) => {
       console.error('TieredCacheHandler: L1 set failed', err);
     });
     await Promise.all([l2Write, l1Write]);
+  }
+
+  // A cap of 0 (or negative) cannot be expressed as a revalidate value —
+  // revalidate <= 0 means "never expires" in both L1 backends — so it disables
+  // L1 writes entirely instead of inverting into immortal entries.
+  private l1Disabled(): boolean {
+    return this.l1MaxTtlSeconds !== undefined && this.l1MaxTtlSeconds <= 0;
   }
 
   // Caps revalidate on a freshly-written entry. Assumes timestamp ~= now, so
@@ -101,6 +114,8 @@ export class TieredCacheHandler implements CacheHandler {
   // time and serve the entry past its L2 expiry.
   // Returns null when the entry has no remaining lifetime (skip the L1 write).
   private applyL1TtlForPromotion(entry: CacheEntry): CacheEntry | null {
+    if (this.l1Disabled()) return null;
+
     const now = Date.now();
     const remainingSeconds =
       entry.revalidate > 0 ? entry.revalidate - (now - entry.timestamp) / 1000 : Infinity;
