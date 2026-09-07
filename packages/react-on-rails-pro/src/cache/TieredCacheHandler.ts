@@ -92,21 +92,31 @@ export class TieredCacheHandler implements CacheHandler {
   // a promoted entry may be arbitrarily old, so the cap must bound the remaining
   // lifetime — rewriting revalidate alone would produce an L1 entry that is
   // already expired (issue #5027).
+  // Finite-lifetime entries are always re-stamped to
+  // { timestamp: now, revalidate: <remaining> }: timestamp-checking handlers
+  // (InMemoryLRUCacheHandler) and TTL-on-write handlers (RedisCacheHandler's EX,
+  // which ignores the entry timestamp) both interpret that as exactly the
+  // remaining lifetime, whereas passing the aged entry through unchanged would
+  // let a TTL-on-write L1 restart the full original revalidate from promotion
+  // time and serve the entry past its L2 expiry.
   // Returns null when the entry has no remaining lifetime (skip the L1 write).
   private applyL1TtlForPromotion(entry: CacheEntry): CacheEntry | null {
     const now = Date.now();
-    const entryExpiryMs = entry.revalidate > 0 ? entry.timestamp + entry.revalidate * 1000 : Infinity;
+    const remainingSeconds =
+      entry.revalidate > 0 ? entry.revalidate - (now - entry.timestamp) / 1000 : Infinity;
 
     // Already expired (possible via L2 TTL rounding or cross-worker clock skew):
     // writing it to L1 would only create an entry the next get deletes.
-    if (entryExpiryMs <= now) return null;
+    if (remainingSeconds <= 0) return null;
 
-    if (this.l1MaxTtlSeconds === undefined) return entry;
+    const cappedSeconds =
+      this.l1MaxTtlSeconds === undefined
+        ? remainingSeconds
+        : Math.min(remainingSeconds, this.l1MaxTtlSeconds);
 
-    // The entry's own expiry is sooner than the cap: keep it unchanged and L1
-    // will expire it at exactly that time.
-    if (entryExpiryMs <= now + this.l1MaxTtlSeconds * 1000) return entry;
+    // Indefinite entry with no cap: nothing to bound.
+    if (!Number.isFinite(cappedSeconds)) return entry;
 
-    return { ...entry, timestamp: now, revalidate: this.l1MaxTtlSeconds };
+    return { ...entry, timestamp: now, revalidate: cappedSeconds };
   }
 }

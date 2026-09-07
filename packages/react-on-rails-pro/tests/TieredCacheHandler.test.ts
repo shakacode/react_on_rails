@@ -136,7 +136,10 @@ describe('TieredCacheHandler', () => {
 
       const l1Entry = await l1.get('key');
       expect(l1Entry).not.toBeNull();
-      expect(l1Entry!.revalidate).toBe(5);
+      // Promotion computes the remaining lifetime, so allow for the few ms
+      // elapsed since the entry was stamped — but never more than the original.
+      expect(l1Entry!.revalidate).toBeLessThanOrEqual(5);
+      expect(l1Entry!.revalidate).toBeGreaterThan(4.5);
     });
 
     test('assigns l1MaxTtlSeconds when original revalidate is 0 (indefinite)', async () => {
@@ -250,9 +253,10 @@ describe('TieredCacheHandler', () => {
       expect(l2GetSpy).toHaveBeenCalledTimes(1);
     });
 
-    test('without l1MaxTtlSeconds, promotes an aged entry unchanged (same absolute expiry)', async () => {
-      // No cap configured: the aged entry keeps its own timestamp/revalidate,
-      // so its absolute expiry in L1 matches L2 exactly.
+    test('without l1MaxTtlSeconds, promotes an aged entry with its absolute expiry preserved', async () => {
+      // No cap configured: the promoted copy must still expire exactly when the
+      // original would, re-stamped so TTL-on-write L1 handlers apply only the
+      // remaining lifetime.
       const originalTimestamp = Date.now() - 60_000;
       const entry = makeEntry({ revalidate: 3600, timestamp: originalTimestamp });
       await l2.set('key', entry);
@@ -261,8 +265,30 @@ describe('TieredCacheHandler', () => {
 
       const l1Entry = await l1.get('key');
       expect(l1Entry).not.toBeNull();
-      expect(l1Entry!.timestamp).toBe(originalTimestamp);
-      expect(l1Entry!.revalidate).toBe(3600);
+      const promotedExpiry = l1Entry!.timestamp + l1Entry!.revalidate * 1000;
+      expect(promotedExpiry).toBeLessThanOrEqual(originalTimestamp + 3600 * 1000 + 1);
+      expect(promotedExpiry).toBeGreaterThan(Date.now());
+    });
+
+    test('promoted entries are re-stamped so TTL-on-write L1 handlers apply only the remaining lifetime', async () => {
+      // RedisCacheHandler.set starts EX ceil(revalidate) at write time and its
+      // get never checks entry.timestamp, so a promoted entry carrying an old
+      // timestamp with its full original revalidate would let a Redis L1 serve
+      // it long past the L2 expiry. The promoted copy must always encode the
+      // remaining lifetime relative to a fresh timestamp.
+      const capped = new TieredCacheHandler(l1, l2, { l1MaxTtlSeconds: 60 });
+      // ~5s of life left out of 3600s.
+      const entry = makeEntry({ revalidate: 3600, timestamp: Date.now() - 3_595_000 });
+      await l2.set('key', entry);
+      const l1SetSpy = jest.spyOn(l1, 'set');
+
+      await capped.get('key');
+
+      expect(l1SetSpy).toHaveBeenCalledTimes(1);
+      const promoted = l1SetSpy.mock.calls[0][1];
+      expect(Date.now() - promoted.timestamp).toBeLessThan(2_000); // fresh timestamp
+      expect(promoted.revalidate).toBeGreaterThan(0);
+      expect(promoted.revalidate).toBeLessThanOrEqual(6); // remaining ~5s, never the original 3600
     });
   });
 });
