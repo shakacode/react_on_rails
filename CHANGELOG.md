@@ -45,6 +45,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   runtime behavior. Fixes [Issue 5036](https://github.com/shakacode/react_on_rails/issues/5036)
   by [justin808](https://github.com/justin808).
 
+- **[Pro]** **`TieredCacheHandler` keeps serving L1 hits for entries older than `l1MaxTtlSeconds`**: Promoting an
+  L2 hit into L1 rewrote the entry's `revalidate` but kept its original `timestamp`, so any entry older than
+  `l1MaxTtlSeconds` was written to L1 already expired — permanently bypassing L1 for that key and paying an L2
+  (e.g. Redis) round trip on every request. Promoted entries now expire at the earlier of the original entry's
+  expiry and `l1MaxTtlSeconds` from promotion time, and entries with no remaining lifetime skip the L1 write.
+  Served data was always correct; this is a performance fix. Fixes
+  [Issue 5027](https://github.com/shakacode/react_on_rails/issues/5027).
+
 - **[Pro]** **Standalone upgrades preserve customized bundler configurations**: The Pro generator automatically
   upgrades only complete, unchanged configuration pairs from supported current templates. Customized, historical,
   missing, or ambiguous pairs remain unchanged with manual migration instructions, preventing helper redeclarations

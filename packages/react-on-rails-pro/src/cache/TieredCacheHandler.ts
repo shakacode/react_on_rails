@@ -50,10 +50,12 @@ export class TieredCacheHandler implements CacheHandler {
     }
 
     if (l2Entry) {
-      const promoted = this.applyL1Ttl(l2Entry);
-      void this.l1.set(key, promoted).catch((err: unknown) => {
-        console.error('TieredCacheHandler: L1 promotion failed', err);
-      });
+      const promoted = this.applyL1TtlForPromotion(l2Entry);
+      if (promoted) {
+        void this.l1.set(key, promoted).catch((err: unknown) => {
+          console.error('TieredCacheHandler: L1 promotion failed', err);
+        });
+      }
       return l2Entry; // Return original entry (full TTL); only L1 gets the capped TTL
     }
 
@@ -65,14 +67,16 @@ export class TieredCacheHandler implements CacheHandler {
       console.error('TieredCacheHandler: L2 set failed', err);
     });
 
-    const l1Entry = this.applyL1Ttl(entry);
+    const l1Entry = this.applyL1TtlForFreshEntry(entry);
     const l1Write = this.l1.set(key, l1Entry).catch((err: unknown) => {
       console.error('TieredCacheHandler: L1 set failed', err);
     });
     await Promise.all([l2Write, l1Write]);
   }
 
-  private applyL1Ttl(entry: CacheEntry): CacheEntry {
+  // Caps revalidate on a freshly-written entry. Assumes timestamp ~= now, so
+  // capping revalidate alone bounds the entry's absolute expiry correctly.
+  private applyL1TtlForFreshEntry(entry: CacheEntry): CacheEntry {
     if (this.l1MaxTtlSeconds === undefined) return entry;
 
     const capped =
@@ -81,5 +85,28 @@ export class TieredCacheHandler implements CacheHandler {
     if (capped === entry.revalidate) return entry;
 
     return { ...entry, revalidate: capped };
+  }
+
+  // Caps an entry promoted from L2 so its absolute expiry is the earlier of the
+  // entry's own expiry and now + l1MaxTtlSeconds. Unlike applyL1TtlForFreshEntry,
+  // a promoted entry may be arbitrarily old, so the cap must bound the remaining
+  // lifetime — rewriting revalidate alone would produce an L1 entry that is
+  // already expired (issue #5027).
+  // Returns null when the entry has no remaining lifetime (skip the L1 write).
+  private applyL1TtlForPromotion(entry: CacheEntry): CacheEntry | null {
+    const now = Date.now();
+    const entryExpiryMs = entry.revalidate > 0 ? entry.timestamp + entry.revalidate * 1000 : Infinity;
+
+    // Already expired (possible via L2 TTL rounding or cross-worker clock skew):
+    // writing it to L1 would only create an entry the next get deletes.
+    if (entryExpiryMs <= now) return null;
+
+    if (this.l1MaxTtlSeconds === undefined) return entry;
+
+    // The entry's own expiry is sooner than the cap: keep it unchanged and L1
+    // will expire it at exactly that time.
+    if (entryExpiryMs <= now + this.l1MaxTtlSeconds * 1000) return entry;
+
+    return { ...entry, timestamp: now, revalidate: this.l1MaxTtlSeconds };
   }
 }
