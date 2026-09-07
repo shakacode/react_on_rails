@@ -25,6 +25,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useEffectEvent,
   useImperativeHandle,
   useLayoutEffect,
   useMemo,
@@ -207,9 +208,12 @@ function RSCRouteContent({
   const refetchError = refetchErrorState?.[0] === currentRouteKey ? refetchErrorState[1] : null;
 
   // Read the latest committed props in `refetch`, even when a descendant
-  // captured the handle at an earlier render.
+  // captured the handle at an earlier render. Deliberately a ref, NOT a
+  // useEffectEvent: an effect event has a new identity every render, which
+  // would destabilize `refetch` → `handle` → the context provider value and
+  // re-render every useCurrentRSCRoute consumer on every route render.
+  // Guarded by imperativeRefetch test 2d.
   const latestPropsRef = useRef<[string, unknown]>([componentName, componentProps]);
-  const onRefetchErrorRef = useRef(onRefetchError);
   const latestRefetchRequestRef = useRef(0);
   // Version 0 means "evicted or not yet seen"; it lets a later monotonic
   // success token clear a stale refetch error after the key reloads.
@@ -224,9 +228,6 @@ function RSCRouteContent({
   useLayoutEffect(() => {
     latestPropsRef.current = [componentName, componentProps];
   }, [componentName, componentProps]);
-  useLayoutEffect(() => {
-    onRefetchErrorRef.current = onRefetchError;
-  }, [onRefetchError]);
   useLayoutEffect(
     () => retainComponent(componentName, componentProps),
     [componentName, componentProps, retainComponent],
@@ -283,9 +284,16 @@ function RSCRouteContent({
     [clearRefetchError, refetch, refetchError],
   );
   useImperativeHandle(ref, () => handle, [handle]);
+  // Always sees the latest committed onRefetchError prop without making the
+  // effect below re-run on callback identity changes. Safe only because these
+  // components are plain function components — see the ordering note above
+  // RouteHandleRef (useEffectEvent freezes inside forwardRef/memo).
+  const emitRefetchError = useEffectEvent((error: ServerComponentFetchError) => {
+    onRefetchError?.(error);
+  });
   useEffect(() => {
     if (refetchError) {
-      onRefetchErrorRef.current?.(refetchError);
+      emitRefetchError(refetchError);
     }
   }, [refetchError]);
 
