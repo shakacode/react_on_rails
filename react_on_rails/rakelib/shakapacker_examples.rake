@@ -196,6 +196,12 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
       sh_in_dir(example_type.dir, "touch .gitignore")
       sh_in_dir(example_type.dir,
                 "echo \"gem 'react_on_rails', path: '#{relative_gem_root}'\" >> #{example_type.gemfile}")
+      # json 3.0.0 (2026-09-07) raises ArgumentError on unknown keywords, and Rails < 8.1
+      # ActiveSupport still passes the removed quirks_mode: option to JSON.generate
+      # (fixed upstream in rails/rails#55534; released only in Rails >= 8.1.0).
+      # Remove this pin when example apps generate on Rails >= 8.1.
+      sh_in_dir(example_type.dir,
+                "echo \"gem 'json', '< 3'\" >> #{example_type.gemfile}")
       # Shakapacker is automatically included as a dependency via react_on_rails.gemspec (>= 6.0)
       bundle_install_in(example_type.dir)
       # Use unbundled_sh_in_dir to ensure we're using the generated app's Gemfile
