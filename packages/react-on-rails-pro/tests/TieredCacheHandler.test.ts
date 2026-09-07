@@ -136,10 +136,10 @@ describe('TieredCacheHandler', () => {
 
       const l1Entry = await l1.get('key');
       expect(l1Entry).not.toBeNull();
-      // Promotion computes the remaining lifetime, so allow for the few ms
-      // elapsed since the entry was stamped — but never more than the original.
+      // Promotion computes the remaining lifetime floored to whole seconds, so
+      // allow up to 1s of slack — but never more than the original.
       expect(l1Entry!.revalidate).toBeLessThanOrEqual(5);
-      expect(l1Entry!.revalidate).toBeGreaterThan(4.5);
+      expect(l1Entry!.revalidate).toBeGreaterThanOrEqual(4);
     });
 
     test('assigns l1MaxTtlSeconds when original revalidate is 0 (indefinite)', async () => {
@@ -294,6 +294,51 @@ describe('TieredCacheHandler', () => {
       expect(l1SetSpy).not.toHaveBeenCalled();
     });
 
+    test('a disabled L1 is also bypassed on reads, so pre-existing L1 data cannot be served', async () => {
+      // A persistent L1 (e.g. shared Redis) may still hold entries from before
+      // the cap disabled it; "all reads go to L2" must include those.
+      await l1.set('key', makeEntry({ value: [Buffer.from('stale-l1')], revalidate: 0 }));
+      await l2.set('key', makeEntry({ value: [Buffer.from('fresh-l2')], revalidate: 0 }));
+      const disabled = new TieredCacheHandler(l1, l2, { l1MaxTtlSeconds: 0 });
+      const l1GetSpy = jest.spyOn(l1, 'get');
+
+      const result = await disabled.get('key');
+
+      expect(result!.value[0].toString()).toBe('fresh-l2');
+      expect(l1GetSpy).not.toHaveBeenCalled();
+    });
+
+    test('a NaN l1MaxTtlSeconds disables L1 instead of writing immortal entries', async () => {
+      // e.g. Number(process.env.UNSET_VAR): NaN passes a `<= 0` check and turns
+      // Math.min into NaN, which both backends treat as "never expires".
+      const capped = new TieredCacheHandler(l1, l2, { l1MaxTtlSeconds: Number.NaN });
+      const l1SetSpy = jest.spyOn(l1, 'set');
+
+      await capped.set('key', makeEntry({ revalidate: 600 }));
+      await l2.set('key2', makeEntry({ revalidate: 600 }));
+      await capped.get('key2'); // promotion path
+
+      expect(l1SetSpy).not.toHaveBeenCalled();
+      expect(await l2.get('key')).not.toBeNull();
+    });
+
+    test('a producer clock ahead of ours cannot inflate the promoted lifetime past the original revalidate', async () => {
+      // Cross-worker skew: the L2 writer's clock is 5s fast, so elapsed looks
+      // negative here. The promoted entry must never outlive the original TTL.
+      const skewed = makeEntry({ revalidate: 10, timestamp: Date.now() + 5_000 });
+      const stubL2: InMemoryLRUCacheHandler = {
+        get: jest.fn().mockResolvedValue(skewed),
+        set: jest.fn().mockResolvedValue(undefined),
+      } as unknown as InMemoryLRUCacheHandler;
+      const capped = new TieredCacheHandler(l1, stubL2, { l1MaxTtlSeconds: 60 });
+      const l1SetSpy = jest.spyOn(l1, 'set');
+
+      await capped.get('key');
+
+      expect(l1SetSpy).toHaveBeenCalledTimes(1);
+      expect(l1SetSpy.mock.calls[0][1].revalidate).toBeLessThanOrEqual(10);
+    });
+
     test('promoted entries are re-stamped so TTL-on-write L1 handlers apply only the remaining lifetime', async () => {
       // RedisCacheHandler.set starts EX ceil(revalidate) at write time and its
       // get never checks entry.timestamp, so a promoted entry carrying an old
@@ -301,8 +346,9 @@ describe('TieredCacheHandler', () => {
       // it long past the L2 expiry. The promoted copy must always encode the
       // remaining lifetime relative to a fresh timestamp.
       const capped = new TieredCacheHandler(l1, l2, { l1MaxTtlSeconds: 60 });
-      // ~5s of life left out of 3600s.
-      const entry = makeEntry({ revalidate: 3600, timestamp: Date.now() - 3_595_000 });
+      // ~4.5s of life left out of 3600s (deliberately not a whole second, so a
+      // rounded-up TTL would provably pass the original expiry).
+      const entry = makeEntry({ revalidate: 3600, timestamp: Date.now() - 3_595_500 });
       await l2.set('key', entry);
       const l1SetSpy = jest.spyOn(l1, 'set');
 
@@ -312,7 +358,11 @@ describe('TieredCacheHandler', () => {
       const promoted = l1SetSpy.mock.calls[0][1];
       expect(Date.now() - promoted.timestamp).toBeLessThan(2_000); // fresh timestamp
       expect(promoted.revalidate).toBeGreaterThan(0);
-      expect(promoted.revalidate).toBeLessThanOrEqual(6); // remaining ~5s, never the original 3600
+      // A TTL-on-write handler applies EX ceil(revalidate) from the promoted
+      // timestamp, so even the rounded-up TTL must not pass the original expiry.
+      const originalExpiry = entry.timestamp + 3600 * 1000;
+      const trueRemainingSeconds = (originalExpiry - promoted.timestamp) / 1000;
+      expect(Math.ceil(promoted.revalidate)).toBeLessThanOrEqual(trueRemainingSeconds);
     });
   });
 });

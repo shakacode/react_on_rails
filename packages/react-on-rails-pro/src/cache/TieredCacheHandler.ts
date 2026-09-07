@@ -39,7 +39,9 @@ export class TieredCacheHandler implements CacheHandler {
   }
 
   async get(key: string): Promise<CacheEntry | null> {
-    const l1Entry = await this.l1.get(key);
+    // A disabled L1 is bypassed on reads too: a persistent L1 (e.g. shared
+    // Redis) may still hold entries written before the cap disabled it.
+    const l1Entry = this.l1Disabled() ? null : await this.l1.get(key);
     if (l1Entry) return l1Entry;
 
     let l2Entry: CacheEntry | null;
@@ -80,11 +82,12 @@ export class TieredCacheHandler implements CacheHandler {
     await Promise.all([l2Write, l1Write]);
   }
 
-  // A cap of 0 (or negative) cannot be expressed as a revalidate value —
-  // revalidate <= 0 means "never expires" in both L1 backends — so it disables
-  // L1 writes entirely instead of inverting into immortal entries.
+  // A cap of 0, negative, or NaN cannot be expressed as a revalidate value —
+  // revalidate <= 0 (and NaN via Math.min) means "never expires" in both L1
+  // backends — so any defined non-positive/non-finite cap disables L1 entirely
+  // instead of inverting into immortal entries. `!(x > 0)` is true for NaN.
   private l1Disabled(): boolean {
-    return this.l1MaxTtlSeconds !== undefined && this.l1MaxTtlSeconds <= 0;
+    return this.l1MaxTtlSeconds !== undefined && !(this.l1MaxTtlSeconds > 0);
   }
 
   // Caps revalidate on a freshly-written entry. Assumes timestamp ~= now, so
@@ -117,8 +120,10 @@ export class TieredCacheHandler implements CacheHandler {
     if (this.l1Disabled()) return null;
 
     const now = Date.now();
+    // Clamp elapsed at >= 0: a producer clock ahead of ours would otherwise
+    // make the remaining lifetime exceed the entry's own revalidate.
     const remainingSeconds =
-      entry.revalidate > 0 ? entry.revalidate - (now - entry.timestamp) / 1000 : Infinity;
+      entry.revalidate > 0 ? entry.revalidate - Math.max(0, now - entry.timestamp) / 1000 : Infinity;
 
     // Already expired (possible via L2 TTL rounding or cross-worker clock skew):
     // writing it to L1 would only create an entry the next get deletes.
@@ -132,6 +137,12 @@ export class TieredCacheHandler implements CacheHandler {
     // Indefinite entry with no cap: nothing to bound.
     if (!Number.isFinite(cappedSeconds)) return entry;
 
-    return { ...entry, timestamp: now, revalidate: cappedSeconds };
+    // Floor to whole seconds: a TTL-on-write L1 (Redis EX) rounds the TTL up
+    // with Math.ceil, so a fractional value could outlive the original expiry
+    // by up to a second. Under one whole second of life left, skip L1.
+    const flooredSeconds = Math.floor(cappedSeconds);
+    if (flooredSeconds <= 0) return null;
+
+    return { ...entry, timestamp: now, revalidate: flooredSeconds };
   }
 }
