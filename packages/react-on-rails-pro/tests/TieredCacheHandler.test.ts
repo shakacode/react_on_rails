@@ -375,6 +375,18 @@ describe('TieredCacheHandler', () => {
       expect(l1SetSpy.mock.calls[0][1].revalidate).toBe(0.5);
     });
 
+    test('an Infinity cap preserves indefinite revalidate on fresh writes, exactly like undefined', async () => {
+      // Without normalization, min/ternary logic would rewrite revalidate: 0 to
+      // Infinity — a value a custom TTL-on-write L1 handler could reject.
+      const uncapped = new TieredCacheHandler(l1, l2, { l1MaxTtlSeconds: Infinity });
+
+      await uncapped.set('key', makeEntry({ revalidate: 0 }));
+
+      const l1Entry = await l1.get('key');
+      expect(l1Entry).not.toBeNull();
+      expect(l1Entry!.revalidate).toBe(0);
+    });
+
     test('an Infinity cap behaves as "no cap", not as disabled L1', async () => {
       // Infinity means "unbounded", the same as leaving the option undefined:
       // L1 stays in use and promoted entries keep their own expiry.

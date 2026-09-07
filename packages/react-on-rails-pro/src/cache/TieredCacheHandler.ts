@@ -38,7 +38,11 @@ export class TieredCacheHandler implements CacheHandler {
   constructor(l1: CacheHandler, l2: CacheHandler, opts: TieredCacheHandlerOptions = {}) {
     this.l1 = l1;
     this.l2 = l2;
-    this.l1MaxTtlSeconds = opts.l1MaxTtlSeconds;
+    // Normalize Infinity to undefined so the two spellings of "no cap" are
+    // truly equivalent — otherwise the fresh-write path would rewrite an
+    // indefinite entry's revalidate: 0 to Infinity, which a custom
+    // TTL-on-write L1 handler could reject as an invalid backend TTL.
+    this.l1MaxTtlSeconds = opts.l1MaxTtlSeconds === Infinity ? undefined : opts.l1MaxTtlSeconds;
   }
 
   async get(key: string): Promise<CacheEntry | null> {
