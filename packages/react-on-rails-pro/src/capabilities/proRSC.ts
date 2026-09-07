@@ -54,6 +54,8 @@ const CLIENT_HOOK_NAMES = [
   'useInsertionEffect',
   'useOptimistic',
   'useActionState',
+  // `use` must NOT be listed: it is legal in Server Components.
+  'useEffectEvent',
 ].join('|');
 const CLIENT_HOOK_RUNTIME_ERROR_REGEX = new RegExp(
   `(?:(?:React\\.)|\\(0\\s*,\\s*[\\w$]+\\.)?(${CLIENT_HOOK_NAMES})\\)? is not a function\\b`,
