@@ -19,8 +19,11 @@ export interface TieredCacheHandlerOptions {
   /**
    * Maximum TTL (in seconds) for entries promoted to L1.
    * Bounds how long a stale L1 entry can persist after L2 is updated by another worker.
-   * Defaults to undefined (use the entry's original revalidate value).
-   * A value <= 0 disables L1 writes entirely (all reads go to L2).
+   * Defaults to undefined (use the entry's original revalidate value); Infinity behaves
+   * the same as undefined.
+   * A non-positive or NaN value disables L1 entirely (all reads and writes go to L2).
+   * Note: a persistent L1 (e.g. Redis) disabled this way retains entries written
+   * before it was disabled; flush it before re-enabling.
    */
   l1MaxTtlSeconds?: number;
 }
@@ -121,15 +124,16 @@ export class TieredCacheHandler implements CacheHandler {
     if (this.l1Disabled()) return null;
 
     const now = Date.now();
+    const hasFiniteLifetime = entry.revalidate > 0;
 
-    // A future timestamp means the producer's clock is ahead of ours. Any
-    // lifetime computed from it overshoots the entry's true expiry (a Redis L2
-    // started its EX at the producer's write), so serve from L2 and skip the
-    // promotion rather than clamping.
-    if (entry.timestamp > now) return null;
+    // A future timestamp on a finite entry means the producer's clock is ahead
+    // of ours: any remaining lifetime computed from it overshoots the entry's
+    // true expiry (a Redis L2 started its EX at the producer's write), so serve
+    // from L2 and skip the promotion rather than clamping. Indefinite entries
+    // are unaffected — their expiry never depends on the timestamp.
+    if (hasFiniteLifetime && entry.timestamp > now) return null;
 
-    const remainingSeconds =
-      entry.revalidate > 0 ? entry.revalidate - (now - entry.timestamp) / 1000 : Infinity;
+    const remainingSeconds = hasFiniteLifetime ? entry.revalidate - (now - entry.timestamp) / 1000 : Infinity;
 
     // Already expired (possible via L2 TTL rounding or cross-worker clock skew):
     // writing it to L1 would only create an entry the next get deletes.

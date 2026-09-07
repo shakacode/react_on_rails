@@ -340,6 +340,26 @@ describe('TieredCacheHandler', () => {
       expect(l1SetSpy).not.toHaveBeenCalled();
     });
 
+    test('a future-stamped indefinite entry is still promoted (its expiry cannot depend on the timestamp)', async () => {
+      // The future-timestamp skip only makes sense for finite lifetimes; an
+      // indefinite entry (revalidate: 0 — the unstable_cache default) must keep
+      // populating L1 even during a clock-skew window.
+      const skewed = makeEntry({ revalidate: 0, timestamp: Date.now() + 5_000 });
+      const stubL2: InMemoryLRUCacheHandler = {
+        get: jest.fn().mockResolvedValue(skewed),
+        set: jest.fn().mockResolvedValue(undefined),
+      } as unknown as InMemoryLRUCacheHandler;
+      const capped = new TieredCacheHandler(l1, stubL2, { l1MaxTtlSeconds: 30 });
+      const l1SetSpy = jest.spyOn(l1, 'set');
+
+      await capped.get('key');
+
+      expect(l1SetSpy).toHaveBeenCalledTimes(1);
+      const promoted = l1SetSpy.mock.calls[0][1];
+      expect(promoted.revalidate).toBe(30);
+      expect(promoted.timestamp).toBeLessThanOrEqual(Date.now());
+    });
+
     test('an Infinity cap behaves as "no cap", not as disabled L1', async () => {
       // Infinity means "unbounded", the same as leaving the option undefined:
       // L1 stays in use and promoted entries keep their own expiry.
