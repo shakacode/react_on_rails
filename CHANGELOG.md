@@ -52,6 +52,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   expiry and `l1MaxTtlSeconds` from promotion time, and entries with no remaining lifetime skip the L1 write.
   Served data was always correct; this is a performance fix. Fixes
   [Issue 5027](https://github.com/shakacode/react_on_rails/issues/5027).
+  [PR 5029](https://github.com/shakacode/react_on_rails/pull/5029) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 - **[Pro]** **Standalone upgrades preserve customized bundler configurations**: The Pro generator automatically
   upgrades only complete, unchanged configuration pairs from supported current templates. Customized, historical,
