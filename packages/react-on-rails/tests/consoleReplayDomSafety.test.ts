@@ -9,14 +9,16 @@
  * parser implements those states, so these tests fail against an escaping scheme that
  * misses either sequence.
  */
-import buildConsoleReplay from '../src/buildConsoleReplay.ts';
+import buildConsoleReplay, { consoleReplay } from '../src/buildConsoleReplay.ts';
 
 function parsePageWithReplay(loggedString: string) {
-  const replay = buildConsoleReplay([{ arguments: [loggedString], level: 'log' }]);
-  return new DOMParser().parseFromString(
+  const history: NonNullable<(typeof console)['history']> = [{ arguments: [loggedString], level: 'log' }];
+  const replay = buildConsoleReplay(history);
+  const doc = new DOMParser().parseFromString(
     `<!doctype html><html><body>${replay}<div id="after">AFTER</div></body></html>`,
     'text/html',
   );
+  return { doc, code: consoleReplay(history) };
 }
 
 describe('console replay script does not swallow the rest of the document', () => {
@@ -29,7 +31,7 @@ describe('console replay script does not swallow the rest of the document', () =
     '<!--<script></script>-->',
     'combo </script> and <!--<script> in one message',
   ])('a following element still parses when logging %j', (logged) => {
-    const doc = parsePageWithReplay(logged);
+    const { doc, code } = parsePageWithReplay(logged);
     const after = doc.getElementById('after');
     const replayScript = doc.getElementById('consoleReplayLog');
 
@@ -40,5 +42,10 @@ describe('console replay script does not swallow the rest of the document', () =
     // And it was not consumed as script text.
     expect(replayScript).not.toBeNull();
     expect(replayScript?.textContent).not.toContain('AFTER');
+
+    // The script element holds the COMPLETE replay code: a regression on the
+    // `</script` half would close the element early and truncate its text,
+    // which the swallow assertions above cannot see on their own.
+    expect(replayScript?.textContent?.trim()).toBe(code);
   });
 });

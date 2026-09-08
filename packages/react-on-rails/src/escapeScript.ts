@@ -4,7 +4,7 @@
 // This behavior allows us to use the backslash to escape characters that might be
 // interpreted as HTML tags, preventing them from being processed by the HTML parser.
 // For example, we can escape the comment tag <!-- as <\!-- and the script tag </script>
-// as <\/script>.
+// as </\script>.
 // This ensures that these tags are not prematurely closed or misinterpreted by the browser.
 //
 // BOTH replacements are required. Inside a <script> element, `</script` can end the
