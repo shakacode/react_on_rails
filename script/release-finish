@@ -3,6 +3,7 @@
 
 require "optparse"
 require "open3"
+require "timeout"
 require_relative "../rakelib/release_commit_classifier"
 
 # Orchestrates the release-train runbook's steps 4 (promote) and 5 (close out),
@@ -30,6 +31,7 @@ class ReleaseFinish
   STABLE_VERSION = /\A\d+\.\d+\.\d+\z/
   SUBCOMMANDS = %w[promote close-out].freeze
   FORWARD_PORT_INCOMPLETE_STATUS = 1
+  REMOTE_REF_TIMEOUT_SECONDS = 30
   CHERRY_PICK_IN_PROGRESS_MESSAGE =
     "a cherry-pick is already in progress; run git cherry-pick --continue, --skip, or --abort first"
   # Resolve the sibling forward-port helper relative to this script so close-out
@@ -281,11 +283,8 @@ class ReleaseFinish
   end
 
   def non_runtime_only_commit?(sha)
-    changed_paths = git_lines("diff-tree", "--no-commit-id", "--name-only", "-r", "#{sha}^", sha)
-    return false if changed_paths.empty?
-
     repo_root = git("rev-parse", "--show-toplevel").strip
-    ReleaseCommitClassifier.non_runtime_only?(monorepo_root: repo_root, sha:)
+    ReleaseCommitClassifier.promotion_non_runtime_only?(monorepo_root: repo_root, sha:)
   end
 
   def collapse_changelog_to_stable
@@ -306,15 +305,16 @@ class ReleaseFinish
   end
 
   def run_release_task!(version, release_branch, rc_tag)
-    section "Promote: bundle exec rake release[#{version}]"
-    puts "This tags v#{version} and publishes. The rake guards (stable_release_branch_allowed?,"
+    section "Promote: script/release"
+    puts "Run the release supervisor without arguments to prepare and publish v#{version}."
+    puts "The rake guards (stable_release_branch_allowed?,"
     puts "ensure_release_branch_promotes_tagged_rc!) validate the #{release_branch} tip against #{rc_tag}."
 
     confirm_outward!(
-      "Run `bundle exec rake \"release[#{version}]\"` now (tags v#{version} and publishes)?",
-      "bundle exec rake \"release[#{version}]\""
+      "Run `script/release` now (prepares, tags v#{version} and publishes)?",
+      "script/release"
     )
-    run_or_print("bundle", "exec", "rake", "release[#{version}]")
+    run_or_print("script/release")
   end
 
   # ---------------------------------------------------------------------------
@@ -624,7 +624,7 @@ class ReleaseFinish
   def ensure_local_release_matches_remote!(release_branch, remote)
     local = git("rev-parse", release_branch).strip
     remote_release = "#{remote}/#{release_branch}"
-    upstream = git("rev-parse", remote_release).strip
+    upstream = advertised_release_tip!(remote, release_branch)
     return if local == upstream
 
     raise AbortError, <<~ERROR.strip
@@ -633,6 +633,44 @@ class ReleaseFinish
         remote: #{upstream}
       Reconcile the local branch with the fetched remote tip before previewing promotion.
     ERROR
+  end
+
+  def advertised_release_tip!(remote, release_branch)
+    ref = "refs/heads/#{release_branch}"
+    args = ["ls-remote", "--exit-code", "--heads", "--", remote, ref]
+    stdout, stderr, status = capture_remote_ref(*args)
+    raise AbortError, "#{release_branch} does not exist on remote #{remote}" if status.exitstatus == 2
+    raise GitError, git_error(args, stdout, stderr, status) unless status.success?
+
+    matches = stdout.lines.map(&:split)
+    unless matches.one? && matches.first.length == 2 && matches.first.last == ref &&
+           matches.first.first.match?(/\A(?:[0-9a-f]{40}|[0-9a-f]{64})\z/)
+      raise GitError, "remote #{remote} did not return one exact head for #{release_branch}"
+    end
+
+    matches.first.first
+  end
+
+  # A read-only remote probe must fail closed if its transport stalls. Kill only
+  # this probe's process group before Open3 waits for its pipes and child.
+  def capture_remote_ref(*args)
+    env = { "GIT_TERMINAL_PROMPT" => "0", "GIT_PAGER" => "cat" }
+    Open3.popen3(env, "git", *args, pgroup: true) do |stdin, stdout, stderr, waiter|
+      stdin.close
+      readers = [Thread.new { stdout.read }, Thread.new { stderr.read }]
+      begin
+        Timeout.timeout(REMOTE_REF_TIMEOUT_SECONDS) { [*readers.map(&:value), waiter.value] }
+      rescue Timeout::Error
+        begin
+          Process.kill("KILL", -waiter.pid)
+        rescue Errno::ESRCH
+          # The probe exited at the timeout boundary.
+        end
+        raise GitError, "remote branch verification timed out after #{REMOTE_REF_TIMEOUT_SECONDS} seconds"
+      ensure
+        readers.each(&:join)
+      end
+    end
   end
 
   # SAFETY GATE for the branch delete: re-fetch and require both checked tips to
