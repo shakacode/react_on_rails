@@ -199,9 +199,11 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
       # json 3.0.0 (2026-09-07) raises ArgumentError on unknown keywords, and Rails < 8.1
       # ActiveSupport still passes the removed quirks_mode: option to JSON.generate
       # (fixed upstream in rails/rails#55534; released only in Rails >= 8.1.0).
-      # Remove this pin when example apps generate on Rails >= 8.1.
-      sh_in_dir(example_type.dir,
-                "echo \"gem 'json', '< 3'\" >> #{example_type.gemfile}")
+      # Self-retires when example apps generate on Rails >= 8.1; also removable if a
+      # json 3.x release restores tolerance for removed keywords.
+      if Gem::Version.new(Rails.version) < Gem::Version.new("8.1")
+        File.write(example_type.gemfile, "gem 'json', '>= 2', '< 3'\n", mode: "a")
+      end
       # Shakapacker is automatically included as a dependency via react_on_rails.gemspec (>= 6.0)
       bundle_install_in(example_type.dir)
       # Use unbundled_sh_in_dir to ensure we're using the generated app's Gemfile
