@@ -52,8 +52,10 @@ module ReactOnRailsProHelper
   CACHED_CSP_NONCE_MARKER_PREFIX = "<!--rorp-cached-csp-nonce:"
   CACHED_CSP_NONCE_MARKER_SUFFIX = "-->"
   # Anchored to the very end of the cached value: the framework appends its marker after
-  # all rendered content, so the trailing marker is always framework-owned.
-  CACHED_CSP_NONCE_MARKER_REGEX = %r{<!--rorp-cached-csp-nonce:([a-zA-Z0-9+/=_-]+)-->\z}
+  # all rendered content, so the trailing marker is always framework-owned. The captured
+  # value mirrors CSP_NONCE_VALUE_PATTERN below (`=` only as trailing padding) so the two
+  # shapes cannot silently diverge.
+  CACHED_CSP_NONCE_MARKER_REGEX = %r{<!--rorp-cached-csp-nonce:([a-zA-Z0-9+/_-]+={0,2})-->\z}
   # Mirrors the accepted shape in packages/react-on-rails/src/sanitizeNonce.ts —
   # base64/base64url characters with optional trailing `=` padding — but validates the
   # original value as-is. Never strip-then-validate: a stripped derivative can pass the
@@ -486,10 +488,13 @@ module ReactOnRailsProHelper
 
   # All view-level component cache keys must segregate nonce-rendered entries from
   # nonce-free ones (issue #5021), so every cached_* helper builds its key through here.
+  # The flag uses the same validity check as the cache-write marker: a present-but-
+  # malformed nonce writes no marker, so letting it share the nonce partition would leave
+  # marker-free entries whose stale nonce a later valid-nonce request could never re-stamp.
   def pro_component_cache_key(component_name, options)
     ReactOnRailsPro::Cache.react_component_cache_key(
       component_name,
-      options.merge(csp_nonce_active: csp_nonce.present?)
+      options.merge(csp_nonce_active: current_csp_nonce_for_cached_html.present?)
     )
   end
 

@@ -692,7 +692,7 @@ describe ReactOnRailsProHelper do
       expect(result).not_to include("rorp-cached-csp-nonce")
     end
 
-    it "does not rewrite when the current nonce is only valid after stripping" do
+    it "never serves another partition's entry to a request with a malformed nonce" do
       allow(self).to receive(:csp_nonce).and_return("strip-orig-AAA=")
 
       cached_react_component("App", cache_key: "csp-nonce-strip", auto_load_bundle: false) do
@@ -701,14 +701,51 @@ describe ReactOnRailsProHelper do
 
       # "abc!" would become the valid-looking "abc" if sanitized by stripping, but the
       # response header still carries "abc!" — splicing "abc" would mismatch every script.
+      # A malformed nonce is not csp_nonce_active, so it must not reuse the valid-nonce
+      # partition's entry (which it could never re-stamp); it renders fresh instead.
       allow(self).to receive(:csp_nonce).and_return("abc!")
+      second_props_evaluated = false
 
       second_result = cached_react_component("App", cache_key: "csp-nonce-strip", auto_load_bundle: false) do
-        raise "props block must not run on a cache hit"
+        second_props_evaluated = true
+        { name: "second" }
       end
 
+      expect(second_props_evaluated).to be(true)
       expect(second_result).not_to include('nonce="abc"')
-      expect(second_result).to include('nonce="strip-orig-AAA="')
+      expect(second_result).not_to include("strip-orig-AAA=")
+    end
+
+    it "keeps marker-free entries out of the validated-nonce partition" do
+      # A present-but-malformed nonce writes no marker, so it must not populate the
+      # partition that valid-nonce requests read from — otherwise a later valid-nonce
+      # request would be served a stale nonce it can never re-stamp.
+      allow(self).to receive(:csp_nonce).and_return("bad nonce value!")
+
+      cached_react_component("App", cache_key: "csp-nonce-partition", auto_load_bundle: false) do
+        { name: "malformed-writer" }
+      end
+
+      allow(self).to receive(:csp_nonce).and_return("valid-nonce-BBB=")
+      second_props_evaluated = false
+
+      second_result = cached_react_component("App", cache_key: "csp-nonce-partition", auto_load_bundle: false) do
+        second_props_evaluated = true
+        { name: "valid-reader" }
+      end
+
+      expect(second_props_evaluated).to be(true)
+      expect(second_result).to include('nonce="valid-nonce-BBB="')
+      expect(second_result).not_to include("malformed-writer")
+    end
+
+    it "skips the defensive rewrite when the current nonce is malformed" do
+      cached_html = %(<div>cached</div><script nonce="orig-AAA=">framework()</script>)
+      allow(self).to receive(:csp_nonce).and_return("abc!")
+
+      rewritten = send(:rewrite_cached_csp_nonces, cached_html, "orig-AAA=")
+
+      expect(rewritten).to equal(cached_html)
     end
 
     it "serves cached markup unchanged when the nonce is stable across requests" do
@@ -791,12 +828,14 @@ describe ReactOnRailsProHelper do
       allow(self).to receive(:csp_nonce).and_return('evil" onload="alert(1)')
 
       second_result = cached_react_component("App", cache_key: "csp-nonce-malformed", auto_load_bundle: false) do
-        raise "props block must not run on a cache hit"
+        { name: "second" }
       end
 
-      expect(second_result).not_to include("onload")
-      # The rewrite is skipped entirely rather than risking attribute injection.
-      expect(second_result).to include('nonce="good-nonce-AAA="')
+      # The malformed request renders fresh in the nonce-free partition; nothing splices
+      # the malformed value as a real attribute (content_tag escapes it) and the rewrite
+      # never runs with it.
+      expect(second_result).not_to include(' onload="alert')
+      expect(second_result).not_to include("good-nonce-AAA=")
     end
 
     context "with async context" do
