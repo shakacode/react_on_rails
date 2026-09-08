@@ -1,0 +1,309 @@
+{
+  "schema_version": "2.0",
+  "run_id": "final-codex-06d962d0-1",
+  "started_at": "2026-08-13T06:38:37Z",
+  "finished_at": "2026-08-13T06:47:27Z",
+  "repository": {
+    "revision": "06d962d089f34dc1ec2963a50c233508ecbc7103",
+    "dirty": false
+  },
+  "definition": {
+    "inputs": [
+      {
+        "path": "bin/assert-agent-call-contained",
+        "sha256": "40c1c22dc6f028a2780a178272a1809511a98e4c4416b401c3c64a385cea861f",
+        "executable": true
+      },
+      {
+        "path": "bin/assert-brokered-credential-absent",
+        "sha256": "2ab2807876e5853dde07257e6effab047b08c4203f5b28454984f94e8d4268b9",
+        "executable": true
+      },
+      {
+        "path": "bin/assert-credential-absent",
+        "sha256": "aac88e885e1ae10953633058596615d281ab0d9ebd12ad04921f9cd8e7443c0c",
+        "executable": true
+      },
+      {
+        "path": "bin/build-claude-agent-report-schema",
+        "sha256": "ecb510fbf756859d5b8f57c9ff96c45d106197c159f0174885380624a0b6b7ff",
+        "executable": true
+      },
+      {
+        "path": "bin/build-claude-credential-helper",
+        "sha256": "aee9f3c54b2bf6c26c7acf5ef40a3233feefc341186905d293d9ffaba370ad42",
+        "executable": true
+      },
+      {
+        "path": "bin/build-runner-diagnostics",
+        "sha256": "ce306f6d8e0181a7883f000fa4ce3a70d8ce984cf8f994fa34d8f8e31cb5ac84",
+        "executable": true
+      },
+      {
+        "path": "bin/build-safe-path",
+        "sha256": "750d086550eaab90da588f92d698812219cd35db63f1158742584da34a7f92c0",
+        "executable": true
+      },
+      {
+        "path": "bin/canonicalize-model-credential",
+        "sha256": "c172c346bafe39239cb328c342f4490f247d8c5487d194d34e8875ef4418885e",
+        "executable": true
+      },
+      {
+        "path": "bin/derive-evidence.mjs",
+        "sha256": "95162eec735d3f6572aaf5bda86231bbc3c65d5025ab63bbc939d04c080a37f8",
+        "executable": true
+      },
+      {
+        "path": "bin/derive-network-probe.mjs",
+        "sha256": "12b00f47e6e922be261d4a2c328e40f508ae3b7ab603b82e13bcae5005be4ef1",
+        "executable": true
+      },
+      {
+        "path": "bin/evidence-limits.mjs",
+        "sha256": "529ad4f7e284ecbd1a21c040b0e7dc4da20badbfcb01ac5ed8ff544fef618a8b",
+        "executable": false
+      },
+      {
+        "path": "bin/file-descriptor-metadata",
+        "sha256": "e4d530b57c36710851ff63e07ca80d4410e3d0e7420de167b7a58532207d8fe3",
+        "executable": true
+      },
+      {
+        "path": "bin/file-permission-mode",
+        "sha256": "0c3fd0edb530090b1a76bdda77da97c159ef701bbac3d81187224615bf1a78a0",
+        "executable": true
+      },
+      {
+        "path": "bin/local-paths.mjs",
+        "sha256": "0c2c004faff9f2fc11c0f7e73b15e666216581568c1129b0383667ab11728aff",
+        "executable": false
+      },
+      {
+        "path": "bin/normalize-claude-events.mjs",
+        "sha256": "a5fb5bf9793b73bebbdadaf9dea7e7ab114d114b9895804382883f85b5e67161",
+        "executable": true
+      },
+      {
+        "path": "bin/normalize-command.mjs",
+        "sha256": "f297b4644beb7abdf3885f440442c7ddb17bc9dc89d3f4f34217420993333d34",
+        "executable": false
+      },
+      {
+        "path": "bin/prepare-agent-state",
+        "sha256": "2f2d29ad439f821156453dbbebaae2e7e7c18366665e5755f5eba5ae070dee23",
+        "executable": true
+      },
+      {
+        "path": "bin/probe-allows-scaffold",
+        "sha256": "0a34be145e275aae7996d0dbbfe56a6ad646ae1445044f93db04942b596b4305",
+        "executable": true
+      },
+      {
+        "path": "bin/quiesce-agent-call",
+        "sha256": "6d79982c3c64f5bf09371068c8cefecd12286e926e9694e18310df54d6399edd",
+        "executable": true
+      },
+      {
+        "path": "bin/run-eval",
+        "sha256": "f423ee47b089ef781ad6b78687f32f8cc0af790f7a983390087b11ad4c91a559",
+        "executable": true
+      },
+      {
+        "path": "bin/run-with-timeout",
+        "sha256": "fc340a86da52a6cdc78656ce009d3b3c2664c9acd58262c925167659332dd169",
+        "executable": true
+      },
+      {
+        "path": "bin/sanitize-agent-report.mjs",
+        "sha256": "322ccd803eb7d6248b3f3d71a30a3148e53454124ec3c385c6a0c47bd48240f8",
+        "executable": true
+      },
+      {
+        "path": "bin/sanitize-events.pl",
+        "sha256": "e4f58f9124f33b9dda1b8d63b74a50eb09ba1ad50b0351047322f604fd67516c",
+        "executable": true
+      },
+      {
+        "path": "bin/scan-local-paths.mjs",
+        "sha256": "5ddc0e5a083c9ad1487014ade004c6bc290ddee33457ee0b7be017cf760055bc",
+        "executable": false
+      },
+      {
+        "path": "bin/scan-sensitive-artifacts",
+        "sha256": "a81eebdb2202ed576b0007b3e374cdd973caaa636dd95978bb14a2ffb6dd572a",
+        "executable": true
+      },
+      {
+        "path": "bin/sensitive-values.mjs",
+        "sha256": "863c7ef327883c2e6842b6eda953cbc4906f6f5f7f3b3116c8b01dfe2da42401",
+        "executable": false
+      },
+      {
+        "path": "bin/validate-evidence-entries",
+        "sha256": "65c00ccd60bdab39bc62d9fe4af02883bd0261f2ca5d07fe368be591bdf8c524",
+        "executable": true
+      },
+      {
+        "path": "bin/validate-json.mjs",
+        "sha256": "d05543f93c1fcbfb917d86f0c4cd93753a8dad5ebc6357231d2d4765b60b20fd",
+        "executable": true
+      },
+      {
+        "path": "bin/validate-network-probe.mjs",
+        "sha256": "9d133938b2ecf50c4b8cb6405ff5bec1b3a45d853f271d305fc70135fab890ca",
+        "executable": true
+      },
+      {
+        "path": "bin/validate-run",
+        "sha256": "a0928dd061cf173487a6459bd14336aa2c9872683f6400ee84e52ad5a4683505",
+        "executable": true
+      },
+      {
+        "path": "bin/validate-run-pair",
+        "sha256": "bdcad421bbf9483d6751483e629092020f72f1e8a4fce21761cb5a0cb8009949",
+        "executable": true
+      },
+      {
+        "path": "isolated-host/Dockerfile",
+        "sha256": "25bd3be054b482b138a1769b3a255f38c49fba4a6108ada013f0d3688cd1e09c",
+        "executable": false
+      },
+      {
+        "path": "isolated-host/README.md",
+        "sha256": "c37fe0b57d152fa79ae2a640976a65e0dbf05ddff44b84b5fb06e11c39a10130",
+        "executable": false
+      },
+      {
+        "path": "isolated-host/run-in-container",
+        "sha256": "263bdc79bf971d644538997bde6b7044e10667aa7b76f1c3966e440afbf47565",
+        "executable": true
+      },
+      {
+        "path": "isolated-host/smoke-runtime",
+        "sha256": "b0a1894843f0a8ec22af1e7ab3259766b320d32c9fbe36c59bdc93ed87af962a",
+        "executable": true
+      },
+      {
+        "path": "schemas/agent-report.schema.json",
+        "sha256": "8f3aec5f85373f49716abaca4a65cfee461cbfcec320c51111a88de70ed47e98",
+        "executable": false
+      },
+      {
+        "path": "schemas/artifact-evidence.schema.json",
+        "sha256": "84db73a776fe39fd2c9856ccd6ab0d9249ffb3db98ace522b03b03cf0292e214",
+        "executable": false
+      },
+      {
+        "path": "schemas/command-evidence.schema.json",
+        "sha256": "133c2faa563184c64064ff78e20c5adafdf03bc853d23d0a8792885abd899362",
+        "executable": false
+      },
+      {
+        "path": "schemas/invocation.schema.json",
+        "sha256": "5d77c18f4e223feace4ea1d80ca0529b334b65a9954d4b214c5575bfdf8280da",
+        "executable": false
+      },
+      {
+        "path": "schemas/network-probe.schema.json",
+        "sha256": "7fbd56094d10cd827f6604e2ae4190675b74bbc7b024f88b405758bb19a81e1c",
+        "executable": false
+      },
+      {
+        "path": "schemas/rubric-results.schema.json",
+        "sha256": "9d5ab41df683ed1d5267b89f032bd86f5fd5c6568e99f65b2305dfbb3eacf16e",
+        "executable": false
+      },
+      {
+        "path": "schemas/run.schema.json",
+        "sha256": "20bff521805fb517bbdd2b042a9c3409982e43ca39e53e8fb63deb8ef317eb93",
+        "executable": false
+      },
+      {
+        "path": "network-probe-prompt.md",
+        "sha256": "519e69907ee517f88708db0a71930c2f3347b70e64fbe502a0e4922bd1301428",
+        "executable": false
+      },
+      {
+        "path": "package.json",
+        "sha256": "b93ddeb0e52c66f5add7a1f935cd955b42226cedc591e7908f8f6c1a72da55c2",
+        "executable": false
+      },
+      {
+        "path": "pnpm-lock.yaml",
+        "sha256": "87e66136a07fd87215393307c1608430cb7d41732526d6670c3e6aa1b87d7fe5",
+        "executable": false
+      },
+      {
+        "path": "prompt.md",
+        "sha256": "9c66a1ed3be6962309da92a0bc379f7828e8c1ef41dc61636d75bbc7baaca82b",
+        "executable": false
+      },
+      {
+        "path": "rubric.md",
+        "sha256": "a27bef599ccfc5891dd6a4e104d4bbb73a4cdbdf56201d569119084ae9cfedb8",
+        "executable": false
+      },
+      {
+        "path": "scenario.md",
+        "sha256": "e50d391e1e57cbc8969473ab35f947ae9362db4cd4b8040fd358bcd62d25a588",
+        "executable": false
+      }
+    ]
+  },
+  "agent": {
+    "name": "codex",
+    "version": "codex-cli 0.144.4",
+    "model": "gpt-5.4",
+    "probe_invoked": true,
+    "scaffold_invoked": true
+  },
+  "environment": {
+    "os": "Linux 7.0.0-28-generic aarch64",
+    "ruby": "ruby 3.4.10 (2026-06-30 revision 2b0b7728dc) +PRISM [aarch64-linux]",
+    "node": "v22.23.2",
+    "npm": "10.9.8",
+    "pnpm": "10.33.4",
+    "git": "git version 2.39.5"
+  },
+  "security": {
+    "umask": "077",
+    "process_environment": "env -i",
+    "shell_environment_inherit": "none",
+    "credential_store": "file",
+    "auth_material_available": true,
+    "auth_source": "operator-attested-file-broker",
+    "stripped_sensitive_variable_categories": [],
+    "raw_cleanup": "EXIT/INT/TERM",
+    "auth_material_persisted": false
+  },
+  "network_preflight": [
+    {
+      "endpoint": "https://registry.npmjs.org/",
+      "status": "pass"
+    },
+    {
+      "endpoint": "https://rubygems.org/",
+      "status": "pass"
+    }
+  ],
+  "runner": {
+    "timeout_command": "/usr/bin/timeout",
+    "scaffold_timeout_seconds": 2700,
+    "probe_timeout_seconds": 120,
+    "timeout_kill_grace_seconds": 10,
+    "maximum_agent_call_wall_clock_seconds": 2840,
+    "sandbox_network_access": true,
+    "isolated_host_attestation": true,
+    "network_probe_artifact": "sandbox-network-probe.json",
+    "exit_code": 0,
+    "timed_out": false,
+    "config_artifact": "invocation.json",
+    "execution_boundary": "isolated-host-attested"
+  },
+  "result": {
+    "classification": "pass",
+    "reason": "Machine-derived rubric result: pass; see rubric-results.json",
+    "tutorial_claims_supported": false
+  }
+}

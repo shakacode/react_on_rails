@@ -99,6 +99,7 @@ const shakaperfReleaseGateWorkflow = read('.github/workflows/shakaperf-release-g
 const proIntegrationWorkflow = read('.github/workflows/pro-integration-tests.yml');
 const waitForH2cServiceAction = read('.github/actions/wait-for-h2c-service/action.yml');
 const rspackViteDxWorkflow = read('.github/workflows/rspack-vite-dx.yml');
+const benchmarkWorkflow = read('.github/workflows/benchmark.yml');
 const gemTestsWorkflow = read('.github/workflows/gem-tests.yml');
 const hostedWorkflowFiles = [
   'lint-js-and-ruby.yml',
@@ -514,6 +515,29 @@ assertMatches(
   'Rspack/Vite DX isolated working directory',
   rspackViteDxWorkflow,
   /working-directory: benchmarks\/rspack-vite-dx/,
+);
+assertMatches('Rails DX benchmark path trigger', benchmarkWorkflow, /pull_request:[\s\S]*benchmarks\/\*\*/);
+assertMatches(
+  'Rails DX benchmark refreshes Corepack trust data',
+  benchmarkWorkflow,
+  /npm install --global --ignore-scripts corepack@0\.34\.7 && corepack enable && corepack prepare pnpm@10\.33\.4 --activate/,
+);
+assertMatches(
+  'Rails DX benchmark frozen install',
+  benchmarkWorkflow,
+  /working-directory: benchmarks\/rspack-vite-rails-dx[\s\S]*pnpm install --ignore-workspace --frozen-lockfile/,
+);
+assertMatches('Rails DX benchmark starter install', benchmarkWorkflow, /pnpm run prepare:starters/);
+assertMatches(
+  'Rails DX benchmark Rspack type-check',
+  benchmarkWorkflow,
+  /pnpm --dir starters\/rspack exec tsc --project tsconfig\.json/,
+);
+assertMatches('Rails DX benchmark Vite type-check', benchmarkWorkflow, /pnpm --dir starters\/vite run check/);
+assertMatches(
+  'Rails DX benchmark replay',
+  benchmarkWorkflow,
+  /rspack-vite-rails-dx-check[\s\S]*pnpm run check/,
 );
 
 console.log('hosted CI workflow safety tests passed');

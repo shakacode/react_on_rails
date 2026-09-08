@@ -3,7 +3,7 @@ set -euo pipefail
 umask 077
 
 usage() {
-  echo "usage: $0 --agent codex|claude --model MODEL --timeout SECONDS --workspace ABSOLUTE_PATH --output PATH [--run-id ID] [--model-credential-file FILE] [--model-credential-stdin] [--ack-disposable-secret-free-host]" >&2
+  echo "usage: $0 --agent codex|claude --model MODEL --timeout SECONDS --workspace ABSOLUTE_PATH --output PATH [--run-id ID] [--model-credential-file FILE] [--model-credential-stdin] [--model-credential-format native|claude-oauth] [--ack-disposable-secret-free-host]" >&2
 }
 
 agent=""
@@ -15,6 +15,7 @@ run_id=""
 model_credential_file=""
 model_credential_fd=9
 model_credential_stdin=false
+model_credential_format=native
 isolated_host_attestation=false
 while (($#)); do
   case "$1" in
@@ -26,6 +27,7 @@ while (($#)); do
     --run-id) run_id="${2:-}"; shift 2 ;;
     --model-credential-file) model_credential_file="${2:-}"; shift 2 ;;
     --model-credential-stdin) model_credential_stdin=true; shift ;;
+    --model-credential-format) model_credential_format="${2:-}"; shift 2 ;;
     --ack-disposable-secret-free-host) isolated_host_attestation=true; shift ;;
     *) usage; exit 64 ;;
   esac
@@ -38,6 +40,11 @@ done
 }
 [[ -z "$model_credential_file" || "$model_credential_stdin" == false ]] || {
   echo "choose exactly one model credential source" >&2
+  exit 64
+}
+[[ "$model_credential_format" == native || \
+  ( "$agent" == claude && "$model_credential_format" == claude-oauth ) ]] || {
+  echo "unsupported model credential format" >&2
   exit 64
 }
 auth_requested=false
@@ -54,6 +61,10 @@ if [[ -n "$model_credential_file" || "$model_credential_stdin" == true ]]; then
     }
   fi
 fi
+[[ "$model_credential_format" != claude-oauth || "$auth_requested" == true ]] || {
+  echo "Claude OAuth credential format requires a credential source" >&2
+  exit 64
+}
 
 root="$(realpath "$(git rev-parse --show-toplevel)")"
 eval_dir="$root/internal/agent-evals/pro-app-buildability"
@@ -66,7 +77,7 @@ else
   echo "GNU timeout or gtimeout is required; refusing an unbounded run" >&2
   exit 69
 fi
-required_commands=("$agent" curl env git head jq node npm perl pnpm realpath ruby shasum "$timeout_name")
+required_commands=("$agent" curl env git head jq node npm perl pnpm realpath ruby shasum sleep stat unlink "$timeout_name")
 safe_path="$(SAFE_PATH_SOURCE="$PATH" BASH_ENV=/dev/null "$eval_dir/bin/build-safe-path" \
   "${required_commands[@]}")"
 
@@ -109,7 +120,7 @@ case "$workspace/" in "$root/"*) echo "workspace must be outside the repository"
 }
 [[ ! -e "$output" ]] || { echo "output already exists: $output" >&2; exit 65; }
 if [[ "$isolated_host_attestation" == true && \
-  ("${EVAL_ISOLATED_PID_NAMESPACE:-0}" != 1 || "$$" != 1) ]]; then
+  ("${EVAL_ISOLATED_PID_NAMESPACE:-0}" != 1 || "$$" == 1 || "$PPID" != 1) ]]; then
   echo "attested evals require the isolated PID namespace wrapper" >&2
   exit 65
 fi
@@ -171,10 +182,14 @@ auth_source=none
 brokered_credential=""
 credential_snapshot=""
 claude_settings="$private_dir/claude-settings.json"
+claude_oauth=false
 if [[ "$auth_material_available" == true ]]; then
   auth_source=operator-attested-file-broker
   if [[ "$agent" == codex ]]; then
     brokered_credential="$private_dir/codex-home/auth.json"
+  elif [[ "$model_credential_format" == claude-oauth ]]; then
+    brokered_credential="$private_dir/model-credential.input"
+    claude_oauth=true
   else
     brokered_credential="$private_dir/model-credential"
   fi
@@ -217,19 +232,33 @@ if [[ "$auth_material_available" == true ]]; then
       exit 65
     }
   else
-    "$eval_dir/bin/canonicalize-model-credential" claude "$brokered_credential"
-    chmod 600 "$brokered_credential"
-    credential_helper="$private_dir/credential-helper"
-    "$eval_dir/bin/build-claude-credential-helper" "$credential_helper"
-    # TMPDIR expands only when Claude invokes the command under the stripped child environment.
-    # shellcheck disable=SC2016
-    credential_helper_command='/bin/sh "$TMPDIR/../credential-helper"'
-    jq -n --arg helper "$credential_helper_command" '{apiKeyHelper:$helper}' >"$claude_settings"
+    if [[ "$claude_oauth" == true ]]; then
+      claude_credentials_dir="$private_dir/runner-home/.claude"
+      mkdir -m 700 "$claude_credentials_dir"
+      oauth_credential="$claude_credentials_dir/.credentials.json"
+      "$eval_dir/bin/canonicalize-model-credential" claude-oauth \
+        "$brokered_credential" "$oauth_credential"
+      brokered_credential="$oauth_credential"
+      credential_snapshot="$(<"$brokered_credential")"
+      # The raw operator JSON can contain unrelated stores such as mcpOAuth.
+      # Only the minimized native store may survive into either agent call.
+      unlink "$private_dir/model-credential.input"
+      jq -n '{}' >"$claude_settings"
+    else
+      "$eval_dir/bin/canonicalize-model-credential" claude "$brokered_credential"
+      chmod 600 "$brokered_credential"
+      credential_helper="$private_dir/credential-helper"
+      "$eval_dir/bin/build-claude-credential-helper" "$credential_helper"
+      # TMPDIR expands only when Claude invokes the command under the stripped child environment.
+      # shellcheck disable=SC2016
+      credential_helper_command='/bin/sh "$TMPDIR/../credential-helper"'
+      jq -n --arg helper "$credential_helper_command" '{apiKeyHelper:$helper}' >"$claude_settings"
+    fi
   fi
   # Preserve the originally brokered bytes in runner memory. The selected CLI
   # shares our UID and may rotate or replace its writable credential file; leak
   # checks must never switch to those later bytes.
-  credential_snapshot="$(<"$brokered_credential")"
+  [[ -n "$credential_snapshot" ]] || credential_snapshot="$(<"$brokered_credential")"
 else
   jq -n '{}' >"$claude_settings"
 fi
@@ -286,6 +315,7 @@ shell_policy="shell_environment_policy.set={PATH=\"$safe_path\",HOME=\"$private_
 npm_probe_command='npm view create-react-on-rails-app version --json'
 rubygems_probe_command="gem search --remote --exact '^rails$'"
 agent_command="codex exec"
+agent_configuration_mode="codex-native"
 if [[ "$agent" == codex ]]; then
   agent_args=(exec --ephemeral --ignore-user-config --ignore-rules --strict-config --model "$model")
   if [[ "$isolated_host_attestation" == true ]]; then
@@ -300,7 +330,14 @@ if [[ "$agent" == codex ]]; then
   agent_args+=(--output-schema "$eval_dir/schemas/agent-report.schema.json" --json -C "$workspace" -)
 else
   agent_command="claude -p"
-  agent_args=(-p --bare --no-session-persistence --disable-slash-commands --no-chrome)
+  agent_args=(-p --no-session-persistence --disable-slash-commands --no-chrome)
+  if [[ "$claude_oauth" == true ]]; then
+    agent_configuration_mode="claude-safe-mode"
+    agent_args+=(--safe-mode)
+  else
+    agent_configuration_mode="claude-bare"
+    agent_args+=(--bare)
+  fi
   agent_args+=(--strict-mcp-config --mcp-config '{"mcpServers":{}}' --tools 'Bash,Read,Write,Edit,Glob,Grep')
   agent_args+=(--model "$model" --output-format stream-json --verbose --settings "$claude_settings")
   agent_args+=(--json-schema "$("$eval_dir/bin/build-claude-agent-report-schema")")
@@ -329,7 +366,7 @@ normalize_agent_events() {
   local normalized_events="$2"
   local agent_exit_code="$3"
   if [[ "$agent" == codex ]]; then
-    cp "$raw_events" "$normalized_events"
+    node "$eval_dir/bin/normalize-codex-events.mjs" "$raw_events" "$normalized_events"
   else
     node "$eval_dir/bin/normalize-claude-events.mjs" \
       "$raw_events" "$normalized_events" "$agent_exit_code"
@@ -339,10 +376,22 @@ normalize_agent_events() {
 assert_credential_absent() {
   local scan_target="$1"
   local symlink_policy="${2:-}"
-  local scan_args=("$agent" "$scan_target" "$brokered_credential")
+  local scan_args=("$agent" "$model_credential_format" "$scan_target" "$brokered_credential")
   [[ -z "$symlink_policy" ]] || scan_args+=("$symlink_policy")
   printf '%s' "$credential_snapshot" |
     "$eval_dir/bin/assert-brokered-credential-absent" "${scan_args[@]}"
+}
+
+scan_evidence_for_sensitive_artifacts() {
+  local evidence_directory="$1"
+  local sensitive_scan_exit=0
+  "$eval_dir/bin/scan-sensitive-artifacts" "$evidence_directory" >/dev/null 2>&1 ||
+    sensitive_scan_exit=$?
+  case "$sensitive_scan_exit" in
+    0) echo "sensitive-artifact scan rejected evidence" >&2; return 1 ;;
+    1) return 0 ;;
+    *) echo "sensitive-artifact scan failed" >&2; return 1 ;;
+  esac
 }
 
 probe_timeout_seconds="$timeout_seconds"
@@ -352,6 +401,7 @@ maximum_agent_call_wall_clock_seconds=$((probe_timeout_seconds + timeout_seconds
 
 invocation_json="$(jq -n --arg command "$agent_command" --arg agent "$agent" --arg model "$model" \
   --arg execution_boundary "$execution_boundary" \
+  --arg agent_configuration_mode "$agent_configuration_mode" \
   --arg auth_source "$auth_source" --argjson auth_material_available "$auth_material_available" \
   --argjson scaffold_timeout "$timeout_seconds" \
   --argjson probe_timeout "$probe_timeout_seconds" \
@@ -367,7 +417,8 @@ invocation_json="$(jq -n --arg command "$agent_command" --arg agent "$agent" --a
     ignore_user_config:true,ignore_rules:true,strict_config:true,multi_agent:false,
     sandbox_network_access:$sandbox_network_access,isolated_host_attestation:$isolated_host_attestation,
     capability_probe:{npm:$npm_probe,rubygems:$rubygems_probe},
-    credential_store:"file",auth_material_available:$auth_material_available,auth_source:$auth_source,
+    credential_store:"file",agent_configuration_mode:$agent_configuration_mode,
+    auth_material_available:$auth_material_available,auth_source:$auth_source,
     human_followups_sent:0,
     shell_environment_policy:{inherit:"none",allowlist:["PATH","HOME","TMPDIR","LANG","LC_ALL","SHELL","CODEX_EVAL"]}}')"
 
@@ -381,13 +432,14 @@ run_agent "$eval_dir/network-probe-prompt.md" "$probe_timeout_seconds" "$raw_pro
   >"$raw_probe_events"
 probe_exit=$?
 set -e
+"$eval_dir/bin/quiesce-agent-call" "$output"
 "$eval_dir/bin/assert-agent-call-contained" "$output"
-normalize_agent_events "$raw_probe_events" "$normalized_probe_events" "$probe_exit"
 if [[ "$auth_material_available" == true ]]; then
   assert_credential_absent "$workspace" --skip-symlinks
 fi
+normalize_agent_events "$raw_probe_events" "$normalized_probe_events" "$probe_exit"
 EVAL_PRIVATE_DIR="$private_dir" EVAL_WORKSPACE="$workspace" EVAL_OUTPUT="$output" \
-  perl "$eval_dir/bin/sanitize-events.pl" "$normalized_probe_events" >"$safe_probe_events"
+  perl "$eval_dir/bin/sanitize-events.pl" --jsonl "$normalized_probe_events" >"$safe_probe_events"
 EVAL_PRIVATE_DIR="$private_dir" EVAL_WORKSPACE="$workspace" EVAL_OUTPUT="$output" \
   perl "$eval_dir/bin/sanitize-events.pl" "$raw_probe_stderr" >"$safe_probe_stderr"
 network_probe_file="$private_dir/sandbox-network-probe.json"
@@ -418,14 +470,15 @@ if "$eval_dir/bin/probe-allows-scaffold" "$probe_exit" "$probe_result" "$sandbox
     >"$raw_scaffold_events"
   runner_exit=$?
   set -e
+  "$eval_dir/bin/quiesce-agent-call" "$output"
   "$eval_dir/bin/assert-agent-call-contained" "$output"
   [[ "$runner_exit" == 124 ]] && timed_out=true
-  normalize_agent_events "$raw_scaffold_events" "$normalized_scaffold_events" "$runner_exit"
   if [[ "$auth_material_available" == true ]]; then
     assert_credential_absent "$workspace" --skip-symlinks
   fi
+  normalize_agent_events "$raw_scaffold_events" "$normalized_scaffold_events" "$runner_exit"
   EVAL_PRIVATE_DIR="$private_dir" EVAL_WORKSPACE="$workspace" EVAL_OUTPUT="$output" \
-    perl "$eval_dir/bin/sanitize-events.pl" "$normalized_scaffold_events" >"$safe_scaffold_events"
+    perl "$eval_dir/bin/sanitize-events.pl" --jsonl "$normalized_scaffold_events" >"$safe_scaffold_events"
   EVAL_PRIVATE_DIR="$private_dir" EVAL_WORKSPACE="$workspace" EVAL_OUTPUT="$output" \
     perl "$eval_dir/bin/sanitize-events.pl" "$raw_scaffold_stderr" >"$safe_scaffold_stderr"
   printf '%s\n' "$safe_probe_events_text" >"$safe_events"
@@ -447,6 +500,10 @@ else
     '{status:"blocked",summary:$reason,commands:[],checks:[],friction:[$reason],human_interventions:0,blockers:[$reason]}' \
     >"$agent_report_file"
 fi
+sanitized_agent_report_file="$private_dir/agent-report.sanitized.json"
+"${minimal_env[@]}" "EVAL_HARNESS_DEPENDENCY_ROOT=$dependency_root" node \
+  "$eval_dir/bin/sanitize-agent-report.mjs" "$agent_report_file" "$sanitized_agent_report_file"
+mv "$sanitized_agent_report_file" "$agent_report_file"
 remove_agent_state
 
 evidence_dir="$private_dir/evidence"
@@ -465,11 +522,12 @@ git -C "$workspace" status --short --untracked-files=normal >"$evidence_dir/work
 
 finished_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 classification="$(jq -r .overall "$evidence_dir/rubric-results.json")"
-reason="Machine-derived rubric result: $classification; see rubric-results.json"
+reason="Semantic review status: $classification; review the captured evidence and rubric-results.json"
 
 jq -n \
   --arg run_id "$run_id" --arg started "$started_at" --arg finished "$finished_at" \
   --arg revision "$revision" --arg agent "$agent" --arg version "$agent_version" --arg model "$model" \
+  --arg agent_configuration_mode "$agent_configuration_mode" \
   --arg auth_source "$auth_source" --argjson auth_material_available "$auth_material_available" \
   --arg os "$(uname -srm)" --arg ruby "$(ruby --version 2>&1)" --arg node "$(node --version)" \
   --arg npm "$(npm --version)" --arg pnpm "$(pnpm --version)" --arg git "$(git --version)" \
@@ -487,7 +545,8 @@ jq -n \
     agent:{name:$agent,version:$version,model:$model,probe_invoked:true,scaffold_invoked:$scaffold_invoked},
     environment:{os:$os,ruby:$ruby,node:$node,npm:$npm,pnpm:$pnpm,git:$git},
     security:{umask:"077",process_environment:"env -i",shell_environment_inherit:"none",
-      credential_store:"file",auth_material_available:$auth_material_available,auth_source:$auth_source,
+      credential_store:"file",
+      auth_material_available:$auth_material_available,auth_source:$auth_source,
       stripped_sensitive_variable_categories:$stripped,
       raw_cleanup:"EXIT/INT/TERM",auth_material_persisted:false},
     network_preflight:$network,
@@ -495,6 +554,7 @@ jq -n \
       probe_timeout_seconds:$probe_timeout,timeout_kill_grace_seconds:$timeout_kill_grace,
       maximum_agent_call_wall_clock_seconds:$maximum_agent_wall_clock,
       sandbox_network_access:$sandbox_network_access,
+      agent_configuration_mode:$agent_configuration_mode,
       isolated_host_attestation:$isolated_host_attestation,network_probe_artifact:"sandbox-network-probe.json",
       exit_code:$exit_code,timed_out:$timed_out,config_artifact:"invocation.json",
       execution_boundary:$execution_boundary},
@@ -504,12 +564,13 @@ checksum_files="$private_dir/checksum-files"
 (cd "$evidence_dir" && find . -maxdepth 1 -type f ! -name SHA256SUMS -print | LC_ALL=C sort | sed 's#^./##') \
   >"$checksum_files"
 "${minimal_env[@]}" node "$dependency_root/node_modules/prettier/bin/prettier.cjs" \
-  --write "$evidence_dir"/*.json >/dev/null
+  --write --print-width 100 "$evidence_dir"/*.json >/dev/null
 (cd "$evidence_dir" && while IFS= read -r file; do shasum -a 256 "$file"; done <"$checksum_files" >SHA256SUMS)
 "$eval_dir/bin/validate-evidence-entries" "$evidence_dir"
 if [[ "$auth_material_available" == true ]]; then
   assert_credential_absent "$evidence_dir"
 fi
+scan_evidence_for_sensitive_artifacts "$evidence_dir"
 
 "$eval_dir/bin/assert-agent-call-contained" "$output"
 mkdir -m 700 "$output"

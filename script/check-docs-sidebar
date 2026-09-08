@@ -109,17 +109,18 @@ while IFS= read -r file; do
   DOC_ID="${DOC_ID%.md}"
   DOC_ID="${DOC_ID%.mdx}"
 
-  # Check exclusion list
-  if printf '%s' "$EXCLUSION_LIST" | grep -qxF "$DOC_ID"; then
+  # Consume each input fully: grep -q can close a large pipe early and make
+  # the producer's SIGPIPE turn a valid match into a failure under pipefail.
+  if printf '%s' "$EXCLUSION_LIST" | grep -xF "$DOC_ID" > /dev/null; then
     EXCLUDED=$((EXCLUDED + 1))
     echo -e "  ${YELLOW}⊘${NC} $DOC_ID  ${YELLOW}(excluded)${NC}"
     continue
   fi
 
   # Check if the ID appears as a quoted string in sidebars.ts
-  if echo "$SIDEBAR_CONTENT" | grep -qF "'${DOC_ID}'"; then
+  if echo "$SIDEBAR_CONTENT" | grep -F "'${DOC_ID}'" > /dev/null; then
     echo -e "  ${GREEN}✓${NC} $DOC_ID"
-  elif echo "$SIDEBAR_CONTENT" | grep -qF "\"${DOC_ID}\""; then
+  elif echo "$SIDEBAR_CONTENT" | grep -F "\"${DOC_ID}\"" > /dev/null; then
     echo -e "  ${GREEN}✓${NC} $DOC_ID"
   else
     echo -e "  ${RED}✗${NC} $DOC_ID  ${RED}(missing from sidebars.ts)${NC}"

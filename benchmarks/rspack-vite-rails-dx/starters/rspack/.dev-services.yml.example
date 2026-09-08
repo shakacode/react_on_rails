@@ -1,0 +1,76 @@
+# Service Dependencies Configuration
+#
+# This file defines external services that must be running before bin/dev starts.
+# Copy this file to .dev-services.yml and customize for your application.
+#
+# bin/dev will check each service before starting the development server.
+# If any service is not running, it will display helpful error messages with
+# instructions on how to start the service.
+#
+# ⚠️  SECURITY WARNING:
+# Commands in this file are executed during bin/dev startup. Only add commands
+# from trusted sources. This file should not be committed if it contains
+# sensitive information or custom paths specific to your machine. Consider
+# adding .dev-services.yml to .gitignore if it contains machine-specific config.
+#
+# Security best practices:
+# - Commands are executed without shell expansion (shell metacharacters won't work)
+# - Use simple, single commands (e.g., "redis-cli ping", "pg_isready")
+# - Do NOT use shell features: &&, ||, |, $, ;, backticks, etc. will fail
+# - Only include services you trust
+# - Keep commands simple and focused on service health checks
+# - Consider adding .dev-services.yml to .gitignore (commit .example instead)
+#
+# Example configuration:
+#
+# services:
+#   redis:
+#     check_command: "redis-cli ping"
+#     expected_output: "PONG"
+#     start_command: "redis-server"
+#     install_hint: "brew install redis (macOS) or apt-get install redis-server (Linux)"
+#     description: "Redis (for caching and background jobs)"
+#
+#   postgresql:
+#     check_command: "pg_isready"
+#     expected_output: "accepting connections"
+#     start_command: "pg_ctl -D /usr/local/var/postgres start"
+#     install_hint: "brew install postgresql (macOS) or apt-get install postgresql (Linux)"
+#     description: "PostgreSQL database"
+#
+#   elasticsearch:
+#     check_command: "curl -s http://localhost:9200"
+#     expected_output: "cluster_name"
+#     start_command: "brew services start elasticsearch-full"
+#     install_hint: "brew install elasticsearch-full"
+#     description: "Elasticsearch (for search)"
+#
+# Field descriptions:
+#   check_command:    Shell command to check if service is running (required)
+#   expected_output:  String that must appear in command output (optional)
+#   start_command:    Command to start the service (shown in error messages)
+#   install_hint:     How to install the service if not found
+#   description:      Human-readable description of the service
+#
+# To use this file:
+# 1. Copy to .dev-services.yml: cp .dev-services.yml.example .dev-services.yml
+# 2. Uncomment and configure the services your app needs
+# 3. Add .dev-services.yml to .gitignore if it contains sensitive info
+# 4. Run bin/dev - it will check services before starting
+
+services:
+  # Uncomment and configure the services your application requires:
+
+  # redis:
+  #   check_command: "redis-cli ping"
+  #   expected_output: "PONG"
+  #   start_command: "redis-server"
+  #   install_hint: "brew install redis (macOS) or apt-get install redis-server (Linux)"
+  #   description: "Redis (for caching and background jobs)"
+
+  # postgresql:
+  #   check_command: "pg_isready"
+  #   expected_output: "accepting connections"
+  #   start_command: "pg_ctl -D /usr/local/var/postgres start"  # macOS; Linux: sudo service postgresql start
+  #   install_hint: "brew install postgresql (macOS) or apt-get install postgresql (Linux)"
+  #   description: "PostgreSQL database"

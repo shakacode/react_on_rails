@@ -70,7 +70,9 @@ React on Rails RC. Follow the ordered dependency-promotion gate in the
 3. For minor and major releases, add a commit to the changelog PR updating `SECURITY.md`:
    - "Current support window" table so supported version lines and cutoff dates match the release being shipped
    - "Last reviewed" date and, when applicable, "Next review due"
-4. Review the PR, verify the computed version, and merge
+4. Review the PR — including that any helper-signature or deploy-order/memory/startup-failure entries
+   follow the conventions in `AGENTS.md` → "Changelog" (see "Helper signature changes" and
+   "Action-required placement") — verify the computed version, and merge
 
 If a stable target lacks this section, the release task aborts before confirmation, tagging, or publication.
 For a prerelease, the task warns and skips the GitHub release. After adding the section, preview the idempotent update
@@ -813,19 +815,26 @@ live create or edit, `script/release` supplies the required supervised per-write
 
 Before running the release command, verify:
 
-1. **One-time coordination setup**: Load `AGENT_COORD_API_URL`, the secret
+1. **Changelog conventions**: Confirm every entry that changes a `ReactOnRailsHelper`/
+   `ReactOnRailsProHelper` method's parameters names the method and the parameter, and that every
+   entry with deploy-order, memory/retention, or startup-failure implications carries an inline
+   `**Action required for upgraders:**` tag, and is repeated in the release-notes page's "Action
+   required" section when this release has or needs one. See `AGENTS.md` → "Changelog" → "Helper signature
+   changes" and "Action-required placement".
+
+2. **One-time coordination setup**: Load `AGENT_COORD_API_URL`, the secret
    `AGENT_COORD_API_TOKEN`, and a stable `AGENT_COORD_MACHINE_ID` from private
    shell/dotfile configuration; ensure `~/.local/bin` is on `PATH`; then run
    `script/release --doctor`. Never commit or print the token.
 
-2. **GitHub CLI**: Run `gh auth login` and ensure your account/token has write access to the repository (required for automatic GitHub release creation)
+3. **GitHub CLI**: Run `gh auth login` and ensure your account/token has write access to the repository (required for automatic GitHub release creation)
 
-3. **NPM authentication**: Run `npm whoami` to confirm you're logged in
+4. **NPM authentication**: Run `npm whoami` to confirm you're logged in
    - If not logged in, the release script will automatically run `npm login` for you
 
-4. **RubyGems authentication**: Ensure you have valid credentials for `gem push`
+5. **RubyGems authentication**: Ensure you have valid credentials for `gem push`
 
-5. **No uncommitted changes**: Run `git status` to verify clean working tree
+6. **No uncommitted changes**: Run `git status` to verify clean working tree
 
 ### Two-Factor Authentication
 
@@ -947,6 +956,16 @@ If the release fails partway through (e.g., during NPM publish):
 4. Follow [Partial-publication recovery](release-train-runbook.md#partial-publication-recovery). Resume only through
    `script/release` after the supervisor has acquired the required claim and the artifact evidence is exact; if lease state
    or any remote/artifact identity is `UNKNOWN`, remain stopped.
+
+If the wrapper cannot clean up its managed release-line lease, it prints the
+exact `script/release-claim --release ...` command followed by the restart
+command. First prove that every process group reported by the failed release is
+dead. Then run the printed release command from the repository root with the
+release-machine coordination environment loaded. Do not edit or reconstruct its
+agent ID, instance ID, repository, or target arguments. The command is fenced to
+that exact lease and safely refuses a replacement lease. See
+[Recover a retained publication lease](release-train-runbook.md#recover-a-retained-publication-lease)
+for the complete procedure.
 
 ## Version History
 

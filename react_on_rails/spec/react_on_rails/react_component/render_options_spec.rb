@@ -124,6 +124,24 @@ describe ReactOnRails::ReactComponent::RenderOptions do
         expect(opts.dom_id).to eq "im-an-id"
         expect(opts.random_dom_id?).to be(false)
       end
+
+      it "treats nil as an omitted id" do
+        attrs = the_attrs(react_component_name: "SomeApp", options: { id: nil, random_dom_id: true })
+        opts = described_class.new(**attrs)
+
+        allow(SecureRandom).to receive(:uuid).and_return("123456789")
+
+        expect(opts.dom_id).to eq "SomeApp-react-component-123456789"
+        expect(opts.random_dom_id?).to be(true)
+      end
+
+      it "uses the base id for nil when random ids are disabled" do
+        attrs = the_attrs(react_component_name: "SomeApp", options: { id: nil, random_dom_id: false })
+        opts = described_class.new(**attrs)
+
+        expect(opts.dom_id).to eq "SomeApp-react-component"
+        expect(opts.random_dom_id?).to be(false)
+      end
     end
   end
 

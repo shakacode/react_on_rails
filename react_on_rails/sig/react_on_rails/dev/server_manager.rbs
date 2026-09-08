@@ -25,7 +25,7 @@ module ReactOnRails
       # could not be inspected safely.
       type overmind_socket_discovery = { paths: Array[String], blockers: Array[String] }
 
-      def self.start: (mode, String?, ?verbose: bool, ?route: String?, ?rails_env: String?) -> void
+      def self.start: (?mode, ?String?, ?verbose: bool, ?route: String?, ?rails_env: String?, ?skip_database_check: bool, ?open_browser: bool, ?open_browser_once: bool) -> void
       def self.kill_processes: () -> Symbol
       def self.clean_generated_assets_and_caches: () -> bool
       def self.killable_ports: () -> Array[Integer]
@@ -47,9 +47,9 @@ module ReactOnRails
       def self.help_customization: () -> String
       def self.help_mode_details: () -> String
       def self.help_troubleshooting: () -> String
-      def self.run_production_like: (?_verbose: bool, ?route: String?, ?rails_env: String?) -> void
-      def self.run_static_development: (String, ?verbose: bool, ?route: String?) -> void
-      def self.run_development: (String, ?verbose: bool, ?route: String?) -> void
+      def self.run_production_like: (?_verbose: bool, ?route: String?, ?rails_env: String?, ?skip_database_check: bool, ?open_browser: bool, ?open_browser_once: bool) -> void
+      def self.run_static_development: (String, ?verbose: bool, ?route: String?, ?skip_database_check: bool, ?open_browser: bool, ?open_browser_once: bool) -> void
+      def self.run_development: (String, ?verbose: bool, ?route: String?, ?skip_database_check: bool, ?open_browser: bool, ?open_browser_once: bool) -> void
       def self.print_server_info: (String, Array[String], ?Integer, ?route: String?) -> void
       def self.print_procfile_info: (String, ?route: String?) -> void
       def self.procfile_port: (String) -> Integer
@@ -117,7 +117,6 @@ module ReactOnRails
       def self.shutdown_settled?: (dev_session_view, Integer?, Array[String]) -> bool
       def self.shutdown_blockers: (dev_session_view, Integer?, Array[String]) -> Array[String]
       def self.owner_release_state: (dev_session_view) -> Symbol
-      def self.owner_released?: (dev_session_view) -> bool
       def self.session_replaced?: (dev_session_view) -> bool
       def self.session_replaced_blocker: (dev_session_view) -> String
       def self.owner_state_blockers: (dev_session_view) -> Array[String]

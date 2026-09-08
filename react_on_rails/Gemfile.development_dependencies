@@ -4,7 +4,7 @@ Dir.chdir(__dir__) { eval_gemfile "../Gemfile.shared_dev_dependencies" }
 
 gem "shakapacker", "10.3.1"
 gem "bootsnap", require: false
-gem "rails", "~> 7.1.0"
+gem "rails", ">= 7.2.3.2", "< 7.3"
 
 gem "sqlite3", "~> 2.0"
 gem "sass-rails", "~> 6.0"

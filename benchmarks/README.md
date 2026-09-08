@@ -15,6 +15,8 @@ benchmark diagnostics.
 - [Benchmark Workflow](../.github/workflows/benchmark.yml) - GitHub-hosted workflow that
   automatically validates benchmark scripts on push and pull request events. The hosted
   benchmark suites inside it are manual-only diagnostics, not the trusted trend source.
+- [Rails-tier Rspack/Vite DX benchmark](rspack-vite-rails-dx/README.md) - matched generated
+  Rails starters for cold-start and React Fast Refresh evidence.
 
 For performance claims, prefer the local dedicated-hardware guide. GitHub-hosted runners
 remain useful for checking that the workflow and benchmark scripts still execute, but their

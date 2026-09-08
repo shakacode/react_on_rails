@@ -57,6 +57,22 @@ string directly into `Gemfile`), the install will fail because no package exists
 under that spelling. Substitute `.` for `-` (or `-` for `.`) when crossing the
 language boundary.
 
+### Compare exact prerelease tags
+
+When you upgrade between prereleases, review the changes between the exact tags. Use Ruby/tag dot notation for both
+placeholders in
+`https://github.com/shakacode/react_on_rails/compare/v<CURRENT_VERSION>...v<TARGET_VERSION>`.
+The release notes summarize the release line, but the tag comparison shows the RC-to-RC changes that apply to your
+current pin.
+
+### Custom overrides of Pro helpers
+
+Methods in `ReactOnRailsProHelper` are internal implementation details, not stable extension points. An application
+that uses `prepend` or otherwise overrides a Pro helper method must re-check the method signature for every upgrade.
+
+Prefer documented configuration and helper APIs. If an internal override is unavoidable, compare the exact release
+tags, update the override signature, and run the application's streamed SSR and RSC tests before deployment.
+
 ### Strict version pinning
 
 Use exact version constraints on both sides — never `^`, `~`, or `*`. Semver
@@ -440,11 +456,19 @@ Before upgrading:
 
 ##### JWT gem requirement
 
-`react_on_rails_pro` uses `jwt` for offline license validation. Current versions require `jwt >= 2.5, < 4`, so apps still pinned to a compatible jwt 2.x release can bundle without upgrading. Apps that can resolve `jwt 3.2.0` or newer in the 3.x line will continue to do so; jwt 4.x is not supported. If your Gemfile pins `jwt` below 2.5 (e.g., `2.2.x` for compatibility with OAuth gems), you will need to upgrade it. Check for conflicts with:
+`react_on_rails_pro` uses `jwt` for offline license validation. The first release containing
+[PR 4864](https://github.com/shakacode/react_on_rails/pull/4864), and later releases, require `jwt >= 2.8, < 4`;
+earlier React on Rails Pro releases retain the dependency range declared by their gemspec. Apps still pinned to a
+compatible jwt 2.x release can bundle without upgrading. Apps that can resolve `jwt 3.2.0` or newer in the 3.x line
+will continue to do so; jwt 4.x is not supported. If your Gemfile pins `jwt` below 2.8 (e.g., `2.2.x` for compatibility
+with OAuth gems), you will need to upgrade it. Check for conflicts with:
 
 ```bash
 bundle update jwt
 ```
+
+> **Why the floor is 2.8.** jwt 2.8.0 began declaring `base64` as a runtime dependency. That declaration
+> keeps offline license validation reliable on Ruby 3.4+, where `base64` is a bundled gem.
 
 ##### Node renderer config: `bundlePath` → `serverBundleCachePath`
 

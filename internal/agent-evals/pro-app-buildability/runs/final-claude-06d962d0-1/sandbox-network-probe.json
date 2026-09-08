@@ -1,0 +1,31 @@
+{
+  "schema_version": "1.0",
+  "sandbox_network_access": true,
+  "limits": {
+    "max_bytes": 1048576,
+    "max_events": 5000,
+    "observed_bytes": 2176,
+    "observed_events": 5,
+    "exceeded": false,
+    "reason": null
+  },
+  "npm": {
+    "attempts": [
+      {
+        "command_id": "command-1",
+        "exit_code": 0
+      }
+    ],
+    "status": "pass"
+  },
+  "rubygems": {
+    "attempts": [
+      {
+        "command_id": "command-2",
+        "exit_code": 0
+      }
+    ],
+    "status": "pass"
+  },
+  "overall": "pass"
+}

@@ -118,6 +118,8 @@ The [migration guide](../../oss/migrating/migrating-to-rsc.md) covers how to inc
 - [RSC Rendering Flow](./rendering-flow.md) — detailed rendering lifecycle, bundle types, and architecture
 - [Critical Resource Hints](./critical-resource-hints.md) — emit measured preload, preconnect, DNS,
   font, script, image, and stylesheet hints from an RSC render
+- [`unstable_cache` for RSC](./unstable-cache.md) — cache serialized RSC fragments with process-local,
+  Redis, or custom handlers, with the current invalidation limits made explicit
 - [Flight Protocol Syntax](./flight-protocol-syntax.md) — the wire format for streaming RSC data
 - [RSC Client Reference Diagnostics](./client-reference-diagnostics.md) — inspect emitted client
   reference chunks and static-page manifest scope

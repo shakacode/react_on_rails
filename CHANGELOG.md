@@ -30,8 +30,27 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   shutdown discovers all `tmp/sockets/overmind*.sock` endpoints, fails closed when discovery or probing cannot be
   completed, and terminates and reaps timed-out control clients under one shared deadline per phase. When no renderer
   port is exported, recognized generated Procfiles supply the local Node Renderer fallback without widening the kill
-  scope to an unrelated listener on port 3800. Fixes
+  scope to an unrelated listener on port 3800. The `ServerManager.start` RBS signature also accepts its existing
+  default arguments and browser/database-check options without weakening invalid-input checks. Fixes
   [Issue 4944](https://github.com/shakacode/react_on_rails/issues/4944). [PR 4986](https://github.com/shakacode/react_on_rails/pull/4986) by
+  [justin808](https://github.com/justin808).
+
+- **[Pro]** **Standalone upgrades preserve customized bundler configurations**: The Pro generator automatically
+  upgrades only complete, unchanged configuration pairs from supported current templates. Customized, historical,
+  missing, or ambiguous pairs remain unchanged with manual migration instructions, preventing helper redeclarations
+  and partial upgrades. Fixes [Issue 4789](https://github.com/shakacode/react_on_rails/issues/4789).
+  [PR 5010](https://github.com/shakacode/react_on_rails/pull/5010) by [justin808](https://github.com/justin808).
+
+- **RSC agent guardrail upgrades now preserve complete files and clean up their stale hook groups**:
+  The installer atomically replaces copied skill and hook files while preserving their existing permission behavior,
+  and removes `PostToolUse` groups only when removing a managed guardrail hook leaves the group empty. Unrelated
+  Claude settings and hook groups remain unchanged. Addresses items 1 and 2 of
+  [Issue 4815](https://github.com/shakacode/react_on_rails/issues/4815).
+
+- **Explicit `id: nil` now uses the configured automatic DOM id behavior**: Component rendering no longer omits the
+  container id while still reporting that a random id is active. Fixes
+  [Issue 4993](https://github.com/shakacode/react_on_rails/issues/4993).
+  [PR 4998](https://github.com/shakacode/react_on_rails/pull/4998) by
   [justin808](https://github.com/justin808).
 
 - **[Pro]** **Prerender-cached streamed renders now hydrate on every request**: The automatic prerender cache key
@@ -176,6 +195,15 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   that previously fell back to the default now fail fast during renderer startup. Fixes
   [Issue 4810](https://github.com/shakacode/react_on_rails/issues/4810).
   [PR 4811](https://github.com/shakacode/react_on_rails/pull/4811) by
+  [justin808](https://github.com/justin808).
+
+- **[Pro]** **Raised the `jwt` floor to `>= 2.8` for reliable offline license validation on Ruby 3.4+**:
+  jwt 2.8 first declares `base64` as a runtime dependency, so the gemspec now requires `jwt >= 2.8, < 4`.
+  jwt 3.x remains supported and 4.x remains unsupported. Documentation now distinguishes the Pro Node renderer's
+  default Fastify 5 setup, which requires Node 20+ at startup, from its `engines.node` floor of Node 18.19.0+
+  when applications use the documented Fastify 4-compatible dependency overrides. Fixes
+  [Issue 4730](https://github.com/shakacode/react_on_rails/issues/4730).
+  [PR 4864](https://github.com/shakacode/react_on_rails/pull/4864) by
   [justin808](https://github.com/justin808).
 
 - **Routine startup diagnostics no longer appear in default `INFO` logs**: Successful package validation, valid
@@ -630,7 +658,7 @@ pair`, returns invalid UTF-8, or silently mis-decodes the value. The parser now 
 - **[Pro]** **`<RSCRoute ssr={false}>` defers initial RSC payload generation**: `<RSCRoute>` now accepts `ssr={false}` to skip server-side RSC payload generation for that route — the server streams the nearest `<Suspense>` fallback and the client fetches the payload through the existing `RSCProvider` path (cache lookup, `/rsc_payload/:componentName` fetch, `ServerComponentFetchError`, and `useRSC().refetchComponent(...)` retry). `ssr` defaults to `true`, so existing routes are unchanged and a mixed page can server-render some routes while deferring others. Deferred roots that do not manually call `wrapServerComponentRenderer` are now supported automatically: RSC-enabled generated client packs register a default RSC provider (also exported as `react-on-rails-pro/registerDefaultRSCProvider/client` for manual entrypoints) that wraps auto-bundled `react_component(..., prerender: false)` and deferred-only `stream_react_component` roots. Completes [Issue 3101](https://github.com/shakacode/react_on_rails/issues/3101). [PR 3318](https://github.com/shakacode/react_on_rails/pull/3318), [PR 3394](https://github.com/shakacode/react_on_rails/pull/3394) by [ihabadham](https://github.com/ihabadham).
 - **Ruby 4.0 CI support**: Updated OSS latest-runtime CI coverage, local CI switching guidance, and public compatibility docs to test Ruby 4.0 while keeping Ruby 3.3 as the minimum supported CI lane. [PR 3529](https://github.com/shakacode/react_on_rails/pull/3529) by [justin808](https://github.com/justin808).
 - **[Pro]** **HTTP rolling-deploy endpoint auto-mount**: Configuring `config.rolling_deploy_adapter = ReactOnRailsPro::RollingDeployAdapters::Http` now automatically mounts `ReactOnRailsPro::RollingDeploy::BundlesController` at `config.rolling_deploy_mount_path` (default `/react_on_rails_pro/rolling_deploy`). Set the mount path to `nil` or blank to opt out and keep a manual `draw_routes` mount; apps that previously mounted the default route manually should remove that route or give secondary manual mounts a distinct `as_prefix:` to avoid duplicate named-route errors. Fixes [Issue 3476](https://github.com/shakacode/react_on_rails/issues/3476). [PR 3504](https://github.com/shakacode/react_on_rails/pull/3504) by [justin808](https://github.com/justin808).
-- **[Pro]** **`unstable_cache` for React Server Component fragment caching**: New experimental `unstable_cache(fn, options)` wrapper memoizes a server component's serialized RSC payload — replaying the stored bytes on a cache hit and tee-ing output to both the response and the cache store on a miss. Ships with a `CacheHandler` interface and a default in-memory LRU handler (register custom backends via `registerCacheHandler`), plus tag-based invalidation through `unstable_revalidateTag(tag)` that broadcasts across all Node Renderer workers via a new `POST /cache/revalidate-tag` endpoint and a Ruby-side `ReactOnRailsPro::RSCCache.revalidate_tag(tag)`. Closes [Issue 3324](https://github.com/shakacode/react_on_rails/issues/3324). [PR 3325](https://github.com/shakacode/react_on_rails/pull/3325) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- **[Pro]** **`unstable_cache` for React Server Component fragment caching**: New experimental `unstable_cache(fn, options)` wrapper memoizes a server component's serialized RSC payload — replaying the stored bytes on a cache hit and tee-ing output to both the response and the cache store on a miss. Ships with a `CacheHandler` interface and a default in-memory LRU handler (register custom backends via `registerCacheHandler`). This API does not include tag-based invalidation, a Node Renderer invalidation endpoint, or a Ruby `RSCCache` bridge; entries expire through the `revalidate` interval or custom cache-handler policy. Closes [Issue 3324](https://github.com/shakacode/react_on_rails/issues/3324). [PR 3325](https://github.com/shakacode/react_on_rails/pull/3325) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 - **[Pro]** **Node Renderer integration API now exposes lifecycle hooks**: `react-on-rails-pro-node-renderer/integrations/api` now exports the tracing reset, provider-state, Fastify lifecycle, and worker shutdown hooks needed by integrations such as OpenTelemetry, keeping integrations inside the supported public boundary. Fixes [Issue 3419](https://github.com/shakacode/react_on_rails/issues/3419). [PR 3456](https://github.com/shakacode/react_on_rails/pull/3456) by [justin808](https://github.com/justin808).
 - **[Pro]** **Built-in HTTP rolling-deploy adapter (scaffold)**: New `ReactOnRailsPro::RollingDeployAdapters::Http` adapter pairs with a mountable `ReactOnRailsPro::RollingDeploy::BundlesController` so the currently-deployed Rails server can directly serve previously-deployed bundles to the next deploy's build CI — no S3 bucket, IAM, or extra gem required. The controller exposes authenticated `GET /manifest` and `GET /bundles/:hash` endpoints using bearer-token auth (constant-time compare, 32-byte minimum), and the adapter pulls bundle tarballs (stdlib-only gzip/tar compose-extract with path-traversal proofing, regular-files-only guards, and a 200 MB zip-bomb cap). Configure via `config.rolling_deploy_adapter = ReactOnRailsPro::RollingDeployAdapters::Http`, `config.rolling_deploy_token`, and `config.rolling_deploy_previous_url`. See `docs/pro/rolling-deploy-adapters.md` for setup. This is part 1 of a multi-PR series — a hard HTTPS gate, streaming download, and additional hardening land in follow-ups. [PR 3379](https://github.com/shakacode/react_on_rails/pull/3379) by [justin808](https://github.com/justin808).
 - **[Pro]** **OpenTelemetry integration for the Node Renderer**: New optional integration at `react-on-rails-pro-node-renderer/integrations/opentelemetry` that adds distributed tracing via standard OpenTelemetry. Users enable it by installing the `@opentelemetry/*` and `@fastify/otel` packages (optional peer deps) and calling `init({ fastify: true, tracing: true })` from their renderer entrypoint, before `reactOnRailsProNodeRenderer()`. Provides auto-instrumented HTTP and Fastify spans, an SSR root span (`ror.ssr.request`), and render-path sub-spans (`ror.bundle.build_execution_context`, `ror.bundle.upload`, `ror.vm.execute`, `ror.result.prepare`, `ror.incremental.stream`, `ror.incremental.process_chunk`). Configuration follows standard OpenTelemetry env-var conventions (`OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME`, `OTEL_RESOURCE_ATTRIBUTES`, etc.); defaults to `BatchSpanProcessor` in production and `SimpleSpanProcessor` otherwise. The integration is fully optional — users who do not enable it pay zero runtime cost, and the renderer has no direct dependency on OpenTelemetry. Closes [Issue 2156](https://github.com/shakacode/react_on_rails/issues/2156). [PR 3382](https://github.com/shakacode/react_on_rails/pull/3382) by [justin808](https://github.com/justin808).

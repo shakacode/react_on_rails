@@ -27,12 +27,23 @@ if [[ "$test_mode" == 1 ]]; then
   proc_root="${EVAL_PROC_ROOT:-/proc}"
   runner_pid="${EVAL_RUNNER_PID:-$PPID}"
 else
-  [[ "$runner_pid" == 1 ]] || {
-    echo "attested eval runner is not PID 1 in its isolated process namespace" >&2
+  [[ "$runner_pid" != 1 ]] || {
+    echo "attested eval runner is not supervised by namespace init" >&2
     exit 1
   }
   [[ "$(stat -f -c %T /proc 2>/dev/null)" == proc ]] || {
     echo "attested eval process root is not a genuine procfs" >&2
+    exit 1
+  }
+  runner_parent=""
+  while read -r status_key status_value _; do
+    if [[ "$status_key" == PPid: ]]; then
+      runner_parent="$status_value"
+      break
+    fi
+  done <"$proc_root/$runner_pid/status"
+  [[ "$runner_parent" == 1 ]] || {
+    echo "attested eval runner is not supervised by namespace init" >&2
     exit 1
   }
 fi
@@ -40,11 +51,6 @@ fi
   echo "invalid process inspection configuration" >&2
   exit 1
 }
-if [[ "$proc_root" == /proc && "$runner_pid" != 1 ]]; then
-  echo "attested eval runner is not PID 1 in its isolated process namespace" >&2
-  exit 1
-fi
-
 shopt -s nullglob dotglob
 process_dirs=("$proc_root"/[0-9]*)
 ((${#process_dirs[@]} > 0)) || {
@@ -58,7 +64,7 @@ for process_dir in "${process_dirs[@]}"; do
     exit 1
   }
   process_pid="${process_dir##*/}"
-  [[ "$process_pid" == "$runner_pid" || "$process_pid" == "$$" ]] && continue
+  [[ "$process_pid" == 1 || "$process_pid" == "$runner_pid" || "$process_pid" == "$$" ]] && continue
   echo "agent process remains after the agent call" >&2
   exit 1
 done

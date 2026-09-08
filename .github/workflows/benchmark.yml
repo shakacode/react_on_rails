@@ -95,6 +95,36 @@ jobs:
       - name: Run benchmark script specs
         run: bundle exec rspec benchmarks/spec
 
+  rails-dx-benchmark-check:
+    name: rspack-vite-rails-dx-check
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: benchmarks/rspack-vite-rails-dx
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .tool-versions
+      - name: Enable pinned pnpm
+        # Node 22.12.0 bundles Corepack 0.29.4, whose stale signing keys reject pnpm 10.33.4.
+        run: npm install --global --ignore-scripts corepack@0.34.7 && corepack enable && corepack prepare pnpm@10.33.4 --activate
+      - name: Install isolated benchmark dependencies
+        run: pnpm install --ignore-workspace --frozen-lockfile
+      - name: Install pinned starter dependencies
+        run: pnpm run prepare:starters
+      - name: Type-check the Rspack starter
+        run: pnpm --dir starters/rspack exec tsc --project tsconfig.json
+      - name: Type-check the Vite starter
+        run: pnpm --dir starters/vite run check
+      - name: Replay Rails DX benchmark artifact checks
+        run: pnpm run check
+
   prepare-benchmark-matrix:
     if: github.event_name == 'workflow_dispatch'
     permissions:

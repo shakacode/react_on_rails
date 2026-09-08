@@ -74,11 +74,9 @@ group :development, :test do
   gem "csv", require: false
   gem "logger", require: false
   gem "ostruct", require: false
-  # base64 was promoted from a default gem to a bundled gem in Ruby 3.4, so Bundler-managed
-  # apps must declare it explicitly. jwt 3.x lists base64 as a runtime dep (which transitively
-  # satisfies our spec on jwt 3.x), but jwt 2.x does not — only jwt >= 2.7 added base64 as an
-  # explicit runtime dep. Declare it here so license_validator_spec.rb's `require "base64"`
-  # works on Ruby 3.4+ regardless of whether bundler resolves jwt 2.x or 3.x.
+  # Ruby 3.4 promotes base64 from a default gem to a bundled gem. jwt 2.8+ declares it as a
+  # runtime dependency, which covers the Pro runtime floor; keep this direct development
+  # dependency because license_validator_spec.rb requires base64 directly to construct test JWTs.
   gem "base64", require: false
 end
 

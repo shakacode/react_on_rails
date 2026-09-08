@@ -1467,12 +1467,10 @@ module ReactOnRailsProHelper
     error_signal = rsc_payload_rendering_error_signal?(metadata)
     return metadata unless error_signal || metadata.key?("renderingError")
 
-    redacted = metadata.except("renderingError")
-    # Preserve a generic failure signal so client error boundaries still fire. `hasErrors` is
-    # forced true when only a non-blank message/stack indicated the failure, matching the
-    # inline path's redacted branch.
-    redacted["hasErrors"] = true if error_signal
-    redacted
+    # Match the inline path's production allowlist exactly. Error chunks may carry sensitive
+    # details in console replay or future metadata fields, so forwarding every field except the
+    # known renderingError key would fail open as the producer evolves.
+    { "hasErrors" => error_signal }
   end
 
   def rsc_payload_rendering_error_signal?(metadata)

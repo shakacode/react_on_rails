@@ -90,6 +90,13 @@ During a managed live run, the wrapper also uses this helper to renew the same
 active identity at least hourly with the exact observed backend version. Any
 identity mismatch or conditional-write conflict stops the supervised release
 process group before the wrapper attempts exact-identity cleanup.
+Managed cleanup uses the same helper to release only the exact active agent and
+instance identity with a conditional write. A matching already-released record
+is a successful retry. A replacement identity or write conflict is refused.
+When cleanup cannot complete, the wrapper prints the exact guarded release
+command and the restart command. Follow
+[Recover a retained publication lease](release-train-runbook.md#recover-a-retained-publication-lease)
+before running them.
 
 Automation that already owns a broader release-line lease may supply both
 `RELEASE_COORDINATOR_ID` and `RELEASE_COORDINATOR_INSTANCE_ID` and pre-acquire

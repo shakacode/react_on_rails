@@ -36,3 +36,7 @@ internal/analysis/rsc-fouc-shakaperf-artifacts/reports/**/*.html
 
 # PPR evidence-base experiment artifacts (#4885); byte-faithful to what ran.
 internal/analysis/experiments/
+
+# Pinned generated Rails fixtures and recorded benchmark output.
+benchmarks/rspack-vite-rails-dx/starters/
+benchmarks/rspack-vite-rails-dx/results/*.json
