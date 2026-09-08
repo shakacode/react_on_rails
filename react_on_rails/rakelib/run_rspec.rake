@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "pathname"
+require "shellwords"
 require "yaml"
 
 require_relative "task_helpers"
@@ -42,7 +43,11 @@ namespace :run_rspec do
       # by appending RBS runtime hook instead of replacing
       existing_rubyopt = ENV.fetch("RUBYOPT", nil)
       rubyopt_parts = ["-rrbs/test/setup", existing_rubyopt].compact.reject(&:empty?)
-      "RBS_TEST_TARGET='ReactOnRails::*' RUBYOPT='#{rubyopt_parts.join(' ')}'"
+      # Configuration accepts Rails.root and documented locale directories as Pathname values.
+      # Load their standard-library signatures without dropping caller-supplied RBS options.
+      rbs_options = "#{ENV.fetch('RBS_TEST_OPT', '-I sig')} -r pathname"
+      "RBS_TEST_OPT=#{Shellwords.escape(rbs_options)} " \
+        "RBS_TEST_TARGET='ReactOnRails::*' RUBYOPT='#{rubyopt_parts.join(' ')}'"
     rescue LoadError
       # RBS not available - silently skip runtime checking
       # This is expected in environments without the rbs gem
