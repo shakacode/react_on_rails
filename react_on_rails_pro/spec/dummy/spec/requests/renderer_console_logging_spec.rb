@@ -53,21 +53,10 @@ describe "Console logging from server" do
       # Remove leading blank line if present (old format had it, new format doesn't)
       script_lines.shift if script_lines.first && script_lines.first.empty?
 
-      # Create external iterators for expected and found console replay script lines:
-      expected_lines_iterator = expected_lines.to_enum
-      script_lines_iterator = script_lines.to_enum
-
-      loop do
-        # rubocop:disable Lint/Void
-        # Use built-in StopIteration handler of "loop" operator:
-        StopIteration
-        # rubocop:enable Lint/Void
-
-        expected_line = expected_lines_iterator.next
-        script_line = script_lines_iterator.next
-
-        expect(script_line).to eq(expected_line)
-      end
+      # Strict comparison: missing or extra replay lines must fail, not just
+      # mismatched lines (the previous pairwise-iterator loop stopped at the
+      # shorter list and silently tolerated both).
+      expect(script_lines).to eq(expected_lines)
     end
   end
 
