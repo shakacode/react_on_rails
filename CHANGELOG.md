@@ -64,6 +64,16 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 5029](https://github.com/shakacode/react_on_rails/pull/5029) by
   [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
+- **Console replay can no longer swallow the rest of the page, and replayed messages are no longer altered**:
+  A server-side `console.log` argument containing `<!--` could switch the browser's HTML parser into a state where
+  the console-replay `<script>` consumed the remainder of the document. The replay code is now escaped with the same
+  lossless two-part escape used by Pro's RSC payload injection (`<!--` → `<\!--`, `</script` → `</\script`), shared
+  as one helper across core and Pro, so the browser console now receives the original logged text (previously
+  `</script` was rewritten to `(/script`). Fixes
+  [Issue 5034](https://github.com/shakacode/react_on_rails/issues/5034).
+  [PR 5035](https://github.com/shakacode/react_on_rails/pull/5035) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 - **[Pro]** **Standalone upgrades preserve customized bundler configurations**: The Pro generator automatically
   upgrades only complete, unchanged configuration pairs from supported current templates. Customized, historical,
   missing, or ambiguous pairs remain unchanged with manual migration instructions, preventing helper redeclarations
