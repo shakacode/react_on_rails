@@ -87,6 +87,16 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
     $stdout = original_stdout
   end
 
+  def run_start_contract_probe(code, rbs:)
+    env = {
+      "RUBYOPT" => "-rbundler/setup",
+      "RBS_TEST_TARGET" => "ReactOnRails::Dev::ServerManager",
+      "RBS_TEST_OPT" => "-I sig"
+    }
+    hooks = rbs ? ["-rrbs/test/setup"] : []
+    Open3.capture3(env, RbConfig.ruby, *hooks, "-Ilib", "-rreact_on_rails/dev", "-e", code)
+  end
+
   # `.start` now wraps the process-manager run in a real, flock-backed dev
   # session that writes tmp/react_on_rails/dev-session.json under the cwd. The
   # session mechanics have dedicated coverage in "worktree-scoped dev sessions";
@@ -114,6 +124,13 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       expect(ReactOnRails::Dev::ProcessManager).to receive(:run_with_process_manager).with("Procfile.dev")
 
       described_class.start(:development)
+    end
+
+    it "accepts omitted mode and procfile" do
+      expect(ReactOnRails::Dev::ProcessManager).to receive(:ensure_procfile).with("Procfile.dev")
+      expect(ReactOnRails::Dev::ProcessManager).to receive(:run_with_process_manager).with("Procfile.dev")
+
+      described_class.start
     end
 
     it "sets default PORT=3000 for development mode" do
@@ -261,7 +278,56 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
     end
 
     it "raises error for unknown mode" do
-      expect { described_class.start(:unknown) }.to raise_error(ArgumentError, "Unknown mode: unknown")
+      # Test Ruby's error contract independently: RBS reports its type error
+      # instead when this invalid literal is passed under runtime checking.
+      code = <<~RUBY
+        begin
+          ReactOnRails::Dev::ServerManager.start(:unknown)
+          abort "unknown mode was accepted"
+        rescue ArgumentError => error
+          abort error.message unless error.message == "Unknown mode: unknown"
+          puts error.class
+        end
+      RUBY
+      stdout, stderr, status = run_start_contract_probe(code, rbs: false)
+
+      expect(status.success?).to be(true), stderr
+      expect(stdout).to eq("ArgumentError\n")
+    end
+
+    it "rejects invalid start arguments through the real RBS hook" do
+      code = <<~RUBY
+        require "rspec/mocks/standalone"
+        manager = ReactOnRails::Dev::ServerManager
+        # RBS reports violations after invoking the method. Isolate all startup
+        # side effects while retaining the real hook on the public entry point.
+        allow(manager).to receive(:run_development)
+        allow(manager).to receive(:run_static_development)
+        allow(manager).to receive(:run_production_like)
+        invalid_calls = [
+          -> { manager.start(:unknown) },
+          -> { manager.start(nil) },
+          -> { manager.start(:development, 123) },
+          -> { manager.start(:development, nil, skip_database_check: "yes") },
+          -> { manager.start(:development, nil, open_browser: "yes") },
+          -> { manager.start(:development, nil, open_browser_once: "yes") },
+          -> { manager.start(:development, nil, unknown_option: true) }
+        ]
+        invalid_calls.each do |call|
+          begin
+            call.call
+            abort "invalid start arguments were accepted"
+          rescue RBS::Test::Tester::TypeError => error
+            abort error.message unless error.message.include?("ServerManager.start") &&
+                                       error.message.match?(/Argument(?:Type)?Error/)
+          end
+        end
+        puts "rejected 7 invalid calls"
+      RUBY
+      stdout, stderr, status = run_start_contract_probe(code, rbs: true)
+
+      expect(status.success?).to be(true), stderr
+      expect(stdout).to eq("rejected 7 invalid calls\n")
     end
 
     context "when REACT_ON_RAILS_BASE_PORT is set in production-like mode" do

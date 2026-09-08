@@ -32,6 +32,11 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   declares its actual symbol results, while invalid inputs remain rejected by runtime type checks.
   Fixes [Issue 5037](https://github.com/shakacode/react_on_rails/issues/5037).
 
+- **Configuration RBS signatures match supported values**: Runtime type checking now accepts the documented
+  `Pathname` directories, unset configuration values, and the `check_database_on_dev_start` keyword without changing
+  runtime behavior. Fixes [Issue 5036](https://github.com/shakacode/react_on_rails/issues/5036)
+  by [justin808](https://github.com/justin808).
+
 - **[Pro]** **Standalone upgrades preserve customized bundler configurations**: The Pro generator automatically
   upgrades only complete, unchanged configuration pairs from supported current templates. Customized, historical,
   missing, or ambiguous pairs remain unchanged with manual migration instructions, preventing helper redeclarations
