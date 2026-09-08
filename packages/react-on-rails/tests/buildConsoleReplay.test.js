@@ -53,11 +53,36 @@ console.warn.apply(console, ["other message","{\\"c\\":3,\\"d\\":4}"]);`;
     ];
     const actual = consoleReplay();
 
-    const expected = `console.log.apply(console, ["some message (/script><script>alert('WTF')\
-(/script>","{\\"a\\":\\"Wow(/script><script>alert('WTF')(/script>\\",\\"b\\":2}"]);
+    // `</script` is backslash-escaped (lossless: `\s` is `s` to the JS engine) so the
+    // HTML parser cannot end the script element early.
+    const expected = `console.log.apply(console, ["some message </\\script><script>alert('WTF')\
+</\\script>","{\\"a\\":\\"Wow</\\script><script>alert('WTF')</\\script>\\",\\"b\\":2}"]);
 console.warn.apply(console, ["other message","{\\"c\\":3,\\"d\\":4}"]);`;
 
     expect(actual).toEqual(expected);
+  });
+
+  it('neutralizes the <!-- comment opener so the script cannot swallow the document (#5034)', () => {
+    console.history = [{ arguments: ['oops <!--<script> tail'], level: 'log' }];
+    const actual = consoleReplay();
+
+    expect(actual).toEqual('console.log.apply(console, ["oops <\\!--<script> tail"]);');
+    expect(actual).not.toContain('<!--');
+  });
+
+  it('replays the original text unaltered when the escaped code runs', () => {
+    const nastyString = 'combo </script> and <!--<script> in one message';
+    const nastyObject = { a: '</script><!--' };
+    console.history = [{ arguments: [nastyString, nastyObject], level: 'log' }];
+    const code = consoleReplay();
+
+    const replayed = [];
+    const consoleStub = { log: { apply: (_thisArg, args) => replayed.push(args) } };
+    // What the browser does after HTML parsing: evaluate the code as JavaScript.
+    // eslint-disable-next-line no-new-func -- evaluating generated code is the point of the test
+    new Function('console', code)(consoleStub);
+
+    expect(replayed).toEqual([[nastyString, JSON.stringify(nastyObject)]]);
   });
 
   it('buildConsoleReplay wraps console replay in a script tag', () => {
