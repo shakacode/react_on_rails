@@ -88,7 +88,7 @@ Since [issue #5021](https://github.com/shakacode/react_on_rails/issues/5021) was
 
 Three related cautions remain:
 
-- **Re-stamping requires a valid current nonce.** If the serving request's nonce falls outside the base64/base64url shape (`[A-Za-z0-9+/_-]` plus optional trailing `=` padding), nothing is spliced into cached markup and the cached scripts keep their original nonce (which the browser will block). Rails' built-in generators always pass; keep custom generators within that alphabet.
+- **Re-stamping requires a valid current nonce.** If the serving request's nonce falls outside the base64/base64url shape (`[A-Za-z0-9+/_-]` plus optional trailing `=` padding), that request is treated as nonce-inactive: it neither reads from nor writes to the nonce partition (it renders fresh instead of reusing entries it could never re-stamp), and nothing is ever spliced into cached markup. Rails' built-in generators always pass; keep custom generators within that alphabet.
 - **Wrapping `redux_store` or `react_component` in a plain Rails `cache do … end` block** bypasses the Pro helpers' normalization entirely: the cached fragment keeps the originating request's nonce (and rails-context script) verbatim. Use the `cached_*` helpers instead of raw fragment caching around React on Rails helpers when nonces are enforced.
 - **Third-party page/CDN caches** that store whole responses still serve stale nonces; that is outside the framework's control.
 
