@@ -20,6 +20,9 @@ import { performance as nodePerformance } from 'perf_hooks';
 import { fileURLToPath } from 'url';
 import { PipeableOrReadableStream } from 'react-on-rails/types';
 import sanitizeNonce from 'react-on-rails/@internal/sanitizeNonce';
+// Shared with the core console replay (buildConsoleReplay) so the two script-escaping
+// implementations cannot drift; see the comment in react-on-rails/src/escapeScript.ts.
+import escapeScript from 'react-on-rails/@internal/escapeScript';
 import { createEmbeddedPayloadKey } from './utils.ts';
 import RSCRequestTracker, {
   hasExpectedRSCStreamCleanup,
@@ -32,18 +35,6 @@ import {
   RSC_STREAM_PERFORMANCE_MARK_PREFIX,
 } from './browserPerformanceMarks.ts';
 import { RSC_PAYLOAD_SCRIPT_MARKER_ATTRIBUTE, RSC_STYLESHEET_PRECEDENCE } from './rscDomMarkers.ts';
-
-// In JavaScript, when an escape sequence with a backslash (\) is followed by a character
-// that isn't a recognized escape character, the backslash is ignored, and the character
-// is treated as-is.
-// This behavior allows us to use the backslash to escape characters that might be
-// interpreted as HTML tags, preventing them from being processed by the HTML parser.
-// For example, we can escape the comment tag <!-- as <\!-- and the script tag </script>
-// as <\/script>.
-// This ensures that these tags are not prematurely closed or misinterpreted by the browser.
-function escapeScript(script: string) {
-  return script.replace(/<!--/g, '<\\!--').replace(/<\/(script)/gi, '</\\$1');
-}
 
 function cacheKeyJSArray(cacheKey: string) {
   return `(self.REACT_ON_RAILS_RSC_PAYLOADS||={})[${JSON.stringify(cacheKey)}]||=[]`;

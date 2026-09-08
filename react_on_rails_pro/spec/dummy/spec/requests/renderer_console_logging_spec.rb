@@ -26,13 +26,17 @@ describe "Console logging from server" do
     it "has server log messages in the script generated" do
       get server_side_hello_world_shared_store_path
       html_nodes = Nokogiri::HTML(response.body)
-      expected = <<~JS
+      # Since #5034, `</script` and `<!--` are backslash-escaped losslessly (`</\script`,
+      # `<\!--`) instead of the old lossy `(/script` rewrite; `</ script`-style sequences
+      # are not end tags per the HTML spec and pass through unchanged. Single-quoted
+      # heredoc: backslashes below are literal characters in the rendered page.
+      expected = <<~'JS'
         console.log.apply(console, ["[SERVER] RENDERED ReduxSharedStoreApp to dom node with id: ReduxSharedStoreApp-react-component-0"]);
-        console.log.apply(console, ["[SERVER] This is a script:\\"</div>\\"(/script> <script>alert('WTF1')(/script>"]);
-        console.log.apply(console, ["[SERVER] Script2:\\"</div>\\"(/script xx> <script>alert('WTF2')(/script xx>"]);
-        console.log.apply(console, ["[SERVER] Script3:\\"</div>\\"(/script xx> <script>alert('WTF3')(/script xx>"]);
-        console.log.apply(console, ["[SERVER] Script4\\"</div>\\"(/script <script>alert('WTF4')(/script>"]);
-        console.log.apply(console, ["[SERVER] Script5:\\"</div>\\"(/script> <script>alert('WTF5')(/script>"]);
+        console.log.apply(console, ["[SERVER] This is a script:\"</div>\"</\script> <script>alert('WTF1')</\script>"]);
+        console.log.apply(console, ["[SERVER] Script2:\"</div>\"</\script xx> <script>alert('WTF2')</\script xx>"]);
+        console.log.apply(console, ["[SERVER] Script3:\"</div>\"</  SCRIPT xx> <script>alert('WTF3')</\script xx>"]);
+        console.log.apply(console, ["[SERVER] Script4\"</div>\"</\script <script>alert('WTF4')</\script>"]);
+        console.log.apply(console, ["[SERVER] Script5:\"</div>\"</ script> <script>alert('WTF5')</\script>"]);
         console.log.apply(console, ["[SERVER] railsContext.serverSide is ","true"]);
         console.log.apply(console, ["[SERVER] RENDERED ReduxSharedStoreApp to dom node with id: ReduxSharedStoreApp-react-component-1"]);
       JS

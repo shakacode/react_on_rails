@@ -300,6 +300,24 @@ describe('injectRSCPayload', () => {
     expect(resultStr).toContain('alert(document.cookie)');
   });
 
+  // PARITY GUARD (issue #5034): core console replay and Pro script injection must share one
+  // escaping policy. Both now import react-on-rails/@internal/escapeScript; this test keeps
+  // the two from drifting apart again if either side ever re-forks its own implementation.
+  it('shares the core escapeScript policy: escaped console replay passes through injection unchanged', async () => {
+    const { default: escapeScript } = await import('react-on-rails/@internal/escapeScript');
+    const { consoleReplay } = await import('react-on-rails/buildConsoleReplay');
+
+    const nasty = 'oops <!--<script></script> tail';
+    const replayCode = consoleReplay([{ arguments: [nasty], level: 'log' }]);
+
+    // Core already neutralized both dangerous sequences...
+    expect(replayCode).not.toContain('<!--');
+    expect(replayCode).not.toContain('</script');
+    // ...and Pro's escapeScript pass over the same code is a no-op (idempotent), so the
+    // console replay metadata that streams through createScriptTag stays lossless.
+    expect(escapeScript(replayCode)).toBe(replayCode);
+  });
+
   it('emits opt-in browser performance marks for RSC payload bytes and flush timing', async () => {
     const flightData = '{"test": "data"}';
     const mockRSC = createMockRSCStream([flightData]);
