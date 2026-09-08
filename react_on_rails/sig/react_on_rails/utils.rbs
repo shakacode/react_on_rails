@@ -12,10 +12,10 @@ module ReactOnRails
     def self.react_on_rails_pro_version: () -> String?
     def self.rsc_support_enabled?: () -> bool
     def self.full_text_errors_enabled?: () -> bool
-    def self.smart_trim: (String str, ?Integer max_length) -> String
+    def self.smart_trim: (_ToS str, ?Integer max_length) -> String
     def self.find_most_recent_mtime: (Array[String] files) -> Time?
     def self.prepend_to_file_if_text_not_present: (file: String, text_to_prepend: String, regex: Regexp) -> void
-    def self.detect_package_manager: () -> String
+    def self.detect_package_manager: () -> (:npm | :yarn | :pnpm | :bun)
     def self.default_troubleshooting_section: () -> String
     def self.server_bundle_js_file_path: () -> String
     def self.running_on_windows?: () -> bool
