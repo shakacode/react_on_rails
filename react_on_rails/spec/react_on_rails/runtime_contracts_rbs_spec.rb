@@ -22,16 +22,19 @@ RSpec.describe "Runtime and RBS input contracts" do
       require "json"
       begin
         #{code}
-        puts JSON.generate({result: "accepted"})
+        puts "ROR_CONTRACT_RESULT:" + JSON.generate({result: "accepted"})
       rescue #{rbs ? 'RBS::Test::Tester::TypeError' : 'StandardError'} => error
-        puts JSON.generate({error_class: error.class.name, message: error.message})
+        puts "ROR_CONTRACT_RESULT:" + JSON.generate({error_class: error.class.name, message: error.message})
       end
     RUBY
     args = [RbConfig.ruby, "-rbundler/setup"]
     args << "-rrbs/test/setup" if rbs
     stdout, stderr, status = Open3.capture3(env, *args, "-e", setup, chdir: File.expand_path("../..", __dir__))
     expect(status.success?).to be(true), "#{stdout}\n#{stderr}"
-    JSON.parse(stdout.lines.last)
+    # Coverage tools can append output after the child's contract result.
+    result_lines = stdout.lines.grep(/\AROR_CONTRACT_RESULT:/)
+    expect(result_lines.size).to eq(1), "#{stdout}\n#{stderr}"
+    JSON.parse(result_lines.fetch(0).delete_prefix("ROR_CONTRACT_RESULT:"))
   end
 
   [false, true].each do |rbs|
