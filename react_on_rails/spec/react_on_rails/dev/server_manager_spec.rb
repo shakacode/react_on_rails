@@ -3070,8 +3070,8 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
             #!/bin/sh
             [ "$1" = "--version" ] && exit 0
 
-            echo $$ > "$OVERMIND_CONTROL_PID_PATH"
             trap '' TERM
+            echo $$ > "$OVERMIND_CONTROL_PID_PATH"
             exec sleep 30
           SH
         )
@@ -3084,15 +3084,18 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         stub_const("#{described_class}::OVERMIND_CONTROL_TERMINATION_GRACE_SECS", 0.1)
         allow(Process).to receive(:fork).and_raise(NotImplementedError, "fork is unavailable")
         runner_pid = nil
+        started = nil
         # Spawn the real fake client directly so this regression measures its
         # process-group supervision, not a busy machine's Ruby CLI load time.
         # Launcher routing and exec selection are covered by the examples above.
         allow(described_class).to receive(:spawn_overmind_command) do |arguments|
           runner_pid = Process.spawn(overmind, *arguments, pgroup: true)
+          expect(wait_for { File.exist?(pid_path) && File.read(pid_path).strip == runner_pid.to_s }).to be true
+          started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+          runner_pid
         end
 
         result = nil
-        started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
         output = capture_stdout do
           result = described_class.send(:run_overmind_command, ["quit", "-s", "/tmp/none.sock"])
         end
@@ -3112,11 +3115,12 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       ensure
         ENV["PATH"] = previous_path if previous_path
         ENV["OVERMIND_CONTROL_PID_PATH"] = previous_pid_path
-        if pid_path && File.exist?(pid_path)
-          control_pid = Integer(File.read(pid_path), 10)
+        if runner_pid
           begin
-            Process.kill("KILL", control_pid)
-            Process.waitpid(control_pid)
+            unless Process.waitpid(runner_pid, Process::WNOHANG)
+              Process.kill("KILL", -runner_pid)
+              Process.waitpid(runner_pid)
+            end
           rescue Errno::ESRCH, Errno::ECHILD
             nil
           end
