@@ -2843,6 +2843,27 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         end
       end
 
+      it "names the socket directory symlink that must be corrected without controlling foreign endpoints" do
+        root = app_root("external-sockets")
+        other = app_root("external-sockets-target")
+        socket_path = File.join(other, "overmind-foreign.sock")
+        servers << UNIXServer.new(socket_path)
+        FileUtils.mkdir_p(File.join(root, "tmp"))
+        File.symlink(other, File.join(root, "tmp", "sockets"))
+        expect(described_class).not_to receive(:overmind_control)
+
+        output = kill_in(root)
+
+        aggregate_failures do
+          expect(output).to include("Shutdown could not be verified")
+          expect(output).to include("resolves outside this app root")
+          expect(output).to include("inspect the symlink and configure an app-local socket directory")
+          expect(output).to include("Resolve the blockers above before retrying")
+          expect(output).not_to include("verified gone")
+          expect(File.socket?(socket_path)).to be true
+        end
+      end
+
       it "fails closed when a live orphan endpoint is hidden by an unreadable socket directory" do
         root = app_root("discovered-unreadable-orphan")
         sockets_dir = File.join(root, "tmp", "sockets")
@@ -2999,6 +3020,39 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         result = described_class.send(:execute_overmind_command, ["kill", "-s", "/tmp/overmind.sock"])
 
         expect(result).to be true
+      end
+
+      it "boots the production Overmind launcher, preserves arguments, and reaps the child" do
+        root = app_root("real-overmind-launcher")
+        fake_bin = File.join(root, "fake-bin")
+        overmind = File.join(fake_bin, "overmind")
+        FileUtils.mkdir_p(fake_bin)
+        File.write(
+          overmind,
+          <<~SH
+            #!/bin/sh
+            [ "$1" = "--version" ] && exit 0
+            [ "$#" -eq 3 ] && [ "$1" = "quit" ] && [ "$2" = "-s" ] &&
+              [ "$3" = "/tmp/overmind endpoint.sock" ]
+          SH
+        )
+        File.chmod(0o755, overmind)
+        previous_path = ENV.fetch("PATH")
+        ENV["PATH"] = "#{fake_bin}:#{previous_path}"
+        runner_pid = nil
+        allow(Process).to receive(:spawn).and_wrap_original do |original, *args, **kwargs|
+          runner_pid = original.call(*args, **kwargs)
+        end
+
+        result = described_class.send(:run_overmind_command, ["quit", "-s", "/tmp/overmind endpoint.sock"])
+
+        aggregate_failures do
+          expect(result).to be true
+          expect(runner_pid).not_to be_nil
+          expect { Process.waitpid(runner_pid, Process::WNOHANG) }.to raise_error(Errno::ECHILD) if runner_pid
+        end
+      ensure
+        ENV["PATH"] = previous_path if previous_path
       end
 
       # The timeout must bound the process, not only Ruby's wait for it. A

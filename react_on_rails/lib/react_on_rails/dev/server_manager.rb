@@ -1493,8 +1493,9 @@ module ReactOnRails
           end
           Array(blockers).each { |blocker| puts "   • #{blocker}" }
           puts ""
-          puts "💡 Inspect the processes above. Once you are certain nothing is running, remove"
-          puts "   #{DEV_SESSION_RELATIVE_PATH} and run `bin/dev kill` again."
+          puts "💡 Resolve the blockers above before retrying. If only stale session state remains"
+          puts "   and you are certain nothing is running, remove #{DEV_SESSION_RELATIVE_PATH},"
+          puts "   then run `bin/dev kill` again."
         end
 
         # ---- process / endpoint observation ----------------------------
@@ -1537,7 +1538,8 @@ module ReactOnRails
           resolved_directory = File.realpath(directory)
           unless inside_dev_app_root?(resolved_directory, root)
             blocker = "could not inspect #{directory} for Overmind endpoints because " \
-                      "it resolves outside this app root"
+                      "it resolves outside this app root; inspect the symlink and configure " \
+                      "an app-local socket directory before retrying"
             return {
               paths: [],
               blockers: [blocker]

@@ -489,14 +489,21 @@ REACT_RENDERER_URL=http://localhost:3801
 The renderer port must match on both sides: `RENDERER_PORT` is read by the Node process and
 `REACT_RENDERER_URL` is read by the Rails-side Pro initializer.
 
-> **Note:** `bin/dev kill` scopes cleanup to the current app directory. It first uses the running
-> session's recorded ports. For a manual default-port setup, export `RENDERER_PORT` (or a local
-> `REACT_RENDERER_URL`) in a fresh shell so the renderer port is scanned; base-port setups also
-> derive the renderer's `base + 2` port. A port candidate is signalled only when `lsof` finds a
+> **Note:** `bin/dev kill` scopes cleanup to the current app directory. It combines the running
+> session's recorded ports with the current port configuration. It can also derive a renderer fallback from an
+> active generated `node-renderer:` command in `Procfile.dev`, `Procfile.dev-static-assets`, or
+> `Procfile.dev-prod-assets` that uses `${RENDERER_PORT:-PORT}`. For a manual setup without that
+> generated command, export `RENDERER_PORT` (or a local `REACT_RENDERER_URL`) in a fresh shell so
+> the renderer port is scanned. Base-port setups also derive the renderer's `base + 2` port.
+> A port candidate is signalled only when `lsof` finds a
 > `LISTEN` socket and the process working directory is inside this app root. Foreign listeners that
 > are visible to the invoking user are reported and left running; a listener owned by another OS user
 > may be invisible to `lsof` and therefore go unreported. If ownership or shutdown cannot be verified,
 > the command exits nonzero instead of reporting success.
+
+`bin/dev kill` cannot verify Overmind shutdown if `tmp/sockets` resolves outside the app directory.
+Inspect the symlink and configure an app-local socket directory before retrying. Removing a stale
+`tmp/react_on_rails/dev-session.json` file alone does not resolve this directory blocker.
 
 ## See Also
 
