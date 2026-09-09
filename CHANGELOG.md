@@ -30,10 +30,20 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   shutdown discovers all `tmp/sockets/overmind*.sock` endpoints, fails closed when discovery or probing cannot be
   completed, and terminates and reaps timed-out control clients under one shared deadline per phase. When no renderer
   port is exported, recognized generated Procfiles supply the local Node Renderer fallback without widening the kill
-  scope to an unrelated listener on port 3800. The `ServerManager.start` RBS signature also accepts its existing
-  default arguments and browser/database-check options without weakening invalid-input checks. Fixes
+  scope to an unrelated listener on port 3800. Fixes
   [Issue 4944](https://github.com/shakacode/react_on_rails/issues/4944). [PR 4986](https://github.com/shakacode/react_on_rails/pull/4986) by
   [justin808](https://github.com/justin808).
+
+- **Ruby type signatures now match supported helper inputs**: RBS accepts the compatibility
+  `immediate_hydration:` option on `Controller#redux_store`, Pathname locale directories,
+  Hash prerender props, and asset-checker/compiler injection keywords. Package-manager detection
+  declares its actual symbol results, while invalid inputs remain rejected by runtime type checks.
+  Fixes [Issue 5037](https://github.com/shakacode/react_on_rails/issues/5037).
+
+- **Configuration RBS signatures match supported values**: Runtime type checking now accepts the documented
+  `Pathname` directories, unset configuration values, and the `check_database_on_dev_start` keyword without changing
+  runtime behavior. Fixes [Issue 5036](https://github.com/shakacode/react_on_rails/issues/5036)
+  by [justin808](https://github.com/justin808).
 
 - **[Pro]** **Standalone upgrades preserve customized bundler configurations**: The Pro generator automatically
   upgrades only complete, unchanged configuration pairs from supported current templates. Customized, historical,
