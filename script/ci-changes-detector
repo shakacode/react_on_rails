@@ -96,7 +96,7 @@ BENCH_PRO_NODE_RENDERER_CHANGED=false
 
 is_release_tooling_path() {
   case "$1" in
-    rakelib/release.rake|rakelib/release_lease_guard.rb|rakelib/release_atomic_claim.rb|rakelib/release_changelog_selector.rb|script/release|script/release-claim|script/release-test.bash|script/release-forward-port|script/release-forward-port-test.bash|script/release-finish|script/release-finish-test.bash)
+    rakelib/release.rake|rakelib/release_lease_guard.rb|rakelib/release_atomic_claim.rb|rakelib/release_changelog_selector.rb|rakelib/release_commit_classifier.rb|script/release|script/release-claim|script/release-test.bash|script/release-forward-port|script/release-forward-port-test.bash|script/release-finish|script/release-finish-test.bash)
       return 0
       ;;
     *)
@@ -107,7 +107,7 @@ is_release_tooling_path() {
 
 release_tooling_heredoc_language() {
   case "$1" in
-    rakelib/release.rake|rakelib/release_lease_guard.rb|rakelib/release_atomic_claim.rb|rakelib/release_changelog_selector.rb|script/release|script/release-claim|script/release-forward-port|script/release-finish)
+    rakelib/release.rake|rakelib/release_lease_guard.rb|rakelib/release_atomic_claim.rb|rakelib/release_changelog_selector.rb|rakelib/release_commit_classifier.rb|script/release|script/release-claim|script/release-forward-port|script/release-finish)
       printf '%s\n' "ruby"
       ;;
     script/release-test.bash|script/release-forward-port-test.bash|script/release-finish-test.bash)

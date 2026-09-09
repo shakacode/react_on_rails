@@ -14,6 +14,7 @@ require "time"
 require "tmpdir"
 require "uri"
 require_relative "release_changelog_selector"
+require_relative "release_commit_classifier"
 require_relative "release_lease_guard"
 require_relative "task_helpers"
 require_relative "../react_on_rails/lib/react_on_rails/version_syntax_converter"
@@ -25,7 +26,12 @@ class RaisingMessageHandler
   end
 end
 
-class UnhandledReleaseFinalizationMetadataPathError < StandardError; end
+# Preserve the private top-level helper interface used throughout these Rake tasks.
+class Object
+  include ReleaseCommitClassifier::Promotion
+end
+
+UnhandledReleaseFinalizationMetadataPathError = ReleaseCommitClassifier::UnhandledReleaseFinalizationMetadataPathError
 
 NPM_REGISTRY_URL = "https://registry.npmjs.org/"
 RUBYGEMS_VERSIONS_API_URL = "https://rubygems.org/api/v1/versions"
@@ -288,26 +294,7 @@ class NpmPublishAttemptError < StandardError
     super("npm publish #{category.to_s.tr('_', ' ')}: #{details}")
   end
 end
-# Keep in sync with every package.json, Gemfile.lock, and version file that the
-# release task rewrites while promoting an RC to a final release.
-# CHANGELOG.md is intentionally excluded. main_ci_walkback_commit? classifies
-# changelog-only release commits through commit_non_runtime_only?; adding
-# Markdown here would need a content handler.
-RELEASE_FINALIZATION_METADATA_PATHS = [
-  "Gemfile.lock",
-  "package.json",
-  "packages/create-react-on-rails-app/package.json",
-  "packages/react-on-rails/package.json",
-  "packages/react-on-rails-pro/package.json",
-  "packages/react-on-rails-pro-node-renderer/package.json",
-  "react_on_rails/Gemfile.lock",
-  "react_on_rails/lib/react_on_rails/version.rb",
-  "react_on_rails/spec/dummy/Gemfile.lock",
-  "react_on_rails_pro/Gemfile.lock",
-  "react_on_rails_pro/lib/react_on_rails_pro/version.rb",
-  "react_on_rails_pro/spec/dummy/Gemfile.lock",
-  "react_on_rails_pro/spec/execjs-compatible-dummy/Gemfile.lock"
-].freeze
+RELEASE_FINALIZATION_METADATA_PATHS = ReleaseCommitClassifier::RELEASE_FINALIZATION_METADATA_PATHS
 SHAKAPERF_RUNTIME_TREE_IGNORED_PATHS = (RELEASE_FINALIZATION_METADATA_PATHS + ["CHANGELOG.md"]).freeze
 
 # Helper methods for release-specific tasks
@@ -3530,26 +3517,8 @@ def release_branch_commits_after_rc_tag(monorepo_root:, tag_sha:, head_sha:)
   { status: :non_runtime_only, commits: }
 end
 
-def release_branch_non_runtime_commit?(monorepo_root:, sha:)
-  metadata_touched = release_finalization_metadata_touched(monorepo_root:, sha:)
-  return false if metadata_touched.nil?
-  return release_finalization_metadata_commit?(monorepo_root:, sha:) if metadata_touched
-
-  commit_non_runtime_only?(monorepo_root:, sha:)
-end
-
-def release_finalization_metadata_touched(monorepo_root:, sha:)
-  output, status = Open3.capture2e(
-    "git", "-C", monorepo_root, "diff-tree", "--no-commit-id", "--name-only", "-r", "#{sha}^", sha
-  )
-  return nil unless status.success?
-
-  paths = output.lines.map(&:strip).reject(&:empty?)
-  return nil if paths.empty?
-
-  paths.any? { |path| RELEASE_FINALIZATION_METADATA_PATHS.include?(path) }
-rescue StandardError
-  nil
+def release_finalization_metadata_paths
+  RELEASE_FINALIZATION_METADATA_PATHS
 end
 
 def ensure_release_branch_current_version_is_rc!(current_branch:, current_checkout_version:, target_gem_version:)
@@ -7764,107 +7733,7 @@ end
 # "unknown" with "runtime-bearing" is the safe direction for a release gate: the
 # walk stops and the current commit is evaluated rather than skipped on a guess.
 def commit_non_runtime_only?(monorepo_root:, sha:)
-  detector = File.join(monorepo_root, "script", "ci-changes-detector")
-  return false unless File.executable?(detector)
-
-  Dir.mktmpdir("ror-ci-detector") do |dir|
-    output_file = File.join(dir, "github_output")
-    File.write(output_file, "")
-    # The detector writes `non_runtime_only=true|false` to $GITHUB_OUTPUT — the
-    # same machine interface CI consumes — so we reuse its path classification
-    # instead of re-deriving paths-ignore rules here. `<sha>^ <sha>` diffs just
-    # that commit; a non-HEAD current ref means no uncommitted folding.
-    _stdout, status = Open3.capture2e(
-      { "GITHUB_OUTPUT" => output_file }, detector, "#{sha}^", sha, chdir: monorepo_root
-    )
-    return false unless status.success?
-
-    flag = File.read(output_file).lines.reverse.find { |line| line.start_with?("non_runtime_only=") }
-    return false if flag.nil?
-
-    flag.split("=", 2).last.strip == "true"
-  end
-rescue StandardError
-  false
-end
-
-def release_finalization_metadata_commit?(monorepo_root:, sha:)
-  output, status = Open3.capture2e(
-    "git", "-C", monorepo_root, "diff-tree", "--no-commit-id", "--name-status", "-r", "#{sha}^", sha
-  )
-  return false unless status.success?
-
-  changes = output.lines.map { |line| release_finalization_metadata_path(line) }
-
-  # Empty diffs are not metadata commits. Non-modification entries map to nil
-  # via release_finalization_metadata_path and fail the all? block below.
-  changes.any? && changes.all? do |path|
-    path &&
-      RELEASE_FINALIZATION_METADATA_PATHS.include?(path) &&
-      release_finalization_metadata_content_only?(monorepo_root:, sha:, path:)
-  end
-rescue UnhandledReleaseFinalizationMetadataPathError
-  raise
-rescue StandardError => e
-  warn "⚠️ Unable to inspect release finalization metadata for #{sha}: #{e.class}: #{e.message}; " \
-       "treating commit as runtime-bearing."
-  false
-end
-
-def release_finalization_metadata_path(change_line)
-  status_code, path, extra = change_line.chomp.split("\t", 3)
-  return nil unless status_code == "M"
-  return nil if path.nil? || extra
-
-  path
-end
-
-def release_finalization_metadata_content_only?(monorepo_root:, sha:, path:)
-  before = git_file_at_commit(monorepo_root:, ref: "#{sha}^", path:)
-  after = git_file_at_commit(monorepo_root:, ref: sha, path:)
-  return false if before.nil? || after.nil?
-
-  release_finalization_metadata_contents_only?(before:, after:, path:)
-end
-
-def release_finalization_metadata_contents_only?(before:, after:, path:)
-  if path.end_with?("package.json")
-    package_json_version_only_change?(before, after)
-  elsif path.end_with?("version.rb")
-    normalized_version_file(before) == normalized_version_file(after)
-  elsif path.end_with?("Gemfile.lock")
-    normalized_release_gemfile_lock(before) == normalized_release_gemfile_lock(after)
-  else
-    raise UnhandledReleaseFinalizationMetadataPathError,
-          "Unhandled release finalization metadata path type: #{path.inspect}"
-  end
-end
-
-def git_file_at_commit(monorepo_root:, ref:, path:)
-  output, status = Open3.capture2e("git", "-C", monorepo_root, "show", "#{ref}:#{path}")
-  return nil unless status.success?
-
-  output
-end
-
-def package_json_version_only_change?(before, after)
-  before_json = JSON.parse(before)
-  after_json = JSON.parse(after)
-  before_version = before_json["version"]
-  after_version = after_json["version"]
-
-  !!(before_version && after_version && before_version != after_version &&
-     before_json.except("version") == after_json.except("version"))
-rescue JSON::ParserError
-  false
-end
-
-def normalized_version_file(content)
-  content.gsub(/(\bVERSION = )"[^"]+"/, '\1"__RELEASE_VERSION__"')
-end
-
-def normalized_release_gemfile_lock(content)
-  content.gsub(/\b(react_on_rails(?:_pro)? \((?:= )?)[^)]+(\))/, '\1__RELEASE_VERSION__\2')
+  ReleaseCommitClassifier.non_runtime_only?(monorepo_root:, sha:)
 end
 
 # First parent of `sha`, or nil at a root commit (or on any git failure) so the

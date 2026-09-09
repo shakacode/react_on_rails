@@ -1325,17 +1325,17 @@ each source patch is still live. A reverted, superseded, or `UNKNOWN` source
 blocks promotion until a maintainer explicitly reapproves retaining it with the
 current evidence.
 
-**Scripted preview path.** `script/release-finish promote X.Y.Z` describes this whole step:
-it runs `git fetch`, asserts you are on `release/X.Y.Z` with a clean tree, verifies the tip equals the
-accepted RC tag (`git diff --stat vX.Y.Z.rc.N` is empty), prompts you to collapse the rc CHANGELOG, then
-asks for explicit confirmation before running `bundle exec rake release[X.Y.Z]`. It wraps — does not
-replace — the rake promotion guards (`stable_release_branch_allowed?`,
-`ensure_release_branch_promotes_tagged_rc!`). Because `release-finish` normal mode does not have the
-publication wrapper's lifetime/per-write contract, use only `--dry-run`:
+**Scripted preview path.** `script/release-finish promote X.Y.Z --dry-run` describes this whole step.
+It runs `git fetch`, asserts you are on a clean `release/X.Y.Z` that exactly matches the remote tip,
+and verifies that the accepted RC tag is an ancestor. Every later commit must receive a positive
+non-runtime-only verdict from the same canonical classifier used by `release.rake`; empty,
+unclassified, non-ancestor, and runtime-bearing commits fail closed. It then previews the stable
+CHANGELOG and release commands. Live `release-finish promote` is blocked because it does not have the
+publication wrapper's lifetime/per-write contract:
 
 ```bash
 script/release-finish promote "${RELEASE_VERSION}" --dry-run   # checks current remote state; performs no release writes
-# BLOCKED: do not run release-finish normal mode until it receives a lifetime/per-write contract.
+# BLOCKED by the script: live promotion is supported only through script/release.
 ```
 
 By default it resolves the highest `v17.0.0.rc.N` tag as the accepted RC; pass `--rc-tag v17.0.0.rc.3`
@@ -1353,9 +1353,10 @@ fi
 readonly ACCEPTED_RC_TAG
 git fetch origin
 git checkout "release/${RELEASE_VERSION}"
-# The branch tip MUST be the last good RC commit (e.g. the v17.0.0.rc.3 commit).
-git rev-parse HEAD            # confirm it equals the tag of the good RC
-git diff --stat "${ACCEPTED_RC_TAG}"  # expect: empty (no drift since the good RC)
+# The branch tip must be the accepted RC or a descendant containing only commits
+# that the release classifier positively identifies as non-runtime-only.
+git rev-parse HEAD
+git log --oneline "${ACCEPTED_RC_TAG}..HEAD"
 ```
 
 Collapse the RC CHANGELOG sections into the final section, then publish only through the fenced wrapper.
