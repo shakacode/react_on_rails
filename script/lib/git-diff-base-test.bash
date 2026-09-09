@@ -385,6 +385,86 @@ install_lefthook_fixture_scripts() {
   fi
 }
 
+setup_sidebar_fixture() {
+  setup_repo_fixture full
+  mkdir -p script/lib docs/oss docs/pro
+  ln -s "$REPO_ROOT/script/check-docs-sidebar" script/check-docs-sidebar
+  ln -s "$REPO_ROOT/script/lib/git-diff-base" script/lib/git-diff-base
+}
+
+append_large_sidebar_fixture() {
+  # Keep the matching entries near the beginning, then exceed pipe capacity.
+  # An early-exiting grep can otherwise turn a match into producer SIGPIPE.
+  local i
+  for ((i = 0; i < 2048; i++)); do
+    printf "  'unrelated-padding-entry-with-a-long-name-for-the-sidebar-%04d',\n" "$i" >> docs/sidebars.ts
+    printf 'unrelated-padding-entry-with-a-long-name-for-the-exclusions-%04d\n' "$i" >> docs/.sidebar-exclusions
+  done
+}
+
+test_sidebar_large_content_accepts_both_quote_styles() {
+  setup_sidebar_fixture
+  printf "  'single[1]',\n  \"pro/double\",\n" > docs/sidebars.ts
+  append_large_sidebar_fixture
+  touch 'docs/oss/single[1].md' docs/pro/double.mdx
+  git add docs/oss docs/pro
+
+  local out
+  if ! out="$(CI='' "$BASH" script/check-docs-sidebar origin/main 2>&1)"; then
+    fail "valid IDs in large sidebar rejected: $out"
+    return 1
+  fi
+  assert_contains "$out" "All 2 new doc(s) have sidebar entries"
+}
+
+test_sidebar_large_exclusions_accepts_exact_ids() {
+  setup_sidebar_fixture
+  printf 'export default {};\n' > docs/sidebars.ts
+  printf '  excluded[1]  # deliberately not in the sidebar\n' > docs/.sidebar-exclusions
+  append_large_sidebar_fixture
+  touch 'docs/oss/excluded[1].md'
+  git add docs/oss
+
+  local out
+  if ! out="$(CI='' "$BASH" script/check-docs-sidebar origin/main 2>&1)"; then
+    fail "valid ID in large exclusions rejected: $out"
+    return 1
+  fi
+  assert_contains "$out" "All 1 new doc(s) accounted for (0 in sidebar, 1 excluded)"
+}
+
+test_sidebar_large_content_rejects_comments_and_partial_ids() {
+  setup_sidebar_fixture
+  printf "// 'comment-only'\n'other', // \"inline-only\"\n'prefix-extra',\n'literal1',\n" > docs/sidebars.ts
+  printf '# excluded-comment\nexcluded-prefix-extra\nother # excluded-inline\n' > docs/.sidebar-exclusions
+  append_large_sidebar_fixture
+  touch docs/oss/comment-only.md docs/oss/inline-only.md docs/oss/prefix.md \
+    'docs/oss/literal[1].md' docs/oss/excluded-comment.md \
+    docs/oss/excluded-prefix.md docs/oss/excluded-inline.md
+  git add docs/oss
+
+  local out rc=0
+  out="$(CI='' "$BASH" script/check-docs-sidebar origin/main 2>&1)" || rc=$?
+  assert_equals 1 "$rc" "missing sidebar entries exit code"
+  assert_contains "$out" "7 doc(s) missing from docs/sidebars.ts"
+}
+
+test_sidebar_missing_file_and_invalid_refs_fail_closed() {
+  setup_sidebar_fixture
+  local out rc=0
+  out="$(CI='' "$BASH" script/check-docs-sidebar origin/main 2>&1)" || rc=$?
+  assert_equals 1 "$rc" "missing sidebar file exit code"
+  assert_contains "$out" "docs/sidebars.ts not found"
+
+  printf 'export default {};\n' > docs/sidebars.ts
+  rc=0
+  out="$(CI='' "$BASH" script/check-docs-sidebar not-a-base-ref 2>&1)" || rc=$?
+  assert_equals 1 "$rc" "invalid base exit code"
+  rc=0
+  out="$(CI='' "$BASH" script/check-docs-sidebar origin/main not-a-current-ref 2>&1)" || rc=$?
+  assert_equals 1 "$rc" "invalid current ref exit code"
+}
+
 test_verify_ref_recognizes_existing_refs() {
   setup_repo_fixture full
   if ! git_diff_base_verify_ref HEAD; then
@@ -730,6 +810,10 @@ ALL_TESTS=(
   test_unshallow_timeout_accepts_zero
   test_unshallow_timeout_warns_on_invalid
   test_run_test_counts_non_final_assertion_failure
+  test_sidebar_large_content_accepts_both_quote_styles
+  test_sidebar_large_exclusions_accepts_exact_ids
+  test_sidebar_large_content_rejects_comments_and_partial_ids
+  test_sidebar_missing_file_and_invalid_refs_fail_closed
   test_verify_ref_recognizes_existing_refs
   test_is_shallow_repository_detects_full_clone
   test_is_shallow_repository_detects_shallow_clone
