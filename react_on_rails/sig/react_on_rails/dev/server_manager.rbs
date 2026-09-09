@@ -109,8 +109,8 @@ module ReactOnRails
       def self.shutdown_live_owner: (dev_session_view) -> shutdown_result
       def self.unreachable_owner_message: (dev_session_view, dev_session) -> String
       def self.request_owner_shutdown: (dev_session_view, Integer?, Array[String]) -> bool
-      def self.shutdown_steps: (Integer?, Array[String]) -> Array[untyped]
-      def self.control_overmind_endpoints: (String, Array[String]) -> bool
+      def self.shutdown_steps: (dev_session_view, Integer?, Array[String]) -> Array[untyped]
+      def self.control_overmind_endpoints: (dev_session_view, String, Array[String]) -> bool
       def self.verify_owner_shutdown: (dev_session_view, Integer?, Array[String]) -> shutdown_result
       def self.outstanding_shutdown_blockers: (dev_session_view) -> Array[String]
       def self.owner_shutdown_complete?: (dev_session_view, Integer?, Array[String]) -> bool

@@ -1217,7 +1217,7 @@ module ReactOnRails
         # produce a verified shutdown inside its grace window. TERM always
         # precedes KILL, and KILL only ever reaches whatever survived TERM.
         def request_owner_shutdown(view, pgid, endpoints)
-          shutdown_steps(pgid, endpoints).each do |label, grace, action|
+          shutdown_steps(view, pgid, endpoints).each do |label, grace, action|
             # Never escalate against state a newer `bin/dev` has taken over: both
             # the recorded pgid and the socket path can have been reused, so the
             # next signal would land on somebody else's session.
@@ -1238,13 +1238,13 @@ module ReactOnRails
           session_replaced?(view) || owner_shutdown_complete?(view, pgid, endpoints)
         end
 
-        def shutdown_steps(pgid, endpoints)
+        def shutdown_steps(view, pgid, endpoints)
           steps = []
           if endpoints.any?
             steps << ["🛑 Asking Overmind to quit via #{endpoints.join(', ')}", SHUTDOWN_TERM_GRACE_SECS,
-                      -> { control_overmind_endpoints("quit", endpoints) }]
+                      -> { control_overmind_endpoints(view, "quit", endpoints) }]
             steps << ["☠️  Overmind did not quit in time; running `overmind kill`", SHUTDOWN_KILL_GRACE_SECS,
-                      -> { control_overmind_endpoints("kill", endpoints) }]
+                      -> { control_overmind_endpoints(view, "kill", endpoints) }]
           end
           if pgid
             steps << ["🛑 Sending TERM to this app's process group (PGID #{pgid})", SHUTDOWN_TERM_GRACE_SECS,
@@ -1255,11 +1255,14 @@ module ReactOnRails
           steps
         end
 
-        def control_overmind_endpoints(subcommand, endpoints)
+        def control_overmind_endpoints(view, subcommand, endpoints)
           deadline = monotonic_now + OVERMIND_CONTROL_BATCH_TIMEOUT_SECS
           all_succeeded = true
 
           endpoints.each_with_index do |endpoint, index|
+            # A preceding command can outlive the session we began shutting down.
+            return false if session_replaced?(view)
+
             remaining = deadline - monotonic_now
             unless remaining.positive?
               skipped = endpoints.length - index

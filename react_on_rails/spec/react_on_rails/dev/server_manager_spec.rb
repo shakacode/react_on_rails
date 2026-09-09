@@ -2782,6 +2782,33 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         end
       end
 
+      it "stops the endpoint batch when session replacement becomes observable" do
+        root = app_root("replaced-between-endpoints")
+        path = session_path(root)
+        FileUtils.mkdir_p(File.dirname(path))
+        File.write(path, "old session")
+        handle = File.open(path)
+        handles << handle
+        view = { root:, path:, handle: }
+        endpoints = %w[first.sock second.sock].map { |name| File.join(root, name) }
+
+        # Conforming claimants respect the fixed lock. Model unexpected inode
+        # replacement, which the existing escalation guard must also respect.
+        allow(described_class).to receive(:overmind_control) do |_command, _endpoint, **_options|
+          File.unlink(path)
+          File.write(path, "replacement session")
+          true
+        end
+        expect(described_class).not_to receive(:signal_process_group)
+
+        capture_stdout { described_class.send(:request_owner_shutdown, view, nil, endpoints) }
+
+        expect(described_class).to have_received(:overmind_control).once
+        expect(described_class).to have_received(:overmind_control)
+          .with("quit", endpoints.first, timeout_secs: kind_of(Numeric))
+        expect(File.read(path)).to eq("replacement session")
+      end
+
       it "discovers sockets when the app root contains glob metacharacters" do
         root = app_root("discovered-[literal]-root")
         sockets_dir = File.join(root, "tmp", "sockets")
@@ -3161,7 +3188,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
           pid
         end
 
-        steps = described_class.send(:shutdown_steps, nil, socket_paths).first(2)
+        steps = described_class.send(:shutdown_steps, { handle: nil }, nil, socket_paths).first(2)
         started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
         output = capture_stdout do
           Dir.chdir(root) { steps.each { |_label, _grace, action| action.call } }
