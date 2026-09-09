@@ -2892,6 +2892,8 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       end
 
       it "fails closed when a live orphan endpoint is hidden by an unreadable socket directory" do
+        skip "file permissions are not enforceable for root" if Process.euid.zero?
+
         root = app_root("discovered-unreadable-orphan")
         sockets_dir = File.join(root, "tmp", "sockets")
         FileUtils.mkdir_p(sockets_dir)
@@ -2913,6 +2915,8 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       end
 
       it "fails closed after stopping an owner when its socket directory cannot be inspected" do
+        skip "file permissions are not enforceable for root" if Process.euid.zero?
+
         root = app_root("discovered-unreadable-owner")
         sockets_dir = File.join(root, "tmp", "sockets")
         FileUtils.mkdir_p(sockets_dir)
