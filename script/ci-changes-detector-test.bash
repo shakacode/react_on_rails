@@ -1536,7 +1536,7 @@ test_benchmark_comment_only_change_is_non_runtime_but_keeps_lint() {
 # this arm existed, rakelib/release.rake hit the uncategorized catch-all and set
 # run_generators=true.
 #
-# All eleven release-tooling paths share one contract, asserted identically via
+# All release-tooling paths share one contract, asserted identically via
 # this helper so a one-character typo in any pattern can't silently fall through
 # to the generator-sensitive script/* CI-infra arm.
 assert_release_tooling_contract() {
@@ -1594,6 +1594,13 @@ test_release_changelog_selector_change_runs_ruby_tests_and_lint_without_generato
   write_file_change "rakelib/release_changelog_selector.rb" "module ReleaseChangelogSelector; end"
 
   assert_release_tooling_contract "$(detector_output)" "release changelog selector output"
+}
+
+test_release_commit_classifier_change_runs_ruby_tests_and_lint_without_generators() {
+  setup_repo
+  write_file_change "rakelib/release_commit_classifier.rb" "module ReleaseCommitClassifier; end"
+
+  assert_release_tooling_contract "$(detector_output)" "release commit classifier output"
 }
 
 test_release_claim_script_change_runs_ruby_tests_and_lint_without_generators() {
@@ -2091,6 +2098,7 @@ run_test test_release_rake_change_runs_ruby_tests_and_lint_without_generators
 run_test test_release_lease_guard_change_runs_ruby_tests_and_lint_without_generators
 run_test test_release_atomic_claim_change_runs_ruby_tests_and_lint_without_generators
 run_test test_release_changelog_selector_change_runs_ruby_tests_and_lint_without_generators
+run_test test_release_commit_classifier_change_runs_ruby_tests_and_lint_without_generators
 run_test test_release_claim_script_change_runs_ruby_tests_and_lint_without_generators
 run_test test_release_finish_script_change_runs_ruby_tests_and_lint_without_generators
 run_test test_release_script_change_runs_ruby_tests_and_lint_without_generators
