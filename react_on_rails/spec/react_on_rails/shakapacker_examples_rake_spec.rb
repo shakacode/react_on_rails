@@ -74,7 +74,8 @@ RSpec.describe "shakapacker_examples rake helpers" do
   end
 
   describe "pinned React example generation" do
-    let(:example_dir) { "/tmp/example-app" }
+    let(:example_dir) { Dir.mktmpdir("ror-example-app-") }
+    let(:generated_gemfile) { "source 'https://rubygems.org'\ngem 'rails'\n" }
     let(:example_type) do
       instance_double(
         ReactOnRails::TaskHelpers::ExampleType,
@@ -94,6 +95,7 @@ RSpec.describe "shakapacker_examples rake helpers" do
     end
 
     before do
+      File.write(example_type.gemfile, generated_gemfile)
       Rake::Task.clear
       allow(ReactOnRails::TaskHelpers::ExampleType).to receive(:all).and_return(
         { shakapacker_examples: [example_type] }
@@ -106,7 +108,10 @@ RSpec.describe "shakapacker_examples rake helpers" do
       allow(task_context).to receive(:sh_in_dir)
       allow(task_context).to receive(:unbundled_sh_in_dir)
       allow(task_context).to receive(:apply_react_version)
+      allow(Rails).to receive(:version).and_return("8.0.4")
     end
+
+    after { FileUtils.remove_entry(example_dir) }
 
     it "pins shakapacker after the pinned React branch bundle install and before npm install" do
       bundle_install_calls = 0
@@ -123,6 +128,22 @@ RSpec.describe "shakapacker_examples rake helpers" do
         .ordered
 
       Rake::Task["shakapacker_examples:gen_example_app"].invoke
+    end
+
+    ["8.0.4", "8.1.0", "8.2.0"].each do |rails_version|
+      it "writes the appropriate JSON pin before bundling on Rails #{rails_version}" do
+        allow(Rails).to receive(:version).and_return(rails_version)
+        expected_gemfile = generated_gemfile.dup
+        expected_gemfile << "gem 'json', '>= 2', '< 3'\n" if rails_version == "8.0.4"
+
+        expect(task_context).to receive(:bundle_install_in).with(example_dir).exactly(3).times do
+          expect(File.read(example_type.gemfile)).to eq(expected_gemfile)
+        end
+
+        Rake::Task["shakapacker_examples:gen_example_app"].invoke
+
+        expect(File.read(example_type.gemfile)).to eq(expected_gemfile)
+      end
     end
   end
 end
