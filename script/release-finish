@@ -668,6 +668,9 @@ class ReleaseFinish
         end
         raise GitError, "remote branch verification timed out after #{REMOTE_REF_TIMEOUT_SECONDS} seconds"
       ensure
+        # A descendant outside the probe group may still hold a pipe open.
+        # Stop our read-only threads rather than waiting for that external EOF.
+        readers.each(&:kill)
         readers.each(&:join)
       end
     end

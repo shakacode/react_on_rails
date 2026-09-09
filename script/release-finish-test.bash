@@ -352,6 +352,46 @@ RUBY
   fi
 }
 
+# A transport descendant can retain a pipe after the probe's process group
+# exits. Model that pipe ownership directly without creating a detached process.
+test_remote_query_timeout_does_not_wait_for_inherited_pipes() {
+  RELEASE_FINISH_SOURCE="$RELEASE_FINISH" ruby <<'RUBY'
+require "stringio"
+load ENV.fetch("RELEASE_FINISH_SOURCE")
+ReleaseFinish.send(:remove_const, :REMOTE_REF_TIMEOUT_SECONDS)
+ReleaseFinish.const_set(:REMOTE_REF_TIMEOUT_SECONDS, 0.05)
+pipes = [IO.pipe, IO.pipe]
+waiter = Thread.new { nil }
+waiter.define_singleton_method(:pid) { 12345 }
+signals = []
+Process.define_singleton_method(:kill) { |signal, pid| signals << [signal, pid] }
+Open3.define_singleton_method(:popen3) do |*_args, **_kwargs, &block|
+  block.call(StringIO.new, pipes[0][0], pipes[1][0], waiter)
+end
+Timeout.timeout(1) { nil } # Start Timeout's own worker before tracking pipe readers.
+readers_before = Thread.list
+probe = Thread.new do
+  ReleaseFinish.new([]).send(:capture_remote_ref, "ls-remote")
+rescue ReleaseFinish::GitError => e
+  e.message
+end
+begin
+  raise "timeout cleanup waited for inherited pipe writers" unless probe.join(2)
+  unless probe.value == "remote branch verification timed out after 0.05 seconds"
+    raise "timeout diagnostic changed: #{probe.value.inspect}"
+  end
+  raise "wrong process group signalled" unless signals == [["KILL", -12345]]
+  raise "pipe readers survived timeout" unless (Thread.list - readers_before - [probe]).empty?
+  puts "retained-pipe timeout and reader cleanup passed"
+ensure
+  pipes.each { |_reader, writer| writer.close }
+  probe.join
+  pipes.each { |reader, _writer| reader.close }
+  waiter.join
+end
+RUBY
+}
+
 # --- promote: explicit rc tag ----------------------------------------------
 
 test_promote_accepts_explicit_rc_tag() {
@@ -1415,6 +1455,7 @@ run_test test_promote_rejects_deleted_remote_branch_with_stale_tracking_ref
 run_test test_promote_checks_remote_tip_with_restricted_fetch_refspec
 run_test test_promote_rejects_failed_or_inexact_remote_query
 run_test test_promote_bounds_stalled_remote_query_and_reaps_probe
+run_test test_remote_query_timeout_does_not_wait_for_inherited_pipes
 run_test test_promote_accepts_explicit_rc_tag
 run_test test_promote_aborts_when_not_on_release_branch
 run_test test_promote_aborts_when_tip_drifted_from_rc_tag
