@@ -21,7 +21,7 @@ module ReactOnRails
       # port => pids, :unavailable is a list of ports whose probe failed.
       type port_listener_scan = Hash[Symbol, untyped]
 
-      def self.start: (mode, String?, ?verbose: bool, ?route: String?, ?rails_env: String?) -> void
+      def self.start: (?mode, ?String?, ?verbose: bool, ?route: String?, ?rails_env: String?, ?skip_database_check: bool, ?open_browser: bool, ?open_browser_once: bool) -> void
       def self.kill_processes: () -> Symbol
       def self.clean_generated_assets_and_caches: () -> bool
       def self.killable_ports: () -> Array[Integer]
@@ -43,9 +43,9 @@ module ReactOnRails
       def self.help_customization: () -> String
       def self.help_mode_details: () -> String
       def self.help_troubleshooting: () -> String
-      def self.run_production_like: (?_verbose: bool, ?route: String?, ?rails_env: String?) -> void
-      def self.run_static_development: (String, ?verbose: bool, ?route: String?) -> void
-      def self.run_development: (String, ?verbose: bool, ?route: String?) -> void
+      def self.run_production_like: (?_verbose: bool, ?route: String?, ?rails_env: String?, ?skip_database_check: bool, ?open_browser: bool, ?open_browser_once: bool) -> void
+      def self.run_static_development: (String, ?verbose: bool, ?route: String?, ?skip_database_check: bool, ?open_browser: bool, ?open_browser_once: bool) -> void
+      def self.run_development: (String, ?verbose: bool, ?route: String?, ?skip_database_check: bool, ?open_browser: bool, ?open_browser_once: bool) -> void
       def self.print_server_info: (String, Array[String], ?Integer, ?route: String?) -> void
       def self.print_procfile_info: (String, ?route: String?) -> void
       def self.procfile_port: (String) -> Integer

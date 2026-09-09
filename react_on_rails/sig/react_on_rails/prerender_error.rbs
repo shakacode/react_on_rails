@@ -9,14 +9,14 @@ module ReactOnRails
     attr_reader js_code: String?
     attr_reader console_messages: String?
 
-    def initialize: (?component_name: String?, ?err: StandardError?, ?props: String?, ?js_code: String?, ?console_messages: String?) -> void
+    def initialize: (?component_name: String?, ?err: StandardError?, ?props: (String | Hash[untyped, untyped])?, ?js_code: String?, ?console_messages: String?) -> void
     def to_honeybadger_context: () -> Hash[Symbol, untyped]
     def raven_context: () -> Hash[Symbol, untyped]
     def to_error_context: () -> Hash[Symbol, untyped]
 
     private
 
-    def calc_message: (String? component_name, String? console_messages, StandardError? err, String? js_code, String? props) -> [String?, String]
+    def calc_message: (String? component_name, String? console_messages, StandardError? err, String? js_code, (String | Hash[untyped, untyped])? props) -> [String?, String]
     def build_troubleshooting_suggestions: (String? component_name, StandardError? err, String? console_messages) -> String
   end
 end
