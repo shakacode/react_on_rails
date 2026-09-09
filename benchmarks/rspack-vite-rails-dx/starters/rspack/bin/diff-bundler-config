@@ -1,0 +1,148 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "yaml"
+
+# This binstub is managed by Shakapacker. Delete it and rerun the install or init command to regenerate it.
+def shakapacker_app_root
+  candidate = File.expand_path("..", __dir__)
+  return candidate if File.exist?(File.join(candidate, "Gemfile"))
+
+  warn "[Shakapacker] No Gemfile found at #{candidate.inspect}; " \
+       "falling back to the current directory (#{Dir.pwd.inspect})."
+  Dir.pwd
+end
+
+def shakapacker_node_binary
+  "node"
+end
+
+def shakapacker_warn_missing_node
+  warn '[Shakapacker] Could not find Node.js executable "node". ' \
+       "Install Node.js and try again."
+  exit 1
+end
+
+def shakapacker_exec_env(launch_dir)
+  return {} unless ENV.key?("PATH")
+
+  path_entries = ENV["PATH"].split(File::PATH_SEPARATOR, -1)
+  path_entries = [""] if path_entries.empty?
+
+  normalized_path = path_entries.map do |entry|
+    entry.empty? ? launch_dir : File.absolute_path(entry, launch_dir)
+  end.join(File::PATH_SEPARATOR)
+
+  { "PATH" => normalized_path }
+end
+
+def shakapacker_exec_node(script_path, argv, launch_dir)
+  exec_env = shakapacker_exec_env(launch_dir)
+
+  if exec_env.empty?
+    exec shakapacker_node_binary, script_path, *argv
+  else
+    exec exec_env, shakapacker_node_binary, script_path, *argv
+  end
+rescue Errno::ENOENT, Errno::EACCES
+  shakapacker_warn_missing_node
+end
+
+def shakapacker_node_env
+  %w[development test].include?(ENV["RAILS_ENV"]) ? "development" : "production"
+end
+
+def shakapacker_load_yaml_file(path)
+  YAML.load_file(path, aliases: true)
+rescue ArgumentError
+  YAML.load_file(path)
+end
+
+def shakapacker_source_path(app_root)
+  config_path = ENV["SHAKAPACKER_CONFIG"] || File.join("config", "shakapacker.yml")
+  config_path = File.expand_path(config_path, app_root)
+  return nil unless File.file?(config_path)
+
+  config = shakapacker_load_yaml_file(config_path)
+  return nil unless config.is_a?(Hash)
+
+  env = ENV["RAILS_ENV"] || ENV["RACK_ENV"] || "development"
+  env_config = config[env] || config["production"]
+  return nil unless env_config.is_a?(Hash)
+
+  source_path = env_config["source_path"]
+  source_path if source_path.is_a?(String)
+rescue Psych::Exception, SystemCallError, ArgumentError
+  nil
+end
+
+def shakapacker_path_within?(path, parent)
+  path == parent || path.start_with?("#{parent}#{File::SEPARATOR}")
+end
+
+def shakapacker_package_root_marker?(path)
+  %w[
+    package.json
+    bun.lockb
+    pnpm-lock.yaml
+    yarn.lock
+    package-lock.json
+    node_modules
+  ].any? { |entry| File.exist?(File.join(path, entry)) }
+end
+
+def shakapacker_client_root(app_root)
+  source_path = shakapacker_source_path(app_root)
+  return app_root unless source_path && !source_path.empty?
+
+  app_root = File.expand_path(app_root)
+  current = File.expand_path(source_path, app_root)
+  return app_root unless shakapacker_path_within?(current, app_root)
+
+  loop do
+    return current if shakapacker_package_root_marker?(current)
+    break if current == app_root
+
+    parent = File.dirname(current)
+    break if parent == current
+
+    current = parent
+  end
+
+  app_root
+end
+
+def shakapacker_package_script_path(package_root, package_script)
+  File.join(
+    package_root,
+    "node_modules",
+    "shakapacker",
+    "package",
+    "bin",
+    package_script
+  )
+end
+
+def shakapacker_package_script_paths(app_root, client_root, package_script)
+  [client_root, app_root].uniq.map do |package_root|
+    shakapacker_package_script_path(package_root, package_script)
+  end
+end
+
+ENV["RAILS_ENV"] ||= ENV["RACK_ENV"] || "development"
+ENV["NODE_ENV"] ||= shakapacker_node_env
+
+launch_dir = Dir.pwd
+app_root = shakapacker_app_root
+client_root = shakapacker_client_root(app_root)
+script_paths = shakapacker_package_script_paths(app_root, client_root, "diff-bundler-config.cjs")
+script_path = script_paths.find { |path| File.file?(path) }
+
+unless script_path
+  warn "[Shakapacker] Could not find #{script_paths.join(' or ')}. Run your package manager install command and try again."
+  exit 1
+end
+
+Dir.chdir(app_root) do
+  shakapacker_exec_node(script_path, ARGV, launch_dir)
+end

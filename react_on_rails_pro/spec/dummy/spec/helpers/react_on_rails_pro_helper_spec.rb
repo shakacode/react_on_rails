@@ -755,6 +755,9 @@ describe ReactOnRailsProHelper do
     let(:synthetic_stack) do
       "Error: User 48213 not authorized\n    at Auth (/app/components/Auth.server.tsx:12:5)"
     end
+    let(:synthetic_console_replay_script) do
+      'console.error("RSC fetch failed for User 48213 at /app/components/Auth.server.tsx:12:5")'
+    end
     let(:rendering_error) { { "message" => synthetic_message, "stack" => synthetic_stack } }
     let(:error_chunk) do
       { "hasErrors" => true, "renderingError" => rendering_error, "html" => "payload" }
@@ -803,6 +806,30 @@ describe ReactOnRailsProHelper do
       expect(wire).not_to include("Auth.server.tsx")
     end
 
+    it "allowlists only a generic error signal in production browser metadata" do
+      stub_rails_env("production")
+      server_metadata = error_chunk.merge(
+        "consoleReplayScript" => synthetic_console_replay_script,
+        "diagnosticContext" => { "sourcePath" => "/srv/private/Auth.server.tsx" }
+      )
+      seen_by_server = nil
+
+      wire = framed_wire_bytes(server_metadata) do |chunk|
+        seen_by_server = chunk
+        chunk
+      end
+
+      expect(wire).to eq("{\"hasErrors\":true}\t00000007\npayload")
+      expect(wire).not_to include(synthetic_message)
+      expect(wire).not_to include("/srv/private/Auth.server.tsx")
+      expect(wire).not_to include(synthetic_console_replay_script)
+      expect(seen_by_server).to include(
+        "renderingError" => rendering_error,
+        "consoleReplayScript" => synthetic_console_replay_script,
+        "diagnosticContext" => { "sourcePath" => "/srv/private/Auth.server.tsx" }
+      )
+    end
+
     it "redacts renderingError in non-development/test environments like staging" do
       stub_rails_env("staging")
 
@@ -843,14 +870,16 @@ describe ReactOnRailsProHelper do
       expect(wire).to eq("{\"hasErrors\":false}\t00000007\npayload")
     end
 
-    it "includes the full renderingError in development" do
+    it "includes full error and console diagnostics in development" do
       stub_rails_env("development")
 
-      wire = framed_wire_bytes(error_chunk)
+      wire = framed_wire_bytes(error_chunk.merge("consoleReplayScript" => synthetic_console_replay_script))
+      metadata = JSON.parse(wire.split("\t", 2).first)
 
       expect(wire).to include("renderingError")
       expect(wire).to include(synthetic_message)
       expect(wire).to include("Auth.server.tsx")
+      expect(metadata["consoleReplayScript"]).to eq(synthetic_console_replay_script)
     end
 
     it "includes the full renderingError in test" do

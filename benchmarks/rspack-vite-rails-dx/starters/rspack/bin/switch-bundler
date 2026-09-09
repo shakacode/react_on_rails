@@ -1,0 +1,161 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "fileutils"
+require "json"
+
+# Script to switch between webpack and rspack bundlers
+class BundlerSwitcher
+  # Pinned to ^major.0.0 to prevent peer dependency conflicts from major version bumps.
+  # Pre-1.0 packages are left bare since ^0.x pins to the minor version.
+  # webpack-cli pinned to ^6 (not ^7) to stay within Shakapacker's supported peer range.
+  WEBPACK_DEPS = {
+    dependencies: %w[webpack@^5.0.0 webpack-assets-manifest@^6.0.0 webpack-merge@^6.0.0],
+    dev_dependencies: %w[webpack-cli@^6.0.0 webpack-dev-server@^5.0.0 @pmmmwh/react-refresh-webpack-plugin]
+  }.freeze
+
+  RSPACK_DEPS = {
+    dependencies: %w[@rspack/core@^2.0.0-0 rspack-manifest-plugin@^5.0.0],
+    dev_dependencies: %w[
+      @rspack/cli@^2.0.0-0
+      @rspack/dev-server@^2.0.0
+      @rspack/plugin-react-refresh@^2.0.0
+      react-refresh
+    ]
+  }.freeze
+
+  def initialize(target_bundler)
+    @target_bundler = target_bundler.to_s.downcase
+    @shakapacker_config = "config/shakapacker.yml"
+    validate_bundler!
+  end
+
+  def switch!
+    puts "🔄 Switching to #{@target_bundler}..."
+
+    update_shakapacker_config
+    update_dependencies
+    install_dependencies
+
+    puts "✅ Successfully switched to #{@target_bundler}!"
+    puts "\nNext steps:"
+    puts "  1. Review your webpack configuration files in config/webpack/"
+    puts "  2. Restart your development server"
+  end
+
+  private
+
+  def validate_bundler!
+    return if %w[webpack rspack].include?(@target_bundler)
+
+    abort "❌ Invalid bundler: #{@target_bundler}. Use 'webpack' or 'rspack'"
+  end
+
+  def update_shakapacker_config
+    abort "❌ #{@shakapacker_config} not found" unless File.exist?(@shakapacker_config)
+
+    puts "📝 Updating #{@shakapacker_config}..."
+    content = File.read(@shakapacker_config)
+
+    # Use regex replacement to preserve file structure (comments, anchors, aliases)
+    # This replaces ALL occurrences of assets_bundler, not just in default section
+    old_bundler = @target_bundler == "rspack" ? "webpack" : "rspack"
+    new_content = content.gsub(
+      /^(\s*assets_bundler:\s*)["']?#{old_bundler}["']?(\s*(?:#.*)?)$/,
+      "\\1#{@target_bundler}\\2"
+    )
+
+    # Update javascript_transpiler based on bundler (rspack works best with SWC)
+    new_loader = @target_bundler == "rspack" ? "swc" : "babel"
+    old_loader = @target_bundler == "rspack" ? "babel" : "swc"
+    new_content = new_content.gsub(
+      /^(\s*javascript_transpiler:\s*)["']?#{old_loader}["']?(\s*(?:#.*)?)$/,
+      "\\1#{new_loader}\\2"
+    )
+
+    File.write(@shakapacker_config, new_content)
+    puts "✅ Updated assets_bundler to '#{@target_bundler}'"
+  end
+
+  def update_dependencies
+    puts "📦 Updating package.json dependencies..."
+
+    package_json_path = "package.json"
+    unless File.exist?(package_json_path)
+      puts "⚠️  package.json not found, skipping dependency updates"
+      return
+    end
+
+    package_json = JSON.parse(File.read(package_json_path))
+
+    remove_deps = @target_bundler == "rspack" ? WEBPACK_DEPS : RSPACK_DEPS
+
+    # Remove old bundler dependencies
+    # Strip version suffix (e.g., "webpack@^5.0.0" -> "webpack") since package.json keys are bare names.
+    # The regex handles scoped (@scope/name@ver) and unscoped (name@ver) packages, and is a no-op for
+    # bare names without a version suffix (e.g., "@pmmmwh/react-refresh-webpack-plugin" stays unchanged).
+    remove_deps[:dependencies].each do |dep|
+      package_json["dependencies"]&.delete(dep[%r{\A(@[^/]+/[^@]+|[^@]+)}])
+    end
+    remove_deps[:dev_dependencies].each do |dep|
+      package_json["devDependencies"]&.delete(dep[%r{\A(@[^/]+/[^@]+|[^@]+)}])
+    end
+
+    puts "✅ Removed #{@target_bundler == 'rspack' ? 'webpack' : 'rspack'} dependencies"
+    File.write(package_json_path, JSON.pretty_generate(package_json))
+  end
+
+  def install_dependencies
+    puts "📥 Installing #{@target_bundler} dependencies..."
+
+    deps = @target_bundler == "rspack" ? RSPACK_DEPS : WEBPACK_DEPS
+
+    # Detect package manager
+    package_manager = detect_package_manager
+
+    # Install dependencies using array form to prevent command injection
+    success = case package_manager
+              when "yarn"
+                system("yarn", "add", *deps[:dependencies])
+              when "pnpm"
+                system("pnpm", "add", *deps[:dependencies])
+              else
+                system("npm", "install", *deps[:dependencies])
+              end
+
+    abort("❌ Failed to install dependencies") unless success
+
+    # Install dev dependencies using array form to prevent command injection
+    success = case package_manager
+              when "yarn"
+                system("yarn", "add", "-D", *deps[:dev_dependencies])
+              when "pnpm"
+                system("pnpm", "add", "-D", *deps[:dev_dependencies])
+              else
+                system("npm", "install", "--save-dev", *deps[:dev_dependencies])
+              end
+
+    abort("❌ Failed to install dev dependencies") unless success
+
+    puts "✅ Installed #{@target_bundler} dependencies"
+  end
+
+  def detect_package_manager
+    return "yarn" if File.exist?("yarn.lock")
+    return "pnpm" if File.exist?("pnpm-lock.yaml")
+
+    "npm"
+  end
+end
+
+# Main execution
+if ARGV.empty?
+  puts "Usage: bin/switch-bundler [webpack|rspack]"
+  puts "\nExamples:"
+  puts "  bin/switch-bundler rspack   # Switch to Rspack"
+  puts "  bin/switch-bundler webpack  # Switch to Webpack"
+  puts "\nNote: This also updates javascript_transpiler (rspack uses swc, webpack uses babel)"
+  exit 1
+end
+
+BundlerSwitcher.new(ARGV[0]).switch!

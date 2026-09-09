@@ -87,6 +87,8 @@ chmod 700 "$synthetic_gem_dir/bin/ror-eval-runtime-smoke"
 
 "${minimal_env[@]}" codex exec --help 2>&1 | grep -q -- '--dangerously-bypass-approvals-and-sandbox'
 "${minimal_env[@]}" claude --version >/dev/null
+"${minimal_env[@]}" claude --help 2>&1 | grep -Fq -- '--safe-mode'
+"${minimal_env[@]}" claude --safe-mode --version >/dev/null
 
 claude_schema="$("$eval_dir/bin/build-claude-agent-report-schema")"
 printf '%s' synthetic-invalid-never-valid >"$private_dir/model-credential"
@@ -102,7 +104,11 @@ import http from 'node:http';
 
 const [portFile, requestFile] = process.argv.slice(2);
 const server = http.createServer((request, response) => {
-  const brokeredAuth = request.headers['x-api-key'] === 'synthetic-invalid-never-valid' ? 'yes' : 'no';
+  const brokeredAuth =
+    request.headers['x-api-key'] === 'synthetic-invalid-never-valid' ||
+    request.headers.authorization === 'Bearer synthetic-oauth-access-token'
+      ? 'yes'
+      : 'no';
   fs.appendFileSync(requestFile, `${request.method} ${request.url} brokered_auth=${brokeredAuth}\n`, {
     mode: 0o600,
   });
@@ -150,6 +156,44 @@ if grep -Fq 'no schema with key or ref' \
   echo "Claude rejected its compatible agent-report schema" >&2
   exit 1
 fi
+
+: >"$claude_stub_request_file"
+claude_oauth_source="$private_dir/claude-oauth-source.json"
+claude_oauth_dir="$runner_home/.claude"
+claude_oauth_store="$claude_oauth_dir/.credentials.json"
+mkdir -m 700 "$claude_oauth_dir"
+printf '%s' \
+  '{"claudeAiOauth":{"accessToken":"synthetic-oauth-access-token","refreshToken":"synthetic-oauth-refresh-token","expiresAt":4102444800000,"refreshTokenExpiresAt":4102444800000,"scopes":["user:inference"],"subscriptionType":null,"rateLimitTier":null},"mcpOAuth":{"discarded":true}}' \
+  >"$claude_oauth_source"
+"$eval_dir/bin/canonicalize-model-credential" claude-oauth \
+  "$claude_oauth_source" "$claude_oauth_store"
+unlink "$claude_oauth_source"
+claude_oauth_settings="$private_dir/claude-oauth-settings.json"
+jq -n '{}' >"$claude_oauth_settings"
+set +e
+env -i "PATH=$safe_path" "HOME=$runner_home" "TMPDIR=$private_dir/tmp" LANG=C LC_ALL=C SHELL=/bin/sh \
+  CODEX_EVAL=1 \
+  ANTHROPIC_BASE_URL="http://127.0.0.1:$claude_stub_port" timeout 8 claude -p \
+  --safe-mode --no-session-persistence --disable-slash-commands --no-chrome \
+  --strict-mcp-config --mcp-config '{"mcpServers":{}}' \
+  --tools 'Bash,Read,Write,Edit,Glob,Grep' --model sonnet \
+  --settings "$claude_oauth_settings" --output-format json --json-schema "$claude_schema" \
+  'native OAuth and safe mode compatibility only' \
+  >"$private_dir/claude-oauth-output" 2>"$private_dir/claude-oauth-error"
+claude_oauth_exit=$?
+set -e
+[[ "$claude_oauth_exit" != 0 ]] || {
+  echo "Claude OAuth smoke unexpectedly completed a model call" >&2
+  exit 1
+}
+[[ -s "$claude_stub_request_file" ]] || {
+  echo "Claude OAuth did not attempt the loopback endpoint" >&2
+  exit 1
+}
+grep -Eq '^POST /v1/messages([?].*)? brokered_auth=yes$' "$claude_stub_request_file" || {
+  echo "Claude OAuth did not issue the expected authenticated loopback model request" >&2
+  exit 1
+}
 kill "$claude_stub_pid" 2>/dev/null || true
 wait "$claude_stub_pid" 2>/dev/null || true
 claude_stub_pid=""

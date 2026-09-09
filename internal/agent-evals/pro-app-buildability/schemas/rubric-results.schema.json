@@ -5,7 +5,7 @@
   "required": ["schema_version", "overall", "items"],
   "properties": {
     "schema_version": { "const": "1.0" },
-    "overall": { "enum": ["pass", "fail", "incomplete"] },
+    "overall": { "enum": ["pass", "fail", "incomplete", "needs-review"] },
     "items": {
       "type": "array",
       "minItems": 9,

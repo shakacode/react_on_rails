@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
 import path from 'node:path';
-import { containsSensitiveValues } from './sensitive-values.mjs';
+import { containsSensitiveNamedValue, containsSensitiveValues } from './sensitive-values.mjs';
 
 const target = process.argv[2];
 if (!target || !fs.existsSync(target)) {
@@ -11,7 +11,44 @@ if (!target || !fs.existsSync(target)) {
 
 const MAX_VISITED_ENTRIES = 5_000;
 const MAX_DEPTH = 64;
+// Leaves room for the bounded 2 MiB artifact payload to expand during JSON escaping.
+const MAX_JSON_BYTES = 16_777_216;
+const MAX_JSON_DEPTH = 64;
+// A 5,000-command evidence document uses fewer than 40,000 nodes under the committed schema.
+const MAX_JSON_NODES = 50_000;
 let visitedEntries = 0;
+
+const containsSensitiveJson = (value, traversal, depth = 0) => {
+  if (depth > MAX_JSON_DEPTH) throw new Error(`JSON scan depth exceeds ${MAX_JSON_DEPTH}`);
+  traversal.nodes += 1;
+  if (traversal.nodes > MAX_JSON_NODES) {
+    throw new Error(`JSON scan nodes exceed ${MAX_JSON_NODES}`);
+  }
+  if (typeof value === 'string') return containsSensitiveValues(value);
+  if (Array.isArray(value)) {
+    return value.some((nestedValue) => containsSensitiveJson(nestedValue, traversal, depth + 1));
+  }
+  if (value === null || typeof value !== 'object') return false;
+  return Object.entries(value).some(
+    ([name, nestedValue]) =>
+      containsSensitiveJson(nestedValue, traversal, depth + 1) ||
+      containsSensitiveNamedValue(name, nestedValue),
+  );
+};
+
+const containsSensitiveJsonFile = (entry, stat) => {
+  if (stat.size > MAX_JSON_BYTES) {
+    throw new Error(`JSON scan bytes exceed ${MAX_JSON_BYTES}: ${entry}`);
+  }
+  const content = fs.readFileSync(entry, 'utf8');
+  let parsed;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    throw new Error(`malformed JSON: ${entry}`);
+  }
+  return containsSensitiveJson(parsed, { nodes: 0 });
+};
 
 const containsSensitiveFile = (entry, depth = 0) => {
   if (depth > MAX_DEPTH) throw new Error(`scan depth exceeds ${MAX_DEPTH}`);
@@ -32,9 +69,15 @@ const containsSensitiveFile = (entry, depth = 0) => {
     } finally {
       directory.closeSync();
     }
-  } else if (stat.isFile() && containsSensitiveValues(fs.readFileSync(entry, 'utf8'))) {
-    console.log(entry);
-    return true;
+  } else if (stat.isFile()) {
+    const sensitive =
+      path.extname(entry).toLowerCase() === '.json'
+        ? containsSensitiveJsonFile(entry, stat)
+        : containsSensitiveValues(fs.readFileSync(entry, 'utf8'));
+    if (sensitive) {
+      console.log(entry);
+      return true;
+    }
   }
   return false;
 };

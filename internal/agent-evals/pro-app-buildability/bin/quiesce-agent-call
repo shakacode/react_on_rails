@@ -1,0 +1,122 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+output="${1:-}"
+[[ -n "$output" ]] || { echo "usage: $0 OUTPUT_PATH" >&2; exit 64; }
+[[ ! -e "$output" && ! -L "$output" ]] || {
+  echo "agent created the evidence output before runner publication" >&2
+  exit 1
+}
+
+test_mode="${EVAL_AGENT_CONTAINMENT_TEST_MODE:-0}"
+[[ "$test_mode" == 0 || "$test_mode" == 1 ]] || {
+  echo "invalid agent containment test mode" >&2
+  exit 1
+}
+if [[ "${EVAL_PROC_ROOT+x}" == x || "${EVAL_RUNNER_PID+x}" == x ||
+  "${EVAL_PROCESS_CONTROL_HOOK+x}" == x || "${EVAL_PROCESS_QUIESCE_DELAY+x}" == x ]]; then
+  [[ "$test_mode" == 1 ]] || {
+    echo "process overrides require explicit test mode" >&2
+    exit 1
+  }
+fi
+[[ "${EVAL_ISOLATED_PID_NAMESPACE:-0}" == 1 ]] || exit 0
+
+proc_root="/proc"
+runner_pid="$PPID"
+control_hook=""
+quiesce_delay=0.1
+if [[ "$test_mode" == 1 ]]; then
+  proc_root="${EVAL_PROC_ROOT:-/proc}"
+  runner_pid="${EVAL_RUNNER_PID:-$PPID}"
+  control_hook="${EVAL_PROCESS_CONTROL_HOOK:-}"
+  quiesce_delay="${EVAL_PROCESS_QUIESCE_DELAY:-0.1}"
+else
+  [[ "$runner_pid" != 1 ]] || {
+    echo "attested eval runner is not supervised by namespace init" >&2
+    exit 1
+  }
+  [[ "$(stat -f -c %T /proc 2>/dev/null)" == proc ]] || {
+    echo "attested eval process root is not a genuine procfs" >&2
+    exit 1
+  }
+  runner_parent=""
+  while read -r status_key status_value _; do
+    if [[ "$status_key" == PPid: ]]; then
+      runner_parent="$status_value"
+      break
+    fi
+  done <"$proc_root/$runner_pid/status"
+  [[ "$runner_parent" == 1 ]] || {
+    echo "attested eval runner is not supervised by namespace init" >&2
+    exit 1
+  }
+fi
+[[ -d "$proc_root" && "$runner_pid" =~ ^[1-9][0-9]*$ ]] || {
+  echo "invalid process inspection configuration" >&2
+  exit 1
+}
+[[ -z "$control_hook" || ( -f "$control_hook" && -x "$control_hook" && ! -L "$control_hook" ) ]] || {
+  echo "invalid process control hook" >&2
+  exit 1
+}
+[[ "$quiesce_delay" =~ ^(0|0\.[0-9]+)$ ]] || {
+  echo "invalid process quiescence delay" >&2
+  exit 1
+}
+
+shopt -s nullglob dotglob
+remaining_processes=()
+collect_remaining_processes() {
+  local process_dir process_pid
+  remaining_processes=()
+  process_dirs=("$proc_root"/[0-9]*)
+  ((${#process_dirs[@]} > 0)) || {
+    echo "process inspection found no process directories" >&2
+    return 1
+  }
+  for process_dir in "${process_dirs[@]}"; do
+    process_pid="${process_dir##*/}"
+    [[ "$process_pid" == 1 || "$process_pid" == "$runner_pid" || "$process_pid" == "$$" ]] && continue
+    remaining_processes+=("$process_pid")
+  done
+}
+
+control_processes() {
+  local signal="$1"
+  local process_pid
+  for process_pid in "${remaining_processes[@]}"; do
+    if [[ -n "$control_hook" ]]; then
+      "$control_hook" "$signal" "$process_pid" "$proc_root"
+    else
+      kill "-$signal" "$process_pid" 2>/dev/null || true
+    fi
+  done
+}
+
+allow_init_to_reap() {
+  if [[ -n "$control_hook" ]]; then
+    "$control_hook" REAP 0 "$proc_root"
+  fi
+  [[ "$quiesce_delay" == 0 ]] || sleep "$quiesce_delay"
+}
+
+collect_remaining_processes
+((${#remaining_processes[@]} == 0)) && exit 0
+control_processes TERM
+for _ in {1..10}; do
+  allow_init_to_reap
+  collect_remaining_processes
+  ((${#remaining_processes[@]} == 0)) && exit 0
+done
+
+for _ in {1..10}; do
+  collect_remaining_processes
+  ((${#remaining_processes[@]} == 0)) && exit 0
+  control_processes KILL
+  allow_init_to_reap
+done
+collect_remaining_processes
+((${#remaining_processes[@]} == 0)) && exit 0
+echo "agent processes remain after bounded cleanup" >&2
+exit 1
