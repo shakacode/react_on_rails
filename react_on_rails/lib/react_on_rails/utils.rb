@@ -3,6 +3,7 @@
 require "English"
 require "open3"
 require "rainbow"
+require "uri"
 require "active_support"
 require "active_support/core_ext/string"
 require "shellwords"
@@ -443,6 +444,94 @@ module ReactOnRails
         path_str
       end
     end
+
+    # Returns a display-safe version of a URL suitable for error messages, logs,
+    # and diagnostics. Strips userinfo (user:password@) from the authority section,
+    # redacts all query-string values (keeping keys for diagnostics), and preserves
+    # the fragment verbatim. The original URL is never modified — only the returned
+    # copy is sanitized.
+    #
+    # Handles edge cases that Ruby's URI.parse misses:
+    # - URI::File silently discards userinfo (userinfo is always nil)
+    # - Malformed URLs with raw /, ?, or # in passwords
+    # - Passwords containing embedded @ characters
+    #
+    # See issue #5046 for the full fuzz table and design rationale.
+    def self.sanitize_url_for_display(url)
+      return url if url.nil? || url.empty?
+
+      begin
+        uri = URI.parse(url)
+        if uri.userinfo.nil?
+          # URI::File (and potentially other schemes) silently discard userinfo.
+          # Check the raw string for a userinfo-like pattern before trusting the
+          # parser's nil — but only in the authority section (before the first
+          # / ? or # after ://), not in the query or fragment where @ is common.
+          if url.match?(%r{://[^/?#]*@})
+            sanitized = strip_userinfo_by_regex(url)
+            return redact_query_values(sanitized)
+          end
+
+          return redact_query_values_in_uri(uri)
+        end
+
+        uri.password = nil
+        uri.user = nil
+        redact_query_values_in_uri(uri)
+      rescue URI::InvalidURIError
+        sanitized = strip_userinfo_by_regex(url)
+        redact_query_values(sanitized)
+      end
+    end
+
+    # Strips userinfo from a URL string using rindex("@") to find the last @
+    # in the authority section. Does not rely on character-class exclusions,
+    # so it handles /, ?, #, and embedded @ in passwords.
+    #
+    # Only called on a single URL value (not prose text), so the assumption
+    # that the last @ before the path is the userinfo delimiter is strong.
+    def self.strip_userinfo_by_regex(url)
+      match = url.match(%r{\A\s*(?<scheme>\w+://)}i)
+      return url unless match
+
+      rest = url[match[0].length..]
+      last_at = rest.rindex("@")
+      return url unless last_at
+
+      match[:scheme] + rest[(last_at + 1)..]
+    end
+    private_class_method :strip_userinfo_by_regex
+
+    # Redacts all query-string values in a parsed URI, keeping keys for diagnostics.
+    # Uses regex-based substitution on the query string to avoid URI.encode_www_form
+    # percent-encoding the [REDACTED] placeholder.
+    # Returns the URI as a string.
+    def self.redact_query_values_in_uri(uri)
+      result = uri.to_s
+      redact_query_values(result)
+    end
+    private_class_method :redact_query_values_in_uri
+
+    # Redacts query-string values in a raw URL string using regex substitution.
+    # Used when we don't have a parsed URI (malformed URL path).
+    def self.redact_query_values(url)
+      return url unless url.include?("?")
+
+      # Split on ? to isolate the query+fragment portion, then redact values
+      base, query_and_fragment = url.split("?", 2)
+      return url unless query_and_fragment
+
+      # Separate fragment from query
+      query_part, fragment = query_and_fragment.split("#", 2)
+
+      # Redact each value: key=value → key=[REDACTED]
+      redacted_query = query_part.gsub(/=([^&]*)/, "=[REDACTED]")
+
+      result = "#{base}?#{redacted_query}"
+      result += "##{fragment}" if fragment
+      result
+    end
+    private_class_method :redact_query_values
 
     def self.default_troubleshooting_section
       <<~DEFAULT

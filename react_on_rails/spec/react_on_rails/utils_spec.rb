@@ -1000,6 +1000,153 @@ module ReactOnRails
         expect(described_class.command_available?("anything")).to be(false)
       end
     end
+
+    # See issue #5046: renderer-URL credential redaction still leaks query-string
+    # credentials, file:// userinfo, and slash-bearing passwords. This fuzz table
+    # is landed as specs so the next bypass fails CI rather than being found by
+    # the next audit.
+    describe ".sanitize_url_for_display" do
+      # Standard userinfo — existing behavior
+      it "strips user:password from HTTP URLs" do
+        expect(described_class.sanitize_url_for_display("http://u:s3cr3t@host:3800/b.js"))
+          .to eq("http://host:3800/b.js")
+      end
+
+      it "strips user:password from HTTPS URLs" do
+        expect(described_class.sanitize_url_for_display("https://u:s3cr3t@host:3800/b.js"))
+          .to eq("https://host:3800/b.js")
+      end
+
+      # Embedded @ in password (PR #5017 fix)
+      it "strips user:password even when password contains @" do
+        result = described_class.sanitize_url_for_display("http://u:s3cr3t@more@host:3800/b.js")
+        expect(result).not_to include("s3cr3t")
+        expect(result).not_to include("more")
+        expect(result).to include("host:3800/b.js")
+      end
+
+      # Leak 1: Query-string credentials (most realistic — presigned S3/CloudFront URLs)
+      it "redacts query values while keeping keys for presigned URLs" do
+        input = "https://cdn.example.com/bundle.js?X-Amz-Credential=AKIAs3cr3t&X-Amz-Signature=abc123"
+        result = described_class.sanitize_url_for_display(input)
+        expect(result).to include("X-Amz-Credential=[REDACTED]")
+        expect(result).to include("X-Amz-Signature=[REDACTED]")
+        expect(result).not_to include("AKIAs3cr3t")
+        expect(result).not_to include("abc123")
+        expect(result).to include("https://cdn.example.com/bundle.js")
+      end
+
+      it "redacts a simple token query parameter" do
+        result = described_class.sanitize_url_for_display("https://cdn.example.com/bundle.js?token=s3cr3t")
+        expect(result).to include("token=[REDACTED]")
+        expect(result).not_to include("s3cr3t")
+      end
+
+      it "redacts all query values in a multi-param URL" do
+        input = "https://cdn.example.com/bundle.js?X-Amz-Credential=AKIA&X-Amz-Signature=abc&X-Amz-Security-Token=FwoGZX"
+        result = described_class.sanitize_url_for_display(input)
+        expect(result).not_to include("AKIA")
+        expect(result).not_to include("abc")
+        expect(result).not_to include("FwoGZX")
+        expect(result).to include("X-Amz-Credential=[REDACTED]")
+        expect(result).to include("X-Amz-Signature=[REDACTED]")
+        expect(result).to include("X-Amz-Security-Token=[REDACTED]")
+      end
+
+      # Leak 2: file:// userinfo (URI::File#userinfo is always nil)
+      it "strips userinfo from file:// URLs" do
+        result = described_class.sanitize_url_for_display("file://u:s3cr3t@host/b.js")
+        expect(result).not_to include("s3cr3t")
+        expect(result).not_to include("u:")
+        expect(result).to include("host/b.js")
+      end
+
+      # Leak 3: Password containing /
+      it "strips userinfo when password contains a slash" do
+        result = described_class.sanitize_url_for_display("http://u:pa/s3cr3t@host/b.js")
+        expect(result).not_to include("s3cr3t")
+        expect(result).not_to include("pa/")
+        expect(result).to include("host/b.js")
+      end
+
+      # Combined: userinfo + query + fragment
+      it "handles userinfo, query credentials, and fragment together" do
+        input = "https://u:s3cr3t@host/b.js?token=xyz#section"
+        result = described_class.sanitize_url_for_display(input)
+        expect(result).not_to include("s3cr3t")
+        expect(result).to include("token=[REDACTED]")
+        expect(result).not_to include("xyz")
+        expect(result).to include("#section")
+        expect(result).to include("https://host/b.js")
+      end
+
+      # Fragment preservation
+      it "preserves the fragment" do
+        result = described_class.sanitize_url_for_display("http://host/b.js?cache=v2#section")
+        expect(result).to include("#section")
+        expect(result).to include("cache=[REDACTED]")
+      end
+
+      # Non-HTTP schemes
+      it "strips userinfo from ftp:// URLs" do
+        result = described_class.sanitize_url_for_display("ftp://u:s3cr3t@host/b.js")
+        expect(result).not_to include("s3cr3t")
+        expect(result).to include("host/b.js")
+      end
+
+      # @ in path (must NOT be stripped)
+      it "preserves @ in paths" do
+        result = described_class.sanitize_url_for_display("http://host/webpack/server@bundle.js")
+        expect(result).to include("server@bundle.js")
+      end
+
+      # @ in query value (redacted as part of value redaction)
+      it "redacts query values that contain @" do
+        result = described_class.sanitize_url_for_display("http://host/b.js?source=@config")
+        expect(result).to include("source=[REDACTED]")
+        expect(result).not_to include("@config")
+      end
+
+      # Local file path (no URL structure)
+      it "passes through local file paths unchanged" do
+        path = "/app/public/webpack/development/server-bundle.js"
+        expect(described_class.sanitize_url_for_display(path)).to eq(path)
+      end
+
+      # nil and empty
+      it "returns nil for nil" do
+        expect(described_class.sanitize_url_for_display(nil)).to be_nil
+      end
+
+      it "returns empty string for empty string" do
+        expect(described_class.sanitize_url_for_display("")).to eq("")
+      end
+
+      # No credentials — URL without query unchanged
+      it "returns URL unchanged when no credentials and no query" do
+        url = "http://host:3800/b.js"
+        expect(described_class.sanitize_url_for_display(url)).to eq(url)
+      end
+
+      # Password with ? and # delimiters (malformed — causes URI::InvalidURIError)
+      it "strips userinfo when password contains ? or #" do
+        ["?", "#"].each do |delim|
+          result = described_class.sanitize_url_for_display(
+            "http://u:s3cr3t#{delim}tail@bad host/b.js"
+          )
+          expect(result).not_to include("s3cr3t")
+        end
+      end
+
+      # URL with query but no credentials — values still redacted (deny-by-default)
+      it "redacts harmless query values too (deny-by-default)" do
+        result = described_class.sanitize_url_for_display("http://host/b.js?cache=v2&mode=dev")
+        expect(result).to include("cache=[REDACTED]")
+        expect(result).to include("mode=[REDACTED]")
+        expect(result).not_to include("v2")
+        expect(result).not_to include("dev")
+      end
+    end
   end
 end
 # rubocop:enable Metrics/ModuleLength, Metrics/BlockLength

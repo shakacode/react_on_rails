@@ -3046,7 +3046,8 @@ module ReactOnRails
 
           return if legacy.strip == current.strip
 
-          warn "WARNING: RENDERER_URL=#{legacy.inspect} and REACT_RENDERER_URL=#{current.inspect} " \
+          warn "WARNING: RENDERER_URL=#{ReactOnRails::Utils.sanitize_url_for_display(legacy).inspect} " \
+               "and REACT_RENDERER_URL=#{ReactOnRails::Utils.sanitize_url_for_display(current).inspect} " \
                "are both set but disagree. RENDERER_URL was renamed to REACT_RENDERER_URL; " \
                "unset RENDERER_URL or align the two values so tooling and the Pro initializer " \
                "can't silently pick different renderer URLs."
@@ -3176,8 +3177,8 @@ module ReactOnRails
           existing = ENV.fetch(var_name, nil)
           return if existing.nil? || existing.strip.empty? || existing.strip == derived_url
 
-          warn "WARNING: Overriding #{var_name}=#{existing.inspect} with #{derived_url} " \
-               "because base port mode is active."
+          warn "WARNING: Overriding #{var_name}=#{ReactOnRails::Utils.sanitize_url_for_display(existing).inspect} " \
+               "with #{derived_url} because base port mode is active."
         end
 
         def apply_explicit_port_env(selected)
@@ -3264,7 +3265,8 @@ module ReactOnRails
             ENV["REACT_RENDERER_URL"] = derived
           elsif url_port_mismatch?(url, port)
             # Both set but inconsistent — SSR will silently break otherwise.
-            warn "WARNING: RENDERER_PORT=#{port} does not match REACT_RENDERER_URL=#{url}; " \
+            warn "WARNING: RENDERER_PORT=#{port} does not match " \
+                 "REACT_RENDERER_URL=#{ReactOnRails::Utils.sanitize_url_for_display(url)}; " \
                  "Rails will use REACT_RENDERER_URL to reach the renderer. " \
                  "Unset one of them or ensure they agree."
           end
@@ -3283,9 +3285,9 @@ module ReactOnRails
         def warn_url_without_port(url)
           return if url.nil? || url.strip.empty? || !localhost_renderer_url?(url)
 
-          warn "WARNING: REACT_RENDERER_URL=#{url} is set without RENDERER_PORT. " \
-               "The node renderer process may bind to a different port than Rails " \
-               "expects. Set RENDERER_PORT to match the URL port."
+          warn "WARNING: REACT_RENDERER_URL=#{ReactOnRails::Utils.sanitize_url_for_display(url)} " \
+               "is set without RENDERER_PORT. The node renderer process may bind to a " \
+               "different port than Rails expects. Set RENDERER_PORT to match the URL port."
         end
 
         # When a local renderer URL is paired with an invalid RENDERER_PORT,
@@ -3304,8 +3306,8 @@ module ReactOnRails
         def clear_local_renderer_url_after_invalid_port(url)
           return if url.nil? || url.strip.empty? || !localhost_renderer_url?(url)
 
-          warn "WARNING: Clearing REACT_RENDERER_URL=#{url} because invalid " \
-               "RENDERER_PORT was ignored; falling back to the default " \
+          warn "WARNING: Clearing REACT_RENDERER_URL=#{ReactOnRails::Utils.sanitize_url_for_display(url)} " \
+               "because invalid RENDERER_PORT was ignored; falling back to the default " \
                "localhost renderer port."
           ENV.delete("REACT_RENDERER_URL")
         end

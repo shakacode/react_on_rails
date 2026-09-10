@@ -395,45 +395,31 @@ module ReactOnRails
         # Strips any embedded credentials from a configured renderer URL before it is
         # interpolated into an error message, so a password in the URL (a supported config
         # convenience, e.g. https://:password@host:3800) cannot leak into logs or error
-        # trackers. Mirrors ReactOnRailsPro::Configuration#strip_renderer_url_userinfo.
+        # trackers. Delegates to Utils.sanitize_url_for_display, which also redacts
+        # query-string values (e.g. presigned S3 URLs) and handles file:// and
+        # malformed URLs. See issue #5046 for the full fuzz table.
         def sanitized_renderer_url(url)
-          return url if url.nil? || url.empty?
-
-          uri = URI.parse(url)
-          return url if uri.userinfo.nil?
-
-          # URI rejects a password without a user, so clear password first.
-          uri.password = nil
-          uri.user = nil
-          uri.to_s
-        rescue URI::InvalidURIError
-          # A URL malformed enough that URI rejects it still shouldn't leak credentials.
-          strip_malformed_configured_url_userinfo(url)
+          Utils.sanitize_url_for_display(url)
         end
 
-        # A configured URL is one value rather than arbitrary prose. Handle only the common
-        # user:password@ fallback shapes that URI.parse rejects, including raw ? or # password
-        # characters. Anchoring the substitutions leaves path/query @ characters alone and avoids
-        # turning this fallback into a general malformed-URL parser.
-        def strip_malformed_configured_url_userinfo(url)
-          url = url.lstrip
-          sanitized_url = url.sub(%r{\A(?<scheme>https?://)[^/:?#]*:[^/]*@}i, '\k<scheme>')
-          return sanitized_url unless sanitized_url == url
-
-          url.sub(%r{\A(?<scheme>https?://)[^/@]*@}i, '\k<scheme>')
-        end
-
-        # Best-effort strip of the common user:pass@ form from arbitrary error text. When the
-        # configured URL is known, replace that exact value with its sanitized form first so raw
-        # ?/# password characters are handled without treating unrelated prose as malformed URL
-        # syntax. The remaining substitution preserves ordinary path, query, and fragment @s.
+        # Best-effort strip of credentials from arbitrary error-message text. When the
+        # configured URL is known, replace that exact value with its sanitized form first
+        # so raw special characters in passwords are handled without treating unrelated
+        # prose as malformed URL syntax. The remaining substitution catches residual
+        # user:pass@ patterns in prose. When configured_url is nil, only the residual
+        # regex and URL-pattern query redaction run — reduced fidelity but no leaks.
         def strip_userinfo(text, configured_url: nil)
           sanitized_text = if configured_url
                              text.to_s.gsub(configured_url) { sanitized_renderer_url(configured_url) }
                            else
                              text.to_s
                            end
-          sanitized_text.gsub(%r{//[^/?#]*@}, "//")
+          # Strip residual user:pass@ patterns in prose text
+          sanitized_text = sanitized_text.gsub(%r{//[^/?#]*@}, "//")
+          # Best-effort query-value redaction on URL-like substrings in prose
+          sanitized_text.gsub(%r{(https?://\S+\?)\S+}) do |match|
+            Utils.sanitize_url_for_display(match)
+          end
         end
 
         def sanitized_url_error_message(error, configured_url:)
