@@ -4631,6 +4631,9 @@ module ReactOnRails
       rsc_version = rsc_package["version"].to_s
       return true if rsc_package_version_at_or_above_minimum?(rsc_version)
 
+      react_requirements = RSC_REACT_MINIMUM_BY_PACKAGE_MINOR.map do |minor, minimum|
+        "RSC #{RSC_SUPPORTED_PACKAGE_MAJOR}.#{minor}.x requires stable React/React DOM ~#{minimum}"
+      end.join("; ")
       prerelease_requirement = if RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION.present?
                                  "\n(or #{RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION} during the RC soak)"
                                else
@@ -4641,8 +4644,8 @@ module ReactOnRails
         🚫 #{RSC_PACKAGE_NAME} #{rsc_version.presence || 'unknown'} is not supported by React on Rails Pro 17 RSC.
 
         React on Rails Pro 17 requires #{RSC_PACKAGE_NAME} >= #{RSC_MINIMUM_PACKAGE_VERSION}#{prerelease_requirement}
-        on the supported #{RSC_SUPPORTED_PACKAGE_LINE} package line
-        with React/React DOM #{RSC_MINIMUM_REACT_VERSION}+.
+        on the supported #{RSC_SUPPORTED_PACKAGE_LINE} package line.
+        #{react_requirements}.
 
         Fix: npm install react@#{ReactOnRails::Generators::JsDependencyManager::RSC_REACT_VERSION_RANGE} react-dom@#{ReactOnRails::Generators::JsDependencyManager::RSC_REACT_VERSION_RANGE} #{RSC_PACKAGE_NAME}@#{RSC_PACKAGE_INSTALL_VERSION} --save-exact
       MSG
@@ -4700,7 +4703,7 @@ module ReactOnRails
 
       rsc_minor = npm_version_tuple(rsc_package["version"])[1]
       minimum_version = RSC_REACT_MINIMUM_BY_PACKAGE_MINOR.fetch(rsc_minor)
-      return true if supported_rsc_react_line?(package_version) &&
+      return true if npm_prerelease(package_version).blank? && supported_rsc_react_line?(package_version) &&
                      !npm_version_less_than?(package_version, minimum_version)
 
       package_label = package_name == "react" ? "React" : "React DOM"
@@ -4708,7 +4711,7 @@ module ReactOnRails
       checker.add_error(<<~MSG.strip)
         🚫 #{RSC_PACKAGE_NAME} #{rsc_package['version']} is installed with unsupported #{package_label} #{package_version}.
 
-        React on Rails Pro 17 RSC currently supports React/React DOM #{RSC_SUPPORTED_REACT_LINE} with patch >= #{minimum_version}.
+        React on Rails Pro 17 RSC currently supports stable React/React DOM #{RSC_SUPPORTED_REACT_LINE} with patch >= #{minimum_version}.
         The node renderer enforces the same support window at startup.
 
         Fix: npm install react@~#{minimum_version} react-dom@~#{minimum_version}

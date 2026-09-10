@@ -8992,6 +8992,10 @@ RSpec.describe ReactOnRails::Doctor do
                                   "npm install react@~19.2.8 react-dom@~19.2.8 " \
                                   "react-on-rails-rsc@19.3.0-rc.1 --save-exact"
                                 ))
+      expect(errors).to include(a_string_including(
+                                  "RSC 19.2.x requires stable React/React DOM ~19.2.7",
+                                  "RSC 19.3.x requires stable React/React DOM ~19.2.8"
+                                ))
     end
 
     [
@@ -8999,6 +9003,10 @@ RSpec.describe ReactOnRails::Doctor do
       ["19.3.0-rc.1", "19.2.7", "19.2.7", "unsupported React 19.2.7"],
       ["19.3.0-rc.1", "19.2.8", "19.2.7", "unsupported React DOM 19.2.7"],
       ["19.3.0-rc.1", "19.2.8", "19.2.9", "requires react and react-dom to resolve to the same version"],
+      ["19.2.1", "19.2.8-rc.1", "19.2.8-rc.1", "unsupported React 19.2.8-rc.1"],
+      ["19.2.1", "19.2.8", "19.2.8-rc.1", "unsupported React DOM 19.2.8-rc.1"],
+      ["19.3.0-rc.1", "19.2.9-rc.1", "19.2.9-rc.1", "unsupported React 19.2.9-rc.1"],
+      ["19.3.0-rc.1", "19.2.9", "19.2.9-rc.1", "unsupported React DOM 19.2.9-rc.1"],
       ["19.2.1", "19.2.7", "19.2.7", nil],
       ["19.3.0-rc.1", "19.2.8", "19.2.8", nil]
     ].each do |rsc_version, react_version, react_dom_version, expected_error|
@@ -9015,6 +9023,9 @@ RSpec.describe ReactOnRails::Doctor do
         successes = checker.messages.select { |message| message[:type] == :success }.pluck(:content)
         if expected_error
           expect(errors).to include(a_string_including(expected_error))
+          if expected_error.start_with?("unsupported")
+            expect(errors).to include(a_string_including("supports stable React/React DOM"))
+          end
           expect(successes).to be_empty
         else
           expect(errors).to be_empty

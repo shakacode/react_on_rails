@@ -64,6 +64,20 @@ describe('checkRscPeerCompatibility', () => {
     expect(minimumPrereleaseVersion).toBe('19.3.0-rc.1');
   });
 
+  it.each(['19.2.1', '19.3.0-rc.1'])(
+    'explains stable-only React and React DOM support for RSC %s',
+    (rscVersion) => {
+      for (const versions of [
+        { reactVersion: '19.2.9-rc.1', reactDomVersion: '19.2.9-rc.1' },
+        { reactVersion: '19.2.9', reactDomVersion: '19.2.9-rc.1' },
+      ]) {
+        const result = checkRscPeerCompatibility({ rscVersion, ...versions });
+        expect(result.level).toBe('error');
+        expect(result.message).toContain('stable releases only');
+      }
+    },
+  );
+
   it('returns ok when react-on-rails-rsc is absent (optional peer not installed)', () => {
     expect(checkRscPeerCompatibility({ rscVersion: null, reactVersion: '19.2.7' })).toEqual({ level: 'ok' });
   });

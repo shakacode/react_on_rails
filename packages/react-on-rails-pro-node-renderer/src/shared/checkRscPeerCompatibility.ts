@@ -126,7 +126,7 @@ const supportedReactRange = (
   return matchingRanges
     .map(
       ({ minor, minPatch }) =>
-        `${supportedMajor}.${minor}.x with patch >= ${supportedMajor}.${minor}.${minPatch}`,
+        `${supportedMajor}.${minor}.x with patch >= ${supportedMajor}.${minor}.${minPatch} (stable releases only)`,
     )
     .join(' or ');
 };
