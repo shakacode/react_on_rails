@@ -466,9 +466,9 @@ module ReactOnRails
           # URI::HTTP, URI::HTTPS, and URI::FTP report userinfo reliably.
           # URI::File (and URI::Generic for unknown schemes) silently discard
           # it — userinfo is always nil regardless of what the raw string
-          # contains. For those classes, fall through to regex-based stripping.
+          # contains. For those classes, check the authority section only.
           unless uri.is_a?(URI::HTTP) || uri.is_a?(URI::FTP)
-            sanitized = strip_userinfo_by_regex(url)
+            sanitized = strip_authority_userinfo(url)
             return redact_query_values(sanitized)
           end
 
@@ -479,57 +479,63 @@ module ReactOnRails
         uri.user = nil
         redact_query_values_in_uri(uri)
       rescue URI::InvalidURIError
-        sanitized = strip_userinfo_by_regex(url)
+        sanitized = strip_malformed_url_userinfo(url)
         redact_query_values(sanitized)
       end
     end
 
-    # Strips userinfo from a URL string. For non-HTTP schemes (file://, etc.)
-    # and malformed URLs that URI.parse can't handle, uses a regex approach
-    # to find and remove the userinfo portion.
-    #
-    # The method handles two distinct cases:
-    # 1. Non-HTTP schemes where URI.parse succeeds but silently drops userinfo
-    #    (e.g. file://u:p@host/path) — here the URL is well-formed, so we can
-    #    use a simple anchored regex to find user:pass@ or user@ before the host.
-    # 2. Malformed URLs where URI.parse raises InvalidURIError (e.g. passwords
-    #    containing /, ?, #, or spaces in the host) — here we use the last @
-    #    in the authority-like prefix as the split point.
-    def self.strip_userinfo_by_regex(url)
+    # Strips userinfo from the authority section of a well-formed URL whose
+    # scheme's URI class doesn't report userinfo (e.g. URI::File). Only looks
+    # for @ in the authority — before the first / ? or # after :// — so @ in
+    # paths, queries, and fragments is never touched.
+    def self.strip_authority_userinfo(url)
+      match = url.match(%r{\A\s*(?<scheme>\w+://)}i)
+      return url unless match
+
+      rest = url[match[0].length..]
+      authority_end = rest.index(%r{[/?#]})
+      authority = authority_end ? rest[0...authority_end] : rest
+      suffix = authority_end ? rest[authority_end..] : ""
+
+      return url unless authority.include?("@")
+
+      last_at = authority.rindex("@")
+      match[:scheme] + authority[(last_at + 1)..] + suffix
+    end
+    private_class_method :strip_authority_userinfo
+
+    # Strips userinfo from a malformed URL that URI.parse rejected. Here we
+    # know there IS userinfo to strip (the URL has embedded credentials that
+    # caused the parse failure — e.g. a slash, space, or raw special char in
+    # the password). We scan for the @ that separates userinfo from host by
+    # preferring an @ followed by a host/path pattern (contains /).
+    def self.strip_malformed_url_userinfo(url)
       match = url.match(%r{\A\s*(?<scheme>\w+://)}i)
       return url unless match
 
       rest = url[match[0].length..]
 
-      # Find the authority section: everything before the first / ? or #
-      # that follows the host. But the tricky part is that / can appear in
-      # the password (the whole reason this method exists for malformed URLs).
-      # Strategy: find the last @ that is followed by a host-like segment
-      # (contains a / or is the end of the URL).
-      #
-      # First, try the simple case: is there an @ before any / ? or # ?
+      # First try the simple case: @ in the authority (before first /?#)
       authority_end = rest.index(%r{[/?#]})
       authority = authority_end ? rest[0...authority_end] : rest
       suffix = authority_end ? rest[authority_end..] : ""
 
       if authority.include?("@")
-        # Simple case: @ is in the authority section
         last_at = authority.rindex("@")
         return match[:scheme] + authority[(last_at + 1)..] + suffix
       end
 
-      # Hard case: the @ might be after a / in the password (e.g. u:pa/s3cr3t@host/path).
-      # Scan all @ positions and prefer one followed by host/path (contains /).
-      # This distinguishes the real authority @ from @-in-query-value.
+      # Hard case: / in the password pushed the @ past the first / (e.g.
+      # u:pa/s3cr3t@host/path). Scan all @ positions and prefer one whose
+      # right side contains / (indicating host/path after it).
       best_at = nil
       pos = 0
       while (at_idx = rest.index("@", pos))
         after_at = rest[(at_idx + 1)..]
-        # Prefer an @ followed by something containing / (host/path pattern).
-        # Fall back to an @ followed by end-of-string only if nothing better.
         if after_at.include?("/")
           best_at = at_idx
-        elsif best_at.nil?
+        elsif best_at.nil? && !after_at.include?("@")
+          # Last resort: @ at end of string with nothing after it
           best_at = at_idx
         end
         pos = at_idx + 1
@@ -539,7 +545,7 @@ module ReactOnRails
 
       match[:scheme] + rest[(best_at + 1)..]
     end
-    private_class_method :strip_userinfo_by_regex
+    private_class_method :strip_malformed_url_userinfo
 
     # Redacts all query-string values in a parsed URI, keeping keys for diagnostics.
     # Uses regex-based substitution on the query string to avoid URI.encode_www_form
@@ -569,7 +575,11 @@ module ReactOnRails
 
       # Guard against empty query (trailing bare ?)
       unless query_part.empty?
+        # Redact key=value pairs
         query_part = query_part.gsub(/=([^&]*)/, "=[REDACTED]")
+        # Also redact bare components without = (e.g. ?eyJhbGciOi... or ?opaque-token&key=val)
+        # A bare component is one between & delimiters (or start/end) that has no =
+        query_part = query_part.split("&").map { |c| c.include?("=") ? c : "[REDACTED]" }.join("&")
       end
 
       result = "#{base}?#{query_part}"
