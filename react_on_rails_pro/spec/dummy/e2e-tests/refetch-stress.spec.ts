@@ -27,6 +27,7 @@ test.describe('Imperative RSC refetch — stress scenarios (Issue 3106)', () => 
     // that interact with RSCRoute refs can race hydration and see null refs
     // (see issue #5045).
     await page.waitForSelector('[data-testid="stress-page-hydrated"][data-hydrated="true"]', {
+      state: 'attached',
       timeout: 15000,
     });
   });
