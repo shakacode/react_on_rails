@@ -29,13 +29,16 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 - **[Pro] RSC 19.3 release-candidate compatibility and generated defaults**: Generated RSC apps now pin
   `react-on-rails-rsc@19.3.0-rc.2` with React/React DOM `~19.2.8`, bringing the JSX/TSX client-export
   parsing and Rspack shared-chunk fixes into the 17.1 RC soak. Doctor and the Node Renderer accept
-  this qualified RC tuple while preserving stable RSC 19.2.1+ with React 19.2.7+; unrelated prereleases
-  and unsupported React minors remain rejected. **Action required:** upgrade the Pro gem/npm packages
-  together before adopting this RSC RC, and keep React and React DOM on the same version. A `"use client"`
+  this qualified RC tuple while preserving stable RSC 19.2.x >=19.2.1 with stable React 19.2.x >=19.2.7.
+  Nonqualified RSC-package prereleases and unsupported React minors remain rejected. The Node Renderer
+  now explicitly rejects React/React DOM prereleases, including apps using stable RSC 19.2.1.
+  **Action required:** use matching supported stable React/React DOM versions, and upgrade the Pro gem/npm
+  packages together before adopting this RSC RC. A `"use client"`
   file without runtime ES-module exports now fails the build instead of silently disappearing.
   Standalone RSC generators also warn about React prereleases instead of discarding their version suffix.
   See [Issue 4958](https://github.com/shakacode/react_on_rails/issues/4958) and
   [RSC release notes](https://github.com/shakacode/react_on_rails_rsc/releases/tag/19.3.0-rc.2).
+  [PR 5026](https://github.com/shakacode/react_on_rails/pull/5026) by [justin808](https://github.com/justin808).
 
 ### [17.1.0.rc.2] - 2026-09-02
 

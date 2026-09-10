@@ -6200,8 +6200,8 @@ describe InstallGenerator, type: :generator do
 
       install_generator.send(:warn_about_react_version_for_rsc)
       warning_text = GeneratorMessages.messages.join("\n")
-      expect(warning_text).to include("below the recommended minimum")
-      expect(warning_text).to include("React 19.2.8")
+      expect(warning_text).to include("below the required minimum")
+      expect(warning_text).to include("matching stable React/React DOM 19.2.8+ on 19.2.x")
     end
   end
 

@@ -21,7 +21,7 @@ describe RscGenerator, type: :generator do
     end
 
     before do
-      dependencies = { "react" => react_version, "react-on-rails-rsc" => rsc_version }
+      dependencies = { "react" => react_version, "react-dom" => react_version, "react-on-rails-rsc" => rsc_version }
       File.write("package.json", JSON.generate("dependencies" => dependencies))
       allow(generator).to receive_messages(prerequisites_met?: true, setup_rsc: nil,
                                            add_rsc_npm_dependencies: nil, install_agent_guardrails: nil,
@@ -35,7 +35,34 @@ describe RscGenerator, type: :generator do
       expect(GeneratorMessages.messages.join("\n")).to include("stable React", "19.2.8-rc.0")
     end
 
-    prerelease_versions = ["19.2.8-rc.0", "^19.2.9-canary.1", "19.2.8.beta.1"]
+    context "with React below the configured RSC pin's minimum" do
+      let(:react_version) { "19.2.7" }
+
+      it "requires a coordinated stable upgrade without changing the app's React dependency" do
+        generator.run_generator
+
+        messages = GeneratorMessages.messages.join("\n")
+        expect(messages).to include("required minimum", "react-on-rails-rsc 19.3.0-rc.2",
+                                    "matching stable React/React DOM 19.2.8+ on 19.2.x",
+                                    "Node Renderer refuses startup until", "react@~19.2.8", "react-dom@~19.2.8")
+        expect(messages).not_to include("recommended minimum")
+        expect(JSON.parse(File.read("package.json")).dig("dependencies", "react")).to eq("19.2.7")
+        expect(JSON.parse(File.read("package.json")).dig("dependencies", "react-dom")).to eq("19.2.7")
+      end
+    end
+
+    context "with a malformed detected React version" do
+      let(:react_version) { "19.2.8..1" }
+
+      it "treats the version as unparseable without crashing standalone setup" do
+        expect { generator.run_generator }.not_to raise_error
+        expect(generator.send(:detect_react_version)).to be_nil
+        expect(generator).to have_received(:setup_rsc)
+        expect(JSON.parse(File.read("package.json")).dig("dependencies", "react")).to eq("19.2.8..1")
+      end
+    end
+
+    prerelease_versions = ["19.2.8-rc.0", "^19.2.9-canary.1", "19.2.8.beta.1", "19.2.0-canary-abc123-20260101"]
     stable_versions = ["~19.2.8", "19.2.9", "19.2.8+build.1"]
     ["19.2.1", "19.3.0-rc.2"].each do |package_version|
       context "with RSC #{package_version}" do

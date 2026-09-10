@@ -105,13 +105,14 @@ module ReactOnRails
           MSG
         elsif patch < RSC_MINIMUM_REACT_PATCH
           GeneratorMessages.add_warning(<<~MSG.strip)
-            ⚠️  React #{react_version} is below the recommended minimum for RSC.
+            ⚠️  React #{react_version} is below the required minimum for RSC.
 
-            Please upgrade to at least React #{RSC_MINIMUM_REACT_VERSION}:
-              #{manual_add_packages_command(["react@#{RSC_MINIMUM_REACT_VERSION}", "react-dom@#{RSC_MINIMUM_REACT_VERSION}"])}
+            react-on-rails-rsc #{JsDependencyManager::RSC_PACKAGE_VERSION_PIN} requires
+            matching stable React/React DOM #{RSC_MINIMUM_REACT_VERSION}+ on #{RSC_SUPPORTED_REACT_LINE}.
+            The Node Renderer refuses startup until React and React DOM are upgraded together:
+              #{manual_add_packages_command(["react@#{RSC_REACT_VERSION_RANGE}", "react-dom@#{RSC_REACT_VERSION_RANGE}"])}
 
-            react-on-rails-rsc #{JsDependencyManager::RSC_PACKAGE_VERSION_PIN} is coordinated with
-            React/React DOM #{RSC_MINIMUM_REACT_VERSION}+ for the React on Rails Pro 17 RSC runtime.
+            The standalone RSC generator does not upgrade your React or React DOM dependencies.
           MSG
         end
       end
