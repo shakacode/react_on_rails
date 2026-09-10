@@ -9772,7 +9772,7 @@ For the **17.1 RC standalone generator**, upgrade React and React DOM together b
 ```bash
 pnpm add react@~19.2.8 react-dom@~19.2.8 react-on-rails-rsc@19.3.0-rc.2
 # or: yarn add react@~19.2.8 react-dom@~19.2.8 react-on-rails-rsc@19.3.0-rc.2
-# or: npm install react@~19.2.8 react-dom@~19.2.8 react-on-rails-rsc@19.3.0-rc.2
+# or: npm install react@~19.2.8 react-dom@~19.2.8 && npm install --save-exact react-on-rails-rsc@19.3.0-rc.2
 ```
 
 For apps staying on the **supported 17.0 stable path**, use this coordinated set instead:
