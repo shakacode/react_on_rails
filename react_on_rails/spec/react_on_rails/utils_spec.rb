@@ -1146,6 +1146,35 @@ module ReactOnRails
         expect(result).not_to include("v2")
         expect(result).not_to include("dev")
       end
+
+      # Edge cases found by claude-review
+      it "does not crash on a trailing bare ?" do
+        result = described_class.sanitize_url_for_display("http://localhost:3800?")
+        expect(result).to eq("http://localhost:3800?")
+      end
+
+      it "does not redact ? inside a fragment (hash-router URLs)" do
+        result = described_class.sanitize_url_for_display("http://host/app#/page?token=abc")
+        expect(result).to include("token=abc")
+        expect(result).not_to include("[REDACTED]")
+      end
+
+      it "handles slash-in-password combined with @ in query" do
+        result = described_class.sanitize_url_for_display("http://u:pa/s3cr3t@host/b.js?source=@config")
+        expect(result).not_to include("s3cr3t")
+        expect(result).to include("host/b.js")
+        expect(result).to include("source=[REDACTED]")
+      end
+
+      it "does not strip @ that appears only in a query value" do
+        result = described_class.sanitize_url_for_display("http://host/path?next=http://evil@host2.com/x")
+        expect(result).to include("host/path")
+      end
+
+      it "handles file:// with slash in password" do
+        result = described_class.sanitize_url_for_display("file://u:pa/s3cr3t@host/b.js")
+        expect(result).not_to include("s3cr3t")
+      end
     end
   end
 end
