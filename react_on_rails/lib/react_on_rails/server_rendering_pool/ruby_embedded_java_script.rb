@@ -416,10 +416,10 @@ module ReactOnRails
                            end
           # Strip residual user:pass@ patterns in prose text
           sanitized_text = sanitized_text.gsub(%r{//[^/?#]*@}, "//")
-          # Best-effort query-value redaction on URL-like substrings in prose.
-          # The regex uses [^\s?]+ (non-greedy alternative: no backtracking overlap
-          # between the pre-? and post-? portions) to avoid ReDoS.
-          sanitized_text.gsub(%r{https?://[^\s?]+\?[^\s]+}) do |match|
+          # Best-effort query-value redaction on any URL-like substrings in prose.
+          # [^\s]+ is a single greedy quantifier with no alternation, so it cannot
+          # cause polynomial backtracking — it matches or fails in linear time.
+          sanitized_text.gsub(%r{https?://[^\s]+}) do |match|
             Utils.sanitize_url_for_display(match)
           end
         end
