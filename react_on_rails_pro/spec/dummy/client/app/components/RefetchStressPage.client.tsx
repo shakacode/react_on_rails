@@ -14,8 +14,25 @@
  */
 
 import * as React from 'react';
-import { Suspense, useRef, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import RSCRoute, { type RSCRouteHandle } from 'react-on-rails-pro/RSCRoute';
+
+/**
+ * Invisible hydration gate for e2e tests. Renders a hidden <span> whose
+ * data-hydrated attribute is set by a useEffect — which fires only after
+ * React hydrates the component tree and all child useImperativeHandle
+ * refs are assigned. Tests wait for this attribute before interacting
+ * with RSCRoute refs.
+ *
+ * See https://github.com/shakacode/react_on_rails/issues/5045
+ */
+const HydrationMarker: React.FC<{ testId: string }> = ({ testId }) => {
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (ref.current) ref.current.dataset.hydrated = 'true';
+  }, []);
+  return <span ref={ref} data-testid={testId} hidden />;
+};
 
 const Section: React.FC<{ title: string; description?: string; children: React.ReactNode }> = ({
   title,
@@ -379,6 +396,7 @@ const ScenarioMountCycle: React.FC = () => {
 
 const RefetchStressPage: React.FC = () => (
   <div>
+    <HydrationMarker testId="stress-page-hydrated" />
     <h2>RSCRoute imperative refetch — stress scenarios</h2>
     <p>
       Each section below exercises a different aspect of the new <code>ref</code> handle and{' '}

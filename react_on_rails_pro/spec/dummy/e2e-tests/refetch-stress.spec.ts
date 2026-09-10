@@ -20,12 +20,15 @@ const visibleByTestId = (page: Page, testId: string) => page.getByTestId(testId)
 
 test.describe('Imperative RSC refetch — stress scenarios (Issue 3106)', () => {
   test.beforeEach(async ({ page }) => {
-    // Relative URL — Playwright prepends `use.baseURL` from playwright.config.ts
-    // (`http://localhost:3000/`). For local runs against a non-standard port,
-    // change baseURL in playwright.config.ts (it does not currently honor a
-    // BASE_URL env var override).
     await page.goto(STRESS_URL);
-    await expect(visibleByTestId(page, 'stress-time-ref-handle')).toBeVisible();
+    // Wait for React hydration to complete. The HydrationMarker's useEffect
+    // sets data-hydrated="true" only after all Suspense children resolve and
+    // all useImperativeHandle refs are assigned. Without this gate, tests
+    // that interact with RSCRoute refs can race hydration and see null refs
+    // (see issue #5045).
+    await page.waitForSelector('[data-testid="stress-page-hydrated"][data-hydrated="true"]', {
+      timeout: 15000,
+    });
   });
 
   test('1. ref handle: button click visibly refreshes the timestamp', async ({ page }) => {
