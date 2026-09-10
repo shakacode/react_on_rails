@@ -4608,6 +4608,8 @@ module ReactOnRails
       return true unless check_rsc_package_minimum_version(rsc_package)
 
       unless rsc_package_declares_react_peer_dependencies?(rsc_package)
+        return true unless check_rsc_supported_react_packages_for_package(rsc_package, react_version)
+
         checker.add_warning(<<~MSG.strip)
           ⚠️  #{RSC_PACKAGE_NAME} #{rsc_package['version']} does not declare React peer dependencies.
 
@@ -4642,7 +4644,7 @@ module ReactOnRails
         on the supported #{RSC_SUPPORTED_PACKAGE_LINE} package line
         with React/React DOM #{RSC_MINIMUM_REACT_VERSION}+.
 
-        Fix: npm install react@#{ReactOnRails::Generators::JsDependencyManager::RSC_REACT_VERSION_RANGE} react-dom@#{ReactOnRails::Generators::JsDependencyManager::RSC_REACT_VERSION_RANGE} #{RSC_PACKAGE_NAME}@#{RSC_PACKAGE_INSTALL_VERSION}
+        Fix: npm install react@#{ReactOnRails::Generators::JsDependencyManager::RSC_REACT_VERSION_RANGE} react-dom@#{ReactOnRails::Generators::JsDependencyManager::RSC_REACT_VERSION_RANGE} #{RSC_PACKAGE_NAME}@#{RSC_PACKAGE_INSTALL_VERSION} --save-exact
       MSG
       false
     end

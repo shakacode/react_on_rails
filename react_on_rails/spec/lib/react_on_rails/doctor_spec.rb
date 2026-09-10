@@ -8977,6 +8977,52 @@ RSpec.describe ReactOnRails::Doctor do
         .to be false
     end
 
+    it "keeps the generator RSC pin on a package minor with a qualified React floor" do
+      major, minor, = doctor.send(:npm_version_tuple, described_class::RSC_PACKAGE_INSTALL_VERSION)
+
+      expect(major).to eq(described_class::RSC_SUPPORTED_PACKAGE_MAJOR)
+      expect(described_class::RSC_REACT_MINIMUM_BY_PACKAGE_MINOR).to have_key(minor)
+    end
+
+    it "suggests an exact RSC pin and bounded React versions for an unsupported RSC package" do
+      doctor.send(:check_rsc_package_minimum_version, { "version" => "19.3.0-rc.0" })
+
+      errors = checker.messages.select { |message| message[:type] == :error }.pluck(:content)
+      expect(errors).to include(a_string_including(
+                                  "npm install react@~19.2.8 react-dom@~19.2.8 " \
+                                  "react-on-rails-rsc@19.3.0-rc.1 --save-exact"
+                                ))
+    end
+
+    [
+      ["19.2.1", "19.2.6", "19.2.6", "unsupported React 19.2.6"],
+      ["19.3.0-rc.1", "19.2.7", "19.2.7", "unsupported React 19.2.7"],
+      ["19.3.0-rc.1", "19.2.8", "19.2.7", "unsupported React DOM 19.2.7"],
+      ["19.3.0-rc.1", "19.2.8", "19.2.9", "requires react and react-dom to resolve to the same version"],
+      ["19.2.1", "19.2.7", "19.2.7", nil],
+      ["19.3.0-rc.1", "19.2.8", "19.2.8", nil]
+    ].each do |rsc_version, react_version, react_dom_version, expected_error|
+      it "checks RSC #{rsc_version} with React #{react_version}/DOM #{react_dom_version} without peer metadata" do
+        allow(doctor).to receive(:detect_react_version_from_deps).and_return(react_version)
+        allow(doctor).to receive(:declared_package_spec).with("react-on-rails-rsc").and_return(rsc_version)
+        allow(doctor).to receive(:installed_package_json).with(anything, "react-on-rails-rsc")
+                                                         .and_return({ "version" => rsc_version })
+        allow(doctor).to receive(:detect_package_version_from_deps).with("react-dom").and_return(react_dom_version)
+
+        doctor.send(:check_rsc_react_version)
+
+        errors = checker.messages.select { |message| message[:type] == :error }.pluck(:content)
+        successes = checker.messages.select { |message| message[:type] == :success }.pluck(:content)
+        if expected_error
+          expect(errors).to include(a_string_including(expected_error))
+          expect(successes).to be_empty
+        else
+          expect(errors).to be_empty
+          expect(successes).to include(a_string_including("compatible with RSC"))
+        end
+      end
+    end
+
     def install_react(version)
       FileUtils.mkdir_p("node_modules/react")
       File.write("node_modules/react/package.json", "{\"version\":\"#{version}\"}")
@@ -8994,12 +9040,7 @@ RSpec.describe ReactOnRails::Doctor do
         )
       )
       rsc_support = support_source.match(/reactOnRailsRsc:\s*\{(?<body>[^}]+)\}/)&.[](:body)
-      react_support = support_source.match(
-        /rscMinor:\s*(?<rsc_minor>\d+),\s*minor:\s*(?<minor>\d+),\s*minPatch:\s*(?<min_patch>\d+)/
-      )
-
       expect(rsc_support).not_to be_nil
-      expect(react_support).not_to be_nil
       expect(described_class::RSC_MINIMUM_PACKAGE_VERSION).to eq(
         rsc_support.match(/minimumVersion:\s*'(?<version>[^']+)'/)[:version]
       )
@@ -9009,18 +9050,20 @@ RSpec.describe ReactOnRails::Doctor do
         rsc_support.match(/supportedMajor:\s*(?<major>\d+)/)[:major].to_i
       )
       supported_pairs = support_source.scan(/rscMinor:\s*(\d+),\s*minor:\s*(\d+),\s*minPatch:\s*(\d+)/)
+      expect(supported_pairs).not_to be_empty
       expected_minimums = supported_pairs.to_h do |rsc_minor, minor, patch|
         [rsc_minor.to_i, "19.#{minor}.#{patch}"]
       end
       expect(described_class::RSC_REACT_MINIMUM_BY_PACKAGE_MINOR).to eq(expected_minimums)
-      expect(described_class::RSC_SUPPORTED_PACKAGE_MINORS).to eq(expected_minimums.keys)
+      expect(described_class::RSC_SUPPORTED_PACKAGE_MINORS).to match_array(expected_minimums.keys)
       expect(described_class::RSC_MINIMUM_REACT_VERSION).to eq(
-        "#{described_class::RSC_SUPPORTED_PACKAGE_MAJOR}.#{react_support[:minor]}.#{react_support[:min_patch]}"
+        expected_minimums.values.min_by { |version| version.split(".").map(&:to_i) }
       )
       expect(described_class::RSC_SUPPORTED_REACT_MAJOR).to eq(described_class::RSC_SUPPORTED_PACKAGE_MAJOR)
-      expect(described_class::RSC_SUPPORTED_REACT_LINE).to eq(
-        "#{described_class::RSC_SUPPORTED_REACT_MAJOR}.#{react_support[:minor]}.x"
-      )
+      expected_lines = supported_pairs.map do |_, minor, _|
+        "#{described_class::RSC_SUPPORTED_REACT_MAJOR}.#{minor}.x"
+      end.uniq
+      expect(described_class::RSC_SUPPORTED_REACT_LINE.split(" or ")).to match_array(expected_lines)
     end
 
     it "derives the RSC React support predicate from the configured floor and line" do
