@@ -9,6 +9,66 @@ describe RscGenerator, type: :generator do
 
   destination File.expand_path("../dummy-for-generators", __dir__)
 
+  describe "React version preflight" do
+    let(:generator) { described_class.new([], {}, destination_root: Dir.pwd) }
+    let(:react_version) { "19.2.8-rc.0" }
+    let(:rsc_version) { "19.3.0-rc.2" }
+
+    around do |example|
+      Dir.mktmpdir("rsc-version-preflight") do |dir|
+        Dir.chdir(dir) { example.run }
+      end
+    end
+
+    before do
+      dependencies = { "react" => react_version, "react-on-rails-rsc" => rsc_version }
+      File.write("package.json", JSON.generate("dependencies" => dependencies))
+      allow(generator).to receive_messages(prerequisites_met?: true, setup_rsc: nil,
+                                           add_rsc_npm_dependencies: nil, install_agent_guardrails: nil,
+                                           print_success_message: nil, print_generator_messages: nil,
+                                           use_rsc?: false)
+    end
+
+    it "warns standalone users about a React prerelease even when its numeric patch meets the floor" do
+      generator.run_generator
+
+      expect(GeneratorMessages.messages.join("\n")).to include("stable React", "19.2.8-rc.0")
+    end
+
+    prerelease_versions = ["19.2.8-rc.0", "^19.2.9-canary.1", "19.2.8.beta.1"]
+    stable_versions = ["~19.2.8", "19.2.9", "19.2.8+build.1"]
+    ["19.2.1", "19.3.0-rc.2"].each do |package_version|
+      context "with RSC #{package_version}" do
+        let(:rsc_version) { package_version }
+
+        prerelease_versions.each do |declared_version|
+          context "with React #{declared_version}" do
+            let(:react_version) { declared_version }
+
+            it "preserves the prerelease in the forced standalone warning" do
+              generator.run_generator
+
+              expect(GeneratorMessages.messages.join("\n"))
+                .to include("stable React", declared_version.delete_prefix("^"))
+            end
+          end
+        end
+
+        stable_versions.each do |declared_version|
+          context "with stable React #{declared_version}" do
+            let(:react_version) { declared_version }
+
+            it "does not warn about a supported stable version" do
+              generator.run_generator
+
+              expect(GeneratorMessages.messages).to eq([])
+            end
+          end
+        end
+      end
+    end
+  end
+
   describe "#add_rsc_to_procfile" do
     let(:generator) { described_class.new([], {}, destination_root:) }
 

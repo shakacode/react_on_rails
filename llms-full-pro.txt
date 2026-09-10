@@ -7735,7 +7735,7 @@ yarn add react@~19.2.7 react-dom@~19.2.7 react-on-rails-rsc@19.2.1
 > React on Rails Pro 17 RSC requires React 19.2.x with patch >= 19.2.7. React 19.0.x is no longer a supported Pro RSC runtime line in v17. See the [React documentation on Server Components](https://react.dev/reference/rsc/server-components#how-do-i-build-support-for-server-components) for details.
 >
 > The Pro 17.0 generator pins stable `react-on-rails-rsc@19.2.1`; the 17.1 RC soak pins
-> `19.3.0-rc.1` with React/React DOM `~19.2.8`. Keep the Pro gem/npm packages, React,
+> `19.3.0-rc.2` with React/React DOM `~19.2.8`. Keep the Pro gem/npm packages, React,
 > React DOM, and `react-on-rails-rsc` upgraded as a coordinated set.
 
 2. Enable support for Server Components in React on Rails Pro configuration:
@@ -9729,7 +9729,7 @@ This guide walks you through adding React Server Components to an existing React
 
 > **For React-side migration patterns** (restructuring components, Context, data fetching, etc.), see the [RSC Migration Guide series](../../oss/migrating/migrating-to-rsc.md). This page covers only the infrastructure upgrade.
 
-> **17.1 RC soak:** the generator now pins `react-on-rails-rsc@19.3.0-rc.1` with matching
+> **17.1 RC soak:** the generator now pins `react-on-rails-rsc@19.3.0-rc.2` with matching
 > React/React DOM 19.2.8. Upgrade the Pro gem and npm packages together to a 17.1 candidate that
 > includes this support before changing RSC; earlier Pro releases reject it at startup.
 > The stable 19.2.1 / React 19.2.7 combination below remains supported for existing apps.
@@ -9738,7 +9738,7 @@ This guide walks you through adding React Server Components to an existing React
 For that 17.1 candidate's generated defaults:
 
 ```bash
-pnpm add react@~19.2.8 react-dom@~19.2.8 react-on-rails-rsc@19.3.0-rc.1
+pnpm add react@~19.2.8 react-dom@~19.2.8 react-on-rails-rsc@19.3.0-rc.2
 ```
 
 The RC loader accepts raw JSX/TSX and supports `parserPlugins` for proposal syntax already
@@ -9783,11 +9783,14 @@ The generator-managed RSC version is what goes in your app's `package.json`. Sep
 
 > [!NOTE]
 > During the 17.1 soak, the Pro package's optional `react-on-rails-rsc` peer range is
-> `>=19.2.1 <19.4.0 || ~19.3.0-rc.1`. Only the 19.3.0 prerelease tuple from rc.1 onward is
+> `>=19.2.1 <19.4.0 || ~19.3.0-rc.2`. Only the 19.3.0 prerelease tuple from rc.2 onward is
 > admitted. Doctor and the Node Renderer enforce React/React DOM 19.2.7+ for RSC 19.2, and
 > 19.2.8+ for RSC 19.3, with matching React/DOM versions. Set
 > `REACT_ON_RAILS_PRO_DISABLE_VERSION_CHECK=1` only as an emergency rollout escape hatch;
 > it downgrades startup errors to warnings.
+>
+> This qualification installs exactly `19.3.0-rc.2`; the compatibility range does not
+> mean that every later satisfying version has been tested.
 
 ## Pre-Migration: Audit Components for Client API Usage
 
@@ -10881,7 +10884,7 @@ The RSC implementation depends on the `react-on-rails-rsc` npm package, which pr
 
 ## React and Package Version Policy
 
-During the 17.1 RC soak, generated RSC apps pin `react-on-rails-rsc@19.3.0-rc.1`
+During the 17.1 RC soak, generated RSC apps pin `react-on-rails-rsc@19.3.0-rc.2`
 with `react@~19.2.8` and `react-dom@~19.2.8` for both webpack and rspack projects.
 RSC 19.3 still uses the React 19.2 runtime. Existing apps using stable RSC 19.2.1+
 and matching React/React DOM 19.2.7+ remain supported. React 19.0.x and 19.3.x

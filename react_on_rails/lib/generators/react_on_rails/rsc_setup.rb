@@ -82,9 +82,17 @@ module ReactOnRails
         react_version = detect_react_version
         return if react_version.nil? # React not installed yet, will be installed by generator
 
-        major, minor, patch = react_version.split(".").map(&:to_i)
+        version = Gem::Version.new(react_version)
+        major, minor, patch = version.segments
 
-        if major != RSC_SUPPORTED_REACT_MAJOR || minor != RSC_SUPPORTED_REACT_MINOR
+        if version.prerelease?
+          GeneratorMessages.add_warning(<<~MSG.strip)
+            ⚠️  RSC requires stable React (detected: #{react_version}).
+
+            React prereleases are not supported. Install matching stable React/React DOM versions:
+              #{manual_add_packages_command(["react@#{RSC_REACT_VERSION_RANGE}", "react-dom@#{RSC_REACT_VERSION_RANGE}"])}
+          MSG
+        elsif major != RSC_SUPPORTED_REACT_MAJOR || minor != RSC_SUPPORTED_REACT_MINOR
           GeneratorMessages.add_warning(<<~MSG.strip)
             ⚠️  RSC requires React #{RSC_SUPPORTED_REACT_LINE} (detected: #{react_version})
 

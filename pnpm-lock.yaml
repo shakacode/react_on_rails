@@ -13,13 +13,13 @@ overrides:
   react_on_rails>react-dom: ^19.2.0
   react-on-rails-pro-node-renderer>react: ~19.2.8
   react-on-rails-pro-node-renderer>react-dom: ~19.2.8
-  react-on-rails-pro-node-renderer>react-on-rails-rsc: 19.3.0-rc.1
+  react-on-rails-pro-node-renderer>react-on-rails-rsc: 19.3.0-rc.2
   react-on-rails-pro>react: ~19.2.8
   react-on-rails-pro>react-dom: ~19.2.8
-  react-on-rails-pro>react-on-rails-rsc: 19.3.0-rc.1
+  react-on-rails-pro>react-on-rails-rsc: 19.3.0-rc.2
   react_on_rails_pro_dummy>react: ~19.2.8
   react_on_rails_pro_dummy>react-dom: ~19.2.8
-  react_on_rails_pro_dummy>react-on-rails-rsc: 19.3.0-rc.1
+  react_on_rails_pro_dummy>react-on-rails-rsc: 19.3.0-rc.2
   sentry-testkit>body-parser: npm:empty-npm-package@1.0.0
   sentry-testkit>express: npm:empty-npm-package@1.0.0
   lodash@>=4.0.0 <=4.17.22: '>=4.17.23 <5'
@@ -286,8 +286,8 @@ importers:
         specifier: ~19.2.8
         version: 19.2.8(react@19.2.8)
       react-on-rails-rsc:
-        specifier: 19.3.0-rc.1
-        version: 19.3.0-rc.1(@rspack/core@2.2.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(webpack@5.105.2(@swc/core@1.15.3))
+        specifier: 19.3.0-rc.2
+        version: 19.3.0-rc.2(@rspack/core@2.2.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(webpack@5.105.2(@swc/core@1.15.3))
 
   packages/react-on-rails-pro-node-renderer:
     dependencies:
@@ -401,8 +401,8 @@ importers:
         specifier: workspace:*
         version: link:../react-on-rails
       react-on-rails-rsc:
-        specifier: 19.3.0-rc.1
-        version: 19.3.0-rc.1(@rspack/core@2.2.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(webpack@5.105.2(@swc/core@1.15.3))
+        specifier: 19.3.0-rc.2
+        version: 19.3.0-rc.2(@rspack/core@2.2.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(webpack@5.105.2(@swc/core@1.15.3))
       redis:
         specifier: ^5.0.1
         version: 5.10.0
@@ -765,8 +765,8 @@ importers:
         specifier: workspace:*
         version: link:../../../packages/react-on-rails-pro-node-renderer
       react-on-rails-rsc:
-        specifier: 19.3.0-rc.1
-        version: 19.3.0-rc.1(@rspack/core@2.2.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(webpack@5.104.1)
+        specifier: 19.3.0-rc.2
+        version: 19.3.0-rc.2(@rspack/core@2.2.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(webpack@5.104.1)
       react-proptypes:
         specifier: ^1.0.0
         version: 1.0.0
@@ -5555,9 +5555,6 @@ packages:
     resolution: {integrity: sha512-uDn+FE1yrDzyC0pCo961B2IHbdM8y/ACZsKD4dG6WqrjV53BADjwa7D+1aom2rsNVfLyDgU/eigvlJGJ08OQ4w==}
     engines: {node: '>= 0.4'}
 
-  es-module-lexer@1.7.0:
-    resolution: {integrity: sha512-jEQoCwk8hyb2AZziIOLhDqpm5+2ww5uIE6lkO/6jcOCusfk6LhMHpXXfBLXTZ7Ydyt0j4VoUQv6uGNYbdW+kBA==}
-
   es-module-lexer@2.0.0:
     resolution: {integrity: sha512-5POEcUuZybH7IdmGsD8wlf0AI55wMecM9rVBTI/qEAy2c1kTOm3DjFYjrBdI2K3BaJjJYfYFeRtM0t9ssnRuxw==}
 
@@ -8581,8 +8578,8 @@ packages:
       react-dom: ~19.0.4
       webpack: ^5.59.0
 
-  react-on-rails-rsc@19.3.0-rc.1:
-    resolution: {integrity: sha512-p4AO4POX8ViAfdMQ2DNno71+I4TbuK3lc57ESg1Muj4cm83BZdEl1xQ23q3PIFhO4lSNAHqBv+uGHdLvIIcumQ==}
+  react-on-rails-rsc@19.3.0-rc.2:
+    resolution: {integrity: sha512-lkh1zkmcKbpHff9AQiGrWuW1F9y+kDwj5Q/97rLw9ySnyYSogA/KKjvbQKM+gCOu7p2s8zX9AEqUjYvV3uJl1w==}
     peerDependencies:
       '@rspack/core': ^1.0.0 || ^2.0.0
       react: ~19.0.4
@@ -15713,8 +15710,6 @@ snapshots:
       iterator.prototype: 1.1.5
       safe-array-concat: 1.1.3
 
-  es-module-lexer@1.7.0: {}
-
   es-module-lexer@2.0.0: {}
 
   es-object-atoms@1.1.1:
@@ -19335,11 +19330,10 @@ snapshots:
       webpack: 5.105.2(@swc/core@1.15.3)
       webpack-sources: 3.3.3
 
-  react-on-rails-rsc@19.3.0-rc.1(@rspack/core@2.2.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(webpack@5.104.1):
+  react-on-rails-rsc@19.3.0-rc.2(@rspack/core@2.2.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(webpack@5.104.1):
     dependencies:
       '@babel/parser': 7.29.7
       acorn-loose: 8.5.2
-      es-module-lexer: 1.7.0
       neo-async: 2.6.2
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
@@ -19349,11 +19343,10 @@ snapshots:
     optionalDependencies:
       '@rspack/core': 2.2.1
 
-  react-on-rails-rsc@19.3.0-rc.1(@rspack/core@2.2.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(webpack@5.105.2(@swc/core@1.15.3)):
+  react-on-rails-rsc@19.3.0-rc.2(@rspack/core@2.2.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(webpack@5.105.2(@swc/core@1.15.3)):
     dependencies:
       '@babel/parser': 7.29.7
       acorn-loose: 8.5.2
-      es-module-lexer: 1.7.0
       neo-async: 2.6.2
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)

@@ -86,7 +86,7 @@
   "peerDependencies": {
     "react": ">= 16",
     "react-dom": ">= 16",
-    "react-on-rails-rsc": ">=19.2.1 <19.4.0 || ~19.3.0-rc.1",
+    "react-on-rails-rsc": ">=19.2.1 <19.4.0 || ~19.3.0-rc.2",
     "@tanstack/react-router": ">=1.139.0 <2.0.0",
     "ioredis": ">= 5"
   },
@@ -118,7 +118,7 @@
     "mock-fs": "^5.5.0",
     "react": "~19.2.8",
     "react-dom": "~19.2.8",
-    "react-on-rails-rsc": "19.3.0-rc.1",
+    "react-on-rails-rsc": "19.3.0-rc.2",
     "ioredis": "5.11.1"
   }
 }

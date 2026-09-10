@@ -486,8 +486,8 @@ module GeneratorHelper
     match = react_version.match(/(\d+)\.(\d+)\.(\d+)(?:[-.]([0-9A-Za-z.-]+))?/)
     return nil unless match
 
-    # Return the matched version (without pre-release suffix for comparison)
-    "#{match[1]}.#{match[2]}.#{match[3]}"
+    # Preserve prerelease identifiers so callers can distinguish stable releases.
+    match[0]
   rescue StandardError
     nil
   end

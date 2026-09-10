@@ -20,10 +20,10 @@
 // Ruby Doctor/generator constants that install and diagnose the same Pro RSC
 // package line. The 19.2.1 line pairs with React/React DOM 19.2.7 and carries
 // the coordinated RSC fixes required by the Pro RSC renderer path.
-// The 19.3.0 RC soak admits only the qualified prerelease tuple, from rc.1 onward.
+// The 19.3.0 RC soak admits only the qualified prerelease tuple, from rc.2 onward.
 // RSC package minors and React runtime minors are independent: RSC 19.3 still uses React 19.2.
 export const RSC_PEER_SUPPORT = {
-  reactOnRailsRsc: { minimumVersion: '19.2.1', minimumPrereleaseVersion: '19.3.0-rc.1', supportedMajor: 19 },
+  reactOnRailsRsc: { minimumVersion: '19.2.1', minimumPrereleaseVersion: '19.3.0-rc.2', supportedMajor: 19 },
   react: {
     supportedMajor: 19,
     supportedRanges: [

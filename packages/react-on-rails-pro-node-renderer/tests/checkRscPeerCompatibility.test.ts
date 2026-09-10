@@ -28,7 +28,7 @@ const versionBelowMinimumVersion = (version: string) => {
 const belowMinimumVersion = versionBelowMinimumVersion(minimumVersion);
 
 describe('checkRscPeerCompatibility', () => {
-  it.each(['19.3.0-rc.1', '19.3.0-rc.2', '19.3.0'])(
+  it.each(['19.3.0-rc.2', '19.3.0-rc.3', '19.3.0'])(
     'accepts %s with the coordinated React 19.2.8 runtime',
     (rscVersion) => {
       expect(
@@ -37,7 +37,7 @@ describe('checkRscPeerCompatibility', () => {
     },
   );
 
-  it.each(['19.3.0-rc.0', '19.3.1-rc.0', '19.4.0-rc.0', '19.4.0'])(
+  it.each(['19.3.0-rc.0', '19.3.0-rc.1', '19.3.1-rc.0', '19.4.0-rc.0', '19.4.0'])(
     'rejects unqualified RSC version %s',
     (rscVersion) => {
       expect(
@@ -56,15 +56,15 @@ describe('checkRscPeerCompatibility', () => {
     ['19.2.9-canary.0', '19.2.9-canary.0'],
   ])('rejects RSC 19.3 with React %s and React DOM %s', (reactVersion, reactDomVersion) => {
     expect(
-      checkRscPeerCompatibility({ rscVersion: '19.3.0-rc.1', reactVersion, reactDomVersion }).level,
+      checkRscPeerCompatibility({ rscVersion: '19.3.0-rc.2', reactVersion, reactDomVersion }).level,
     ).toBe('error');
   });
 
   it('configures the qualified 19.3.0 prerelease tuple', () => {
-    expect(minimumPrereleaseVersion).toBe('19.3.0-rc.1');
+    expect(minimumPrereleaseVersion).toBe('19.3.0-rc.2');
   });
 
-  it.each(['19.2.1', '19.3.0-rc.1'])(
+  it.each(['19.2.1', '19.3.0-rc.2'])(
     'explains stable-only React and React DOM support for RSC %s',
     (rscVersion) => {
       for (const versions of [
@@ -103,7 +103,7 @@ describe('checkRscPeerCompatibility', () => {
       expect(r.level).toBe('error');
       expect(r.message).toContain(prerelease);
       expect(r.message).toContain(`>= ${minimumVersion}`);
-      expect(r.message).toContain('19.3.0-rc.1 during the RC soak');
+      expect(r.message).toContain('19.3.0-rc.2 during the RC soak');
       expect(r.message).not.toContain('undefined');
     },
   );
@@ -112,7 +112,7 @@ describe('checkRscPeerCompatibility', () => {
     const r = checkRscPeerCompatibility({ rscVersion: belowMinimumVersion, reactVersion: '19.2.7' });
     expect(r.level).toBe('error');
     expect(r.message).toContain(`>= ${minimumVersion}`);
-    expect(r.message).toContain('19.3.0-rc.1 during the RC soak');
+    expect(r.message).toContain('19.3.0-rc.2 during the RC soak');
     expect(r.message).not.toContain('undefined');
   });
 
