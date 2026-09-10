@@ -193,9 +193,9 @@ Thanks to the companies supporting ShakaCode's open-source work.
   </a>
   <a href="https://coderabbit.ai">
     <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://victorious-bubble-f69a016683.media.strapiapp.com/White_Typemark_7229870ac5.svg">
-      <source media="(prefers-color-scheme: light)" srcset="https://victorious-bubble-f69a016683.media.strapiapp.com/Orange_Typemark_7958cfa790.svg">
-      <img alt="CodeRabbit" src="https://victorious-bubble-f69a016683.media.strapiapp.com/Orange_Typemark_7958cfa790.svg" height="34">
+      <source media="(prefers-color-scheme: dark)" srcset="https://docs.coderabbit.ai/coderabbit-logo-dark.svg">
+      <source media="(prefers-color-scheme: light)" srcset="https://docs.coderabbit.ai/coderabbit-logo-light.svg">
+      <img alt="CodeRabbit" src="https://docs.coderabbit.ai/coderabbit-logo-light.svg" height="34">
     </picture>
   </a>
 </p>
