@@ -164,7 +164,7 @@ module ReactOnRails
           # in URI::InvalidURIError's own message.
           msg = "You specified server rendering JS file: #{sanitized_renderer_url(server_js_file)}, but it cannot " \
                 "be read. You may set the server_bundle_js_file in your configuration to be \"\" to " \
-                "avoid this warning.\nError is: #{strip_userinfo(e.message)}\n\n" \
+                "avoid this warning.\nError is: #{strip_userinfo(e.message, configured_url: server_js_file)}\n\n" \
                 "#{Utils.default_troubleshooting_section}"
           raise ReactOnRails::ServerBundleLoadError, msg
         end
@@ -408,17 +408,38 @@ module ReactOnRails
           uri.to_s
         rescue URI::InvalidURIError
           # A URL malformed enough that URI rejects it still shouldn't leak credentials.
-          strip_userinfo(url)
+          strip_malformed_configured_url_userinfo(url)
         end
 
-        # Best-effort strip of the common user:pass@ form from arbitrary text — not just a URL
-        # value, but also free-form text that may quote one, such as the message of a
-        # URI::InvalidURIError raised from an unparseable credential-bearing URL (that message
-        # embeds the raw original string verbatim). Shared by sanitized_renderer_url's malformed-
-        # URL fallback and by the rescue blocks below, so there is exactly one definition of
-        # "strip userinfo" rather than two regexes that can drift apart.
-        def strip_userinfo(text)
-          text.to_s.gsub(%r{//[^/@]*@}, "//")
+        # A configured URL is one value rather than arbitrary prose. Handle only the common
+        # user:password@ fallback shapes that URI.parse rejects, including raw ? or # password
+        # characters. Anchoring the substitutions leaves path/query @ characters alone and avoids
+        # turning this fallback into a general malformed-URL parser.
+        def strip_malformed_configured_url_userinfo(url)
+          url = url.lstrip
+          sanitized_url = url.sub(%r{\A(?<scheme>https?://)[^/:?#]*:[^/]*@}i, '\k<scheme>')
+          return sanitized_url unless sanitized_url == url
+
+          url.sub(%r{\A(?<scheme>https?://)[^/@]*@}i, '\k<scheme>')
+        end
+
+        # Best-effort strip of the common user:pass@ form from arbitrary error text. When the
+        # configured URL is known, replace that exact value with its sanitized form first so raw
+        # ?/# password characters are handled without treating unrelated prose as malformed URL
+        # syntax. The remaining substitution preserves ordinary path, query, and fragment @s.
+        def strip_userinfo(text, configured_url: nil)
+          sanitized_text = if configured_url
+                             text.to_s.gsub(configured_url) { sanitized_renderer_url(configured_url) }
+                           else
+                             text.to_s
+                           end
+          sanitized_text.gsub(%r{//[^/?#]*@}, "//")
+        end
+
+        def sanitized_url_error_message(error, configured_url:)
+          return strip_userinfo(error.message, configured_url:) unless error.is_a?(URI::InvalidURIError)
+
+          "bad URI (sanitized): #{sanitized_renderer_url(configured_url).inspect}"
         end
 
         def file_url_to_string(url)
@@ -462,7 +483,7 @@ module ReactOnRails
           # well as url itself: a URL malformed enough that URI.parse raises embeds the raw,
           # unsanitized URL verbatim in URI::InvalidURIError's own message.
           msg = "file_url_to_string #{sanitized_renderer_url(url)} failed\nError is: " \
-                "#{strip_userinfo(e.message)}\n\n#{Utils.default_troubleshooting_section}"
+                "#{sanitized_url_error_message(e, configured_url: url)}\n\n#{Utils.default_troubleshooting_section}"
           raise ReactOnRails::ServerBundleLoadError, msg
         end
 
