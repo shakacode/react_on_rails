@@ -4824,7 +4824,8 @@ module ReactOnRails
         checker.add_warning(<<~MSG.strip)
           ⚠️  #{RSC_PACKAGE_NAME} #{installed_version} is behind the npm #{tag} dist-tag #{tag_version}.
 
-          React Server Components track React minor versions. If your React version is on the #{tag_version.split('.')[0, 2].join('.')} line, install the matching RSC package instead of relying on a stale latest tag.
+          Before upgrading, check the candidate package's React peer requirements
+          and the React runtime versions supported by this React on Rails Pro release.
 
           Check peer requirements with:
             npm view #{RSC_PACKAGE_NAME}@#{tag_version} peerDependencies

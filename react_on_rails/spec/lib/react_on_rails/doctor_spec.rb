@@ -9685,8 +9685,35 @@ RSpec.describe ReactOnRails::Doctor do
         expect(warning_msgs).to include(
           a_string_including(
             "react-on-rails-rsc 19.2.1 is behind the npm next dist-tag 19.2.2-rc.1",
-            "React Server Components track React minor versions"
+            "npm view react-on-rails-rsc@19.2.2-rc.1 peerDependencies"
           )
+        )
+      end
+
+      it "does not infer a React runtime minor from a newer RSC package dist-tag" do
+        allow(doctor).to receive(:capture_rsc_dist_tags)
+          .with(Dir.pwd)
+          .and_return(
+            [
+              JSON.generate("latest" => "19.2.1", "next" => "19.3.0-rc.2"),
+              instance_double(Process::Status, success?: true)
+            ]
+          )
+
+        doctor.send(:check_rsc_react_version)
+
+        expect(checker.messages).not_to include(hash_including(type: :error))
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }.map { |m| m[:content] }
+        expect(warning_msgs).to include(
+          a_string_including(
+            "react-on-rails-rsc 19.2.1 is behind the npm next dist-tag 19.3.0-rc.2",
+            "React peer requirements",
+            "React runtime versions supported by this React on Rails Pro release",
+            "npm view react-on-rails-rsc@19.3.0-rc.2 peerDependencies"
+          )
+        )
+        expect(warning_msgs.join("\n")).not_to include(
+          "track React minor versions", "React version is on the 19.3 line"
         )
       end
 
