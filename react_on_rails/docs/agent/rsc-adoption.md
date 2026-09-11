@@ -25,6 +25,9 @@ bundle exec rake react_on_rails:install_rsc_agent_guardrails
 bin/rails react_on_rails:doctor FORMAT=json
 ```
 
+The generated advisory hook requires Claude Code 2.1.139 or newer. That release added the exec-form
+`args` field that keeps project paths with spaces or special characters intact.
+
 Before completion, protect any RSC payload route, keep the Node renderer private, avoid sensitive
 logged props or URLs, build all three bundles, and exercise navigation and hydration in a browser.
 
