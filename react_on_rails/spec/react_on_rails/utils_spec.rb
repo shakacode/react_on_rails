@@ -1200,6 +1200,29 @@ module ReactOnRails
         expect(result).to include("key=[REDACTED]")
       end
     end
+
+    # sanitize_error_text scrubs URL-like patterns in arbitrary error-message
+    # prose, where the text is not a single URL but may embed one.
+    describe ".sanitize_error_text" do
+      it "strips credentials from a URL embedded in a URI::InvalidURIError message" do
+        text = 'bad URI(is not URI?): "http://u:s3cr3t@bad host:3800"'
+        result = described_class.sanitize_error_text(text)
+        expect(result).not_to include("s3cr3t")
+        expect(result).not_to include("u:")
+      end
+
+      it "redacts query-string credentials from a URL in prose" do
+        text = "Error: https://cdn.example.com/b.js?token=s3cr3t failed"
+        result = described_class.sanitize_error_text(text)
+        expect(result).not_to include("s3cr3t")
+        expect(result).to include("token=[REDACTED]")
+      end
+
+      it "passes through error text with no URL unchanged" do
+        text = "Connection refused - connect(2) for host:3800"
+        expect(described_class.sanitize_error_text(text)).to eq(text)
+      end
+    end
   end
 end
 # rubocop:enable Metrics/ModuleLength, Metrics/BlockLength

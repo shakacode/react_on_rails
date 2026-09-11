@@ -414,16 +414,7 @@ module ReactOnRails
                            else
                              text.to_s
                            end
-          # Strip residual user:pass@ patterns in prose text
-          sanitized_text = sanitized_text.gsub(%r{//[^/?#]*@}, "//")
-          # Best-effort query-value redaction on any URL-like substrings in prose.
-          # Match greedily then trim trailing prose punctuation so . and : inside
-          # the URL (hostname, port) are captured but a sentence-final "." or ")"
-          # is not absorbed into the redacted output.
-          sanitized_text.gsub(%r{https?://[^\s]+}) do |match|
-            trimmed = match.sub(/[).,;:'">\]]+\z/, "")
-            Utils.sanitize_url_for_display(trimmed) + match[trimmed.length..]
-          end
+          Utils.sanitize_error_text(sanitized_text)
         end
 
         def sanitized_url_error_message(error, configured_url:)

@@ -484,6 +484,22 @@ module ReactOnRails
       end
     end
 
+    # Sanitizes arbitrary error-message text that may contain URLs with
+    # credentials. Finds URL-like substrings (http:// or https://) in the
+    # text and passes each through sanitize_url_for_display. Trailing prose
+    # punctuation is preserved. Use this for exception messages, log text,
+    # or any string that may embed a credentialed URL in prose.
+    def self.sanitize_error_text(text)
+      return text if text.nil? || text.empty?
+
+      text.to_s
+          .gsub(%r{//[^/?#]*@}, "//")
+          .gsub(%r{https?://[^\s]+}) do |match|
+        trimmed = match.sub(/[).,;:'">\]]+\z/, "")
+        sanitize_url_for_display(trimmed) + match[trimmed.length..]
+      end
+    end
+
     # Strips userinfo from the authority section of a well-formed URL whose
     # scheme's URI class doesn't report userinfo (e.g. URI::File). Only looks
     # for @ in the authority — before the first / ? or # after :// — so @ in

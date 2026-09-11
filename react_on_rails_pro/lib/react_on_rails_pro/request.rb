@@ -695,7 +695,7 @@ module ReactOnRailsPro
           renderer_url = #{ReactOnRails::Utils.sanitize_url_for_display(url)}
           Be sure to use a url that contains the protocol of http or https.
           Original error is
-          #{e}
+          #{ReactOnRails::Utils.sanitize_error_text(e.message)}
         MSG
         raise ReactOnRailsPro::Error, message
       end
