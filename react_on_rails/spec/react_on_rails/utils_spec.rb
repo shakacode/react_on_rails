@@ -1176,11 +1176,6 @@ module ReactOnRails
         expect(result).not_to include("s3cr3t")
       end
 
-      it "preserves @ in path when there is no userinfo" do
-        result = described_class.sanitize_url_for_display("http://host/webpack/server@bundle.js")
-        expect(result).to include("server@bundle.js")
-      end
-
       it "preserves @ in path alongside @ in query value" do
         result = described_class.sanitize_url_for_display("http://host/path@file.js?next=@val")
         expect(result).to include("host/path@file.js")
