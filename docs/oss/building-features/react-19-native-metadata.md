@@ -411,8 +411,8 @@ Use this matrix to decide which approach to use:
 ## Prerequisites
 
 - **React 19** — native metadata hoisting is a React 19 feature
-- **React on Rails 16.2.0+** — for basic `react_component` usage (16.2.0+ is the currently supported, version-aligned line)
-- **React on Rails Pro** — for `stream_react_component` and RSC support. Current public releases (16.2.0+) are version-aligned: install Pro at the same version as `react_on_rails`.
+- **React on Rails 16.2.0+** — the minimum for basic `react_component` usage; the current stable documentation targets React on Rails 17
+- **React on Rails Pro 17** — for `stream_react_component` and supported GA RSC. Install Pro at the same version as `react_on_rails`; the stable RSC stack uses React and React DOM 19.2.x with patch 19.2.7 or newer and `react-on-rails-rsc` 19.2.x with patch 19.2.1 or newer.
 
 ## References
 

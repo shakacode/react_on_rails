@@ -1,6 +1,12 @@
+---
+description: >-
+  React on Rails Pro 17 supports RSC on Rspack as a GA path, with stable package
+  requirements, end-to-end CI coverage, and known limitations.
+---
+
 # Rspack Compatibility with React Server Components
 
-> **Status**: Supported as of React on Rails Pro 17.0.0. Rspack is the default bundler for fresh installs, the generator scaffolds the native `RSCRspackPlugin`, and RSC-on-Rspack is covered end-to-end by a CI gate — the `dummy-app-rspack-rsc-runtime-gate` job in [`.github/workflows/pro-integration-tests.yml`](https://github.com/shakacode/react_on_rails/blob/main/.github/workflows/pro-integration-tests.yml), which builds the client/server/RSC bundles with Rspack, boots Rails plus the Pro Node renderer, and runs the RSC Playwright suite so RSC routes are proven to render and hydrate under Rspack. Further production hardening is tracked in [issue #3488](https://github.com/shakacode/react_on_rails/issues/3488). The remaining known limitations below (no official React endorsement of the `react-server-dom-webpack` runtime under Rspack; production-posture streamed-CSS coverage) are genuine and still apply.
+> **Status**: Supported as a GA path as of React on Rails Pro 17.0.0. Rspack is the default bundler for fresh installs, the generator scaffolds the native `RSCRspackPlugin`, and RSC-on-Rspack is covered end-to-end by a CI gate — the `dummy-app-rspack-rsc-runtime-gate` job in [`.github/workflows/pro-integration-tests.yml`](https://github.com/shakacode/react_on_rails/blob/main/.github/workflows/pro-integration-tests.yml), which builds the client/server/RSC bundles with Rspack, boots Rails plus the Pro Node renderer, and runs the RSC Playwright suite so RSC routes are proven to render and hydrate under Rspack. Further production hardening is tracked in [issue #3488](https://github.com/shakacode/react_on_rails/issues/3488). The remaining known limitations below (no official React endorsement of the `react-server-dom-webpack` runtime under Rspack; production-posture streamed-CSS coverage) are genuine and still apply.
 
 This page documents the compatibility status of [Rspack](https://rspack.rs/) with React on Rails Pro's React Server Components (RSC) implementation.
 

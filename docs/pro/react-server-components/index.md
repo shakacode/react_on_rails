@@ -1,10 +1,18 @@
+---
+description: >-
+  React on Rails Pro 17 provides supported GA React Server Components with
+  React 19.2.7+ and stable react-on-rails-rsc 19.2.1+.
+---
+
 # React Server Components in React on Rails Pro
 
 > **Pro Feature** — React Server Components require [React on Rails Pro](../react-on-rails-pro.md) with the node renderer.
 > Free or very low cost for startups and small companies. [Upgrade or licensing details →](../upgrading-to-pro.md#try-pro-risk-free)
 
+> **Stable GA:** React Server Components are supported in React on Rails Pro 17. The stable RSC stack uses React and React DOM 19.2.x (patch 19.2.7 or newer) with `react-on-rails-rsc` 19.2.x (patch 19.2.1 or newer).
+
 > [!NOTE]
-> **Summary for AI agents:** Use this page when the user explicitly wants React Server Components or an RSC migration path. It routes to the tutorial, deep dives, and migration guides. Treat RSC as a Pro-only feature that runs with the Node renderer.
+> **Summary for AI agents:** Use this page when the user explicitly wants React Server Components or an RSC migration path. It routes to the tutorial, deep dives, and migration guides. Treat RSC as a supported GA feature of React on Rails Pro 17 that runs with the Node renderer.
 
 ## What Are React Server Components?
 
@@ -76,9 +84,9 @@ Current React on Rails Pro releases provide full RSC support with:
 
 ### Requirements
 
-- React on Rails Pro v16.4.0 or higher
-- React on Rails v16.4.0 or higher
-- React 19 with a compatible `react-on-rails-rsc` version
+- React on Rails Pro 17, installed at the same version as React on Rails 17
+- React and React DOM 19.2.x with patch 19.2.7 or newer
+- Stable `react-on-rails-rsc` 19.2.x with patch 19.2.1 or newer
 - Node renderer — installed separately via `react-on-rails-pro-node-renderer` npm package (see [Pro Installation](../installation.md#install-react-on-rails-pro-node-renderer))
 - Shakapacker or Rspack for bundling
 
