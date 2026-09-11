@@ -7,6 +7,8 @@ This package supplies the Rails-level evidence requested by issue #4695 and the 
 
 Both starters use React 19.0.4 and the same minimal stateful component. Their committed Ruby and pnpm lockfiles make the package replayable. [PROVENANCE.md](PROVENANCE.md) records the generation commands and the small alignment edits made after generation.
 
+The committed checks validate the recorded artifact without running a new benchmark.
+
 ## What it measures
 
 The harness records at least five samples per stack for:
