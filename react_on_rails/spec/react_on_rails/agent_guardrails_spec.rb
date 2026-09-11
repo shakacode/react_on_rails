@@ -36,6 +36,26 @@ module ReactOnRails
       Dir.chdir(@app_root) { Open3.capture3(env, RbConfig.ruby, hook_path, *args, stdin_data:) }
     end
 
+    def run_registered_hook(app_root, stdin_data:)
+      settings_path = File.join(app_root, ".claude/settings.json")
+      settings = JSON.parse(File.read(settings_path))
+      hook = settings.dig("hooks", "PostToolUse")
+                     .find { |entry| entry.fetch("matcher").split("|").include?("Write") }
+                     .fetch("hooks")
+                     .find { |entry| entry.fetch("type") == "command" }
+      environment = { "CLAUDE_PROJECT_DIR" => app_root }
+      command = hook.fetch("command").gsub("${CLAUDE_PROJECT_DIR}", app_root)
+
+      Dir.chdir(app_root) do
+        if hook.key?("args")
+          args = hook.fetch("args").map { |arg| arg.gsub("${CLAUDE_PROJECT_DIR}", app_root) }
+          Open3.capture3(environment, [command, command], *args, stdin_data:)
+        else
+          Open3.capture3(environment, command, stdin_data:)
+        end
+      end
+    end
+
     def additional_context(stdout)
       JSON.parse(stdout).dig("hookSpecificOutput", "additionalContext")
     end
@@ -997,6 +1017,21 @@ module ReactOnRails
       expect(hook).to include(
         "type" => "command", "command" => described_class::HOOK_COMMAND, "args" => described_class::HOOK_ARGS
       )
+    end
+
+    it "executes the registered project hook when the generated app path contains spaces" do
+      app_root = File.join(@app_root, "generated app")
+      routes_path = File.join(app_root, "config/routes.rb")
+      described_class.install(app_root)
+      FileUtils.mkdir_p(File.dirname(routes_path))
+      File.write(routes_path, "rsc_payload_route\n")
+      hook_input = JSON.generate("tool_name" => "Write", "tool_input" => { "file_path" => routes_path })
+
+      stdout, stderr, status = run_registered_hook(app_root, stdin_data: hook_input)
+
+      expect(status).to be_success
+      expect(stderr).to be_empty
+      expect(additional_context(stdout)).to include("rsc-app-safety: config/routes.rb")
     end
 
     it "removes the legacy shell hook file and upgrades its settings registration" do
