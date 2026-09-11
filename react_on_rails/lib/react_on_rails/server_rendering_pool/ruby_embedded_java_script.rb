@@ -392,22 +392,14 @@ module ReactOnRails
           nil
         end
 
-        # Strips any embedded credentials from a configured renderer URL before it is
-        # interpolated into an error message, so a password in the URL (a supported config
-        # convenience, e.g. https://:password@host:3800) cannot leak into logs or error
-        # trackers. Delegates to Utils.sanitize_url_for_display, which also redacts
-        # query-string values (e.g. presigned S3 URLs) and handles file:// and
-        # malformed URLs. See issue #5046 for the full fuzz table.
+        # Removes credentials from a renderer URL for safe display. See #5046.
         def sanitized_renderer_url(url)
           Utils.sanitize_url_for_display(url)
         end
 
-        # Best-effort strip of credentials from arbitrary error-message text. When the
-        # configured URL is known, replace that exact value with its sanitized form first
-        # so raw special characters in passwords are handled without treating unrelated
-        # prose as malformed URL syntax. The remaining substitution catches residual
-        # user:pass@ patterns in prose. When configured_url is nil, only the residual
-        # regex and URL-pattern query redaction run — reduced fidelity but no leaks.
+        # Scrubs credentials from error-message text. When the configured URL is
+        # known, replaces it exactly first (handles tricky passwords), then cleans
+        # any remaining URL-like patterns in the prose.
         def strip_userinfo(text, configured_url: nil)
           sanitized_text = if configured_url
                              text.to_s.gsub(configured_url) { sanitized_renderer_url(configured_url) }
