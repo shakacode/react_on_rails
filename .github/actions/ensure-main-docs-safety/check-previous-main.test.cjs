@@ -520,6 +520,121 @@ async function testAllSkippedJobsDoNotSupersedeOlderFailure() {
   assert.match(core.failed[0], /Check Markdown Links/);
 }
 
+async function testSuccessfulGuardJobDoesNotSupersedeSkippedSubstantiveWork() {
+  const descendant = 'docs-fix';
+  const ancestor = 'broken-lint';
+  const guardRun = run({
+    id: 47,
+    workflowId: 470,
+    sha: descendant,
+    name: 'Docs Guard',
+    conclusion: 'failure',
+  });
+  const orchestrationOnlyRun = run({ id: 48, workflowId: 480, sha: descendant, name: 'Lint' });
+  const staleFailure = run({
+    id: 49,
+    workflowId: 480,
+    sha: ancestor,
+    name: 'Lint',
+    conclusion: 'failure',
+  });
+  const github = makeGithub({
+    pages: [[guardRun, orchestrationOnlyRun, staleFailure]],
+    jobsByRunId: {
+      47: [guardOnlyJob()],
+      48: [successJob(GUARD_JOB_NAME), skippedJob('lint')],
+      49: [buildFailureJob()],
+    },
+    parentsBySha: {
+      [descendant]: ancestor,
+    },
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context,
+    core,
+    previousSha: descendant,
+    excludeWorkflowsInput: '',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /Lint #49/);
+}
+
+async function testMissingWorkflowIdsDoNotSupersedeOlderFailure() {
+  const descendant = 'docs-fix';
+  const ancestor = 'broken-docs';
+  const guardRun = run({ id: 50, workflowId: 500, sha: descendant, name: 'Lint', conclusion: 'failure' });
+  const successfulRun = { ...run({ id: 51, sha: descendant, name: 'Check Markdown Links' }) };
+  const staleFailure = {
+    ...run({ id: 52, sha: ancestor, name: 'Check Markdown Links', conclusion: 'failure' }),
+  };
+  delete successfulRun.workflow_id;
+  delete staleFailure.workflow_id;
+  const github = makeGithub({
+    pages: [[guardRun, successfulRun, staleFailure]],
+    jobsByRunId: {
+      50: [guardOnlyJob()],
+      51: [successJob()],
+      52: [buildFailureJob()],
+    },
+    parentsBySha: {
+      [descendant]: ancestor,
+    },
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context,
+    core,
+    previousSha: descendant,
+    excludeWorkflowsInput: '',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /Check Markdown Links #52/);
+}
+
+async function testMalformedWorkflowIdsDoNotSupersedeOlderFailure() {
+  const descendant = 'docs-fix';
+  const ancestor = 'broken-docs';
+  const guardRun = run({ id: 53, workflowId: 530, sha: descendant, name: 'Lint', conclusion: 'failure' });
+  const successfulRun = {
+    ...run({ id: 54, sha: descendant, name: 'Check Markdown Links' }),
+    workflow_id: 'not-a-workflow-id',
+  };
+  const staleFailure = {
+    ...run({ id: 55, sha: ancestor, name: 'Check Markdown Links', conclusion: 'failure' }),
+    workflow_id: 'not-a-workflow-id',
+  };
+  const github = makeGithub({
+    pages: [[guardRun, successfulRun, staleFailure]],
+    jobsByRunId: {
+      53: [guardOnlyJob()],
+      54: [successJob()],
+      55: [buildFailureJob()],
+    },
+    parentsBySha: {
+      [descendant]: ancestor,
+    },
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context,
+    core,
+    previousSha: descendant,
+    excludeWorkflowsInput: '',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /Check Markdown Links #55/);
+}
+
 async function testIncompleteRunDoesNotSupersedeOlderFailure() {
   const descendant = 'docs-fix';
   const ancestor = 'broken-docs';
@@ -1222,6 +1337,9 @@ async function main() {
   await testDescendantSuccessDoesNotSupersedeDifferentWorkflowFailure();
   await testEmptyJobsDoNotSupersedeOlderFailure();
   await testAllSkippedJobsDoNotSupersedeOlderFailure();
+  await testSuccessfulGuardJobDoesNotSupersedeSkippedSubstantiveWork();
+  await testMissingWorkflowIdsDoNotSupersedeOlderFailure();
+  await testMalformedWorkflowIdsDoNotSupersedeOlderFailure();
   await testIncompleteRunDoesNotSupersedeOlderFailure();
   await testGuardOnlyRunDoesNotSupersedeOlderSameWorkflowFailure();
   await testNoRunSyntheticBaseLooksThroughToParentFailure();

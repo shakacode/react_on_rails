@@ -33,6 +33,10 @@ function latestRunsByWorkflow(workflowRuns) {
   return latestByWorkflow;
 }
 
+function isValidWorkflowId(workflowId) {
+  return Number.isSafeInteger(workflowId) && workflowId > 0;
+}
+
 function latestAttemptJobs(jobs) {
   const latestAttempt = Math.max(...jobs.map((job) => job.run_attempt));
   return jobs.filter((job) => job.run_attempt === latestAttempt);
@@ -235,10 +239,15 @@ async function evaluateCommitRuns({ github, context, core, sha, createdAfter, ex
       const failed = failedJobs(latestJobs);
 
       if (failed.length === 0) {
-        const hasSuccessfulJob = latestJobs.some((job) => job.conclusion === 'success');
+        const hasSuccessfulSubstantiveJob = latestJobs.some(
+          (job) => job.name !== GUARD_JOB_NAME && job.conclusion === 'success',
+        );
         return {
           kind: 'passing',
-          successfulWorkflowId: run.conclusion === 'success' && hasSuccessfulJob ? run.workflow_id : null,
+          successfulWorkflowId:
+            run.conclusion === 'success' && isValidWorkflowId(run.workflow_id) && hasSuccessfulSubstantiveJob
+              ? run.workflow_id
+              : null,
         };
       }
 
@@ -470,11 +479,11 @@ async function checkPreviousMainCommitStatus({
       );
     }
 
-    const supersededFailingRuns = result.failingRuns.filter((run) =>
-      successfulDescendantWorkflowIds.has(run.workflow_id),
+    const supersededFailingRuns = result.failingRuns.filter(
+      (run) => isValidWorkflowId(run.workflow_id) && successfulDescendantWorkflowIds.has(run.workflow_id),
     );
     const unresolvedFailingRuns = result.failingRuns.filter(
-      (run) => !successfulDescendantWorkflowIds.has(run.workflow_id),
+      (run) => !isValidWorkflowId(run.workflow_id) || !successfulDescendantWorkflowIds.has(run.workflow_id),
     );
 
     if (unresolvedFailingRuns.length > 0) {
