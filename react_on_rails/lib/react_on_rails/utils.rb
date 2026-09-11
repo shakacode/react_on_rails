@@ -473,12 +473,12 @@ module ReactOnRails
             return redact_query_values(sanitized)
           end
 
-          return redact_query_values_in_uri(uri)
+          return redact_query_values(uri.to_s)
         end
 
         uri.password = nil
         uri.user = nil
-        redact_query_values_in_uri(uri)
+        redact_query_values(uri.to_s)
       rescue URI::InvalidURIError
         sanitized = strip_malformed_url_userinfo(url)
         redact_query_values(sanitized)
@@ -564,17 +564,7 @@ module ReactOnRails
     end
     private_class_method :strip_malformed_url_userinfo
 
-    # Redacts all query-string values in a parsed URI, keeping keys for diagnostics.
-    # Uses regex-based substitution on the query string to avoid URI.encode_www_form
-    # percent-encoding the [REDACTED] placeholder.
-    # Returns the URI as a string.
-    def self.redact_query_values_in_uri(uri)
-      result = uri.to_s
-      redact_query_values(result)
-    end
-    private_class_method :redact_query_values_in_uri
-
-    # Redacts query-string values in a raw URL string using regex substitution.
+    # Redacts query-string values in a URL string using regex substitution.
     # Used when we don't have a parsed URI (malformed URL path).
     #
     # Per RFC 3986, the fragment starts at the first # and the query is between
