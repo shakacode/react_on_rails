@@ -9085,6 +9085,7 @@ RSpec.describe ReactOnRails::Doctor do
       expect(doctor.send(:unsupported_rsc_react_version?, described_class::RSC_MINIMUM_REACT_VERSION)).to be false
       expect(doctor.send(:unsupported_rsc_react_version?, below_floor)).to be true
       expect(doctor.send(:unsupported_rsc_react_version?, unsupported_minor)).to be true
+      expect(doctor.send(:unsupported_rsc_react_version?, "19.2.8-rc.1")).to be true
     end
 
     context "when React 19.2.7+" do

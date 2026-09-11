@@ -4675,7 +4675,8 @@ module ReactOnRails
     end
 
     def supported_rsc_react_version?(react_version)
-      supported_rsc_react_line?(react_version) &&
+      npm_prerelease(react_version).empty? &&
+        supported_rsc_react_line?(react_version) &&
         !npm_version_less_than?(react_version, RSC_MINIMUM_REACT_VERSION)
     end
 
