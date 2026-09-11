@@ -4,6 +4,7 @@ require "json"
 require_relative "version_syntax_converter"
 require_relative "shakapacker_config_helpers"
 require_relative "rsc_rspack_support"
+require_relative "version_checker/lockfile_resolution"
 
 module ReactOnRails
   # Responsible for checking versions of rubygem versus yarn node package
@@ -38,6 +39,7 @@ module ReactOnRails
       validate_exact_version!
       validate_version_match!
       validate_rsc_rspack_version!
+      warn_lockfile_diagnostic
     end
 
     private
@@ -204,9 +206,11 @@ module ReactOnRails
 
         Detected: #{node_package_version.raw}
              Gem: #{gem_version}
-
-        React on Rails requires exact version matching between the gem and npm package.
-        Do not use ^, ~, >, <, *, or other semver ranges.
+        #{lockfile_diagnostic_section}
+        React on Rails checks the INSTALLED package version against the gem version, so semver
+        ranges like ^ or ~ in package.json are fine when a lockfile can resolve them. No lockfile
+        could resolve the installed version here (see above), so the package.json version itself
+        must be an exact version matching the gem.
 
         Fix:
           Run: #{install_cmd}
@@ -234,7 +238,7 @@ module ReactOnRails
 
         Package: #{node_package_version.raw}
             Gem: #{gem_version}
-
+        #{lockfile_diagnostic_section}
         The npm package and gem versions must match exactly for compatibility.
 
         Fix:
@@ -444,36 +448,33 @@ module ReactOnRails
       "Package.json location: #{VersionChecker::NodePackageVersion.package_json_path}"
     end
 
-    # rubocop:disable Metrics/ClassLength
+    # A blank line plus the lockfile diagnostic (missing / stale / ambiguous / unsupported)
+    # when resolution produced one, so version errors explain WHY no lockfile answered.
+    def lockfile_diagnostic_section
+      diagnostic = node_package_version.resolution_diagnostic
+      diagnostic ? "\n#{diagnostic.message}\n" : ""
+    end
+
+    # When every check passes but lockfile resolution flagged a hygiene problem (e.g. ambiguous
+    # or foreign stale lockfiles alongside an exact pin), keep it visible without failing boot.
+    def warn_lockfile_diagnostic
+      diagnostic = node_package_version.resolution_diagnostic
+      Rails.logger&.warn("[React on Rails] #{diagnostic.message}") if diagnostic
+    end
+
     class NodePackageVersion
-      attr_reader :package_json, :yarn_lock, :package_lock
+      attr_reader :package_json
 
       def self.build
-        new(package_json_path, yarn_lock_path, package_lock_path)
+        new(package_json_path)
       end
 
       def self.package_json_path
         Rails.root.join(ReactOnRails.configuration.node_modules_location, "package.json")
       end
 
-      def self.yarn_lock_path
-        # Lockfiles are in the same directory as package.json
-        # If node_modules_location is empty, use Rails.root
-        base_dir = ReactOnRails.configuration.node_modules_location.presence || ""
-        Rails.root.join(base_dir, "yarn.lock").to_s
-      end
-
-      def self.package_lock_path
-        # Lockfiles are in the same directory as package.json
-        # If node_modules_location is empty, use Rails.root
-        base_dir = ReactOnRails.configuration.node_modules_location.presence || ""
-        Rails.root.join(base_dir, "package-lock.json").to_s
-      end
-
-      def initialize(package_json, yarn_lock = nil, package_lock = nil)
+      def initialize(package_json)
         @package_json = package_json
-        @yarn_lock = yarn_lock
-        @package_lock = package_lock
       end
 
       def raw
@@ -562,6 +563,13 @@ module ReactOnRails
         !raw.nil? && raw.start_with?("workspace:")
       end
 
+      # Why lockfile resolution declined (or warned) for this package — a
+      # LockfileResolution::Diagnostic (missing / stale / ambiguous / unsupported), or nil.
+      def resolution_diagnostic
+        raw # ensure resolution ran
+        @resolution_diagnostic
+      end
+
       def parts
         return if local_path_or_url? || workspace_protocol?
 
@@ -577,26 +585,17 @@ module ReactOnRails
 
       private
 
-      # Resolve version from lockfiles if available, otherwise use package.json version
+      # Resolve the installed version from the detected package manager's lockfile
+      # (see LockfileResolution), otherwise fall back to the package.json version.
       def resolve_version(package_json_version, package_name)
         # If package.json specifies a local path or URL, don't try to resolve from lockfiles
         # Lockfiles may contain placeholder versions like "0.0.0" for local links
         return package_json_version if local_path_or_url_version?(package_json_version)
 
-        # Try yarn.lock first
-        if yarn_lock && File.exist?(yarn_lock)
-          lockfile_version = version_from_yarn_lock(package_name)
-          return lockfile_version if lockfile_version
-        end
-
-        # Try package-lock.json
-        if package_lock && File.exist?(package_lock)
-          lockfile_version = version_from_package_lock(package_name)
-          return lockfile_version if lockfile_version
-        end
-
-        # Fall back to package.json version
-        package_json_version
+        resolution = LockfileResolution.resolve(package_json, package_name, package_json_version,
+                                                declared_manager: parsed_package_contents["packageManager"])
+        @resolution_diagnostic = resolution.diagnostic
+        resolution.version || package_json_version
       end
 
       # Check if a version string represents a local path or URL
@@ -605,74 +604,6 @@ module ReactOnRails
 
         version.include?("/") && !version.start_with?("npm:")
       end
-
-      # Parse version from yarn.lock
-      # Looks for entries like:
-      #   react-on-rails@^16.1.1:
-      #     version "16.1.1"
-      # The pattern ensures exact package name match to avoid matching similar names
-      # (e.g., "react-on-rails" won't match "react-on-rails-pro")
-      # rubocop:disable Metrics/CyclomaticComplexity
-      def version_from_yarn_lock(package_name)
-        return nil unless yarn_lock && File.exist?(yarn_lock)
-
-        in_package_block = false
-        File.foreach(yarn_lock) do |line|
-          # Check if we're starting the block for our package
-          # Pattern: optionally quoted package name, followed by @, ensuring it's not followed by more word chars
-          # This prevents "react-on-rails" from matching "react-on-rails-pro"
-          if line.match?(/^"?#{Regexp.escape(package_name)}@/)
-            in_package_block = true
-            next
-          end
-
-          # If we're in the package block, look for the version line
-          if in_package_block
-            # Version line looks like:  version "16.1.1"
-            if (match = line.match(/^\s+version\s+"([^"]+)"/))
-              return match[1]
-            end
-
-            # If we hit a blank line or new package, we've left the block
-            break if line.strip.empty? || (line[0] != " " && line[0] != "\t")
-          end
-        end
-
-        nil
-      end
-      # rubocop:enable Metrics/CyclomaticComplexity
-
-      # Parse version from package-lock.json
-      # Supports both v1 (dependencies) and v2/v3 (packages) formats
-      # rubocop:disable Metrics/CyclomaticComplexity
-      def version_from_package_lock(package_name)
-        return nil unless package_lock && File.exist?(package_lock)
-
-        begin
-          parsed = JSON.parse(File.read(package_lock))
-
-          # Try v2/v3 format first (packages)
-          if parsed["packages"]
-            # Look for node_modules/package-name entry
-            node_modules_key = "node_modules/#{package_name}"
-            package_data = parsed["packages"][node_modules_key]
-            return package_data["version"] if package_data&.key?("version")
-          end
-
-          # Fall back to v1 format (dependencies)
-          if parsed["dependencies"]
-            dependency_data = parsed["dependencies"][package_name]
-            # In v1, the dependency can be a hash with a "version" key
-            return dependency_data["version"] if dependency_data.is_a?(Hash) && dependency_data.key?("version")
-          end
-        rescue JSON::ParserError
-          # If we can't parse the lockfile, fall back to package.json version
-          nil
-        end
-
-        nil
-      end
-      # rubocop:enable Metrics/CyclomaticComplexity
 
       def package_installed?(package_name)
         return false unless File.exist?(package_json)
@@ -710,6 +641,5 @@ module ReactOnRails
         end
       end
     end
-    # rubocop:enable Metrics/ClassLength
   end
 end

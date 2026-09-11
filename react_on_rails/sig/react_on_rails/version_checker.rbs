@@ -1,12 +1,32 @@
 module ReactOnRails
-  module VersionChecker
-    def self.log_if_gem_and_node_package_versions_differ: () -> void
+  class VersionChecker
+    VERSION_PARTS_REGEX: Regexp
 
-    private
+    attr_reader node_package_version: untyped
 
-    def self.node_package_version: () -> String?
-    def self.gem_version: () -> String
-    def self.node_package_version_different_from_gem?: () -> bool
-    def self.pr_1683_warning: () -> String
+    def self.build: () -> VersionChecker
+    def initialize: (untyped node_package_version) -> void
+    def validate_version_and_package_compatibility!: () -> void
+
+    class NodePackageVersion
+      attr_reader package_json: untyped
+
+      def self.build: () -> NodePackageVersion
+      def self.package_json_path: () -> untyped
+      def initialize: (untyped package_json) -> void
+      def raw: () -> String?
+      def resolution_diagnostic: () -> LockfileResolution::Diagnostic?
+      def react_on_rails_package?: () -> bool
+      def react_on_rails_pro_package?: () -> bool
+      def package_name: () -> String
+      def semver_wildcard?: () -> bool
+      def special_version_string?: () -> bool
+      def wildcard_or_x_range?: () -> untyped
+      def range_operator?: () -> bool
+      def range_syntax?: () -> bool
+      def local_path_or_url?: () -> bool
+      def workspace_protocol?: () -> bool
+      def parts: () -> Array[String]?
+    end
   end
 end

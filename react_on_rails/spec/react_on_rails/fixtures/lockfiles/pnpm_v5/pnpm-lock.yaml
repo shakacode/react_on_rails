@@ -1,0 +1,16 @@
+lockfileVersion: 5.4
+
+specifiers:
+  react-on-rails: ^16.1.1
+
+dependencies:
+  react-on-rails: 16.6.0
+
+packages:
+
+  /react-on-rails/16.6.0:
+    resolution: {integrity: sha512-LqLi7A0n0Tv5c3yMYlwS9s6rE82gvXNMj3sscmK2LOgIJ+mLQlOX65n0Jq5ZJ4Nsl9SRgxEOOQmcrfvDeB9F1g==}
+    peerDependencies:
+      react: '>= 16'
+      react-dom: '>= 16'
+    dev: false

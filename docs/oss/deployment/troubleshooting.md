@@ -45,6 +45,39 @@ bin/rails generate react_on_rails:install
 - Use the bundled `npm`, or install another package manager such as `pnpm`, `yarn`, or `bun`
 - On macOS, for example: `brew install node pnpm`
 
+### "Package version is not an exact version" / lockfile diagnostics at boot
+
+At boot, React on Rails verifies that the installed npm package version matches the gem version.
+It resolves the **installed** version from your package manager's lockfile (npm, Yarn classic,
+Yarn Berry, pnpm, and bun are all supported), so semver ranges like `^17.0.0` in package.json are
+fine as long as a lockfile can answer. When no lockfile can answer, the error explains why with a
+class-prefixed diagnostic:
+
+- **`Lockfile missing:`** — your declared package manager has no lockfile yet. Run its install
+  command (e.g. `pnpm install`) to generate one.
+- **`Lockfile stale:`** — the lockfile has no entry matching the exact dependency selector
+  currently in package.json (you changed package.json without re-installing), or a leftover
+  lockfile from a previous package manager is being ignored. Re-run your manager's install, and
+  delete lockfiles from managers you no longer use.
+- **`Lockfile ambiguity:`** — lockfiles from more than one package manager exist and package.json
+  does not declare which one owns the app. No lockfile is trusted in that state. Delete the stale
+  lockfile(s), or declare your manager, e.g. `"packageManager": "pnpm@10.0.0"` in package.json.
+- **`Lockfile unsupported:`** — the lockfile cannot be read. The binary `bun.lockb` is never
+  parsed: migrate to bun's text lockfile with
+  `bun install --save-text-lockfile --frozen-lockfile --lockfile-only` and delete `bun.lockb`.
+
+Two known limitations:
+
+- **Monorepos / workspaces with a hoisted lockfile**: the checker looks for the lockfile next to
+  the package.json it validates. Package managers hoist the lockfile to the workspace root, so a
+  Rails app that is a workspace member may resolve no lockfile and fall back to the strict
+  exact-version rule. Workarounds: pin the exact version in the app's package.json (the error
+  message shows the command), or set `REACT_ON_RAILS_SKIP_VALIDATION=true` if you accept the risk.
+- **The check reads lockfiles, not `node_modules`**: if you pulled a change to the lockfile but
+  have not re-run install, the check can pass while the app still runs old code from
+  `node_modules`. If versions look right but runtime behavior disagrees, re-run your package
+  manager's install.
+
 ## 🔧 Build Issues
 
 ### "Module not found: Can't resolve 'react-on-rails'"

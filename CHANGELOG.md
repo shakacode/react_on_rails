@@ -26,6 +26,23 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **Version checking now resolves the installed package version from pnpm, bun, and Yarn Berry lockfiles**:
+  `pnpm-lock.yaml` (lockfileVersion 5.4/6.0/9.0, including the pnpm 11 multi-document form), `bun.lock`
+  (lockfileVersion 0-2), Yarn Berry `yarn.lock` (`__metadata` versions 4-8), and `npm-shrinkwrap.json` join the
+  existing Yarn classic and `package-lock.json` support, so semver ranges like `^17.0.0` in package.json no longer
+  fail Rails boot for pnpm, bun, and Yarn 2+ users. Resolution now trusts only the confidently detected package
+  manager (the declared `packageManager` field, or the single lockfile present) and never reads another manager's
+  possibly-stale lockfile; lockfile entries are matched against package.json's exact dependency selector rather
+  than the first same-name entry; and boot errors/warnings carry class-prefixed diagnostics
+  (`Lockfile missing:`/`Lockfile stale:`/`Lockfile ambiguity:`/`Lockfile unsupported:`) naming the file and fix.
+  The binary `bun.lockb` is not parsed — migrate with `bun install --save-text-lockfile`.
+  **Action required for upgraders:** an app carrying lockfiles from two package managers with no `packageManager`
+  field in package.json and a non-exact version spec now fails boot with a `Lockfile ambiguity` diagnostic
+  (previously it silently resolved from `yarn.lock`, even a stale one); delete the stale lockfile or declare your
+  package manager in package.json's `packageManager` field. Fixes
+  [Issue 5049](https://github.com/shakacode/react_on_rails/issues/5049) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 - **`bin/dev kill` now verifies every app-scoped Overmind endpoint within a bounded control budget**:
   shutdown discovers all `tmp/sockets/overmind*.sock` endpoints, fails closed when discovery or probing cannot be
   completed, and terminates and reaps timed-out control clients under one shared deadline per phase. When no renderer
