@@ -701,6 +701,76 @@ async function testDuplicateSuccessfulAndSkippedJobNamesDoNotSupersedeFailure() 
   assert.match(core.failed[0], /Integration Tests #68/);
 }
 
+async function testPartialSuccessAcrossDescendantsDoesNotSupersedeCombinedFailure() {
+  // Production break: separate descendant runs each pass only one job, but
+  // unioning their evidence incorrectly suggests that one run passed both jobs.
+  const newestDescendant = 'docs-fix-newest';
+  const olderDescendant = 'docs-fix-older';
+  const ancestor = 'broken-integration';
+  const newestGuardRun = run({
+    id: 69,
+    workflowId: 690,
+    sha: newestDescendant,
+    name: 'Docs Guard',
+    conclusion: 'failure',
+  });
+  const newestPartialRun = run({
+    id: 70,
+    workflowId: 700,
+    sha: newestDescendant,
+    name: 'Integration Tests',
+  });
+  const olderGuardRun = run({
+    id: 71,
+    workflowId: 710,
+    sha: olderDescendant,
+    name: 'Docs Guard',
+    conclusion: 'failure',
+  });
+  const olderPartialRun = run({
+    id: 72,
+    workflowId: 700,
+    sha: olderDescendant,
+    name: 'Integration Tests',
+  });
+  const staleFailure = run({
+    id: 73,
+    workflowId: 700,
+    sha: ancestor,
+    name: 'Integration Tests',
+    conclusion: 'failure',
+  });
+  const github = makeGithub({
+    pages: [[newestGuardRun, newestPartialRun, olderGuardRun, olderPartialRun, staleFailure]],
+    jobsByRunId: {
+      69: [guardOnlyJob()],
+      70: [successJob('rspack-dummy-app-tests'), skippedJob('webpack-dummy-app-tests')],
+      71: [guardOnlyJob()],
+      72: [skippedJob('rspack-dummy-app-tests'), successJob('webpack-dummy-app-tests')],
+      73: [
+        { ...buildFailureJob(), name: 'rspack-dummy-app-tests' },
+        { ...buildFailureJob(), name: 'webpack-dummy-app-tests' },
+      ],
+    },
+    parentsBySha: {
+      [newestDescendant]: olderDescendant,
+      [olderDescendant]: ancestor,
+    },
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context,
+    core,
+    previousSha: newestDescendant,
+    excludeWorkflowsInput: '',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /Integration Tests #73/);
+}
+
 async function testMissingWorkflowIdsDoNotSupersedeOlderFailure() {
   const descendant = 'docs-fix';
   const ancestor = 'broken-docs';
@@ -1543,6 +1613,7 @@ async function main() {
   await testSuccessfulMatrixSetupDoesNotSupersedeSkippedQualityGates();
   await testSuccessfulJobDoesNotSupersedeDifferentSkippedJobFailure();
   await testDuplicateSuccessfulAndSkippedJobNamesDoNotSupersedeFailure();
+  await testPartialSuccessAcrossDescendantsDoesNotSupersedeCombinedFailure();
   await testMissingWorkflowIdsDoNotSupersedeOlderFailure();
   await testMalformedWorkflowIdsDoNotSupersedeOlderFailure();
   await testMissingWorkflowIdCollisionFailsClosed();

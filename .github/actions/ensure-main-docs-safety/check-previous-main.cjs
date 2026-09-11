@@ -404,7 +404,7 @@ async function checkPreviousMainCommitStatus({
 
   const guardOnlyTrail = [];
   const noRunsTrail = [];
-  const successfulDescendantJobsByWorkflow = new Map();
+  const successfulDescendantJobSetsByWorkflow = new Map();
 
   async function checkSha(shaToCheck, remainingGuardOnlyHops, remainingNoRunsHops) {
     if (remainingGuardOnlyHops <= 0 || remainingNoRunsHops <= 0) {
@@ -518,18 +518,20 @@ async function checkPreviousMainCommitStatus({
     }
 
     const isSupersededByDescendant = ({ run, failedJobNames, ambiguousJobNames }) => {
-      const successfulJobNames = successfulDescendantJobsByWorkflow.get(run.workflow_id);
+      const successfulJobNameSets = successfulDescendantJobSetsByWorkflow.get(run.workflow_id);
 
       return (
         isValidWorkflowId(run.workflow_id) &&
-        successfulJobNames !== undefined &&
+        successfulJobNameSets !== undefined &&
         failedJobNames.length > 0 &&
-        failedJobNames.every(
-          (jobName) =>
-            typeof jobName === 'string' &&
-            jobName.length > 0 &&
-            !ambiguousJobNames.has(jobName) &&
-            successfulJobNames.has(jobName),
+        successfulJobNameSets.some((successfulJobNames) =>
+          failedJobNames.every(
+            (jobName) =>
+              typeof jobName === 'string' &&
+              jobName.length > 0 &&
+              !ambiguousJobNames.has(jobName) &&
+              successfulJobNames.has(jobName),
+          ),
         )
       );
     };
@@ -585,11 +587,9 @@ async function checkPreviousMainCommitStatus({
       `Main commit ${shaToCheck} only has docs-only guard failures. Checking first parent ${parentSha} for the underlying CI state.`,
     );
     for (const [workflowId, jobNames] of result.successfulJobsByWorkflow) {
-      const accumulatedJobNames = successfulDescendantJobsByWorkflow.get(workflowId) || new Set();
-      for (const jobName of jobNames) {
-        accumulatedJobNames.add(jobName);
-      }
-      successfulDescendantJobsByWorkflow.set(workflowId, accumulatedJobNames);
+      const successfulJobNameSets = successfulDescendantJobSetsByWorkflow.get(workflowId) || [];
+      successfulJobNameSets.push(jobNames);
+      successfulDescendantJobSetsByWorkflow.set(workflowId, successfulJobNameSets);
     }
     guardOnlyTrail.push({ sha: shaToCheck, runs: result.guardOnlyRuns });
     await checkSha(parentSha, remainingGuardOnlyHops - 1, remainingNoRunsHops);
