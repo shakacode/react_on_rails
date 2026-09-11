@@ -75,7 +75,24 @@ function isGuardOnlyFailure(jobs) {
 }
 
 function isSuccessfulQualityGateJob(job) {
-  return job.conclusion === 'success' && !ORCHESTRATION_JOB_NAMES.has(job.name);
+  return (
+    job.conclusion === 'success' &&
+    typeof job.name === 'string' &&
+    job.name.length > 0 &&
+    !ORCHESTRATION_JOB_NAMES.has(job.name)
+  );
+}
+
+function jobNameCounts(jobs) {
+  const counts = new Map();
+
+  for (const job of jobs) {
+    if (typeof job.name === 'string' && job.name.length > 0) {
+      counts.set(job.name, (counts.get(job.name) || 0) + 1);
+    }
+  }
+
+  return counts;
 }
 
 function githubApiErrorStatus(error) {
@@ -250,15 +267,21 @@ async function evaluateCommitRuns({ github, context, core, sha, createdAfter, ex
 
       const latestJobs = latestAttemptJobs(jobs);
       const failed = failedJobs(latestJobs);
+      const nameCounts = jobNameCounts(latestJobs);
 
       if (failed.length === 0) {
-        const hasSuccessfulSubstantiveJob = latestJobs.some(isSuccessfulQualityGateJob);
+        const successfulJobNames = latestJobs
+          .filter((job) => isSuccessfulQualityGateJob(job) && nameCounts.get(job.name) === 1)
+          .map((job) => job.name);
         return {
           kind: 'passing',
           successfulWorkflowId:
-            run.conclusion === 'success' && isValidWorkflowId(run.workflow_id) && hasSuccessfulSubstantiveJob
+            run.conclusion === 'success' &&
+            isValidWorkflowId(run.workflow_id) &&
+            successfulJobNames.length > 0
               ? run.workflow_id
               : null,
+          successfulJobNames,
         };
       }
 
@@ -267,20 +290,24 @@ async function evaluateCommitRuns({ github, context, core, sha, createdAfter, ex
       return {
         kind: isGuardOnlyFailure(latestJobs) ? 'guard-only' : 'failing',
         run,
+        failedJobNames: failed.map((job) => job.name),
+        ambiguousJobNames: new Set(
+          Array.from(nameCounts, ([jobName, count]) => (count > 1 ? jobName : null)).filter(Boolean),
+        ),
       };
     }),
   );
-  const failingRuns = [];
+  const failingRunResults = [];
   const guardOnlyRuns = [];
-  const successfulWorkflowIds = [];
+  const successfulJobsByWorkflow = new Map();
 
   for (const runResult of completedRunResults) {
     if (runResult.kind === 'failing') {
-      failingRuns.push(runResult.run);
+      failingRunResults.push(runResult);
     } else if (runResult.kind === 'guard-only') {
       guardOnlyRuns.push(runResult.run);
     } else if (runResult.successfulWorkflowId !== null) {
-      successfulWorkflowIds.push(runResult.successfulWorkflowId);
+      successfulJobsByWorkflow.set(runResult.successfulWorkflowId, new Set(runResult.successfulJobNames));
     }
   }
 
@@ -288,9 +315,9 @@ async function evaluateCommitRuns({ github, context, core, sha, createdAfter, ex
     status: 'runs-found',
     workflowRuns,
     incompleteRuns,
-    failingRuns,
+    failingRunResults,
     guardOnlyRuns,
-    successfulWorkflowIds,
+    successfulJobsByWorkflow,
   };
 }
 
@@ -377,7 +404,7 @@ async function checkPreviousMainCommitStatus({
 
   const guardOnlyTrail = [];
   const noRunsTrail = [];
-  const successfulDescendantWorkflowIds = new Set();
+  const successfulDescendantJobsByWorkflow = new Map();
 
   async function checkSha(shaToCheck, remainingGuardOnlyHops, remainingNoRunsHops) {
     if (remainingGuardOnlyHops <= 0 || remainingNoRunsHops <= 0) {
@@ -490,12 +517,28 @@ async function checkPreviousMainCommitStatus({
       );
     }
 
-    const supersededFailingRuns = result.failingRuns.filter(
-      (run) => isValidWorkflowId(run.workflow_id) && successfulDescendantWorkflowIds.has(run.workflow_id),
-    );
-    const unresolvedFailingRuns = result.failingRuns.filter(
-      (run) => !isValidWorkflowId(run.workflow_id) || !successfulDescendantWorkflowIds.has(run.workflow_id),
-    );
+    const isSupersededByDescendant = ({ run, failedJobNames, ambiguousJobNames }) => {
+      const successfulJobNames = successfulDescendantJobsByWorkflow.get(run.workflow_id);
+
+      return (
+        isValidWorkflowId(run.workflow_id) &&
+        successfulJobNames !== undefined &&
+        failedJobNames.length > 0 &&
+        failedJobNames.every(
+          (jobName) =>
+            typeof jobName === 'string' &&
+            jobName.length > 0 &&
+            !ambiguousJobNames.has(jobName) &&
+            successfulJobNames.has(jobName),
+        )
+      );
+    };
+    const supersededFailingRuns = result.failingRunResults
+      .filter(isSupersededByDescendant)
+      .map(({ run }) => run);
+    const unresolvedFailingRuns = result.failingRunResults
+      .filter((runResult) => !isSupersededByDescendant(runResult))
+      .map(({ run }) => run);
 
     if (unresolvedFailingRuns.length > 0) {
       const details = unresolvedFailingRuns.map(summarizeRun).join('\n');
@@ -541,8 +584,12 @@ async function checkPreviousMainCommitStatus({
     core.info(
       `Main commit ${shaToCheck} only has docs-only guard failures. Checking first parent ${parentSha} for the underlying CI state.`,
     );
-    for (const workflowId of result.successfulWorkflowIds) {
-      successfulDescendantWorkflowIds.add(workflowId);
+    for (const [workflowId, jobNames] of result.successfulJobsByWorkflow) {
+      const accumulatedJobNames = successfulDescendantJobsByWorkflow.get(workflowId) || new Set();
+      for (const jobName of jobNames) {
+        accumulatedJobNames.add(jobName);
+      }
+      successfulDescendantJobsByWorkflow.set(workflowId, accumulatedJobNames);
     }
     guardOnlyTrail.push({ sha: shaToCheck, runs: result.guardOnlyRuns });
     await checkSha(parentSha, remainingGuardOnlyHops - 1, remainingNoRunsHops);
