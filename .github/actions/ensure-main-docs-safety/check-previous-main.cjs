@@ -235,7 +235,11 @@ async function evaluateCommitRuns({ github, context, core, sha, createdAfter, ex
       const failed = failedJobs(latestJobs);
 
       if (failed.length === 0) {
-        return { kind: 'passing' };
+        const hasSuccessfulJob = latestJobs.some((job) => job.conclusion === 'success');
+        return {
+          kind: 'passing',
+          successfulWorkflowId: run.conclusion === 'success' && hasSuccessfulJob ? run.workflow_id : null,
+        };
       }
 
       warnForMissingGuardSteps({ core, run, jobs: latestJobs });
@@ -248,12 +252,15 @@ async function evaluateCommitRuns({ github, context, core, sha, createdAfter, ex
   );
   const failingRuns = [];
   const guardOnlyRuns = [];
+  const successfulWorkflowIds = [];
 
   for (const runResult of completedRunResults) {
     if (runResult.kind === 'failing') {
       failingRuns.push(runResult.run);
     } else if (runResult.kind === 'guard-only') {
       guardOnlyRuns.push(runResult.run);
+    } else if (runResult.successfulWorkflowId !== null) {
+      successfulWorkflowIds.push(runResult.successfulWorkflowId);
     }
   }
 
@@ -263,6 +270,7 @@ async function evaluateCommitRuns({ github, context, core, sha, createdAfter, ex
     incompleteRuns,
     failingRuns,
     guardOnlyRuns,
+    successfulWorkflowIds,
   };
 }
 
@@ -349,6 +357,7 @@ async function checkPreviousMainCommitStatus({
 
   const guardOnlyTrail = [];
   const noRunsTrail = [];
+  const successfulDescendantWorkflowIds = new Set();
 
   async function checkSha(shaToCheck, remainingGuardOnlyHops, remainingNoRunsHops) {
     if (remainingGuardOnlyHops <= 0 || remainingNoRunsHops <= 0) {
@@ -461,8 +470,15 @@ async function checkPreviousMainCommitStatus({
       );
     }
 
-    if (result.failingRuns.length > 0) {
-      const details = result.failingRuns.map(summarizeRun).join('\n');
+    const supersededFailingRuns = result.failingRuns.filter((run) =>
+      successfulDescendantWorkflowIds.has(run.workflow_id),
+    );
+    const unresolvedFailingRuns = result.failingRuns.filter(
+      (run) => !successfulDescendantWorkflowIds.has(run.workflow_id),
+    );
+
+    if (unresolvedFailingRuns.length > 0) {
+      const details = unresolvedFailingRuns.map(summarizeRun).join('\n');
 
       core.setFailed(
         [
@@ -480,7 +496,11 @@ async function checkPreviousMainCommitStatus({
     }
 
     if (result.guardOnlyRuns.length === 0) {
-      if (result.incompleteRuns.length > 0) {
+      if (supersededFailingRuns.length > 0) {
+        core.info(
+          `Main commit ${shaToCheck} has ${supersededFailingRuns.length} failure(s) superseded by a successful descendant run for the same workflow. Docs-only skip allowed.`,
+        );
+      } else if (result.incompleteRuns.length > 0) {
         core.info(
           `Main commit ${shaToCheck} has ${result.incompleteRuns.length} running workflow(s) but no completed failures. Docs-only skip allowed.`,
         );
@@ -501,6 +521,9 @@ async function checkPreviousMainCommitStatus({
     core.info(
       `Main commit ${shaToCheck} only has docs-only guard failures. Checking first parent ${parentSha} for the underlying CI state.`,
     );
+    for (const workflowId of result.successfulWorkflowIds) {
+      successfulDescendantWorkflowIds.add(workflowId);
+    }
     guardOnlyTrail.push({ sha: shaToCheck, runs: result.guardOnlyRuns });
     await checkSha(parentSha, remainingGuardOnlyHops - 1, remainingNoRunsHops);
   }
