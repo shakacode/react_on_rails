@@ -128,6 +128,7 @@ const ScenarioMultiInstance: React.FC = () => {
         <div style={{ flex: 1 }}>
           <small>card A (has ref)</small>
           <Suspense fallback={<div>loading…</div>}>
+            <HydrationMarker testId="stress-hydrated-scenario3" />
             <RSCRoute
               ref={ref}
               componentName="RefetchStressServerComponent"
@@ -164,6 +165,7 @@ const ScenarioIndependentSiblings: React.FC = () => {
             Refresh left only
           </button>
           <Suspense fallback={<div>loading…</div>}>
+            <HydrationMarker testId="stress-hydrated-scenario4" />
             <RSCRoute
               ref={refLeft}
               componentName="RefetchStressServerComponent"
@@ -291,6 +293,7 @@ const ScenarioRapidClicks: React.FC = () => {
         {log.join('\n') || '(empty)'}
       </pre>
       <Suspense fallback={<div>loading…</div>}>
+        <HydrationMarker testId="stress-hydrated-scenario6" />
         <RSCRoute
           ref={ref}
           componentName="RefetchStressServerComponent"
@@ -332,6 +335,7 @@ const ScenarioManySiblings: React.FC = () => {
         {Array.from({ length: COUNT }).map((_, i) => (
           // eslint-disable-next-line react/no-array-index-key
           <Suspense key={i} fallback={<div>loading…</div>}>
+            {i === COUNT - 1 && <HydrationMarker testId="stress-hydrated-scenario7" />}
             <RSCRoute
               ref={(handle) => {
                 refs.current[i] = handle;
