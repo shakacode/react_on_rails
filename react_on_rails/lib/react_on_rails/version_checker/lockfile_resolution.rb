@@ -58,6 +58,12 @@ module ReactOnRails
         when :bun then BunLockfile.version(path, package_name, requested_spec)
         when :npm then NpmLockfile.version(path, package_name, requested_spec)
         end
+      rescue TypeError, NoMethodError
+        # Parseable lockfile whose nested values have unexpected types (e.g. importers as a
+        # string) — a boot-time check must diagnose that, never crash the Rails initializer.
+        :unrecognized
+      rescue SystemCallError => e
+        [:unreadable, e.message.to_s.lines.first&.strip]
       end
 
       def self.result_for(outcome, detection, lockfile, package_name, requested_spec)
@@ -249,12 +255,15 @@ module ReactOnRails
           [:unreadable, e.message.to_s.lines.first&.strip]
         end
 
-        # v2/v3 record the requested selector on the root package entry ("" in packages); a
-        # mismatch means package.json changed since the last install: stale lockfile. v1 records
+        # v2/v3 record the requested selector on the root package entry ("" in packages); the
+        # entry must exist AND match, or the lockfile is stale (e.g. only a transitive
+        # node_modules entry remains from before the package was a direct dependency, or
+        # package.json changed since the last install). v1 has no packages section and records
         # no selector, so there is nothing to verify.
         def self.selector_current?(doc, package_name, requested_spec)
-          recorded = doc.dig("packages", "", "dependencies", package_name)
-          recorded.nil? || recorded == requested_spec
+          return true unless doc.key?("packages")
+
+          doc.dig("packages", "", "dependencies", package_name) == requested_spec
         end
       end
 
@@ -391,7 +400,10 @@ module ReactOnRails
         # lockfileVersion >= 6: "16.6.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)" -> "16.6.0"
         # lockfileVersion 5.x:  "16.6.0_react@19.3.0" -> "16.6.0"
         def self.strip_peer_suffix(version)
-          version&.sub(/[(_].*\z/, "")
+          return nil if version.nil?
+
+          cut = [version.index("("), version.index("_")].compact.min
+          cut ? version[0...cut] : version
         end
       end
     end

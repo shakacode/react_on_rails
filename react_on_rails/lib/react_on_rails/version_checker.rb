@@ -209,8 +209,8 @@ module ReactOnRails
         #{lockfile_diagnostic_section}
         React on Rails checks the INSTALLED package version against the gem version, so semver
         ranges like ^ or ~ in package.json are fine when a lockfile can resolve them. No lockfile
-        could resolve the installed version here (see above), so the package.json version itself
-        must be an exact version matching the gem.
+        could resolve the installed version here, so the package.json version itself must be an
+        exact version matching the gem.
 
         Fix:
           Run: #{install_cmd}

@@ -209,6 +209,36 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
             end
           end
         end
+
+        context "when an npm v3 lockfile only retains a transitive node_modules entry" do
+          it "treats the lockfile as stale rather than trusting the unrelated version" do
+            stub_gem_version("16.6.0")
+            expect { validate_fixture!("npm_v3_transitive_only") }.to raise_error(ReactOnRails::Error) do |error|
+              expect(error.message).to include("not an exact version")
+              expect(error.message).to include("Lockfile stale:")
+            end
+          end
+        end
+
+        context "when a parseable lockfile has an unexpected structure" do
+          it "boots with an unsupported-lockfile warning instead of crashing" do
+            stub_gem_version("16.6.0")
+            allow(Rails.logger).to receive(:warn)
+            expect { validate_fixture!("pnpm_wrong_shape") }.not_to raise_error
+            expect(Rails.logger).to have_received(:warn).with(a_string_including("Lockfile unsupported:"))
+          end
+        end
+
+        context "when no lockfile and no packageManager field exist at all" do
+          it "raises a coherent exact-version error without referencing an absent diagnostic" do
+            stub_gem_version("1.2.3")
+            expect { validate_fixture!("no_lockfile") }.to raise_error(ReactOnRails::Error) do |error|
+              expect(error.message).to include("not an exact version")
+              expect(error.message).not_to include("see above")
+              expect(error.message).not_to include("Lockfile ambiguity:")
+            end
+          end
+        end
       end
 
       context "when package version is not exact (has semver wildcard)" do
