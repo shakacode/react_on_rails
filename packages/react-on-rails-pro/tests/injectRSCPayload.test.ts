@@ -163,6 +163,31 @@ const createFlushingHTMLStream = (html: string) =>
     },
   }) as Readable;
 
+const createFlushingHTMLChunkStream = (chunks: string[]) =>
+  ({
+    pipe(destination: PassThrough & { flush?: () => void }) {
+      if (chunks.length === 0) {
+        destination.end();
+        return destination;
+      }
+
+      const writeChunk = (index: number) => {
+        setTimeout(() => {
+          destination.write(new TextEncoder().encode(chunks[index]));
+          destination.flush?.();
+          if (index === chunks.length - 1) {
+            destination.end();
+          } else {
+            writeChunk(index + 1);
+          }
+        }, 0);
+      };
+
+      writeChunk(0);
+      return destination;
+    },
+  }) as Readable;
+
 const collectStreamData = async (stream: Readable) => {
   const chunks: string[] = [];
   for await (const chunk of stream) {
@@ -685,8 +710,9 @@ describe('injectRSCPayload', () => {
     const revealHTML =
       '<div hidden id="RscFoucProbe-react-component-0S:0">styled boundary</div>' +
       '<script>$RC("RscFoucProbe-react-component-0B:0","RscFoucProbe-react-component-0S:0")</script>';
-    const mockHTML = createMockHTMLStream([
-      `<link rel="preload" as="style" href="https://cdn.example.com${manifestStylesheetHref}?body=1">${unrelatedPreload}${revealHTML}`,
+    const mockHTML = createFlushingHTMLChunkStream([
+      `<link rel="preload" as="style" href="https://cdn.example.com${manifestStylesheetHref}?body=1">${unrelatedPreload}`,
+      revealHTML,
     ]);
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
 
@@ -696,14 +722,20 @@ describe('injectRSCPayload', () => {
     const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
       rscClientManifestStylesheetHrefs: new Set([manifestStylesheetHref]),
     });
-    const resultStr = await collectStreamData(result);
+    const { allData, chunks } = collectStreamDataByChunk(result);
+    const resultStr = await allData;
+    const stylesheetChunkIndex = chunks.findIndex(
+      (chunk) => chunk.includes('rel="stylesheet"') && chunk.includes(manifestStylesheetHref),
+    );
+    const revealChunkIndex = chunks.findIndex((chunk) =>
+      chunk.includes('<div hidden id="RscFoucProbe-react-component-0S:0">'),
+    );
 
     expect(resultStr).toContain(
       `<link rel="stylesheet" href="https://cdn.example.com${manifestStylesheetHref}?body=1" data-precedence="rsc-css">`,
     );
-    expect(resultStr.indexOf(manifestStylesheetHref)).toBeLessThan(
-      resultStr.indexOf('<div hidden id="RscFoucProbe-react-component-0S:0">'),
-    );
+    expect(stylesheetChunkIndex).toBeGreaterThanOrEqual(0);
+    expect(revealChunkIndex).toBeGreaterThan(stylesheetChunkIndex);
     expect(resultStr.split(manifestStylesheetHref)).toHaveLength(2);
     expect(resultStr).toContain(unrelatedPreload);
     expect(resultStr).toContain(expectedPayloadPushScript(flightData));
