@@ -79,7 +79,7 @@ two plugins share the same `{ isServer, clientReferences }` options.
 > Rails plus the Pro Node renderer, and runs the RSC Playwright suite on every qualifying
 > change). The native-plugin delivery completed in [issue #3488](https://github.com/shakacode/react_on_rails/issues/3488),
 > which superseded the abandoned manifest-helper approach in
-> [PR #3385](https://github.com/shakacode/react_on_rails/pull/3385)).
+> [PR #3385](https://github.com/shakacode/react_on_rails/pull/3385).
 > The live production CSS/FOUC simplification follow-up is
 > [issue #4557](https://github.com/shakacode/react_on_rails/issues/4557).
 
@@ -163,7 +163,7 @@ builds; production-posture coverage is tracked in
 
 ## Related Resources
 
-- [Issue #3488: Rspack RSC path to production-ready (native RSCRspackPlugin)](https://github.com/shakacode/react_on_rails/issues/3488)
+- [Issue #3488: Completed native RSCRspackPlugin delivery](https://github.com/shakacode/react_on_rails/issues/3488)
 - [Issue #1828: Rspack support for RSC](https://github.com/shakacode/react_on_rails/issues/1828)
 - [PR #3385: Manifest-helper approach for Rspack builds (superseded by the native plugin)](https://github.com/shakacode/react_on_rails/pull/3385)
 - [Rspack React Server Components guide](https://rspack.rs/guide/integrations/rsc)
