@@ -161,7 +161,7 @@ module ReactOnRails
       RSC_REACT_VERSION_RANGE = "~19.2.8"
       # Qualify the JSX/TSX loader and Rspack chunk fixes during the 19.3.0 RC soak.
       # Keep the React 19.2 runtime line independent from the RSC package minor.
-      RSC_PACKAGE_VERSION_PIN = "19.3.0-rc.2"
+      RSC_PACKAGE_VERSION_PIN = "19.3.0-rc.3"
 
       private
 

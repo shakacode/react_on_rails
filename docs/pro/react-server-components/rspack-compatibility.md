@@ -17,7 +17,7 @@ The RSC implementation depends on the `react-on-rails-rsc` npm package, which pr
 
 ## React and Package Version Policy
 
-During the 17.1 RC soak, generated RSC apps pin `react-on-rails-rsc@19.3.0-rc.2`
+During the 17.1 RC soak, generated RSC apps pin `react-on-rails-rsc@19.3.0-rc.3`
 with `react@~19.2.8` and `react-dom@~19.2.8` for both webpack and rspack projects.
 RSC 19.3 still uses the React 19.2 runtime. Existing apps using stable RSC 19.2.1+
 and matching React/React DOM 19.2.7+ remain supported. React 19.0.x and 19.3.x

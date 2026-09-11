@@ -8948,13 +8948,13 @@ RSpec.describe ReactOnRails::Doctor do
     let(:doctor) { described_class.new(verbose: false, fix: false) }
     let(:checker) { doctor.instance_variable_get(:@checker) }
 
-    ["19.3.0-rc.2", "19.3.0-rc.3", "19.3.0"].each do |version|
+    ["19.3.0-rc.3", "19.3.0"].each do |version|
       it "accepts qualified RSC #{version}" do
         expect(doctor.send(:rsc_package_version_at_or_above_minimum?, version)).to be true
       end
     end
 
-    ["19.3.0-rc.0", "19.3.0-rc.1", "19.3.1-rc.0", "19.4.0-rc.0", "19.4.0"].each do |version|
+    ["19.3.0-rc.0", "19.3.0-rc.1", "19.3.0-rc.2", "19.3.1-rc.0", "19.4.0-rc.0", "19.4.0"].each do |version|
       it "rejects unqualified RSC #{version}" do
         expect(doctor.send(:rsc_package_version_at_or_above_minimum?, version)).to be false
       end
@@ -8966,7 +8966,7 @@ RSpec.describe ReactOnRails::Doctor do
     end
 
     it "enforces the RSC 19.3 React floor even when package peers are overly broad" do
-      package = { "version" => "19.3.0-rc.2" }
+      package = { "version" => "19.3.0-rc.3" }
       expect(doctor.send(:check_rsc_supported_react_version_for_package, package, "react", "19.2.7"))
         .to be false
       expect(doctor.send(:check_rsc_supported_react_version_for_package, package, "react-dom", "19.2.7"))
@@ -8990,7 +8990,7 @@ RSpec.describe ReactOnRails::Doctor do
       errors = checker.messages.select { |message| message[:type] == :error }.pluck(:content)
       expect(errors).to include(a_string_including(
                                   "npm install react@~19.2.8 react-dom@~19.2.8 " \
-                                  "react-on-rails-rsc@19.3.0-rc.2 --save-exact"
+                                  "react-on-rails-rsc@19.3.0-rc.3 --save-exact"
                                 ))
       expect(errors).to include(a_string_including(
                                   "RSC 19.2.x requires stable React/React DOM ~19.2.7",
@@ -9000,15 +9000,15 @@ RSpec.describe ReactOnRails::Doctor do
 
     [
       ["19.2.1", "19.2.6", "19.2.6", "unsupported React 19.2.6"],
-      ["19.3.0-rc.2", "19.2.7", "19.2.7", "unsupported React 19.2.7"],
-      ["19.3.0-rc.2", "19.2.8", "19.2.7", "unsupported React DOM 19.2.7"],
-      ["19.3.0-rc.2", "19.2.8", "19.2.9", "requires react and react-dom to resolve to the same version"],
+      ["19.3.0-rc.3", "19.2.7", "19.2.7", "unsupported React 19.2.7"],
+      ["19.3.0-rc.3", "19.2.8", "19.2.7", "unsupported React DOM 19.2.7"],
+      ["19.3.0-rc.3", "19.2.8", "19.2.9", "requires react and react-dom to resolve to the same version"],
       ["19.2.1", "19.2.8-rc.1", "19.2.8-rc.1", "unsupported React 19.2.8-rc.1"],
       ["19.2.1", "19.2.8", "19.2.8-rc.1", "unsupported React DOM 19.2.8-rc.1"],
-      ["19.3.0-rc.2", "19.2.9-rc.1", "19.2.9-rc.1", "unsupported React 19.2.9-rc.1"],
-      ["19.3.0-rc.2", "19.2.9", "19.2.9-rc.1", "unsupported React DOM 19.2.9-rc.1"],
+      ["19.3.0-rc.3", "19.2.9-rc.1", "19.2.9-rc.1", "unsupported React 19.2.9-rc.1"],
+      ["19.3.0-rc.3", "19.2.9", "19.2.9-rc.1", "unsupported React DOM 19.2.9-rc.1"],
       ["19.2.1", "19.2.7", "19.2.7", nil],
-      ["19.3.0-rc.2", "19.2.8", "19.2.8", nil]
+      ["19.3.0-rc.3", "19.2.8", "19.2.8", nil]
     ].each do |rsc_version, react_version, react_dom_version, expected_error|
       it "checks RSC #{rsc_version} with React #{react_version}/DOM #{react_dom_version} without peer metadata" do
         allow(doctor).to receive(:detect_react_version_from_deps).and_return(react_version)
@@ -9695,7 +9695,7 @@ RSpec.describe ReactOnRails::Doctor do
           .with(Dir.pwd)
           .and_return(
             [
-              JSON.generate("latest" => "19.2.1", "next" => "19.3.0-rc.2"),
+              JSON.generate("latest" => "19.2.1", "next" => "19.3.0-rc.3"),
               instance_double(Process::Status, success?: true)
             ]
           )
@@ -9706,10 +9706,10 @@ RSpec.describe ReactOnRails::Doctor do
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }.map { |m| m[:content] }
         expect(warning_msgs).to include(
           a_string_including(
-            "react-on-rails-rsc 19.2.1 is behind the npm next dist-tag 19.3.0-rc.2",
+            "react-on-rails-rsc 19.2.1 is behind the npm next dist-tag 19.3.0-rc.3",
             "React peer requirements",
             "React runtime versions supported by this React on Rails Pro release",
-            "npm view react-on-rails-rsc@19.3.0-rc.2 peerDependencies"
+            "npm view react-on-rails-rsc@19.3.0-rc.3 peerDependencies"
           )
         )
         expect(warning_msgs.join("\n")).not_to include(

@@ -4,7 +4,7 @@ This guide walks you through adding React Server Components to an existing React
 
 > **For React-side migration patterns** (restructuring components, Context, data fetching, etc.), see the [RSC Migration Guide series](../../oss/migrating/migrating-to-rsc.md). This page covers only the infrastructure upgrade.
 
-> **17.1 RC soak:** the generator now pins `react-on-rails-rsc@19.3.0-rc.2` with matching
+> **17.1 RC soak:** the generator now pins `react-on-rails-rsc@19.3.0-rc.3` with matching
 > React/React DOM 19.2.8. Upgrade the Pro gem and npm packages together to a 17.1 candidate that
 > includes this support before changing RSC; earlier Pro releases reject it at startup.
 > The stable 19.2.1 / React 19.2.7 combination below remains supported for existing apps.
@@ -18,7 +18,7 @@ startup with the new RSC pin until this required upgrade is complete.
 For that 17.1 candidate's generated defaults:
 
 ```bash
-pnpm add react@~19.2.8 react-dom@~19.2.8 react-on-rails-rsc@19.3.0-rc.2
+pnpm add react@~19.2.8 react-dom@~19.2.8 react-on-rails-rsc@19.3.0-rc.3
 ```
 
 The RC loader accepts raw JSX/TSX and supports `parserPlugins` for proposal syntax already
@@ -38,7 +38,7 @@ Before running the generator, verify your environment:
 | React on Rails Pro npm   | `npm ls react-on-rails-pro` / `yarn why react-on-rails-pro` / `pnpm list react-on-rails-pro` / `bun pm why react-on-rails-pro` | Matches gem version                                           |
 | React version            | `npm ls react` / `yarn why react` / `pnpm list react` / `bun pm why react`                                                     | Stable 19.2.x: >=19.2.8 for 17.1 RC; >=19.2.7 for 17.0 stable |
 | React DOM version        | `npm ls react-dom` / `yarn why react-dom` / `pnpm list react-dom` / `bun pm why react-dom`                                     | Must match `react` version                                    |
-| `react-on-rails-rsc`     | `npm ls react-on-rails-rsc` / `yarn why react-on-rails-rsc` / `pnpm list react-on-rails-rsc` / `bun pm why react-on-rails-rsc` | 17.1 RC pin: 19.3.0-rc.2; 17.0 stable: stable 19.2.x >=19.2.1 |
+| `react-on-rails-rsc`     | `npm ls react-on-rails-rsc` / `yarn why react-on-rails-rsc` / `pnpm list react-on-rails-rsc` / `bun pm why react-on-rails-rsc` | 17.1 RC pin: 19.3.0-rc.3; 17.0 stable: stable 19.2.x >=19.2.1 |
 | Node.js                  | `node --version`                                                                                                               | 18+                                                           |
 | Pro initializer exists   | `ls config/initializers/react_on_rails_pro.rb`                                                                                 | File exists                                                   |
 | Node renderer configured | Check `react_on_rails_pro.rb` for `server_renderer = "NodeRenderer"`                                                           | NodeRenderer enabled                                          |
@@ -46,9 +46,9 @@ Before running the generator, verify your environment:
 For the **17.1 RC standalone generator**, upgrade React and React DOM together before running it:
 
 ```bash
-pnpm add react@~19.2.8 react-dom@~19.2.8 react-on-rails-rsc@19.3.0-rc.2
-# or: yarn add react@~19.2.8 react-dom@~19.2.8 react-on-rails-rsc@19.3.0-rc.2
-# or: npm install react@~19.2.8 react-dom@~19.2.8 && npm install --save-exact react-on-rails-rsc@19.3.0-rc.2
+pnpm add react@~19.2.8 react-dom@~19.2.8 react-on-rails-rsc@19.3.0-rc.3
+# or: yarn add react@~19.2.8 react-dom@~19.2.8 react-on-rails-rsc@19.3.0-rc.3
+# or: npm install react@~19.2.8 react-dom@~19.2.8 && npm install --save-exact react-on-rails-rsc@19.3.0-rc.3
 ```
 
 For apps staying on the **supported 17.0 stable path**, use this coordinated set instead:
@@ -71,13 +71,13 @@ The generator-managed RSC version is what goes in your app's `package.json`. Sep
 
 > [!NOTE]
 > During the 17.1 soak, the Pro package's optional `react-on-rails-rsc` peer range is
-> `>=19.2.1 <19.4.0 || ~19.3.0-rc.2`. Only the 19.3.0 prerelease tuple from rc.2 onward is
+> `>=19.2.1 <19.4.0 || ~19.3.0-rc.3`. Only the 19.3.0 prerelease tuple from rc.3 onward is
 > admitted. Doctor and the Node Renderer enforce React/React DOM 19.2.7+ for RSC 19.2, and
 > 19.2.8+ for RSC 19.3, with matching stable React/DOM 19.2.x versions. Set
 > `REACT_ON_RAILS_PRO_DISABLE_VERSION_CHECK=1` only as an emergency diagnostic escape hatch;
 > it downgrades startup errors to warnings and does not make an unsupported tuple supported.
 >
-> This qualification installs exactly `19.3.0-rc.2`; the compatibility range does not
+> This qualification installs exactly `19.3.0-rc.3`; the compatibility range does not
 > mean that every later satisfying version has been tested.
 
 ## Pre-Migration: Audit Components for Client API Usage

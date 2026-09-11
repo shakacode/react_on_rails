@@ -37,7 +37,7 @@ yarn add react@~19.2.7 react-dom@~19.2.7 react-on-rails-rsc@19.2.1
 > React on Rails Pro 17 RSC requires React 19.2.x with patch >= 19.2.7. React 19.0.x is no longer a supported Pro RSC runtime line in v17. See the [React documentation on Server Components](https://react.dev/reference/rsc/server-components#how-do-i-build-support-for-server-components) for details.
 >
 > The Pro 17.0 generator pins stable `react-on-rails-rsc@19.2.1`; the 17.1 RC soak pins
-> `19.3.0-rc.2` with React/React DOM `~19.2.8`. Keep the Pro gem/npm packages, React,
+> `19.3.0-rc.3` with React/React DOM `~19.2.8`. Keep the Pro gem/npm packages, React,
 > React DOM, and `react-on-rails-rsc` upgraded as a coordinated set.
 
 2. Enable support for Server Components in React on Rails Pro configuration:
