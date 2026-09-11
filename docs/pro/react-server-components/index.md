@@ -106,7 +106,7 @@ See the full [RSC tutorial](./tutorial.md) for the complete learning path.
 
 ### Upgrading an Existing Pro App?
 
-See [Upgrading an Existing Pro App to RSC](./upgrading-existing-pro-app.md) for the generator-based runbook: prerequisites, `rails g react_on_rails:rsc` usage, legacy webpack compatibility, and a verification checklist.
+See [Upgrading an Existing Pro App to RSC](./upgrading-existing-pro-app.md) for the generator-based runbook: prerequisites, `rails g react_on_rails:rsc` usage, legacy webpack compatibility, and a verification checklist. Its Pro 16.4+ prerequisite is only the minimum starting point for an existing app; upgrade the app to Pro 17 for the supported GA destination documented here.
 
 ### Migrating Your React Components?
 
