@@ -1,0 +1,84 @@
+module ReactOnRails
+  class VersionChecker
+    module LockfileResolution
+      MANAGER_LOCKFILES: Hash[Symbol, Array[String]]
+
+      class Diagnostic < ::Struct[untyped]
+        def code: () -> Symbol
+        def message: () -> String
+      end
+
+      class Result < ::Struct[untyped]
+        def version: () -> String?
+        def diagnostic: () -> Diagnostic?
+      end
+
+      # A parser outcome: a resolved version String, a failure code Symbol
+      # (:stale, :unreadable, :unrecognized, :binary), or [code, detail].
+      type parser_outcome = String | Symbol | [Symbol, String?]
+
+      def self.resolve: (untyped package_json_path, String package_name, String requested_spec,
+                         ?declared_manager: String?) -> Result
+      def self.version_from: (Symbol manager, String path, String package_name, String requested_spec) -> parser_outcome
+      def self.result_for: (parser_outcome outcome, Detection detection, String lockfile,
+                            String package_name, String requested_spec) -> Result
+      def self.missing_diagnostic: (Detection detection) -> Diagnostic
+      def self.foreign_lockfile_warning: (Detection detection) -> Diagnostic?
+
+      module Messages
+        def self.ambiguity: (Detection detection) -> String
+        def self.ambiguity_reason: (Detection detection) -> String
+        def self.missing: (Symbol manager, String dir) -> String
+        def self.stale: (String lockfile_name, Symbol manager, String package_name, String requested_spec) -> String
+        def self.stale_foreign: (Array[String] foreign_names, Symbol manager) -> String
+        def self.unsupported_binary: () -> String
+        def self.unsupported_unreadable: (String lockfile_name, Symbol manager, String? detail) -> String
+        def self.unsupported_unrecognized: (String lockfile_name, Symbol manager) -> String
+      end
+
+      class Detection
+        attr_reader manager: Symbol?
+        attr_reader declared: Symbol?
+        attr_reader dir: String
+
+        def initialize: (String dir, String? declared_manager) -> void
+        def confident?: () -> bool
+        def ambiguous?: () -> bool
+        def lockfile_path: () -> String?
+        def present_lockfile_names: () -> Array[String]
+        def foreign_lockfile_names: () -> Array[String]
+
+        private
+
+        def detect: () -> [Symbol?, Symbol]
+        def normalize_declared: (String? value) -> Symbol?
+        def lockfile_for: (Symbol manager) -> String?
+      end
+
+      module PnpmLockfile
+        def self.version: (String path, String package_name, String requested_spec) -> parser_outcome
+        def self.dependencies: (Hash[String, untyped] doc) -> Hash[String, untyped]?
+        def self.project_document: (String path) -> (Hash[String, untyped] | Symbol | [Symbol, String?])
+        def self.strip_peer_suffix: (String? version) -> String?
+      end
+
+      module YarnLockfile
+        def self.version: (String path, String package_name, String requested_spec) -> parser_outcome
+        def self.berry_version: (String content, String package_name, String requested_spec) -> parser_outcome
+        def self.berry_entry: (Hash[untyped, untyped] doc, String package_name, String requested_spec) -> untyped
+        def self.classic_version: (String content, String package_name, String requested_spec) -> parser_outcome
+        def self.header_selectors: (String line) -> Array[String]
+      end
+
+      module BunLockfile
+        def self.version: (String path, String package_name, String requested_spec) -> parser_outcome
+        def self.jsonc_to_json: (String content) -> String
+      end
+
+      module NpmLockfile
+        def self.version: (String path, String package_name, String requested_spec) -> parser_outcome
+        def self.selector_current?: (Hash[String, untyped] doc, String package_name, String requested_spec) -> bool
+      end
+    end
+  end
+end
