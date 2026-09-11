@@ -14,6 +14,8 @@
  */
 
 import { Readable, PassThrough } from 'stream';
+import { readFileSync } from 'fs';
+import { resolve as resolvePath } from 'path';
 import { RailsContextWithServerStreamingCapabilities } from 'react-on-rails/types';
 import injectRSCPayload from '../src/injectRSCPayload.ts';
 import RSCRequestTracker from '../src/RSCRequestTracker.ts';
@@ -39,6 +41,25 @@ const expectedPayloadPushScript = (chunk: string) =>
   `<script ${rscPayloadScriptMarker}>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})${rscPayloadKeyReference}||=[]).push(${JSON.stringify(
     chunk,
   )})</script>`;
+
+type ShakapackerAssetShapes = {
+  production: {
+    flightRow: string;
+    manifestEntry: {
+      chunks: Array<number | string>;
+      css: string[];
+    };
+  };
+  development: {
+    flightRow: string;
+    chunkName: string;
+    stylesheetHref: string;
+  };
+};
+
+const shakapackerAssetShapes = JSON.parse(
+  readFileSync(resolvePath(__dirname, 'fixtures/rsc-css-gating/shakapacker-asset-shapes.json'), 'utf8'),
+) as ShakapackerAssetShapes;
 
 // Shared utilities — createMockRSCStream wraps content in length-prefixed format,
 // createMockHTMLStream passes HTML through as-is.
@@ -656,17 +677,21 @@ describe('injectRSCPayload', () => {
   });
 
   it('promotes only manifest-listed production RSC stylesheet preloads', async () => {
-    const flightData =
-      '2:I["./client/app/components/FoucProbe/RscFoucProbeClient.jsx",[4092,"js/client1-570df890c7aa791c.chunk.js"],"default"]\n' +
-      '0:["$","$L2",null,{},null]\n';
+    const { flightRow: flightData, manifestEntry } = shakapackerAssetShapes.production;
     const mockRSC = createMockRSCStream([flightData]);
-    const manifestStylesheetHref = '/webpack/test/css/4092-98880bc1.css';
+    const [manifestStylesheetHref] = manifestEntry.css;
     const unrelatedPreload =
       '<link rel="preload" as="style" href="https://cdn.example.com/assets/next-route-theme.css">';
+    const revealHTML =
+      '<div hidden id="RscFoucProbe-react-component-0S:0">styled boundary</div>' +
+      '<script>$RC("RscFoucProbe-react-component-0B:0","RscFoucProbe-react-component-0S:0")</script>';
     const mockHTML = createMockHTMLStream([
-      `<link rel="preload" as="style" href="https://cdn.example.com${manifestStylesheetHref}?body=1">${unrelatedPreload}`,
+      `<link rel="preload" as="style" href="https://cdn.example.com${manifestStylesheetHref}?body=1">${unrelatedPreload}${revealHTML}`,
     ]);
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    expect(manifestEntry.chunks).toEqual([635, 'js/client0-ddfe2f4e010169bd.chunk.js']);
+    expect(manifestStylesheetHref).toBe('/packs/css/635-166421e0.css');
 
     const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
       rscClientManifestStylesheetHrefs: new Set([manifestStylesheetHref]),
@@ -676,9 +701,31 @@ describe('injectRSCPayload', () => {
     expect(resultStr).toContain(
       `<link rel="stylesheet" href="https://cdn.example.com${manifestStylesheetHref}?body=1" data-precedence="rsc-css">`,
     );
+    expect(resultStr.indexOf(manifestStylesheetHref)).toBeLessThan(
+      resultStr.indexOf('<div hidden id="RscFoucProbe-react-component-0S:0">'),
+    );
     expect(resultStr.split(manifestStylesheetHref)).toHaveLength(2);
     expect(resultStr).toContain(unrelatedPreload);
     expect(resultStr).toContain(expectedPayloadPushScript(flightData));
+  });
+
+  it('does not infer a stylesheet from the real unhashed development asset shape', async () => {
+    const { flightRow, chunkName, stylesheetHref } = shakapackerAssetShapes.development;
+    const mockRSC = createMockRSCStream([flightRow]);
+    const mockHTML = createMockHTMLStream(['<main>ready</main>']);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    expect(flightRow).toContain(`["${chunkName}","js/${chunkName}.chunk.js"]`);
+    expect(stylesheetHref).toBe(`/packs/css/${chunkName}.css`);
+
+    const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
+      rscClientChunkStylesheetHrefsByChunkName: new Map([[chunkName, [stylesheetHref]]]),
+    });
+    const resultStr = await collectStreamData(result);
+
+    expect(resultStr).toContain('<main>ready</main>');
+    expect(resultStr).not.toContain(`<link rel="stylesheet" href="${stylesheetHref}"`);
+    expect(resultStr).toContain(expectedPayloadPushScript(flightRow));
   });
 
   it('injects inferred RSC client chunk stylesheets before streamed reveal HTML', async () => {
