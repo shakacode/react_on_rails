@@ -3718,7 +3718,7 @@ describe InstallGenerator, type: :generator do
       allow(install_generator).to receive(:fallback_package_manager).and_return("pnpm")
     end
 
-    it "explains why every RSC install is pinned to the stable package" do
+    it "explains why every RSC install is pinned to the qualified release candidate" do
       allow(install_generator).to receive(:add_packages).and_return(true)
 
       install_generator.send(:add_rsc_dependencies)
@@ -3728,9 +3728,9 @@ describe InstallGenerator, type: :generator do
       expect(message_text).to include("react-on-rails-rsc@#{rsc_pin}")
       expect(message_text).to include("react-on-rails-rsc/RspackPlugin")
       expect(message_text).to include("Webpack")
-      expect(message_text).not_to include("temporarily")
-      expect(message_text).not_to include("prerelease")
-      expect(message_text).not_to include("until stable")
+      expect(message_text).to include("client-export parsing fixes")
+      expect(message_text).to include("splitChunks fix")
+      expect(message_text).to include("until stable react-on-rails-rsc@19.3.0")
     end
 
     it "keeps the version pin and uses the detected package manager when manual RSC recovery is needed" do
@@ -6156,11 +6156,11 @@ describe InstallGenerator, type: :generator do
     end
   end
 
-  context "when using --rsc with React 19.2.7" do
+  context "when using --rsc with React 19.2.8" do
     let(:install_generator) { install_generator_fixture(rsc: true) }
 
     specify "warn_about_react_version_for_rsc does not add warning" do
-      allow(install_generator).to receive(:detect_react_version).and_return("19.2.7")
+      allow(install_generator).to receive(:detect_react_version).and_return("19.2.8")
 
       install_generator.send(:warn_about_react_version_for_rsc)
       expect(GeneratorMessages.messages.join("\n")).not_to include("⚠️")
@@ -6200,8 +6200,8 @@ describe InstallGenerator, type: :generator do
 
       install_generator.send(:warn_about_react_version_for_rsc)
       warning_text = GeneratorMessages.messages.join("\n")
-      expect(warning_text).to include("below the recommended minimum")
-      expect(warning_text).to include("React 19.2.7")
+      expect(warning_text).to include("below the required minimum")
+      expect(warning_text).to include("matching stable React/React DOM 19.2.8+ on 19.2.x")
     end
   end
 

@@ -82,9 +82,17 @@ module ReactOnRails
         react_version = detect_react_version
         return if react_version.nil? # React not installed yet, will be installed by generator
 
-        major, minor, patch = react_version.split(".").map(&:to_i)
+        version = Gem::Version.new(react_version)
+        major, minor, patch = version.segments
 
-        if major != RSC_SUPPORTED_REACT_MAJOR || minor != RSC_SUPPORTED_REACT_MINOR
+        if version.prerelease?
+          GeneratorMessages.add_warning(<<~MSG.strip)
+            ⚠️  RSC requires stable React (detected: #{react_version}).
+
+            React prereleases are not supported. Install matching stable React/React DOM versions:
+              #{manual_add_packages_command(["react@#{RSC_REACT_VERSION_RANGE}", "react-dom@#{RSC_REACT_VERSION_RANGE}"])}
+          MSG
+        elsif major != RSC_SUPPORTED_REACT_MAJOR || minor != RSC_SUPPORTED_REACT_MINOR
           GeneratorMessages.add_warning(<<~MSG.strip)
             ⚠️  RSC requires React #{RSC_SUPPORTED_REACT_LINE} (detected: #{react_version})
 
@@ -97,13 +105,14 @@ module ReactOnRails
           MSG
         elsif patch < RSC_MINIMUM_REACT_PATCH
           GeneratorMessages.add_warning(<<~MSG.strip)
-            ⚠️  React #{react_version} is below the recommended minimum for RSC.
+            ⚠️  React #{react_version} is below the required minimum for RSC.
 
-            Please upgrade to at least React #{RSC_MINIMUM_REACT_VERSION}:
-              #{manual_add_packages_command(["react@#{RSC_MINIMUM_REACT_VERSION}", "react-dom@#{RSC_MINIMUM_REACT_VERSION}"])}
+            react-on-rails-rsc #{JsDependencyManager::RSC_PACKAGE_VERSION_PIN} requires
+            matching stable React/React DOM #{RSC_MINIMUM_REACT_VERSION}+ on #{RSC_SUPPORTED_REACT_LINE}.
+            The Node Renderer refuses startup until React and React DOM are upgraded together:
+              #{manual_add_packages_command(["react@#{RSC_REACT_VERSION_RANGE}", "react-dom@#{RSC_REACT_VERSION_RANGE}"])}
 
-            react-on-rails-rsc 19.2.x with patch >= 19.2.1 is coordinated with
-            React/React DOM #{RSC_MINIMUM_REACT_VERSION}+ for the React on Rails Pro 17 RSC runtime.
+            The standalone RSC generator does not upgrade your React or React DOM dependencies.
           MSG
         end
       end

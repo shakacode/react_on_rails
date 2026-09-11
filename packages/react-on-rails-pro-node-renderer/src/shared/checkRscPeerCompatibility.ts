@@ -126,7 +126,7 @@ const supportedReactRange = (
   return matchingRanges
     .map(
       ({ minor, minPatch }) =>
-        `${supportedMajor}.${minor}.x with patch >= ${supportedMajor}.${minor}.${minPatch}`,
+        `${supportedMajor}.${minor}.x with patch >= ${supportedMajor}.${minor}.${minPatch} (stable releases only)`,
     )
     .join(' or ');
 };
@@ -215,8 +215,10 @@ export function checkRscPeerCompatibility(input: RscPeerCheckInput): RscPeerChec
   // an app with React truly absent will fail during normal module loading.
   let reactTuple: VersionTuple | null = null;
   if (reactVersion) {
-    reactTuple = parseTuple(reactVersion);
-    if (!isSupportedReactTuple(reactTuple, rscTuple, react)) {
+    const parsedReact = parseVersion(reactVersion);
+    reactTuple = parsedReact.tuple;
+    // The qualified prerelease exception is for RSC, not its stable React peers.
+    if (parsedReact.prerelease || !isSupportedReactTuple(reactTuple, rscTuple, react)) {
       return {
         level: 'error',
         message: errorMessage('react', reactVersion, supportedReactRange(rscTuple, react), proVersion),
@@ -225,8 +227,9 @@ export function checkRscPeerCompatibility(input: RscPeerCheckInput): RscPeerChec
   }
 
   if (reactDomVersion) {
-    const reactDomTuple = parseTuple(reactDomVersion);
-    if (!isSupportedReactTuple(reactDomTuple, rscTuple, react)) {
+    const parsedReactDom = parseVersion(reactDomVersion);
+    const reactDomTuple = parsedReactDom.tuple;
+    if (parsedReactDom.prerelease || !isSupportedReactTuple(reactDomTuple, rscTuple, react)) {
       return {
         level: 'error',
         message: errorMessage('react-dom', reactDomVersion, supportedReactRange(rscTuple, react), proVersion),

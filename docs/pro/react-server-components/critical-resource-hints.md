@@ -47,10 +47,9 @@ The useful React DOM APIs for RSC resource hints are:
 - `preloadModule(href, options)`
 
 > [!NOTE]
-> The generator currently installs the tested React 19.2.7 / `react-on-rails-rsc` 19.2.1 package
-> line (stable `19.2.1` or later). Newer published
-> `react-on-rails-rsc` releases may add automatic package-level hinting, but app-authored resource
-> hints should still use React DOM's public APIs rather than package-private helpers.
+> Generator defaults differ between the stable 17.0 release and 17.1 release candidates. See
+> [Upgrading an Existing Pro App](./upgrading-existing-pro-app.md) for the versioned package sets.
+> App-authored resource hints should use React DOM's public APIs rather than package-private helpers.
 
 Use already-resolved URLs. These helpers do not look up logical pack names such as
 `generated/WelcomePage.css`; resolve those through the host app's asset manifest before calling the

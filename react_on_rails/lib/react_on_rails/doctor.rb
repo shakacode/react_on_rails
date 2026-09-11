@@ -4301,7 +4301,9 @@ module ReactOnRails
     RSC_PACKAGE_NAME = "react-on-rails-rsc"
     RSC_MINIMUM_PACKAGE_VERSION = "19.2.1"
     RSC_SUPPORTED_PACKAGE_MAJOR = 19
-    RSC_SUPPORTED_PACKAGE_MINORS = [2].freeze
+    # Package and React minors differ: RSC 19.3 uses the React 19.2.8 runtime.
+    RSC_REACT_MINIMUM_BY_PACKAGE_MINOR = { 2 => "19.2.7", 3 => "19.2.8" }.freeze
+    RSC_SUPPORTED_PACKAGE_MINORS = RSC_REACT_MINIMUM_BY_PACKAGE_MINOR.keys.freeze
     RSC_SUPPORTED_PACKAGE_LINE = RSC_SUPPORTED_PACKAGE_MINORS.map do |minor|
       "#{RSC_SUPPORTED_PACKAGE_MAJOR}.#{minor}.x"
     end.join(" or ")
@@ -4313,7 +4315,10 @@ module ReactOnRails
     RSC_MINIMUM_REACT_VERSION = "19.2.7"
     RSC_MINIMUM_REACT_VERSION_TUPLE = RSC_MINIMUM_REACT_VERSION.split(".").map(&:to_i).freeze
     RSC_SUPPORTED_REACT_MAJOR = RSC_MINIMUM_REACT_VERSION_TUPLE.fetch(0)
-    RSC_SUPPORTED_REACT_LINE = RSC_SUPPORTED_PACKAGE_MINORS.map do |minor|
+    RSC_SUPPORTED_REACT_MINORS = RSC_REACT_MINIMUM_BY_PACKAGE_MINOR.values.map do |version|
+      version.split(".").fetch(1).to_i
+    end.uniq.freeze
+    RSC_SUPPORTED_REACT_LINE = RSC_SUPPORTED_REACT_MINORS.map do |minor|
       "#{RSC_SUPPORTED_REACT_MAJOR}.#{minor}.x"
     end.join(" or ")
     RSC_DIST_TAGS_TO_CHECK = %w[next rc].freeze
@@ -4603,6 +4608,8 @@ module ReactOnRails
       return true unless check_rsc_package_minimum_version(rsc_package)
 
       unless rsc_package_declares_react_peer_dependencies?(rsc_package)
+        return true unless check_rsc_supported_react_packages_for_package(rsc_package, react_version)
+
         checker.add_warning(<<~MSG.strip)
           ⚠️  #{RSC_PACKAGE_NAME} #{rsc_package['version']} does not declare React peer dependencies.
 
@@ -4624,8 +4631,11 @@ module ReactOnRails
       rsc_version = rsc_package["version"].to_s
       return true if rsc_package_version_at_or_above_minimum?(rsc_version)
 
+      react_requirements = RSC_REACT_MINIMUM_BY_PACKAGE_MINOR.map do |minor, minimum|
+        "RSC #{RSC_SUPPORTED_PACKAGE_MAJOR}.#{minor}.x requires stable React/React DOM ~#{minimum}"
+      end.join("; ")
       prerelease_requirement = if RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION.present?
-                                 "\n(or #{RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION} during the 17.0 RC soak)"
+                                 "\n(or #{RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION} during the RC soak)"
                                else
                                  ""
                                end
@@ -4634,10 +4644,10 @@ module ReactOnRails
         🚫 #{RSC_PACKAGE_NAME} #{rsc_version.presence || 'unknown'} is not supported by React on Rails Pro 17 RSC.
 
         React on Rails Pro 17 requires #{RSC_PACKAGE_NAME} >= #{RSC_MINIMUM_PACKAGE_VERSION}#{prerelease_requirement}
-        on the supported #{RSC_SUPPORTED_PACKAGE_LINE} package line
-        with React/React DOM #{RSC_MINIMUM_REACT_VERSION}+.
+        on the supported #{RSC_SUPPORTED_PACKAGE_LINE} package line.
+        #{react_requirements}.
 
-        Fix: npm install react@~#{RSC_MINIMUM_REACT_VERSION} react-dom@~#{RSC_MINIMUM_REACT_VERSION} #{RSC_PACKAGE_NAME}@#{RSC_PACKAGE_INSTALL_VERSION} --save-exact
+        Fix: npm install react@#{ReactOnRails::Generators::JsDependencyManager::RSC_REACT_VERSION_RANGE} react-dom@#{ReactOnRails::Generators::JsDependencyManager::RSC_REACT_VERSION_RANGE} && npm install #{RSC_PACKAGE_NAME}@#{RSC_PACKAGE_INSTALL_VERSION} --save-exact
       MSG
       false
     end
@@ -4665,13 +4675,14 @@ module ReactOnRails
     end
 
     def supported_rsc_react_version?(react_version)
-      supported_rsc_react_line?(react_version) &&
+      npm_prerelease(react_version).empty? &&
+        supported_rsc_react_line?(react_version) &&
         !npm_version_less_than?(react_version, RSC_MINIMUM_REACT_VERSION)
     end
 
     def supported_rsc_react_line?(react_version)
       major, minor, = npm_version_tuple(react_version)
-      major == RSC_SUPPORTED_REACT_MAJOR && RSC_SUPPORTED_PACKAGE_MINORS.include?(minor)
+      major == RSC_SUPPORTED_REACT_MAJOR && RSC_SUPPORTED_REACT_MINORS.include?(minor)
     end
 
     def rsc_react_major_or_newer?(react_version)
@@ -4690,17 +4701,21 @@ module ReactOnRails
 
     def check_rsc_supported_react_version_for_package(rsc_package, package_name, package_version)
       return true if package_version.blank?
-      return true unless unsupported_rsc_react_version?(package_version)
+
+      rsc_minor = npm_version_tuple(rsc_package["version"])[1]
+      minimum_version = RSC_REACT_MINIMUM_BY_PACKAGE_MINOR.fetch(rsc_minor)
+      return true if npm_prerelease(package_version).blank? && supported_rsc_react_line?(package_version) &&
+                     !npm_version_less_than?(package_version, minimum_version)
 
       package_label = package_name == "react" ? "React" : "React DOM"
 
       checker.add_error(<<~MSG.strip)
         🚫 #{RSC_PACKAGE_NAME} #{rsc_package['version']} is installed with unsupported #{package_label} #{package_version}.
 
-        React on Rails Pro 17 RSC currently supports React/React DOM #{RSC_SUPPORTED_REACT_LINE} with patch >= #{RSC_MINIMUM_REACT_VERSION}.
+        React on Rails Pro 17 RSC currently supports stable React/React DOM #{RSC_SUPPORTED_REACT_LINE} with patch >= #{minimum_version}.
         The node renderer enforces the same support window at startup.
 
-        Fix: npm install react@~#{RSC_MINIMUM_REACT_VERSION} react-dom@~#{RSC_MINIMUM_REACT_VERSION} --save-exact
+        Fix: npm install react@~#{minimum_version} react-dom@~#{minimum_version}
       MSG
       false
     end
@@ -4810,7 +4825,8 @@ module ReactOnRails
         checker.add_warning(<<~MSG.strip)
           ⚠️  #{RSC_PACKAGE_NAME} #{installed_version} is behind the npm #{tag} dist-tag #{tag_version}.
 
-          React Server Components track React minor versions. If your React version is on the #{tag_version.split('.')[0, 2].join('.')} line, install the matching RSC package instead of relying on a stale latest tag.
+          Before upgrading, check the candidate package's React peer requirements
+          and the React runtime versions supported by this React on Rails Pro release.
 
           Check peer requirements with:
             npm view #{RSC_PACKAGE_NAME}@#{tag_version} peerDependencies
