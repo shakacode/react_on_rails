@@ -563,6 +563,54 @@ async function testSuccessfulGuardJobDoesNotSupersedeSkippedSubstantiveWork() {
   assert.match(core.failed[0], /Lint #49/);
 }
 
+async function testSuccessfulMatrixSetupDoesNotSupersedeSkippedQualityGates() {
+  const descendant = 'docs-fix';
+  const ancestor = 'broken-integration';
+  const guardRun = run({
+    id: 60,
+    workflowId: 600,
+    sha: descendant,
+    name: 'Docs Guard',
+    conclusion: 'failure',
+  });
+  const orchestrationOnlyRun = run({ id: 61, workflowId: 610, sha: descendant, name: 'Integration Tests' });
+  const staleFailure = run({
+    id: 62,
+    workflowId: 610,
+    sha: ancestor,
+    name: 'Integration Tests',
+    conclusion: 'failure',
+  });
+  const github = makeGithub({
+    pages: [[guardRun, orchestrationOnlyRun, staleFailure]],
+    jobsByRunId: {
+      60: [guardOnlyJob()],
+      61: [
+        successJob(GUARD_JOB_NAME),
+        successJob('setup-integration-matrix'),
+        skippedJob('webpack-dummy-app-tests'),
+        skippedJob('rspack-dummy-app-tests'),
+      ],
+      62: [buildFailureJob()],
+    },
+    parentsBySha: {
+      [descendant]: ancestor,
+    },
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context,
+    core,
+    previousSha: descendant,
+    excludeWorkflowsInput: '',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /Integration Tests #62/);
+}
+
 async function testMissingWorkflowIdsDoNotSupersedeOlderFailure() {
   const descendant = 'docs-fix';
   const ancestor = 'broken-docs';
@@ -595,7 +643,8 @@ async function testMissingWorkflowIdsDoNotSupersedeOlderFailure() {
   });
 
   assert.equal(core.failed.length, 1);
-  assert.match(core.failed[0], /Check Markdown Links #52/);
+  assert.match(core.failed[0], /GitHub API returned an unexpected response/);
+  assert.match(core.failed[0], /workflow run 51 to have a positive safe integer workflow_id/);
 }
 
 async function testMalformedWorkflowIdsDoNotSupersedeOlderFailure() {
@@ -632,7 +681,70 @@ async function testMalformedWorkflowIdsDoNotSupersedeOlderFailure() {
   });
 
   assert.equal(core.failed.length, 1);
-  assert.match(core.failed[0], /Check Markdown Links #55/);
+  assert.match(core.failed[0], /GitHub API returned an unexpected response/);
+  assert.match(core.failed[0], /workflow run 54 to have a positive safe integer workflow_id/);
+}
+
+async function testMissingWorkflowIdCollisionFailsClosed() {
+  const previous = 'docs-fix';
+  const failingRun = run({ id: 56, sha: previous, name: 'Check Markdown Links', conclusion: 'failure' });
+  const successfulRun = run({ id: 57, sha: previous, name: 'Check Markdown Links' });
+  delete failingRun.workflow_id;
+  delete successfulRun.workflow_id;
+  const github = makeGithub({
+    pages: [[failingRun, successfulRun]],
+    jobsByRunId: {
+      56: [buildFailureJob()],
+      57: [successJob()],
+    },
+    parentsBySha: {},
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context,
+    core,
+    previousSha: previous,
+    excludeWorkflowsInput: '',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /GitHub API returned an unexpected response/);
+  assert.match(core.failed[0], /workflow run 56 to have a positive safe integer workflow_id/);
+}
+
+async function testMalformedWorkflowIdCollisionFailsClosed() {
+  const previous = 'docs-fix';
+  const failingRun = {
+    ...run({ id: 58, sha: previous, name: 'Check Markdown Links', conclusion: 'failure' }),
+    workflow_id: 'invalid',
+  };
+  const successfulRun = {
+    ...run({ id: 59, sha: previous, name: 'Check Markdown Links' }),
+    workflow_id: 'invalid',
+  };
+  const github = makeGithub({
+    pages: [[failingRun, successfulRun]],
+    jobsByRunId: {
+      58: [buildFailureJob()],
+      59: [successJob()],
+    },
+    parentsBySha: {},
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context,
+    core,
+    previousSha: previous,
+    excludeWorkflowsInput: '',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /GitHub API returned an unexpected response/);
+  assert.match(core.failed[0], /workflow run 58 to have a positive safe integer workflow_id/);
 }
 
 async function testIncompleteRunDoesNotSupersedeOlderFailure() {
@@ -1338,8 +1450,11 @@ async function main() {
   await testEmptyJobsDoNotSupersedeOlderFailure();
   await testAllSkippedJobsDoNotSupersedeOlderFailure();
   await testSuccessfulGuardJobDoesNotSupersedeSkippedSubstantiveWork();
+  await testSuccessfulMatrixSetupDoesNotSupersedeSkippedQualityGates();
   await testMissingWorkflowIdsDoNotSupersedeOlderFailure();
   await testMalformedWorkflowIdsDoNotSupersedeOlderFailure();
+  await testMissingWorkflowIdCollisionFailsClosed();
+  await testMalformedWorkflowIdCollisionFailsClosed();
   await testIncompleteRunDoesNotSupersedeOlderFailure();
   await testGuardOnlyRunDoesNotSupersedeOlderSameWorkflowFailure();
   await testNoRunSyntheticBaseLooksThroughToParentFailure();

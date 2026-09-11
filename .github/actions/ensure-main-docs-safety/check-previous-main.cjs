@@ -1,6 +1,7 @@
 const FAILURE_CONCLUSIONS = new Set(['failure', 'timed_out', 'cancelled', 'action_required']);
 const GUARD_JOB_NAME = 'detect-changes';
 const GUARD_STEP_NAME = 'Guard docs-only main pushes';
+const ORCHESTRATION_JOB_NAMES = new Set([GUARD_JOB_NAME, 'setup-integration-matrix', 'setup-matrix']);
 const TRUSTED_RUN_EVENTS = new Set(['push', 'merge_group']);
 const MAX_GUARD_ONLY_HOPS = 10;
 const MAX_NO_RUNS_HOPS = 50;
@@ -16,10 +17,22 @@ function summarizeRun(run) {
   return `- [${run.name} #${run.run_number}](${run.html_url}) concluded ${run.conclusion}`;
 }
 
+function isValidWorkflowId(workflowId) {
+  return Number.isSafeInteger(workflowId) && workflowId > 0;
+}
+
 function latestRunsByWorkflow(workflowRuns) {
   const latestByWorkflow = new Map();
 
   for (const run of workflowRuns) {
+    if (!isValidWorkflowId(run.workflow_id)) {
+      const error = new TypeError(
+        `Expected workflow run ${run.id ?? 'UNKNOWN'} to have a positive safe integer workflow_id.`,
+      );
+      error.unexpectedGithubApiResponse = true;
+      throw error;
+    }
+
     const existing = latestByWorkflow.get(run.workflow_id);
     if (
       !existing ||
@@ -31,10 +44,6 @@ function latestRunsByWorkflow(workflowRuns) {
   }
 
   return latestByWorkflow;
-}
-
-function isValidWorkflowId(workflowId) {
-  return Number.isSafeInteger(workflowId) && workflowId > 0;
 }
 
 function latestAttemptJobs(jobs) {
@@ -63,6 +72,10 @@ function isGuardOnlyFailure(jobs) {
       return failedSteps.length > 0 && failedSteps.every((step) => step.name === GUARD_STEP_NAME);
     })
   );
+}
+
+function isSuccessfulQualityGateJob(job) {
+  return job.conclusion === 'success' && !ORCHESTRATION_JOB_NAMES.has(job.name);
 }
 
 function githubApiErrorStatus(error) {
@@ -239,9 +252,7 @@ async function evaluateCommitRuns({ github, context, core, sha, createdAfter, ex
       const failed = failedJobs(latestJobs);
 
       if (failed.length === 0) {
-        const hasSuccessfulSubstantiveJob = latestJobs.some(
-          (job) => job.name !== GUARD_JOB_NAME && job.conclusion === 'success',
-        );
+        const hasSuccessfulSubstantiveJob = latestJobs.some(isSuccessfulQualityGateJob);
         return {
           kind: 'passing',
           successfulWorkflowId:
