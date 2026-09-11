@@ -9750,6 +9750,8 @@ handled by your application transpiler. A `"use client"` module must expose at l
 ES-module export; type-only modules and CommonJS-style exports now produce a file-specific build
 error. Add an ES-module export or remove the directive. Rspack builds now honor application
 `splitChunks` settings while retaining the sibling chunk metadata needed for hydration.
+RC3 also restores stylesheet hints when Webpack or Rspack scope-hoists a client reference and its
+CSS-bearing children into concatenated modules in production builds.
 
 ## Prerequisites
 

@@ -28,7 +28,9 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 - **[Pro] RSC 19.3 release-candidate compatibility and generated defaults**: Generated RSC apps now pin
   `react-on-rails-rsc@19.3.0-rc.3` with React/React DOM `~19.2.8`, bringing the JSX/TSX client-export
-  parsing and Rspack shared-chunk fixes into the 17.1 RC soak. Doctor and the Node Renderer accept
+  parsing and Rspack shared-chunk fixes into the 17.1 RC soak. RC3 also restores stylesheet hints
+  when Webpack or Rspack scope-hoists CSS-bearing client-reference trees into concatenated modules.
+  Doctor and the Node Renderer accept
   this qualified RC tuple while preserving stable RSC 19.2.x >=19.2.1 with stable React 19.2.x >=19.2.7.
   Nonqualified RSC-package prereleases and unsupported React minors remain rejected. The Node Renderer
   now explicitly rejects React/React DOM prereleases, including apps using stable RSC 19.2.1.
