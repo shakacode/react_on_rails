@@ -35,12 +35,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   possibly-stale lockfile; lockfile entries are matched against package.json's exact dependency selector rather
   than the first same-name entry; and boot errors/warnings carry class-prefixed diagnostics
   (`Lockfile missing:`/`Lockfile stale:`/`Lockfile ambiguity:`/`Lockfile unsupported:`) naming the file and fix.
-  The binary `bun.lockb` is not parsed — migrate with `bun install --save-text-lockfile`.
+  The binary `bun.lockb` is not parsed — migrate with
+  `bun install --save-text-lockfile --frozen-lockfile --lockfile-only`.
   **Action required for upgraders:** an app carrying lockfiles from two package managers with no `packageManager`
   field in package.json and a non-exact version spec now fails boot with a `Lockfile ambiguity` diagnostic
   (previously it silently resolved from `yarn.lock`, even a stale one); delete the stale lockfile or declare your
   package manager in package.json's `packageManager` field. Fixes
-  [Issue 5049](https://github.com/shakacode/react_on_rails/issues/5049) by
+  [Issue 5049](https://github.com/shakacode/react_on_rails/issues/5049).
+  [PR 5058](https://github.com/shakacode/react_on_rails/pull/5058) by
   [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 - **`bin/dev kill` now verifies every app-scoped Overmind endpoint within a bounded control budget**:

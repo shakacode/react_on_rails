@@ -47,11 +47,11 @@ bin/rails generate react_on_rails:install
 
 ### "Package version is not an exact version" / lockfile diagnostics at boot
 
-At boot, React on Rails verifies that the installed npm package version matches the gem version.
-It resolves the **installed** version from your package manager's lockfile (npm, Yarn classic,
-Yarn Berry, pnpm, and bun are all supported), so semver ranges like `^17.0.0` in package.json are
-fine as long as a lockfile can answer. When no lockfile can answer, the error explains why with a
-class-prefixed diagnostic:
+At boot, React on Rails verifies that the npm package version matches the gem version. It
+resolves the **lockfile-recorded** package version from your package manager's lockfile (npm,
+Yarn classic, Yarn Berry, pnpm, and bun are all supported), so semver ranges like `^17.0.0` in
+package.json are fine as long as a lockfile can answer. When no lockfile can answer, the error
+explains why with a class-prefixed diagnostic:
 
 - **`Lockfile missing:`** — your declared package manager has no lockfile yet. Run its install
   command (e.g. `pnpm install`) to generate one.
@@ -62,8 +62,9 @@ class-prefixed diagnostic:
 - **`Lockfile ambiguity:`** — lockfiles from more than one package manager exist and package.json
   does not declare which one owns the app. No lockfile is trusted in that state. Delete the stale
   lockfile(s), or declare your manager, e.g. `"packageManager": "pnpm@10.0.0"` in package.json.
-- **`Lockfile unsupported:`** — the lockfile cannot be read. The binary `bun.lockb` is never
-  parsed: migrate to bun's text lockfile with
+- **`Lockfile unsupported:`** — the lockfile cannot be used: it is unreadable/corrupt, it parses
+  but has an unrecognized structure (possibly from a newer package-manager release), or it is the
+  binary `bun.lockb`, which is never parsed — migrate to bun's text lockfile with
   `bun install --save-text-lockfile --frozen-lockfile --lockfile-only` and delete `bun.lockb`.
 
 Two known limitations:

@@ -1,0 +1,53 @@
+{
+  "type": "lane-assignment",
+  "version": 1,
+  "batch_plan_id": "ror-5058-closeout-20260911-1922",
+  "lane_id": "pr5058-closeout",
+  "wave": "wave-1",
+  "assignment": {
+    "lane_id": "pr5058-closeout",
+    "route_preference": {
+      "model": "opus-5",
+      "effort": "high"
+    },
+    "dispatcher": "claude-code-subagent",
+    "instance_id": "pr5058-closeout-worker-02",
+    "launch_token": "dispatch-eb7d8db290227a88",
+    "lifecycle": "active",
+    "requested": {
+      "dispatcher": "claude-code-subagent",
+      "route": {
+        "effort": "high",
+        "model": "opus-5"
+      }
+    },
+    "selection_provenance": "requested-dispatcher",
+    "observed_host": {
+      "host": "UNKNOWN",
+      "model": "UNKNOWN",
+      "effort": "UNKNOWN"
+    },
+    "candidate_index": 0
+  },
+  "replacement_history": [
+    {
+      "proof_id": "replace-pr5058-worker-01-with-02-20260911",
+      "consumed": true,
+      "reason": "user directive: use opus for everything, no sonnet",
+      "prior_assignment": {
+        "lane_id": "pr5058-closeout",
+        "dispatcher": "claude-code-subagent",
+        "instance_id": "pr5058-closeout-worker-01",
+        "launch_token": "dispatch-e6583aa01aa7a90d",
+        "stopped": true,
+        "reconciliation": "worker-01 stopped mid merge-ledger run; greptile thread verification/resolution possibly partially complete \u2014 worker-02 re-verifies all thread and check state from live GitHub"
+      }
+    }
+  ],
+  "state_ref": "https://github.com/shakacode/react_on_rails/pull/5058#issuecomment-5637597455",
+  "preflight": {
+    "security": "SECURITY_PREFLIGHT_OK",
+    "batch_plan_preflight": "accepted; eligible=[pr5058-closeout]",
+    "stage_dependency_gate": "eligible; binding sha256:736df3532c0a92e4eaab05cef4a5c4026d392c924f82fe86f051cf91bcd571e1"
+  }
+}

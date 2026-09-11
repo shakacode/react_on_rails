@@ -342,7 +342,7 @@ module ReactOnRails
           return :unrecognized unless entry.is_a?(Hash) && entry["version"]
 
           entry["version"].to_s
-        rescue Psych::SyntaxError => e
+        rescue Psych::Exception => e
           [:unreadable, e.message.to_s.lines.first&.strip]
         end
 
@@ -393,7 +393,7 @@ module ReactOnRails
         def self.project_document(path)
           docs = YAML.safe_load_stream(File.read(path))
           docs.find { |d| d.is_a?(Hash) && (d.key?("importers") || d.key?("dependencies")) } || :unrecognized
-        rescue Psych::SyntaxError => e
+        rescue Psych::Exception => e
           [:unreadable, e.message.to_s.lines.first&.strip]
         end
 

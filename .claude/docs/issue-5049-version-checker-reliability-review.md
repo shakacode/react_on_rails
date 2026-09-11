@@ -426,7 +426,7 @@ Variant (declared-vs-disk conflict):
 > Lockfile ambiguity: package.json declares `packageManager: pnpm@9` but `pnpm-lock.yaml` is
 > missing while `yarn.lock` exists. …same numbered fixes…
 
-**UNSUPPORTED** — the detected manager's lockfile exists but cannot be read, three flavors:
+**UNSUPPORTED** — the detected manager's lockfile exists but cannot be used — unreadable, unrecognized structure, or binary; three flavors:
 
 - Binary by design (`bun.lockb`):
   > Lockfile unsupported: `bun.lockb` is a binary lockfile this gem cannot read.

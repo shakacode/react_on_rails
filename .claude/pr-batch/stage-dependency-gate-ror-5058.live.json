@@ -1,0 +1,21 @@
+{
+  "contract": "stage-dependency-gate",
+  "version": 1,
+  "lanes": [
+    {
+      "id": "pr5058-closeout",
+      "maker": "claude-worker-pr5058-closeout",
+      "checker": "claude-checker-pr5058-readiness",
+      "head_sha": "572c8d89e653a154de03fa3f24dd11fdb311c255",
+      "base_sha": "0da027f330c272319254ced1180180c76aad62bf",
+      "preparation": {
+        "source_patch_inspection": "PR 5058 diff reviewed by planner in-session; scope = version_checker + lockfile_resolution + fixtures/specs/docs; see PR description Testing section",
+        "collision_domain_mapping": "single-lane serial batch; owned paths = PR 5058 changed files only (react_on_rails/lib/react_on_rails/version_checker*, sig, Steepfile, spec fixtures/specs, CHANGELOG.md, docs/oss/deployment/troubleshooting.md, .claude/docs review doc)",
+        "semantic_adaptation_notes": "no cross-PR porting; closeout lane only monitors CI, resolves review threads, runs merge-ledger, and executes ask-mode walkthrough on head 572c8d89e",
+        "validation_review_plan": "hosted CI green at head; greptile threads addressed/resolved; script/pr-merge-ledger 5058 --strict complete_allowed; $pr-walkthrough before final ask-mode merge decision",
+        "evidence_templates": "final handoff: check-run URLs at head SHA, merge-ledger verdict text, thread resolution links, walkthrough completion note, coordination declaration"
+      }
+    }
+  ],
+  "edges": []
+}

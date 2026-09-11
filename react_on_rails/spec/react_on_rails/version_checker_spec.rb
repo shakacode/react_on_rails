@@ -229,6 +229,15 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
           end
         end
 
+        context "when the lockfile uses YAML aliases (rejected by safe parsing)" do
+          it "boots with an unsupported-lockfile warning instead of crashing" do
+            stub_gem_version("16.6.0")
+            allow(Rails.logger).to receive(:warn)
+            expect { validate_fixture!("pnpm_yaml_alias") }.not_to raise_error
+            expect(Rails.logger).to have_received(:warn).with(a_string_including("Lockfile unsupported:"))
+          end
+        end
+
         context "when no lockfile and no packageManager field exist at all" do
           it "raises a coherent exact-version error without referencing an absent diagnostic" do
             stub_gem_version("1.2.3")
