@@ -148,11 +148,11 @@ Resolution:
   rule. If the spec is an exact matching pin, the check passes (the app is provably
   consistent) — but still warn about the ambiguity. If the spec is a range or mismatched, the
   boot error fires and its message MUST name the ambiguity and the three fixes:
-    1. delete the stale lockfile(s) (list the ones found),
-    2. or declare the real manager in package.json's `packageManager` field,
-    3. or pin the exact version (install command per best-guess manager, defaulting as
-       Utils does today).
-  Never resolve a version from a guessed lockfile.
+  1. delete the stale lockfile(s) (list the ones found),
+  2. or declare the real manager in package.json's `packageManager` field,
+  3. or pin the exact version (install command per best-guess manager, defaulting as
+     Utils does today).
+     Never resolve a version from a guessed lockfile.
 
 Implementation notes:
 
@@ -190,14 +190,14 @@ implementation correction.**
 Evidence and nuances:
 
 - Drift scenario (a) is real and uncaught: after `git pull` without install, the check passes
-  against the pulled lockfile while the dev server compiles from stale node_modules → confusing
+  against the pulled lockfile while the dev server compiles from stale node*modules → confusing
   protocol-mismatch SSR/hydration errors with no version hint. No runtime gem-vs-npm assertion
-  exists in the JS package, and doctor's gem/npm match check reads the *declared* spec
+  exists in the JS package, and doctor's gem/npm match check reads the \_declared* spec
   (`system_checker.rb:225-248`) — same blind spot.
 - **Critical finding:** the RSC `NODE_PACKAGE_RESOLUTION_SCRIPT`
   (`rsc_rspack_support.rb:40-44`) ALWAYS fails for `react-on-rails`/`react-on-rails-pro`:
   their `exports` maps do not export `./package.json`, so `require.resolve(pkg +
-  '/package.json')` throws `ERR_PACKAGE_PATH_NOT_EXPORTED` (verified against a real install;
+'/package.json')` throws `ERR_PACKAGE_PATH_NOT_EXPORTED` (verified against a real install;
   `@rspack/core` exports it, which is why the script works for rspack). Any node_modules tier
   must use the flat-read helper `rsc_flat_installed_package_version` only — ~1ms
   File.read/JSON.parse, verified to work through pnpm symlinks; no node spawn (~36ms) per boot.
@@ -207,7 +207,7 @@ Evidence and nuances:
   hoisting — flat read misses → lockfile fallback. Required guard: the tier must stay behind the
   existing `local_path_or_url_version?` / workspace exemptions or the repo's own dummy apps
   (`workspace:`/`file:` links, installed version `17.0.0-rc.6`) would newly fail CI boot.
-- Philosophy question settled by the project itself: issue #5049 says "the *installed* version
+- Philosophy question settled by the project itself: issue #5049 says "the _installed_ version
   is what gets checked", and doctor prefers installed-over-declared for other packages. When
   node_modules is present it is a strictly better witness than the lockfile; the lockfile
   remains the right proxy when absent. Note node_modules is not ground truth in production
@@ -253,7 +253,7 @@ Evidence:
 - The requested spec is available at the call site (`resolve_version` line 581 has it in hand)
   and is simply not passed to the parser (line 588).
 - Ordering correction: yarn v1 sorts entries by raw char-code of the full `name@range` key —
-  digits (0x30) < `^` (0x5E) < `~` (0x7E). So an *exact* pin `react-on-rails@17.0.0` sorts
+  digits (0x30) < `^` (0x5E) < `~` (0x7E). So an _exact_ pin `react-on-rails@17.0.0` sorts
   BEFORE `react-on-rails@^16.0.0` and is accidentally correct; the bug fires when the app uses a
   caret/tilde range (`^17` loses to transitive `^16`; `~16.0.0` loses to `^16.1.0`). Both
   false-fail and false-pass are reachable.
@@ -285,6 +285,7 @@ entry matching the current selector (likely out of date) and suggesting the dete
 install command. Never use the first same-name entry.
 
 Mirror the same rule in every format that records the requested selector:
+
 - Berry: entry key `"name@npm:<spec>"` must equal the package.json spec (after `npm:`
   normalization).
 - pnpm 6.0/9.0: the dependency object's `specifier` field must equal the package.json spec;
@@ -292,8 +293,8 @@ Mirror the same rule in every format that records the requested selector:
 - bun.lock: `workspaces[""].dependencies[name]` must equal the package.json spec.
 - npm v2/v3: `packages[""].dependencies[name]` (root package entry) must equal the spec;
   npm v1 records no requested selector — name-keyed entry accepted as-is (nothing to verify).
-Any selector mismatch ⇒ stale/unresolved ⇒ package.json fallback with the out-of-date
-diagnostic.
+  Any selector mismatch ⇒ stale/unresolved ⇒ package.json fallback with the out-of-date
+  diagnostic.
 
 Tests: `multi_block_yarn.lock` fixture (selector-matching block chosen over earlier same-name
 block); a "no selector match → unresolved → package.json fallback + stale-lockfile message"
@@ -311,15 +312,15 @@ pnpm 7.33.7 / 8.15.9, local pnpm 10.33.4; bun via official blog/docs + a real-wo
 
 ### Version history per manager (verified)
 
-| Manager | Version field | Values → writers | Shape relevant to version extraction |
-|---|---|---|---|
-| npm | `lockfileVersion` (Integer) | 1 → npm 5-6; 2 → npm 7-8; 3 → npm 9-11 (current; **no v4 exists**, `--lockfile-version` caps at 3) | v1: `dependencies.<name>.version`; v2: `packages` + legacy `dependencies` (both); v3: `packages["node_modules/<name>"].version` only. Existing code already handles all three. npm itself parses leniently ("always attempt to get whatever data it can"). |
-| npm (shrinkwrap) | same | `npm-shrinkwrap.json` — same format, npm PREFERS it over package-lock.json when present | same parser, add the filename to candidates. |
-| Yarn classic | header `# yarn lockfile v1` | only one version ever | line-based blocks, `version "x"` quoted. |
-| Yarn Berry | `__metadata.version` (Integer) | 4 → yarn 2.4; 5, 6 → yarn 3.x (3.8 = 6); 7 → late 3.x; 8 → yarn 4.x | Entry shape EMPIRICALLY IDENTICAL across 4/6/8: `"name@npm:range":` key, `version:` and `resolution: "name@npm:X.Y.Z"` fields. Real YAML → parse with Psych, not line regex; ignore `__metadata.version`. |
-| pnpm | `lockfileVersion` (Float, then String!) | 5.4 (Float) → pnpm 7; '6.0' → pnpm 8; '9.0' → pnpm 9 AND 10; '9.0' **multi-document** → pnpm 11 (env doc first, `---`, then project doc) | 5.4: top-level `dependencies: name: "16.6.0"` (string; `_peer` suffix form) + separate `specifiers`; 6.0: `dependencies: name: {specifier, version}` with `(...)` peer suffix; 9.0: same objects under `importers: .:`. Peer suffixes NEST: `16.6.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)` → cut at first `(` or `_`. One shape-dispatching extractor handled all three locally without reading `lockfileVersion` at all. |
-| bun | `lockfileVersion` (Integer) | 0 → bun 1.1.39 opt-in; 1 → bun 1.2-1.3; 2 (+`configVersion`) → bun 1.4+, **no on-disk shape change** | JSONC — trailing commas THROUGHOUT (verified on a real bun.lock); `JSON.parse` fails; a `,(\s*[}\]])` strip fixes it (comments also allowed by format, strip too). `packages[name][0]` = `"name@version"`; spec at `workspaces[""].dependencies`. Nested keys like `"a/b"` for conflicts. |
-| bun (binary) | n/a | `bun.lockb` ≤ 1.1 era | undocumented binary — do not parse. |
+| Manager          | Version field                           | Values → writers                                                                                                                         | Shape relevant to version extraction                                                                                                                                                                                                                                                                                                                                                                                              |
+| ---------------- | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| npm              | `lockfileVersion` (Integer)             | 1 → npm 5-6; 2 → npm 7-8; 3 → npm 9-11 (current; **no v4 exists**, `--lockfile-version` caps at 3)                                       | v1: `dependencies.<name>.version`; v2: `packages` + legacy `dependencies` (both); v3: `packages["node_modules/<name>"].version` only. Existing code already handles all three. npm itself parses leniently ("always attempt to get whatever data it can").                                                                                                                                                                        |
+| npm (shrinkwrap) | same                                    | `npm-shrinkwrap.json` — same format, npm PREFERS it over package-lock.json when present                                                  | same parser, add the filename to candidates.                                                                                                                                                                                                                                                                                                                                                                                      |
+| Yarn classic     | header `# yarn lockfile v1`             | only one version ever                                                                                                                    | line-based blocks, `version "x"` quoted.                                                                                                                                                                                                                                                                                                                                                                                          |
+| Yarn Berry       | `__metadata.version` (Integer)          | 4 → yarn 2.4; 5, 6 → yarn 3.x (3.8 = 6); 7 → late 3.x; 8 → yarn 4.x                                                                      | Entry shape EMPIRICALLY IDENTICAL across 4/6/8: `"name@npm:range":` key, `version:` and `resolution: "name@npm:X.Y.Z"` fields. Real YAML → parse with Psych, not line regex; ignore `__metadata.version`.                                                                                                                                                                                                                         |
+| pnpm             | `lockfileVersion` (Float, then String!) | 5.4 (Float) → pnpm 7; '6.0' → pnpm 8; '9.0' → pnpm 9 AND 10; '9.0' **multi-document** → pnpm 11 (env doc first, `---`, then project doc) | 5.4: top-level `dependencies: name: "16.6.0"` (string; `_peer` suffix form) + separate `specifiers`; 6.0: `dependencies: name: {specifier, version}` with `(...)` peer suffix; 9.0: same objects under `importers: .:`. Peer suffixes NEST: `16.6.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)` → cut at first `(` or `_`. One shape-dispatching extractor handled all three locally without reading `lockfileVersion` at all. |
+| bun              | `lockfileVersion` (Integer)             | 0 → bun 1.1.39 opt-in; 1 → bun 1.2-1.3; 2 (+`configVersion`) → bun 1.4+, **no on-disk shape change**                                     | JSONC — trailing commas THROUGHOUT (verified on a real bun.lock); `JSON.parse` fails; a `,(\s*[}\]])` strip fixes it (comments also allowed by format, strip too). `packages[name][0]` = `"name@version"`; spec at `workspaces[""].dependencies`. Nested keys like `"a/b"` for conflicts.                                                                                                                                         |
+| bun (binary)     | n/a                                     | `bun.lockb` ≤ 1.1 era                                                                                                                    | undocumented binary — do not parse.                                                                                                                                                                                                                                                                                                                                                                                               |
 
 ### Two Ruby gotchas (verified locally)
 
@@ -376,6 +377,7 @@ immediately know which situation they are in: **missing**, **stale**, **ambiguou
 gives the fix command for the detected manager.
 
 Surfacing rule (two channels):
+
 - When the strict package.json fallback then FAILS (range spec or gem mismatch), the class-
   prefixed diagnostic is embedded in the raised boot error, explaining WHY lockfile resolution
   did not apply.
@@ -389,6 +391,7 @@ Implementation: resolution returns `(version, diagnostic)` — e.g. a small stru
 ### Message templates
 
 **MISSING** — confident manager, no lockfile at all:
+
 > Lockfile missing: no `pnpm-lock.yaml` found in `<dir>` for pnpm (detected via the
 > `packageManager` field). The installed version cannot be verified, so the declared version in
 > package.json is used.
@@ -396,29 +399,35 @@ Implementation: resolution returns `(version, diagnostic)` — e.g. a small stru
 
 **STALE** — lockfile present but no entry matches the current exact selector (Problem 4 rule),
 or its recorded selector differs from package.json:
+
 > Lockfile stale: `<path>` has no entry matching `react-on-rails@^17.0.0` from package.json —
 > the lockfile is out of date (package.json changed since the last install).
 > Fix: run `yarn install` to update it.
 
 Variant (confident manager, foreign lockfiles present — warning only, never an error):
+
 > Lockfile stale: ignoring `yarn.lock` — this app is managed by pnpm (`packageManager` field +
 > `pnpm-lock.yaml` present); lockfiles from other package managers are presumed stale.
 > Fix: delete `yarn.lock` to avoid confusion.
 
 **AMBIGUOUS** — detection not confident; NO lockfile was consulted:
+
 > Lockfile ambiguity: cannot determine which package manager owns this app. Found `yarn.lock`
 > AND `package-lock.json` in `<dir>`, and package.json has no `packageManager` field. No
 > lockfile was used to resolve the installed version.
 > Fix (any one):
->   1. Delete the stale lockfile(s) so only your real manager's lockfile remains.
->   2. Declare your manager in package.json, e.g. `"packageManager": "pnpm@10.0.0"`.
->   3. Pin the exact version: `<install cmd>`.
+>
+> 1. Delete the stale lockfile(s) so only your real manager's lockfile remains.
+> 2. Declare your manager in package.json, e.g. `"packageManager": "pnpm@10.0.0"`.
+> 3. Pin the exact version: `<install cmd>`.
 
 Variant (declared-vs-disk conflict):
+
 > Lockfile ambiguity: package.json declares `packageManager: pnpm@9` but `pnpm-lock.yaml` is
 > missing while `yarn.lock` exists. …same numbered fixes…
 
 **UNSUPPORTED** — the detected manager's lockfile exists but cannot be read, three flavors:
+
 - Binary by design (`bun.lockb`):
   > Lockfile unsupported: `bun.lockb` is a binary lockfile this gem cannot read.
   > Fix: migrate to bun's text lockfile:
@@ -442,12 +451,12 @@ the fix command appear in the raised error (range-spec case) and in the logged w
 
 ## Summary of decisions
 
-| # | Problem | Verdict | Decision | Difficulty |
-|---|---------|---------|----------|-----------|
-| 1 | Workspace lockfile hoisting (no walk-up) | Confirmed (severity: low-med, rising post-#5049) | Follow-up PR + docs entry now; 2 structural asks in #5049 | M |
-| 2 | Fixed lockfile precedence / 3-way detection inconsistency | Confirmed (+ Rails.root bug in utils.rb) | **Fix in #5049 PR** | S–M |
-| 3 | Lockfile-vs-installed drift (node_modules tier) | Partially confirmed (fidelity gap; exports-map blocker found) | Follow-up issue/PR + docs entry now | S |
-| 4 | Yarn v1 first-block-wins parser bug | Confirmed with repro (+ bonus early-`break` bug) | **Fix in #5049 PR** | S |
+| #   | Problem                                                   | Verdict                                                       | Decision                                                  | Difficulty |
+| --- | --------------------------------------------------------- | ------------------------------------------------------------- | --------------------------------------------------------- | ---------- |
+| 1   | Workspace lockfile hoisting (no walk-up)                  | Confirmed (severity: low-med, rising post-#5049)              | Follow-up PR + docs entry now; 2 structural asks in #5049 | M          |
+| 2   | Fixed lockfile precedence / 3-way detection inconsistency | Confirmed (+ Rails.root bug in utils.rb)                      | **Fix in #5049 PR**                                       | S–M        |
+| 3   | Lockfile-vs-installed drift (node_modules tier)           | Partially confirmed (fidelity gap; exports-map blocker found) | Follow-up issue/PR + docs entry now                       | S          |
+| 4   | Yarn v1 first-block-wins parser bug                       | Confirmed with repro (+ bonus early-`break` bug)              | **Fix in #5049 PR**                                       | S          |
 
 ### Resulting #5049 PR scope
 
