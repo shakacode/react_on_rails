@@ -18,11 +18,11 @@ import { Suspense, useEffect, useRef, useState } from 'react';
 import RSCRoute, { type RSCRouteHandle } from 'react-on-rails-pro/RSCRoute';
 
 /**
- * Invisible hydration gate for e2e tests. Renders a hidden <span> whose
- * data-hydrated attribute is set by a useEffect — which fires only after
- * React hydrates the component tree and all child useImperativeHandle
- * refs are assigned. Tests wait for this attribute before interacting
- * with RSCRoute refs.
+ * Invisible hydration gate for e2e tests. Place this INSIDE a Suspense
+ * boundary, as a sibling of RSCRoute. React commits siblings together,
+ * so this component's useEffect cannot fire until the boundary resolves
+ * and RSCRoute's useImperativeHandle (a layout effect) has assigned the
+ * ref. Tests wait for the data-hydrated attribute to confirm readiness.
  *
  * See https://github.com/shakacode/react_on_rails/issues/5045
  */
@@ -77,6 +77,7 @@ const ScenarioRefHandle: React.FC = () => {
       </button>
       {error ? <div style={{ color: 'red' }}>error: {error}</div> : null}
       <Suspense fallback={<div>loading…</div>}>
+        <HydrationMarker testId="stress-hydrated-scenario1" />
         <RSCRoute
           ref={ref}
           componentName="RefetchStressServerComponent"
@@ -232,6 +233,7 @@ const ScenarioCapturedHandle: React.FC = () => {
         </button>
       </div>
       <Suspense fallback={<div>loading…</div>}>
+        <HydrationMarker testId="stress-hydrated-scenario5" />
         <RSCRoute
           ref={ref}
           componentName="RefetchStressServerComponent"
@@ -381,6 +383,7 @@ const ScenarioMountCycle: React.FC = () => {
       <span data-testid="mount-ref-state">ref.current: {refState}</span>
       {mounted ? (
         <Suspense fallback={<div>loading…</div>}>
+          <HydrationMarker testId="stress-hydrated-scenario8" />
           <RSCRoute
             ref={ref}
             componentName="RefetchStressServerComponent"
@@ -396,7 +399,6 @@ const ScenarioMountCycle: React.FC = () => {
 
 const RefetchStressPage: React.FC = () => (
   <div>
-    <HydrationMarker testId="stress-page-hydrated" />
     <h2>RSCRoute imperative refetch — stress scenarios</h2>
     <p>
       Each section below exercises a different aspect of the new <code>ref</code> handle and{' '}

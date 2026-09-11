@@ -21,12 +21,13 @@ const visibleByTestId = (page: Page, testId: string) => page.getByTestId(testId)
 test.describe('Imperative RSC refetch — stress scenarios (Issue 3106)', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto(STRESS_URL);
-    // Wait for React hydration to complete. The HydrationMarker's useEffect
-    // sets data-hydrated="true" only after all Suspense children resolve and
-    // all useImperativeHandle refs are assigned. Without this gate, tests
-    // that interact with RSCRoute refs can race hydration and see null refs
-    // (see issue #5045).
-    await page.waitForSelector('[data-testid="stress-page-hydrated"][data-hydrated="true"]', {
+    // Wait for the last Suspense boundary (scenario 8) to resolve and
+    // hydrate. The HydrationMarker is a sibling of RSCRoute INSIDE the
+    // boundary, so its useEffect cannot fire until the boundary resolves
+    // and RSCRoute's useImperativeHandle assigns the ref. Since scenario 8
+    // is always the last to hydrate, this guarantees all other scenarios
+    // are ready too. (See issue #5045.)
+    await page.waitForSelector('[data-testid="stress-hydrated-scenario8"][data-hydrated="true"]', {
       state: 'attached',
       timeout: 15000,
     });
@@ -136,6 +137,38 @@ test.describe('Imperative RSC refetch — stress scenarios (Issue 3106)', () => 
     // re-mount
     await visibleByTestId(page, 'mount-toggle').click();
     await expect(visibleByTestId(page, 'stress-card-mount-cycle')).toBeVisible();
+    await visibleByTestId(page, 'mount-check-ref').click();
+    await expect(visibleByTestId(page, 'mount-ref-state')).toHaveText('ref.current: set');
+  });
+
+  test('9. delayed RSC: per-boundary marker guarantees ref is set after re-mount', async ({ page }) => {
+    // Regression guard for issue #5045: after unmounting and re-mounting
+    // scenario 8's RSCRoute, the Suspense boundary must resolve again
+    // before the ref is available. The per-boundary HydrationMarker
+    // fires only after the boundary commits, so waiting for it guarantees
+    // the ref is set — even when the re-mount triggers a fresh RSC fetch.
+    //
+    // This is the scenario that originally failed intermittently: the
+    // test interacted with ref.current before the RSCRoute had hydrated.
+
+    // Unmount scenario 8's RSCRoute
+    await visibleByTestId(page, 'mount-toggle').click();
+    // Verify the marker is gone (unmounted with the Suspense boundary)
+    const markerAfterUnmount = await page.$(
+      '[data-testid="stress-hydrated-scenario8"][data-hydrated="true"]',
+    );
+    expect(markerAfterUnmount).toBeNull();
+
+    // Re-mount — the RSCRoute triggers a fresh RSC fetch
+    await visibleByTestId(page, 'mount-toggle').click();
+    // Wait for the per-boundary marker (proves Suspense resolved + ref set)
+    await page.waitForSelector('[data-testid="stress-hydrated-scenario8"][data-hydrated="true"]', {
+      state: 'attached',
+      timeout: 15000,
+    });
+
+    // The ref must be set because the marker's useEffect fires only after
+    // the sibling RSCRoute's useImperativeHandle (a layout effect).
     await visibleByTestId(page, 'mount-check-ref').click();
     await expect(visibleByTestId(page, 'mount-ref-state')).toHaveText('ref.current: set');
   });
