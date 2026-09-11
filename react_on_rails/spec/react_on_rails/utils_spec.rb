@@ -1087,12 +1087,6 @@ module ReactOnRails
         expect(result).to include("cache=[REDACTED]")
       end
 
-      # Non-HTTP schemes
-      it "strips userinfo from ftp:// URLs" do
-        result = described_class.sanitize_url_for_display("ftp://u:s3cr3t@host/b.js")
-        expect(result).not_to include("s3cr3t")
-        expect(result).to include("host/b.js")
-      end
 
       # @ in path (must NOT be stripped)
       it "preserves @ in paths" do

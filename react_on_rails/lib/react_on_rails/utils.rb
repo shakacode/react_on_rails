@@ -463,11 +463,12 @@ module ReactOnRails
       begin
         uri = URI.parse(url)
         if uri.userinfo.nil?
-          # URI::HTTP, URI::HTTPS, and URI::FTP report userinfo reliably.
-          # URI::File (and URI::Generic for unknown schemes) silently discard
+          # URI::HTTP (and its subclass URI::HTTPS) reports userinfo reliably.
+          # URI::File (and URI::Generic for unknown schemes) silently discards
           # it — userinfo is always nil regardless of what the raw string
           # contains. For those classes, check the authority section only.
-          unless uri.is_a?(URI::HTTP) || uri.is_a?(URI::FTP)
+          # React on Rails renderer URLs use http://, https://, or file:// only.
+          unless uri.is_a?(URI::HTTP)
             sanitized = strip_authority_userinfo(url)
             return redact_query_values(sanitized)
           end
