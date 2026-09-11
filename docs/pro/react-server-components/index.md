@@ -1,7 +1,8 @@
 ---
 description: >-
   React on Rails Pro 17 provides supported GA React Server Components with
-  React 19.2.7+ and stable react-on-rails-rsc 19.2.1+.
+  React and React DOM 19.2.x (patch 19.2.7+) and stable react-on-rails-rsc
+  19.2.x (patch 19.2.1+).
 ---
 
 # React Server Components in React on Rails Pro
