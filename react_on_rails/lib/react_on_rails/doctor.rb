@@ -4647,7 +4647,7 @@ module ReactOnRails
         on the supported #{RSC_SUPPORTED_PACKAGE_LINE} package line.
         #{react_requirements}.
 
-        Fix: npm install react@#{ReactOnRails::Generators::JsDependencyManager::RSC_REACT_VERSION_RANGE} react-dom@#{ReactOnRails::Generators::JsDependencyManager::RSC_REACT_VERSION_RANGE} #{RSC_PACKAGE_NAME}@#{RSC_PACKAGE_INSTALL_VERSION} --save-exact
+        Fix: npm install react@#{ReactOnRails::Generators::JsDependencyManager::RSC_REACT_VERSION_RANGE} react-dom@#{ReactOnRails::Generators::JsDependencyManager::RSC_REACT_VERSION_RANGE} && npm install #{RSC_PACKAGE_NAME}@#{RSC_PACKAGE_INSTALL_VERSION} --save-exact
       MSG
       false
     end

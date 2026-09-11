@@ -8989,8 +8989,8 @@ RSpec.describe ReactOnRails::Doctor do
 
       errors = checker.messages.select { |message| message[:type] == :error }.pluck(:content)
       expect(errors).to include(a_string_including(
-                                  "npm install react@~19.2.8 react-dom@~19.2.8 " \
-                                  "react-on-rails-rsc@19.3.0-rc.3 --save-exact"
+                                  "npm install react@~19.2.8 react-dom@~19.2.8 && " \
+                                  "npm install react-on-rails-rsc@19.3.0-rc.3 --save-exact"
                                 ))
       expect(errors).to include(a_string_including(
                                   "RSC 19.2.x requires stable React/React DOM ~19.2.7",
