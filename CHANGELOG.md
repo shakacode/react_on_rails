@@ -45,6 +45,23 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   runtime behavior. Fixes [Issue 5036](https://github.com/shakacode/react_on_rails/issues/5036)
   by [justin808](https://github.com/justin808).
 
+- **[Pro]** **`TieredCacheHandler` keeps serving L1 hits for entries older than `l1MaxTtlSeconds`**: Promoting an
+  L2 hit into L1 rewrote the entry's `revalidate` but kept its original `timestamp`, so any entry older than
+  `l1MaxTtlSeconds` was written to L1 already expired — permanently bypassing L1 for that key and paying an L2
+  (e.g. Redis) round trip on every request. Promoted entries now expire at the earlier of the original entry's
+  expiry and `l1MaxTtlSeconds` from promotion time, and entries with no remaining lifetime skip the L1 write.
+  A non-positive `l1MaxTtlSeconds` now disables L1 entirely instead of storing permanent L1 entries.
+  **Action required for upgraders:** if you run a persistent L1 (e.g. `RedisCacheHandler`) with a
+  non-positive `l1MaxTtlSeconds`, the disabled L1 retains entries written before it was disabled —
+  flush that L1 store before re-enabling it with a positive cap, or retained stale/indefinite entries
+  become readable again.
+  With the default in-memory L1 this was purely a performance bug; a `RedisCacheHandler` L1 could
+  additionally serve entries past their intended expiry, because Redis applies TTLs at write time —
+  promoted entries now always encode exactly the remaining lifetime. Fixes
+  [Issue 5027](https://github.com/shakacode/react_on_rails/issues/5027).
+  [PR 5029](https://github.com/shakacode/react_on_rails/pull/5029) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 - **[Pro]** **Standalone upgrades preserve customized bundler configurations**: The Pro generator automatically
   upgrades only complete, unchanged configuration pairs from supported current templates. Customized, historical,
   missing, or ambiguous pairs remain unchanged with manual migration instructions, preventing helper redeclarations

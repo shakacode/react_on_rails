@@ -19,7 +19,15 @@ export interface TieredCacheHandlerOptions {
   /**
    * Maximum TTL (in seconds) for entries promoted to L1.
    * Bounds how long a stale L1 entry can persist after L2 is updated by another worker.
-   * Defaults to undefined (use the entry's original revalidate value).
+   * Defaults to undefined (use the entry's original revalidate value); Infinity behaves
+   * the same as undefined.
+   * A non-positive or NaN value disables L1 entirely (all reads and writes go to L2).
+   * Note: a persistent L1 (e.g. Redis) disabled this way retains entries written
+   * before it was disabled; flush it before re-enabling.
+   * Cross-worker promotion assumes roughly synchronized clocks: a finite-lifetime
+   * L2 entry stamped ahead of the local clock is served from L2 without being
+   * promoted, so a writer with a persistently fast clock keeps L1 unpopulated
+   * for the keys it writes until clocks converge.
    */
   l1MaxTtlSeconds?: number;
 }
@@ -34,11 +42,17 @@ export class TieredCacheHandler implements CacheHandler {
   constructor(l1: CacheHandler, l2: CacheHandler, opts: TieredCacheHandlerOptions = {}) {
     this.l1 = l1;
     this.l2 = l2;
-    this.l1MaxTtlSeconds = opts.l1MaxTtlSeconds;
+    // Normalize Infinity to undefined so the two spellings of "no cap" are
+    // truly equivalent — otherwise the fresh-write path would rewrite an
+    // indefinite entry's revalidate: 0 to Infinity, which a custom
+    // TTL-on-write L1 handler could reject as an invalid backend TTL.
+    this.l1MaxTtlSeconds = opts.l1MaxTtlSeconds === Infinity ? undefined : opts.l1MaxTtlSeconds;
   }
 
   async get(key: string): Promise<CacheEntry | null> {
-    const l1Entry = await this.l1.get(key);
+    // A disabled L1 is bypassed on reads too: a persistent L1 (e.g. shared
+    // Redis) may still hold entries written before the cap disabled it.
+    const l1Entry = this.l1Disabled() ? null : await this.l1.get(key);
     if (l1Entry) return l1Entry;
 
     let l2Entry: CacheEntry | null;
@@ -50,10 +64,12 @@ export class TieredCacheHandler implements CacheHandler {
     }
 
     if (l2Entry) {
-      const promoted = this.applyL1Ttl(l2Entry);
-      void this.l1.set(key, promoted).catch((err: unknown) => {
-        console.error('TieredCacheHandler: L1 promotion failed', err);
-      });
+      const promoted = this.applyL1TtlForPromotion(l2Entry);
+      if (promoted) {
+        void this.l1.set(key, promoted).catch((err: unknown) => {
+          console.error('TieredCacheHandler: L1 promotion failed', err);
+        });
+      }
       return l2Entry; // Return original entry (full TTL); only L1 gets the capped TTL
     }
 
@@ -65,14 +81,30 @@ export class TieredCacheHandler implements CacheHandler {
       console.error('TieredCacheHandler: L2 set failed', err);
     });
 
-    const l1Entry = this.applyL1Ttl(entry);
+    if (this.l1Disabled()) {
+      await l2Write;
+      return;
+    }
+
+    const l1Entry = this.applyL1TtlForFreshEntry(entry);
     const l1Write = this.l1.set(key, l1Entry).catch((err: unknown) => {
       console.error('TieredCacheHandler: L1 set failed', err);
     });
     await Promise.all([l2Write, l1Write]);
   }
 
-  private applyL1Ttl(entry: CacheEntry): CacheEntry {
+  // A cap of 0, negative, or NaN cannot be expressed as a revalidate value —
+  // revalidate <= 0 (and NaN via Math.min) means "never expires" in both L1
+  // backends — so those caps disable L1 entirely instead of inverting into
+  // immortal entries. `!(x > 0)` is true for NaN. An Infinity cap is NOT
+  // disabled: it means "unbounded", the same as leaving the option undefined.
+  private l1Disabled(): boolean {
+    return this.l1MaxTtlSeconds !== undefined && !(this.l1MaxTtlSeconds > 0);
+  }
+
+  // Caps revalidate on a freshly-written entry. Assumes timestamp ~= now, so
+  // capping revalidate alone bounds the entry's absolute expiry correctly.
+  private applyL1TtlForFreshEntry(entry: CacheEntry): CacheEntry {
     if (this.l1MaxTtlSeconds === undefined) return entry;
 
     const capped =
@@ -81,5 +113,64 @@ export class TieredCacheHandler implements CacheHandler {
     if (capped === entry.revalidate) return entry;
 
     return { ...entry, revalidate: capped };
+  }
+
+  // Caps an entry promoted from L2 so its absolute expiry is the earlier of the
+  // entry's own expiry and now + l1MaxTtlSeconds. Unlike applyL1TtlForFreshEntry,
+  // a promoted entry may be arbitrarily old, so the cap must bound the remaining
+  // lifetime — rewriting revalidate alone would produce an L1 entry that is
+  // already expired (issue #5027).
+  // Finite-lifetime entries are always re-stamped to
+  // { timestamp: now, revalidate: <remaining> }: timestamp-checking handlers
+  // (InMemoryLRUCacheHandler) and TTL-on-write handlers (RedisCacheHandler's EX,
+  // which ignores the entry timestamp) both interpret that as exactly the
+  // remaining lifetime, whereas passing the aged entry through unchanged would
+  // let a TTL-on-write L1 restart the full original revalidate from promotion
+  // time and serve the entry past its L2 expiry.
+  // Returns null when the entry has no remaining lifetime (skip the L1 write).
+  private applyL1TtlForPromotion(entry: CacheEntry): CacheEntry | null {
+    if (this.l1Disabled()) return null;
+
+    const now = Date.now();
+    // Infinity counts as indefinite, not finite: both supported backends treat
+    // it as "never expires" (RedisCacheHandler serializes any non-finite
+    // revalidate as 0 / no EX; InMemoryLRUCacheHandler's age check can never
+    // exceed it), so it must take the indefinite path below.
+    const hasFiniteLifetime = Number.isFinite(entry.revalidate) && entry.revalidate > 0;
+
+    // A future timestamp on a finite entry means the producer's clock is ahead
+    // of ours: any remaining lifetime computed from it overshoots the entry's
+    // true expiry (a Redis L2 started its EX at the producer's write), so serve
+    // from L2 and skip the promotion rather than clamping. A non-finite
+    // timestamp (corrupted or malformed data from a custom L2) is skipped for
+    // the same reason — no remaining lifetime can be derived from it, and NaN
+    // would otherwise slide through every comparison below and promote the
+    // entry unmodified, making it immortal in L1. Indefinite entries are
+    // unaffected — their expiry never depends on the timestamp.
+    if (hasFiniteLifetime && (!Number.isFinite(entry.timestamp) || entry.timestamp > now)) return null;
+
+    // Floor the remaining lifetime to whole seconds: a TTL-on-write L1 (Redis
+    // EX) rounds the TTL up with Math.ceil, so a fractional value could outlive
+    // the ORIGINAL expiry by up to a second. Only the remaining-lifetime term
+    // is floored — the cap below is applied unfloored, so sub-second caps keep
+    // working (exceeding the cap itself by Redis's <1s rounding never passes
+    // the entry's own expiry, because ceil(cap) <= floor(remaining) here).
+    // Expired or under one whole second of life left (also possible via L2 TTL
+    // rounding or cross-worker clock skew): skip L1 — writing the entry would
+    // only create one the next get deletes.
+    const remainingSeconds = hasFiniteLifetime
+      ? Math.floor(entry.revalidate - (now - entry.timestamp) / 1000)
+      : Infinity;
+    if (remainingSeconds <= 0) return null;
+
+    const cappedSeconds =
+      this.l1MaxTtlSeconds === undefined
+        ? remainingSeconds
+        : Math.min(remainingSeconds, this.l1MaxTtlSeconds);
+
+    // Indefinite entry with no cap: nothing to bound.
+    if (!Number.isFinite(cappedSeconds)) return entry;
+
+    return { ...entry, timestamp: now, revalidate: cappedSeconds };
   }
 }
