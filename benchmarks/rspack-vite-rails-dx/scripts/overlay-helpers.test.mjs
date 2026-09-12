@@ -25,6 +25,7 @@ test('runtime probe inserts a deterministic throw and reports its line', () => {
 test('source location accepts an original path and line but rejects a generated frame', () => {
   const relativePath = 'app/frontend/pages/inertia_example/index.tsx';
   assert.equal(sourceLocationVisible(`${relativePath}:17:9`, relativePath, 17), true);
+  assert.equal(sourceLocationVisible(`${relativePath} ╭─[17:9]`, relativePath, 17), true);
   assert.equal(sourceLocationVisible('assets/application.js:17:9', relativePath, 17), false);
   assert.equal(sourceLocationVisible(`${relativePath}:18:9`, relativePath, 17), false);
 });

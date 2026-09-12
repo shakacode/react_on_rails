@@ -19,7 +19,7 @@ import { prepareWorkspaces, removeWorkspaces } from './starter-workspace.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const repositoryRoot = path.resolve(root, '../..');
-const output = path.resolve(root, readArgument('--output') ?? 'results/overlay-local.json');
+const output = path.resolve(root, readArgument('--output') ?? 'results/local-overlay.json');
 const report = path.resolve(root, readArgument('--report') ?? 'OVERLAY_RESULTS.local.md');
 const tools = ['rspack', 'vite'];
 const rootAliases = [
@@ -231,7 +231,9 @@ async function currentOverlayText(page, tool) {
       : page.locator('vite-error-overlay');
   if (!(await host.isVisible().catch(() => false))) return '';
   const locator =
-    tool === 'rspack' ? page.frameLocator('#rspack-dev-server-client-overlay').locator('body') : host;
+    tool === 'rspack'
+      ? page.frameLocator('#rspack-dev-server-client-overlay').locator('body')
+      : host.locator('.window');
   return (await locator.textContent({ timeout: 500 }).catch(() => '')) ?? '';
 }
 

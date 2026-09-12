@@ -27,7 +27,9 @@ export function sourceLocationVisible(text, relativePath, line) {
   const basename = path.posix.basename(relativePath);
   const hasPath = normalized.includes(relativePath) || normalized.includes(basename);
   const escapedLine = String(line).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const hasLine = new RegExp(`(?:[:(]|line\\s+)${escapedLine}(?::\\d+|[):\\s])`, 'i').test(normalized);
+  const hasLine = new RegExp(`(?::|\\(|\\[|line\\s+)${escapedLine}(?::\\d+|\\)|\\]|\\s)`, 'i').test(
+    normalized,
+  );
   return hasPath && hasLine;
 }
 
