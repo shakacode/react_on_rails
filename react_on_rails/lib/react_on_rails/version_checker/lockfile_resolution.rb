@@ -74,12 +74,16 @@ module ReactOnRails
         end
 
         # YAML.safe_load would return only the FIRST document of a pnpm 11 multi-document
-        # lockfile (the env document, which has no importers), so scan the stream for the
-        # project document. permitted_classes: some pnpm versions write unquoted ISO timestamps
-        # (a time: map), which Psych types as Date/Time and safe parsing would otherwise reject.
+        # lockfile — the env document, which itself carries an importers section (with
+        # configDependencies/packageManagerDependencies under ".", never dependencies), so a
+        # first-match scan would pick it and resolution would come up empty. pnpm always writes
+        # the project document last (writeEnvLockfile prepends the env doc on every write), so
+        # scan the stream from the end. permitted_classes: some pnpm versions write unquoted
+        # ISO timestamps (a time: map), which Psych types as Date/Time and safe parsing would
+        # otherwise reject.
         def self.project_document(path)
           docs = YAML.safe_load_stream(File.read(path), permitted_classes: [Date, Time])
-          docs.find { |d| d.is_a?(Hash) && (d.key?("importers") || d.key?("dependencies")) }
+          docs.reverse_each.find { |d| d.is_a?(Hash) && (d.key?("importers") || d.key?("dependencies")) }
         end
 
         # lockfileVersion >= 6: "16.6.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)" -> "16.6.0"
