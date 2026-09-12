@@ -64,7 +64,9 @@ module ReactOnRails
         # Parseable lockfile whose nested values have unexpected types (e.g. importers as a
         # string) — a boot-time check must diagnose that, never crash the Rails initializer.
         :unrecognized
-      rescue SystemCallError => e
+      rescue SystemCallError, EncodingError, ArgumentError => e
+        # Unreadable file, or content that cannot be processed as text (e.g. invalid UTF-8
+        # bytes raise ArgumentError from string scanning).
         [:unreadable, e.message.to_s.lines.first&.strip]
       end
 

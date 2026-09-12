@@ -238,6 +238,22 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
           end
         end
 
+        context "when the lockfile contains invalid UTF-8 bytes" do
+          it "boots with an unsupported-lockfile warning instead of crashing (pnpm YAML path)" do
+            stub_gem_version("16.6.0")
+            allow(Rails.logger).to receive(:warn)
+            expect { validate_fixture!("pnpm_invalid_encoding") }.not_to raise_error
+            expect(Rails.logger).to have_received(:warn).with(a_string_including("Lockfile unsupported:"))
+          end
+
+          it "boots with an unsupported-lockfile warning instead of crashing (bun JSONC path)" do
+            stub_gem_version("16.6.0")
+            allow(Rails.logger).to receive(:warn)
+            expect { validate_fixture!("bun_invalid_encoding") }.not_to raise_error
+            expect(Rails.logger).to have_received(:warn).with(a_string_including("Lockfile unsupported:"))
+          end
+        end
+
         context "when the lockfile uses YAML aliases (rejected by safe parsing)" do
           it "boots with an unsupported-lockfile warning instead of crashing" do
             stub_gem_version("16.6.0")
@@ -1358,6 +1374,12 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
         context "with a Yarn Berry yarn.lock whose selectors no longer match package.json" do
           it "treats the lockfile as stale and falls back to the package.json spec" do
             expect(node_package_version_for("yarn_berry_v8_stale_selector").raw).to eq("^17.0.0")
+          end
+        end
+
+        context "with a Yarn Berry workspace: protocol dependency" do
+          it "keeps the workspace spec so the version validators exempt it" do
+            expect(node_package_version_for("yarn_berry_workspace").raw).to eq("workspace:^")
           end
         end
 

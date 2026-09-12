@@ -588,9 +588,11 @@ module ReactOnRails
       # Resolve the installed version from the detected package manager's lockfile
       # (see LockfileResolution), otherwise fall back to the package.json version.
       def resolve_version(package_json_version, package_name)
-        # If package.json specifies a local path or URL, don't try to resolve from lockfiles
-        # Lockfiles may contain placeholder versions like "0.0.0" for local links
-        return package_json_version if local_path_or_url_version?(package_json_version)
+        # If package.json specifies a local path, URL, or workspace link, don't resolve from
+        # lockfiles: they record placeholders for links (e.g. "0.0.0-use.local", "link:.."),
+        # and keeping the raw spec lets the validators apply their local/workspace exemptions.
+        return package_json_version if local_path_or_url_version?(package_json_version) ||
+                                       package_json_version.start_with?("workspace:")
 
         resolution = LockfileResolution.resolve(package_json, package_name, package_json_version,
                                                 declared_manager: parsed_package_contents["packageManager"])
