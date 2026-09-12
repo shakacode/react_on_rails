@@ -37,7 +37,7 @@ Run on an otherwise quiet machine and compare both stacks within the same run. D
 
 The report uses medians and min-to-max spread. It labels a metric `ambiguous` when either spread exceeds 50% of its median. Otherwise, a difference inside the larger observed spread is a `wash`; only a difference outside that local noise band is called an improvement or regression for Vite relative to Rspack.
 
-The generated-configuration audit is descriptive. File and line counts do not measure how difficult the concepts are to learn. This package also does not test production performance, runtime-error overlay quality, or click-to-editor behavior; issue #4696 owns the overlay follow-up.
+The generated-configuration audit is descriptive. File and line counts do not measure how difficult the concepts are to learn. The timing benchmark does not test production performance or overlay behavior; the verifier below owns the overlay evidence requested by issue #4696.
 
 ## Overlay verification
 
