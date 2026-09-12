@@ -10,12 +10,15 @@ module ReactOnRails
 
     class NodePackageVersion
       attr_reader package_json: untyped
+      attr_reader yarn_lock: untyped
+      attr_reader package_lock: untyped
 
       def self.build: () -> NodePackageVersion
       def self.package_json_path: () -> untyped
-      def initialize: (untyped package_json) -> void
+      def self.yarn_lock_path: () -> String
+      def self.package_lock_path: () -> String
+      def initialize: (untyped package_json, ?untyped yarn_lock, ?untyped package_lock) -> void
       def raw: () -> String?
-      def resolution_diagnostic: () -> LockfileResolution::Diagnostic?
       def react_on_rails_package?: () -> bool
       def react_on_rails_pro_package?: () -> bool
       def package_name: () -> String
