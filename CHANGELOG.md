@@ -24,6 +24,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+### [17.1.0.rc.3] - 2026-09-11
+
 #### Fixed
 
 - **[Pro] RSC 19.3 release-candidate compatibility and generated defaults**: Generated RSC apps now pin
@@ -3236,7 +3238,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.1.0.rc.2...main
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.1.0.rc.3...main
+[17.1.0.rc.3]: https://github.com/shakacode/react_on_rails/compare/v17.1.0.rc.2...v17.1.0.rc.3
 [17.1.0.rc.2]: https://github.com/shakacode/react_on_rails/compare/v17.1.0.rc.1...v17.1.0.rc.2
 [17.1.0.rc.1]: https://github.com/shakacode/react_on_rails/compare/v17.1.0.rc.0...v17.1.0.rc.1
 [17.1.0.rc.0]: https://github.com/shakacode/react_on_rails/compare/v17.0.1...v17.1.0.rc.0
