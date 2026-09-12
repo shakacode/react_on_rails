@@ -17,7 +17,7 @@ The RSC implementation depends on the `react-on-rails-rsc` npm package, which pr
 
 ## React and Package Version Policy
 
-During the 17.1 RC soak, generated RSC apps pin `react-on-rails-rsc@19.3.0-rc.3`
+During the 17.1 RC soak, generated RSC apps pin `react-on-rails-rsc@19.3.0-rc.4`
 with `react@~19.2.8` and `react-dom@~19.2.8` for both webpack and rspack projects.
 RSC 19.3 still uses the React 19.2 runtime. Existing apps using stable RSC 19.2.1+
 and matching React/React DOM 19.2.7+ remain supported. React 19.0.x and 19.3.x
@@ -25,8 +25,9 @@ are outside the supported runtime line.
 
 The RSC RC honors application `splitChunks` settings for generated client-reference
 chunks and preserves their complete sibling chunk metadata for hydration. Its shared
-loader parses raw JSX/TSX, and modules marked `"use client"` without a runtime ES-module
-export fail the build with a file-specific error.
+loader parses raw JSX/TSX, and modules marked `"use client"` may omit exports when they
+perform observable runtime side effects. Inert, type-only, and CommonJS-style client modules
+still fail the build with a file-specific error.
 
 Upgrade the Pro gem/npm packages, React, React DOM, and `react-on-rails-rsc` as a
 coordinated set; see the [17.1 candidate upgrade guidance](upgrading-existing-pro-app.md).

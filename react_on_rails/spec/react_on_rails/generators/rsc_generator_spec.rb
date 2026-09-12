@@ -12,7 +12,7 @@ describe RscGenerator, type: :generator do
   describe "React version preflight" do
     let(:generator) { described_class.new([], {}, destination_root: Dir.pwd) }
     let(:react_version) { "19.2.8-rc.0" }
-    let(:rsc_version) { "19.3.0-rc.3" }
+    let(:rsc_version) { "19.3.0-rc.4" }
 
     around do |example|
       Dir.mktmpdir("rsc-version-preflight") do |dir|
@@ -42,7 +42,7 @@ describe RscGenerator, type: :generator do
         generator.run_generator
 
         messages = GeneratorMessages.messages.join("\n")
-        expect(messages).to include("required minimum", "react-on-rails-rsc 19.3.0-rc.3",
+        expect(messages).to include("required minimum", "react-on-rails-rsc 19.3.0-rc.4",
                                     "matching stable React/React DOM 19.2.8+ on 19.2.x",
                                     "Node Renderer refuses startup until", "react@~19.2.8", "react-dom@~19.2.8")
         expect(messages).not_to include("recommended minimum")
@@ -64,7 +64,7 @@ describe RscGenerator, type: :generator do
 
     prerelease_versions = ["19.2.8-rc.0", "^19.2.9-canary.1", "19.2.8.beta.1", "19.2.0-canary-abc123-20260101"]
     stable_versions = ["~19.2.8", "19.2.9", "19.2.8+build.1"]
-    ["19.2.1", "19.3.0-rc.3"].each do |package_version|
+    ["19.2.1", "19.3.0-rc.4"].each do |package_version|
       context "with RSC #{package_version}" do
         let(:rsc_version) { package_version }
 

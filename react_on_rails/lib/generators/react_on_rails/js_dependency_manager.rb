@@ -159,9 +159,9 @@ module ReactOnRails
       # `react-on-rails-rsc`. Coordination note for #3609: Pro package metadata and generated apps
       # use the tested React 19.2.x range with the exact RSC package pin.
       RSC_REACT_VERSION_RANGE = "~19.2.8"
-      # Qualify the JSX/TSX loader and Rspack chunk fixes during the 19.3.0 RC soak.
+      # Qualify the side-effect-only client module and CSS wrapper fixes during the 19.3.0 RC soak.
       # Keep the React 19.2 runtime line independent from the RSC package minor.
-      RSC_PACKAGE_VERSION_PIN = "19.3.0-rc.3"
+      RSC_PACKAGE_VERSION_PIN = "19.3.0-rc.4"
 
       private
 
