@@ -80,14 +80,18 @@ examples.
 
 ## Reference
 
-- Escaping: `packages/react-on-rails-pro/src/injectRSCPayload.ts` (`escapeScript`, `createScriptTag`), `packages/react-on-rails/src/sanitizeNonce.ts`.
-- Base-package escaping (same trusted-server → untrusted-client boundary, non-RSC):
-  `packages/react-on-rails/src/scriptSanitizedVal.ts`, used via `wrapInScriptTags` in
-  `packages/react-on-rails/src/RenderUtils.ts` and consumed by `helper.rb`'s console-replay
-  (`content_tag(:script, console_script_code.html_safe, ...)`). Note the asymmetry: `scriptSanitizedVal`
-  neutralizes only `</script`-like sequences (`/<\/\W*script/gi`), not `<!--`, because its input is the
-  server-generated console-replay payload rather than arbitrary RSC flight bytes; do not assume it is a
-  drop-in equal of `escapeScript`, and tighten it if its input surface ever widens.
+- Escaping: `packages/react-on-rails/src/escapeScript.ts` is the single shared script-content
+  escape (`<!--` → `<\!--`, `</script` → `</\script`, lossless inside JS string literals). Pro's
+  `createScriptTag` (`packages/react-on-rails-pro/src/injectRSCPayload.ts`) imports it via
+  `react-on-rails/@internal/escapeScript`, and the core console replay
+  (`packages/react-on-rails/src/buildConsoleReplay.ts`) applies it to the finished replay code,
+  which `helper.rb`'s console-replay then wraps
+  (`content_tag(:script, console_script_code.html_safe, ...)`). Both dangerous sequences must stay
+  covered — `</script` ends a script element early, and `<!--` switches the parser into the
+  script-data-escaped state, where a subsequent `<script` makes `</script>` stop ending the
+  element (issue #5034). Do not re-fork per-package copies; the parity test in
+  `packages/react-on-rails-pro/tests/injectRSCPayload.test.ts` guards against drift. Nonce
+  attribute hygiene: `packages/react-on-rails/src/sanitizeNonce.ts`.
 - Ruby stream escaping: `react_on_rails_pro/lib/react_on_rails_pro/concerns/stream.rb`
   (`ERB::Util.json_escape`, `ERB::Util.html_escape`).
 - Request-scoping: `packages/react-on-rails-pro/src/RSCRequestTracker.ts`, `RSCProvider.tsx`, `RSCPrefetchStore.ts`.

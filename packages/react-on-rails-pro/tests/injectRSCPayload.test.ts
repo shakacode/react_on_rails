@@ -300,6 +300,35 @@ describe('injectRSCPayload', () => {
     expect(resultStr).toContain('alert(document.cookie)');
   });
 
+  // PARITY GUARD (issue #5034): core console replay and Pro script injection must share one
+  // escaping policy. The replay code is escaped by the REAL core consoleReplay, then streamed
+  // through the REAL injection path (metadata.consoleReplayScript → createScriptTag → Pro's
+  // escaping pass), so this fails if either side re-forks a divergent implementation — a lossy
+  // or double-escaping fork corrupts the byte-identical round trip asserted below.
+  it('shares the core escapeScript policy: escaped console replay passes through injection unchanged', async () => {
+    const { consoleReplay } = await import('react-on-rails/buildConsoleReplay');
+
+    const nasty = 'oops <!--<script></script> tail';
+    const replayCode = consoleReplay([{ arguments: [nasty], level: 'log' }]);
+
+    // Core already neutralized both dangerous sequences...
+    expect(replayCode).not.toContain('<!--');
+    expect(replayCode).not.toContain('</script');
+
+    // ...and Pro's second escaping pass over the injected replay must be a no-op.
+    const mockRSC = createMockRSCStreamWithMetadata('{"test": "data"}', {
+      consoleReplayScript: replayCode,
+    });
+    const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId, undefined, {
+      railsEnv: 'test',
+    });
+    const resultStr = await collectStreamData(result);
+
+    expect(resultStr).toContain(`<script>${replayCode}</script>`);
+  });
+
   it('emits opt-in browser performance marks for RSC payload bytes and flush timing', async () => {
     const flightData = '{"test": "data"}';
     const mockRSC = createMockRSCStream([flightData]);
