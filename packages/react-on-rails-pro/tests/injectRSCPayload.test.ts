@@ -301,10 +301,11 @@ describe('injectRSCPayload', () => {
   });
 
   // PARITY GUARD (issue #5034): core console replay and Pro script injection must share one
-  // escaping policy. Both now import react-on-rails/@internal/escapeScript; this test keeps
-  // the two from drifting apart again if either side ever re-forks its own implementation.
+  // escaping policy. The replay code is escaped by the REAL core consoleReplay, then streamed
+  // through the REAL injection path (metadata.consoleReplayScript → createScriptTag → Pro's
+  // escaping pass), so this fails if either side re-forks a divergent implementation — a lossy
+  // or double-escaping fork corrupts the byte-identical round trip asserted below.
   it('shares the core escapeScript policy: escaped console replay passes through injection unchanged', async () => {
-    const { default: escapeScript } = await import('react-on-rails/@internal/escapeScript');
     const { consoleReplay } = await import('react-on-rails/buildConsoleReplay');
 
     const nasty = 'oops <!--<script></script> tail';
@@ -313,9 +314,19 @@ describe('injectRSCPayload', () => {
     // Core already neutralized both dangerous sequences...
     expect(replayCode).not.toContain('<!--');
     expect(replayCode).not.toContain('</script');
-    // ...and Pro's escapeScript pass over the same code is a no-op (idempotent), so the
-    // console replay metadata that streams through createScriptTag stays lossless.
-    expect(escapeScript(replayCode)).toBe(replayCode);
+
+    // ...and Pro's second escaping pass over the injected replay must be a no-op.
+    const mockRSC = createMockRSCStreamWithMetadata('{"test": "data"}', {
+      consoleReplayScript: replayCode,
+    });
+    const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId, undefined, {
+      railsEnv: 'test',
+    });
+    const resultStr = await collectStreamData(result);
+
+    expect(resultStr).toContain(`<script>${replayCode}</script>`);
   });
 
   it('emits opt-in browser performance marks for RSC payload bytes and flush timing', async () => {

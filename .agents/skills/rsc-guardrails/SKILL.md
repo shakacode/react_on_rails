@@ -87,8 +87,9 @@ examples.
   (`packages/react-on-rails/src/buildConsoleReplay.ts`) applies it to the finished replay code,
   which `helper.rb`'s console-replay then wraps
   (`content_tag(:script, console_script_code.html_safe, ...)`). Both dangerous sequences must stay
-  covered — `</script` ends a script element early, and `<!--` puts the parser in a state where
-  `</script>` stops ending it (issue #5034). Do not re-fork per-package copies; the parity test in
+  covered — `</script` ends a script element early, and `<!--` switches the parser into the
+  script-data-escaped state, where a subsequent `<script` makes `</script>` stop ending the
+  element (issue #5034). Do not re-fork per-package copies; the parity test in
   `packages/react-on-rails-pro/tests/injectRSCPayload.test.ts` guards against drift. Nonce
   attribute hygiene: `packages/react-on-rails/src/sanitizeNonce.ts`.
 - Ruby stream escaping: `react_on_rails_pro/lib/react_on_rails_pro/concerns/stream.rb`
