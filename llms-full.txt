@@ -312,7 +312,7 @@ Read the full **[React on Rails Doctrine](./misc/doctrine.md)** for our design p
 
 ## System Requirements
 
-- **Rails 7.0+** (Ruby 3.3+ is incompatible with Rails < 7.0; CI tests against Rails 7.1)
+- **Rails 7.0+** (Ruby 3.3+ is incompatible with Rails < 7.0; CI tests against Rails 7.2)
 - **Ruby 3.3+**
 - **Node.js 18+** (React on Rails Pro's Node renderer defaults to Fastify 5 and requires **Node.js 20+** at startup;
   its **Node.js 18.19.0+** `engines.node` floor applies with the documented Fastify 4-compatible dependency overrides)
@@ -14419,14 +14419,21 @@ REACT_RENDERER_URL=http://localhost:3801
 The renderer port must match on both sides: `RENDERER_PORT` is read by the Node process and
 `REACT_RENDERER_URL` is read by the Rails-side Pro initializer.
 
-> **Note:** `bin/dev kill` scopes cleanup to the current app directory. It first uses the running
-> session's recorded ports. For a manual default-port setup, export `RENDERER_PORT` (or a local
-> `REACT_RENDERER_URL`) in a fresh shell so the renderer port is scanned; base-port setups also
-> derive the renderer's `base + 2` port. A port candidate is signalled only when `lsof` finds a
+> **Note:** `bin/dev kill` scopes cleanup to the current app directory. It combines the running
+> session's recorded ports with the current port configuration. It can also derive a renderer fallback from an
+> active generated `node-renderer:` command in `Procfile.dev`, `Procfile.dev-static-assets`, or
+> `Procfile.dev-prod-assets` that uses `${RENDERER_PORT:-PORT}`. For a manual setup without that
+> generated command, export `RENDERER_PORT` (or a local `REACT_RENDERER_URL`) in a fresh shell so
+> the renderer port is scanned. Base-port setups also derive the renderer's `base + 2` port.
+> A port candidate is signalled only when `lsof` finds a
 > `LISTEN` socket and the process working directory is inside this app root. Foreign listeners that
 > are visible to the invoking user are reported and left running; a listener owned by another OS user
 > may be invisible to `lsof` and therefore go unreported. If ownership or shutdown cannot be verified,
 > the command exits nonzero instead of reporting success.
+
+`bin/dev kill` cannot verify Overmind shutdown if `tmp/sockets` resolves outside the app directory.
+Inspect the symlink and configure an app-local socket directory before retrying. Removing a stale
+`tmp/react_on_rails/dev-session.json` file alone does not resolve this directory blocker.
 
 ## See Also
 
@@ -20921,7 +20928,9 @@ rails generate react_on_rails:install --pro --typescript
 rails generate react_on_rails:install --pro --rspack
 ```
 
-The standalone Pro generator also modifies `config/webpack/serverWebpackConfig.js` (enables `libraryTarget: 'commonjs2'`, adds `extractLoader`, sets `target = 'node'`, changes exports to object style) and updates the import in `config/webpack/ServerClientOrBoth.js`. If your webpack configs use the legacy filename `generateWebpackConfigs.js`, the generator will rename it automatically.
+The standalone Pro generator upgrades `serverWebpackConfig.js` and its companion `ServerClientOrBoth.js` in the active `config/webpack/` or `config/rspack/` directory only when both files exactly match a supported current generated pair. It enables Pro server settings and updates the paired export/import shape. A supported pair can use the legacy companion filename `generateWebpackConfigs.js`; the generator keeps that filename without renaming it.
+
+Customized, unknown, unsupported historical, incomplete, or ambiguous pairs are left unchanged, including their paths. If the generator skips the pair, follow the [manual webpack/Rspack migration instructions](../../pro/upgrading-to-pro.md#complete-a-skipped-webpackrspack-migration-manually); rerunning it does not migrate these files.
 
 **Upgrading an existing React on Rails app to Pro:**
 
@@ -22463,6 +22472,40 @@ bin/rails generate react_on_rails:install
 - Install Node.js 18+ from [nodejs.org](https://nodejs.org)
 - Use the bundled `npm`, or install another package manager such as `pnpm`, `yarn`, or `bun`
 - On macOS, for example: `brew install node pnpm`
+
+### "Package version is not an exact version" / lockfile diagnostics at boot
+
+At boot, React on Rails verifies that the npm package version matches the gem version. It
+resolves the **lockfile-recorded** package version from your package manager's lockfile (npm,
+Yarn classic, Yarn Berry, pnpm, and bun are all supported), so semver ranges like `^17.0.0` in
+package.json are fine as long as a lockfile can answer. When no lockfile can answer, the error
+explains why with a class-prefixed diagnostic:
+
+- **`Lockfile missing:`** — your declared package manager has no lockfile yet. Run its install
+  command (e.g. `pnpm install`) to generate one.
+- **`Lockfile stale:`** — the lockfile has no entry matching the exact dependency selector
+  currently in package.json (you changed package.json without re-installing), or a leftover
+  lockfile from a previous package manager is being ignored. Re-run your manager's install, and
+  delete lockfiles from managers you no longer use.
+- **`Lockfile ambiguity:`** — lockfiles from more than one package manager exist and package.json
+  does not declare which one owns the app. No lockfile is trusted in that state. Delete the stale
+  lockfile(s), or declare your manager, e.g. `"packageManager": "pnpm@10.0.0"` in package.json.
+- **`Lockfile unsupported:`** — the lockfile cannot be used: it is unreadable/corrupt, it parses
+  but has an unrecognized structure (possibly from a newer package-manager release), or it is the
+  binary `bun.lockb`, which is never parsed — migrate to bun's text lockfile with
+  `bun install --save-text-lockfile --frozen-lockfile --lockfile-only` and delete `bun.lockb`.
+
+Two known limitations:
+
+- **Monorepos / workspaces with a hoisted lockfile**: the checker looks for the lockfile next to
+  the package.json it validates. Package managers hoist the lockfile to the workspace root, so a
+  Rails app that is a workspace member may resolve no lockfile and fall back to the strict
+  exact-version rule. Workarounds: pin the exact version in the app's package.json (the error
+  message shows the command), or set `REACT_ON_RAILS_SKIP_VALIDATION=true` if you accept the risk.
+- **The check reads lockfiles, not `node_modules`**: if you pulled a change to the lockfile but
+  have not re-run install, the check can pass while the app still runs old code from
+  `node_modules`. If versions look right but runtime behavior disagrees, re-run your package
+  manager's install.
 
 ## 🔧 Build Issues
 
