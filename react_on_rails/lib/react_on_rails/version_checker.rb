@@ -16,7 +16,10 @@ module ReactOnRails
     attr_reader :node_package_version
 
     # Semver uses - to separate pre-release, but RubyGems use .
-    VERSION_PARTS_REGEX = /(\d+)\.(\d+)\.(\d+)(?:[-.]([0-9A-Za-z.-]+))?/
+    # Possessive quantifiers (++) keep matching linear on adversarial inputs (e.g. a version
+    # string of thousands of digits): a digit run never needs to backtrack for the following
+    # "." to match, so the semantics are unchanged.
+    VERSION_PARTS_REGEX = /(\d++)\.(\d++)\.(\d++)(?:[-.]([0-9A-Za-z.-]++))?/
     def self.build
       new(NodePackageVersion.build)
     end
