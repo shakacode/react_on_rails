@@ -20,7 +20,7 @@
 /// <reference types="react/experimental" />
 
 import * as React from 'react';
-import { Suspense, useInsertionEffect, useState } from 'react';
+import { Suspense, useEffectEvent, useInsertionEffect, useState } from 'react';
 import * as mock from 'mock-fs';
 import * as path from 'path';
 import { finished } from 'stream/promises';
@@ -70,7 +70,14 @@ const InsertionEffectWithoutClientDirective = () => {
   return <p>Client insertion effect in RSC runtime</p>;
 };
 
+const EffectEventWithoutClientDirective = () => {
+  useEffectEvent(() => undefined);
+
+  return <p>Client effect event in RSC runtime</p>;
+};
+
 ReactOnRails.register({
+  EffectEventWithoutClientDirective,
   HooksWithoutClientDirective,
   InsertionEffectWithoutClientDirective,
   PromiseContainer,
@@ -258,6 +265,18 @@ test('explains likely missing use client directive for newer client hooks', asyn
   expect((error as Error).message).toContain('"use client";');
   expect((error as Error).message).toContain('Original error:');
   expect((error as Error).message).toContain('useInsertionEffect');
+  expect((error as Error).message).toContain('is not a function');
+});
+
+test('explains likely missing use client directive when a server component calls useEffectEvent', async () => {
+  const error = await captureRenderedError('EffectEventWithoutClientDirective');
+
+  expect(error).toBeInstanceOf(Error);
+  expect((error as Error).message).toContain('EffectEventWithoutClientDirective');
+  expect((error as Error).message).toContain('client hook "useEffectEvent"');
+  expect((error as Error).message).toContain('"use client";');
+  expect((error as Error).message).toContain('Original error:');
+  expect((error as Error).message).toContain('useEffectEvent');
   expect((error as Error).message).toContain('is not a function');
 });
 
