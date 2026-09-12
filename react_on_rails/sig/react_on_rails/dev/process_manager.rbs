@@ -7,6 +7,7 @@ module ReactOnRails
       def self.installed?: (String) -> bool
       def self.ensure_procfile: (String) -> void
       def self.run_with_process_manager: (String) -> void
+      def self.exec_process_if_available: (String, Array[String]) -> bool
 
       private
 

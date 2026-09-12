@@ -3027,26 +3027,9 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       # project. A bare `system("overmind", ...)` here repeats the context that
       # already failed, and the process-group fallback cannot reach an Overmind
       # session because its tmux server daemonizes to PPID 1.
-      it "executes Overmind in the bundled context when startup finds it there" do
-        root = app_root("runner")
-        socket_path = File.join(root, "r.sock")
-        servers << UNIXServer.new(socket_path)
-
-        allow(ReactOnRails::Dev::ProcessManager).to receive(:installed?).with("overmind").and_return(true)
-        expect(described_class).to receive(:exec).with("overmind", "quit", "-s", socket_path).and_return(true)
-
-        expect(described_class.send(:execute_overmind_command, ["quit", "-s", socket_path])).to be true
-      end
-
-      it "executes Overmind outside Bundler when startup finds it only there" do
-        env_overrides = { "PORT" => "4321" }
-        allow(ReactOnRails::Dev::ProcessManager).to receive(:installed?).with("overmind").and_return(false)
-        allow(ReactOnRails::Dev::ProcessManager)
-          .to receive(:process_available_in_system?).with("overmind").and_return(true)
-        allow(ReactOnRails::Dev::ProcessManager).to receive(:preserve_runtime_env_vars).and_return(env_overrides)
-        allow(ReactOnRails::Dev::ProcessManager).to receive(:with_unbundled_context).and_yield
-        expect(described_class).to receive(:exec)
-          .with(env_overrides, "overmind", "kill", "-s", "/tmp/overmind.sock").and_return(true)
+      it "uses ProcessManager's public execution API for Overmind control" do
+        expect(ReactOnRails::Dev::ProcessManager).to receive(:exec_process_if_available)
+          .with("overmind", ["kill", "-s", "/tmp/overmind.sock"]).and_return(true)
 
         result = described_class.send(:execute_overmind_command, ["kill", "-s", "/tmp/overmind.sock"])
 
