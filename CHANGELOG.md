@@ -38,9 +38,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   The binary `bun.lockb` is not parsed — migrate with
   `bun install --save-text-lockfile --frozen-lockfile --lockfile-only`.
   **Action required for upgraders:** an app carrying lockfiles from two package managers with no `packageManager`
-  field in package.json and a non-exact version spec now fails boot with a `Lockfile ambiguity` diagnostic
-  (previously it silently resolved from `yarn.lock`, even a stale one); delete the stale lockfile or declare your
-  package manager in package.json's `packageManager` field. Fixes
+  field in package.json now logs a `Lockfile ambiguity` deprecation warning at boot; for this release it still
+  resolves via the legacy yarn-first precedence (now with exact-selector matching) so previously-booting apps keep
+  booting, but a future release removes that fallback and this situation will fail boot. Delete the stale lockfile
+  or declare your package manager in package.json's `packageManager` field before then. Fixes
   [Issue 5049](https://github.com/shakacode/react_on_rails/issues/5049).
   [PR 5058](https://github.com/shakacode/react_on_rails/pull/5058) by
   [AbanoubGhadban](https://github.com/AbanoubGhadban).

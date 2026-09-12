@@ -123,11 +123,21 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
           VersionChecker.new(node_package_version).validate_version_and_package_compatibility!
         end
 
-        context "when two managers' lockfiles exist and package.json has no packageManager field" do
-          it "raises the exact-version error carrying a class-prefixed ambiguity diagnostic" do
+        context "when two managers' lockfiles exist and the legacy-precedence lockfile resolves correctly" do
+          it "boots on the deprecated grace fallback and warns with the ambiguity diagnostic" do
+            stub_gem_version("16.6.0")
+            allow(Rails.logger).to receive(:warn)
+            expect { validate_fixture!("ambiguous_grace_yarn_npm") }.not_to raise_error
+            expect(Rails.logger).to have_received(:warn)
+              .with(a_string_including("Lockfile ambiguity:").and(a_string_including("deprecated")))
+          end
+        end
+
+        context "when two managers' lockfiles exist and the legacy-precedence lockfile is stale" do
+          it "raises the version-mismatch error carrying the ambiguity diagnostic" do
             stub_gem_version("16.6.0")
             expect { validate_fixture!("ambiguous_yarn_npm") }.to raise_error(ReactOnRails::Error) do |error|
-              expect(error.message).to include("not an exact version")
+              expect(error.message).to include("does not match the gem version")
               expect(error.message).to include("Lockfile ambiguity:")
               expect(error.message).to include("yarn.lock")
               expect(error.message).to include("package-lock.json")
@@ -200,13 +210,12 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
         end
 
         context "when packageManager declares pnpm but only a yarn.lock exists" do
-          it "raises with the declared-vs-disk ambiguity diagnostic instead of guessing" do
+          it "boots on the deprecated grace fallback and warns with the declared-vs-disk diagnostic" do
             stub_gem_version("16.6.0")
-            expect { validate_fixture!("declared_conflict") }.to raise_error(ReactOnRails::Error) do |error|
-              expect(error.message).to include("Lockfile ambiguity:")
-              expect(error.message).to include("packageManager: pnpm")
-              expect(error.message).to include("yarn.lock")
-            end
+            allow(Rails.logger).to receive(:warn)
+            expect { validate_fixture!("declared_conflict") }.not_to raise_error
+            expect(Rails.logger).to have_received(:warn)
+              .with(a_string_including("Lockfile ambiguity:").and(a_string_including("packageManager: pnpm")))
           end
         end
 

@@ -36,7 +36,7 @@ module ReactOnRails
       # presumed stale), and an ambiguous detection consults no lockfile at all.
       def self.resolve(package_json_path, package_name, requested_spec, declared_manager: nil)
         detection = Detection.new(File.dirname(package_json_path), declared_manager)
-        return Result.new(nil, Diagnostic.new(:ambiguous, Messages.ambiguity(detection))) if detection.ambiguous?
+        return resolve_ambiguous(detection, package_name, requested_spec) if detection.ambiguous?
         return Result.new(nil, nil) unless detection.confident?
 
         lockfile = detection.lockfile_path
@@ -88,6 +88,30 @@ module ReactOnRails
         Diagnostic.new(:missing, Messages.missing(detection.manager, detection.dir))
       end
 
+      # DEPRECATED grace fallback (one release): when detection is ambiguous, previously-booting
+      # apps used to resolve from yarn.lock/package-lock.json in fixed order. To avoid turning a
+      # routine gem upgrade into a boot failure, resolve from the present lockfiles in the legacy
+      # precedence order (still with exact-selector matching) and surface the ambiguity as a
+      # warning. A future release removes this fallback and fails closed instead.
+      def self.resolve_ambiguous(detection, package_name, requested_spec)
+        grace = grace_resolution(detection, package_name, requested_spec)
+        message = Messages.ambiguity(detection, grace_note: grace && Messages.ambiguity_grace(*grace))
+        Result.new(grace&.first, Diagnostic.new(:ambiguous, message))
+      end
+
+      # First present lockfile (legacy MANAGER_LOCKFILES order) whose parser yields a version.
+      # Returns [version, lockfile_name] or nil.
+      def self.grace_resolution(detection, package_name, requested_spec)
+        MANAGER_LOCKFILES.each_key do |manager|
+          lockfile = detection.lockfile_for(manager)
+          next unless lockfile
+
+          outcome = version_from(manager, lockfile, package_name, requested_spec)
+          return [outcome, File.basename(lockfile)] if outcome.is_a?(String)
+        end
+        nil
+      end
+
       # Confident detection with other managers' lockfiles lying around: they were never read
       # (presumed stale), but tell the user so the leftovers get cleaned up.
       def self.foreign_lockfile_warning(detection)
@@ -100,15 +124,20 @@ module ReactOnRails
       # Builds the class-prefixed diagnostic messages of the taxonomy:
       # "Lockfile missing:", "Lockfile stale:", "Lockfile ambiguity:", "Lockfile unsupported:".
       module Messages
-        def self.ambiguity(detection)
+        def self.ambiguity(detection, grace_note: nil)
           <<~MSG.strip
             Lockfile ambiguity: cannot determine which package manager owns this app — #{ambiguity_reason(detection)}
-            No lockfile was used to resolve the installed version.
+            #{grace_note || 'No lockfile was used to resolve the installed version.'}
             Fix (any one):
               1. Delete the stale lockfile(s) so only your real package manager's lockfile remains.
               2. Declare your package manager in package.json, e.g. "packageManager": "pnpm@10.0.0".
               3. Pin the exact package version in package.json.
           MSG
+        end
+
+        def self.ambiguity_grace(version, lockfile_name)
+          "Resolved #{version} from #{lockfile_name} via the deprecated legacy-precedence fallback; " \
+            "a future release removes this fallback and this situation will fail boot."
         end
 
         def self.ambiguity_reason(detection)
@@ -197,6 +226,13 @@ module ReactOnRails
           end
         end
 
+        # The manager's first existing lockfile in the manager's own preference order.
+        def lockfile_for(manager)
+          MANAGER_LOCKFILES.fetch(manager)
+                           .map { |name| File.join(@dir, name) }
+                           .find { |path| File.exist?(path) }
+        end
+
         def confident?
           @state == :confident
         end
@@ -230,12 +266,6 @@ module ReactOnRails
         def normalize_declared(value)
           name = value.to_s.split("@").first
           MANAGER_LOCKFILES.key?(name&.to_sym) ? name.to_sym : nil
-        end
-
-        def lockfile_for(manager)
-          MANAGER_LOCKFILES.fetch(manager)
-                           .map { |name| File.join(@dir, name) }
-                           .find { |path| File.exist?(path) }
         end
       end
 
