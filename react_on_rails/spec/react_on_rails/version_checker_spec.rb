@@ -123,7 +123,7 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
         # falls back to the package.json version (an exact pin in these fixtures), and boot
         # succeeds — a bad lockfile must never crash the Rails initializer.
         %w[pnpm_corrupt pnpm_wrong_shape pnpm_yaml_alias pnpm_invalid_encoding
-           bun_invalid_encoding].each do |fixture|
+           bun_invalid_encoding yarn_berry_invalid_encoding].each do |fixture|
           context "when the lockfile is unusable (#{fixture})" do
             it "falls back to package.json and boots" do
               stub_gem_version("16.6.0")
