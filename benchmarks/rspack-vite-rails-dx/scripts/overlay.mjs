@@ -116,7 +116,8 @@ async function withProbeSession(tool, label, browserErrors, probe) {
     browser,
     root,
     tool,
-    label: `overlay-${label}`,
+    // Overmind includes this value in a tmux socket path with a strict length limit.
+    label: label === 'compile' ? 'oc' : 'or',
     extraEnv: {
       LAUNCH_EDITOR: recorderPath,
       OVERLAY_EDITOR_RECORD: recorderOutput,
