@@ -2,4 +2,5 @@
 results/latest.json
 results/local*.json
 RESULTS.local.md
+OVERLAY_RESULTS.local.md
 node_modules/
