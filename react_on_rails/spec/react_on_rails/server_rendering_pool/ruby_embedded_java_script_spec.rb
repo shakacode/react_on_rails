@@ -413,8 +413,12 @@ module ReactOnRails
           end
         end
 
+        # See issue #5046: query-string values are now redacted (they can contain
+        # credentials such as presigned S3 tokens), but query keys and fragments
+        # are preserved for diagnostics. This updates the PR #5017 spec that
+        # originally asserted verbatim preservation of query/fragment content.
         context "when a valid HTTP-served bundle URL contains query or fragment @ characters" do
-          it "preserves them in the raised diagnostic" do
+          it "redacts query values and preserves fragment in the raised diagnostic" do
             server_bundle_url = "http://localhost:3035?source=@config#next=@fragment"
 
             allow(ReactOnRails::Utils).to receive_messages(
@@ -428,7 +432,10 @@ module ReactOnRails
             expect do
               described_class.read_bundle_js_code
             end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
-              expect(error.message).to include(server_bundle_url)
+              expect(error.message).to include("http://localhost:3035")
+              expect(error.message).to include("source=[REDACTED]")
+              expect(error.message).to include("#next=@fragment")
+              expect(error.message).not_to include("@config")
             }
           end
         end
@@ -519,7 +526,7 @@ module ReactOnRails
             end
           end
 
-          it "preserves @ characters in the path and query string" do
+          it "preserves @ characters in the path and redacts query values" do
             server_bundle_url = "http://bad host/webpack/server@bundle.js?source=@config"
 
             allow(ReactOnRails::Utils).to receive_messages(
@@ -530,7 +537,9 @@ module ReactOnRails
             expect do
               described_class.read_bundle_js_code
             end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
-              expect(error.message).to include("/webpack/server@bundle.js?source=@config")
+              expect(error.message).to include("/webpack/server@bundle.js")
+              expect(error.message).to include("source=[REDACTED]")
+              expect(error.message).not_to include("@config")
             }
           end
         end

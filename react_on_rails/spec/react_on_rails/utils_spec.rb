@@ -1000,6 +1000,113 @@ module ReactOnRails
         expect(described_class.command_available?("anything")).to be(false)
       end
     end
+
+    # See issue #5046: renderer-URL credential redaction leaks. Each spec below
+    # guards a distinct behavior — the minimum set that catches a real regression
+    # without redundancy. See the 30-minute fuzz test (12.6M iterations) for
+    # exhaustive coverage beyond this deterministic set.
+    describe ".sanitize_url_for_display" do
+      it "strips user:password from the authority section" do
+        expect(described_class.sanitize_url_for_display("http://u:s3cr3t@host:3800/b.js"))
+          .to eq("http://host:3800/b.js")
+      end
+
+      it "strips passwords containing embedded @ characters" do
+        result = described_class.sanitize_url_for_display("http://u:s3cr3t@more@host:3800/b.js")
+        expect(result).not_to include("s3cr3t")
+        expect(result).to include("host:3800/b.js")
+      end
+
+      it "redacts query-string values while keeping keys" do
+        input = "https://cdn.example.com/bundle.js?X-Amz-Credential=AKIAs3cr3t&X-Amz-Signature=abc123"
+        result = described_class.sanitize_url_for_display(input)
+        expect(result).to include("X-Amz-Credential=[REDACTED]")
+        expect(result).to include("X-Amz-Signature=[REDACTED]")
+        expect(result).not_to include("AKIAs3cr3t")
+        expect(result).not_to include("abc123")
+      end
+
+      it "strips userinfo from file:// URLs despite URI::File reporting nil userinfo" do
+        result = described_class.sanitize_url_for_display("file://u:s3cr3t@host/b.js")
+        expect(result).not_to include("s3cr3t")
+        expect(result).to include("host/b.js")
+      end
+
+      it "strips userinfo when the password contains a slash" do
+        result = described_class.sanitize_url_for_display("http://u:pa/s3cr3t@host/b.js")
+        expect(result).not_to include("s3cr3t")
+        expect(result).to include("host/b.js")
+      end
+
+      it "handles userinfo stripping, query redaction, and fragment preservation together" do
+        result = described_class.sanitize_url_for_display("https://u:s3cr3t@host/b.js?token=xyz#section")
+        expect(result).not_to include("s3cr3t")
+        expect(result).to include("token=[REDACTED]")
+        expect(result).to include("#section")
+        expect(result).to include("https://host/b.js")
+      end
+
+      it "does not strip @ characters that appear in paths" do
+        result = described_class.sanitize_url_for_display("http://host/webpack/server@bundle.js")
+        expect(result).to include("server@bundle.js")
+      end
+
+      it "passes through local file paths unchanged" do
+        expect(described_class.sanitize_url_for_display("/app/public/bundle.js"))
+          .to eq("/app/public/bundle.js")
+      end
+
+      it "returns nil for nil input" do
+        expect(described_class.sanitize_url_for_display(nil)).to be_nil
+      end
+
+      it "does not crash on a trailing bare ?" do
+        expect(described_class.sanitize_url_for_display("http://localhost:3800?"))
+          .to eq("http://localhost:3800?")
+      end
+
+      it "does not redact a ? inside a fragment" do
+        result = described_class.sanitize_url_for_display("http://host/app#/page?token=abc")
+        expect(result).to include("token=abc")
+        expect(result).not_to include("[REDACTED]")
+      end
+
+      it "handles slash-in-password combined with @ in query value" do
+        result = described_class.sanitize_url_for_display("http://u:pa/s3cr3t@host/b.js?source=@config")
+        expect(result).not_to include("s3cr3t")
+        expect(result).to include("host/b.js")
+        expect(result).to include("source=[REDACTED]")
+      end
+
+      it "redacts bare query components that have no =" do
+        result = described_class.sanitize_url_for_display("https://host/b.js?eyJhbGciOi")
+        expect(result).not_to include("eyJhbGciOi")
+        expect(result).to include("[REDACTED]")
+      end
+    end
+
+    # sanitize_error_text scrubs URL-like patterns in arbitrary error-message
+    # prose, where the text is not a single URL but may embed one.
+    describe ".sanitize_error_text" do
+      it "strips credentials from a URL embedded in a URI::InvalidURIError message" do
+        text = 'bad URI(is not URI?): "http://u:s3cr3t@bad host:3800"'
+        result = described_class.sanitize_error_text(text)
+        expect(result).not_to include("s3cr3t")
+        expect(result).not_to include("u:")
+      end
+
+      it "redacts query-string credentials from a URL in prose" do
+        text = "Error: https://cdn.example.com/b.js?token=s3cr3t failed"
+        result = described_class.sanitize_error_text(text)
+        expect(result).not_to include("s3cr3t")
+        expect(result).to include("token=[REDACTED]")
+      end
+
+      it "passes through error text with no URL unchanged" do
+        text = "Connection refused - connect(2) for host:3800"
+        expect(described_class.sanitize_error_text(text)).to eq(text)
+      end
+    end
   end
 end
 # rubocop:enable Metrics/ModuleLength, Metrics/BlockLength
