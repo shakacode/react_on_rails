@@ -1373,6 +1373,24 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
           end
         end
 
+        describe "bun JSONC sanitizing" do
+          it "strips comments and trailing commas without ever altering string contents" do
+            content = <<~JSONC
+              {
+                // line comment
+                "tricky": ["x,]", "y, }", "// not a comment", "a /* not */ comment"],
+                "packages": {
+                  "p": ["p@1.0.0", "", {}, "sha512-abc"],
+                },
+              }
+            JSONC
+            sanitized = VersionChecker::LockfileResolution::BunLockfile.jsonc_to_json(content)
+            parsed = JSON.parse(sanitized)
+            expect(parsed["tricky"]).to eq(["x,]", "y, }", "// not a comment", "a /* not */ comment"])
+            expect(parsed["packages"]["p"].first).to eq("p@1.0.0")
+          end
+        end
+
         context "with a Yarn classic yarn.lock holding multiple blocks for the same package" do
           it "picks the block matching package.json's exact selector, not the first same-name block" do
             expect(node_package_version_for("yarn_classic_multi_block").raw).to eq("17.0.0")
