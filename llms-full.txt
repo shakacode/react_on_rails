@@ -312,7 +312,7 @@ Read the full **[React on Rails Doctrine](./misc/doctrine.md)** for our design p
 
 ## System Requirements
 
-- **Rails 7.0+** (Ruby 3.3+ is incompatible with Rails < 7.0; CI tests against Rails 7.1)
+- **Rails 7.0+** (Ruby 3.3+ is incompatible with Rails < 7.0; CI tests against Rails 7.2)
 - **Ruby 3.3+**
 - **Node.js 18+** (React on Rails Pro's Node renderer defaults to Fastify 5 and requires **Node.js 20+** at startup;
   its **Node.js 18.19.0+** `engines.node` floor applies with the documented Fastify 4-compatible dependency overrides)
@@ -6820,8 +6820,8 @@ Use this matrix to decide which approach to use:
 ## Prerequisites
 
 - **React 19** — native metadata hoisting is a React 19 feature
-- **React on Rails 16.2.0+** — for basic `react_component` usage (16.2.0+ is the currently supported, version-aligned line)
-- **React on Rails Pro** — for `stream_react_component` and RSC support. Current public releases (16.2.0+) are version-aligned: install Pro at the same version as `react_on_rails`.
+- **React on Rails 16.2.0+** — the minimum for basic `react_component` usage; the current stable documentation targets React on Rails 17
+- **React on Rails Pro 17 with React on Rails 17** — for `stream_react_component` and supported GA RSC. Install Pro at the same version as `react_on_rails`; the stable RSC stack uses React and React DOM 19.2.x with patch 19.2.7 or newer and `react-on-rails-rsc` 19.2.x with patch 19.2.1 or newer.
 
 ## References
 
@@ -12326,6 +12326,12 @@ React Server Components add one more moving part to the standard test setup: sys
 
 Use this recipe for Capybara, system, and end-to-end tests that exercise `stream_react_component`, `RSCRoute`, or the `rsc_payload_route`.
 
+This recipe fits a Rails-managed system-test topology: the normal Rails test server can reach a renderer that is
+started once for the suite or worker. If the browser test needs a separately launched Rails origin and renderer,
+cross-process data setup, or detailed streaming, network, and trace assertions, use E2E on Rails + Playwright
+instead. See [System Specs for Streamed RSC Payloads](../../pro/react-server-components/system-spec-streaming-rsc.md#choose-the-test-topology)
+for the decision rule and the multi-process lifecycle boundary.
+
 This recipe uses the React on Rails TestHelper with `build_test_command`: Rails checks whether generated bundles are stale, runs your test build command when needed, and fails fast if compilation fails.
 
 The Step 3 renderer-lifecycle helper is **RSpec-focused** because it uses `before(:suite)` and `after(:suite)` hooks; for Minitest, see [Minitest Equivalent](#minitest-equivalent) for a parallel adaptation that reuses the same safety points from a `test/test_helper.rb` harness plus `Minitest.after_run`.
@@ -12642,7 +12648,7 @@ Require this file from `spec/rails_helper.rb` after loading `react_on_rails/test
 
 In CI, set `RSC_NODE_RENDERER_TESTS=1` for jobs that need the renderer. For local development, leaving it unset lets you run non-RSC specs without starting another process.
 
-### 4. Write A Capybara RSC Smoke Test
+### 4. Write A Capybara RSC Smoke Test for a Rails-managed Runtime
 
 Keep the first system test boring: visit a route that streams one Server Component and assert on visible HTML plus one hydrated Client Component interaction.
 
@@ -14419,14 +14425,21 @@ REACT_RENDERER_URL=http://localhost:3801
 The renderer port must match on both sides: `RENDERER_PORT` is read by the Node process and
 `REACT_RENDERER_URL` is read by the Rails-side Pro initializer.
 
-> **Note:** `bin/dev kill` scopes cleanup to the current app directory. It first uses the running
-> session's recorded ports. For a manual default-port setup, export `RENDERER_PORT` (or a local
-> `REACT_RENDERER_URL`) in a fresh shell so the renderer port is scanned; base-port setups also
-> derive the renderer's `base + 2` port. A port candidate is signalled only when `lsof` finds a
+> **Note:** `bin/dev kill` scopes cleanup to the current app directory. It combines the running
+> session's recorded ports with the current port configuration. It can also derive a renderer fallback from an
+> active generated `node-renderer:` command in `Procfile.dev`, `Procfile.dev-static-assets`, or
+> `Procfile.dev-prod-assets` that uses `${RENDERER_PORT:-PORT}`. For a manual setup without that
+> generated command, export `RENDERER_PORT` (or a local `REACT_RENDERER_URL`) in a fresh shell so
+> the renderer port is scanned. Base-port setups also derive the renderer's `base + 2` port.
+> A port candidate is signalled only when `lsof` finds a
 > `LISTEN` socket and the process working directory is inside this app root. Foreign listeners that
 > are visible to the invoking user are reported and left running; a listener owned by another OS user
 > may be invisible to `lsof` and therefore go unreported. If ownership or shutdown cannot be verified,
 > the command exits nonzero instead of reporting success.
+
+`bin/dev kill` cannot verify Overmind shutdown if `tmp/sockets` resolves outside the app directory.
+Inspect the symlink and configure an app-local socket directory before retrying. Removing a stale
+`tmp/react_on_rails/dev-session.json` file alone does not resolve this directory blocker.
 
 ## See Also
 
@@ -20921,7 +20934,9 @@ rails generate react_on_rails:install --pro --typescript
 rails generate react_on_rails:install --pro --rspack
 ```
 
-The standalone Pro generator also modifies `config/webpack/serverWebpackConfig.js` (enables `libraryTarget: 'commonjs2'`, adds `extractLoader`, sets `target = 'node'`, changes exports to object style) and updates the import in `config/webpack/ServerClientOrBoth.js`. If your webpack configs use the legacy filename `generateWebpackConfigs.js`, the generator will rename it automatically.
+The standalone Pro generator upgrades `serverWebpackConfig.js` and its companion `ServerClientOrBoth.js` in the active `config/webpack/` or `config/rspack/` directory only when both files exactly match a supported current generated pair. It enables Pro server settings and updates the paired export/import shape. A supported pair can use the legacy companion filename `generateWebpackConfigs.js`; the generator keeps that filename without renaming it.
+
+Customized, unknown, unsupported historical, incomplete, or ambiguous pairs are left unchanged, including their paths. If the generator skips the pair, follow the [manual webpack/Rspack migration instructions](../../pro/upgrading-to-pro.md#complete-a-skipped-webpackrspack-migration-manually); rerunning it does not migrate these files.
 
 **Upgrading an existing React on Rails app to Pro:**
 
@@ -25938,7 +25953,7 @@ This guide covers the React-side challenges of migrating an existing React on Ra
 > [!NOTE]
 > **Summary for AI agents:** Use this page when the user has an existing React on Rails app and wants to adopt RSC. This covers the React-side migration (component restructuring, state, data fetching). For the initial RSC setup, see the [RSC tutorial](../../pro/react-server-components/tutorial.md). RSC requires Pro with the Node renderer.
 
-> **React on Rails Pro required:** RSC support requires [React on Rails Pro](../../pro/react-on-rails-pro.md) with the node renderer. Current public releases (16.2.0+) are version-aligned: install Pro at the same version as `react_on_rails`. The Pro gem provides the streaming view helpers (`stream_react_component`, `stream_react_component_with_async_props`, `rsc_payload_react_component`, and `rsc_payload_react_component_with_async_props`), the RSC webpack plugin and loader, and the `registerServerComponent` API. For setup, see the [RSC tutorial](../../pro/react-server-components/tutorial.md). For upgrade steps, see the [performance breakthroughs guide](../../pro/major-performance-breakthroughs-upgrade-guide.md).
+> **React on Rails Pro required:** RSC is a supported GA feature of [React on Rails Pro 17](../../pro/react-on-rails-pro.md) with the node renderer. Install Pro at the same version as `react_on_rails`. The stable v17 RSC stack uses React and React DOM 19.2.x with patch 19.2.7 or newer and `react-on-rails-rsc` 19.2.x with patch 19.2.1 or newer. The Pro gem provides the streaming view helpers (`stream_react_component`, `stream_react_component_with_async_props`, `rsc_payload_react_component`, and `rsc_payload_react_component_with_async_props`), the RSC webpack plugin and loader, and the `registerServerComponent` API. For setup, see the [RSC tutorial](../../pro/react-server-components/tutorial.md). For upgrade steps, see [Upgrading an Existing React on Rails Pro App to RSC](../../pro/react-server-components/upgrading-existing-pro-app.md). That guide's Pro 16.4+ prerequisite is only the minimum starting point for an existing app; Pro 17 is the supported GA destination and current documentation baseline.
 
 ## Why Migrate?
 
@@ -26145,8 +26160,9 @@ These mistakes account for the majority of setup failures:
 
 ## Prerequisites
 
-- React 19+
-- [React on Rails Pro](../../pro/react-on-rails-pro.md) installed at the same version as React on Rails (current public releases, 16.2.0+, are version-aligned)
+- React and React DOM 19.2.x with patch 19.2.7 or newer
+- [React on Rails Pro 17](../../pro/react-on-rails-pro.md) installed at the same version as React on Rails 17
+- Stable `react-on-rails-rsc` 19.2.x with patch 19.2.1 or newer
 - Node renderer configured (RSC requires server-side JavaScript execution)
 - RSC webpack bundle configured (see [RSC tutorial](../../pro/react-server-components/tutorial.md))
 - Node.js 20+
@@ -26196,7 +26212,7 @@ After these steps, every component is still a Client Component (because of the `
 
 Before starting, ensure you have:
 
-- **React on Rails Pro** and **React on Rails** installed at the same version — current public releases (16.2.0+) are version-aligned, and the Pro gem depends on the exact matching `react_on_rails` release
+- **React on Rails Pro 17** and **React on Rails 17** installed at the same version — these stable v17 releases are version-aligned, and the Pro gem depends on the exact matching `react_on_rails` release
 - **React 19.2.x** (`react` and `react-dom` both at 19.2.x with patch `>= 19.2.7` for the React on Rails Pro 17 RSC path)
 - **Node renderer** configured and running (RSC requires server-side JavaScript execution via the node renderer, not ExecJS). If you're still using ExecJS, migrate to the node renderer first -- see [Node Renderer Basics](../building-features/node-renderer/basics.md).
 - **Shakapacker** (or webpack configured via Shakapacker)
