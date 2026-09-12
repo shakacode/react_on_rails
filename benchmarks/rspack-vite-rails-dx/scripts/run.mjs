@@ -136,3 +136,7 @@ function readArgument(name) {
   const index = process.argv.indexOf(name);
   return index === -1 ? undefined : process.argv[index + 1];
 }
+
+function round(value) {
+  return Math.round(value * 10) / 10;
+}
