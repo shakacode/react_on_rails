@@ -175,7 +175,11 @@ async function verifyClickToEditor(session, tool, expectedLine) {
           .frameLocator('#rspack-dev-server-client-overlay')
           .locator('[data-can-open="true"]')
           .first()
-      : session.page.locator('vite-error-overlay').locator('.file-link').first();
+      : session.page
+          .locator('vite-error-overlay')
+          .locator('.file-link')
+          .filter({ hasText: path.basename(session.workspace.messagePath) })
+          .first();
   try {
     await target.waitFor({ state: 'visible', timeout: 5_000 });
     await target.evaluate((element) => element.click());
