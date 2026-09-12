@@ -22,7 +22,24 @@ Common symptoms:
 - browser console logs show a pending Flight decode or missing client reference after the payload route returned
   successfully on the server.
 
-## Recommended Capybara Shape
+## Choose the Test Topology
+
+Choose the owner of the application runtime before you choose the browser assertions:
+
+| Situation                                                                                                                                                     | Recommended owner                                               |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| Rails' normal system-test server can reach the renderer, no custom application processes run inside examples, and the test needs a simple hydration assertion | Capybara with a non-buffering driver is acceptable              |
+| The test needs a separately launched Rails server or node renderer                                                                                            | E2E on Rails + Playwright                                       |
+| Test data must be visible across process or database connections                                                                                              | E2E on Rails app commands or scenarios                          |
+| Streaming HTTP, Action Cable, exact network counts, failed-resource checks, or traces are central assertions                                                  | Playwright                                                      |
+| The app already uses Playwright for ShakaPerf, visual regression, or other browser verification                                                               | Playwright; reuse the existing browser runtime                  |
+| Puffing Billy or another external proxy is needed for unrelated APIs                                                                                          | A separate Capybara suite; keep the RSC stream out of the proxy |
+
+Capybara is not generally incompatible with RSC. It is a good fit when Rails manages the system-test server and
+that server can reach the renderer. If you would need to start a separate Rails origin or renderer around each
+example, stop extending the Capybara harness and use the multi-process path below.
+
+## Capybara Shape for a Rails-managed Runtime
 
 Use a non-Billy browser driver for specs that assert streamed RSC behavior. If your suite's default JavaScript
 driver is already a plain Selenium driver, you can use it directly. Otherwise, register a dedicated driver for
@@ -61,6 +78,52 @@ Good assertions include:
 - an app-owned hydration marker appears after the client boundary finishes;
 - a Suspense fallback is replaced by streamed content and the related client control works.
 
+## E2E on Rails + Playwright for a Multi-process Runtime
+
+Use [E2E on Rails](https://e2eonrails.com/) with Playwright when a test needs an external Rails server, a node
+renderer, cross-process Rails data setup, or detailed streaming and network evidence. Follow the canonical
+[Streamed and Multi-process Applications](https://e2eonrails.com/docs/STREAMING_AND_MULTI_PROCESS_APPS/) guide for
+the full setup. Keep this React on Rails guide focused on the RSC transport boundary.
+
+```text
+focused RSC E2E run
+  -> start and wait for the node renderer
+  -> start and wait for one Rails test server
+  -> run the configured Playwright desktop and mobile projects
+       -> E2E on Rails command resets and creates Rails data
+       -> fresh browser context exercises the real RSC stream
+       -> assert hydration, interaction, console, failed resources, and network
+  -> stop Rails
+  -> stop the renderer
+```
+
+Keep these responsibilities separate:
+
+- React on Rails owns the RSC route, renderer configuration, and streaming contract.
+- The consuming app owns process commands, dependency ordering, readiness checks, logs, and cleanup.
+- E2E on Rails owns Rails-side app commands and state setup.
+- Playwright owns browser contexts, traces, console and page errors, failed resources, and network assertions.
+
+> **Lifecycle rule:** Do not start and stop the Rails server or RSC renderer around individual examples or
+> retries. Keep one application topology alive for the focused E2E run. Reset browser contexts and application
+> data between tests, and stop application processes only after the run. When workers or browser projects share a
+> Rails database, run them serially; parallel runs require an isolated database and external-state namespace for
+> each worker or shard.
+
+Streamed chunks and browser resource requests can outlive the assertion that appears to finish a test. Killing the
+origin during reset can create late chunk errors, attribute a failure to the next test, and make retries look more
+stable than the underlying system.
+
+### Make Test Data Visible to Rails
+
+A separate Rails server uses another process and database connection. It normally cannot see records inside an
+RSpec example's uncommitted transaction. Do not use committed `before(:all)` fixtures as the default workaround.
+
+Create and reset data inside the serving Rails process through E2E on Rails
+[app commands](https://e2eonrails.com/docs/app-commands/) or
+[scenarios](https://e2eonrails.com/docs/scenarios/). Transaction-sharing modes require every participating
+process, thread, and connection to support the same assumptions; they are not a general multi-process solution.
+
 ## Puffing Billy Compatibility
 
 Puffing Billy is an HTTP proxy for browser requests. Its
@@ -98,6 +161,17 @@ For app-specific system specs:
 2. Wait for an app-owned hydrated marker, visible client-island behavior, or streamed content replacement.
 3. Confirm the RSC payload route was served by the app under test, not by a Billy stub or cache.
 4. Keep external API stubbing separate from the RSC payload transport check.
+
+For a multi-process Playwright test, also:
+
+1. Fail on unexpected `console.error` messages, page errors or unhandled rejections, failed RSC chunks, failed
+   network requests, and non-2xx responses from the RSC route.
+2. Capture a Playwright trace, screenshot or video, Rails logs, and renderer logs when a test fails.
+3. Verify that one stable Rails origin and one stable renderer origin serve the focused run.
+4. Run the same source tests in each required desktop and mobile project.
+5. Treat retries as diagnostic evidence, not proof of stability.
+6. After migration parity, delete superseded browser specs and custom runtime helpers instead of maintaining two
+   sources of truth.
 
 Request specs for `/rsc_payload/:component_name` are still useful for status codes, content type, and payload
 shape, but they do not prove browser streaming. Pair request specs with at least one browser assertion when the

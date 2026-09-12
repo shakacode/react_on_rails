@@ -38,7 +38,10 @@ RUBYGEMS_VERSIONS_API_URL = "https://rubygems.org/api/v1/versions"
 RUBYGEMS_VERSIONS_OPEN_TIMEOUT_SECONDS = 10
 RUBYGEMS_VERSIONS_READ_TIMEOUT_SECONDS = 15
 GITHUB_RELEASE_BODY_MAX_LENGTH = 125_000
-NPM_PUBLISH_VERIFY_ATTEMPTS = 6
+# npm can take longer than the former 25-second window to serve a just-published
+# exact version, even when cache reads are bypassed. Keep the recovery bounded
+# while allowing the registry's eventual-consistency window to settle.
+NPM_PUBLISH_VERIFY_ATTEMPTS = 24
 NPM_PUBLISH_VERIFY_RETRY_DELAY_SECONDS = 5
 NPM_PUBLISH_MAX_BACKOFF_SECONDS = 30
 NPM_PUBLISH_HARD_FAILURE_CATEGORIES = %i[
@@ -9708,7 +9711,11 @@ def fetch_npm_package_metadata(package_ref, registry_url:)
     "peerDependencies",
     "--json",
     "--registry",
-    registry_url
+    registry_url,
+    # A package version can be available at the registry while npm's local cache
+    # still serves the pre-publish 404. Release verification must consult npm
+    # online so that a successful publish is not treated as a failed release.
+    "--prefer-online"
   )
   [output, status]
 end
