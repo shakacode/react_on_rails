@@ -44,11 +44,15 @@ module ReactOnRailsProHelper
   # cache hit and the browser refuses to run the script (issue #5021). At cache-write time
   # the framework appends a trailing marker comment recording the originating request's
   # nonce; on a cache hit, only attributes carrying that exact originating value are
-  # re-stamped with the serving request's nonce. Matching the exact secret per-request
-  # value (instead of any nonce-shaped attribute) means markup that arrived with any other
-  # nonce value — e.g. attacker-influenced content rendered through an app-level HTML
-  # injection sink — is never promoted to the live nonce, and unrelated cached text is
-  # never mutated: nobody but the originating request could know that value.
+  # re-stamped with the serving request's nonce. Scope of that match: markup carrying a
+  # guessed or unrelated nonce value is never promoted to the live nonce, and unrelated
+  # cached text is never mutated. It is NOT an XSS boundary: the originating nonce is
+  # visible in that response's CSP header and in every sibling framework script tag, so
+  # content injected into the same fragment through an app-level HTML injection sink can
+  # copy it at render time. Such content already executes on the originating response
+  # (its copied nonce matches that response's policy), and on cache hits its attribute is
+  # re-stamped like the framework's own — neutralizing that requires fixing the injection
+  # sink itself.
   CACHED_CSP_NONCE_MARKER_PREFIX = "<!--rorp-cached-csp-nonce:"
   CACHED_CSP_NONCE_MARKER_SUFFIX = "-->"
   # Anchored to the very end of the cached value: the framework appends its marker after
@@ -552,10 +556,31 @@ module ReactOnRailsProHelper
 
     return result unless result.is_a?(Hash) && result.key?(ReactOnRails::Helper::COMPONENT_HTML_KEY)
 
-    result.merge(
+    normalized = result.merge(
       ReactOnRails::Helper::COMPONENT_HTML_KEY =>
         normalize_cached_pro_attribution_html(result[ReactOnRails::Helper::COMPONENT_HTML_KEY], cached_csp_nonce)
     )
+    return normalized if cached_csp_nonce.nil?
+
+    # Rails-context/attribution normalization is componentHtml-only, but every other
+    # string field of a cached hash can carry nonce-stamped markup too (e.g. a render
+    # function's apolloStateTag), so the CSP nonce re-stamp covers them all.
+    normalized.to_h do |key, value|
+      next [key, value] if key == ReactOnRails::Helper::COMPONENT_HTML_KEY
+
+      [key, rewrite_cached_csp_nonces_in_value(value, cached_csp_nonce)]
+    end
+  end
+
+  # Recursive companion to rewrite_cached_csp_nonces for non-componentHtml hash fields,
+  # whose values may nest (arrays of tags, sub-hashes from custom render functions).
+  def rewrite_cached_csp_nonces_in_value(value, cached_csp_nonce)
+    case value
+    when String then rewrite_cached_csp_nonces(value, cached_csp_nonce)
+    when Hash then value.transform_values { |nested| rewrite_cached_csp_nonces_in_value(nested, cached_csp_nonce) }
+    when Array then value.map { |nested| rewrite_cached_csp_nonces_in_value(nested, cached_csp_nonce) }
+    else value
+    end
   end
 
   def normalize_cached_pro_attribution_html(html, cached_csp_nonce = nil)
@@ -564,11 +589,9 @@ module ReactOnRailsProHelper
 
     if @rendered_rails_context && !normalized_html.include?(PRO_ATTRIBUTION_MARKER) &&
        !normalized_html.include?(RAILS_CONTEXT_MARKER)
-      # Preserve the fast path's identity contract: cached content that needed no rewrite
-      # and no attribution normalization is returned as the same object.
-      return html if normalized_html.equal?(html)
-
-      return was_html_safe ? normalized_html.html_safe : normalized_html
+      # rewrite_cached_csp_nonces preserves object identity when nothing matched and the
+      # receiver's html_safe flag when it rewrote, so the fast path returns it as-is.
+      return normalized_html
     end
 
     normalized_html = strip_leading_pro_attribution_comments(normalized_html)
@@ -665,7 +688,11 @@ module ReactOnRailsProHelper
     attribute_pattern = /(?<=\s)nonce=(["'])#{Regexp.escape(cached_csp_nonce)}\1/
     return html unless html.match?(attribute_pattern)
 
-    html.gsub(attribute_pattern) { %(nonce="#{current_nonce}") }
+    # SafeBuffer#gsub semantics vary across Rails versions (the html_safe flag is dropped,
+    # and some versions HTML-escape a non-safe block return), so rewrite a plain copy and
+    # restore the receiver's html_safe flag explicitly.
+    rewritten = String.new(html).gsub(attribute_pattern) { %(nonce="#{current_nonce}") }
+    html.html_safe? ? rewritten.html_safe : rewritten
   end
 
   # Returns the current request's CSP nonce, or nil when absent or malformed. The original

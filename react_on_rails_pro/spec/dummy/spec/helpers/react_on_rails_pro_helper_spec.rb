@@ -663,6 +663,8 @@ describe ReactOnRailsProHelper do
 
       expect(second_result).to include('nonce="hit-nonce-BBB="')
       expect(second_result).not_to include("miss-nonce-AAA=")
+      # The re-stamped value must render without Rails re-escaping it in a real view.
+      expect(second_result).to be_html_safe
       # The cache-write marker never leaks into served markup.
       expect(first_result).not_to include("rorp-cached-csp-nonce")
       expect(second_result).not_to include("rorp-cached-csp-nonce")
@@ -690,6 +692,9 @@ describe ReactOnRailsProHelper do
       expect(result).to include('<script nonce="attacker-guess">evil()</script>')
       expect(result).not_to include("origin-AAA=")
       expect(result).not_to include("rorp-cached-csp-nonce")
+      # A SafeBuffer written to a real store must come back out html_safe after the
+      # marker slice and nonce gsub (SafeBuffer#gsub drops the flag if unhandled).
+      expect(result).to be_html_safe
     end
 
     it "never serves another partition's entry to a request with a malformed nonce" do
@@ -797,6 +802,35 @@ describe ReactOnRailsProHelper do
 
       expect(second_result["componentHtml"]).to include('nonce="hash-hit-BBB="')
       expect(second_result["componentHtml"]).not_to include("hash-miss-AAA=")
+    end
+
+    it "re-stamps nonce-bearing strings in every cached_react_component_hash field" do
+      # A render function can return extra HTML-string fields alongside componentHtml
+      # (e.g. an Apollo state tag) whose scripts are stamped from railsContext.cspNonce.
+      expected_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(
+        "App", cache_key: "csp-nonce-hash-fields", prerender: true, csp_nonce_active: true
+      )
+      cached_hash = {
+        "componentHtml" => '<div>cached</div><script nonce="origin-AAA=">hydrate()</script>' \
+                           "<!--rorp-cached-csp-nonce:origin-AAA=-->".html_safe,
+        "apolloStateTag" => '<script nonce="origin-AAA=">window.__APOLLO_STATE__={}</script>'.html_safe,
+        "scriptTags" => ['<script nonce="origin-AAA=">one()</script>'],
+        "title" => "<title>Cached</title>"
+      }
+      Rails.cache.write(expected_cache_key, cached_hash)
+      allow(self).to receive(:csp_nonce).and_return("live-BBB=")
+
+      result = cached_react_component_hash("App", cache_key: "csp-nonce-hash-fields",
+                                                  auto_load_bundle: false) do
+        raise "props block must not run on a cache hit"
+      end
+
+      expect(result["componentHtml"]).to include('<script nonce="live-BBB=">hydrate()</script>')
+      expect(result["apolloStateTag"]).to eq('<script nonce="live-BBB=">window.__APOLLO_STATE__={}</script>')
+      expect(result["apolloStateTag"]).to be_html_safe
+      expect(result["scriptTags"]).to eq(['<script nonce="live-BBB=">one()</script>'])
+      expect(result["title"]).to eq("<title>Cached</title>")
+      expect(result.values.grep(String).join).not_to include("origin-AAA=")
     end
 
     it "leaves nonce-like text inside the cached props JSON untouched" do
