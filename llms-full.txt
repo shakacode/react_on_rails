@@ -22486,7 +22486,9 @@ explains why with a class-prefixed diagnostic:
 - **`Lockfile stale:`** — the lockfile has no entry matching the exact dependency selector
   currently in package.json (you changed package.json without re-installing), or a leftover
   lockfile from a previous package manager is being ignored. Re-run your manager's install, and
-  delete lockfiles from managers you no longer use.
+  delete lockfiles from managers you no longer use. One exemption: npm's ancient
+  `lockfileVersion: 1` format (npm 5-6) records no dependency selectors, so staleness cannot be
+  detected there — its version entries are trusted as-is.
 - **`Lockfile ambiguity:`** — lockfiles from more than one package manager exist and package.json
   does not declare which one owns the app. No lockfile is trusted in that state. Delete the stale
   lockfile(s), or declare your manager, e.g. `"packageManager": "pnpm@10.0.0"` in package.json.

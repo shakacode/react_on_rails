@@ -1322,6 +1322,12 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
           end
         end
 
+        context "with a pnpm-lock.yaml containing unquoted time: timestamps" do
+          it "still resolves the installed version (Date/Time scalars are permitted)" do
+            expect(node_package_version_for("pnpm_v9_time_field").raw).to eq("16.6.0")
+          end
+        end
+
         context "with a pnpm-lock.yaml whose recorded selector no longer matches package.json" do
           it "treats the lockfile as stale and falls back to the package.json spec" do
             expect(node_package_version_for("pnpm_v9_stale_selector").raw).to eq("^17.0.0")
@@ -1349,6 +1355,12 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
         context "with a bun.lock text lockfile (lockfileVersion 1, JSONC with trailing commas and comments)" do
           it "returns the installed version from the lockfile" do
             expect(node_package_version_for("bun_v1").raw).to eq("16.6.0")
+          end
+        end
+
+        context "with a real bun 1.4 bun.lock (lockfileVersion 2 + configVersion)" do
+          it "returns the installed version from the lockfile" do
+            expect(node_package_version_for("bun_v2_real").raw).to eq("16.6.0")
           end
         end
 
@@ -1403,7 +1415,7 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
         context "with the same caret spec across every package manager" do
           it "resolves the identical installed version from every lockfile format" do
             versions = %w[yarn_classic yarn_berry_v4 yarn_berry_v8 npm_v1 npm_v2 npm_v3 npm_shrinkwrap
-                          pnpm_v5 pnpm_v6 pnpm_v9 pnpm_v11_multidoc bun_v1].to_h do |fixture|
+                          pnpm_v5 pnpm_v6 pnpm_v9 pnpm_v11_multidoc bun_v1 bun_v2_real].to_h do |fixture|
               [fixture, node_package_version_for(fixture).raw]
             end
             expect(versions.values).to all(eq("16.6.0")), versions.inspect

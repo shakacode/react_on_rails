@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "yaml"
+require "date"
 
 module ReactOnRails
   class VersionChecker
@@ -334,7 +335,10 @@ module ReactOnRails
         end
 
         def self.berry_version(content, package_name, requested_spec)
-          doc = YAML.safe_load(content)
+          # Lockfiles can carry unquoted ISO timestamps (e.g. a time: map some pnpm versions
+          # write), which Psych types as Date/Time — permit them so safe parsing doesn't
+          # reject the file.
+          doc = YAML.safe_load(content, permitted_classes: [Date, Time])
           return :unrecognized unless doc.is_a?(Hash)
 
           entry = berry_entry(doc, package_name, requested_spec)
@@ -391,7 +395,9 @@ module ReactOnRails
         # multi-document lockfile (the env document, which has no importers), so scan the
         # stream for the project document instead.
         def self.project_document(path)
-          docs = YAML.safe_load_stream(File.read(path))
+          # permitted_classes: some pnpm versions write unquoted ISO timestamps (time: map),
+          # which Psych types as Date/Time and safe parsing would otherwise reject.
+          docs = YAML.safe_load_stream(File.read(path), permitted_classes: [Date, Time])
           docs.find { |d| d.is_a?(Hash) && (d.key?("importers") || d.key?("dependencies")) } || :unrecognized
         rescue Psych::Exception => e
           [:unreadable, e.message.to_s.lines.first&.strip]
