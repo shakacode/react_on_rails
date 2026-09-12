@@ -11,8 +11,8 @@ Each overlay result requires the deterministic marker and the original TSX file 
 
 ## Environment
 
-- Recorded: 2026-09-12T01:10:38.530Z
-- Harness commit: `caaa27bc232393836bb71c2f8c94ec656bed49c2`
+- Recorded: 2026-09-12T09:03:13.467Z
+- Harness commit: `ce8bb80f48f7ae11c4eb1ae999eb7377b5ecf1a4`
 - Worktree clean at start: true
 - OS: Darwin 25.6.0 arm64
 - CPU: Apple M5 Max (18 logical CPUs)
