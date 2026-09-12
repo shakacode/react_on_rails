@@ -306,7 +306,7 @@ async function evaluateCommitRuns({ github, context, core, sha, createdAfter, ex
       failingRunResults.push(runResult);
     } else if (runResult.kind === 'guard-only') {
       guardOnlyRuns.push(runResult.run);
-    } else if (runResult.successfulWorkflowId !== null) {
+    } else if (runResult.kind === 'passing' && runResult.successfulWorkflowId !== null) {
       successfulJobsByWorkflow.set(runResult.successfulWorkflowId, new Set(runResult.successfulJobNames));
     }
   }

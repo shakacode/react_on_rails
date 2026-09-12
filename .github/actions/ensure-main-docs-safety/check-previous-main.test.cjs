@@ -3,6 +3,7 @@ const {
   GUARD_JOB_NAME,
   GUARD_STEP_NAME,
   checkPreviousMainCommitStatus,
+  evaluateCommitRuns,
   isGuardOnlyFailure,
   latestRunsByWorkflow,
   parseExcludeWorkflows,
@@ -301,6 +302,29 @@ async function testUnexpectedJobIteratorShapeFailsClearly() {
   assert.equal(core.failed.length, 1);
   assert.match(core.failed[0], /GitHub API returned an unexpected response/);
   assert.match(core.failed[0], /Expected jobs array while listing workflow run 15 \(Main push lint\)\./);
+}
+
+async function testNoJobsRunDoesNotCreateSuccessfulWorkflowEvidence() {
+  const previous = 'previous';
+  const emptyRun = run({ id: 16, sha: previous, name: 'Empty workflow' });
+  const github = makeGithub({
+    pages: [[emptyRun]],
+    jobsByRunId: {},
+    parentsBySha: {},
+  });
+  const core = makeCore();
+
+  const result = await evaluateCommitRuns({
+    github,
+    context,
+    core,
+    sha: previous,
+    createdAfter: '2026-01-01T00:00:00.000Z',
+    excludeWorkflows: [],
+  });
+
+  assert.deepEqual(Array.from(result.successfulJobsByWorkflow), []);
+  assert.match(core.warnings[0], /No jobs found for workflow run 16/);
 }
 
 async function testGuardOnlyHopLimitStopsAtConfiguredLimit() {
@@ -1644,6 +1668,7 @@ async function main() {
   await testPaginatedJobsAreChecked();
   await testOctokitJobIteratorArrayPagesAreChecked();
   await testUnexpectedJobIteratorShapeFailsClearly();
+  await testNoJobsRunDoesNotCreateSuccessfulWorkflowEvidence();
   await testGuardOnlyHopLimitStopsAtConfiguredLimit();
 }
 
