@@ -27,6 +27,8 @@ test('source location accepts an original path and line but rejects a generated 
   assert.equal(sourceLocationVisible(`${relativePath}:17:9`, relativePath, 17), true);
   assert.equal(sourceLocationVisible(`${relativePath} ╭─[17:9]`, relativePath, 17), true);
   assert.equal(sourceLocationVisible('assets/application.js:17:9', relativePath, 17), false);
+  assert.equal(sourceLocationVisible('/tmp/other/index.tsx:17:9', relativePath, 17), false);
+  assert.equal(sourceLocationVisible(`${relativePath} mentioned; node.js:17:9`, relativePath, 17), false);
   assert.equal(sourceLocationVisible(`${relativePath}:18:9`, relativePath, 17), false);
 });
 

@@ -24,13 +24,20 @@ export function addRuntimeError(source, tool) {
 
 export function sourceLocationVisible(text, relativePath, line) {
   const normalized = text.replaceAll('\\', '/');
-  const basename = path.posix.basename(relativePath);
-  const hasPath = normalized.includes(relativePath) || normalized.includes(basename);
+  const normalizedPath = relativePath.replaceAll('\\', '/');
+  const pathIndex = normalized.indexOf(normalizedPath);
+  if (pathIndex === -1) return false;
+  const escapedPath = normalizedPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const escapedLine = String(line).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const hasLine = new RegExp(`(?::|\\(|\\[|line\\s+)${escapedLine}(?::\\d+|\\)|\\]|\\s)`, 'i').test(
-    normalized,
+  if (new RegExp(`${escapedPath}:${escapedLine}:\\d+`).test(normalized)) return true;
+
+  // Rspack renders the source path in the error heading and its line/column in
+  // the immediately following SWC code frame instead of one contiguous token.
+  const errorTail = normalized.slice(
+    pathIndex + normalizedPath.length,
+    pathIndex + normalizedPath.length + 400,
   );
-  return hasPath && hasLine;
+  return new RegExp(`(?:╭─)?\\[${escapedLine}:\\d+\\]`).test(errorTail);
 }
 
 export function parseEditorInvocation(invocation, workspaceDirectory, expectedSourcePath) {
