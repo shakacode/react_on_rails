@@ -40,3 +40,5 @@ internal/analysis/experiments/
 # Pinned generated Rails fixtures and recorded benchmark output.
 benchmarks/rspack-vite-rails-dx/starters/
 benchmarks/rspack-vite-rails-dx/results/*.json
+# Intentionally invalid JSON fixture (lockfile parser resilience test)
+react_on_rails/spec/react_on_rails/fixtures/lockfiles/npm_malformed/package-lock.json

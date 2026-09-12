@@ -1,0 +1,30 @@
+module ReactOnRails
+  class VersionChecker
+    module LockfileResolution
+      def self.version: (String dir, String package_name) -> String?
+      def self.berry_yarn_version: (String content, String package_name) -> String?
+      def self.guard: [T] () { () -> T } -> T?
+
+      module PnpmLockfile
+        def self.version: (String path, String package_name) -> String?
+        def self.dependencies: (Hash[String, untyped] doc) -> Hash[String, untyped]?
+        def self.project_document: (String path) -> Hash[String, untyped]?
+        def self.strip_peer_suffix: (String? version) -> String?
+      end
+
+      module BunLockfile
+        STRING_LITERAL: Regexp
+        LINE_COMMENT: Regexp
+        BLOCK_COMMENT: Regexp
+        TRAILING_COMMA: Regexp
+
+        def self.version: (String path, String package_name) -> String?
+        def self.jsonc_to_json: (String content) -> String
+      end
+
+      module BerryYarnLockfile
+        def self.version: (String content, String package_name) -> String?
+      end
+    end
+  end
+end
