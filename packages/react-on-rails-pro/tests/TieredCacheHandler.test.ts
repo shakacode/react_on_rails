@@ -360,6 +360,28 @@ describe('TieredCacheHandler', () => {
       expect(promoted.timestamp).toBeLessThanOrEqual(Date.now());
     });
 
+    test('a future-stamped Infinity entry is also promoted (Infinity is the other indefinite spelling)', async () => {
+      // RedisCacheHandler maps every non-finite revalidate to the non-expiring
+      // representation (serialized as 0, stored without EX), and the in-memory
+      // handler's age check can never exceed Infinity — so like revalidate: 0,
+      // an Infinity entry's expiry cannot depend on its timestamp and clock
+      // skew must not block promotion.
+      const skewed = makeEntry({ revalidate: Infinity, timestamp: Date.now() + 5_000 });
+      const stubL2: InMemoryLRUCacheHandler = {
+        get: jest.fn().mockResolvedValue(skewed),
+        set: jest.fn().mockResolvedValue(undefined),
+      } as unknown as InMemoryLRUCacheHandler;
+      const capped = new TieredCacheHandler(l1, stubL2, { l1MaxTtlSeconds: 30 });
+      const l1SetSpy = jest.spyOn(l1, 'set');
+
+      await capped.get('key');
+
+      expect(l1SetSpy).toHaveBeenCalledTimes(1);
+      const promoted = l1SetSpy.mock.calls[0][1];
+      expect(promoted.revalidate).toBe(30);
+      expect(promoted.timestamp).toBeLessThanOrEqual(Date.now());
+    });
+
     test('a sub-second cap still promotes (flooring must not zero out the cap)', async () => {
       // Flooring exists to stop Redis EX ceil from passing the ORIGINAL expiry,
       // so only the remaining-lifetime term is floored; the cap itself is

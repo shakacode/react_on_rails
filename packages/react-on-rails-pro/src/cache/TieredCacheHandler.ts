@@ -128,7 +128,11 @@ export class TieredCacheHandler implements CacheHandler {
     if (this.l1Disabled()) return null;
 
     const now = Date.now();
-    const hasFiniteLifetime = entry.revalidate > 0;
+    // Infinity counts as indefinite, not finite: both supported backends treat
+    // it as "never expires" (RedisCacheHandler serializes any non-finite
+    // revalidate as 0 / no EX; InMemoryLRUCacheHandler's age check can never
+    // exceed it), so it must take the indefinite path below.
+    const hasFiniteLifetime = Number.isFinite(entry.revalidate) && entry.revalidate > 0;
 
     // A future timestamp on a finite entry means the producer's clock is ahead
     // of ours: any remaining lifetime computed from it overshoots the entry's
