@@ -28,20 +28,13 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 - **Version checking now resolves the installed package version from pnpm, bun, and Yarn Berry lockfiles**:
   `pnpm-lock.yaml` (lockfileVersion 5.4/6.0/9.0, including the pnpm 11 multi-document form), `bun.lock`
-  (lockfileVersion 0-2), Yarn Berry `yarn.lock` (`__metadata` versions 4-8), and `npm-shrinkwrap.json` join the
-  existing Yarn classic and `package-lock.json` support, so semver ranges like `^17.0.0` in package.json no longer
-  fail Rails boot for pnpm, bun, and Yarn 2+ users. Resolution now trusts only the confidently detected package
-  manager (the declared `packageManager` field, or the single lockfile present) and never reads another manager's
-  possibly-stale lockfile; lockfile entries are matched against package.json's exact dependency selector rather
-  than the first same-name entry; and boot errors/warnings carry class-prefixed diagnostics
-  (`Lockfile missing:`/`Lockfile stale:`/`Lockfile ambiguity:`/`Lockfile unsupported:`) naming the file and fix.
+  (lockfileVersion 0-2, JSONC), and Yarn Berry `yarn.lock` (`__metadata` versions 4-8) join the existing Yarn
+  classic and `package-lock.json` support, with the same package.json fallback and precedence behavior as before —
+  so semver ranges like `^17.0.0` in package.json no longer fail Rails boot for pnpm, bun, and Yarn 2+ users.
   The binary `bun.lockb` is not parsed — migrate with
-  `bun install --save-text-lockfile --frozen-lockfile --lockfile-only`.
-  **Action required for upgraders:** an app carrying lockfiles from two package managers with no `packageManager`
-  field in package.json now logs a `Lockfile ambiguity` deprecation warning at boot; for this release it still
-  resolves via the legacy yarn-first precedence (now with exact-selector matching) so previously-booting apps keep
-  booting, but a future release removes that fallback and this situation will fail boot. Delete the stale lockfile
-  or declare your package manager in package.json's `packageManager` field before then. Fixes
+  `bun install --save-text-lockfile --frozen-lockfile --lockfile-only`, or pin the exact version. A malformed or
+  unreadable lockfile falls back to the package.json version instead of erroring, and the non-exact-version error
+  text now explains the relaxed installed-version rule instead of forbidding semver ranges outright. Fixes
   [Issue 5049](https://github.com/shakacode/react_on_rails/issues/5049).
   [PR 5058](https://github.com/shakacode/react_on_rails/pull/5058) by
   [AbanoubGhadban](https://github.com/AbanoubGhadban).

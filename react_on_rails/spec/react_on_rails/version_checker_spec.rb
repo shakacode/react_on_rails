@@ -24,7 +24,6 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
       context "when both react-on-rails and react-on-rails-pro packages are installed" do
         let(:node_package_version) do
           instance_double(VersionChecker::NodePackageVersion,
-                          resolution_diagnostic: nil,
                           react_on_rails_package?: true,
                           react_on_rails_pro_package?: true,
                           raw: "16.1.1",
@@ -42,7 +41,6 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
       context "when neither react-on-rails nor react-on-rails-pro packages are installed" do
         let(:node_package_version) do
           instance_double(VersionChecker::NodePackageVersion,
-                          resolution_diagnostic: nil,
                           react_on_rails_package?: false,
                           react_on_rails_pro_package?: false,
                           raw: nil,
@@ -64,7 +62,6 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
       context "when Pro gem is installed but using base package" do
         let(:node_package_version) do
           instance_double(VersionChecker::NodePackageVersion,
-                          resolution_diagnostic: nil,
                           react_on_rails_package?: true,
                           react_on_rails_pro_package?: false,
                           raw: "16.1.1",
@@ -89,7 +86,6 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
       context "when Pro package is installed but Pro gem is not" do
         let(:node_package_version) do
           instance_double(VersionChecker::NodePackageVersion,
-                          resolution_diagnostic: nil,
                           react_on_rails_package?: false,
                           react_on_rails_pro_package?: true,
                           raw: "16.1.1",
@@ -112,9 +108,9 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
         end
       end
 
-      describe "lockfile resolution diagnostics" do
-        # Runs the real NodePackageVersion against a fixtures/lockfiles/<dir> directory
-        # (no File stubbing — detection reads the actual fixture files).
+      describe "lockfile robustness" do
+        # Runs the real NodePackageVersion against a fixtures/lockfiles/<dir> directory so the
+        # actual fixture lockfiles are read (no File stubbing).
         def validate_fixture!(fixture_dir)
           package_json = File.expand_path("fixtures/lockfiles/#{fixture_dir}/package.json", __dir__)
           allow(Rails).to receive(:root).and_return(Pathname.new(File.dirname(package_json)))
@@ -123,154 +119,23 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
           VersionChecker.new(node_package_version).validate_version_and_package_compatibility!
         end
 
-        context "when two managers' lockfiles exist and the legacy-precedence lockfile resolves correctly" do
-          it "boots on the deprecated grace fallback and warns with the ambiguity diagnostic" do
-            stub_gem_version("16.6.0")
-            allow(Rails.logger).to receive(:warn)
-            expect { validate_fixture!("ambiguous_grace_yarn_npm") }.not_to raise_error
-            expect(Rails.logger).to have_received(:warn)
-              .with(a_string_including("Lockfile ambiguity:").and(a_string_including("deprecated")))
-          end
-        end
-
-        context "when two managers' lockfiles exist and the legacy-precedence lockfile is stale" do
-          it "raises the version-mismatch error carrying the ambiguity diagnostic" do
-            stub_gem_version("16.6.0")
-            expect { validate_fixture!("ambiguous_yarn_npm") }.to raise_error(ReactOnRails::Error) do |error|
-              expect(error.message).to include("does not match the gem version")
-              expect(error.message).to include("Lockfile ambiguity:")
-              expect(error.message).to include("yarn.lock")
-              expect(error.message).to include("package-lock.json")
-              expect(error.message).to include("packageManager")
-            end
-          end
-        end
-
-        context "when the lockfile's recorded selector no longer matches package.json" do
-          it "raises the exact-version error carrying a class-prefixed stale diagnostic" do
-            stub_gem_version("17.0.0")
-            expect { validate_fixture!("pnpm_v9_stale_selector") }.to raise_error(ReactOnRails::Error) do |error|
-              expect(error.message).to include("not an exact version")
-              expect(error.message).to include("Lockfile stale:")
-              expect(error.message).to include("pnpm-lock.yaml")
-              expect(error.message).to include("react-on-rails@^17.0.0")
-              expect(error.message).to include("pnpm install")
-            end
-          end
-        end
-
-        context "when detection is ambiguous but package.json pins the exact matching version" do
-          it "passes the check and surfaces the ambiguity as a logged warning" do
-            stub_gem_version("16.6.0")
-            allow(Rails.logger).to receive(:warn)
-            expect { validate_fixture!("ambiguous_exact_pin") }.not_to raise_error
-            expect(Rails.logger).to have_received(:warn).with(a_string_including("Lockfile ambiguity:"))
-          end
-        end
-
-        context "when the declared manager resolves but a foreign lockfile is also present" do
-          it "passes the check and warns that the foreign lockfile is ignored as presumed stale" do
-            stub_gem_version("16.6.0")
-            allow(Rails.logger).to receive(:warn)
-            expect { validate_fixture!("npm_confident_with_stale_yarn") }.not_to raise_error
-            expect(Rails.logger).to have_received(:warn)
-              .with(a_string_including("Lockfile stale:").and(a_string_including("ignoring yarn.lock")))
-          end
-        end
-
-        context "when packageManager is declared but no lockfile exists" do
-          it "raises the exact-version error carrying a class-prefixed missing diagnostic" do
-            stub_gem_version("16.6.0")
-            expect { validate_fixture!("missing_declared_pnpm") }.to raise_error(ReactOnRails::Error) do |error|
-              expect(error.message).to include("Lockfile missing:")
-              expect(error.message).to include("pnpm install")
+        # A lockfile the parsers cannot use must behave exactly like a missing one: resolution
+        # falls back to the package.json version (an exact pin in these fixtures), and boot
+        # succeeds — a bad lockfile must never crash the Rails initializer.
+        %w[pnpm_corrupt pnpm_wrong_shape pnpm_yaml_alias pnpm_invalid_encoding
+           bun_invalid_encoding].each do |fixture|
+          context "when the lockfile is unusable (#{fixture})" do
+            it "falls back to package.json and boots" do
+              stub_gem_version("16.6.0")
+              expect { validate_fixture!(fixture) }.not_to raise_error
             end
           end
         end
 
         context "when only the binary bun.lockb exists" do
-          it "raises the exact-version error carrying a class-prefixed unsupported diagnostic" do
+          it "is not parsed; package.json is used and boot succeeds with an exact pin" do
             stub_gem_version("16.6.0")
-            expect { validate_fixture!("bun_lockb") }.to raise_error(ReactOnRails::Error) do |error|
-              expect(error.message).to include("Lockfile unsupported:")
-              expect(error.message).to include("bun.lockb")
-              expect(error.message).to include("--save-text-lockfile")
-            end
-          end
-        end
-
-        context "when the lockfile cannot be parsed" do
-          it "raises the exact-version error carrying a class-prefixed unsupported diagnostic" do
-            stub_gem_version("16.6.0")
-            expect { validate_fixture!("pnpm_corrupt") }.to raise_error(ReactOnRails::Error) do |error|
-              expect(error.message).to include("Lockfile unsupported:")
-              expect(error.message).to include("could not parse pnpm-lock.yaml")
-            end
-          end
-        end
-
-        context "when packageManager declares pnpm but only a yarn.lock exists" do
-          it "boots on the deprecated grace fallback and warns with the declared-vs-disk diagnostic" do
-            stub_gem_version("16.6.0")
-            allow(Rails.logger).to receive(:warn)
-            expect { validate_fixture!("declared_conflict") }.not_to raise_error
-            expect(Rails.logger).to have_received(:warn)
-              .with(a_string_including("Lockfile ambiguity:").and(a_string_including("packageManager: pnpm")))
-          end
-        end
-
-        context "when an npm v3 lockfile only retains a transitive node_modules entry" do
-          it "treats the lockfile as stale rather than trusting the unrelated version" do
-            stub_gem_version("16.6.0")
-            expect { validate_fixture!("npm_v3_transitive_only") }.to raise_error(ReactOnRails::Error) do |error|
-              expect(error.message).to include("not an exact version")
-              expect(error.message).to include("Lockfile stale:")
-            end
-          end
-        end
-
-        context "when a parseable lockfile has an unexpected structure" do
-          it "boots with an unsupported-lockfile warning instead of crashing" do
-            stub_gem_version("16.6.0")
-            allow(Rails.logger).to receive(:warn)
-            expect { validate_fixture!("pnpm_wrong_shape") }.not_to raise_error
-            expect(Rails.logger).to have_received(:warn).with(a_string_including("Lockfile unsupported:"))
-          end
-        end
-
-        context "when the lockfile contains invalid UTF-8 bytes" do
-          it "boots with an unsupported-lockfile warning instead of crashing (pnpm YAML path)" do
-            stub_gem_version("16.6.0")
-            allow(Rails.logger).to receive(:warn)
-            expect { validate_fixture!("pnpm_invalid_encoding") }.not_to raise_error
-            expect(Rails.logger).to have_received(:warn).with(a_string_including("Lockfile unsupported:"))
-          end
-
-          it "boots with an unsupported-lockfile warning instead of crashing (bun JSONC path)" do
-            stub_gem_version("16.6.0")
-            allow(Rails.logger).to receive(:warn)
-            expect { validate_fixture!("bun_invalid_encoding") }.not_to raise_error
-            expect(Rails.logger).to have_received(:warn).with(a_string_including("Lockfile unsupported:"))
-          end
-        end
-
-        context "when the lockfile uses YAML aliases (rejected by safe parsing)" do
-          it "boots with an unsupported-lockfile warning instead of crashing" do
-            stub_gem_version("16.6.0")
-            allow(Rails.logger).to receive(:warn)
-            expect { validate_fixture!("pnpm_yaml_alias") }.not_to raise_error
-            expect(Rails.logger).to have_received(:warn).with(a_string_including("Lockfile unsupported:"))
-          end
-        end
-
-        context "when no lockfile and no packageManager field exist at all" do
-          it "raises a coherent exact-version error without referencing an absent diagnostic" do
-            stub_gem_version("1.2.3")
-            expect { validate_fixture!("no_lockfile") }.to raise_error(ReactOnRails::Error) do |error|
-              expect(error.message).to include("not an exact version")
-              expect(error.message).not_to include("see above")
-              expect(error.message).not_to include("Lockfile ambiguity:")
-            end
+            expect { validate_fixture!("bun_lockb") }.not_to raise_error
           end
         end
       end
@@ -278,7 +143,6 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
       context "when package version is not exact (has semver wildcard)" do
         let(:node_package_version) do
           instance_double(VersionChecker::NodePackageVersion,
-                          resolution_diagnostic: nil,
                           react_on_rails_package?: true,
                           react_on_rails_pro_package?: false,
                           raw: "^16.1.1",
@@ -300,7 +164,6 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
       context "when package version does not match gem version" do
         let(:node_package_version) do
           instance_double(VersionChecker::NodePackageVersion,
-                          resolution_diagnostic: nil,
                           react_on_rails_package?: true,
                           react_on_rails_pro_package?: false,
                           raw: "16.1.2",
@@ -323,7 +186,6 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
       context "when versions match exactly" do
         let(:node_package_version) do
           instance_double(VersionChecker::NodePackageVersion,
-                          resolution_diagnostic: nil,
                           react_on_rails_package?: true,
                           react_on_rails_pro_package?: false,
                           raw: "16.1.1",
@@ -344,7 +206,6 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
       context "when using local path" do
         let(:node_package_version) do
           instance_double(VersionChecker::NodePackageVersion,
-                          resolution_diagnostic: nil,
                           react_on_rails_package?: true,
                           react_on_rails_pro_package?: false,
                           raw: "file:../react-on-rails",
@@ -364,7 +225,6 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
       context "when using pnpm workspace protocol" do
         let(:node_package_version) do
           instance_double(VersionChecker::NodePackageVersion,
-                          resolution_diagnostic: nil,
                           react_on_rails_package?: true,
                           react_on_rails_pro_package?: false,
                           raw: "workspace:*",
@@ -384,7 +244,6 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
       context "when Pro gem and Pro package are both installed with matching versions" do
         let(:node_package_version) do
           instance_double(VersionChecker::NodePackageVersion,
-                          resolution_diagnostic: nil,
                           react_on_rails_package?: false,
                           react_on_rails_pro_package?: true,
                           raw: "16.1.1",
@@ -1006,7 +865,6 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
       context "when package.json file does not exist" do
         let(:node_package_version) do
           instance_double(VersionChecker::NodePackageVersion,
-                          resolution_diagnostic: nil,
                           package_json: "/path/to/nonexistent/package.json")
         end
 
@@ -1033,7 +891,6 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
     def double_package_version(raw: nil, semver_wildcard: false,
                                parts: nil, local_path_or_url: false)
       instance_double(VersionChecker::NodePackageVersion,
-                      resolution_diagnostic: nil,
                       raw:,
                       semver_wildcard?: semver_wildcard,
                       parts:,
@@ -1267,9 +1124,12 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
 
       describe "Lockfile version resolution" do
         # Each fixtures/lockfiles/<dir> holds a package.json plus lockfiles under their real
-        # filenames, so directory-based lockfile discovery operates on the fixture dir itself.
+        # filenames; yarn.lock/package-lock.json paths are injected as the checker does itself.
         def node_package_version_in(fixture_dir)
-          described_class.new(File.expand_path("fixtures/lockfiles/#{fixture_dir}/package.json", __dir__))
+          base = File.expand_path("fixtures/lockfiles/#{fixture_dir}", __dir__)
+          described_class.new(File.join(base, "package.json"),
+                              File.join(base, "yarn.lock"),
+                              File.join(base, "package-lock.json"))
         end
 
         context "with similar package names in yarn.lock" do
@@ -1318,62 +1178,50 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
       describe "Lockfile version resolution across package managers" do
         # Fixture directories under fixtures/lockfiles/ hold REAL lockfiles generated by the
         # actual package managers against react-on-rails@^16.1.1 (resolved: 16.6.0), using real
-        # filenames so directory-based lockfile discovery operates on the fixture dir itself.
+        # filenames. yarn.lock/package-lock.json go through the long-standing injected-path
+        # parsers; pnpm-lock.yaml and bun.lock are found next to package.json.
         def node_package_version_for(fixture_dir)
-          described_class.new(File.expand_path("fixtures/lockfiles/#{fixture_dir}/package.json", __dir__))
+          base = File.expand_path("fixtures/lockfiles/#{fixture_dir}", __dir__)
+          described_class.new(File.join(base, "package.json"),
+                              File.join(base, "yarn.lock"),
+                              File.join(base, "package-lock.json"))
         end
 
-        context "with pnpm-lock.yaml lockfileVersion 9.0 (pnpm 9/10) and a caret spec" do
-          it "returns the installed version from the lockfile" do
-            expect(node_package_version_for("pnpm_v9").raw).to eq("16.6.0")
+        {
+          "yarn_classic" => "Yarn classic yarn.lock",
+          "yarn_berry_v4" => "Yarn Berry yarn.lock (__metadata version 4, yarn 2)",
+          "yarn_berry_v8" => "Yarn Berry yarn.lock (__metadata version 8, yarn 4)",
+          "npm_v1" => "package-lock.json lockfileVersion 1 (npm 5-6)",
+          "npm_v2" => "package-lock.json lockfileVersion 2 (npm 7-8)",
+          "npm_v3" => "package-lock.json lockfileVersion 3 (npm 9+)",
+          "pnpm_v5" => "pnpm-lock.yaml lockfileVersion 5.4 (pnpm 7)",
+          "pnpm_v6" => "pnpm-lock.yaml lockfileVersion 6.0 (pnpm 8)",
+          "pnpm_v9" => "pnpm-lock.yaml lockfileVersion 9.0 (pnpm 9/10)",
+          "pnpm_v11_multidoc" => "pnpm 11 multi-document pnpm-lock.yaml",
+          "pnpm_v9_time_field" => "pnpm-lock.yaml with unquoted time: timestamps",
+          "bun_v1" => "bun.lock text lockfile (lockfileVersion 1, JSONC)",
+          "bun_v2_real" => "real bun 1.4 bun.lock (lockfileVersion 2)"
+        }.each do |fixture, description|
+          context "with a #{description} and a caret spec" do
+            it "returns the installed version from the lockfile" do
+              expect(node_package_version_for(fixture).raw).to eq("16.6.0")
+            end
           end
         end
 
-        context "with pnpm-lock.yaml lockfileVersion 6.0 (pnpm 8) and a caret spec" do
-          it "returns the installed version from the lockfile" do
-            expect(node_package_version_for("pnpm_v6").raw).to eq("16.6.0")
+        # The relaxed rule from #1898: the INSTALLED version is what gets checked, so a lockfile
+        # entry still resolves by package name even after package.json's range was edited.
+        %w[yarn_classic_stale_selector yarn_berry_v8_stale_selector pnpm_v9_stale_selector].each do |fixture|
+          context "when package.json's range changed after install (#{fixture})" do
+            it "still resolves the installed version recorded in the lockfile" do
+              expect(node_package_version_for(fixture).raw).to eq("16.6.0")
+            end
           end
         end
 
-        context "with pnpm-lock.yaml lockfileVersion 5.4 (pnpm 7) and a caret spec" do
-          it "returns the installed version from the lockfile" do
-            expect(node_package_version_for("pnpm_v5").raw).to eq("16.6.0")
-          end
-        end
-
-        context "with a pnpm 11 multi-document pnpm-lock.yaml (env document before project document)" do
-          it "resolves from the project document, not the env document" do
-            expect(node_package_version_for("pnpm_v11_multidoc").raw).to eq("16.6.0")
-          end
-        end
-
-        context "with a pnpm-lock.yaml containing unquoted time: timestamps" do
-          it "still resolves the installed version (Date/Time scalars are permitted)" do
-            expect(node_package_version_for("pnpm_v9_time_field").raw).to eq("16.6.0")
-          end
-        end
-
-        context "with a pnpm-lock.yaml whose recorded selector no longer matches package.json" do
-          it "treats the lockfile as stale and falls back to the package.json spec" do
-            expect(node_package_version_for("pnpm_v9_stale_selector").raw).to eq("^17.0.0")
-          end
-        end
-
-        context "with a Yarn Berry yarn.lock (__metadata version 8, yarn 4) and a caret spec" do
-          it "returns the installed version from the lockfile" do
-            expect(node_package_version_for("yarn_berry_v8").raw).to eq("16.6.0")
-          end
-        end
-
-        context "with a Yarn Berry yarn.lock (__metadata version 4, yarn 2)" do
-          it "returns the installed version from the lockfile (entry shape is stable across Berry versions)" do
-            expect(node_package_version_for("yarn_berry_v4").raw).to eq("16.6.0")
-          end
-        end
-
-        context "with a Yarn Berry yarn.lock whose selectors no longer match package.json" do
-          it "treats the lockfile as stale and falls back to the package.json spec" do
-            expect(node_package_version_for("yarn_berry_v8_stale_selector").raw).to eq("^17.0.0")
+        context "when lockfiles from several package managers exist" do
+          it "prefers yarn.lock, matching the long-standing precedence" do
+            expect(node_package_version_for("ambiguous_yarn_npm").raw).to eq("16.5.0")
           end
         end
 
@@ -1383,15 +1231,13 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
           end
         end
 
-        context "with a bun.lock text lockfile (lockfileVersion 1, JSONC with trailing commas and comments)" do
-          it "returns the installed version from the lockfile" do
-            expect(node_package_version_for("bun_v1").raw).to eq("16.6.0")
-          end
-        end
-
-        context "with a real bun 1.4 bun.lock (lockfileVersion 2 + configVersion)" do
-          it "returns the installed version from the lockfile" do
-            expect(node_package_version_for("bun_v2_real").raw).to eq("16.6.0")
+        context "with the same caret spec across every package manager" do
+          it "resolves the identical installed version from every lockfile format" do
+            versions = %w[yarn_classic yarn_berry_v4 yarn_berry_v8 npm_v1 npm_v2 npm_v3
+                          pnpm_v5 pnpm_v6 pnpm_v9 pnpm_v11_multidoc bun_v1 bun_v2_real].to_h do |fixture|
+              [fixture, node_package_version_for(fixture).raw]
+            end
+            expect(versions.values).to all(eq("16.6.0")), versions.inspect
           end
         end
 
@@ -1410,64 +1256,6 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
             parsed = JSON.parse(sanitized)
             expect(parsed["tricky"]).to eq(["x,]", "y, }", "// not a comment", "a /* not */ comment"])
             expect(parsed["packages"]["p"].first).to eq("p@1.0.0")
-          end
-        end
-
-        context "with a Yarn classic yarn.lock holding multiple blocks for the same package" do
-          it "picks the block matching package.json's exact selector, not the first same-name block" do
-            expect(node_package_version_for("yarn_classic_multi_block").raw).to eq("17.0.0")
-          end
-        end
-
-        context "with a Yarn classic yarn.lock and a caret spec" do
-          it "returns the installed version from the lockfile" do
-            expect(node_package_version_for("yarn_classic").raw).to eq("16.6.0")
-          end
-        end
-
-        context "with a Yarn classic yarn.lock whose selectors no longer match package.json" do
-          it "treats the lockfile as stale and falls back to the package.json spec" do
-            expect(node_package_version_for("yarn_classic_stale_selector").raw).to eq("^17.0.0")
-          end
-        end
-
-        context "with a package-lock.json lockfileVersion 3 (npm 9+) discovered next to package.json" do
-          it "returns the installed version from the lockfile" do
-            expect(node_package_version_for("npm_v3").raw).to eq("16.6.0")
-          end
-        end
-
-        context "when packageManager declares npm and its lockfile exists alongside a stale yarn.lock" do
-          it "trusts only the declared manager's lockfile and never reads the foreign one" do
-            expect(node_package_version_for("npm_confident_with_stale_yarn").raw).to eq("16.6.0")
-          end
-        end
-
-        context "with a package-lock.json lockfileVersion 1 (npm 5-6)" do
-          it "returns the installed version from the lockfile" do
-            expect(node_package_version_for("npm_v1").raw).to eq("16.6.0")
-          end
-        end
-
-        context "with a package-lock.json lockfileVersion 2 (npm 7-8)" do
-          it "returns the installed version from the lockfile" do
-            expect(node_package_version_for("npm_v2").raw).to eq("16.6.0")
-          end
-        end
-
-        context "with an npm-shrinkwrap.json (same format npm prefers over package-lock.json)" do
-          it "returns the installed version from the shrinkwrap file" do
-            expect(node_package_version_for("npm_shrinkwrap").raw).to eq("16.6.0")
-          end
-        end
-
-        context "with the same caret spec across every package manager" do
-          it "resolves the identical installed version from every lockfile format" do
-            versions = %w[yarn_classic yarn_berry_v4 yarn_berry_v8 npm_v1 npm_v2 npm_v3 npm_shrinkwrap
-                          pnpm_v5 pnpm_v6 pnpm_v9 pnpm_v11_multidoc bun_v1 bun_v2_real].to_h do |fixture|
-              [fixture, node_package_version_for(fixture).raw]
-            end
-            expect(versions.values).to all(eq("16.6.0")), versions.inspect
           end
         end
       end

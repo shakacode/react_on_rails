@@ -22473,34 +22473,24 @@ bin/rails generate react_on_rails:install
 - Use the bundled `npm`, or install another package manager such as `pnpm`, `yarn`, or `bun`
 - On macOS, for example: `brew install node pnpm`
 
-### "Package version is not an exact version" / lockfile diagnostics at boot
+### "Package version is not an exact version" at boot
 
 At boot, React on Rails verifies that the npm package version matches the gem version. It
-resolves the **lockfile-recorded** package version from your package manager's lockfile (npm,
-Yarn classic, Yarn Berry, pnpm, and bun are all supported), so semver ranges like `^17.0.0` in
-package.json are fine as long as a lockfile can answer. When no lockfile can answer, the error
-explains why with a class-prefixed diagnostic:
+resolves the installed version from your package manager's lockfile (`yarn.lock` — both Yarn
+classic and Yarn Berry formats — `package-lock.json`, `pnpm-lock.yaml`, and `bun.lock`), so
+semver ranges like `^17.0.0` in package.json are fine as long as a lockfile can answer. When no
+lockfile can answer, the raw package.json version must be an exact version matching the gem.
 
-- **`Lockfile missing:`** — your declared package manager has no lockfile yet. Run its install
-  command (e.g. `pnpm install`) to generate one.
-- **`Lockfile stale:`** — the lockfile has no entry matching the exact dependency selector
-  currently in package.json (you changed package.json without re-installing), or a leftover
-  lockfile from a previous package manager is being ignored. Re-run your manager's install, and
-  delete lockfiles from managers you no longer use. One exemption: npm's ancient
-  `lockfileVersion: 1` format (npm 5-6) records no dependency selectors, so staleness cannot be
-  detected there — its version entries are trusted as-is.
-- **`Lockfile ambiguity:`** — lockfiles from more than one package manager exist and package.json
-  does not declare which one owns the app. For this release the check still resolves through the
-  deprecated legacy precedence (yarn first) with exact-selector matching and logs this warning; a
-  future release removes that fallback and treats ambiguity as unresolved. Delete the stale
-  lockfile(s), or declare your manager, e.g. `"packageManager": "pnpm@10.0.0"` in package.json.
-- **`Lockfile unsupported:`** — the lockfile cannot be used: it is unreadable/corrupt, it parses
-  but has an unrecognized structure (possibly from a newer package-manager release), or it is the
-  binary `bun.lockb`, which is never parsed — migrate to bun's text lockfile with
-  `bun install --save-text-lockfile --frozen-lockfile --lockfile-only` and delete `bun.lockb`.
+Notes and known limitations:
 
-Two known limitations:
-
+- **Binary `bun.lockb` is not parsed.** Migrate to bun's text lockfile with
+  `bun install --save-text-lockfile --frozen-lockfile --lockfile-only`, then delete `bun.lockb`
+  — or pin the exact version in package.json.
+- **A malformed or unreadable lockfile behaves like a missing one**: resolution falls back to
+  the package.json version.
+- **Multiple lockfiles**: when lockfiles from several package managers exist, `yarn.lock` is
+  consulted first, then `package-lock.json`, then `pnpm-lock.yaml`, then `bun.lock`. Delete
+  lockfiles from managers you no longer use.
 - **Monorepos / workspaces with a hoisted lockfile**: the checker looks for the lockfile next to
   the package.json it validates. Package managers hoist the lockfile to the workspace root, so a
   Rails app that is a workspace member may resolve no lockfile and fall back to the strict
