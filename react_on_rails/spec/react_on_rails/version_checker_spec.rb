@@ -139,6 +139,16 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
           end
         end
 
+        describe "LockfileResolution.guard" do
+          it "returns nil and leaves a debug trace of the swallowed error" do
+            messages = []
+            allow(Rails.logger).to receive(:debug) { |&block| messages << (block ? block.call : nil) }
+            result = VersionChecker::LockfileResolution.guard { raise TypeError, "shape surprise" }
+            expect(result).to be_nil
+            expect(messages.join).to include("TypeError").and include("shape surprise")
+          end
+        end
+
         context "when the dependency entry has a JSON null value" do
           it "raises the no-package error instead of crashing on nil" do
             stub_gem_version("16.6.0")

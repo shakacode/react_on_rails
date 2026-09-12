@@ -4,6 +4,7 @@ module ReactOnRails
       def self.version: (String dir, String package_name) -> String?
       def self.berry_yarn_version: (String content, String package_name) -> String?
       def self.guard: [T] () { () -> T } -> T?
+      def self.log_ignored: (Exception error) -> void
 
       module PnpmLockfile
         def self.version: (String path, String package_name) -> String?

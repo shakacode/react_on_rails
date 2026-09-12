@@ -47,8 +47,18 @@ module ReactOnRails
       def self.guard
         yield
       rescue Psych::Exception, JSON::ParserError, TypeError, NoMethodError,
-             SystemCallError, EncodingError, ArgumentError
+             SystemCallError, EncodingError, ArgumentError => e
+        # These classes are how bad lockfile CONTENT surfaces (shape surprises from dig chains,
+        # invalid encodings, parse errors) — but a bug inside a parser would raise the same
+        # classes. Leave a debug trace so a swallowed programming error stays discoverable.
+        log_ignored(e)
         nil
+      end
+
+      def self.log_ignored(error)
+        return unless defined?(Rails) && Rails.logger
+
+        Rails.logger.debug { "React on Rails lockfile resolution ignored #{error.class}: #{error.message}" }
       end
 
       # pnpm-lock.yaml. Handles lockfileVersion 5.x (pnpm <= 7: bare version strings), 6.0
