@@ -77,13 +77,17 @@ async function verifyTool(tool) {
   const browserErrors = [];
   const compileResult = await withProbeSession(tool, 'compile', browserErrors, async (session) => {
     const healthySource = await session.workspace.readSource();
-    const compile = addCompileError(healthySource);
+    const compile = addCompileError(healthySource, tool);
     await session.workspace.writeSource(compile.source);
     const compileEvidence = await observeOverlay(session, tool, compileErrorMarker, compile.line);
     const clickEvidence =
       compileEvidence.status === 'PASS'
-        ? await verifyClickToEditor(session, tool, compile.line)
-        : { status: 'FAIL', reason: 'compile overlay did not expose verified source evidence' };
+        ? await verifyClickToEditor(session, tool, compile.line, compile.column)
+        : {
+            status: 'FAIL',
+            expected_source: `${session.workspace.relativeMessagePath}:${compile.line}:${compile.column}`,
+            evidence: 'Compile overlay did not expose verified source evidence.',
+          };
     const restoration = await restoreHealthy(session, tool, healthySource, compileErrorMarker);
     return { compileEvidence, clickEvidence, restoration };
   });
@@ -92,7 +96,7 @@ async function verifyTool(tool) {
     const healthySource = await session.workspace.readSource();
     const runtime = addRuntimeError(healthySource, tool);
     await session.workspace.writeSource(runtime.source);
-    const runtimeEvidence = await observeOverlay(session, tool, runtimeErrorMarker, runtime.line, 12_000);
+    const runtimeEvidence = await observeOverlay(session, tool, runtimeErrorMarker, runtime.line);
     const restoration = await restoreHealthy(session, tool, healthySource, runtimeErrorMarker);
     return { runtimeEvidence, restoration };
   });
@@ -157,7 +161,7 @@ async function observeOverlay(session, tool, marker, line, timeout = 30_000) {
   };
 }
 
-async function verifyClickToEditor(session, tool, expectedLine) {
+async function verifyClickToEditor(session, tool, expectedLine, expectedColumn) {
   const responses = [];
   const recordResponse = async (response) => {
     if (!response.url().includes('open-editor')) return;
@@ -188,11 +192,10 @@ async function verifyClickToEditor(session, tool, expectedLine) {
       session.workspace.directory,
       session.workspace.messagePath,
     );
-    const positionMatches =
-      parsed?.line === expectedLine && Number.isInteger(parsed.column) && parsed.column > 0;
+    const positionMatches = parsed?.line === expectedLine && parsed.column === expectedColumn;
     return {
       status: positionMatches ? 'PASS' : 'FAIL',
-      expected_source: `${session.workspace.relativeMessagePath}:${expectedLine}:<column>`,
+      expected_source: `${session.workspace.relativeMessagePath}:${expectedLine}:${expectedColumn}`,
       recorded_source: parsed ? `${parsed.file}:${parsed.line}:${parsed.column}` : undefined,
       recorded_invocation: invocation.map((argument) =>
         redactEvidence(argument.replaceAll(session.workspace.directory, '<WORKSPACE>'), session),
@@ -213,7 +216,7 @@ async function verifyClickToEditor(session, tool, expectedLine) {
         : [];
     return {
       status: 'FAIL',
-      expected_source: `${session.workspace.relativeMessagePath}:${expectedLine}:<column>`,
+      expected_source: `${session.workspace.relativeMessagePath}:${expectedLine}:${expectedColumn}`,
       evidence: excerpt(redactEvidence(error.message, session)),
       available_targets: availableTargets.map((targetText) =>
         redactEvidence(targetText.replaceAll(session.workspace.directory, '<WORKSPACE>'), session),

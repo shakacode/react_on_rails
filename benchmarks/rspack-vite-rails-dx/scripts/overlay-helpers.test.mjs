@@ -12,9 +12,12 @@ import {
 } from './overlay-helpers.mjs';
 
 test('compile probe reports the appended source line', () => {
-  const probe = addCompileError('const valid = true;\n');
-  assert.equal(probe.line, 2);
-  assert.match(probe.source, new RegExp(compileErrorMarker));
+  const rspackProbe = addCompileError('const valid = true;\n', 'rspack');
+  const viteProbe = addCompileError('const valid = true;\n', 'vite');
+  assert.equal(rspackProbe.line, 2);
+  assert.equal(rspackProbe.column, 36);
+  assert.equal(viteProbe.column, 37);
+  assert.match(rspackProbe.source, new RegExp(compileErrorMarker));
 });
 
 test('runtime probe inserts a deterministic throw and reports its line', () => {
@@ -31,6 +34,14 @@ test('source location accepts an original path and line but rejects a generated 
   assert.equal(sourceLocationVisible('/tmp/other/index.tsx:17:9', relativePath, 17), false);
   assert.equal(sourceLocationVisible(`${relativePath} mentioned; node.js:17:9`, relativePath, 17), false);
   assert.equal(sourceLocationVisible(`${relativePath}:18:9`, relativePath, 17), false);
+  assert.equal(
+    sourceLocationVisible(
+      `${relativePath} mentioned without a frame; ${'x'.repeat(450)} ${relativePath} ╭─[17:9]`,
+      relativePath,
+      17,
+    ),
+    true,
+  );
 });
 
 test('editor invocation must contain the exact workspace source, line, and column', () => {

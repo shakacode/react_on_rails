@@ -3,11 +3,16 @@ import path from 'node:path';
 export const compileErrorMarker = 'ROR_DX_COMPILE_ERROR_MARKER';
 export const runtimeErrorMarker = 'ROR_DX_RUNTIME_ERROR_MARKER';
 
-export function addCompileError(source) {
+export function addCompileError(source, tool) {
+  if (!['rspack', 'vite'].includes(tool)) throw new Error(`unsupported compile probe tool: ${tool}`);
   const prefix = source.endsWith('\n') ? source : `${source}\n`;
+  const statement = `const ${compileErrorMarker} = ;`;
   return {
-    source: `${prefix}const ${compileErrorMarker} = ;\n`,
+    source: `${prefix}${statement}\n`,
     line: prefix.split('\n').length,
+    // The pinned SWC diagnostic uses a zero-based column while Oxc uses a
+    // one-based column for the same missing expression.
+    column: statement.indexOf(';') + (tool === 'rspack' ? 0 : 1),
   };
 }
 
@@ -25,19 +30,18 @@ export function addRuntimeError(source, tool) {
 export function sourceLocationVisible(text, relativePath, line) {
   const normalized = text.replaceAll('\\', '/');
   const normalizedPath = relativePath.replaceAll('\\', '/');
-  const pathIndex = normalized.indexOf(normalizedPath);
-  if (pathIndex === -1) return false;
   const escapedPath = normalizedPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const escapedLine = String(line).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   if (new RegExp(`${escapedPath}:${escapedLine}:\\d+`).test(normalized)) return true;
 
   // Rspack renders the source path in the error heading and its line/column in
   // the immediately following SWC code frame instead of one contiguous token.
-  const errorTail = normalized.slice(
-    pathIndex + normalizedPath.length,
-    pathIndex + normalizedPath.length + 400,
-  );
-  return new RegExp(`(?:╭─)?\\[${escapedLine}:\\d+\\]`).test(errorTail);
+  const pathPattern = new RegExp(escapedPath, 'g');
+  const framePattern = new RegExp(`(?:╭─)?\\[${escapedLine}:\\d+\\]`);
+  return [...normalized.matchAll(pathPattern)].some(({ index }) => {
+    const errorTail = normalized.slice(index + normalizedPath.length, index + normalizedPath.length + 400);
+    return framePattern.test(errorTail);
+  });
 }
 
 export function parseEditorInvocation(invocation, workspaceDirectory, expectedSourcePath) {
