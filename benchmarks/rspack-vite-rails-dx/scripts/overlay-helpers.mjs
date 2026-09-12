@@ -48,15 +48,20 @@ export function parseEditorInvocation(invocation, workspaceDirectory, expectedSo
 export function buildOverlayReport(raw) {
   const cells = (tool) => {
     const result = raw.results[tool];
-    return [result.compile_overlay.status, result.runtime_overlay.status, result.click_to_editor.status];
+    return [
+      result.compile_overlay.status,
+      result.runtime_overlay.status,
+      result.click_to_editor.status,
+      result.source_restoration.status,
+    ];
   };
   const row = (label, tool) => `| ${label} | ${cells(tool).join(' | ')} |`;
   return `# Recorded Rails-tier overlay evidence
 
 Generated from \`results/overlay-recorded.json\`. Do not edit the matrix by hand.
 
-| Stack | Compile overlay | Runtime overlay with original source frame | Compile-error click-to-editor |
-| --- | --- | --- | --- |
+| Stack | Compile overlay | Runtime overlay with original source frame | Compile-error click-to-editor | Source restoration |
+| --- | --- | --- | --- | --- |
 ${row('React on Rails + Rspack', 'rspack')}
 ${row('Inertia Rails + Vite', 'vite')}
 

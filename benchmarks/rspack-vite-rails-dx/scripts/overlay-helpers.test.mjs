@@ -69,13 +69,15 @@ test('report renders all measured matrix cells', () => {
         compile_overlay: { status: 'PASS' },
         runtime_overlay: { status: 'PASS' },
         click_to_editor: { status: 'PASS' },
+        source_restoration: { status: 'PASS' },
       },
       vite: {
         compile_overlay: { status: 'PASS' },
         runtime_overlay: { status: 'FAIL' },
         click_to_editor: { status: 'PASS' },
+        source_restoration: { status: 'PASS' },
       },
     },
   };
-  assert.match(buildOverlayReport(raw), /Inertia Rails \+ Vite \| PASS \| FAIL \| PASS/);
+  assert.match(buildOverlayReport(raw), /Inertia Rails \+ Vite \| PASS \| FAIL \| PASS \| PASS/);
 });

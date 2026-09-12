@@ -74,11 +74,49 @@ console.log(JSON.stringify(matrixSummary(safeRaw), null, 2));
 async function verifyTool(tool) {
   await rm(recorderOutput, { force: true });
   const browserErrors = [];
+  const compileResult = await withProbeSession(tool, 'compile', browserErrors, async (session) => {
+    const healthySource = await session.workspace.readSource();
+    const compile = addCompileError(healthySource);
+    await session.workspace.writeSource(compile.source);
+    const compileEvidence = await observeOverlay(session, tool, compileErrorMarker, compile.line);
+    const clickEvidence =
+      compileEvidence.status === 'PASS'
+        ? await verifyClickToEditor(session, tool, compile.line)
+        : { status: 'FAIL', reason: 'compile overlay did not expose verified source evidence' };
+    const restoration = await restoreHealthy(session, tool, healthySource, compileErrorMarker);
+    return { compileEvidence, clickEvidence, restoration };
+  });
+
+  const runtimeResult = await withProbeSession(tool, 'runtime', browserErrors, async (session) => {
+    const healthySource = await session.workspace.readSource();
+    const runtime = addRuntimeError(healthySource, tool);
+    await session.workspace.writeSource(runtime.source);
+    const runtimeEvidence = await observeOverlay(session, tool, runtimeErrorMarker, runtime.line, 12_000);
+    const restoration = await restoreHealthy(session, tool, healthySource, runtimeErrorMarker);
+    return { runtimeEvidence, restoration };
+  });
+
+  const restorations = [compileResult.restoration, runtimeResult.restoration];
+  return {
+    compile_overlay: compileResult.compileEvidence,
+    runtime_overlay: runtimeResult.runtimeEvidence,
+    click_to_editor: compileResult.clickEvidence,
+    source_restoration: {
+      status: restorations.every((result) => result.status === 'PASS') ? 'PASS' : 'FAIL',
+      compile: compileResult.restoration,
+      runtime: runtimeResult.restoration,
+    },
+    browser_error_excerpt: excerpt(browserErrors.join('\n')),
+    cleanup: 'PASS',
+  };
+}
+
+async function withProbeSession(tool, label, browserErrors, probe) {
   const session = await startApp({
     browser,
     root,
     tool,
-    label: 'overlay',
+    label: `overlay-${label}`,
     extraEnv: {
       LAUNCH_EDITOR: recorderPath,
       OVERLAY_EDITOR_RECORD: recorderOutput,
@@ -89,29 +127,8 @@ async function verifyTool(tool) {
     browserErrors.push(redactEvidence(error.stack ?? error.message, session)),
   );
   const healthySource = await session.workspace.readSource();
-
   try {
-    const compile = addCompileError(healthySource);
-    await session.workspace.writeSource(compile.source);
-    const compileEvidence = await observeOverlay(session, tool, compileErrorMarker, compile.line);
-    const clickEvidence =
-      compileEvidence.status === 'PASS'
-        ? await verifyClickToEditor(session, tool, compile.line)
-        : { status: 'FAIL', reason: 'compile overlay did not expose verified source evidence' };
-    await restoreHealthy(session, tool, healthySource, compileErrorMarker);
-
-    const runtime = addRuntimeError(healthySource, tool);
-    await session.workspace.writeSource(runtime.source);
-    const runtimeEvidence = await observeOverlay(session, tool, runtimeErrorMarker, runtime.line, 12_000);
-    await restoreHealthy(session, tool, healthySource, runtimeErrorMarker);
-
-    return {
-      compile_overlay: compileEvidence,
-      runtime_overlay: runtimeEvidence,
-      click_to_editor: clickEvidence,
-      browser_error_excerpt: excerpt(browserErrors.join('\n')),
-      cleanup: 'PASS',
-    };
+    return await probe(session);
   } finally {
     await session.workspace.writeSource(healthySource).catch(() => {});
     await session.stop();
@@ -187,12 +204,13 @@ async function restoreHealthy(session, tool, healthySource, marker) {
       .filter({ hasText: session.marker })
       .isVisible()
       .catch(() => false);
-    if (!lastOverlay.includes(marker) && lastReady) return;
+    if (!lastOverlay.includes(marker) && lastReady) return { status: 'PASS' };
     await delay(100);
   }
-  throw new Error(
-    `${tool} overlay did not clear after restoring the source: ready=${lastReady}; overlay=${excerpt(redactEvidence(lastOverlay, session))}`,
-  );
+  return {
+    status: 'FAIL',
+    evidence: `ready=${lastReady}; overlay=${excerpt(redactEvidence(lastOverlay, session))}`,
+  };
 }
 
 async function waitForOverlayText(page, tool, marker, timeout) {
@@ -255,6 +273,7 @@ function matrixSummary(result) {
         compile_overlay: result.results[tool].compile_overlay.status,
         runtime_overlay: result.results[tool].runtime_overlay.status,
         click_to_editor: result.results[tool].click_to_editor.status,
+        source_restoration: result.results[tool].source_restoration.status,
       },
     ]),
   );
