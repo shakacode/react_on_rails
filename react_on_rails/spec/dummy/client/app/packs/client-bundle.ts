@@ -10,6 +10,7 @@ import { supportsReact19RootErrorCallbacks } from 'react-on-rails/reactApis';
 import HelloTurboStream from '../startup/HelloTurboStream';
 import HydrationSchedulingProbe from '../startup/HydrationSchedulingProbe';
 import ManualRenderComponent from '../startup/ManualRenderComponent';
+import StreamingHydrationDemo from '../startup/StreamingHydrationDemo';
 import SharedReduxStore from '../stores/SharedReduxStore';
 import { wrapRegisteredComponentsWithStrictMode } from '../strictModeSupport';
 
@@ -100,6 +101,7 @@ ReactOnRails.register({
   HelloTurboStream,
   HydrationSchedulingProbe,
   ManualRenderComponent,
+  StreamingHydrationDemo,
 });
 
 ReactOnRails.registerStoreGenerators({
