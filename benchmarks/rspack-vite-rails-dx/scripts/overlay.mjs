@@ -159,6 +159,16 @@ async function observeOverlay(session, tool, marker, line, timeout = 30_000) {
 }
 
 async function verifyClickToEditor(session, tool, expectedLine) {
+  const responses = [];
+  const recordResponse = async (response) => {
+    if (!response.url().includes('open-editor')) return;
+    responses.push({
+      status: response.status(),
+      url: redactEvidence(response.url(), session),
+      body: excerpt(redactEvidence(await response.text().catch(() => ''), session)),
+    });
+  };
+  session.page.on('response', recordResponse);
   const target =
     tool === 'rspack'
       ? session.page
@@ -167,7 +177,8 @@ async function verifyClickToEditor(session, tool, expectedLine) {
           .first()
       : session.page.locator('vite-error-overlay').locator('.file-link').first();
   try {
-    await target.click({ timeout: 5_000 });
+    await target.waitFor({ state: 'visible', timeout: 5_000 });
+    await target.evaluate((element) => element.click());
     const invocation = await waitForEditorInvocation();
     const parsed = parseEditorInvocation(
       invocation,
@@ -180,6 +191,10 @@ async function verifyClickToEditor(session, tool, expectedLine) {
       status: positionMatches ? 'PASS' : 'FAIL',
       expected_source: `${session.workspace.relativeMessagePath}:${expectedLine}:<column>`,
       recorded_source: parsed ? `${parsed.file}:${parsed.line}:${parsed.column}` : undefined,
+      recorded_invocation: invocation.map((argument) =>
+        redactEvidence(argument.replaceAll(session.workspace.directory, '<WORKSPACE>'), session),
+      ),
+      responses,
       evidence: positionMatches
         ? 'The temporary editor recorder received the exact copied source path, line, and column.'
         : 'The editor recorder did not receive the expected copied source location.',
@@ -189,7 +204,10 @@ async function verifyClickToEditor(session, tool, expectedLine) {
       status: 'FAIL',
       expected_source: `${session.workspace.relativeMessagePath}:${expectedLine}:<column>`,
       evidence: excerpt(redactEvidence(error.message, session)),
+      responses,
     };
+  } finally {
+    session.page.off('response', recordResponse);
   }
 }
 
