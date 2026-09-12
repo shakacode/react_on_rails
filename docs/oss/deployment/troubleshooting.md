@@ -62,7 +62,9 @@ explains why with a class-prefixed diagnostic:
   `lockfileVersion: 1` format (npm 5-6) records no dependency selectors, so staleness cannot be
   detected there — its version entries are trusted as-is.
 - **`Lockfile ambiguity:`** — lockfiles from more than one package manager exist and package.json
-  does not declare which one owns the app. No lockfile is trusted in that state. Delete the stale
+  does not declare which one owns the app. For this release the check still resolves through the
+  deprecated legacy precedence (yarn first) with exact-selector matching and logs this warning; a
+  future release removes that fallback and treats ambiguity as unresolved. Delete the stale
   lockfile(s), or declare your manager, e.g. `"packageManager": "pnpm@10.0.0"` in package.json.
 - **`Lockfile unsupported:`** — the lockfile cannot be used: it is unreadable/corrupt, it parses
   but has an unrecognized structure (possibly from a newer package-manager release), or it is the

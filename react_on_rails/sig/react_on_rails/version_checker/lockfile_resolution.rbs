@@ -24,9 +24,12 @@ module ReactOnRails
                             String package_name, String requested_spec) -> Result
       def self.missing_diagnostic: (Detection detection) -> Diagnostic
       def self.foreign_lockfile_warning: (Detection detection) -> Diagnostic?
+      def self.resolve_ambiguous: (Detection detection, String package_name, String requested_spec) -> Result
+      def self.grace_resolution: (Detection detection, String package_name, String requested_spec) -> [String, String]?
 
       module Messages
-        def self.ambiguity: (Detection detection) -> String
+        def self.ambiguity: (Detection detection, ?grace_note: String?) -> String
+        def self.ambiguity_grace: (String version, String lockfile_name) -> String
         def self.ambiguity_reason: (Detection detection) -> String
         def self.missing: (Symbol manager, String dir) -> String
         def self.stale: (String lockfile_name, Symbol manager, String package_name, String requested_spec) -> String
@@ -47,12 +50,12 @@ module ReactOnRails
         def lockfile_path: () -> String?
         def present_lockfile_names: () -> Array[String]
         def foreign_lockfile_names: () -> Array[String]
+        def lockfile_for: (Symbol manager) -> String?
 
         private
 
         def detect: () -> [Symbol?, Symbol]
         def normalize_declared: (String? value) -> Symbol?
-        def lockfile_for: (Symbol manager) -> String?
       end
 
       module PnpmLockfile
