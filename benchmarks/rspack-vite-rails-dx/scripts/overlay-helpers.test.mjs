@@ -6,6 +6,7 @@ import {
   buildOverlayReport,
   compileErrorMarker,
   parseEditorInvocation,
+  replaceBenchmarkMarker,
   runtimeErrorMarker,
   sourceLocationVisible,
 } from './overlay-helpers.mjs';
@@ -46,6 +47,14 @@ test('editor invocation must contain the exact workspace source, line, and colum
     column: 7,
   });
   assert.equal(parseEditorInvocation(['/other/index.tsx:12:7'], workspace, source), undefined);
+});
+
+test('restoration health marker must replace an existing benchmark marker', () => {
+  assert.equal(
+    replaceBenchmarkMarker("const BENCHMARK_MARKER = 'old';\n", 'recovered'),
+    "const BENCHMARK_MARKER = 'recovered';\n",
+  );
+  assert.throws(() => replaceBenchmarkMarker('const other = true;\n', 'recovered'), /was not found/);
 });
 
 test('report renders all measured matrix cells', () => {

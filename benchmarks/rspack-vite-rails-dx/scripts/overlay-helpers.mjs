@@ -54,6 +54,12 @@ export function parseEditorInvocation(invocation, workspaceDirectory, expectedSo
   };
 }
 
+export function replaceBenchmarkMarker(source, marker) {
+  const updated = source.replace(/const BENCHMARK_MARKER = '[^']+'/, `const BENCHMARK_MARKER = '${marker}'`);
+  if (updated === source) throw new Error('benchmark marker was not found in probe source');
+  return updated;
+}
+
 export function buildOverlayReport(raw) {
   const cells = (tool) => {
     const result = raw.results[tool];

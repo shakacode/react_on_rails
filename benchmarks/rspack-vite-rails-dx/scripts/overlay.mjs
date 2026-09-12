@@ -12,6 +12,7 @@ import {
   buildOverlayReport,
   compileErrorMarker,
   parseEditorInvocation,
+  replaceBenchmarkMarker,
   runtimeErrorMarker,
   sourceLocationVisible,
 } from './overlay-helpers.mjs';
@@ -227,7 +228,8 @@ async function verifyClickToEditor(session, tool, expectedLine) {
 }
 
 async function restoreHealthy(session, tool, healthySource, marker) {
-  await session.workspace.writeSource(healthySource);
+  const recoveryMarker = `recovered-${tool}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  await session.workspace.writeSource(replaceBenchmarkMarker(healthySource, recoveryMarker));
   const deadline = Date.now() + 30_000;
   let lastOverlay = '';
   let lastReady = false;
@@ -235,14 +237,15 @@ async function restoreHealthy(session, tool, healthySource, marker) {
     lastOverlay = await currentOverlayText(session.page, tool);
     lastReady = await session.page
       .locator('[data-benchmark-marker]')
-      .filter({ hasText: session.marker })
+      .filter({ hasText: recoveryMarker })
       .isVisible()
       .catch(() => false);
-    if (!lastOverlay.includes(marker) && lastReady) return { status: 'PASS' };
+    if (!lastOverlay.includes(marker) && lastReady) return { status: 'PASS', health_marker_observed: true };
     await delay(100);
   }
   return {
     status: 'FAIL',
+    health_marker_observed: false,
     evidence: `ready=${lastReady}; overlay=${excerpt(redactEvidence(lastOverlay, session))}`,
   };
 }
