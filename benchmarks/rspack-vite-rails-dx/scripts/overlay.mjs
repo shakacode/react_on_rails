@@ -204,10 +204,21 @@ async function verifyClickToEditor(session, tool, expectedLine) {
         : 'The editor recorder did not receive the expected copied source location.',
     };
   } catch (error) {
+    const availableTargets =
+      tool === 'vite'
+        ? await session.page
+            .locator('vite-error-overlay')
+            .locator('.file-link')
+            .allTextContents()
+            .catch(() => [])
+        : [];
     return {
       status: 'FAIL',
       expected_source: `${session.workspace.relativeMessagePath}:${expectedLine}:<column>`,
       evidence: excerpt(redactEvidence(error.message, session)),
+      available_targets: availableTargets.map((targetText) =>
+        redactEvidence(targetText.replaceAll(session.workspace.directory, '<WORKSPACE>'), session),
+      ),
       responses,
     };
   } finally {
