@@ -4,15 +4,15 @@ Generated from `results/overlay-recorded.json`. Do not edit the matrix by hand.
 
 | Stack                   | Compile overlay | Runtime overlay with original source frame | Compile-error click-to-editor | Source restoration |
 | ----------------------- | --------------- | ------------------------------------------ | ----------------------------- | ------------------ |
-| React on Rails + Rspack | PASS            | FAIL                                       | FAIL                          | PASS               |
+| React on Rails + Rspack | PASS            | FAIL                                       | FAIL                          | FAIL               |
 | Inertia Rails + Vite    | PASS            | FAIL                                       | FAIL                          | PASS               |
 
 Each overlay result requires the deterministic marker and the original TSX file and line. Click-to-editor uses a temporary `LAUNCH_EDITOR` recorder and requires the copied workspace's exact source path, line, and column. The harness restores each mutation, waits for the overlay to clear, and removes its process group, workspace, and ports.
 
 ## Environment
 
-- Recorded: 2026-09-12T00:52:09.890Z
-- Harness commit: `aff9a6a2a83fa85bebce13e91b7d3882b500404c`
+- Recorded: 2026-09-12T01:10:38.530Z
+- Harness commit: `caaa27bc232393836bb71c2f8c94ec656bed49c2`
 - Worktree clean at start: true
 - OS: Darwin 25.6.0 arm64
 - CPU: Apple M5 Max (18 logical CPUs)
