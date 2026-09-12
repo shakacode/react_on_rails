@@ -51,6 +51,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   (e.g. Redis) round trip on every request. Promoted entries now expire at the earlier of the original entry's
   expiry and `l1MaxTtlSeconds` from promotion time, and entries with no remaining lifetime skip the L1 write.
   A non-positive `l1MaxTtlSeconds` now disables L1 entirely instead of storing permanent L1 entries.
+  **Action required for upgraders:** if you run a persistent L1 (e.g. `RedisCacheHandler`) with a
+  non-positive `l1MaxTtlSeconds`, the disabled L1 retains entries written before it was disabled —
+  flush that L1 store before re-enabling it with a positive cap, or retained stale/indefinite entries
+  become readable again.
   With the default in-memory L1 this was purely a performance bug; a `RedisCacheHandler` L1 could
   additionally serve entries past their intended expiry, because Redis applies TTLs at write time —
   promoted entries now always encode exactly the remaining lifetime. Fixes

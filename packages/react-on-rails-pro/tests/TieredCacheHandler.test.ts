@@ -360,6 +360,24 @@ describe('TieredCacheHandler', () => {
       expect(promoted.timestamp).toBeLessThanOrEqual(Date.now());
     });
 
+    test('a NaN-stamped finite entry is served from L2 but never promoted (would be immortal in L1)', async () => {
+      // A malformed timestamp from a custom L2 yields NaN remaining lifetime,
+      // which passes every <=/> comparison unchecked and would previously fall
+      // through to promoting the entry unmodified — never expiring in L1.
+      const malformed = makeEntry({ revalidate: 600, timestamp: Number.NaN });
+      const stubL2: InMemoryLRUCacheHandler = {
+        get: jest.fn().mockResolvedValue(malformed),
+        set: jest.fn().mockResolvedValue(undefined),
+      } as unknown as InMemoryLRUCacheHandler;
+      const capped = new TieredCacheHandler(l1, stubL2, { l1MaxTtlSeconds: 60 });
+      const l1SetSpy = jest.spyOn(l1, 'set');
+
+      const result = await capped.get('key');
+
+      expect(result).not.toBeNull(); // L2 value still served
+      expect(l1SetSpy).not.toHaveBeenCalled();
+    });
+
     test('a future-stamped Infinity entry is also promoted (Infinity is the other indefinite spelling)', async () => {
       // RedisCacheHandler maps every non-finite revalidate to the non-expiring
       // representation (serialized as 0, stored without EX), and the in-memory

@@ -24,6 +24,10 @@ export interface TieredCacheHandlerOptions {
    * A non-positive or NaN value disables L1 entirely (all reads and writes go to L2).
    * Note: a persistent L1 (e.g. Redis) disabled this way retains entries written
    * before it was disabled; flush it before re-enabling.
+   * Cross-worker promotion assumes roughly synchronized clocks: a finite-lifetime
+   * L2 entry stamped ahead of the local clock is served from L2 without being
+   * promoted, so a writer with a persistently fast clock keeps L1 unpopulated
+   * for the keys it writes until clocks converge.
    */
   l1MaxTtlSeconds?: number;
 }
@@ -137,9 +141,13 @@ export class TieredCacheHandler implements CacheHandler {
     // A future timestamp on a finite entry means the producer's clock is ahead
     // of ours: any remaining lifetime computed from it overshoots the entry's
     // true expiry (a Redis L2 started its EX at the producer's write), so serve
-    // from L2 and skip the promotion rather than clamping. Indefinite entries
-    // are unaffected — their expiry never depends on the timestamp.
-    if (hasFiniteLifetime && entry.timestamp > now) return null;
+    // from L2 and skip the promotion rather than clamping. A non-finite
+    // timestamp (corrupted or malformed data from a custom L2) is skipped for
+    // the same reason — no remaining lifetime can be derived from it, and NaN
+    // would otherwise slide through every comparison below and promote the
+    // entry unmodified, making it immortal in L1. Indefinite entries are
+    // unaffected — their expiry never depends on the timestamp.
+    if (hasFiniteLifetime && (!Number.isFinite(entry.timestamp) || entry.timestamp > now)) return null;
 
     // Floor the remaining lifetime to whole seconds: a TTL-on-write L1 (Redis
     // EX) rounds the TTL up with Math.ceil, so a fractional value could outlive
