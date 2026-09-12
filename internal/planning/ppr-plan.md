@@ -12,13 +12,35 @@ and dates in this document are **proposals** pending maintainer confirmation.
 This document is the single plan of record for Partial Prerendering (PPR). It
 supersedes:
 
-| Superseded doc                                                                     | What it contributed                                                          |
-| ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| [`ppr-investigation-findings.md`](./ppr-investigation-findings.md)                 | 2026-05-18 research: two-layer architecture, `"use cache"`, hanging promises |
-| [`ppr-implementation-plan.md`](./ppr-implementation-plan.md)                       | Track B design of record; §Settle Criterion Design amended by #4855          |
-| [`react-19-partial-prerendering-plan.md`](./react-19-partial-prerendering-plan.md) | Track A definition, React 19.2 verification checklist, #3255 decisions       |
+| Superseded doc                          | What it contributed                                                          |
+| --------------------------------------- | ---------------------------------------------------------------------------- |
+| `ppr-investigation-findings.md`         | 2026-05-18 research: two-layer architecture, `"use cache"`, hanging promises |
+| `ppr-implementation-plan.md`            | Track B design of record; §Settle Criterion Design amended by #4855          |
+| `react-19-partial-prerendering-plan.md` | Track A definition, React 19.2 verification checklist, #3255 decisions       |
 
-Each carries a "superseded by" header and is kept for reasoning history.
+All three were removed from the tree once their conclusions had been absorbed
+here; every claim they carried that is still load-bearing is restated in this
+document, and the bodies remain in git history (last present at `22d3cfdf6`).
+The one decision that lived only in the third document is preserved below.
+
+### Preserved from `react-19-partial-prerendering-plan.md`: #3486 decision record
+
+Resolved 2026-06-03 by @justin808, closing the package-range questions split
+out of #3255.
+
+- **Minimum supported React version — React 18 (and 16/17) support stays.** The
+  OSS `react-on-rails` and Pro `react-on-rails-pro` `react` / `react-dom` peer
+  ranges stay at `>= 16` (verified still true on `origin/main`). v17 is a
+  Ruby-baseline release, not a React-baseline release, and ships features for
+  React 16/17 consumers (`react-on-rails/webpackHelpers`
+  `reactDomClientWarning`). The React 19 baseline RSC requires is expressed at
+  the RSC boundary through the **optional** `react-on-rails-rsc` peer, so
+  non-RSC SSR/streaming users are not forced off React 18. The
+  `packages/react-on-rails/src/ReactDOMServer.cts` React 16/17 shim therefore
+  stays; removing it remains gated on an explicitly signed-off baseline bump.
+- **The record's second clause is itself superseded.** It widened the
+  `react-on-rails-rsc` peer to `>= 19.0.2 < 20.0.0`; PR #4672 later raised the
+  floor to `>=19.2.1 <20.0.0`. See §3 fact 6 and §7 D3 for the current pin.
 
 **Stale reference note:** issue #4885 names a fourth planning doc,
 `internal/planning/ppr-plan-validity-review-2026-07-12.md`. That file does not
@@ -491,7 +513,7 @@ Owners and dates are **proposals for maintainer confirmation** (review under
 - Re-deciding the Track A / Track B split from #3255. That decision stands;
   this plan re-cuts phasing and sequencing underneath it. Track A (streaming
   SSR + fragment-cached shell on existing helpers) shipped its decisions in
-  [`react-19-partial-prerendering-plan.md`](./react-19-partial-prerendering-plan.md);
+  `react-19-partial-prerendering-plan.md` (removed; see Supersedes);
   this plan is Track B's plan of record.
 - HTTP/CDN-caching of streamed responses with live per-request holes (#3255
   Decision 2 non-goal; CDN resume protocol stays parked in #3572).
