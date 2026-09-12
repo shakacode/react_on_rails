@@ -38,3 +38,15 @@ Run on an otherwise quiet machine and compare both stacks within the same run. D
 The report uses medians and min-to-max spread. It labels a metric `ambiguous` when either spread exceeds 50% of its median. Otherwise, a difference inside the larger observed spread is a `wash`; only a difference outside that local noise band is called an improvement or regression for Vite relative to Rspack.
 
 The generated-configuration audit is descriptive. File and line counts do not measure how difficult the concepts are to learn. This package also does not test production performance, runtime-error overlay quality, or click-to-editor behavior; issue #4696 owns the overlay follow-up.
+
+## Overlay verification
+
+The issue #4696 verifier uses the same pinned starter pair and isolated workspace lifecycle. It injects deterministic compile and runtime errors, checks each overlay for the marker and original TSX source line, and verifies compile-error click-to-editor through a temporary `LAUNCH_EDITOR` recorder. It does not open a local editor or modify the committed starters.
+
+After installing the replay prerequisites above, run:
+
+```bash
+pnpm run verify:overlays
+```
+
+The local JSON and Markdown outputs are ignored. A recorded result must come from a clean committed harness, redact local paths, and be replayed twice on a quiet machine before replacing `results/overlay-recorded.json` and `OVERLAY_RESULTS.md`. A failed matrix cell records observed behavior; evaluate product changes separately.

@@ -29,20 +29,32 @@ export async function createWorkspace(root, tool, nonce) {
   await symlink(dependencyPath, path.join(destination, 'node_modules'), 'dir');
   await mkdir(path.join(destination, 'log'), { recursive: true });
   await mkdir(path.join(destination, 'tmp'), { recursive: true });
+  const messagePath =
+    tool === 'rspack'
+      ? path.join(destination, 'app/javascript/src/HelloWorld/ror_components/HelloWorld.client.tsx')
+      : path.join(destination, 'app/frontend/pages/inertia_example/index.tsx');
+  const originalSource = await readFile(messagePath, 'utf8');
   return {
     directory: destination,
-    messagePath:
-      tool === 'rspack'
-        ? path.join(destination, 'app/javascript/src/HelloWorld/ror_components/HelloWorld.client.tsx')
-        : path.join(destination, 'app/frontend/pages/inertia_example/index.tsx'),
+    messagePath,
+    relativeMessagePath: path.relative(destination, messagePath).split(path.sep).join('/'),
+    async readSource() {
+      return readFile(messagePath, 'utf8');
+    },
+    async restoreSource() {
+      await writeFile(messagePath, originalSource);
+    },
     async setMarker(marker) {
-      const contents = await readFile(this.messagePath, 'utf8');
+      const contents = await readFile(messagePath, 'utf8');
       const updated = contents.replace(
         /const BENCHMARK_MARKER = '[^']+'/,
         `const BENCHMARK_MARKER = '${marker}'`,
       );
       if (updated === contents) throw new Error(`benchmark marker was not found in ${tool} starter`);
-      await writeFile(this.messagePath, updated);
+      await writeFile(messagePath, updated);
+    },
+    async writeSource(contents) {
+      await writeFile(messagePath, contents);
     },
     async remove() {
       await rm(destination, { recursive: true, force: true });
