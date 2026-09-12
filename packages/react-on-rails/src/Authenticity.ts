@@ -9,7 +9,8 @@ export function authenticityToken(): string | null {
 }
 
 export const authenticityHeaders = (otherHeaders: Record<string, string> = {}): AuthenticityHeaders =>
-  Object.assign(otherHeaders, {
+  // eslint-disable-next-line prefer-object-spread -- spread triggers TS2322 (authenticityToken() returns string|null)
+  Object.assign({}, otherHeaders, {
     'X-CSRF-Token': authenticityToken(),
     'X-Requested-With': 'XMLHttpRequest',
   });
