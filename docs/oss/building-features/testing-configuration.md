@@ -47,6 +47,12 @@ React Server Components add one more moving part to the standard test setup: sys
 
 Use this recipe for Capybara, system, and end-to-end tests that exercise `stream_react_component`, `RSCRoute`, or the `rsc_payload_route`.
 
+This recipe fits a Rails-managed system-test topology: the normal Rails test server can reach a renderer that is
+started once for the suite or worker. If the browser test needs a separately launched Rails origin and renderer,
+cross-process data setup, or detailed streaming, network, and trace assertions, use E2E on Rails + Playwright
+instead. See [System Specs for Streamed RSC Payloads](../../pro/react-server-components/system-spec-streaming-rsc.md#choose-the-test-topology)
+for the decision rule and the multi-process lifecycle boundary.
+
 This recipe uses the React on Rails TestHelper with `build_test_command`: Rails checks whether generated bundles are stale, runs your test build command when needed, and fails fast if compilation fails.
 
 The Step 3 renderer-lifecycle helper is **RSpec-focused** because it uses `before(:suite)` and `after(:suite)` hooks; for Minitest, see [Minitest Equivalent](#minitest-equivalent) for a parallel adaptation that reuses the same safety points from a `test/test_helper.rb` harness plus `Minitest.after_run`.
@@ -363,7 +369,7 @@ Require this file from `spec/rails_helper.rb` after loading `react_on_rails/test
 
 In CI, set `RSC_NODE_RENDERER_TESTS=1` for jobs that need the renderer. For local development, leaving it unset lets you run non-RSC specs without starting another process.
 
-### 4. Write A Capybara RSC Smoke Test
+### 4. Write A Capybara RSC Smoke Test for a Rails-managed Runtime
 
 Keep the first system test boring: visit a route that streams one Server Component and assert on visible HTML plus one hydrated Client Component interaction.
 
