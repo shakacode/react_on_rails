@@ -55,6 +55,7 @@ export async function startApp({ browser, label, root, tool, extraEnv = {} }) {
       try {
         await page?.close();
         await stopProcess(child);
+        await stopResidualProcesses(nonce);
         await waitForClosedPorts([webPort, assetPort]);
       } finally {
         await workspace.remove();
@@ -91,6 +92,19 @@ export async function startApp({ browser, label, root, tool, extraEnv = {} }) {
       `${tool} failed to become browser-ready: ${error.message}\n${redactLocalPaths(logTail, rootAliases)}`,
     );
   }
+}
+
+export function residualProcessGroups(processList, nonce, ownPid = process.pid) {
+  const groups = new Set();
+  for (const line of processList.split('\n')) {
+    const match = line.match(/^\s*(\d+)\s+(\d+)\s+(.+)$/);
+    if (!match) continue;
+    const [, pidText, groupText, command] = match;
+    const pid = Number(pidText);
+    const group = Number(groupText);
+    if (pid !== ownPid && group > 1 && command.includes(nonce)) groups.add(group);
+  }
+  return [...groups];
 }
 
 export function captureEnvironment(root) {
@@ -199,6 +213,30 @@ async function stopProcess(child) {
   if (await Promise.race([exited.then(() => true), delay(10_000).then(() => false)])) return;
   signalProcess(target, 'SIGKILL');
   await exited;
+}
+
+async function stopResidualProcesses(nonce) {
+  if (process.platform === 'win32') return;
+  let groups = currentResidualProcessGroups(nonce);
+  for (const group of groups) signalProcess(-group, 'SIGTERM');
+  const deadline = Date.now() + 5_000;
+  while (groups.length > 0 && Date.now() < deadline) {
+    await delay(50);
+    groups = currentResidualProcessGroups(nonce);
+  }
+  for (const group of groups) signalProcess(-group, 'SIGKILL');
+  if (groups.length > 0) {
+    await delay(50);
+    const survivors = currentResidualProcessGroups(nonce);
+    if (survivors.length > 0)
+      throw new Error(`benchmark session processes did not exit: ${survivors.join(', ')}`);
+  }
+}
+
+function currentResidualProcessGroups(nonce) {
+  const result = spawnSync('ps', ['-axo', 'pid=,pgid=,command='], { encoding: 'utf8' });
+  if (result.status !== 0) throw new Error(`could not inspect benchmark session processes: ${result.stderr}`);
+  return residualProcessGroups(result.stdout, nonce);
 }
 
 function signalProcess(target, signal) {
