@@ -9708,7 +9708,11 @@ def fetch_npm_package_metadata(package_ref, registry_url:)
     "peerDependencies",
     "--json",
     "--registry",
-    registry_url
+    registry_url,
+    # A package version can be available at the registry while npm's local cache
+    # still serves the pre-publish 404. Release verification must consult npm
+    # online so that a successful publish is not treated as a failed release.
+    "--prefer-online"
   )
   [output, status]
 end
