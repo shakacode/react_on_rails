@@ -28,6 +28,17 @@ if ! command -v lychee &> /dev/null; then
   exit 0
 fi
 
+required_lychee_version="0.23.0"
+lychee_version="$(lychee --version 2>&1 || true)"
+if [ "$lychee_version" != "lychee ${required_lychee_version}" ]; then
+  echo "⚠️  lychee version mismatch; skipping ${mode_label} Markdown link check." >&2
+  echo "   Found: ${lychee_version:-unable to determine}" >&2
+  echo "   Required: lychee ${required_lychee_version} (matches CI)" >&2
+  echo "   Install with: cargo install lychee --version ${required_lychee_version}" >&2
+  echo "   Or run bin/check-links manually with lychee ${required_lychee_version}." >&2
+  exit 0
+fi
+
 files_arr=()
 while IFS= read -r file; do
   [ -n "$file" ] && files_arr+=("$file")
