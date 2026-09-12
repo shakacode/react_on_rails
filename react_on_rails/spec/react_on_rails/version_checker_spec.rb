@@ -138,6 +138,19 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
             expect { validate_fixture!("bun_lockb") }.not_to raise_error
           end
         end
+
+        context "when the dependency entry has a JSON null value" do
+          it "raises the no-package error instead of crashing on nil" do
+            stub_gem_version("16.6.0")
+            expect { validate_fixture!("null_dependency") }
+              .to raise_error(ReactOnRails::Error, /No React on Rails npm package is installed/)
+          end
+
+          it "returns nil from #raw without crashing" do
+            package_json = File.expand_path("fixtures/lockfiles/null_dependency/package.json", __dir__)
+            expect(VersionChecker::NodePackageVersion.new(package_json).raw).to be_nil
+          end
+        end
       end
 
       context "when package version is not exact (has semver wildcard)" do

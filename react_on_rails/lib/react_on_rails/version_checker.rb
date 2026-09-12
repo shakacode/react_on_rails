@@ -588,8 +588,10 @@ module ReactOnRails
         # If package.json specifies a local path, URL, or workspace link, don't try to resolve
         # from lockfiles. Lockfiles record placeholders for links (e.g. "0.0.0", the Yarn Berry
         # "0.0.0-use.local"), and keeping the raw spec lets the validators apply their
-        # local/workspace exemptions.
-        return package_json_version if local_path_or_url_version?(package_json_version) ||
+        # local/workspace exemptions. A JSON null dependency value stays nil (validators treat a
+        # nil raw as "not installed").
+        return package_json_version if package_json_version.nil? ||
+                                       local_path_or_url_version?(package_json_version) ||
                                        package_json_version.start_with?("workspace:")
 
         # Fall back to the package.json version when no lockfile resolves one.
@@ -630,12 +632,14 @@ module ReactOnRails
         return nil unless yarn_lock && File.exist?(yarn_lock)
 
         # Yarn Berry (yarn 2+) writes the same yarn.lock filename in a YAML format marked by an
-        # __metadata section; the format is decided by content, not by the yarn version in use.
-        content = File.read(yarn_lock)
-        return LockfileResolution.berry_yarn_version(content, package_name) if content.include?("__metadata:")
+        # __metadata section near the top; the format is decided by content, not by the yarn
+        # version in use. Sniff only the file head so the classic path below keeps streaming.
+        if File.open(yarn_lock) { |f| f.read(1024) }.to_s.include?("__metadata:")
+          return LockfileResolution.berry_yarn_version(File.read(yarn_lock), package_name)
+        end
 
         in_package_block = false
-        content.each_line do |line|
+        File.foreach(yarn_lock) do |line|
           # Check if we're starting the block for our package
           # Pattern: optionally quoted package name, followed by @, ensuring it's not followed by more word chars
           # This prevents "react-on-rails" from matching "react-on-rails-pro"
