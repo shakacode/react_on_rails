@@ -2,6 +2,7 @@
 
 require "yaml"
 require "date"
+require "strscan"
 
 module ReactOnRails
   class VersionChecker
@@ -317,11 +318,28 @@ module ReactOnRails
           [:unreadable, e.message.to_s.lines.first&.strip]
         end
 
-        # Line-start comments and trailing commas only: JSON strings cannot span lines, so a
-        # line beginning with optional whitespace and "//" is never inside a string, and the
-        # values bun writes (names, versions, hashes) never contain ",}" or ",]".
+        # One complete JSON string literal (escape-aware), a // line comment, a /* */ block
+        # comment, and a trailing comma directly before } or ].
+        STRING_LITERAL = /"(?:[^"\\]|\\.)*"/
+        LINE_COMMENT = %r{//[^\n]*}
+        BLOCK_COMMENT = %r{/\*.*?\*/}m
+        TRAILING_COMMA = /,(?=\s*[}\]])/
+
+        # String-aware JSONC-to-JSON: comments and trailing commas are only stripped OUTSIDE
+        # string literals, so values like "x,]" or "https://..." can never be corrupted.
         def self.jsonc_to_json(content)
-          content.gsub(%r{^\s*//.*$}, "").gsub(/,(\s*[}\]])/, "\\1")
+          scanner = StringScanner.new(content)
+          result = +""
+          until scanner.eos?
+            if (string = scanner.scan(STRING_LITERAL))
+              result << string
+            elsif scanner.scan(LINE_COMMENT) || scanner.scan(BLOCK_COMMENT) || scanner.scan(TRAILING_COMMA)
+              next
+            else
+              result << scanner.getch
+            end
+          end
+          result
         end
       end
 
