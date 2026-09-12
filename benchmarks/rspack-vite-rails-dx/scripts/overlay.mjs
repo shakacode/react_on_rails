@@ -128,11 +128,9 @@ async function withProbeSession(tool, label, browserErrors, probe) {
   session.page.on('pageerror', (error) =>
     browserErrors.push(redactEvidence(error.stack ?? error.message, session)),
   );
-  const healthySource = await session.workspace.readSource();
   try {
     return await probe(session);
   } finally {
-    await session.workspace.writeSource(healthySource).catch(() => {});
     await session.stop();
     activeSession = undefined;
   }

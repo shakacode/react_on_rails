@@ -14,8 +14,8 @@ export function addCompileError(source) {
 export function addRuntimeError(source, tool) {
   const anchor =
     tool === 'rspack' ? 'const HelloWorld = () => {' : 'export default function InertiaExample() {';
-  const line = source.slice(0, source.indexOf(anchor)).split('\n').length + 1;
   if (!source.includes(anchor)) throw new Error(`runtime probe anchor was not found for ${tool}`);
+  const line = source.slice(0, source.indexOf(anchor)).split('\n').length + 1;
   return {
     source: source.replace(anchor, `${anchor}\n  throw new Error('${runtimeErrorMarker}');`),
     line,

@@ -33,16 +33,12 @@ export async function createWorkspace(root, tool, nonce) {
     tool === 'rspack'
       ? path.join(destination, 'app/javascript/src/HelloWorld/ror_components/HelloWorld.client.tsx')
       : path.join(destination, 'app/frontend/pages/inertia_example/index.tsx');
-  const originalSource = await readFile(messagePath, 'utf8');
   return {
     directory: destination,
     messagePath,
     relativeMessagePath: path.relative(destination, messagePath).split(path.sep).join('/'),
     async readSource() {
       return readFile(messagePath, 'utf8');
-    },
-    async restoreSource() {
-      await writeFile(messagePath, originalSource);
     },
     async setMarker(marker) {
       const contents = await readFile(messagePath, 'utf8');
