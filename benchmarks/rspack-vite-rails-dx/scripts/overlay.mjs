@@ -202,10 +202,13 @@ async function waitForOverlayText(page, tool, marker, timeout) {
 }
 
 async function currentOverlayText(page, tool) {
-  const locator =
+  const host =
     tool === 'rspack'
-      ? page.frameLocator('#rspack-dev-server-client-overlay').locator('body')
+      ? page.locator('#rspack-dev-server-client-overlay')
       : page.locator('vite-error-overlay');
+  if (!(await host.isVisible().catch(() => false))) return '';
+  const locator =
+    tool === 'rspack' ? page.frameLocator('#rspack-dev-server-client-overlay').locator('body') : host;
   return (await locator.textContent({ timeout: 500 }).catch(() => '')) ?? '';
 }
 
