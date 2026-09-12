@@ -1,0 +1,28 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      react-on-rails:
+        specifier: ^16.1.1
+        version: 16.4.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+
+packages:
+
+  react-on-rails@16.4.0:
+    resolution: {integrity: sha512-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa==}
+    peerDependencies:
+      react: '>= 16'
+      react-dom: '>= 16'
+
+snapshots:
+
+  react-on-rails@16.4.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0):
+    dependencies:
+      react: 19.3.0
+      react-dom: 19.3.0(react@19.3.0)

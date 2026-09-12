@@ -1,13 +1,24 @@
+---
 lockfileVersion: '9.0'
-
-packageManagerDependencies:
-  pnpm: 11.0.0
+importers:
+  .:
+    configDependencies:
+      '@pnpm/plugin-esm-node-path':
+        specifier: 0.1.2
+        version: 0.1.2
+packages:
+  '@pnpm/plugin-esm-node-path@0.1.2':
+    resolution: {integrity: sha512-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa==}
+snapshots:
+  '@pnpm/plugin-esm-node-path@0.1.2': {}
 ---
 lockfileVersion: '9.0'
 
 settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
+
+pnpmfileChecksum: sha256-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa=
 
 importers:
 
