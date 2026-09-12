@@ -9646,8 +9646,8 @@ Choose the owner of the application runtime before you choose the browser assert
 | The test needs a separately launched Rails server or node renderer                                                                                            | E2E on Rails + Playwright                                       |
 | Test data must be visible across process or database connections                                                                                              | E2E on Rails app commands or scenarios                          |
 | Streaming HTTP, Action Cable, exact network counts, failed-resource checks, or traces are central assertions                                                  | Playwright                                                      |
-| The app already uses Playwright for ShakaPerf, visual regression, or other browser verification                                                               | Reuse Playwright instead of adding a custom Capybara runtime    |
-| Puffing Billy or another external proxy is needed for unrelated APIs                                                                                          | Keep those tests separate; do not proxy or cache the RSC stream |
+| The app already uses Playwright for ShakaPerf, visual regression, or other browser verification                                                               | Playwright; reuse the existing browser runtime                  |
+| Puffing Billy or another external proxy is needed for unrelated APIs                                                                                          | A separate Capybara suite; keep the RSC stream out of the proxy |
 
 Capybara is not generally incompatible with RSC. It is a good fit when Rails manages the system-test server and
 that server can reach the renderer. If you would need to start a separate Rails origin or renderer around each
@@ -9720,7 +9720,9 @@ Keep these responsibilities separate:
 
 > **Lifecycle rule:** Do not start and stop the Rails server or RSC renderer around individual examples or
 > retries. Keep one application topology alive for the focused E2E run. Reset browser contexts and application
-> data between tests, and stop application processes only after the run.
+> data between tests, and stop application processes only after the run. When workers or browser projects share a
+> Rails database, run them serially; parallel runs require an isolated database and external-state namespace for
+> each worker or shard.
 
 Streamed chunks and browser resource requests can outlive the assertion that appears to finish a test. Killing the
 origin during reset can create late chunk errors, attribute a failure to the next test, and make retries look more
@@ -9776,8 +9778,8 @@ For app-specific system specs:
 
 For a multi-process Playwright test, also:
 
-1. Fail on unexpected `console.error` messages, page errors or unhandled rejections, failed RSC chunks, and failed
-   resources.
+1. Fail on unexpected `console.error` messages, page errors or unhandled rejections, failed RSC chunks, failed
+   network requests, and non-2xx responses from the RSC route.
 2. Capture a Playwright trace, screenshot or video, Rails logs, and renderer logs when a test fails.
 3. Verify that one stable Rails origin and one stable renderer origin serve the focused run.
 4. Run the same source tests in each required desktop and mobile project.
