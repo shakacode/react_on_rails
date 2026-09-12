@@ -178,17 +178,21 @@ async function verifyClickToEditor(session, tool, expectedLine) {
 async function restoreHealthy(session, tool, healthySource, marker) {
   await session.workspace.writeSource(healthySource);
   const deadline = Date.now() + 30_000;
+  let lastOverlay = '';
+  let lastReady = false;
   while (Date.now() < deadline) {
-    const overlay = await currentOverlayText(session.page, tool);
-    const ready = await session.page
+    lastOverlay = await currentOverlayText(session.page, tool);
+    lastReady = await session.page
       .locator('[data-benchmark-marker]')
       .filter({ hasText: session.marker })
       .isVisible()
       .catch(() => false);
-    if (!overlay.includes(marker) && ready) return;
+    if (!lastOverlay.includes(marker) && lastReady) return;
     await delay(100);
   }
-  throw new Error(`${tool} overlay did not clear after restoring the source`);
+  throw new Error(
+    `${tool} overlay did not clear after restoring the source: ready=${lastReady}; overlay=${excerpt(redactEvidence(lastOverlay, session))}`,
+  );
 }
 
 async function waitForOverlayText(page, tool, marker, timeout) {
