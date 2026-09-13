@@ -3,6 +3,7 @@
 require "English"
 require "open3"
 require "rainbow"
+require "uri"
 require "active_support"
 require "active_support/core_ext/string"
 require "shellwords"
@@ -443,6 +444,121 @@ module ReactOnRails
         path_str
       end
     end
+
+    # Removes credentials from a URL for safe display in logs and error messages.
+    # Strips user:pass@ from the authority, replaces query values with [REDACTED],
+    # and preserves fragments. See #5046.
+    def self.sanitize_url_for_display(url)
+      return url if url.nil? || url.empty?
+
+      begin
+        uri = URI.parse(url)
+        if uri.userinfo.nil?
+          # URI::File silently drops userinfo — .userinfo is always nil even when
+          # the raw string has credentials. Fall back to regex for non-HTTP schemes.
+          unless uri.is_a?(URI::HTTP)
+            return redact_query_values(strip_authority_userinfo(url))
+          end
+
+          return redact_query_values(uri.to_s)
+        end
+
+        uri.password = nil
+        uri.user = nil
+        redact_query_values(uri.to_s)
+      rescue URI::InvalidURIError
+        redact_query_values(strip_malformed_url_userinfo(url))
+      end
+    end
+
+    # Scrubs credentials from arbitrary error-message text that may contain URLs.
+    def self.sanitize_error_text(text)
+      return text if text.nil? || text.empty?
+
+      text.to_s
+          .gsub(%r{//[^/?#]*@}, "//")
+          .gsub(%r{https?://[^\s]+}) do |match|
+        trimmed = match.sub(/[).,;:'">\]]+\z/, "")
+        sanitize_url_for_display(trimmed) + match[trimmed.length..]
+      end
+    end
+
+    # Strips userinfo from file:// and other non-HTTP URLs where URI.parse
+    # succeeds but silently loses the credentials. Only looks at the authority
+    # (before the first /?#), so @ in paths and queries is left alone.
+    def self.strip_authority_userinfo(url)
+      match = url.match(%r{\A\s*(?<scheme>\w+://)}i)
+      return url unless match
+
+      rest = url[match[0].length..]
+      authority_end = rest.index(%r{[/?#]})
+      authority = authority_end ? rest[0...authority_end] : rest
+      suffix = authority_end ? rest[authority_end..] : ""
+
+      return url unless authority.include?("@")
+
+      last_at = authority.rindex("@")
+      match[:scheme] + authority[(last_at + 1)..] + suffix
+    end
+    private_class_method :strip_authority_userinfo
+
+    # Strips userinfo from malformed URLs that URI.parse rejects (e.g. a password
+    # containing raw /, ?, or space). Prefers the @ followed by host/path over
+    # an @ buried in a query value.
+    def self.strip_malformed_url_userinfo(url)
+      match = url.match(%r{\A\s*(?<scheme>\w+://)}i)
+      return url unless match
+
+      rest = url[match[0].length..]
+      authority_end = rest.index(%r{[/?#]})
+      authority = authority_end ? rest[0...authority_end] : rest
+      suffix = authority_end ? rest[authority_end..] : ""
+
+      if authority.include?("@")
+        last_at = authority.rindex("@")
+        return match[:scheme] + authority[(last_at + 1)..] + suffix
+      end
+
+      # Password contains / so the @ landed after the first path separator.
+      # e.g. http://u:pa/s3cr3t@host/path — pick the @ with host/path after it.
+      best_at = nil
+      pos = 0
+      while (at_idx = rest.index("@", pos))
+        after_at = rest[(at_idx + 1)..]
+        if after_at.include?("/")
+          best_at = at_idx
+        elsif best_at.nil? && !after_at.include?("@")
+          best_at = at_idx
+        end
+        pos = at_idx + 1
+      end
+
+      return url unless best_at
+
+      match[:scheme] + rest[(best_at + 1)..]
+    end
+    private_class_method :strip_malformed_url_userinfo
+
+    # Replaces query-string values with [REDACTED], keeping keys for diagnostics.
+    # Splits # before ? so a ?-inside-fragment (hash-router URLs) isn't misread.
+    def self.redact_query_values(url)
+      return url unless url.include?("?")
+
+      base_and_query, fragment = url.split("#", 2)
+      base, query_part = base_and_query.split("?", 2)
+      return url unless query_part
+
+      unless query_part.empty?
+        query_part = query_part.gsub(/=([^&]*)/, "=[REDACTED]")
+        # Bare components without = (e.g. ?eyJhbGciOi...) are opaque tokens — redact those too
+        query_part = query_part.split("&").map { |c| c.include?("=") ? c : "[REDACTED]" }.join("&")
+      end
+
+      result = "#{base}?#{query_part}"
+      result += "##{fragment}" if fragment
+      result
+    end
+    private_class_method :redact_query_values
 
     def self.default_troubleshooting_section
       <<~DEFAULT
