@@ -24,6 +24,19 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Fixed
+
+- **[Pro]** **Side-effect-only RSC client modules work in generated apps again**: Generated RSC apps now pin
+  `react-on-rails-rsc@19.3.0-rc.4` with React/React DOM `~19.2.8`. RC4 accepts `"use client"` browser
+  registration modules that intentionally perform runtime side effects without exporting a client reference,
+  while continuing to reject inert, type-only, and CommonJS-style modules that may have lost their exports.
+  It also preserves CSS-wrapper side effects through production Webpack and Rspack tree shaking. RC3 remains
+  outside the qualified prerelease window because it rejected valid side-effect-only registration entrypoints.
+  See [Tutorial Issue 823](https://github.com/shakacode/react-webpack-rails-tutorial/issues/823) and the
+  [RSC RC4 release](https://github.com/shakacode/react_on_rails_rsc/releases/tag/19.3.0-rc.4).
+  [PR 5066](https://github.com/shakacode/react_on_rails/pull/5066) by
+  [justin808](https://github.com/justin808).
+
 ### [17.1.0.rc.3] - 2026-09-11
 
 #### Fixed
