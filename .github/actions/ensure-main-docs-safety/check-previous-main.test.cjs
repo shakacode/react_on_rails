@@ -3,6 +3,7 @@ const {
   GUARD_JOB_NAME,
   GUARD_STEP_NAME,
   checkPreviousMainCommitStatus,
+  evaluateCommitRuns,
   isGuardOnlyFailure,
   latestRunsByWorkflow,
   parseExcludeWorkflows,
@@ -68,6 +69,15 @@ function successJob(name = 'build') {
     run_attempt: 1,
     conclusion: 'success',
     steps: [{ name: 'Run tests', conclusion: 'success' }],
+  };
+}
+
+function skippedJob(name = 'build') {
+  return {
+    name,
+    run_attempt: 1,
+    conclusion: 'skipped',
+    steps: [{ name: 'Run tests', conclusion: 'skipped' }],
   };
 }
 
@@ -294,6 +304,29 @@ async function testUnexpectedJobIteratorShapeFailsClearly() {
   assert.match(core.failed[0], /Expected jobs array while listing workflow run 15 \(Main push lint\)\./);
 }
 
+async function testNoJobsRunDoesNotCreateSuccessfulWorkflowEvidence() {
+  const previous = 'previous';
+  const emptyRun = run({ id: 16, sha: previous, name: 'Empty workflow' });
+  const github = makeGithub({
+    pages: [[emptyRun]],
+    jobsByRunId: {},
+    parentsBySha: {},
+  });
+  const core = makeCore();
+
+  const result = await evaluateCommitRuns({
+    github,
+    context,
+    core,
+    sha: previous,
+    createdAfter: '2026-01-01T00:00:00.000Z',
+    excludeWorkflows: [],
+  });
+
+  assert.deepEqual(Array.from(result.successfulJobsByWorkflow), []);
+  assert.match(core.warnings[0], /No jobs found for workflow run 16/);
+}
+
 async function testGuardOnlyHopLimitStopsAtConfiguredLimit() {
   const previous = 'docs-2';
   const parent = 'docs-1';
@@ -361,6 +394,622 @@ async function testGuardOnlyFailuresLookThroughToParentFailure() {
   assert.equal(core.failed.length, 1);
   assert.match(core.failed[0], /main commit real-failure still has failing workflows/);
   assert.match(core.failed[0], /Ignored docs-only guard-only failures/);
+}
+
+async function testDescendantSuccessSupersedesOlderSameWorkflowFailure() {
+  const descendant = 'docs-fix';
+  const ancestor = 'broken-docs';
+  const guardRun = run({ id: 30, workflowId: 300, sha: descendant, name: 'Lint', conclusion: 'failure' });
+  const fixedRun = run({ id: 31, workflowId: 310, sha: descendant, name: 'Check Markdown Links' });
+  const staleFailure = run({
+    id: 32,
+    workflowId: 310,
+    sha: ancestor,
+    name: 'Renamed Markdown Link Check',
+    conclusion: 'failure',
+  });
+  const github = makeGithub({
+    pages: [[guardRun, fixedRun, staleFailure]],
+    jobsByRunId: {
+      30: [guardOnlyJob()],
+      31: [successJob()],
+      32: [buildFailureJob()],
+    },
+    parentsBySha: {
+      [descendant]: ancestor,
+    },
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context,
+    core,
+    previousSha: descendant,
+    excludeWorkflowsInput: '',
+  });
+
+  assert.deepEqual(core.failed, []);
+  assert.match(core.infoMessages.at(-1), /superseded by a successful descendant run/);
+}
+
+async function testDescendantSuccessDoesNotSupersedeDifferentWorkflowFailure() {
+  const descendant = 'docs-fix';
+  const ancestor = 'broken-build';
+  const guardRun = run({ id: 33, workflowId: 330, sha: descendant, name: 'Lint', conclusion: 'failure' });
+  const fixedRun = run({ id: 34, workflowId: 340, sha: descendant, name: 'Check Markdown Links' });
+  const unrelatedFailure = run({
+    id: 35,
+    workflowId: 350,
+    sha: ancestor,
+    name: 'Check Markdown Links',
+    conclusion: 'failure',
+  });
+  const github = makeGithub({
+    pages: [[guardRun, fixedRun, unrelatedFailure]],
+    jobsByRunId: {
+      33: [guardOnlyJob()],
+      34: [successJob()],
+      35: [buildFailureJob()],
+    },
+    parentsBySha: {
+      [descendant]: ancestor,
+    },
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context,
+    core,
+    previousSha: descendant,
+    excludeWorkflowsInput: '',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /Check Markdown Links #35/);
+}
+
+async function testEmptyJobsDoNotSupersedeOlderFailure() {
+  const descendant = 'docs-fix';
+  const ancestor = 'broken-docs';
+  const guardRun = run({ id: 36, workflowId: 360, sha: descendant, name: 'Lint', conclusion: 'failure' });
+  const emptyRun = run({ id: 37, workflowId: 370, sha: descendant, name: 'Check Markdown Links' });
+  const staleFailure = run({
+    id: 38,
+    workflowId: 370,
+    sha: ancestor,
+    name: 'Check Markdown Links',
+    conclusion: 'failure',
+  });
+  const github = makeGithub({
+    pages: [[guardRun, emptyRun, staleFailure]],
+    jobsByRunId: {
+      36: [guardOnlyJob()],
+      37: [],
+      38: [buildFailureJob()],
+    },
+    parentsBySha: {
+      [descendant]: ancestor,
+    },
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context,
+    core,
+    previousSha: descendant,
+    excludeWorkflowsInput: '',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /Check Markdown Links/);
+}
+
+async function testAllSkippedJobsDoNotSupersedeOlderFailure() {
+  const descendant = 'docs-fix';
+  const ancestor = 'broken-docs';
+  const guardRun = run({ id: 39, workflowId: 390, sha: descendant, name: 'Lint', conclusion: 'failure' });
+  const skippedRun = run({ id: 40, workflowId: 400, sha: descendant, name: 'Check Markdown Links' });
+  const staleFailure = run({
+    id: 41,
+    workflowId: 400,
+    sha: ancestor,
+    name: 'Check Markdown Links',
+    conclusion: 'failure',
+  });
+  const github = makeGithub({
+    pages: [[guardRun, skippedRun, staleFailure]],
+    jobsByRunId: {
+      39: [guardOnlyJob()],
+      40: [skippedJob()],
+      41: [buildFailureJob()],
+    },
+    parentsBySha: {
+      [descendant]: ancestor,
+    },
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context,
+    core,
+    previousSha: descendant,
+    excludeWorkflowsInput: '',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /Check Markdown Links/);
+}
+
+async function testSuccessfulGuardJobDoesNotSupersedeSkippedSubstantiveWork() {
+  const descendant = 'docs-fix';
+  const ancestor = 'broken-lint';
+  const guardRun = run({
+    id: 47,
+    workflowId: 470,
+    sha: descendant,
+    name: 'Docs Guard',
+    conclusion: 'failure',
+  });
+  const orchestrationOnlyRun = run({ id: 48, workflowId: 480, sha: descendant, name: 'Lint' });
+  const staleFailure = run({
+    id: 49,
+    workflowId: 480,
+    sha: ancestor,
+    name: 'Lint',
+    conclusion: 'failure',
+  });
+  const github = makeGithub({
+    pages: [[guardRun, orchestrationOnlyRun, staleFailure]],
+    jobsByRunId: {
+      47: [guardOnlyJob()],
+      48: [successJob(GUARD_JOB_NAME), skippedJob('lint')],
+      49: [buildFailureJob()],
+    },
+    parentsBySha: {
+      [descendant]: ancestor,
+    },
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context,
+    core,
+    previousSha: descendant,
+    excludeWorkflowsInput: '',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /Lint #49/);
+}
+
+async function testSuccessfulMatrixSetupDoesNotSupersedeSkippedQualityGates() {
+  const descendant = 'docs-fix';
+  const ancestor = 'broken-integration';
+  const guardRun = run({
+    id: 60,
+    workflowId: 600,
+    sha: descendant,
+    name: 'Docs Guard',
+    conclusion: 'failure',
+  });
+  const orchestrationOnlyRun = run({ id: 61, workflowId: 610, sha: descendant, name: 'Integration Tests' });
+  const staleFailure = run({
+    id: 62,
+    workflowId: 610,
+    sha: ancestor,
+    name: 'Integration Tests',
+    conclusion: 'failure',
+  });
+  const github = makeGithub({
+    pages: [[guardRun, orchestrationOnlyRun, staleFailure]],
+    jobsByRunId: {
+      60: [guardOnlyJob()],
+      61: [
+        successJob(GUARD_JOB_NAME),
+        successJob('setup-integration-matrix'),
+        skippedJob('webpack-dummy-app-tests'),
+        skippedJob('rspack-dummy-app-tests'),
+      ],
+      62: [buildFailureJob()],
+    },
+    parentsBySha: {
+      [descendant]: ancestor,
+    },
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context,
+    core,
+    previousSha: descendant,
+    excludeWorkflowsInput: '',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /Integration Tests #62/);
+}
+
+async function testSuccessfulJobDoesNotSupersedeDifferentSkippedJobFailure() {
+  // Production break: a narrower descendant matrix passes one job and skips the
+  // ancestor's failing job, but workflow-level success incorrectly hides that failure.
+  const descendant = 'docs-fix';
+  const ancestor = 'broken-integration';
+  const guardRun = run({
+    id: 63,
+    workflowId: 630,
+    sha: descendant,
+    name: 'Docs Guard',
+    conclusion: 'failure',
+  });
+  const narrowerRun = run({ id: 64, workflowId: 640, sha: descendant, name: 'Integration Tests' });
+  const staleFailure = run({
+    id: 65,
+    workflowId: 640,
+    sha: ancestor,
+    name: 'Integration Tests',
+    conclusion: 'failure',
+  });
+  const github = makeGithub({
+    pages: [[guardRun, narrowerRun, staleFailure]],
+    jobsByRunId: {
+      63: [guardOnlyJob()],
+      64: [successJob('webpack-dummy-app-tests'), skippedJob('rspack-dummy-app-tests')],
+      65: [{ ...buildFailureJob(), name: 'rspack-dummy-app-tests' }],
+    },
+    parentsBySha: {
+      [descendant]: ancestor,
+    },
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context,
+    core,
+    previousSha: descendant,
+    excludeWorkflowsInput: '',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /Integration Tests #65/);
+}
+
+async function testDuplicateSuccessfulAndSkippedJobNamesDoNotSupersedeFailure() {
+  // Production break: duplicate display names collapse into one Set entry, so
+  // one success can hide that another same-named job was skipped.
+  const descendant = 'docs-fix';
+  const ancestor = 'broken-integration';
+  const guardRun = run({
+    id: 66,
+    workflowId: 660,
+    sha: descendant,
+    name: 'Docs Guard',
+    conclusion: 'failure',
+  });
+  const ambiguousRun = run({ id: 67, workflowId: 670, sha: descendant, name: 'Integration Tests' });
+  const staleFailure = run({
+    id: 68,
+    workflowId: 670,
+    sha: ancestor,
+    name: 'Integration Tests',
+    conclusion: 'failure',
+  });
+  const github = makeGithub({
+    pages: [[guardRun, ambiguousRun, staleFailure]],
+    jobsByRunId: {
+      66: [guardOnlyJob()],
+      67: [successJob('integration'), skippedJob('integration')],
+      68: [{ ...buildFailureJob(), name: 'integration' }],
+    },
+    parentsBySha: {
+      [descendant]: ancestor,
+    },
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context,
+    core,
+    previousSha: descendant,
+    excludeWorkflowsInput: '',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /Integration Tests #68/);
+}
+
+async function testPartialSuccessAcrossDescendantsDoesNotSupersedeCombinedFailure() {
+  // Production break: separate descendant runs each pass only one job, but
+  // unioning their evidence incorrectly suggests that one run passed both jobs.
+  const newestDescendant = 'docs-fix-newest';
+  const olderDescendant = 'docs-fix-older';
+  const ancestor = 'broken-integration';
+  const newestGuardRun = run({
+    id: 69,
+    workflowId: 690,
+    sha: newestDescendant,
+    name: 'Docs Guard',
+    conclusion: 'failure',
+  });
+  const newestPartialRun = run({
+    id: 70,
+    workflowId: 700,
+    sha: newestDescendant,
+    name: 'Integration Tests',
+  });
+  const olderGuardRun = run({
+    id: 71,
+    workflowId: 710,
+    sha: olderDescendant,
+    name: 'Docs Guard',
+    conclusion: 'failure',
+  });
+  const olderPartialRun = run({
+    id: 72,
+    workflowId: 700,
+    sha: olderDescendant,
+    name: 'Integration Tests',
+  });
+  const staleFailure = run({
+    id: 73,
+    workflowId: 700,
+    sha: ancestor,
+    name: 'Integration Tests',
+    conclusion: 'failure',
+  });
+  const github = makeGithub({
+    pages: [[newestGuardRun, newestPartialRun, olderGuardRun, olderPartialRun, staleFailure]],
+    jobsByRunId: {
+      69: [guardOnlyJob()],
+      70: [successJob('rspack-dummy-app-tests'), skippedJob('webpack-dummy-app-tests')],
+      71: [guardOnlyJob()],
+      72: [skippedJob('rspack-dummy-app-tests'), successJob('webpack-dummy-app-tests')],
+      73: [
+        { ...buildFailureJob(), name: 'rspack-dummy-app-tests' },
+        { ...buildFailureJob(), name: 'webpack-dummy-app-tests' },
+      ],
+    },
+    parentsBySha: {
+      [newestDescendant]: olderDescendant,
+      [olderDescendant]: ancestor,
+    },
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context,
+    core,
+    previousSha: newestDescendant,
+    excludeWorkflowsInput: '',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /Integration Tests #73/);
+}
+
+async function testMissingWorkflowIdsDoNotSupersedeOlderFailure() {
+  const descendant = 'docs-fix';
+  const ancestor = 'broken-docs';
+  const guardRun = run({ id: 50, workflowId: 500, sha: descendant, name: 'Lint', conclusion: 'failure' });
+  const successfulRun = { ...run({ id: 51, sha: descendant, name: 'Check Markdown Links' }) };
+  const staleFailure = {
+    ...run({ id: 52, sha: ancestor, name: 'Check Markdown Links', conclusion: 'failure' }),
+  };
+  delete successfulRun.workflow_id;
+  delete staleFailure.workflow_id;
+  const github = makeGithub({
+    pages: [[guardRun, successfulRun, staleFailure]],
+    jobsByRunId: {
+      50: [guardOnlyJob()],
+      51: [successJob()],
+      52: [buildFailureJob()],
+    },
+    parentsBySha: {
+      [descendant]: ancestor,
+    },
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context,
+    core,
+    previousSha: descendant,
+    excludeWorkflowsInput: '',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /GitHub API returned an unexpected response/);
+  assert.match(core.failed[0], /workflow run 51 to have a positive safe integer workflow_id/);
+}
+
+async function testMalformedWorkflowIdsDoNotSupersedeOlderFailure() {
+  const descendant = 'docs-fix';
+  const ancestor = 'broken-docs';
+  const guardRun = run({ id: 53, workflowId: 530, sha: descendant, name: 'Lint', conclusion: 'failure' });
+  const successfulRun = {
+    ...run({ id: 54, sha: descendant, name: 'Check Markdown Links' }),
+    workflow_id: 'not-a-workflow-id',
+  };
+  const staleFailure = {
+    ...run({ id: 55, sha: ancestor, name: 'Check Markdown Links', conclusion: 'failure' }),
+    workflow_id: 'not-a-workflow-id',
+  };
+  const github = makeGithub({
+    pages: [[guardRun, successfulRun, staleFailure]],
+    jobsByRunId: {
+      53: [guardOnlyJob()],
+      54: [successJob()],
+      55: [buildFailureJob()],
+    },
+    parentsBySha: {
+      [descendant]: ancestor,
+    },
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context,
+    core,
+    previousSha: descendant,
+    excludeWorkflowsInput: '',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /GitHub API returned an unexpected response/);
+  assert.match(core.failed[0], /workflow run 54 to have a positive safe integer workflow_id/);
+}
+
+async function testMissingWorkflowIdCollisionFailsClosed() {
+  const previous = 'docs-fix';
+  const failingRun = run({ id: 56, sha: previous, name: 'Check Markdown Links', conclusion: 'failure' });
+  const successfulRun = run({ id: 57, sha: previous, name: 'Check Markdown Links' });
+  delete failingRun.workflow_id;
+  delete successfulRun.workflow_id;
+  const github = makeGithub({
+    pages: [[failingRun, successfulRun]],
+    jobsByRunId: {
+      56: [buildFailureJob()],
+      57: [successJob()],
+    },
+    parentsBySha: {},
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context,
+    core,
+    previousSha: previous,
+    excludeWorkflowsInput: '',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /GitHub API returned an unexpected response/);
+  assert.match(core.failed[0], /workflow run 56 to have a positive safe integer workflow_id/);
+}
+
+async function testMalformedWorkflowIdCollisionFailsClosed() {
+  const previous = 'docs-fix';
+  const failingRun = {
+    ...run({ id: 58, sha: previous, name: 'Check Markdown Links', conclusion: 'failure' }),
+    workflow_id: 'invalid',
+  };
+  const successfulRun = {
+    ...run({ id: 59, sha: previous, name: 'Check Markdown Links' }),
+    workflow_id: 'invalid',
+  };
+  const github = makeGithub({
+    pages: [[failingRun, successfulRun]],
+    jobsByRunId: {
+      58: [buildFailureJob()],
+      59: [successJob()],
+    },
+    parentsBySha: {},
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context,
+    core,
+    previousSha: previous,
+    excludeWorkflowsInput: '',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /GitHub API returned an unexpected response/);
+  assert.match(core.failed[0], /workflow run 58 to have a positive safe integer workflow_id/);
+}
+
+async function testIncompleteRunDoesNotSupersedeOlderFailure() {
+  const descendant = 'docs-fix';
+  const ancestor = 'broken-docs';
+  const guardRun = run({ id: 42, workflowId: 420, sha: descendant, name: 'Lint', conclusion: 'failure' });
+  const incompleteRun = {
+    ...run({ id: 43, workflowId: 430, sha: descendant, name: 'Check Markdown Links' }),
+    status: 'in_progress',
+    conclusion: null,
+  };
+  const staleFailure = run({
+    id: 44,
+    workflowId: 430,
+    sha: ancestor,
+    name: 'Check Markdown Links',
+    conclusion: 'failure',
+  });
+  const github = makeGithub({
+    pages: [[guardRun, incompleteRun, staleFailure]],
+    jobsByRunId: {
+      42: [guardOnlyJob()],
+      44: [buildFailureJob()],
+    },
+    parentsBySha: {
+      [descendant]: ancestor,
+    },
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context,
+    core,
+    previousSha: descendant,
+    excludeWorkflowsInput: '',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /Check Markdown Links/);
+}
+
+async function testGuardOnlyRunDoesNotSupersedeOlderSameWorkflowFailure() {
+  const descendant = 'docs-fix';
+  const ancestor = 'broken-docs';
+  const guardRun = run({
+    id: 45,
+    workflowId: 450,
+    sha: descendant,
+    name: 'Check Markdown Links',
+    conclusion: 'failure',
+  });
+  const staleFailure = run({
+    id: 46,
+    workflowId: 450,
+    sha: ancestor,
+    name: 'Check Markdown Links',
+    conclusion: 'failure',
+  });
+  const github = makeGithub({
+    pages: [[guardRun, staleFailure]],
+    jobsByRunId: {
+      45: [guardOnlyJob()],
+      46: [buildFailureJob()],
+    },
+    parentsBySha: {
+      [descendant]: ancestor,
+    },
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context,
+    core,
+    previousSha: descendant,
+    excludeWorkflowsInput: '',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /Check Markdown Links/);
 }
 
 async function testNoRunSyntheticBaseLooksThroughToParentFailure() {
@@ -980,6 +1629,21 @@ async function main() {
   );
 
   await testGuardOnlyFailuresLookThroughToParentFailure();
+  await testDescendantSuccessSupersedesOlderSameWorkflowFailure();
+  await testDescendantSuccessDoesNotSupersedeDifferentWorkflowFailure();
+  await testEmptyJobsDoNotSupersedeOlderFailure();
+  await testAllSkippedJobsDoNotSupersedeOlderFailure();
+  await testSuccessfulGuardJobDoesNotSupersedeSkippedSubstantiveWork();
+  await testSuccessfulMatrixSetupDoesNotSupersedeSkippedQualityGates();
+  await testSuccessfulJobDoesNotSupersedeDifferentSkippedJobFailure();
+  await testDuplicateSuccessfulAndSkippedJobNamesDoNotSupersedeFailure();
+  await testPartialSuccessAcrossDescendantsDoesNotSupersedeCombinedFailure();
+  await testMissingWorkflowIdsDoNotSupersedeOlderFailure();
+  await testMalformedWorkflowIdsDoNotSupersedeOlderFailure();
+  await testMissingWorkflowIdCollisionFailsClosed();
+  await testMalformedWorkflowIdCollisionFailsClosed();
+  await testIncompleteRunDoesNotSupersedeOlderFailure();
+  await testGuardOnlyRunDoesNotSupersedeOlderSameWorkflowFailure();
   await testNoRunSyntheticBaseLooksThroughToParentFailure();
   await testNoRunPushBaseLooksThroughToParentFailure();
   await testNoRunPushBaseLooksThroughToParentSuccess();
@@ -1004,6 +1668,7 @@ async function main() {
   await testPaginatedJobsAreChecked();
   await testOctokitJobIteratorArrayPagesAreChecked();
   await testUnexpectedJobIteratorShapeFailsClearly();
+  await testNoJobsRunDoesNotCreateSuccessfulWorkflowEvidence();
   await testGuardOnlyHopLimitStopsAtConfiguredLimit();
 }
 
