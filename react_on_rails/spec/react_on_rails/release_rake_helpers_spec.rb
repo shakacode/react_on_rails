@@ -8027,8 +8027,7 @@ RSpec.describe "release.rake helper methods" do
             "peerDependencies",
             "--json",
             "--registry",
-            "https://registry.npmjs.org/",
-            "--prefer-online"
+            "https://registry.npmjs.org/"
           )
           .and_return(["npm ERR! 404 Not Found", instance_double(Process::Status, success?: false)])
         allow(self).to receive(:sleep)
@@ -8215,8 +8214,7 @@ RSpec.describe "release.rake helper methods" do
           "peerDependencies",
           "--json",
           "--registry",
-          "https://registry.npmjs.org/",
-          "--prefer-online"
+          "https://registry.npmjs.org/"
         )
         .and_return(
           ["npm ERR! 404 Not Found", failed_status],
@@ -8244,8 +8242,7 @@ RSpec.describe "release.rake helper methods" do
           "peerDependencies",
           "--json",
           "--registry",
-          "https://registry.npmjs.org/",
-          "--prefer-online"
+          "https://registry.npmjs.org/"
         )
         .and_return([
                       JSON.generate(
