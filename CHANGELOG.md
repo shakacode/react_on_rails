@@ -24,6 +24,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+### [17.1.0.rc.4] - 2026-09-12
+
 #### Fixed
 
 - **[Pro]** **Side-effect-only RSC client modules work in generated apps again**: Generated RSC apps now pin
@@ -3251,7 +3253,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.1.0.rc.3...main
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.1.0.rc.4...main
+[17.1.0.rc.4]: https://github.com/shakacode/react_on_rails/compare/v17.1.0.rc.3...v17.1.0.rc.4
 [17.1.0.rc.3]: https://github.com/shakacode/react_on_rails/compare/v17.1.0.rc.2...v17.1.0.rc.3
 [17.1.0.rc.2]: https://github.com/shakacode/react_on_rails/compare/v17.1.0.rc.1...v17.1.0.rc.2
 [17.1.0.rc.1]: https://github.com/shakacode/react_on_rails/compare/v17.1.0.rc.0...v17.1.0.rc.1
