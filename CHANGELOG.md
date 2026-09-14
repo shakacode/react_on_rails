@@ -24,6 +24,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+### [17.1.0.rc.5] - 2026-09-13
+
+No user-visible changes since 17.1.0.rc.4; this candidate completes publication after the partial RC4 release.
+
 ### [17.1.0.rc.4] - 2026-09-12
 
 #### Fixed
@@ -3253,7 +3257,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.1.0.rc.4...main
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.1.0.rc.5...main
+[17.1.0.rc.5]: https://github.com/shakacode/react_on_rails/compare/v17.1.0.rc.4...v17.1.0.rc.5
 [17.1.0.rc.4]: https://github.com/shakacode/react_on_rails/compare/v17.1.0.rc.3...v17.1.0.rc.4
 [17.1.0.rc.3]: https://github.com/shakacode/react_on_rails/compare/v17.1.0.rc.2...v17.1.0.rc.3
 [17.1.0.rc.2]: https://github.com/shakacode/react_on_rails/compare/v17.1.0.rc.1...v17.1.0.rc.2
