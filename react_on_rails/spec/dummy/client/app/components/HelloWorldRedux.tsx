@@ -35,7 +35,7 @@ export default class HelloWorldRedux extends React.Component<HelloWorldReduxProp
     const { name } = data;
 
     // If this creates an alert, we have a problem!
-    // see file node_package/src/scriptSanitizedVal.js for the fix to this prior issue.
+    // see packages/react-on-rails/src/escapeScript.ts for the fix to this prior issue (#5034).
 
     console.log('This is a script:"</div>"</script> <script>alert(\'WTF1\')</script>');
     console.log('Script2:"</div>"</script xx> <script>alert(\'WTF2\')</script xx>');

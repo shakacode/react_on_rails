@@ -59,6 +59,7 @@
     "./ReactDOMServer": "./lib/ReactDOMServer.cjs",
     "./serverRenderReactComponent": "./lib/serverRenderReactComponent.js",
     "./@internal/sanitizeNonce": "./lib/sanitizeNonce.js",
+    "./@internal/escapeScript": "./lib/escapeScript.js",
     "./@internal/rendererTeardown": "./lib/rendererTeardown.js",
     "./@internal/rootErrorHandlers": "./lib/rootErrorHandlers.js",
     "./@internal/isThenable": "./lib/isThenable.js",
