@@ -26,6 +26,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [17.1.0.rc.5] - 2026-09-13
 
+No user-visible changes since 17.1.0.rc.4; this candidate completes publication after the partial RC4 release.
+
 ### [17.1.0.rc.4] - 2026-09-12
 
 #### Fixed
