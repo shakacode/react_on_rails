@@ -42,7 +42,7 @@ The render template in react_on_rails_pro does real work (React rendering and pr
 
 ## Reproducibility Note
 
-The original local experiment bundle was an ephemeral `tmp/` path and was not retained. A narrow standalone reproduction script is now committed as [`internal/analysis/vm-script-caching-repro-2026-06-13.mjs`](vm-script-caching-repro-2026-06-13.mjs). It is intended to reproduce the shape of the microbenchmark, not to establish portable production throughput. The example reproduction output below was captured on an Apple M5 Max host, not the original Apple M1 host.
+The original local experiment bundle was an ephemeral `tmp/` path and was not retained. A narrow standalone reproduction script (`vm-script-caching-repro-2026-06-13.mjs`) was committed alongside this note and later removed as unused; it is recoverable from git history (last present at `22d3cfdf6`). It reproduced the shape of the microbenchmark only, not portable production throughput. The example reproduction output below was captured on an Apple M5 Max host, not the original Apple M1 host.
 
 ## Key Results
 
@@ -172,14 +172,14 @@ Adding `vm.Script` caching without stronger evidence would:
 
 Benchmark scripts and raw data are captured in this committed analysis note:
 
-- Reproduction script: [`internal/analysis/vm-script-caching-repro-2026-06-13.mjs`](vm-script-caching-repro-2026-06-13.mjs)
+- Reproduction script: `vm-script-caching-repro-2026-06-13.mjs` (removed; recoverable from git history at `22d3cfdf6`)
 - Example reproduction output: see the section below.
 - Original raw benchmark output: see the two later sections, with caveats.
 - Original local experiment bundle: intentionally not retained because it was an ephemeral `tmp/` path.
 
 ### Example Reproduction Output (2026-06-13)
 
-Later runs on the same host varied with source shape, V8's compilation cache, GC pauses, and sampling noise; run the script above for current local values. The compile measurements allocate many temporary `vm.Script` objects, so treat adjacent execution timings as directional rather than as stable benchmark numbers. The same-source/precompiled ratio is the relevant comparison only for a renderer path whose request source text is stable across calls. Current render paths that interpolate props or other request-specific text should be compared against the unique-source/precompiled contrast or a production-like benchmark.
+Later runs on the same host varied with source shape, V8's compilation cache, GC pauses, and sampling noise; restore `vm-script-caching-repro-2026-06-13.mjs` from git history (`git show 22d3cfdf6:internal/analysis/vm-script-caching-repro-2026-06-13.mjs`) and run it for current local values. The compile measurements allocate many temporary `vm.Script` objects, so treat adjacent execution timings as directional rather than as stable benchmark numbers. The same-source/precompiled ratio is the relevant comparison only for a renderer path whose request source text is stable across calls. Current render paths that interpolate props or other request-specific text should be compared against the unique-source/precompiled contrast or a production-like benchmark.
 
 ```text
 vm.Script caching reproduction
