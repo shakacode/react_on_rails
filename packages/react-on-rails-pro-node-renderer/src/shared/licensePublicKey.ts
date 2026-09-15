@@ -17,12 +17,12 @@
 // The private key corresponding to this public key is held by ShakaCode
 // and is never committed to the repository
 // Last updated: 2025-10-09 15:57:09 UTC
-// Source: http://shakacode.com/api/public-key
+// Source: https://pro.reactonrails.com/api/public-key
 //
 // You can update this public key by running the rake task:
 //   react_on_rails_pro:update_public_key
 // This task fetches the latest key from the API endpoint:
-//   http://shakacode.com/api/public-key
+//   https://pro.reactonrails.com/api/public-key
 export const PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAzcS/fpHz5CbnTQxb4Zot
 khjzXu7xNS+Y9VKfapMaHOMzNoCMfy1++hxHJatRedr+YQfZRCjfiN168Cpe+dhe
