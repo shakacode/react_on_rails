@@ -72,11 +72,40 @@ const renderWithDefaultStylesheetInference = async (
 const missingLoadableStatsError = () =>
   Object.assign(new Error('loadable-stats.json not copied yet'), { code: 'ENOENT' });
 
+// Test probe for the cross-package contract defined in ../src/injectRSCPayload.ts and
+// packages/react-on-rails-pro-node-renderer/src/worker/vm.ts; keep the Node Renderer test probe in sync.
+const LOADABLE_STATS_MISSING_DIAGNOSTIC_CONTEXT_KEY = '__reactOnRailsProReportMissingLoadableStats';
+
 describe('loadRSCClientChunkStylesheetHrefsByChunkName', () => {
   afterEach(() => {
+    Reflect.deleteProperty(globalThis, LOADABLE_STATS_MISSING_DIAGNOSTIC_CONTEXT_KEY);
     jest.dontMock('fs');
     jest.resetModules();
     jest.restoreAllMocks();
+  });
+
+  it('reports missing loadable-stats through the host diagnostic while preserving fallback', async () => {
+    const reportMissingLoadableStats = jest.fn();
+    Reflect.set(globalThis, LOADABLE_STATS_MISSING_DIAGNOSTIC_CONTEXT_KEY, reportMissingLoadableStats);
+    const readFileSync = jest.fn(() => {
+      throw missingLoadableStatsError();
+    });
+
+    jest.doMock('fs', () => ({
+      ...jest.requireActual<typeof import('fs')>('fs'),
+      readFileSync,
+    }));
+    const { default: injectRSCPayload } = await import('../src/injectRSCPayload.ts');
+    const renderedHTML = await renderWithDefaultStylesheetInference(
+      injectRSCPayload,
+      '["client1","js/client1-12345678.chunk.js"]',
+    );
+
+    expect(renderedHTML).toContain('<main>ready</main>');
+    expect(renderedHTML).not.toContain('/webpack/test/css/client1-12345678.css');
+    expect(reportMissingLoadableStats).toHaveBeenCalledWith(
+      resolvePath(__dirname, '../src/loadable-stats.json'),
+    );
   });
 
   it('widens and caps the loadable-stats read retry backoff after repeated failures', async () => {

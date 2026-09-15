@@ -3,7 +3,8 @@
  */
 
 import * as React from 'react';
-import { renderComponent, reactOnRailsComponentLoaded } from '../src/ClientRenderer.ts';
+import { renderComponent, renderAllComponents, reactOnRailsComponentLoaded } from '../src/ClientRenderer.ts';
+import { reactOnRailsPageLoaded } from '../src/clientStartup.ts';
 import type { RendererFunction } from '../src/types/index.ts';
 import ComponentRegistry from '../src/ComponentRegistry.ts';
 import StoreRegistry from '../src/StoreRegistry.ts';
@@ -114,6 +115,31 @@ describe('ClientRenderer', () => {
       // Verify the component was rendered
       expect(targetNode.innerHTML).toContain('Rendered:');
     });
+
+    it.each(['component"quoted', 'component\\backslash', 'component#selector.metachar[one]'])(
+      'renders a component whose DOM ID contains selector metacharacters: %s',
+      (domId) => {
+        setupRailsContext();
+
+        const TestComponent: React.FC<{ message: string }> = ({ message }) =>
+          React.createElement('div', null, `Hello, ${message}!`);
+        ComponentRegistry.register({ TestComponent });
+
+        const componentElement = document.createElement('div');
+        componentElement.className = 'js-react-on-rails-component';
+        componentElement.setAttribute('data-component-name', 'TestComponent');
+        componentElement.setAttribute('data-dom-id', domId);
+        componentElement.textContent = JSON.stringify({ message: 'World' });
+        document.body.appendChild(componentElement);
+
+        const targetNode = document.createElement('div');
+        targetNode.id = domId;
+        document.body.appendChild(targetNode);
+
+        expect(() => renderComponent(domId)).not.toThrow();
+        expect(targetNode.innerHTML).toContain('Rendered:');
+      },
+    );
 
     it('handles missing Rails context gracefully', () => {
       // Don't setup Rails context - should return early without error
@@ -1270,6 +1296,583 @@ describe('ClientRenderer', () => {
       // The old root was unmounted during replacement, and a new root was created for the new node.
       expect(rootUnmount).toHaveBeenCalledTimes(1);
       expect(mockHydrateOrRender).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  // Issue #4572: deferred hydration can bind a shared Redux store to a re-created instance
+  describe('store re-initialization guard (issue #4572)', () => {
+    beforeEach(() => {
+      runPageUnload();
+      setupRailsContext();
+      StoreRegistry.clearHydratedStores();
+      StoreRegistry.clearStoreGenerators();
+    });
+
+    afterEach(() => {
+      StoreRegistry.clearHydratedStores();
+      StoreRegistry.clearStoreGenerators();
+    });
+
+    const setupStoreElement = (storeName: string, props: Record<string, unknown>): void => {
+      // Use a div element with the store attribute, matching how forEachStore queries for stores
+      // (it queries by attribute, not by element type)
+      const storeElement = document.createElement('div');
+      storeElement.setAttribute('data-js-react-on-rails-store', storeName);
+      storeElement.textContent = JSON.stringify(props);
+      document.body.appendChild(storeElement);
+    };
+
+    it('does not re-create an already-hydrated store when forEachStore runs again', () => {
+      const storeGenerator = jest.fn((props: Record<string, unknown>) => ({
+        getState: () => ({ count: (props as { initialCount: number }).initialCount }),
+        dispatch: jest.fn(),
+        subscribe: jest.fn(),
+      }));
+      StoreRegistry.register({ SharedStore: storeGenerator });
+      setupStoreElement('SharedStore', { initialCount: 42 });
+
+      const TestComponent: React.FC = () => React.createElement('div', null, 'Test');
+      ComponentRegistry.register({ TestComponent });
+
+      // Setup a component that will trigger forEachStore
+      const componentElement = document.createElement('div');
+      componentElement.className = 'js-react-on-rails-component';
+      componentElement.setAttribute('data-component-name', 'TestComponent');
+      componentElement.setAttribute('data-dom-id', 'store-guard-test');
+      componentElement.textContent = JSON.stringify({});
+      document.body.appendChild(componentElement);
+
+      const targetNode = document.createElement('div');
+      targetNode.id = 'store-guard-test';
+      document.body.appendChild(targetNode);
+
+      // First render: creates the store
+      renderComponent('store-guard-test');
+      expect(storeGenerator).toHaveBeenCalledTimes(1);
+      const firstStore = StoreRegistry.getStore('SharedStore');
+
+      // Simulate a Turbo Frame or async content load that triggers another renderComponent
+      // This should NOT re-create the store
+      renderComponent('store-guard-test');
+      expect(storeGenerator).toHaveBeenCalledTimes(1);
+      const secondStore = StoreRegistry.getStore('SharedStore');
+
+      // The store instance should be the same
+      expect(firstStore).toBe(secondStore);
+    });
+
+    it('prevents store divergence between immediate and deferred components', () => {
+      type ObserverCallback = ConstructorParameters<typeof IntersectionObserver>[0];
+      const observerInstances: Array<{
+        callback: ObserverCallback;
+        disconnect: jest.Mock;
+        observe: jest.Mock;
+      }> = [];
+
+      class MockIntersectionObserver {
+        callback: ObserverCallback;
+
+        disconnect = jest.fn();
+
+        observe = jest.fn();
+
+        constructor(callback: ObserverCallback) {
+          this.callback = callback;
+          observerInstances.push(this);
+        }
+      }
+
+      Object.defineProperty(globalThis, 'IntersectionObserver', {
+        configurable: true,
+        value: MockIntersectionObserver,
+      });
+
+      let storeCallCount = 0;
+      const stores: Array<{ id: number }> = [];
+      const storeGenerator = jest.fn(() => {
+        storeCallCount += 1;
+        const store = {
+          id: storeCallCount,
+          getState: () => ({ storeId: storeCallCount }),
+          dispatch: jest.fn(),
+          subscribe: jest.fn(),
+        };
+        stores.push(store);
+        return store;
+      });
+      StoreRegistry.register({ SharedStore: storeGenerator });
+      setupStoreElement('SharedStore', {});
+
+      const TestComponent: React.FC = () => React.createElement('div', null, 'Test');
+      ComponentRegistry.register({ TestComponent });
+
+      // Setup immediate component
+      const immediateComponentEl = document.createElement('div');
+      immediateComponentEl.className = 'js-react-on-rails-component';
+      immediateComponentEl.setAttribute('data-component-name', 'TestComponent');
+      immediateComponentEl.setAttribute('data-dom-id', 'immediate-comp');
+      immediateComponentEl.setAttribute('data-hydrate-on', 'immediate');
+      immediateComponentEl.textContent = JSON.stringify({});
+      document.body.appendChild(immediateComponentEl);
+
+      const immediateTargetNode = document.createElement('div');
+      immediateTargetNode.id = 'immediate-comp';
+      immediateTargetNode.innerHTML = '<div>Server rendered</div>';
+      document.body.appendChild(immediateTargetNode);
+
+      // Setup visible (deferred) component
+      const visibleComponentEl = document.createElement('div');
+      visibleComponentEl.className = 'js-react-on-rails-component';
+      visibleComponentEl.setAttribute('data-component-name', 'TestComponent');
+      visibleComponentEl.setAttribute('data-dom-id', 'visible-comp');
+      visibleComponentEl.setAttribute('data-hydrate-on', 'visible');
+      visibleComponentEl.textContent = JSON.stringify({});
+      document.body.appendChild(visibleComponentEl);
+
+      const visibleTargetNode = document.createElement('div');
+      visibleTargetNode.id = 'visible-comp';
+      visibleTargetNode.innerHTML = '<div>Server rendered</div>';
+      document.body.appendChild(visibleTargetNode);
+
+      // First render: immediate component hydrates, visible is scheduled
+      renderComponent('immediate-comp');
+      renderComponent('visible-comp');
+
+      // Store should be created once
+      expect(storeGenerator).toHaveBeenCalledTimes(1);
+      const storeAfterFirstRender = StoreRegistry.getStore('SharedStore');
+
+      // Simulate async content load (e.g., Turbo Frame) triggering another forEachStore
+      // This happens when reactOnRailsComponentLoaded is called for a new component
+      const asyncComponentEl = document.createElement('div');
+      asyncComponentEl.className = 'js-react-on-rails-component';
+      asyncComponentEl.setAttribute('data-component-name', 'TestComponent');
+      asyncComponentEl.setAttribute('data-dom-id', 'async-comp');
+      asyncComponentEl.textContent = JSON.stringify({});
+      document.body.appendChild(asyncComponentEl);
+
+      const asyncTargetNode = document.createElement('div');
+      asyncTargetNode.id = 'async-comp';
+      document.body.appendChild(asyncTargetNode);
+
+      // This would previously re-create the store
+      renderComponent('async-comp');
+
+      // Store should still be the same instance
+      expect(storeGenerator).toHaveBeenCalledTimes(1);
+      const storeAfterAsyncLoad = StoreRegistry.getStore('SharedStore');
+      expect(storeAfterAsyncLoad).toBe(storeAfterFirstRender);
+
+      // Now the visible component becomes visible
+      observerInstances[0].callback(
+        [{ isIntersecting: true, intersectionRatio: 1 }] as IntersectionObserverEntry[],
+        observerInstances[0] as unknown as IntersectionObserver,
+      );
+
+      // The visible component should have gotten the same store instance
+      // (we can't directly test the component's store reference, but we verify
+      // the store wasn't re-created before the visible component mounted)
+      expect(storeGenerator).toHaveBeenCalledTimes(1);
+      expect(StoreRegistry.getStore('SharedStore')).toBe(storeAfterFirstRender);
+
+      // Cleanup
+      const observerGlobal = globalThis as unknown as { IntersectionObserver?: unknown };
+      delete observerGlobal.IntersectionObserver;
+    });
+
+    it('clears stores on page unload so navigation re-initializes with new props', () => {
+      const storeGenerator = jest.fn((props: Record<string, unknown>) => ({
+        getState: () => ({ count: (props as { initialCount: number }).initialCount }),
+        dispatch: jest.fn(),
+        subscribe: jest.fn(),
+      }));
+      StoreRegistry.register({ NavigationStore: storeGenerator });
+      setupStoreElement('NavigationStore', { initialCount: 1 });
+
+      const TestComponent: React.FC = () => React.createElement('div', null, 'Test');
+      ComponentRegistry.register({ TestComponent });
+
+      const componentElement = document.createElement('div');
+      componentElement.className = 'js-react-on-rails-component';
+      componentElement.setAttribute('data-component-name', 'TestComponent');
+      componentElement.setAttribute('data-dom-id', 'nav-store-test');
+      componentElement.textContent = JSON.stringify({});
+      document.body.appendChild(componentElement);
+
+      const targetNode = document.createElement('div');
+      targetNode.id = 'nav-store-test';
+      document.body.appendChild(targetNode);
+
+      // First page load: creates the store
+      renderComponent('nav-store-test');
+      expect(storeGenerator).toHaveBeenCalledTimes(1);
+      const firstStore = StoreRegistry.getStore('NavigationStore');
+      expect(firstStore?.getState()).toEqual({ count: 1 });
+
+      // Simulate Turbo/Turbolinks page unload (this should clear stores)
+      runPageUnload();
+
+      // After page unload, the store should be cleared
+      expect(StoreRegistry.getStore('NavigationStore', false)).toBeUndefined();
+
+      // Simulate new page - clear DOM and set up fresh page content
+      // This mimics what Turbo does: replace the entire page content
+      document.body.innerHTML = '';
+      document.head.innerHTML = '';
+      setupRailsContext();
+      setupStoreElement('NavigationStore', { initialCount: 100 });
+
+      const newComponentElement = document.createElement('div');
+      newComponentElement.className = 'js-react-on-rails-component';
+      newComponentElement.setAttribute('data-component-name', 'TestComponent');
+      newComponentElement.setAttribute('data-dom-id', 'nav-store-test-2');
+      newComponentElement.textContent = JSON.stringify({});
+      document.body.appendChild(newComponentElement);
+
+      const newTargetNode = document.createElement('div');
+      newTargetNode.id = 'nav-store-test-2';
+      document.body.appendChild(newTargetNode);
+
+      // Second page load: should create a NEW store with new props
+      renderComponent('nav-store-test-2');
+      expect(storeGenerator).toHaveBeenCalledTimes(2);
+      const secondStore = StoreRegistry.getStore('NavigationStore');
+      expect(secondStore?.getState()).toEqual({ count: 100 });
+
+      // The stores should be different instances
+      expect(secondStore).not.toBe(firstStore);
+    });
+  });
+
+  describe('store preservation on on-demand component render (issue #4862)', () => {
+    beforeEach(() => {
+      runPageUnload();
+      setupRailsContext();
+      StoreRegistry.clearHydratedStores();
+      StoreRegistry.clearStoreGenerators();
+    });
+
+    afterEach(() => {
+      StoreRegistry.clearHydratedStores();
+      StoreRegistry.clearStoreGenerators();
+    });
+
+    // Mirrors the production markup (generate_store_script emits a JSON script tag), unlike the
+    // #4572 block's div fixture, so a selector-tightening refactor cannot silently pass here.
+    const setupStoreElement = (storeName: string, props: Record<string, unknown>): void => {
+      const storeElement = document.createElement('script');
+      storeElement.type = 'application/json';
+      storeElement.setAttribute('data-js-react-on-rails-store', storeName);
+      storeElement.textContent = JSON.stringify(props);
+      document.body.appendChild(storeElement);
+    };
+
+    // `storeDependencies` mirrors the `data-store-dependencies` attribute emitted by
+    // generate_component_script (`render_options.store_dependencies&.to_json`); pass a raw
+    // string to simulate malformed hand-written markup. Omitting it mirrors markup rendered
+    // by a request that registered no stores (the attribute is omitted entirely).
+    const setupComponentIsland = (
+      componentName: string,
+      domId: string,
+      storeDependencies?: string[] | string,
+    ): void => {
+      const componentElement = document.createElement('div');
+      componentElement.className = 'js-react-on-rails-component';
+      componentElement.setAttribute('data-component-name', componentName);
+      componentElement.setAttribute('data-dom-id', domId);
+      if (storeDependencies !== undefined) {
+        componentElement.setAttribute(
+          'data-store-dependencies',
+          typeof storeDependencies === 'string' ? storeDependencies : JSON.stringify(storeDependencies),
+        );
+      }
+      componentElement.textContent = JSON.stringify({});
+      document.body.appendChild(componentElement);
+
+      const targetNode = document.createElement('div');
+      targetNode.id = domId;
+      document.body.appendChild(targetNode);
+    };
+
+    type MiniStoreAction = { type: string; item: string };
+    type MiniStore = {
+      getState: () => { items: string[] };
+      dispatch: (action: MiniStoreAction) => void;
+      subscribe: (listener: () => void) => void;
+    };
+
+    // A minimal functional store (rather than jest.fn() stubs) so the tests can assert that
+    // dispatched state — not just the store instance — survives the on-demand render.
+    const createMiniStoreGenerator = (): { generator: jest.Mock<MiniStore>; calls: () => number } => {
+      const generator = jest.fn((props: Record<string, unknown>): MiniStore => {
+        let state = { items: (props as { items?: string[] }).items ?? [] };
+        const listeners: Array<() => void> = [];
+        return {
+          getState: () => state,
+          dispatch: (action: MiniStoreAction) => {
+            state = { items: [...state.items, action.item] };
+            listeners.forEach((listener) => listener());
+          },
+          subscribe: (listener: () => void) => listeners.push(listener),
+        };
+      });
+      return { generator, calls: () => generator.mock.calls.length };
+    };
+
+    it('reactOnRailsComponentLoaded after page load preserves accumulated store state across on-demand renders', async () => {
+      const { generator, calls } = createMiniStoreGenerator();
+      StoreRegistry.register({ cartStore: generator });
+      setupStoreElement('cartStore', { items: [] });
+
+      const CartWidget: React.FC = () => React.createElement('div', null, 'Cart');
+      const ReviewsPanel: React.FC = () => React.createElement('div', null, 'Reviews');
+      ComponentRegistry.register({ CartWidget, ReviewsPanel });
+
+      setupComponentIsland('CartWidget', 'CartWidget-react-component-0');
+
+      // Initial page load renders everything and hydrates the store.
+      renderAllComponents();
+      expect(calls()).toBe(1);
+      const storeAfterLoad = StoreRegistry.getStore('cartStore') as MiniStore;
+
+      // The user accumulates client-side state after page load.
+      storeAfterLoad.dispatch({ type: 'ADD', item: 'a' });
+      storeAfterLoad.dispatch({ type: 'ADD', item: 'b' });
+      storeAfterLoad.dispatch({ type: 'ADD', item: 'c' });
+
+      // Async content arrives (fetched fragment, lazy panel) and is activated via the
+      // documented public API for asynchronously loaded content.
+      setupComponentIsland('ReviewsPanel', 'ReviewsPanel-react-component-0');
+      await reactOnRailsComponentLoaded('ReviewsPanel-react-component-0');
+
+      // The new island rendered. Assert only the mount target (arg 0 of the mocked internal
+      // renderer): an earlier test permanently overrides the mock's return value (clearMocks
+      // does not restore implementations) so DOM output is unreliable here, and pinning more
+      // of the call shape would couple this test to the renderer's signature.
+      const mockHydrateOrRender = require('../src/reactHydrateOrRender.ts').default as jest.Mock;
+      expect(mockHydrateOrRender.mock.lastCall?.[0]).toBe(
+        document.getElementById('ReviewsPanel-react-component-0'),
+      );
+      // ...without re-running the generator or replacing the hydrated store,
+      expect(calls()).toBe(1);
+      expect(StoreRegistry.getStore('cartStore')).toBe(storeAfterLoad);
+      // ...so the state accumulated since page load is still there.
+      expect(storeAfterLoad.getState().items).toEqual(['a', 'b', 'c']);
+
+      // Later fragments and re-announced islands (e.g. a fragment re-inserted by the host
+      // app) are equally forbidden from touching the store: once per name per page lifetime.
+      setupComponentIsland('ReviewsPanel', 'ReviewsPanel-react-component-1');
+      await reactOnRailsComponentLoaded('ReviewsPanel-react-component-1');
+      expect(mockHydrateOrRender.mock.lastCall?.[0]).toBe(
+        document.getElementById('ReviewsPanel-react-component-1'),
+      );
+      await reactOnRailsComponentLoaded('ReviewsPanel-react-component-0');
+
+      expect(calls()).toBe(1);
+      expect(StoreRegistry.getStore('cartStore')).toBe(storeAfterLoad);
+      expect(storeAfterLoad.getState().items).toEqual(['a', 'b', 'c']);
+
+      // reactOnRailsPageLoaded is documented to be callable multiple times (e.g. for
+      // asynchronously loaded content), so a repeat full page-load pass must not refresh
+      // hydrated stores either — the invariant holds for BOTH public re-entry points.
+      reactOnRailsPageLoaded();
+      expect(calls()).toBe(1);
+      expect(StoreRegistry.getStore('cartStore')).toBe(storeAfterLoad);
+      expect(storeAfterLoad.getState().items).toEqual(['a', 'b', 'c']);
+    });
+
+    it('still hydrates a NEW store that arrives with the injected fragment, before the island renders', async () => {
+      const existing = createMiniStoreGenerator();
+      const arriving = createMiniStoreGenerator();
+      StoreRegistry.register({ cartStore: existing.generator, reviewsStore: arriving.generator });
+      setupStoreElement('cartStore', { items: [] });
+
+      const CartWidget: React.FC = () => React.createElement('div', null, 'Cart');
+      // A 2-arg render function runs synchronously inside the mount, like a real island that
+      // consumes its store at render time — recording the store state it sees pins that the
+      // fragment's store hydrates BEFORE the arriving island renders, not merely by the time
+      // the call returns.
+      let itemsSeenAtRender: string[] | null = null;
+      const ReviewsPanel = (_props: Record<string, unknown>, _railsContext: unknown) => {
+        itemsSeenAtRender = (StoreRegistry.getStore('reviewsStore') as MiniStore).getState().items;
+        return () => React.createElement('div', null, 'Reviews');
+      };
+      ComponentRegistry.register({ CartWidget, ReviewsPanel });
+
+      setupComponentIsland('CartWidget', 'CartWidget-react-component-0');
+      renderAllComponents();
+      const cartStore = StoreRegistry.getStore('cartStore') as MiniStore;
+      cartStore.dispatch({ type: 'ADD', item: 'kept' });
+
+      // The async fragment carries its own store element alongside the island.
+      setupStoreElement('reviewsStore', { items: ['from-fragment'] });
+      setupComponentIsland('ReviewsPanel', 'ReviewsPanel-react-component-0');
+      await reactOnRailsComponentLoaded('ReviewsPanel-react-component-0');
+
+      // The store that did not exist yet is hydrated from the fragment's props, and the
+      // island observed that state when it rendered...
+      expect(arriving.calls()).toBe(1);
+      expect(itemsSeenAtRender).toEqual(['from-fragment']);
+      expect((StoreRegistry.getStore('reviewsStore') as MiniStore).getState().items).toEqual([
+        'from-fragment',
+      ]);
+      // ...while the already-hydrated store is left untouched.
+      expect(existing.calls()).toBe(1);
+      expect(StoreRegistry.getStore('cartStore')).toBe(cartStore);
+      expect(cartStore.getState().items).toEqual(['kept']);
+    });
+
+    it('ignores new props on a same-name store element arriving with a fragment', async () => {
+      const { generator, calls } = createMiniStoreGenerator();
+      StoreRegistry.register({ cartStore: generator });
+      setupStoreElement('cartStore', { items: [] });
+
+      const CartWidget: React.FC = () => React.createElement('div', null, 'Cart');
+      const ReviewsPanel: React.FC = () => React.createElement('div', null, 'Reviews');
+      ComponentRegistry.register({ CartWidget, ReviewsPanel });
+
+      setupComponentIsland('CartWidget', 'CartWidget-react-component-0');
+      renderAllComponents();
+      const store = StoreRegistry.getStore('cartStore') as MiniStore;
+      store.dispatch({ type: 'ADD', item: 'accumulated' });
+
+      // The fragment re-declares the store with fresh server props (as a partial rendered by
+      // the same Rails helpers would). Within one page lifetime those props must be ignored:
+      // one store instance per name per page lifetime — re-hydrating from them is exactly the
+      // silent state-discard this suite guards against.
+      setupStoreElement('cartStore', { items: ['fresh-server-props'] });
+      setupComponentIsland('ReviewsPanel', 'ReviewsPanel-react-component-0');
+      await reactOnRailsComponentLoaded('ReviewsPanel-react-component-0');
+
+      expect(calls()).toBe(1);
+      expect(StoreRegistry.getStore('cartStore')).toBe(store);
+      expect(store.getState().items).toEqual(['accumulated']);
+    });
+
+    it('initializes only the declared store dependencies of the requested island', async () => {
+      // The react_component helper defaults data-store-dependencies to the stores registered
+      // in its request, so real markup declares what each island needs. Rendering one island
+      // on demand must initialize exactly those stores — not every store element on the page.
+      const declared = createMiniStoreGenerator();
+      const unrelated = createMiniStoreGenerator();
+      StoreRegistry.register({ widgetStore: declared.generator, otherStore: unrelated.generator });
+
+      // Two fragments were injected; each carries a store element. Neither store is hydrated
+      // yet, and only the first fragment's island is being announced.
+      setupStoreElement('widgetStore', { items: ['from-fragment'] });
+      setupStoreElement('otherStore', { items: ['other-fragment'] });
+
+      // A 2-arg render function runs synchronously inside the mount, so recording the store
+      // state it sees pins that the declared dependency hydrates BEFORE the island renders.
+      let itemsSeenAtRender: string[] | null = null;
+      const Widget = (_props: Record<string, unknown>, _railsContext: unknown) => {
+        itemsSeenAtRender = (StoreRegistry.getStore('widgetStore') as MiniStore).getState().items;
+        return () => React.createElement('div', null, 'Widget');
+      };
+      ComponentRegistry.register({ Widget });
+      setupComponentIsland('Widget', 'Widget-react-component-0', ['widgetStore']);
+
+      await reactOnRailsComponentLoaded('Widget-react-component-0');
+
+      expect(declared.calls()).toBe(1);
+      expect(itemsSeenAtRender).toEqual(['from-fragment']);
+      // The unrelated store element was not touched: no generator run, nothing hydrated.
+      expect(unrelated.calls()).toBe(0);
+      expect(StoreRegistry.getStore('otherStore', false)).toBeUndefined();
+
+      // Re-announcing the island keeps the once-per-name-per-page-lifetime guard.
+      await reactOnRailsComponentLoaded('Widget-react-component-0');
+      expect(declared.calls()).toBe(1);
+    });
+
+    it('renders the requested island even when an unrelated store element has no registered generator', async () => {
+      // A fragment can carry a store element whose generator lives in a bundle that has not
+      // registered yet. Before the fix, the on-demand sweep called getStoreGenerator for
+      // EVERY store element and threw before the requested — unrelated — island rendered.
+      const declared = createMiniStoreGenerator();
+      StoreRegistry.register({ widgetStore: declared.generator });
+      setupStoreElement('widgetStore', { items: [] });
+      setupStoreElement('pendingStore', { items: ['bundle-not-loaded'] }); // no generator registered
+
+      const Widget: React.FC = () => React.createElement('div', null, 'Widget');
+      ComponentRegistry.register({ Widget });
+      setupComponentIsland('Widget', 'Widget-react-component-0', ['widgetStore']);
+
+      await reactOnRailsComponentLoaded('Widget-react-component-0');
+
+      const mockHydrateOrRender = require('../src/reactHydrateOrRender.ts').default as jest.Mock;
+      expect(mockHydrateOrRender.mock.lastCall?.[0]).toBe(
+        document.getElementById('Widget-react-component-0'),
+      );
+      expect(declared.calls()).toBe(1);
+      expect(StoreRegistry.getStore('pendingStore', false)).toBeUndefined();
+    });
+
+    it('renders the island when a declared store dependency cannot initialize, logging the failure', async () => {
+      // Islands routinely over-declare dependencies (the helper defaults to every store in
+      // the request), so one dependency that cannot initialize yet must be logged — not
+      // abort the render or the initialization of the remaining declared dependencies.
+      const working = createMiniStoreGenerator();
+      StoreRegistry.register({ widgetStore: working.generator });
+      setupStoreElement('lazyStore', { items: [] }); // declared below, but no generator registered
+      setupStoreElement('widgetStore', { items: ['ok'] });
+
+      const Widget: React.FC = () => React.createElement('div', null, 'Widget');
+      ComponentRegistry.register({ Widget });
+      setupComponentIsland('Widget', 'Widget-react-component-0', ['lazyStore', 'widgetStore']);
+
+      const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      try {
+        await reactOnRailsComponentLoaded('Widget-react-component-0');
+        // The failure was surfaced with the store's name.
+        expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('lazyStore'), expect.any(Error));
+      } finally {
+        errorSpy.mockRestore();
+      }
+
+      const mockHydrateOrRender = require('../src/reactHydrateOrRender.ts').default as jest.Mock;
+      expect(mockHydrateOrRender.mock.lastCall?.[0]).toBe(
+        document.getElementById('Widget-react-component-0'),
+      );
+      // The dependency after the failing one still initialized...
+      expect(working.calls()).toBe(1);
+      expect((StoreRegistry.getStore('widgetStore') as MiniStore).getState().items).toEqual(['ok']);
+    });
+
+    it('does not touch stores when the requested dom id has no component element', async () => {
+      // The Pro renderer no-ops when the element is missing; core must too, rather than
+      // hydrating every store on the page as a side effect of a failed lookup.
+      const { generator, calls } = createMiniStoreGenerator();
+      StoreRegistry.register({ cartStore: generator });
+      setupStoreElement('cartStore', { items: [] });
+
+      await reactOnRailsComponentLoaded('missing-dom-id');
+
+      expect(calls()).toBe(0);
+      expect(StoreRegistry.getStore('cartStore', false)).toBeUndefined();
+    });
+
+    it('falls back to initializing every store when data-store-dependencies is malformed', async () => {
+      // Hand-written markup with a malformed attribute must warn and behave like markup
+      // without the attribute (the legacy initialize-every-store sweep, hydration guard intact).
+      const { generator, calls } = createMiniStoreGenerator();
+      StoreRegistry.register({ cartStore: generator });
+      setupStoreElement('cartStore', { items: ['swept'] });
+
+      const Widget: React.FC = () => React.createElement('div', null, 'Widget');
+      ComponentRegistry.register({ Widget });
+      setupComponentIsland('Widget', 'Widget-react-component-0', 'not-a-json-array');
+
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        await reactOnRailsComponentLoaded('Widget-react-component-0');
+        expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('data-store-dependencies'));
+      } finally {
+        warnSpy.mockRestore();
+      }
+
+      expect(calls()).toBe(1);
+      expect((StoreRegistry.getStore('cartStore') as MiniStore).getState().items).toEqual(['swept']);
     });
   });
 });

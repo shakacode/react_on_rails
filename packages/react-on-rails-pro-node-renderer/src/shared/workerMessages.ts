@@ -17,7 +17,7 @@ export const WORKER_STARTUP_FAILURE = 'NODE_RENDERER_WORKER_STARTUP_FAILURE' as 
 
 export interface WorkerStartupFailureMessage {
   type: typeof WORKER_STARTUP_FAILURE;
-  stage: 'listen';
+  stage: 'listen' | 'prewarm';
   code?: string;
   errno?: number;
   syscall?: string;
@@ -33,12 +33,9 @@ export function isWorkerStartupFailureMessage(value: unknown): value is WorkerSt
 
   const message = value as Partial<WorkerStartupFailureMessage>;
 
-  // stage: 'listen' is the only supported stage today. To handle pre-listen
-  // failures (e.g. plugin registration), add a new stage value here and
-  // update the master handler accordingly.
   return (
     message.type === WORKER_STARTUP_FAILURE &&
-    message.stage === 'listen' &&
+    (message.stage === 'listen' || message.stage === 'prewarm') &&
     typeof message.host === 'string' &&
     typeof message.port === 'number' &&
     Number.isInteger(message.port) &&

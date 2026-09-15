@@ -50,84 +50,254 @@ module ReactOnRails
       rails_root ? rails_root.to_s : Dir.pwd
     end
 
+    module FileOwnership
+      module_function
+
+      def preserve(existing_stat, path)
+        return unless existing_stat
+
+        File.chown(existing_stat.uid, existing_stat.gid, path)
+      rescue Errno::EPERM, Errno::EINVAL, NotImplementedError
+        nil
+      end
+    end
+    private_constant :FileOwnership
+
+    module FileWriter
+      module_function
+
+      def ensure_existing_writable!(path)
+        return unless File.exist?(path)
+        return if File.writable?(path)
+
+        raise Errno::EACCES, path
+      end
+
+      # Prefer rename over truncate-and-write so interrupted writes cannot leave a partial destination.
+      # Copied guardrails may retain the old in-place behavior when directory permissions block replacement.
+      def write(path, content, new_file_mode: 0o644, allow_in_place_fallback: false, ensure_executable: false)
+        existing_stat = File.stat(path) if File.exist?(path)
+        temp = Tempfile.create([".#{File.basename(path)}", ".tmp"], File.dirname(path))
+        begin
+          temp.write(content)
+          temp.flush
+          temp.fsync
+          temp.close
+          FileOwnership.preserve(existing_stat, temp.path)
+          File.chmod(existing_stat ? existing_stat.mode & 0o7777 : new_file_mode, temp.path)
+          File.rename(temp.path, path)
+          :atomic
+        rescue StandardError
+          cleanup_tempfile(temp)
+          raise
+        end
+      rescue Errno::EACCES, Errno::EPERM
+        raise unless existing_stat && allow_in_place_fallback
+
+        prepare_in_place(path, ensure_executable)
+        File.write(path, content)
+        :in_place
+      end
+
+      def finish_copy(path, ensure_executable:, strategy:)
+        return unless ensure_executable
+        return if strategy == :in_place
+
+        File.chmod(0o755, path)
+      end
+
+      def prepare_in_place(path, ensure_executable)
+        return unless ensure_executable
+
+        File.chmod(0o755, path)
+      end
+
+      def cleanup_tempfile(temp)
+        close_tempfile(temp)
+        remove_tempfile(temp.path)
+      end
+
+      def close_tempfile(temp)
+        temp.close unless temp.closed?
+      rescue StandardError
+        nil
+      end
+
+      def remove_tempfile(path)
+        FileUtils.rm_f(path)
+      rescue StandardError
+        nil
+      end
+      private_class_method :prepare_in_place, :cleanup_tempfile, :close_tempfile, :remove_tempfile
+    end
+    private_constant :FileWriter
+
+    module WritePath
+      module_function
+
+      def resolve_root(path)
+        resolve(path)
+      end
+
+      def resolve_within(path, destination_root, resolved_destination_root)
+        resolved_path = resolve(path)
+        raise Error, "#{path} resolves outside the destination root" unless
+          within_destination_root?(resolved_path, resolved_destination_root)
+
+        managed_path_has_symlink?(path, destination_root) ? resolved_path : path
+      end
+
+      def resolve(path)
+        path = File.realdirpath(path) if File.symlink?(path)
+
+        existing_path = path
+        missing_components = []
+        until path_entry_exists?(existing_path)
+          parent = File.dirname(existing_path)
+          raise Errno::ENOENT, path if parent == existing_path
+
+          missing_components.unshift(File.basename(existing_path))
+          existing_path = parent
+        end
+
+        resolved_existing_path = if File.symlink?(existing_path)
+                                   File.realdirpath(existing_path)
+                                 else
+                                   File.realpath(existing_path)
+                                 end
+        File.join(resolved_existing_path, *missing_components)
+      end
+
+      def within_destination_root?(path, resolved_destination_root)
+        return true if path == resolved_destination_root
+
+        root_prefix = if resolved_destination_root.end_with?(File::SEPARATOR)
+                        resolved_destination_root
+                      else
+                        "#{resolved_destination_root}#{File::SEPARATOR}"
+                      end
+        path.start_with?(root_prefix)
+      end
+
+      def managed_path_has_symlink?(path, destination_root)
+        current_path = path
+        until current_path == destination_root
+          return true if File.symlink?(current_path)
+
+          parent = File.dirname(current_path)
+          return false if parent == current_path
+
+          current_path = parent
+        end
+        false
+      end
+
+      def path_entry_exists?(path)
+        File.exist?(path) || File.symlink?(path)
+      end
+      private_class_method :resolve, :within_destination_root?, :managed_path_has_symlink?, :path_entry_exists?
+    end
+    private_constant :WritePath
+
     # Encapsulates a single install run against one app root.
     class Installer
       def initialize(destination_root, skip_existing: false)
         @destination_root = File.expand_path(destination_root.to_s)
+        @resolved_destination_root = WritePath.resolve_root(@destination_root)
         @skip_existing = skip_existing
       end
 
       def install
-        validate_settings_before_copy
-        actions = FILES.map { |source, dest_rel| copy_file(source, dest_rel) }
-        actions << register_hook
-        actions << remove_legacy_hook
-        actions.compact
+        copy_write_paths = validate_copy_paths_before_copy
+        settings_write_path = validate_settings_before_copy
+        actions = FILES.map { |source, dest_rel| copy_file(source, dest_rel, copy_write_paths.fetch(dest_rel)) }
+        actions.push(register_hook(settings_write_path), remove_legacy_hook).compact
       end
 
       private
 
-      attr_reader :destination_root, :skip_existing
+      attr_reader :destination_root, :resolved_destination_root, :skip_existing
 
       def validate_settings_before_copy
         settings_path = File.join(destination_root, SETTINGS_REL)
-        return if skip_existing && File.exist?(settings_path)
+        if skip_existing && path_entry_exists?(settings_path)
+          raise Error, "#{SETTINGS_REL} is a dangling symlink, so it cannot be skipped safely" unless
+            File.exist?(settings_path)
 
+          return settings_path
+        end
+
+        settings_write_path = write_path_for(settings_path)
         read_settings(settings_path)
+        settings_write_path
       end
 
-      def copy_file(source, dest_rel)
+      def validate_copy_paths_before_copy
+        FILES.values.to_h do |dest_rel|
+          dest_path = File.join(destination_root, dest_rel)
+          if skip_existing && path_entry_exists?(dest_path)
+            # A missing skipped hook would still be registered; a missing skill remains intentionally skipped.
+            raise Error, "#{HOOK_REL} is a dangling symlink, so its missing target cannot be skipped safely" if
+              dest_rel == HOOK_REL && !File.exist?(dest_path)
+
+            next [dest_rel, dest_path]
+          end
+          [dest_rel, write_path_for(dest_path)]
+        end
+      end
+
+      def copy_file(source, dest_rel, write_path)
         source_path = File.join(TEMPLATES_DIR, source)
         dest_path = File.join(destination_root, dest_rel)
-        existed = File.exist?(dest_path)
+        hook = dest_rel == HOOK_REL
+        existed = path_entry_exists?(dest_path)
         return "skipped    #{dest_rel} (already exists)" if skip_existing && existed
 
         new_content = File.read(source_path)
-        unchanged = existed && File.read(dest_path) == new_content
+        unchanged = File.exist?(dest_path) && File.read(dest_path) == new_content
+        write_strategy = nil
 
         unless unchanged
-          FileUtils.mkdir_p(File.dirname(dest_path))
-          File.write(dest_path, new_content)
+          # File.write previously required an existing guardrail target to be writable even when its parent
+          # directory could replace it. Preserve that protection before selecting the atomic replacement path.
+          FileWriter.ensure_existing_writable!(write_path)
+
+          FileUtils.mkdir_p(File.dirname(write_path))
+          write_strategy = FileWriter.write(
+            write_path,
+            new_content,
+            new_file_mode: 0o666 & ~File.umask,
+            allow_in_place_fallback: true,
+            ensure_executable: hook
+          )
         end
-        File.chmod(0o755, dest_path) if dest_rel == HOOK_REL
+        FileWriter.finish_copy(write_path, ensure_executable: hook, strategy: write_strategy)
 
         return "unchanged  #{dest_rel}" if unchanged
 
         existed ? "updated    #{dest_rel}" : "created    #{dest_rel}"
       end
 
-      def register_hook
+      def register_hook(settings_write_path)
         settings_path = File.join(destination_root, SETTINGS_REL)
-        return "skipped    #{SETTINGS_REL} (already exists)" if skip_existing && File.exist?(settings_path)
+        return "skipped    #{SETTINGS_REL} (already exists)" if skip_existing && path_entry_exists?(settings_path)
 
         settings = read_settings(settings_path)
         return "unchanged  #{SETTINGS_REL} (hook already registered)" if hook_registered?(settings)
 
         add_hook(settings)
-        FileUtils.mkdir_p(File.dirname(settings_path))
-        existed = File.exist?(settings_path)
-        atomic_write(settings_path, "#{JSON.pretty_generate(settings)}\n")
+        FileUtils.mkdir_p(File.dirname(settings_write_path))
+        existed = path_entry_exists?(settings_path)
+        FileWriter.write(settings_write_path, "#{JSON.pretty_generate(settings)}\n")
         existed ? "updated    #{SETTINGS_REL} (registered hook)" : "created    #{SETTINGS_REL} (registered hook)"
       end
 
-      # settings.json is the user's file and may hold unrelated configuration, so it is replaced by
-      # rename rather than truncate-and-write: an interrupted or failed write can never leave a
-      # half-written or empty settings file behind.
-      def atomic_write(path, content)
-        directory = File.dirname(path)
-        mode = File.exist?(path) ? File.stat(path).mode & 0o7777 : 0o644
-        temp = Tempfile.create([".#{File.basename(path)}", ".tmp"], directory)
-        begin
-          temp.write(content)
-          temp.flush
-          temp.fsync
-          temp.close
-          File.chmod(mode, temp.path)
-          File.rename(temp.path, path)
-        rescue StandardError
-          FileUtils.rm_f(temp.path)
-          raise
-        end
+      def path_entry_exists?(path)
+        File.exist?(path) || File.symlink?(path)
+      end
+
+      def write_path_for(path)
+        WritePath.resolve_within(path, destination_root, resolved_destination_root)
       end
 
       def remove_legacy_hook
@@ -200,15 +370,23 @@ module ReactOnRails
       def add_hook(settings)
         hooks = (settings["hooks"] ||= {})
         post_tool_use = (hooks["PostToolUse"] ||= [])
-        post_tool_use.each do |candidate|
-          Array(candidate["hooks"]).reject! { |hook| managed_hook?(hook) }
-        end
+        remove_managed_hooks(post_tool_use)
         entry = post_tool_use.find { |candidate| candidate["matcher"] == HOOK_MATCHER }
         unless entry
           entry = { "matcher" => HOOK_MATCHER, "hooks" => [] }
           post_tool_use << entry
         end
         (entry["hooks"] ||= []) << { "type" => "command", "command" => HOOK_COMMAND, "args" => HOOK_ARGS }
+      end
+
+      def remove_managed_hooks(post_tool_use)
+        post_tool_use.reject! do |candidate|
+          candidate_hooks = candidate["hooks"]
+          next false unless candidate_hooks
+
+          removed_hooks = candidate_hooks.reject! { |hook| managed_hook?(hook) }
+          removed_hooks && candidate_hooks.empty?
+        end
       end
 
       def registered_hook?(hook)

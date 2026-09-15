@@ -70,6 +70,7 @@ const config = defineConfig([
     '**/bundle/',
     // Self-contained benchmark with its own pinned toolchain and checks.
     'benchmarks/rspack-vite-dx/',
+    'benchmarks/rspack-vite-rails-dx/',
     // dependencies
     '**/node_modules/',
     // fixtures
@@ -87,6 +88,9 @@ const config = defineConfig([
     // runtime and are committed as investigation artifacts, not repo TS source.
     'internal/analysis/rsc-fouc-shakaperf-artifacts/setup/ab-tests/**/*.ts',
     'internal/analysis/rsc-fouc-shakaperf-artifacts/setup/config/**/*.ts',
+    // PPR evidence-base experiment scripts (#4885): standalone artifacts with
+    // their own pinned React, committed byte-faithful to what actually ran.
+    'internal/analysis/experiments/',
   ]),
   {
     files: ['**/*.[jt]s', '**/*.[jt]sx', '**/*.[cm][jt]s'],

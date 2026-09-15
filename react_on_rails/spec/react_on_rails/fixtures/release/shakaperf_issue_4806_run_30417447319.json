@@ -1,0 +1,36 @@
+{
+  "non_publishing": true,
+  "repository": "shakacode/react_on_rails",
+  "tracker": {
+    "number": 4806,
+    "title": "Release gate: react_on_rails 17.0.1",
+    "state": "open"
+  },
+  "comment": {
+    "id": 5112224453,
+    "body": "Tracker Update: ShakaPerf passed; the local release watcher exhausted GitHub API quota\n\n<!-- shakaperf-release-evidence v1\nrepository: shakacode/react_on_rails\nrelease: 17.0.1\nbranch: release/17.0.1\nhead_sha: 88c0de5b8994d7ed9bcd2cc2405d2e520e1bf20a\nworkflow: shakaperf-release-gates.yml\nrun_id: 30417447319\nrun_attempt: 1\nevent: workflow_dispatch\nstatus: completed\nconclusion: success\nstarted_at: 2026-07-29T02:40:04Z\ncompleted_at: 2026-07-29T02:43:01Z\nrun_url: https://github.com/shakacode/react_on_rails/actions/runs/30417447319\nreport_digest: sha256:bf8e730bcd0a28ec33b7abc522600ecadc912c8cdee9f6dc6204d21b2454f226\nserver_logs_digest: sha256:e44bc8753070bb0884e74f11d3a81164dcdc9eadb7f19f543aa827035c374dcd\n-->\n",
+    "issue_url": "https://api.github.com/repos/shakacode/react_on_rails/issues/4806",
+    "created_at": "2026-07-29T02:50:07Z",
+    "updated_at": "2026-07-29T02:50:07Z",
+    "user": {
+      "login": "justin808"
+    }
+  },
+  "run": {
+    "id": 30417447319,
+    "run_attempt": 1,
+    "event": "workflow_dispatch",
+    "status": "completed",
+    "conclusion": "success",
+    "head_branch": "release/17.0.1",
+    "head_sha": "88c0de5b8994d7ed9bcd2cc2405d2e520e1bf20a",
+    "path": ".github/workflows/shakaperf-release-gates.yml",
+    "display_title": "ShakaPerf Release Gates",
+    "run_started_at": "2026-07-29T02:40:04Z",
+    "updated_at": "2026-07-29T02:43:01Z",
+    "html_url": "https://github.com/shakacode/react_on_rails/actions/runs/30417447319",
+    "repository": {
+      "full_name": "shakacode/react_on_rails"
+    }
+  }
+}

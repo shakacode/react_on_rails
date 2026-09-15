@@ -322,32 +322,37 @@ export async function handleRenderRequest({
     // Start before the first VM lookup so cache-hit and cache-miss timings cover
     // the same request span, including bundle upload on first deploy.
     const rendererServerTimingStartedAtMs = performance.now();
-    try {
-      const executionContext = await subSpan(
-        {
-          name: 'ror.bundle.build_execution_context',
-          attributes: {
-            'bundle.timestamp': String(bundleTimestamp),
-            'bundle.paths.count': allBundleFilePaths.length,
-            'cache.strategy': 'cache-first',
-          },
+    const cachedExecutionContext = await subSpan(
+      {
+        name: 'ror.bundle.build_execution_context',
+        attributes: {
+          'bundle.timestamp': String(bundleTimestamp),
+          'bundle.paths.count': allBundleFilePaths.length,
+          // This labels probe intent, not whether the lookup hits or misses.
+          'cache.strategy': 'cache-first',
         },
-        () => buildExecutionContext(allBundleFilePaths, /* buildVmsIfNeeded */ false),
-      );
+      },
+      async () => {
+        try {
+          return await buildExecutionContext(allBundleFilePaths, /* buildVmsIfNeeded */ false);
+        } catch (error) {
+          // A missing VM is expected here; bundle validation below handles absent bundles.
+          if (error instanceof VMContextNotFoundError) {
+            return undefined;
+          }
+          throw error;
+        }
+      },
+    );
+    if (cachedExecutionContext) {
       return await prepareResponseWithServerTiming(
         renderingRequest,
         bundleTimestamp,
         entryBundleFilePath,
-        executionContext,
+        cachedExecutionContext,
         rendererServerTimingStartedAtMs,
         rscStreamObservability,
       );
-    } catch (e) {
-      // Ignore VMContextNotFoundError, it means the bundle does not exist.
-      // The following code will handle this case.
-      if (!(e instanceof VMContextNotFoundError)) {
-        throw e;
-      }
     }
 
     // If gem has posted updated bundle:

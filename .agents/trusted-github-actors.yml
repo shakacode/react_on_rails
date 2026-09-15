@@ -12,6 +12,8 @@ trusted_bots:
   - chatgpt-codex-connector
   - claude
   - coderabbitai
+  - copilot
+  - copilot-pull-request-reviewer
   - cursor
   - dependabot
   - greptile-apps

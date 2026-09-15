@@ -1,0 +1,22 @@
+{
+  "provenance": {
+    "productionSource": "shakacode/react_on_rails#4560 production QA and #4570",
+    "developmentSource": "shakacode/react_on_rails#4561 verified Shakapacker development shape",
+    "bundler": "Rspack 2.0.5 through Shakapacker",
+    "note": "Sanitized excerpt. Paths and hashes preserve the captured asset-name shapes."
+  },
+  "production": {
+    "flightRow": "2:I[\"./client/app/components/FoucProbe/RscFoucProbeClient.jsx\",[635,\"js/client0-ddfe2f4e010169bd.chunk.js\"],\"default\"]\n",
+    "manifestEntry": {
+      "id": "./client/app/components/FoucProbe/RscFoucProbeClient.jsx",
+      "chunks": [635, "js/client0-ddfe2f4e010169bd.chunk.js"],
+      "css": ["/packs/css/635-166421e0.css"],
+      "name": "default"
+    }
+  },
+  "development": {
+    "flightRow": "2:I[\"./client/app/components/FoucProbe/RscFoucProbeClient.jsx\",[\"client0\",\"js/client0.chunk.js\"],\"default\"]\n",
+    "chunkName": "client0",
+    "stylesheetHref": "/packs/css/client0.css"
+  }
+}

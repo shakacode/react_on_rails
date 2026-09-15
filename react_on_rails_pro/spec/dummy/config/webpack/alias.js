@@ -13,22 +13,32 @@
  * https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
-const { resolve } = require('path');
+const { dirname, resolve } = require('path');
 
-const rootNodeModules = resolve(__dirname, '..', '..', '..', '..', '..', 'node_modules');
+// Resolve React from the dummy package root, not the workspace root. The
+// pnpm overrides scope React 19.2.7 to this dummy (react_on_rails_pro_dummy>react)
+// while the workspace root stays on the 19.0.x line, which has no <Activity>
+// export — bundling the root copy breaks the Activity-in-RSC demo (#3883) and
+// diverges from the React version this dummy declares and soak-tests. Mirrors
+// the same fix in react_on_rails/spec/dummy/config/webpack/alias.js (#3938).
+const dummyPackageRoot = resolve(__dirname, '..', '..');
+const resolveFromDummy = (specifier) => require.resolve(specifier, { paths: [dummyPackageRoot] });
+const reactPackageRoot = dirname(resolveFromDummy('react/package.json'));
+const reactDomPackageRoot = dirname(resolveFromDummy('react-dom/package.json'));
 
 module.exports = {
   resolve: {
     alias: {
       Assets: resolve(__dirname, '..', '..', 'client', 'app', 'assets'),
-      // Ensure a single copy of React across the pnpm workspace to prevent
-      // "Invalid hook call" errors from duplicate React instances during SSR
-      react: resolve(rootNodeModules, 'react'),
-      'react/jsx-runtime': resolve(rootNodeModules, 'react', 'jsx-runtime'),
-      'react/jsx-dev-runtime': resolve(rootNodeModules, 'react', 'jsx-dev-runtime'),
-      'react-dom': resolve(rootNodeModules, 'react-dom'),
-      'react-dom/client': resolve(rootNodeModules, 'react-dom', 'client'),
-      'react-dom/server': resolve(rootNodeModules, 'react-dom', 'server'),
+      // Ensure a single copy of React across everything bundled here (app code
+      // plus the linked workspace packages) to prevent "Invalid hook call"
+      // errors from duplicate React instances during SSR
+      react: reactPackageRoot,
+      'react/jsx-runtime': resolveFromDummy('react/jsx-runtime'),
+      'react/jsx-dev-runtime': resolveFromDummy('react/jsx-dev-runtime'),
+      'react-dom': reactDomPackageRoot,
+      'react-dom/client': resolveFromDummy('react-dom/client'),
+      'react-dom/server': resolveFromDummy('react-dom/server'),
       'react-on-rails-pro$': resolve(__dirname, '..', '..', 'client', 'app', 'strictModeReactOnRailsPro.js'),
       'react-on-rails-pro/client$': resolve(
         __dirname,

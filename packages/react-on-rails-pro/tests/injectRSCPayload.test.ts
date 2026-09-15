@@ -14,6 +14,8 @@
  */
 
 import { Readable, PassThrough } from 'stream';
+import { readFileSync } from 'fs';
+import { resolve as resolvePath } from 'path';
 import { RailsContextWithServerStreamingCapabilities } from 'react-on-rails/types';
 import injectRSCPayload from '../src/injectRSCPayload.ts';
 import RSCRequestTracker from '../src/RSCRequestTracker.ts';
@@ -39,6 +41,25 @@ const expectedPayloadPushScript = (chunk: string) =>
   `<script ${rscPayloadScriptMarker}>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})${rscPayloadKeyReference}||=[]).push(${JSON.stringify(
     chunk,
   )})</script>`;
+
+type ShakapackerAssetShapes = {
+  production: {
+    flightRow: string;
+    manifestEntry: {
+      chunks: Array<number | string>;
+      css: string[];
+    };
+  };
+  development: {
+    flightRow: string;
+    chunkName: string;
+    stylesheetHref: string;
+  };
+};
+
+const shakapackerAssetShapes = JSON.parse(
+  readFileSync(resolvePath(__dirname, 'fixtures/rsc-css-gating/shakapacker-asset-shapes.json'), 'utf8'),
+) as ShakapackerAssetShapes;
 
 // Shared utilities — createMockRSCStream wraps content in length-prefixed format,
 // createMockHTMLStream passes HTML through as-is.
@@ -138,6 +159,31 @@ const createFlushingHTMLStream = (html: string) =>
         destination.flush?.();
         destination.end();
       }, 0);
+      return destination;
+    },
+  }) as Readable;
+
+const createFlushingHTMLChunkStream = (chunks: string[]) =>
+  ({
+    pipe(destination: PassThrough & { flush?: () => void }) {
+      if (chunks.length === 0) {
+        destination.end();
+        return destination;
+      }
+
+      const writeChunk = (index: number) => {
+        setTimeout(() => {
+          destination.write(new TextEncoder().encode(chunks[index]));
+          destination.flush?.();
+          if (index === chunks.length - 1) {
+            destination.end();
+          } else {
+            writeChunk(index + 1);
+          }
+        }, 0);
+      };
+
+      writeChunk(0);
       return destination;
     },
   }) as Readable;
@@ -417,7 +463,7 @@ describe('injectRSCPayload', () => {
         message: 'useState is not a function',
         stack: 'TypeError: useState is not a function\n    at Broken (/app/components/Broken.server.tsx:7:3)',
       },
-      consoleReplayScript: '<script>console.log("replay")</script>',
+      consoleReplayScript: 'console.log("test diagnostic replay")',
       serializedProps: { token: 'do-not-serialize' },
     });
     const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
@@ -439,6 +485,7 @@ describe('injectRSCPayload', () => {
     expect(resultStr).not.toContain('serializedProps');
     expect(resultStr).not.toContain('do-not-serialize');
     expect(resultStr).not.toContain('consoleReplayScript');
+    expect(resultStr).toContain('<script>console.log("test diagnostic replay")</script>');
   });
 
   it('keeps the first RSC diagnostic metadata for a payload key', async () => {
@@ -504,6 +551,8 @@ describe('injectRSCPayload', () => {
         message: 'User 48213 not authorized for org 77',
         stack: 'Error: User 48213 not authorized\n    at Auth (/app/components/Auth.server.tsx:12:5)',
       },
+      consoleReplayScript:
+        'console.error("RSC inline failed for User 48213 at /srv/private/Auth.server.tsx:12:5")',
     });
     const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
@@ -519,6 +568,8 @@ describe('injectRSCPayload', () => {
     expect(resultStr).not.toContain('not authorized');
     expect(resultStr).not.toContain('Auth.server.tsx');
     expect(resultStr).not.toContain('renderingError');
+    expect(resultStr).not.toContain('RSC inline failed');
+    expect(resultStr).not.toContain('/srv/private/Auth.server.tsx');
   });
 
   it('redacts renderingError in non-development/test environments like staging', async () => {
@@ -528,6 +579,7 @@ describe('injectRSCPayload', () => {
         message: 'Internal server failure',
         stack: 'Error: Internal server failure\n    at Server (/app/lib/server.ts:42:7)',
       },
+      consoleReplayScript: 'console.error("staging secret at /srv/private/server.ts:42:7")',
     });
     const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
@@ -542,6 +594,7 @@ describe('injectRSCPayload', () => {
     expect(resultStr).not.toContain('Internal server failure');
     expect(resultStr).not.toContain('server.ts');
     expect(resultStr).not.toContain('renderingError');
+    expect(resultStr).not.toContain('staging secret');
   });
 
   it('redacts renderingError when railsEnv is not provided (undefined)', async () => {
@@ -551,6 +604,7 @@ describe('injectRSCPayload', () => {
         message: 'Database connection refused at 10.0.3.42:5432',
         stack: 'Error: Database connection refused\n    at Pool (/app/lib/db.ts:18:11)',
       },
+      consoleReplayScript: 'console.error("unknown-env secret at /srv/private/db.ts:18:11")',
     });
     const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
@@ -563,6 +617,7 @@ describe('injectRSCPayload', () => {
     expect(resultStr).not.toContain('10.0.3.42');
     expect(resultStr).not.toContain('db.ts');
     expect(resultStr).not.toContain('renderingError');
+    expect(resultStr).not.toContain('unknown-env secret');
   });
 
   it('forces hasErrors:true in production even when metadata has hasErrors:false with renderingError signal', async () => {
@@ -572,6 +627,7 @@ describe('injectRSCPayload', () => {
         message: 'Internal server failure',
         stack: 'Error: Internal server failure\n    at Server (/app/lib/server.ts:42:7)',
       },
+      consoleReplayScript: 'console.error("secondary inline secret at /srv/private/server.ts:42:7")',
     });
     const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
@@ -585,6 +641,24 @@ describe('injectRSCPayload', () => {
     expect(resultStr).not.toContain('Internal server failure');
     expect(resultStr).not.toContain('server.ts');
     expect(resultStr).not.toContain('renderingError');
+    expect(resultStr).not.toContain('secondary inline secret');
+    expect(resultStr).not.toContain('/srv/private/server.ts');
+  });
+
+  it('preserves console replay for clean production chunks', async () => {
+    const mockRSC = createMockRSCStreamWithMetadata('{"test": "data"}', {
+      hasErrors: false,
+      consoleReplayScript: 'console.log("clean production replay")',
+    });
+    const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId, undefined, {
+      railsEnv: 'production',
+    });
+    const resultStr = await collectStreamData(result);
+
+    expect(resultStr).toContain('<script>console.log("clean production replay")</script>');
   });
 
   it('includes full renderingError in diagnostic metadata in development', async () => {
@@ -594,6 +668,7 @@ describe('injectRSCPayload', () => {
         message: 'useState is not a function',
         stack: 'TypeError: useState is not a function\n    at Broken (/app/components/Broken.server.tsx:7:3)',
       },
+      consoleReplayScript: 'console.error("development diagnostic replay")',
     });
     const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
@@ -607,6 +682,7 @@ describe('injectRSCPayload', () => {
     expect(resultStr).toContain('useState is not a function');
     expect(resultStr).toContain('Broken.server.tsx');
     expect(resultStr).toContain('renderingError');
+    expect(resultStr).toContain('<script>console.error("development diagnostic replay")</script>');
   });
 
   it('promotes streamed RSC client chunk stylesheet preloads to gate reveal', async () => {
@@ -626,29 +702,62 @@ describe('injectRSCPayload', () => {
   });
 
   it('promotes only manifest-listed production RSC stylesheet preloads', async () => {
-    const flightData =
-      '2:I["./client/app/components/FoucProbe/RscFoucProbeClient.jsx",[4092,"js/client1-570df890c7aa791c.chunk.js"],"default"]\n' +
-      '0:["$","$L2",null,{},null]\n';
+    const { flightRow: flightData, manifestEntry } = shakapackerAssetShapes.production;
     const mockRSC = createMockRSCStream([flightData]);
-    const manifestStylesheetHref = '/webpack/test/css/4092-98880bc1.css';
+    const [manifestStylesheetHref] = manifestEntry.css;
     const unrelatedPreload =
       '<link rel="preload" as="style" href="https://cdn.example.com/assets/next-route-theme.css">';
-    const mockHTML = createMockHTMLStream([
+    const revealHTML =
+      '<div hidden id="RscFoucProbe-react-component-0S:0">styled boundary</div>' +
+      '<script>$RC("RscFoucProbe-react-component-0B:0","RscFoucProbe-react-component-0S:0")</script>';
+    const mockHTML = createFlushingHTMLChunkStream([
       `<link rel="preload" as="style" href="https://cdn.example.com${manifestStylesheetHref}?body=1">${unrelatedPreload}`,
+      revealHTML,
     ]);
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    expect(manifestEntry.chunks).toEqual([635, 'js/client0-ddfe2f4e010169bd.chunk.js']);
+    expect(manifestStylesheetHref).toBe('/packs/css/635-166421e0.css');
 
     const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
       rscClientManifestStylesheetHrefs: new Set([manifestStylesheetHref]),
     });
-    const resultStr = await collectStreamData(result);
+    const { allData, chunks } = collectStreamDataByChunk(result);
+    const resultStr = await allData;
+    const stylesheetChunkIndex = chunks.findIndex(
+      (chunk) => chunk.includes('rel="stylesheet"') && chunk.includes(manifestStylesheetHref),
+    );
+    const revealChunkIndex = chunks.findIndex((chunk) =>
+      chunk.includes('<div hidden id="RscFoucProbe-react-component-0S:0">'),
+    );
 
     expect(resultStr).toContain(
       `<link rel="stylesheet" href="https://cdn.example.com${manifestStylesheetHref}?body=1" data-precedence="rsc-css">`,
     );
+    expect(stylesheetChunkIndex).toBeGreaterThanOrEqual(0);
+    expect(revealChunkIndex).toBeGreaterThan(stylesheetChunkIndex);
     expect(resultStr.split(manifestStylesheetHref)).toHaveLength(2);
     expect(resultStr).toContain(unrelatedPreload);
     expect(resultStr).toContain(expectedPayloadPushScript(flightData));
+  });
+
+  it('does not infer a stylesheet from the real unhashed development asset shape', async () => {
+    const { flightRow, chunkName, stylesheetHref } = shakapackerAssetShapes.development;
+    const mockRSC = createMockRSCStream([flightRow]);
+    const mockHTML = createMockHTMLStream(['<main>ready</main>']);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    expect(flightRow).toContain(`["${chunkName}","js/${chunkName}.chunk.js"]`);
+    expect(stylesheetHref).toBe(`/packs/css/${chunkName}.css`);
+
+    const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
+      rscClientChunkStylesheetHrefsByChunkName: new Map([[chunkName, [stylesheetHref]]]),
+    });
+    const resultStr = await collectStreamData(result);
+
+    expect(resultStr).toContain('<main>ready</main>');
+    expect(resultStr).not.toContain(`<link rel="stylesheet" href="${stylesheetHref}"`);
+    expect(resultStr).toContain(expectedPayloadPushScript(flightRow));
   });
 
   it('injects inferred RSC client chunk stylesheets before streamed reveal HTML', async () => {

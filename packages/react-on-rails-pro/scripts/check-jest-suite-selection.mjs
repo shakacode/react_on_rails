@@ -21,6 +21,8 @@ import { fileURLToPath } from 'node:url';
 const scriptPath = fileURLToPath(import.meta.url);
 const packageRoot = path.resolve(path.dirname(scriptPath), '..');
 const require = createRequire(import.meta.url);
+const isReactServerOnlyTest = (testPath) =>
+  testPath.includes('.rsc.test.') || path.basename(testPath).startsWith('rscSsrSynchrony');
 
 const runPnpmCommand = (args) =>
   execFileSync('pnpm', args, {
@@ -38,27 +40,30 @@ export default function checkJestSuiteSelection({
   log = console.log,
   react19OnlyClientTests = [path.join(packageRoot, 'tests/registerServerComponent.client.test.jsx')],
 } = {}) {
-  if (Number.parseInt(reactVersion, 10) < 19) {
-    log(`Jest suite-selection check skipped (requires React 19+, found ${reactVersion})`);
-    return;
-  }
-
   const allTests = runPnpm(['exec', 'jest', '--listTests', 'tests']);
   const nonRscTests = runPnpm(['run', '--silent', 'test:non-rsc', '--listTests']);
-  const streamingTests = runPnpm(['run', '--silent', 'test:streaming', '--listTests']);
-  const selectedTests = new Set([
-    ...nonRscTests,
-    ...streamingTests,
-    ...runPnpm(['run', '--silent', 'test:rsc', '--listTests']),
-  ]);
-
-  const misplacedReact19Tests = react19OnlyClientTests.filter((testPath) => nonRscTests.includes(testPath));
+  const reactServerOnlyTests = allTests.filter(isReactServerOnlyTest);
+  const misplacedReact19Tests = [...react19OnlyClientTests, ...reactServerOnlyTests].filter((testPath) =>
+    nonRscTests.includes(testPath),
+  );
   if (misplacedReact19Tests.length > 0) {
     const relativePaths = misplacedReact19Tests.map((testPath) => path.relative(packageRoot, testPath));
     throw new Error(
       `React 19-only tests selected by the React 18-compatible test:non-rsc suite:\n${relativePaths.join('\n')}`,
     );
   }
+
+  if (Number.parseInt(reactVersion, 10) < 19) {
+    log(`Jest suite-selection check skipped (requires React 19+, found ${reactVersion})`);
+    return;
+  }
+
+  const streamingTests = runPnpm(['run', '--silent', 'test:streaming', '--listTests']);
+  const selectedTests = new Set([
+    ...nonRscTests,
+    ...streamingTests,
+    ...runPnpm(['run', '--silent', 'test:rsc', '--listTests']),
+  ]);
 
   const orphanedTests = allTests.filter((testPath) => !selectedTests.has(testPath));
 

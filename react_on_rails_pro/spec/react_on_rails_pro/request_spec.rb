@@ -91,7 +91,7 @@ describe ReactOnRailsPro::Request do
       response = mock_response(status: 200)
       requested_path = nil
       requested_form = nil
-      allow(mock_connection).to receive(:post) do |path, form:|
+      allow(mock_connection).to receive(:post) do |path, form:, **_opts|
         requested_path = path
         requested_form = form
         response
@@ -130,7 +130,7 @@ describe ReactOnRailsPro::Request do
       response = mock_response(status: 200)
       requested_path = nil
       requested_form = nil
-      allow(mock_connection).to receive(:post) do |path, form:|
+      allow(mock_connection).to receive(:post) do |path, form:, **_opts|
         requested_path = path
         requested_form = form
         response
@@ -313,7 +313,7 @@ describe ReactOnRailsPro::Request do
       requests = []
       call_count = 0
       allow(mock_connection).to receive(:post) do |path, **options|
-        requests << [path, options[:form]]
+        requests << [path, options[:form], options[:raw]]
         call_count += 1
         case call_count
         when 1 then mock_response(status: ReactOnRailsPro::STATUS_SEND_BUNDLE, chunks: ["Bundle not found"])
@@ -337,21 +337,27 @@ describe ReactOnRailsPro::Request do
         "/bundles/#{server_artifact.id}/render/digest"
       ]
       expect(requests.map(&:first)).to eq(expected_paths)
-      expect(requests.fetch(1).last).to include(
+      upload_form = requests.fetch(1)[1]
+      expect(upload_form).to include(
         "bundle_#{server_artifact.id}",
         "bundle_#{rsc_artifact.id}"
       )
-      expect(requests.fetch(1).last.fetch("assetsToCopy0")[:body]).to eq("old manifest bytes")
-      expect(requests.fetch(2).last["renderingRequest"]).to eq(js_code)
-      expect(requests.fetch(2).last["dependencyBundleTimestamps"])
-        .to eq([rsc_artifact.id, server_artifact.id])
+      expect(upload_form.fetch("assetsToCopy0")[:body]).to eq("old manifest bytes")
+      retry_render = requests.fetch(2)[2]
+      expect(retry_render.fetch(:body)).to eq(js_code)
+      expect(retry_render.fetch(:headers)).to include(
+        [
+          "x-react-on-rails-pro-dependency-bundle-timestamps",
+          JSON.generate([rsc_artifact.id, server_artifact.id])
+        ]
+      )
       expect(ReactOnRailsPro::Utils).not_to have_received(:renderer_artifacts)
     end
 
     it "passes the stream observability opt-in to the renderer request" do
-      captured_form = nil
-      allow(mock_connection).to receive(:post) do |_path, form:, **_opts|
-        captured_form = form
+      captured_raw_request = nil
+      allow(mock_connection).to receive(:post) do |_path, raw:, **_opts|
+        captured_raw_request = raw
         mock_response(status: 200, chunks: [to_length_prefixed("Hello, world!")])
       end
 
@@ -363,7 +369,8 @@ describe ReactOnRailsPro::Request do
       )
       stream.each_chunk(&:itself)
 
-      expect(captured_form["rscStreamObservability"]).to be true
+      expect(captured_raw_request[:headers])
+        .to include(%w[x-react-on-rails-pro-rsc-stream-observability true])
     end
 
     it "raises duplicate bundle upload error when server asks for bundle twice" do
@@ -423,6 +430,101 @@ describe ReactOnRailsPro::Request do
           stream.each_chunk { |_chunk| nil }
         end.to raise_error(ReactOnRailsPro::Error, /#{status_code}:\nUnknown error message/)
       end
+    end
+  end
+
+  describe ".raw_render_request" do
+    it "puts JavaScript in the body and normalized metadata in headers" do
+      raw_request = described_class.send(
+        :raw_render_request,
+        "console.log('héllo');",
+        {
+          "renderingRequest" => "console.log('héllo');",
+          "protocolVersion" => "2.0.0",
+          "gemVersion" => "16.0.0",
+          "password" => "secret",
+          "railsEnv" => "test",
+          "dependencyBundleTimestamps" => %w[server rsc],
+          "rscStreamObservability" => true
+        }
+      )
+
+      expect(raw_request[:body]).to eq("console.log('héllo');")
+      expect(raw_request[:headers]).to include(
+        ["content-type", "application/vnd.react-on-rails.render-request+javascript"],
+        ["authorization", "Bearer secret"],
+        ["x-react-on-rails-pro-protocol-version", "2.0.0"],
+        ["x-react-on-rails-pro-dependency-bundle-timestamps", '["server","rsc"]'],
+        %w[x-react-on-rails-pro-rsc-stream-observability true]
+      )
+    end
+
+    it "rejects header injection through the renderer password" do
+      expect do
+        described_class.send(
+          :raw_render_request,
+          "ReactOnRails.dummy",
+          {
+            "renderingRequest" => "ReactOnRails.dummy",
+            "protocolVersion" => "2.0.0",
+            "gemVersion" => "16.0.0",
+            "password" => "secret\r\ninjected: true",
+            "railsEnv" => "test",
+            "dependencyBundleTimestamps" => []
+          }
+        )
+      end.to raise_error(ArgumentError, /cannot contain newlines/)
+    end
+
+    it "rejects header injection through non-password metadata" do
+      expect do
+        described_class.send(
+          :raw_render_request,
+          "ReactOnRails.dummy",
+          {
+            "renderingRequest" => "ReactOnRails.dummy",
+            "protocolVersion" => "2.0.0",
+            "gemVersion" => "16.0.0",
+            "password" => "secret",
+            "railsEnv" => "test\r\ninjected: true",
+            "dependencyBundleTimestamps" => []
+          }
+        )
+      end.to raise_error(ArgumentError, /cannot contain newlines/)
+    end
+  end
+
+  describe ".render_code request body encoding" do
+    let(:form) do
+      {
+        "renderingRequest" => "ReactOnRails.dummy",
+        "protocolVersion" => "2.0.0",
+        "gemVersion" => "17.0.0",
+        "password" => "secret",
+        "railsEnv" => "test",
+        "dependencyBundleTimestamps" => []
+      }
+    end
+
+    before do
+      allow(described_class).to receive(:form_with_code).and_return(form)
+      allow(mock_connection).to receive(:post).and_return(mock_response(status: 200))
+    end
+
+    it "uses the raw body encoding when no bundle is attached" do
+      described_class.render_code(render_path, "ReactOnRails.dummy", false)
+
+      expect(mock_connection).to have_received(:post).with(
+        render_path,
+        raw: hash_including(body: "ReactOnRails.dummy"),
+        stream: false
+      )
+    end
+
+    it "preserves the form path for bundle uploads" do
+      described_class.render_code(render_path, "ReactOnRails.dummy", true)
+
+      expect(mock_connection).to have_received(:post).with(render_path, form:, stream: false)
     end
   end
 
@@ -707,6 +809,98 @@ describe ReactOnRailsPro::Request do
 
     after do
       described_class.instance_variable_set(:@connection, nil)
+    end
+
+    it "keeps routine connection setup at debug level" do
+      connection = instance_double(ReactOnRailsPro::RendererHttpClient)
+      setup_messages = []
+      allow(ReactOnRailsPro.configuration).to receive_messages(
+        renderer_http_pool_timeout: 5,
+        ssr_timeout: 10
+      )
+      allow(ReactOnRailsPro::RendererHttpClient).to receive(:new).and_return(connection)
+      allow(logger_mock).to receive(:debug) { |&block| setup_messages << block.call }
+      expect(logger_mock).not_to receive(:info)
+
+      expect(described_class.send(:create_connection)).to be(connection)
+      expect(setup_messages).to eq(["[ReactOnRailsPro] Setting up Node Renderer connection to #{renderer_url}"])
+    end
+
+    it "forces h2c when the transport setting is left at its default" do
+      connection = instance_double(ReactOnRailsPro::RendererHttpClient)
+      allow(ReactOnRailsPro.configuration).to receive_messages(
+        renderer_http_pool_timeout: 5,
+        renderer_http_force_http2: true,
+        ssr_timeout: 10
+      )
+      allow(ReactOnRailsPro::RendererHttpClient).to receive(:new).and_return(connection)
+
+      expect(described_class.send(:create_connection)).to be(connection)
+      expect(ReactOnRailsPro::RendererHttpClient).to have_received(:new).with(
+        origin: renderer_url,
+        pool_size: 20,
+        connect_timeout: 5,
+        read_timeout: 10,
+        force_http2: true
+      )
+    end
+
+    it "does not force h2c when HTTP/1.1 is configured" do
+      connection = instance_double(ReactOnRailsPro::RendererHttpClient)
+      allow(ReactOnRailsPro.configuration).to receive_messages(
+        renderer_http_pool_timeout: 5,
+        renderer_http_force_http2: false,
+        ssr_timeout: 10
+      )
+      allow(ReactOnRailsPro::RendererHttpClient).to receive(:new).and_return(connection)
+
+      expect(described_class.send(:create_connection)).to be(connection)
+      expect(ReactOnRailsPro::RendererHttpClient).to have_received(:new).with(
+        origin: renderer_url,
+        pool_size: 20,
+        connect_timeout: 5,
+        read_timeout: 10,
+        force_http2: false
+      )
+    end
+
+    it "includes the transport setting after request retries are exhausted" do
+      allow(ReactOnRailsPro.configuration).to receive_messages(
+        renderer_http_force_http2: false
+      )
+      transport_error = ReactOnRailsPro::RendererHttpClient::ConnectionError.new("unexpected protocol")
+
+      expect do
+        described_class.send(:retry_or_raise_transport_error, transport_error, 0, "/render", "Connection")
+      end.to raise_error(
+        ReactOnRailsPro::Error,
+        a_string_including(
+          "renderer_http_force_http2 = false",
+          "unexpected protocol"
+        )
+      )
+    end
+
+    it "keeps renderer connection failures actionable" do
+      allow(ReactOnRailsPro.configuration).to receive_messages(
+        renderer_http_pool_timeout: 5,
+        renderer_http_pool_warn_timeout: 10,
+        renderer_http_keep_alive_timeout: 15,
+        ssr_timeout: 20
+      )
+      allow(ReactOnRailsPro::RendererHttpClient).to receive(:new)
+        .and_raise(StandardError, "invalid renderer URL")
+
+      expect { described_class.send(:create_connection) }
+        .to raise_error(
+          ReactOnRailsPro::Error,
+          a_string_including(
+            "Error creating async-http connection",
+            "renderer_url = #{renderer_url}",
+            "Be sure to use a url that contains the protocol of http or https",
+            "invalid renderer URL"
+          )
+        )
     end
 
     it "creates only one connection when accessed concurrently" do
@@ -1016,6 +1210,42 @@ describe ReactOnRailsPro::Request do
       stream.each_chunk(&:itself)
 
       expect(emitter_received).to be_a(ReactOnRailsPro::AsyncPropsEmitter)
+    end
+
+    it "preserves the Rails OpenTelemetry context inside the async props block" do
+      captured_contexts = []
+      capture_fibers = []
+      active_contexts = []
+      with_context_fibers = []
+      observed_contexts = nil
+      props_fiber = nil
+      allow(ReactOnRailsPro::OpenTelemetry).to receive(:capture_context) do
+        capture_fibers << Fiber.current
+        Object.new.tap { |context| captured_contexts << context }
+      end
+      allow(ReactOnRailsPro::OpenTelemetry).to receive(:with_context) do |context, &block|
+        with_context_fibers << Fiber.current
+        active_contexts.push(context)
+        block.call
+      ensure
+        active_contexts.pop
+      end
+      test_async_props_block = proc do |_emitter|
+        props_fiber = Fiber.current
+        observed_contexts = active_contexts.dup
+      end
+
+      stream = described_class.render_code_with_incremental_updates(
+        "/render-incremental",
+        js_code,
+        async_props_block: test_async_props_block
+      )
+      stream.each_chunk(&:itself)
+
+      expect(captured_contexts.length).to eq(2)
+      expect(observed_contexts).to eq(captured_contexts)
+      expect(capture_fibers).not_to include(props_fiber)
+      expect(with_context_fibers.last).to be(props_fiber)
     end
 
     it "uses rsc_bundle_hash for the AsyncPropsEmitter" do

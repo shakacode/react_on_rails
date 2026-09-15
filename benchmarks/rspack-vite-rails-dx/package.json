@@ -1,0 +1,19 @@
+{
+  "name": "react-on-rails-rspack-vite-rails-dx-benchmark",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.33.4",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "benchmark": "node scripts/run.mjs",
+    "check": "prettier --check . --ignore-path .prettierignore && node --test scripts/*.test.mjs && node scripts/report.mjs --check",
+    "format": "prettier --write . --ignore-path .prettierignore",
+    "prepare:starters": "pnpm --dir starters/rspack install --ignore-workspace --frozen-lockfile && pnpm --dir starters/vite install --ignore-workspace --frozen-lockfile"
+  },
+  "devDependencies": {
+    "playwright": "1.61.1",
+    "prettier": "3.9.5"
+  }
+}

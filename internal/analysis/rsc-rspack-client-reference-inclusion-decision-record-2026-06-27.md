@@ -162,7 +162,7 @@ Rspack docs say web-target lazy compilation defaults to `{ entries: false, impor
 Sources:
 
 - <https://rspack.rs/config/lazy-compilation>
-- <https://rspack.rs/guide/features/lazy-compilation>
+- <https://rspack.rs/guide/advanced/lazy-compilation>
 
 [react_on_rails#4227](https://github.com/shakacode/react_on_rails/pull/4227) shipped the short-term fix:
 
@@ -472,7 +472,7 @@ RSC package:
 Rspack / Shakapacker:
 
 - [Rspack lazyCompilation config](https://rspack.rs/config/lazy-compilation)
-- [Rspack lazyCompilation guide](https://rspack.rs/guide/features/lazy-compilation)
+- [Rspack lazyCompilation guide](https://rspack.rs/guide/advanced/lazy-compilation)
 - [web-infra-dev/rspack#7174 — Module.addBlock API](https://github.com/web-infra-dev/rspack/issues/7174)
 - [web-infra-dev/rspack#8469 — missing RSC framework APIs](https://github.com/web-infra-dev/rspack/issues/8469)
 - [web-infra-dev/rspack#9661 — JS identity support for dependency blocks](https://github.com/web-infra-dev/rspack/pull/9661)

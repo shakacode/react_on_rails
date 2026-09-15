@@ -1,3 +1,9 @@
+---
+description: >-
+  Migrate a React on Rails Pro 17 app to supported GA React Server Components
+  with the stable React 19.2 and react-on-rails-rsc 19.2 stack.
+---
+
 # Migrating Your React App to React Server Components
 
 This guide covers the React-side challenges of migrating an existing React on Rails application to React Server Components (RSC). It focuses on how to restructure your component tree, handle Context and state management, migrate data fetching patterns, deal with third-party library compatibility, and avoid common pitfalls.
@@ -5,7 +11,7 @@ This guide covers the React-side challenges of migrating an existing React on Ra
 > [!NOTE]
 > **Summary for AI agents:** Use this page when the user has an existing React on Rails app and wants to adopt RSC. This covers the React-side migration (component restructuring, state, data fetching). For the initial RSC setup, see the [RSC tutorial](../../pro/react-server-components/tutorial.md). RSC requires Pro with the Node renderer.
 
-> **React on Rails Pro required:** RSC support requires [React on Rails Pro](../../pro/react-on-rails-pro.md) with the node renderer. Current public releases (16.2.0+) are version-aligned: install Pro at the same version as `react_on_rails`. The Pro gem provides the streaming view helpers (`stream_react_component`, `stream_react_component_with_async_props`, `rsc_payload_react_component`, and `rsc_payload_react_component_with_async_props`), the RSC webpack plugin and loader, and the `registerServerComponent` API. For setup, see the [RSC tutorial](../../pro/react-server-components/tutorial.md). For upgrade steps, see the [performance breakthroughs guide](../../pro/major-performance-breakthroughs-upgrade-guide.md).
+> **React on Rails Pro required:** RSC is a supported GA feature of [React on Rails Pro 17](../../pro/react-on-rails-pro.md) with the node renderer. Install Pro at the same version as `react_on_rails`. The stable v17 RSC stack uses React and React DOM 19.2.x with patch 19.2.7 or newer and `react-on-rails-rsc` 19.2.x with patch 19.2.1 or newer. The Pro gem provides the streaming view helpers (`stream_react_component`, `stream_react_component_with_async_props`, `rsc_payload_react_component`, and `rsc_payload_react_component_with_async_props`), the RSC webpack plugin and loader, and the `registerServerComponent` API. For setup, see the [RSC tutorial](../../pro/react-server-components/tutorial.md). For upgrade steps, see [Upgrading an Existing React on Rails Pro App to RSC](../../pro/react-server-components/upgrading-existing-pro-app.md). That guide's Pro 16.4+ prerequisite is only the minimum starting point for an existing app; Pro 17 is the supported GA destination and current documentation baseline.
 
 ## Why Migrate?
 
@@ -212,8 +218,9 @@ These mistakes account for the majority of setup failures:
 
 ## Prerequisites
 
-- React 19+
-- [React on Rails Pro](../../pro/react-on-rails-pro.md) installed at the same version as React on Rails (current public releases, 16.2.0+, are version-aligned)
+- React and React DOM 19.2.x with patch 19.2.7 or newer
+- [React on Rails Pro 17](../../pro/react-on-rails-pro.md) installed at the same version as React on Rails 17
+- Stable `react-on-rails-rsc` 19.2.x with patch 19.2.1 or newer
 - Node renderer configured (RSC requires server-side JavaScript execution)
 - RSC webpack bundle configured (see [RSC tutorial](../../pro/react-server-components/tutorial.md))
 - Node.js 20+

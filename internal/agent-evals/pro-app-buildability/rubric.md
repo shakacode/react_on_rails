@@ -1,7 +1,8 @@
 # Rubric
 
-Grade from captured command output and workspace files, never solely from the
-agent's report.
+Review captured command output and workspace files, never solely the agent's
+report. The harness records bounded facts but does not interpret application
+source, shell syntax, test names, or framework conventions.
 
 | ID                  | Required evidence                                    | Passing evidence                                                            |
 | ------------------- | ---------------------------------------------------- | --------------------------------------------------------------------------- |
@@ -15,6 +16,11 @@ agent's report.
 | `unaided`           | runner-owned invocation record                       | runner sent no human follow-up input after the immutable prompt             |
 | `evidence.complete` | metadata, hashes, inventory, report, verification    | run artifacts validate and contain no unresolved `UNKNOWN` required result  |
 
-Overall status is `pass` only when all rows pass. A completed attempt with any
-failed row is `fail`. A runner, network, capacity, credential, or time-budget
-blocker that prevents meaningful grading is `incomplete`.
+New runs use overall status `needs-review`, with every semantic row `unknown`,
+until a human reviews the cited command and artifact evidence. Command exit
+codes, truncation, omitted evidence, and collection-limit failures remain facts
+for that review; they are not converted into semantic pass/fail judgments.
+
+Historical bundles retain their original `pass`, `fail`, or `incomplete`
+statuses for byte-for-byte replay compatibility. Those legacy statuses describe
+the retired classifier's output and do not substitute for current manual review.

@@ -551,8 +551,10 @@ export interface ReactOnRails {
    */
   authenticityToken(): string | null;
   /**
-   * Returns headers with CSRF authenticity token and XMLHttpRequest
-   * @param otherHeaders Other headers
+   * Returns a new header object merging otherHeaders with CSRF authenticity token and XMLHttpRequest.
+   * The input otherHeaders object is not modified.
+   * @param otherHeaders - additional headers to include
+   * @returns a new merged header object
    */
   authenticityHeaders(otherHeaders: Record<string, string>): AuthenticityHeaders;
   /**

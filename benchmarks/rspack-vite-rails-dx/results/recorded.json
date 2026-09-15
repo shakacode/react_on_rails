@@ -1,0 +1,155 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-09-04T02:25:25.259Z",
+  "environment": {
+    "harness_git_head": "107cef846b8cc284ac5021947fa57683aa930b34",
+    "harness_git_clean": true,
+    "operating_system": "Darwin 25.6.0 arm64",
+    "cpu": "Apple M5 Max",
+    "logical_cpu_count": 18,
+    "total_memory_bytes": 137438953472,
+    "node": "v22.12.0",
+    "pnpm": "10.33.4",
+    "ruby": "ruby 4.0.5 (2026-05-20 revision 64336ffd0e) +PRISM [arm64-darwin23]",
+    "rails": { "rspack": "Rails 8.1.3", "vite": "Rails 8.1.3" },
+    "dependencies": {
+      "rspack_ruby": "react_on_rails 17.0.1; shakapacker 10.3.0",
+      "rspack_javascript": "rspack/2.2.2 darwin-arm64 node-v22.12.0",
+      "vite_ruby": "inertia_rails 3.22.0; vite_rails 3.11.1",
+      "vite_javascript": "vite/8.2.2 darwin-arm64 node-v22.12.0"
+    },
+    "commands": {
+      "rspack": "REACT_ON_RAILS_BASE_PORT=<PORT> bin/dev --no-open-browser",
+      "vite": "PORT=<PORT> VITE_RUBY_PORT=<PORT+1> bin/dev"
+    }
+  },
+  "methodology": {
+    "sample_count": 5,
+    "order": "cold starts alternate stack order; Fast Refresh markers alternate values within each stack",
+    "cold_start": "bin/dev process spawn to the generated React marker becoming visible in Chromium",
+    "fast_refresh": "source write to browser-observed marker update while a typed input value remains unchanged",
+    "cache_policy": "a fresh ignored starter copy and empty app caches for every cold start; installed dependencies are shared",
+    "noise_policy": "ambiguous above 50% spread; otherwise differences inside the larger observed min-to-max spread are a wash",
+    "stale_server_control": "preflighted ports plus a unique marker compiled into every process; shutdown waits for process exit and closed ports"
+  },
+  "raw_samples_ms": {
+    "cold_start": {
+      "rspack": [5339, 5245.6, 4979.7, 5008.8, 4852.7],
+      "vite": [3234.4, 2954.7, 3208.8, 2952.4, 3001.5]
+    },
+    "fast_refresh": {
+      "rspack": [75.2, 179.2, 77.6, 178.7, 74.5],
+      "vite": [75.5, 176.2, 77.4, 75.2, 83.6]
+    }
+  },
+  "fast_refresh_state_preserved": {
+    "rspack": [true, true, true, true, true],
+    "vite": [true, true, true, true, true]
+  },
+  "generated_config_audit": {
+    "rspack": {
+      "files": [
+        {
+          "file": "starters/rspack/Procfile.dev",
+          "bytes": 521,
+          "nonblank_noncomment_lines": 3
+        },
+        {
+          "file": "starters/rspack/config/shakapacker.yml",
+          "bytes": 6999,
+          "nonblank_noncomment_lines": 51
+        },
+        {
+          "file": "starters/rspack/config/rspack/rspack.config.ts",
+          "bytes": 440,
+          "nonblank_noncomment_lines": 12
+        },
+        {
+          "file": "starters/rspack/config/rspack/commonWebpackConfig.js",
+          "bytes": 738,
+          "nonblank_noncomment_lines": 12
+        },
+        {
+          "file": "starters/rspack/config/rspack/clientWebpackConfig.js",
+          "bytes": 705,
+          "nonblank_noncomment_lines": 7
+        },
+        {
+          "file": "starters/rspack/config/rspack/serverWebpackConfig.js",
+          "bytes": 6213,
+          "nonblank_noncomment_lines": 92
+        },
+        {
+          "file": "starters/rspack/config/rspack/development.js",
+          "bytes": 1390,
+          "nonblank_noncomment_lines": 20
+        }
+      ],
+      "total_files": 7,
+      "total_nonblank_noncomment_lines": 197,
+      "caution": "descriptive generated-file surface only; line counts are not a usability score"
+    },
+    "vite": {
+      "files": [
+        {
+          "file": "starters/vite/Procfile.dev",
+          "bytes": 37,
+          "nonblank_noncomment_lines": 2
+        },
+        {
+          "file": "starters/vite/config/vite.json",
+          "bytes": 302,
+          "nonblank_noncomment_lines": 17
+        },
+        {
+          "file": "starters/vite/vite.config.mts",
+          "bytes": 255,
+          "nonblank_noncomment_lines": 11
+        }
+      ],
+      "total_files": 3,
+      "total_nonblank_noncomment_lines": 30,
+      "caution": "descriptive generated-file surface only; line counts are not a usability score"
+    }
+  },
+  "summary": {
+    "cold_start": {
+      "rspack": {
+        "samples": 5,
+        "median_ms": 5008.8,
+        "min_ms": 4852.7,
+        "max_ms": 5339,
+        "spread_ms": 486.3,
+        "spread_percent_of_median": 9.7
+      },
+      "vite": {
+        "samples": 5,
+        "median_ms": 3001.5,
+        "min_ms": 2952.4,
+        "max_ms": 3234.4,
+        "spread_ms": 282,
+        "spread_percent_of_median": 9.4
+      },
+      "vite_relative_to_rspack": "improvement"
+    },
+    "fast_refresh": {
+      "rspack": {
+        "samples": 5,
+        "median_ms": 77.6,
+        "min_ms": 74.5,
+        "max_ms": 179.2,
+        "spread_ms": 104.7,
+        "spread_percent_of_median": 134.9
+      },
+      "vite": {
+        "samples": 5,
+        "median_ms": 77.4,
+        "min_ms": 75.2,
+        "max_ms": 176.2,
+        "spread_ms": 101,
+        "spread_percent_of_median": 130.5
+      },
+      "vite_relative_to_rspack": "ambiguous"
+    }
+  }
+}

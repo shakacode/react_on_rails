@@ -191,11 +191,36 @@ def assert_directory_with_keep_file(dir)
   assert_file File.join(dir, ".keep")
 end
 
-# Simulates base-install webpack configs (use_pro? = false, use_rsc? = false).
-# Contains all structural elements that Pro gsub transforms target.
-# Used by Pro generator tests to verify standalone upgrade transforms.
+# Render through the real base generator independently of Pro pair recognition.
+def generated_webpack_pair_contents(pro: false, rsc: false, rspack: false, shakapacker9: true)
+  renderer = ReactOnRails::Generators::BaseGenerator.new([], { pro:, rsc:, rspack: })
+  allow(renderer).to receive(:shakapacker_version_9_or_higher?).and_return(shakapacker9)
+  %w[serverWebpackConfig.js ServerClientOrBoth.js].map do |filename|
+    renderer.send(:rendered_template_for_cleanup, "base/base/config/webpack/#{filename}.tt")
+  end
+end
+
+# Positive Pro upgrade fixtures must be entire generated files, not structural approximations.
 def simulate_base_webpack_files
-  simulate_existing_file("config/webpack/serverWebpackConfig.js", base_server_webpack_content)
+  server, companion = generated_webpack_pair_contents
+  simulate_existing_file("config/webpack/serverWebpackConfig.js", server)
+  simulate_existing_file("config/webpack/ServerClientOrBoth.js", companion)
+end
+
+# Simulates a base install produced before the shared getLoaderPath helper existed.
+# Used to verify the Pro upgrade still emits a self-consistent serverWebpackConfig.js
+# when the file it patches has no helper to hang extractLoader off of.
+def simulate_legacy_base_webpack_files
+  simulate_existing_file("config/webpack/serverWebpackConfig.js",
+                         legacy_base_server_webpack_content_pre_get_loader_path)
+  simulate_existing_file("config/webpack/ServerClientOrBoth.js",
+                         server_client_or_both_content(destructured_import: false))
+end
+
+# Simulates a base install whose getLoaderPath helper the app owner has rewritten.
+# Used to verify the Pro upgrade preserves customized files without rewriting them.
+def simulate_customized_base_webpack_files
+  simulate_existing_file("config/webpack/serverWebpackConfig.js", customized_base_server_webpack_content)
   simulate_existing_file("config/webpack/ServerClientOrBoth.js",
                          server_client_or_both_content(destructured_import: false))
 end
@@ -224,9 +249,9 @@ end
 # Used by standalone generator tests (e.g. ProGenerator) on existing rspack projects.
 def simulate_rspack_base_webpack_files
   simulate_rspack_shakapacker_yml
-  simulate_existing_file("config/rspack/serverWebpackConfig.js", base_server_webpack_content)
-  simulate_existing_file("config/rspack/ServerClientOrBoth.js",
-                         server_client_or_both_content(destructured_import: false))
+  server, companion = generated_webpack_pair_contents(rspack: true)
+  simulate_existing_file("config/rspack/serverWebpackConfig.js", server)
+  simulate_existing_file("config/rspack/ServerClientOrBoth.js", companion)
 end
 
 # Simulates Pro-transformed webpack configs for an rspack project.
@@ -277,8 +302,102 @@ def base_server_webpack_content
       ? require('@rspack/core')
       : require('webpack');
 
+    // Normalizes an entry of a webpack/rspack `rule.use` array to its loader path.
+    // Entries may be a bare string, a `{ loader, options }` object, or null.
+    function getLoaderPath(item) {
+      if (typeof item === 'string') return item;
+      if (item && typeof item.loader === 'string') return item.loader;
+      return '';
+    }
+
     const configureServer = () => {
       const serverWebpackConfig = commonWebpackConfig();
+
+      const serverBundleOutputPath = require('path').resolve(__dirname, '../../ssr-generated');
+
+      serverWebpackConfig.output = {
+        filename: 'server-bundle.js',
+        globalObject: 'this',
+        // If using the React on Rails Pro node server renderer, uncomment the next line
+        // libraryTarget: 'commonjs2',
+        path: serverBundleOutputPath,
+      };
+
+      serverWebpackConfig.plugins.unshift(new bundler.optimize.LimitChunkCountPlugin({ maxChunks: 1 }));
+
+      const rules = serverWebpackConfig.module.rules;
+      rules.forEach((rule) => {
+        if (Array.isArray(rule.use)) {
+          const cssLoader = rule.use.find((item) => getLoaderPath(item).includes('css-loader'));
+          if (cssLoader && cssLoader.options && cssLoader.options.modules) {
+            cssLoader.options.modules = {
+              ...(typeof cssLoader.options.modules === 'object' ? cssLoader.options.modules : {}),
+              exportOnlyLocals: true,
+            };
+          }
+        }
+      });
+
+      serverWebpackConfig.devtool = process.env.NODE_ENV === 'production' ? false : 'cheap-module-source-map';
+
+      // If using the default 'web', then libraries like Emotion and loadable-components
+      // break with SSR. The fix is to use a node renderer and change the target.
+      // If using the React on Rails Pro node server renderer, uncomment the next line
+      // serverWebpackConfig.target = 'node'
+
+      return serverWebpackConfig;
+    };
+
+    module.exports = configureServer;
+  JS
+end
+
+# A base install whose getLoaderPath helper has been customized by the app owner.
+# Declared as a const arrow function rather than the template's function declaration, so a
+# second emitted `function getLoaderPath` would be a SyntaxError (identifier already declared),
+# not silent shadowing. The Pro upgrade must reuse this declaration.
+def customized_base_server_webpack_content
+  base_server_webpack_content.sub(
+    ReactOnRails::Generators::ProSetup::GET_LOADER_PATH_JS,
+    <<~JS
+      // Project-specific loader path normalization.
+      const getLoaderPath = (item) => (typeof item === 'string' ? item : (item && item.loader) || '');
+    JS
+  )
+end
+
+# A base install whose extractLoader helper has been customized by the app owner.
+# Declared as a const arrow function so emitting the template's function declaration would
+# redeclare the identifier and make the generated config invalid JavaScript.
+def customized_extract_loader_base_server_webpack_content
+  base_server_webpack_content.sub(
+    ReactOnRails::Generators::ProSetup::GET_LOADER_PATH_JS,
+    <<~JS
+      #{ReactOnRails::Generators::ProSetup::GET_LOADER_PATH_JS.chomp}
+
+      // Project-specific rule traversal.
+      const extractLoader = (rule, loaderName) => rule.use.find((item) => getLoaderPath(item).endsWith(loaderName));
+    JS
+  )
+end
+
+# A base install generated before the shared getLoaderPath helper was extracted.
+# Kept deliberately stale so the standalone Pro upgrade path stays covered for apps
+# installed with an older React on Rails, where extractLoader cannot assume the
+# helper already exists in the file it is patching.
+def legacy_base_server_webpack_content_pre_get_loader_path
+  <<~JS
+    const { merge, config } = require('shakapacker');
+    const commonWebpackConfig = require('./commonWebpackConfig');
+
+    const bundler = config.assets_bundler === 'rspack'
+      ? require('@rspack/core')
+      : require('webpack');
+
+    const configureServer = () => {
+      const serverWebpackConfig = commonWebpackConfig();
+
+      const serverBundleOutputPath = require('path').resolve(__dirname, '../../ssr-generated');
 
       serverWebpackConfig.output = {
         filename: 'server-bundle.js',
@@ -334,12 +453,17 @@ def pro_server_webpack_content
       ? require('@rspack/core')
       : require('webpack');
 
+    // Normalizes an entry of a webpack/rspack `rule.use` array to its loader path.
+    // Entries may be a bare string, a `{ loader, options }` object, or null.
+    function getLoaderPath(item) {
+      if (typeof item === 'string') return item;
+      if (item && typeof item.loader === 'string') return item.loader;
+      return '';
+    }
+
     function extractLoader(rule, loaderName) {
       if (!Array.isArray(rule.use)) return null;
-      return rule.use.find((item) => {
-        const testValue = typeof item === 'string' ? item : item.loader;
-        return testValue && testValue.includes(loaderName);
-      });
+      return rule.use.find((item) => getLoaderPath(item).includes(loaderName));
     }
 
     const configureServer = () => {

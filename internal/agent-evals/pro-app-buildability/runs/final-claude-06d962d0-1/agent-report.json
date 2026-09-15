@@ -1,0 +1,50 @@
+{
+  "status": "completed",
+  "summary": "Built eval_app with `npx create-react-on-rails-app@17.0.1 eval_app --rsc --template typescript --package-manager npm` (Pro + RSC path). Since the sandbox has no Rails/Bundler and no PostgreSQL server binary preinstalled, I bootstrapped both locally under .ror-eval-state (workspace-only, no root/apt access needed): installed the `rails` gem, and used the npm-distributed portable @embedded-postgres/linux-arm64 binaries plus a tiny LD_PRELOAD getpwuid shim (uid 504 has no /etc/passwd entry, which otherwise makes initdb/postgres abort) to init and run a real PostgreSQL 18 server on a Unix socket at .ror-eval-state/pgsocket, port 5433, user postgres, trust auth (no password). I also started the React on Rails Pro Node Renderer (needed because RSC streaming uses NodeRenderer, not ExecJS, even in test) in the background. The generated app already included one RSC route (/hello_server, HelloServer server component rendering server-supplied props/data with a client LikeButton island). I added a Subscriber feature (model with presence/format/uniqueness validations, SubscribersController#new/create/show, form_with view) providing both a server-side validation-failure path (422 + re-rendered errors) and a successful-submission path (create + redirect + show). Added Minitest coverage: a controller test asserting the RSC page renders server-provided data, and controller+model tests covering the form's invalid and valid submission paths. All 8 automated tests pass, and the production JS asset build (`npm run build`, Rspack via Shakapacker) completed successfully with exit 0 (only a non-fatal Pro-license informational warning, since no token is required for dev/test/CI/build per the tool's own docs — only actual \"Production Use\" serving needs a paid license, which was never invoked). Committed the added feature/tests inside eval_app's own generator-initialized git repo.",
+  "commands": [
+    "gem install rails --no-document",
+    "npm install @embedded-postgres/linux-arm64 embedded-postgres (throwaway tool dir, to obtain portable postgres binaries)",
+    "gcc -shared -fPIC -o libfakeuser.so fakeuser.c  # LD_PRELOAD shim faking getpwuid for uid 504",
+    "LD_PRELOAD=libfakeuser.so LD_LIBRARY_PATH=pg-native/lib pg-native/bin/initdb -D pgdata -U postgres -A trust --no-locale -E UTF8",
+    "LD_PRELOAD=libfakeuser.so LD_LIBRARY_PATH=pg-native/lib pg-native/bin/pg_ctl -D pgdata -l pglog.log -o \"-p 5433 -k <LOCAL_PATH>/.ror-eval-state/pgsocket -h ''\" start",
+    "cd <LOCAL_PATH>; set -o pipefail; npx --yes create-react-on-rails-app@17.0.1 eval_app --rsc --template typescript --package-manager npm 2>&1 | tee .ror-eval-state/scaffold.log | tail -n 300; ROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}; echo \"ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT\"",
+    "bundle install",
+    "PGHOST=.../pgsocket PGPORT=5433 PGUSER=postgres bin/rails db:prepare",
+    "bin/rails generate model Subscriber email:string",
+    "bin/rails generate controller Subscribers new create show --skip-routes",
+    "edited migration/model/controller/routes/views for Subscriber form",
+    "PGHOST=... PGPORT=5433 PGUSER=postgres bin/rails db:migrate",
+    "added test/controllers/hello_server_controller_test.rb, test/controllers/subscribers_controller_test.rb, test/models/subscriber_test.rb, fixed test/fixtures/subscribers.yml (unique emails, since a unique index was added)",
+    "npm run build:test  # compile RSC/SSR bundles required before running Rails tests",
+    "nohup node renderer/node-renderer.js > .ror-eval-state/logs/node-renderer.log 2>&1 &  # background Pro Node Renderer needed for RSC streaming",
+    "git config --local user.name/user.email; git add -A; git commit -m 'Add Subscriber form ...' --no-gpg-sign",
+    "cd <LOCAL_PATH>/eval_app; export PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket; export PGPORT=5433; export PGUSER=postgres; set -o pipefail; bin/rails test 2>&1 | tee .ror-eval-state/test.log | tail -n 200; ROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}; echo \"ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT\"",
+    "cd <LOCAL_PATH>/eval_app; set -o pipefail; npm run build 2>&1 | tee .ror-eval-state/build.log | tail -n 200; ROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}; echo \"ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT\""
+  ],
+  "checks": [
+    {
+      "command": "cd <LOCAL_PATH>; set -o pipefail; npx --yes create-react-on-rails-app@17.0.1 eval_app --rsc --template typescript --package-manager npm 2>&1 | tee .ror-eval-state/scaffold.log | tail -n 300; ROR_EVAL_SCAFFOLD_EXIT=${PIPESTATUS[0]}; echo \"ROR_EVAL_SCAFFOLD_EXIT=$ROR_EVAL_SCAFFOLD_EXIT\"",
+      "exit_code": 0,
+      "result": "pass"
+    },
+    {
+      "command": "cd <LOCAL_PATH>/eval_app; export PGHOST=<LOCAL_PATH>/.ror-eval-state/pgsocket; export PGPORT=5433; export PGUSER=postgres; set -o pipefail; bin/rails test 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/test.log | tail -n 200; ROR_EVAL_TEST_EXIT=${PIPESTATUS[0]}; echo \"ROR_EVAL_TEST_EXIT=$ROR_EVAL_TEST_EXIT\"",
+      "exit_code": 0,
+      "result": "pass"
+    },
+    {
+      "command": "cd <LOCAL_PATH>/eval_app; set -o pipefail; npm run build 2>&1 | tee <LOCAL_PATH>/.ror-eval-state/build.log | tail -n 200; ROR_EVAL_BUILD_EXIT=${PIPESTATUS[0]}; echo \"ROR_EVAL_BUILD_EXIT=$ROR_EVAL_BUILD_EXIT\"",
+      "exit_code": 0,
+      "result": "pass"
+    }
+  ],
+  "friction": [
+    "No PostgreSQL server binary, client (psql), or apt<LOCAL_PATH> access exists in the sandbox (root fs read-only, no sudo). Worked around by fetching the portable @embedded-postgres/linux-arm64 npm package's bundled postgres/initdb/pg_ctl binaries and running them directly from the workspace.",
+    "The sandbox's numeric uid (504) has no /etc/passwd entry, which makes PostgreSQL's initdb/postgres abort with 'could not look up effective user ID' since /etc/passwd is on a read-only filesystem and can't be edited. Worked around with a small custom LD_PRELOAD shared library overriding getpwuid/getpwuid_r/getpwnam to fabricate a 'postgres' passwd entry.",
+    "Rails and Bundler (a working `rails` executable) were not preinstalled; had to `gem install rails` before the create-react-on-rails-app prerequisite check would pass — the first scaffold attempt correctly failed fast with a clear 'Rails is not installed' error and exit code 1, which was captured as expected generator-failure propagation before the successful rerun.",
+    "The --rsc scaffold wires the app to React on Rails Pro's NodeRenderer (not ExecJS) for SSR/RSC streaming even in the test environment, so Rails tests against the RSC route would hang/fail without a running renderer process; started `node renderer/node-renderer.js` in the background ahead of the test run.",
+    "Default generated Subscriber fixtures both used the same placeholder email string, which conflicted with the unique index added on subscribers.email and would have broken fixture loading; fixed by giving fixtures distinct emails."
+  ],
+  "human_interventions": 0,
+  "blockers": []
+}

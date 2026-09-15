@@ -19,6 +19,13 @@ source_encoding_patterns = [
 ].freeze
 magic_comment_prefix_pattern = /\A(?:\xEF\xBB\xBF)?\s*#/n
 shebang_pattern = /\A(?:\xEF\xBB\xBF)?#!/n
+# Dependabot statically follows literal eval_gemfile calls, including inside
+# uncalled lambdas. The runtime loader below remains authoritative so local and
+# CI overrides can still replace base dependency declarations.
+_dependabot_dependency_files = lambda do
+  eval_gemfile "./Gemfile.development_dependencies"
+end
+
 unsupported_source_encoding = lambda do |path, detected_encoding, reason|
   raise ArgumentError, "#{path} declares unsupported source encoding #{detected_encoding.inspect}: #{reason}"
 end

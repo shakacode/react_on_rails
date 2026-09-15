@@ -106,10 +106,14 @@ If the app uses `vite_rails` plus a custom Rails-side React wrapper, the first c
 ## 1. Add React on Rails and Shakapacker
 
 ```bash
-bundle add shakapacker --strict
 bundle add react_on_rails --strict
+SHAKAPACKER_VERSION="$(bundle exec ruby -rreact_on_rails -e 'print ReactOnRails::PackerUtils.shakapacker_version')"
+bundle add shakapacker --version="${SHAKAPACKER_VERSION}" --strict
 bundle exec rails generate react_on_rails:install
 ```
+
+Adding React on Rails first lets Bundler select a compatible Shakapacker release. Pinning that resolved version when
+adding Shakapacker directly prevents an older globally installed gem from replacing it.
 
 The generator adds the React on Rails initializer, `bin/dev`, Shakapacker config, example routes, and the server bundle entrypoint.
 

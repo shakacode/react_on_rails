@@ -1,3 +1,6 @@
+> **Superseded by [`internal/planning/ppr-plan.md`](./ppr-plan.md) (2026-08-13).**
+> Kept for reasoning history.
+
 # Partial Pre-rendering (PPR) Investigation Findings
 
 **Date**: 2026-05-18

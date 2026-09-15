@@ -11,6 +11,11 @@ AllCops:
 Style/StringLiterals:
   EnforcedStyle: double_quotes
 
+Style/HashSyntax:
+  # Shared copies must stay byte-identical even when this repo's older RuboCop
+  # has a different shorthand preference from the source pack toolchain.
+  EnforcedShorthandSyntax: either
+
 Layout/EmptyLinesAroundBlockBody:
   Enabled: false
 
@@ -30,6 +35,9 @@ Metrics/CyclomaticComplexity:
   Enabled: false
 
 Metrics/MethodLength:
+  Enabled: false
+
+Metrics/BlockNesting:
   Enabled: false
 
 Metrics/ModuleLength:

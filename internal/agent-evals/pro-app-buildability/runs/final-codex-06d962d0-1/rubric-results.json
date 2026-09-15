@@ -1,0 +1,87 @@
+{
+  "schema_version": "1.0",
+  "overall": "pass",
+  "items": [
+    {
+      "id": "install.pro",
+      "status": "pass",
+      "reason": "The public scaffold command exited 0 and captured Ruby/JavaScript manifests contain exact Pro dependencies.",
+      "citations": [
+        "artifact-evidence.json#eval_app/Gemfile",
+        "artifact-evidence.json#eval_app/package.json",
+        "command-evidence.json#command-10"
+      ]
+    },
+    {
+      "id": "rsc.route",
+      "status": "pass",
+      "reason": "An RSC-specific route and source are paired with successful test output.",
+      "citations": [
+        "artifact-evidence.json#eval_app/config/routes.rb",
+        "artifact-evidence.json#eval_app/app/javascript/src/HelloServer/ror_components/HelloServer.tsx",
+        "command-evidence.json#command-45",
+        "command-evidence.json#command-47"
+      ]
+    },
+    {
+      "id": "form.validation",
+      "status": "pass",
+      "reason": "Model validation, invalid-response controller behavior, failure/success tests, and successful test output are evidenced.",
+      "citations": [
+        "artifact-evidence.json#eval_app/app/models/tasting_request.rb",
+        "artifact-evidence.json#eval_app/app/controllers/tasting_requests_controller.rb",
+        "artifact-evidence.json#eval_app/test/integration/tasting_requests_test.rb",
+        "command-evidence.json#command-45",
+        "command-evidence.json#command-47"
+      ]
+    },
+    {
+      "id": "tests.page",
+      "status": "pass",
+      "reason": "A page/RSC-specific test is paired with successful test output.",
+      "citations": [
+        "artifact-evidence.json#eval_app/test/integration/hello_server_page_test.rb",
+        "command-evidence.json#command-45",
+        "command-evidence.json#command-47"
+      ]
+    },
+    {
+      "id": "tests.form",
+      "status": "pass",
+      "reason": "A test covering both form failure and success is paired with successful test output.",
+      "citations": [
+        "artifact-evidence.json#eval_app/test/integration/tasting_requests_test.rb",
+        "command-evidence.json#command-45",
+        "command-evidence.json#command-47"
+      ]
+    },
+    {
+      "id": "build.production",
+      "status": "pass",
+      "reason": "A production-relevant build command completed with exit status 0.",
+      "citations": [
+        "artifact-evidence.json#eval_app/package.json",
+        "command-evidence.json#command-46",
+        "command-evidence.json#command-48"
+      ]
+    },
+    {
+      "id": "tests.green",
+      "status": "pass",
+      "reason": "At least one relevant automated test command completed with exit status 0.",
+      "citations": ["command-evidence.json#command-45", "command-evidence.json#command-47"]
+    },
+    {
+      "id": "unaided",
+      "status": "pass",
+      "reason": "The runner-owned invocation record proves that no human follow-up input was sent.",
+      "citations": ["invocation.json#/human_followups_sent"]
+    },
+    {
+      "id": "evidence.complete",
+      "status": "pass",
+      "reason": "Every required outcome row has passing, cited evidence.",
+      "citations": ["command-evidence.json", "artifact-evidence.json", "SHA256SUMS"]
+    }
+  ]
+}

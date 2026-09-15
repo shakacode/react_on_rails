@@ -1,7 +1,7 @@
 # Server Rendering Tips
 
 :::tip Pro Upgrade
-For the best SSR performance, React on Rails Pro provides a [dedicated Node.js renderer](../../pro/node-renderer.md) (10-100x faster than ExecJS), [streaming SSR](../../pro/streaming-ssr.md) for faster TTFB, and [fragment caching](../../pro/fragment-caching.md) to skip redundant rendering entirely. [Learn more →](../../pro/upgrading-to-pro.md)
+React on Rails Pro provides a [dedicated Node.js renderer](../../pro/node-renderer.md) with persistent workers for concurrent SSR, [streaming SSR](../../pro/streaming-ssr.md) for faster TTFB, and [fragment caching](../../pro/fragment-caching.md) to skip redundant rendering entirely. Performance gains are workload-dependent, so [benchmark your own pages](../core-concepts/performance-benchmarks.md). [Learn more →](../../pro/upgrading-to-pro.md)
 :::
 
 ## General Tips

@@ -1,0 +1,58 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "optparse"
+require_relative "../rakelib/release_atomic_claim"
+
+options = { renew: false, release: false }
+parser = OptionParser.new do |config|
+  config.banner = "Usage: script/release-claim [--renew | --release] --repo OWNER/REPO --target TARGET " \
+                  "--agent-id ID --instance-id ID [--machine-id ID --branch BRANCH --ttl SECONDS]"
+  config.on("--repo VALUE") { |value| options[:repo] = value }
+  config.on("--target VALUE") { |value| options[:target] = value }
+  config.on("--agent-id VALUE") { |value| options[:agent_id] = value }
+  config.on("--instance-id VALUE") { |value| options[:instance_id] = value }
+  config.on("--machine-id VALUE") { |value| options[:machine_id] = value }
+  config.on("--branch VALUE") { |value| options[:branch] = value }
+  config.on("--ttl SECONDS", Integer) { |value| options[:ttl] = value }
+  config.on("--renew", "Renew only the exact active claim identity") { options[:renew] = true }
+  config.on("--release", "Release only the exact active claim identity") { options[:release] = true }
+end
+
+begin
+  parser.parse!(ARGV)
+  raise OptionParser::InvalidArgument, "positional arguments are not supported" unless ARGV.empty?
+
+  if options.values_at(:renew, :release).all?
+    raise OptionParser::InvalidArgument, "choose only one of --renew or --release"
+  end
+
+  required = %i[repo target agent_id instance_id]
+  required.push(:machine_id, :branch, :ttl) unless options[:release]
+  missing = required.reject { |name| options.key?(name) }
+  raise OptionParser::MissingArgument, missing.join(", ") unless missing.empty?
+
+  client = ReleaseAtomicClaim::Client.new(
+    base_url: ENV.fetch("AGENT_COORD_API_URL", ""),
+    token: ENV.fetch("AGENT_COORD_API_TOKEN", "")
+  )
+  renew = options.delete(:renew)
+  release = options.delete(:release)
+  if release
+    client.release!(**options.slice(:repo, :target, :agent_id, :instance_id))
+    puts "atomic release-line claim released by #{options.fetch(:agent_id)}"
+  elsif renew
+    client.renew!(**options)
+    puts "atomic release-line claim renewed by #{options.fetch(:agent_id)}"
+  else
+    client.acquire!(**options)
+    puts "atomic release-line claim acquired by #{options.fetch(:agent_id)}"
+  end
+  exit 0
+rescue ReleaseAtomicClaim::ClaimRefused => e
+  warn "CLAIM_REFUSED: #{e.message}"
+  exit 3
+rescue OptionParser::ParseError, ReleaseAtomicClaim::Error => e
+  warn "ERROR: #{e.message}"
+  exit 1
+end

@@ -83,8 +83,8 @@ module TrackBenchmarks
         when :confirmed
           lines = confirmed_alerts.map { |alert| "- #{describe_alert(alert)}" }.join("\n")
           "## #{suite_name} confirmation: ✅ CONFIRMED\n\n" \
-            "These first-run alerts re-alerted on a fresh runner (re-tested against main's " \
-            "baseline) and will be reported:\n\n#{lines}\n\n"
+            "These first-run alerts re-alerted on a fresh runner (base and head re-benchmarked " \
+            "side by side) and will be reported:\n\n#{lines}\n\n"
         when :cleared
           "## #{suite_name} confirmation: 🟢 CLEARED (noise)\n\n" \
           "The first-run alert(s) did not re-alert on a fresh runner. No issue will be filed.\n\n"

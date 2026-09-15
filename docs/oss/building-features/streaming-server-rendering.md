@@ -6,6 +6,14 @@ SSR works in the OSS version via ExecJS. Pro adds streaming SSR with `renderToPi
 
 React on Rails Pro supports streaming server rendering using React 18/19's `renderToPipeableStream` API. Instead of waiting for the entire page to render before sending any HTML, streaming SSR sends HTML to the browser progressively as each part of the page becomes ready.
 
+:::note React version compatibility
+React 18 applications can progressively stream ordinary components with Suspense and synchronous props without
+installing or enabling React Server Components. React 16 and 17 remain compatible through synchronous SSR fallback,
+provided the rendered tree does not actually suspend; `renderToString` cannot complete SSR for a suspended child such
+as `React.lazy`. Async props and React Server Components require React/React DOM 19.2.x with patch 19.2.7 or newer. See
+[React 18 Streaming Without RSC](../../pro/streaming-ssr.md#react-18-streaming-without-rsc) for a complete example.
+:::
+
 ## Why Streaming SSR?
 
 Traditional SSR renders the full page on the server, then sends the complete HTML in one response. This means the user sees nothing until the slowest component finishes rendering. Streaming SSR changes this:

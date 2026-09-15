@@ -13,9 +13,21 @@
  * https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
-import type { FastifyInstance } from './types.js';
+import type { FastifyInstance, Http1FastifyInstance, Http2FastifyInstance } from './types.js';
 
-export type FastifyConfigFunction = (app: FastifyInstance) => void;
+// Unannotated callbacks are mode-safe. Concrete annotations are compatibility assertions that must match
+// fastifyServerOptions.http2.
+type RuntimeFastifyConfigFunction = (app: FastifyInstance) => void;
+export type FastifyConfigFunction =
+  | ((app: Http1FastifyInstance) => void)
+  | ((app: Http2FastifyInstance) => void)
+  | RuntimeFastifyConfigFunction;
+
+type RegisterFastifyConfigFunction = ((configFunction: RuntimeFastifyConfigFunction) => () => void) &
+  ((configFunction: FastifyConfigFunction) => () => void);
+
+type ConfigureFastify = ((configFunction: RuntimeFastifyConfigFunction) => void) &
+  ((configFunction: FastifyConfigFunction) => void);
 
 const fastifyConfigFunctions: FastifyConfigFunction[] = [];
 
@@ -26,7 +38,9 @@ const fastifyConfigFunctions: FastifyConfigFunction[] = [];
  * `fastify`, so integrations can register instrumentation before Fastify is
  * required by the worker module graph.
  */
-export function registerFastifyConfigFunction(configFunction: FastifyConfigFunction): () => void {
+export const registerFastifyConfigFunction: RegisterFastifyConfigFunction = (
+  configFunction: FastifyConfigFunction,
+) => {
   fastifyConfigFunctions.push(configFunction);
   return () => {
     const index = fastifyConfigFunctions.indexOf(configFunction);
@@ -34,20 +48,22 @@ export function registerFastifyConfigFunction(configFunction: FastifyConfigFunct
       fastifyConfigFunctions.splice(index, 1);
     }
   };
-}
+};
 
 /**
  * Public one-way registration API for custom entrypoints and integrations.
  * Internal callers use registerFastifyConfigFunction() when they need the
  * unregister callback during failed initialization or shutdown cleanup.
+ * Leave the callback parameter unannotated to handle either runtime mode. A
+ * protocol-specific annotation must match `fastifyServerOptions.http2`.
  */
-export function configureFastify(configFunction: FastifyConfigFunction): void {
+export const configureFastify: ConfigureFastify = (configFunction: FastifyConfigFunction) => {
   registerFastifyConfigFunction(configFunction);
-}
+};
 
 export function applyFastifyConfigFunctions(app: FastifyInstance): void {
   fastifyConfigFunctions.forEach((configFunction) => {
-    configFunction(app);
+    (configFunction as RuntimeFastifyConfigFunction)(app);
   });
 }
 

@@ -1,0 +1,154 @@
+name: Wait for h2c service
+description: Waits for an HTTP/2 cleartext endpoint to return a successful response.
+
+inputs:
+  service-name:
+    description: Human-readable service name used in readiness output.
+    required: true
+  path:
+    description: Request path used for the readiness probe.
+    required: true
+  authority:
+    description: >-
+      Single HTTP/2 cleartext authority, including scheme and port. Keep the service bind,
+      client URL, and this authority pinned to the same IPv4 endpoint.
+    required: true
+  timeout-seconds:
+    description: Maximum number of seconds to wait for readiness.
+    required: false
+    default: '300'
+  log-path:
+    description: Optional service log path to include in timeout diagnostics.
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Wait for ${{ inputs.service-name }} to start
+      shell: bash
+      env:
+        SERVICE_AUTHORITY: ${{ inputs.authority }}
+        SERVICE_NAME: ${{ inputs.service-name }}
+        SERVICE_PATH: ${{ inputs.path }}
+        SERVICE_LOG_PATH: ${{ inputs.log-path }}
+        SERVICE_TIMEOUT_SECONDS: ${{ inputs.timeout-seconds }}
+      run: |
+        case "$SERVICE_TIMEOUT_SECONDS" in
+          ''|*[!0-9]*)
+            echo "::error::timeout-seconds must be a positive integer"
+            exit 1
+            ;;
+        esac
+        if [ "$SERVICE_TIMEOUT_SECONDS" -eq 0 ]; then
+          echo "::error::timeout-seconds must be a positive integer"
+          exit 1
+        fi
+        case "$SERVICE_PATH" in
+          /*) ;;
+          *)
+            echo "::error::path must start with /"
+            exit 1
+            ;;
+        esac
+
+        timeout="$SERVICE_TIMEOUT_SECONDS"
+        start=$SECONDS
+
+        while true; do
+          if node - "$SERVICE_AUTHORITY" "$SERVICE_PATH" <<'NODE'
+        const http2 = require('node:http2');
+
+        const [authority, path] = process.argv.slice(2);
+        const client = http2.connect(authority);
+        const request = client.request({ ':method': 'GET', ':path': path });
+        let status;
+        let timeout;
+        let completed = false;
+
+        const finish = (exitCode, destroyClient = false) => {
+          if (completed) return;
+          completed = true;
+          clearTimeout(timeout);
+          if (destroyClient) {
+            client.destroy();
+          } else {
+            client.close();
+          }
+          process.exit(exitCode);
+        };
+
+        const fail = () => finish(1, true);
+
+        client.on('error', fail);
+        request.on('error', fail);
+        request.on('response', (headers) => {
+          status = headers[':status'];
+        });
+        request.on('data', () => {});
+        request.on('end', () => {
+          finish(status >= 200 && status < 300 ? 0 : 1);
+        });
+        request.end();
+        timeout = setTimeout(fail, 10000);
+        NODE
+          then
+            elapsed=$((SECONDS - start))
+            echo "${SERVICE_NAME} started at ${SERVICE_AUTHORITY}${SERVICE_PATH} after ${elapsed}s"
+            exit 0
+          fi
+
+          sleep 1
+          elapsed=$((SECONDS - start))
+          if [ "$elapsed" -ge "$timeout" ]; then
+            echo "Timeout waiting for ${SERVICE_NAME} to start after ${timeout}s"
+            echo "::group::${SERVICE_NAME} h2c readiness diagnostics"
+            echo "GET ${SERVICE_AUTHORITY}${SERVICE_PATH}"
+            node - "$SERVICE_AUTHORITY" "$SERVICE_PATH" <<'NODE' || true
+        const http2 = require('node:http2');
+
+        const [authority, path] = process.argv.slice(2);
+        const client = http2.connect(authority);
+        let body = '';
+        const timeout = setTimeout(() => {
+          console.error('diagnostic timeout without response');
+          client.destroy();
+          process.exit(1);
+        }, 5000);
+
+        const finish = (exitCode) => {
+          clearTimeout(timeout);
+          client.close();
+          process.exit(exitCode);
+        };
+
+        client.on('error', (error) => {
+          console.error(`connect error: ${error.message}`);
+          finish(1);
+        });
+        const request = client.request({ ':method': 'GET', ':path': path });
+        request.on('response', (headers) => {
+          console.log(`response headers: ${JSON.stringify(headers)}`);
+        });
+        request.on('data', (chunk) => {
+          body += chunk.toString();
+          body = body.slice(0, 500);
+        });
+        request.on('end', () => {
+          if (body) console.log(`response body: ${body}`);
+          finish(0);
+        });
+        request.on('error', (error) => {
+          console.error(`request error: ${error.message}`);
+          finish(1);
+        });
+        request.end();
+        NODE
+            if [ -n "$SERVICE_LOG_PATH" ] && [ -f "$SERVICE_LOG_PATH" ]; then
+              echo "Last 200 lines from $SERVICE_LOG_PATH:"
+              tail -n 200 "$SERVICE_LOG_PATH" || true
+            fi
+            echo "::endgroup::"
+            exit 1
+          fi
+        done

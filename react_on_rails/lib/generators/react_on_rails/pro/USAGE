@@ -10,11 +10,22 @@ Example:
     - Node renderer process to Procfile.dev
 
 Modifies:
-    - config/webpack/serverWebpackConfig.js (enables Pro settings: libraryTarget,
-      target, extractLoader, Babel SSR caller, object exports)
-    - config/webpack/ServerClientOrBoth.js (switches to destructured import)
     - package.json (replaces react-on-rails with react-on-rails-pro and
       react-on-rails-pro-node-renderer)
+
+Bundler configuration:
+    Upgrades serverWebpackConfig.js and ServerClientOrBoth.js in the active
+    config/webpack/ or config/rspack/ directory only when both files exactly
+    match a supported current generated pair. Enables Pro server settings,
+    extractLoader, Babel SSR caller handling, and matching exports/imports.
+    A supported pair using the legacy companion filename generateWebpackConfigs.js
+    keeps that filename; it is not renamed.
+
+    Customized, unknown, unsupported historical, incomplete, or ambiguous pairs
+    are left unchanged, including their paths. If the pair is skipped, complete
+    the manual migration before building and verifying SSR; rerunning the
+    generator does not migrate these files:
+    https://reactonrails.com/docs/pro/upgrading-to-pro/#complete-a-skipped-webpackrspack-migration-manually
 
 Prerequisites:
     - React on Rails must be installed (rails g react_on_rails:install)

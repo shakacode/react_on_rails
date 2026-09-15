@@ -1,0 +1,13 @@
+/.bundle/
+/.env
+/config/master.key
+/log/*
+!/log/.keep
+/node_modules/
+/public/packs/
+/public/packs-test/
+/tmp/*
+!/tmp/.keep
+!/tmp/pids/
+!/tmp/pids/.keep
+/vendor/bundle/

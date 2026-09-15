@@ -1,7 +1,21 @@
 module ReactOnRails
   module TestHelper
+    interface _AssetsStatusChecker
+      def stale_generated_webpack_files: () -> Array[String | Pathname]
+    end
+
+    interface _AssetsCompiler
+      def compile_assets: () -> void
+    end
+
     def self.configure_rspec_to_compile_assets: (untyped config) -> void
-    def self.ensure_assets_compiled: (?force_compile: bool) -> void
+    def self.ensure_assets_compiled: (
+      ?webpack_assets_status_checker: _AssetsStatusChecker?,
+      ?webpack_assets_compiler: _AssetsCompiler?,
+      ?source_path: (String | Pathname)?,
+      ?generated_assets_full_path: (String | Pathname)?,
+      ?webpack_generated_files: Array[String]?
+    ) -> void
     def self.webpack_assets_compiled?: () -> bool
 
     module EnsureAssetsCompiled

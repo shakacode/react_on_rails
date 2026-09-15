@@ -405,6 +405,18 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
       expect(File.symlink?(dest_file)).to be(false)
     end
 
+    it "writes an immutable revision-scoped declaration for only the current server artifact" do
+      manifest_path = pre_seed_cache
+      manifest = JSON.parse(File.read(manifest_path))
+
+      expect(manifest_path).to match(%r{\.current-generations/rorp-generation-v1-[0-9a-f]{64}\.json\z})
+      expect(manifest).to eq(
+        "schema_version" => 1,
+        "generation_id" => File.basename(manifest_path, ".json"),
+        "artifacts" => [{ "role" => "server", "id" => bundle_hash }]
+      )
+    end
+
     it "copies assets into the bundle subdirectory" do
       pre_seed_cache
 
@@ -813,6 +825,20 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
       expect(File.exist?(server_dest)).to be(true)
       expect(File.exist?(rsc_dest)).to be(true)
       expect(File.read(rsc_dest)).to eq("// rsc bundle content")
+    end
+
+    it "declares exactly this revision's server and RSC artifacts" do
+      manifest_path = pre_seed_cache
+      manifest = JSON.parse(File.read(manifest_path))
+
+      expect(manifest.fetch("artifacts")).to eq(
+        [
+          { "role" => "server", "id" => bundle_hash },
+          { "role" => "rsc", "id" => rsc_bundle_hash }
+        ]
+      )
+      expect(manifest.fetch("artifacts").map { |artifact| artifact.fetch("id") })
+        .not_to include("previous-generation")
     end
 
     it "copies RSC manifest assets into both bundle directories" do

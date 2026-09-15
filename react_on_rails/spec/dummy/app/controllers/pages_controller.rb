@@ -14,6 +14,12 @@ class PagesController < ApplicationController
 
   # See files in spec/dummy/app/views/pages
 
+  # Server-rendered fragment fetched by async_component_shared_store.html.erb (issue #4862).
+  # Rendered without the layout because the fragment is injected into an already-loaded page.
+  def async_component_shared_store_island
+    render layout: false
+  end
+
   private
 
   def initialize_shared_store

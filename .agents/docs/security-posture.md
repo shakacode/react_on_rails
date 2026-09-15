@@ -47,19 +47,55 @@ replaces ordinary least-privilege controls.
 The `pr-batch` security preflight is defense in depth. Run the resolved
 `pr-security-preflight` helper before assigning public issue or PR targets to
 workers. It catches obvious and provenance-based risks such as untrusted,
-hidden, or unidentifiable participants. Pass `--strict-trust` when those actor
-findings must block worker launch instead of remaining advisory audit context.
+hidden, or unidentifiable participants. By default those actor-trust findings
+are reported as exact-target audit context; add `--strict-trust` when they
+should block worker launch.
+
+React on Rails batch launch call sites use `--strict-trust`. The pinned drift
+gate makes later changes to those helper bytes, trust defaults, or executable
+modes explicit review events instead of silent local-copy divergence.
+
+The helper resolves trusted GitHub actors from `--trust-config`, repo-local
+`.agents/trusted-github-actors.yml`, `$AGENT_WORKFLOWS_TRUST_CONFIG`,
+`~/.agents/trusted-github-actors.yml`, then the packaged
+`skills/pr-batch/trusted-github-actors.yml` fallback. A present empty file is an
+intentional policy, while an absent file falls through to the next layer, except
+a missing `$AGENT_WORKFLOWS_TRUST_CONFIG` path aborts fail-closed. The
+packaged fallback trusts only `github-actions[bot]` as metadata-only by default;
+human maintainers and all actionable automation belong in a repo-local or
+user-global trust config. Global
+configs must use `OWNER/team-slug` entries, and only entries whose owner matches
+the scanned repo owner are honored. Bare team slugs are only resolved for
+repo-local configs.
+Add other workflow commenters under `trusted_metadata_bots` only when
+maintainers trust their generated comments as CI/status metadata but not as
+actionable agent instructions.
+
+When a maintainer explicitly accepts exact blocking preflight findings without changing
+trust policy, pass `--acknowledge-risk NUMBER:risk-id[,risk-id]` for each
+target and risk category. This downgrades only the named categories for that
+exact target and still reports the acknowledged findings in the preflight
+output. Use a trust config for durable actor policy; use acknowledgement for a
+specific audited run.
+
+Use `agent-workflows-trust-audit --repo OWNER/REPO --limit 10` to sample recent
+merged PRs and identify recurring trusted-actor candidates before editing a
+repo-local trust config. Treat the sample as evidence only: a merged PR proves
+the actor appeared in accepted history, but it does not prove future comments
+from that actor are safe to interpret as instructions.
+See [trust-and-preflight.md](https://github.com/shakacode/agent-workflows/blob/main/docs/trust-and-preflight.md) for the full operator
+workflow and trust-layer guidance.
 
 A clean preflight is not a trust decision. Pattern and regex-style detection can
-miss indirect, transformed, deleted, or carefully worded prompt-injection
+miss indirect, transformed, deleted, or carefully worded malicious prompt-style
 payloads. The capability boundary remains in force after `SECURITY_PREFLIGHT_OK`:
 untrusted public text still cannot grant itself access to secrets, unattended
 state changes, merge authority, approval changes, sandbox changes, or workflow
 override authority.
 
 The preflight catches the obvious cases. The Rule of Two boundary catches the
-evasions by ensuring that even a successful prompt injection lacks either the
-sensitive data or the unattended state-change/exfiltration capability needed to
+evasions by ensuring that even a successful prompt-style attack lacks either the
+sensitive data or the unattended state-change/external-disclosure capability needed to
 complete the attack chain.
 
 ## Portable Operation

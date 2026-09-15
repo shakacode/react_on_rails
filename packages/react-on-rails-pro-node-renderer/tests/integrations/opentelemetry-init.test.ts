@@ -482,8 +482,9 @@ describe('opentelemetry integration: init() failure path', () => {
 
     // We never reach provider.register() because the silent-failure check fires first.
     expect(registerSpy).not.toHaveBeenCalled();
-    // We shut our provider down so its span processor doesn't keep buffering.
-    expect(ourShutdownSpy).toHaveBeenCalledTimes(1);
+    // The mock deliberately omits forceFlush. Failed init must not fall through to
+    // shutdown(), which would destroy the caller-supplied span processor.
+    expect(ourShutdownSpy).not.toHaveBeenCalled();
     expect(messageSpy).toHaveBeenCalledWith(expect.stringContaining('already registered globally'));
 
     // Pre-existing provider still owns the global, so spans land there, not in ours.

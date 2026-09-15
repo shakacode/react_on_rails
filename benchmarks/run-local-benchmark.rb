@@ -60,6 +60,7 @@ options = {
   start_point_reset: true,
   fail_on_alert: false,
   setup: true,
+  preflight_only: false,
   duration: "30s",
   rate: "max",
   connections: "10"
@@ -79,6 +80,9 @@ parser = OptionParser.new do |opts|
   opts.on("--fail-on-alert", "Exit non-zero if Bencher flags a regression") { options[:fail_on_alert] = true }
   opts.on("--[no-]setup", "Run the build/setup steps (default: on; skip to reuse a prior build)") do |v|
     options[:setup] = v
+  end
+  opts.on("--preflight-only", "Validate suite and upload prerequisites, then exit") do
+    options[:preflight_only] = true
   end
   opts.on("--duration D", "Per-route benchmark duration (default: 30s)") { |v| options[:duration] = v }
   opts.on("--rate R", "Requests per second, or 'max' (default: max)") { |v| options[:rate] = v }
@@ -111,6 +115,10 @@ if options[:upload]
   end
   abort "bencher CLI not found on PATH; install it or pass --no-upload." if `command -v bencher`.strip.empty?
 end
+
+puts "Suite: #{suite[:suite_name]} | Ruby (app): #{MIN_RUBY || 'ambient'} | " \
+     "testbed: #{options[:testbed]} | upload: #{options[:upload]}"
+exit 0 if options[:preflight_only]
 
 app_dir = File.join(REPO_ROOT, suite.fetch(:app_directory))
 bench_script = File.join(REPO_ROOT, suite.fetch(:benchmark_script))
@@ -173,15 +181,6 @@ web_concurrency = [cpu_count - 1, 1].max
 pro = suite.fetch(:pro_env)
 pro_app = suite.fetch(:app_directory).start_with?("react_on_rails_pro/")
 node_renderer = suite.fetch(:server_kind) == "node-renderer"
-
-# Fail fast (before the long build) if a Pro benchmark is missing its license: the app would
-# otherwise boot with an empty license and die mid-startup with a cryptic error.
-if pro_app && ENV["REACT_ON_RAILS_PRO_LICENSE"].to_s.empty?
-  abort "REACT_ON_RAILS_PRO_LICENSE is required for Pro benchmark suites; export it first."
-end
-
-puts "Suite: #{suite[:suite_name]} | Ruby (app): #{MIN_RUBY || 'ambient'} | " \
-     "testbed: #{options[:testbed]} | upload: #{options[:upload]}"
 
 if options[:setup]
   log "Install JS deps + build workspace packages"

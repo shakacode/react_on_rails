@@ -300,22 +300,6 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
   end
 
   describe ".build_form_body" do
-    it "uses url-encoded form data when no uploaded files are present" do
-      headers, body = described_class.build_form_body(
-        {
-          "password" => "secret",
-          "targetBundles" => %w[server rsc],
-          "renderingRequest" => "console.log('Hello, world!');"
-        }
-      )
-
-      expect(headers).to eq([["content-type", "application/x-www-form-urlencoded"]])
-      expect(body).to include("password=secret")
-      expect(body).to include("targetBundles%5B%5D=server")
-      expect(body).to include("targetBundles%5B%5D=rsc")
-      expect(body).to include("renderingRequest=console.log")
-    end
-
     it "uses multipart form data when uploaded files are present" do
       Tempfile.create(["react-on-rails-pro", ".js"]) do |file|
         form = {
@@ -334,6 +318,48 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
         )
         expect(body.join).to include('name="bundle_server"; filename="server.js"')
       end
+    end
+
+    it "returns an unknown size when a multipart chunk has no byte size" do
+      body = described_class::MultipartBody.new
+      unknown_size_chunk = Class.new do
+        def read; end
+      end.new
+      body << "known"
+      body << unknown_size_chunk
+
+      expect(body.bytesize).to be_nil
+    end
+  end
+
+  describe "raw request bodies" do
+    it "passes custom headers and the body through without encoding" do
+      client = described_class.new(
+        origin: "http://localhost:3800",
+        pool_size: 1,
+        connect_timeout: 1,
+        read_timeout: 1
+      )
+      raw = { headers: [["content-type", "application/example"]], body: "const value = '✓';" }
+
+      expect(client.send(:request_body, form: nil, json: nil, raw:)).to eq([raw[:headers], raw[:body]])
+    ensure
+      client&.close
+    end
+
+    it "rejects ambiguous body encodings" do
+      client = described_class.new(
+        origin: "http://localhost:3800",
+        pool_size: 1,
+        connect_timeout: 1,
+        read_timeout: 1
+      )
+
+      expect do
+        client.send(:request_body, form: { "key" => "value" }, json: nil, raw: { headers: [], body: "raw" })
+      end.to raise_error(ArgumentError, /only one request body encoding/)
+    ensure
+      client&.close
     end
   end
 
@@ -360,6 +386,49 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
         force_http2: false
       )
       expect(closed_response_status).to eq(200)
+    end
+  end
+
+  describe "transport selection" do
+    def build_client(origin:, force_http2:)
+      described_class.new(
+        origin:,
+        pool_size: 1,
+        connect_timeout: 1,
+        read_timeout: 1,
+        force_http2:
+      )
+    end
+
+    it "forces HTTP/2 prior knowledge for a cleartext URL by default" do
+      client = build_client(origin: "http://localhost:3800", force_http2: true)
+
+      endpoint = client.send(:endpoint_for, "http://localhost:3800")
+
+      expect(endpoint.protocol).to be(Async::HTTP::Protocol::HTTP2)
+    ensure
+      client&.close
+    end
+
+    it "selects HTTP/1.1 for a cleartext URL when forcing HTTP/2 is disabled" do
+      client = build_client(origin: "http://localhost:3800", force_http2: false)
+
+      endpoint = client.send(:endpoint_for, "http://localhost:3800")
+
+      expect(endpoint.protocol).to be(Async::HTTP::Protocol::HTTP)
+    ensure
+      client&.close
+    end
+
+    it "leaves HTTPS protocol selection to ALPN for either setting" do
+      protocols = [true, false].map do |force_http2|
+        client = build_client(origin: "https://localhost:3800", force_http2:)
+        client.send(:endpoint_for, "https://localhost:3800").protocol
+      ensure
+        client&.close
+      end
+
+      expect(protocols).to eq([Async::HTTP::Protocol::HTTPS, Async::HTTP::Protocol::HTTPS])
     end
   end
 
@@ -740,7 +809,7 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
       Errno::EPIPE,
       Errno::ETIMEDOUT,
       Protocol::HTTP::RefusedError,
-      [Protocol::HTTP2::StreamError, "stream reset"]
+      [Protocol::HTTP2::Error, "pooled HTTP/2 client closed"]
     ].each do |error_class, *args|
       it "wraps #{error_class} in a ConnectionError" do
         client = described_class.new(origin: "http://localhost:3800", pool_size: 1, connect_timeout: 1, read_timeout: 1)
@@ -749,6 +818,41 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
 
         expect { client.get("/render") }
           .to raise_error(ReactOnRailsPro::RendererHttpClient::ConnectionError)
+      end
+    end
+
+    it "wraps peer-reset HTTP/2 streams in a ConnectionError" do
+      client = described_class.new(origin: "http://localhost:3800", pool_size: 1, connect_timeout: 1, read_timeout: 1)
+      stream_error = Protocol::HTTP2::StreamError.new("Stream closed!", Protocol::HTTP2::Error::CANCEL)
+
+      allow(client).to receive(:with_client).and_raise(stream_error)
+
+      expect { client.get("/render") }
+        .to raise_error(ReactOnRailsPro::RendererHttpClient::ConnectionError, "Stream closed!")
+    end
+
+    it "wraps connection-level HTTP/2 GOAWAY errors in a ConnectionError" do
+      client = described_class.new(origin: "http://localhost:3800", pool_size: 1, connect_timeout: 1, read_timeout: 1)
+      goaway_error = Protocol::HTTP2::GoawayError.new("server shutting down", Protocol::HTTP2::Error::ENHANCE_YOUR_CALM)
+
+      allow(client).to receive(:with_client).and_raise(goaway_error)
+
+      expect { client.get("/render") }
+        .to raise_error(ReactOnRailsPro::RendererHttpClient::ConnectionError, "server shutting down")
+    end
+
+    [
+      [Protocol::HTTP1::ProtocolError, "protocol mismatch"],
+      [Protocol::HTTP2::FrameSizeError, "invalid frame size"],
+      [Protocol::HTTP2::StreamClosed, "invalid stream state"],
+      [Protocol::HTTP2::HeaderError, "invalid headers"]
+    ].each do |error_class, message|
+      it "does not wrap #{error_class} in a ConnectionError" do
+        client = described_class.new(origin: "http://localhost:3800", pool_size: 1, connect_timeout: 1, read_timeout: 1)
+
+        allow(client).to receive(:with_client).and_raise(error_class, message)
+
+        expect { client.get("/render") }.to raise_error(error_class, message)
       end
     end
 

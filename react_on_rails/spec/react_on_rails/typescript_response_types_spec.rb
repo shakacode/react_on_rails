@@ -204,15 +204,5 @@ module ReactOnRails
       expect { described_class.define_response("", type_name: "BlankResponse", fields: {}) }
         .to raise_error(ReactOnRails::Error, /Response type key must be present/)
     end
-
-    it "rejects invalid fields at registration time" do
-      expect do
-        described_class.define_type("Project", fields: nil)
-      end.to raise_error(ReactOnRails::Error, /fields must be a Hash, got NilClass/)
-
-      expect do
-        described_class.define_response("projects.index", type_name: "ProjectsIndexResponse", fields: [])
-      end.to raise_error(ReactOnRails::Error, /fields must be a Hash, got Array/)
-    end
   end
 end

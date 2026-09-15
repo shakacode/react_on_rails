@@ -163,13 +163,14 @@ module ReactOnRails
       if shakapacker_in_gemfile?
         add_success("✅ Shakapacker is declared in Gemfile")
       else
+        shakapacker_version = ReactOnRails::PackerUtils.shakapacker_version
         add_warning(<<~MSG.strip)
           ⚠️  Shakapacker not found in Gemfile.
 
           While Shakapacker might be available as a dependency,
           it's recommended to add it explicitly to your Gemfile:
 
-          bundle add shakapacker --strict
+          bundle add shakapacker --version #{shakapacker_version} --strict
         MSG
       end
     end

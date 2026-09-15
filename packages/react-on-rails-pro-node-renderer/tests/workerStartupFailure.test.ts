@@ -133,6 +133,34 @@ describe('worker startup listen error handling', () => {
     expect(exitCalls).toEqual([1]);
   });
 
+  it('reports a configured declaration failure as the prewarm startup stage', () => {
+    const sentMessages: unknown[] = [];
+    const send = ((msg: unknown, _handle?: unknown, _options?: unknown, callback?: () => void) => {
+      sentMessages.push(msg);
+      callback?.();
+      return true;
+    }) as NodeJS.Process['send'];
+
+    handleStartupListenError({
+      err: new Error('Current generation manifest exceeds 65536 byte limit'),
+      host: 'localhost',
+      port: 3800,
+      stage: 'prewarm',
+      isWorker: true,
+      send,
+      exit: (() => undefined) as NodeJS.Process['exit'],
+    });
+
+    expect(sentMessages).toEqual([
+      expect.objectContaining({
+        type: WORKER_STARTUP_FAILURE,
+        stage: 'prewarm',
+        message: 'Current generation manifest exceeds 65536 byte limit',
+      }),
+    ]);
+    expect(isWorkerStartupFailureMessage(sentMessages[0])).toBe(true);
+  });
+
   it('exits without IPC in single-process mode via the production handler', () => {
     const send = jest.fn();
     const exitCalls: number[] = [];

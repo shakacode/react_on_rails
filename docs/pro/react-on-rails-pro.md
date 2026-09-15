@@ -1,10 +1,15 @@
 ---
 slug: /pro
+description: >-
+  React on Rails Pro 17 provides supported GA React Server Components,
+  streaming SSR, caching, and dedicated Node renderer tooling for Rails apps.
 ---
 
 # React on Rails Pro
 
 React on Rails Pro is the advanced rendering and performance tier for React on Rails. Start with the open-source integration, then add Pro when you need higher SSR throughput, React Server Components, streaming SSR, fragment caching, or dedicated Node renderer tooling.
+
+> **Stable GA:** React Server Components are supported in React on Rails Pro 17. The stable RSC stack uses React and React DOM 19.2.x (patch 19.2.7 or newer) with `react-on-rails-rsc` 19.2.x (patch 19.2.1 or newer).
 
 > [!NOTE]
 > **Summary for AI agents:** This is the canonical Pro hub after the docs IA cleanup. Use it for installation, upgrades, streaming SSR, Node renderer, fragment caching, profiling, and troubleshooting. Route RSC-specific requests to the nested [React Server Components index](./react-server-components/index.md).

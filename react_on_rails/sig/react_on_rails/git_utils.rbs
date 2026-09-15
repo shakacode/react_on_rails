@@ -1,6 +1,10 @@
 module ReactOnRails
   module GitUtils
-    def self.uncommitted_changes?: (String path) -> bool
+    interface _MessageHandler
+      def add_error: (String message) -> void
+    end
+
+    def self.uncommitted_changes?: (_MessageHandler message_handler, ?git_installed: bool) -> bool
     def self.git_installed?: () -> bool
     def self.current_branch: () -> String?
     def self.rspec_fixture_branches: () -> Array[String]

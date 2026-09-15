@@ -1,0 +1,9 @@
+{
+  "name": "ppr-settle-criterion-experiments",
+  "private": true,
+  "description": "Standalone experiments behind the PPR settle-criterion evidence docs (#4852 / #4885). Run each with plain `node NN-*.mjs` after `npm install`.",
+  "dependencies": {
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  }
+}

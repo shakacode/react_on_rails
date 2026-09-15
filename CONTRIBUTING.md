@@ -12,6 +12,7 @@ When contributing:
 ---
 
 - [internal/contributor-info/Releasing](./internal/contributor-info/releasing.md) for instructions on releasing. Key workflow: update CHANGELOG.md **before** releasing (run `/update-changelog release`), then `rake release` reads the version and auto-creates the GitHub release.
+- See `AGENTS.md` → "Changelog" for entry conventions, including the "Helper signature changes" rule (name the method and parameter when a `ReactOnRailsHelper`/`ReactOnRailsProHelper` method's parameters change) and the "Action-required placement" rule (deploy-order/memory/startup-failure entries carry an inline `**Action required for upgraders:**` tag, and are repeated in the release-notes page's "Action required" section when the release has or needs one).
 - [internal/contributor-info/pull-requests](./internal/contributor-info/pull-requests.md)
 - [internal/contributor-info/rbs-type-signatures](./internal/contributor-info/rbs-type-signatures.md) for information on RBS type signatures
 - See other docs in [internal/contributor-info](./internal/contributor-info)
@@ -497,8 +498,8 @@ That fallback comes from `CI_PNPM_FALLBACK_VERSION` in [`react_on_rails/lib/gene
 **Verification:**
 
 ```sh
-bundle exec rspec react_on_rails/spec/react_on_rails/generators/install_generator_spec.rb \
-  -e "keeps the fallback pin tied to a version-specific pnpm release note"
+(cd react_on_rails && bundle exec rspec spec/react_on_rails/generators/install_generator_spec.rb \
+  -e "keeps the fallback pin tied to a version-specific pnpm release note")
 ```
 
 Users who want exact reproducibility in their generated CI can commit a `packageManager: pnpm@<version>` field to their own `package.json`; the generator then omits the fallback `version:` entirely.
@@ -898,7 +899,8 @@ bundle install
 git clean -fd && git reset --hard generator_testing_base && git clean -fd
 
 # Add Shakapacker to Gemfile
-bundle add shakapacker --strict
+SHAKAPACKER_VERSION="$(bin/read-tool-version .ci-dependency-versions latest-shakapacker)"
+bundle add shakapacker --version="${SHAKAPACKER_VERSION}" --strict
 
 # Run Shakapacker installer first
 ./bin/rails shakapacker:install

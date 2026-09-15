@@ -23,6 +23,54 @@ RSpec.describe ReactOnRails::Generators::BaseGenerator, type: :generator do
     end
   end
 
+  # Regression coverage for PR #2489, which fixed two rspack SSR bugs in the generated
+  # serverWebpackConfig.js and shipped without any assertions (issue #4786). These render
+  # the real template rather than a hand-maintained copy, so a revert in the template is red.
+  describe "rendered serverWebpackConfig.js.tt" do
+    let(:destination) { File.expand_path("../dummy-for-generators", __dir__) }
+
+    def render_server_webpack_config(options = {})
+      described_class.new([], options, { destination_root: destination })
+                     .send(:rendered_template_for_cleanup, "base/base/config/webpack/serverWebpackConfig.js.tt")
+    end
+
+    it "drops rspack's cssExtractLoader from the server bundle, not just mini-css-extract-plugin" do
+      # rspack routes CSS extraction through cssExtractLoader. Matching only
+      # mini-css-extract-plugin leaked CSS extraction into the server bundle.
+      content = render_server_webpack_config
+
+      expect(content.scan("loaderPath.includes('cssExtractLoader')").size).to eq(2)
+      expect(content.scan("loaderPath.includes('mini-css-extract-plugin')").size).to eq(2)
+    end
+
+    it "merges exportOnlyLocals into existing CSS module options instead of replacing them" do
+      # Shakapacker's getStyleRule.js already sets `modules: { auto: true, ... }`.
+      # Overwriting the whole object dropped those settings from the server build.
+      content = render_server_webpack_config
+
+      expect(content).to include(
+        "...(typeof cssLoader.options.modules === 'object' ? cssLoader.options.modules : {})"
+      )
+      expect(content).to include("exportOnlyLocals: true")
+    end
+
+    it "resolves every rule.use entry through a single shared getLoaderPath helper" do
+      content = render_server_webpack_config(pro: true)
+
+      expect(content.scan("function getLoaderPath(item) {").size).to eq(1)
+      expect(content.scan("getLoaderPath(item)").size).to eq(5)
+    end
+
+    it "emits the loader helpers that the standalone Pro upgrade also writes" do
+      # ProSetup patches an existing base config instead of rendering this template, so the
+      # two paths drift silently unless the emitted source text is asserted to be identical.
+      content = render_server_webpack_config(pro: true)
+
+      expect(content).to include(ReactOnRails::Generators::ProSetup::GET_LOADER_PATH_JS)
+      expect(content).to include(ReactOnRails::Generators::ProSetup::EXTRACT_LOADER_JS)
+    end
+  end
+
   describe "#generate_new_app_home_page?" do
     it "returns false without calling add_root_route when --new-app is disabled" do
       base_generator = described_class.new

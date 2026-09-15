@@ -77,6 +77,32 @@ RSpec.describe TrackBenchmarks::Summary do
     end
   end
 
+  describe ".samples_by_name" do
+    it "keys each row's per-sample values by benchmark name, skipping sample-less rows" do
+      Dir.mktmpdir do |dir|
+        path = File.join(dir, "benchmark_display.json")
+        File.write(path, JSON.generate(
+                           [
+                             { "name" => "/a", "rps" => 10.0, "samples" => { "rps" => [9.0, 10.0, 11.0] } },
+                             { "name" => "/single", "rps" => 10.0 },
+                             { "name" => "/bad-samples", "rps" => 10.0, "samples" => "oops" },
+                             { "rps" => 10.0, "samples" => { "rps" => [1.0, 2.0] } }
+                           ]
+                         ))
+
+        expect(described_class.samples_by_name(path)).to eq(
+          "/a" => { "rps" => [9.0, 10.0, 11.0] }
+        )
+      end
+    end
+
+    it "returns an empty hash for a missing sidecar" do
+      Dir.mktmpdir do |dir|
+        expect(described_class.samples_by_name(File.join(dir, "missing.json"))).to eq({})
+      end
+    end
+  end
+
   describe ".regressed_alert_pairs" do
     it "deduplicates active alert benchmark and measure pairs" do
       report = BencherReport.parse(

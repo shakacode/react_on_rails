@@ -16,7 +16,7 @@
 source "https://rubygems.org"
 
 ENV["SPEC_DUMMY"] = "yes"
-eval_gemfile File.expand_path("../../Gemfile.loader", __dir__)
+Dir.chdir(__dir__) { eval_gemfile "../../Gemfile.loader" }
 
 gem "react_on_rails_pro", path: "../.."
 

@@ -15,10 +15,13 @@
 
 import formAutoContent from './formAutoContent';
 import { createReadStream } from 'fs-extra';
+import fs from 'fs';
+import path from 'path';
 // eslint-disable-next-line import/no-relative-packages
 import packageJson from '../package.json';
 import worker, { configureFastify, disableHttp2 } from '../src/worker';
 import { __resetFastifyConfigFunctionsForTest } from '../src/worker/fastifyConfig';
+import { prewarmDeclaredBundleGeneration } from '../src/worker/vm';
 import { BUNDLE_TIMESTAMP, getFixtureBundle, resetForTest, serverBundleCachePath } from './helper';
 
 const testName = 'healthEndpoints';
@@ -182,6 +185,30 @@ describe('built-in health endpoints', () => {
     const renderRes = await renderWithBundle(app);
     expect(renderRes.statusCode).toBe(200);
 
+    const readyRes = await app.inject().get('/ready').end();
+    expect(readyRes.statusCode).toBe(200);
+    expect(JSON.parse(readyRes.payload)).toEqual({ status: 'ready' });
+  });
+
+  test('GET /ready requires this worker complete its configured declared current set', async () => {
+    const cachePath = serverBundleCachePath(testName);
+    const declaredPaths = ['current-server', 'current-rsc'].map((role) => {
+      const bundlePath = path.join(cachePath, role, `${role}.js`);
+      fs.mkdirSync(path.dirname(bundlePath), { recursive: true });
+      fs.copyFileSync(getFixtureBundle(), bundlePath);
+      return bundlePath;
+    });
+    app = createWorker({
+      enableHealthEndpoints: true,
+      currentGenerationManifestPath: path.join(cachePath, '.current-generations', 'current.json'),
+    });
+
+    const notReadyRes = await app.inject().get('/ready').end();
+    expect(notReadyRes.statusCode).toBe(503);
+    expect(JSON.parse(notReadyRes.payload)).toEqual({ status: 'waiting_for_current_generation' });
+
+    const prewarmContext = await prewarmDeclaredBundleGeneration(declaredPaths);
+    prewarmContext.release();
     const readyRes = await app.inject().get('/ready').end();
     expect(readyRes.statusCode).toBe(200);
     expect(JSON.parse(readyRes.payload)).toEqual({ status: 'ready' });

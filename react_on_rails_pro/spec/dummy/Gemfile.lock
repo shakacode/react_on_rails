@@ -25,7 +25,7 @@ PATH
       async-http (~> 0.95)
       execjs (~> 2.9)
       io-endpoint (~> 0.17.0)
-      jwt (>= 2.5, < 4)
+      jwt (>= 2.8, < 4)
       nokogiri (>= 1.12, < 2)
       react_on_rails (= 17.0.0.rc.6)
 
@@ -150,7 +150,7 @@ GEM
     cgi (0.5.2)
     childprocess (5.0.0)
     coderay (1.1.3)
-    concurrent-ruby (1.3.7)
+    concurrent-ruby (1.3.8)
     connection_pool (3.0.2)
     console (1.34.2)
       fiber-annotation
@@ -169,7 +169,7 @@ GEM
     drb (2.2.3)
     equivalent-xml (0.6.0)
       nokogiri (>= 1.4.3)
-    erb (6.0.4)
+    erb (6.0.7)
     erubi (1.13.1)
     execjs (2.9.1)
     fakefs (2.8.0)
@@ -204,7 +204,7 @@ GEM
     hashdiff (1.1.0)
     i18n (1.15.2)
       concurrent-ruby (~> 1.0)
-    io-console (0.8.2)
+    io-console (0.9.2)
     io-endpoint (0.17.2)
     io-event (1.14.2)
     io-stream (0.13.0)
@@ -230,7 +230,7 @@ GEM
       rb-fsevent (~> 0.10, >= 0.10.3)
       rb-inotify (~> 0.9, >= 0.9.10)
     logger (1.7.0)
-    loofah (2.25.1)
+    loofah (2.25.2)
       crass (~> 1.0.2)
       nokogiri (>= 1.12.0)
     mail (2.9.0)
@@ -280,6 +280,20 @@ GEM
       racc (~> 1.4)
     nokogiri (1.19.4-x86_64-linux-musl)
       racc (~> 1.4)
+    opentelemetry-api (1.11.0)
+      logger
+    opentelemetry-common (0.25.1)
+      opentelemetry-api (~> 1.0)
+    opentelemetry-registry (0.6.3)
+      opentelemetry-api (~> 1.1)
+    opentelemetry-sdk (1.13.0)
+      logger
+      opentelemetry-api (~> 1.1)
+      opentelemetry-common (~> 0.20)
+      opentelemetry-registry (~> 0.2)
+      opentelemetry-semantic_conventions
+    opentelemetry-semantic_conventions (1.43.0)
+      opentelemetry-api (~> 1.0)
     ostruct (0.6.3)
     package_json (0.2.0)
     pg (1.5.6)
@@ -307,16 +321,16 @@ GEM
       pry (>= 0.13.0)
     pry-theme (1.3.1)
       coderay (~> 1.1)
-    psych (5.4.0)
+    psych (5.5.0)
       date
       stringio
     public_suffix (6.0.0)
     puma (6.5.0)
       nio4r (~> 2.0)
     racc (1.8.1)
-    rack (3.2.6)
-    rack-proxy (0.8.3)
-      rack
+    rack (3.2.7)
+    rack-proxy (1.0.1)
+      rack (>= 2.0, < 4)
     rack-session (2.1.2)
       base64 (>= 0.1.0)
       rack (>= 3.0.0)
@@ -342,8 +356,8 @@ GEM
       activesupport (>= 5.0.0)
       minitest
       nokogiri (>= 1.6)
-    rails-html-sanitizer (1.7.0)
-      loofah (~> 2.25)
+    rails-html-sanitizer (1.7.1)
+      loofah (~> 2.25, >= 2.25.2)
       nokogiri (>= 1.15.7, != 1.16.7, != 1.16.6, != 1.16.5, != 1.16.4, != 1.16.3, != 1.16.2, != 1.16.1, != 1.16.0.rc1, != 1.16.0)
     railties (7.2.3)
       actionpack (= 7.2.3)
@@ -371,7 +385,7 @@ GEM
     redis-client (0.24.0)
       connection_pool
     regexp_parser (2.9.2)
-    reline (0.6.3)
+    reline (0.7.0)
       io-console (~> 0.5)
     rexml (3.4.4)
     rspec-core (3.13.0)
@@ -419,7 +433,7 @@ GEM
       rubyzip (>= 1.2.2, < 3.0)
       websocket (~> 1.0)
     semantic_range (3.1.1)
-    shakapacker (10.3.0)
+    shakapacker (10.3.1)
       activesupport (>= 5.2)
       package_json
       rack-proxy (>= 0.6.1)
@@ -487,7 +501,7 @@ GEM
     xpath (3.2.0)
       nokogiri (~> 1.8)
     yard (0.9.36)
-    zeitwerk (2.8.2)
+    zeitwerk (2.8.3)
 
 PLATFORMS
   aarch64-linux
@@ -529,6 +543,7 @@ DEPENDENCIES
   net-http
   net-imap
   net-smtp
+  opentelemetry-sdk
   ostruct
   pg
   prism-rails
@@ -549,7 +564,7 @@ DEPENDENCIES
   sass-rails
   scss_lint
   selenium-webdriver (= 4.9.0)
-  shakapacker (= 10.3.0)
+  shakapacker (= 10.3.1)
   simplecov (~> 0.16.1)
   spring
   spring-watcher-listen

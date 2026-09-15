@@ -24,5 +24,19 @@ misc/tips
 getting-started/comparison-with-alternatives
 getting-started/nextjs-with-separate-rails-backend
 
+# Individual release-note pages (linked from upgrading/release-notes/index.md, not the sidebar)
+upgrading/release-notes/15.0.0
+upgrading/release-notes/16.0.0
+upgrading/release-notes/16.1.0
+upgrading/release-notes/16.2.0
+upgrading/release-notes/16.3.0
+upgrading/release-notes/16.4.0
+upgrading/release-notes/16.5.0
+upgrading/release-notes/16.5.1
+upgrading/release-notes/16.6.0
+upgrading/release-notes/17.0.0
+upgrading/release-notes/17.0.1
+upgrading/release-notes/17.1.0
+
 # URL-compatibility stub that redirects to pro/react-on-rails-pro
 pro/home-pro

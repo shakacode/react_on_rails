@@ -27,7 +27,8 @@ _Avoid_: unbenchmarked "fast" claims
 Neutralizing Inertia's "one command and it works" edge for the new-app funnel — generator quality, zero-config defaults, time-to-first-success.
 
 **Agent-native development**:
-Making React on Rails the stack AI coding agents can install, build with, and debug unaided — llms.txt, MCP, AGENTS.md scaffolding, agent-legible errors.
+Making React on Rails the stack AI coding agents can install, build with, and debug unaided — llms.txt, Skills shipped in-package with version-matched bundled docs, AGENTS.md scaffolding, agent-legible errors. A slim MCP is deferred until eval evidence shows Skills + doctor-JSON are insufficient ([ADR 0002](../adr/0002-skills-in-package-over-mcp.md)).
+_Avoid_: presuming MCP is the delivery vehicle (the full server was rejected in #3870; the slim variant awaits #4603 eval data)
 
 **New-app path**:
 `npx create-react-on-rails-app` — defaults to Pro (opt out via `--standard`); the quick-start leads with it. Distinct from the existing-app installer (`rails g react_on_rails:install`), which still defaults Pro off.
@@ -50,3 +51,4 @@ Roadmap work that feeds the headliners but doesn't lead the narrative: DX-parity
 
 - "installs" was used to mean both raw package downloads and real adoptions — resolved: **Pro install** means an Organization adopting Pro in a real app; raw downloads rejected as a goal metric (2026-07-11).
 - "vite-rails as competitor" — resolved: the **Competitive frame** is the full Inertia+Vite stack; bundler-level Vite DX is a supporting concern, not the anchor (2026-07-11).
+- "MCP" as shorthand for **Agent-native development** delivery — resolved: the 17.2 vehicle is Skills-in-package + version-matched bundled docs; a slim MCP stays deferred pending #4603 eval evidence ([ADR 0002](../adr/0002-skills-in-package-over-mcp.md), #4605, 2026-07-17).

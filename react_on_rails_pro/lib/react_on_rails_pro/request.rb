@@ -16,12 +16,16 @@
 require "digest"
 require "io/wait"
 require "uri"
+require_relative "open_telemetry"
 require_relative "renderer_http_client"
 require_relative "stream_request"
 require_relative "async_props_emitter"
 
 module ReactOnRailsPro
   class Request # rubocop:disable Metrics/ClassLength
+    RAW_RENDER_CONTENT_TYPE = "application/vnd.react-on-rails.render-request+javascript"
+    RAW_RENDER_HEADER_PREFIX = "x-react-on-rails-pro-"
+
     class UploadAssetsWaiter
       def initialize
         if Fiber.scheduler
@@ -91,7 +95,7 @@ module ReactOnRailsPro
         artifacts = resolve_upload_artifacts(artifacts, action_description: "uploading requested assets") if send_bundle
         request_path = send_bundle ? retarget_render_path(path, artifacts, bundle_role) : path
         form = form_with_code(js_code, send_bundle, artifacts:)
-        perform_request(request_path, form:)
+        perform_render_request(request_path, js_code, form:, send_bundle:)
       end
 
       def render_code_as_stream(path, js_code, is_rsc_payload:, rsc_stream_observability: false, artifacts: nil)
@@ -109,11 +113,11 @@ module ReactOnRailsPro
           request_path, request_artifacts = prepare_streaming_request(path, send_bundle:, bundle_role:, artifacts:)
 
           form = form_with_code(js_code, false, artifacts: request_artifacts, rsc_stream_observability:)
-          perform_request(request_path, form:, stream: true)
+          perform_render_request(request_path, js_code, form:, send_bundle: false, stream: true)
         end
       end
 
-      # Performs an incremental render request with bidirectional HTTP/2 streaming.
+      # Performs an incremental render request with bidirectional streaming.
       #
       # ARCHITECTURE: This method orchestrates the async props flow:
       #
@@ -130,13 +134,13 @@ module ReactOnRailsPro
       # │                                   │     └── Sends NDJSON: {updateChunk} │
       # │                                   │                                     │
       # │  ... streaming HTML chunks ...    │  4. Block completes                 │
-      # │                                   │     output.close (sends END_STREAM) │
+      # │                                   │     output.close (request EOF)      │
       # └───────────────────────────────────┴─────────────────────────────────────┘
       #
       # WHY async task?
       # - We need to return the response stream immediately so Rails can start sending HTML
       # - The async_props_block runs concurrently, sending props as they become available
-      # - When the block finishes, we close the output (END_STREAM flag)
+      # - When the block finishes, we close the request body
       # - Node's handleRequestClosed then calls asyncPropsManager.endStream()
       #
       def render_code_with_incremental_updates(
@@ -163,8 +167,8 @@ module ReactOnRailsPro
         ) do |send_bundle, tasks|
           request_path, request_artifacts = prepare_streaming_request(path, send_bundle:, bundle_role:, artifacts:)
 
-          # Open a bidirectional HTTP/2 stream using async-http's Writable body.
-          # output supports << (alias for write) and close (sends END_STREAM).
+          # Open a bidirectional request using async-http's Writable body.
+          # output supports << (alias for write) and close (signals request EOF).
           output, response = connection.post_bidi(
             request_path,
             headers: [["content-type", "application/x-ndjson"]]
@@ -183,11 +187,14 @@ module ReactOnRailsPro
 
           # Execute async props block in a separate fiber.
           # This runs concurrently with the response streaming back to the client.
+          parent_context = ReactOnRailsPro::OpenTelemetry.capture_context
           tasks.push(Async::Task.current.async do
-            async_props_block.call(emitter)
+            ReactOnRailsPro::OpenTelemetry.with_context(parent_context) do
+              async_props_block.call(emitter)
+            end
           ensure
             # When the block completes (or raises), close the output.
-            # This sends HTTP/2 END_STREAM flag, triggering Node's handleRequestClosed.
+            # This signals request-body EOF, triggering Node's handleRequestClosed.
             output.close
           end)
 
@@ -268,7 +275,9 @@ module ReactOnRailsPro
       def retry_or_raise_transport_error(error, available_retries, path, error_type)
         if available_retries.zero?
           raise ReactOnRailsPro::Error,
-                "#{error_type} error on renderer request: #{path}.\nOriginal error:\n#{error}\n#{error.backtrace}"
+                "#{error_type} error on renderer request: #{path}.\n" \
+                "#{ReactOnRailsPro::RendererHttpClient.transport_config_description}\n" \
+                "Original error:\n#{error}\n#{error.backtrace}"
         end
         Rails.logger.info do
           "[ReactOnRailsPro] #{error_type} error when making a request to the Node Renderer. " \
@@ -320,6 +329,48 @@ module ReactOnRailsPro
         form["rscStreamObservability"] = true if rsc_stream_observability
         populate_form_with_bundle_and_assets(form, check_bundle: false, artifacts:) if send_bundle
         form
+      end
+
+      def perform_render_request(path, js_code, form:, send_bundle:, stream: false)
+        if send_bundle
+          perform_request(path, form:, stream:)
+        else
+          perform_request(path, raw: raw_render_request(js_code, form), stream:)
+        end
+      end
+
+      # The field list here must stay in sync with common_form_data / form_with_code and
+      # the Node renderer's normalizeRawRenderRequest (node renderer's worker.ts); an
+      # unmapped field raises ArgumentError below. Every value is sanitized because these
+      # body fields become raw HTTP header values.
+      def raw_render_request(js_code, form)
+        metadata = form.except("renderingRequest")
+        headers = [
+          ["content-type", RAW_RENDER_CONTENT_TYPE],
+          ["#{RAW_RENDER_HEADER_PREFIX}protocol-version",
+           sanitize_raw_render_header(metadata.delete("protocolVersion"))],
+          ["#{RAW_RENDER_HEADER_PREFIX}gem-version", sanitize_raw_render_header(metadata.delete("gemVersion"))],
+          ["#{RAW_RENDER_HEADER_PREFIX}rails-env", sanitize_raw_render_header(metadata.delete("railsEnv"))],
+          [
+            "#{RAW_RENDER_HEADER_PREFIX}dependency-bundle-timestamps",
+            sanitize_raw_render_header(JSON.generate(Array(metadata.delete("dependencyBundleTimestamps"))))
+          ]
+        ]
+        password = metadata.delete("password")
+        headers << ["authorization", "Bearer #{sanitize_raw_render_header(password)}"] if password
+        if metadata.key?("rscStreamObservability")
+          observability = sanitize_raw_render_header(metadata.delete("rscStreamObservability"))
+          headers << ["#{RAW_RENDER_HEADER_PREFIX}rsc-stream-observability", observability]
+        end
+        raise ArgumentError, "Unsupported raw render metadata: #{metadata.keys.join(', ')}" unless metadata.empty?
+
+        { headers:, body: js_code }
+      end
+
+      def sanitize_raw_render_header(value)
+        value.to_s.tap do |header_value|
+          raise ArgumentError, "Renderer metadata headers cannot contain newlines" if header_value.match?(/[\r\n]/)
+        end
       end
 
       def populate_form_with_bundle_and_assets(form, check_bundle:, artifacts: nil, assets_to_copy: nil)
@@ -621,7 +672,7 @@ module ReactOnRailsPro
 
       def create_connection
         url = ReactOnRailsPro.configuration.renderer_url
-        Rails.logger.info do
+        Rails.logger.debug do
           "[ReactOnRailsPro] Setting up Node Renderer connection to #{url}"
         end
 
@@ -629,7 +680,8 @@ module ReactOnRailsPro
           origin: url,
           pool_size: ReactOnRailsPro.configuration.renderer_http_pool_size,
           connect_timeout: ReactOnRailsPro.configuration.renderer_http_pool_timeout,
-          read_timeout: ReactOnRailsPro.configuration.ssr_timeout
+          read_timeout: ReactOnRailsPro.configuration.ssr_timeout,
+          force_http2: ReactOnRailsPro.configuration.renderer_http_force_http2
         )
       rescue StandardError => e
         message = <<~MSG
@@ -638,6 +690,7 @@ module ReactOnRailsPro
           renderer_http_pool_timeout = #{ReactOnRailsPro.configuration.renderer_http_pool_timeout}
           renderer_http_pool_warn_timeout = #{ReactOnRailsPro.configuration.renderer_http_pool_warn_timeout}
           renderer_http_keep_alive_timeout = #{ReactOnRailsPro.configuration.renderer_http_keep_alive_timeout}
+          renderer_http_force_http2 = #{ReactOnRailsPro.configuration.renderer_http_force_http2}
           renderer_url = #{url}
           Be sure to use a url that contains the protocol of http or https.
           Original error is

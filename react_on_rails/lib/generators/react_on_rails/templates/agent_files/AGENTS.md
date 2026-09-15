@@ -162,7 +162,28 @@ Exit code `0` means there are no errors (warnings may still be present); exit co
 the report no longer contains errors. The JSON contract is documented at
 https://reactonrails.com/docs/api-reference/doctor.
 
-## 7. Where the full reference lives
+## 7. Use the bundled docs and skills first
+
+Use the installed gem directory as the canonical, reliable lookup for version-matched
+guidance:
+
+```bash
+bundle show react_on_rails
+```
+
+From the returned directory, read `docs/agent/README.md` and load the matching workflow
+skill when the task fits:
+
+- Install or upgrade: `skills/install-and-upgrade/SKILL.md`
+- Adopt React Server Components (Pro): `skills/rsc-adoption/SKILL.md`
+- Debug streaming SSR (Pro): `skills/streaming-debug/SKILL.md`
+- Run the doctor fix loop: `skills/doctor-fix-loop/SKILL.md`
+
+An optional direct-dependency path is `node_modules/react-on-rails/`, but use it only when
+that directory exists. Do not assume it exists: Pro installations may omit the direct base
+npm dependency, and pnpm may isolate a transitive copy.
+
+## 8. Where the hosted reference lives
 
 - Hosted docs: https://reactonrails.com/docs/
 - Getting-started tutorial: https://reactonrails.com/docs/getting-started/tutorial/

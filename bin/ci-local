@@ -63,6 +63,7 @@ echo ""
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 ROOT_GEMFILE="$ROOT_DIR/Gemfile"
 OSS_GEMFILE="$ROOT_DIR/react_on_rails/Gemfile"
+OSS_DUMMY_GEMFILE="$ROOT_DIR/react_on_rails/spec/dummy/Gemfile"
 PRO_GEMFILE="$ROOT_DIR/react_on_rails_pro/Gemfile"
 PRO_DUMMY_GEMFILE="$ROOT_DIR/react_on_rails_pro/spec/dummy/Gemfile"
 cd "$ROOT_DIR"
@@ -117,6 +118,7 @@ bundle_command() {
 FAILED_JOBS=()
 OSS_DEPS_READY=false
 PRO_DEPS_READY=false
+RUN_RELEASE_SUPERVISOR_TESTS=false
 
 # Internal implementation: runs a shell command string via the shell, so
 # compound commands (e.g. "cd X && make") work. Prefer the argv-based helper
@@ -195,6 +197,8 @@ if [ "$RUN_ALL" = false ]; then
       RUN_RUBY=$(echo "$DETECTOR_JSON" | jq -r '.run_ruby_tests // false')
       RUN_JS=$(echo "$DETECTOR_JSON" | jq -r '.run_js_tests // false')
       RUN_DUMMY=$(echo "$DETECTOR_JSON" | jq -r '.run_dummy_tests // false')
+      RUN_GEM_GENERATOR_SPECS=$(echo "$DETECTOR_JSON" | jq -r '.run_gem_generator_specs // false')
+      RUN_RELEASE_SUPERVISOR_TESTS=$(echo "$DETECTOR_JSON" | jq -r '.run_release_supervisor_tests // false')
       RUN_GENERATORS=$(echo "$DETECTOR_JSON" | jq -r '.run_generators // false')
       RUN_PRO_LINT=$(echo "$DETECTOR_JSON" | jq -r '.run_pro_lint // false')
       RUN_PRO_TESTS=$(echo "$DETECTOR_JSON" | jq -r '.run_pro_tests // false')
@@ -228,6 +232,10 @@ if [ "$RUN_ALL" = false ]; then
       RUN_RUBY=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ RSpec gem tests" && echo true || echo false)
       RUN_JS=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ JS unit tests" && echo true || echo false)
       RUN_DUMMY=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ Dummy app integration tests" && echo true || echo false)
+      RUN_GEM_GENERATOR_SPECS=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ RSpec gem generator specs" && echo true || echo false)
+      RUN_RELEASE_SUPERVISOR_TESTS=$(
+        echo "$DETECTOR_OUTPUT" | grep -q "✓ Release supervisor integration tests" && echo true || echo false
+      )
       RUN_GENERATORS=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ Generator tests" && echo true || echo false)
       RUN_PRO_LINT=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ React on Rails Pro Lint" && echo true || echo false)
       RUN_PRO_TESTS=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ React on Rails Pro tests" && echo true || echo false)
@@ -252,6 +260,10 @@ if [ "$RUN_ALL" = false ]; then
     RUN_RUBY=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ RSpec gem tests" && echo true || echo false)
     RUN_JS=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ JS unit tests" && echo true || echo false)
     RUN_DUMMY=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ Dummy app integration tests" && echo true || echo false)
+    RUN_GEM_GENERATOR_SPECS=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ RSpec gem generator specs" && echo true || echo false)
+    RUN_RELEASE_SUPERVISOR_TESTS=$(
+      echo "$DETECTOR_OUTPUT" | grep -q "✓ Release supervisor integration tests" && echo true || echo false
+    )
     RUN_GENERATORS=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ Generator tests" && echo true || echo false)
     RUN_PRO_LINT=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ React on Rails Pro Lint" && echo true || echo false)
     RUN_PRO_TESTS=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ React on Rails Pro tests" && echo true || echo false)
@@ -263,6 +275,8 @@ else
   RUN_RUBY=true
   RUN_JS=true
   RUN_DUMMY=true
+  RUN_GEM_GENERATOR_SPECS=true
+  RUN_RELEASE_SUPERVISOR_TESTS=true
   RUN_GENERATORS=true
   RUN_PRO_LINT=true
   RUN_PRO_TESTS=true
@@ -327,6 +341,41 @@ ensure_oss_dependencies() {
   OSS_DEPS_READY=true
 }
 
+# shellcheck disable=SC2329 # Passed by name to run_job_argv below.
+prepare_oss_dummy_test_bundles() {
+  (
+    local dummy_dir="$ROOT_DIR/react_on_rails/spec/dummy"
+    cd "$dummy_dir" || return 1
+
+    if [ ! -d node_modules ]; then
+      echo -e "${YELLOW}Setting up dummy app JavaScript dependencies...${NC}"
+      bundle_command "$OSS_DUMMY_GEMFILE" pnpm install || return 1
+    fi
+
+    if ! bundle_command "$OSS_DUMMY_GEMFILE" bundle check >/dev/null 2>&1; then
+      bundle_command "$OSS_DUMMY_GEMFILE" bundle install || return 1
+    fi
+
+    bundle_command "$OSS_DUMMY_GEMFILE" pnpm run build:test
+  )
+}
+
+# shellcheck disable=SC2329 # Passed by name to run_job_argv below.
+run_oss_dummy_rspec() {
+  (
+    cd "$ROOT_DIR/react_on_rails" || return 1
+    bundle_command "$OSS_GEMFILE" bundle exec rake run_rspec:dummy
+  )
+}
+
+# shellcheck disable=SC2329 # Passed by name to run_job_argv below.
+run_pro_js_tests() {
+  (
+    cd "$ROOT_DIR" || return 1
+    pnpm --filter react-on-rails-pro test
+  )
+}
+
 # Ensure dependencies are installed
 if [ ! -d "node_modules" ] || [ ! -d "vendor/bundle" ]; then
   echo -e "${YELLOW}Installing dependencies...${NC}"
@@ -348,7 +397,12 @@ fi
 # gives contributors a complete failure report from a single local run.
 run_job_argv "Docs Sidebar Check" script/check-docs-sidebar "$BASE_REF" || true
 
-if [ "$RUN_RUBY" = true ] || [ "$RUN_DUMMY" = true ] || [ "$RUN_GENERATORS" = true ]; then
+if [ "$RUN_RELEASE_SUPERVISOR_TESTS" = true ]; then
+  run_job_argv "Release Supervisor Integration Tests" bash script/release-test.bash || true
+fi
+
+if [ "$RUN_RUBY" = true ] || [ "$RUN_DUMMY" = true ] ||
+  [ "$RUN_GEM_GENERATOR_SPECS" = true ] || [ "$RUN_GENERATORS" = true ]; then
   ensure_oss_dependencies
 fi
 
@@ -367,7 +421,7 @@ if [ "$RUN_JS" = true ]; then
   run_job "Package Build" "pnpm run build"
   ensure_pro_dummy_test_bundles
   run_job "React on Rails JS Unit Tests" "pnpm --filter react-on-rails test"
-  run_job "React on Rails Pro JS Unit Tests" "pnpm --filter react-on-rails-pro test"
+  run_job_argv "React on Rails Pro JS Unit Tests" run_pro_js_tests
   run_job "Create React on Rails App JS Unit Tests" "pnpm --filter create-react-on-rails-app test"
   run_job "React on Rails Pro Node Renderer JS Tests" "pnpm --filter react-on-rails-pro-node-renderer run ci"
 fi
@@ -375,9 +429,11 @@ fi
 # Run Ruby gem tests
 if [ "$RUN_RUBY" = true ]; then
   if [ "$FAST_MODE" = true ]; then
-    run_job "RSpec (Gem Only - Fast)" "cd react_on_rails && bundle_command \"$OSS_GEMFILE\" bundle exec rspec spec/react_on_rails"
+    run_job "RSpec (Gem Unit - Fast)" \
+      "cd react_on_rails && bundle_command \"$OSS_GEMFILE\" bundle exec rake run_rspec:gem_unit"
   else
-    run_job "RSpec (Gem Only)" "cd react_on_rails && bundle_command \"$OSS_GEMFILE\" bundle exec rake run_rspec:gem"
+    run_job "RSpec (Gem Unit)" \
+      "cd react_on_rails && bundle_command \"$OSS_GEMFILE\" bundle exec rake run_rspec:gem_unit"
   fi
 fi
 
@@ -387,28 +443,36 @@ if [ "$RUN_DUMMY" = true ]; then
     echo -e "${YELLOW}Skipping dummy app tests in --fast mode${NC}"
     echo ""
   else
-    # Build dummy app if needed
-    if [ ! -d "react_on_rails/spec/dummy/node_modules" ]; then
-      echo -e "${YELLOW}Setting up dummy app...${NC}"
-      if ! (cd react_on_rails/spec/dummy && pnpm install); then
-        echo -e "${YELLOW}⚠ Dummy app setup failed, skipping dummy app tests${NC}"
-        echo ""
-      else
-        run_job "Dummy App Integration Tests" "cd react_on_rails && bundle_command \"$OSS_GEMFILE\" bundle exec rake run_rspec:dummy"
-      fi
+    # Always rebuild immediately before RSpec: installed dependencies do not
+    # prove that the generated test manifest exists or matches this checkout.
+    if run_job_argv "Dummy App Test Bundles" prepare_oss_dummy_test_bundles; then
+      run_job_argv "Dummy App Integration Tests" run_oss_dummy_rspec
     else
-      run_job "Dummy App Integration Tests" "cd react_on_rails && bundle_command \"$OSS_GEMFILE\" bundle exec rake run_rspec:dummy"
+      echo -e "${YELLOW}Skipping dummy app integration tests because test bundle preparation failed${NC}"
+      echo ""
     fi
   fi
 fi
 
-# Run generator tests
-if [ "$RUN_GENERATORS" = true ]; then
+# Run the hosted generator RSpec shard independently from generated examples.
+if [ "$RUN_GEM_GENERATOR_SPECS" = true ]; then
   if [ "$FAST_MODE" = true ]; then
-    echo -e "${YELLOW}Skipping generator tests in --fast mode (they are slow)${NC}"
+    echo -e "${YELLOW}Skipping gem generator specs in --fast mode (they are slow)${NC}"
     echo ""
   else
-    run_job "Generator Tests" "cd react_on_rails && bundle_command \"$OSS_GEMFILE\" bundle exec rake run_rspec:shakapacker_examples"
+    run_job "RSpec (Gem Generators)" \
+      "cd react_on_rails && bundle_command \"$OSS_GEMFILE\" bundle exec rake run_rspec:gem_generators"
+  fi
+fi
+
+# Generated example apps are a separate detector category from gem specs.
+if [ "$RUN_GENERATORS" = true ]; then
+  if [ "$FAST_MODE" = true ]; then
+    echo -e "${YELLOW}Skipping generated example app tests in --fast mode (they are slow)${NC}"
+    echo ""
+  else
+    run_job "Generated Example App Tests" \
+      "cd react_on_rails && bundle_command \"$OSS_GEMFILE\" bundle exec rake run_rspec:shakapacker_examples"
   fi
 fi
 
@@ -435,7 +499,9 @@ if [ "$RUN_PRO_TESTS" = true ]; then
     echo -e "${YELLOW}Skipping React on Rails Pro tests in --fast mode${NC}"
     echo ""
   elif ensure_pro_dependencies; then
-    run_job "React on Rails Pro JS Tests" "cd react_on_rails_pro && pnpm run nps test"
+    if [ "$RUN_JS" != true ]; then
+      run_job_argv "React on Rails Pro JS Tests" run_pro_js_tests
+    fi
     run_job "React on Rails Pro RSpec" "cd react_on_rails_pro && bundle_command \"$PRO_GEMFILE\" bundle exec rspec"
   fi
 fi

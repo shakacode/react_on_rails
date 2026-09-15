@@ -30,9 +30,9 @@ module ReactOnRails
       config.after_initialize do
         next if Engine.skip_version_validation?
 
-        Rails.logger.info "[React on Rails] Validating package version and compatibility..."
+        Rails.logger.debug "[React on Rails] Validating package version and compatibility..."
         VersionChecker.build.validate_version_and_package_compatibility!
-        Rails.logger.info "[React on Rails] Package validation successful"
+        Rails.logger.debug "[React on Rails] Package validation successful"
       end
     end
 

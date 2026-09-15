@@ -14,6 +14,7 @@
 # https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
 
 require "async"
+require_relative "open_telemetry"
 
 module ReactOnRailsPro
   class StreamDecorator
@@ -137,7 +138,12 @@ module ReactOnRailsPro
     def each_chunk(&block)
       return enum_for(:each_chunk) unless block
 
-      Sync { consume_with_bundle_reupload(&block) }
+      parent_context = ReactOnRailsPro::OpenTelemetry.capture_context
+      Sync do
+        ReactOnRailsPro::OpenTelemetry.with_context(parent_context) do
+          consume_with_bundle_reupload(&block)
+        end
+      end
     end
 
     def self.create(first_chunk_warn_callback: nil, pull_enabled: false, &request_block)
@@ -281,6 +287,7 @@ module ReactOnRailsPro
       error_type = error.is_a?(ReactOnRailsPro::RendererHttpClient::TimeoutError) ? "Time out" : "Connection"
       if @received_first_chunk || available_retries.zero?
         raise ReactOnRailsPro::Error, "#{error_type} error while server side render streaming a component.\n" \
+                                      "#{ReactOnRailsPro::RendererHttpClient.transport_config_description}\n" \
                                       "Original error:\n#{error}\n#{error.backtrace}"
       end
       Rails.logger.info do

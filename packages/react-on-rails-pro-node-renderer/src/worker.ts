@@ -23,7 +23,8 @@ import cluster from 'cluster';
 import { randomUUID } from 'crypto';
 import { rm } from 'fs/promises';
 import { Readable, Transform } from 'stream';
-import fastify from 'fastify';
+import fastify, { type FastifyServerOptions } from 'fastify';
+import type { Http2Server } from 'http2';
 import fastifyFormbody from '@fastify/formbody';
 import fastifyMultipart, { type MultipartFile } from '@fastify/multipart';
 import log, { sharedLoggerOptions } from './shared/log.js';
@@ -63,7 +64,8 @@ import {
 } from './shared/utils.js';
 import { startSsrRequestOptions, subSpan, trace, type TracingContext } from './shared/tracing.js';
 import { applyFastifyConfigFunctions } from './worker/fastifyConfig.js';
-import { hasAnyVMContext } from './worker/vm.js';
+import { hasAnyVMContext, isDeclaredCurrentGenerationReady } from './worker/vm.js';
+import { prewarmCurrentGenerationBeforeListen } from './worker/startCurrentGeneration.js';
 
 export { configureFastify, type FastifyConfigFunction } from './worker/fastifyConfig.js';
 
@@ -155,45 +157,27 @@ function setHeaders(headers: ResponseResult['headers'], res: FastifyReply) {
   Object.entries(headers).forEach(([key, header]) => res.header(key, header));
 }
 
-function hasHeader(headers: ResponseResult['headers'], headerName: string) {
-  const lowerHeaderName = headerName.toLowerCase();
-  return Object.keys(headers).some((key) => key.toLowerCase() === lowerHeaderName);
-}
-
-function setStringResponseHeaders(headers: ResponseResult['headers'], res: FastifyReply) {
-  if (!hasHeader(headers, 'Content-Type')) {
-    res.type('text/plain; charset=utf-8');
-  }
-  if (!hasHeader(headers, 'X-Content-Type-Options')) {
-    res.header('X-Content-Type-Options', 'nosniff');
-  }
-}
-
 const setResponse = async (result: ResponseResult, res: FastifyReply) => {
   const { status, data, headers, stream } = result;
   if (status !== 200 && status !== 410) {
     log.info({ msg: 'Sending non-200, non-410 data back', data });
-  }
-  if (!stream && typeof data === 'string' && status >= 400) {
-    setHeaders(headers, res);
-    res.header('Content-Type', 'text/plain; charset=utf-8');
-    res.header('X-Content-Type-Options', 'nosniff');
-    res.status(status);
-    res.send(data);
-    return;
-  }
-
-  if (!stream && typeof data === 'string') {
-    setStringResponseHeaders(headers, res);
   }
   setHeaders(headers, res);
   res.status(status);
 
   if (stream) {
     await res.send(stream);
-  } else {
-    res.send(data);
+    return;
   }
+
+  if (typeof data === 'string') {
+    // String payloads (rendered output and error text) may embed request-derived
+    // content; the Rails client reads them as raw text, so an explicit non-HTML
+    // content type keeps reflected markup inert if a browser hits this endpoint.
+    res.header('Content-Type', 'text/plain; charset=utf-8');
+    res.header('X-Content-Type-Options', 'nosniff');
+  }
+  res.send(data);
 };
 
 function runWhenStreamFinishes(
@@ -446,6 +430,8 @@ export const disableHttp2 = () => {
 type WithBodyArrayField<T, K extends string> = T & { [P in K | `${K}[]`]?: string | string[] };
 
 const INVALID_CONTENT_LENGTH_ERROR_CODE = 'FST_ERR_CTP_INVALID_CONTENT_LENGTH';
+const RAW_RENDER_CONTENT_TYPE = 'application/vnd.react-on-rails.render-request+javascript';
+const RAW_RENDER_HEADER_PREFIX = 'x-react-on-rails-pro-';
 
 const errorCode = (error: unknown): string | undefined => {
   const code = (error as { code?: unknown })?.code;
@@ -506,6 +492,89 @@ const extractBodyArrayField = <Key extends string>(
   return undefined;
 };
 
+type RawRenderHeaders = Record<string, unknown>;
+
+const scalarHeader = (headers: RawRenderHeaders, name: string) => {
+  const value = headers[name];
+  return typeof value === 'string' ? value : undefined;
+};
+
+const normalizeRawRenderRequest = (
+  renderingRequest: unknown,
+  headers: RawRenderHeaders,
+): { body?: Record<string, unknown>; error?: string } => {
+  if (typeof renderingRequest !== 'string') {
+    return { error: 'Invalid raw render request body: expected a JavaScript string.' };
+  }
+
+  const authorization = scalarHeader(headers, 'authorization');
+  if (authorization && !authorization.startsWith('Bearer ')) {
+    return { error: 'Invalid Authorization header for raw render request.' };
+  }
+
+  const dependencyHeader = scalarHeader(headers, `${RAW_RENDER_HEADER_PREFIX}dependency-bundle-timestamps`);
+  let dependencyBundleTimestamps: unknown = [];
+  if (dependencyHeader !== undefined) {
+    try {
+      dependencyBundleTimestamps = JSON.parse(dependencyHeader);
+    } catch {
+      return { error: 'Invalid dependency bundle timestamps header: expected a JSON array.' };
+    }
+    if (
+      !Array.isArray(dependencyBundleTimestamps) ||
+      !dependencyBundleTimestamps.every((timestamp) => typeof timestamp === 'string')
+    ) {
+      return { error: 'Invalid dependency bundle timestamps header: expected an array of strings.' };
+    }
+  }
+
+  const observabilityHeader = scalarHeader(headers, `${RAW_RENDER_HEADER_PREFIX}rsc-stream-observability`);
+  if (
+    observabilityHeader !== undefined &&
+    observabilityHeader !== 'true' &&
+    observabilityHeader !== 'false'
+  ) {
+    return { error: 'Invalid RSC stream observability header: expected true or false.' };
+  }
+
+  return {
+    body: {
+      renderingRequest,
+      protocolVersion: scalarHeader(headers, `${RAW_RENDER_HEADER_PREFIX}protocol-version`),
+      gemVersion: scalarHeader(headers, `${RAW_RENDER_HEADER_PREFIX}gem-version`),
+      railsEnv: scalarHeader(headers, `${RAW_RENDER_HEADER_PREFIX}rails-env`),
+      password: authorization?.slice('Bearer '.length),
+      dependencyBundleTimestamps,
+      ...(observabilityHeader === undefined ? {} : { rscStreamObservability: observabilityHeader }),
+    },
+  };
+};
+
+// Extracts only the precheck fields, without shape validation, so protocol, version, and
+// password checks run before normalizeRawRenderRequest's 400s; a malformed but
+// unauthenticated raw request must fail auth first, matching the parsed-body path and
+// /asset-exists. Must include every field checkProtocolVersion reads (gemVersion and
+// railsEnv drive the non-production version-mismatch 412), since prechecks run only once
+// on this path. Absent headers must not produce keys at all, so the protocol-version
+// diagnostic's "received fields" list only names fields the client actually sent.
+const rawRenderPrecheckBody = (headers: RawRenderHeaders) => {
+  const authorization = scalarHeader(headers, 'authorization');
+  const body: Record<string, string> = {};
+  const assign = (key: string, value: string | undefined) => {
+    if (value !== undefined) {
+      body[key] = value;
+    }
+  };
+  assign('protocolVersion', scalarHeader(headers, `${RAW_RENDER_HEADER_PREFIX}protocol-version`));
+  assign('gemVersion', scalarHeader(headers, `${RAW_RENDER_HEADER_PREFIX}gem-version`));
+  assign('railsEnv', scalarHeader(headers, `${RAW_RENDER_HEADER_PREFIX}rails-env`));
+  assign(
+    'password',
+    authorization?.startsWith('Bearer ') ? authorization.slice('Bearer '.length) : authorization,
+  );
+  return body;
+};
+
 function discardMultipartFile(part: MultipartFile) {
   part.file.resume();
   // eslint-disable-next-line no-param-reassign
@@ -539,18 +608,25 @@ export default function run(config: Partial<Config>) {
     fastifyServerOptions,
     workersCount,
     enableHealthEndpoints,
+    currentGenerationManifestPath,
   } = getConfig();
 
-  // The renderer uses cleartext HTTP/2 (h2c). Node's `allowHTTP1` option only
-  // applies to TLS servers (http2.createSecureServer), so it cannot enable
-  // HTTP/1.1 Kubernetes httpGet probes on this listener.
-  const app = fastify({
-    http2: useHttp2 as true,
+  const { http2: configuredHttp2, ...serverOptions } = fastifyServerOptions ?? {};
+  const http2Enabled = configuredHttp2 ?? useHttp2;
+  const commonServerOptions = {
     bodyLimit: BODY_SIZE_LIMIT,
     logger:
       logHttpLevel !== 'silent' ? { name: 'RORP HTTP', level: logHttpLevel, ...sharedLoggerOptions } : false,
-    ...fastifyServerOptions,
-  });
+    ...serverOptions,
+  };
+  const app = (
+    http2Enabled
+      ? fastify<Http2Server>({
+          ...(commonServerOptions as FastifyServerOptions<Http2Server>),
+          http2: true,
+        })
+      : fastify(commonServerOptions as FastifyServerOptions)
+  ) as FastifyInstance;
 
   handleGracefulShutdown(app);
 
@@ -599,7 +675,10 @@ export default function run(config: Partial<Config>) {
     }
   });
 
-  // Supports application/x-www-form-urlencoded
+  // Supports application/x-www-form-urlencoded. The gem no longer sends it (render
+  // requests use RAW_RENDER_CONTENT_TYPE), but keep parsing it so a not-yet-upgraded
+  // gem in a rolling deploy still reaches the protocol/render path instead of failing
+  // with an unactionable 415 at the content-type layer.
   void app.register(fastifyFormbody);
   app.addHook('preParsing', (req, _res, payload, done) => {
     const contentLength = Number(req.headers['content-length']);
@@ -681,6 +760,10 @@ export default function run(config: Partial<Config>) {
     },
   });
 
+  app.addContentTypeParser(RAW_RENDER_CONTENT_TYPE, { parseAs: 'string' }, (_req, body, done) => {
+    done(null, body);
+  });
+
   // Ensure NDJSON bodies are not buffered and are available as a stream immediately
   app.addContentTypeParser('application/x-ndjson', (req, payload, done) => {
     // Pass through the raw stream; the route will consume req.raw
@@ -700,9 +783,31 @@ export default function run(config: Partial<Config>) {
       return;
     }
 
-    const precheckResult = performRequestPrechecks(req.body);
-    if (precheckResult) {
-      await setResponse(precheckResult, res);
+    let body: Record<string, unknown>;
+    if (req.headers['content-type']?.split(';', 1)[0] === RAW_RENDER_CONTENT_TYPE) {
+      const precheckResult = performRequestPrechecks(rawRenderPrecheckBody(req.headers));
+      if (precheckResult) {
+        await setResponse(precheckResult, res);
+        return;
+      }
+      const normalizedRequest = normalizeRawRenderRequest(req.body, req.headers);
+      if (normalizedRequest.error || !normalizedRequest.body) {
+        await setResponse(
+          badRequestResponseResult(normalizedRequest.error ?? 'Invalid raw render request.'),
+          res,
+        );
+        return;
+      }
+      body = normalizedRequest.body;
+    } else if (req.body && typeof req.body === 'object') {
+      body = req.body;
+      const precheckResult = performRequestPrechecks(body);
+      if (precheckResult) {
+        await setResponse(precheckResult, res);
+        return;
+      }
+    } else {
+      await setResponse(badRequestResponseResult('Invalid or missing request body.'), res);
       return;
     }
 
@@ -717,11 +822,6 @@ export default function run(config: Partial<Config>) {
     //   await delay(100000);
     // }
 
-    const { body } = req;
-    if (!body || typeof body !== 'object') {
-      await setResponse(badRequestResponseResult('Invalid or missing request body.'), res);
-      return;
-    }
     const { renderingRequest } = body;
     if (!isValidRenderingRequest(renderingRequest)) {
       await setResponse(badRequestResponseResult(invalidRenderingRequestMessage(body)), res);
@@ -1383,13 +1483,12 @@ export default function run(config: Partial<Config>) {
   });
 
   // Built-in, opt-in probe endpoints (enableHealthEndpoints config option).
-  // Like /info, they are plain GET routes outside the authenticated render and
-  // asset endpoints: orchestrator probes cannot carry the renderer password.
-  // Both intentionally return status-only bodies — no versions, paths, or
-  // license details — so leaving them reachable exposes nothing sensitive.
-  // NOTE: this listener speaks cleartext HTTP/2 (h2c), so HTTP/1.1-only probes
-  // (e.g. Kubernetes httpGet) cannot reach these routes. Use tcpSocket or exec
-  // probes (`curl --http2-prior-knowledge`). See
+  // They are plain GET routes outside the authenticated render and asset
+  // endpoints because orchestrator probes cannot carry the renderer password.
+  // Unlike /info above, both return status-only bodies with no version details.
+  // The listener uses cleartext HTTP/2 (h2c) by default. With
+  // fastifyServerOptions.http2 set to false, ordinary HTTP/1.1 probes can reach
+  // these routes. See
   // docs/oss/building-features/node-renderer/health-checks.md.
   if (enableHealthEndpoints) {
     // Liveness: 200 whenever this process can answer — i.e. the event loop is
@@ -1415,35 +1514,58 @@ export default function run(config: Partial<Config>) {
     // codeql[js/missing-rate-limiting]
     // lgtm[js/missing-rate-limiting]
     app.get('/ready', (_req, res) => {
-      if (hasAnyVMContext()) {
+      const ready = currentGenerationManifestPath ? isDeclaredCurrentGenerationReady() : hasAnyVMContext();
+      if (ready) {
         res.send({ status: 'ready' });
       } else {
         res
           .status(503)
           .header('Retry-After', String(READY_RETRY_AFTER_SECONDS))
-          .send({ status: 'waiting_for_bundle' });
+          .send({
+            status: currentGenerationManifestPath ? 'waiting_for_current_generation' : 'waiting_for_bundle',
+          });
       }
     });
   }
 
-  // In tests we will run worker in master thread, so we need to ensure server
-  // will not listen:
-  // we are extracting worker from cluster to avoid false TS error
+  // Integration hooks must be registered before Fastify boots during listen.
+  applyFastifyConfigWithHealthEndpointMigrationHint(app, enableHealthEndpoints);
+
+  // In tests we will run worker in master thread, so we need to ensure server will not listen.
+  // We are extracting worker from cluster to avoid false TS error.
   const { worker } = cluster;
   if (workersCount === 0 || cluster.isWorker) {
-    app.listen({ port, host }, (err, address) => {
-      if (err) {
-        handleStartupListenError({ err, host, port });
-        return;
-      }
-      const workerName = worker ? `worker #${worker.id}` : 'master (single-process)';
-      log.info({ workerName, address }, 'Node renderer listening');
+    let startupStage: 'prewarm' | 'listen' = currentGenerationManifestPath ? 'prewarm' : 'listen';
+    const listen = () => {
+      startupStage = 'listen';
+      return new Promise<void>((resolve, reject) => {
+        app.listen({ port, host }, (err, address) => {
+          if (err) {
+            reject(err);
+            return;
+          }
+          const workerName = worker ? `worker #${worker.id}` : 'master (single-process)';
+          log.info({ workerName, address }, 'Node renderer listening');
+          resolve();
+        });
+      });
+    };
+    const start = currentGenerationManifestPath
+      ? prewarmCurrentGenerationBeforeListen({
+          currentGenerationManifestPath,
+          serverBundleCachePath,
+          listen,
+        })
+      : listen();
+    void start.catch((error: unknown) => {
+      handleStartupListenError({
+        err: error instanceof Error ? error : new Error(String(error)),
+        host,
+        port,
+        stage: startupStage,
+      });
     });
   }
-
-  // Integration hooks registered before the worker loads are applied here, immediately after
-  // listen() is scheduled and before Fastify finishes booting.
-  applyFastifyConfigWithHealthEndpointMigrationHint(app, enableHealthEndpoints);
 
   return app;
 }

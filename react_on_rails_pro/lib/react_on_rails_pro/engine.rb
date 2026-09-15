@@ -79,9 +79,13 @@ module ReactOnRailsPro
         when :expired
           expiration = ReactOnRailsPro::LicenseValidator.license_expiration
           expired_on = expiration ? " (expired on #{expiration.strftime('%Y-%m-%d')})" : ""
-          log_license_issue("License has expired#{expired_on}", "Renew your license at #{LICENSE_URL}")
+          log_license_issue(
+            "License has expired#{expired_on}",
+            "Renew your license at #{LICENSE_URL}",
+            warn_outside_production: true
+          )
         when :invalid
-          log_license_issue("Invalid license", "Get a license at #{LICENSE_URL}")
+          log_license_issue("Invalid license", "Get a license at #{LICENSE_URL}", warn_outside_production: true)
         end
       end
 
@@ -109,7 +113,7 @@ module ReactOnRailsPro
 
         message += " Attribution required for this license type." if attribution_required
 
-        Rails.logger.info message
+        Rails.logger.debug message
       end
 
       def plan_display_name(plan)
@@ -126,15 +130,17 @@ module ReactOnRailsPro
         end
       end
 
-      def log_license_issue(issue, action)
+      def log_license_issue(issue, action, warn_outside_production: false)
         prefix = "[React on Rails Pro] #{issue}."
 
         if Rails.env.production?
           warning = "Production Use of React on Rails Pro requires a valid license. " \
                     "If this deployment is Production Use, #{action}"
           Rails.logger.warn "#{prefix} #{warning}"
+        elsif warn_outside_production
+          Rails.logger.warn "#{prefix} #{action}"
         else
-          Rails.logger.info "#{prefix} No license required for development/test environments."
+          Rails.logger.debug "#{prefix} No license required for development/test environments."
         end
       end
     end

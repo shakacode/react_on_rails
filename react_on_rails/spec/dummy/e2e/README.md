@@ -2,6 +2,17 @@
 
 This directory contains end-to-end tests using Playwright integrated with Rails via the `cypress-on-rails` gem.
 
+This is the repository's runnable reference for Rails-side app commands, scenarios, database reset, and Playwright
+browser contexts. Applications that need a separate Rails server plus an RSC node renderer should keep that runtime
+alive for the focused run and reuse these E2E on Rails responsibilities. See
+[System Specs for Streamed RSC Payloads](../../../../docs/pro/react-server-components/system-spec-streaming-rsc.md#choose-the-test-topology)
+for the Capybara-versus-Playwright decision and
+[E2E on Rails: Streamed and Multi-process Applications](https://e2eonrails.com/docs/STREAMING_AND_MULTI_PROCESS_APPS/)
+for the full external-runtime setup.
+
+The dummy app does not currently expose a streamed RSC route. Its examples demonstrate the test harness, not an
+RSC runtime. Use an application's existing RSC route and renderer commands when adapting the public guide.
+
 ## Quick Start
 
 ```bash
@@ -194,9 +205,11 @@ pnpm test:e2e:report
 5. **Test Hydration**: Ensure client-side hydration works correctly
 6. **Monitor Console**: Listen for console errors during tests
 7. **Scenarios for Complex Setup**: Create reusable scenarios for complex application states
+8. **Stable Multi-process Runtime**: Start Rails and auxiliary renderers once for a focused run, not around each
+   test or retry
 
 ## More Information
 
 - [Playwright Documentation](https://playwright.dev/)
 - [cypress-on-rails Gem](https://github.com/shakacode/cypress-on-rails)
-- [React on Rails Testing Guide](../../CLAUDE.md#playwright-e2e-testing)
+- [React on Rails Playwright E2E Testing Guide](../../../../.claude/docs/playwright-e2e-testing.md)

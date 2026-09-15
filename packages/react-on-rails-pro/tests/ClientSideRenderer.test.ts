@@ -18,7 +18,7 @@
  */
 
 import * as React from 'react';
-import { resetRailsContext } from 'react-on-rails/context';
+import { getRailsContext, resetRailsContext } from 'react-on-rails/context';
 import { supportsReact19RootErrorCallbacks } from 'react-on-rails/reactApis';
 import type { RailsContext, RendererFunction } from 'react-on-rails/types';
 import { resetRootErrorHandlers, setRootErrorHandlers } from 'react-on-rails/@internal/rootErrorHandlers';
@@ -133,6 +133,25 @@ describe('ClientSideRenderer', () => {
     expect(mockReactHydrateOrRender).toHaveBeenCalledTimes(1);
   });
 
+  it('uses replacement RailsContext for immediate hydration before page-loaded callbacks', async () => {
+    const receivedPathnames: Array<string | undefined> = [];
+    const TestRenderer: RendererFunction = (_props, railsContext, _domNodeId) => {
+      receivedPathnames.push(railsContext?.pathname);
+    };
+    ComponentRegistry.register({ TestComponent: TestRenderer });
+    addRailsContext({ pathname: '/posts/1' });
+    await renderOrHydrateComponent(setupTestComponentDom('page-one'));
+
+    unmountAll();
+    getRailsContext();
+    const contextElement = document.getElementById('js-react-on-rails-context');
+    if (!contextElement) throw new Error('Expected RailsContext element');
+    contextElement.textContent = JSON.stringify({ serverSide: false, rorPro: true, pathname: '/posts/2' });
+    await renderOrHydrateComponent(setupTestComponentDom('page-two'));
+
+    expect(receivedPathnames).toEqual(['/posts/1', '/posts/2']);
+  });
+
   it('does not cache a store renderer created before railsContext exists', async () => {
     const storeGenerator = jest.fn(() => ({ getState: () => ({}) }));
     StoreRegistry.register({ TestStore: storeGenerator });
@@ -176,6 +195,84 @@ describe('ClientSideRenderer', () => {
     } finally {
       getOrWaitForStoreSpy.mockRestore();
     }
+  });
+
+  // Issue #4861: the store_dependencies hydration gate across a soft navigation.
+  // unmountAll() is exactly what reactOnRailsPageUnloaded runs on turbo:before-render /
+  // turbolinks:before-render, so these tests drive the real page-unload teardown path.
+  describe('store_dependencies gate across page unload', () => {
+    // The suite-level hooks do not reset StoreRegistry; these tests register and hydrate
+    // stores, so reset both registries around each one to keep tests order-independent.
+    beforeEach(() => {
+      StoreRegistry.clearHydratedStores();
+      StoreRegistry.clearStoreGenerators();
+    });
+
+    afterEach(() => {
+      StoreRegistry.clearHydratedStores();
+      StoreRegistry.clearStoreGenerators();
+    });
+
+    const flushMicrotasks = () =>
+      new Promise((resolve) => {
+        setTimeout(resolve, 0);
+      });
+
+    function setupGatedComponentDom(domId: string): Element {
+      const componentSpec = setupTestComponentDom(domId);
+      componentSpec.setAttribute('data-store-dependencies', JSON.stringify(['SharedStore']));
+      return componentSpec;
+    }
+
+    it('control: blocks rendering while the store dependency is not hydrated', async () => {
+      ComponentRegistry.register({
+        TestComponent: ({ greeting }: { greeting: string }) => React.createElement('div', null, greeting),
+      });
+      StoreRegistry.register({ SharedStore: () => ({}) as never });
+      addRailsContext();
+      const componentSpec = setupGatedComponentDom('gated-dom-id');
+
+      void renderOrHydrateComponent(componentSpec);
+      await flushMicrotasks();
+
+      expect(mockReactHydrateOrRender).not.toHaveBeenCalled();
+
+      // Hydrating the depended-on store releases the gate.
+      await hydrateStore(setupTestStoreDom('SharedStore'));
+      await renderOrHydrateComponent(componentSpec);
+      expect(mockReactHydrateOrRender).toHaveBeenCalledTimes(1);
+    });
+
+    it('repro: blocks rendering on the next page even though the previous page hydrated the same store', async () => {
+      ComponentRegistry.register({
+        TestComponent: ({ greeting }: { greeting: string }) => React.createElement('div', null, greeting),
+      });
+      StoreRegistry.register({ SharedStore: () => ({}) as never });
+      addRailsContext();
+
+      // Page A: hydrate the store (its entry is what leaked across navigations pre-fix).
+      await hydrateStore(setupTestStoreDom('SharedStore'));
+      expect(StoreRegistry.stores().has('SharedStore')).toBe(true);
+
+      // Soft navigation: what reactOnRailsPageUnloaded runs on turbo:before-render.
+      unmountAll();
+      document.body.innerHTML = '';
+      addRailsContext();
+
+      // Page B: same setup as the control — identical DOM, store not yet hydrated.
+      const componentSpec = setupGatedComponentDom('gated-dom-id');
+      void renderOrHydrateComponent(componentSpec);
+      await flushMicrotasks();
+
+      // Pre-fix, page A's leftover registry entry satisfied the gate instantly and the
+      // component rendered against the previous page's store.
+      expect(mockReactHydrateOrRender).not.toHaveBeenCalled();
+
+      // Page B's own store hydration releases the gate.
+      await hydrateStore(setupTestStoreDom('SharedStore'));
+      await renderOrHydrateComponent(componentSpec);
+      expect(mockReactHydrateOrRender).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('treats page-unload store generator wait rejection as cancellation', async () => {

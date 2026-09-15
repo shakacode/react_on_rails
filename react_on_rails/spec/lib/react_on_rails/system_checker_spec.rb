@@ -234,6 +234,18 @@ RSpec.describe ReactOnRails::SystemChecker do
     end
   end
 
+  describe "#check_shakapacker_in_gemfile" do
+    it "pins the loaded Shakapacker version in the recovery command" do
+      allow(checker).to receive(:shakapacker_in_gemfile?).and_return(false)
+      allow(ReactOnRails::PackerUtils).to receive(:shakapacker_version).and_return("10.3.1")
+
+      checker.send(:check_shakapacker_in_gemfile)
+
+      warning = checker.messages.find { |message| message[:type] == :warning }
+      expect(warning[:content]).to include("bundle add shakapacker --version 10.3.1 --strict")
+    end
+  end
+
   describe "#check_webpack_configuration" do
     it "mentions custom assets_bundler_config_path when no bundler config is found" do
       allow(checker).to receive(:detect_bundler_config_path).and_return(nil)

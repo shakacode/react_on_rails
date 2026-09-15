@@ -18,7 +18,13 @@ import fs from 'fs';
 import fsPromises from 'fs/promises';
 import vm from 'vm';
 import { mkdirAsync, serverBundleCachePath, vmBundlePath, resetForTest, waitFor } from './helper';
-import { buildExecutionContext, hasVMContextForBundle, removeVM, resetVM } from '../src/worker/vm';
+import {
+  buildExecutionContext,
+  getVMPoolDiagnostics,
+  hasVMContextForBundle,
+  removeVM,
+  resetVM,
+} from '../src/worker/vm';
 import { buildConfig } from '../src/shared/configBuilder';
 import { isErrorRenderResult } from '../src/shared/utils';
 import log from '../src/shared/log';
@@ -1502,6 +1508,114 @@ describe('source-mapped stack traces for VM errors', () => {
 
     executionContext.release();
     expect(remapStackTrace(`Error: host\n    at boom (${bundlePath}:3:17)`)).toBeUndefined();
+  });
+
+  test('concurrent unique builds never expose a pool above the hard cap while active contexts stay safe', async () => {
+    buildConfig({
+      serverBundleCachePath: serverBundleCachePath(testName),
+      supportModules: true,
+      stubTimers: false,
+      maxVMPoolSize: 1,
+    });
+
+    const bundlePaths = await Promise.all(
+      Array.from({ length: 3 }, async (_unused, index) => {
+        const bundlePath = path.join(serverBundleCachePath(testName), `concurrent-${index}.js`);
+        return writeBundleAt(
+          bundlePath,
+          `${buildThrowingBundleSource()}\nglobal.bundleValue = 'bundle-${index}';\n` +
+            `${inlineSourceMapComment(buildThrowingBundleMap(path.basename(bundlePath)))}\n`,
+        );
+      }),
+    );
+    const retainedCountsAtBuildEvents: number[] = [];
+    const diagnosticCountsAtBuildEvents: number[] = [];
+    const debugSpy = jest.spyOn(log, 'debug').mockImplementation((payload) => {
+      if (
+        typeof payload === 'object' &&
+        payload !== null &&
+        'event' in payload &&
+        payload.event === 'vm_pool_context_built' &&
+        'retainedContexts' in payload &&
+        typeof payload.retainedContexts === 'number'
+      ) {
+        retainedCountsAtBuildEvents.push(payload.retainedContexts);
+        diagnosticCountsAtBuildEvents.push(getVMPoolDiagnostics().retainedContexts);
+      }
+    });
+
+    try {
+      const executionContext = await buildExecutionContext(bundlePaths, /* buildVmsIfNeeded */ true);
+
+      expect(retainedCountsAtBuildEvents).toHaveLength(3);
+      expect(Math.max(...retainedCountsAtBuildEvents)).toBeLessThanOrEqual(1);
+      expect(Math.max(...diagnosticCountsAtBuildEvents)).toBeLessThanOrEqual(1);
+      expect(getVMPoolDiagnostics()).toMatchObject({
+        retainedContexts: 1,
+        contextsBuilt: 3,
+        hardLimitEvictions: 2,
+      });
+
+      const renderResults = await Promise.all(
+        bundlePaths.map((bundlePath) => executionContext.runInVM('global.bundleValue', bundlePath)),
+      );
+      expect(renderResults).toEqual(['bundle-0', 'bundle-1', 'bundle-2']);
+
+      const errorResults = await Promise.all(
+        bundlePaths.map((bundlePath) => executionContext.runInVM('global.triggerSsrError()', bundlePath)),
+      );
+      errorResults.forEach((result) => {
+        expect(isErrorRenderResult(result)).toBe(true);
+        if (isErrorRenderResult(result)) {
+          expect(result.exceptionMessage).toContain(`${ORIGINAL_SOURCE}:2:3`);
+        }
+      });
+      const sourceMapRegistrations = new Map(
+        bundlePaths.map((bundlePath) => {
+          const registration = executionContext.getVMContext(bundlePath)?.sourceMapRegistration;
+          expect(registration).toBeDefined();
+          return [bundlePath, registration!] as const;
+        }),
+      );
+
+      const evictedBundlePaths = bundlePaths.filter((bundlePath) => !hasVMContextForBundle(bundlePath));
+      expect(evictedBundlePaths).toHaveLength(2);
+      evictedBundlePaths.forEach((bundlePath) => {
+        expect(
+          resolveOriginalPositionForRegistration(sourceMapRegistrations.get(bundlePath)!, bundlePath, 3, 17),
+        ).toMatchObject({ source: ORIGINAL_SOURCE, line: 2, column: 3 });
+      });
+
+      executionContext.release();
+      evictedBundlePaths.forEach((bundlePath) => {
+        expect(
+          resolveOriginalPositionForRegistration(sourceMapRegistrations.get(bundlePath)!, bundlePath, 3, 17),
+        ).toBeNull();
+      });
+      const pooledBundlePath = bundlePaths.find(hasVMContextForBundle);
+      expect(pooledBundlePath).toBeDefined();
+      if (pooledBundlePath) {
+        expect(
+          resolveOriginalPositionForRegistration(
+            sourceMapRegistrations.get(pooledBundlePath)!,
+            pooledBundlePath,
+            3,
+            17,
+          ),
+        ).toMatchObject({ source: ORIGINAL_SOURCE, line: 2, column: 3 });
+        removeVM(pooledBundlePath);
+        expect(
+          resolveOriginalPositionForRegistration(
+            sourceMapRegistrations.get(pooledBundlePath)!,
+            pooledBundlePath,
+            3,
+            17,
+          ),
+        ).toBeNull();
+      }
+    } finally {
+      debugSpy.mockRestore();
+    }
   });
 
   test('failed parallel VM builds release source maps retained by sibling builds that settle later', async () => {

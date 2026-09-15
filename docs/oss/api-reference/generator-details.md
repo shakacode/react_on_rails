@@ -242,7 +242,9 @@ rails generate react_on_rails:install --pro --typescript
 rails generate react_on_rails:install --pro --rspack
 ```
 
-The standalone Pro generator also modifies `config/webpack/serverWebpackConfig.js` (enables `libraryTarget: 'commonjs2'`, adds `extractLoader`, sets `target = 'node'`, changes exports to object style) and updates the import in `config/webpack/ServerClientOrBoth.js`. If your webpack configs use the legacy filename `generateWebpackConfigs.js`, the generator will rename it automatically.
+The standalone Pro generator upgrades `serverWebpackConfig.js` and its companion `ServerClientOrBoth.js` in the active `config/webpack/` or `config/rspack/` directory only when both files exactly match a supported current generated pair. It enables Pro server settings and updates the paired export/import shape. A supported pair can use the legacy companion filename `generateWebpackConfigs.js`; the generator keeps that filename without renaming it.
+
+Customized, unknown, unsupported historical, incomplete, or ambiguous pairs are left unchanged, including their paths. If the generator skips the pair, follow the [manual webpack/Rspack migration instructions](../../pro/upgrading-to-pro.md#complete-a-skipped-webpackrspack-migration-manually); rerunning it does not migrate these files.
 
 **Upgrading an existing React on Rails app to Pro:**
 

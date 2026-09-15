@@ -21,6 +21,17 @@ https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE
   <%= form_tag '/xhr_refresh', method: :get, remote: true, format: :js do %>
     <%= submit_tag 'Refresh', id: 'refresh', name: 'refresh' %>
   <% end %>
+  <%= javascript_tag nonce: true do %>
+    // Clear the previous cycle's post-swap marker the moment a new refresh request
+    // starts. rails-ujs fires ajax:send synchronously before xhr.send(), so the whole
+    // in-flight window is observable as "no data-refreshed" and a waiter can only
+    // match after THIS cycle's response (xhr_refresh.js.erb) sets it again. Clearing
+    // inside the response script would be useless: remove + set would run in one
+    // synchronous script evaluation, so the cleared state would never be observable.
+    document.addEventListener('ajax:send', function () {
+      document.getElementById('component-container').removeAttribute('data-refreshed');
+    });
+  <% end %>
 </div>
 <hr/>
 

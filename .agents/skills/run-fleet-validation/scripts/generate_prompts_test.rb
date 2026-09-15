@@ -3193,7 +3193,7 @@ class FleetValidationGeneratorTest < Minitest::Test
     assert_includes pack, "fallback_claim_repo: shakacode/react_on_rails"
     assert_includes pack, "adhoc:fleet-snapshot-RESOLVED_TAG"
     assert_includes pack, "Search the open `Release gate: react_on_rails X.Y.Z`"
-    assert_includes pack, "workflow=cpflow-review-app.yml, status_check=cpflow/review-app"
+    assert_includes pack, "workflow=.github/workflows/cpflow-deploy-review-app.yml, status_check=deploy / deploy"
     assert_includes pack, "one execution subagent for the assigned monorepo generator/install gate"
     assert_includes pack, "(cd react_on_rails && bundle exec rspec spec/react_on_rails/generators)"
     assert_includes pack, "create-react-on-rails-app@RESOLVED_NPM_VERSION fleet-standard --standard"
@@ -3273,6 +3273,35 @@ class FleetValidationGeneratorTest < Minitest::Test
       assert_operator index.index("Start prompt coordinator 1"), :<, index.index("[PREFLIGHT.md](PREFLIGHT.md)")
       assert_operator index.index("[PREFLIGHT.md](PREFLIGHT.md)"), :<, index.index("Start the remaining prompt coordinators")
       refute_includes index, "Start all 6 prompt coordinators simultaneously after the snapshot exists"
+    end
+  end
+
+  def test_index_closeout_command_targets_the_generated_pack_directory
+    Dir.mktmpdir do |root|
+      output_dir = File.join(root, "fleet pack")
+      build_generator.write_pack(output_dir)
+      index = File.read(File.join(output_dir, "INDEX.md"))
+
+      assert_includes index, "PACK_DIR=#{Shellwords.escape(output_dir)}"
+      assert_includes index, "bundle exec ruby .agents/skills/run-fleet-validation/scripts/validate_ledger.rb"
+      assert_includes index, '--ledger "$PACK_DIR/result-ledger.json"'
+      assert_includes index, '--render-tracker "$PACK_DIR/tracker-closeout.md"'
+    end
+  end
+
+  def test_index_closeout_command_anchors_a_relative_output_directory
+    Dir.mktmpdir do |root|
+      relative_output_dir = "fleet pack"
+      output_dir = File.join(File.realpath(root), relative_output_dir)
+      launch_dir = File.join(root, "closeout")
+      FileUtils.mkdir_p(launch_dir)
+
+      Dir.chdir(root) { build_generator.write_pack(relative_output_dir) }
+      index = File.read(File.join(output_dir, "INDEX.md"))
+      assignment = index.lines.find { |line| line.strip.start_with?("PACK_DIR=") }.strip
+      pack_dir = Shellwords.split(assignment.delete_prefix("PACK_DIR=")).fetch(0)
+
+      assert_equal output_dir, File.expand_path(pack_dir, launch_dir)
     end
   end
 

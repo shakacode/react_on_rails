@@ -572,6 +572,9 @@ For each hard-gate app PR:
 For the `react_on_rails` generator/install gate:
 
 ```bash
+# Generator specs run in the react_on_rails/ gem bundle (its Gemfile provides Rails).
+# Running them from the workspace root fails with `cannot load such file -- rails`,
+# because the root workspace bundle does not include Rails.
 (cd react_on_rails && bundle exec rspec spec/react_on_rails/generators)
 pnpm run build
 CREATE_ROR_SMOKE_SCOPE=oss packages/create-react-on-rails-app/scripts/smoke-test-local-gems.sh

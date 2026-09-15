@@ -14,8 +14,25 @@
  */
 
 import * as React from 'react';
-import { Suspense, useRef, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import RSCRoute, { type RSCRouteHandle } from 'react-on-rails-pro/RSCRoute';
+
+/**
+ * Invisible hydration gate for e2e tests. Place this INSIDE a Suspense
+ * boundary, as a sibling of RSCRoute. React commits siblings together,
+ * so this component's useEffect cannot fire until the boundary resolves
+ * and RSCRoute's useImperativeHandle (a layout effect) has assigned the
+ * ref. Tests wait for the data-hydrated attribute to confirm readiness.
+ *
+ * See https://github.com/shakacode/react_on_rails/issues/5045
+ */
+const HydrationMarker: React.FC<{ testId: string }> = ({ testId }) => {
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (ref.current) ref.current.dataset.hydrated = 'true';
+  }, []);
+  return <span ref={ref} data-testid={testId} hidden />;
+};
 
 const Section: React.FC<{ title: string; description?: string; children: React.ReactNode }> = ({
   title,
@@ -60,6 +77,7 @@ const ScenarioRefHandle: React.FC = () => {
       </button>
       {error ? <div style={{ color: 'red' }}>error: {error}</div> : null}
       <Suspense fallback={<div>loading…</div>}>
+        <HydrationMarker testId="stress-hydrated-scenario1" />
         <RSCRoute
           ref={ref}
           componentName="RefetchStressServerComponent"
@@ -110,6 +128,7 @@ const ScenarioMultiInstance: React.FC = () => {
         <div style={{ flex: 1 }}>
           <small>card A (has ref)</small>
           <Suspense fallback={<div>loading…</div>}>
+            <HydrationMarker testId="stress-hydrated-scenario3" />
             <RSCRoute
               ref={ref}
               componentName="RefetchStressServerComponent"
@@ -146,6 +165,7 @@ const ScenarioIndependentSiblings: React.FC = () => {
             Refresh left only
           </button>
           <Suspense fallback={<div>loading…</div>}>
+            <HydrationMarker testId="stress-hydrated-scenario4" />
             <RSCRoute
               ref={refLeft}
               componentName="RefetchStressServerComponent"
@@ -215,6 +235,7 @@ const ScenarioCapturedHandle: React.FC = () => {
         </button>
       </div>
       <Suspense fallback={<div>loading…</div>}>
+        <HydrationMarker testId="stress-hydrated-scenario5" />
         <RSCRoute
           ref={ref}
           componentName="RefetchStressServerComponent"
@@ -272,6 +293,7 @@ const ScenarioRapidClicks: React.FC = () => {
         {log.join('\n') || '(empty)'}
       </pre>
       <Suspense fallback={<div>loading…</div>}>
+        <HydrationMarker testId="stress-hydrated-scenario6" />
         <RSCRoute
           ref={ref}
           componentName="RefetchStressServerComponent"
@@ -313,6 +335,7 @@ const ScenarioManySiblings: React.FC = () => {
         {Array.from({ length: COUNT }).map((_, i) => (
           // eslint-disable-next-line react/no-array-index-key
           <Suspense key={i} fallback={<div>loading…</div>}>
+            {i === COUNT - 1 && <HydrationMarker testId="stress-hydrated-scenario7" />}
             <RSCRoute
               ref={(handle) => {
                 refs.current[i] = handle;
@@ -364,6 +387,7 @@ const ScenarioMountCycle: React.FC = () => {
       <span data-testid="mount-ref-state">ref.current: {refState}</span>
       {mounted ? (
         <Suspense fallback={<div>loading…</div>}>
+          <HydrationMarker testId="stress-hydrated-scenario8" />
           <RSCRoute
             ref={ref}
             componentName="RefetchStressServerComponent"

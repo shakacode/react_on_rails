@@ -96,6 +96,15 @@ function hasRenderingErrorSignal(renderingError: unknown) {
   return nonEmptyMetadataString(message) || nonEmptyMetadataString(stack);
 }
 
+function shouldEmitConsoleReplay(metadata: Record<string, unknown>, railsEnv?: string) {
+  // Console replay remains useful in development/test and for clean production chunks. On an
+  // error-bearing chunk, however, it can repeat the same server-only message or stack path that
+  // diagnostic metadata redacts, so unknown and production-like environments fail closed.
+  if (railsEnv === 'development' || railsEnv === 'test') return true;
+
+  return metadata.hasErrors !== true && !hasRenderingErrorSignal(metadata.renderingError);
+}
+
 function createRSCDiagnosticScript(
   metadata: Record<string, unknown>,
   cacheKey: string,
@@ -130,6 +139,12 @@ const LOADABLE_STATS_FILE_NAME = 'loadable-stats.json';
 const LOADABLE_STATS_INITIAL_READ_RETRY_DELAY_MS = 100;
 const LOADABLE_STATS_MAX_READ_RETRY_DELAY_MS = 30_000;
 const LOADABLE_STATS_UNEXPECTED_WARNING_INTERVAL_MS = LOADABLE_STATS_MAX_READ_RETRY_DELAY_MS;
+// The Node Renderer injects the host callback under this VM-global key. Keep its test probes in
+// packages/react-on-rails-pro-node-renderer/tests/vm.test.ts and
+// packages/react-on-rails-pro/tests/loadClientChunkStylesheetHrefs.test.ts in sync too.
+// MIRROR VALUES OF: packages/react-on-rails-pro-node-renderer/src/worker/vm.ts
+const LOADABLE_STATS_MISSING_DIAGNOSTIC_CONTEXT_KEY = '__reactOnRailsProReportMissingLoadableStats';
+// MIRROR VALUES END
 const RSC_CLIENT_STYLESHEET_INFERENCE_TIMEOUT_MS = 100;
 const STACK_FILE_LOCATION = /\(?((?:file:\/\/\/.+)|(?:\/.+)|(?:[A-Za-z]:[\\/].+)):\d+:\d+\)?\s*$/;
 
@@ -170,8 +185,16 @@ function isFileNotFoundError(error: unknown) {
   return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT';
 }
 
+function reportMissingLoadableStats(loadableStatsPath: string) {
+  const hostDiagnostic = Reflect.get(globalThis, LOADABLE_STATS_MISSING_DIAGNOSTIC_CONTEXT_KEY) as unknown;
+  if (typeof hostDiagnostic === 'function') hostDiagnostic(loadableStatsPath);
+}
+
 function warnIfUnexpectedLoadableStatsFailure(error: unknown, loadableStatsPath: string) {
-  if (isFileNotFoundError(error)) return;
+  if (isFileNotFoundError(error)) {
+    reportMissingLoadableStats(loadableStatsPath);
+    return;
+  }
 
   const warningKey = `${loadableStatsPath}\n${error instanceof Error ? `${error.name}:${error.message}` : String(error)}`;
   const nowMs = rscClientChunkStylesheetHrefsRetryClockMs();
@@ -2068,7 +2091,7 @@ export default function injectRSCPayload(
 
               // Emit console replay as a separate <script> tag (not inside the payload)
               const consoleScript = metadata.consoleReplayScript as string;
-              if (consoleScript) {
+              if (consoleScript && shouldEmitConsoleReplay(metadata, railsEnv)) {
                 rscPayloadBuffers.push(Buffer.from(createScriptTag(consoleScript, sanitizedNonce)));
               }
               // Primary flush is handled by React's flush() callback (see above).

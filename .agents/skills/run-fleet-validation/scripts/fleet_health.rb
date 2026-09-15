@@ -291,6 +291,8 @@ module FleetValidation
       shared_callers = repository_workflows.flat_map do |workflow|
         content = @client.content(repo, workflow.fetch("path"), ref: head)
         shared_smoke_callers(content).map { |caller| [workflow, caller] }
+      rescue MissingPublicContentError
+        []
       rescue StandardError => e
         discovery_errors << "#{workflow['path'] || 'unknown workflow'}: #{e.class}: #{e.message}"
         []
@@ -473,6 +475,7 @@ module FleetValidation
         workflow_evidence,
         run["html_url"],
         ("event=#{run['event']}" if run["event"]),
+        ("actor=#{run.dig('actor', 'login')}" if run.dig("actor", "login")),
         ("head_branch=#{run['head_branch']}" if run["head_branch"]),
         ("head_sha=#{run['head_sha']}" if run["head_sha"]),
         ("run_started_at=#{run['run_started_at']}" if run["run_started_at"]),
@@ -487,6 +490,12 @@ module FleetValidation
     end
 
     def review_run_identity_error(run, default_branch:, observed_at:)
+      actor = run["actor"]
+      unless actor.is_a?(Hash) && present_string?(actor["login"]) && present_string?(actor["type"])
+        return "run actor identity is unavailable"
+      end
+      return "run actor is a bot" if actor["type"] == "Bot" || actor["login"].end_with?("[bot]")
+
       return "event is not pull_request" unless run["event"] == "pull_request"
 
       pull_request = Array(run["pull_requests"]).find do |candidate|

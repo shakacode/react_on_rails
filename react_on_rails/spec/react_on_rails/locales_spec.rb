@@ -7,6 +7,7 @@ module ReactOnRails
     describe ".compile" do
       before do
         @original_output_format = ReactOnRails.configuration.i18n_output_format
+        allow(ReactOnRails.configuration).to receive_messages(i18n_dir: nil, i18n_yml_dir: nil)
       end
 
       after do
@@ -16,7 +17,7 @@ module ReactOnRails
       it "by default compiles to JSON" do
         ReactOnRails.configuration.i18n_output_format = nil
 
-        expect(ReactOnRails::Locales::ToJson).to receive(:new)
+        expect(ReactOnRails::Locales::ToJson).to receive(:new).and_call_original
 
         described_class.compile
       end
@@ -24,7 +25,7 @@ module ReactOnRails
       it "by compiles to JS when specified" do
         ReactOnRails.configuration.i18n_output_format = "js"
 
-        expect(ReactOnRails::Locales::ToJs).to receive(:new)
+        expect(ReactOnRails::Locales::ToJs).to receive(:new).and_call_original
 
         described_class.compile
       end
@@ -32,7 +33,7 @@ module ReactOnRails
       it "compiles to JSON" do
         ReactOnRails.configuration.i18n_output_format = "JSON"
 
-        expect(ReactOnRails::Locales::ToJson).to receive(:new)
+        expect(ReactOnRails::Locales::ToJson).to receive(:new).and_call_original
 
         described_class.compile
       end
@@ -40,7 +41,7 @@ module ReactOnRails
       it "passes force parameter to ToJson" do
         ReactOnRails.configuration.i18n_output_format = nil
 
-        expect(ReactOnRails::Locales::ToJson).to receive(:new).with(force: true)
+        expect(ReactOnRails::Locales::ToJson).to receive(:new).with(force: true).and_call_original
 
         described_class.compile(force: true)
       end
@@ -48,7 +49,7 @@ module ReactOnRails
       it "passes force parameter to ToJs" do
         ReactOnRails.configuration.i18n_output_format = "js"
 
-        expect(ReactOnRails::Locales::ToJs).to receive(:new).with(force: true)
+        expect(ReactOnRails::Locales::ToJs).to receive(:new).with(force: true).and_call_original
 
         described_class.compile(force: true)
       end

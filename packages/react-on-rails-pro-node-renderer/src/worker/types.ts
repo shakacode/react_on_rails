@@ -18,8 +18,15 @@ import {
   FastifyReply as LibFastifyReply,
   RouteGenericInterface,
 } from 'fastify';
-import { Http2Server } from 'http2';
+import type { Server as HttpServer } from 'http';
+import type { Http2Server } from 'http2';
 
-export type FastifyInstance = LibFastifyInstance<Http2Server>;
+export type RendererServer = HttpServer | Http2Server;
 
-export type FastifyReply = LibFastifyReply<RouteGenericInterface, Http2Server>;
+export type Http1FastifyInstance = LibFastifyInstance;
+
+export type Http2FastifyInstance = LibFastifyInstance<Http2Server>;
+
+export type FastifyInstance = LibFastifyInstance<RendererServer>;
+
+export type FastifyReply = LibFastifyReply<RouteGenericInterface, RendererServer>;

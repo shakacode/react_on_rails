@@ -1,0 +1,215 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Report whether explicitly selected PR checks completed after the PR merged.
+# This is a post-merge audit signal; selectors come from the consumer repo seam
+# or maintainer-provided replay scope, not from hardcoded shared-pack policy.
+
+require "json"
+require "open3"
+require "optparse"
+require "time"
+
+module PrCheckCompletionTiming
+  class Error < StandardError; end
+
+  module_function
+
+  def run(argv)
+    opts = parse_args(argv)
+    if opts[:help]
+      puts usage
+      return 0
+    end
+
+    pr_number = validate_pr!(opts[:pr])
+    repo = resolve_repo!(opts[:repo])
+    selectors = compile_selectors(opts)
+    result = assess(repo, pr_number, selectors)
+    puts JSON.pretty_generate(result)
+    0
+  rescue Error => e
+    warn "Error: #{e.message}"
+    1
+  end
+
+  def usage
+    <<~USAGE
+      Usage: pr-check-completion-timing <pr-number> [options]
+
+      Options:
+            --repo REPO              GitHub repo in OWNER/REPO form. Defaults to gh repo view.
+            --select-name REGEX      Select checks by check name. Repeatable.
+            --select-workflow REGEX  Select checks by workflow name. Repeatable.
+            --json                   Print JSON (default).
+        -h, --help                   Show this help.
+    USAGE
+  end
+
+  def parse_args(argv)
+    opts = { pr: nil, repo: nil, names: [], workflows: [], help: false }
+    parser = OptionParser.new do |parser_opts|
+      parser_opts.on("--repo REPO") { |repo| opts[:repo] = repo }
+      parser_opts.on("--select-name REGEX") { |regex| opts[:names] << regex }
+      parser_opts.on("--select-workflow REGEX") { |regex| opts[:workflows] << regex }
+      parser_opts.on("--json") { nil }
+      parser_opts.on("-h", "--help") { opts[:help] = true }
+    end
+    parser.order!(argv) do |arg|
+      raise Error, "unexpected extra argument: #{arg}" unless opts[:pr].nil?
+
+      opts[:pr] = arg
+    end
+    opts
+  rescue OptionParser::ParseError => e
+    raise Error, "#{e.message}\n\n#{usage}"
+  end
+
+  def validate_pr!(pr_number)
+    raise Error, "a positive integer PR number is required\n\n#{usage}" unless pr_number.to_s.match?(/\A[1-9]\d*\z/)
+
+    pr_number
+  end
+
+  REPO_FORMAT = %r{\A[^/\s]+/[^/\s]+\z}
+
+  def resolve_repo!(repo)
+    repo ||= capture_required!("gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner").strip
+    raise Error, "--repo must be in OWNER/REPO form (got: '#{repo}')" unless repo.match?(REPO_FORMAT)
+
+    repo
+  end
+
+  def compile_selectors(opts)
+    selectors = {
+      names: opts.fetch(:names).map { |pattern| Regexp.new(pattern) },
+      workflows: opts.fetch(:workflows).map { |pattern| Regexp.new(pattern) }
+    }
+    if selectors[:names].empty? && selectors[:workflows].empty?
+      raise Error, "at least one --select-name or --select-workflow selector is required"
+    end
+
+    selectors
+  rescue RegexpError => e
+    raise Error, "invalid selector regex: #{e.message}"
+  end
+
+  def assess(repo, pr_number, selectors)
+    pr = capture_json!("gh", "pr", "view", pr_number.to_s, "--repo", repo, "--json", "number,mergedAt")
+    merged_at_raw = pr.fetch("mergedAt", "").to_s
+    return unknown_result(pr_number, "PR has no mergedAt value") if merged_at_raw.empty?
+
+    merged_at = Time.iso8601(merged_at_raw)
+    rows = fetch_check_rows(repo, pr_number)
+    selected = rows.select { |row| selected?(row, selectors) }
+    if selected.empty?
+      reason = rows.empty? ? "no checks reported by GitHub" : "no selected checks matched"
+      return unknown_result(pr_number, reason, merged_at: merged_at_raw)
+    end
+
+    late = []
+    pending = []
+    failing = []
+    timing_unknown = []
+    selected.each do |row|
+      bucket = row.fetch("bucket", "").to_s
+      completed_at_raw = row.fetch("completedAt", "").to_s
+      summary = row_summary(row)
+      pending << summary if bucket == "pending"
+      failing << summary if %w[fail cancel].include?(bucket)
+      if completed_at_raw.empty?
+        timing_unknown << summary unless bucket == "pending" || %w[fail cancel].include?(bucket)
+        next
+      end
+
+      late << summary.merge("completed_at" => completed_at_raw) if Time.iso8601(completed_at_raw) > merged_at
+    end
+
+    {
+      "pr" => pr_number.to_i,
+      "verdict" => timing_verdict(late, pending, failing, timing_unknown),
+      "merged_at" => merged_at_raw,
+      "selected_count" => selected.length,
+      "late" => late,
+      "pending" => pending,
+      "failing" => failing,
+      "timing_unknown" => timing_unknown
+    }
+  rescue ArgumentError => e
+    unknown_result(pr_number, "invalid timestamp: #{e.message}")
+  end
+
+  def timing_verdict(late, pending, failing, timing_unknown)
+    return "SELECTED_CHECKS_FAILED" if failing.any?
+    return "LATE_SELECTED_CHECKS" if late.any?
+    return "SELECTED_CHECKS_PENDING" if pending.any?
+    return "UNKNOWN" if timing_unknown.any?
+
+    "NO_LATE_SELECTED_CHECKS"
+  end
+
+  def fetch_check_rows(repo, pr_number)
+    raw, err, status = Open3.capture3(
+      "gh", "pr", "checks", pr_number.to_s,
+      "--repo", repo,
+      "--json", "name,workflow,bucket,state,startedAt,completedAt,link"
+    )
+    if raw.strip.empty?
+      return [] if status.success? || err.match?(/no checks reported/i)
+
+      message = err.strip.lines.first.to_s
+      raise Error, "gh pr checks failed: #{message.empty? ? "exit #{status.exitstatus}" : message}"
+    end
+
+    data = JSON.parse(raw)
+    data.is_a?(Array) ? data : []
+  rescue JSON::ParserError => e
+    raise Error, "gh pr checks returned invalid JSON: #{e.message}"
+  end
+
+  def selected?(row, selectors)
+    name = row.fetch("name", "").to_s
+    workflow = row.fetch("workflow", "").to_s
+    selectors.fetch(:names).any? { |regex| regex.match?(name) } ||
+      selectors.fetch(:workflows).any? { |regex| regex.match?(workflow) }
+  end
+
+  def row_summary(row)
+    {
+      "name" => row.fetch("name", "").to_s,
+      "workflow" => row.fetch("workflow", "").to_s,
+      "bucket" => row.fetch("bucket", "").to_s,
+      "state" => row.fetch("state", "").to_s,
+      "url" => row.fetch("link", "").to_s
+    }
+  end
+
+  def unknown_result(pr_number, reason, merged_at: nil)
+    {
+      "pr" => pr_number.to_i,
+      "verdict" => "UNKNOWN",
+      "merged_at" => merged_at,
+      "selected_count" => 0,
+      "late" => [],
+      "pending" => [],
+      "failing" => [],
+      "timing_unknown" => [],
+      "reason" => reason
+    }
+  end
+
+  def capture_json!(*cmd)
+    JSON.parse(capture_required!(*cmd))
+  rescue JSON::ParserError => e
+    raise Error, "command returned invalid JSON: #{cmd.first(3).join(' ')} (#{e.message})"
+  end
+
+  def capture_required!(*cmd)
+    out, status = Open3.capture2(*cmd)
+    raise Error, "command failed: #{cmd.first(3).join(' ')}" unless status.success?
+
+    out.force_encoding("UTF-8")
+  end
+end
+
+exit(PrCheckCompletionTiming.run(ARGV)) if $PROGRAM_NAME == __FILE__

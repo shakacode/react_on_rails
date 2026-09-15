@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+[[ "$#" == 1 ]] || { echo "usage: $0 PATH" >&2; exit 64; }
+
+mode=""
+if stat --version >/dev/null 2>&1; then
+  mode="$(stat --format='%a' -- "$1")" || {
+    echo "cannot determine file permissions" >&2
+    exit 69
+  }
+else
+  mode="$(stat -f '%Lp' -- "$1")" || {
+    echo "cannot determine file permissions" >&2
+    exit 69
+  }
+fi
+[[ "$mode" =~ ^[0-7]{3,4}$ ]] || {
+  echo "unexpected file permission format" >&2
+  exit 69
+}
+printf '%s\n' "$mode"

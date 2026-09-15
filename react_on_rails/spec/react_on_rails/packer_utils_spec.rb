@@ -190,7 +190,7 @@ module ReactOnRails
 
       context "when precompile_hook points to a script file" do
         let(:hook_path) { "bin/shakapacker-precompile-hook" }
-        let(:script_full_path) { instance_double(Pathname) }
+        let(:script_full_path) { Pathname.new("/fake/rails/root").join(hook_path) }
         let(:rails_root) { instance_double(Pathname) }
 
         before do
@@ -272,7 +272,7 @@ module ReactOnRails
 
     describe ".hook_script_has_self_guard?" do
       let(:hook_path) { "bin/shakapacker-precompile-hook" }
-      let(:script_full_path) { instance_double(Pathname) }
+      let(:script_full_path) { Pathname.new("/fake/rails/root").join(hook_path) }
       let(:rails_root) { instance_double(Pathname) }
 
       before do

@@ -28,6 +28,10 @@ Additional helper:
   `$AGENT_WORKFLOWS_ROOT`, installed Codex or Claude skills, or finally
   `$HOME/src/agent-workflows`. Use it when a workflow needs a helper script from
   a shared skill without keeping duplicate local `SKILL.md` copies.
+- `agent-workflow-drift-manifest-test.rb --source-root <pinned-agent-workflows>`
+  verifies that `.agents/agent-workflow-drift.yml` covers every required file
+  and governed source prefix, with only the reviewed source-only exclusions.
+  Required CI runs it before the pinned source pack's content/mode drift checker.
 
 Non-command policy lives in [`../agent-workflow.yml`](../agent-workflow.yml).
 Workflow-specific checks such as `actionlint` and `yamllint .github/` stay in the

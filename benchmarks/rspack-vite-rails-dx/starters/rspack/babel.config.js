@@ -1,0 +1,37 @@
+// The source code including full typescript support is available at:
+// https://github.com/shakacode/react-on-rails-demo-ssr-hmr/blob/master/babel.config.js
+
+module.exports = function (api) {
+  const defaultConfigFunc = require('shakapacker/package/babel/preset.js');
+  const resultConfig = defaultConfigFunc(api);
+  const isProductionEnv = api.env('production');
+
+  const changesOnDefault = {
+    presets: [
+      [
+        '@babel/preset-react',
+        {
+          development: !isProductionEnv,
+          useBuiltIns: true,
+          runtime: 'automatic',
+        },
+      ],
+    ].filter(Boolean),
+    plugins: [
+      // Enable React Refresh (Fast Refresh) only when webpack-dev-server is running (HMR mode)
+      // This prevents React Refresh from trying to connect when using static compilation
+      !isProductionEnv && process.env.WEBPACK_SERVE && 'react-refresh/babel',
+      isProductionEnv && [
+        'babel-plugin-transform-react-remove-prop-types',
+        {
+          removeImport: true,
+        },
+      ],
+    ].filter(Boolean),
+  };
+
+  resultConfig.presets = [...resultConfig.presets, ...changesOnDefault.presets];
+  resultConfig.plugins = [...resultConfig.plugins, ...changesOnDefault.plugins];
+
+  return resultConfig;
+};

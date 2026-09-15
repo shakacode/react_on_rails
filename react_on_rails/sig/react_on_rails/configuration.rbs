@@ -1,38 +1,39 @@
 module ReactOnRails
   class Configuration
-    attr_accessor node_modules_location: String?
-    attr_accessor server_bundle_js_file: String
-    attr_accessor prerender: bool
-    attr_accessor replay_console: bool
+    attr_accessor node_modules_location: (String | Pathname)?
+    attr_accessor server_bundle_js_file: String?
+    attr_accessor prerender: bool?
+    attr_accessor replay_console: bool?
     attr_accessor trace: bool
     attr_accessor development_mode: bool
-    attr_accessor logging_on_server: bool
-    attr_accessor server_renderer_pool_size: Integer
-    attr_accessor server_renderer_timeout: Integer
-    attr_accessor raise_on_prerender_error: bool
-    attr_accessor generated_assets_dir: String
+    attr_accessor logging_on_server: bool?
+    attr_accessor server_renderer_pool_size: Integer?
+    attr_accessor server_renderer_timeout: Integer?
+    attr_accessor raise_on_prerender_error: bool?
+    attr_accessor generated_assets_dir: String?
     attr_accessor components_subdirectory: String?
     attr_accessor stores_subdirectory: String?
-    attr_accessor webpack_generated_files: Array[String]
+    attr_accessor webpack_generated_files: Array[String]?
     attr_accessor rendering_extension: String?
-    attr_accessor build_test_command: String
-    attr_accessor build_production_command: String
-    attr_accessor i18n_dir: String?
-    attr_accessor i18n_yml_dir: String?
-    attr_accessor i18n_output_format: Symbol?
+    attr_accessor build_test_command: String?
+    attr_accessor build_production_command: String?
+    attr_accessor i18n_dir: (String | Pathname)?
+    attr_accessor i18n_yml_dir: (String | Pathname)?
+    attr_accessor i18n_output_format: (String | Symbol)?
     attr_accessor i18n_yml_safe_load_options: Hash[Symbol, untyped]?
-    attr_accessor random_dom_id: bool
-    attr_accessor auto_load_bundle: bool
-    attr_accessor same_bundle_for_client_and_server: bool
+    attr_accessor random_dom_id: bool?
+    attr_accessor auto_load_bundle: bool?
+    attr_accessor same_bundle_for_client_and_server: bool?
     attr_accessor rendering_props_extension: String?
-    attr_accessor make_generated_server_bundle_the_entrypoint: bool
+    attr_accessor make_generated_server_bundle_the_entrypoint: bool?
     attr_accessor generated_component_packs_loading_strategy: Symbol?
-    attr_accessor component_registry_timeout: Integer
+    attr_accessor component_registry_timeout: Integer?
     attr_accessor server_bundle_output_path: String?
-    attr_accessor enforce_private_server_bundles: bool
+    attr_accessor enforce_private_server_bundles: bool?
+    attr_accessor check_database_on_dev_start: bool
 
     def initialize: (
-      ?node_modules_location: String?,
+      ?node_modules_location: (String | Pathname)?,
       ?server_bundle_js_file: String?,
       ?prerender: bool?,
       ?replay_console: bool?,
@@ -50,9 +51,9 @@ module ReactOnRails
       ?build_production_command: String?,
       ?generated_component_packs_loading_strategy: Symbol?,
       ?same_bundle_for_client_and_server: bool?,
-      ?i18n_dir: String?,
-      ?i18n_yml_dir: String?,
-      ?i18n_output_format: Symbol?,
+      ?i18n_dir: (String | Pathname)?,
+      ?i18n_yml_dir: (String | Pathname)?,
+      ?i18n_output_format: (String | Symbol)?,
       ?i18n_yml_safe_load_options: Hash[Symbol, untyped]?,
       ?random_dom_id: bool?,
       ?rendering_props_extension: String?,
@@ -61,7 +62,8 @@ module ReactOnRails
       ?auto_load_bundle: bool?,
       ?component_registry_timeout: Integer?,
       ?server_bundle_output_path: String?,
-      ?enforce_private_server_bundles: bool?
+      ?enforce_private_server_bundles: bool?,
+      ?check_database_on_dev_start: bool?
     ) -> void
 
     def setup_config_values: () -> void

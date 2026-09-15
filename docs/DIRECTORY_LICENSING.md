@@ -47,7 +47,7 @@ react_on_rails/ (monorepo root)
    - `react_on_rails_pro/react_on_rails_pro.gemspec`: `s.license = "LicenseRef-LICENSE"`
 
 2. **Package.json Files**:
-   - `packages/react-on-rails/package.json`: `"license": "SEE LICENSE IN LICENSE.md"` (MIT)
+   - `packages/react-on-rails/package.json`: `"license": "MIT"` with a package-local `LICENSE.md`
    - `packages/react-on-rails-pro/package.json`: `"license": "SEE LICENSE IN LICENSE.md"`
    - `packages/react-on-rails-pro-node-renderer/package.json`: `"license": "SEE LICENSE IN LICENSE.md"`
 

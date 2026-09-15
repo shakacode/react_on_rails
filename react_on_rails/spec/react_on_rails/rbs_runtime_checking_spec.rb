@@ -17,7 +17,7 @@ RSpec.describe "RBS Runtime Type Checking", type: :rbs do
       # violating a type signature and expecting RBS to catch it
       #
       # Type signature defined in: sig/react_on_rails/configuration.rbs
-      #   attr_accessor server_bundle_js_file: String
+      #   attr_accessor server_bundle_js_file: String?
       #
       # When RBS runtime checking is enabled via rakelib/run_rspec.rake, the
       # RBS::Test::Hook wraps all method calls to ReactOnRails classes and validates
@@ -27,7 +27,7 @@ RSpec.describe "RBS Runtime Type Checking", type: :rbs do
           server_bundle_js_file: 123 # Invalid: should be String, not Integer
         )
         config.server_bundle_js_file # Access to trigger type check
-      end.to raise_error(RBS::Test::Hook::TypeError)
+      end.to raise_error(RBS::Test::Tester::TypeError, /ArgumentTypeError/)
     end
 
     it "allows valid type assignments to configuration" do

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "yaml"
+require "json"
 require "fileutils"
 require "open3"
 require "shellwords"
@@ -100,10 +101,10 @@ RSpec.describe "Ruby version support" do
 
   # Only use this helper on workflows that hardcode `ruby-version` in steps. Matrix-driven
   # workflows store the unexpanded `${{ matrix.ruby-version }}` expression in that field.
-  def workflow_ruby_versions(path)
+  def workflow_ruby_versions(path, except_jobs: [])
     workflow = YAML.safe_load(read_repo_file(path), aliases: true)
 
-    workflow.fetch("jobs").values.flat_map do |job|
+    workflow.fetch("jobs").except(*except_jobs).values.flat_map do |job|
       # Jobs that call reusable workflows with `uses:` do not have their own steps.
       Array(job["steps"] || []).filter_map do |step|
         next unless ruby_setup_actions.include?(step["uses"])
@@ -111,6 +112,35 @@ RSpec.describe "Ruby version support" do
         step.dig("with", "ruby-version")
       end
     end
+  end
+
+  def run_workflow_step(run_script, env)
+    Dir.mktmpdir do |tmpdir|
+      github_output = File.join(tmpdir, "github-output")
+      stdout, stderr, status = Open3.capture3(
+        env.merge("GITHUB_OUTPUT" => github_output), "bash", "-c", run_script, chdir: repo_root
+      )
+
+      expect(status).to be_success, "#{stdout}\n#{stderr}"
+      File.read(github_output).lines.to_h { |line| line.strip.split("=", 2) }
+    end
+  end
+
+  def pro_ruby_matrix
+    workflow = YAML.safe_load(read_repo_file(".github/workflows/pro-test-package-and-gem.yml"), aliases: true)
+    matrix_step = workflow.fetch("jobs").fetch("detect-changes").fetch("steps")
+                          .find { |step| step["id"] == "set-ruby-matrix" }
+    latest_versions = tool_versions(".tool-versions")
+    minimum_versions = tool_versions(".minimum.tool-versions")
+    outputs = run_workflow_step(
+      matrix_step.fetch("run"),
+      {
+        "CURRENT_RUBY_VERSION" => latest_versions.fetch("ruby"),
+        "MINIMUM_RUBY_VERSION" => minimum_versions.fetch("ruby")
+      }
+    )
+
+    JSON.parse(outputs.fetch("matrix"))
   end
 
   it "uses the merge queue base SHA for merge_group change detection" do
@@ -235,8 +265,28 @@ RSpec.describe "Ruby version support" do
     expect(lint_ruby_versions).not_to be_empty
     expect(precompile_ruby_versions).to all(eq(expected_latest_ruby))
     expect(precompile_ruby_versions).not_to be_empty
-    expect(workflow_ruby_versions(".github/workflows/pro-test-package-and-gem.yml")).to all(eq(expected_minimum_ruby))
-    expect(read_repo_file(".github/workflows/pro-test-package-and-gem.yml")).not_to include("env.RUBY_VERSION")
+    pro_workflow_path = ".github/workflows/pro-test-package-and-gem.yml"
+    pro_workflow = YAML.safe_load(read_repo_file(pro_workflow_path), aliases: true)
+    pro_rspec_job = pro_workflow.fetch("jobs").fetch("rspec-gem-specs")
+    pro_non_matrix_ruby_versions = workflow_ruby_versions(pro_workflow_path, except_jobs: ["rspec-gem-specs"])
+
+    expect(pro_non_matrix_ruby_versions).to all(eq(expected_minimum_ruby))
+    expect(pro_non_matrix_ruby_versions).not_to be_empty
+    expect(pro_workflow.dig("jobs", "detect-changes", "outputs", "ruby_matrix"))
+      .to eq("${{ steps.set-ruby-matrix.outputs.matrix }}")
+    expect(pro_ruby_matrix).to eq(
+      "include" => [
+        { "ruby-version" => tool_versions(".tool-versions").fetch("ruby") },
+        { "ruby-version" => tool_versions(".minimum.tool-versions").fetch("ruby") }
+      ]
+    )
+    expect(pro_rspec_job.fetch("strategy")).to include(
+      "fail-fast" => false,
+      "matrix" => "${{ fromJson(needs.detect-changes.outputs.ruby_matrix) }}"
+    )
+    pro_rspec_setup = pro_rspec_job.fetch("steps").find { |step| step["uses"] == "./.github/actions/setup-bundle" }
+    expect(pro_rspec_setup.dig("with", "ruby-version")).to eq("${{ matrix.ruby-version }}")
+    expect(read_repo_file(pro_workflow_path)).not_to include("env.RUBY_VERSION")
 
     examples_workflow = read_repo_file(".github/workflows/examples.yml")
     playwright_workflow = read_repo_file(".github/workflows/playwright.yml")
@@ -253,7 +303,7 @@ RSpec.describe "Ruby version support" do
 
   it "documents and switches to Ruby 4.0 for the latest local CI configuration" do
     expect(read_repo_file("README.md")).to include("Ruby >= 3.3 (CI tested: 3.3 - 4.0)")
-    expect(read_repo_file("README.md")).to include("CI tested: 8.2.0 - 10.3.0")
+    expect(read_repo_file("README.md")).to include("CI tested: 8.2.0 - 10.3.1")
     expect(read_repo_file(".github/read-me.md")).to include("Only latest dependency versions (Ruby 4.0, Node 22)")
 
     ci_switch_config = read_repo_file("bin/ci-switch-config")
@@ -318,7 +368,7 @@ RSpec.describe "Ruby version support" do
     dependency_versions = tool_versions(".ci-dependency-versions")
     expect(dependency_versions.fetch("minimum-shakapacker")).to eq("8.2.0")
     expect(dependency_versions.fetch("minimum-react")).to eq("18.0.0")
-    expect(dependency_versions.fetch("latest-shakapacker")).to eq("10.3.0")
+    expect(dependency_versions.fetch("latest-shakapacker")).to eq("10.3.1")
     expect(dependency_versions.fetch("latest-react")).to eq("19.0.0")
     expect(ci_switch_config).to match(/set_ruby_version "\$LATEST_RUBY_VERSION"/)
     expect(ci_switch_config).to match(/set_node_version "\$LATEST_NODE_VERSION"/)
@@ -335,7 +385,7 @@ RSpec.describe "Ruby version support" do
     ci_rerun_failures = read_repo_file("bin/ci-rerun-failures")
     latest_job_description = [
       'JOB_VERSION_MAP["dummy-app-integration-tests (4.0, 22, latest)"]=',
-      '"Ruby 4.0, Node 22, Shakapacker 10.3.0, React 19"'
+      '"Ruby 4.0, Node 22, Shakapacker 10.3.1, React 19"'
     ].join
     expect(ci_rerun_failures).to include(latest_job_description)
 
@@ -344,7 +394,7 @@ RSpec.describe "Ruby version support" do
     expect(switching_guide).to include("Restore `.tool-versions` from `.maximum.tool-versions`")
 
     expect(read_repo_file(".claude/docs/replicating-ci-failures.md")).to include(
-      "Ruby 4.0, Node 22, Shakapacker 10.3.0, React 19"
+      "Ruby 4.0, Node 22, Shakapacker 10.3.1, React 19"
     )
     # Exact table spacing is intentional: keeps the Markdown column padding in sync.
     expect(read_repo_file("internal/contributor-info/ci-optimization.md")).to include(

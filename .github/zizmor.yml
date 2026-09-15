@@ -51,8 +51,6 @@ rules:
       - bundle-size.yml:23
       - check-markdown-links.yml:34
       - check-markdown-links.yml:70
-      - claude-code-review.yml:17
-      - claude.yml:25
       - codeql.yml:24
       - playwright.yml:79
   dependabot-cooldown:
@@ -109,8 +107,6 @@ rules:
       - bundle-size.yml:129
       - check-markdown-links.yml:37
       - check-markdown-links.yml:80
-      - claude-code-review.yml:24
-      - claude.yml:32
       - dummy-app-bundler-tests.yml:46
       - dummy-app-bundler-tests.yml:160
       - examples.yml:154

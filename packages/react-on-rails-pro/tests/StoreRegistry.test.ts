@@ -141,4 +141,46 @@ describe('StoreRegistry', () => {
       /Could not find hydrated store registered with name Missing/,
     );
   });
+
+  // Issue #4861: hydrated stores are per-page data and must not survive a soft navigation,
+  // while registered store generators are code and must survive (bundles stay loaded).
+  describe('clearHydratedStoresKeepingWaiters', () => {
+    it('drops hydrated stores so getOrWaitForStore waits instead of resolving with the previous page store', async () => {
+      const pageOneStore = createStore();
+      StoreRegistry.setStore('SharedStore', pageOneStore);
+
+      StoreRegistry.clearHydratedStoresKeepingWaiters();
+
+      expect(StoreRegistry.stores().size).toBe(0);
+
+      // The wait must now resolve only with the NEW page's store, not page one's.
+      const waitingForStore = StoreRegistry.getOrWaitForStore('SharedStore');
+      const pageTwoStore = createStore();
+      StoreRegistry.setStore('SharedStore', pageTwoStore);
+
+      await expect(waitingForStore).resolves.toBe(pageTwoStore);
+    });
+
+    it('keeps registered store generators intact', () => {
+      StoreRegistry.register({ SharedStore: storeGenerator });
+      StoreRegistry.setStore('SharedStore', createStore());
+
+      StoreRegistry.clearHydratedStoresKeepingWaiters();
+
+      expect(StoreRegistry.getStoreGenerator('SharedStore')).toBe(storeGenerator);
+    });
+
+    it('leaves pending waiters untouched so the page-unload rejection handling stays in charge', async () => {
+      const pendingStore = StoreRegistry.getOrWaitForStore('SharedStore');
+
+      StoreRegistry.clearHydratedStoresKeepingWaiters();
+
+      // The waiter must still be resolvable — CallbackRegistry's own page-unload handler is
+      // responsible for rejecting waiters, and the two unload callbacks run in either order.
+      const hydratedStore = createStore();
+      StoreRegistry.setStore('SharedStore', hydratedStore);
+
+      await expect(pendingStore).resolves.toBe(hydratedStore);
+    });
+  });
 });
