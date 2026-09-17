@@ -24,11 +24,9 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
-### [17.1.0.rc.5] - 2026-09-13
+### [17.1.0] - 2026-09-16
 
 No user-visible changes since 17.1.0.rc.4; this candidate completes publication after the partial RC4 release.
-
-### [17.1.0.rc.4] - 2026-09-12
 
 #### Fixed
 
@@ -42,31 +40,15 @@ No user-visible changes since 17.1.0.rc.4; this candidate completes publication 
   [RSC RC4 release](https://github.com/shakacode/react_on_rails_rsc/releases/tag/19.3.0-rc.4).
   [PR 5066](https://github.com/shakacode/react_on_rails/pull/5066) by
   [justin808](https://github.com/justin808).
-
-### [17.1.0.rc.3] - 2026-09-11
-
-#### Fixed
-
-- **[Pro] RSC 19.3 release-candidate compatibility and generated defaults**: Generated RSC apps now pin
-  `react-on-rails-rsc@19.3.0-rc.3` with React/React DOM `~19.2.8`, bringing the JSX/TSX client-export
-  parsing and Rspack shared-chunk fixes into the 17.1 RC soak. RC3 also restores stylesheet hints
-  when Webpack or Rspack scope-hoists CSS-bearing client-reference trees into concatenated modules.
-  Doctor and the Node Renderer accept
-  this qualified RC tuple while preserving stable RSC 19.2.x >=19.2.1 with stable React 19.2.x >=19.2.7.
-  Nonqualified RSC-package prereleases and unsupported React minors remain rejected. The Node Renderer
-  now explicitly rejects React/React DOM prereleases, including apps using stable RSC 19.2.1.
-  **Action required:** use matching supported stable React/React DOM versions, and upgrade the Pro gem/npm
-  packages together before adopting this RSC RC. A `"use client"`
-  file without runtime ES-module exports now fails the build instead of silently disappearing.
-  Standalone RSC generators also warn about React prereleases instead of discarding their version suffix.
-  See [Issue 4958](https://github.com/shakacode/react_on_rails/issues/4958) and
-  [RSC release notes](https://github.com/shakacode/react_on_rails_rsc/releases/tag/19.3.0-rc.3).
+- **[Pro] RSC 19.3 prerelease compatibility**: The 17.1 series adds JSX/TSX client-export parsing,
+  Rspack shared-chunk fixes, and stylesheet hints when Webpack or Rspack scope-hoists CSS-bearing
+  client-reference trees into concatenated modules. Generated apps use the RC4 tuple described above.
+  Doctor and the Node Renderer accept this qualified tuple while preserving stable RSC 19.2.x >=19.2.1
+  with stable React 19.2.x >=19.2.7. Nonqualified RSC-package prereleases and unsupported React minors
+  remain rejected. The Node Renderer explicitly rejects React/React DOM prereleases, including apps using
+  stable RSC 19.2.1, and standalone RSC generators warn about React prereleases instead of discarding their
+  version suffix. See [Issue 4958](https://github.com/shakacode/react_on_rails/issues/4958).
   [PR 5026](https://github.com/shakacode/react_on_rails/pull/5026) by [justin808](https://github.com/justin808).
-
-### [17.1.0.rc.2] - 2026-09-02
-
-#### Fixed
-
 - **[Pro]** **Prerender-cached streamed renders now hydrate on every request**: The automatic prerender cache key
   deliberately ignores random dom ids so one cached render serves every mount point, but the cached
   chunks still embedded the first request's dom id in their React Server Component payload keys.
@@ -74,11 +56,6 @@ No user-visible changes since 17.1.0.rc.4; this candidate completes publication 
   byte-identical. Cached streams are now rebound to the dom id of the render being served. Fixes
   [Issue 4984](https://github.com/shakacode/react_on_rails/issues/4984). [PR 4987](https://github.com/shakacode/react_on_rails/pull/4987) by
   [justin808](https://github.com/justin808).
-
-### [17.1.0.rc.1] - 2026-08-28
-
-#### Fixed
-
 - **Release failures now provide supervised, reason-specific recovery**: `script/release --evaluate-head`
   supports strict exact-HEAD CI evaluation for both preview and live retries, foreign claims identify the available
   holder/task/session metadata and targeted status command, and npm readiness distinguishes stale dependencies,
@@ -92,11 +69,6 @@ No user-visible changes since 17.1.0.rc.4; this candidate completes publication 
   and the macOS 27 liveness fix. Fixes
   [Issue 4947](https://github.com/shakacode/react_on_rails/issues/4947). [PR 4948](https://github.com/shakacode/react_on_rails/pull/4948) by
   [justin808](https://github.com/justin808).
-
-### [17.1.0.rc.0] - 2026-08-23
-
-#### Fixed
-
 - **[Pro]** **Expected Node Renderer cold starts no longer emit OpenTelemetry error spans**: The
   `ror.bundle.build_execution_context` cache-first probe previously ended with status ERROR when a worker had not
   compiled a bundle's VM context yet, even though the normal cache-miss path then rendered successfully. The probe
@@ -3257,13 +3229,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.1.0.rc.5...main
-[17.1.0.rc.5]: https://github.com/shakacode/react_on_rails/compare/v17.1.0.rc.4...v17.1.0.rc.5
-[17.1.0.rc.4]: https://github.com/shakacode/react_on_rails/compare/v17.1.0.rc.3...v17.1.0.rc.4
-[17.1.0.rc.3]: https://github.com/shakacode/react_on_rails/compare/v17.1.0.rc.2...v17.1.0.rc.3
-[17.1.0.rc.2]: https://github.com/shakacode/react_on_rails/compare/v17.1.0.rc.1...v17.1.0.rc.2
-[17.1.0.rc.1]: https://github.com/shakacode/react_on_rails/compare/v17.1.0.rc.0...v17.1.0.rc.1
-[17.1.0.rc.0]: https://github.com/shakacode/react_on_rails/compare/v17.0.1...v17.1.0.rc.0
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.1.0...main
+[17.1.0]: https://github.com/shakacode/react_on_rails/compare/v17.0.1...v17.1.0
 [17.0.1]: https://github.com/shakacode/react_on_rails/compare/v17.0.0...v17.0.1
 [17.0.0]: https://github.com/shakacode/react_on_rails/compare/v16.6.0...v17.0.0
 [16.6.0]: https://github.com/shakacode/react_on_rails/compare/v16.5.1...v16.6.0
