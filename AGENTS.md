@@ -735,6 +735,11 @@ Score from a `10/10` baseline: all checks complete, expected skips explained, ch
 
 ### Release-Train Branching And Phase Gating
 
+> **Shaka migration:** Shaka now owns release-task orchestration and PR-level serialization. The
+> publication command does not use `agent-coord`, release-line claims, heartbeats, or `AGENT_COORD_*`
+> credentials. Any legacy release-line lease instructions later in this section or the linked runbook
+> are superseded for publication. `script/release` retains local process-group and liveness fencing.
+
 Releases use a release-train branching model. Full mechanics (cut, stabilize, forward-port, promote, close out) live in [`internal/contributor-info/release-train-runbook.md`](internal/contributor-info/release-train-runbook.md). The rules an agent must follow:
 
 - **`main` never freezes.** It stays in the `beta` phase and keeps absorbing batch work the whole time.

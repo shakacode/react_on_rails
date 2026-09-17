@@ -127,6 +127,11 @@ flowchart TD
 
 ### Serialize every release-line write
 
+> **Migration note (2026-09-16):** use Shaka to serialize release PR work. The
+> `agent-coord` lease commands in this legacy section are no longer prerequisites
+> for `script/release` and must not be used to block publication. The wrapper now
+> provides process-local supervision only.
+
 Before running **any** step below that creates, updates, tags, promotes, or
 deletes `release/X.Y.Z`, acquire the canonical release-line coordination lease
 and hold it through that write. This includes release-branch creation, every RC
@@ -143,8 +148,8 @@ gates and is not an alternative.
 
 #### Normal publication path
 
-The publication wrapper owns this coordination for a normal maintainer. Prepare
-and commit the next non-empty version section immediately after
+The Shaka task owns orchestration for a normal maintainer; the publication
+wrapper owns only its local process group. Prepare and commit the next non-empty version section immediately after
 `### [Unreleased]`, then run:
 
 ```bash

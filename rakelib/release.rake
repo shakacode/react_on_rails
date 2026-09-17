@@ -323,7 +323,7 @@ end
 def release_write_fence!(operation)
   ReleaseLeaseGuard.fence!
 rescue ReleaseLeaseGuard::LeaseError => e
-  abort "❌ Release lease fence failed before #{operation}: #{e.message}"
+  abort "❌ Release supervisor fence failed before #{operation}: #{e.message}"
 end
 
 def release_paths(monorepo_root)
@@ -3095,7 +3095,7 @@ def validate_supervised_release_version_after_pull!(monorepo_root:, selected_ver
     after `git pull --rebase`, or its selected section is now empty.
 
     No publication has started. Review the refreshed changelog and rerun `script/release`
-    so its release-line claim and supervised contract bind the refreshed version.
+    so its supervised contract binds the refreshed version.
   ERROR
 end
 
@@ -3369,10 +3369,9 @@ end
 def release_line_legacy_live_prompt_warning(release_branch:)
   <<~WARNING.chomp
     ⚠️ LEGACY LIVE RELEASE-LINE PATH
-    Answering yes will create and push #{release_branch} without the release-line lease.
+    Answering yes will create and push #{release_branch} outside the Shaka PR workflow.
     This remains technically possible only for backward compatibility and violates current repository release policy.
-    Operators and agents must answer no and follow the individually guarded procedure in
-    internal/contributor-info/release-train-runbook.md.
+    Operators and agents must answer no and prepare the release branch through a reviewed PR.
   WARNING
 end
 
@@ -8824,11 +8823,12 @@ end
 
 def release_compound_live_boundary_guidance
   <<~GUIDANCE.chomp
-    Live release uses only `script/release`, which selects the prepared CHANGELOG.md version, acquires the
-    matching release-line lease, and performs fresh authoritative fences before every outward write. Direct
+    Live release uses only `script/release`, which selects the prepared CHANGELOG.md version, supervises one
+    dedicated process group, and verifies its local liveness contract before every outward write. Direct
     live Rake is refused without its private supervisor contract; use `bundle exec rake
-    "release[VERSION,true]"` only for an explicit internal preview. See
-    internal/contributor-info/release-train-runbook.md for automation compatibility and recovery procedures.
+    "release[VERSION,true]"` only for an explicit internal preview. Cross-agent coordination belongs to the
+    Shaka workflow that prepares the release PR, not to the publication command. See
+    internal/contributor-info/release-train-runbook.md for the release sequence and recovery procedures.
   GUIDANCE
 end
 
@@ -9967,11 +9967,11 @@ Preview the exact version, for example `bundle exec rake \"release[16.2.0.rc.1,t
 command from a prerelease checkout fails closed instead of inferring promotion to the stable version.
 
 Live release entry point: `script/release`. It reads the first prepared version after
-`### [Unreleased]`, acquires the matching release-line claim under a fresh process UUID, and
-supervises this task with fresh authoritative per-write lease fences.
+`### [Unreleased]`, starts a dedicated process group, and supervises this task with fresh
+process-local liveness fences before outward writes.
 Direct live `bundle exec rake release[...]` is refused without that private wrapper contract;
 use Rake directly only with `dry_run=true`. See internal/contributor-info/release-train-runbook.md
-for one-time machine setup, automation compatibility, recovery, and the supervised reconciliation path.
+for Shaka orchestration, recovery, and the supervised reconciliation path.
 
 This will update and release:
   PUBLIC (npmjs.org + rubygems.org):

@@ -822,10 +822,9 @@ Before running the release command, verify:
    required" section when this release has or needs one. See `AGENTS.md` → "Changelog" → "Helper signature
    changes" and "Action-required placement".
 
-2. **One-time coordination setup**: Load `AGENT_COORD_API_URL`, the secret
-   `AGENT_COORD_API_TOKEN`, and a stable `AGENT_COORD_MACHINE_ID` from private
-   shell/dotfile configuration; ensure `~/.local/bin` is on `PATH`; then run
-   `script/release --doctor`. Never commit or print the token.
+2. **Local release setup**: Run `script/release --doctor`. It validates the
+   publishing tools used by the locally supervised release; no coordination
+   backend credentials are required.
 
 3. **GitHub CLI**: Run `gh auth login` and ensure your account/token has write access to the repository (required for automatic GitHub release creation)
 
@@ -945,27 +944,20 @@ a fresh code; all printed OTP values remain redacted.
 
 ### If Release Fails
 
+`script/release` is locally supervised and has no `agent-coord` lease to retain
+or reacquire. Coordinate the recovery through the Shaka release task and keep
+the existing branch, tag, and registry identity checks below.
+
 If the release fails partway through (e.g., during NPM publish):
 
-1. Stop the compound helper and keep the release-line lease. Do not delete or move tags, rewrite the
+1. Stop the compound helper. Do not delete or move tags, rewrite the
    release branch, rerun publication, or manually publish missing packages.
 2. Check what was published with read-only registry queries:
    - NPM: `npm view react-on-rails@X.Y.Z`
    - RubyGems: `gem list react_on_rails -r -a`
 3. Record the exact branch tip, local and remote tag identity, published artifact set, and helper output.
 4. Follow [Partial-publication recovery](release-train-runbook.md#partial-publication-recovery). Resume only through
-   `script/release` after the supervisor has acquired the required claim and the artifact evidence is exact; if lease state
-   or any remote/artifact identity is `UNKNOWN`, remain stopped.
-
-If the wrapper cannot clean up its managed release-line lease, it prints the
-exact `script/release-claim --release ...` command followed by the restart
-command. First prove that every process group reported by the failed release is
-dead. Then run the printed release command from the repository root with the
-release-machine coordination environment loaded. Do not edit or reconstruct its
-agent ID, instance ID, repository, or target arguments. The command is fenced to
-that exact lease and safely refuses a replacement lease. See
-[Recover a retained publication lease](release-train-runbook.md#recover-a-retained-publication-lease)
-for the complete procedure.
+   `script/release` after the artifact evidence is exact; if any remote/artifact identity is `UNKNOWN`, remain stopped.
 
 ## Version History
 
