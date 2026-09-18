@@ -147,6 +147,11 @@ when "sleep"
   end
   File.open(log, "a") { |file| file.puts "sleeping" }
   sleep 30
+when "prompt"
+  print "Proceed with release? [y/N] "
+  answer = $stdin.gets
+  File.open(log, "a") { |file| file.puts "answer:#{answer&.chomp}" }
+  exit(answer == "y\n" ? 0 : 9)
 else
   abort "unknown TEST_BUNDLE_MODE"
 end
@@ -195,6 +200,31 @@ start_live_headless() {
   wrapper_pid=$!
 }
 
+run_live_in_pty() {
+  TEST_CASE_REPO="${fake_repo}" TEST_CASE_OUTPUT="${output_log}" ruby -rpty -rtimeout -e '
+    output = +""
+    status = nil
+    PTY.spawn(File.join(ENV.fetch("TEST_CASE_REPO"), "script", "release"), chdir: ENV.fetch("TEST_CASE_REPO")) do |reader, writer, pid|
+      begin
+        Timeout.timeout(10) do
+          until output.include?("Proceed with release? [y/N] ")
+            output << reader.readpartial(1024)
+          end
+          writer.write("y\n")
+          loop { output << reader.readpartial(1024) }
+        end
+      rescue EOFError, Errno::EIO
+        _, status = Process.wait2(pid)
+      ensure
+        Process.kill("KILL", pid) unless status
+        Process.wait(pid) unless status
+        File.write(ENV.fetch("TEST_CASE_OUTPUT"), output)
+      end
+    end
+    exit(status&.exitstatus || 1)
+  '
+}
+
 setup_case doctor-without-agent-coord
 run_release --doctor || fail "release doctor failed without agent-coord"
 assert_contains "${output_log}" "Release machine doctor: PASS"
@@ -241,6 +271,13 @@ assert_not_contains "${bundle_log}" "agent_id"
 assert_not_contains "${bundle_log}" "machine_id"
 assert_contains "${output_log}" "completed with status 0"
 pass "live publication uses only the local supervisor contract"
+
+setup_case interactive-terminal-handoff
+export TEST_BUNDLE_MODE="prompt"
+run_live_in_pty || fail "interactive release could not read confirmation from its terminal"
+assert_contains "${bundle_log}" "answer:y"
+assert_contains "${output_log}" "completed with status 0"
+pass "interactive publication hands terminal input to the release process group"
 
 setup_case live-failure-status
 export TEST_BUNDLE_MODE="failure"
