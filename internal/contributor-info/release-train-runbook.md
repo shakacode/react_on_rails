@@ -136,6 +136,21 @@ GitHub branch protection, expected-head checks, and the merge queue serialize
 remote branch updates. `script/release` provides process-local supervision for
 publication. It does not use an external coordination lease.
 
+Set the release version once in the coordinator shell for the command examples
+below. The branch name is derived from that value; no per-run identity or lease
+variables are required:
+
+```bash
+RELEASE_VERSION="${RELEASE_VERSION_INPUT:?set the exact X.Y.Z release version}"
+[[ "${RELEASE_VERSION}" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || {
+  echo "release version must be X.Y.Z; stop" >&2
+  return 1 2>/dev/null || exit 1
+}
+RELEASE_BRANCH="release/${RELEASE_VERSION}"
+readonly RELEASE_VERSION RELEASE_BRANCH
+export RELEASE_VERSION RELEASE_BRANCH
+```
+
 #### Normal publication path
 
 The Shaka task owns orchestration for a normal maintainer; the publication
@@ -461,9 +476,8 @@ unfenced command safe.
 ### 1. Cut the RC onto `release/X.Y.Z`
 
 Do this when maintainers decide `main` is feature-complete for the target and want to start stabilizing.
-Acquire the release-line writer lease above before Step 1a, keep its heartbeat
-live while waiting for CI, and rerun `require_live_release_line_lease`
-immediately before the branch push and again before every RC cut or re-spin.
+Keep Step 1 in the single Shaka release-coordinator task. Refetch and recheck the
+exact remote refs immediately before every branch push and RC cut or re-spin.
 
 Starting a release line is two steps with a CI run between them — cutting the branch and tagging rc.0
 **cannot** be one command. The release CI gate evaluates the branch tip, and a freshly pushed
@@ -493,7 +507,6 @@ After the dry-run succeeds, create the branch from an explicitly refreshed
 git fetch --prune origin "+refs/heads/main:refs/remotes/origin/main"
 # Cut from the exact main commit you intend to stabilize.
 git switch -c "release/${RELEASE_VERSION}" origin/main
-require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
 git push \
   --force-with-lease="refs/heads/release/${RELEASE_VERSION}:" \
   -u origin "release/${RELEASE_VERSION}:refs/heads/release/${RELEASE_VERSION}"
@@ -713,17 +726,13 @@ above; when there are multiple selections, serialize the sequence:
      echo "release version must be X.Y.Z; stop backport" >&2
      return 1 2>/dev/null || exit 1
    fi
-   test "${BACKPORT_RELEASE_VERSION}" = "${RELEASE_VERSION}" || {
-     echo "backport release version must equal held release-line lease version ${RELEASE_VERSION}; stop backport" >&2
-     return 1 2>/dev/null || exit 1
-   }
    jq -en --arg branch "${BACKPORT_RELEASE_BRANCH}" \
      '$branch | test("^release/[0-9]+\\.[0-9]+\\.[0-9]+$")' >/dev/null || {
      echo "backport target is not an exact release/X.Y.Z branch; stop backport" >&2
      return 1 2>/dev/null || exit 1
    }
-   test "${BACKPORT_RELEASE_BRANCH}" = "release/${RELEASE_VERSION}" || {
-     echo "backport target must equal release/${RELEASE_VERSION}; stop backport" >&2
+   test "${BACKPORT_RELEASE_BRANCH}" = "release/${BACKPORT_RELEASE_VERSION}" || {
+     echo "backport target must equal release/${BACKPORT_RELEASE_VERSION}; stop backport" >&2
      return 1 2>/dev/null || exit 1
    }
    ruby -e '
@@ -808,7 +817,6 @@ above; when there are multiple selections, serialize the sequence:
      echo "source audit is missing, UNKNOWN, stale, or not clean; stop backport" >&2
      return 1 2>/dev/null || exit 1
    }
-   require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
    backport_merge_result="$(
      gh api graphql \
        -f query='mutation(
@@ -951,14 +959,14 @@ Merge every source-change PR and the dedicated changelog PR synchronously from
 the release coordinator's shell after its exact-head gates pass. Set
 `CLOSEOUT_MERGE_METHOD=REBASE` for a source-change PR and `SQUASH` for the
 dedicated changelog PR. Do not use auto-merge or a merge queue here: neither
-rechecks the release-line lease immediately before the write, and a queued
-merge can land a different head. Record both the head OID and base OID covered
+preserves this exact-head, exact-base synchronous workflow, and a queued merge
+can land a different head. Record both the head OID and base OID covered
 by validation and review. The mutation binds the head with `expectedHeadOid`;
 the base comparisons below are fail-closed preflight checks because GitHub's
 merge mutation has no expected-base argument:
 
-Both merge methods require `CLOSEOUT_RELEASE_VERSION` to match the canonical
-lease version. A `REBASE` additionally binds one full source release SHA to the
+Both merge methods require an explicit `CLOSEOUT_RELEASE_VERSION`. A `REBASE`
+additionally binds one full source release SHA to the
 fetched canonical release ref, the current `origin/main` forward-port plan, and
 the PR's single commit plus direct provenance footer. A `SQUASH` binds its
 source changelog OID to the latest `CHANGELOG.md` commit on that same fetched
@@ -978,10 +986,6 @@ if [[ ! "${CLOSEOUT_RELEASE_VERSION}" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[
   echo "closeout release version must be X.Y.Z; stop closeout" >&2
   return 1 2>/dev/null || exit 1
 fi
-test "${CLOSEOUT_RELEASE_VERSION}" = "${RELEASE_VERSION}" || {
-  echo "closeout release version must equal held release-line lease version ${RELEASE_VERSION}; stop closeout" >&2
-  return 1 2>/dev/null || exit 1
-}
 if [[ ! "${CLOSEOUT_VALIDATED_HEAD_OID}" =~ ^[0-9a-f]{40}$ ]] ||
    [[ ! "${CLOSEOUT_VALIDATED_BASE_OID}" =~ ^[0-9a-f]{40}$ ]]; then
   echo "validated closeout head and base must be lowercase 40-character SHAs; stop closeout" >&2
@@ -1110,7 +1114,6 @@ test "$(git rev-parse "${closeout_main_ref}^{commit}")" = "${CLOSEOUT_VALIDATED_
   echo "origin/main differs from the validated base; stop closeout" >&2
   return 1 2>/dev/null || exit 1
 }
-require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
 if [ "${CLOSEOUT_MERGE_METHOD}" = "SQUASH" ]; then
   closeout_merge_result="$(
     gh api graphql \
@@ -1270,9 +1273,10 @@ planning the next source-change PR or the final changelog PR.
 
 When the hard gates pass for a specific RC, promote **that** RC. Do not re-cut from `main`.
 
-Acquire or renew the release-line writer lease before promotion, keep its
-heartbeat live through publication, and rerun `require_live_release_line_lease`
-immediately before the release task writes the final version commit and tag.
+Keep promotion in the single Shaka release-coordinator task. Immediately before
+publication, refetch the release branch and confirm the exact accepted head;
+`script/release` then supervises the local publisher through the final version
+commit and tag.
 
 Before promotion, fetch `origin/main` and repeat the retained-source audit from
 the backport workflow. Enumerate every main-origin backport retained in the
@@ -1362,11 +1366,9 @@ evidence and maintainer sign-off; it must not become a global skip of CI, ShakaP
 
 ### 5. Close out the release line
 
-Acquire or renew the release-line writer lease before closeout and hold it
-through guarded branch deletion. Refresh its heartbeat during the read-only
-checks, and rerun `require_live_release_line_lease` immediately before every
-remote ref transaction. Release the lease only after closeout and phase clear
-are durable.
+Keep closeout in the single Shaka release-coordinator task through guarded
+branch deletion. Refetch and recheck the expected refs immediately before every
+remote transaction, and finish only after closeout and phase clear are durable.
 
 Before running the closeout helper, fetch `origin/main` and repeat the
 retained-source audit. If a retained backport's main origin was reverted,
@@ -1390,8 +1392,9 @@ source recreation rejects that cleanup transaction and leaves recovery available
 stable version-bump, merge, or rollback item that was inspected and intentionally required no source
 PR. For a legacy authoritative changelog PR without embedded source-SHA provenance, also pass
 `--ack-final-changelog-source <current-source-changelog-sha>`. Because the helper cannot refresh the
-canonical coordination lease immediately before each remote transaction, normal mode remains blocked
-until `release-finish` itself receives the lifetime/per-write contract. Preview with `--dry-run`:
+expected remote refs immediately before each transaction, normal mode remains
+blocked until `release-finish` itself receives that per-write contract. Preview
+with `--dry-run`:
 
 ```bash
 git fetch origin
@@ -1445,7 +1448,6 @@ test "$(git rev-parse origin/main)" = "${checked_main_sha}"
 test "$(git rev-parse "origin/release/${RELEASE_VERSION}")" = "${checked_source_sha}"
 release_ref="refs/heads/release/${RELEASE_VERSION}"
 recovery_ref="refs/heads/release-finish-recovery/${RELEASE_VERSION}-${checked_source_sha:0:12}"
-require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
 git push --atomic \
   --force-with-lease="${release_ref}:${checked_source_sha}" \
   --force-with-lease="${recovery_ref}:" \
@@ -1465,7 +1467,6 @@ if git ls-remote --exit-code --heads -- origin "release/${RELEASE_VERSION}" >/de
   exit 1
 fi
 if test "$(git rev-parse origin/main)" != "${checked_main_sha}"; then
-  require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
   git push --atomic \
     --force-with-lease="${release_ref}:" \
     --force-with-lease="${recovery_ref}:${checked_source_sha}" \
@@ -1475,7 +1476,6 @@ if test "$(git rev-parse origin/main)" != "${checked_main_sha}"; then
   echo "main changed; release branch restored — rerun close-out" >&2
   exit 1
 fi
-require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
 git push --atomic \
   --force-with-lease="${release_ref}:" \
   --force-with-lease="${recovery_ref}:${checked_source_sha}" \
@@ -1507,7 +1507,7 @@ audited manual path instead:
      return 1 2>/dev/null || exit 1
    fi
    test "${SELECTIVE_CLOSEOUT_RELEASE_VERSION}" = "${RELEASE_VERSION}" || {
-     echo "selective closeout version must equal held release-line lease version ${RELEASE_VERSION}; stop selective closeout" >&2
+     echo "selective closeout version must equal coordinator release version ${RELEASE_VERSION}; stop selective closeout" >&2
      return 1 2>/dev/null || exit 1
    }
    PLAN_FILE="${PLAN_FILE:?set a durable path for release-tracker plan evidence}"
@@ -1891,10 +1891,6 @@ audited manual path instead:
      -m "Final-plan-sha256: ${FINAL_PLAN_SHA256}" \
      -m "Omitted-picks-sha256: ${OMITTED_PICKS_SHA256}" || {
      echo "could not create the closeout evidence tag" >&2
-     return 1 2>/dev/null || exit 1
-   }
-   require_live_release_line_lease || {
-     echo "release-line lease unavailable or UNKNOWN; stop selective closeout" >&2
      return 1 2>/dev/null || exit 1
    }
    git push --atomic \

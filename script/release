@@ -2,7 +2,6 @@
 # frozen_string_literal: true
 
 require "json"
-require "English"
 require "io/wait"
 require "open3"
 require "optparse"
@@ -679,7 +678,11 @@ class ReleaseSupervisor
   def signal_termination_target(signal, pgid, child_pid:, signal_direct_child:)
     # A controlling-terminal read can stop the release child before shutdown begins.
     signal_group("CONT", pgid)
-    signal_group(signal, pgid)
+    begin
+      signal_group(signal, pgid)
+    rescue Errno::EPERM
+      nil
+    end
     signal_child(signal, child_pid) if signal_direct_child
   end
 
