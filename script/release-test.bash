@@ -47,11 +47,28 @@ wait_for_log() {
 wait_for_group_exit() {
   local pgid="$1"
   local attempt
+  local group_status
   for attempt in $(seq 1 100); do
     ! kill -0 -- "-${pgid}" 2>/dev/null && return 0
+    if group_has_live_members "${pgid}"; then
+      :
+    else
+      group_status=$?
+      test "${group_status}" -eq 1 && return 0
+    fi
     sleep 0.05
   done
   return 1
+}
+
+group_has_live_members() {
+  local pgid="$1"
+  local process_table
+  process_table="$(ps -eo pgid=,stat=)" || return 2
+  awk -v expected_pgid="${pgid}" '
+    $1 == expected_pgid && $2 !~ /^Z/ { live = 1 }
+    END { exit live ? 0 : 1 }
+  ' <<<"${process_table}"
 }
 
 setup_case() {
