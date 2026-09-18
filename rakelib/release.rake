@@ -311,6 +311,13 @@ RELEASE_FINALIZATION_METADATA_PATHS = [
   "react_on_rails_pro/spec/dummy/Gemfile.lock",
   "react_on_rails_pro/spec/execjs-compatible-dummy/Gemfile.lock"
 ].freeze
+RELEASE_RETRY_OPERATIONAL_PATH_PREFIXES = [
+  "internal/contributor-info/",
+  "rakelib/release",
+  "react_on_rails/spec/react_on_rails/release_",
+  "script/release"
+].freeze
+RELEASE_RETRY_OPERATIONAL_PATHS = ["AGENTS.md"].freeze
 SHAKAPERF_RUNTIME_TREE_IGNORED_PATHS = (RELEASE_FINALIZATION_METADATA_PATHS + ["CHANGELOG.md"]).freeze
 
 # Helper methods for release-specific tasks
@@ -3665,6 +3672,13 @@ def release_tag_retry_state(monorepo_root:, release_tag:, head_sha:, current_bra
 
   return :remote if local_tag_sha == head_sha
 
+  if tag_type == "stable" && release_tag_retry_metadata_only_ancestor?(
+    monorepo_root:, tag_sha: local_tag_sha, candidate_sha: head_sha
+  )
+    puts "ℹ️ Stable tag #{release_tag} precedes metadata-only release commits; preserving the immutable tag for retry."
+    return :remote_metadata
+  end
+
   abort <<~ERROR
     ❌ #{retry_label} is already tagged at a different commit.
 
@@ -3732,11 +3746,11 @@ def preflight_explicit_accelerated_rc_target_tag!(monorepo_root:, target_gem_ver
 end
 
 def remote_release_tag_retry?(retry_state)
-  retry_state == :remote
+  %i[remote remote_metadata].include?(retry_state)
 end
 
 def release_tag_at_current_head?(retry_state)
-  %i[local remote].include?(retry_state)
+  %i[local remote remote_metadata].include?(retry_state)
 end
 
 def stable_release_retry_for_current_head?(monorepo_root:, current_branch:, current_checkout_version:,
@@ -5040,13 +5054,46 @@ def create_accelerated_rc_tag!(monorepo_root:, tag:, record:)
   )
 end
 
-def validate_release_tag_candidate_sha!(monorepo_root:, tag:, candidate_sha:)
+def validate_release_tag_candidate_sha!(monorepo_root:, tag:, candidate_sha:, allow_metadata_only_ancestor: false)
   tag_sha = peeled_git_tag_sha(monorepo_root:, tag:)
-  unless tag_sha == candidate_sha
-    abort "❌ Release tag #{tag} is not bound to the explicitly validated release candidate SHA."
+  return tag_sha if tag_sha == candidate_sha
+
+  if allow_metadata_only_ancestor && release_tag_retry_metadata_only_ancestor?(
+    monorepo_root:, tag_sha:, candidate_sha:
+  )
+    puts "ℹ️ Release tag #{tag} precedes metadata-only release commits; preserving its immutable candidate SHA."
+    return tag_sha
   end
 
-  tag_sha
+  abort "❌ Release tag #{tag} is not bound to the explicitly validated release candidate SHA."
+end
+
+def release_tag_retry_metadata_only_ancestor?(monorepo_root:, tag_sha:, candidate_sha:)
+  return false if tag_sha.nil? || tag_sha == candidate_sha
+
+  return false unless rc_tag_ancestor?(monorepo_root:, tag_sha:, head_sha: candidate_sha)
+
+  commit_shas_after_rc_tag!(monorepo_root:, tag_sha:, head_sha: candidate_sha).all? do |sha|
+    release_branch_non_runtime_commit?(monorepo_root:, sha:) ||
+      release_tag_retry_operational_commit?(monorepo_root:, sha:)
+  end
+end
+
+def release_tag_retry_operational_commit?(monorepo_root:, sha:)
+  output, status = Open3.capture2e(
+    "git", "-C", monorepo_root, "diff-tree", "--no-commit-id", "--name-only", "-r", "#{sha}^", sha
+  )
+  return false unless status.success?
+
+  paths = output.lines.map(&:strip).reject(&:empty?)
+  paths.any? && paths.all? { |path| release_tag_retry_operational_path?(path) }
+rescue StandardError
+  false
+end
+
+def release_tag_retry_operational_path?(path)
+  RELEASE_RETRY_OPERATIONAL_PATHS.include?(path) ||
+    RELEASE_RETRY_OPERATIONAL_PATH_PREFIXES.any? { |prefix| path.start_with?(prefix) }
 end
 
 def create_release_tag_at_candidate_sha!(monorepo_root:, tag:, candidate_sha:)
@@ -5059,14 +5106,17 @@ def create_release_tag_at_candidate_sha!(monorepo_root:, tag:, candidate_sha:)
   validate_release_tag_candidate_sha!(monorepo_root:, tag:, candidate_sha:)
 end
 
-def validate_release_candidate_publication_boundary!(monorepo_root:, tag:, candidate_sha:, phase:)
+def validate_release_candidate_publication_boundary!(monorepo_root:, tag:, candidate_sha:, phase:,
+                                                     allow_metadata_only_ancestor: false)
   head_sha = current_git_sha!(monorepo_root, context: "release #{phase}")
   unless head_sha == candidate_sha
     abort "❌ Local HEAD moved away from the validated release candidate before #{phase}; " \
           "refusing to continue."
   end
 
-  validate_release_tag_candidate_sha!(monorepo_root:, tag:, candidate_sha:)
+  validate_release_tag_candidate_sha!(
+    monorepo_root:, tag:, candidate_sha:, allow_metadata_only_ancestor:
+  )
 end
 
 def abort_malformed_remote_release_tag!(tag:, phase:)
@@ -5163,9 +5213,17 @@ def valid_accelerated_rc_tag_object_identity?(identity)
     identity[:provenance]["candidate_sha"] == identity[:candidate_sha]
 end
 
-def validate_remote_release_tag_candidate_sha!(monorepo_root:, tag:, candidate_sha:, phase:)
+def validate_remote_release_tag_candidate_sha!(monorepo_root:, tag:, candidate_sha:, phase:,
+                                               allow_metadata_only_ancestor: false)
   remote_sha = remote_release_tag_candidate_sha!(monorepo_root:, tag:, phase:)
   return remote_sha if remote_sha == candidate_sha
+
+  if allow_metadata_only_ancestor && release_tag_retry_metadata_only_ancestor?(
+    monorepo_root:, tag_sha: remote_sha, candidate_sha:
+  )
+    puts "ℹ️ Remote release tag #{tag} precedes metadata-only release commits; preserving its immutable candidate SHA."
+    return remote_sha
+  end
 
   abort "❌ Remote release tag #{tag} moved away from the validated release candidate before #{phase}; " \
         "refusing to continue."
@@ -5483,7 +5541,8 @@ def validate_final_promotion_source_rc_tag_boundary!(
   abort "❌ Final promotion source RC tag #{source_rc_tag} moved before #{phase}; refusing to continue."
 end
 
-def ensure_release_tag_for_candidate!(monorepo_root:, tag:, candidate_sha:, tag_authorization:)
+def ensure_release_tag_for_candidate!(monorepo_root:, tag:, candidate_sha:, tag_authorization:,
+                                      allow_metadata_only_ancestor: false)
   tag_exists = system(
     "git", "-C", monorepo_root, "rev-parse", "--verify", "--quiet", "refs/tags/#{tag}",
     out: File::NULL, err: File::NULL
@@ -5492,7 +5551,9 @@ def ensure_release_tag_for_candidate!(monorepo_root:, tag:, candidate_sha:, tag_
     if tag_authorization
       validate_existing_accelerated_rc_tag!(monorepo_root:, tag:, record: tag_authorization)
     else
-      validate_release_tag_candidate_sha!(monorepo_root:, tag:, candidate_sha:)
+      validate_release_tag_candidate_sha!(
+        monorepo_root:, tag:, candidate_sha:, allow_metadata_only_ancestor:
+      )
     end
     puts "Git tag #{tag} already exists, skipping tag creation"
   elsif tag_authorization
@@ -5511,19 +5572,34 @@ def validate_ordinary_shakaperf_boundary!(monorepo_root:, contexts:, phase:)
   )
 end
 
+def ordinary_shakaperf_contexts(association:, waiver:)
+  { association:, waiver: }
+end
+
+def validate_release_tag_package_publication_boundary!(monorepo_root:, tag:, candidate_sha:, shakaperf_contexts:,
+                                                       allow_metadata_only_ancestor:)
+  validate_release_candidate_publication_boundary!(
+    monorepo_root:, tag:, candidate_sha:, phase: "package publication", allow_metadata_only_ancestor:
+  )
+  validate_remote_release_tag_candidate_sha!(
+    monorepo_root:, tag:, candidate_sha:, phase: "package publication", allow_metadata_only_ancestor:
+  )
+  validate_ordinary_shakaperf_boundary!(monorepo_root:, contexts: shakaperf_contexts, phase: "package publication")
+end
+
 def push_release_tag_for_candidate!(monorepo_root:, tag:, candidate_sha:, accelerated_publication_record: nil,
                                     accelerated_boundary_record: nil, accelerated_final_promotion_context: nil,
                                     ordinary_stable_shakaperf_association_context: nil,
                                     ordinary_stable_shakaperf_waiver_context: nil)
-  shakaperf_contexts = {
-    association: ordinary_stable_shakaperf_association_context,
-    waiver: ordinary_stable_shakaperf_waiver_context
-  }
+  shakaperf_contexts = ordinary_shakaperf_contexts(
+    association: ordinary_stable_shakaperf_association_context, waiver: ordinary_stable_shakaperf_waiver_context
+  )
   boundary_context = accelerated_repository_boundary_context!(
     accelerated_publication_record:, accelerated_boundary_record:
   )
   boundary_record = boundary_context.fetch(:record)
   tag_authorization = boundary_context.fetch(:tag_authorization)
+  allow_metadata_only_ancestor = !release_prerelease_version?(parse_release_tag_to_gem_version(tag))
   identity_anchors = final_promotion_publication_identity_anchors(accelerated_final_promotion_context)
   validate_final_promotion_context!(
     boundary_record:, context: accelerated_final_promotion_context, candidate_sha:,
@@ -5534,13 +5610,14 @@ def push_release_tag_for_candidate!(monorepo_root:, tag:, candidate_sha:, accele
     monorepo_root:, record: boundary_record, final_promotion_context: accelerated_final_promotion_context,
     candidate_sha:, identity_anchors:, phase: "tag handling"
   )
-  ensure_release_tag_for_candidate!(monorepo_root:, tag:, candidate_sha:, tag_authorization:)
+  ensure_release_tag_for_candidate!(monorepo_root:, tag:, candidate_sha:, tag_authorization:,
+                                    allow_metadata_only_ancestor:)
   validate_accelerated_tag_publication_phase!(
     monorepo_root:, record: boundary_record, final_promotion_context: accelerated_final_promotion_context,
     candidate_sha:, identity_anchors:, phase: "git tag push"
   )
   validate_release_candidate_publication_boundary!(
-    monorepo_root:, tag:, candidate_sha:, phase: "git tag push"
+    monorepo_root:, tag:, candidate_sha:, phase: "git tag push", allow_metadata_only_ancestor:
   )
   validate_ordinary_shakaperf_boundary!(monorepo_root:, contexts: shakaperf_contexts, phase: "git tag push")
   release_write_fence!("push release tag #{tag}")
@@ -5549,13 +5626,9 @@ def push_release_tag_for_candidate!(monorepo_root:, tag:, candidate_sha:, accele
     monorepo_root:, record: boundary_record, final_promotion_context: accelerated_final_promotion_context,
     candidate_sha:, identity_anchors:, phase: "package publication"
   )
-  validate_release_candidate_publication_boundary!(
-    monorepo_root:, tag:, candidate_sha:, phase: "package publication"
+  validate_release_tag_package_publication_boundary!(
+    monorepo_root:, tag:, candidate_sha:, shakaperf_contexts:, allow_metadata_only_ancestor:
   )
-  validate_remote_release_tag_candidate_sha!(
-    monorepo_root:, tag:, candidate_sha:, phase: "package publication"
-  )
-  validate_ordinary_shakaperf_boundary!(monorepo_root:, contexts: shakaperf_contexts, phase: "package publication")
 end
 
 def validate_existing_accelerated_rc_tag!(monorepo_root:, tag:, record:)
