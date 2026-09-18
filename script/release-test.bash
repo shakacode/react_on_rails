@@ -128,6 +128,7 @@ when "sleep"
     File.open(log, "a") { |file| file.puts "signal:TERM" }
     exit 143
   end
+  File.open(log, "a") { |file| file.puts "sleeping" }
   sleep 30
 else
   abort "unknown TEST_BUNDLE_MODE"
@@ -235,7 +236,7 @@ pass "release child failures propagate through the supervisor"
 setup_case signal-cleanup
 export TEST_BUNDLE_MODE="sleep"
 start_live_headless
-wait_for_log "${bundle_log}" "start:" || fail "release child did not start"
+wait_for_log "${bundle_log}" "sleeping" || fail "release child did not become ready"
 process_group="$(awk -F: '/^start:/ { print $3; exit }' "${bundle_log}")"
 kill -TERM "${wrapper_pid}"
 set +e
@@ -251,7 +252,7 @@ pass "signals terminate the supervised release process group"
 setup_case supervisor-death-cleanup
 export TEST_BUNDLE_MODE="sleep"
 start_live_headless
-wait_for_log "${bundle_log}" "start:" || fail "release child did not start"
+wait_for_log "${bundle_log}" "sleeping" || fail "release child did not become ready"
 process_group="$(awk -F: '/^start:/ { print $3; exit }' "${bundle_log}")"
 kill -KILL "${wrapper_pid}"
 set +e

@@ -127,24 +127,14 @@ flowchart TD
 
 ### Serialize every release-line write
 
-> **Migration note (2026-09-16):** use Shaka to serialize release PR work. The
-> `agent-coord` lease commands in this legacy section are no longer prerequisites
-> for `script/release` and must not be used to block publication. The wrapper now
-> provides process-local supervision only.
+Use one Shaka task as the release coordinator. Before creating or updating a
+release PR, search for existing release-targeted tasks, pull requests, and remote
+branches. Reuse the active lane or wait until it reaches a terminal state. Chain
+dependent work in Shaka so only one release-line mutation is ready at a time.
 
-Before running **any** step below that creates, updates, tags, promotes, or
-deletes `release/X.Y.Z`, acquire the canonical release-line coordination lease
-and hold it through that write. This includes release-branch creation, every RC
-cut or re-spin, release-first fixes, backports from `main`, changelog and metadata
-PRs, final promotion, and branch deletion. The lease is an `agent-coord` claim
-in `shakacode/react_on_rails` whose target is exactly `release-line:X.Y.Z` (for
-example, `release-line:17.0.0`). One dedicated release coordinator owns this
-synthetic target and is the only actor that dispatches a release-targeted lane
-or performs a release-line write. A claim on an individual issue or PR does not
-serialize writers that target the same release line. If an actor cannot
-participate in this lease, stop. The repository's merge-group CI does not rerun
-release-specific source-liveness, provenance, attribution, manual QA, or review
-gates and is not an alternative.
+GitHub branch protection, expected-head checks, and the merge queue serialize
+remote branch updates. `script/release` provides process-local supervision for
+publication. It does not use an external coordination lease.
 
 #### Normal publication path
 
@@ -171,69 +161,28 @@ script/release --dry-run --evaluate-head
 script/release --evaluate-head
 ```
 
-`script/release` derives `release-line:X.Y.Z` and `release/X.Y.Z` from that
-changelog version, creates a fresh UUID-backed identity, claims the exact line,
-heartbeats and authoritatively verifies it, supervises the Rake process group,
-and releases its own claim after success, failure, or a handled signal. A
-refused, stale, local, unhealthy, or `UNKNOWN` backend state stops before release
-work. Do not pass a version; the wrapper rejects positional arguments so the
-committed changelog remains the source of truth.
+`script/release` derives `release/X.Y.Z` from the changelog version, starts the
+Rake task in a dedicated process group, and holds a private liveness channel.
+It terminates and proves that process group absent after success, failure, or a
+handled signal. Do not pass a version; the committed changelog remains the
+source of truth.
 
-Managed acquisition is an atomic conditional write: an absent record is created
-with `If-None-Match: *`, while a released record is replaced only with the exact
-observed version in `If-Match`. Every active record is refused, including one
-whose holder appears dead, stale, or expired. A concurrent `409` is likewise a
-claim refusal. The preliminary status read is diagnostic only and never grants
-takeover authority.
+#### Recover an interrupted publication
 
-On a foreign-claim refusal, the wrapper prints available holder metadata,
-including task/thread and session fields when the claim recorded them, plus the
-targeted inspection command:
+Before retrying, prove that the prior supervisor's printed process group and
+children are dead. Keep the interrupted version first after `### [Unreleased]`,
+preserve any required `RELEASE_TRACKER`, and rerun `script/release`. Registry,
+tag, and GitHub-release checks resume without republishing artifacts that
+already exist.
 
-```bash
-agent-coord status --repo shakacode/react_on_rails --target release-line:X.Y.Z --json
-```
+#### Retired agent-coord automation reference
 
-Inspect and coordinate with the recorded holder. Never infer takeover safety
-from lease expiry or heartbeat age alone; the wrapper does not provide or
-attempt an automatic takeover.
+> **Historical reference only:** The following lease procedure documents the
+> retired publication design. Do not run it. Shaka now owns orchestration, and
+> `script/release` uses only its local supervisor contract.
 
-#### Recover a retained publication lease
-
-If managed lease cleanup fails, `script/release` prints the exact recovery
-command for the lease that it acquired. A foreign-claim refusal prints the same
-command when the backend supplies a usable exact identity. Before running the
-command, prove that every process group reported by the failed release is dead.
-Do not use lease expiry or heartbeat age as that proof.
-
-Run the printed command from the repository root with the release-machine
-coordination environment loaded. Its shape is:
-
-```bash
-script/release-claim --release \
-  --agent-id <printed-agent-id> \
-  --instance-id <printed-instance-id> \
-  --repo shakacode/react_on_rails \
-  --target release-line:X.Y.Z
-```
-
-The helper releases only the exact active `agent_id` and `instance_id` at the
-observed backend version. It refuses a replacement lease, even if the new lease
-reuses the agent ID. Repeating the command is safe when the first release write
-succeeded but its response was lost. If the backend reports a missing,
-malformed, or `UNKNOWN` identity, the wrapper omits the release command. Inspect
-the authoritative status and coordinate with the holder instead of constructing
-a command manually.
-
-After the exact lease release succeeds, keep the interrupted version first
-after `### [Unreleased]` and run the printed restart command. It preserves
-applicable command modifiers such as `--evaluate-head` or
-`--reconcile-accelerated-rc`; reapply any required `RELEASE_TRACKER` value in
-the environment.
-The release task's registry, tag, and GitHub-release checks resume an interrupted
-publication without republishing artifacts that already exist.
-
-#### Advanced automation compatibility
+<details>
+<summary>Former agent-coord publication protocol</summary>
 
 Automation that already coordinates a broader sequence of release-line writes
 may keep the externally supplied identity path below. This is not the normal
@@ -463,16 +412,18 @@ takeover becomes available. A fresh identity helps reject later preflights from
 a resumed old process; it cannot revoke a write already between preflight and
 mutation.
 
+</details>
+
 #### Partial-publication recovery
 
-If a compound release stops after any outward write, stop the helper and preserve
-the release-line lease state. Preserve the exact local and remote branch tips,
+If a compound release stops after any outward write, stop the helper. Preserve
+the exact local and remote branch tips,
 local and remote tag identity, the complete six-package registry artifact set,
 and the helper command and output. Do not delete or move tags, reset or
-force-push the release branch, rerun direct or unfenced publication, overwrite
-published artifacts, or ad-lib manual publication. If the prior supervisor has
-stopped, prove its process group and children are dead before an operator
-intentionally releases/acquires the claim under a fresh identity.
+force-push the release branch, rerun direct or unsupervised publication,
+overwrite published artifacts, or ad-lib manual publication. If the prior
+supervisor has stopped, prove its process group and children are dead before an
+operator starts a new supervised retry.
 
 For a known tracker, retry with that exact issue:
 

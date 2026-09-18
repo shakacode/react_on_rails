@@ -13,18 +13,15 @@ and [Release Verification Runbook](release-verification-runbook.md).
 > **Execution boundary:** Live publication and accelerated-RC reconciliation use
 > only `script/release` (or
 > `script/release --reconcile-accelerated-rc`). The supervisor selects the first
-> prepared version after `### [Unreleased]`, creates a fresh process UUID,
-> atomically acquires the matching `release-line:X.Y.Z` claim without takeover,
-> maintains its heartbeat, renews its exact active claim at least hourly, and
-> proves that each outward write still has the same live claim. It never takes
-> over another holder and releases only its acquired claim after proving the
-> supervised process group absent. Direct live
+> prepared version after `### [Unreleased]`, starts a dedicated process group,
+> and holds a private liveness channel. It terminates and proves the supervised
+> process group absent after success, failure, or a handled signal. Shaka owns
+> release-task orchestration and PR serialization. Direct live
 > `bundle exec rake release[...]` is refused; use Rake directly only with `dry_run=true`.
-> For one-time machine setup, advanced automation compatibility, handoff, and partial-publication
+> For one-time machine setup, handoff, and partial-publication
 > recovery, follow the [Release-Train
 > Runbook](release-train-runbook.md#serialize-every-release-line-write).
 
-The derived lease branch must equal the checkout used for publication.
 Prereleases and accelerated-RC reconciliation remain restricted to the matching
 `release/X.Y.Z` branch; a stable release may use that matching branch or `main`.
 
