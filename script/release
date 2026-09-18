@@ -389,6 +389,7 @@ class ReleaseSupervisor
     terminal_owner = foreground_terminal_owner
     child_pid = nil
     death_watch_pid = nil
+    terminal_handoff = nil
     child_pid = fork_release_child(scope, pipes)
     prepare_supervisor_release_pipes(pipes)
     pgid = read_child_process_group!(
@@ -410,17 +411,20 @@ class ReleaseSupervisor
     release_child(pipes.start_writer)
     [child_pid, pgid, death_watch_pid, pipes.liveness_writer, pipes.death_writer, terminal_handoff]
   rescue StandardError
-    begin
-      close_release_pipes(pipes)
-    ensure
-      stop_unverified_child(child_pid, grace: termination_grace) if child_pid
-      reap_death_watch(death_watch_pid, grace: termination_grace)
-    end
+    cleanup_failed_spawn(pipes, terminal_handoff, child_pid, death_watch_pid, termination_grace)
     raise
   ensure
     close_io(pipes&.ready_reader)
     close_io(pipes&.death_reader)
     close_io(pipes&.start_writer)
+  end
+
+  def cleanup_failed_spawn(pipes, terminal_handoff, child_pid, death_watch_pid, termination_grace)
+    restore_terminal_after_release(terminal_handoff, $ERROR_INFO)
+    close_release_pipes(pipes)
+  ensure
+    stop_unverified_child(child_pid, grace: termination_grace) if child_pid
+    reap_death_watch(death_watch_pid, grace: termination_grace)
   end
 
   def release_pipes
