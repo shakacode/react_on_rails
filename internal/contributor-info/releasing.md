@@ -13,18 +13,15 @@ and [Release Verification Runbook](release-verification-runbook.md).
 > **Execution boundary:** Live publication and accelerated-RC reconciliation use
 > only `script/release` (or
 > `script/release --reconcile-accelerated-rc`). The supervisor selects the first
-> prepared version after `### [Unreleased]`, creates a fresh process UUID,
-> atomically acquires the matching `release-line:X.Y.Z` claim without takeover,
-> maintains its heartbeat, renews its exact active claim at least hourly, and
-> proves that each outward write still has the same live claim. It never takes
-> over another holder and releases only its acquired claim after proving the
-> supervised process group absent. Direct live
+> prepared version after `### [Unreleased]`, starts a dedicated process group,
+> and holds a private liveness channel. It terminates and proves the supervised
+> process group absent after success, failure, or a handled signal. Shaka owns
+> release-task orchestration and PR serialization. Direct live
 > `bundle exec rake release[...]` is refused; use Rake directly only with `dry_run=true`.
-> For one-time machine setup, advanced automation compatibility, handoff, and partial-publication
+> For one-time machine setup, handoff, and partial-publication
 > recovery, follow the [Release-Train
 > Runbook](release-train-runbook.md#serialize-every-release-line-write).
 
-The derived lease branch must equal the checkout used for publication.
 Prereleases and accelerated-RC reconciliation remain restricted to the matching
 `release/X.Y.Z` branch; a stable release may use that matching branch or `main`.
 
@@ -70,7 +67,9 @@ React on Rails RC. Follow the ordered dependency-promotion gate in the
 3. For minor and major releases, add a commit to the changelog PR updating `SECURITY.md`:
    - "Current support window" table so supported version lines and cutoff dates match the release being shipped
    - "Last reviewed" date and, when applicable, "Next review due"
-4. Review the PR, verify the computed version, and merge
+4. Review the PR — including that any helper-signature or deploy-order/memory/startup-failure entries
+   follow the conventions in `AGENTS.md` → "Changelog" (see "Helper signature changes" and
+   "Action-required placement") — verify the computed version, and merge
 
 If a stable target lacks this section, the release task aborts before confirmation, tagging, or publication.
 For a prerelease, the task warns and skips the GitHub release. After adding the section, preview the idempotent update
@@ -813,19 +812,25 @@ live create or edit, `script/release` supplies the required supervised per-write
 
 Before running the release command, verify:
 
-1. **One-time coordination setup**: Load `AGENT_COORD_API_URL`, the secret
-   `AGENT_COORD_API_TOKEN`, and a stable `AGENT_COORD_MACHINE_ID` from private
-   shell/dotfile configuration; ensure `~/.local/bin` is on `PATH`; then run
-   `script/release --doctor`. Never commit or print the token.
+1. **Changelog conventions**: Confirm every entry that changes a `ReactOnRailsHelper`/
+   `ReactOnRailsProHelper` method's parameters names the method and the parameter, and that every
+   entry with deploy-order, memory/retention, or startup-failure implications carries an inline
+   `**Action required for upgraders:**` tag, and is repeated in the release-notes page's "Action
+   required" section when this release has or needs one. See `AGENTS.md` → "Changelog" → "Helper signature
+   changes" and "Action-required placement".
 
-2. **GitHub CLI**: Run `gh auth login` and ensure your account/token has write access to the repository (required for automatic GitHub release creation)
+2. **Local release setup**: Run `script/release --doctor`. It validates the
+   publishing tools used by the locally supervised release; no coordination
+   backend credentials are required.
 
-3. **NPM authentication**: Run `npm whoami` to confirm you're logged in
+3. **GitHub CLI**: Run `gh auth login` and ensure your account/token has write access to the repository (required for automatic GitHub release creation)
+
+4. **NPM authentication**: Run `npm whoami` to confirm you're logged in
    - If not logged in, the release script will automatically run `npm login` for you
 
-4. **RubyGems authentication**: Ensure you have valid credentials for `gem push`
+5. **RubyGems authentication**: Ensure you have valid credentials for `gem push`
 
-5. **No uncommitted changes**: Run `git status` to verify clean working tree
+6. **No uncommitted changes**: Run `git status` to verify clean working tree
 
 ### Two-Factor Authentication
 
@@ -936,17 +941,20 @@ a fresh code; all printed OTP values remain redacted.
 
 ### If Release Fails
 
+`script/release` is locally supervised and has no `agent-coord` lease to retain
+or reacquire. Coordinate the recovery through the Shaka release task and keep
+the existing branch, tag, and registry identity checks below.
+
 If the release fails partway through (e.g., during NPM publish):
 
-1. Stop the compound helper and keep the release-line lease. Do not delete or move tags, rewrite the
+1. Stop the compound helper. Do not delete or move tags, rewrite the
    release branch, rerun publication, or manually publish missing packages.
 2. Check what was published with read-only registry queries:
    - NPM: `npm view react-on-rails@X.Y.Z`
    - RubyGems: `gem list react_on_rails -r -a`
 3. Record the exact branch tip, local and remote tag identity, published artifact set, and helper output.
 4. Follow [Partial-publication recovery](release-train-runbook.md#partial-publication-recovery). Resume only through
-   `script/release` after the supervisor has acquired the required claim and the artifact evidence is exact; if lease state
-   or any remote/artifact identity is `UNKNOWN`, remain stopped.
+   `script/release` after the artifact evidence is exact; if any remote/artifact identity is `UNKNOWN`, remain stopped.
 
 ## Version History
 
