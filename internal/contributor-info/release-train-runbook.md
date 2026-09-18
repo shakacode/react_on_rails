@@ -726,6 +726,10 @@ above; when there are multiple selections, serialize the sequence:
      echo "release version must be X.Y.Z; stop backport" >&2
      return 1 2>/dev/null || exit 1
    fi
+   test "${BACKPORT_RELEASE_VERSION}" = "${RELEASE_VERSION}" || {
+     echo "backport release version must equal coordinator release version ${RELEASE_VERSION}; stop backport" >&2
+     return 1 2>/dev/null || exit 1
+   }
    jq -en --arg branch "${BACKPORT_RELEASE_BRANCH}" \
      '$branch | test("^release/[0-9]+\\.[0-9]+\\.[0-9]+$")' >/dev/null || {
      echo "backport target is not an exact release/X.Y.Z branch; stop backport" >&2
@@ -986,6 +990,10 @@ if [[ ! "${CLOSEOUT_RELEASE_VERSION}" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[
   echo "closeout release version must be X.Y.Z; stop closeout" >&2
   return 1 2>/dev/null || exit 1
 fi
+test "${CLOSEOUT_RELEASE_VERSION}" = "${RELEASE_VERSION}" || {
+  echo "closeout release version must equal coordinator release version ${RELEASE_VERSION}; stop closeout" >&2
+  return 1 2>/dev/null || exit 1
+}
 if [[ ! "${CLOSEOUT_VALIDATED_HEAD_OID}" =~ ^[0-9a-f]{40}$ ]] ||
    [[ ! "${CLOSEOUT_VALIDATED_BASE_OID}" =~ ^[0-9a-f]{40}$ ]]; then
   echo "validated closeout head and base must be lowercase 40-character SHAs; stop closeout" >&2
