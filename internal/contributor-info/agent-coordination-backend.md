@@ -62,47 +62,15 @@ precedence to hide them.
 
 ### Release-machine setup
 
-A maintainer normally configures release coordination once in a private shell
-or dotfile, not once per release:
+Release orchestration has moved to the Shaka workflow. `script/release` no
+longer reads or mutates this backend, accepts coordinator identities, or needs
+`AGENT_COORD_*` configuration. `script/release --doctor` validates only local
+publishing tools. During publication, the wrapper still owns a dedicated
+process group, a private liveness channel, signal cleanup, and a local contract
+fence before every outward write.
 
-- `AGENT_COORD_API_URL`: the deployed shared HTTP backend URL.
-- `AGENT_COORD_API_TOKEN`: the scoped secret token. Never commit, echo, or paste
-  it into an issue, PR, log, or handoff.
-- `AGENT_COORD_MACHINE_ID`: a stable, recognizable name for this release
-  machine; do not generate it per invocation.
-- `~/.local/bin` on `PATH`, so the bootstrapped `agent-coord` is callable.
-
-After loading that configuration, run `script/release --doctor`. It performs
-only local command/config checks plus the read-only `agent-coord doctor --json`
-probe. It rejects local or legacy backend selection, verifies shared HTTP health
-and authentication, and reports setup actions without printing the token. The
-normal `script/release` path then generates its own fresh UUID identity, derives
-the exact release line from `CHANGELOG.md`, and owns claim/heartbeat/release
-cleanup. Per-run `RELEASE_COORDINATOR_ID` variables are unnecessary.
-
-Normal acquisition uses the repository-owned `script/release-claim` helper
-against that same shared HTTP URL and token. The helper conditionally creates an
-absent record or replaces the exact observed version of a released record. It
-never asks the general coordination client to take over a dead, stale, or
-expired active holder. A concurrent winner is therefore a claim refusal, not a
-takeover opportunity, and helper errors never echo the token.
-During a managed live run, the wrapper also uses this helper to renew the same
-active identity at least hourly with the exact observed backend version. Any
-identity mismatch or conditional-write conflict stops the supervised release
-process group before the wrapper attempts exact-identity cleanup.
-Managed cleanup uses the same helper to release only the exact active agent and
-instance identity with a conditional write. A matching already-released record
-is a successful retry. A replacement identity or write conflict is refused.
-When cleanup cannot complete, the wrapper prints the exact guarded release
-command and the restart command. Follow
-[Recover a retained publication lease](release-train-runbook.md#recover-a-retained-publication-lease)
-before running them.
-
-Automation that already owns a broader release-line lease may supply both
-`RELEASE_COORDINATOR_ID` and `RELEASE_COORDINATOR_INSTANCE_ID` and pre-acquire
-the exact claim. That compatibility path is advanced-only: the wrapper verifies
-and heartbeats the supplied identity but does not claim, take over, or release
-the automation's lease.
+The remaining backend guidance below applies only to legacy batch workflows
+that have not yet migrated to Shaka; it is not part of the release command.
 
 Treat the backend as available when `agent-coord doctor --json` and targeted
 lane-scoped status probes exit 0. In React on Rails batch workflows, run agent

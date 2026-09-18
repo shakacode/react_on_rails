@@ -803,11 +803,12 @@ RSpec.describe "release.rake helper methods" do
 
     it "states the wrapper boundary and direct-Rake refusal" do
       expect(release_compound_live_boundary_guidance).to eq(<<~GUIDANCE.chomp)
-        Live release uses only `script/release`, which selects the prepared CHANGELOG.md version, acquires the
-        matching release-line lease, and performs fresh authoritative fences before every outward write. Direct
+        Live release uses only `script/release`, which selects the prepared CHANGELOG.md version, supervises one
+        dedicated process group, and verifies its local liveness contract before every outward write. Direct
         live Rake is refused without its private supervisor contract; use `bundle exec rake
-        "release[VERSION,true]"` only for an explicit internal preview. See
-        internal/contributor-info/release-train-runbook.md for automation compatibility and recovery procedures.
+        "release[VERSION,true]"` only for an explicit internal preview. Cross-agent coordination belongs to the
+        Shaka workflow that prepares the release PR, not to the publication command. See
+        internal/contributor-info/release-train-runbook.md for the release sequence and recovery procedures.
       GUIDANCE
 
       expect(github_release_sync_preview_guidance(version: "17.0.0")).to eq(<<~GUIDANCE.chomp)
@@ -24245,10 +24246,9 @@ RSpec.describe "release.rake helper methods" do
       allow(self).to receive(:start_release_line!)
       expected_output = <<~OUTPUT.chomp
         ⚠️ LEGACY LIVE RELEASE-LINE PATH
-        Answering yes will create and push release/17.0.0 without the release-line lease.
+        Answering yes will create and push release/17.0.0 outside the Shaka PR workflow.
         This remains technically possible only for backward compatibility and violates current repository release policy.
-        Operators and agents must answer no and follow the individually guarded procedure in
-        internal/contributor-info/release-train-runbook.md.
+        Operators and agents must answer no and prepare the release branch through a reviewed PR.
         Start the 17.0.0 release line now? [y/N]:
       OUTPUT
 
