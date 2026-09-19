@@ -18418,7 +18418,8 @@ RSpec.describe "release.rake helper methods" do
       )
       allow(self).to receive(:sh_in_dir_for_release)
       allow(self).to receive(:validate_remote_release_tag_candidate_sha!).with(
-        monorepo_root: "/tmp/repo", tag: "v17.0.0", candidate_sha:, phase: "package publication"
+        monorepo_root: "/tmp/repo", tag: "v17.0.0", candidate_sha:, phase: "package publication",
+        allow_metadata_only_ancestor: true
       ).and_return(candidate_sha)
 
       push_release_tag_for_candidate!(
@@ -18431,7 +18432,8 @@ RSpec.describe "release.rake helper methods" do
 
       expect(self).to have_received(:fetch_remote_rc_tag!).exactly(3).times
       expect(self).to have_received(:validate_remote_release_tag_candidate_sha!).with(
-        monorepo_root: "/tmp/repo", tag: "v17.0.0", candidate_sha:, phase: "package publication"
+        monorepo_root: "/tmp/repo", tag: "v17.0.0", candidate_sha:, phase: "package publication",
+        allow_metadata_only_ancestor: true
       )
     end
 
@@ -18897,6 +18899,9 @@ RSpec.describe "release.rake helper methods" do
         "git", "-C", "/tmp/repo", "ls-remote", "--tags", "origin",
         "refs/tags/v17.0.0", "refs/tags/v17.0.0^{}"
       ).and_return(["#{moved_sha}\trefs/tags/v17.0.0\n", success])
+      allow(Open3).to receive(:capture2e).with(
+        "git", "-C", "/tmp/repo", "merge-base", "--is-ancestor", moved_sha, candidate_sha
+      ).and_return(["", instance_double(Process::Status, success?: false, exitstatus: 1)])
       pushed = false
       package_publication_started = false
       allow(self).to receive(:sh_in_dir_for_release) { pushed = true }
@@ -23322,13 +23327,13 @@ RSpec.describe "release.rake helper methods" do
         .with(monorepo_root, context: "stable release retry")
         .and_return("headsha")
       allow(self).to receive(:remote_git_tag_exists?)
-        .with(monorepo_root:, tag: "v17.1.0")
+        .with(monorepo_root:, tag: "v17.0.0")
         .and_return(true)
       allow(self).to receive(:peeled_git_tag_sha)
-        .with(monorepo_root:, tag: "v17.1.0")
+        .with(monorepo_root:, tag: "v17.0.0")
         .and_return(nil, "headsha")
       allow(self).to receive(:fetch_remote_release_tag!)
-        .with(monorepo_root:, tag: "v17.1.0", tag_type: "stable")
+        .with(monorepo_root:, tag: "v17.0.0", tag_type: "stable")
 
       expect do
         expect(
@@ -23599,7 +23604,10 @@ RSpec.describe "release.rake helper methods" do
 
     before do
       allow(self).to receive(:remote_git_tag_exists?).and_call_original
-      allow(self).to receive(:remote_release_tags).and_return(["v17.0.0.rc.3"])
+      allow(self).to receive_messages(
+        release_tag_retry_operational_commit?: false,
+        remote_release_tags: ["v17.0.0.rc.3"]
+      )
       allow(self)
         .to receive(:remote_git_tag_exists?)
         .with(monorepo_root:, tag: "v17.0.0.rc.3")
