@@ -1099,6 +1099,81 @@ class CapturingErrorBoundary extends React.Component<
     result.unmount();
   });
 
+  it('2c. onRefetchError observes the latest callback prop after a re-render', async () => {
+    process.env.NODE_ENV = 'production';
+    const refetchFailure = new Error('refetch failed after callback swap');
+    setupSequencedFetcher([<div data-testid="card">v1</div>, rejectWith(refetchFailure)]);
+    const ref = React.createRef<RSCRouteHandle>();
+    const staleCallback = jest.fn();
+    const freshCallback = jest.fn();
+
+    const Root: React.FC<{ onRefetchError: (error: unknown) => void }> = ({ onRefetchError }) => (
+      <TestHarness>
+        <RSCRoute
+          ref={ref}
+          componentName="UserCard"
+          componentProps={{ id: 1 }}
+          onRefetchError={onRefetchError}
+        />
+      </TestHarness>
+    );
+
+    const result = await renderInAct(<Root onRefetchError={staleCallback} />);
+    expect(screen.getByTestId('card')).toHaveTextContent('v1');
+
+    // Swap the callback prop without changing the route key. The error path
+    // must observe the swapped-in callback, not the one captured at mount.
+    // Guards the effect-event freshness that forwardRef/memo would silently
+    // freeze (see the ordering note in RSCRoute.tsx and issue #5030).
+    await rerenderInAct(result, <Root onRefetchError={freshCallback} />);
+
+    await act(async () => {
+      await ref.current!.refetch().catch(() => undefined);
+    });
+
+    await waitFor(() => expect(freshCallback).toHaveBeenCalledTimes(1));
+    expect(freshCallback.mock.calls[0][0]).toBe(ref.current!.refetchError);
+    expect(staleCallback).not.toHaveBeenCalled();
+  });
+
+  it('2d. handle identity is stable across re-renders with unchanged route props', async () => {
+    let consumerRenders = 0;
+    const HandleConsumer: React.FC = () => {
+      useCurrentRSCRoute();
+      consumerRenders += 1;
+      return null;
+    };
+    setupSequencedFetcher([
+      <div data-testid="card">
+        v1
+        <HandleConsumer />
+      </div>,
+    ]);
+    const ref = React.createRef<RSCRouteHandle>();
+
+    // componentProps is a fresh object every render (the common JSX inline
+    // shape); only the derived route key must matter for handle stability.
+    const Root: React.FC = () => (
+      <TestHarness>
+        <RSCRoute ref={ref} componentName="UserCard" componentProps={{ id: 1 }} />
+      </TestHarness>
+    );
+
+    const result = await renderInAct(<Root />);
+    expect(screen.getByTestId('card')).toHaveTextContent('v1');
+
+    const firstHandle = ref.current!;
+    const rendersAfterMount = consumerRenders;
+
+    await rerenderInAct(result, <Root />);
+
+    // Guards the `latestPropsRef` exclusion (issue #5030): if `refetch` ever
+    // gained a per-render identity (e.g. via useEffectEvent), `handle` would
+    // recompute each render and re-render every useCurrentRSCRoute consumer.
+    expect(ref.current).toBe(firstHandle);
+    expect(consumerRenders).toBe(rendersAfterMount);
+  });
+
   it('3. useCurrentRSCRoute() from a descendant calls refetch with the parent route name and props', async () => {
     const InlineButton: React.FC = () => {
       const { refetch } = useCurrentRSCRoute();
