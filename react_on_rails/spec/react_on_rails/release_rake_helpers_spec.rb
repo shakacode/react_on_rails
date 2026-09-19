@@ -23461,6 +23461,58 @@ RSpec.describe "release.rake helper methods" do
       end
     end
 
+    def commit_release_test_paths(repo, paths, message)
+      paths.each do |path|
+        full_path = File.join(repo, path)
+        FileUtils.mkdir_p(File.dirname(full_path))
+        File.write(full_path, "#{message}\n")
+      end
+      expect(system("git", "-C", repo, "add", ".")).to be(true)
+      expect(system("git", "-C", repo, "commit", "-qm", message)).to be(true)
+      sha, status = Open3.capture2("git", "-C", repo, "rev-parse", "HEAD")
+      expect(status).to be_success
+      sha.strip
+    end
+
+    def init_release_test_repo(repo)
+      expect(system("git", "init", "-q", repo)).to be(true)
+      expect(system("git", "-C", repo, "config", "user.email", "release@example.test")).to be(true)
+      expect(system("git", "-C", repo, "config", "user.name", "Release Test")).to be(true)
+    end
+
+    release_operational_test_paths = [
+      "AGENTS.md", "internal/contributor-info/releasing.md", "rakelib/release.rake",
+      "react_on_rails/spec/react_on_rails/release_rake_helpers_spec.rb", "script/release"
+    ]
+
+    it "recognizes release-operational commits in a real git ancestry" do
+      Dir.mktmpdir("ror release retry") do |repo|
+        init_release_test_repo(repo)
+        tag_sha = commit_release_test_paths(repo, ["runtime.rb"], "Release candidate")
+        head_sha = commit_release_test_paths(repo, release_operational_test_paths, "Release operation cleanup")
+
+        expect(release_tag_retry_metadata_only_ancestor?(monorepo_root: repo, tag_sha:, candidate_sha: head_sha))
+          .to be(true)
+      end
+    end
+
+    it "classifies operational-only commits as non-runtime for release-branch promotion" do
+      Dir.mktmpdir("ror release promotion") do |repo|
+        init_release_test_repo(repo)
+        commit_release_test_paths(repo, ["runtime.rb"], "Release candidate")
+        operational_sha =
+          commit_release_test_paths(repo, release_operational_test_paths, "Release operation cleanup")
+        runtime_sha = commit_release_test_paths(
+          repo, ["react_on_rails/lib/react_on_rails/helper.rb"], "Runtime change"
+        )
+
+        expect(ReleaseCommitClassifier.promotion_non_runtime_only?(monorepo_root: repo, sha: operational_sha))
+          .to be(true)
+        expect(ReleaseCommitClassifier.promotion_non_runtime_only?(monorepo_root: repo, sha: runtime_sha))
+          .to be(false)
+      end
+    end
+
     it "does not trust a local-only stable tag at HEAD for idempotent retry" do
       allow(self).to receive(:current_git_sha!)
         .with(monorepo_root, context: "stable release retry")
@@ -23663,7 +23715,10 @@ RSpec.describe "release.rake helper methods" do
 
     before do
       allow(self).to receive(:remote_git_tag_exists?).and_call_original
-      allow(self).to receive(:remote_release_tags).and_return(["v17.0.0.rc.3"])
+      allow(self).to receive_messages(
+        release_tag_retry_operational_commit?: false,
+        remote_release_tags: ["v17.0.0.rc.3"]
+      )
       allow(self)
         .to receive(:remote_git_tag_exists?)
         .with(monorepo_root:, tag: "v17.0.0.rc.3")
