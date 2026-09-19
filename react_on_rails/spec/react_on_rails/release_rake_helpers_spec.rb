@@ -23322,13 +23322,13 @@ RSpec.describe "release.rake helper methods" do
         .with(monorepo_root, context: "stable release retry")
         .and_return("headsha")
       allow(self).to receive(:remote_git_tag_exists?)
-        .with(monorepo_root:, tag: "v17.0.0")
+        .with(monorepo_root:, tag: "v17.1.0")
         .and_return(true)
       allow(self).to receive(:peeled_git_tag_sha)
-        .with(monorepo_root:, tag: "v17.0.0")
+        .with(monorepo_root:, tag: "v17.1.0")
         .and_return(nil, "headsha")
       allow(self).to receive(:fetch_remote_release_tag!)
-        .with(monorepo_root:, tag: "v17.0.0", tag_type: "stable")
+        .with(monorepo_root:, tag: "v17.1.0", tag_type: "stable")
 
       expect do
         expect(
@@ -23340,6 +23340,36 @@ RSpec.describe "release.rake helper methods" do
           )
         ).to be(true)
       end.to output(/Stable tag v17\.0\.0 already points at local HEAD/).to_stdout
+    end
+
+    it "allows a stable release retry when the immutable tag precedes only metadata commits" do
+      monorepo_root = File.expand_path("../../..", __dir__)
+      tag_sha = "0e519671a0dc533a14ae11ac811b4930e5ab3b9c"
+      release_head_sha = "dd646bfaa140fed8f71697a2c401a6a43720dec5"
+      allow(self).to receive(:current_git_sha!)
+        .with(monorepo_root, context: "stable release retry")
+        .and_return(release_head_sha)
+      allow(self).to receive(:remote_git_tag_exists?)
+        .with(monorepo_root:, tag: "v17.1.0")
+        .and_return(true)
+      allow(self).to receive(:peeled_git_tag_sha)
+        .with(monorepo_root:, tag: "v17.1.0")
+        .and_return(nil, tag_sha)
+      allow(self).to receive(:fetch_remote_release_tag!)
+        .with(monorepo_root:, tag: "v17.1.0", tag_type: "stable")
+
+      retry_state = nil
+      expect do
+        retry_state = stable_release_retry_state_for_current_head(
+          monorepo_root:,
+          current_branch: "release/17.1.0",
+          current_checkout_version: "17.1.0",
+          target_gem_version: "17.1.0"
+        )
+      end.to output(/v17\.1\.0 precedes metadata-only release commits/).to_stdout
+      expect(retry_state).to eq(:remote_metadata)
+      expect(remote_release_tag_retry?(retry_state)).to be(true)
+      expect(release_tag_at_current_head?(retry_state)).to be(true)
     end
 
     it "does not trust a local-only stable tag at HEAD for idempotent retry" do
