@@ -23343,33 +23343,58 @@ RSpec.describe "release.rake helper methods" do
     end
 
     it "allows a stable release retry when the immutable tag precedes only metadata commits" do
-      monorepo_root = File.expand_path("../../..", __dir__)
-      tag_sha = "0e519671a0dc533a14ae11ac811b4930e5ab3b9c"
-      release_head_sha = "dd646bfaa140fed8f71697a2c401a6a43720dec5"
       allow(self).to receive(:current_git_sha!)
         .with(monorepo_root, context: "stable release retry")
-        .and_return(release_head_sha)
+        .and_return("headsha")
       allow(self).to receive(:remote_git_tag_exists?)
-        .with(monorepo_root:, tag: "v17.1.0")
+        .with(monorepo_root:, tag: "v17.0.0")
         .and_return(true)
       allow(self).to receive(:peeled_git_tag_sha)
-        .with(monorepo_root:, tag: "v17.1.0")
-        .and_return(nil, tag_sha)
+        .with(monorepo_root:, tag: "v17.0.0")
+        .and_return(nil, "tagsha")
       allow(self).to receive(:fetch_remote_release_tag!)
-        .with(monorepo_root:, tag: "v17.1.0", tag_type: "stable")
+        .with(monorepo_root:, tag: "v17.0.0", tag_type: "stable")
+      allow(self).to receive(:release_tag_retry_metadata_only_ancestor?)
+        .with(monorepo_root:, tag_sha: "tagsha", candidate_sha: "headsha")
+        .and_return(true)
 
       retry_state = nil
       expect do
         retry_state = stable_release_retry_state_for_current_head(
           monorepo_root:,
-          current_branch: "release/17.1.0",
-          current_checkout_version: "17.1.0",
-          target_gem_version: "17.1.0"
+          current_branch: "release/17.0.0",
+          current_checkout_version: "17.0.0",
+          target_gem_version: "17.0.0"
         )
-      end.to output(/v17\.1\.0 precedes metadata-only release commits/).to_stdout
+      end.to output(/v17\.0\.0 precedes metadata-only release commits/).to_stdout
       expect(retry_state).to eq(:remote_metadata)
       expect(remote_release_tag_retry?(retry_state)).to be(true)
       expect(release_tag_at_current_head?(retry_state)).to be(true)
+    end
+
+    it "recognizes release-operational commits in a real git ancestry" do
+      Dir.mktmpdir("ror-release-retry") do |repo|
+        expect(system("git", "init", "-q", repo)).to be(true)
+        expect(system("git", "-C", repo, "config", "user.email", "release@example.test")).to be(true)
+        expect(system("git", "-C", repo, "config", "user.name", "Release Test")).to be(true)
+        File.write(File.join(repo, "runtime.rb"), "runtime = :unchanged\n")
+        expect(system("git", "-C", repo, "add", ".")).to be(true)
+        expect(system("git", "-C", repo, "commit", "-qm", "Release candidate")).to be(true)
+        tag_sha = `git -C #{repo} rev-parse HEAD`.strip
+
+        ["AGENTS.md", "internal/contributor-info/releasing.md", "rakelib/release.rake",
+         "react_on_rails/spec/react_on_rails/release_rake_helpers_spec.rb", "script/release"].each do |path|
+          full_path = File.join(repo, path)
+          FileUtils.mkdir_p(File.dirname(full_path))
+          File.write(full_path, "release operation\n")
+        end
+        expect(system("git", "-C", repo, "add", ".")).to be(true)
+        expect(system("git", "-C", repo, "commit", "-qm", "Release operation cleanup")).to be(true)
+        head_sha = `git -C #{repo} rev-parse HEAD`.strip
+
+        expect(release_tag_retry_metadata_only_ancestor?(monorepo_root: repo, tag_sha:, candidate_sha: head_sha))
+          .to be(true)
+      end
     end
 
     it "does not trust a local-only stable tag at HEAD for idempotent retry" do
