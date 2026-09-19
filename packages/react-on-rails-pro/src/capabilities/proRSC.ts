@@ -36,8 +36,12 @@ import { setManifestFileNames } from '../cache/manifestLoader.ts';
 import { getServerRenderer } from '../cache/manifestLoaderServer.ts';
 import { setBuildId } from '../cache/buildIdProvider.ts';
 
+// `use` must NOT be listed: it is legal in Server Components.
+// `useEffectEvent` sits before its prefix `useEffect` so the alternation matches
+// the longer hook name without relying on regex backtracking.
 const CLIENT_HOOK_NAMES = [
   'useState',
+  'useEffectEvent',
   'useEffect',
   'useReducer',
   'useCallback',
@@ -54,8 +58,6 @@ const CLIENT_HOOK_NAMES = [
   'useInsertionEffect',
   'useOptimistic',
   'useActionState',
-  // `use` must NOT be listed: it is legal in Server Components.
-  'useEffectEvent',
 ].join('|');
 const CLIENT_HOOK_RUNTIME_ERROR_REGEX = new RegExp(
   `(?:(?:React\\.)|\\(0\\s*,\\s*[\\w$]+\\.)?(${CLIENT_HOOK_NAMES})\\)? is not a function\\b`,
