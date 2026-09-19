@@ -52,18 +52,14 @@ schema_version: 1
 standing_health:
   # Standing health is intentionally public-only and independent from the
   # candidate lifecycle below. Only repos with `standing_health.public: true`
-  # are queried. Archived targets are retained here as report-only catalog
-  # evidence and never become release mutation lanes.
+  # are queried. Do not list archived GitHub repositories here; they are not
+  # mutation or health lanes.
   schema_version: 1
   stable_release: v17.0.0
   rsc_version: 19.2.1
   max_minor_lag: 1
   max_default_age_days: 45
   dependabot_policy: v1
-  archived_targets:
-    - name: shakacode/react-on-rails-rsc-demo
-      headline: Retired manual RSC generator demo
-      packages: []
 
 lifecycle:
   # Release-path coverage is independent from repository tier. Every required
@@ -358,24 +354,6 @@ repos:
     needs_pro: false
     package_manager: yarn_berry
     smoke: [/hello_world]
-    verify: true
-
-  - name: shakacode/react-on-rails-demo-v16-bundle-splitting
-    tier: soft_track
-    headline: On-demand bundle loading
-    standing_health:
-      public: true
-      disposition: report_only
-      review_app: not_required
-    packages:
-      - { ecosystem: gem, name: react_on_rails }
-      - { ecosystem: npm, name: react-on-rails }
-      - { ecosystem: gem, name: shakapacker }
-      - { ecosystem: npm, name: shakapacker }
-    needs_pro: false
-    package_manager: npm
-    ruby_test: RAILS_ENV=test bin/rails db:test:prepare test test:system
-    smoke: [/]
     verify: true
 
   - name: shakacode/react-on-rails-example-open-flights

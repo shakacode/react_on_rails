@@ -242,7 +242,7 @@ class FleetValidationGeneratorTest < Minitest::Test
     inventory = build_generator.lifecycle_inventory
 
     assert_equal 8, (inventory.count { |target| target.fetch("tier") == "hard_gate" })
-    assert_equal 5, (inventory.count { |target| target.fetch("tier") == "soft_track" })
+    assert_equal 4, (inventory.count { |target| target.fetch("tier") == "soft_track" })
     core = inventory.find { |target| target.fetch("id") == "react-on-rails-generator-install-smoke" }
     assert_equal "validation_only", core.fetch("work_mode")
     assert(inventory.select { |target| target.fetch("tier") == "soft_track" }
@@ -267,12 +267,12 @@ class FleetValidationGeneratorTest < Minitest::Test
     assert(errors.any? { |error| error.include?("duplicate target") })
   end
 
-  def test_report_only_prompt_covers_all_five_soft_tracks_without_mutation
+  def test_report_only_prompt_covers_all_soft_tracks_without_mutation
     Dir.mktmpdir do |directory|
       build_generator.write_pack(directory)
       report_only = File.read(File.join(directory, "REPORT-ONLY.md"))
 
-      assert_equal 5, (report_only.lines.count { |line| line.include?("Report only; do not mutate") })
+      assert_equal 4, (report_only.lines.count { |line| line.include?("Report only; do not mutate") })
       assert_includes report_only, "fresh default"
       assert_includes report_only, "archived or deferred disposition"
     end
@@ -1432,7 +1432,7 @@ class FleetValidationGeneratorTest < Minitest::Test
 
     assert_includes tracker, "<!-- fleet-validation-closeout:fleet-test-pack -->"
     assert_includes tracker, "Verdict: PASS"
-    assert_equal 13, (tracker.lines.count { |line| line.match?(/\| (hard_gate|soft_track) \|/) })
+    assert_equal 12, (tracker.lines.count { |line| line.match?(/\| (hard_gate|soft_track) \|/) })
     assert_includes tracker, "## Required release paths"
     assert_includes tracker, "## Blocker ownership"
     assert_includes tracker, "Promotion recommendation: recommend"

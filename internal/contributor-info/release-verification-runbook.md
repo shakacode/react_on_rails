@@ -123,7 +123,7 @@ review-app capability uses the exact `standing_health.review_app_workflow` publi
 cleanup, delete, help, and promotion workflows never substitute for that path. GitHub archival of
 an active target blocks as manifest drift. Dependabot requires one enabled weekly root entry per
 required ecosystem; separate disabled, non-root, or differently scheduled entries cannot combine
-into a pass. Keep soft-track and archived findings report-only. This pack is evidence for fleet
+into a pass. Keep soft-track findings report-only. This pack is evidence for fleet
 currency and capability drift; it is not a replacement for the candidate ledger or a
 release-promotion signal.
 
