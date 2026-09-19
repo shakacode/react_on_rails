@@ -76,8 +76,17 @@ const EffectEventWithoutClientDirective = () => {
   return <p>Client effect event in RSC runtime</p>;
 };
 
+// The helper's name deliberately ends in a hook name ('...reuseState') to pin
+// that the client-hook diagnostic only brands whole-identifier hook calls.
+const HelperWithHookNameSuffix = () => {
+  const helpers = {} as { reuseState: () => string };
+
+  return <p>{helpers.reuseState()}</p>;
+};
+
 ReactOnRails.register({
   EffectEventWithoutClientDirective,
+  HelperWithHookNameSuffix,
   HooksWithoutClientDirective,
   InsertionEffectWithoutClientDirective,
   PromiseContainer,
@@ -278,6 +287,15 @@ test('explains likely missing use client directive when a server component calls
   expect((error as Error).message).toContain('Original error:');
   expect((error as Error).message).toContain('useEffectEvent');
   expect((error as Error).message).toContain('is not a function');
+});
+
+test('does not brand unrelated errors whose identifier merely ends in a hook name', async () => {
+  const error = await captureRenderedError('HelperWithHookNameSuffix');
+
+  expect(error).toBeInstanceOf(Error);
+  expect((error as Error).message).toContain('reuseState is not a function');
+  expect((error as Error).message).not.toContain('client hook');
+  expect((error as Error).message).not.toContain('[React on Rails Pro]');
 });
 
 test('reports the client hook diagnostic in stream metadata when throwJsErrors is false', async () => {
