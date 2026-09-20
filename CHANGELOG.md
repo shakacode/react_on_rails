@@ -73,8 +73,9 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   with the serving request's nonce (streamed replays are rewritten across chunk boundaries, so an attribute that
   straddles two cached chunks is still re-stamped) — matching the exact per-request secret means
   markup that arrived with any other nonce value is never promoted to the live nonce. Every component cache key also
-  gains a CSP-nonce partition segment (`csp-nonce` or `csp-nonce-free`), placed before the caller's `cache_key`
-  value so user key segments can never spell one partition into the other; entries rendered with a nonce are never
+  gains a CSP-nonce partition segment (`csp-nonce` or `csp-nonce-free`), placed at a fixed position preceded only
+  by framework-controlled segments — before the caller's component name and `cache_key` value — so neither can
+  spell one partition into the other; entries rendered with a nonce are never
   shared with nonce-free requests (and vice versa) when an app toggles its nonce generator. (Component cache keys
   already embed the gem version, so the new segment costs no extra cache fault beyond the upgrade's own.) This also stops serving one request's nonce value to other users from shared cache
   entries, which mattered for session-derived nonce generators. Requests whose nonce is present but falls outside
