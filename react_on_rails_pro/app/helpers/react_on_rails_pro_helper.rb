@@ -65,6 +65,10 @@ module ReactOnRailsProHelper
   # original value as-is. Never strip-then-validate: a stripped derivative can pass the
   # pattern while the CSP header still carries the original, mismatching every script.
   CSP_NONCE_VALUE_PATTERN = %r{\A[a-zA-Z0-9+/_-]+={0,2}\z}
+  # HTML ASCII whitespace allowed around an attribute's `=`, derived from
+  # HTML_SPACE_CHARACTERS so the two cannot drift. Deliberately narrower than Ruby's \s:
+  # \v is not HTML whitespace (it parses as part of an attribute name or value).
+  CSP_NONCE_ATTR_WS_PATTERN = "[#{Regexp.escape(HTML_SPACE_CHARACTERS.join)}]*".freeze
   @static_rsc_asset_diagnostic_cache = {}
 
   class << self
@@ -696,15 +700,24 @@ module ReactOnRailsProHelper
     # and is left alone). The nonce VALUE match stays case-sensitive: it is an exact
     # secret, not an HTML name. Every match is rewritten to the canonical double-quoted
     # lowercase form.
-    html_ws = "[\t\n\f\r ]*" # HTML ASCII whitespace; narrower than Ruby's \s (no \v)
+    html_ws = CSP_NONCE_ATTR_WS_PATTERN
     attribute_pattern =
       /(?<=\s)(?i:nonce)#{html_ws}=#{html_ws}(?:(?<quote>["'])#{escaped_nonce}\k<quote>|#{escaped_nonce}(?=[\s>]))/
-    return html unless html.match?(attribute_pattern)
 
     # SafeBuffer#gsub semantics vary across Rails versions (the html_safe flag is dropped,
     # and some versions HTML-escape a non-safe block return), so rewrite a plain copy and
-    # restore the receiver's html_safe flag explicitly.
-    rewritten = String.new(html).gsub(attribute_pattern) { %(nonce="#{current_nonce}") }
+    # restore the receiver's html_safe flag explicitly. Single pass over the HTML: the
+    # matched flag replaces a separate match? pre-scan, so the no-match case now allocates
+    # one copy of the receiver where it previously returned before copying — acceptable
+    # because marker-gated callers only invoke this when a rewrite is expected. No-match
+    # still returns the receiver itself: callers rely on object identity to detect it.
+    matched = false
+    rewritten = String.new(html).gsub(attribute_pattern) do
+      matched = true
+      %(nonce="#{current_nonce}")
+    end
+    return html unless matched
+
     html.html_safe? ? rewritten.html_safe : rewritten
   end
 
