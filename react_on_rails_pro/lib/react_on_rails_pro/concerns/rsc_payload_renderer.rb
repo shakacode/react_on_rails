@@ -75,7 +75,10 @@ module ReactOnRailsPro
         raise JSON::ParserError, "props must be a JSON string, got #{params[:props].class}"
       end
 
-      JSON.parse(params[:props])
+      parsed = JSON.parse(params[:props])
+      raise JSON::ParserError, "props must be a JSON object, got #{parsed.class}" unless parsed.is_a?(Hash)
+
+      parsed
     end
 
     def rsc_payload_component_name
@@ -127,7 +130,7 @@ module ReactOnRailsPro
       controller = self
       begin
         provider = provider_class_name.constantize
-      rescue NameError => e
+      rescue NameError, LoadError, SyntaxError => e
         Rails.logger.error(
           "[React on Rails Pro] Async props provider '#{provider_class_name}' for " \
           "component '#{component_name}' could not be loaded: #{e.message}"
