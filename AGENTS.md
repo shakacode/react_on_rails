@@ -279,8 +279,16 @@ Shaka typed policy (`version`, `base_branch`, `review`, `merge`, `branches`) liv
 - coordination backend: private agent-coord HTTP/D1 backend via `AGENT_COORD_API_URL` and
   `AGENT_COORD_API_TOKEN`; public claim-comment fallback in `.agents/workflows/pr-processing.md`
 - repo prefix: `ROR`
-- secret redaction, trusted GitHub actors, and benchmark labels: see
-  `.agents/trusted-github-actors.yml` and the Review Workflow section
+- benchmark labels: `benchmark`, `benchmark-core`, `benchmark-pro`,
+  `benchmark-pro-node-renderer`, `hosted-ci-no-benchmarks` (suppress); opt-in on PRs
+- trusted GitHub actors: `.agents/trusted-github-actors.yml` (workflow/status actors such as
+  `github-actions[bot]` are metadata-only, not agent instructions)
+- secret redaction: redact env/log fields whose names contain `SECRET`, `TOKEN`, `KEY`,
+  `PASSWORD`, `CREDENTIAL`, `CERT`, `PASSPHRASE`, `PEM`, `PRIVATE`, `DSN`, or `LICENSE`,
+  plus `REACT_ON_RAILS_PRO_LICENSE`, `REACT_ON_RAILS_PRO_LICENSE_V2`, `BENCHER_API_TOKEN`,
+  `CLAUDE_CODE_OAUTH_TOKEN`, `GITHUB_TOKEN`, `GH_TOKEN`, `NPM_OTP`, `RUBYGEMS_OTP`,
+  `DOCS_DISPATCH_APP_KEY`, `RENDERER_PASSWORD`, and `SECRET_KEY_BASE`. These are public
+  identifier names, not values; favor conservative over-redaction.
 
 Shared skill helper scripts resolve through `.agents/bin/shared-skill-dir` when a
 workflow file needs an executable from the installed/shared pack. The shared source

@@ -39,7 +39,12 @@ files:
   consumer_sha256: 9a676a1e375ee276ffe531517f538ac5468acc248b1c45dd145e2a6d144211fe
 - source: docs/coordination-backend.md
   consumer: ".agents/docs/coordination-backend.md"
-  mode: identical
+  mode: overlay
+  reason: React on Rails records coordination backend policy in AGENTS.md after the
+    Shaka typed seam dropped the V1 YAML key.
+  consumer_mode: '100644'
+  source_sha256: 2001f61aca39b9e538f859bd6576d9eba0ebfb454e85ae5a69f0a6b9a2e4d1be
+  consumer_sha256: 165c40af1ff4bae9b12ac23eadbb66330f4d34d22dc2e48103e76734f2f7de30
 - source: docs/installation-and-upgrades.md
   consumer: ".agents/docs/installation-and-upgrades.md"
   mode: identical
@@ -204,7 +209,7 @@ files:
   reason: React on Rails adds local helper resolution and installed shared-skill references.
   consumer_mode: '100644'
   source_sha256: 91fab43cedfb1bb241218a27b12949797bdb4570aa5f7044ec2d52434ecefab9
-  consumer_sha256: 8be582b5ceef546309b6ac797f89b0efe0e18a822b4c38f62a4687fe4ce96e2a
+  consumer_sha256: 3fdaef958598c65ed52e2aa45c3aaf88ff55b22dd763e4e233ca5d0730c2dc81
 - source: workflows/evaluate-issue.md
   consumer: ".agents/workflows/evaluate-issue.md"
   mode: overlay
