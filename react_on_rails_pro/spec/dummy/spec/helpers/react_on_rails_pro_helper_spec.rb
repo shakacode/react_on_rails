@@ -726,6 +726,37 @@ describe ReactOnRailsProHelper do
       expect(result).to be_html_safe
     end
 
+    it "re-stamps case-insensitive attribute names and whitespace around the equals sign" do
+      # HTML attribute names are ASCII case-insensitive and HTML whitespace is allowed
+      # around `=`, so app-provided raw markup can spell the attribute as `NONCE="..."`,
+      # `nonce = "..."`, or combinations with the unquoted form. Every spelling of the
+      # exact originating value must be re-stamped (normalized to canonical
+      # `nonce="..."`); the value itself stays case-sensitive.
+      expected_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(
+        "App", cache_key: "csp-nonce-spellings", csp_nonce_active: true
+      )
+      cached_html = "<div>cached</div>" \
+                    '<script NONCE="origin-AAA=">upperName()</script>' \
+                    "<script nonce = \"origin-AAA=\">spacedEquals()</script>" \
+                    "<script Nonce =\torigin-AAA=>combinedUnquoted()</script>" \
+                    '<script nonce="ORIGIN-aaa=">wrongCaseValue()</script>' \
+                    "<!--rorp-cached-csp-nonce:origin-AAA=-->"
+      Rails.cache.write(expected_cache_key, cached_html.html_safe)
+      allow(self).to receive(:csp_nonce).and_return("live-BBB=")
+
+      result = cached_react_component("App", cache_key: "csp-nonce-spellings", auto_load_bundle: false) do
+        raise "props block must not run on a cache hit"
+      end
+
+      expect(result).to include('<script nonce="live-BBB=">upperName()</script>')
+      expect(result).to include('<script nonce="live-BBB=">spacedEquals()</script>')
+      expect(result).to include('<script nonce="live-BBB=">combinedUnquoted()</script>')
+      # A case-variant VALUE is a different secret and is never promoted.
+      expect(result).to include('<script nonce="ORIGIN-aaa=">wrongCaseValue()</script>')
+      expect(result).not_to include("origin-AAA=")
+      expect(result).to be_html_safe
+    end
+
     it "never serves another partition's entry to a request with a malformed nonce" do
       allow(self).to receive(:csp_nonce).and_return("strip-orig-AAA=")
 

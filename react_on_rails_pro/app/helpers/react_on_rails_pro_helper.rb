@@ -687,14 +687,18 @@ module ReactOnRailsProHelper
     return html if current_nonce.nil? || current_nonce == cached_csp_nonce
 
     escaped_nonce = Regexp.escape(cached_csp_nonce)
-    # Framework emitters always quote the attribute, but cached SSR output can embed
-    # app-provided raw markup that stamps it unquoted (`<script nonce=abc...>`), which the
-    # HTML parser accepts. Match that spelling too — the exact originating value terminated
-    # by whitespace or `>` per the unquoted-attribute-value grammar (a longer unquoted
-    # value that merely starts with the originating nonce is a different value and is left
-    # alone). Every match is rewritten to the double-quoted form.
+    # Framework emitters always write lowercase `nonce="..."`, but cached SSR output can
+    # embed app-provided raw markup using any spelling the HTML parser accepts: the
+    # attribute name is ASCII case-insensitive (`NONCE=`), HTML whitespace is allowed
+    # around `=` (`nonce = "..."`), and the value may be unquoted (`<script nonce=abc...>`,
+    # terminated by whitespace or `>` per the unquoted-attribute-value grammar — a longer
+    # unquoted value that merely starts with the originating nonce is a different value
+    # and is left alone). The nonce VALUE match stays case-sensitive: it is an exact
+    # secret, not an HTML name. Every match is rewritten to the canonical double-quoted
+    # lowercase form.
+    html_ws = "[\t\n\f\r ]*" # HTML ASCII whitespace; narrower than Ruby's \s (no \v)
     attribute_pattern =
-      /(?<=\s)nonce=(?:(?<quote>["'])#{escaped_nonce}\k<quote>|#{escaped_nonce}(?=[\s>]))/
+      /(?<=\s)(?i:nonce)#{html_ws}=#{html_ws}(?:(?<quote>["'])#{escaped_nonce}\k<quote>|#{escaped_nonce}(?=[\s>]))/
     return html unless html.match?(attribute_pattern)
 
     # SafeBuffer#gsub semantics vary across Rails versions (the html_safe flag is dropped,
