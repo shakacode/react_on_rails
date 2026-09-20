@@ -125,7 +125,6 @@ module AgentWorkflowSeamDoctor
     hosted_ci_trigger
     ci_change_detector
   ].freeze
-  SHAKA_CONTRACT_KEYS = %w[version base_branch review merge plan branches recovery].freeze
   UNTRUSTED_CONTRIBUTOR_INTAKE_POLICY_KEY = "untrusted_contributor_intake"
   UNTRUSTED_CONTRIBUTOR_INTAKE_POLICY_KEYS = %w[
     trusted_github_host
@@ -1453,6 +1452,8 @@ module AgentWorkflowSeamDoctor
   end
 
   def prepare_init_policy(root, base_branch, existing)
+    return if shaka_contract?(existing)
+
     defaults = REQUIRED_POLICY_KEYS.to_h { |key| [key, key == "base_branch" ? base_branch : "n/a"] }
     defaults["follow_up_prefix"] = "Follow-up:"
     prepare_init_mapping(File.join(root, POLICY_CONFIG), existing, defaults, "policy config")
@@ -1695,7 +1696,6 @@ module AgentWorkflowSeamDoctor
     end
 
     config.each do |key, value|
-      next if SHAKA_CONTRACT_KEYS.include?(key)
       next unless unresolved_policy_value?(value)
 
       issues << "unresolved policy value for key: #{key}"

@@ -89,4 +89,41 @@ class ShakaSeamContractTest < Minitest::Test
       assert_includes out, "missing policy key: review"
     end
   end
+
+  def test_shaka_seam_unresolved_branches_fails
+    with_repo do |root|
+      write_shaka_contract(root)
+      File.write(
+        File.join(root, ".agents/agent-workflow.yml"),
+        YAML.dump(SHAKA_POLICY.merge("branches" => { "name" => "<base branch>" }))
+      )
+
+      out, status = run_doctor(root)
+
+      refute status.success?, out
+      assert_includes out, "unresolved policy value for key: branches"
+    end
+  end
+
+  def test_init_does_not_append_v1_keys_to_shaka_yaml
+    with_repo do |root|
+      write_shaka_contract(root)
+      File.write(File.join(root, ".agents/bin/setup"), <<~BASH)
+        #!/usr/bin/env bash
+        set -euo pipefail
+        cd "$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
+        exec true
+      BASH
+      File.chmod(0o755, File.join(root, ".agents/bin/setup"))
+      File.write(File.join(root, ".agents/skills/example/SKILL.md"), "Run `.agents/bin/validate`.\n")
+
+      out, status = Open3.capture2e("ruby", SCRIPT, "--init", "--root", root)
+
+      assert status.success?, out
+      config = YAML.safe_load(File.read(File.join(root, ".agents/agent-workflow.yml")))
+      refute config.key?("follow_up_prefix")
+      refute config.key?("hosted_ci_trigger")
+      assert_equal 1, config["version"]
+    end
+  end
 end

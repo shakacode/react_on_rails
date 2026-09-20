@@ -87,22 +87,14 @@ script means that capability is n/a in that repo.
 
 ## Policy Contract
 
-`.agents/agent-workflow.yml` carries non-command values:
+This consumer uses the Shaka typed seam in `.agents/agent-workflow.yml`
+(`version`, `base_branch`, `review`, `merge`, `branches`). Remaining
+React on Rails policy (hosted CI, changelog, merge ledger, follow-up prefix,
+coordination backend, redaction, and trust) lives in `AGENTS.md`.
 
-- `base_branch`
-- `follow_up_prefix`
-- `review_gate`
-- `approval_exempt`
-- `coordination_backend`
-- `changelog`
-- `benchmark_labels`
-- `merge_ledger`
-- `ci_parity_environment`
-- `hosted_ci_trigger`
-- `ci_change_detector`
-
-Repos may add policy keys such as `secret_redaction_patterns` when needed. Use
-`n/a` for unavailable policy. Keep values terse and behavior-complete.
+The source pack's V1 key list is not loaded from YAML here. Repos that still
+use unversioned V1 YAML keep those keys; this overlay accepts both contracts
+in `agent-workflow-seam-doctor`.
 
 Repos that use `untrusted-contributor-intake` add one explicit trusted-base
 authority mapping. The seam doctor requires all three values when the mapping
@@ -123,14 +115,14 @@ Each consumer `AGENTS.md` owns a section named
 ```markdown
 ## Agent Workflow Configuration
 
-Portable shared skills resolve this repo's commands and policy through:
-
-- **Commands** — run `.agents/bin/<name>` (`setup`, `validate`, `test`, ...); see `.agents/bin/README.md`. A missing script means that capability is n/a here.
-- **Policy / config** — `.agents/agent-workflow.yml`.
+Resolve the trusted default branch to an immutable commit. Load and validate
+`.agents/agent-workflow.yml` with the trusted installed `shaka seam check --ref REF`
+command. Run the fixed executable paths reported by that command from the candidate
+checkout; do not reconstruct their behavior from prose. `AGENTS.md` retains human-only boundaries.
 ```
 
-Consumer repos should keep broader human guidance in `AGENTS.md`, but command
-resolution and workflow policy come from the binstubs and YAML.
+Consumer repos should keep broader human guidance in `AGENTS.md`. Command
+resolution uses `.agents/bin/`; Shaka typed policy uses `.agents/agent-workflow.yml`.
 
 ## Seam Initialization
 
@@ -169,8 +161,8 @@ remove the marker deliberately before taking direct ownership.
 - `.agents/bin/README.md` exists
 - core scripts `validate` and `test` exist, are executable, pass `bash -n`, and
   include the repo-root `cd` preamble
-- `.agents/agent-workflow.yml` parses and has all required policy keys with
-  resolved values
+- `.agents/agent-workflow.yml` parses as the Shaka typed contract, or as V1
+  policy keys when `version` is absent
 - an optional `.agents/trusted-github-actors.yml` parses as a mapping and has no
   normalized bot login in both actionable and metadata-only roles; regular
   checks and `--init` preserve preflight compatibility with legacy scalar

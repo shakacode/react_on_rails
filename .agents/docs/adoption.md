@@ -70,16 +70,11 @@ notes.
    commands to make that wrapper repo-owned. Explicit replacement of a
    repo-owned wrapper fails closed.
 
-4. **Review policy YAML.** The initializer creates
-   `.agents/agent-workflow.yml` with required
-   non-command policy keys: `base_branch`, `follow_up_prefix`, `review_gate`,
-   `approval_exempt`, `coordination_backend`, `changelog`, `benchmark_labels`,
-   `merge_ledger`, `ci_parity_environment`, `hosted_ci_trigger`, and
-   `ci_change_detector`. Use `n/a` for unavailable policy. Start from
-   [`examples/agent-workflow.yml`](https://github.com/shakacode/agent-workflows/blob/main/examples/agent-workflow.yml) when
-   bootstrapping a new consumer repo. When an existing mapping needs new
-   required keys, initialization appends them without rewriting its comments or
-   formatting and fails closed if that merge cannot be represented safely.
+4. **Review policy YAML.** This repository's `.agents/agent-workflow.yml` is the
+   Shaka typed contract (`version`, `base_branch`, `review`, `merge`, `branches`).
+   Human-only React on Rails policy stays in `AGENTS.md`. Do not add V1 keys such
+   as `follow_up_prefix` or `hosted_ci_trigger` to the Shaka YAML; `shaka seam check`
+   rejects unknown keys.
 
 5. **Review repo-local trust YAML.** The generated
    `.agents/trusted-github-actors.yml` contains empty, fail-closed lists. Add
