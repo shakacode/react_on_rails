@@ -347,7 +347,7 @@ describe ReactOnRailsPro::Cache, :caching do
                                                          cache_key: cacheable, prerender: true)
 
       expect(result).to eq(["ror_component", ReactOnRails::VERSION, ReactOnRailsPro::VERSION, "123456", "Foobar",
-                            cacheable])
+                            described_class::CSP_NONCE_FREE_CACHE_KEY_SEGMENT, cacheable])
     end
 
     it "properly expands cache keys with the dependencies" do
@@ -360,7 +360,8 @@ describe ReactOnRailsPro::Cache, :caching do
                                                                    prerender: true)
 
       expect(result).to eq(["ror_component", ReactOnRails::VERSION, ReactOnRailsPro::VERSION,
-                            "123456", "abc", "Foobar", cacheable])
+                            "123456", "abc", "Foobar",
+                            described_class::CSP_NONCE_FREE_CACHE_KEY_SEGMENT, cacheable])
     end
 
     it "includes both server and RSC bundle hashes when prerendering with RSC support enabled" do
@@ -374,20 +375,42 @@ describe ReactOnRailsPro::Cache, :caching do
                                                          cache_key: cacheable, prerender: true)
 
       expect(result).to eq(["ror_component", ReactOnRails::VERSION, ReactOnRailsPro::VERSION, "123456",
-                            "rsc789", "Foobar", cacheable])
+                            "rsc789", "Foobar",
+                            described_class::CSP_NONCE_FREE_CACHE_KEY_SEGMENT, cacheable])
     ensure
       ReactOnRailsPro.configuration.enable_rsc_support = original_enable_rsc_support
     end
 
-    it "appends the CSP nonce segment when csp_nonce_active is set (issue #5021)" do
+    it "stamps the CSP nonce partition segment in a fixed position before the user key (issue #5021)" do
       allow(ReactOnRailsPro::Utils).to receive(:bundle_hash).and_return("123456")
 
       nonce_free_key = described_class.react_component_cache_key("Foobar", cache_key: "abc", prerender: true)
       nonce_active_key = described_class.react_component_cache_key("Foobar", cache_key: "abc", prerender: true,
                                                                              csp_nonce_active: true)
 
-      expect(nonce_free_key).not_to include(described_class::CSP_NONCE_CACHE_KEY_SEGMENT)
-      expect(nonce_active_key).to eq(nonce_free_key + [described_class::CSP_NONCE_CACHE_KEY_SEGMENT])
+      # The segment is always present — both states — so user key segments can never
+      # spell one partition into the other, and it precedes the caller's cache_key value.
+      expect(nonce_free_key[-2..]).to eq([described_class::CSP_NONCE_FREE_CACHE_KEY_SEGMENT, "abc"])
+      expect(nonce_active_key[-2..]).to eq([described_class::CSP_NONCE_CACHE_KEY_SEGMENT, "abc"])
+      expect(nonce_active_key.length).to eq(nonce_free_key.length)
+    end
+
+    it "never collides a nonce-free key whose user segments end in the nonce segment (issue #5021)" do
+      allow(ReactOnRailsPro::Utils).to receive(:bundle_hash).and_return("123456")
+
+      # Cache stores flatten nested key arrays into one slash-joined string, so a
+      # conditional TRAILING segment would make these two expand identically.
+      nonce_active_key = described_class.react_component_cache_key(
+        "Foobar", cache_key: ["article", 1], prerender: true, csp_nonce_active: true
+      )
+      forged_nonce_free_key = described_class.react_component_cache_key(
+        "Foobar",
+        cache_key: ["article", 1, ReactOnRailsPro::Cache::CSP_NONCE_CACHE_KEY_SEGMENT],
+        prerender: true
+      )
+
+      expect(ActiveSupport::Cache.expand_cache_key(nonce_active_key))
+        .not_to eq(ActiveSupport::Cache.expand_cache_key(forged_nonce_free_key))
     end
   end
 

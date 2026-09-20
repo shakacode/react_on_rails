@@ -224,7 +224,7 @@ describe ReactOnRailsProHelper do
           end
 
           expect(cache_data.keys)
-            .to include(%r{/App/cache-key})
+            .to include(%r{/App/csp-nonce-free/cache-key})
           expect(cache_data.first[1].value).to match(/div id="App-react-component"/)
         end
 
@@ -253,7 +253,7 @@ describe ReactOnRailsProHelper do
           render_cached.call
 
           expect(props_calls).to eq(1)
-          expect(cache_data.keys).to include(%r{/App/callable-cache-key})
+          expect(cache_data.keys).to include(%r{/App/csp-nonce-free/callable-cache-key})
         end
 
         it "doesn't call the block if content is cached" do
@@ -279,7 +279,7 @@ describe ReactOnRailsProHelper do
           render_uncached.call
 
           expect(props_calls).to eq(2)
-          expect(cache_data.keys).not_to include(%r{/App/skip-if-false})
+          expect(cache_data.keys).not_to include(%r{/App/csp-nonce-free/skip-if-false})
         end
 
         it "skips the cache when unless is true" do
@@ -295,7 +295,7 @@ describe ReactOnRailsProHelper do
           render_uncached.call
 
           expect(props_calls).to eq(2)
-          expect(cache_data.keys).not_to include(%r{/App/skip-unless-true})
+          expect(cache_data.keys).not_to include(%r{/App/csp-nonce-free/skip-unless-true})
         end
 
         context "with cache_tags" do
@@ -312,15 +312,15 @@ describe ReactOnRailsProHelper do
             render_cached.call
             render_cached.call
             expect(props_calls).to eq(1)
-            expect(cache_data.keys).to include(%r{/App/tagged-cache-key})
+            expect(cache_data.keys).to include(%r{/App/csp-nonce-free/tagged-cache-key})
 
             expect(ReactOnRailsPro.revalidate_tag("post:42")).to eq(1)
-            expect(cache_data.keys).not_to include(%r{/App/tagged-cache-key})
+            expect(cache_data.keys).not_to include(%r{/App/csp-nonce-free/tagged-cache-key})
 
             result = render_cached.call
             expect(props_calls).to eq(2)
             expect(result).to match(/div id="App-react-component"/)
-            expect(cache_data.keys).to include(%r{/App/tagged-cache-key})
+            expect(cache_data.keys).to include(%r{/App/csp-nonce-free/tagged-cache-key})
           end
 
           it "revalidates every entry registered under the tag" do
@@ -334,8 +334,8 @@ describe ReactOnRailsProHelper do
             end
 
             expect(ReactOnRailsPro.revalidate_tags("shared-tag")).to eq(2)
-            expect(cache_data.keys).not_to include(%r{/App/tagged-key-one})
-            expect(cache_data.keys).not_to include(%r{/App/tagged-key-two})
+            expect(cache_data.keys).not_to include(%r{/App/csp-nonce-free/tagged-key-one})
+            expect(cache_data.keys).not_to include(%r{/App/csp-nonce-free/tagged-key-two})
           end
 
           it "is a no-op for tags that were never written" do
@@ -350,7 +350,7 @@ describe ReactOnRailsProHelper do
               end
             end.to raise_error(ReactOnRailsPro::Error, /blank tag/)
 
-            expect(cache_data.keys).not_to include(%r{/App/invalid-tagged-key})
+            expect(cache_data.keys).not_to include(%r{/App/csp-nonce-free/invalid-tagged-key})
           end
 
           it "converts expires_at before writing tagged entries when the cache store lacks expires_at support" do
@@ -386,7 +386,7 @@ describe ReactOnRailsProHelper do
             render_cached.call
 
             expect(props_calls).to eq(2)
-            expect(cache_data.keys).not_to include(%r{/App/expired-expires-at-key})
+            expect(cache_data.keys).not_to include(%r{/App/csp-nonce-free/expired-expires-at-key})
             expect(ReactOnRailsPro.revalidate_tag("post:42")).to eq(0)
           end
         end
@@ -400,7 +400,7 @@ describe ReactOnRailsProHelper do
               props
             end
 
-            expect(cache_data.keys).to include(%r{/App/a/b})
+            expect(cache_data.keys).to include(%r{/App/csp-nonce-free/a/b})
             expect(cache_data.first[1].value).to match(/div id="App-react-component"/)
           end
         end
@@ -530,7 +530,8 @@ describe ReactOnRailsProHelper do
             props
           end
 
-          expect(cache_data.keys[0]).to match(%r{#{base_cache_key_with_prerender}/ReactHelmetApp/cache-key})
+          expect(cache_data.keys[0])
+            .to match(%r{#{base_cache_key_with_prerender}/ReactHelmetApp/csp-nonce-free/cache-key})
           expect(cache_data.values[0].value).to match(/div id="ReactHelmetApp-react-component"/)
         end
 
@@ -573,7 +574,8 @@ describe ReactOnRailsProHelper do
               props
             end
 
-            expect(cache_data.keys[0]).to match(%r{#{base_cache_key_with_prerender}/ReactHelmetApp/cache-key})
+            expect(cache_data.keys[0])
+              .to match(%r{#{base_cache_key_with_prerender}/ReactHelmetApp/csp-nonce-free/cache-key})
             expect(cache_data.values[0].value).to match(/div id="ReactHelmetApp-react-component"/)
           end
         end
@@ -844,6 +846,29 @@ describe ReactOnRailsProHelper do
 
       expect(second_props_evaluated).to be(true)
       expect(second_result).to include("malformed-reader")
+      expect(second_result).not_to include("nonce-free-writer")
+    end
+
+    it "never shares an entry between partitions when user key segments spell the nonce segment" do
+      # Cache stores flatten nested key arrays into one slash-joined string. If the
+      # partition discriminator were a conditional trailing segment, a nonce-free request
+      # with cache_key ["csp-collision", "csp-nonce"] would expand to the same key as a
+      # nonce-active request with cache_key ["csp-collision"] — and its marker-free entry
+      # (no attribute to re-stamp) would be served under a nonce-enforcing policy.
+      cached_react_component("App", cache_key: %w[csp-collision csp-nonce], auto_load_bundle: false) do
+        { name: "nonce-free-writer" }
+      end
+
+      allow(self).to receive(:csp_nonce).and_return("live-AAA=")
+      second_props_evaluated = false
+
+      second_result = cached_react_component("App", cache_key: ["csp-collision"], auto_load_bundle: false) do
+        second_props_evaluated = true
+        { name: "nonce-active-reader" }
+      end
+
+      expect(second_props_evaluated).to be(true)
+      expect(second_result).to include("nonce-active-reader")
       expect(second_result).not_to include("nonce-free-writer")
     end
 
