@@ -721,25 +721,22 @@ module ReactOnRailsProHelper
     return html if current_nonce.nil? || current_nonce == cached_csp_nonce
 
     escaped_nonce = Regexp.escape(cached_csp_nonce)
-    # Framework emitters always write lowercase `nonce="..."`, but cached SSR output can
-    # embed app-provided raw markup using any spelling the HTML parser accepts: the
-    # attribute name is ASCII case-insensitive (`NONCE=`), HTML whitespace is allowed
-    # around `=` (`nonce = "..."`), and the value may be unquoted (`<script nonce=abc...>`,
-    # terminated by whitespace or `>` per the unquoted-attribute-value grammar — a longer
-    # unquoted value that merely starts with the originating nonce is a different value
-    # and is left alone). The nonce VALUE match stays case-sensitive: it is an exact
-    # secret, not an HTML name. Every match is rewritten to the canonical double-quoted
-    # lowercase form.
-    # Every whitespace position uses the HTML ASCII whitespace set, never Ruby's \s: \v is
-    # not HTML whitespace, so a \v before the name belongs to the previous token, and a \v
-    # after an unquoted value is part of that value — `nonce=abc\vfoo` is the single value
-    # "abc\vfoo", not "abc", and terminating at \v would re-stamp a prefix of a different
-    # value, minting a live nonce the originating response never granted.
+    # Only the double-quoted spelling `nonce="<originating value>"` is re-stamped — the
+    # form every framework emitter produces. The attribute name stays ASCII
+    # case-insensitive, HTML whitespace is allowed around `=` (the HTML set, never Ruby's
+    # \s — \v is not HTML whitespace), and the attribute may start after HTML whitespace,
+    # `/`, or a closing quote, all tokenizer-valid attribute starts
+    # (`<script/nonce="...">`, `<script id="x"nonce="...">`). Unquoted and single-quoted
+    # spellings are deliberately NOT matched: cached SSR output embeds JSON data blocks
+    # whose escaping (ERB::Util.json_escape / JSON string rules) leaves plain text and
+    # single quotes intact, so those spellings can occur as inert text inside a JSON
+    # string — rewriting one would inject raw double quotes that break JSON.parse on
+    # every cache hit. The double-quoted form cannot appear unescaped inside a JSON
+    # string (its quotes are `\"`), so this bound is JSON-safe; app-provided raw markup
+    # using another spelling fails closed and keeps its stale nonce for CSP to block.
     ws = CSP_NONCE_HTML_WS_CHARS
     html_ws = CSP_NONCE_ATTR_WS_PATTERN
-    value_match =
-      /(?:(?<quote>["'])#{escaped_nonce}\k<quote>|#{escaped_nonce}(?=[#{ws}>]))/
-    attribute_pattern = /(?<=[#{ws}])(?i:nonce)#{html_ws}=#{html_ws}#{value_match}/
+    attribute_pattern = %r{(?<=[#{ws}/"'])(?i:nonce)#{html_ws}=#{html_ws}"#{escaped_nonce}"}
 
     # SafeBuffer#gsub semantics vary across Rails versions (the html_safe flag is dropped,
     # and some versions HTML-escape a non-safe block return), so rewrite a plain copy and
@@ -765,10 +762,9 @@ module ReactOnRailsProHelper
   # ReactOnRailsPro::StreamCache::DomNodeIdRewriter solves for cached dom ids. The
   # String chunks are joined, rewritten once, and re-split at the original chunk
   # boundaries. When the rewrite changes the total byte length (differing nonce
-  # lengths, or an unquoted attribute normalized to a quoted one) — or a
-  # length-compensating mix would slice a multibyte character — the original
-  # boundaries no longer apply, so the whole rewritten document is delivered in the
-  # first String chunk and the rest are emptied; the streamed concatenation is
+  # lengths) — or, defensively, if a re-split would slice a multibyte character — the
+  # original boundaries no longer apply, so the whole rewritten document is delivered
+  # in the first String chunk and the rest are emptied; the streamed concatenation is
   # identical either way.
   def rewrite_cached_csp_nonces_across_chunks(chunks, cached_csp_nonce)
     return chunks if cached_csp_nonce.nil?

@@ -699,12 +699,12 @@ describe ReactOnRailsProHelper do
       expect(result).to be_html_safe
     end
 
-    it "re-stamps unquoted and single-quoted nonce attributes in cached raw markup" do
-      # Framework emitters always double-quote the attribute, but cached SSR output can
-      # embed app-provided raw markup with valid unquoted (or single-quoted) attribute
-      # spellings. All spellings of the exact originating value must be re-stamped; an
-      # unquoted value that merely starts with the originating nonce is a different
-      # attribute value and must be left alone.
+    it "leaves unquoted and single-quoted nonce spellings untouched (fail closed)" do
+      # Only the double-quoted spelling is re-stamped: unquoted and single-quoted text
+      # can legitimately occur inside cached JSON data blocks, where a rewrite would
+      # inject raw double quotes and break JSON.parse. App-provided raw markup using
+      # those spellings keeps its stale nonce (blocked by CSP on the hit) instead of
+      # risking corruption.
       expected_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(
         "App", cache_key: "csp-nonce-unquoted", csp_nonce_active: true
       )
@@ -721,19 +721,75 @@ describe ReactOnRailsProHelper do
         raise "props block must not run on a cache hit"
       end
 
-      expect(result).to include('<script nonce="live-BBB=">unquoted()</script>')
-      expect(result).to include('<script nonce="live-BBB=">singleQuoted()</script>')
+      expect(result).to include("<script nonce=origin-AAA=>unquoted()</script>")
+      expect(result).to include("<script nonce='origin-AAA='>singleQuoted()</script>")
       expect(result).to include('<script nonce="live-BBB=">framework()</script>')
       expect(result).to include("<script nonce=origin-AAA=x>lookalike()</script>")
       expect(result).to be_html_safe
     end
 
+    it "never rewrites nonce-like text inside JSON script bodies" do
+      # ERB::Util.json_escape leaves plain text and single quotes intact, so cached JSON
+      # data blocks can legitimately contain ` nonce=origin-AAA= ` (a props string) or
+      # nonce='origin-AAA=' verbatim. Rewriting either would inject raw double quotes
+      # into the JSON and break JSON.parse on every cache hit — strictly worse than the
+      # stale nonce. The double-quoted attribute form cannot occur unescaped inside a
+      # JSON string, so only it is re-stamped.
+      expected_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(
+        "App", cache_key: "csp-nonce-json-body", csp_nonce_active: true
+      )
+      json_block = '<script type="application/json" id="js-props">' \
+                   '{"text":"choose nonce=origin-AAA= wisely",' \
+                   "\"html\":\"<i nonce='origin-AAA='>x</i>\"}" \
+                   "</script>"
+      cached_html = "<div>cached</div>" \
+                    "#{json_block}" \
+                    '<script nonce="origin-AAA=">framework()</script>' \
+                    "<!--rorp-cached-csp-nonce:origin-AAA=-->"
+      Rails.cache.write(expected_cache_key, cached_html.html_safe)
+      allow(self).to receive(:csp_nonce).and_return("live-BBB=")
+
+      result = cached_react_component("App", cache_key: "csp-nonce-json-body", auto_load_bundle: false) do
+        raise "props block must not run on a cache hit"
+      end
+
+      expect(result).to include(json_block)
+      expect(result).to include('<script nonce="live-BBB=">framework()</script>')
+    end
+
+    it "re-stamps tokenizer-valid attribute starts without preceding whitespace" do
+      # WHATWG tokenizers accept `/` (self-closing-start-tag recovery) and a closing
+      # quote (after-attribute-value-quoted recovery) as attribute starts, so
+      # <script/nonce="..."> and <script id="x"nonce="..."> parse as nonce attributes and
+      # must be re-stamped. Safe from the JSON-corruption class: the double-quoted
+      # delimiters cannot appear unescaped inside a JSON string.
+      expected_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(
+        "App", cache_key: "csp-nonce-attr-starts", csp_nonce_active: true
+      )
+      cached_html = "<div>cached</div>" \
+                    '<script/nonce="origin-AAA=">slashStart()</script>' \
+                    '<script id="x"nonce="origin-AAA=">quoteStart()</script>' \
+                    "<script id='y'nonce=\"origin-AAA=\">singleQuoteStart()</script>" \
+                    "<!--rorp-cached-csp-nonce:origin-AAA=-->"
+      Rails.cache.write(expected_cache_key, cached_html.html_safe)
+      allow(self).to receive(:csp_nonce).and_return("live-BBB=")
+
+      result = cached_react_component("App", cache_key: "csp-nonce-attr-starts", auto_load_bundle: false) do
+        raise "props block must not run on a cache hit"
+      end
+
+      expect(result).to include('<script/nonce="live-BBB=">slashStart()</script>')
+      expect(result).to include('<script id="x"nonce="live-BBB=">quoteStart()</script>')
+      expect(result).to include("<script id='y'nonce=\"live-BBB=\">singleQuoteStart()</script>")
+      expect(result).not_to include("origin-AAA=")
+    end
+
     it "re-stamps case-insensitive attribute names and whitespace around the equals sign" do
       # HTML attribute names are ASCII case-insensitive and HTML whitespace is allowed
-      # around `=`, so app-provided raw markup can spell the attribute as `NONCE="..."`,
-      # `nonce = "..."`, or combinations with the unquoted form. Every spelling of the
-      # exact originating value must be re-stamped (normalized to canonical
-      # `nonce="..."`); the value itself stays case-sensitive.
+      # around `=`, so double-quoted app markup can spell the attribute as `NONCE="..."`
+      # or `nonce = "..."` and is re-stamped (normalized to canonical `nonce="..."`).
+      # The value itself stays case-sensitive, and unquoted spellings fail closed (see
+      # the JSON-body spec).
       expected_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(
         "App", cache_key: "csp-nonce-spellings", csp_nonce_active: true
       )
@@ -752,19 +808,19 @@ describe ReactOnRailsProHelper do
 
       expect(result).to include('<script nonce="live-BBB=">upperName()</script>')
       expect(result).to include('<script nonce="live-BBB=">spacedEquals()</script>')
-      expect(result).to include('<script nonce="live-BBB=">combinedUnquoted()</script>')
+      # Unquoted (even mixed-case, spaced) stays untouched under the double-quoted bound.
+      expect(result).to include("<script Nonce =\torigin-AAA=>combinedUnquoted()</script>")
       # A case-variant VALUE is a different secret and is never promoted.
       expect(result).to include('<script nonce="ORIGIN-aaa=">wrongCaseValue()</script>')
-      expect(result).not_to include("origin-AAA=")
       expect(result).to be_html_safe
     end
 
-    it "never re-stamps a prefix of an unquoted value continued by a vertical tab" do
-      # \v is NOT HTML whitespace: the parser reads `origin-AAA=\vfoo` as ONE attribute
-      # value, which differs from the originating nonce and must stay untouched. Ruby's
-      # \s includes \v, so a \s-based terminator would rewrite just the prefix — minting
-      # a live nonce for a script the originating response refused to run. Real HTML
-      # whitespace (tab) still terminates an unquoted value and is re-stamped.
+    it "never re-stamps unquoted values or names preceded by a vertical tab" do
+      # Under the double-quoted bound, unquoted spellings are never re-stamped at all —
+      # including `origin-AAA=\vfoo` (one attribute value per HTML: \v is NOT HTML
+      # whitespace, so a \s-based rewrite would have minted a live nonce for a prefix of
+      # a different value) and the plain tab-delimited form. A \v-preceded name is part
+      # of the previous token and stays untouched too.
       expected_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(
         "App", cache_key: "csp-nonce-vtab", csp_nonce_active: true
       )
@@ -781,10 +837,8 @@ describe ReactOnRailsProHelper do
       end
 
       expect(result).to include("<script nonce=origin-AAA=\vfoo>vtabLookalike()</script>")
-      expect(result).to include("<script nonce=\"live-BBB=\"\tdata-x=1>tabDelimited()</script>")
+      expect(result).to include("<script nonce=origin-AAA=\tdata-x=1>tabDelimited()</script>")
       expect(result).not_to include("nonce=\"live-BBB=\"\vfoo")
-      # A \v-preceded name is part of the PREVIOUS token per HTML (here the attribute
-      # name "\vnonce"), so it is a different attribute and must stay untouched too.
       expect(result).to include("<script \vnonce=\"origin-AAA=\">vtabName()</script>")
     end
 
