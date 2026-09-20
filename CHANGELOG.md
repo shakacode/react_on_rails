@@ -24,6 +24,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Added
+
+- **[Pro]** **Candidate `react-on-rails-rsc@19.3.1-rc.0` soak**: The Pro package optional peer now
+  also accepts `~19.3.1-rc.0` so apps can install the React 19.3 Flight RC (`next` dist-tag)
+  without satisfying the stable `>=19.2.1 <20.0.0` range. Pro dummy and package tests pin that RC
+  with React/React DOM/`react-server-dom-webpack` 19.3.0. The generator still installs stable
+  `19.2.1`. Do not mix this RC with published `react-on-rails-rsc@19.3.0` (React 19.2.8 Flight).
+
 #### Fixed
 
 - **`authenticityHeaders()` no longer mutates its input object**: The helper now returns a new merged object instead of writing CSRF headers into the caller's `otherHeaders` argument. Previously, passing a shared or module-level headers object would bake a stale CSRF token into it, causing intermittent `422 InvalidAuthenticityToken` errors after Turbo navigations. Fixes [Issue 5028](https://github.com/shakacode/react_on_rails/issues/5028).

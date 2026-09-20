@@ -28,8 +28,8 @@ const versionBelowMinimumVersion = (version: string) => {
 const belowMinimumVersion = versionBelowMinimumVersion(minimumVersion);
 
 describe('checkRscPeerCompatibility', () => {
-  it('does not configure a prerelease exception for the stable package floor', () => {
-    expect(minimumPrereleaseVersion).toBeUndefined();
+  it('configures the 19.3.1-rc.0 soak as the prerelease exception', () => {
+    expect(minimumPrereleaseVersion).toBe('19.3.1-rc.0');
   });
 
   it('returns ok when react-on-rails-rsc is absent (optional peer not installed)', () => {
@@ -57,7 +57,7 @@ describe('checkRscPeerCompatibility', () => {
       expect(r.level).toBe('error');
       expect(r.message).toContain(prerelease);
       expect(r.message).toContain(`>= ${minimumVersion}`);
-      expect(r.message).not.toContain('during the RC soak');
+      expect(r.message).toContain('during the RC soak');
       expect(r.message).not.toContain('undefined');
     },
   );
@@ -66,7 +66,7 @@ describe('checkRscPeerCompatibility', () => {
     const r = checkRscPeerCompatibility({ rscVersion: belowMinimumVersion, reactVersion: '19.2.7' });
     expect(r.level).toBe('error');
     expect(r.message).toContain(`>= ${minimumVersion}`);
-    expect(r.message).not.toContain('during the RC soak');
+    expect(r.message).toContain('during the RC soak');
     expect(r.message).not.toContain('undefined');
   });
 
@@ -97,11 +97,37 @@ describe('checkRscPeerCompatibility', () => {
   });
 
   it('errors on future unlisted rsc minors before suggesting React changes', () => {
-    const r = checkRscPeerCompatibility({ rscVersion: '19.3.0', reactVersion: '19.2.7' });
+    const r = checkRscPeerCompatibility({ rscVersion: '19.4.0', reactVersion: '19.2.7' });
+    expect(r.level).toBe('error');
+    expect(r.message).toContain('react-on-rails-rsc');
+    expect(r.message).toContain('19.4.0');
+    expect(r.message).toContain('19.2.x');
+    expect(r.message).toContain('19.3.x');
+  });
+
+  it('errors on published react-on-rails-rsc 19.3.0 before mixing it with React 19.3', () => {
+    const r = checkRscPeerCompatibility({ rscVersion: '19.3.0', reactVersion: '19.3.0' });
     expect(r.level).toBe('error');
     expect(r.message).toContain('react-on-rails-rsc');
     expect(r.message).toContain('19.3.0');
-    expect(r.message).toContain('19.2.x');
+    expect(r.message).not.toContain('Incompatible react version');
+  });
+
+  it('returns ok for the 19.3.1-rc.0 soak with React 19.3.0', () => {
+    expect(
+      checkRscPeerCompatibility({
+        rscVersion: '19.3.1-rc.0',
+        reactVersion: '19.3.0',
+        reactDomVersion: '19.3.0',
+      }).level,
+    ).toBe('ok');
+  });
+
+  it('errors when the 19.3.1-rc.0 soak is paired with React 19.2.7', () => {
+    const r = checkRscPeerCompatibility({ rscVersion: '19.3.1-rc.0', reactVersion: '19.2.7' });
+    expect(r.level).toBe('error');
+    expect(r.message).toContain('react');
+    expect(r.message).toContain('19.3.x with patch >= 19.3.0');
   });
 
   it('errors when React major is below the RSC minimum', () => {

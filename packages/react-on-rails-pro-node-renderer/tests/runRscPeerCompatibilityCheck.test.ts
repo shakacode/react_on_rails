@@ -134,6 +134,15 @@ describe('runRscPeerCompatibilityCheck', () => {
     expect(warnSpy).not.toHaveBeenCalled();
   });
 
+  it('does not warn for the 19.3.1-rc.0 soak with React 19.3.0', () => {
+    expect(() =>
+      runRscPeerCompatibilityCheck({
+        resolveVersion: resolveVersions('19.3.1-rc.0', '19.3.0'),
+      }),
+    ).not.toThrow();
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
   it.each(['19.2.1-rc.0', '19.2.1-rc.1'])(
     'throws for the superseded prerelease package line %s',
     (prerelease) => {

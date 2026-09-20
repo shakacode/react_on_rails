@@ -5066,21 +5066,26 @@ module ReactOnRails
     RSC_PACKAGE_NAME = "react-on-rails-rsc"
     RSC_MINIMUM_PACKAGE_VERSION = "19.2.1"
     RSC_SUPPORTED_PACKAGE_MAJOR = 19
-    RSC_SUPPORTED_PACKAGE_MINORS = [2].freeze
+    # Keep in sync with packages/react-on-rails-pro-node-renderer/src/shared/rscPeerSupport.ts.
+    # rsc_min_patch: 1 on the 19.3 line keeps published 19.3.0 (React 19.2.8 Flight) out of
+    # the React 19.3 soak window used by react-on-rails-rsc 19.3.1-rc.0.
+    RSC_REACT_SUPPORT_RANGES = [
+      { rsc_minor: 2, rsc_min_patch: 1, minor: 2, min_patch: 7 },
+      { rsc_minor: 3, rsc_min_patch: 1, minor: 3, min_patch: 0 }
+    ].freeze
+    RSC_SUPPORTED_PACKAGE_MINORS = RSC_REACT_SUPPORT_RANGES.map { |range| range.fetch(:rsc_minor) }.freeze
     RSC_SUPPORTED_PACKAGE_LINE = RSC_SUPPORTED_PACKAGE_MINORS.map do |minor|
       "#{RSC_SUPPORTED_PACKAGE_MAJOR}.#{minor}.x"
     end.join(" or ")
     RSC_PACKAGE_INSTALL_VERSION = ReactOnRails::Generators::JsDependencyManager::RSC_PACKAGE_VERSION_PIN
-    # A temporary prerelease pin may define a matching exception during a future soak.
-    # Stable pins leave this nil so prereleases do not satisfy the package floor.
-    RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION =
-      RSC_PACKAGE_INSTALL_VERSION.include?("-") ? RSC_PACKAGE_INSTALL_VERSION : nil
+    # Candidate soak only. The generator pin stays on stable 19.2.1 / latest.
+    RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION = "19.3.1-rc.0"
     RSC_MINIMUM_REACT_VERSION = "19.2.7"
     RSC_MINIMUM_REACT_VERSION_TUPLE = RSC_MINIMUM_REACT_VERSION.split(".").map(&:to_i).freeze
     RSC_SUPPORTED_REACT_MAJOR = RSC_MINIMUM_REACT_VERSION_TUPLE.fetch(0)
-    RSC_SUPPORTED_REACT_LINE = RSC_SUPPORTED_PACKAGE_MINORS.map do |minor|
-      "#{RSC_SUPPORTED_REACT_MAJOR}.#{minor}.x"
-    end.join(" or ")
+    RSC_SUPPORTED_REACT_LINE = RSC_REACT_SUPPORT_RANGES.map do |range|
+      "#{RSC_SUPPORTED_REACT_MAJOR}.#{range.fetch(:minor)}.x"
+    end.uniq.join(" or ")
     RSC_DIST_TAGS_TO_CHECK = %w[next rc].freeze
     NPM_VIEW_FETCH_TIMEOUT_MS = 5_000
     NPM_VIEW_FETCH_TIMEOUT_SECONDS = NPM_VIEW_FETCH_TIMEOUT_MS / 1000.0
@@ -5419,10 +5424,16 @@ module ReactOnRails
     def rsc_stable_package_version_supported?(rsc_version)
       return false if npm_prerelease(rsc_version).present?
 
-      major, minor, = npm_version_tuple(rsc_version)
+      major, minor, patch = npm_version_tuple(rsc_version)
+      range = rsc_react_support_range_for_minor(minor)
       major == RSC_SUPPORTED_PACKAGE_MAJOR &&
-        RSC_SUPPORTED_PACKAGE_MINORS.include?(minor) &&
+        range &&
+        patch >= range.fetch(:rsc_min_patch) &&
         npm_version_compare(rsc_version, RSC_MINIMUM_PACKAGE_VERSION) >= 0
+    end
+
+    def rsc_react_support_range_for_minor(rsc_minor)
+      RSC_REACT_SUPPORT_RANGES.find { |range| range.fetch(:rsc_minor) == rsc_minor }
     end
 
     def unsupported_rsc_react_version?(react_version)
@@ -5455,19 +5466,40 @@ module ReactOnRails
 
     def check_rsc_supported_react_version_for_package(rsc_package, package_name, package_version)
       return true if package_version.blank?
-      return true unless unsupported_rsc_react_version?(package_version)
+      return true if supported_rsc_react_version_for_package?(package_version, rsc_package["version"].to_s)
 
       package_label = package_name == "react" ? "React" : "React DOM"
+      react_range_label = supported_react_range_label_for_rsc_package(rsc_package["version"].to_s)
 
       checker.add_error(<<~MSG.strip)
         🚫 #{RSC_PACKAGE_NAME} #{rsc_package['version']} is installed with unsupported #{package_label} #{package_version}.
 
-        React on Rails Pro 17 RSC currently supports React/React DOM #{RSC_SUPPORTED_REACT_LINE} with patch >= #{RSC_MINIMUM_REACT_VERSION}.
+        React on Rails Pro 17 RSC currently supports React/React DOM #{react_range_label}.
         The node renderer enforces the same support window at startup.
 
         Fix: npm install react@~#{RSC_MINIMUM_REACT_VERSION} react-dom@~#{RSC_MINIMUM_REACT_VERSION} --save-exact
       MSG
       false
+    end
+
+    def supported_rsc_react_version_for_package?(react_version, rsc_version)
+      _rsc_major, rsc_minor, = npm_version_tuple(rsc_version)
+      range = rsc_react_support_range_for_minor(rsc_minor)
+      return false unless range
+
+      major, minor, patch = npm_version_tuple(react_version)
+      major == RSC_SUPPORTED_REACT_MAJOR &&
+        minor == range.fetch(:minor) &&
+        patch >= range.fetch(:min_patch)
+    end
+
+    def supported_react_range_label_for_rsc_package(rsc_version)
+      _rsc_major, rsc_minor, = npm_version_tuple(rsc_version)
+      range = rsc_react_support_range_for_minor(rsc_minor)
+      return RSC_SUPPORTED_REACT_LINE unless range
+
+      "#{RSC_SUPPORTED_REACT_MAJOR}.#{range.fetch(:minor)}.x with patch >= " \
+        "#{RSC_SUPPORTED_REACT_MAJOR}.#{range.fetch(:minor)}.#{range.fetch(:min_patch)}"
     end
 
     def check_rsc_react_dom_matches_react_for_package(rsc_package, react_version, react_dom_version)
