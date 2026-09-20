@@ -12,7 +12,12 @@ files:
   consumer_sha256: 622598aa9c8a1c5e1e577f95b39c9a3cd6a52dd558f94bdfe9add44106e5d290
 - source: bin/agent-workflow-seam-doctor
   consumer: ".agents/bin/agent-workflow-seam-doctor"
-  mode: identical
+  mode: overlay
+  reason: React on Rails accepts the Shaka V2 typed seam in agent-workflow.yml
+    while keeping the V1 policy-key contract for unmigrated fixtures.
+  consumer_mode: '100755'
+  source_sha256: 110099519bd99c739bbe5a90c55145eaf27421362fc285f6283947402f8ab062
+  consumer_sha256: b4cdb7fefa446b261eb33c77ac38b18425419843880fc09cd6623e54e8e74f3b
 - source: bin/agent-workflow-seam-doctor-test.rb
   consumer: ".agents/bin/agent-workflow-seam-doctor-test.rb"
   mode: identical
@@ -28,13 +33,18 @@ files:
   consumer: ".agents/docs/adoption.md"
   mode: overlay
   reason: React on Rails documents installed shared skills, repo-pinned helper copies,
-    and source-pack links for its consumer layout.
+    and source-pack links for its consumer layout, and records the Shaka typed seam.
   consumer_mode: '100644'
   source_sha256: 509b333b461cded9f7f05498567aa454240af62f63697d66e4ebf41e6499555f
-  consumer_sha256: 3f184494b2ba156bf2ada9e2412af2371eea5465f4f948b6d3a05d72e3840583
+  consumer_sha256: 08949f00d1d770ecd45c29bf610b5e390583acf2486e20829ddccd28b528d3c4
 - source: docs/coordination-backend.md
   consumer: ".agents/docs/coordination-backend.md"
-  mode: identical
+  mode: overlay
+  reason: React on Rails records coordination backend policy in AGENTS.md after the
+    Shaka typed seam dropped the V1 YAML key.
+  consumer_mode: '100644'
+  source_sha256: 2001f61aca39b9e538f859bd6576d9eba0ebfb454e85ae5a69f0a6b9a2e4d1be
+  consumer_sha256: 165c40af1ff4bae9b12ac23eadbb66330f4d34d22dc2e48103e76734f2f7de30
 - source: docs/installation-and-upgrades.md
   consumer: ".agents/docs/installation-and-upgrades.md"
   mode: identical
@@ -64,7 +74,7 @@ files:
     replaces source-pack-only glossary links.
   consumer_mode: '100644'
   source_sha256: 39b1afb441b0b77f26c31daa043c51d0665c22190efa6454fff2882aa6ab4f05
-  consumer_sha256: 5fc91bb70b28784d04c24a54c65877271abf258e0f3e91d2f1413f4665223343
+  consumer_sha256: 81c4ff5b5574df546ad6b9466392a34320b15084e5598576d489321c250587c3
 - source: docs/security-posture.md
   consumer: ".agents/docs/security-posture.md"
   mode: overlay
@@ -184,7 +194,7 @@ files:
     installed address-review skill.
   consumer_mode: '100644'
   source_sha256: 9337d46ed3d446c831e5b00f7c7310a40b0f0d981b6d8213a9ea7735b2e1aa31
-  consumer_sha256: c5060895bbf37e68305b9e4f936c7398c0c32380c4fb00b45ca378c543981ecb
+  consumer_sha256: 1605f87ea0bb065befcb1a6e17002e6e02c3e430565e34a0bd2bcc2e516bffee
 - source: workflows/adversarial-pr-review.md
   consumer: ".agents/workflows/adversarial-pr-review.md"
   mode: overlay
@@ -199,7 +209,7 @@ files:
   reason: React on Rails adds local helper resolution and installed shared-skill references.
   consumer_mode: '100644'
   source_sha256: 91fab43cedfb1bb241218a27b12949797bdb4570aa5f7044ec2d52434ecefab9
-  consumer_sha256: 8be582b5ceef546309b6ac797f89b0efe0e18a822b4c38f62a4687fe4ce96e2a
+  consumer_sha256: 3fdaef958598c65ed52e2aa45c3aaf88ff55b22dd763e4e233ca5d0730c2dc81
 - source: workflows/evaluate-issue.md
   consumer: ".agents/workflows/evaluate-issue.md"
   mode: overlay
@@ -225,7 +235,7 @@ files:
     qa-evidence v2 contract with a reviewed structured v3 forward-gate overlay.
   consumer_mode: '100644'
   source_sha256: 7d0fbef62293d3a59e2c7a63abc6863be39ceb6883c6bc11b6a1c9747d9ad6c7
-  consumer_sha256: 122688ab4870c88e0192d71ff589cccc007b431e1bee3eeafff1ee47485863a3
+  consumer_sha256: e632e9e818b42b9ff4977f29195cd9fcccefc109f1602174a4348aa2035b8e9a
 - source: workflows/tdd.md
   consumer: ".agents/workflows/tdd.md"
   mode: overlay

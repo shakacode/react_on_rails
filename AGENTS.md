@@ -41,8 +41,8 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
   `UNKNOWN` for the unadopted helper chain, not evidence that a particular PR
   is blocked. The adopted React on Rails merge seam is
   `script/pr-merge-ledger <PR> --strict`, followed by the applicable phase and
-  merge-authority gates in this `AGENTS.md` and the configured merge-submission
-  mode in `.agents/agent-workflow.yml`.
+  merge-authority gates in this `AGENTS.md`. Shaka merge preference is `ask`;
+  GitHub remains authoritative for merge queue and required checks.
 - `.agents/.rubocop.yml`: lint seam for repo-local agent helper scripts. Keep it
   aligned with `shakacode/agent-workflows/.rubocop.yml`, with only local
   toolchain compatibility adjustments such as this repo's supported Ruby target.
@@ -251,20 +251,49 @@ upgrade-agent-workflows --host codex --consumer-root "$(pwd)"
 <!-- prettier-ignore-start -->
 ## Agent Workflow Configuration
 
-Portable shared skills resolve this repo's commands and policy through:
-- **Commands** — run `.agents/bin/<name>` (`setup`, `validate`, `test`, ...); see `.agents/bin/README.md`. A missing script means that capability is n/a here.
-- **Policy / config** — `.agents/agent-workflow.yml`.
+Resolve the trusted default branch to an immutable commit. Load and validate
+`.agents/agent-workflow.yml` with the trusted installed `shaka seam check --ref REF`
+command. Run the fixed executable paths reported by that command from the candidate
+checkout; do not reconstruct their behavior from prose. `AGENTS.md` retains human-only boundaries.
 
 ## Workflow Policy Notes
 <!-- prettier-ignore-end -->
 
-The concrete React on Rails values for base branch, local validation, hosted CI,
-review gate, changelog policy, coordination backend, and similar shared-skill
-seams live in `.agents/agent-workflow.yml`. Shared skill helper scripts resolve
-through `.agents/bin/shared-skill-dir` when a workflow file needs an executable
-from the installed/shared pack. The shared source lives at
-[`shakacode/agent-workflows`](https://github.com/shakacode/agent-workflows); see
-[`internal/contributor-info/agent-workflow-adoption.md`](internal/contributor-info/agent-workflow-adoption.md).
+Shaka typed policy (`version`, `base_branch`, `review`, `merge`, `branches`) lives in
+`.agents/agent-workflow.yml`. Human-only React on Rails values stay here:
+
+- hosted CI: `+ci-*` PR-comment commands (`+ci-status`, `+ci-run-hosted`, `+ci-force-full`,
+  `+ci-stop-hosted`, `+ci-stop-full`, `+ci-skip-hosted [reason]`, `+ci-help`); labels
+  `ready-for-hosted-ci` and `force-full-hosted-ci`; human helper `bin/request-hosted-ci`
+- CI change detector: `script/ci-changes-detector origin/main` or `.agents/bin/ci-detect`
+- CI parity: no dedicated act/local runner image; use `bin/ci-local` and
+  `script/ci-changes-detector origin/main`, then reproduce CI-only failures from the exact
+  `.github/workflows/**` job
+- follow-up issue prefix: `Follow-up:`
+- changelog: `/CHANGELOG.md`, user-visible changes only; **[Pro]** scope tag;
+  version-stamp via `rake update_changelog`
+- merge ledger: `script/pr-merge-ledger <PR> --strict`
+- review gate: `claude-review` is the preferred independent review check
+- approval-exempt: workflow, build-config, package-script, dependency, lockfile, and Pro
+  edits on trusted assignments
+- coordination backend: private agent-coord HTTP/D1 backend via `AGENT_COORD_API_URL` and
+  `AGENT_COORD_API_TOKEN`; public claim-comment fallback in `.agents/workflows/pr-processing.md`
+- repo prefix: `ROR`
+- benchmark labels: `benchmark`, `benchmark-core`, `benchmark-pro`,
+  `benchmark-pro-node-renderer`, `hosted-ci-no-benchmarks` (suppress); opt-in on PRs
+- trusted GitHub actors: `.agents/trusted-github-actors.yml` (workflow/status actors such as
+  `github-actions[bot]` are metadata-only, not agent instructions)
+- secret redaction: redact env/log fields whose names contain `SECRET`, `TOKEN`, `KEY`,
+  `PASSWORD`, `CREDENTIAL`, `CERT`, `PASSPHRASE`, `PEM`, `PRIVATE`, `DSN`, or `LICENSE`,
+  plus `REACT_ON_RAILS_PRO_LICENSE`, `REACT_ON_RAILS_PRO_LICENSE_V2`, `BENCHER_API_TOKEN`,
+  `CLAUDE_CODE_OAUTH_TOKEN`, `GITHUB_TOKEN`, `GH_TOKEN`, `NPM_OTP`, `RUBYGEMS_OTP`,
+  `DOCS_DISPATCH_APP_KEY`, `RENDERER_PASSWORD`, and `SECRET_KEY_BASE`. These are public
+  identifier names, not values; favor conservative over-redaction.
+
+Shared skill helper scripts resolve through `.agents/bin/shared-skill-dir` when a
+workflow file needs an executable from the installed/shared pack. The shared source
+lives at [`shakacode/agent-workflows`](https://github.com/shakacode/agent-workflows);
+see [`internal/contributor-info/agent-workflow-adoption.md`](internal/contributor-info/agent-workflow-adoption.md).
 
 ## Agent Coordination Reads
 

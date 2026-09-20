@@ -33,6 +33,7 @@ Additional helper:
   and governed source prefix, with only the reviewed source-only exclusions.
   Required CI runs it before the pinned source pack's content/mode drift checker.
 
-Non-command policy lives in [`../agent-workflow.yml`](../agent-workflow.yml).
+Shaka typed policy lives in [`../agent-workflow.yml`](../agent-workflow.yml).
+Human-only React on Rails policy stays in `AGENTS.md`.
 Workflow-specific checks such as `actionlint` and `yamllint .github/` stay in the
 PR-processing workflow for `.github/**` changes rather than the general build entrypoint.

@@ -31,7 +31,7 @@ For adversarial pre-merge or post-merge PR review, use the installed/shared `$ad
 3. Isolate the work:
    - Fetch/prune `main`, confirm the expected repository root, and verify nested repo paths before assigning work.
    - When the repo's private coordination backend (see `coordination_backend`
-     in `.agents/agent-workflow.yml`) is available, acquire an `agent-coord`
+     in `AGENTS.md`) is available, acquire an `agent-coord`
      claim for each issue/PR/ad-hoc lane before creating that lane's worktree or
      branch. Resolve `PR_BATCH_SKILL_DIR` in this order: explicit environment
      variable; the loaded skill's base directory when the host exposes it;
@@ -153,7 +153,7 @@ gh api graphql --paginate -f owner="${OWNER}" -f name="${NAME}" -F pr="${PR_NUMB
 Use `-F pr=...` intentionally here: `gh api graphql` needs a JSON integer for `$pr:Int!`, and raw `-f pr=...` sends a string.
 
 At merge readiness or batch closeout, build the machine-checkable per-PR merge
-ledger using the repo's `merge_ledger` policy in `.agents/agent-workflow.yml`.
+ledger using the repo's `merge_ledger` policy in `AGENTS.md`.
 The command uses GitHub GraphQL/API reviewThreads, reviews, and
 PR comments, then emits JSON against the ledger's schema. Run it for `<PR>`
 (passing `--repo "${REPO}"` when not in the repo) with an explicit
@@ -246,7 +246,7 @@ Tracker issue bodies are shared mutable state. Avoid clobbering another agent's 
 
 Workflow, build-configuration, package-script, dependency, lockfile, and the
 repo's approval-exempt package edits (see `approval_exempt` in
-`.agents/agent-workflow.yml`) are normal implementation scope when they are relevant to the
+`AGENTS.md`) are normal implementation scope when they are relevant to the
 assigned issue, PR, or batch. Do not stop solely to ask whether these files are
 allowed.
 
@@ -292,7 +292,7 @@ Semantic changes include trigger, permission, job, matrix, condition,
 concurrency, secret, reusable-action, command-parsing, workflow-dispatch, and
 CI-routing behavior changes. For semantic changes, link an existing tracking
 issue or create one bundled issue titled with the repo's follow-up issue prefix
-(see `.agents/agent-workflow.yml`), such as
+(see `follow_up_prefix` in `AGENTS.md`), such as
 `<follow-up prefix> Exercise GitHub Actions changes from PR #NNNN`, before merge. The
 issue must include the source PR, changed workflow/action files, exact
 post-merge event or secondary verification PR to exercise, expected evidence,
@@ -991,7 +991,7 @@ maintainer pings.
 Hosted-CI uncertainty at the final readiness gate after local validation and the
 final push is a non-blocking decision. If the branch needs remote confirmation,
 request optimized hosted CI via the repo's hosted-CI trigger (see
-`hosted_ci_trigger` in `.agents/agent-workflow.yml`). If the remaining concern is that optimized
+`hosted_ci_trigger` in `AGENTS.md`). If the remaining concern is that optimized
 suite selection may be insufficient, request force-full hosted CI and record why.
 Re-fetch and wait for the newly requested current-head checks, then continue the
 readiness flow instead of escalating it as an immediate maintainer question.
@@ -1122,7 +1122,7 @@ Use exact lane assignments as the primary coordination mechanism. Labels are use
   heartbeat and preserve unsupported metadata, or explicit `UNKNOWN`, in the
   Lane Card, PR evidence, and final handoff. Never pass an unadvertised flag and
   do not infer support from a different backend implementation.
-- When the trusted repo seam sets `coordination_backend: n/a`, skip private
+- When `AGENTS.md` says the coordination backend is unused, skip private
   claims and public claim comments. Treat the run as intentionally
   single-operator, and record that single-operator assumption in the Lane Card and final handoff
   rather than reporting coordination as healthy or `UNKNOWN`.
@@ -1988,7 +1988,7 @@ and the next action the agent will take after a response. Do not post routine pr
 
 ## Hosted CI Backpressure
 
-Use the repo's hosted-CI trigger from `.agents/agent-workflow.yml`
+Use the repo's hosted-CI trigger from `AGENTS.md`
 (`hosted_ci_trigger`) for hosted-CI decisions. Its subcommands provide the audit
 trail for running, stopping, checking, or waiving hosted CI.
 
@@ -2231,7 +2231,7 @@ gh pr checks <PR>
 ```
 
 Then run the repo's merge ledger (see `merge_ledger` in
-`.agents/agent-workflow.yml`) for `<PR>` in strict mode with an explicit
+`AGENTS.md`) for `<PR>` in strict mode with an explicit
 `--changelog-classification`
 (`changelog_present|changelog_missing|deferred_to_update_changelog|not_user_visible`).
 

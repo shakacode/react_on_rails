@@ -7,9 +7,9 @@ The default model is:
 
 - shared skills are installed in the user or agent environment
 - each repo owns command wrappers in `.agents/bin/`
-- each repo owns non-command policy in `.agents/agent-workflow.yml`
+- each repo owns the Shaka typed contract in `.agents/agent-workflow.yml`
 - each repo owns durable PR-batch actor trust in `.agents/trusted-github-actors.yml`
-- `AGENTS.md` points agents to those two sources
+- `AGENTS.md` keeps human-only policy and the Shaka pointer section
 - repo-pinned copies are optional and justified case by case
 
 See [seam-design.md](seam-design.md) for the design rationale. See
@@ -25,61 +25,47 @@ notes.
    files, protected-branch requirements, review bots, and which checks are cheap
    locally versus reserved for hosted CI.
 
-2. **Install or enable the shared skills for the user/agent.** Clone
-   [`shakacode/agent-workflows`](https://github.com/shakacode/agent-workflows)
-   and use `bin/install-agent-workflows --host codex` or
-   `bin/install-agent-workflows --host claude`, or use the agent platform's
-   normal user-skill installation mechanism.
+2. **Install Shaka for the user/agent.** Clone
+   [`shakacode/shaka`](https://github.com/shakacode/shaka) outside every
+   consumer checkout and run that clone's `bin/install` into the host skill
+   directory. Cursor uses `$HOME/.cursor/skills`; Codex uses
+   `$HOME/.agents/skills`; Claude Code uses `$HOME/.claude/skills`. See
+   [Shaka getting started](https://github.com/shakacode/shaka/blob/main/docs/getting-started.md).
+   Shared `agent-workflows` skills (`$pr-batch`, `$address-review`, and similar)
+   remain a separate host install when this repository still uses that pack.
 
-3. **Initialize the consumer seam.** From the consumer repo, run:
-
-   ```bash
-   agent-workflow-seam-doctor --init --shared "$HOME/src/agent-workflows"
-   ```
-
-   The initializer preserves valid repo-owned wrappers and existing policy,
-   trust, and `AGENTS.md` content. It detects executable root `bin/validate`
-   plus `bin/test`, or exact `validate` and `test` package scripts when exactly
-   one of `package-lock.json`, `pnpm-lock.yaml`, or `yarn.lock` identifies the
-   runner. It does not guess Ruby/Rake tasks, combine partial validation
-   scripts, or choose among ambiguous package managers.
-
-   If detection is unavailable, the command creates clearly marked
-   fail-closed wrappers and returns `FAIL` with the next step. Supply both real
-   commands to initialize and pass in one invocation:
+3. **Initialize the consumer seam.** From the consumer repo, run the installed
+   Shaka helper. Do not use `agent-workflow-seam-doctor --init` to create the
+   contract: on a missing YAML that helper still writes unversioned V1 keys,
+   and `shaka seam check` rejects them.
 
    ```bash
-   agent-workflow-seam-doctor --init \
-     --validate-command 'bin/validate' \
-     --test-command 'bin/test' \
-     --shared "$HOME/src/agent-workflows"
+   "$HOME/.cursor/skills/shaka/scripts/shaka" seam init \
+     --root . \
+     --setup-command "bin/setup" \
+     --validate-command "bin/ci-local" \
+     --test-command "bin/test" \
+     --review-policy meaningful_changes \
+     --review-check claude-review
    ```
 
-   `--validate-command` and `--test-command` accept non-empty single-line shell
-   commands and must be supplied together. Simple commands forward wrapper
-   arguments automatically. `npm run` commands add npm's `--` separator, while
-   `pnpm run` and `yarn run` pass arguments directly. Compound shell expressions
-   are preserved verbatim, so include `"$@"` when they should receive wrapper
-   arguments. Use `--base-branch` when the new policy should not default to
-   `main`. `env -S` and `env --split-string` commands are preserved verbatim;
-   their split payload must place any desired wrapper forwarding itself.
+   Use the `scripts/shaka` path printed by `bin/install` for the host you
+   installed. Pass this repository's real wrapper targets. The command creates
+   `.agents/agent-workflow.yml` and the Scripts-to-Rule-Them-All wrappers when
+   they are absent. It refuses to overwrite repo-owned wrappers or YAML.
+   Default merge preference is Ask. Add `--merge-preference auto` only when
+   that is the repository's established authority. Use `--base-branch` when
+   work should not default to the GitHub default branch.
 
-   Generated wrappers that retain the init marker are tool-owned, and another
-   explicit-command run rewrites both of them. Keep custom logic in the target
-   commands, or replace a wrapper without the marker and rerun without explicit
-   commands to make that wrapper repo-owned. Explicit replacement of a
-   repo-owned wrapper fails closed.
+   Existing consumers that already have wrappers, as this repository does,
+   write the typed YAML by hand to the same shape `seam init` would emit, then
+   validate with `shaka seam check --root .`.
 
-4. **Review policy YAML.** The initializer creates
-   `.agents/agent-workflow.yml` with required
-   non-command policy keys: `base_branch`, `follow_up_prefix`, `review_gate`,
-   `approval_exempt`, `coordination_backend`, `changelog`, `benchmark_labels`,
-   `merge_ledger`, `ci_parity_environment`, `hosted_ci_trigger`, and
-   `ci_change_detector`. Use `n/a` for unavailable policy. Start from
-   [`examples/agent-workflow.yml`](https://github.com/shakacode/agent-workflows/blob/main/examples/agent-workflow.yml) when
-   bootstrapping a new consumer repo. When an existing mapping needs new
-   required keys, initialization appends them without rewriting its comments or
-   formatting and fails closed if that merge cannot be represented safely.
+4. **Review policy YAML.** This repository's `.agents/agent-workflow.yml` is the
+   Shaka typed contract (`version`, `base_branch`, `review`, `merge`, `branches`).
+   Human-only React on Rails policy stays in `AGENTS.md`. Do not add V1 keys such
+   as `follow_up_prefix` or `hosted_ci_trigger` to the Shaka YAML; `shaka seam check`
+   rejects unknown keys.
 
 5. **Review repo-local trust YAML.** The generated
    `.agents/trusted-github-actors.yml` contains empty, fail-closed lists. Add
@@ -92,17 +78,11 @@ notes.
    in the consumer repo's local trust file unless maintainers verify and choose
    a narrower team slug.
 
-6. **Review the AGENTS pointer.** `AGENTS.md` stays canonical for human policy,
-   and the initializer adds or repairs only this workflow configuration section:
-
-   ```markdown
-   ## Agent Workflow Configuration
-
-   Portable shared skills resolve this repo's commands and policy through:
-
-   - **Commands** — run `.agents/bin/<name>` (`setup`, `validate`, `test`, ...); see `.agents/bin/README.md`. A missing script means that capability is n/a here.
-   - **Policy / config** — `.agents/agent-workflow.yml`.
-   ```
+6. **Review the AGENTS pointer.** `AGENTS.md` stays canonical for human policy.
+   The compared pointer section must match the doctor `POINTER_SECTION` text:
+   resolve the trusted default branch, run installed `shaka seam check --ref REF`,
+   execute the paths that command reports, and keep human-only boundaries in
+   `AGENTS.md`.
 
 7. **Keep repo-local skills local, but keep workflow references reachable.** Add
    only repo-specific skills, repo-pinned helper `bin/` copies, or local
@@ -112,10 +92,11 @@ notes.
    execute the installed skill's `bin` helpers, keep a local helper copy for
    that skill without adding a duplicate `SKILL.md`.
 
-8. **Validate the contract.** Initialization runs the same seam-doctor check.
-   After resolving any fail-closed wrapper guidance, rerun
-   `agent-workflow-seam-doctor` with `--shared` pointing at the cloned or
-   installed pack root. Then run one dry workflow pass without making changes.
+8. **Validate the contract.** Run installed `shaka seam check --root .` first.
+   Then run `.agents/bin/agent-workflow-seam-doctor` (add `--shared` only when
+   checking user-installed shared skills outside this checkout). The doctor is
+   a V1 compatibility gate; it does not replace `shaka seam check`. Then run
+   one dry workflow pass without making changes.
 
 9. **Make `AGENTS.md` canonical.** Tool-specific files such as `CLAUDE.md`
    should stay thin and link back to `AGENTS.md`.

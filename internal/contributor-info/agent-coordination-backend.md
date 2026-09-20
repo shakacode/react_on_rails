@@ -2,8 +2,8 @@
 
 React on Rails uses the portable coordination model described in
 [.agents/docs/coordination-backend.md](../../.agents/docs/coordination-backend.md)
-and selects a private `agent-coord` backend through
-[.agents/agent-workflow.yml](../../.agents/agent-workflow.yml).
+and selects a private `agent-coord` backend through the coordination policy in
+[AGENTS.md](../../AGENTS.md).
 
 `shakacode/agent-coordination` is the public CLI/bootstrap source repository.
 Runtime coordination state lives in the backend reported by

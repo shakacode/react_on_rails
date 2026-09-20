@@ -10,8 +10,10 @@ fi
 if [ -f .agents/bin/agent-workflow-seam-doctor ]; then
   BUNDLE_GEMFILE=Gemfile bundle exec rubocop \
     .agents/bin/agent-workflow-seam-doctor \
-    .agents/bin/agent-workflow-seam-doctor-test.rb || rc=1
+    .agents/bin/agent-workflow-seam-doctor-test.rb \
+    .agents/bin/shaka-seam-contract-test.rb || rc=1
   ruby .agents/bin/agent-workflow-seam-doctor-test.rb || rc=1
+  ruby .agents/bin/shaka-seam-contract-test.rb || rc=1
 fi
 pnpm run lint || rc=1
 pnpm start format.listDifferent || rc=1
