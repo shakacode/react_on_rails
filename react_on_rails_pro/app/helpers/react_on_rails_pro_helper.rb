@@ -60,9 +60,13 @@ module ReactOnRailsProHelper
   # validation pattern are both built from it, so the two cannot silently diverge.
   CSP_NONCE_VALUE_SHAPE = "[a-zA-Z0-9+/_-]+={0,2}"
   # Anchored to the very end of the cached value: the framework appends its marker after
-  # all rendered content, so the trailing marker is always framework-owned. The captured
-  # value is built from CSP_NONCE_VALUE_SHAPE, the same source as CSP_NONCE_VALUE_PATTERN.
-  CACHED_CSP_NONCE_MARKER_REGEX = /<!--rorp-cached-csp-nonce:(#{CSP_NONCE_VALUE_SHAPE})-->\z/
+  # all rendered content, so the trailing marker is always framework-owned. Built from
+  # CACHED_CSP_NONCE_MARKER_PREFIX/SUFFIX and CSP_NONCE_VALUE_SHAPE — the same sources
+  # the writer and the validation pattern use — so none of the shapes can silently drift.
+  CACHED_CSP_NONCE_MARKER_REGEX = Regexp.new(
+    "#{Regexp.escape(CACHED_CSP_NONCE_MARKER_PREFIX)}(#{CSP_NONCE_VALUE_SHAPE})" \
+    "#{Regexp.escape(CACHED_CSP_NONCE_MARKER_SUFFIX)}\\z"
+  )
   # Mirrors the accepted shape in packages/react-on-rails/src/sanitizeNonce.ts —
   # base64/base64url characters with optional trailing `=` padding — but validates the
   # original value as-is. Never strip-then-validate: a stripped derivative can pass the
@@ -720,23 +724,7 @@ module ReactOnRailsProHelper
     current_nonce = current_csp_nonce_for_cached_html
     return html if current_nonce.nil? || current_nonce == cached_csp_nonce
 
-    escaped_nonce = Regexp.escape(cached_csp_nonce)
-    # Only the double-quoted spelling `nonce="<originating value>"` is re-stamped — the
-    # form every framework emitter produces. The attribute name stays ASCII
-    # case-insensitive, HTML whitespace is allowed around `=` (the HTML set, never Ruby's
-    # \s — \v is not HTML whitespace), and the attribute may start after HTML whitespace,
-    # `/`, or a closing quote, all tokenizer-valid attribute starts
-    # (`<script/nonce="...">`, `<script id="x"nonce="...">`). Unquoted and single-quoted
-    # spellings are deliberately NOT matched: cached SSR output embeds JSON data blocks
-    # whose escaping (ERB::Util.json_escape / JSON string rules) leaves plain text and
-    # single quotes intact, so those spellings can occur as inert text inside a JSON
-    # string — rewriting one would inject raw double quotes that break JSON.parse on
-    # every cache hit. The double-quoted form cannot appear unescaped inside a JSON
-    # string (its quotes are `\"`), so this bound is JSON-safe; app-provided raw markup
-    # using another spelling fails closed and keeps its stale nonce for CSP to block.
-    ws = CSP_NONCE_HTML_WS_CHARS
-    html_ws = CSP_NONCE_ATTR_WS_PATTERN
-    attribute_pattern = %r{(?<=[#{ws}/"'])(?i:nonce)#{html_ws}=#{html_ws}"#{escaped_nonce}"}
+    attribute_pattern = cached_csp_nonce_attribute_pattern(cached_csp_nonce)
 
     # SafeBuffer#gsub semantics vary across Rails versions (the html_safe flag is dropped,
     # and some versions HTML-escape a non-safe block return), so rewrite a plain copy and
@@ -753,6 +741,33 @@ module ReactOnRailsProHelper
     return html unless matched
 
     html.html_safe? ? rewritten.html_safe : rewritten
+  end
+
+  # Builds the attribute pattern for one originating nonce. Only the double-quoted
+  # spelling `nonce="<originating value>"` is matched — the form every framework emitter
+  # produces. The attribute name stays ASCII case-insensitive, HTML whitespace is allowed
+  # around `=` (the HTML set, never Ruby's \s — \v is not HTML whitespace), and the
+  # attribute may start after HTML whitespace, `/`, or a closing quote, all
+  # tokenizer-valid attribute starts (`<script/nonce="...">`, `<script id="x"nonce="...">`).
+  # Unquoted and single-quoted spellings are deliberately NOT matched: cached SSR output
+  # embeds JSON data blocks whose escaping (ERB::Util.json_escape / JSON string rules)
+  # leaves plain text and single quotes intact, so those spellings can occur as inert
+  # text inside a JSON string — rewriting one would inject raw double quotes that break
+  # JSON.parse on every cache hit. The double-quoted form cannot appear unescaped inside
+  # a JSON string (its quotes are `\"`), so this bound is JSON-safe; app-provided raw
+  # markup using another spelling fails closed and keeps its stale nonce for CSP to block.
+  # Compiled once per originating nonce and reused across the hash fields, nested values,
+  # and stream chunks of one entry (value-keyed like @csp_nonce_validation_memo, since
+  # entries with different originating nonces can be served within one request).
+  def cached_csp_nonce_attribute_pattern(cached_csp_nonce)
+    memo = @csp_nonce_attribute_pattern_memo if defined?(@csp_nonce_attribute_pattern_memo)
+    return memo[1] if memo && memo[0] == cached_csp_nonce
+
+    ws = CSP_NONCE_HTML_WS_CHARS
+    html_ws = CSP_NONCE_ATTR_WS_PATTERN
+    escaped_nonce = Regexp.escape(cached_csp_nonce)
+    pattern = %r{(?<=[#{ws}/"'])(?i:nonce)#{html_ws}=#{html_ws}"#{escaped_nonce}"}
+    (@csp_nonce_attribute_pattern_memo = [cached_csp_nonce, pattern])[1]
   end
 
   # Re-stamps nonces across a cached stream's chunk array as one document. React's
@@ -844,9 +859,7 @@ module ReactOnRailsProHelper
   # marker-free under the nonce-free key, that stale (possibly session-derived) value
   # would replay verbatim to genuinely nonce-free requests.
   def malformed_csp_nonce_bypasses_component_cache?
-    bypassed = csp_nonce.present? && current_csp_nonce_for_cached_html.nil?
-    warn_component_cache_bypassed_for_malformed_nonce if bypassed
-    bypassed
+    csp_nonce.present? && current_csp_nonce_for_cached_html.nil?
   end
 
   # The bypass is an app misconfiguration, not a routine path: every cached_* helper
@@ -867,9 +880,17 @@ module ReactOnRailsProHelper
   end
 
   # Single gate for every cached_* entry point: component caching is usable only when the
-  # cache options enable it AND the request's CSP nonce does not force a bypass.
+  # cache options enable it AND the request's CSP nonce does not force a bypass. The
+  # bypass warning lives here (not in the predicate) so the predicate stays pure.
   def pro_component_cache_usable?(options)
-    ReactOnRailsPro::Cache.use_cache?(options) && !malformed_csp_nonce_bypasses_component_cache?
+    return false unless ReactOnRailsPro::Cache.use_cache?(options)
+
+    if malformed_csp_nonce_bypasses_component_cache?
+      warn_component_cache_bypassed_for_malformed_nonce
+      return false
+    end
+
+    true
   end
 
   def strip_leading_pro_attribution_comments(html)
