@@ -12,7 +12,12 @@ files:
   consumer_sha256: 622598aa9c8a1c5e1e577f95b39c9a3cd6a52dd558f94bdfe9add44106e5d290
 - source: bin/agent-workflow-seam-doctor
   consumer: ".agents/bin/agent-workflow-seam-doctor"
-  mode: identical
+  mode: overlay
+  reason: React on Rails accepts the Shaka V2 typed seam in agent-workflow.yml
+    while keeping the V1 policy-key contract for unmigrated fixtures.
+  consumer_mode: '100755'
+  source_sha256: 110099519bd99c739bbe5a90c55145eaf27421362fc285f6283947402f8ab062
+  consumer_sha256: 8ed00c3ce19e2afe56de3a621234ba4ab971b3ec720a85d3dbb2586407a0ab2b
 - source: bin/agent-workflow-seam-doctor-test.rb
   consumer: ".agents/bin/agent-workflow-seam-doctor-test.rb"
   mode: identical
