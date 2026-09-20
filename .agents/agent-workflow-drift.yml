@@ -36,7 +36,7 @@ files:
     and source-pack links for its consumer layout, and records the Shaka typed seam.
   consumer_mode: '100644'
   source_sha256: 509b333b461cded9f7f05498567aa454240af62f63697d66e4ebf41e6499555f
-  consumer_sha256: 9a676a1e375ee276ffe531517f538ac5468acc248b1c45dd145e2a6d144211fe
+  consumer_sha256: 08949f00d1d770ecd45c29bf610b5e390583acf2486e20829ddccd28b528d3c4
 - source: docs/coordination-backend.md
   consumer: ".agents/docs/coordination-backend.md"
   mode: overlay
