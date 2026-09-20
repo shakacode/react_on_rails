@@ -53,6 +53,7 @@ module ReactOnRailsPro
       enable_rsc_support: Configuration::DEFAULT_ENABLE_RSC_SUPPORT,
       rsc_payload_generation_url_path: Configuration::DEFAULT_RSC_PAYLOAD_GENERATION_URL_PATH,
       rsc_payload_authorizer: nil,
+      async_props_registry: {},
       rsc_bundle_js_file: Configuration::DEFAULT_RSC_BUNDLE_JS_FILE,
       react_client_manifest_file: Configuration::DEFAULT_REACT_CLIENT_MANIFEST_FILE,
       react_server_client_manifest_file: Configuration::DEFAULT_REACT_SERVER_CLIENT_MANIFEST_FILE,
@@ -127,7 +128,7 @@ module ReactOnRailsPro
 
     attr_reader :concurrent_component_streaming_buffer_size, :renderer_http_keep_alive_timeout,
                 :renderer_http_pool_size, :renderer_http_force_http2, :cache_tag_index_expires_in,
-                :cache_tag_index_max_keys, :rsc_payload_authorizer
+                :cache_tag_index_max_keys, :rsc_payload_authorizer, :async_props_registry
 
     # Sets how long tag->key index entries live (see Cache::TagIndex).
     #
@@ -230,6 +231,38 @@ module ReactOnRailsPro
       @rsc_payload_authorizer = value
     end
 
+    # Register an async props provider for a component.
+    #
+    # @param component_name [String] the registered component name (must match
+    #   what registerServerComponent() uses on the JS side)
+    # @param provider_class_name [String] the name of a class that responds to
+    #   +.call(emit, props, controller)+. Passed as a string so the reference
+    #   survives Rails class reloading in development.
+    #
+    # @example
+    #   config.register_async_props("ProductPageRSC", "ProductRscProps")
+    #
+    # The provider class:
+    #   class ProductRscProps
+    #     def self.call(emit, props, controller)
+    #       product = Product.find(props.fetch("product").fetch("id"))
+    #       emit.call("reviews", product.reviews.recent)
+    #     end
+    #   end
+    def register_async_props(component_name, provider_class_name)
+      unless component_name.is_a?(String) && component_name.present?
+        raise ReactOnRailsPro::Error, "register_async_props: component_name must be a non-empty String"
+      end
+
+      unless provider_class_name.is_a?(String) && provider_class_name.present?
+        raise ReactOnRailsPro::Error,
+              "register_async_props: provider_class_name must be a non-empty String " \
+              "(pass the class name, not the class itself, so Rails dev reloading works)"
+      end
+
+      @async_props_registry[component_name] = provider_class_name
+    end
+
     def initialize(renderer_url: nil, renderer_password: nil, license_token: nil, # rubocop:disable Metrics/AbcSize
                    server_renderer: nil,
                    renderer_use_fallback_exec_js: nil, prerender_caching: nil,
@@ -245,6 +278,7 @@ module ReactOnRailsPro
                    renderer_request_retry_limit: nil, throw_js_errors: nil, ssr_timeout: nil,
                    profile_server_rendering_js_code: nil, raise_non_shell_server_rendering_errors: nil,
                    enable_rsc_support: nil, rsc_payload_generation_url_path: nil, rsc_payload_authorizer: nil,
+                   async_props_registry: nil,
                    rsc_bundle_js_file: nil, react_client_manifest_file: nil,
                    react_server_client_manifest_file: nil,
                    concurrent_component_streaming_buffer_size: DEFAULT_CONCURRENT_COMPONENT_STREAMING_BUFFER_SIZE,
@@ -283,6 +317,7 @@ module ReactOnRailsPro
       self.enable_rsc_support = enable_rsc_support
       self.rsc_payload_generation_url_path = rsc_payload_generation_url_path
       self.rsc_payload_authorizer = rsc_payload_authorizer
+      @async_props_registry = async_props_registry&.dup || {}
       self.rsc_bundle_js_file = rsc_bundle_js_file
       self.react_client_manifest_file = react_client_manifest_file
       self.react_server_client_manifest_file = react_server_client_manifest_file

@@ -528,6 +528,12 @@ export default function DetailsPanel({ id }) {
 
 ## Manually refetching a server component
 
+> [!NOTE]
+> `refetch()` works by fetching a fresh RSC payload from the server. If your
+> component uses async props (`stream_react_component_with_async_props`), you must
+> register an async props provider so the payload endpoint knows how to resolve them.
+> See [Streaming SSR](../streaming-ssr.md#rscroute-refetch-and-async-props) for setup.
+
 Sometimes you need to refresh an `<RSCRoute>` outside of an error-recovery flow — a "Refresh" toolbar button, a websocket-driven invalidation, an inline button rendered by the server component itself. There are three APIs, designed for different positions in the tree:
 
 ### `ref` handle on `<RSCRoute>`

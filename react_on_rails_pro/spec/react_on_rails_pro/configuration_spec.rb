@@ -1148,6 +1148,81 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
       end
     end
 
+    describe "#register_async_props" do
+      it "registers a provider by component name" do
+        ReactOnRailsPro.configure do |config|
+          config.register_async_props("MyComponent", "MyProvider")
+        end
+
+        expect(ReactOnRailsPro.configuration.async_props_registry["MyComponent"]).to eq("MyProvider")
+      end
+
+      it "allows multiple registrations" do
+        ReactOnRailsPro.configure do |config|
+          config.register_async_props("ComponentA", "ProviderA")
+          config.register_async_props("ComponentB", "ProviderB")
+        end
+
+        registry = ReactOnRailsPro.configuration.async_props_registry
+        expect(registry["ComponentA"]).to eq("ProviderA")
+        expect(registry["ComponentB"]).to eq("ProviderB")
+      end
+
+      it "defaults to an empty registry" do
+        ReactOnRailsPro.configure {} # rubocop:disable Lint/EmptyBlock
+
+        expect(ReactOnRailsPro.configuration.async_props_registry).to eq({})
+      end
+
+      it "rejects nil component_name" do
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.register_async_props(nil, "MyProvider")
+          end
+        end.to raise_error(ReactOnRailsPro::Error, /component_name must be a non-empty String/)
+      end
+
+      it "rejects empty component_name" do
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.register_async_props("", "MyProvider")
+          end
+        end.to raise_error(ReactOnRailsPro::Error, /component_name must be a non-empty String/)
+      end
+
+      it "rejects non-string component_name" do
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.register_async_props(:MyComponent, "MyProvider")
+          end
+        end.to raise_error(ReactOnRailsPro::Error, /component_name must be a non-empty String/)
+      end
+
+      it "rejects nil provider_class_name" do
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.register_async_props("MyComponent", nil)
+          end
+        end.to raise_error(ReactOnRailsPro::Error, /provider_class_name must be a non-empty String/)
+      end
+
+      it "rejects empty provider_class_name" do
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.register_async_props("MyComponent", "")
+          end
+        end.to raise_error(ReactOnRailsPro::Error, /provider_class_name must be a non-empty String/)
+      end
+
+      it "rejects a class object instead of a string" do
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.register_async_props("MyComponent", String)
+          end
+        end.to raise_error(ReactOnRailsPro::Error, /provider_class_name must be a non-empty String.*class name, not the class/)
+      end
+    end
+
     describe ".concurrent_component_streaming_buffer_size" do
       it "accepts positive integers" do
         ReactOnRailsPro.configure do |config|
