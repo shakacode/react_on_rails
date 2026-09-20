@@ -759,6 +759,35 @@ describe ReactOnRailsProHelper do
       expect(result).to be_html_safe
     end
 
+    it "never re-stamps a prefix of an unquoted value continued by a vertical tab" do
+      # \v is NOT HTML whitespace: the parser reads `origin-AAA=\vfoo` as ONE attribute
+      # value, which differs from the originating nonce and must stay untouched. Ruby's
+      # \s includes \v, so a \s-based terminator would rewrite just the prefix — minting
+      # a live nonce for a script the originating response refused to run. Real HTML
+      # whitespace (tab) still terminates an unquoted value and is re-stamped.
+      expected_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(
+        "App", cache_key: "csp-nonce-vtab", csp_nonce_active: true
+      )
+      cached_html = "<div>cached</div>" \
+                    "<script nonce=origin-AAA=\vfoo>vtabLookalike()</script>" \
+                    "<script nonce=origin-AAA=\tdata-x=1>tabDelimited()</script>" \
+                    "<script \vnonce=\"origin-AAA=\">vtabName()</script>" \
+                    "<!--rorp-cached-csp-nonce:origin-AAA=-->"
+      Rails.cache.write(expected_cache_key, cached_html.html_safe)
+      allow(self).to receive(:csp_nonce).and_return("live-BBB=")
+
+      result = cached_react_component("App", cache_key: "csp-nonce-vtab", auto_load_bundle: false) do
+        raise "props block must not run on a cache hit"
+      end
+
+      expect(result).to include("<script nonce=origin-AAA=\vfoo>vtabLookalike()</script>")
+      expect(result).to include("<script nonce=\"live-BBB=\"\tdata-x=1>tabDelimited()</script>")
+      expect(result).not_to include("nonce=\"live-BBB=\"\vfoo")
+      # A \v-preceded name is part of the PREVIOUS token per HTML (here the attribute
+      # name "\vnonce"), so it is a different attribute and must stay untouched too.
+      expect(result).to include("<script \vnonce=\"origin-AAA=\">vtabName()</script>")
+    end
+
     it "never serves another partition's entry to a request with a malformed nonce" do
       allow(self).to receive(:csp_nonce).and_return("strip-orig-AAA=")
 

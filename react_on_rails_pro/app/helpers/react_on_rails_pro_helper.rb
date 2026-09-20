@@ -55,20 +55,25 @@ module ReactOnRailsProHelper
   # sink itself.
   CACHED_CSP_NONCE_MARKER_PREFIX = "<!--rorp-cached-csp-nonce:"
   CACHED_CSP_NONCE_MARKER_SUFFIX = "-->"
+  # Single source of truth for the accepted CSP nonce shape — base64/base64url characters
+  # with `=` only as trailing padding. The cache-write marker capture and the value
+  # validation pattern are both built from it, so the two cannot silently diverge.
+  CSP_NONCE_VALUE_SHAPE = "[a-zA-Z0-9+/_-]+={0,2}"
   # Anchored to the very end of the cached value: the framework appends its marker after
   # all rendered content, so the trailing marker is always framework-owned. The captured
-  # value mirrors CSP_NONCE_VALUE_PATTERN below (`=` only as trailing padding) so the two
-  # shapes cannot silently diverge.
-  CACHED_CSP_NONCE_MARKER_REGEX = %r{<!--rorp-cached-csp-nonce:([a-zA-Z0-9+/_-]+={0,2})-->\z}
+  # value is built from CSP_NONCE_VALUE_SHAPE, the same source as CSP_NONCE_VALUE_PATTERN.
+  CACHED_CSP_NONCE_MARKER_REGEX = /<!--rorp-cached-csp-nonce:(#{CSP_NONCE_VALUE_SHAPE})-->\z/
   # Mirrors the accepted shape in packages/react-on-rails/src/sanitizeNonce.ts —
   # base64/base64url characters with optional trailing `=` padding — but validates the
   # original value as-is. Never strip-then-validate: a stripped derivative can pass the
   # pattern while the CSP header still carries the original, mismatching every script.
-  CSP_NONCE_VALUE_PATTERN = %r{\A[a-zA-Z0-9+/_-]+={0,2}\z}
-  # HTML ASCII whitespace allowed around an attribute's `=`, derived from
+  CSP_NONCE_VALUE_PATTERN = /\A#{CSP_NONCE_VALUE_SHAPE}\z/
+  # Escaped HTML ASCII whitespace characters for regexp character classes, derived from
   # HTML_SPACE_CHARACTERS so the two cannot drift. Deliberately narrower than Ruby's \s:
   # \v is not HTML whitespace (it parses as part of an attribute name or value).
-  CSP_NONCE_ATTR_WS_PATTERN = "[#{Regexp.escape(HTML_SPACE_CHARACTERS.join)}]*".freeze
+  CSP_NONCE_HTML_WS_CHARS = Regexp.escape(HTML_SPACE_CHARACTERS.join).freeze
+  # HTML ASCII whitespace run allowed around an attribute's `=`.
+  CSP_NONCE_ATTR_WS_PATTERN = "[#{CSP_NONCE_HTML_WS_CHARS}]*".freeze
   @static_rsc_asset_diagnostic_cache = {}
 
   class << self
@@ -700,9 +705,16 @@ module ReactOnRailsProHelper
     # and is left alone). The nonce VALUE match stays case-sensitive: it is an exact
     # secret, not an HTML name. Every match is rewritten to the canonical double-quoted
     # lowercase form.
+    # Every whitespace position uses the HTML ASCII whitespace set, never Ruby's \s: \v is
+    # not HTML whitespace, so a \v before the name belongs to the previous token, and a \v
+    # after an unquoted value is part of that value — `nonce=abc\vfoo` is the single value
+    # "abc\vfoo", not "abc", and terminating at \v would re-stamp a prefix of a different
+    # value, minting a live nonce the originating response never granted.
+    ws = CSP_NONCE_HTML_WS_CHARS
     html_ws = CSP_NONCE_ATTR_WS_PATTERN
-    attribute_pattern =
-      /(?<=\s)(?i:nonce)#{html_ws}=#{html_ws}(?:(?<quote>["'])#{escaped_nonce}\k<quote>|#{escaped_nonce}(?=[\s>]))/
+    value_match =
+      /(?:(?<quote>["'])#{escaped_nonce}\k<quote>|#{escaped_nonce}(?=[#{ws}>]))/
+    attribute_pattern = /(?<=[#{ws}])(?i:nonce)#{html_ws}=#{html_ws}#{value_match}/
 
     # SafeBuffer#gsub semantics vary across Rails versions (the html_safe flag is dropped,
     # and some versions HTML-escape a non-safe block return), so rewrite a plain copy and
