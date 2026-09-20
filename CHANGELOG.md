@@ -31,6 +31,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   without satisfying the stable `>=19.2.1 <20.0.0` range. Pro dummy and package tests pin that RC
   with React/React DOM/`react-server-dom-webpack` 19.3.0. The generator still installs stable
   `19.2.1`. Do not mix this RC with published `react-on-rails-rsc@19.3.0` (React 19.2.8 Flight).
+  [PR 5094](https://github.com/shakacode/react_on_rails/pull/5094) by [justin808](https://github.com/justin808).
 
 #### Fixed
 
