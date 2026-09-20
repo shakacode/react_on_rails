@@ -492,9 +492,10 @@ module ReactOnRailsProHelper
 
   # All view-level component cache keys must segregate nonce-rendered entries from
   # nonce-free ones (issue #5021), so every cached_* helper builds its key through here.
-  # The flag uses the same validity check as the cache-write marker: a present-but-
-  # malformed nonce writes no marker, so letting it share the nonce partition would leave
-  # marker-free entries whose stale nonce a later valid-nonce request could never re-stamp.
+  # The flag uses the same validity check as the cache-write marker. Requests whose nonce
+  # is present but malformed never reach this key builder: they bypass the component
+  # cache entirely (see malformed_csp_nonce_bypasses_component_cache?), because their
+  # marker-free entries would poison whichever partition held them.
   def pro_component_cache_key(component_name, options)
     ReactOnRailsPro::Cache.react_component_cache_key(
       component_name,
@@ -503,7 +504,7 @@ module ReactOnRailsProHelper
   end
 
   def fetch_react_component(component_name, options, cache_write_if: nil)
-    return yield unless ReactOnRailsPro::Cache.use_cache?(options)
+    return yield unless pro_component_cache_usable?(options)
 
     cache_key = pro_component_cache_key(component_name, options)
     Rails.logger.debug { "React on Rails Pro cache_key is #{cache_key.inspect}" }
@@ -771,6 +772,27 @@ module ReactOnRailsProHelper
     CSP_NONCE_VALUE_PATTERN.match?(nonce) ? nonce : nil
   end
 
+  # True when the request carries a CSP nonce that current_csp_nonce_for_cached_html
+  # rejects. Such a request bypasses the component cache entirely — no read, no write; it
+  # renders fresh (documented in docs/pro/strict-csp.md -> Caching Caveats). It cannot use
+  # the nonce partition: no marker can record its value (markers only carry pattern-valid
+  # values), so its entries could never be re-stamped. It must not use the nonce-free
+  # partition either: railsContext.cspNonce carries the raw value and the JS pipeline
+  # sanitizes by stripping disallowed characters before validating
+  # (packages/react-on-rails/src/sanitizeNonce.ts), so markup rendered under a
+  # malformed-but-sanitizable nonce can still carry live nonce attributes — cached
+  # marker-free under the nonce-free key, that stale (possibly session-derived) value
+  # would replay verbatim to genuinely nonce-free requests.
+  def malformed_csp_nonce_bypasses_component_cache?
+    csp_nonce.present? && current_csp_nonce_for_cached_html.nil?
+  end
+
+  # Single gate for every cached_* entry point: component caching is usable only when the
+  # cache options enable it AND the request's CSP nonce does not force a bypass.
+  def pro_component_cache_usable?(options)
+    ReactOnRailsPro::Cache.use_cache?(options) && !malformed_csp_nonce_bypasses_component_cache?
+  end
+
   def strip_leading_pro_attribution_comments(html)
     cursor = 0
     stripped_comment = false
@@ -919,7 +941,7 @@ module ReactOnRailsProHelper
     cache_write_if:,
     &
   )
-    cache_enabled = ReactOnRailsPro::Cache.use_cache?(cache_options)
+    cache_enabled = pro_component_cache_usable?(cache_options)
     cache_diagnostics[:enabled] = cache_enabled
     cache_diagnostics[:hit] = false
 
@@ -1378,7 +1400,7 @@ module ReactOnRailsProHelper
   def fetch_stream_react_component(component_name, raw_options, &)
     auto_load_bundle = auto_load_bundle_option(raw_options)
 
-    unless ReactOnRailsPro::Cache.use_cache?(raw_options)
+    unless pro_component_cache_usable?(raw_options)
       return render_stream_component_with_props(component_name, raw_options, auto_load_bundle, &)
     end
 
@@ -1507,7 +1529,7 @@ module ReactOnRailsProHelper
     cache_options = options_with_auto_load_bundle(raw_options)
 
     # Check conditional caching (:if / :unless options)
-    unless ReactOnRailsPro::Cache.use_cache?(cache_options)
+    unless pro_component_cache_usable?(cache_options)
       return render_async_react_component_uncached(component_name, raw_options, &)
     end
 

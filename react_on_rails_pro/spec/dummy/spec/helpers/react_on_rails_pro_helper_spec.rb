@@ -773,6 +773,49 @@ describe ReactOnRailsProHelper do
       expect(second_result).not_to include("malformed-writer")
     end
 
+    it "keeps malformed-nonce writes out of the nonce-free partition" do
+      # railsContext.cspNonce carries the raw value and the JS pipeline sanitizes by
+      # stripping disallowed characters before validating (sanitizeNonce), so markup
+      # rendered under a malformed-but-sanitizable nonce (e.g. "AAA BBB=" stamped as
+      # "AAABBB=") can still carry a live nonce attribute. A marker-free entry under the
+      # nonce-free key would replay that stale value verbatim to genuinely nonce-free
+      # requests, so a malformed-nonce request must not write to the component cache.
+      allow(self).to receive(:csp_nonce).and_return("AAA BBB=")
+
+      cached_react_component("App", cache_key: "csp-nonce-w-bypass", auto_load_bundle: false) do
+        { name: "malformed-writer" }
+      end
+
+      allow(self).to receive(:csp_nonce).and_return(nil)
+      second_props_evaluated = false
+
+      second_result = cached_react_component("App", cache_key: "csp-nonce-w-bypass", auto_load_bundle: false) do
+        second_props_evaluated = true
+        { name: "nonce-free-reader" }
+      end
+
+      expect(second_props_evaluated).to be(true)
+      expect(second_result).not_to include("malformed-writer")
+    end
+
+    it "renders fresh instead of reading the nonce-free partition when the nonce is malformed" do
+      cached_react_component("App", cache_key: "csp-nonce-r-bypass", auto_load_bundle: false) do
+        { name: "nonce-free-writer" }
+      end
+
+      allow(self).to receive(:csp_nonce).and_return("abc!")
+      second_props_evaluated = false
+
+      second_result = cached_react_component("App", cache_key: "csp-nonce-r-bypass", auto_load_bundle: false) do
+        second_props_evaluated = true
+        { name: "malformed-reader" }
+      end
+
+      expect(second_props_evaluated).to be(true)
+      expect(second_result).to include("malformed-reader")
+      expect(second_result).not_to include("nonce-free-writer")
+    end
+
     it "skips the defensive rewrite when the current nonce is malformed" do
       cached_html = %(<div>cached</div><script nonce="orig-AAA=">framework()</script>)
       allow(self).to receive(:csp_nonce).and_return("abc!")
