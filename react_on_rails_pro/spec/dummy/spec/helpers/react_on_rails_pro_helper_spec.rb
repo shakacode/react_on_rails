@@ -950,6 +950,60 @@ describe ReactOnRailsProHelper do
       expect(second_result).not_to include("rorp-cached-csp-nonce")
     end
 
+    it "never strips app content that mimics the marker from nonce-free entries" do
+      # Nonce-free entries carry no framework marker, so a trailing marker-shaped comment
+      # is app content (e.g. CMS-supplied) and must survive the cache round-trip verbatim.
+      expected_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(
+        "App", cache_key: "csp-nonce-mimic-free", csp_nonce_active: false
+      )
+      cached_html = "<div>cached</div><!--rorp-cached-csp-nonce:app-supplied-AAA=-->"
+      Rails.cache.write(expected_cache_key, cached_html.html_safe)
+
+      result = cached_react_component("App", cache_key: "csp-nonce-mimic-free", auto_load_bundle: false) do
+        raise "props block must not run on a cache hit"
+      end
+
+      expect(result).to end_with("<!--rorp-cached-csp-nonce:app-supplied-AAA=-->")
+      expect(result).to include("<div>cached</div>")
+    end
+
+    it "consumes only the framework marker when nonce-active app content also mimics it" do
+      # The framework marker is appended LAST at write time, so on the nonce-active
+      # partition the trailing match is always framework-owned; an app-supplied
+      # marker-shaped comment right before it stays in the served markup verbatim.
+      expected_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(
+        "App", cache_key: "csp-nonce-mimic-active", csp_nonce_active: true
+      )
+      cached_html = "<div>cached</div>" \
+                    '<script nonce="origin-AAA=">framework()</script>' \
+                    "<!--rorp-cached-csp-nonce:app-mimic-BBB=-->" \
+                    "<!--rorp-cached-csp-nonce:origin-AAA=-->"
+      Rails.cache.write(expected_cache_key, cached_html.html_safe)
+      allow(self).to receive(:csp_nonce).and_return("live-CCC=")
+
+      result = cached_react_component("App", cache_key: "csp-nonce-mimic-active", auto_load_bundle: false) do
+        raise "props block must not run on a cache hit"
+      end
+
+      expect(result).to include('<script nonce="live-CCC=">framework()</script>')
+      expect(result).to end_with("<!--rorp-cached-csp-nonce:app-mimic-BBB=-->")
+      expect(result).not_to include("origin-AAA=")
+    end
+
+    it "skips the hash re-stamp walk when the nonce is stable across requests" do
+      # A stable nonce re-stamps nothing, so the hash path must take the merge-only
+      # branch instead of walking and rebuilding every field.
+      allow(self).to receive(:csp_nonce).and_return("stable-AAA=")
+      apollo_tag = '<script nonce="stable-AAA=">window.__APOLLO_STATE__={}</script>'
+      cached_hash = { "componentHtml" => "<div>cached</div>", "apolloStateTag" => apollo_tag }
+
+      expect(self).not_to receive(:rewrite_cached_csp_nonces_in_value)
+      normalized = send(:normalize_cached_pro_attribution, cached_hash, "stable-AAA=")
+
+      # Untouched fields keep object identity on the merge-only branch.
+      expect(normalized["apolloStateTag"]).to equal(apollo_tag)
+    end
+
     it "does not reuse entries cached without a nonce once a nonce generator is active" do
       first_result = cached_react_component("App", cache_key: "csp-nonce-keying", auto_load_bundle: false) do
         { name: "first" }

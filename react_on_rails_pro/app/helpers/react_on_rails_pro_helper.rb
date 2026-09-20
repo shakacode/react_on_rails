@@ -562,6 +562,7 @@ module ReactOnRailsProHelper
   end
 
   def normalize_cached_pro_attribution(result, cached_csp_nonce = nil)
+    cached_csp_nonce = effective_cached_csp_nonce(cached_csp_nonce)
     return normalize_cached_pro_attribution_html(result, cached_csp_nonce) if result.is_a?(String)
 
     return result unless result.is_a?(Hash) && result.key?(ReactOnRails::Helper::COMPONENT_HTML_KEY)
@@ -584,6 +585,20 @@ module ReactOnRailsProHelper
         [key, rewrite_cached_csp_nonces_in_value(value, cached_csp_nonce)]
       end
     end
+  end
+
+  # Demotes the originating nonce to nil when re-stamping would be a no-op — the serving
+  # nonce is absent, malformed, or identical to the originating one (mirroring
+  # rewrite_cached_csp_nonces's per-string short-circuit) — so hash entries take the
+  # merge-only path instead of walking and rebuilding every field, while componentHtml
+  # still gets its attribution normalization.
+  def effective_cached_csp_nonce(cached_csp_nonce)
+    return nil unless cached_csp_nonce
+
+    current_nonce = current_csp_nonce_for_cached_html
+    return nil if current_nonce.nil? || current_nonce == cached_csp_nonce
+
+    cached_csp_nonce
   end
 
   # Recursive companion to rewrite_cached_csp_nonces for non-componentHtml hash fields,
@@ -648,11 +663,17 @@ module ReactOnRailsProHelper
     html.html_safe? ? html + marker.html_safe : html + marker
   end
 
-  # Splits a cached value into [value_without_marker, originating_nonce]. The marker is
-  # anchored to the very end of the cached value (or is the final chunk of a cached chunk
-  # array), a position only the framework's cache-write append can occupy, so a lookalike
-  # marker inside rendered content is inert. Entries without a marker re-stamp nothing.
+  # Splits a cached value into [value_without_marker, originating_nonce]. Extraction runs
+  # only for nonce-active readers: the reader's nonce state selects the cache partition
+  # (see pro_component_cache_key), and the nonce-active partition is written exclusively
+  # by valid-nonce requests, which always append the framework marker LAST — so the
+  # trailing match stays framework-owned even when app content also ends in marker-shaped
+  # text (the capture's alphabet cannot span across an earlier comment's `-->`). Nonce-free
+  # entries never carry a framework marker, so a trailing marker-shaped comment there is
+  # app content (e.g. CMS-supplied) and must never be stripped.
   def extract_cached_csp_nonce_marker(value)
+    return [value, nil] if current_csp_nonce_for_cached_html.nil?
+
     case value
     when Array then extract_cached_csp_nonce_marker_from_chunks(value)
     when Hash then extract_cached_csp_nonce_marker_from_hash(value)

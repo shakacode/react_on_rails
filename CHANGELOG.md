@@ -81,7 +81,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   entries, which mattered for session-derived nonce generators. Requests whose nonce is present but falls outside
   the base64/base64url shape bypass the component cache entirely (they render fresh), so a malformed nonce can
   neither create entries that no later request could re-stamp nor leak a sanitized derivative of its value into entries
-  served to nonce-free requests. Fixes
+  served to nonce-free requests. Note for apps overriding private normalization hooks: `normalize_cached_pro_attribution`
+  and `normalize_cached_pro_attribution_html` now take a `cached_csp_nonce` parameter and are invoked with it on cache
+  hits, so an override or prepended module written for the old one-argument form raises ArgumentError after upgrading —
+  accept (and forward) the new parameter. Fixes
   [Issue 5021](https://github.com/shakacode/react_on_rails/issues/5021).
   [PR 5025](https://github.com/shakacode/react_on_rails/pull/5025) by
   [AbanoubGhadban](https://github.com/AbanoubGhadban).
