@@ -17,7 +17,7 @@ files:
     while keeping the V1 policy-key contract for unmigrated fixtures.
   consumer_mode: '100755'
   source_sha256: 110099519bd99c739bbe5a90c55145eaf27421362fc285f6283947402f8ab062
-  consumer_sha256: 1866e096c6abf16752ca5ea96f5709e8df60bbde01ae1bd755049cc757993cee
+  consumer_sha256: b4cdb7fefa446b261eb33c77ac38b18425419843880fc09cd6623e54e8e74f3b
 - source: bin/agent-workflow-seam-doctor-test.rb
   consumer: ".agents/bin/agent-workflow-seam-doctor-test.rb"
   mode: identical

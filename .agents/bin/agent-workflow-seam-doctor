@@ -1696,6 +1696,7 @@ module AgentWorkflowSeamDoctor
     end
 
     config.each do |key, value|
+      next if %w[base_branch review merge].include?(key)
       next unless unresolved_policy_value?(value)
 
       issues << "unresolved policy value for key: #{key}"

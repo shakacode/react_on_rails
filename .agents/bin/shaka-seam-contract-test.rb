@@ -90,6 +90,21 @@ class ShakaSeamContractTest < Minitest::Test
     end
   end
 
+  def test_shaka_seam_empty_review_reports_once
+    with_repo do |root|
+      write_shaka_contract(root)
+      File.write(
+        File.join(root, ".agents/agent-workflow.yml"),
+        YAML.dump(SHAKA_POLICY.merge("review" => {}))
+      )
+
+      out, status = run_doctor(root)
+
+      refute status.success?, out
+      assert_equal 1, out.scan("unresolved policy value for key: review").length
+    end
+  end
+
   def test_shaka_seam_unresolved_branches_fails
     with_repo do |root|
       write_shaka_contract(root)
