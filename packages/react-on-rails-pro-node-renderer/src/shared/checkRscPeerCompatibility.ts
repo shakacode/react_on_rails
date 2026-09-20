@@ -144,7 +144,8 @@ const isSupportedReactTuple = (
 const isSupportedRscMinor = (
   rscTuple: VersionTuple,
   { supportedRanges }: typeof RSC_PEER_SUPPORT.react,
-): boolean => supportedRanges.some((range) => rscTuple[1] === range.rscMinor);
+): boolean =>
+  supportedRanges.some((range) => rscTuple[1] === range.rscMinor && rscTuple[2] >= range.rscMinPatch);
 
 const proLabel = (proVersion?: string) =>
   proVersion ? `React on Rails Pro (${proVersion})` : 'React on Rails Pro';

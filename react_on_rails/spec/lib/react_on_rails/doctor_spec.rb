@@ -11505,12 +11505,17 @@ RSpec.describe ReactOnRails::Doctor do
         )
       )
       rsc_support = support_source.match(/reactOnRailsRsc:\s*\{(?<body>[^}]+)\}/)&.[](:body)
-      react_support = support_source.match(
-        /rscMinor:\s*(?<rsc_minor>\d+),\s*minor:\s*(?<minor>\d+),\s*minPatch:\s*(?<min_patch>\d+)/
+      react_ranges = support_source.scan(
+        /
+          rscMinor:\s*(?<rsc_minor>\d+),\s*
+          rscMinPatch:\s*(?<rsc_min_patch>\d+),\s*
+          minor:\s*(?<minor>\d+),\s*
+          minPatch:\s*(?<min_patch>\d+)
+        /x
       )
 
       expect(rsc_support).not_to be_nil
-      expect(react_support).not_to be_nil
+      expect(react_ranges).not_to be_empty
       expect(described_class::RSC_MINIMUM_PACKAGE_VERSION).to eq(
         rsc_support.match(/minimumVersion:\s*'(?<version>[^']+)'/)[:version]
       )
@@ -11519,20 +11524,33 @@ RSpec.describe ReactOnRails::Doctor do
       expect(described_class::RSC_SUPPORTED_PACKAGE_MAJOR).to eq(
         rsc_support.match(/supportedMajor:\s*(?<major>\d+)/)[:major].to_i
       )
-      expect(described_class::RSC_SUPPORTED_PACKAGE_MINORS).to eq([react_support[:rsc_minor].to_i])
+      expect(described_class::RSC_SUPPORTED_PACKAGE_MINORS).to eq(react_ranges.map { |range| range[0].to_i })
+      expect(described_class::RSC_REACT_SUPPORT_RANGES).to eq(
+        react_ranges.map do |rsc_minor, rsc_min_patch, minor, min_patch|
+          {
+            rsc_minor: rsc_minor.to_i,
+            rsc_min_patch: rsc_min_patch.to_i,
+            minor: minor.to_i,
+            min_patch: min_patch.to_i
+          }
+        end
+      )
+      first_range = described_class::RSC_REACT_SUPPORT_RANGES.fetch(0)
       expect(described_class::RSC_MINIMUM_REACT_VERSION).to eq(
-        "#{described_class::RSC_SUPPORTED_PACKAGE_MAJOR}.#{react_support[:minor]}.#{react_support[:min_patch]}"
+        "#{described_class::RSC_SUPPORTED_PACKAGE_MAJOR}.#{first_range.fetch(:minor)}.#{first_range.fetch(:min_patch)}"
       )
       expect(described_class::RSC_SUPPORTED_REACT_MAJOR).to eq(described_class::RSC_SUPPORTED_PACKAGE_MAJOR)
       expect(described_class::RSC_SUPPORTED_REACT_LINE).to eq(
-        "#{described_class::RSC_SUPPORTED_REACT_MAJOR}.#{react_support[:minor]}.x"
+        described_class::RSC_REACT_SUPPORT_RANGES.map do |range|
+          "#{described_class::RSC_SUPPORTED_REACT_MAJOR}.#{range.fetch(:minor)}.x"
+        end.uniq.join(" or ")
       )
     end
 
     it "derives the RSC React support predicate from the configured floor and line" do
       minimum_major, minimum_minor, minimum_patch = described_class::RSC_MINIMUM_REACT_VERSION_TUPLE
       below_floor = "#{minimum_major}.#{minimum_minor}.#{minimum_patch - 1}"
-      unsupported_minor = "#{minimum_major}.#{minimum_minor + 1}.0"
+      unsupported_minor = "#{minimum_major}.#{described_class::RSC_SUPPORTED_PACKAGE_MINORS.max + 1}.0"
 
       expect(doctor.send(:unsupported_rsc_react_version?, described_class::RSC_MINIMUM_REACT_VERSION)).to be false
       expect(doctor.send(:unsupported_rsc_react_version?, below_floor)).to be true
@@ -11862,12 +11880,49 @@ RSpec.describe ReactOnRails::Doctor do
                 "dependencies" => {
                   "react" => "19.2.7",
                   "react-dom" => "19.2.7",
-                  "react-on-rails-rsc" => "19.3.0"
+                  "react-on-rails-rsc" => "19.4.0"
                 }
               )
             )
             install_react("19.2.7")
             install_package("react-dom", "version" => "19.2.7")
+            install_package(
+              "react-on-rails-rsc",
+              "version" => "19.4.0",
+              "peerDependencies" => { "react" => "^19.4.0", "react-dom" => "^19.4.0" }
+            )
+            stub_package_root(Dir.pwd)
+            allow(doctor).to receive(:capture_rsc_dist_tags)
+
+            doctor.send(:check_rsc_react_version)
+
+            error_msgs = checker.messages.select { |m| m[:type] == :error }.map { |m| m[:content] }
+            expect(error_msgs).to include(
+              a_string_including(
+                "react-on-rails-rsc 19.4.0 is not supported by React on Rails Pro 17 RSC",
+                "supported 19.2.x or 19.3.x package line"
+              )
+            )
+            expect(doctor).not_to have_received(:capture_rsc_dist_tags)
+          end
+        end
+      end
+
+      it "errors when published react-on-rails-rsc 19.3.0 is mixed with React 19.3" do
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            File.write(
+              "package.json",
+              JSON.generate(
+                "dependencies" => {
+                  "react" => "19.3.0",
+                  "react-dom" => "19.3.0",
+                  "react-on-rails-rsc" => "19.3.0"
+                }
+              )
+            )
+            install_react("19.3.0")
+            install_package("react-dom", "version" => "19.3.0")
             install_package(
               "react-on-rails-rsc",
               "version" => "19.3.0",
@@ -11882,10 +11937,41 @@ RSpec.describe ReactOnRails::Doctor do
             expect(error_msgs).to include(
               a_string_including(
                 "react-on-rails-rsc 19.3.0 is not supported by React on Rails Pro 17 RSC",
-                "supported 19.2.x package line"
+                "19.3.1-rc.0"
               )
             )
             expect(doctor).not_to have_received(:capture_rsc_dist_tags)
+          end
+        end
+      end
+
+      it "accepts the 19.3.1-rc.0 soak with React 19.3.0" do
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            File.write(
+              "package.json",
+              JSON.generate(
+                "dependencies" => {
+                  "react" => "19.3.0",
+                  "react-dom" => "19.3.0",
+                  "react-on-rails-rsc" => "19.3.1-rc.0"
+                }
+              )
+            )
+            install_react("19.3.0")
+            install_package("react-dom", "version" => "19.3.0")
+            install_package(
+              "react-on-rails-rsc",
+              "version" => "19.3.1-rc.0",
+              "peerDependencies" => { "react" => "^19.3.0", "react-dom" => "^19.3.0" }
+            )
+            stub_package_root(Dir.pwd)
+            allow(doctor).to receive(:rsc_dist_tags).and_return({})
+
+            doctor.send(:check_rsc_react_version)
+
+            error_msgs = checker.messages.select { |m| m[:type] == :error }.map { |m| m[:content] }
+            expect(error_msgs).to be_empty
           end
         end
       end
