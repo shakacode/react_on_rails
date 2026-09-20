@@ -383,6 +383,44 @@ After a mutation, choose the refresh mechanism that matches the UI:
 For the migration-specific warning, see
 [Mutations: Rails Controllers, Not Server Actions](../migrating/rsc-data-fetching.md#mutations-rails-controllers-not-server-actions).
 
+## Refreshing after a mutation with `RSCRoute.refetch()`
+
+If your page uses `registerServerComponent` (which wraps the component in `<RSCRoute>`),
+you can call `refetch()` from a client component to re-render the server component
+without a full page reload:
+
+```tsx
+'use client';
+import { useCurrentRSCRoute } from 'react-on-rails-pro';
+
+function SaveButton({ onSave }) {
+  const { refetch } = useCurrentRSCRoute();
+
+  const handleSave = async () => {
+    await onSave();
+    await refetch();
+  };
+
+  return <button onClick={handleSave}>Save</button>;
+}
+```
+
+> [!IMPORTANT]
+> If your page uses async props (`stream_react_component_with_async_props`),
+> `refetch()` will not work out of the box. The RSC payload endpoint does not run your
+> page view's emit block. You must register an async props provider:
+>
+> ```ruby
+> # config/initializers/react_on_rails_pro.rb
+> ReactOnRailsPro.configure do |config|
+>   config.register_async_props("ProductPageRSC", "ProductRscProps")
+> end
+> ```
+>
+> Or override `rsc_payload_async_props_block_override` in your controller.
+> See [Streaming SSR: Progressive Data](../../pro/streaming-ssr.md#progressive-data-with-async-props)
+> for the full setup.
+
 ## Testing checklist
 
 - Controller/request spec: valid write, invalid `422` error JSON, authorization failure, and redirect

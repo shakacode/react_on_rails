@@ -90,6 +90,13 @@ RSpec.describe "RSC payload endpoint" do
     expect(response.body).to eq("Invalid props JSON")
   end
 
+  it "returns bad request for bracket-notation props instead of 500" do
+    get "/rsc_payload/RscEchoProps", params: { "props[foo]" => "bar" }
+
+    expect(response).to have_http_status(:bad_request)
+    expect(response.body).to include("Invalid props JSON")
+  end
+
   it "denies an unauthorized request before parsing malformed props" do
     ReactOnRailsPro.configuration.rsc_payload_authorizer = ->(_controller, _component_name) { false }
 

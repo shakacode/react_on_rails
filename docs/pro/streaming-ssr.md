@@ -256,6 +256,27 @@ turn a prop name into an arbitrary constant, method call, or SQL fragment.
 
 For the full data-fetching guidance — synchronous props, parallelizing independent queries, and React Query / SWR interop — see [RSC data fetching patterns](../oss/migrating/rsc-data-fetching.md).
 
+### RSCRoute.refetch() and async props
+
+> [!WARNING]
+> When you register a component with `registerServerComponent`, it gets wrapped in
+> `<RSCRoute>`, which provides `useCurrentRSCRoute().refetch()`. However, the RSC
+> payload endpoint (`GET /rsc_payload/:component_name`) does not run your page view's
+> emit block. Without additional configuration, calling `refetch()` on an async-props
+> page will fail with an error.
+>
+> To fix this, register an async props provider in your initializer:
+>
+> ```ruby
+> ReactOnRailsPro.configure do |config|
+>   config.register_async_props("YourComponent", "YourAsyncPropsProvider")
+> end
+> ```
+>
+> Or override `rsc_payload_async_props_block_override` in your controller. See the
+> [RSC payload endpoint docs](react-server-components/rsc-payload-route-data.md)
+> for details.
+
 ### The discouraged alternative: direct `fetch` from the renderer
 
 For contrast, a Server Component _can_ reach Rails by calling `fetch` itself. This is a plain **network round-trip** — the renderer's VM has no in-process access to Rails models, sessions, or cookies — and it gives up what async props provide for free, so prefer async props for Rails-owned data:
