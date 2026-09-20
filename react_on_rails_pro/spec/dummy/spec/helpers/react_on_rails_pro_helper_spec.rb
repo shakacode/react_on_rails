@@ -881,6 +881,19 @@ describe ReactOnRailsProHelper do
       expect(rewritten).to equal(cached_html)
     end
 
+    it "returns the receiver itself when the originating nonce does not appear" do
+      # Callers (e.g. the cross-chunk stream rewriter) detect the no-match case through
+      # object identity, so the rewrite must return the receiver itself — not an equal
+      # copy — when nothing matched. This exercises the full rewrite path (valid current
+      # nonce differing from the marker value), unlike the early returns above.
+      cached_html = %(<div>cached</div><script nonce="other-CCC=">framework()</script>)
+      allow(self).to receive(:csp_nonce).and_return("live-BBB=")
+
+      rewritten = send(:rewrite_cached_csp_nonces, cached_html, "orig-AAA=")
+
+      expect(rewritten).to equal(cached_html)
+    end
+
     it "preserves per-chunk html_safe flags when re-stamping across chunk boundaries" do
       allow(self).to receive(:csp_nonce).and_return("live-BBB=")
       chunks = [%(<div>a</div><script nonce="orig).html_safe, %(in-AAA=">go()</script>)]
