@@ -697,6 +697,35 @@ describe ReactOnRailsProHelper do
       expect(result).to be_html_safe
     end
 
+    it "re-stamps unquoted and single-quoted nonce attributes in cached raw markup" do
+      # Framework emitters always double-quote the attribute, but cached SSR output can
+      # embed app-provided raw markup with valid unquoted (or single-quoted) attribute
+      # spellings. All spellings of the exact originating value must be re-stamped; an
+      # unquoted value that merely starts with the originating nonce is a different
+      # attribute value and must be left alone.
+      expected_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(
+        "App", cache_key: "csp-nonce-unquoted", csp_nonce_active: true
+      )
+      cached_html = "<div>cached</div>" \
+                    "<script nonce=origin-AAA=>unquoted()</script>" \
+                    "<script nonce='origin-AAA='>singleQuoted()</script>" \
+                    "<script nonce=origin-AAA=x>lookalike()</script>" \
+                    '<script nonce="origin-AAA=">framework()</script>' \
+                    "<!--rorp-cached-csp-nonce:origin-AAA=-->"
+      Rails.cache.write(expected_cache_key, cached_html.html_safe)
+      allow(self).to receive(:csp_nonce).and_return("live-BBB=")
+
+      result = cached_react_component("App", cache_key: "csp-nonce-unquoted", auto_load_bundle: false) do
+        raise "props block must not run on a cache hit"
+      end
+
+      expect(result).to include('<script nonce="live-BBB=">unquoted()</script>')
+      expect(result).to include('<script nonce="live-BBB=">singleQuoted()</script>')
+      expect(result).to include('<script nonce="live-BBB=">framework()</script>')
+      expect(result).to include("<script nonce=origin-AAA=x>lookalike()</script>")
+      expect(result).to be_html_safe
+    end
+
     it "never serves another partition's entry to a request with a malformed nonce" do
       allow(self).to receive(:csp_nonce).and_return("strip-orig-AAA=")
 
