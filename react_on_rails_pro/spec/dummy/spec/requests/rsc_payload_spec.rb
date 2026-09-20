@@ -156,21 +156,24 @@ RSpec.describe "RSC payload endpoint" do
       expect_valid_rsc_payload_response
     end
 
-    it "prefers the controller override over the registry" do
-      # Register a provider that would raise if called
+    it "uses the controller override and skips the registry when the override returns a proc" do
+      # Register a provider that should never be reached
       ReactOnRailsPro.configuration.register_async_props("RscEchoProps", "NonExistentProvider")
 
-      # Override returns nil (no async props for this component) — the registry should NOT be consulted
+      # Override returns a truthy proc — the `||` short-circuits and the registry is never consulted.
+      # The proc itself is a no-op (no emit calls), so the component renders without async props.
+      noop_block = ->(_emit) {}
       allow_any_instance_of(PagesController).to receive(:rsc_payload_async_props_block_override) # rubocop:disable RSpec/AnyInstance
-        .and_return(nil)
+        .and_return(noop_block)
 
-      # If the registry were consulted, constantize("NonExistentProvider") would log an error
-      # and return nil. We verify the override's nil short-circuits the whole chain.
+      # If the registry WERE consulted, constantize("NonExistentProvider") would log an error.
+      # Asserting no error log proves the registry was never reached.
       allow(Rails.logger).to receive(:error)
 
       request_rsc_payload
 
-      expect_valid_rsc_payload_response
+      expect(response).to have_http_status(:ok)
+      expect(Rails.logger).not_to have_received(:error)
     end
 
     it "logs an error and falls back to nil when the registry class cannot be loaded" do
