@@ -566,19 +566,23 @@ module ReactOnRailsProHelper
 
     return result unless result.is_a?(Hash) && result.key?(ReactOnRails::Helper::COMPONENT_HTML_KEY)
 
-    normalized = result.merge(
-      ReactOnRails::Helper::COMPONENT_HTML_KEY =>
-        normalize_cached_pro_attribution_html(result[ReactOnRails::Helper::COMPONENT_HTML_KEY], cached_csp_nonce)
-    )
-    return normalized if cached_csp_nonce.nil?
+    if cached_csp_nonce.nil?
+      return result.merge(
+        ReactOnRails::Helper::COMPONENT_HTML_KEY =>
+          normalize_cached_pro_attribution_html(result[ReactOnRails::Helper::COMPONENT_HTML_KEY])
+      )
+    end
 
-    # Rails-context/attribution normalization is componentHtml-only, but every other
-    # string field of a cached hash can carry nonce-stamped markup too (e.g. a render
-    # function's apolloStateTag), so the CSP nonce re-stamp covers them all.
-    normalized.to_h do |key, value|
-      next [key, value] if key == ReactOnRails::Helper::COMPONENT_HTML_KEY
-
-      [key, rewrite_cached_csp_nonces_in_value(value, cached_csp_nonce)]
+    # One traversal builds the normalized hash: componentHtml gets attribution
+    # normalization plus the nonce re-stamp, and every other string field gets the
+    # re-stamp too (any hash field can carry nonce-stamped markup, e.g. a render
+    # function's apolloStateTag, possibly nested).
+    result.to_h do |key, value|
+      if key == ReactOnRails::Helper::COMPONENT_HTML_KEY
+        [key, normalize_cached_pro_attribution_html(value, cached_csp_nonce)]
+      else
+        [key, rewrite_cached_csp_nonces_in_value(value, cached_csp_nonce)]
+      end
     end
   end
 
@@ -794,11 +798,21 @@ module ReactOnRailsProHelper
   # value is validated as-is (never stripped first): a stripped derivative could pass the
   # pattern while the response header still carries the original, so every re-stamped
   # script would mismatch the policy.
+  # The shape validation is memoized keyed by the raw value: Rails already memoizes the
+  # nonce itself per request, but this helper is consulted by the cache gate, key builder,
+  # marker writer, and every rewrite of a cached component, so the pattern match should
+  # not rerun each time. Keying by the raw value (rather than a bare defined? guard)
+  # keeps the memo correct if the nonce ever changes under one helper instance — as specs
+  # that simulate several requests on a single view context do.
   def current_csp_nonce_for_cached_html
-    nonce = csp_nonce
-    return nil if nonce.blank?
+    nonce = csp_nonce.presence
+    if defined?(@csp_nonce_validation_memo) && @csp_nonce_validation_memo.first == nonce
+      return @csp_nonce_validation_memo.last
+    end
 
-    CSP_NONCE_VALUE_PATTERN.match?(nonce) ? nonce : nil
+    validated = nonce && CSP_NONCE_VALUE_PATTERN.match?(nonce) ? nonce : nil
+    @csp_nonce_validation_memo = [nonce, validated]
+    validated
   end
 
   # True when the request carries a CSP nonce that current_csp_nonce_for_cached_html
