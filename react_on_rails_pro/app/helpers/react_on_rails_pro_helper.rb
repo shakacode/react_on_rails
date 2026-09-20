@@ -848,7 +848,26 @@ module ReactOnRailsProHelper
   # marker-free under the nonce-free key, that stale (possibly session-derived) value
   # would replay verbatim to genuinely nonce-free requests.
   def malformed_csp_nonce_bypasses_component_cache?
-    csp_nonce.present? && current_csp_nonce_for_cached_html.nil?
+    bypassed = csp_nonce.present? && current_csp_nonce_for_cached_html.nil?
+    warn_component_cache_bypassed_for_malformed_nonce if bypassed
+    bypassed
+  end
+
+  # The bypass is an app misconfiguration, not a routine path: every cached_* helper
+  # renders fresh for the request (a silent 0% hit rate), so surface it at warn level.
+  # Warned once per helper instance (one view context per request) so a page of many
+  # cached components does not spam the log. The nonce value is secret-adjacent and never
+  # logged — only its length.
+  def warn_component_cache_bypassed_for_malformed_nonce
+    return if defined?(@warned_component_cache_bypassed_for_malformed_nonce)
+
+    @warned_component_cache_bypassed_for_malformed_nonce = true
+    Rails.logger.warn(
+      "[React on Rails Pro] Component caching bypassed for this request: the CSP nonce " \
+      "(length #{csp_nonce.to_s.length}) falls outside the accepted base64/base64url shape, so every cached_* " \
+      "helper renders fresh. Fix content_security_policy_nonce_generator to emit only [A-Za-z0-9+/_-] characters " \
+      "with optional trailing '=' padding."
+    )
   end
 
   # Single gate for every cached_* entry point: component caching is usable only when the

@@ -878,6 +878,37 @@ describe ReactOnRailsProHelper do
       expect(second_result).not_to include("nonce-free-writer")
     end
 
+    it "warns once per request when a malformed nonce bypasses component caching" do
+      # The bypass is otherwise silent (0% hit rate with no signal). One actionable warn
+      # per helper instance; the nonce value itself is secret-adjacent and never logged.
+      allow(Rails.logger).to receive(:warn)
+      allow(self).to receive(:csp_nonce).and_return("bad nonce!")
+
+      2.times do |index|
+        cached_react_component("App", cache_key: ["csp-nonce-warn", index], auto_load_bundle: false) do
+          { name: "fresh-#{index}" }
+        end
+      end
+
+      expect(Rails.logger).to have_received(:warn)
+        .with(/Component caching bypassed for this request.*content_security_policy_nonce_generator/).once
+      expect(Rails.logger).not_to have_received(:warn).with(/bad nonce!/)
+    end
+
+    it "does not warn about cache bypass for valid-nonce or nonce-free requests" do
+      allow(Rails.logger).to receive(:warn)
+
+      cached_react_component("App", cache_key: "csp-nonce-nowarn-free", auto_load_bundle: false) do
+        { name: "nonce-free" }
+      end
+      allow(self).to receive(:csp_nonce).and_return("valid-AAA=")
+      cached_react_component("App", cache_key: "csp-nonce-nowarn-valid", auto_load_bundle: false) do
+        { name: "valid-nonce" }
+      end
+
+      expect(Rails.logger).not_to have_received(:warn).with(/Component caching bypassed/)
+    end
+
     it "never shares an entry between partitions when user key segments spell the nonce segment" do
       # Cache stores flatten nested key arrays into one slash-joined string. If the
       # partition discriminator were a conditional trailing segment, a nonce-free request
