@@ -703,6 +703,63 @@ module ReactOnRailsProHelper
     html.html_safe? ? rewritten.html_safe : rewritten
   end
 
+  # Re-stamps nonces across a cached stream's chunk array as one document. React's
+  # streaming writer flushes at fixed-size buffer boundaries, so a `nonce="..."`
+  # attribute can straddle two cached chunks; rewriting each chunk independently would
+  # miss the split attribute and replay the stale nonce — the same boundary problem
+  # ReactOnRailsPro::StreamCache::DomNodeIdRewriter solves for cached dom ids. The
+  # String chunks are joined, rewritten once, and re-split at the original chunk
+  # boundaries. When the rewrite changes the total byte length (differing nonce
+  # lengths, or an unquoted attribute normalized to a quoted one) — or a
+  # length-compensating mix would slice a multibyte character — the original
+  # boundaries no longer apply, so the whole rewritten document is delivered in the
+  # first String chunk and the rest are emptied; the streamed concatenation is
+  # identical either way.
+  def rewrite_cached_csp_nonces_across_chunks(chunks, cached_csp_nonce)
+    return chunks if cached_csp_nonce.nil?
+
+    document = chunks.map { |chunk| chunk.is_a?(String) ? chunk : "" }.join
+    rewritten = rewrite_cached_csp_nonces(document, cached_csp_nonce)
+    # rewrite_cached_csp_nonces returns the receiver untouched when nothing matched.
+    return chunks if rewritten.equal?(document)
+
+    if rewritten.bytesize == document.bytesize
+      pieces = resplit_stream_chunks_at_original_boundaries(chunks, rewritten)
+      return pieces if pieces
+    end
+
+    land_rewritten_stream_document(chunks, rewritten)
+  end
+
+  # Byte-slices the rewritten document back into the original chunk sizes, preserving
+  # each chunk's html_safe flag. Returns nil when a boundary would cut a multibyte
+  # character (possible when same-total-length rewrites shift bytes between chunks).
+  def resplit_stream_chunks_at_original_boundaries(chunks, rewritten)
+    offset = 0
+    chunks.map do |chunk|
+      next chunk unless chunk.is_a?(String)
+
+      piece = rewritten.byteslice(offset, chunk.bytesize) || ""
+      offset += chunk.bytesize
+      return nil unless piece.valid_encoding?
+
+      chunk.html_safe? ? piece.html_safe : piece
+    end
+  end
+
+  # Fallback framing when the original byte boundaries no longer apply: the whole
+  # rewritten document rides in the first String chunk (mirroring DomNodeIdRewriter's
+  # landing behavior) and every other String chunk is emptied.
+  def land_rewritten_stream_document(chunks, rewritten)
+    landing_index = chunks.index { |chunk| chunk.is_a?(String) }
+    chunks.each_with_index.map do |chunk, index|
+      next chunk unless chunk.is_a?(String)
+
+      piece = index == landing_index ? rewritten : ""
+      chunk.html_safe? ? piece.html_safe : piece
+    end
+  end
+
   # Returns the current request's CSP nonce, or nil when absent or malformed. The original
   # value is validated as-is (never stripped first): a stripped derivative could pass the
   # pattern while the response header still carries the original, so every re-stamped
@@ -1348,7 +1405,11 @@ module ReactOnRailsProHelper
     load_pack_for_cached_react_component(component_name, raw_options.merge(auto_load_bundle:))
 
     cached_chunks, cached_csp_nonce = extract_cached_csp_nonce_marker(cached_chunks)
-    initial_result = normalize_cached_pro_attribution(cached_chunks.first, cached_csp_nonce)
+    # Nonce re-stamping must happen across the joined chunk array, not per chunk: a
+    # `nonce="..."` attribute can straddle two cached chunks and per-chunk rewriting
+    # would replay the stale value.
+    cached_chunks = rewrite_cached_csp_nonces_across_chunks(cached_chunks, cached_csp_nonce)
+    initial_result = normalize_cached_pro_attribution(cached_chunks.first)
 
     # Enqueue remaining chunks asynchronously
     parent_context = ReactOnRailsPro::OpenTelemetry.capture_context
@@ -1360,7 +1421,7 @@ module ReactOnRailsProHelper
           next if index.zero?
           break if response.stream.closed?
 
-          @main_output_queue.enqueue(normalize_cached_pro_attribution(chunk, cached_csp_nonce))
+          @main_output_queue.enqueue(normalize_cached_pro_attribution(chunk))
         end
       end
     rescue Async::Queue::ClosedError

@@ -782,6 +782,18 @@ describe ReactOnRailsProHelper do
       expect(rewritten).to equal(cached_html)
     end
 
+    it "preserves per-chunk html_safe flags when re-stamping across chunk boundaries" do
+      allow(self).to receive(:csp_nonce).and_return("live-BBB=")
+      chunks = [%(<div>a</div><script nonce="orig).html_safe, %(in-AAA=">go()</script>)]
+
+      rewritten = send(:rewrite_cached_csp_nonces_across_chunks, chunks, "origin-AAA=")
+
+      expect(rewritten.join).to include('nonce="live-BBB="')
+      expect(rewritten.join).not_to include("origin-AAA=")
+      expect(rewritten.first).to be_html_safe
+      expect(rewritten.last).not_to be_html_safe
+    end
+
     it "serves cached markup unchanged when the nonce is stable across requests" do
       allow(self).to receive(:csp_nonce).and_return("stable-AAA=")
 
@@ -1948,7 +1960,11 @@ describe ReactOnRailsProHelper do
 
       # Regression coverage for issue #5021 on the chunk-replay path: every cached chunk
       # (not just the first) can carry nonce-stamped inline scripts — the immediate-hydration
-      # script in the first chunk and console-replay scripts in later chunks here.
+      # script in the first chunk and console-replay scripts in later chunks here. The
+      # serving nonce is the same length as the originating one so the cross-chunk rewrite
+      # preserves the original chunk framing and the per-chunk assertions stay meaningful
+      # (differing lengths collapse the replay into the first chunk; see the straddle
+      # examples below).
       it "re-stamps nonces in every replayed chunk on a cache HIT" do
         mock_request_and_response
         render_with_cached_stream
@@ -1961,7 +1977,7 @@ describe ReactOnRailsProHelper do
         reset_stream_buffers
         @rendered_rails_context = nil
         @rails_context = nil
-        allow(self).to receive(:csp_nonce).and_return("stream-hit-BBB=")
+        allow(self).to receive(:csp_nonce).and_return("stream-hit-BBBB=")
 
         second_run_chunks = run_stream
         expect(chunks_read.count).to eq(0)
@@ -1970,8 +1986,71 @@ describe ReactOnRailsProHelper do
         nonce_carrying_chunks = second_run_chunks.select { |chunk| chunk.include?('nonce="') }
         expect(nonce_carrying_chunks.length).to be >= 2
         nonce_carrying_chunks.each do |chunk|
-          expect(chunk.scan(/nonce="([^"]*)"/).flatten.uniq).to eq(["stream-hit-BBB="])
+          expect(chunk.scan(/nonce="([^"]*)"/).flatten.uniq).to eq(["stream-hit-BBBB="])
         end
+      end
+
+      # React's streaming writer flushes at fixed-size buffer boundaries, so a
+      # `nonce="..."` attribute can straddle two cached chunks (the same boundary
+      # problem issue #4984 hit for dom ids). Per-chunk rewriting misses the split
+      # attribute; the replay must re-stamp across chunk boundaries.
+      it "re-stamps a nonce attribute that straddles two cached chunks" do
+        mock_request_and_response
+        render_with_cached_stream
+
+        view_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(
+          component_name,
+          cache_key: ["stream-cache-spec", component_name],
+          prerender: true,
+          csp_nonce_active: true
+        )
+        straddled_chunks = [
+          "<div>shell</div>",
+          %(<script nonce="orig),
+          %(in-AAA=">hydrate()</script>),
+          "<!--rorp-cached-csp-nonce:origin-AAA=-->"
+        ]
+        Rails.cache.write(view_cache_key, straddled_chunks, expires_in: 60)
+        allow(self).to receive(:csp_nonce).and_return("live-BBB=")
+
+        joined = run_stream.join
+
+        expect(chunks_read.count).to eq(0)
+        expect(joined).to include(%(<script nonce="live-BBB=">hydrate()</script>))
+        expect(joined).not_to include("origin-AAA=")
+      end
+
+      it "preserves chunk framing when the re-stamped nonce has the same length" do
+        mock_request_and_response
+        render_with_cached_stream
+
+        view_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(
+          component_name,
+          cache_key: ["stream-cache-spec", component_name],
+          prerender: true,
+          csp_nonce_active: true
+        )
+        straddled_chunks = [
+          "<div>shell</div>",
+          %(<script nonce="orig),
+          %(in-AAA=">hydrate()</script>),
+          "<!--rorp-cached-csp-nonce:origin-AAA=-->"
+        ]
+        Rails.cache.write(view_cache_key, straddled_chunks, expires_in: 60)
+        # Same length as the originating "origin-AAA=" value, so the rewrite keeps every
+        # byte offset and the original chunk boundaries are re-split exactly.
+        allow(self).to receive(:csp_nonce).and_return("live-BBBBB=")
+
+        run_chunks = run_stream
+
+        expect(chunks_read.count).to eq(0)
+        # Chunks after the first are streamed contiguously; the re-stamped attribute
+        # reassembles across the preserved boundary.
+        expect(run_chunks[1..].join).to include(%(<script nonce="live-BBBBB=">hydrate()</script>))
+        expect(run_chunks.join).not_to include("origin-AAA=")
+        # The straddled tail stays in the final streamed chunk instead of being
+        # collapsed into the first (landing) chunk.
+        expect(run_chunks.last).to end_with(%(-BBBBB=">hydrate()</script>))
       end
 
       # Regression for https://github.com/shakacode/react_on_rails/issues/4581.

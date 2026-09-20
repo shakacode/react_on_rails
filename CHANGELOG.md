@@ -70,7 +70,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   hydration, console replay, and React's streaming runtime scripts — so under a nonce-enforcing `script-src` every
   cache hit served scripts the browser refused to run. The cache write now records the originating request's nonce
   in a trailing framework marker, and cache hits re-stamp exactly the attributes carrying that originating value
-  with the serving request's nonce (per chunk on streamed replays) — matching the exact per-request secret means
+  with the serving request's nonce (streamed replays are rewritten across chunk boundaries, so an attribute that
+  straddles two cached chunks is still re-stamped) — matching the exact per-request secret means
   markup that arrived with any other nonce value is never promoted to the live nonce. The component cache key also
   gains a `csp-nonce` segment so entries rendered with a nonce are never shared with nonce-free requests (and vice
   versa) when an app toggles its nonce generator. This also stops serving one request's nonce value to other users from shared cache
