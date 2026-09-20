@@ -5469,7 +5469,9 @@ module ReactOnRails
       return true if supported_rsc_react_version_for_package?(package_version, rsc_package["version"].to_s)
 
       package_label = package_name == "react" ? "React" : "React DOM"
-      react_range_label = supported_react_range_label_for_rsc_package(rsc_package["version"].to_s)
+      rsc_version = rsc_package["version"].to_s
+      react_range_label = supported_react_range_label_for_rsc_package(rsc_version)
+      react_install = recommended_react_install_version_for_rsc_package(rsc_version)
 
       checker.add_error(<<~MSG.strip)
         🚫 #{RSC_PACKAGE_NAME} #{rsc_package['version']} is installed with unsupported #{package_label} #{package_version}.
@@ -5477,7 +5479,7 @@ module ReactOnRails
         React on Rails Pro 17 RSC currently supports React/React DOM #{react_range_label}.
         The node renderer enforces the same support window at startup.
 
-        Fix: npm install react@~#{RSC_MINIMUM_REACT_VERSION} react-dom@~#{RSC_MINIMUM_REACT_VERSION} --save-exact
+        Fix: npm install react@~#{react_install} react-dom@~#{react_install} --save-exact
       MSG
       false
     end
@@ -5500,6 +5502,14 @@ module ReactOnRails
 
       "#{RSC_SUPPORTED_REACT_MAJOR}.#{range.fetch(:minor)}.x with patch >= " \
         "#{RSC_SUPPORTED_REACT_MAJOR}.#{range.fetch(:minor)}.#{range.fetch(:min_patch)}"
+    end
+
+    def recommended_react_install_version_for_rsc_package(rsc_version)
+      _rsc_major, rsc_minor, = npm_version_tuple(rsc_version)
+      range = rsc_react_support_range_for_minor(rsc_minor)
+      return RSC_MINIMUM_REACT_VERSION unless range
+
+      "#{RSC_SUPPORTED_REACT_MAJOR}.#{range.fetch(:minor)}.#{range.fetch(:min_patch)}"
     end
 
     def check_rsc_react_dom_matches_react_for_package(rsc_package, react_version, react_dom_version)

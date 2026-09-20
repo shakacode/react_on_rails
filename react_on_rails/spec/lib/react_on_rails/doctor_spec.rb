@@ -11945,6 +11945,44 @@ RSpec.describe ReactOnRails::Doctor do
         end
       end
 
+      it "recommends React 19.3.0 when the 19.3.1-rc.0 soak is paired with React 19.2" do
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            File.write(
+              "package.json",
+              JSON.generate(
+                "dependencies" => {
+                  "react" => "19.2.7",
+                  "react-dom" => "19.2.7",
+                  "react-on-rails-rsc" => "19.3.1-rc.0"
+                }
+              )
+            )
+            install_react("19.2.7")
+            install_package("react-dom", "version" => "19.2.7")
+            install_package(
+              "react-on-rails-rsc",
+              "version" => "19.3.1-rc.0",
+              "peerDependencies" => { "react" => "^19.0.0", "react-dom" => "^19.0.0" }
+            )
+            stub_package_root(Dir.pwd)
+            allow(doctor).to receive(:rsc_dist_tags).and_return({})
+
+            doctor.send(:check_rsc_react_version)
+
+            error_msgs = checker.messages.select { |m| m[:type] == :error }.map { |m| m[:content] }
+            expect(error_msgs).to include(
+              a_string_including(
+                "react-on-rails-rsc 19.3.1-rc.0 is installed with unsupported React 19.2.7",
+                "React/React DOM 19.3.x with patch >= 19.3.0",
+                "Fix: npm install react@~19.3.0 react-dom@~19.3.0 --save-exact"
+              )
+            )
+            expect(error_msgs.none? { |msg| msg.include?("react@~19.2.7") }).to be true
+          end
+        end
+      end
+
       it "accepts the 19.3.1-rc.0 soak with React 19.3.0" do
         Dir.mktmpdir do |tmpdir|
           Dir.chdir(tmpdir) do
@@ -12062,7 +12100,8 @@ RSpec.describe ReactOnRails::Doctor do
             expect(error_msgs).to include(
               a_string_including(
                 "react-on-rails-rsc 19.2.1 is installed with unsupported React 19.0.7",
-                "React/React DOM 19.2.x with patch >= 19.2.7"
+                "React/React DOM 19.2.x with patch >= 19.2.7",
+                "Fix: npm install react@~19.2.7 react-dom@~19.2.7 --save-exact"
               )
             )
             expect(warning_msgs).not_to include(a_string_including("RSC support currently targets React 19.2.x"))
