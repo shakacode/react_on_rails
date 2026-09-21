@@ -77,8 +77,12 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   by framework-controlled segments — before the caller's component name and `cache_key` value — so neither can
   spell one partition into the other; entries rendered with a nonce are never
   shared with nonce-free requests (and vice versa) when an app toggles its nonce generator. (Component cache keys
-  already embed the gem version, so the new segment costs no extra cache fault beyond the upgrade's own.) This also stops serving one request's nonce value to other users from shared cache
-  entries, which mattered for session-derived nonce generators. Requests whose nonce is present but falls outside
+  already embed the gem version, so the new segment costs no extra cache fault beyond the upgrade's own.) For the executable double-quoted
+  `nonce="…"` attributes it covers, the re-stamp also stops serving one request's nonce value to other users from
+  shared cache entries, which mattered for session-derived nonce generators — but only there: a nonce rendered into
+  visible text, a data attribute, differently-quoted app markup, or JSON props inside a cached fragment still replays
+  verbatim, so apps must not render the nonce (e.g. `railsContext.cspNonce`) into cached content outside those
+  attributes. Requests whose nonce is present but falls outside
   the base64/base64url shape bypass the component cache entirely (they render fresh), so a malformed nonce can
   neither create entries that no later request could re-stamp nor leak a sanitized derivative of its value into entries
   served to nonce-free requests. Note for apps overriding private normalization hooks: `normalize_cached_pro_attribution`

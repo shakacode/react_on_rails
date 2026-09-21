@@ -995,6 +995,17 @@ describe ReactOnRailsProHelper do
       expect(rewritten).to equal(cached_html)
     end
 
+    it "returns the receiver itself when the nonce appears only outside an attribute" do
+      # Substring present (so the allocation-free pre-check passes) but no re-stampable
+      # attribute — the single-pass rewrite must still return the receiver itself.
+      cached_html = %(<div>choose origin-AAA= wisely</div>)
+      allow(self).to receive(:csp_nonce).and_return("live-BBB=")
+
+      rewritten = send(:rewrite_cached_csp_nonces, cached_html, "origin-AAA=")
+
+      expect(rewritten).to equal(cached_html)
+    end
+
     it "returns the receiver itself when the originating nonce does not appear" do
       # Callers (e.g. the cross-chunk stream rewriter) detect the no-match case through
       # object identity, so the rewrite must return the receiver itself — not an equal

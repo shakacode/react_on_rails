@@ -724,15 +724,19 @@ module ReactOnRailsProHelper
     current_nonce = current_csp_nonce_for_cached_html
     return html if current_nonce.nil? || current_nonce == cached_csp_nonce
 
+    # Allocation-free pre-check: the recursive hash/array field walk calls this for every
+    # string field and most fields carry no nonce at all. A field that never mentions the
+    # originating value cannot match the attribute pattern, so return the receiver itself
+    # (the identity contract callers detect via equal?).
+    return html unless html.include?(cached_csp_nonce)
+
     attribute_pattern = cached_csp_nonce_attribute_pattern(cached_csp_nonce)
 
     # SafeBuffer#gsub semantics vary across Rails versions (the html_safe flag is dropped,
     # and some versions HTML-escape a non-safe block return), so rewrite a plain copy and
-    # restore the receiver's html_safe flag explicitly. Single pass over the HTML: the
-    # matched flag replaces a separate match? pre-scan, so the no-match case now allocates
-    # one copy of the receiver where it previously returned before copying — acceptable
-    # because marker-gated callers only invoke this when a rewrite is expected. No-match
-    # still returns the receiver itself: callers rely on object identity to detect it.
+    # restore the receiver's html_safe flag explicitly. The matched flag keeps the rewrite
+    # single-pass (no separate match? pre-scan), and a substring-present-but-no-attribute
+    # case still returns the receiver itself: callers rely on object identity.
     matched = false
     rewritten = String.new(html).gsub(attribute_pattern) do
       matched = true
