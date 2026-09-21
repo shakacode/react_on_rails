@@ -136,6 +136,56 @@ const getValidatedPPRApis = (): PPRApis => {
 };
 
 // ---------------------------------------------------------------------------
+// Runtime environment preflight — AbortController & real setTimeout (#5019-B)
+// ---------------------------------------------------------------------------
+
+/**
+ * Checks that the VM context has AbortController and a real (non-stubbed) setTimeout.
+ * Throws a descriptive error naming the config fix if either is missing. Called once per process.
+ *
+ * TODO: when PPR adoption grows, consider a renderer-level `ppr: true` config in configBuilder.ts
+ * that auto-sets `stubTimers: false` and injects AbortController, so operators don't need to
+ * configure both knobs manually.
+ */
+let pprRuntimeValidated = false;
+
+/** @internal Reset the once-per-process preflight guard. Test-only. */
+export const _resetPPRRuntimeValidation = (): void => {
+  pprRuntimeValidated = false;
+};
+
+export const validatePPRRuntimeEnvironment = (): void => {
+  if (pprRuntimeValidated) return;
+
+  // 1. AbortController must be available in the current execution context.
+  if (typeof AbortController === 'undefined') {
+    throw new Error(
+      'React on Rails Pro PPR requires AbortController to be available in the node renderer ' +
+        'VM context, but it is not defined. The node renderer does not inject AbortController ' +
+        'by default — add it to your renderer config:\n\n' +
+        '  additionalContext: { AbortController }\n\n' +
+        'See the node renderer JS configuration docs for details.',
+    );
+  }
+
+  // 2. setTimeout must be a real timer, not the no-op stub.
+  // The stub (`function setTimeout() {}`) returns undefined; a real setTimeout returns a
+  // truthy handle (Timeout object in Node.js, number in browsers).
+  const handle = setTimeout(() => {}, 0);
+  if (!handle) {
+    throw new Error(
+      'React on Rails Pro PPR requires a real setTimeout (not the no-op stub) in the node ' +
+        'renderer VM context. The default renderer config stubs timers, which prevents the ' +
+        'PPR settle budget from firing. Disable timer stubbing in your renderer config:\n\n' +
+        '  stubTimers: false\n\n' +
+        'Or set the environment variable RENDERER_STUB_TIMERS=false.',
+    );
+  }
+  clearTimeout(handle);
+  pprRuntimeValidated = true;
+};
+
+// ---------------------------------------------------------------------------
 // Shared per-render helpers
 // ---------------------------------------------------------------------------
 
@@ -265,6 +315,10 @@ const pprPrerenderRenderReactComponent = (
         if (options.signal) {
           prerenderSignal = options.signal;
         } else {
+          // Preflight: verify the VM context has a real AbortController and non-stubbed
+          // setTimeout before we rely on them for the settle timer (#5019-B).
+          validatePPRRuntimeEnvironment();
+
           const settleController = new AbortController();
           prerenderSignal = settleController.signal;
           settleTimeoutId = setTimeout(() => settleController.abort(), resolveSettleBudgetMs(railsContext));
@@ -306,6 +360,18 @@ const pprPrerenderRenderReactComponent = (
 
         if (settleTimeoutId !== undefined) clearTimeout(settleTimeoutId);
         renderState.isShellReady = true;
+
+        // PPR #5019-A: when the prerender has postponed boundaries, cancel any RSC streams
+        // that are still in-flight before injectRSCPayload drains them into the cached shell.
+        // In-flight streams correspond to RSC fetches for boundaries React postponed (or that
+        // outlasted the settle budget). Their Flight payload must NOT land in the shell because:
+        //   (a) it may contain per-user data that would be cached under a shared key, and
+        //   (b) the resume pass will regenerate those payloads fresh with the current user.
+        // Streams whose source already completed (non-postponed boundaries that resolved before
+        // the settle abort) are kept — their static payload belongs in the shell for hydration.
+        if (postponed != null) {
+          streamingTrackers.rscRequestTracker.cancelInFlightStreams();
+        }
 
         // Pipe the HTML prelude through injectRSCPayload so the RSC payload scripts and promoted
         // CSS links are part of the cached shell, exactly like the streaming path's shell.
