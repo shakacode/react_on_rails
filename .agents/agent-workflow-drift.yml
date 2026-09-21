@@ -11,15 +11,10 @@ files:
   source_sha256: cdbafa760fac90538cea9605bed1fbb359d469fbb6c4b1ae7b370965fe575d07
   consumer_sha256: 622598aa9c8a1c5e1e577f95b39c9a3cd6a52dd558f94bdfe9add44106e5d290
 - source: bin/agent-workflow-seam-doctor
-  consumer: ".agents/bin/agent-workflow-seam-doctor"
-  mode: overlay
-  reason: React on Rails accepts the Shaka V2 typed seam in agent-workflow.yml
-    while keeping the V1 policy-key contract for unmigrated fixtures.
-  consumer_mode: '100755'
-  source_sha256: 110099519bd99c739bbe5a90c55145eaf27421362fc285f6283947402f8ab062
-  consumer_sha256: b4cdb7fefa446b261eb33c77ac38b18425419843880fc09cd6623e54e8e74f3b
+  consumer: ".agents/fixtures/agent-workflows/bin/agent-workflow-seam-doctor"
+  mode: identical
 - source: bin/agent-workflow-seam-doctor-test.rb
-  consumer: ".agents/bin/agent-workflow-seam-doctor-test.rb"
+  consumer: ".agents/fixtures/agent-workflows/bin/agent-workflow-seam-doctor-test.rb"
   mode: identical
 - source: bin/validate
   consumer: ".agents/bin/validate"
@@ -32,11 +27,11 @@ files:
 - source: docs/adoption.md
   consumer: ".agents/docs/adoption.md"
   mode: overlay
-  reason: React on Rails documents installed shared skills, repo-pinned helper copies,
-    and source-pack links for its consumer layout, and records the Shaka typed seam.
+  reason: React on Rails makes Shaka the typed-seam validator and limits the pinned
+    agent-workflows doctor to transitional legacy fixtures.
   consumer_mode: '100644'
   source_sha256: 509b333b461cded9f7f05498567aa454240af62f63697d66e4ebf41e6499555f
-  consumer_sha256: 08949f00d1d770ecd45c29bf610b5e390583acf2486e20829ddccd28b528d3c4
+  consumer_sha256: 2f57ad7b82f21294627926e598f8fa109e38353c93c246ad8aff76c6cdb98e84
 - source: docs/coordination-backend.md
   consumer: ".agents/docs/coordination-backend.md"
   mode: overlay
@@ -70,11 +65,11 @@ files:
 - source: docs/seam-design.md
   consumer: ".agents/docs/seam-design.md"
   mode: overlay
-  reason: React on Rails preserves its no-duplicate skill-picker architecture and
-    replaces source-pack-only glossary links.
+  reason: React on Rails records Shaka as the sole typed-seam validator while retaining
+    agent-workflows only as transitional pinned content.
   consumer_mode: '100644'
   source_sha256: 39b1afb441b0b77f26c31daa043c51d0665c22190efa6454fff2882aa6ab4f05
-  consumer_sha256: 81c4ff5b5574df546ad6b9466392a34320b15084e5598576d489321c250587c3
+  consumer_sha256: fe051d2f51eca4d8310227b61058ac6388af3b1e51efa3460d39a20473193d69
 - source: docs/security-posture.md
   consumer: ".agents/docs/security-posture.md"
   mode: overlay

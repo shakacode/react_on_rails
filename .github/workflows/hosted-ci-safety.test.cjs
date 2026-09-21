@@ -163,6 +163,21 @@ assertMatches(
   requiredWorkflow,
   /\.agent-workflows-source\/bin\/check-agent-workflow-drift[\s\S]*--manifest \.agents\/agent-workflow-drift\.yml[\s\S]*--source-root \.agent-workflows-source[\s\S]*--consumer-root \./,
 );
+assertMatches(
+  'ci-required pinned Shaka checkout',
+  requiredWorkflow,
+  /- name: Check out pinned Shaka[\s\S]*uses: actions\/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5[\s\S]*repository: shakacode\/shaka[\s\S]*ref: 60b99a5070d46e78e2348173dcf5df9735214d91[\s\S]*path: \.shaka-source[\s\S]*fetch-depth: 1[\s\S]*persist-credentials: false/,
+);
+assertMatches(
+  'ci-required Shaka candidate seam validation',
+  requiredWorkflow,
+  /\.shaka-source\/skills\/shaka\/scripts\/shaka seam check --root "\$GITHUB_WORKSPACE" --local/,
+);
+assertMatches(
+  'ci-required Shaka regression fixtures',
+  requiredWorkflow,
+  /SHAKA_COMMAND=\.shaka-source\/skills\/shaka\/scripts\/shaka ruby script\/shaka_seam_check_test\.rb/,
+);
 assertMatches('ci-required mirrored-block lint', requiredWorkflow, /ruby bin\/lint-mirrored-blocks/);
 assertMatches(
   'ci-required mirrored-block lint tests',

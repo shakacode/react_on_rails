@@ -76,6 +76,20 @@ jobs:
             --consumer-root .
         # yamllint enable rule:line-length
 
+      - name: Check out pinned Shaka
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          repository: shakacode/shaka
+          ref: 60b99a5070d46e78e2348173dcf5df9735214d91
+          path: .shaka-source
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Validate repository seam with Shaka
+        run: |
+          .shaka-source/skills/shaka/scripts/shaka seam check --root "$GITHUB_WORKSPACE" --local
+          SHAKA_COMMAND=.shaka-source/skills/shaka/scripts/shaka ruby script/shaka_seam_check_test.rb
+
       - name: Validate workflow YAML
         run: |
           ruby -e "require 'yaml'; Dir['.github/workflows/*.{yml,yaml}'].sort.each { |f| YAML.safe_load_file(f, permitted_classes: [], aliases: false); puts f }"
@@ -83,6 +97,9 @@ jobs:
       - name: Validate CI scripts
         run: |
           for script in \
+            .agents/bin/setup \
+            .agents/bin/validate \
+            .agents/bin/test \
             bin/ci-local \
             bin/ci-rerun-failures \
             bin/request-hosted-ci \

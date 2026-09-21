@@ -7,13 +7,12 @@ rc=0
 if [ -d react_on_rails_pro ]; then
   ( cd react_on_rails_pro && BUNDLE_GEMFILE=../Gemfile bundle exec rubocop --ignore-parent-exclusion ) || rc=1
 fi
-if [ -f .agents/bin/agent-workflow-seam-doctor ]; then
+legacy_doctor_dir=.agents/fixtures/agent-workflows/bin
+if [ -f "$legacy_doctor_dir/agent-workflow-seam-doctor" ]; then
   BUNDLE_GEMFILE=Gemfile bundle exec rubocop \
-    .agents/bin/agent-workflow-seam-doctor \
-    .agents/bin/agent-workflow-seam-doctor-test.rb \
-    .agents/bin/shaka-seam-contract-test.rb || rc=1
-  ruby .agents/bin/agent-workflow-seam-doctor-test.rb || rc=1
-  ruby .agents/bin/shaka-seam-contract-test.rb || rc=1
+    "$legacy_doctor_dir/agent-workflow-seam-doctor" \
+    "$legacy_doctor_dir/agent-workflow-seam-doctor-test.rb" || rc=1
+  ruby "$legacy_doctor_dir/agent-workflow-seam-doctor-test.rb" || rc=1
 fi
 pnpm run lint || rc=1
 pnpm start format.listDifferent || rc=1

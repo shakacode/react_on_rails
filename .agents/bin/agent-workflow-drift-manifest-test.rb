@@ -51,17 +51,25 @@ module AgentWorkflowDriftManifest
       "Source-pack contract test validates installed single-target entrypoints and is not vendored here."
   }.freeze
 
+  CONSUMER_PATH_OVERRIDES = {
+    "bin/agent-workflow-seam-doctor" =>
+      ".agents/fixtures/agent-workflows/bin/agent-workflow-seam-doctor",
+    "bin/agent-workflow-seam-doctor-test.rb" =>
+      ".agents/fixtures/agent-workflows/bin/agent-workflow-seam-doctor-test.rb"
+  }.freeze
+
   def run(manifest_path:, source_root:, consumer_root:, output: $stdout)
     errors = []
     manifest = load_manifest(manifest_path, errors)
     revision = source_revision(manifest, errors)
-    mapped_sources = mapped_pairs(manifest, errors).map(&:first).uniq.sort
+    mappings = mapped_pairs(manifest, errors)
+    mapped_sources = mappings.map(&:first).uniq.sort
     source_files = revision ? pinned_source_files(source_root, revision, errors) : []
     consumer_files = consumer_agent_files(consumer_root, errors)
 
     validate_source_head(source_root, revision, errors) if revision
     validate_exclusions(source_files, errors)
-    validate_inventory(source_files, consumer_files, mapped_sources, errors)
+    validate_inventory(source_files, consumer_files, mappings, errors)
 
     if errors.empty?
       output.puts "AGENT_WORKFLOW_MANIFEST_COMPLETENESS_OK mapped=#{mapped_sources.length} excluded=#{EXCLUSIONS.length}"
@@ -137,7 +145,7 @@ module AgentWorkflowDriftManifest
         next
       end
 
-      expected_consumer = ".agents/#{source}"
+      expected_consumer = CONSUMER_PATH_OVERRIDES.fetch(source, ".agents/#{source}")
       if consumer != expected_consumer
         errors << "manifest consumer path must match source path: #{source} -> #{consumer}"
       end
@@ -209,7 +217,8 @@ module AgentWorkflowDriftManifest
     end
   end
 
-  def validate_inventory(source_files, consumer_files, mapped_sources, errors)
+  def validate_inventory(source_files, consumer_files, mappings, errors)
+    mapped_sources = mappings.map(&:first).uniq.sort
     governed = source_files.select do |path|
       REQUIRED_EXPLICIT_PATHS.include?(path) || GOVERNED_PREFIXES.any? { |prefix| path.start_with?(prefix) }
     end
@@ -219,7 +228,15 @@ module AgentWorkflowDriftManifest
     append_set_differences(errors, "required governed source is not mapped", expected_sources - mapped_sources)
     append_set_differences(errors, "manifest maps source outside the governed inventory", mapped_sources - expected_sources)
     append_set_differences(errors, "same-path consumer source is not mapped", same_path_intersection - mapped_sources)
-    append_set_differences(errors, "mapped source has no same-path consumer file", mapped_sources - same_path_intersection)
+    CONSUMER_PATH_OVERRIDES.each_key do |source|
+      next unless consumer_files.include?(source)
+
+      errors << "active consumer copy conflicts with fixture-only override: .agents/#{source}"
+    end
+    mappings.each do |source, consumer|
+      relative_consumer = consumer.delete_prefix(".agents/")
+      errors << "mapped consumer file is missing: #{source} -> #{consumer}" unless consumer_files.include?(relative_consumer)
+    end
     append_set_differences(
       errors,
       "required explicit source path is absent at the pinned revision",

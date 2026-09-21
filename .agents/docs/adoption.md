@@ -79,10 +79,10 @@ notes.
    a narrower team slug.
 
 6. **Review the AGENTS pointer.** `AGENTS.md` stays canonical for human policy.
-   The compared pointer section must match the doctor `POINTER_SECTION` text:
-   resolve the trusted default branch, run installed `shaka seam check --ref REF`,
-   execute the paths that command reports, and keep human-only boundaries in
-   `AGENTS.md`.
+   Its pointer must resolve the trusted default branch, run installed
+   `shaka seam check --ref REF`, execute the paths that command reports, and
+   keep human-only boundaries in `AGENTS.md`. The legacy doctor pointer is not
+   the Shaka contract.
 
 7. **Keep repo-local skills local, but keep workflow references reachable.** Add
    only repo-specific skills, repo-pinned helper `bin/` copies, or local
@@ -92,11 +92,12 @@ notes.
    execute the installed skill's `bin` helpers, keep a local helper copy for
    that skill without adding a duplicate `SKILL.md`.
 
-8. **Validate the contract.** Run installed `shaka seam check --root .` first.
-   Then run `.agents/bin/agent-workflow-seam-doctor` (add `--shared` only when
-   checking user-installed shared skills outside this checkout). The doctor is
-   a V1 compatibility gate; it does not replace `shaka seam check`. Then run
-   one dry workflow pass without making changes.
+8. **Validate the contract.** Run installed
+   `shaka seam check --root . --local`, then run one dry workflow pass without
+   making changes. Candidate validation grants neither policy nor merge
+   authority; agents load trusted policy with `--ref <immutable-default-sha>`.
+   Do not run `agent-workflow-seam-doctor` against the typed seam. That helper
+   remains transitional legacy content for `agent-workflows` fixtures only.
 
 9. **Make `AGENTS.md` canonical.** Tool-specific files such as `CLAUDE.md`
    should stay thin and link back to `AGENTS.md`.
@@ -129,19 +130,18 @@ repo. `bash -n` catches syntax errors, not missing package scripts or Rake tasks
 ## Seam Validation
 
 ```bash
-agent-workflow-seam-doctor --shared "${AGENT_WORKFLOWS_ROOT:?set path to shakacode/agent-workflows}"
+shaka seam check --root . --local
 ```
 
-For repos that keep the checker in the checkout:
+The same Shaka parser must validate trusted policy from an immutable default
+branch commit before an agent relies on it:
 
 ```bash
-.agents/bin/agent-workflow-seam-doctor --shared .agents
+shaka seam check --root . --ref <default-branch-sha>
 ```
 
-The checker fails when the pointer section is missing, core scripts are missing
-or malformed, policy YAML is incomplete, or executable snippets in repo-local or
-installed shared skill Markdown still contain unresolved placeholders such as
-`<follow-up prefix>`.
+The local mode rejects unknown or duplicate keys, invalid nested values, and
+unsafe, missing, or non-executable command paths without granting authority.
 
 ## Keeping The Installed Pack Current
 
@@ -152,13 +152,12 @@ source clone:
 agent-workflows-status --host codex
 ```
 
-Use `upgrade-agent-workflows` to update the source clone, reinstall, and run the
-seam doctor against one or more consumer repos:
+Use `upgrade-agent-workflows` to update the source clone and reinstall the
+transitional pack, then validate this consumer with trusted Shaka:
 
 ```bash
-upgrade-agent-workflows \
-  --host codex \
-  --consumer-root /path/to/consumer/repo
+upgrade-agent-workflows --host codex
+shaka seam check --root /path/to/consumer/repo --ref <immutable-default-sha>
 ```
 
 ## Shared Vs Repo-Local Skills
@@ -183,7 +182,7 @@ updates reviewed in that repo. If a repo chooses that route:
 - do not customize shared files in place
 - keep repo-specific command/policy values in `.agents/bin/` and
   `.agents/agent-workflow.yml`
-- run the seam doctor with `--shared` after every sync or update
+- keep transitional `agent-workflows` copies covered by their drift manifest
 
 ### Detecting Drift In Pinned Copies
 
@@ -281,7 +280,7 @@ malformed schema.
 
 - `agent-workflows-status --host <codex|claude>` reports `UP_TO_DATE`, or the
   upgrade decision is recorded.
-- `agent-workflow-seam-doctor --shared <path-to-shakacode/agent-workflows>` passes.
+- `shaka seam check --root . --local` passes.
 - Every generated wrapper's underlying command exists in the target repo.
 - `pr-security-preflight --repo OWNER/REPO --trust-config .agents/trusted-github-actors.yml --strict-trust <exact-targets>`
   reports `SECURITY_PREFLIGHT_OK` for maintainer-approved exact targets.
@@ -300,7 +299,7 @@ malformed schema.
 
 ## Validation
 
-- `agent-workflow-seam-doctor --shared <path-to-shakacode/agent-workflows>`
+- `shaka seam check --root . --local`
 - verified wrapped commands exist
 - markdown formatting + link check
 ```

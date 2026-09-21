@@ -1,0 +1,206 @@
+# frozen_string_literal: true
+
+require "fileutils"
+require "json"
+require "minitest/autorun"
+require "open3"
+require "tmpdir"
+require "yaml"
+
+module ShakaTrustConfigHelper
+  def merge_trust_config(contents)
+    repository = "shakacode/react_on_rails"
+    parsed = Shaka::PublicComments::TrustSettings.new(repository).parse(contents, scope: "repository")
+    github = Struct.new(:repository).new(repository)
+
+    Shaka::PublicComments::TrustConfig.new(github).send(:merged_config, [parsed])
+  end
+end
+
+class ShakaSeamCheckTest < Minitest::Test
+  SHAKA_COMMAND = File.expand_path(ENV.fetch("SHAKA_COMMAND"))
+  SHAKA_SKILL_ROOT = File.expand_path("..", File.dirname(File.realpath(SHAKA_COMMAND)))
+  REPOSITORY_ROOT = File.expand_path("..", __dir__)
+
+  $LOAD_PATH.unshift(File.join(SHAKA_SKILL_ROOT, "lib"))
+  require "shaka/public_comments/trust_config"
+  require "shaka/public_comments/trust_settings"
+
+  include ShakaTrustConfigHelper
+
+  def test_valid_candidate_reports_no_authority
+    with_valid_seam do |root|
+      output, error, status = run_check(root)
+
+      assert status.success?, error
+      validation = JSON.parse(output).fetch("validation")
+      assert_equal "local/candidate", validation.fetch("mode")
+      assert_equal false, validation.fetch("grants_policy")
+      assert_equal false, validation.fetch("grants_merge_authority")
+    end
+  end
+
+  def test_unknown_top_level_key_is_rejected
+    with_valid_seam do |root|
+      append_config(root, "surprise: true\n")
+
+      assert_rejected(root, "unknown .agents/agent-workflow.yml key: surprise")
+    end
+  end
+
+  def test_invalid_review_value_is_rejected
+    with_valid_seam do |root|
+      replace_config(root, "required: meaningful_changes", "required: sometimes")
+
+      assert_rejected(root, "review.required must be always, meaningful_changes, or none")
+    end
+  end
+
+  def test_missing_review_is_rejected
+    with_valid_seam do |root|
+      update_config(root) { |config| config.delete("review") }
+
+      assert_rejected(root, "missing .agents/agent-workflow.yml key: review")
+    end
+  end
+
+  def test_empty_review_is_rejected
+    with_valid_seam do |root|
+      update_config(root) { |config| config["review"] = {} }
+
+      assert_rejected(root, "missing review key: required")
+    end
+  end
+
+  def test_invalid_merge_value_is_rejected
+    with_valid_seam do |root|
+      replace_config(root, "preference: ask", "preference: sometimes")
+
+      assert_rejected(root, "merge.preference must be ask or auto")
+    end
+  end
+
+  def test_duplicate_yaml_key_is_rejected
+    with_valid_seam do |root|
+      append_config(root, "merge:\n  preference: ask\n")
+
+      assert_rejected(root, "duplicate key: merge")
+    end
+  end
+
+  def test_unknown_branch_placeholder_is_rejected
+    with_valid_seam do |root|
+      append_config(root, "branches:\n  name: '{issue}-{base_branch}'\n")
+
+      assert_rejected(root, "branches.name has unknown placeholder: base_branch")
+    end
+  end
+
+  def test_required_command_resolving_outside_repository_is_rejected
+    with_valid_seam do |root|
+      Dir.mktmpdir("shaka-outside") do |outside_root|
+        outside_command = File.join(outside_root, "command")
+        File.write(outside_command, "#!/bin/sh\nexit 0\n")
+        File.chmod(0o755, outside_command)
+        FileUtils.rm(File.join(root, ".agents/bin/test"))
+        File.symlink(outside_command, File.join(root, ".agents/bin/test"))
+
+        assert_rejected(root, ".agents/bin/test must resolve inside the repository")
+      end
+    end
+  end
+
+  def test_missing_required_command_is_rejected
+    with_valid_seam do |root|
+      FileUtils.rm(File.join(root, ".agents/bin/validate"))
+
+      assert_rejected(root, ".agents/bin/validate does not exist")
+    end
+  end
+
+  def test_non_executable_required_command_is_rejected
+    with_valid_seam do |root|
+      File.chmod(0o644, File.join(root, ".agents/bin/setup"))
+
+      assert_rejected(root, ".agents/bin/setup is not executable")
+    end
+  end
+
+  def test_repository_trust_config_is_accepted_by_shaka
+    trust_path = File.join(REPOSITORY_ROOT, ".agents/trusted-github-actors.yml")
+
+    merged = merge_trust_config(File.binread(trust_path))
+
+    assert_empty merged.fetch(:bots) & merged.fetch(:metadata_bots)
+  end
+
+  def test_overlapping_trust_bot_roles_are_rejected_by_shaka
+    contents = <<~YAML
+      trusted_bots:
+        - github-actions
+      trusted_metadata_bots:
+        - github-actions
+    YAML
+
+    error = assert_raises(Shaka::Error) { merge_trust_config(contents) }
+
+    assert_equal "A trust bot is also metadata-only.", error.message
+  end
+
+  private
+
+  def with_valid_seam
+    Dir.mktmpdir("shaka-seam-check") do |root|
+      FileUtils.mkdir_p(File.join(root, ".agents/bin"))
+      File.write(File.join(root, ".agents/agent-workflow.yml"), <<~YAML)
+        ---
+        version: 1
+        base_branch: main
+        review:
+          required: meaningful_changes
+          check: claude-review
+          reviewers:
+            - provider: anthropic
+              model_family: claude
+        merge:
+          preference: ask
+      YAML
+      %w[setup validate test].each do |name|
+        command = File.join(root, ".agents/bin", name)
+        File.write(command, "#!/bin/sh\nexit 0\n")
+        File.chmod(0o755, command)
+      end
+      yield root
+    end
+  end
+
+  def run_check(root)
+    Open3.capture3(SHAKA_COMMAND, "seam", "check", "--root", root, "--local")
+  end
+
+  def assert_rejected(root, message)
+    output, error, status = run_check(root)
+
+    refute status.success?, output
+    assert_includes error, message
+  end
+
+  def append_config(root, content)
+    File.open(File.join(root, ".agents/agent-workflow.yml"), "a") { |file| file.write(content) }
+  end
+
+  def replace_config(root, old_value, new_value)
+    path = File.join(root, ".agents/agent-workflow.yml")
+    source = File.read(path)
+    raise "missing fixture value: #{old_value}" unless source.include?(old_value)
+
+    File.write(path, source.sub(old_value, new_value))
+  end
+
+  def update_config(root)
+    path = File.join(root, ".agents/agent-workflow.yml")
+    config = YAML.safe_load_file(path, permitted_classes: [], aliases: false)
+    yield config
+    File.write(path, YAML.dump(config))
+  end
+end
