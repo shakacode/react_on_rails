@@ -58,6 +58,19 @@ describe ProGenerator, type: :generator do
       expect(error_text).to include("This generator requires the react_on_rails_pro gem")
       expect(error_text).not_to include("You specified")
       expect(error_text).to include("react_on_rails_pro")
+      expect(error_text).to include("No license key is needed to run Pro")
+      expect(error_text).to include("Production is free for small organizations, charities, schools, and hospitals")
+      expect(error_text).to include("larger organizations subscribe: https://reactonrails.com/pricing/")
+    end
+  end
+
+  describe "next steps" do
+    it "presents the subscription key as optional" do
+      described_class.new.send(:print_success_message)
+
+      expect(GeneratorMessages.messages.join("\n")).to include(
+        "1. Optional: set the license key from your subscription: export REACT_ON_RAILS_PRO_LICENSE=your_key"
+      )
     end
   end
 

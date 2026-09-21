@@ -4,6 +4,15 @@ require "ripper"
 require_relative "../support/generator_spec_helper"
 
 RSpec.describe ReactOnRails::Generators::BaseGenerator, type: :generator do
+  describe "OSS home page Pro guidance" do
+    it "explains that the optional key only sets attribution status" do
+      note = described_class.new.send(:home_page_pro_note_for_oss_app)
+
+      expect(note).to include("enable it when you're ready")
+      expect(note).to include("a license key is optional and only marks your pages Licensed")
+    end
+  end
+
   describe "managed webpack template map" do
     it "covers all webpack templates except explicitly handled files" do
       templates_root = described_class.source_root

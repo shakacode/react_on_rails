@@ -53,7 +53,7 @@ Popmenu achieved a [73% decrease in average response times and 20-25% lower Hero
 
 ## Getting Started with Pro
 
-- [Pro pricing and sign up](https://pro.reactonrails.com/)
+- [Pricing](https://reactonrails.com/pricing/) and [sign up](https://pro.reactonrails.com/)
 - [React on Rails Pro overview](../../pro/react-on-rails-pro.md)
 - [Pro installation guide](../../pro/installation.md)
 - [Book a consultation](https://meetings.hubspot.com/justingordon/30-minute-consultation)

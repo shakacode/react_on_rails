@@ -4340,7 +4340,7 @@ describe InstallGenerator, type: :generator do
       expect(install_generator.send(:use_pro?)).to be(false)
     end
 
-    it "prints the trust-license note and upgrade documentation before asking" do
+    it "prints the optional key and production terms before asking" do
       install_generator = install_generator_fixture
       allow(install_generator).to receive_messages(interactive_install_session?: true, ask: "Y")
       allow(install_generator).to receive(:say)
@@ -4348,7 +4348,11 @@ describe InstallGenerator, type: :generator do
       install_generator.send(:prompt_for_pro_features_if_applicable)
 
       expect(install_generator).to have_received(:say)
-        .with(a_string_including("free for evaluation", "production use requires a subscription"))
+        .with(a_string_including(
+                "No license key is needed to run Pro",
+                "Production is free for small organizations, charities, schools, and hospitals",
+                "larger organizations subscribe: https://reactonrails.com/pricing/"
+              ))
       expect(install_generator).to have_received(:say)
         .with(a_string_including("https://reactonrails.com/docs/pro/upgrading-to-pro/"))
     end

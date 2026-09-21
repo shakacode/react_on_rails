@@ -32,7 +32,7 @@ RSpec.describe "published Pro license metadata" do
     gemspec_path = File.join(repo_root, "react_on_rails_pro", "react_on_rails_pro.gemspec")
     gemspec = Gem::Specification.load(gemspec_path)
 
-    expect(gemspec.license).to eq("LicenseRef-LICENSE")
+    expect(gemspec.license).to eq("LicenseRef-ReactOnRailsPro")
     expect(gemspec.files).to include("LICENSE")
     expect(File.binread(File.join(repo_root, "react_on_rails_pro", "LICENSE"))).to eq(commercial_license)
   end

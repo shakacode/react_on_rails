@@ -562,7 +562,7 @@ No license key is needed to run Pro.
 
 - **[OSS vs Pro comparison](./oss-vs-pro.md)** - See what Pro adds
 - **[React Server Components](../../pro/react-server-components/tutorial.md)** - Add the RSC path when you need it
-- **[Pro pricing and sign up](https://pro.reactonrails.com/)** - Subscription for organizations above the free line
+- **[Pricing](https://reactonrails.com/pricing/) and [sign up](https://pro.reactonrails.com/)**: Subscription for organizations above the free line
 
 ## 🆘 Need Help?
 
@@ -1994,7 +1994,7 @@ Popmenu achieved a [73% decrease in average response times and 20-25% lower Hero
 
 ## Getting Started with Pro
 
-- [Pro pricing and sign up](https://pro.reactonrails.com/)
+- [Pricing](https://reactonrails.com/pricing/) and [sign up](https://pro.reactonrails.com/)
 - [React on Rails Pro overview](../../pro/react-on-rails-pro.md)
 - [Pro installation guide](../../pro/installation.md)
 - [Book a consultation](https://meetings.hubspot.com/justingordon/30-minute-consultation)
@@ -2012,7 +2012,7 @@ paths land on the right Pro docs instead of a second, competing setup guide.
 
 ## Choose the Right Pro Path
 
-- **Need a production subscription?** Visit [Pro pricing and sign up](https://pro.reactonrails.com/).
+- **Need a production subscription?** Visit [Pricing](https://reactonrails.com/pricing/) and [sign up](https://pro.reactonrails.com/).
 - **Starting a new Pro app from scratch?** Use [Pro Installation](../../pro/installation.md#fresh-installation).
 - **Upgrading an existing React on Rails app?** Use [Upgrading from React on Rails to React on Rails Pro](../../pro/upgrading-to-pro.md).
 - **Still deciding between OSS and Pro?** Review [React on Rails: OSS vs Pro Feature Comparison](./oss-vs-pro.md).
@@ -32301,7 +32301,7 @@ Free in development, test, CI, and staging, and in production for small
 organizations, charities, schools, and hospitals; larger organizations
 subscribe at https://pro.reactonrails.com/ ($1,800 per year per organization).
 No license key is needed to run Pro. See
-[Pro pricing and sign up](https://pro.reactonrails.com/), the
+[Pricing](https://reactonrails.com/pricing/) and [sign up](https://pro.reactonrails.com/), the
 [React on Rails Pro docs](../../pro/react-on-rails-pro.md), and the
 [OSS vs Pro feature matrix](./oss-vs-pro.md) for a detailed breakdown.
 
