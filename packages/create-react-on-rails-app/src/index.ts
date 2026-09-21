@@ -94,9 +94,10 @@ function run(appName: string, rawOpts: Record<string, unknown>, command?: Comman
     logInfo(`Note: ${setupLabel} adds react_on_rails_pro and uses the Pro generator path.`);
     logInfo('If installation fails, verify your Bundler/RubyGems setup, then rerun the command.');
     logInfo('Pro setup docs: https://reactonrails.com/docs/pro/installation/');
-    logInfo('Pro pricing and sign up: https://pro.reactonrails.com/');
+    logInfo('Pro pricing: https://reactonrails.com/pricing/');
+    logInfo('Pro sign up: https://pro.reactonrails.com/');
     logInfo(
-      'License: no token is required for development, test, CI/CD, or staging. Production Pro deployments need a paid license, with free or low-cost options for startups and small projects.',
+      'License: no license key is needed to run Pro. It is free in development, test, CI, and staging, and in production for small organizations, charities, schools, and hospitals; larger organizations subscribe ($1,800 per year per organization).',
     );
     console.log('');
   }
@@ -181,10 +182,11 @@ that is where React 19.2 feature support lives. Use --standard only when you
 intentionally want an open-source-only scaffold. Use --rsc when you want the
 generated React Server Components example.
 
-Pro license note: no token is required for development, test, CI/CD, or
-staging. Production Pro deployments need a paid license, with free or low-cost
-options for startups and small projects. See pricing and sign up:
-https://pro.reactonrails.com/
+Pro license note: no license key is needed to run Pro. It is free in development,
+test, CI, and staging, and in production for small organizations, charities,
+schools, and hospitals; larger organizations subscribe ($1,800 per year per
+organization). Pricing: https://reactonrails.com/pricing/
+Sign up: https://pro.reactonrails.com/
 
 What it does:
   1. Creates a new Rails app with PostgreSQL
