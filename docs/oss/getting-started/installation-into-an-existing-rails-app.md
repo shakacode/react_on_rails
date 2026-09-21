@@ -54,8 +54,10 @@ TypeScript is the recommended default for new integrations. If you want JavaScri
 
 When you run the generator in an interactive terminal without choosing a product mode, it asks whether to enable
 React on Rails Pro. Press Enter or answer `y` to include the Node Renderer and the Pro foundation for streaming SSR
-and React Server Components. Pro is free for evaluation; production use requires a subscription. See the
-[Pro upgrade guide](../../pro/upgrading-to-pro.md) for licensing and setup details.
+and React Server Components. Free in development, test, CI, and staging, and in production for small organizations,
+charities, schools, and hospitals; larger organizations subscribe at https://pro.reactonrails.com/ ($1,800 per year
+per organization). No license key is needed to run Pro. See the [Pro upgrade guide](../../pro/upgrading-to-pro.md) for
+licensing and setup details.
 
 The prompt never appears in CI, redirected-input scripts, or other noninteractive sessions; those runs preserve the
 existing open-source-only default. Pass `--pro` or `--rsc` to select Pro without a prompt. Pass `--no-pro`,

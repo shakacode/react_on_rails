@@ -29,8 +29,9 @@ react_on_rails/ (monorepo root)
 **Important Distinction:**
 
 - **MIT-licensed interface files** (outside the Pro-licensed directories) can be freely modified under MIT terms
-- **Using those modifications to access Pro features** without a license violates the Pro License
-- **Pro-licensed files** require a Pro license to use in any way
+- **Pro-licensed files** remain governed by The React on Rails Pro License
+- **Free Pro uses** include development, test, CI, staging, education, personal and open-source projects, and production use by small organizations, charities, educational institutions, and hospitals
+- **Other production use** requires a subscription
 
 ## License Compliance Rules
 
@@ -63,7 +64,7 @@ react_on_rails/ (monorepo root)
 
 ### When Adding New Files
 
-1. Determine if the functionality is Core (MIT) or Pro (subscription required)
+1. Determine if the functionality is Core (MIT) or Pro (The React on Rails Pro License)
 2. Place the file in the appropriate licensed directory
 3. Ensure the package.json or gemspec correctly reflects the license
 4. Update LICENSE.md if creating new directories

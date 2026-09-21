@@ -8,8 +8,8 @@ run with disposable resources.
 
 Do not expose a production license token to fork pull request review-app builds or runtime by default, whether it comes
 from `REACT_ON_RAILS_PRO_LICENSE`, Rails credentials, or the Node renderer's `licenseToken` configuration. React on
-Rails Pro supports evaluation, development, test, CI/CD, and staging without a license token. Review apps should use
-that license-free path unless there is a deliberate reason to test a production-license path.
+Rails Pro needs no license key in any non-production environment. Review apps should run without a key unless there is
+a deliberate reason to test license status handling.
 
 If a review app must validate license behavior:
 
@@ -17,9 +17,6 @@ If a review app must validate license behavior:
 - restrict the deployment to trusted maintainers;
 - keep the token out of ordinary fork PR workflows;
 - rotate the token if deployed pull request code is suspected of reading or exfiltrating it.
-
-Production license verification remains a production deployment concern. See
-[License CI Integration](../license-ci-integration.md) for the deploy-time production gate.
 
 ## Node Renderer And RSC Credentials
 

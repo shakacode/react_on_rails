@@ -1,7 +1,7 @@
 # Node Renderer JavaScript Configuration
 
 > **Pro Feature** — Available with [React on Rails Pro](../../../pro/react-on-rails-pro.md).
-> Free or very low cost for startups and small companies. [Upgrade or licensing details →](../../../pro/upgrading-to-pro.md#try-pro-risk-free)
+> Free in development, test, CI, and staging, and in production for small organizations, charities, schools, and hospitals; larger organizations subscribe at https://pro.reactonrails.com/ ($1,800 per year per organization). No license key is needed to run Pro.
 
 You can configure the node-renderer entirely with ENV values from your own launch file or
 `package.json` script. The package does not ship a standalone `node-renderer` CLI.

@@ -215,8 +215,7 @@ rails generate react_on_rails:install --pro
 **Prerequisites:**
 
 - Add `gem 'react_on_rails_pro'` to your Gemfile and run `bundle install` (check [the CHANGELOG](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md) for the latest version)
-- Under ShakaCode Trust-Based Commercial Licensing, no token is needed for evaluation, development, test, CI/CD, or staging
-- For production, get a license from [Pro pricing and sign up](https://pro.reactonrails.com/) or contact [justin@shakacode.com](mailto:justin@shakacode.com)
+- Free in development, test, CI, and staging, and in production for small organizations, charities, schools, and hospitals; larger organizations subscribe at https://pro.reactonrails.com/ ($1,800 per year per organization). No license key is needed to run Pro.
 
 **What gets created:**
 
@@ -227,7 +226,7 @@ rails generate react_on_rails:install --pro
 
 **After installation:**
 
-For production, configure your license token through `config.license_token` or
+If your organization subscribes, you can configure its optional key through `config.license_token` or
 `REACT_ON_RAILS_PRO_LICENSE`. A standalone Node renderer can use its `licenseToken` option or the same environment
 fallback. See [LICENSE_SETUP.md](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/LICENSE_SETUP.md)
 for all options.

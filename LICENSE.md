@@ -25,7 +25,7 @@ The following directories and all their contents are licensed under the **React 
 
 See [REACT-ON-RAILS-PRO-LICENSE.md](./REACT-ON-RAILS-PRO-LICENSE.md) for complete Pro license terms.
 
-**Important:** Pro-licensed code is included in this package but requires a valid React on Rails Pro subscription to use. Using Pro features without a valid license violates the React on Rails Pro License.
+**Important:** Pro-licensed code is included in this repository and is governed by The React on Rails Pro License: free for development, test, CI, staging, education, personal projects, open-source projects, and for production use by small organizations, charities, educational institutions, and hospitals; other production use requires a subscription.
 
 ---
 
@@ -67,17 +67,9 @@ For Pro-licensed code (as defined in the "License Scope" section above), see:
 
 **Key Points:**
 
-- Pro features require a valid React on Rails Pro subscription for production use
-- Free use is permitted for educational, personal, and non-production purposes
-- Modifying MIT-licensed interface files is permitted under MIT terms
-- However, using those modifications to access Pro features without a valid license violates the Pro License
-
-### License Validation Mechanisms
-
-**License validation mechanisms** include but are not limited to:
-
-- Runtime checks for valid Pro subscriptions
-- Authentication systems in `react_on_rails/lib/react_on_rails/utils.rb` and Pro TypeScript modules
-- The `react_on_rails_pro?` method and `rorPro` field generation
-
-While MIT-licensed code may be modified under MIT terms, using such modifications to access Pro features without a valid license violates the React on Rails Pro License.
+- Development, test, CI, staging, preview and review apps, education, personal projects, open-source projects, and a 45-day production evaluation are free for everyone.
+- Production use is free when all three answers are yes: fewer than 10 people work for the organization, revenue in the last twelve months is under US $1M, and lifetime outside capital raised is under US $1M, counted with affiliates. Charities, educational institutions, and hospitals are free at any size.
+- Other production use requires a subscription at $1,800 per year per organization.
+- The Generated Attribution HTML comment must remain in every rendered document.
+- A license key is optional and only sets the attribution status.
+- MIT-licensed files may be modified under the MIT License, while the Pro packages remain governed by The React on Rails Pro License.

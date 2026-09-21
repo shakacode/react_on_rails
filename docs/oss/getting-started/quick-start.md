@@ -196,12 +196,15 @@ Now that you have React on Rails working, here's what to explore next:
 ### Pro Features
 
 :::tip Pro Features
-Start at [React on Rails Pro](../../pro/react-on-rails-pro.md) for the canonical route map, or go directly to [Pro pricing and sign up](https://pro.reactonrails.com/). From there you can jump to [React Server Components](../../pro/react-server-components/tutorial.md), [streaming SSR](../../pro/streaming-ssr.md), [fragment caching](../../pro/fragment-caching.md), and the [Node renderer](../../pro/node-renderer.md). ShakaCode Trust-Based Commercial Licensing: no token is required for development, test, CI/CD, or staging.
+Free in development, test, CI, and staging, and in production for small
+organizations, charities, schools, and hospitals; larger organizations
+subscribe at https://pro.reactonrails.com/ ($1,800 per year per organization).
+No license key is needed to run Pro.
 :::
 
 - **[OSS vs Pro comparison](./oss-vs-pro.md)** - See what Pro adds
 - **[React Server Components](../../pro/react-server-components/tutorial.md)** - Add the RSC path when you need it
-- **[Pro pricing and sign up](https://pro.reactonrails.com/)** - Current plans and production licenses
+- **[Pro pricing and sign up](https://pro.reactonrails.com/)** - Subscription for organizations above the free line
 
 ## 🆘 Need Help?
 

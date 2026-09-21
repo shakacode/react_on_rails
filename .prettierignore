@@ -40,3 +40,8 @@ internal/analysis/experiments/
 # Pinned generated Rails fixtures and recorded benchmark output.
 benchmarks/rspack-vite-rails-dx/starters/
 benchmarks/rspack-vite-rails-dx/results/*.json
+
+# Verbatim legal text is verified by its required SHA-256 digest.
+REACT-ON-RAILS-PRO-LICENSE.md
+packages/react-on-rails-pro/LICENSE.md
+packages/react-on-rails-pro-node-renderer/LICENSE.md

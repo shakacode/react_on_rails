@@ -58,6 +58,15 @@ The [Evil Martians Inertia Rails React Starter Kit](https://evilmartians.com/ope
 
 **Best for:** New apps where you want a SPA-like experience with server-side routing, using a controller-driven architecture across React, Vue, or Svelte.
 
+Comparing with Inertia Rails? React on Rails and Inertia Rails are both MIT. The
+only paid part of this stack is React on Rails Pro, and only in production at
+organizations above the small-organization line. That subscription buys what
+Inertia Rails does not have today: React Server Components, streaming SSR with
+selective hydration, fragment caching, and per-component adoption inside
+existing Rails views. Already on Inertia? Both gems coexist in one app, so you
+can migrate route by route: see the
+[Inertia Rails migration guide](../migrating/migrating-from-inertia-rails.md).
+
 ### Hotwire / Turbo
 
 [Hotwire](https://hotwired.dev/) is Rails' default frontend approach, using Turbo (for page navigation and partial updates) and Stimulus (for lightweight JavaScript behavior). It minimizes JavaScript by sending HTML over the wire.
@@ -184,7 +193,13 @@ Build speed is only part of the picture. Here's how the two approaches compare a
 - **Code splitting with SSR** — route-based splitting via Loadable Components
 - **TanStack Router SSR** — type-safe routing with server rendering
 
-Available under ShakaCode Trust-Based Commercial Licensing for free evaluation, with startup-friendly pricing for production licenses. See [Pro pricing and sign up](https://pro.reactonrails.com/), the [React on Rails Pro docs](../../pro/react-on-rails-pro.md), and the [OSS vs Pro feature matrix](./oss-vs-pro.md) for a detailed breakdown.
+Free in development, test, CI, and staging, and in production for small
+organizations, charities, schools, and hospitals; larger organizations
+subscribe at https://pro.reactonrails.com/ ($1,800 per year per organization).
+No license key is needed to run Pro. See
+[Pro pricing and sign up](https://pro.reactonrails.com/), the
+[React on Rails Pro docs](../../pro/react-on-rails-pro.md), and the
+[OSS vs Pro feature matrix](./oss-vs-pro.md) for a detailed breakdown.
 
 **Best for:** Production Rails apps with high-traffic pages, SEO requirements, or need for React Server Components.
 
