@@ -136,6 +136,56 @@ const getValidatedPPRApis = (): PPRApis => {
 };
 
 // ---------------------------------------------------------------------------
+// Runtime environment preflight — AbortController & real setTimeout (#5019-B)
+// ---------------------------------------------------------------------------
+
+/**
+ * Validates that the VM context provides the runtime primitives the PPR settle timer needs:
+ *
+ *   1. `AbortController` — used to construct the settle signal that demotes still-pending
+ *      Suspense boundaries to resume-phase holes. The node renderer intentionally does NOT
+ *      inject it via `supportModules` (see vm.ts); callers must provide it in
+ *      `additionalContext: { AbortController }`.
+ *
+ *   2. A real (non-stubbed) `setTimeout` — the settle budget fires a `setTimeout` whose
+ *      callback calls `AbortController.abort()`. When `stubTimers` is true (the default when
+ *      `RENDERER_STUB_TIMERS` is unset), `setTimeout` is overwritten with a no-op that
+ *      returns `undefined`, so the abort never fires. Set `stubTimers: false` in your
+ *      node-renderer config, or `RENDERER_STUB_TIMERS=false` in the environment.
+ *
+ * Both checks run once per prerender (cheap: one typeof + one trial call) and throw a
+ * descriptive error naming the two config knobs so operators get a clear message at first
+ * PPR request rather than a silent no-op timer or an opaque ReferenceError.
+ */
+export const validatePPRRuntimeEnvironment = (): void => {
+  // 1. AbortController must be available in the current execution context.
+  if (typeof AbortController === 'undefined') {
+    throw new Error(
+      'React on Rails Pro PPR requires AbortController to be available in the node renderer ' +
+        'VM context, but it is not defined. The node renderer does not inject AbortController ' +
+        'by default — add it to your renderer config:\n\n' +
+        '  additionalContext: { AbortController }\n\n' +
+        'See the node renderer JS configuration docs for details.',
+    );
+  }
+
+  // 2. setTimeout must be a real timer, not the no-op stub.
+  // The stub (`function setTimeout() {}`) returns undefined; a real setTimeout returns a
+  // truthy handle (Timeout object in Node.js, number in browsers).
+  const handle = setTimeout(() => {}, 0);
+  if (!handle) {
+    throw new Error(
+      'React on Rails Pro PPR requires a real setTimeout (not the no-op stub) in the node ' +
+        'renderer VM context. The default renderer config stubs timers, which prevents the ' +
+        'PPR settle budget from firing. Disable timer stubbing in your renderer config:\n\n' +
+        '  stubTimers: false\n\n' +
+        'Or set the environment variable RENDERER_STUB_TIMERS=false.',
+    );
+  }
+  clearTimeout(handle);
+};
+
+// ---------------------------------------------------------------------------
 // Shared per-render helpers
 // ---------------------------------------------------------------------------
 
@@ -265,6 +315,10 @@ const pprPrerenderRenderReactComponent = (
         if (options.signal) {
           prerenderSignal = options.signal;
         } else {
+          // Preflight: verify the VM context has a real AbortController and non-stubbed
+          // setTimeout before we rely on them for the settle timer (#5019-B).
+          validatePPRRuntimeEnvironment();
+
           const settleController = new AbortController();
           prerenderSignal = settleController.signal;
           settleTimeoutId = setTimeout(() => settleController.abort(), resolveSettleBudgetMs(railsContext));

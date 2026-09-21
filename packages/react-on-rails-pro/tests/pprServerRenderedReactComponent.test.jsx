@@ -25,6 +25,7 @@ import {
   PPR_POSTPONED_STATE_CHUNK_KEY,
   PPR_RENDER_ERRORED_CHUNK_KEY,
   PPR_ASSET_MANIFEST_CHUNK_KEY,
+  validatePPRRuntimeEnvironment,
 } from '../src/pprServerRenderedReactComponent.ts';
 import * as ComponentRegistry from '../src/ComponentRegistry.ts';
 import ReactOnRails from '../src/ReactOnRails.node.ts';
@@ -548,5 +549,78 @@ describe('pprServerRenderedReactComponent', () => {
       jest.dontMock('react-dom/static.node');
       jest.resetModules();
     }
+  });
+
+  // ---------------------------------------------------------------------------
+  // Defect B — PPR runtime environment preflight (#5019)
+  // ---------------------------------------------------------------------------
+
+  describe('validatePPRRuntimeEnvironment (#5019-B)', () => {
+    it('throws when AbortController is not available, naming additionalContext', () => {
+      const original = globalThis.AbortController;
+      // @ts-expect-error — deliberately removing AbortController to simulate default VM context
+      delete globalThis.AbortController;
+      try {
+        expect(() => validatePPRRuntimeEnvironment()).toThrow(/AbortController/);
+        expect(() => validatePPRRuntimeEnvironment()).toThrow(/additionalContext/);
+      } finally {
+        globalThis.AbortController = original;
+      }
+    });
+
+    it('throws when setTimeout is stubbed (returns undefined), naming stubTimers', () => {
+      const originalSetTimeout = globalThis.setTimeout;
+      const originalClearTimeout = globalThis.clearTimeout;
+      // Simulate the VM stub: `function setTimeout() {}` returns undefined
+      globalThis.setTimeout = () => {};
+      globalThis.clearTimeout = () => {};
+      try {
+        expect(() => validatePPRRuntimeEnvironment()).toThrow(/stubTimers/);
+        expect(() => validatePPRRuntimeEnvironment()).toThrow(/RENDERER_STUB_TIMERS/);
+      } finally {
+        globalThis.setTimeout = originalSetTimeout;
+        globalThis.clearTimeout = originalClearTimeout;
+      }
+    });
+
+    it('does not throw when both AbortController and real setTimeout are available', () => {
+      // The default Jest/Node environment has both — this is the happy path.
+      expect(() => validatePPRRuntimeEnvironment()).not.toThrow();
+    });
+
+    it('surfaces the preflight error through the prerender stream when no caller signal is provided', async () => {
+      const originalSetTimeout = globalThis.setTimeout;
+      // Simulate the VM stub: `function setTimeout() {}` returns undefined.
+      // AbortController is still available so we hit the setTimeout check.
+      globalThis.setTimeout = () => {};
+      try {
+        const { chunks, errors } = await collectStreamResult(runPrerender({ throwJsErrors: true }));
+        expect(errors).toHaveLength(1);
+        expect(errors[0].message).toContain('stubTimers');
+        expect(chunks.some((chunk) => chunk.hasErrors === true)).toBe(true);
+      } finally {
+        globalThis.setTimeout = originalSetTimeout;
+      }
+    });
+
+    it('does not run the preflight when a caller-provided signal bypasses the settle timer', async () => {
+      const originalSetTimeout = globalThis.setTimeout;
+      // Stub setTimeout — would fail the preflight if it ran.
+      globalThis.setTimeout = () => {};
+      try {
+        // The caller provides their own signal, bypassing the internal settle timer.
+        // The preflight should NOT run, so the render should succeed.
+        const controller = new AbortController();
+        // Abort immediately so the render completes quickly.
+        controller.abort();
+        const { errors } = await collectStreamResult(
+          runPrerender({ signal: controller.signal, throwJsErrors: false }),
+        );
+        // The render completes (the abort is handled gracefully), no preflight error.
+        expect(errors.filter((e) => e.message.includes('stubTimers'))).toHaveLength(0);
+      } finally {
+        globalThis.setTimeout = originalSetTimeout;
+      }
+    });
   });
 });
