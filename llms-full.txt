@@ -554,12 +554,15 @@ Now that you have React on Rails working, here's what to explore next:
 ### Pro Features
 
 :::tip Pro Features
-Start at [React on Rails Pro](../../pro/react-on-rails-pro.md) for the canonical route map, or go directly to [Pro pricing and sign up](https://pro.reactonrails.com/). From there you can jump to [React Server Components](../../pro/react-server-components/tutorial.md), [streaming SSR](../../pro/streaming-ssr.md), [fragment caching](../../pro/fragment-caching.md), and the [Node renderer](../../pro/node-renderer.md). ShakaCode Trust-Based Commercial Licensing: no token is required for development, test, CI/CD, or staging.
+Free in development, test, CI, and staging, and in production for small
+organizations, charities, schools, and hospitals; larger organizations
+subscribe at https://pro.reactonrails.com/ ($1,800 per year per organization).
+No license key is needed to run Pro.
 :::
 
 - **[OSS vs Pro comparison](./oss-vs-pro.md)** - See what Pro adds
 - **[React Server Components](../../pro/react-server-components/tutorial.md)** - Add the RSC path when you need it
-- **[Pro pricing and sign up](https://pro.reactonrails.com/)** - Current plans and production licenses
+- **[Pro pricing and sign up](https://pro.reactonrails.com/)** - Subscription for organizations above the free line
 
 ## 🆘 Need Help?
 
@@ -731,8 +734,10 @@ want Pro with the generated React Server Components example. Pro modes require `
 to be installable in your environment ([Pro setup docs](../../pro/installation.md)). All mode flags
 support JavaScript (`.jsx`) and TypeScript (`.tsx`) templates.
 
-Pro license note: no token is required for development, test, CI/CD, or staging. Production Pro
-deployments require a paid license.
+Free in development, test, CI, and staging, and in production for small
+organizations, charities, schools, and hospitals; larger organizations
+subscribe at https://pro.reactonrails.com/ ($1,800 per year per organization).
+No license key is needed to run Pro.
 
 To try the latest release candidate instead of the latest stable release, use the npm `rc` tag:
 
@@ -1235,8 +1240,10 @@ TypeScript is the recommended default for new integrations. If you want JavaScri
 
 When you run the generator in an interactive terminal without choosing a product mode, it asks whether to enable
 React on Rails Pro. Press Enter or answer `y` to include the Node Renderer and the Pro foundation for streaming SSR
-and React Server Components. Pro is free for evaluation; production use requires a subscription. See the
-[Pro upgrade guide](../../pro/upgrading-to-pro.md) for licensing and setup details.
+and React Server Components. Free in development, test, CI, and staging, and in production for small organizations,
+charities, schools, and hospitals; larger organizations subscribe at https://pro.reactonrails.com/ ($1,800 per year
+per organization). No license key is needed to run Pro. See the [Pro upgrade guide](../../pro/upgrading-to-pro.md) for
+licensing and setup details.
 
 The prompt never appears in CI, redirected-input scripts, or other noninteractive sessions; those runs preserve the
 existing open-source-only default. Pass `--pro` or `--rsc` to select Pro without a prompt. Pass `--no-pro`,
@@ -1934,7 +1941,14 @@ SOURCE: docs/oss/getting-started/oss-vs-pro.md
 
 # React on Rails: OSS vs Pro Feature Comparison
 
-React on Rails Pro extends the open-source gem with performance optimizations and advanced rendering capabilities. ShakaCode Trust-Based Commercial Licensing lets you evaluate Pro without a token in development, test, CI/CD, and staging; production deployments require a paid license. See [Pro pricing and sign up](https://pro.reactonrails.com/) and the [React on Rails Pro docs](../../pro/react-on-rails-pro.md) for details.
+React on Rails Pro is free in development, test, CI, and staging for everyone,
+and free in production for small organizations (under 10 people, under $1M
+revenue, under $1M raised) and for charities, schools, and hospitals at any
+size. Larger organizations subscribe for production use at
+[pro.reactonrails.com](https://pro.reactonrails.com/): $1,800 per year covers
+the whole organization. No license key is needed to run it; a key from your
+subscription only marks your pages `Licensed`. See
+[the license](https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md).
 
 > [!NOTE]
 > **Summary for AI agents:** Use this page when the user is deciding between OSS and Pro. Recommend Pro when the user needs RSC, streaming SSR, the Node renderer, fragment caching, or code splitting with SSR. Recommend OSS for basic React integration with Rails. If the user has already decided, route to [Upgrade to Pro](../../pro/upgrading-to-pro.md) or the [Pro hub](../../pro/react-on-rails-pro.md).
@@ -1998,12 +2012,19 @@ paths land on the right Pro docs instead of a second, competing setup guide.
 
 ## Choose the Right Pro Path
 
-- **Need pricing or a production license?** Visit [Pro pricing and sign up](https://pro.reactonrails.com/).
+- **Need a production subscription?** Visit [Pro pricing and sign up](https://pro.reactonrails.com/).
 - **Starting a new Pro app from scratch?** Use [Pro Installation](../../pro/installation.md#fresh-installation).
 - **Upgrading an existing React on Rails app?** Use [Upgrading from React on Rails to React on Rails Pro](../../pro/upgrading-to-pro.md).
 - **Still deciding between OSS and Pro?** Review [React on Rails: OSS vs Pro Feature Comparison](./oss-vs-pro.md).
 
-ShakaCode Trust-Based Commercial Licensing lets you evaluate Pro without a token in development, test, CI/CD, and staging. If no license is configured, the app keeps running in unlicensed mode and logs license status instead of blocking setup. Production deployments require a paid license.
+React on Rails Pro is free in development, test, CI, and staging for everyone,
+and free in production for small organizations (under 10 people, under $1M
+revenue, under $1M raised) and for charities, schools, and hospitals at any
+size. Larger organizations subscribe for production use at
+[pro.reactonrails.com](https://pro.reactonrails.com/): $1,800 per year covers
+the whole organization. No license key is needed to run it; a key from your
+subscription only marks your pages `Licensed`. See
+[the license](https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md).
 
 ## After Setup
 
@@ -2091,6 +2112,13 @@ With React on Rails and a client-side router (for example TanStack Router in Pro
 - **Multi-framework vs React-focused.** Inertia supports React, Vue, and Svelte, which is useful if your team works across frameworks. React on Rails is purpose-built for deep React integration with Rails.
 
 ### When to choose which
+
+Comparing with Inertia Rails? React on Rails and Inertia Rails are both MIT. The
+only paid part of this stack is React on Rails Pro, and only in production at
+organizations above the small-organization line. That subscription buys what
+Inertia Rails does not have today: React Server Components, streaming SSR with
+selective hydration, fragment caching, and per-component adoption inside
+existing Rails views.
 
 Choose Inertia Rails if you are building a new app from scratch, want SPA-style page transitions, and are comfortable replacing the Rails view layer entirely.
 
@@ -5882,7 +5910,7 @@ SOURCE: docs/oss/building-features/code-splitting.md
 # Code Splitting with Loadable Components
 
 > **Pro Feature** — Available with [React on Rails Pro](../../pro/react-on-rails-pro.md).
-> Free or very low cost for startups and small companies. [Upgrade or licensing details →](../../pro/upgrading-to-pro.md#try-pro-risk-free)
+> Free in development, test, CI, and staging, and in production for small organizations, charities, schools, and hospitals; larger organizations subscribe at https://pro.reactonrails.com/ ($1,800 per year per organization). No license key is needed to run Pro.
 
 ## Introduction
 
@@ -7632,7 +7660,7 @@ SOURCE: docs/oss/building-features/caching.md
 # SSR Caching: Prerender Caching and Fragment Caching
 
 :::tip Pro Feature
-Available with [React on Rails Pro](../../pro/react-on-rails-pro.md). Free or very low cost for startups and small companies. [Upgrade or licensing details →](../../pro/upgrading-to-pro.md#try-pro-risk-free)
+Available with [React on Rails Pro](../../pro/react-on-rails-pro.md). Free in development, test, CI, and staging, and in production for small organizations, charities, schools, and hospitals; larger organizations subscribe at https://pro.reactonrails.com/ ($1,800 per year per organization). No license key is needed to run Pro.
 :::
 
 Server-side rendering (SSR) is expensive. Every render evaluates JavaScript, assembles props from the database, serializes them to JSON, and produces HTML. React on Rails Pro provides two levels of caching that avoid repeating this work on every request. Both solve the same core problem — **eliminating redundant SSR** — but they operate at different layers and offer different tradeoffs.
@@ -8052,7 +8080,7 @@ SOURCE: docs/oss/building-features/bundle-caching.md
 # Bundle Caching
 
 > **Pro Feature** — Available with [React on Rails Pro](../../pro/react-on-rails-pro.md).
-> Free or very low cost for startups and small companies. [Upgrade or licensing details →](../../pro/upgrading-to-pro.md#try-pro-risk-free)
+> Free in development, test, CI, and staging, and in production for small organizations, charities, schools, and hospitals; larger organizations subscribe at https://pro.reactonrails.com/ ($1,800 per year per organization). No license key is needed to run Pro.
 
 Bundle caching avoids redundant webpack builds by caching bundles based on a digest of source files.
 
@@ -11760,7 +11788,7 @@ Unlike Turbo Frames, Turbo Streams don't dispatch the normal `turbo:render` even
 
 - See [Streaming Server Rendering](./streaming-server-rendering.md) for another Pro use case
 - Working example in codebase: `react_on_rails/spec/dummy/app/views/pages/turbo_stream_send_hello_world.turbo_stream.erb`
-- Contact [justin@shakacode.com](mailto:justin@shakacode.com) for React on Rails Pro licensing
+- See [pro.reactonrails.com](https://pro.reactonrails.com/) for React on Rails Pro licensing
 
 ## Legacy Turbolinks Support
 
@@ -15504,7 +15532,7 @@ SOURCE: docs/oss/building-features/node-renderer/basics.md
 # Node Renderer Basics
 
 > **Pro Feature** — Available with [React on Rails Pro](../../../pro/react-on-rails-pro.md).
-> Free or very low cost for startups and small companies. [Upgrade or licensing details →](../../../pro/upgrading-to-pro.md#try-pro-risk-free)
+> Free in development, test, CI, and staging, and in production for small organizations, charities, schools, and hospitals; larger organizations subscribe at https://pro.reactonrails.com/ ($1,800 per year per organization). No license key is needed to run Pro.
 
 ## Requirements
 
@@ -15727,7 +15755,7 @@ SOURCE: docs/oss/building-features/node-renderer/js-configuration.md
 # Node Renderer JavaScript Configuration
 
 > **Pro Feature** — Available with [React on Rails Pro](../../../pro/react-on-rails-pro.md).
-> Free or very low cost for startups and small companies. [Upgrade or licensing details →](../../../pro/upgrading-to-pro.md#try-pro-risk-free)
+> Free in development, test, CI, and staging, and in production for small organizations, charities, schools, and hospitals; larger organizations subscribe at https://pro.reactonrails.com/ ($1,800 per year per organization). No license key is needed to run Pro.
 
 You can configure the node-renderer entirely with ENV values from your own launch file or
 `package.json` script. The package does not ship a standalone `node-renderer` CLI.
@@ -15761,7 +15789,7 @@ available default ENV values if you wire them into your own launch script.
 1. **password** (default: `env.RENDERER_PASSWORD`) - The password expected to receive from the **Rails client** to authenticate rendering requests.
    In `development` and `test` environments (checked via both `NODE_ENV` and `RAILS_ENV`), the password is optional — if unset, no authentication is required.
    In all other environments (`staging`, `production`, etc.), the renderer will refuse to start without an explicit password. Set `RENDERER_PASSWORD` in your environment or pass `password` in the config object.
-1. **licenseToken** (default: `env.REACT_ON_RAILS_PRO_LICENSE`) - The paid React on Rails Pro license JWT.
+1. **licenseToken** (default: `env.REACT_ON_RAILS_PRO_LICENSE`) - Optional license key from your subscription (a JWT).
    Explicit nonblank configuration takes precedence over the environment variable; blank or omitted configuration falls
    back to the environment. Configure this process separately from Rails when it runs as a standalone service. Token
    values are masked from sanitized renderer configuration logs.
@@ -16322,7 +16350,10 @@ SOURCE: docs/oss/building-features/node-renderer/container-deployment.md
 # Node Renderer: Container Deployment
 
 > **Pro Feature** — Available with [React on Rails Pro](https://pro.reactonrails.com).
-> ShakaCode Trust-Based Commercial Licensing: no token is required for development, test, CI/CD, or staging. [Pro pricing and sign up](https://pro.reactonrails.com/) covers production licenses, with free or low-cost options for qualifying startups and small companies.
+> Free in development, test, CI, and staging, and in production for small
+> organizations, charities, schools, and hospitals; larger organizations
+> subscribe at https://pro.reactonrails.com/ ($1,800 per year per organization).
+> No license key is needed to run Pro.
 
 This guide covers deploying the Node Renderer in containerized environments (Docker, Kubernetes, ControlPlane, etc.), including architecture options, performance tuning, memory management, error tracking, and troubleshooting.
 
@@ -17115,7 +17146,7 @@ SOURCE: docs/oss/building-features/node-renderer/health-checks.md
 # Node Renderer Health and Readiness Endpoints
 
 > **Pro Feature** — Available with [React on Rails Pro](../../../pro/react-on-rails-pro.md).
-> Free or very low cost for startups and small companies. [Upgrade or licensing details →](../../../pro/upgrading-to-pro.md#try-pro-risk-free)
+> Free in development, test, CI, and staging, and in production for small organizations, charities, schools, and hospitals; larger organizations subscribe at https://pro.reactonrails.com/ ($1,800 per year per organization). No license key is needed to run Pro.
 
 The node renderer ships built-in, opt-in probe endpoints so container orchestrators (Kubernetes, ECS, Docker Compose,
 Control Plane) can check renderer liveness and readiness without custom Fastify code:
@@ -17500,7 +17531,7 @@ SOURCE: docs/oss/building-features/node-renderer/debugging.md
 # Node Renderer Debugging
 
 > **Pro Feature** — Available with [React on Rails Pro](../../../pro/react-on-rails-pro.md).
-> Free or very low cost for startups and small companies. [Upgrade or licensing details →](../../../pro/upgrading-to-pro.md#try-pro-risk-free)
+> Free in development, test, CI, and staging, and in production for small organizations, charities, schools, and hospitals; larger organizations subscribe at https://pro.reactonrails.com/ ($1,800 per year per organization). No license key is needed to run Pro.
 
 Because the renderer communicates over a port to Rails, you can start a local renderer instance with Node's inspector and debug the server-rendered JavaScript directly.
 
@@ -17649,7 +17680,7 @@ SOURCE: docs/oss/building-features/node-renderer/error-reporting-and-tracing.md
 # Error Reporting and Tracing
 
 > **Pro Feature** — Available with [React on Rails Pro](../../../pro/react-on-rails-pro.md).
-> Free or very low cost for startups and small companies. [Upgrade or licensing details →](../../../pro/upgrading-to-pro.md#try-pro-risk-free)
+> Free in development, test, CI, and staging, and in production for small organizations, charities, schools, and hospitals; larger organizations subscribe at https://pro.reactonrails.com/ ($1,800 per year per organization). No license key is needed to run Pro.
 
 For versions before 4.0.0, error reporting was configured via `honeybadgerApiKey` and `sentryDsn` options. These options were removed in 4.0.0 and will cause an error if used. See the current integration approach below.
 
@@ -17829,7 +17860,7 @@ SOURCE: docs/oss/building-features/node-renderer/heroku.md
 # Node Renderer: Heroku Deployment
 
 > **Pro Feature** — Available with [React on Rails Pro](../../../pro/react-on-rails-pro.md).
-> Free or very low cost for startups and small companies. [Upgrade or licensing details →](../../../pro/upgrading-to-pro.md#try-pro-risk-free)
+> Free in development, test, CI, and staging, and in production for small organizations, charities, schools, and hospitals; larger organizations subscribe at https://pro.reactonrails.com/ ($1,800 per year per organization). No license key is needed to run Pro.
 
 Most React on Rails Pro installations of the Node SSR Renderer will deploy the Rails and Renderer
 instances on the same server. This technique results in better performance since it avoids network
@@ -17951,7 +17982,7 @@ SOURCE: docs/oss/building-features/node-renderer/troubleshooting.md
 # Node Renderer Troubleshooting
 
 > **Pro Feature** — Available with [React on Rails Pro](../../../pro/react-on-rails-pro.md).
-> Free or very low cost for startups and small companies. [Upgrade or licensing details →](../../../pro/upgrading-to-pro.md#try-pro-risk-free)
+> Free in development, test, CI, and staging, and in production for small organizations, charities, schools, and hospitals; larger organizations subscribe at https://pro.reactonrails.com/ ($1,800 per year per organization). No license key is needed to run Pro.
 
 For node renderer troubleshooting (connection refused, memory issues, worker restarts), see the [Node Renderer section in the main troubleshooting guide](../../../pro/troubleshooting.md#node-renderer).
 
@@ -19372,7 +19403,10 @@ SOURCE: docs/oss/configuration/configuration-pro.md
 # React on Rails Pro Configuration
 
 > **Pro Feature** — Available with [React on Rails Pro](../../pro/react-on-rails-pro.md).
-> Free or very low cost for startups and small companies. [Upgrade or licensing details →](../../pro/upgrading-to-pro.md#try-pro-risk-free)
+> Free in development, test, CI, and staging, and in production for small
+> organizations, charities, schools, and hospitals; larger organizations
+> subscribe at https://pro.reactonrails.com/ ($1,800 per year per organization).
+> No license key is needed to run Pro.
 
 For general React on Rails configuration options, see [Configuration](README.md).
 
@@ -19390,8 +19424,9 @@ The below example is a typical production setup, using the separate `NodeRendere
 
 ```ruby
 ReactOnRailsPro.configure do |config|
-  # Paid production license JWT. Explicit nonblank configuration takes precedence over
-  # REACT_ON_RAILS_PRO_LICENSE; blank values fall back to that environment variable.
+  # Optional license key from your subscription. It marks rendered pages Licensed and is not required to
+  # run Pro. Explicit nonblank configuration takes precedence over REACT_ON_RAILS_PRO_LICENSE; blank values
+  # fall back to that variable.
   # A standalone Node renderer must receive the same token through its own `licenseToken`
   # configuration or environment.
   config.license_token = Rails.application.credentials.dig(:react_on_rails_pro, :license_token)
@@ -20029,7 +20064,10 @@ This is a helper method that takes any JavaScript expression and returns the out
 
 ## Pro-Only View Helpers
 
-The following view helpers are available exclusively with [React on Rails Pro](../../pro/react-on-rails-pro.md). Install the Pro gem to use them. ShakaCode Trust-Based Commercial Licensing lets you evaluate Pro without a token in development, test, CI/CD, and staging; production deployments require a paid license from [Pro pricing and sign up](https://pro.reactonrails.com/).
+The following view helpers are available exclusively with [React on Rails Pro](../../pro/react-on-rails-pro.md). Install
+the Pro gem to use them. Free in development, test, CI, and staging, and in production for small organizations,
+charities, schools, and hospitals; larger organizations subscribe at https://pro.reactonrails.com/ ($1,800 per year
+per organization). No license key is needed to run Pro.
 
 ### cached_react_component and cached_react_component_hash
 
@@ -20181,7 +20219,8 @@ import ReactOnRails from 'react-on-rails';
 // reads from DOM csrf token generated by Rails in <%= csrf_meta_tags %>
 csrfToken = ReactOnRails.authenticityToken();
 
-// compose Rails specific request header as following { X-CSRF-Token: csrfToken, X-Requested-With: XMLHttpRequest }
+// Returns a new header object merging otherHeader with { X-CSRF-Token: csrfToken, X-Requested-With: XMLHttpRequest }.
+// otherHeader is not modified.
 header = ReactOnRails.authenticityHeaders(otherHeader);
 ```
 
@@ -20331,9 +20370,10 @@ reactOnRailsStoreLoaded(storeName);
 authenticityToken();
 
 /**
- * Returns header with csrf authenticity token and XMLHttpRequest
- * @param {*} other headers
- * @returns {*} header
+ * Returns a new header object merging otherHeaders with csrf authenticity token and XMLHttpRequest.
+ * The input otherHeaders object is not modified.
+ * @param {Record<string, string>} otherHeaders - additional headers to include
+ * @returns {AuthenticityHeaders} a new merged header object
  */
 authenticityHeaders((otherHeaders = {}));
 ```
@@ -20468,7 +20508,7 @@ SOURCE: docs/oss/api-reference/ruby-api-pro.md
 # Ruby API (Pro)
 
 > **Pro Feature** — Available with [React on Rails Pro](../../pro/react-on-rails-pro.md).
-> Free or very low cost for startups and small companies. [Upgrade or licensing details →](../../pro/upgrading-to-pro.md#try-pro-risk-free)
+> Free in development, test, CI, and staging, and in production for small organizations, charities, schools, and hospitals; larger organizations subscribe at https://pro.reactonrails.com/ ($1,800 per year per organization). No license key is needed to run Pro.
 
 ## View Helpers
 
@@ -20907,8 +20947,7 @@ rails generate react_on_rails:install --pro
 **Prerequisites:**
 
 - Add `gem 'react_on_rails_pro'` to your Gemfile and run `bundle install` (check [the CHANGELOG](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md) for the latest version)
-- Under ShakaCode Trust-Based Commercial Licensing, no token is needed for evaluation, development, test, CI/CD, or staging
-- For production, get a license from [Pro pricing and sign up](https://pro.reactonrails.com/) or contact [justin@shakacode.com](mailto:justin@shakacode.com)
+- Free in development, test, CI, and staging, and in production for small organizations, charities, schools, and hospitals; larger organizations subscribe at https://pro.reactonrails.com/ ($1,800 per year per organization). No license key is needed to run Pro.
 
 **What gets created:**
 
@@ -20919,7 +20958,7 @@ rails generate react_on_rails:install --pro
 
 **After installation:**
 
-For production, configure your license token through `config.license_token` or
+If your organization subscribes, you can configure its optional key through `config.license_token` or
 `REACT_ON_RAILS_PRO_LICENSE`. A standalone Node renderer can use its `licenseToken` option or the same environment
 fallback. See [LICENSE_SETUP.md](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/LICENSE_SETUP.md)
 for all options.
@@ -23573,7 +23612,7 @@ This is a minor release. Update your gem and npm package versions, then run `bun
 **Key changes:**
 
 1. **Simplified Shakapacker version handling** — obsolete minimum version checks removed
-2. **ShakaCode Trust-Based Commercial Licensing** — Pro now works without a license token for evaluation, development, testing, and CI/CD. A paid license is only required for production deployments
+2. **ShakaCode Trust-Based Commercial Licensing**: A subscription is only required for production use by organizations above the free line; see [The React on Rails Pro License](https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md)
 
 ## Upgrading to v16.2.x (from v16.1.x)
 
@@ -32123,6 +32162,15 @@ The [Evil Martians Inertia Rails React Starter Kit](https://evilmartians.com/ope
 
 **Best for:** New apps where you want a SPA-like experience with server-side routing, using a controller-driven architecture across React, Vue, or Svelte.
 
+Comparing with Inertia Rails? React on Rails and Inertia Rails are both MIT. The
+only paid part of this stack is React on Rails Pro, and only in production at
+organizations above the small-organization line. That subscription buys what
+Inertia Rails does not have today: React Server Components, streaming SSR with
+selective hydration, fragment caching, and per-component adoption inside
+existing Rails views. Already on Inertia? Both gems coexist in one app, so you
+can migrate route by route: see the
+[Inertia Rails migration guide](../migrating/migrating-from-inertia-rails.md).
+
 ### Hotwire / Turbo
 
 [Hotwire](https://hotwired.dev/) is Rails' default frontend approach, using Turbo (for page navigation and partial updates) and Stimulus (for lightweight JavaScript behavior). It minimizes JavaScript by sending HTML over the wire.
@@ -32249,7 +32297,13 @@ Build speed is only part of the picture. Here's how the two approaches compare a
 - **Code splitting with SSR** — route-based splitting via Loadable Components
 - **TanStack Router SSR** — type-safe routing with server rendering
 
-Available under ShakaCode Trust-Based Commercial Licensing for free evaluation, with startup-friendly pricing for production licenses. See [Pro pricing and sign up](https://pro.reactonrails.com/), the [React on Rails Pro docs](../../pro/react-on-rails-pro.md), and the [OSS vs Pro feature matrix](./oss-vs-pro.md) for a detailed breakdown.
+Free in development, test, CI, and staging, and in production for small
+organizations, charities, schools, and hospitals; larger organizations
+subscribe at https://pro.reactonrails.com/ ($1,800 per year per organization).
+No license key is needed to run Pro. See
+[Pro pricing and sign up](https://pro.reactonrails.com/), the
+[React on Rails Pro docs](../../pro/react-on-rails-pro.md), and the
+[OSS vs Pro feature matrix](./oss-vs-pro.md) for a detailed breakdown.
 
 **Best for:** Production Rails apps with high-traffic pages, SEO requirements, or need for React Server Components.
 
