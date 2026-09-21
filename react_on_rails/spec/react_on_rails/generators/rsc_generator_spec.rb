@@ -296,6 +296,16 @@ describe RscGenerator, type: :generator do
           expect(content).to include("return readManifestReferences(defaultRefsJson);")
           expect(content).to include("directory: resolve(config.source_path)")
           expect(content).to include('include: /\.(js|mjs|cjs|ts|mts|cts|jsx|tsx)$/')
+          # The pro package's shipped 'use client' components must be registered explicitly
+          # (issue #5079); kept in lockstep with the Pro dummy's PRO_CLIENT_REFERENCES list in
+          # react_on_rails_pro/spec/dummy/tests/rsc-manifest-client-references.test.js.
+          expect(content).to include("const reactOnRailsProClientReferences = [")
+          expect(content).to include("'react-on-rails-pro/RSCRoute',")
+          expect(content).to include("'react-on-rails-pro/RSCProvider',")
+          expect(content).to include("'react-on-rails-pro/registerDefaultRSCProvider/client',")
+          expect(content).to include(
+            "return [...new Set([...resolveDiscoveredClientReferences(), ...reactOnRailsProClientReferences])];"
+          )
           expect(content).to include("isServer: true")
         end
       end
@@ -316,6 +326,14 @@ describe RscGenerator, type: :generator do
           expect(content).to include("return readManifestReferences(defaultRefsJson);")
           expect(content).to include("directory: resolve(config.source_path)")
           expect(content).to include('include: /\.(js|mjs|cjs|ts|mts|cts|jsx|tsx)$/')
+          # Mirrors the serverWebpackConfig pins above; see the note there (issue #5079).
+          expect(content).to include("const reactOnRailsProClientReferences = [")
+          expect(content).to include("'react-on-rails-pro/RSCRoute',")
+          expect(content).to include("'react-on-rails-pro/RSCProvider',")
+          expect(content).to include("'react-on-rails-pro/registerDefaultRSCProvider/client',")
+          expect(content).to include(
+            "return [...new Set([...resolveDiscoveredClientReferences(), ...reactOnRailsProClientReferences])];"
+          )
           expect(content).to include("isServer: false")
         end
       end
@@ -1925,13 +1943,31 @@ describe RscGenerator, type: :generator do
         import { dirname, resolve } from 'node:path';
         import { fileURLToPath } from 'node:url';
 
-        const require = createRequire(import.meta.url);
+        const nodeRequire = createRequire(import.meta.url);
+        // The gem test environment installs no npm packages, so stub resolution of the
+        // react-on-rails-pro package the resolver registers explicitly (issue #5079). Real apps
+        // resolve the installed package through the documented createRequire prelude unchanged.
+        const require = Object.assign((request) => nodeRequire(request), nodeRequire, {
+          resolve: (request) =>
+            request.startsWith('react-on-rails-pro/')
+              ? `/stubbed-node-modules/${request}.js`
+              : nodeRequire.resolve(request),
+        });
         const __dirname = dirname(fileURLToPath(import.meta.url));
         const config = { source_path: '.', source_entry_path: '.' };
 
         #{resolver}
 
         if (!Array.isArray(rscClientReferences)) throw new Error('Expected an array of client references');
+        const proReferences = [
+          '/stubbed-node-modules/react-on-rails-pro/RSCRoute.js',
+          '/stubbed-node-modules/react-on-rails-pro/RSCProvider.js',
+          '/stubbed-node-modules/react-on-rails-pro/registerDefaultRSCProvider/client.js',
+        ];
+        const tail = rscClientReferences.slice(-proReferences.length);
+        if (JSON.stringify(tail) !== JSON.stringify(proReferences)) {
+          throw new Error(`Expected the pro client components to be appended, got: ${JSON.stringify(tail)}`);
+        }
       JS
 
       Tempfile.create(["rsc-client-references", ".mjs"]) do |file|

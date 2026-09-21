@@ -36,6 +36,8 @@ const { config } = require('shakapacker');
 //     hint) -> broad fallback
 //   - staleness warning:  selected manifest older than the registration entry -> console.warn (non-fatal)
 //   - precompile hint:    "Run bin/shakapacker-precompile-hook before bin/shakapacker."
+//   - pro components:     the react-on-rails-pro package's own shipped 'use client' components
+//     (require.resolve'd) are appended, deduplicated, to EVERY branch's result (issue #5079)
 // Both sides are pinned by contract tests so drift on either side fails CI: this resolver by the
 // dummy-root tests/rsc-manifest-client-references.test.js (run by the Pro `package-js-tests` CI
 // job), and the generator by react_on_rails/spec/react_on_rails/generators/rsc_generator_spec.rb.
@@ -179,7 +181,7 @@ function rscConfigSupportsDiscovery() {
   );
 }
 
-function rscManifestClientReferences() {
+function resolveDiscoveredClientReferences() {
   const configuredRefsJson = process.env.RSC_MANIFEST_CLIENT_REFERENCES_JSON;
   if (configuredRefsJson) {
     const resolvedRefsJson = path.resolve(configuredRefsJson);
@@ -217,6 +219,36 @@ function rscManifestClientReferences() {
   }
 
   return DEFAULT_CLIENT_REFERENCES;
+}
+
+// react-on-rails-pro ships its own 'use client' components (RSCRoute, RSCProvider, and the default
+// RSC provider registration). Both the discovery build and the broad directory scan only cover app
+// source — node_modules is never scanned — so these can never be discovered and, without explicit
+// registration, never reach react-client-manifest.json. Server components rendering them (e.g. a
+// nested <RSCRoute> for section-level refetching) then fail the render-time manifest lookup even
+// when the RSC bundle compiles (issue #5079). require.resolve returns the absolute realpath, which
+// matches the module resource webpack records (resolve.symlinks defaults to true), so the manifest
+// keys line up with the file URLs the RSC bundle's client references carry even when
+// react-on-rails-pro is installed through a symlink (pnpm, workspaces).
+function reactOnRailsProClientReferences() {
+  return [
+    'react-on-rails-pro/RSCRoute',
+    'react-on-rails-pro/RSCProvider',
+    'react-on-rails-pro/registerDefaultRSCProvider/client',
+  ].map((subpath) => {
+    try {
+      return require.resolve(subpath);
+    } catch (err) {
+      throw new Error(
+        `Failed to resolve the react-on-rails-pro client component "${subpath}" for RSC ` +
+          `client-reference registration: ${err.message}`,
+      );
+    }
+  });
+}
+
+function rscManifestClientReferences() {
+  return [...new Set([...resolveDiscoveredClientReferences(), ...reactOnRailsProClientReferences()])];
 }
 
 module.exports = rscManifestClientReferences;
