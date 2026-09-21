@@ -52,8 +52,8 @@ Start at [React on Rails Pro](./pro/react-on-rails-pro.md) for the canonical Pro
 
 ## Friendly evaluation policy
 
-- You can try React on Rails Pro without a license while evaluating.
-- If your organization is budget-constrained, [contact us](mailto:justin@shakacode.com) about free licenses.
+- You can try React on Rails Pro without a license key in development, test, CI, and staging, and in production for 45 days.
+- Small organizations, charities, schools, and hospitals run Pro in production for free; larger organizations subscribe at [pro.reactonrails.com](https://pro.reactonrails.com/).
 
 ## Need more help?
 

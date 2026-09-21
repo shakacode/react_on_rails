@@ -63,8 +63,10 @@ RSpec.describe ReactOnRailsPro::Engine do
           described_class.log_license_status
         end
 
-        it "explains that Production Use requires a license without declaring every deployment a violation" do
-          expect(mock_logger).to receive(:warn).with(/Production Use.*requires a valid license/)
+        it "explains which organizations need a production subscription" do
+          expect(mock_logger).to receive(:warn).with(
+            /free in production.*other organizations need a subscription.*If that is you, get a license/
+          )
           described_class.log_license_status
         end
       end
@@ -89,8 +91,10 @@ RSpec.describe ReactOnRailsPro::Engine do
           described_class.log_license_status
         end
 
-        it "explains that Production Use requires a license without declaring every deployment a violation" do
-          expect(mock_logger).to receive(:warn).with(/Production Use.*requires a valid license/)
+        it "explains which organizations need a production subscription" do
+          expect(mock_logger).to receive(:warn).with(
+            /free in production.*other organizations need a subscription.*If that is you, renew your license/
+          )
           described_class.log_license_status
         end
       end
@@ -107,8 +111,10 @@ RSpec.describe ReactOnRailsPro::Engine do
           described_class.log_license_status
         end
 
-        it "explains that Production Use requires a license without declaring every deployment a violation" do
-          expect(mock_logger).to receive(:warn).with(/Production Use.*requires a valid license/)
+        it "explains which organizations need a production subscription" do
+          expect(mock_logger).to receive(:warn).with(
+            /free in production.*other organizations need a subscription.*If that is you, get a license/
+          )
           described_class.log_license_status
         end
       end

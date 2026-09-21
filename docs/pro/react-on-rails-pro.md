@@ -16,11 +16,11 @@ React on Rails Pro is the advanced rendering and performance tier for React on R
 
 ## Start Here
 
-- [Pricing and sign up](https://pro.reactonrails.com/) - Current Pro plans and license purchase
+- [Pricing and sign up](https://pro.reactonrails.com/) - Current Pro subscription
 - [Installation](./installation.md) - Fresh install or manual setup
 - [Upgrade from OSS to Pro](./upgrading-to-pro.md) - Three-step upgrade path
 - [Configuration](../oss/configuration/configuration-pro.md) - Pro-specific runtime settings
-- [License CI Integration](./license-ci-integration.md) - Gate deploys, monitor expirations, parse JSON output
+- [License CI Integration](./license-ci-integration.md) - Optionally monitor a subscription key
 - [Pro Review App Security](./deployment/review-app-security.md) - Safe review-app defaults for public repositories
 - [Troubleshooting](./troubleshooting.md) - Common setup and runtime issues
 
@@ -44,11 +44,34 @@ React on Rails Pro is the advanced rendering and performance tier for React on R
 
 ## ShakaCode Trust-Based Commercial Licensing
 
-Try Pro freely in development, test, CI/CD, and staging. No token is required to evaluate the advanced rendering features before making any purchasing decision. If no license is configured, React on Rails Pro keeps running in unlicensed mode and logs license status instead of blocking the app.
+React on Rails (the `react_on_rails` gem and the `react-on-rails` package) is
+open source under the MIT License, the same license as Inertia Rails.
 
-Trust-based means ShakaCode keeps evaluation low-friction instead of forcing runtime lockouts in non-production environments. It relies on professional teams to purchase a license before production deployment.
+React on Rails Pro adds React Server Components, streaming SSR, fragment
+caching, and the dedicated Node renderer, under The React on Rails Pro License,
+a trust-based commercial license:
 
-Production deployments require a paid license. See [Pro pricing and sign up](https://pro.reactonrails.com/) for current options. If your organization is budget-constrained, email [justin@shakacode.com](mailto:justin@shakacode.com). We can provide free or low-cost licenses in qualifying cases. For larger companies, paid licenses support continued React on Rails development.
+- **Free for everyone, at any organization size:** development, test, CI,
+  staging, preview and review apps (no license key needed), education, personal
+  projects, open-source projects, and a 45-day production evaluation.
+- **Free in production for small organizations:** under 10 people, under US $1M
+  revenue in the last twelve months, and under US $1M raised, counted with
+  affiliates. Charities, educational institutions, and hospitals are free at
+  any size.
+- **Everyone else subscribes for production use:** $1,800 per year per
+  organization, covering every application, environment, and developer, with
+  updates and maintainer support. Subscribe at
+  [pro.reactonrails.com](https://pro.reactonrails.com/).
+- **No license key is required to run anything,** nothing phones home, and
+  nothing breaks: a missing key only changes one HTML comment from `Licensed`
+  to `UNLICENSED`. If a subscription lapses, production stays licensed for 30
+  days.
+- **Terms are per version:** once a release ships under these terms, they never
+  tighten on that release.
+
+Full text:
+[REACT-ON-RAILS-PRO-LICENSE.md](https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md).
+Questions: [contact@shakacode.com](mailto:contact@shakacode.com).
 
 See [Upgrading to Pro](./upgrading-to-pro.md#try-pro-risk-free) for the current licensing and upgrade details.
 

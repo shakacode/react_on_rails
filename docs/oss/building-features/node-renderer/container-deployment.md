@@ -1,7 +1,10 @@
 # Node Renderer: Container Deployment
 
 > **Pro Feature** — Available with [React on Rails Pro](https://pro.reactonrails.com).
-> ShakaCode Trust-Based Commercial Licensing: no token is required for development, test, CI/CD, or staging. [Pro pricing and sign up](https://pro.reactonrails.com/) covers production licenses, with free or low-cost options for qualifying startups and small companies.
+> Free in development, test, CI, and staging, and in production for small
+> organizations, charities, schools, and hospitals; larger organizations
+> subscribe at https://pro.reactonrails.com/ ($1,800 per year per organization).
+> No license key is needed to run Pro.
 
 This guide covers deploying the Node Renderer in containerized environments (Docker, Kubernetes, ControlPlane, etc.), including architecture options, performance tuning, memory management, error tracking, and troubleshooting.
 

@@ -1,7 +1,10 @@
 # React on Rails Pro Configuration
 
 > **Pro Feature** — Available with [React on Rails Pro](../../pro/react-on-rails-pro.md).
-> Free or very low cost for startups and small companies. [Upgrade or licensing details →](../../pro/upgrading-to-pro.md#try-pro-risk-free)
+> Free in development, test, CI, and staging, and in production for small
+> organizations, charities, schools, and hospitals; larger organizations
+> subscribe at https://pro.reactonrails.com/ ($1,800 per year per organization).
+> No license key is needed to run Pro.
 
 For general React on Rails configuration options, see [Configuration](README.md).
 
@@ -19,8 +22,9 @@ The below example is a typical production setup, using the separate `NodeRendere
 
 ```ruby
 ReactOnRailsPro.configure do |config|
-  # Paid production license JWT. Explicit nonblank configuration takes precedence over
-  # REACT_ON_RAILS_PRO_LICENSE; blank values fall back to that environment variable.
+  # Optional license key from your subscription. It marks rendered pages Licensed and is not required to
+  # run Pro. Explicit nonblank configuration takes precedence over REACT_ON_RAILS_PRO_LICENSE; blank values
+  # fall back to that variable.
   # A standalone Node renderer must receive the same token through its own `licenseToken`
   # configuration or environment.
   config.license_token = Rails.application.credentials.dig(:react_on_rails_pro, :license_token)

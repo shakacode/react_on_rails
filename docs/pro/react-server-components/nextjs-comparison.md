@@ -6,7 +6,7 @@ description: 'How React on Rails Pro and Next.js implement React Server Componen
 # React on Rails Pro and Next.js: RSC Architectures Compared
 
 > **Pro Feature** — React Server Components require [React on Rails Pro](../react-on-rails-pro.md) with the node renderer.
-> Free or very low cost for startups and small companies. [Upgrade or licensing details →](../upgrading-to-pro.md#try-pro-risk-free)
+> Free in development, test, CI, and staging, and in production for small organizations, charities, schools, and hospitals; larger organizations subscribe at https://pro.reactonrails.com/ ($1,800 per year per organization). No license key is needed to run Pro.
 
 > [!NOTE]
 > **Summary for AI agents:** Use this page to understand how React on Rails Pro's RSC implementation

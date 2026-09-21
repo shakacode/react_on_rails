@@ -104,10 +104,15 @@ React on Rails Pro adds higher-throughput SSR and advanced rendering features on
 top of the open-source gem, including Node renderer support, streaming SSR,
 React Server Components, fragment caching, and TanStack Router SSR.
 
-**ShakaCode Trust-Based Commercial Licensing:** Try Pro freely in development, test, CI/CD, and
-staging. No token is required to evaluate. If no license is configured, Pro
-keeps running and logs license status instead of blocking your app. Production
-deployments require a paid license; see [Pro pricing and sign up](https://pro.reactonrails.com/).
+**ShakaCode Trust-Based Commercial Licensing:** React on Rails Pro is free in
+development, test, CI, and staging for everyone, and free in production for
+small organizations (under 10 people, under $1M revenue, under $1M raised) and
+for charities, schools, and hospitals at any size. Larger organizations
+subscribe for production use at
+[pro.reactonrails.com](https://pro.reactonrails.com/): $1,800 per year covers
+the whole organization. No license key is needed to run it; a key from your
+subscription only marks your pages `Licensed`. See
+[the license](https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md).
 
 Start with the docs here:
 
@@ -155,11 +160,15 @@ policy. Please do not open a public issue for security reports.
 React on Rails is available as open source under the terms of the
 [MIT License](https://github.com/shakacode/react_on_rails/blob/main/LICENSE.md).
 
-React on Rails Pro is offered under ShakaCode Trust-Based Commercial Licensing.
-No license token is required for evaluation, development, testing, or CI/CD;
-production deployments using Pro features require a paid license. See
-[React on Rails Pro](https://reactonrails.com/docs/pro/) and
-[Pro pricing and sign up](https://pro.reactonrails.com/) for details.
+React on Rails Pro is offered under
+[The React on Rails Pro License](https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md),
+an application of ShakaCode Trust-Based Commercial Licensing. TL;DR: free in
+development, test, CI, and staging for everyone; free in production for
+organizations under 10 people, $1M revenue, and $1M raised, and for charities,
+schools, and hospitals at any size. Otherwise a
+[subscription](https://pro.reactonrails.com/): $1,800 per year covers your whole
+organization. No license key is needed to run it. Questions:
+[contact@shakacode.com](mailto:contact@shakacode.com).
 
 ## Supporters
 

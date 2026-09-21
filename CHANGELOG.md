@@ -560,6 +560,13 @@ pair`, returns invalid UTF-8, or silently mis-decodes the value. The parser now 
 
 #### Changed
 
+- **[Pro]** **License**: React on Rails Pro moves to The React on Rails Pro License 3.0, an application of ShakaCode
+  Trust-Based Commercial Licensing that matches ShakaPerf: free in production for small organizations, charities,
+  educational institutions, and hospitals; 45-day production evaluation; 30-day grace after a subscription lapses;
+  the license key stays optional and only sets the attribution status.
+  [PR 5104](https://github.com/shakacode/react_on_rails/pull/5104) by
+  [sashakhar1](https://github.com/sashakhar1).
+
 - **[Pro] Render requests now send raw JavaScript bodies to the Node renderer**: Non-bundle render
   requests use a raw `application/vnd.react-on-rails.render-request+javascript` body with metadata in
   `X-React-On-Rails-Pro-*` headers instead of `application/x-www-form-urlencoded`, removing

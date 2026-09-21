@@ -1,8 +1,15 @@
 # React on Rails Pro License — CI Integration
 
-Detailed examples for integrating the Pro license check into CI/CD pipelines, monitoring expirations, and sending renewal notifications. For basic license configuration, see [Installation > License Configuration](./installation.md#license-configuration-production-only).
+Detailed examples for organizations that choose to monitor an optional subscription key in CI/CD, track expirations,
+and send renewal notifications. For basic key configuration, see
+[Installation > License Key](./installation.md#license-key-optional).
 
-React on Rails Pro validates licenses **offline** and never crashes — a missing, invalid, or expired license is logged, not raised. That means a CI check is the recommended way to surface license problems before they reach production. The built-in `react_on_rails_pro:verify_license` rake task exits non-zero for missing, invalid, or expired licenses, so most teams only need a one-line CI step (see the [Installation guide](./installation.md#verify-license-compliance)). Everything below is optional polish on top of that.
+React on Rails Pro checks keys **offline** and never crashes. A missing, invalid,
+or expired key is logged, not raised. No key is required to run Pro. For
+subscribing organizations that want rendered pages to read `Licensed`, the
+`react_on_rails_pro:verify_license` rake task can surface key problems before
+deployment. It exits non-zero for missing, invalid, or expired keys. Everything
+below is optional.
 
 The rake task loads the Rails environment and therefore honors `config.license_token`, including values read from Rails
 credentials. The examples below use `REACT_ON_RAILS_PRO_LICENSE` because CI secret injection is portable and does not
@@ -13,7 +20,7 @@ can decrypt the application credentials.
 
 | Goal                                                       | Section                                                       |
 | ---------------------------------------------------------- | ------------------------------------------------------------- |
-| Block deployment when the license is invalid               | [Blocking deploy gate](#blocking-deploy-gate)                 |
+| Block deployment when a subscription key is invalid        | [Subscriber key deploy gate](#subscriber-key-deploy-gate)     |
 | Surface license issues without failing the workflow        | [Advisory check](#advisory-check)                             |
 | Custom expiration warning threshold (e.g. fail at 14 days) | [Custom expiration monitoring](#custom-expiration-monitoring) |
 | Email or Slack alert when expiring soon                    | [Renewal notifications](#renewal-notifications)               |
@@ -37,9 +44,9 @@ The rake task accepts `FORMAT=json` for scripting. The output shape for an expir
 
 Additional fields may appear in future gem versions; scripts should ignore unknown keys. The task exits non-zero for `missing`, `invalid`, and `expired` statuses; it exits 0 for `valid` even when `renewal_required: true`. Treat CI logs, step summaries, and uploaded artifacts as internal if they include raw task output — `organization`, `plan`, and `expiration` are license metadata.
 
-## Blocking deploy gate
+## Subscriber key deploy gate
 
-A reusable workflow that fails the deploy when the license is invalid:
+A reusable workflow for subscribing organizations that fails the deploy when the configured key is invalid:
 
 ```yaml
 # .github/workflows/react-on-rails-pro-license.yml

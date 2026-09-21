@@ -33,8 +33,8 @@ React on Rails Pro is a **commercial extension** to the open-source [React on Ra
 
 - **Requires**: [React on Rails](https://github.com/shakacode/react_on_rails) (open-source) as a foundation
 - **Location**: Part of the React on Rails monorepo at `react_on_rails_pro/`
-- **No license token required** to get started — install, evaluate, and develop freely
-- **ShakaCode Trust-Based Commercial Licensing**: Paid license required for production deployments
+- **License terms**: Free in development, test, CI, and staging, and in production for small organizations, charities, schools, and hospitals; larger organizations subscribe at https://pro.reactonrails.com/ ($1,800 per year per organization)
+- **License key**: No license key is needed to run Pro
 
 ### How It Relates to React on Rails
 
@@ -61,24 +61,18 @@ React on Rails Pro is a **commercial extension** to the open-source [React on Ra
 
 ### ShakaCode Trust-Based Commercial Licensing
 
-React on Rails Pro works **without a license token** for evaluation, development, testing, and CI/CD. No registration or license key is needed to get started.
-
-**A paid license is required only for production deployments.**
-
-- **Evaluation & Development**: Works out of the box — no license token needed
-- **CI/CD**: Works without a license token
-- **Production**: Requires a paid license
-
-### Paid License (Production)
-
-- **Duration**: 1 year subscription (or longer)
-- **Usage**: Production deployments and commercial applications
-- **Support**: Professional support included
-- **Contact**: [justin@shakacode.com](mailto:justin@shakacode.com) for pricing
+React on Rails Pro is free in development, test, CI, and staging for everyone,
+and free in production for small organizations (under 10 people, under $1M
+revenue, under $1M raised) and for charities, schools, and hospitals at any
+size. Larger organizations subscribe for production use at
+[pro.reactonrails.com](https://pro.reactonrails.com/): $1,800 per year covers
+the whole organization. No license key is needed to run it; a key from your
+subscription only marks your pages `Licensed`. See
+[the license](https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md).
 
 ### License Setup
 
-Once you have a paid license, configure it through Rails credentials:
+If your organization subscribes, configure its optional key through Rails credentials:
 
 ```ruby
 ReactOnRailsPro.configure do |config|
@@ -291,7 +285,10 @@ end
 
 ### Quick Start
 
-**No license token is required to get started.** React on Rails Pro runs freely for evaluation, development, and testing. A paid license is only needed for production deployments.
+Free in development, test, CI, and staging, and in production for small
+organizations, charities, schools, and hospitals; larger organizations
+subscribe at https://pro.reactonrails.com/ ($1,800 per year per organization).
+No license key is needed to run Pro.
 
 **1. Install the Gem**
 
@@ -413,7 +410,7 @@ Check out these production applications using React on Rails Pro:
 ### Getting Help
 
 - **📧 Email Support**: [support@shakacode.com](mailto:support@shakacode.com)
-- **💼 Sales & Licensing**: [justin@shakacode.com](mailto:justin@shakacode.com)
+- **💼 Sales & Licensing**: [contact@shakacode.com](mailto:contact@shakacode.com)
 - **📖 Documentation**: [docs/pro/](../docs/pro/)
 - **🐛 Found a Bug?**: Email [support@shakacode.com](mailto:support@shakacode.com) (for Pro customers)
 
@@ -447,11 +444,16 @@ React on Rails Pro is developed and maintained by [ShakaCode](https://www.shakac
 
 **Q: Do I need a license to try React on Rails Pro?**
 
-A: No! Under ShakaCode Trust-Based Commercial Licensing, React on Rails Pro works without a license token for evaluation, development, testing, and CI/CD. A paid license is only required for production deployments.
+A: No. React on Rails Pro is free in development, test, CI, and staging, and in
+production for small organizations, charities, schools, and hospitals. Larger
+organizations subscribe for production use. No license key is needed to run
+Pro.
 
-**Q: How much does a production license cost?**
+**Q: How much does a production subscription cost?**
 
-A: Pricing is customized based on your needs. Contact [justin@shakacode.com](mailto:justin@shakacode.com) for a quote.
+A: A subscription costs $1,800 per year per organization and covers every
+application, environment, and developer. Subscribe at
+[pro.reactonrails.com](https://pro.reactonrails.com/).
 
 ### Technical Questions
 
@@ -498,11 +500,11 @@ A: Check the [CHANGELOG](./CHANGELOG.md) for breaking changes and migration step
 
 **Q: Where do I start?**
 
-A: Follow our [Quick Start guide](#-getting-started) — no license token needed to get started!
+A: Follow our [Quick Start guide](#-getting-started). No license key is needed to run Pro.
 
 **Q: Can I try Pro before buying?**
 
-A: Yes! React on Rails Pro works without a license token for evaluation and development. Just install and start using it.
+A: Yes. Development, test, CI, staging, and a 45-day production evaluation are free for every organization. Just install and start using it.
 
 **Q: Is there a demo application?**
 
@@ -512,13 +514,15 @@ A: Yes! The [spec/dummy](./spec/dummy) app demonstrates all Pro features. [See e
 
 ## 📄 License
 
-React on Rails Pro is commercial software under ShakaCode Trust-Based Commercial Licensing. See [LICENSE](./LICENSE) for the complete license agreement.
+React on Rails Pro is free in development, test, CI, and staging for everyone,
+and free in production for small organizations (under 10 people, under $1M
+revenue, under $1M raised) and for charities, schools, and hospitals at any
+size. Larger organizations subscribe for production use at
+[pro.reactonrails.com](https://pro.reactonrails.com/): $1,800 per year covers
+the whole organization. No license key is needed to run it; a key from your
+subscription only marks your pages `Licensed`. See [the license](./LICENSE).
 
-**Summary**:
-
-- ✅ **No license token needed** for evaluation, development, testing, and CI/CD
-- 💼 **Paid license required** for production deployments
-- 📧 **Questions?** Contact [justin@shakacode.com](mailto:justin@shakacode.com)
+Questions: [contact@shakacode.com](mailto:contact@shakacode.com).
 
 ---
 

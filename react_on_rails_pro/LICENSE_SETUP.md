@@ -1,20 +1,21 @@
 # React on Rails Pro License Setup
 
-This document explains how to configure your React on Rails Pro license for production use.
+This document explains how to configure the optional React on Rails Pro license key.
 
 ## ShakaCode Trust-Based Commercial Licensing
 
-React on Rails Pro works **without a license token** for evaluation, development, testing, and CI/CD. No registration or license key is needed to get started.
+Free in development, test, CI, and staging, and in production for small
+organizations, charities, schools, and hospitals; larger organizations
+subscribe at https://pro.reactonrails.com/ ($1,800 per year per organization).
+No license key is needed to run Pro.
 
-**A paid license is required only for production deployments.**
-
-| Environment        | License Required? |
-| ------------------ | ----------------- |
-| Development        | No                |
-| Test               | No                |
-| CI/CD              | No                |
-| Staging (non-prod) | No                |
-| Production         | **Yes** (paid)    |
+| Environment        | License key                                                                                                                                                         |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Development        | Optional                                                                                                                                                            |
+| Test               | Optional                                                                                                                                                            |
+| CI/CD              | Optional                                                                                                                                                            |
+| Staging (non-prod) | Optional                                                                                                                                                            |
+| Production         | Free for small organizations, charities, educational institutions, and hospitals; subscription otherwise. The key is optional and only sets the attribution status. |
 
 ## Upgrading from Previous Versions
 
@@ -112,10 +113,11 @@ License-related checks and signals occur at multiple points:
 2. **Node Renderer**: When the Node renderer process starts
 3. **Browser Package**: Receives Pro-installed signal via `railsContext.rorPro` (not license-valid state)
 
-The browser package does not perform independent license validation. A valid paid license is still required for
-production deployments.
+The browser package does not perform independent license validation. Your organization's status under The React on
+Rails Pro License determines whether production use is free or requires a subscription.
 
-When no license is present, the application runs in **unlicensed mode**. This is fine for development, testing, and CI/CD. Production deployments should always have a valid paid license.
+When no license key is present, the application runs in **unlicensed mode**. This only changes the attribution status
+and log line. Organizations above the free line subscribe and configure their key so rendered pages read `Licensed`.
 
 ## Team Setup
 
@@ -123,7 +125,7 @@ When no license is present, the application runs in **unlicensed mode**. This is
 
 No license setup is needed for development. Developers can install and use React on Rails Pro immediately.
 
-For production deployments, configure a paid license through `config.license_token` or
+Organizations with a subscription can configure the optional key through `config.license_token` or
 `REACT_ON_RAILS_PRO_LICENSE`. Configure a standalone Node renderer separately when you use one.
 
 > Migration note: `config/react_on_rails_pro_license.key` is no longer read.
@@ -132,7 +134,8 @@ For production deployments, configure a paid license through `config.license_tok
 
 ### For CI/CD
 
-CI/CD environments work without a license token. If your CI pipeline deploys to production, ensure the production environment has a valid paid license configured.
+CI/CD environments work without a license key. A deployment pipeline may pass the optional key to production so
+rendered pages identify a subscribing organization as `Licensed`.
 
 ## Verification
 
@@ -290,9 +293,9 @@ window.railsContext.rorPro;
 
 ### Warning: "No license found"
 
-This is expected behavior in development, test, and CI environments. The application will run in unlicensed mode. For
-production, ensure the license is available through application configuration or `REACT_ON_RAILS_PRO_LICENSE` in each
-process that validates it.
+This is expected whenever no key is configured, including production. The application keeps running, the log reports
+the status, and rendered pages use the `UNLICENSED` attribution status. Subscribing organizations can configure the key
+through application configuration or `REACT_ON_RAILS_PRO_LICENSE` in each process that reads it.
 
 ### Error: "Invalid license signature"
 
@@ -311,14 +314,16 @@ process that validates it.
 
 **Solutions:**
 
-1. Contact [support@shakacode.com](mailto:support@shakacode.com) to renew your paid license
+1. Renew your subscription at [pro.reactonrails.com](https://pro.reactonrails.com/)
 2. Update `config.license_token`, the Node renderer's `licenseToken`, or `REACT_ON_RAILS_PRO_LICENSE` with the new token
 
 ### Error: "License plan is not valid for production use"
 
 **Cause:** The license has a plan that is not authorized for production use (e.g., an old free evaluation license).
 
-**Solution:** Purchase a paid license. Contact [justin@shakacode.com](mailto:justin@shakacode.com) for pricing.
+**Solution:** If your organization is above the free line, subscribe at
+[pro.reactonrails.com](https://pro.reactonrails.com/) to get a current key. No key is needed to run Pro; an invalid key
+only changes the attribution status.
 
 ### Error: "License is missing required expiration field"
 
@@ -337,7 +342,7 @@ The license is a JWT (JSON Web Token) signed with RSA-256, containing:
   "sub": "user@example.com", // Your email (REQUIRED)
   "iat": 1234567890, // Issued at timestamp (REQUIRED)
   "exp": 1234567890, // Expiration timestamp (REQUIRED)
-  "plan": "paid", // License plan (Optional — only "paid" is valid for production)
+  "plan": "paid", // Subscription plan recorded in the optional key
   "org": "Your Company", // Organization name (Optional)
   "iss": "api" // Issuer identifier (Optional, standard JWT claim)
 }
@@ -362,7 +367,7 @@ The license is a JWT (JSON Web Token) signed with RSA-256, containing:
 Need help?
 
 1. **Email**: support@shakacode.com
-2. **Sales**: [justin@shakacode.com](mailto:justin@shakacode.com) for pricing
+2. **Licensing**: [contact@shakacode.com](mailto:contact@shakacode.com)
 
 ## Security Best Practices
 
@@ -374,10 +379,12 @@ Need help?
 ## FAQ
 
 **Q: Do I need a license for development?**
-A: No. React on Rails Pro works without a license token for development, testing, and evaluation.
+A: No. No license key is required to run Pro in development or any other environment.
 
 **Q: Do I need a license for CI?**
-A: No. CI/CD environments work without a license token. Only production deployments require a paid license.
+A: No. CI/CD environments work without a license key. Production is also free
+for small organizations, charities, educational institutions, and hospitals;
+larger organizations subscribe for production use.
 
 **Q: Do I need internet to validate the license?**
 A: No! License validation is completely offline using cryptographic signatures.
