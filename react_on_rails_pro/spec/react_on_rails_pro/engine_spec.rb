@@ -64,7 +64,9 @@ RSpec.describe ReactOnRailsPro::Engine do
         end
 
         it "explains which organizations need a production subscription" do
-          expect(mock_logger).to receive(:warn).with(/free in production.*other organizations need a subscription/)
+          expect(mock_logger).to receive(:warn).with(
+            /free in production.*other organizations need a subscription.*If that is you, get a license/
+          )
           described_class.log_license_status
         end
       end
@@ -90,7 +92,9 @@ RSpec.describe ReactOnRailsPro::Engine do
         end
 
         it "explains which organizations need a production subscription" do
-          expect(mock_logger).to receive(:warn).with(/free in production.*other organizations need a subscription/)
+          expect(mock_logger).to receive(:warn).with(
+            /free in production.*other organizations need a subscription.*If that is you, renew your license/
+          )
           described_class.log_license_status
         end
       end
@@ -108,7 +112,9 @@ RSpec.describe ReactOnRailsPro::Engine do
         end
 
         it "explains which organizations need a production subscription" do
-          expect(mock_logger).to receive(:warn).with(/free in production.*other organizations need a subscription/)
+          expect(mock_logger).to receive(:warn).with(
+            /free in production.*other organizations need a subscription.*If that is you, get a license/
+          )
           described_class.log_license_status
         end
       end
