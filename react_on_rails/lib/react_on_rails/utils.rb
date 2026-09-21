@@ -446,16 +446,23 @@ module ReactOnRails
     end
 
     # Removes credentials from a URL for safe display in logs and error messages.
-    # Strips user:pass@ from the authority, replaces query values with [REDACTED],
-    # and preserves fragments. See #5046.
+    #
+    # Handles the URL shapes React on Rails actually receives:
+    #   - http(s)://user:pass@host/path  → strips userinfo via URI.parse
+    #   - http(s)://host/b.js?key=val    → redacts query values (presigned S3, etc.)
+    #   - file://user:pass@host/path     → strips userinfo via regex (URI::File drops it)
+    #   - /local/path/bundle.js          → passed through unchanged
+    #
+    # URLs malformed enough to fail URI.parse (spaces, unencoded special chars) are
+    # not realistic renderer URLs — return a safe placeholder instead of trying to
+    # regex-extract credentials from arbitrary broken strings. See #5046.
     def self.sanitize_url_for_display(url)
       return url if url.nil? || url.empty?
 
       begin
         uri = URI.parse(url)
         if uri.userinfo.nil?
-          # URI::File silently drops userinfo — .userinfo is always nil even when
-          # the raw string has credentials. Fall back to regex for non-HTTP schemes.
+          # URI::File silently drops userinfo — fall back to regex for non-HTTP schemes.
           unless uri.is_a?(URI::HTTP)
             return redact_query_values(strip_authority_userinfo(url))
           end
@@ -467,11 +474,13 @@ module ReactOnRails
         uri.user = nil
         redact_query_values(uri.to_s)
       rescue URI::InvalidURIError
-        redact_query_values(strip_malformed_url_userinfo(url))
+        "[unparseable URL redacted]"
       end
     end
 
     # Scrubs credentials from arbitrary error-message text that may contain URLs.
+    # Strips //...@ patterns (authority userinfo) and redacts query values in any
+    # http(s) URL found in the text.
     def self.sanitize_error_text(text)
       return text if text.nil? || text.empty?
 
@@ -501,43 +510,6 @@ module ReactOnRails
       match[:scheme] + authority[(last_at + 1)..] + suffix
     end
     private_class_method :strip_authority_userinfo
-
-    # Strips userinfo from malformed URLs that URI.parse rejects (e.g. a password
-    # containing raw /, ?, or space). Prefers the @ followed by host/path over
-    # an @ buried in a query value.
-    def self.strip_malformed_url_userinfo(url)
-      match = url.match(%r{\A\s*(?<scheme>\w+://)}i)
-      return url unless match
-
-      rest = url[match[0].length..]
-      authority_end = rest.index(%r{[/?#]})
-      authority = authority_end ? rest[0...authority_end] : rest
-      suffix = authority_end ? rest[authority_end..] : ""
-
-      if authority.include?("@")
-        last_at = authority.rindex("@")
-        return match[:scheme] + authority[(last_at + 1)..] + suffix
-      end
-
-      # Password contains / so the @ landed after the first path separator.
-      # e.g. http://u:pa/s3cr3t@host/path — pick the @ with host/path after it.
-      best_at = nil
-      pos = 0
-      while (at_idx = rest.index("@", pos))
-        after_at = rest[(at_idx + 1)..]
-        if after_at.include?("/")
-          best_at = at_idx
-        elsif best_at.nil? && !after_at.include?("@")
-          best_at = at_idx
-        end
-        pos = at_idx + 1
-      end
-
-      return url unless best_at
-
-      match[:scheme] + rest[(best_at + 1)..]
-    end
-    private_class_method :strip_malformed_url_userinfo
 
     # Replaces query-string values with [REDACTED], keeping keys for diagnostics.
     # Splits # before ? so a ?-inside-fragment (hash-router URLs) isn't misread.

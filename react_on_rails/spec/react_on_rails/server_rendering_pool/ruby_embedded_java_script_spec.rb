@@ -440,11 +440,10 @@ module ReactOnRails
           end
         end
 
-        # A URL malformed enough that URI.parse itself raises (e.g. a space in the host) fails
-        # before sanitized_renderer_url is ever applied to the `url` variable at the raise site —
-        # URI::InvalidURIError's own message embeds the original credential-bearing string
-        # verbatim, so that message must be scrubbed independently of the url variable.
-        context "when the HTTP-served bundle URL embeds credentials and is malformed enough to fail URI parsing" do
+        # A URL malformed enough that URI.parse itself raises (e.g. a space in the host) is not
+        # a realistic renderer URL — sanitize_url_for_display returns a safe placeholder rather
+        # than trying to regex-extract credentials from arbitrary broken strings.
+        context "when the HTTP-served bundle URL is malformed enough to fail URI parsing" do
           it "does not leak the credential into the raised error message" do
             server_bundle_url = "http://bundle-user:s3cr3t@bad host/webpack/development/server-bundle.js"
 
@@ -458,88 +457,7 @@ module ReactOnRails
             end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
               expect(error.message).not_to include("s3cr3t")
               expect(error.message).not_to include("bundle-user")
-              # The error must still say the URL was malformed and show enough of it (host/path
-              # minus credentials) for an operator to identify which configured URL failed.
-              expect(error.message).to include("bad URI")
-              expect(error.message).to include("bad host")
-            }
-          end
-
-          it "does not leak a password that contains an @" do
-            server_bundle_url = "http://bundle-user:s3cr3t@still-secret@bad host/webpack/development/server-bundle.js"
-
-            allow(ReactOnRails::Utils).to receive_messages(
-              server_bundle_js_file_path: server_bundle_url,
-              server_bundle_path_is_http?: true
-            )
-
-            expect do
-              described_class.read_bundle_js_code
-            end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
-              expect(error.message).not_to include("bundle-user")
-              expect(error.message).not_to include("s3cr3t")
-              expect(error.message).not_to include("still-secret")
-            }
-          end
-
-          it "does not leak a password that contains a raw query or fragment delimiter" do
-            ["?", "#"].each do |delimiter|
-              server_bundle_url =
-                "http://bundle-user:s3cr3t#{delimiter}still-secret@bad host/webpack/development/server-bundle.js"
-
-              allow(ReactOnRails::Utils).to receive_messages(
-                server_bundle_js_file_path: server_bundle_url,
-                server_bundle_path_is_http?: true
-              )
-
-              expect do
-                described_class.read_bundle_js_code
-              end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
-                expect(error.message).not_to include("bundle-user")
-                expect(error.message).not_to include("s3cr3t")
-                expect(error.message).not_to include("still-secret")
-                expect(error.message).to include(
-                  "http://bad host/webpack/development/server-bundle.js"
-                )
-              }
-            end
-          end
-
-          it "does not leak credentials from an escaped invalid-URI error" do
-            [
-              'http://bundle-user:s3cr3t"?tail@bad host/webpack/development/server-bundle.js',
-              " http://bundle-user:s3cr3t@bad host/webpack/development/server-bundle.js",
-              "http://bundle-user:s3cr3t?tail word@bad host/webpack/development/server-bundle.js"
-            ].each do |server_bundle_url|
-              allow(ReactOnRails::Utils).to receive_messages(
-                server_bundle_js_file_path: server_bundle_url,
-                server_bundle_path_is_http?: true
-              )
-
-              expect do
-                described_class.read_bundle_js_code
-              end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
-                expect(error.message).not_to include("bundle-user")
-                expect(error.message).not_to include("s3cr3t")
-                expect(error.message).to include("http://bad host/webpack/development/server-bundle.js")
-              }
-            end
-          end
-
-          it "preserves @ characters in the path and redacts query values" do
-            server_bundle_url = "http://bad host/webpack/server@bundle.js?source=@config"
-
-            allow(ReactOnRails::Utils).to receive_messages(
-              server_bundle_js_file_path: server_bundle_url,
-              server_bundle_path_is_http?: true
-            )
-
-            expect do
-              described_class.read_bundle_js_code
-            end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
-              expect(error.message).to include("/webpack/server@bundle.js")
-              expect(error.message).to include("source=[REDACTED]")
-              expect(error.message).not_to include("@config")
+              expect(error.message).to include("[unparseable URL redacted]")
             }
           end
         end

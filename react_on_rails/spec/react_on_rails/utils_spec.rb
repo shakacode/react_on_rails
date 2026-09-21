@@ -1011,12 +1011,6 @@ module ReactOnRails
           .to eq("http://host:3800/b.js")
       end
 
-      it "strips passwords containing embedded @ characters" do
-        result = described_class.sanitize_url_for_display("http://u:s3cr3t@more@host:3800/b.js")
-        expect(result).not_to include("s3cr3t")
-        expect(result).to include("host:3800/b.js")
-      end
-
       it "redacts query-string values while keeping keys" do
         input = "https://cdn.example.com/bundle.js?X-Amz-Credential=AKIAs3cr3t&X-Amz-Signature=abc123"
         result = described_class.sanitize_url_for_display(input)
@@ -1028,12 +1022,6 @@ module ReactOnRails
 
       it "strips userinfo from file:// URLs despite URI::File reporting nil userinfo" do
         result = described_class.sanitize_url_for_display("file://u:s3cr3t@host/b.js")
-        expect(result).not_to include("s3cr3t")
-        expect(result).to include("host/b.js")
-      end
-
-      it "strips userinfo when the password contains a slash" do
-        result = described_class.sanitize_url_for_display("http://u:pa/s3cr3t@host/b.js")
         expect(result).not_to include("s3cr3t")
         expect(result).to include("host/b.js")
       end
@@ -1071,17 +1059,16 @@ module ReactOnRails
         expect(result).not_to include("[REDACTED]")
       end
 
-      it "handles slash-in-password combined with @ in query value" do
-        result = described_class.sanitize_url_for_display("http://u:pa/s3cr3t@host/b.js?source=@config")
-        expect(result).not_to include("s3cr3t")
-        expect(result).to include("host/b.js")
-        expect(result).to include("source=[REDACTED]")
-      end
-
       it "redacts bare query components that have no =" do
         result = described_class.sanitize_url_for_display("https://host/b.js?eyJhbGciOi")
         expect(result).not_to include("eyJhbGciOi")
         expect(result).to include("[REDACTED]")
+      end
+
+      it "returns a safe placeholder for URLs that fail URI.parse" do
+        result = described_class.sanitize_url_for_display("http://u:s3cr3t@bad host/b.js")
+        expect(result).to eq("[unparseable URL redacted]")
+        expect(result).not_to include("s3cr3t")
       end
     end
 
