@@ -193,23 +193,26 @@ const rscClientReferences = (() => {
   // absolute realpath, which matches the module resource webpack records
   // (resolve.symlinks defaults to true), so the manifest keys line up with the file URLs
   // the RSC bundle's client references carry even when react-on-rails-pro is installed
-  // through a symlink (pnpm, workspaces).
-  const reactOnRailsProClientReferences = [
-    'react-on-rails-pro/RSCRoute',
-    'react-on-rails-pro/RSCProvider',
-    'react-on-rails-pro/registerDefaultRSCProvider/client',
-  ].map((subpath) => {
-    try {
-      return require.resolve(subpath);
-    } catch (err) {
-      throw new Error(
-        `Failed to resolve the react-on-rails-pro client component "${subpath}" for RSC ` +
-          `client-reference registration: ${err.message}`,
-      );
-    }
-  });
+  // through a symlink (pnpm, workspaces). A function (invoked in the return below, after
+  // the discovered references resolve) so both this resolver and its Pro dummy mirror
+  // surface the same first error when both steps fail.
+  const reactOnRailsProClientReferences = () =>
+    [
+      'react-on-rails-pro/RSCRoute',
+      'react-on-rails-pro/RSCProvider',
+      'react-on-rails-pro/registerDefaultRSCProvider/client',
+    ].map((subpath) => {
+      try {
+        return require.resolve(subpath);
+      } catch (err) {
+        throw new Error(
+          `Failed to resolve the react-on-rails-pro client component "${subpath}" for RSC ` +
+            `client-reference registration: ${err.message}`,
+        );
+      }
+    });
 
-  return [...new Set([...resolveDiscoveredClientReferences(), ...reactOnRailsProClientReferences])];
+  return [...new Set([...resolveDiscoveredClientReferences(), ...reactOnRailsProClientReferences()])];
 })();
 
 const configureClient = () => {
