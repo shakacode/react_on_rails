@@ -322,7 +322,8 @@ through application configuration or `REACT_ON_RAILS_PRO_LICENSE` in each proces
 **Cause:** The license has a plan that is not authorized for production use (e.g., an old free evaluation license).
 
 **Solution:** If your organization is above the free line, subscribe at
-[pro.reactonrails.com](https://pro.reactonrails.com/). Otherwise, no key is required to run Pro.
+[pro.reactonrails.com](https://pro.reactonrails.com/) to get a current key. No key is needed to run Pro; an invalid key
+only changes the attribution status.
 
 ### Error: "License is missing required expiration field"
 

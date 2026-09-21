@@ -13,6 +13,7 @@
 # For licensing terms:
 # https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
 
+require "digest"
 require "json"
 
 RSpec.describe "published Pro license metadata" do
@@ -22,6 +23,9 @@ RSpec.describe "published Pro license metadata" do
   it "publishes the approved license version" do
     expect(commercial_license).to include("The React on Rails Pro License, version 3.0".b)
     expect(commercial_license).to include("SPDX-License-Identifier: LicenseRef-ReactOnRailsPro".b)
+    expect(Digest::SHA256.hexdigest(commercial_license)).to eq(
+      "8b1ae877b9d415e677f520ca9791a6eeb70ef4fec3314a2dd318849398371a70"
+    )
   end
 
   it "declares the commercial gem license and includes its license file" do

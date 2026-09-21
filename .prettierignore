@@ -41,7 +41,8 @@ internal/analysis/experiments/
 benchmarks/rspack-vite-rails-dx/starters/
 benchmarks/rspack-vite-rails-dx/results/*.json
 
-# Verbatim legal text is verified by its required SHA-256 digest.
+# Legal copies follow the byte faithful precedents above for the pinned shared copy and PPR evidence artifacts.
+# Their required digest is verified by package_license_metadata_spec.rb.
 REACT-ON-RAILS-PRO-LICENSE.md
 packages/react-on-rails-pro/LICENSE.md
 packages/react-on-rails-pro-node-renderer/LICENSE.md

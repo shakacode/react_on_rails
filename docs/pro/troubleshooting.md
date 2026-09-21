@@ -77,6 +77,8 @@ For issues related to upgrading from GitHub Packages to public distribution, see
 
 - Under The React on Rails Pro License no key is required to run Pro; an expired or missing key only changes the attribution comment and the log line.
 - To renew or get a key, see [pro.reactonrails.com](https://pro.reactonrails.com/).
+- If your organization configured a key, give a standalone Node renderer its own `licenseToken` or `REACT_ON_RAILS_PRO_LICENSE`.
+- Run `bundle exec rake react_on_rails_pro:verify_license` (`FORMAT=json` for CI) to see the key status.
 
 ## React Server Components
 
