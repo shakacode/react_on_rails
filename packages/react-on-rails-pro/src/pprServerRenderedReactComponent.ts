@@ -140,24 +140,23 @@ const getValidatedPPRApis = (): PPRApis => {
 // ---------------------------------------------------------------------------
 
 /**
- * Validates that the VM context provides the runtime primitives the PPR settle timer needs:
+ * Checks that the VM context has AbortController and a real (non-stubbed) setTimeout.
+ * Throws a descriptive error naming the config fix if either is missing. Called once per process.
  *
- *   1. `AbortController` — used to construct the settle signal that demotes still-pending
- *      Suspense boundaries to resume-phase holes. The node renderer intentionally does NOT
- *      inject it via `supportModules` (see vm.ts); callers must provide it in
- *      `additionalContext: { AbortController }`.
- *
- *   2. A real (non-stubbed) `setTimeout` — the settle budget fires a `setTimeout` whose
- *      callback calls `AbortController.abort()`. When `stubTimers` is true (the default when
- *      `RENDERER_STUB_TIMERS` is unset), `setTimeout` is overwritten with a no-op that
- *      returns `undefined`, so the abort never fires. Set `stubTimers: false` in your
- *      node-renderer config, or `RENDERER_STUB_TIMERS=false` in the environment.
- *
- * Both checks run once per prerender (cheap: one typeof + one trial call) and throw a
- * descriptive error naming the two config knobs so operators get a clear message at first
- * PPR request rather than a silent no-op timer or an opaque ReferenceError.
+ * TODO: when PPR adoption grows, consider a renderer-level `ppr: true` config in configBuilder.ts
+ * that auto-sets `stubTimers: false` and injects AbortController, so operators don't need to
+ * configure both knobs manually.
  */
+let pprRuntimeValidated = false;
+
+/** @internal Reset the once-per-process preflight guard. Test-only. */
+export const _resetPPRRuntimeValidation = (): void => {
+  pprRuntimeValidated = false;
+};
+
 export const validatePPRRuntimeEnvironment = (): void => {
+  if (pprRuntimeValidated) return;
+
   // 1. AbortController must be available in the current execution context.
   if (typeof AbortController === 'undefined') {
     throw new Error(
@@ -183,6 +182,7 @@ export const validatePPRRuntimeEnvironment = (): void => {
     );
   }
   clearTimeout(handle);
+  pprRuntimeValidated = true;
 };
 
 // ---------------------------------------------------------------------------
@@ -360,6 +360,18 @@ const pprPrerenderRenderReactComponent = (
 
         if (settleTimeoutId !== undefined) clearTimeout(settleTimeoutId);
         renderState.isShellReady = true;
+
+        // PPR #5019-A: when the prerender has postponed boundaries, cancel any RSC streams
+        // that are still in-flight before injectRSCPayload drains them into the cached shell.
+        // In-flight streams correspond to RSC fetches for boundaries React postponed (or that
+        // outlasted the settle budget). Their Flight payload must NOT land in the shell because:
+        //   (a) it may contain per-user data that would be cached under a shared key, and
+        //   (b) the resume pass will regenerate those payloads fresh with the current user.
+        // Streams whose source already completed (non-postponed boundaries that resolved before
+        // the settle abort) are kept — their static payload belongs in the shell for hydration.
+        if (postponed != null) {
+          streamingTrackers.rscRequestTracker.cancelInFlightStreams();
+        }
 
         // Pipe the HTML prelude through injectRSCPayload so the RSC payload scripts and promoted
         // CSS links are part of the cached shell, exactly like the streaming path's shell.

@@ -99,6 +99,12 @@ class RSCRequestTracker {
   // destroyed immediately instead of being wired up and tracked.
   private cleared = false;
 
+  // Set by cancelInFlightStreams() when the PPR prerender settles with postponed boundaries.
+  // A `generateRSCPayload` promise that resolves *after* this point must not wire up or fire
+  // callbacks — its source is destroyed immediately and an ended stream is returned (#5019-A).
+  // Unlike `cleared`, this does NOT tear down callbacks, diagnostics, or existing streams.
+  private settled = false;
+
   private callbacks: RSCPayloadCallback[] = [];
 
   private capturedRSCDiagnostics: CapturedRSCDiagnostic[] = [];
@@ -164,6 +170,58 @@ class RSCRequestTracker {
     this.streams = [];
     this.callbacks = [];
     this.capturedRSCDiagnostics = [];
+  }
+
+  /**
+   * Cancels RSC streams whose source has not yet finished delivering data (#5019-A).
+   *
+   * Used by the PPR prerender phase after `prerenderToNodeStream` resolves: streams still
+   * in-flight at that point correspond to Suspense boundaries that React postponed (or to
+   * RSC fetches that outlasted the settle budget). Their Flight payload must NOT be drained
+   * into the cached shell — the resume pass will regenerate them fresh with the current
+   * user's data.
+   *
+   * Streams whose source already ended naturally (non-postponed, resolved before the settle
+   * abort) are left intact — their payload belongs in the shell for client hydration.
+   *
+   * Unlike `clear()`, this method does NOT set `this.cleared`, does NOT drop callbacks or
+   * diagnostics, and does NOT prevent future `getRSCPayloadStream` calls. It only stops the
+   * upstream work and ends the tee output for the subset of streams still in-flight.
+   */
+  cancelInFlightStreams(): void {
+    // Mark the tracker as settled so that any generateRSCPayload promise that resolves
+    // AFTER this point (slow Rails endpoint whose HTTP response hasn't arrived yet) does
+    // not wire up a new stream or fire onRSCPayloadGenerated callbacks. Without this flag,
+    // a late-arriving RSC response bypasses cancellation entirely and leaks into the shell.
+    //
+    // TODO (#5019 follow-up): thread the settle AbortSignal through generateRSCPayload so
+    // the Rails HTTP request itself is cancelled at settle time, saving wasted server work.
+    // Currently the Rails endpoint keeps running; only the response is discarded when it
+    // finally arrives.
+    this.settled = true;
+
+    this.sourceStreams.forEach((source, index) => {
+      try {
+        if (!source.destroyed && !source.readableEnded) {
+          markExpectedRSCStreamCleanup(source);
+          source.destroy();
+
+          const teeStream = this.streams[index]?.stream as PassThrough | undefined;
+          if (teeStream && !teeStream.writableEnded && !teeStream.destroyed) {
+            markExpectedRSCStreamCleanup(teeStream);
+            // Drain buffered chunks so end() doesn't flush them into the shell (#5019-A).
+            while (teeStream.read() !== null) {} // eslint-disable-line no-empty
+            teeStream.end();
+          }
+        }
+      } catch (error) {
+        const componentName = this.streams[index]?.componentName ?? 'unknown';
+        console.warn(
+          `Warning: Error while cancelling in-flight RSC stream for ${componentName} at index ${index}:`,
+          error,
+        );
+      }
+    });
   }
 
   /**
@@ -297,7 +355,7 @@ class RSCRequestTracker {
       // at disconnect cannot be cancelled here because `GenerateRSCPayloadFunction` takes no
       // `AbortSignal`; cancelling that requires threading a signal through the JS → node-renderer →
       // Rails boundary.
-      if (this.cleared) {
+      if (this.cleared || this.settled) {
         const source = stream as Readable;
         if (!source.destroyed) {
           source.destroy();
