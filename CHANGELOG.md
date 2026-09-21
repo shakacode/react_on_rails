@@ -26,15 +26,32 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
-- **npm packages no longer ship dangling `sourceMappingURL` pointers**: Every published `lib/**/*.js` file in
-  `react-on-rails` and `react-on-rails-pro` ended with a `//# sourceMappingURL=<name>.js.map` comment, but the
+- **Published JavaScript no longer ships dangling `sourceMappingURL` pointers**: Every published `lib/**/*.js` file
+  in `react-on-rails` and `react-on-rails-pro` ended with a `//# sourceMappingURL=<name>.js.map` comment, but the
   packages never published the `.map` files, so each pointer referenced a missing file. Besides devtools warnings,
   the dangling pointers crashed RSC bundle builds (`SyntaxError: ... is not valid JSON` from
   `react-on-rails-rsc/WebpackLoader`) whenever server-component code imported one of the Pro package's own
   `'use client'` components such as `react-on-rails-pro/RSCRoute`. The packages' `tsc` builds no longer emit
-  sourcemaps, removing the pointer comments without changing the emitted JavaScript. Part of
+  JavaScript sourcemaps, removing the pointer comments without changing the emitted JavaScript. (TypeScript
+  `declarationMap` pointers in published `.d.ts` files are unaffected — cosmetic, tracked as a follow-up.) Part of
   [Issue 5079](https://github.com/shakacode/react_on_rails/issues/5079).
   [PR 5099](https://github.com/shakacode/react_on_rails/pull/5099) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
+- **[Pro]** **RSC client-reference resolution now registers the Pro package's own `'use client'` components**:
+  Client-reference discovery only scans app source directories (`node_modules` is excluded), so the `'use client'`
+  components the `react-on-rails-pro` npm package itself ships — `react-on-rails-pro/RSCRoute`,
+  `react-on-rails-pro/RSCProvider`, and `react-on-rails-pro/registerDefaultRSCProvider/client` — could never appear
+  in `react-client-manifest.json`. A server component rendering one of them (for example a nested `<RSCRoute>` used
+  for section-level refetching) then failed the render-time manifest lookup even when the RSC bundle compiled. The
+  client-reference resolver emitted by the `react_on_rails:rsc` generator now appends these components as explicit
+  `clientReferences` entries (via `require.resolve`) to every resolution branch, on both the client and server
+  manifest plugins. Re-run `rails g react_on_rails:rsc` to pick this up in an existing app: a resolver emitted by a
+  previous generator version is upgraded in place, while a customized resolver is left untouched with a warning that
+  explains the manual registration (or register the entries in a hand-maintained config — see the
+  [RSC setup docs](https://reactonrails.com/docs/pro/react-server-components/create-without-ssr)). Part of
+  [Issue 5079](https://github.com/shakacode/react_on_rails/issues/5079).
+  [PR 5100](https://github.com/shakacode/react_on_rails/pull/5100) by
   [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 - **`authenticityHeaders()` no longer mutates its input object**: The helper now returns a new merged object instead of writing CSRF headers into the caller's `otherHeaders` argument. Previously, passing a shared or module-level headers object would bake a stale CSRF token into it, causing intermittent `422 InvalidAuthenticityToken` errors after Turbo navigations. Fixes [Issue 5028](https://github.com/shakacode/react_on_rails/issues/5028).
