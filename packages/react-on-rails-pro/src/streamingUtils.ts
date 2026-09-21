@@ -13,8 +13,10 @@
  * https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
-import * as React from 'react';
+import { Console } from 'node:console';
 import { PassThrough, Readable } from 'stream';
+
+import * as React from 'react';
 
 import createReactOutput from 'react-on-rails/createReactOutput';
 import { isPromise, isServerRenderHash } from 'react-on-rails/isServerRenderResult';
@@ -37,6 +39,59 @@ import safePipe from './safePipe.ts';
 type BufferedEvent = {
   event: 'data' | 'error' | 'end' | 'renderingError';
   data: unknown;
+};
+
+const FLIGHT_PATCHED_CONSOLE_METHODS = [
+  'assert',
+  'debug',
+  'dir',
+  'dirxml',
+  'error',
+  'group',
+  'groupCollapsed',
+  'groupEnd',
+  'info',
+  'log',
+  'table',
+  'trace',
+  'warn',
+] as const;
+
+const nativeConsole = new Console({ stdout: process.stdout, stderr: process.stderr });
+
+// React 19.3 Flight patches console while `currentRequest` / ALS is set. Emitting a chunk to the
+// returned Readable is still inside that request, so consumer `on('data')` logs were encoded as
+// `:W["log"...]` rows. Swap Flight's wrappers for Node's native console for the duration of the
+// consumer push so those logs stay out of the RSC payload.
+const runWithFlightConsoleCaptureDisabled = <T>(callback: () => T): T => {
+  const restored: Array<() => void> = [];
+
+  FLIGHT_PATCHED_CONSOLE_METHODS.forEach((methodName) => {
+    const current = console[methodName];
+    const nativeMethod = nativeConsole[methodName];
+    if (typeof current !== 'function' || typeof nativeMethod !== 'function') {
+      return;
+    }
+
+    Object.defineProperty(console, methodName, {
+      configurable: true,
+      writable: true,
+      value: nativeMethod.bind(nativeConsole),
+    });
+    restored.push(() => {
+      Object.defineProperty(console, methodName, {
+        configurable: true,
+        writable: true,
+        value: current,
+      });
+    });
+  });
+
+  try {
+    return callback();
+  } finally {
+    restored.reverse().forEach((restore) => restore());
+  }
 };
 
 /**
@@ -77,13 +132,17 @@ const bufferStream = (stream: Readable) => {
       listeners.forEach(({ event, listener }) => stream.off(event, listener));
       const handleEvent = ({ event, data }: BufferedEvent) => {
         if (event === 'data') {
-          this.push(data);
+          runWithFlightConsoleCaptureDisabled(() => {
+            this.push(data);
+          });
         } else if (event === 'error') {
           this.emit('error', data);
         } else if (event === 'renderingError') {
           this.emit('renderingError', data);
         } else {
-          this.push(null);
+          runWithFlightConsoleCaptureDisabled(() => {
+            this.push(null);
+          });
         }
       };
 

@@ -26,6 +26,20 @@ const UNWRAPPED_STREAM_PAYLOAD_KEY =
   'SimpleComponent-fun4a7ngv9-UnwrappedStreamRSCRouteDemo-react-component-0';
 const RSC_ROUTE_SSR_FALSE_BAILOUT_DIGEST = 'REACT_ON_RAILS_RSC_ROUTE_SSR_FALSE_BAILOUT';
 
+// DEVELOPMENT Flight reconstructs server stacks with `(0, eval)(...)`. Dummy CSP in test has no
+// 'unsafe-eval'; the library catches that and hydrates anyway. Ignore the resulting console error
+// (same filter as activity_rsc.spec.ts / strict_csp.spec.ts).
+function unexpectedConsoleErrors(consoleMessages: string[]): string[] {
+  return consoleMessages.filter(
+    (message) =>
+      message.startsWith('error:') &&
+      !(
+        message.includes('eval() is not supported in this environment') &&
+        message.includes('React will never use eval() in production mode')
+      ),
+  );
+}
+
 test.describe('RSCRoute ssr=false', () => {
   test('server-renders sibling routes while deferring the ssr=false route', async ({ page, request }) => {
     const response = await request.get(MIXED_ROUTE_PATH);
@@ -118,7 +132,7 @@ test.describe('RSCRoute ssr=false', () => {
     const browserConsole = consoleMessages.join('\n');
     expect(browserConsole).not.toContain('useRSC must be used within a RSCProvider');
     expect(browserConsole).not.toContain('skipped server rendering because it was rendered with ssr={false}');
-    expect(consoleMessages.filter((message) => message.startsWith('error:'))).toHaveLength(0);
+    expect(unexpectedConsoleErrors(consoleMessages)).toHaveLength(0);
   });
 
   test('hydrates unwrapped stream_react_component roots without logging the ssr=false bailout', async ({
@@ -165,7 +179,7 @@ test.describe('RSCRoute ssr=false', () => {
     expect(browserConsole).not.toContain('useRSC must be used within a RSCProvider');
     expect(browserConsole).not.toContain('skipped server rendering because it was rendered with ssr={false}');
     expect(browserConsole).not.toContain(RSC_ROUTE_SSR_FALSE_BAILOUT_DIGEST);
-    expect(consoleMessages.filter((message) => message.startsWith('error:'))).toHaveLength(0);
+    expect(unexpectedConsoleErrors(consoleMessages)).toHaveLength(0);
   });
 
   test('does not load the RSC client fetch runtime for a normal client-rendered page', async ({ page }) => {

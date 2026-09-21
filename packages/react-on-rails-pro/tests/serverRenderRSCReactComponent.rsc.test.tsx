@@ -230,6 +230,7 @@ test('does not capture consumer data-listener logs after returning the render st
   expect(content1).toContain('First Unique Name');
   expect(content1).not.toContain('From Interval');
   expect(content1).not.toContain('Outside The Component');
+  expect(content1).toContain('[First Unique Name] Before awaitng');
 });
 
 test('explains likely missing use client directive when a server component calls a client hook', async () => {

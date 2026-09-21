@@ -36,6 +36,13 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **RSC streams no longer encode consumer `on('data')` logs into the Flight payload**: React 19.3
+  Flight keeps a console hook for the life of the render request, so logs from Node consumers of the
+  returned Readable were serialized as `:W["log"...]` rows. Chunk delivery to the consumer now uses
+  Node's native console for that turn. `streamServerRenderedComponent` / `bufferStream` in
+  `streamingUtils.ts` is the delivery path. [PR 5094](https://github.com/shakacode/react_on_rails/pull/5094)
+  by [justin808](https://github.com/justin808).
+
 - **`authenticityHeaders()` no longer mutates its input object**: The helper now returns a new merged object instead of writing CSRF headers into the caller's `otherHeaders` argument. Previously, passing a shared or module-level headers object would bake a stale CSRF token into it, causing intermittent `422 InvalidAuthenticityToken` errors after Turbo navigations. Fixes [Issue 5028](https://github.com/shakacode/react_on_rails/issues/5028).
 
 - **`bin/dev kill` now verifies every app-scoped Overmind endpoint within a bounded control budget**:
