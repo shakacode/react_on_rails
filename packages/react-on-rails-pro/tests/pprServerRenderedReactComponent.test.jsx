@@ -18,6 +18,7 @@
  */
 
 import * as React from 'react';
+import { PassThrough } from 'stream';
 import {
   pprPrerenderServerRenderedReactComponent,
   pprResumeServerRenderedReactComponent,
@@ -26,6 +27,7 @@ import {
   PPR_RENDER_ERRORED_CHUNK_KEY,
   PPR_ASSET_MANIFEST_CHUNK_KEY,
   validatePPRRuntimeEnvironment,
+  _resetPPRRuntimeValidation,
 } from '../src/pprServerRenderedReactComponent.ts';
 import * as ComponentRegistry from '../src/ComponentRegistry.ts';
 import ReactOnRails from '../src/ReactOnRails.node.ts';
@@ -77,6 +79,52 @@ const PprFullyStatic = () => (
   </div>
 );
 
+// Wraps raw content in the length-prefixed format that transformRenderStreamChunksToResultObject
+// produces. The RSCRequestTracker's generateRSCPayload must return streams in this format.
+const toLengthPrefixed = (content) => {
+  const metadata = JSON.stringify({ consoleReplayScript: '', hasErrors: false, isShellReady: true });
+  const contentBuf = Buffer.from(content, 'utf8');
+  return `${metadata}\t${contentBuf.length.toString(16).padStart(8, '0')}\n${content}`;
+};
+
+// A component factory (receives (props, railsContext)) that:
+//   1. Starts an RSC payload fetch via railsContext.getRSCPayloadStream (fire-and-forget)
+//   2. Returns a tree with a Suspense boundary whose hole is delayed past the settle budget
+// The RSC payload stream is in-flight when the settle abort fires, so it represents
+// a postponed boundary's RSC data that must NOT be cached in the shell (#5019-A).
+const RSC_PAYLOAD_MARKER = 'RSC_FLIGHT_DATA_FOR_POSTPONED_HOLE';
+const PprShellWithRSCHole = (props, railsContext) => {
+  // Fire-and-forget: starts RSC payload generation on the tracker. The payload stream will
+  // be picked up by injectRSCPayload when it subscribes to onRSCPayloadGenerated.
+  if (railsContext.getRSCPayloadStream) {
+    railsContext.getRSCPayloadStream('PostponedRSCComponent', { marker: RSC_PAYLOAD_MARKER });
+  }
+  return (
+    <div>
+      <h1>{SHELL_HEADER_TEXT}</h1>
+      <React.Suspense fallback={<div>{HOLE_FALLBACK_TEXT}</div>}>
+        <DelayedHole {...props} />
+      </React.Suspense>
+    </div>
+  );
+};
+
+/**
+ * Creates a generateRSCPayload mock that returns a slow stream (takes `streamDelayMs`
+ * to deliver its data). When the settle budget fires before the stream completes,
+ * the stream is still in-flight and represents a postponed boundary's RSC data.
+ */
+const createSlowGenerateRSCPayload = (streamDelayMs = HOLE_DELAY_MS * 2) =>
+  jest.fn().mockImplementation(async (_componentName, _props, _railsContext) => {
+    const source = new PassThrough();
+    // Deliver the RSC payload after a delay that exceeds the settle budget.
+    setTimeout(() => {
+      source.push(new TextEncoder().encode(toLengthPrefixed(RSC_PAYLOAD_MARKER)));
+      source.push(null);
+    }, streamDelayMs);
+    return source;
+  });
+
 // Regression component for the in-band flaw (#4890): user content deliberately contains the
 // EXACT bytes of the old #4659 prototype delimiter. The metadata-based protocol must transport
 // the PostponedState correctly regardless of what the rendered HTML contains.
@@ -107,6 +155,7 @@ describe('pprServerRenderedReactComponent', () => {
 
   beforeEach(() => {
     ComponentRegistry.clear();
+    _resetPPRRuntimeValidation();
   });
 
   const parseStreamChunk = (rawBytes) => {
@@ -157,6 +206,7 @@ describe('pprServerRenderedReactComponent', () => {
     railsContext = testingRailsContext,
     throwJsErrors = false,
     signal,
+    generateRSCPayload,
   } = {}) => {
     ReactOnRails.register({ [componentName]: component });
     return pprPrerenderServerRenderedReactComponent({
@@ -167,6 +217,7 @@ describe('pprServerRenderedReactComponent', () => {
       throwJsErrors,
       railsContext,
       ...(signal ? { signal } : {}),
+      ...(generateRSCPayload ? { generateRSCPayload } : {}),
     });
   };
 
@@ -621,6 +672,134 @@ describe('pprServerRenderedReactComponent', () => {
       } finally {
         globalThis.setTimeout = originalSetTimeout;
       }
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Defect A — cached shell must not embed RSC payloads for postponed boundaries (#5019)
+  // ---------------------------------------------------------------------------
+
+  describe('RSC payload exclusion from cached prerender shell (#5019-A)', () => {
+    // Shared helper: runs a prerender with PprShellWithRSCHole and asserts the structural
+    // invariants (no errors, prerender complete, postponed state present). Returns { html,
+    // trailingChunk } so each test asserts only its unique property.
+    const runPostponedPrerender = async (generateRSCPayload) => {
+      const { chunks, errors } = await collectStreamResult(
+        runPrerender({
+          component: PprShellWithRSCHole,
+          componentName: 'PprShellWithRSCHole',
+          generateRSCPayload,
+        }),
+      );
+      const html = chunks.map((chunk) => chunk.html).join('');
+      const trailingChunk = chunks[chunks.length - 1];
+      expect(errors).toHaveLength(0);
+      expect(trailingChunk[PPR_PRERENDER_COMPLETE_CHUNK_KEY]).toBe(true);
+      expect(trailingChunk[PPR_POSTPONED_STATE_CHUNK_KEY]).toBeDefined();
+      return { html, trailingChunk, chunks };
+    };
+
+    it('does not include RSC payload push scripts for postponed boundaries in the prerender output', async () => {
+      const { html } = await runPostponedPrerender(createSlowGenerateRSCPayload());
+
+      expect(html).not.toContain(RSC_PAYLOAD_MARKER);
+      expect(html).not.toContain('.push(');
+      expect(html).toContain(SHELL_HEADER_TEXT);
+      expect(html).toContain(HOLE_FALLBACK_TEXT);
+    });
+
+    it('preserves RSC payload init scripts in the shell even when payload chunks are suppressed', async () => {
+      const { html, trailingChunk } = await runPostponedPrerender(createSlowGenerateRSCPayload());
+
+      const manifest = JSON.parse(trailingChunk[PPR_ASSET_MANIFEST_CHUNK_KEY]);
+      expect(manifest).toHaveProperty('initScriptKeys');
+      expect(Array.isArray(manifest.initScriptKeys)).toBe(true);
+      expect(html).not.toContain(RSC_PAYLOAD_MARKER);
+    });
+
+    it('discards partially-delivered RSC payload chunks that arrived before the settle abort', async () => {
+      // If an RSC stream delivers chunks BEFORE the settle budget fires but hasn't ended,
+      // the drain-then-end in cancelInFlightStreams must discard them.
+      const EARLY_CHUNK = 'EARLY_RSC_DATA_BEFORE_SETTLE';
+      const LATE_CHUNK = 'LATE_RSC_DATA_AFTER_SETTLE';
+      const generateRSCPayload = jest.fn().mockImplementation(async () => {
+        const source = new PassThrough();
+        source.push(new TextEncoder().encode(toLengthPrefixed(EARLY_CHUNK)));
+        setTimeout(() => {
+          source.push(new TextEncoder().encode(toLengthPrefixed(LATE_CHUNK)));
+          source.push(null);
+        }, HOLE_DELAY_MS * 2);
+        return source;
+      });
+
+      const { html } = await runPostponedPrerender(generateRSCPayload);
+      expect(html).not.toContain(EARLY_CHUNK);
+      expect(html).not.toContain(LATE_CHUNK);
+      expect(html).not.toContain('.push(');
+    });
+
+    it('discards RSC payloads from slow endpoints whose HTTP response arrives after the settle abort', async () => {
+      // Slow Rails endpoint: HTTP response arrives AFTER cancelInFlightStreams() ran.
+      // The "settled" flag catches these late arrivals.
+      const LATE_ENDPOINT_DATA = 'LATE_ENDPOINT_RSC_DATA';
+      const generateRSCPayload = jest.fn().mockImplementation(async () => {
+        await new Promise((resolve) => setTimeout(resolve, HOLE_DELAY_MS * 3));
+        const source = new PassThrough();
+        source.push(new TextEncoder().encode(toLengthPrefixed(LATE_ENDPOINT_DATA)));
+        source.push(null);
+        return source;
+      });
+
+      const { html } = await runPostponedPrerender(generateRSCPayload);
+      expect(html).not.toContain(LATE_ENDPOINT_DATA);
+      expect(html).not.toContain('.push(');
+    });
+
+    it('still includes RSC payloads in the output for a fully static prerender (no postponed boundaries)', async () => {
+      // When no boundaries are postponed (postponed === null), the prerender output is the
+      // complete page. RSC payloads SHOULD be present for client hydration.
+      // Use a fast-resolving generateRSCPayload and a fast-resolving component.
+      const fastPayloadData = 'STATIC_RSC_PAYLOAD';
+      const generateRSCPayload = jest.fn().mockImplementation(async () => {
+        const source = new PassThrough();
+        // Deliver immediately — before the settle budget fires.
+        source.push(new TextEncoder().encode(toLengthPrefixed(fastPayloadData)));
+        source.push(null);
+        return source;
+      });
+
+      // PprFullyStaticWithRSC: starts RSC payload generation and renders fully static content.
+      const PprFullyStaticWithRSC = (_props, railsContext) => {
+        if (railsContext.getRSCPayloadStream) {
+          railsContext.getRSCPayloadStream('StaticRSCComponent', {});
+        }
+        return (
+          <div>
+            <h1>{SHELL_HEADER_TEXT}</h1>
+            <p>Fully static with RSC</p>
+          </div>
+        );
+      };
+
+      const { chunks, errors } = await collectStreamResult(
+        runPrerender({
+          component: PprFullyStaticWithRSC,
+          componentName: 'PprFullyStaticWithRSC',
+          generateRSCPayload,
+        }),
+      );
+      const html = chunks.map((chunk) => chunk.html).join('');
+
+      expect(errors).toHaveLength(0);
+      const trailingChunk = chunks[chunks.length - 1];
+      expect(trailingChunk[PPR_PRERENDER_COMPLETE_CHUNK_KEY]).toBe(true);
+      // No postponed boundaries — the page is fully static.
+      expect(trailingChunk[PPR_POSTPONED_STATE_CHUNK_KEY]).toBeUndefined();
+
+      // The RSC payload SHOULD be present in the output — no boundaries were postponed,
+      // so the payload is static and belongs in the cached shell.
+      expect(html).toContain(fastPayloadData);
+      expect(html).toContain('REACT_ON_RAILS_RSC_PAYLOADS');
     });
   });
 });
