@@ -306,6 +306,8 @@ new RSCWebpackPlugin({
 }),
 ```
 
+If your bundler config sets `resolve.symlinks: false`, the bundle records symlink-path module ids while `require.resolve` returns realpaths, so also register the symlink-path spelling of these files (for example `node_modules/react-on-rails-pro/lib/RSCRoute.js`) as additional entries.
+
 > [!NOTE]
 > Registration puts the components in the manifest, but on currently released versions (react-on-rails-pro ≤ 17.0.x with react-on-rails-rsc ≤ 19.2.1) importing them from a server component still fails the RSC bundle build itself ([issue 5079](https://github.com/shakacode/react_on_rails/issues/5079)): the published files carry `sourceMappingURL` pointers to `.map` files that are not in the package, and the released RSC loader crashes on them. Until packages with the fixes ship, mount them from server components through a small app-level `'use client'` wrapper instead — see [Refetchable sections inside a server component](./inside-client-components.md#refetchable-sections-inside-a-server-component).
 
