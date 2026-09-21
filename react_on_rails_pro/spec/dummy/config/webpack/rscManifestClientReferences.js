@@ -229,7 +229,9 @@ function resolveDiscoveredClientReferences() {
 // when the RSC bundle compiles (issue #5079). require.resolve returns the absolute realpath, which
 // matches the module resource webpack records (resolve.symlinks defaults to true), so the manifest
 // keys line up with the file URLs the RSC bundle's client references carry even when
-// react-on-rails-pro is installed through a symlink (pnpm, workspaces).
+// react-on-rails-pro is installed through a symlink (pnpm, workspaces). Invoked after the
+// discovered references resolve (see rscManifestClientReferences below), matching the generator's
+// emitted resolver so both sides surface the same first error when both steps fail.
 function reactOnRailsProClientReferences() {
   return [
     'react-on-rails-pro/RSCRoute',
