@@ -50,6 +50,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   the [RSC setup docs](https://reactonrails.com/docs/pro/react-server-components/create-without-ssr))
   to pick this up in an existing app. Part of
   [Issue 5079](https://github.com/shakacode/react_on_rails/issues/5079).
+  [PR 5100](https://github.com/shakacode/react_on_rails/pull/5100) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 - **`authenticityHeaders()` no longer mutates its input object**: The helper now returns a new merged object instead of writing CSRF headers into the caller's `otherHeaders` argument. Previously, passing a shared or module-level headers object would bake a stale CSRF token into it, causing intermittent `422 InvalidAuthenticityToken` errors after Turbo navigations. Fixes [Issue 5028](https://github.com/shakacode/react_on_rails/issues/5028).
 
