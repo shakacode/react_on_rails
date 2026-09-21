@@ -1,7 +1,14 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "outDir": "./lib"
+    "outDir": "./lib",
+    // The published package ships only lib/**/*.js and lib/**/*.d.ts (see package.json "files"),
+    // never .map files, so the root config's "sourceMap": true only added dangling
+    // `//# sourceMappingURL=<name>.js.map` comments to every published file. Those dangling
+    // pointers crash RSC bundle builds when react-on-rails-rsc's WebpackLoader processes a
+    // package's own 'use client' files (#5079). Disabling sourceMap here removes the pointer
+    // comment and the unpublished .map output without changing the emitted JS in any other way.
+    "sourceMap": false
   },
   "include": ["src/**/*"]
 }
