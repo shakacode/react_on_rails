@@ -564,6 +564,7 @@ pair`, returns invalid UTF-8, or silently mis-decodes the value. The parser now 
   Trust-Based Commercial Licensing that matches ShakaPerf: free in production for small organizations, charities,
   educational institutions, and hospitals; 45-day production evaluation; 30-day grace after a subscription lapses;
   the license key stays optional and only sets the attribution status.
+  Published gem metadata now uses `LicenseRef-ReactOnRailsPro`, and generator messages reflect these terms.
   [PR 5104](https://github.com/shakacode/react_on_rails/pull/5104) by
   [sashakhar1](https://github.com/sashakhar1).
 

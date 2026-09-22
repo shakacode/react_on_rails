@@ -6,7 +6,7 @@ React on Rails 17.0.0 is shipping now. This document says where the project goes
 
 ## North star
 
-Make **React on Rails Pro the obvious way to run modern React on a Rails backend** — for new apps, for teams migrating from Inertia or a separate Next.js frontend, and for existing React on Rails users upgrading. Pro is [trust-licensed](./REACT-ON-RAILS-PRO-LICENSE.md): freely installable, paid for production use, free for evaluation, education, and qualifying open source.
+Make **React on Rails Pro the obvious way to run modern React on a Rails backend** for new apps, for teams migrating from Inertia or a separate Next.js frontend, and for existing React on Rails users upgrading. Pro uses [License 3.0](./REACT-ON-RAILS-PRO-LICENSE.md): freely installable, free in development, test, CI, and staging, and free in production for small organizations, charities, schools, and hospitals; larger organizations subscribe. No license key is needed to run it.
 
 ## Three commitments
 

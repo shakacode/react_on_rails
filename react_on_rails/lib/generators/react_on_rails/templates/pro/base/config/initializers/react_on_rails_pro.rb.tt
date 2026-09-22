@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # See https://reactonrails.com/docs/configuration/configuration-pro
-# License: Set REACT_ON_RAILS_PRO_LICENSE environment variable
+# Optional license key from your subscription: set REACT_ON_RAILS_PRO_LICENSE to mark your pages Licensed.
 ReactOnRailsPro.configure do |config|
   config.server_renderer = "NodeRenderer"
   config.renderer_url = ENV.fetch("REACT_RENDERER_URL", "http://localhost:3800")

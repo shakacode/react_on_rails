@@ -197,7 +197,7 @@ Free in development, test, CI, and staging, and in production for small
 organizations, charities, schools, and hospitals; larger organizations
 subscribe at https://pro.reactonrails.com/ ($1,800 per year per organization).
 No license key is needed to run Pro. See
-[Pro pricing and sign up](https://pro.reactonrails.com/), the
+[Pricing](https://reactonrails.com/pricing/) and [sign up](https://pro.reactonrails.com/), the
 [React on Rails Pro docs](../../pro/react-on-rails-pro.md), and the
 [OSS vs Pro feature matrix](./oss-vs-pro.md) for a detailed breakdown.
 

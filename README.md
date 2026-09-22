@@ -20,7 +20,7 @@
   <a href="https://reactonrails.com/docs/getting-started/quick-start/">Quick Start</a> ·
   <a href="https://reactonrails.com/examples/">Examples</a> ·
   <a href="https://reactonrails.com/docs/pro/">Pro</a> ·
-  <a href="https://pro.reactonrails.com/">Pro Pricing / Sign Up</a>
+  <a href="https://reactonrails.com/pricing/">Pricing</a>
 </p>
 
 ## React on Rails
@@ -42,7 +42,7 @@ React on Rails is maintained by [ShakaCode](https://www.shakacode.com).
 - [Install into an existing Rails app](https://reactonrails.com/docs/getting-started/existing-rails-app/)
 - [Examples](https://reactonrails.com/examples/)
 - [Compare OSS and Pro](https://reactonrails.com/docs/getting-started/oss-vs-pro/)
-- [Pro pricing and sign up](https://pro.reactonrails.com/)
+- [Pricing](https://reactonrails.com/pricing/) and [sign up](https://pro.reactonrails.com/)
 - [Compare with alternatives](https://reactonrails.com/docs/getting-started/comparison-with-alternatives/)
 - [Changelog](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md)
 
@@ -119,7 +119,7 @@ Start with the docs here:
 - [React on Rails Pro docs](https://reactonrails.com/docs/pro/)
 - [OSS vs Pro feature comparison](https://reactonrails.com/docs/getting-started/oss-vs-pro/)
 - [Upgrade to Pro](https://reactonrails.com/docs/pro/upgrading-to-pro/)
-- [Pro pricing and sign up](https://pro.reactonrails.com/)
+- [Pricing](https://reactonrails.com/pricing/) and [sign up](https://pro.reactonrails.com/)
 
 ## Requirements
 

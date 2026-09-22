@@ -204,7 +204,7 @@ No license key is needed to run Pro.
 
 - **[OSS vs Pro comparison](./oss-vs-pro.md)** - See what Pro adds
 - **[React Server Components](../../pro/react-server-components/tutorial.md)** - Add the RSC path when you need it
-- **[Pro pricing and sign up](https://pro.reactonrails.com/)** - Subscription for organizations above the free line
+- **[Pricing](https://reactonrails.com/pricing/) and [sign up](https://pro.reactonrails.com/)**: Subscription for organizations above the free line
 
 ## 🆘 Need Help?
 
