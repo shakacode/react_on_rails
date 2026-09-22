@@ -138,7 +138,7 @@ module ReactOnRails
       ].freeze
 
       # React on Rails Pro dependencies (only installed when --pro or --rsc flag is used)
-      # These packages are published publicly on npmjs.org but require a license for production use
+      # Public npm packages with free production use for eligible organizations; see https://reactonrails.com/pricing/
       PRO_DEPENDENCIES = %w[
         react-on-rails-pro
         react-on-rails-pro-node-renderer
