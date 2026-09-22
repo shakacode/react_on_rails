@@ -48,9 +48,12 @@ module ReactOnRailsPro
       # - :warmed  — the request wrote at least one PPR cache entry (`ppr.cache.write`). On a
       #   page with several PPR components, `detail` carries a partial-failure note when some
       #   other write was refused.
-      # - :already_warm — 2xx response and no cache write. Either every PPR component on the
-      #   page was a cache hit, or the page renders no `ppr_react_component` at all — the two
-      #   are indistinguishable until a cache-hit event exists (observability child issue).
+      # - :already_warm — 2xx response, no cache write, and at least one `ppr.cache.lookup`
+      #   event fired: every PPR component on the page was a cache hit. Proven by the lookup
+      #   counter (issue #5102), not inferred from silence.
+      # - :no_ppr — 2xx response and no PPR event at all: the page rendered no
+      #   `ppr_react_component` (typo'd path that still routes somewhere, or a template that
+      #   dropped the helper). NOT a success — warming such a path is a misconfiguration.
       # - :failed — non-2xx response, a raised error, a refused cache write, or a degraded
       #   resume that evicted the entry. `detail` carries the reason.
       PathResult = Struct.new(:path, :status, :http_status, :writes, :detail, keyword_init: true)
@@ -68,22 +71,30 @@ module ReactOnRailsPro
           results.select { |result| result.status == :warmed }
         end
 
-        # Includes pages with no PPR component at all — see PathResult#status.
         def already_warm
           results.select { |result| result.status == :already_warm }
+        end
+
+        # Pages that rendered no ppr_react_component at all — see PathResult#status.
+        def no_ppr
+          results.select { |result| result.status == :no_ppr }
         end
 
         def failed
           results.select { |result| result.status == :failed }
         end
 
+        # A no-PPR path is not a success: the operator asked to warm a page the feature never
+        # touches (issue #5102 acceptance criterion). PPR_WARM_STRICT trips on it via this
+        # predicate, and non-strict callers logging `unless summary.success?` surface it too.
         def success?
-          failed.empty?
+          failed.empty? && no_ppr.empty?
         end
 
         def to_log
           lines = ["[ReactOnRailsPro] PPR warm-up finished in #{duration.round(2)}s " \
-                   "(#{warmed.size} warmed, #{already_warm.size} already-warm/no-ppr, #{failed.size} failed)"]
+                   "(#{warmed.size} warmed, #{already_warm.size} already-warm, " \
+                   "#{no_ppr.size} no-ppr, #{failed.size} failed)"]
           results.each do |result|
             lines << "  #{result.status}: #{result.path}#{result_detail_suffix(result)}"
           end
@@ -97,7 +108,7 @@ module ReactOnRailsPro
           when :warmed
             partial = result.detail ? "; #{result.detail}" : ""
             " (#{result.writes} #{'entry'.pluralize(result.writes)} written#{partial})"
-          when :failed then " (#{result.detail})"
+          when :failed, :no_ppr then " (#{result.detail})"
           else ""
           end
         end
@@ -106,6 +117,7 @@ module ReactOnRailsPro
       # PPR instrumentation events observed during each request to attribute the outcome.
       # See ReactOnRailsPro::Ppr for the event contracts.
       TRACKED_EVENTS = {
+        Ppr::CACHE_LOOKUP_NOTIFICATION => :lookups,
         Ppr::CACHE_WRITE_NOTIFICATION => :writes,
         Ppr::CACHE_WRITE_REFUSED_NOTIFICATION => :refusals,
         Ppr::DEGRADED_PRE_FLUSH_NOTIFICATION => :degraded_pre_flush,
@@ -221,8 +233,15 @@ module ReactOnRailsPro
                          detail: partial_warm_detail(counts, details))
         elsif counts[:refusals].positive? || counts[:degraded_pre_flush].positive?
           failed(path, http_status, counts, details.first || "cache write refused")
-        else
+        elsif counts[:lookups].positive?
+          # Every ppr_react_component invocation emits exactly one ppr.cache.lookup, and every
+          # miss then writes or refuses (handled above) — reaching here with lookups means every
+          # component on the page was a cache hit.
           PathResult.new(path:, status: :already_warm, http_status:, writes: 0)
+        else
+          # 2xx and not a single PPR event: the page renders no ppr_react_component at all.
+          PathResult.new(path:, status: :no_ppr, http_status:, writes: 0,
+                         detail: "no ppr_react_component rendered on this page")
         end
       end
 

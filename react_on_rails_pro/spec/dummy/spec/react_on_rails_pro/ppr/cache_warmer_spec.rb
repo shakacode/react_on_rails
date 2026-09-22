@@ -41,6 +41,10 @@ describe ReactOnRailsPro::Ppr::CacheWarmer do
     ReactOnRailsPro::Ppr.instrument_cache_write(component_name: "Component", cache_key: "key")
   end
 
+  def instrument_hit
+    ReactOnRailsPro::Ppr.instrument_cache_lookup(component_name: "Component", outcome: :hit)
+  end
+
   describe "path resolution" do
     around do |example|
       original = ReactOnRailsPro.configuration.ppr_warm_up_paths
@@ -137,13 +141,39 @@ describe ReactOnRailsPro::Ppr::CacheWarmer do
       expect(result.detail).to include("partial — 1 cache write refused (render_error)")
     end
 
-    it "classifies a 2xx response with no cache write as already warm" do
-      stub_get(200)
+    it "classifies a 2xx all-hits page as already warm, proven by the lookup counter" do
+      stub_get(200) { instrument_hit }
 
       summary = described_class.call(paths: ["/a"])
 
       expect(summary.already_warm.map(&:path)).to eq(["/a"])
       expect(summary.success?).to be(true)
+    end
+
+    it "classifies a 2xx response with no PPR event at all as no_ppr, which is not success" do
+      # Issue #5102 acceptance criterion: a warmed path that renders no ppr_react_component
+      # (typo'd path that still routes somewhere, helper removed in a refactor) must not
+      # report success. Before the lookup counter existed this was indistinguishable from
+      # "every component was a cache hit".
+      stub_get(200)
+
+      summary = described_class.call(paths: ["/a"])
+
+      expect(summary.no_ppr.map(&:path)).to eq(["/a"])
+      expect(summary.already_warm).to be_empty
+      expect(summary.success?).to be(false)
+      expect(summary.no_ppr.first.detail).to include("no ppr_react_component")
+    end
+
+    it "keeps warmed above already_warm on a mixed page (one miss written, one hit)" do
+      stub_get(200) do
+        instrument_hit
+        instrument_write
+      end
+
+      summary = described_class.call(paths: ["/a"])
+
+      expect(summary.warmed.map(&:path)).to eq(["/a"])
     end
 
     it "classifies a refused cache write as failed with the refusal reason" do
@@ -234,14 +264,23 @@ describe ReactOnRailsPro::Ppr::CacheWarmer do
         .with(a_string_including("PPR warm-up finished").and(including("warmed: /a")))
     end
 
-    it "renders one line per path in Summary#to_log" do
-      stub_get(200)
+    it "renders one line per path in Summary#to_log, splitting already-warm from no-ppr" do
+      stub_get(200) { instrument_hit }
 
       log = described_class.call(paths: ["/a", "/b"]).to_log
 
-      expect(log).to include("2 already-warm/no-ppr")
+      expect(log).to include("2 already-warm, 0 no-ppr")
       expect(log).to include("already_warm: /a")
       expect(log).to include("already_warm: /b")
+    end
+
+    it "names no-ppr paths in Summary#to_log with the reason" do
+      stub_get(200)
+
+      log = described_class.call(paths: ["/a"]).to_log
+
+      expect(log).to include("0 already-warm, 1 no-ppr")
+      expect(log).to include("no_ppr: /a (no ppr_react_component rendered on this page)")
     end
   end
 end
