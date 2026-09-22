@@ -4,7 +4,7 @@
 
 Every PPR render path emits [`ActiveSupport::Notifications`](https://guides.rubyonrails.org/active_support_instrumentation.html) events so operators can monitor cache effectiveness, cache health, and degradations without touching the render pipeline. This page is the complete catalog: eight events, their triggers, payloads, and the guarantees they ship with.
 
-Names follow the Rails convention `ppr.<area>.<what>.react_on_rails_pro` — the library name goes last so subscribers can match every PPR event with one pattern:
+Names put the library last, per the Rails convention, so subscribers can match every PPR event with one pattern; all but the oldest event also follow the `ppr.<area>.<what>.react_on_rails_pro` shape (`ppr.static_shell` predates it):
 
 ```ruby
 # config/initializers/ppr_metrics.rb — count every PPR event in StatsD
@@ -17,16 +17,16 @@ All constants live on `ReactOnRailsPro::Ppr` (e.g. `ReactOnRailsPro::Ppr::CACHE_
 
 ## The catalog
 
-| Event                            | Fires when                                                                                                                | Payload                                                                                                                 |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `ppr.cache.lookup`               | Once per `ppr_react_component` invocation, at the validated cache read                                                    | `component_name`, `outcome` (`:hit` \| `:miss`)                                                                         |
-| `ppr.static_shell`               | A render completed with no Suspense holes (`postponed_state` nil) and no render error                                     | `component_name`                                                                                                        |
-| `ppr.cache.write`                | A shell + PostponedState envelope was persisted                                                                           | `component_name`, `cache_key` (raw — see below)                                                                         |
-| `ppr.cache.write_refused`        | A cache write was skipped or failed                                                                                       | `component_name`, `reason` (`"render_error"` \| `"expired"` \| `"store_error"`)                                         |
-| `ppr.cache.read_error`           | The cache store raised during a read (treated as a miss)                                                                  | `component_name`, `error` (class name only)                                                                             |
-| `ppr.cache.evict_invalid`        | A cached entry failed envelope validation and was deleted                                                                 | `component_name`, `reason` (`"malformed"` \| `"unknown_schema"` \| `"react_version_mismatch"` \| `"checksum_mismatch"`) |
-| `ppr.resume.degraded_pre_flush`  | The cache-hit path raised **before** the shell was committed; entry evicted, full SSR fallback served in the same request | `component_name`, `error` (class name only)                                                                             |
-| `ppr.resume.degraded_post_flush` | The resume phase raised **after** the shell was flushed; entry evicted, stream terminated (page heals on reload)          | `component_name`, `error` (class name only)                                                                             |
+| Event                            | Fires when                                                                                                                          | Payload                                                                                                                 |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `ppr.cache.lookup`               | Once per `ppr_react_component` invocation, at the validated cache read                                                              | `component_name`, `outcome` (`:hit` \| `:miss`)                                                                         |
+| `ppr.static_shell`               | A render completed with no Suspense holes (blank `postponed_state`) and no render error                                             | `component_name`                                                                                                        |
+| `ppr.cache.write`                | A shell + PostponedState envelope was persisted                                                                                     | `component_name`, `cache_key` (raw — see below)                                                                         |
+| `ppr.cache.write_refused`        | A cache write was skipped or failed — also fires after a _persisted_ write whose cache-tag registration failed (see ordering below) | `component_name`, `reason` (`"render_error"` \| `"expired"` \| `"store_error"`)                                         |
+| `ppr.cache.read_error`           | The cache store raised during a read (treated as a miss)                                                                            | `component_name`, `error` (class name only)                                                                             |
+| `ppr.cache.evict_invalid`        | A cached entry failed envelope validation and was deleted                                                                           | `component_name`, `reason` (`"malformed"` \| `"unknown_schema"` \| `"react_version_mismatch"` \| `"checksum_mismatch"`) |
+| `ppr.resume.degraded_pre_flush`  | The cache-hit path raised **before** the shell was committed; entry evicted, full SSR fallback served in the same request           | `component_name`, `error` (class name only)                                                                             |
+| `ppr.resume.degraded_post_flush` | The resume phase raised **after** the shell was flushed; entry evicted, stream terminated (page heals on reload)                    | `component_name`, `error` (class name only)                                                                             |
 
 Full event names carry the `.react_on_rails_pro` suffix, e.g. `ppr.cache.lookup.react_on_rails_pro`.
 
@@ -49,7 +49,7 @@ end
 
 Semantics worth knowing before you alert on it:
 
-- **The event records the lookup, not the delivery.** If a hit's serve path fails before the shell reaches the response, the lookup is not retracted — the request additionally emits `ppr.resume.degraded_pre_flush` and falls back to a full render. A _degraded hit_ is therefore the pair `lookup{outcome: :hit}` + `degraded_pre_flush` in the same request; the fallback render emits **no second lookup**, so `hits + misses` always equals the number of helper invocations.
+- **The event records the lookup, not the delivery.** If a hit's serve path fails before the shell reaches the response, the lookup is not retracted — the request additionally emits `ppr.resume.degraded_pre_flush` and falls back to a full render. A _degraded hit_ is therefore the pair `lookup{outcome: :hit}` + `degraded_pre_flush` in the same request; the fallback render emits **no second lookup**, so `hits + misses` equals the number of invocations that reach the cache read (an invocation that fails option validation raises before the read and emits nothing).
 - **Diagnostic misses stay diagnosable.** An invalid entry or a read error counts as `outcome: :miss` _and_ fires its own `evict_invalid` / `read_error` event — the lookup keeps denominators honest while the sibling event carries the reason.
 - **Per invocation, not per page.** A page rendering three `ppr_react_component` calls emits three lookups. `hits / lookups` is a component-render hit rate; interpret page-level questions accordingly.
 - **`ppr.static_shell` is a different axis.** It reports "this render had no holes" and says nothing about cache state; the two compose (a fully-static warm serve emits `lookup{hit}` + `static_shell`).
@@ -58,22 +58,24 @@ Semantics worth knowing before you alert on it:
 
 **Events never break the page (the non-fatal contract).** Every emission on a render path is wrapped so a raising subscriber cannot take down the render — the shell still serves and cache writes still land. Boundary: the wrapper rescues `StandardError`; a subscriber raising a bare `Exception` subclass (`SystemExit` and friends) propagates by design. Note that this is a Pro-side guarantee: plain `ActiveSupport::Notifications` **re-raises subscriber errors to the instrumenting caller**, so keep your own subscribers cheap and rescued anyway — they run inline on the request thread.
 
-**Payloads are redacted (no request data).** Error payloads carry only the error **class name**, never `error.message`, which can embed user input (PRs #4966/#4976). Lookup payloads carry only `component_name` and `outcome` — deliberately no cache key, because PPR cache keys are user-supplied (`cache_key: ["dashboard", current_user.id]` is typical) and can carry identifiers.
+**Payloads are redacted (no request data).** Error payloads carry only the error **class name**, never `error.message`, which can embed user input (issue #4966 / PR #4976). Lookup payloads carry only `component_name` and `outcome` — deliberately no cache key, because PPR cache keys are user-supplied (`cache_key: ["dashboard", current_user.id]` is typical) and can carry identifiers.
 
 **The one raw-value exception**: `ppr.cache.write` includes the raw computed `cache_key`, kept for cache debugging (finding the entry in Redis). If your subscriber forwards payloads to an external system, drop or hash that field.
 
 **Ordering within one invocation** (events on the same request thread, in emission order — `evict_invalid` / `read_error` fire _inside_ the cache read, so they precede the `lookup` event that reports the read's outcome):
 
-| Scenario                    | Sequence                                                                             |
-| --------------------------- | ------------------------------------------------------------------------------------ |
-| Cold miss (normal page)     | `lookup{miss}` → `cache.write`                                                       |
-| Warm hit (normal page)      | `lookup{hit}`                                                                        |
-| Fully static, cold → warm   | `lookup{miss}` → `cache.write` → `static_shell`, then `lookup{hit}` → `static_shell` |
-| Invalid entry               | `cache.evict_invalid` → `lookup{miss}` → `cache.write`                               |
-| Read error                  | `cache.read_error` → `lookup{miss}` → `cache.write`                                  |
-| Render error                | `lookup{miss}` → `cache.write_refused{render_error}`                                 |
-| Degraded hit (pre-flush)    | `lookup{hit}` → `resume.degraded_pre_flush` → `cache.write`                          |
-| Resume failure (post-flush) | `lookup{hit or miss}` → … → `resume.degraded_post_flush`                             |
+| Scenario                                                   | Sequence                                                                                                                        |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Cold miss (normal page)                                    | `lookup{miss}` → `cache.write`                                                                                                  |
+| Warm hit (normal page)                                     | `lookup{hit}`                                                                                                                   |
+| Fully static, cold → warm                                  | `lookup{miss}` → `cache.write` → `static_shell`, then `lookup{hit}` → `static_shell`                                            |
+| Invalid entry                                              | `cache.evict_invalid` → `lookup{miss}` → `cache.write`                                                                          |
+| Read error                                                 | `cache.read_error` → `lookup{miss}` → `cache.write`                                                                             |
+| Render error                                               | `lookup{miss}` → `cache.write_refused{render_error}`                                                                            |
+| Prerender raise on a miss (protocol/transport/props error) | `lookup{miss}` only — the request errors before any write event                                                                 |
+| Write persisted, tag registration failed                   | `lookup{miss}` → `cache.write` → `cache.write_refused{store_error}` — the entry IS cached, but `revalidate_tag` cannot evict it |
+| Degraded hit (pre-flush)                                   | `lookup{hit}` → `resume.degraded_pre_flush` → `cache.write`                                                                     |
+| Resume failure (post-flush)                                | `lookup{hit or miss}` → … → `resume.degraded_post_flush`                                                                        |
 
 **Attribution is process-global.** Subscriptions see every thread in the process; there is no per-request scoping. When counting per request (as the [cache warm-up](./ppr-cache-warm-up.md) tool does), run in a process that is not concurrently serving PPR traffic.
 
