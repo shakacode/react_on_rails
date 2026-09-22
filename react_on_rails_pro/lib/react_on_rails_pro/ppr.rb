@@ -42,9 +42,27 @@ module ReactOnRailsPro
     PPR_ENVELOPE_SCHEMA = 1
 
     # ActiveSupport::Notifications event emitted each time a PPR render serves a fully-static
-    # shell (prerender finished with `postponed == null`, so no resume phase runs). This is the
-    # `ppr.static_shell` counter: subscribe and count events. Payload: :component_name, :cache_hit.
+    # shell (prerender finished with `postponed == null`, so no resume phase runs) without a
+    # render error. This is the `ppr.static_shell` counter: subscribe and count events. It says
+    # nothing about cache state — the hit/miss dimension belongs exclusively to the
+    # `ppr.cache.lookup` event (issue #5102), so the two axes compose instead of overlapping.
+    # Payload: :component_name
     STATIC_SHELL_NOTIFICATION = "ppr.static_shell.react_on_rails_pro"
+
+    # Cache-effectiveness instrumentation (issue #5102). Exactly ONE ppr.cache.lookup event
+    # fires per ppr_react_component invocation, at the validated read branch point, with
+    # outcome :hit (a validated cached envelope was found — the cached shell serves with no
+    # prerender request) or outcome :miss (no usable entry — first visit, expired, evicted
+    # invalid, or read error — so the full prerender runs). One event with the outcome in the
+    # payload follows Rails' own cache convention (`cache_read.active_support` and its :hit
+    # payload key). The hit rate is `hits / lookups` from a single subscription.
+    #
+    # The event records the LOOKUP outcome: when a hit path degrades before the shell is
+    # flushed, the event is not retracted and the fallback render emits no second lookup — a
+    # degraded hit is the pair `ppr.cache.lookup{outcome: :hit}` +
+    # `ppr.resume.degraded_pre_flush` in the same request.
+    # Payload: :component_name, :outcome (:hit | :miss)
+    CACHE_LOOKUP_NOTIFICATION = "ppr.cache.lookup.react_on_rails_pro"
 
     # Instrumentation events for the three degradation paths (issue #4891):
     #
@@ -122,11 +140,24 @@ module ReactOnRailsPro
         Digest::SHA256.hexdigest("#{shell_html.bytesize}:#{shell_html}\x00#{state_segment}")
       end
 
-      def instrument_static_shell(component_name:, cache_hit:)
+      def instrument_static_shell(component_name:)
         ActiveSupport::Notifications.instrument(
           STATIC_SHELL_NOTIFICATION,
+          component_name:
+        )
+      end
+
+      # The payload carries :component_name and :outcome only — deliberately no cache key
+      # (issue #5102). PPR cache keys are user-supplied (`cache_key: ["dashboard",
+      # current_user.id]` is typical) and can carry identifiers, so the lookup counter must not
+      # become a new PII surface. Subscribers that need per-key analysis can compose with
+      # ppr.cache.write, which already carries the raw key — a precedent kept for cache
+      # debugging, not extended here.
+      def instrument_cache_lookup(component_name:, outcome:)
+        ActiveSupport::Notifications.instrument(
+          CACHE_LOOKUP_NOTIFICATION,
           component_name:,
-          cache_hit:
+          outcome:
         )
       end
 
