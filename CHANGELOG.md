@@ -39,7 +39,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   `Summary#success?` returns false for it, and `PPR_WARM_STRICT=true` exits non-zero. The full
   eight-event PPR catalog (payloads, ordering, non-fatal and redaction guarantees) is now
   documented in [docs/pro/ppr-events.md](docs/pro/ppr-events.md). Resolves
-  [Issue 5102](https://github.com/shakacode/react_on_rails/issues/5102) by
+  [Issue 5102](https://github.com/shakacode/react_on_rails/issues/5102).
+  [PR 5106](https://github.com/shakacode/react_on_rails/pull/5106) by
   [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 - **[Pro]** **PPR cache warm-up mechanism (experimental)**: New `rake react_on_rails_pro:ppr:warm`
