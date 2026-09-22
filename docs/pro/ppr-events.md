@@ -62,15 +62,15 @@ Semantics worth knowing before you alert on it:
 
 **The one raw-value exception**: `ppr.cache.write` includes the raw computed `cache_key`, kept for cache debugging (finding the entry in Redis). If your subscriber forwards payloads to an external system, drop or hash that field.
 
-**Ordering within one invocation** (events on the same request thread, in emission order):
+**Ordering within one invocation** (events on the same request thread, in emission order — `evict_invalid` / `read_error` fire _inside_ the cache read, so they precede the `lookup` event that reports the read's outcome):
 
 | Scenario                    | Sequence                                                                             |
 | --------------------------- | ------------------------------------------------------------------------------------ |
 | Cold miss (normal page)     | `lookup{miss}` → `cache.write`                                                       |
 | Warm hit (normal page)      | `lookup{hit}`                                                                        |
 | Fully static, cold → warm   | `lookup{miss}` → `cache.write` → `static_shell`, then `lookup{hit}` → `static_shell` |
-| Invalid entry               | `lookup{miss}` → `cache.evict_invalid` → `cache.write`                               |
-| Read error                  | `lookup{miss}` → `cache.read_error` → `cache.write`                                  |
+| Invalid entry               | `cache.evict_invalid` → `lookup{miss}` → `cache.write`                               |
+| Read error                  | `cache.read_error` → `lookup{miss}` → `cache.write`                                  |
 | Render error                | `lookup{miss}` → `cache.write_refused{render_error}`                                 |
 | Degraded hit (pre-flush)    | `lookup{hit}` → `resume.degraded_pre_flush` → `cache.write`                          |
 | Resume failure (post-flush) | `lookup{hit or miss}` → … → `resume.degraded_post_flush`                             |
