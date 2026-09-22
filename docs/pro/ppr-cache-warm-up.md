@@ -51,10 +51,11 @@ bundle exec rake react_on_rails_pro:ppr:warm
 The task requests each configured path, isolates failures (one failing route never aborts the rest), and finishes with a summary:
 
 ```text
-[ReactOnRailsPro] PPR warm-up finished in 14.2s (2 warmed, 1 already-warm/no-ppr, 1 failed)
+[ReactOnRailsPro] PPR warm-up finished in 14.2s (2 warmed, 1 already-warm, 1 no-ppr, 1 failed)
   warmed: / (1 entry written)
   warmed: /pricing (1 entry written)
   already_warm: /products/best-sellers
+  no_ppr: /prodcuts/typo-page (no ppr_react_component rendered on this page)
   failed: /broken-page (HTTP 500)
 ```
 
@@ -65,11 +66,11 @@ Options via environment variables:
 | `PPR_WARM_PATHS=/a,/b` | Override the configured list for this run.                                                                                                       |
 | `PPR_WARM_HOST=...`    | Host header for the requests. Set your canonical host if cached shells contain absolute URLs — the shell HTML is cached verbatim, host included. |
 | `PPR_WARM_HTTPS=false` | Issue plain-HTTP requests (default is HTTPS so `force_ssl` apps don't answer with a redirect).                                                   |
-| `PPR_WARM_STRICT=true` | Exit non-zero when any path fails.                                                                                                               |
+| `PPR_WARM_STRICT=true` | Exit non-zero when any path fails or renders no PPR component (`no_ppr`).                                                                        |
 
 The variables are `PPR_WARM_`-prefixed on purpose: bare `HOST`/`HTTPS` are commonly pre-set by shells, CGI servers, and Docker images, and a leaked value would silently change warm-up behavior.
 
-**Exit-code policy:** by default the task exits 0 even when paths fail, because warm-up is best-effort — the worst case is what you have without it (the first visitor pays the prerender), and a failed warm-up should not roll back an otherwise good release. Use `PPR_WARM_STRICT=true` where you want the deploy pipeline to surface failures loudly. The one exception: an entirely empty path list (nothing configured and no `PPR_WARM_PATHS`) is a misconfiguration, not a failed warm-up, and exits non-zero with guidance regardless of `PPR_WARM_STRICT`.
+**Exit-code policy:** by default the task exits 0 even when paths fail, because warm-up is best-effort — the worst case is what you have without it (the first visitor pays the prerender), and a failed warm-up should not roll back an otherwise good release. Use `PPR_WARM_STRICT=true` where you want the deploy pipeline to surface failures loudly — including `no_ppr` paths, which are misconfigurations (a warmed path whose page renders no `ppr_react_component`), not best-effort losses. The one exception: an entirely empty path list (nothing configured and no `PPR_WARM_PATHS`) is a misconfiguration, not a failed warm-up, and exits non-zero with guidance regardless of `PPR_WARM_STRICT`.
 
 ## The Ruby API
 
@@ -84,13 +85,14 @@ summary = ReactOnRailsPro::Ppr::CacheWarmer.call(
 )
 
 summary.warmed.map(&:path)        # => ["/", "/pricing"]
-summary.already_warm              # cache hit — or the page renders no PPR component at all
+summary.already_warm              # every PPR component was a cache hit (proven by ppr.cache.lookup)
+summary.no_ppr                    # 2xx pages that rendered no ppr_react_component at all
 summary.failed.map(&:detail)      # => ["HTTP 500", ...]
-summary.success?                  # => false if anything failed
+summary.success?                  # => false if anything failed or any path had no PPR component
 Rails.logger.warn(summary.to_log) unless summary.success?
 ```
 
-Outcomes are attributed by observing the `ppr.cache.write` / `ppr.cache.write_refused` instrumentation events during each request. One caveat until PPR hit/miss counters land: a 2xx response with no cache write is reported as _already warm_, which also covers a page that renders no `ppr_react_component` at all — a typo'd path that still routes somewhere real shows up in this bucket, not in `failed`. Attribution observes process-global events, so run warm-up in a process that is not concurrently serving PPR traffic (a release phase, rake task, or job worker — the usual setups — all qualify); in a process that is also serving requests, another request's events could be attributed to the path being warmed.
+Outcomes are attributed by observing the PPR instrumentation events during each request — see the [PPR event catalog](./ppr-events.md) for the full list. A cache write means _warmed_; a `ppr.cache.lookup` event with no write means every component was a genuine cache hit (_already warm_); **no PPR event at all on a 2xx response means the page renders no `ppr_react_component`** and is reported as _no_ppr_ — a typo'd path that still routes somewhere real lands in this bucket and fails `PPR_WARM_STRICT`, instead of masquerading as success. Attribution observes process-global events, so run warm-up in a process that is not concurrently serving PPR traffic (a release phase, rake task, or job worker — the usual setups — all qualify); in a process that is also serving requests, another request's events could be attributed to the path being warmed.
 
 ## Where to Hook It Into Your Deploy
 
@@ -154,4 +156,4 @@ end
 
 - **Every path reports `failed (redirected to ...)`** — your app redirects the warmer's requests, typically `force_ssl` (keep the default `https: true`), a locale redirect, or authentication. For member-only pages pass a session cookie via the Ruby API's `headers:` option; a redirecting path warms nothing, so list the final path instead.
 - **Warm-up reports `warmed` but visitors still miss** — check that `Rails.cache` is a shared store reachable from both the warm-up process and your web instances, and that warm-up ran the same release (same bundle digests) your instances serve.
-- **Paths report `already_warm` unexpectedly** — remember this bucket also covers pages that render no `ppr_react_component` (see above).
+- **Paths report `no_ppr`** — the page answered 2xx without rendering a single `ppr_react_component`: a typo'd path that still routes somewhere real, or a template refactor that dropped the helper. Fix the path list (or the template); under `PPR_WARM_STRICT=true` these fail the run.

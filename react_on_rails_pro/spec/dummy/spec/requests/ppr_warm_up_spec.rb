@@ -64,10 +64,15 @@ describe "PPR cache warm-up", :caching, :server_rendering do
     subscription = ActiveSupport::Notifications.subscribe(ReactOnRailsPro::Ppr::CACHE_WRITE_NOTIFICATION) do
       user_request_writes += 1
     end
+    lookup_outcomes = []
+    lookup_subscription = ActiveSupport::Notifications.subscribe(
+      ReactOnRailsPro::Ppr::CACHE_LOOKUP_NOTIFICATION
+    ) { |_name, _start, _finish, _id, payload| lookup_outcomes << payload[:outcome] }
     begin
       get ppr_path
     ensure
       ActiveSupport::Notifications.unsubscribe(subscription)
+      ActiveSupport::Notifications.unsubscribe(lookup_subscription)
     end
 
     expect(response).to have_http_status(:ok)
@@ -77,6 +82,9 @@ describe "PPR cache warm-up", :caching, :server_rendering do
     expect(user_request_writes).to eq(0)
     expect(prerender_calls).to eq(0)
     expect(resume_calls).to eq(1)
+    # The warm hit is PROVEN by the lookup counter, not inferred from renderer silence — the
+    # request-level warm-hit assertion issue #5103's benchmark gate needs (issue #5102).
+    expect(lookup_outcomes).to eq([:hit])
   end
 
   it "classifies a second warm-up run of the same path as already warm" do
@@ -87,6 +95,20 @@ describe "PPR cache warm-up", :caching, :server_rendering do
     expect(second.warmed).to be_empty
     expect(second.failed).to be_empty
     expect(second.already_warm.map(&:path)).to eq([ppr_path])
+    expect(second.success?).to be(true)
+  end
+
+  it "classifies a 2xx page that renders no ppr_react_component as no_ppr, not success" do
+    # A typo'd warm path that still routes somewhere real must not report success
+    # (issue #5102): before the lookup counter existed this bucket was indistinguishable
+    # from "every component was a cache hit" and PPR_WARM_STRICT exited 0.
+    summary = ReactOnRailsPro::Ppr::CacheWarmer.call(paths: ["/server_side_hello_world"])
+
+    expect(summary.no_ppr.map(&:path)).to eq(["/server_side_hello_world"])
+    expect(summary.already_warm).to be_empty
+    expect(summary.failed).to be_empty
+    expect(summary.success?).to be(false)
+    expect(summary.to_log).to include("no_ppr: /server_side_hello_world")
   end
 
   it "does not let a failing path prevent the remaining paths from warming" do
