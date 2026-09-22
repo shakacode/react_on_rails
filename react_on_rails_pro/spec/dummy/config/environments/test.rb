@@ -40,6 +40,17 @@ Rails.application.configure do
   # disable caching for tests
   config.cache_store = :null_store
 
+  # ShakaPerf PPR benchmark gate (issue #5103): the gate boots this app with
+  # RAILS_ENV=test (mirroring the rsc-fouc gate) but measures *warm-hit* PPR
+  # requests, which require a real cache store — with :null_store every
+  # ppr_react_component lookup is a miss and the gate would silently measure
+  # cold prerenders. Opt-in via env so normal test runs keep the
+  # deterministic :null_store.
+  if ENV["SHAKAPERF_PPR_CACHE"] == "true"
+    config.action_controller.perform_caching = true
+    config.cache_store = :memory_store, { size: 64.megabytes }
+  end
+
   # Raise exceptions instead of rendering exception templates.
   config.action_dispatch.show_exceptions = :none
 
