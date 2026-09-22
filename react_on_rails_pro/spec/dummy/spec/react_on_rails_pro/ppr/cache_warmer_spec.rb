@@ -199,6 +199,22 @@ describe ReactOnRailsPro::Ppr::CacheWarmer do
       expect(summary.failed.map(&:path)).to eq(["/a"])
     end
 
+    it "surfaces a bare miss beside a sibling write as a partial-warm detail" do
+      # Component A missed and wrote; component B's prerender raised and the app rescued the
+      # error into this 2xx. The page stays warmed (A's entry is usable) but B's cold cache
+      # must not be silently masked by A's write.
+      stub_get(200) do
+        instrument_miss
+        instrument_write
+        instrument_miss
+      end
+
+      summary = described_class.call(paths: ["/a"])
+
+      expect(summary.warmed.map(&:path)).to eq(["/a"])
+      expect(summary.warmed.first.detail).to include("1 cache miss with no write")
+    end
+
     it "keeps warmed above already_warm on a mixed page (one miss written, one hit)" do
       stub_get(200) do
         instrument_hit
