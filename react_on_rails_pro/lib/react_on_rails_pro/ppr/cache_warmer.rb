@@ -267,16 +267,29 @@ module ReactOnRailsPro
       end
 
       # A page can render several ppr_react_component instances, so one can write while another
-      # is refused (the refused component stays uncached and its first visitor still pays a
-      # prerender). Keep the warmed classification — something usable was cached — but surface
-      # the partial failure instead of silently masking it. Pre-flush degradations are not
-      # partial failures: their cache-miss fallback re-writes the entry (counted in writes).
+      # is refused, or misses without any write at all (its prerender raised and the app rescued
+      # the error into this 2xx). Either way that component stays uncached and its first visitor
+      # still pays a prerender. Keep the warmed classification — something usable was cached —
+      # but surface the partial failure instead of silently masking it. Pre-flush degradations
+      # are not partial failures: their cache-miss fallback re-writes the entry (counted in
+      # writes). Unaccounted misses are `misses - writes - refusals`: on a healthy page every
+      # miss ends in a write or a refusal (a tag-registration failure emits both for one miss,
+      # driving the difference negative, never positive).
       def partial_warm_detail(counts, details)
-        return nil unless counts[:refusals].positive?
+        parts = []
+        if counts[:refusals].positive?
+          refusal = details.find { |detail| detail.start_with?("refusals: ") }
+          reason = refusal ? " (#{refusal.delete_prefix('refusals: ')})" : ""
+          parts << "#{counts[:refusals]} cache #{'write'.pluralize(counts[:refusals])} refused#{reason}"
+        end
+        unaccounted_misses = counts[:misses] - counts[:writes] - counts[:refusals]
+        if unaccounted_misses.positive?
+          parts << "#{unaccounted_misses} cache #{'miss'.pluralize(unaccounted_misses)} with no write " \
+                   "(prerender raised and the app rescued it)"
+        end
+        return nil if parts.empty?
 
-        refusal = details.find { |detail| detail.start_with?("refusals: ") }
-        reason = refusal ? " (#{refusal.delete_prefix('refusals: ')})" : ""
-        "partial — #{counts[:refusals]} cache #{'write'.pluralize(counts[:refusals])} refused#{reason}"
+        "partial — #{parts.join('; ')}"
       end
 
       def http_failure_detail(http_status, response)
