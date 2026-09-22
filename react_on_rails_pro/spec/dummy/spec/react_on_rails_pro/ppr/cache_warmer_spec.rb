@@ -45,6 +45,10 @@ describe ReactOnRailsPro::Ppr::CacheWarmer do
     ReactOnRailsPro::Ppr.instrument_cache_lookup(component_name: "Component", outcome: :hit)
   end
 
+  def instrument_miss
+    ReactOnRailsPro::Ppr.instrument_cache_lookup(component_name: "Component", outcome: :miss)
+  end
+
   describe "path resolution" do
     around do |example|
       original = ReactOnRailsPro.configuration.ppr_warm_up_paths
@@ -117,7 +121,10 @@ describe ReactOnRailsPro::Ppr::CacheWarmer do
   describe "outcome classification" do
     it "classifies a request that wrote cache entries as warmed, counting the writes" do
       stub_get(200) do
+        # Real requests always emit the lookup before the write (fixtures stay event-realistic).
+        instrument_miss
         instrument_write
+        instrument_miss
         instrument_write
       end
 
@@ -130,7 +137,9 @@ describe ReactOnRailsPro::Ppr::CacheWarmer do
 
     it "keeps a partially refused multi-component page warmed but surfaces the refusal" do
       stub_get(200) do
+        instrument_miss
         instrument_write
+        instrument_miss
         ReactOnRailsPro::Ppr.instrument_cache_write_refused(component_name: "Other", reason: "render_error")
       end
 
@@ -165,9 +174,35 @@ describe ReactOnRailsPro::Ppr::CacheWarmer do
       expect(summary.no_ppr.first.detail).to include("no ppr_react_component")
     end
 
+    it "classifies a bare lookup miss on a 2xx as failed (rescued prerender failure, cold cache)" do
+      # A completed miss always writes or refuses; a miss with neither means the prerender
+      # raised and an app-level rescue_from produced this 2xx. The cache is still cold, so
+      # reporting it warm would be the exact false success issue #5102 exists to eliminate.
+      stub_get(200) { instrument_miss }
+
+      summary = described_class.call(paths: ["/a"])
+
+      expect(summary.failed.map(&:path)).to eq(["/a"])
+      expect(summary.already_warm).to be_empty
+      expect(summary.success?).to be(false)
+      expect(summary.failed.first.detail).to include("cache miss with no write")
+    end
+
+    it "keeps a hit-plus-bare-miss page failed, not already warm" do
+      stub_get(200) do
+        instrument_hit
+        instrument_miss
+      end
+
+      summary = described_class.call(paths: ["/a"])
+
+      expect(summary.failed.map(&:path)).to eq(["/a"])
+    end
+
     it "keeps warmed above already_warm on a mixed page (one miss written, one hit)" do
       stub_get(200) do
         instrument_hit
+        instrument_miss
         instrument_write
       end
 
@@ -178,6 +213,9 @@ describe ReactOnRailsPro::Ppr::CacheWarmer do
 
     it "classifies a refused cache write as failed with the refusal reason" do
       stub_get(200) do
+        # The lookup{miss} that precedes every real refusal must NOT outrank the refusal —
+        # this pins the classify branch order (refusals before hit/miss buckets).
+        instrument_miss
         ReactOnRailsPro::Ppr.instrument_cache_write_refused(component_name: "Component", reason: "render_error")
       end
 
@@ -189,6 +227,7 @@ describe ReactOnRailsPro::Ppr::CacheWarmer do
 
     it "classifies a post-flush degradation as failed even though a write happened first" do
       stub_get(200) do
+        instrument_miss
         instrument_write
         ReactOnRailsPro::Ppr.instrument_degraded_post_flush(component_name: "Component",
                                                             error: StandardError.new("boom"))
@@ -202,6 +241,7 @@ describe ReactOnRailsPro::Ppr::CacheWarmer do
 
     it "classifies a pre-flush degradation recovered by the cache-miss fallback as warmed" do
       stub_get(200) do
+        instrument_hit
         ReactOnRailsPro::Ppr.instrument_degraded_pre_flush(component_name: "Component",
                                                            error: StandardError.new("boom"))
         instrument_write

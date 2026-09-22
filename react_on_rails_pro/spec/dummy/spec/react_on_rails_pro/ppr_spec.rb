@@ -133,6 +133,32 @@ describe ReactOnRailsPro::Ppr do
     end
   end
 
+  describe "event name constants" do
+    it "pins the published event-name strings (the docs/pro/ppr-events.md contract)" do
+      expect(
+        {
+          static_shell: described_class::STATIC_SHELL_NOTIFICATION,
+          cache_lookup: described_class::CACHE_LOOKUP_NOTIFICATION,
+          cache_write: described_class::CACHE_WRITE_NOTIFICATION,
+          cache_write_refused: described_class::CACHE_WRITE_REFUSED_NOTIFICATION,
+          cache_read_error: described_class::CACHE_READ_ERROR_NOTIFICATION,
+          evict_invalid: described_class::EVICT_INVALID_NOTIFICATION,
+          degraded_pre_flush: described_class::DEGRADED_PRE_FLUSH_NOTIFICATION,
+          degraded_post_flush: described_class::DEGRADED_POST_FLUSH_NOTIFICATION
+        }
+      ).to eq(
+        static_shell: "ppr.static_shell.react_on_rails_pro",
+        cache_lookup: "ppr.cache.lookup.react_on_rails_pro",
+        cache_write: "ppr.cache.write.react_on_rails_pro",
+        cache_write_refused: "ppr.cache.write_refused.react_on_rails_pro",
+        cache_read_error: "ppr.cache.read_error.react_on_rails_pro",
+        evict_invalid: "ppr.cache.evict_invalid.react_on_rails_pro",
+        degraded_pre_flush: "ppr.resume.degraded_pre_flush.react_on_rails_pro",
+        degraded_post_flush: "ppr.resume.degraded_post_flush.react_on_rails_pro"
+      )
+    end
+  end
+
   describe ".instrument_cache_lookup" do
     it "emits the ppr.cache.lookup notification with component_name and outcome only" do
       events = []

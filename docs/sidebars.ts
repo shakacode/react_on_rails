@@ -234,6 +234,7 @@ const sidebars: SidebarsConfig = {
         'pro/fragment-caching',
         'pro/ppr-runtime-requirements',
         'pro/ppr-cache-warm-up',
+        'pro/ppr-events',
         'pro/js-memory-leaks',
         'pro/profiling-server-side-rendering-code',
         'pro/troubleshooting',
