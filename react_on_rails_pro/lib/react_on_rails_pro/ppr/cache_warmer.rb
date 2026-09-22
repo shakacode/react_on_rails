@@ -267,14 +267,20 @@ module ReactOnRailsPro
       end
 
       # A page can render several ppr_react_component instances, so one can write while another
-      # is refused, or misses without any write at all (its prerender raised and the app rescued
-      # the error into this 2xx). Either way that component stays uncached and its first visitor
-      # still pays a prerender. Keep the warmed classification — something usable was cached —
-      # but surface the partial failure instead of silently masking it. Pre-flush degradations
-      # are not partial failures: their cache-miss fallback re-writes the entry (counted in
-      # writes). Unaccounted misses are `misses - writes - refusals`: on a healthy page every
-      # miss ends in a write or a refusal (a tag-registration failure emits both for one miss,
-      # driving the difference negative, never positive).
+      # is refused, or ends cold without any write at all — its prerender raised and the app
+      # rescued the error into this 2xx, or a degraded hit's fallback failed after the eviction.
+      # Either way that component stays uncached and its first visitor still pays a prerender.
+      # Keep the warmed classification — something usable was cached — but surface the partial
+      # failure instead of silently masking it.
+      #
+      # Cold components are counted as `misses + degraded_pre_flush - writes - refusals`: on a
+      # healthy page every miss ends in a write or a refusal (0), a recovered degradation adds
+      # one degraded_pre_flush and one fallback write/refusal (0), and only a component that
+      # emitted a lookup or degradation with no terminal write/refusal drives the count
+      # positive. The one negative contributor is a tag-registration failure (one miss emits
+      # both write and write_refused) — that entry IS cached and its refusal is already named,
+      # but on the same page it can offset one cold component in this count (accepted
+      # limitation of a per-page event stream without per-invocation correlation).
       def partial_warm_detail(counts, details)
         parts = []
         if counts[:refusals].positive?
@@ -282,10 +288,10 @@ module ReactOnRailsPro
           reason = refusal ? " (#{refusal.delete_prefix('refusals: ')})" : ""
           parts << "#{counts[:refusals]} cache #{'write'.pluralize(counts[:refusals])} refused#{reason}"
         end
-        unaccounted_misses = counts[:misses] - counts[:writes] - counts[:refusals]
-        if unaccounted_misses.positive?
-          parts << "#{unaccounted_misses} cache #{'miss'.pluralize(unaccounted_misses)} with no write " \
-                   "(prerender raised and the app rescued it)"
+        cold = counts[:misses] + counts[:degraded_pre_flush] - counts[:writes] - counts[:refusals]
+        if cold.positive?
+          parts << "#{cold} PPR #{'component'.pluralize(cold)} left no cache entry " \
+                   "(prerender raised and the app rescued it, or a degraded hit's fallback failed)"
         end
         return nil if parts.empty?
 
