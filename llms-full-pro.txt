@@ -4523,10 +4523,11 @@ bundle exec rake react_on_rails_pro:ppr:warm
 The task requests each configured path, isolates failures (one failing route never aborts the rest), and finishes with a summary:
 
 ```text
-[ReactOnRailsPro] PPR warm-up finished in 14.2s (2 warmed, 1 already-warm/no-ppr, 1 failed)
+[ReactOnRailsPro] PPR warm-up finished in 14.2s (2 warmed, 1 already-warm, 1 no-ppr, 1 failed)
   warmed: / (1 entry written)
   warmed: /pricing (1 entry written)
   already_warm: /products/best-sellers
+  no_ppr: /prodcuts/typo-page (no ppr_react_component rendered on this page)
   failed: /broken-page (HTTP 500)
 ```
 
@@ -4537,11 +4538,11 @@ Options via environment variables:
 | `PPR_WARM_PATHS=/a,/b` | Override the configured list for this run.                                                                                                       |
 | `PPR_WARM_HOST=...`    | Host header for the requests. Set your canonical host if cached shells contain absolute URLs — the shell HTML is cached verbatim, host included. |
 | `PPR_WARM_HTTPS=false` | Issue plain-HTTP requests (default is HTTPS so `force_ssl` apps don't answer with a redirect).                                                   |
-| `PPR_WARM_STRICT=true` | Exit non-zero when any path fails.                                                                                                               |
+| `PPR_WARM_STRICT=true` | Exit non-zero when any path fails or renders no PPR component (`no_ppr`).                                                                        |
 
 The variables are `PPR_WARM_`-prefixed on purpose: bare `HOST`/`HTTPS` are commonly pre-set by shells, CGI servers, and Docker images, and a leaked value would silently change warm-up behavior.
 
-**Exit-code policy:** by default the task exits 0 even when paths fail, because warm-up is best-effort — the worst case is what you have without it (the first visitor pays the prerender), and a failed warm-up should not roll back an otherwise good release. Use `PPR_WARM_STRICT=true` where you want the deploy pipeline to surface failures loudly. The one exception: an entirely empty path list (nothing configured and no `PPR_WARM_PATHS`) is a misconfiguration, not a failed warm-up, and exits non-zero with guidance regardless of `PPR_WARM_STRICT`.
+**Exit-code policy:** by default the task exits 0 even when paths fail, because warm-up is best-effort — the worst case is what you have without it (the first visitor pays the prerender), and a failed warm-up should not roll back an otherwise good release. Use `PPR_WARM_STRICT=true` where you want the deploy pipeline to surface failures loudly — including `no_ppr` paths, which are misconfigurations (a warmed path whose page renders no `ppr_react_component`), not best-effort losses. The one exception: an entirely empty path list (nothing configured and no `PPR_WARM_PATHS`) is a misconfiguration, not a failed warm-up, and exits non-zero with guidance regardless of `PPR_WARM_STRICT`.
 
 ## The Ruby API
 
@@ -4556,13 +4557,14 @@ summary = ReactOnRailsPro::Ppr::CacheWarmer.call(
 )
 
 summary.warmed.map(&:path)        # => ["/", "/pricing"]
-summary.already_warm              # cache hit — or the page renders no PPR component at all
+summary.already_warm              # every PPR component was a cache hit (proven by ppr.cache.lookup)
+summary.no_ppr                    # 2xx pages that rendered no ppr_react_component at all
 summary.failed.map(&:detail)      # => ["HTTP 500", ...]
-summary.success?                  # => false if anything failed
+summary.success?                  # => false if anything failed or any path had no PPR component
 Rails.logger.warn(summary.to_log) unless summary.success?
 ```
 
-Outcomes are attributed by observing the `ppr.cache.write` / `ppr.cache.write_refused` instrumentation events during each request. One caveat until PPR hit/miss counters land: a 2xx response with no cache write is reported as _already warm_, which also covers a page that renders no `ppr_react_component` at all — a typo'd path that still routes somewhere real shows up in this bucket, not in `failed`. Attribution observes process-global events, so run warm-up in a process that is not concurrently serving PPR traffic (a release phase, rake task, or job worker — the usual setups — all qualify); in a process that is also serving requests, another request's events could be attributed to the path being warmed.
+Outcomes are attributed by observing the PPR instrumentation events during each request — see the [PPR event catalog](./ppr-events.md) for the full list. Failure signals take precedence: a post-flush degradation always classifies the path as _failed_; a refused write or a pre-flush degradation classifies it as _failed_ when no component wrote. With a successful sibling write the page stays _warmed_, and a `partial —` detail names what stayed cold (refused writes, rescued prerender failures, degraded hits whose fallback failed). Otherwise a cache write means _warmed_; hit-only `ppr.cache.lookup` events with no write mean every component was a genuine cache hit (_already warm_); a lookup **miss** with no write and no refusal means the prerender raised and an app-level `rescue_from` produced the 2xx — the cache is still cold, so the path is _failed_; **no PPR event at all on a 2xx response means the page renders no `ppr_react_component`** and is reported as _no_ppr_ — a typo'd path that still routes somewhere real lands in this bucket and fails `PPR_WARM_STRICT`, instead of masquerading as success. Attribution observes process-global events, so run warm-up in a process that is not concurrently serving PPR traffic (a release phase, rake task, or job worker — the usual setups — all qualify); in a process that is also serving requests, another request's events could be attributed to the path being warmed.
 
 ## Where to Hook It Into Your Deploy
 
@@ -4626,7 +4628,97 @@ end
 
 - **Every path reports `failed (redirected to ...)`** — your app redirects the warmer's requests, typically `force_ssl` (keep the default `https: true`), a locale redirect, or authentication. For member-only pages pass a session cookie via the Ruby API's `headers:` option; a redirecting path warms nothing, so list the final path instead.
 - **Warm-up reports `warmed` but visitors still miss** — check that `Rails.cache` is a shared store reachable from both the warm-up process and your web instances, and that warm-up ran the same release (same bundle digests) your instances serve.
-- **Paths report `already_warm` unexpectedly** — remember this bucket also covers pages that render no `ppr_react_component` (see above).
+- **Paths report `no_ppr`** — the page answered 2xx without rendering a single `ppr_react_component`: a typo'd path that still routes somewhere real, or a template refactor that dropped the helper. Fix the path list (or the template); under `PPR_WARM_STRICT=true` these fail the run.
+
+================================================================================
+PAGE: https://reactonrails.com/docs/pro/ppr-events
+SOURCE: docs/pro/ppr-events.md
+================================================================================
+
+# PPR Instrumentation Events
+
+> **Experimental**: `ppr_react_component` (Partial Prerendering) is an experimental Pro feature. Event names and payloads may change between minor versions.
+
+Every PPR render path emits [`ActiveSupport::Notifications`](https://guides.rubyonrails.org/active_support_instrumentation.html) events so operators can monitor cache effectiveness, cache health, and degradations without touching the render pipeline. This page is the complete catalog: eight events, their triggers, payloads, and the guarantees they ship with.
+
+Names put the library last, per the Rails convention, so subscribers can match every PPR event with one pattern; all but the oldest event also follow the `ppr.<area>.<what>.react_on_rails_pro` shape (`ppr.static_shell` predates it):
+
+```ruby
+# config/initializers/ppr_metrics.rb — count every PPR event in StatsD
+ActiveSupport::Notifications.subscribe(/\Appr\..*\.react_on_rails_pro\z/) do |name, _start, _finish, _id, payload|
+  StatsD.increment(name.sub(".react_on_rails_pro", ""), tags: ["component:#{payload[:component_name]}"])
+end
+```
+
+All constants live on `ReactOnRailsPro::Ppr` (e.g. `ReactOnRailsPro::Ppr::CACHE_LOOKUP_NOTIFICATION`), so subscribe via the constants rather than string literals where you can.
+
+## The catalog
+
+| Event                            | Fires when                                                                                                                          | Payload                                                                                                                 |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `ppr.cache.lookup`               | Once per `ppr_react_component` invocation, at the validated cache read                                                              | `component_name`, `outcome` (`:hit` \| `:miss`)                                                                         |
+| `ppr.static_shell`               | A render completed with no Suspense holes (blank `postponed_state`) and no render error                                             | `component_name`                                                                                                        |
+| `ppr.cache.write`                | A shell + PostponedState envelope was persisted                                                                                     | `component_name`, `cache_key` (raw — see below)                                                                         |
+| `ppr.cache.write_refused`        | A cache write was skipped or failed — also fires after a _persisted_ write whose cache-tag registration failed (see ordering below) | `component_name`, `reason` (`"render_error"` \| `"expired"` \| `"store_error"`)                                         |
+| `ppr.cache.read_error`           | The cache store raised during a read (treated as a miss)                                                                            | `component_name`, `error` (class name only)                                                                             |
+| `ppr.cache.evict_invalid`        | A cached entry failed envelope validation and was deleted                                                                           | `component_name`, `reason` (`"malformed"` \| `"unknown_schema"` \| `"react_version_mismatch"` \| `"checksum_mismatch"`) |
+| `ppr.resume.degraded_pre_flush`  | The cache-hit path raised **before** the shell was committed; entry evicted, full SSR fallback served in the same request           | `component_name`, `error` (class name only)                                                                             |
+| `ppr.resume.degraded_post_flush` | The resume phase raised **after** the shell was flushed; entry evicted, stream terminated (page heals on reload)                    | `component_name`, `error` (class name only)                                                                             |
+
+Full event names carry the `.react_on_rails_pro` suffix, e.g. `ppr.cache.lookup.react_on_rails_pro`.
+
+## `ppr.cache.lookup` — cache effectiveness
+
+The hit/miss counter. Exactly **one** lookup event fires per `ppr_react_component` invocation, decided by the validated cache read before any render work:
+
+- `outcome: :hit` — a validated cached envelope was found; the cached shell serves with no prerender request.
+- `outcome: :miss` — no usable entry: first visit, expired, evicted as invalid, or a cache read error. The full prerender runs.
+
+One event with the outcome in the payload follows Rails' own cache convention (`cache_read.active_support` and its `:hit` payload key). The hit rate is one subscription:
+
+```ruby
+lookups = Hash.new(0)
+ActiveSupport::Notifications.subscribe(ReactOnRailsPro::Ppr::CACHE_LOOKUP_NOTIFICATION) do |*args|
+  lookups[args.last[:outcome]] += 1
+end
+# hit rate = lookups[:hit].to_f / (lookups[:hit] + lookups[:miss])
+```
+
+Semantics worth knowing before you alert on it:
+
+- **The event records the lookup, not the delivery.** If a hit's serve path fails before the shell reaches the response, the lookup is not retracted — the request additionally emits `ppr.resume.degraded_pre_flush` and falls back to a full render. A _degraded hit_ is therefore the pair `lookup{outcome: :hit}` + `degraded_pre_flush` in the same request; the fallback render emits **no second lookup**, so `hits + misses` equals the number of invocations that reach the cache read (an invocation that fails option validation raises before the read and emits nothing).
+- **Diagnostic misses stay diagnosable.** An invalid entry or a read error counts as `outcome: :miss` _and_ fires its own `evict_invalid` / `read_error` event — the lookup keeps denominators honest while the sibling event carries the reason.
+- **Per invocation, not per page.** A page rendering three `ppr_react_component` calls emits three lookups. `hits / lookups` is a component-render hit rate; interpret page-level questions accordingly.
+- **`ppr.static_shell` is a different axis.** It reports "this render had no holes" and says nothing about cache state; the two compose (a fully-static warm serve emits `lookup{hit}` + `static_shell`).
+
+## Guarantees
+
+**Events never break the page (the non-fatal contract).** Every emission on a render path is wrapped so a raising subscriber cannot take down the render — the shell still serves and cache writes still land. Boundary: the wrapper rescues `StandardError`; a subscriber raising a bare `Exception` subclass (`SystemExit` and friends) propagates by design. Note that this is a Pro-side guarantee: plain `ActiveSupport::Notifications` **re-raises subscriber errors to the instrumenting caller**, so keep your own subscribers cheap and rescued anyway — they run inline on the request thread.
+
+**Payloads are redacted (no request data).** Error payloads carry only the error **class name**, never `error.message`, which can embed user input (issue #4966 / PR #4976). Lookup payloads carry only `component_name` and `outcome` — deliberately no cache key, because PPR cache keys are user-supplied (`cache_key: ["dashboard", current_user.id]` is typical) and can carry identifiers.
+
+**The one raw-value exception**: `ppr.cache.write` includes the raw computed `cache_key`, kept for cache debugging (finding the entry in Redis). If your subscriber forwards payloads to an external system, drop or hash that field.
+
+**Ordering within one invocation** (events on the same request thread, in emission order — `evict_invalid` / `read_error` fire _inside_ the cache read, so they precede the `lookup` event that reports the read's outcome):
+
+| Scenario                                                   | Sequence                                                                                                                        |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Cold miss (normal page)                                    | `lookup{miss}` → `cache.write`                                                                                                  |
+| Warm hit (normal page)                                     | `lookup{hit}`                                                                                                                   |
+| Fully static, cold → warm                                  | `lookup{miss}` → `cache.write` → `static_shell`, then `lookup{hit}` → `static_shell`                                            |
+| Invalid entry                                              | `cache.evict_invalid` → `lookup{miss}` → `cache.write`                                                                          |
+| Read error                                                 | `cache.read_error` → `lookup{miss}` → `cache.write`                                                                             |
+| Render error                                               | `lookup{miss}` → `cache.write_refused{render_error}`                                                                            |
+| Prerender raise on a miss (protocol/transport/props error) | `lookup{miss}` only — the request errors before any write event                                                                 |
+| Write persisted, tag registration failed                   | `lookup{miss}` → `cache.write` → `cache.write_refused{store_error}` — the entry IS cached, but `revalidate_tag` cannot evict it |
+| Degraded hit (pre-flush)                                   | `lookup{hit}` → `resume.degraded_pre_flush` → `cache.write`                                                                     |
+| Resume failure (post-flush)                                | `lookup{hit or miss}` → … → `resume.degraded_post_flush`                                                                        |
+
+**Attribution is process-global.** Subscriptions see every thread in the process; there is no per-request scoping. When counting per request (as the [cache warm-up](./ppr-cache-warm-up.md) tool does), run in a process that is not concurrently serving PPR traffic.
+
+## Reference consumer
+
+`ReactOnRailsPro::Ppr::CacheWarmer` subscribes to five of these events to classify each warm-up request as `warmed` / `already_warm` / `no_ppr` / `failed` — see [PPR Cache Warm-Up](./ppr-cache-warm-up.md). In particular, "2xx response with zero PPR events" is how it detects a warm path that renders no `ppr_react_component` at all.
 
 ================================================================================
 PAGE: https://reactonrails.com/docs/pro/js-memory-leaks

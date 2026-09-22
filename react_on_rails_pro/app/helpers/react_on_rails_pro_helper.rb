@@ -502,6 +502,14 @@ module ReactOnRailsProHelper
       raw_cache_options = render_options[:cache_options] || {}
       cached_entry = ppr_read_cache_entry(cache_key, raw_cache_options, component_name)
 
+      # The single cache-effectiveness branch point (issue #5102): exactly ONE
+      # `ppr.cache.lookup` event fires per invocation, decided by the validated cache read
+      # above. Emitting here — not inside the path methods — keeps the pre-flush degradation
+      # fallback (which re-enters ppr_cache_miss) from double-counting: a degraded hit stays a
+      # hit, identified by the `ppr.cache.lookup{outcome: :hit}` +
+      # `ppr.resume.degraded_pre_flush` pair.
+      ppr_instrument_non_fatal(component_name, :lookup, cached_entry ? :hit : :miss)
+
       if cached_entry
         ppr_cache_hit_with_fallback(
           component_name, render_options, cached_entry, cache_key, raw_cache_options, &block
@@ -1455,7 +1463,7 @@ module ReactOnRailsProHelper
     ppr_write_cache_entry(component_name, prerender_result, cache_key, raw_cache_options, render_options)
 
     ppr_serve_shell(component_name, options, prerender_result,
-                    cache_hit: false, cache_key:, raw_cache_options:)
+                    cache_key:, raw_cache_options:)
   end
 
   # Pre-flush fallback wrapper (issue #4891 Layer 3a). The cache-hit path runs BEFORE the shell
@@ -1492,7 +1500,7 @@ module ReactOnRailsProHelper
     prerender_result = ppr_hit_prerender_result(component_name, options, cached_entry)
 
     ppr_serve_shell(component_name, options, prerender_result,
-                    cache_hit: true, cache_key:, raw_cache_options:)
+                    cache_key:, raw_cache_options:)
   end
 
   # Builds the warm path's per-request render context (render options + component specification
@@ -1621,9 +1629,14 @@ module ReactOnRailsProHelper
   end
 
   # Emits a PPR instrumentation event without allowing a subscriber error to propagate.
-  # Used in code paths that must remain non-fatal (cache read fallback, cache write skip).
-  def ppr_instrument_non_fatal(component_name, event, detail)
+  # Used in code paths that must remain non-fatal (cache read fallback, cache write skip,
+  # the lookup and static-shell counters — pure observability must never break a render).
+  def ppr_instrument_non_fatal(component_name, event, detail = nil)
     case event
+    when :lookup
+      ReactOnRailsPro::Ppr.instrument_cache_lookup(component_name:, outcome: detail)
+    when :static_shell
+      ReactOnRailsPro::Ppr.instrument_static_shell(component_name:)
     when :write
       ReactOnRailsPro::Ppr.instrument_cache_write(component_name:, cache_key: detail)
     when :write_refused
@@ -1721,10 +1734,12 @@ module ReactOnRailsProHelper
   # dynamic holes, starts the resume phase that streams them. A shell with no PostponedState is a
   # fully static page: SUCCESS with no resume request, counted by the ppr.static_shell counter —
   # unless the prerender reported a render error, which is a failed render, not a static page.
+  # Cache state is NOT re-reported here: the hit/miss axis fired once already as
+  # `ppr.cache.lookup` at the read branch (issue #5102).
   #
   # cache_key and raw_cache_options are threaded through to ppr_enqueue_resume_stream so the
   # post-flush degradation handler (Layer 3b) can evict the entry on resume failure.
-  def ppr_serve_shell(component_name, options, prerender_result, cache_hit:,
+  def ppr_serve_shell(component_name, options, prerender_result,
                       cache_key: nil, raw_cache_options: nil)
     shell_result = build_react_component_result_for_server_rendered_string(
       server_rendered_html: prerender_result[:shell_html],
@@ -1739,7 +1754,9 @@ module ReactOnRailsProHelper
                                 cache_key:, raw_cache_options:,
                                 asset_manifest: prerender_result[:asset_manifest])
     elsif !prerender_result[:had_render_error]
-      ReactOnRailsPro::Ppr.instrument_static_shell(component_name:, cache_hit:)
+      # Non-fatal like every other render-path emission: a raising subscriber here previously
+      # escaped into the pre-flush fallback, evicting a valid entry and failing the render.
+      ppr_instrument_non_fatal(component_name, :static_shell)
     end
 
     shell_result

@@ -41,6 +41,14 @@ describe ReactOnRailsPro::Ppr::CacheWarmer do
     ReactOnRailsPro::Ppr.instrument_cache_write(component_name: "Component", cache_key: "key")
   end
 
+  def instrument_hit
+    ReactOnRailsPro::Ppr.instrument_cache_lookup(component_name: "Component", outcome: :hit)
+  end
+
+  def instrument_miss
+    ReactOnRailsPro::Ppr.instrument_cache_lookup(component_name: "Component", outcome: :miss)
+  end
+
   describe "path resolution" do
     around do |example|
       original = ReactOnRailsPro.configuration.ppr_warm_up_paths
@@ -113,7 +121,10 @@ describe ReactOnRailsPro::Ppr::CacheWarmer do
   describe "outcome classification" do
     it "classifies a request that wrote cache entries as warmed, counting the writes" do
       stub_get(200) do
+        # Real requests always emit the lookup before the write (fixtures stay event-realistic).
+        instrument_miss
         instrument_write
+        instrument_miss
         instrument_write
       end
 
@@ -126,7 +137,9 @@ describe ReactOnRailsPro::Ppr::CacheWarmer do
 
     it "keeps a partially refused multi-component page warmed but surfaces the refusal" do
       stub_get(200) do
+        instrument_miss
         instrument_write
+        instrument_miss
         ReactOnRailsPro::Ppr.instrument_cache_write_refused(component_name: "Other", reason: "render_error")
       end
 
@@ -137,8 +150,8 @@ describe ReactOnRailsPro::Ppr::CacheWarmer do
       expect(result.detail).to include("partial — 1 cache write refused (render_error)")
     end
 
-    it "classifies a 2xx response with no cache write as already warm" do
-      stub_get(200)
+    it "classifies a 2xx all-hits page as already warm, proven by the lookup counter" do
+      stub_get(200) { instrument_hit }
 
       summary = described_class.call(paths: ["/a"])
 
@@ -146,8 +159,113 @@ describe ReactOnRailsPro::Ppr::CacheWarmer do
       expect(summary.success?).to be(true)
     end
 
+    it "classifies a 2xx response with no PPR event at all as no_ppr, which is not success" do
+      # Issue #5102 acceptance criterion: a warmed path that renders no ppr_react_component
+      # (typo'd path that still routes somewhere, helper removed in a refactor) must not
+      # report success. Before the lookup counter existed this was indistinguishable from
+      # "every component was a cache hit".
+      stub_get(200)
+
+      summary = described_class.call(paths: ["/a"])
+
+      expect(summary.no_ppr.map(&:path)).to eq(["/a"])
+      expect(summary.already_warm).to be_empty
+      expect(summary.success?).to be(false)
+      expect(summary.no_ppr.first.detail).to include("no ppr_react_component")
+    end
+
+    it "classifies a bare lookup miss on a 2xx as failed (rescued prerender failure, cold cache)" do
+      # A completed miss always writes or refuses; a miss with neither means the prerender
+      # raised and an app-level rescue_from produced this 2xx. The cache is still cold, so
+      # reporting it warm would be the exact false success issue #5102 exists to eliminate.
+      stub_get(200) { instrument_miss }
+
+      summary = described_class.call(paths: ["/a"])
+
+      expect(summary.failed.map(&:path)).to eq(["/a"])
+      expect(summary.already_warm).to be_empty
+      expect(summary.success?).to be(false)
+      expect(summary.failed.first.detail).to include("cache miss with no write")
+    end
+
+    it "keeps a hit-plus-bare-miss page failed, not already warm" do
+      stub_get(200) do
+        instrument_hit
+        instrument_miss
+      end
+
+      summary = described_class.call(paths: ["/a"])
+
+      expect(summary.failed.map(&:path)).to eq(["/a"])
+    end
+
+    it "surfaces a bare miss beside a sibling write as a partial-warm detail" do
+      # Component A missed and wrote; component B's prerender raised and the app rescued the
+      # error into this 2xx. The page stays warmed (A's entry is usable) but B's cold cache
+      # must not be silently masked by A's write.
+      stub_get(200) do
+        instrument_miss
+        instrument_write
+        instrument_miss
+      end
+
+      summary = described_class.call(paths: ["/a"])
+
+      expect(summary.warmed.map(&:path)).to eq(["/a"])
+      expect(summary.warmed.first.detail).to include("1 PPR component left no cache entry")
+    end
+
+    it "does not report a partial for a degraded hit recovered by a fallback write beside a healthy miss" do
+      stub_get(200) do
+        instrument_miss
+        instrument_write
+        instrument_hit
+        ReactOnRailsPro::Ppr.instrument_degraded_pre_flush(component_name: "Component",
+                                                           error: RuntimeError.new("x"))
+        instrument_write
+      end
+
+      summary = described_class.call(paths: ["/a"])
+
+      expect(summary.warmed.map(&:path)).to eq(["/a"])
+      expect(summary.warmed.first.detail).to be_nil
+    end
+
+    it "surfaces a degraded hit whose fallback failed beside a sibling write" do
+      # Component A: healthy miss + write. Component B: cached hit degraded pre-flush, then the
+      # fallback prerender itself raised and the app rescued it — B's entry was evicted and
+      # nothing replaced it, which must not hide behind A's write.
+      stub_get(200) do
+        instrument_miss
+        instrument_write
+        instrument_hit
+        ReactOnRailsPro::Ppr.instrument_degraded_pre_flush(component_name: "Component",
+                                                           error: RuntimeError.new("x"))
+      end
+
+      summary = described_class.call(paths: ["/a"])
+
+      expect(summary.warmed.map(&:path)).to eq(["/a"])
+      expect(summary.warmed.first.detail).to include("1 PPR component left no cache entry")
+    end
+
+    it "keeps warmed above already_warm on a mixed page (one miss written, one hit)" do
+      stub_get(200) do
+        instrument_hit
+        instrument_miss
+        instrument_write
+      end
+
+      summary = described_class.call(paths: ["/a"])
+
+      expect(summary.warmed.map(&:path)).to eq(["/a"])
+    end
+
     it "classifies a refused cache write as failed with the refusal reason" do
       stub_get(200) do
+        # The lookup{miss} that precedes every real refusal must NOT outrank the refusal —
+        # this pins the classify branch order (refusals before hit/miss buckets).
+        instrument_miss
         ReactOnRailsPro::Ppr.instrument_cache_write_refused(component_name: "Component", reason: "render_error")
       end
 
@@ -159,6 +277,7 @@ describe ReactOnRailsPro::Ppr::CacheWarmer do
 
     it "classifies a post-flush degradation as failed even though a write happened first" do
       stub_get(200) do
+        instrument_miss
         instrument_write
         ReactOnRailsPro::Ppr.instrument_degraded_post_flush(component_name: "Component",
                                                             error: StandardError.new("boom"))
@@ -172,6 +291,7 @@ describe ReactOnRailsPro::Ppr::CacheWarmer do
 
     it "classifies a pre-flush degradation recovered by the cache-miss fallback as warmed" do
       stub_get(200) do
+        instrument_hit
         ReactOnRailsPro::Ppr.instrument_degraded_pre_flush(component_name: "Component",
                                                            error: StandardError.new("boom"))
         instrument_write
@@ -234,14 +354,23 @@ describe ReactOnRailsPro::Ppr::CacheWarmer do
         .with(a_string_including("PPR warm-up finished").and(including("warmed: /a")))
     end
 
-    it "renders one line per path in Summary#to_log" do
-      stub_get(200)
+    it "renders one line per path in Summary#to_log, splitting already-warm from no-ppr" do
+      stub_get(200) { instrument_hit }
 
       log = described_class.call(paths: ["/a", "/b"]).to_log
 
-      expect(log).to include("2 already-warm/no-ppr")
+      expect(log).to include("2 already-warm, 0 no-ppr")
       expect(log).to include("already_warm: /a")
       expect(log).to include("already_warm: /b")
+    end
+
+    it "names no-ppr paths in Summary#to_log with the reason" do
+      stub_get(200)
+
+      log = described_class.call(paths: ["/a"]).to_log
+
+      expect(log).to include("0 already-warm, 1 no-ppr")
+      expect(log).to include("no_ppr: /a (no ppr_react_component rendered on this page)")
     end
   end
 end

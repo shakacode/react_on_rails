@@ -26,13 +26,30 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Added
 
+- **[Pro]** **PPR cache hit/miss instrumentation and event catalog (experimental)**: Every
+  `ppr_react_component` invocation now emits exactly one `ppr.cache.lookup.react_on_rails_pro`
+  notification with `outcome: :hit` or `:miss` at the validated cache read (the
+  `cache_read.active_support` convention), so the PPR cache hit rate — the number the feature
+  exists to move — is measurable as `hits / lookups` from one subscription. A hit that degrades
+  pre-flush stays a hit, identified by pairing with `ppr.resume.degraded_pre_flush`; invalid
+  entries and cache read errors count as misses alongside their diagnostic events.
+  `ppr.static_shell` no longer carries `cache_hit:` — the cache axis lives exclusively in the
+  lookup event. The warm-up tool consumes the new counter: a 2xx path that renders no
+  `ppr_react_component` is now reported as `no_ppr` instead of masquerading as `already_warm`,
+  `Summary#success?` returns false for it, and `PPR_WARM_STRICT=true` exits non-zero. The full
+  eight-event PPR catalog (payloads, ordering, non-fatal and redaction guarantees) is now
+  documented in [docs/pro/ppr-events.md](docs/pro/ppr-events.md). Resolves
+  [Issue 5102](https://github.com/shakacode/react_on_rails/issues/5102).
+  [PR 5106](https://github.com/shakacode/react_on_rails/pull/5106) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 - **[Pro]** **PPR cache warm-up mechanism (experimental)**: New `rake react_on_rails_pro:ppr:warm`
   task and `ReactOnRailsPro::Ppr::CacheWarmer.call` API populate PPR shell cache entries by issuing
   real in-process requests against routes listed in the new `config.ppr_warm_up_paths` (an Array or a
   callable resolved at warm time). Run it after each deploy — the PPR cache key includes the bundle
   digests, so deploys invalidate every PPR entry and the first visitor per route otherwise pays the
   full prerender. One failing route never aborts the rest; the run finishes with a
-  warmed / already-warm / failed summary. Resolves
+  warmed / already-warm / no-ppr / failed summary. Resolves
   [Issue 4965](https://github.com/shakacode/react_on_rails/issues/4965).
   [PR 4967](https://github.com/shakacode/react_on_rails/pull/4967) by
   [AbanoubGhadban](https://github.com/AbanoubGhadban).
