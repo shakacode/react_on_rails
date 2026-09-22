@@ -2367,11 +2367,11 @@ describe ReactOnRailsProHelper do
         subscription = ActiveSupport::Notifications.subscribe(
           ReactOnRailsPro::Ppr::STATIC_SHELL_NOTIFICATION
         ) { |event| static_shell_events << event }
+        stub_render_with_ppr
         lookup_events = []
         lookup_subscription = ActiveSupport::Notifications.subscribe(
           ReactOnRailsPro::Ppr::CACHE_LOOKUP_NOTIFICATION
         ) { |event| lookup_events << event }
-        stub_render_with_ppr
 
         begin
           cold_chunks = run_stream
@@ -2571,9 +2571,21 @@ describe ReactOnRailsProHelper do
           ReactOnRailsPro::Ppr::EVICT_INVALID_NOTIFICATION
         ) { |event| evict_events << event }
         lookup_events = []
+        event_sequence = []
         lookup_subscription = ActiveSupport::Notifications.subscribe(
           ReactOnRailsPro::Ppr::CACHE_LOOKUP_NOTIFICATION
-        ) { |event| lookup_events << event }
+        ) do |event|
+          lookup_events << event
+          event_sequence << :lookup
+        end
+        sequence_subscriptions = [
+          ReactOnRailsPro::Ppr::EVICT_INVALID_NOTIFICATION,
+          ReactOnRailsPro::Ppr::CACHE_WRITE_NOTIFICATION
+        ].map do |name|
+          ActiveSupport::Notifications.subscribe(name) do |event|
+            event_sequence << (event.name.include?("evict") ? :evict_invalid : :write)
+          end
+        end
 
         begin
           reset_stream_buffers
@@ -2591,9 +2603,14 @@ describe ReactOnRailsProHelper do
           # An evicted-invalid entry is a lookup MISS (plus the eviction diagnostic above), so
           # hit-rate denominators stay "every invocation" (issue #5102).
           expect(lookup_events.map { |event| event.payload[:outcome] }).to eq([:miss])
+
+          # Documented ordering (ppr-events.md): the eviction fires INSIDE the cache read,
+          # before the lookup event that reports the read's outcome, then the re-prerender writes.
+          expect(event_sequence).to eq(%i[evict_invalid lookup write])
         ensure
           ActiveSupport::Notifications.unsubscribe(subscription)
           ActiveSupport::Notifications.unsubscribe(lookup_subscription)
+          sequence_subscriptions.each { |sub| ActiveSupport::Notifications.unsubscribe(sub) }
         end
       end
 
@@ -2715,6 +2732,10 @@ describe ReactOnRailsProHelper do
           RuntimeError, "deliberate post-flush test failure"
         )
 
+        lookup_events = []
+        lookup_subscription = ActiveSupport::Notifications.subscribe(
+          ReactOnRailsPro::Ppr::CACHE_LOOKUP_NOTIFICATION
+        ) { |event| lookup_events << event }
         post_flush_events = []
         subscription = ActiveSupport::Notifications.subscribe(
           ReactOnRailsPro::Ppr::DEGRADED_POST_FLUSH_NOTIFICATION
@@ -2734,6 +2755,9 @@ describe ReactOnRailsProHelper do
           expect(combined).not_to include("$RC(")
 
           # The degradation counter fired.
+          # Post-flush degradation must not emit extra lookups: the warm request's single
+          # lookup{hit} is the only one (hit-rate denominators stay per-invocation).
+          expect(lookup_events.map { |event| event.payload[:outcome] }).to eq([:hit])
           expect(post_flush_events.length).to eq(1)
           # Redacted: payload carries only the error class name, never the raw message (#4966)
           expect(post_flush_events.first.payload[:error]).to eq("RuntimeError")
@@ -2742,6 +2766,7 @@ describe ReactOnRailsProHelper do
           expect(Rails.cache.read(computed_ppr_cache_key)).to be_nil
         ensure
           ActiveSupport::Notifications.unsubscribe(subscription)
+          ActiveSupport::Notifications.unsubscribe(lookup_subscription)
         end
       end
 
@@ -2816,6 +2841,74 @@ describe ReactOnRailsProHelper do
         end
       end
 
+      it "emits one lookup per invocation on a page with two PPR components" do
+        # Two fully-static components keep the renderer-request order deterministic (no resume
+        # requests interleaving with the second prerender).
+        mock_ppr_responses(ppr_static_shell_chunks, ppr_static_shell_chunks)
+        allow(self).to receive(:render_to_string) do
+          first = ppr_react_component(
+            component_name,
+            cache_key: ["ppr-spec", component_name],
+            id: "#{component_name}-react-component-0",
+            cache_options: { expires_in: 60 }
+          ) { props }
+          second = ppr_react_component(
+            component_name,
+            cache_key: ["ppr-spec", component_name, "second"],
+            id: "#{component_name}-react-component-1",
+            cache_options: { expires_in: 60 }
+          ) { props }
+          "<div>#{first}#{second}</div>"
+        end
+
+        lookup_events = []
+        subscription = ActiveSupport::Notifications.subscribe(
+          ReactOnRailsPro::Ppr::CACHE_LOOKUP_NOTIFICATION
+        ) { |event| lookup_events << event }
+
+        begin
+          run_stream
+
+          # Per invocation, not per page: two components, two lookups.
+          expect(lookup_events.map { |event| event.payload[:outcome] }).to eq(%i[miss miss])
+
+          # Warm page: still one lookup per invocation, both hits, zero renderer requests.
+          reset_stream_buffers
+          run_stream
+          expect(chunks_read.count).to eq(0)
+          expect(lookup_events.map { |event| event.payload[:outcome] }).to eq(%i[miss miss hit hit])
+        ensure
+          ActiveSupport::Notifications.unsubscribe(subscription)
+        end
+      end
+
+      it "a raising ppr.static_shell subscriber does not break a fully-static render (non-fatal contract)" do
+        # Regression guard: this emission used to be the only unwrapped one on the render path.
+        # On a WARM fully-static serve a raising subscriber escaped into the pre-flush fallback,
+        # which evicted the valid entry and then failed the fallback serve too.
+        mock_ppr_responses(ppr_static_shell_chunks)
+        stub_render_with_ppr
+
+        subscription = ActiveSupport::Notifications.subscribe(
+          ReactOnRailsPro::Ppr::STATIC_SHELL_NOTIFICATION
+        ) { raise "deliberate static_shell subscriber failure" }
+
+        begin
+          cold_chunks = run_stream
+          expect(cold_chunks.join).to include("Fully static PPR shell")
+          expect(Rails.cache.read(computed_ppr_cache_key)).to be_present
+
+          # Warm serve: still served from cache, entry NOT evicted, no fallback prerender.
+          reset_stream_buffers
+          warm_chunks = run_stream
+          expect(warm_chunks.join).to include("Fully static PPR shell")
+          expect(chunks_read.count).to eq(0)
+          expect(Rails.cache.read(computed_ppr_cache_key)).to be_present
+        ensure
+          ActiveSupport::Notifications.unsubscribe(subscription)
+        end
+      end
+
       it "emits ppr.cache.write_refused when prerender had a render error" do
         error_shell_chunks = [
           { html: "<div>PPR shell from a partially failed tree</div>", consoleReplayScript: "",
@@ -2831,6 +2924,10 @@ describe ReactOnRailsProHelper do
         subscription = ActiveSupport::Notifications.subscribe(
           ReactOnRailsPro::Ppr::CACHE_WRITE_REFUSED_NOTIFICATION
         ) { |event| refused_events << event }
+        lookup_events = []
+        lookup_subscription = ActiveSupport::Notifications.subscribe(
+          ReactOnRailsPro::Ppr::CACHE_LOOKUP_NOTIFICATION
+        ) { |event| lookup_events << event }
 
         begin
           run_stream
@@ -2839,8 +2936,12 @@ describe ReactOnRailsProHelper do
           expect(refused_events.first.payload[:component_name]).to eq(component_name)
           expect(refused_events.first.payload[:reason]).to eq("render_error")
           expect(Rails.cache.read(computed_ppr_cache_key)).to be_nil
+
+          # The render-error request is still a lookup MISS (docs: lookup{miss} -> write_refused).
+          expect(lookup_events.map { |event| event.payload[:outcome] }).to eq([:miss])
         ensure
           ActiveSupport::Notifications.unsubscribe(subscription)
+          ActiveSupport::Notifications.unsubscribe(lookup_subscription)
         end
       end
 

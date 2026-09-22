@@ -1630,11 +1630,13 @@ module ReactOnRailsProHelper
 
   # Emits a PPR instrumentation event without allowing a subscriber error to propagate.
   # Used in code paths that must remain non-fatal (cache read fallback, cache write skip,
-  # the lookup counter — pure observability must never break a render).
+  # the lookup and static-shell counters — pure observability must never break a render).
   def ppr_instrument_non_fatal(component_name, event, detail = nil)
     case event
     when :lookup
       ReactOnRailsPro::Ppr.instrument_cache_lookup(component_name:, outcome: detail)
+    when :static_shell
+      ReactOnRailsPro::Ppr.instrument_static_shell(component_name:)
     when :write
       ReactOnRailsPro::Ppr.instrument_cache_write(component_name:, cache_key: detail)
     when :write_refused
@@ -1752,7 +1754,9 @@ module ReactOnRailsProHelper
                                 cache_key:, raw_cache_options:,
                                 asset_manifest: prerender_result[:asset_manifest])
     elsif !prerender_result[:had_render_error]
-      ReactOnRailsPro::Ppr.instrument_static_shell(component_name:)
+      # Non-fatal like every other render-path emission: a raising subscriber here previously
+      # escaped into the pre-flush fallback, evicting a valid entry and failing the render.
+      ppr_instrument_non_fatal(component_name, :static_shell)
     end
 
     shell_result

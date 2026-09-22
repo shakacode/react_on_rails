@@ -49,7 +49,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   callable resolved at warm time). Run it after each deploy — the PPR cache key includes the bundle
   digests, so deploys invalidate every PPR entry and the first visitor per route otherwise pays the
   full prerender. One failing route never aborts the rest; the run finishes with a
-  warmed / already-warm / failed summary. Resolves
+  warmed / already-warm / no-ppr / failed summary. Resolves
   [Issue 4965](https://github.com/shakacode/react_on_rails/issues/4965).
   [PR 4967](https://github.com/shakacode/react_on_rails/pull/4967) by
   [AbanoubGhadban](https://github.com/AbanoubGhadban).
