@@ -212,7 +212,41 @@ describe ReactOnRailsPro::Ppr::CacheWarmer do
       summary = described_class.call(paths: ["/a"])
 
       expect(summary.warmed.map(&:path)).to eq(["/a"])
-      expect(summary.warmed.first.detail).to include("1 cache miss with no write")
+      expect(summary.warmed.first.detail).to include("1 PPR component left no cache entry")
+    end
+
+    it "does not report a partial for a degraded hit recovered by a fallback write beside a healthy miss" do
+      stub_get(200) do
+        instrument_miss
+        instrument_write
+        instrument_hit
+        ReactOnRailsPro::Ppr.instrument_degraded_pre_flush(component_name: "Component",
+                                                           error: RuntimeError.new("x"))
+        instrument_write
+      end
+
+      summary = described_class.call(paths: ["/a"])
+
+      expect(summary.warmed.map(&:path)).to eq(["/a"])
+      expect(summary.warmed.first.detail).to be_nil
+    end
+
+    it "surfaces a degraded hit whose fallback failed beside a sibling write" do
+      # Component A: healthy miss + write. Component B: cached hit degraded pre-flush, then the
+      # fallback prerender itself raised and the app rescued it — B's entry was evicted and
+      # nothing replaced it, which must not hide behind A's write.
+      stub_get(200) do
+        instrument_miss
+        instrument_write
+        instrument_hit
+        ReactOnRailsPro::Ppr.instrument_degraded_pre_flush(component_name: "Component",
+                                                           error: RuntimeError.new("x"))
+      end
+
+      summary = described_class.call(paths: ["/a"])
+
+      expect(summary.warmed.map(&:path)).to eq(["/a"])
+      expect(summary.warmed.first.detail).to include("1 PPR component left no cache entry")
     end
 
     it "keeps warmed above already_warm on a mixed page (one miss written, one hit)" do
