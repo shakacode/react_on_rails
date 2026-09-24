@@ -55,22 +55,23 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
   skills as launchers. Installed/global skills never override this repo's
   `AGENTS.md`; repo-local files win only when this repo explicitly names or
   keeps a local copy/override.
-- `.agents/bin/agent-workflow-seam-doctor`: the repo-local seam validator. Pack
-  management helpers such as `agent-workflows-status`, `install-agent-workflows`,
-  `upgrade-agent-workflows`, and `bin/validate` belong in installed agent homes
-  or the shared `agent-workflows` clone, not this consumer checkout; shared
-  `bin/validate` expects the shared pack root. Pass
-  `--shared <agent-workflows-root>` when checking user-installed skills outside
-  this checkout.
+- `.agents/fixtures/agent-workflows/bin/agent-workflow-seam-doctor`: a
+  byte-identical legacy
+  `agent-workflows` helper retained only for that pack's transitional fixture
+  suite. It is not the React on Rails seam validator and does not accept the
+  Shaka typed contract. Installed Shaka validates `.agents/agent-workflow.yml`;
+  required CI pins the reviewed Shaka Git revision and runs candidate-only
+  validation. Pack management helpers such as `agent-workflows-status`,
+  `install-agent-workflows`, `upgrade-agent-workflows`, and `bin/validate`
+  remain transitional installed/shared-pack tools.
 - `.agents/bin/agent-workflow-drift-manifest-test.rb`: the consumer-owned
   completeness boundary for pinned shared files. It governs explicit files and
   whole source-pack prefixes, including reviewed source-only exclusions, so a
   new upstream helper cannot silently escape the drift manifest.
-- `internal/contributor-info/agent-workflow-adoption.md`: guide for sharing
-  these agent workflows with other repositories through user-installed skills
-  plus a repo-local seam
-- `internal/contributor-info/portable-agent-workflows-seam-design.md`: design
-  rationale for the user-installed skill + seam model
+- `internal/contributor-info/agent-workflow-adoption.md`: React on Rails'
+  current Shaka seam boundary, transitional source-pack content, and validation
+- `internal/contributor-info/portable-agent-workflows-seam-design.md`: current
+  Shaka seam architecture and legacy retirement status
 - `internal/contributor-info/agent-pr-batch-skills.md`: contributor guide for choosing and sequencing `$plan-issue-triage`, `$plan-pr-batch`, and `$pr-batch`
 - `internal/contributor-info/multi-batch-operations.md`: operator guide for running multiple batches across machines, launch surfaces, and repos
 - `internal/contributor-info/issue-evaluation.md`: principles for deciding whether issues and proposed fixes are worth implementing
@@ -216,12 +217,13 @@ After fetching, verify the `## Agent Workflow Configuration` seam before relying
 on installed/shared skills for issue, PR, or batch work:
 
 ```bash
-.agents/bin/agent-workflow-seam-doctor
+shaka seam check --root "$(pwd)" --ref "$(git rev-parse origin/main)"
 ```
 
-When checking user-installed shared skills outside this checkout, add
-`--shared <agent-workflows-root>`; for example, a clone of
-`https://github.com/shakacode/agent-workflows`.
+This trusted-ref check establishes workflow policy. Candidate CI validation uses
+the separately pinned Shaka checkout with `--local`, which grants neither policy
+nor merge authority. The old doctor lives under `.agents/fixtures/` only for
+legacy `agent-workflows` tests; it is not an active repository command.
 
 If a workflow explicitly needs a repo-local `.agents/skills/...` file, it should
 be a repo-specific local skill such as `stress-test` or
@@ -241,11 +243,12 @@ For user-installed shared skills, check the installed pack with:
 agent-workflows-status --host codex
 ```
 
-Use `--host claude` for Claude Code installs. To upgrade and validate this repo
-in one step, run:
+Use `--host claude` for Claude Code installs. Upgrade the transitional shared
+pack, then validate this repository with trusted Shaka:
 
 ```bash
-upgrade-agent-workflows --host codex --consumer-root "$(pwd)"
+upgrade-agent-workflows --host codex
+shaka seam check --root "$(pwd)" --ref "$(git rev-parse origin/main)"
 ```
 
 <!-- prettier-ignore-start -->

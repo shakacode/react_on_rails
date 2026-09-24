@@ -16,10 +16,9 @@ module AgentWorkflowSeamDoctor
   POINTER_SECTION = <<~MARKDOWN.chomp
     ## Agent Workflow Configuration
 
-    Resolve the trusted default branch to an immutable commit. Load and validate
-    `.agents/agent-workflow.yml` with the trusted installed `shaka seam check --ref REF`
-    command. Run the fixed executable paths reported by that command from the candidate
-    checkout; do not reconstruct their behavior from prose. `AGENTS.md` retains human-only boundaries.
+    Portable shared skills resolve this repo's commands and policy through:
+    - **Commands** — run `.agents/bin/<name>` (`setup`, `validate`, `test`, ...); see `.agents/bin/README.md`. A missing script means that capability is n/a here.
+    - **Policy / config** — `.agents/agent-workflow.yml`.
   MARKDOWN
   COMMANDS_DIR = ".agents/bin"
   COMMAND_README = ".agents/bin/README.md"
@@ -1452,8 +1451,6 @@ module AgentWorkflowSeamDoctor
   end
 
   def prepare_init_policy(root, base_branch, existing)
-    return if shaka_contract?(existing)
-
     defaults = REQUIRED_POLICY_KEYS.to_h { |key| [key, key == "base_branch" ? base_branch : "n/a"] }
     defaults["follow_up_prefix"] = "Follow-up:"
     prepare_init_mapping(File.join(root, POLICY_CONFIG), existing, defaults, "policy config")
@@ -1655,8 +1652,6 @@ module AgentWorkflowSeamDoctor
     config = load_policy_config(path)
     return ["invalid policy config: #{POLICY_CONFIG}"] unless config.is_a?(Hash)
 
-    return shaka_policy_issues(config) if shaka_contract?(config)
-
     issues = []
     REQUIRED_POLICY_KEYS.each do |key|
       if !config.key?(key)
@@ -1678,32 +1673,6 @@ module AgentWorkflowSeamDoctor
     issues
   rescue Psych::Exception
     ["invalid policy config: #{POLICY_CONFIG}"]
-  end
-
-  def shaka_contract?(config)
-    config.key?("version")
-  end
-
-  def shaka_policy_issues(config)
-    issues = []
-    issues << "invalid policy value for key: version" unless config["version"] == 1
-    %w[base_branch review merge].each do |key|
-      if !config.key?(key)
-        issues << "missing policy key: #{key}"
-      elsif unresolved_policy_value?(config[key])
-        issues << "unresolved policy value for key: #{key}"
-      end
-    end
-
-    config.each do |key, value|
-      next if %w[base_branch review merge].include?(key)
-      next unless unresolved_policy_value?(value)
-
-      issues << "unresolved policy value for key: #{key}"
-    end
-
-    issues.concat(untrusted_contributor_intake_policy_issues(config))
-    issues
   end
 
   def untrusted_contributor_intake_policy_issues(config)

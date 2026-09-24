@@ -16,6 +16,23 @@ function assertDoesNotMatch(name, text, pattern) {
   assert.doesNotMatch(text, pattern, `${name} unexpectedly matches ${pattern}`);
 }
 
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function assertPinnedCheckout(name, step, { repository, ref, path }) {
+  assertMatches(
+    `${name} action`,
+    step,
+    /^\s+uses: actions\/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5\s+# v4$/m,
+  );
+  assertMatches(`${name} repository`, step, new RegExp(`^\\s+repository: ${escapeRegExp(repository)}$`, 'm'));
+  assertMatches(`${name} ref`, step, new RegExp(`^\\s+ref: ${escapeRegExp(ref)}$`, 'm'));
+  assertMatches(`${name} path`, step, new RegExp(`^\\s+path: ${escapeRegExp(path)}$`, 'm'));
+  assertMatches(`${name} fetch depth`, step, /^\s+fetch-depth: 1$/m);
+  assertMatches(`${name} credentials`, step, /^\s+persist-credentials: false$/m);
+}
+
 function extractRunScript(workflow, stepName) {
   const lines = workflow.split('\n');
   const stepIndex = lines.findIndex((line) => line.trim() === `- name: ${stepName}`);
@@ -91,6 +108,13 @@ function runGemMatrix(script, { full, generators }) {
 
 const labelDispatchWorkflow = read('.github/workflows/hosted-ci-label-dispatch.yml');
 const requiredWorkflow = read('.github/workflows/ci-required.yml');
+const agentLint = read('.agents/bin/lint');
+const agentInstructions = read('AGENTS.md');
+const requiredPrGateJob = extractJob(requiredWorkflow, 'required-pr-gate');
+const agentWorkflowCheckoutStep = extractStep(requiredPrGateJob, 'Check out pinned agent workflows');
+const agentWorkflowDriftStep = extractStep(requiredPrGateJob, 'Validate pinned agent workflow copies');
+const shakaCheckoutStep = extractStep(requiredPrGateJob, 'Check out pinned Shaka');
+const shakaValidationStep = extractStep(requiredPrGateJob, 'Validate repository seam with Shaka');
 const agentWorkflowDriftManifest = read('.agents/agent-workflow-drift.yml');
 const hostedSelectorsAction = read('.github/actions/hosted-ci-selectors/action.yml');
 const ciCommandsWorkflow = read('.github/workflows/ci-commands.yml');
@@ -146,22 +170,61 @@ const agentWorkflowRevision = agentWorkflowDriftManifest.match(
   /^source_revision:\s*["']?([0-9a-f]{40})["']?$/m,
 );
 assert.ok(agentWorkflowRevision, 'agent workflow drift manifest must pin a full source revision');
-assertMatches(
-  'ci-required pinned agent workflow checkout',
-  requiredWorkflow,
-  new RegExp(
-    String.raw`- name: Check out pinned agent workflows[\s\S]*uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5[\s\S]*repository: shakacode/agent-workflows[\s\S]*ref: ${agentWorkflowRevision[1]}[\s\S]*path: \.agent-workflows-source[\s\S]*fetch-depth: 1[\s\S]*persist-credentials: false`,
-  ),
-);
+assertPinnedCheckout('ci-required pinned agent workflow checkout', agentWorkflowCheckoutStep, {
+  repository: 'shakacode/agent-workflows',
+  ref: agentWorkflowRevision[1],
+  path: '.agent-workflows-source',
+});
 assertMatches(
   'ci-required agent workflow manifest completeness check',
-  requiredWorkflow,
+  agentWorkflowDriftStep,
   /ruby \.agents\/bin\/agent-workflow-drift-manifest-test\.rb --source-root \.agent-workflows-source/,
 );
 assertMatches(
   'ci-required pinned agent workflow drift check',
-  requiredWorkflow,
+  agentWorkflowDriftStep,
   /\.agent-workflows-source\/bin\/check-agent-workflow-drift[\s\S]*--manifest \.agents\/agent-workflow-drift\.yml[\s\S]*--source-root \.agent-workflows-source[\s\S]*--consumer-root \./,
+);
+assertPinnedCheckout('ci-required pinned Shaka checkout', shakaCheckoutStep, {
+  repository: 'shakacode/shaka',
+  ref: '67c1d8f70f5c4eaa05f58f796be53a6866148139',
+  path: '.shaka-source',
+});
+assertMatches(
+  'ci-required Shaka candidate seam validation',
+  shakaValidationStep,
+  /\.shaka-source\/skills\/shaka\/scripts\/shaka seam check --root "\$GITHUB_WORKSPACE" --local/,
+);
+assertMatches(
+  'ci-required Shaka regression fixtures',
+  shakaValidationStep,
+  /SHAKA_COMMAND=\.shaka-source\/skills\/shaka\/scripts\/shaka ruby script\/shaka_seam_check_test\.rb/,
+);
+assertMatches(
+  'local lint validates the candidate seam when Shaka is installed',
+  agentLint,
+  /seam check --root \. --local/,
+);
+assertMatches(
+  'local lint runs Shaka regression fixtures when Shaka is installed',
+  agentLint,
+  /SHAKA_COMMAND="\$shaka_command" ruby script\/shaka_seam_check_test\.rb/,
+);
+assertMatches(
+  'local lint runs consumer-owned drift manifest tests',
+  agentLint,
+  /ruby \.agents\/bin\/agent_workflow_drift_manifest_test_test\.rb/,
+);
+assertMatches(
+  'local lint fails when the legacy fixture is incomplete',
+  agentLint,
+  /legacy agent-workflows fixture is incomplete/,
+);
+assertMatches('agent workflow pointer heading', agentInstructions, /^## Agent Workflow Configuration$/m);
+assertMatches(
+  'agent workflow trusted Shaka pointer',
+  agentInstructions,
+  /shaka seam check --root "\$\(pwd\)" --ref "\$\(git rev-parse origin\/main\)"/,
 );
 assertMatches('ci-required mirrored-block lint', requiredWorkflow, /ruby bin\/lint-mirrored-blocks/);
 assertMatches(

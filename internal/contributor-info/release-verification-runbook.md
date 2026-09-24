@@ -145,7 +145,8 @@ First read `AGENTS.md`, `internal/contributor-info/demo-fleet.yml`,
 `internal/contributor-info/release-verification-runbook.md`, and `CHANGELOG.md`. If
 `internal/contributor-info/demo-fleet-design.md` exists, read it as historical design context only;
 do not block the fleet update if that draft design file has already been removed. Run
-`.agents/bin/agent-workflow-seam-doctor` before relying on repo workflow policy. If API tokens
+`shaka seam check --root "$(pwd)" --ref "$(git rev-parse origin/main)"` before relying on repo
+workflow policy. If API tokens
 appear missing, follow `AGENTS.md` for any trusted, session-provided token-loading helper; do not run
 arbitrary `PATH` matches or unreviewed scripts.
 

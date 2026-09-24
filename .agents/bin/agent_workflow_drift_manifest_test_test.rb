@@ -6,6 +6,18 @@ require "tempfile"
 require_relative "agent-workflow-drift-manifest-test"
 
 class AgentWorkflowDriftManifestTest < Minitest::Test
+  def test_real_consumer_inventory_includes_relocated_legacy_fixtures
+    repository_root = File.expand_path("../..", __dir__)
+    errors = []
+
+    files = AgentWorkflowDriftManifest.consumer_agent_files(repository_root, errors)
+
+    assert_empty errors
+    AgentWorkflowDriftManifest::CONSUMER_PATH_OVERRIDES.each_value do |consumer|
+      assert_includes files, consumer.delete_prefix(".agents/")
+    end
+  end
+
   def test_safe_yaml_loader_rejects_aliases
     Tempfile.create(["agent-workflow-drift", ".yml"]) do |file|
       file.write("version: &version 1\nsource_revision: *version\nfiles: []\n")
@@ -26,8 +38,8 @@ class AgentWorkflowDriftManifestTest < Minitest::Test
 
     AgentWorkflowDriftManifest.validate_inventory(
       source_files,
-      baseline_mapped_sources,
-      baseline_mapped_sources,
+      baseline_consumer_files,
+      baseline_mappings,
       errors
     )
 
@@ -40,8 +52,8 @@ class AgentWorkflowDriftManifestTest < Minitest::Test
 
     AgentWorkflowDriftManifest.validate_inventory(
       baseline_source_files + [local_unmapped],
-      baseline_mapped_sources + [local_unmapped],
-      baseline_mapped_sources,
+      baseline_consumer_files + [local_unmapped],
+      baseline_mappings,
       errors
     )
 
@@ -62,8 +74,89 @@ class AgentWorkflowDriftManifestTest < Minitest::Test
     AgentWorkflowDriftManifest.mapped_pairs(manifest, errors)
 
     assert_includes errors,
-                    "manifest consumer path must match source path: " \
-                    "skills/pr-batch/bin/existing-helper -> .agents/bin/wrong-helper"
+                    "manifest consumer path is invalid: skills/pr-batch/bin/existing-helper -> " \
+                    ".agents/bin/wrong-helper; expected .agents/skills/pr-batch/bin/existing-helper"
+  end
+
+  def test_manifest_allows_reviewed_legacy_fixture_relocation
+    errors = []
+    source = "bin/agent-workflow-seam-doctor"
+    manifest = {
+      "files" => [
+        {
+          "source" => source,
+          "consumer" => AgentWorkflowDriftManifest::CONSUMER_PATH_OVERRIDES.fetch(source)
+        }
+      ]
+    }
+
+    AgentWorkflowDriftManifest.mapped_pairs(manifest, errors)
+
+    assert_empty errors
+  end
+
+  def test_manifest_rejects_default_path_for_fixture_only_override
+    errors = []
+    source = "bin/agent-workflow-seam-doctor"
+    manifest = {
+      "files" => [
+        {
+          "source" => source,
+          "consumer" => ".agents/#{source}"
+        }
+      ]
+    }
+
+    AgentWorkflowDriftManifest.mapped_pairs(manifest, errors)
+
+    assert_includes errors,
+                    "manifest consumer path is invalid: #{source} -> .agents/#{source}; " \
+                    "expected #{AgentWorkflowDriftManifest::CONSUMER_PATH_OVERRIDES.fetch(source)}"
+  end
+
+  def test_invalid_consumer_path_does_not_also_report_the_consumer_as_missing
+    source = "bin/agent-workflow-seam-doctor"
+    invalid_consumer = ".agents/bin/agent-workflow-seam-doctor"
+    errors = []
+
+    AgentWorkflowDriftManifest.validate_inventory(
+      baseline_source_files,
+      baseline_consumer_files,
+      baseline_mappings.reject { |mapped_source, _consumer| mapped_source == source } + [[source, invalid_consumer]],
+      errors
+    )
+
+    refute_includes errors, "mapped consumer file is missing: #{source} -> #{invalid_consumer}"
+  end
+
+  def test_inventory_rejects_stray_active_copy_of_fixture_only_source
+    source = "bin/agent-workflow-seam-doctor"
+    errors = []
+
+    AgentWorkflowDriftManifest.validate_inventory(
+      baseline_source_files,
+      baseline_consumer_files + [source],
+      baseline_mappings,
+      errors
+    )
+
+    assert_includes errors, "active consumer copy conflicts with fixture-only override: .agents/#{source}"
+  end
+
+  def test_inventory_rejects_missing_relocated_consumer
+    source = "bin/agent-workflow-seam-doctor"
+    consumer = AgentWorkflowDriftManifest::CONSUMER_PATH_OVERRIDES.fetch(source)
+    relative_consumer = consumer.delete_prefix(".agents/")
+    errors = []
+
+    AgentWorkflowDriftManifest.validate_inventory(
+      baseline_source_files,
+      baseline_consumer_files - [relative_consumer],
+      baseline_mappings,
+      errors
+    )
+
+    assert_includes errors, "mapped consumer file is missing: #{source} -> #{consumer}"
   end
 
   def test_failure_diagnostics_are_sorted
@@ -172,5 +265,15 @@ class AgentWorkflowDriftManifestTest < Minitest::Test
 
   def baseline_mapped_sources
     baseline_source_files - AgentWorkflowDriftManifest::EXCLUSIONS.keys
+  end
+
+  def baseline_mappings
+    baseline_mapped_sources.map do |source|
+      [source, AgentWorkflowDriftManifest::CONSUMER_PATH_OVERRIDES.fetch(source, ".agents/#{source}")]
+    end
+  end
+
+  def baseline_consumer_files
+    baseline_mappings.map { |_source, consumer| consumer.delete_prefix(".agents/") }
   end
 end
