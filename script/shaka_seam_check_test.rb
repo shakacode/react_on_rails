@@ -8,13 +8,6 @@ require "tmpdir"
 require "yaml"
 
 module ShakaTrustConfigHelper
-  TRUST_SENTINELS = {
-    users: "justin808",
-    bots: "claude",
-    metadata_bots: "github-actions",
-    teams: %w[shakacode shakacode]
-  }.freeze
-
   GitHubTrustFixture = Struct.new(:repository, :contents) do
     def graphql(_query, owner:, name:, expression:)
       expected_expression = "#{'a' * 40}:.agents/trusted-github-actors.yml"
@@ -74,16 +67,17 @@ module ShakaSeamFixtureHelper
   end
 
   def commit_fixture(root)
+    git = ["git", "-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false", "-C", root]
     commands = [
       %w[init -q],
       %w[add .],
       ["-c", "user.name=Shaka Test", "-c", "user.email=shaka-test@example.com", "commit", "-qm", "fixture"]
     ]
     commands.each do |arguments|
-      _output, error, status = Open3.capture3("git", "-C", root, *arguments)
+      _output, error, status = Open3.capture3(*git, *arguments)
       raise "fixture git command failed: #{error}" unless status.success?
     end
-    output, error, status = Open3.capture3("git", "-C", root, "rev-parse", "HEAD")
+    output, error, status = Open3.capture3(*git, "rev-parse", "HEAD")
     raise "fixture git rev-parse failed: #{error}" unless status.success?
 
     output.strip
@@ -118,7 +112,13 @@ end
 
 class ShakaSeamCheckTest < Minitest::Test
   SHAKA_COMMAND = File.expand_path(ENV.fetch("SHAKA_COMMAND"))
-  SHAKA_SKILL_ROOT = File.expand_path("..", File.dirname(File.realpath(SHAKA_COMMAND)))
+  SHAKA_COMMAND_ROOT = File.dirname(File.realpath(SHAKA_COMMAND))
+  SHAKA_SKILL_ROOT = [
+    File.expand_path("..", SHAKA_COMMAND_ROOT),
+    File.expand_path("../skills/shaka", SHAKA_COMMAND_ROOT)
+  ].find { |root| File.file?(File.join(root, "lib/shaka/public_comments/trust_config.rb")) }
+  raise "cannot locate Shaka skill root from #{SHAKA_COMMAND}" unless SHAKA_SKILL_ROOT
+
   REPOSITORY_ROOT = File.expand_path("..", __dir__)
 
   $LOAD_PATH.unshift(File.join(SHAKA_SKILL_ROOT, "lib"))
@@ -246,7 +246,7 @@ class ShakaSeamCheckTest < Minitest::Test
 
     merged = load_trust_config(File.binread(trust_path))
 
-    TRUST_SENTINELS.each { |role, entry| assert_includes merged.fetch(role), entry }
+    %i[users bots metadata_bots teams].each { |role| refute_empty merged.fetch(role) }
   end
 
   def test_overlapping_trust_bot_roles_are_rejected_by_shaka

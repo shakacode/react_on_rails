@@ -18,7 +18,16 @@ else
     "$legacy_doctor_dir/agent-workflow-seam-doctor-test.rb" || rc=1
   ruby "$legacy_doctor_dir/agent-workflow-seam-doctor-test.rb" || rc=1
 fi
-BUNDLE_GEMFILE=Gemfile bundle exec rubocop script/shaka_seam_check_test.rb || rc=1
+BUNDLE_GEMFILE=Gemfile bundle exec rubocop \
+  .agents/bin/agent_workflow_drift_manifest_test_test.rb \
+  script/shaka_seam_check_test.rb || rc=1
+ruby .agents/bin/agent_workflow_drift_manifest_test_test.rb || rc=1
+if shaka_command=$(command -v shaka 2>/dev/null); then
+  "$shaka_command" seam check --root . --local || rc=1
+  SHAKA_COMMAND="$shaka_command" ruby script/shaka_seam_check_test.rb || rc=1
+else
+  echo "Skipping local Shaka seam checks because shaka is not installed." >&2
+fi
 pnpm run lint || rc=1
 pnpm start format.listDifferent || rc=1
 exit "$rc"
