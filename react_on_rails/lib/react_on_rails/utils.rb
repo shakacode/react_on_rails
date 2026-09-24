@@ -3,6 +3,7 @@
 require "English"
 require "open3"
 require "rainbow"
+require "uri"
 require "active_support"
 require "active_support/core_ext/string"
 require "shellwords"
@@ -443,6 +444,58 @@ module ReactOnRails
         path_str
       end
     end
+
+    # Removes credentials from a URL for safe display in logs and error messages.
+    # Uses URI.parse for all heavy lifting — no regex on the URL itself.
+    #
+    # URI::File silently drops userinfo during parsing, so uri.to_s is already
+    # clean for file:// URLs. Malformed URLs that fail URI.parse get a safe
+    # placeholder. See #5046.
+    def self.sanitize_url_for_display(url)
+      return url if url.nil? || url.empty?
+
+      begin
+        uri = URI.parse(url)
+      rescue URI::InvalidURIError
+        return "[unparseable URL redacted]"
+      end
+
+      if uri.userinfo
+        uri.password = nil
+        uri.user = nil
+      end
+
+      redact_query_values(uri)
+    end
+
+    # Scrubs credentials from error-message text that may contain URLs.
+    def self.sanitize_error_text(text)
+      return text if text.nil? || text.empty?
+
+      text.to_s
+          .gsub(%r{//[^/?#]*@}, "//")
+          .gsub(%r{https?://[^\s]+}) do |match|
+        trimmed = match.sub(/[).,;:'">\]]+\z/, "")
+        sanitize_url_for_display(trimmed) + match[trimmed.length..]
+      end
+    end
+
+    # Replaces query values with [REDACTED], keeping keys for diagnostics.
+    # Bare components without = (like ?eyJhbGciOi...) are treated as opaque
+    # tokens and fully redacted. Operates on a parsed URI object.
+    def self.redact_query_values(uri)
+      if uri.query && !uri.query.empty?
+        begin
+          pairs = URI.decode_www_form(uri.query)
+          uri.query = pairs.map { |k, v| v.empty? ? "[REDACTED]" : "#{k}=[REDACTED]" }.join("&")
+        rescue ArgumentError
+          uri.query = "[REDACTED]"
+        end
+      end
+
+      uri.to_s
+    end
+    private_class_method :redact_query_values
 
     def self.default_troubleshooting_section
       <<~DEFAULT
