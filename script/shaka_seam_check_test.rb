@@ -158,8 +158,9 @@ class ShakaSeamCheckTest < Minitest::Test
         base_branch: main
         review:
           required: meaningful_changes
-          check: claude-review
-          reviewers:
+          ci_review_jobs:
+            - claude-review
+          local_review_agents:
             - provider: anthropic
               model_family: claude
         merge:
