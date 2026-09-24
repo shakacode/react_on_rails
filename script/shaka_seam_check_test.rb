@@ -8,6 +8,13 @@ require "tmpdir"
 require "yaml"
 
 module ShakaTrustConfigHelper
+  TRUST_SENTINELS = {
+    users: "justin808",
+    bots: "claude",
+    metadata_bots: "github-actions",
+    teams: %w[shakacode shakacode]
+  }.freeze
+
   def merge_trust_config(contents)
     repository = "shakacode/react_on_rails"
     parsed = Shaka::PublicComments::TrustSettings.new(repository).parse(contents, scope: "repository")
@@ -131,7 +138,7 @@ class ShakaSeamCheckTest < Minitest::Test
 
     merged = merge_trust_config(File.binread(trust_path))
 
-    assert_empty merged.fetch(:bots) & merged.fetch(:metadata_bots)
+    TRUST_SENTINELS.each { |role, entry| assert_includes merged.fetch(role), entry }
   end
 
   def test_overlapping_trust_bot_roles_are_rejected_by_shaka
@@ -151,6 +158,7 @@ class ShakaSeamCheckTest < Minitest::Test
 
   def with_valid_seam
     Dir.mktmpdir("shaka-seam-check") do |root|
+      execution_marker = File.join(root, "candidate-wrapper-executed")
       FileUtils.mkdir_p(File.join(root, ".agents/bin"))
       File.write(File.join(root, ".agents/agent-workflow.yml"), <<~YAML)
         ---
@@ -168,10 +176,11 @@ class ShakaSeamCheckTest < Minitest::Test
       YAML
       %w[setup validate test].each do |name|
         command = File.join(root, ".agents/bin", name)
-        File.write(command, "#!/bin/sh\nexit 0\n")
+        File.write(command, "#!/bin/sh\ntouch #{execution_marker.dump}\n")
         File.chmod(0o755, command)
       end
       yield root
+      refute File.exist?(execution_marker), "candidate seam validation must not execute repository wrappers"
     end
   end
 

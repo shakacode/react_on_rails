@@ -62,8 +62,8 @@ class AgentWorkflowDriftManifestTest < Minitest::Test
     AgentWorkflowDriftManifest.mapped_pairs(manifest, errors)
 
     assert_includes errors,
-                    "manifest consumer path must match source path: " \
-                    "skills/pr-batch/bin/existing-helper -> .agents/bin/wrong-helper"
+                    "manifest consumer path is invalid: skills/pr-batch/bin/existing-helper -> " \
+                    ".agents/bin/wrong-helper; expected .agents/skills/pr-batch/bin/existing-helper"
   end
 
   def test_manifest_allows_reviewed_legacy_fixture_relocation
@@ -98,8 +98,8 @@ class AgentWorkflowDriftManifestTest < Minitest::Test
     AgentWorkflowDriftManifest.mapped_pairs(manifest, errors)
 
     assert_includes errors,
-                    "manifest consumer path must match source path: " \
-                    "#{source} -> .agents/#{source}"
+                    "manifest consumer path is invalid: #{source} -> .agents/#{source}; " \
+                    "expected #{AgentWorkflowDriftManifest::CONSUMER_PATH_OVERRIDES.fetch(source)}"
   end
 
   def test_inventory_rejects_stray_active_copy_of_fixture_only_source

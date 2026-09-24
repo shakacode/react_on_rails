@@ -147,7 +147,7 @@ module AgentWorkflowDriftManifest
 
       expected_consumer = CONSUMER_PATH_OVERRIDES.fetch(source, ".agents/#{source}")
       if consumer != expected_consumer
-        errors << "manifest consumer path must match source path: #{source} -> #{consumer}"
+        errors << "manifest consumer path is invalid: #{source} -> #{consumer}; expected #{expected_consumer}"
       end
       [source, consumer]
     end
