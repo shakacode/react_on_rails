@@ -90,6 +90,27 @@ RSpec.describe "RSC payload endpoint" do
     expect(response.body).to eq("Invalid props JSON")
   end
 
+  it "returns bad request for bracket-notation props instead of 500" do
+    get "/rsc_payload/RscEchoProps", params: { "props[foo]" => "bar" }
+
+    expect(response).to have_http_status(:bad_request)
+    expect(response.body).to include("Invalid props JSON")
+  end
+
+  it "denies unauthorized requests before looking up async props block" do
+    hook_called = false
+    allow_any_instance_of(PagesController).to receive(:rsc_payload_async_props_block) do # rubocop:disable RSpec/AnyInstance
+      hook_called = true
+      nil
+    end
+    ReactOnRailsPro.configuration.rsc_payload_authorizer = ->(_controller, _component_name) { false }
+
+    request_rsc_payload
+
+    expect(response).to have_http_status(:forbidden)
+    expect(hook_called).to be(false)
+  end
+
   it "denies an unauthorized request before parsing malformed props" do
     ReactOnRailsPro.configuration.rsc_payload_authorizer = ->(_controller, _component_name) { false }
 
@@ -118,6 +139,54 @@ RSpec.describe "RSC payload endpoint" do
     request_rsc_payload
 
     expect(response).to have_http_status(:forbidden)
+  end
+
+  describe "async props block resolution" do
+    around do |example|
+      original_registry = ReactOnRailsPro.configuration.async_props_registry.dup
+      example.run
+    ensure
+      ReactOnRailsPro.configuration.instance_variable_set(:@async_props_registry, original_registry)
+    end
+
+    it "returns nil when no override and no registry entry" do
+      # The default code path: no override, no registry → nil block → template uses plain helper.
+      # Verified indirectly: the endpoint renders successfully with the plain helper (no async props).
+      request_rsc_payload
+      expect_valid_rsc_payload_response
+    end
+
+    it "uses the controller override and skips the registry when the override returns a proc" do
+      # Register a provider that should never be reached
+      ReactOnRailsPro.configuration.register_async_props("RscEchoProps", "NonExistentProvider")
+
+      # Override returns a truthy proc — the `||` short-circuits and the registry is never consulted.
+      # The proc itself is a no-op (no emit calls), so the component renders without async props.
+      noop_block = ->(_emit) {}
+      allow_any_instance_of(PagesController).to receive(:rsc_payload_async_props_block_override) # rubocop:disable RSpec/AnyInstance
+        .and_return(noop_block)
+
+      # If the registry WERE consulted, constantize("NonExistentProvider") would log an error.
+      # Asserting no error log proves the registry was never reached.
+      allow(Rails.logger).to receive(:error)
+
+      request_rsc_payload
+
+      expect(response).to have_http_status(:ok)
+      expect(Rails.logger).not_to have_received(:error)
+    end
+
+    it "logs an error and falls back to nil when the registry class cannot be loaded" do
+      ReactOnRailsPro.configuration.register_async_props("RscEchoProps", "NoSuchProviderClass")
+
+      allow(Rails.logger).to receive(:error)
+
+      request_rsc_payload
+
+      # Falls back to the plain helper (no async props), so the response is still valid
+      expect_valid_rsc_payload_response
+      expect(Rails.logger).to have_received(:error).with(/NoSuchProviderClass.*could not be loaded/)
+    end
   end
 
   # Regression for https://github.com/shakacode/react_on_rails/issues/4550.

@@ -491,6 +491,30 @@ If you are upgrading from Pro 3.x and relied on default values without explicitl
 
 If your app depends on the previous defaults, set them explicitly in `config/initializers/react_on_rails_pro.rb`.
 
+##### Async props on the RSC payload endpoint
+
+The RSC payload endpoint now supports async props through two mechanisms:
+
+1. **Config registry** (recommended): Register providers in your initializer:
+
+   ```ruby
+   ReactOnRailsPro.configure do |config|
+     config.register_async_props("ComponentName", "ProviderClassName")
+   end
+   ```
+
+   The provider class must implement `.call(emit, props, controller)`. Pass the
+   class name as a string (not the class itself) so the reference survives Rails
+   class reloading in development.
+
+2. **Controller hook**: Override `rsc_payload_async_props_block_override` in your controller
+   for components that need controller context (e.g. `current_user`).
+
+If you were using the template-shadowing workaround described in
+[#5075](https://github.com/shakacode/react_on_rails/issues/5075), you can now
+replace it with either approach. The template-shadow approach continues to work but
+is no longer necessary.
+
 ##### RSC payload template overrides
 
 React on Rails Pro now renders the built-in RSC payload template with `formats: [:text]` so Rails view annotations cannot inject HTML comments into NDJSON responses.
