@@ -5074,8 +5074,10 @@ module ReactOnRails
       { rsc_minor: 3, rsc_min_patch: 1, minor: 3, min_patch: 0 }
     ].freeze
     RSC_SUPPORTED_PACKAGE_MINORS = RSC_REACT_SUPPORT_RANGES.map { |range| range.fetch(:rsc_minor) }.freeze
-    RSC_SUPPORTED_PACKAGE_LINE = RSC_SUPPORTED_PACKAGE_MINORS.map do |minor|
-      "#{RSC_SUPPORTED_PACKAGE_MAJOR}.#{minor}.x"
+    RSC_SUPPORTED_PACKAGE_LINE = RSC_REACT_SUPPORT_RANGES.map do |range|
+      minor = range.fetch(:rsc_minor)
+      floor = "#{RSC_SUPPORTED_PACKAGE_MAJOR}.#{minor}.#{range.fetch(:rsc_min_patch)}"
+      "#{RSC_SUPPORTED_PACKAGE_MAJOR}.#{minor}.x starting at #{floor}"
     end.join(" or ")
     RSC_PACKAGE_INSTALL_VERSION = ReactOnRails::Generators::JsDependencyManager::RSC_PACKAGE_VERSION_PIN
     # Candidate soak only. The generator pin stays on stable 19.2.1 / latest.

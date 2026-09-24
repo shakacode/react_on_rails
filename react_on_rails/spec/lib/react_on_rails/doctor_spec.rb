@@ -11900,9 +11900,10 @@ RSpec.describe ReactOnRails::Doctor do
             expect(error_msgs).to include(
               a_string_including(
                 "react-on-rails-rsc 19.4.0 is not supported by React on Rails Pro 17 RSC",
-                "supported 19.2.x or 19.3.x package line"
+                "supported 19.2.x starting at 19.2.1 or 19.3.x starting at 19.3.1 package line"
               )
             )
+            expect(error_msgs.size).to eq(1)
             expect(doctor).not_to have_received(:capture_rsc_dist_tags)
           end
         end
@@ -11937,6 +11938,7 @@ RSpec.describe ReactOnRails::Doctor do
             expect(error_msgs).to include(
               a_string_including(
                 "react-on-rails-rsc 19.3.0 is not supported by React on Rails Pro 17 RSC",
+                "19.3.x starting at 19.3.1",
                 "19.3.1-rc.0"
               )
             )
