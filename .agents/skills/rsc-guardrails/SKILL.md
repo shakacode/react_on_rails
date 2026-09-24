@@ -20,8 +20,10 @@ examples.
 
 1. **Inline `<script>` / payload emission goes through `createScriptTag` → `escapeScript`.**
    Never hand-build a `<script>…</script>` string that contains flight-payload bytes, props, or any
-   user-derived data. `escapeScript` (in `packages/react-on-rails-pro/src/injectRSCPayload.ts`)
-   neutralizes `</script` and `<!--`; combined with `JSON.stringify` it blocks HTML/JS breakout.
+   user-derived data. `escapeScript` (the shared core implementation in
+   `packages/react-on-rails/src/escapeScript.ts`, imported by Pro's `createScriptTag` via
+   `react-on-rails/@internal/escapeScript`) neutralizes `</script` and `<!--`; combined with
+   `JSON.stringify` it blocks HTML/JS breakout.
    A payload chunk is user-controlled (usernames, comments). Regression test:
    `packages/react-on-rails-pro/tests/injectRSCPayload.test.ts` (breakout-escaping case).
    Nonces must pass through `sanitizeNonce` before landing in an attribute.
