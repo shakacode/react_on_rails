@@ -228,12 +228,15 @@ module AgentWorkflowDriftManifest
     append_set_differences(errors, "required governed source is not mapped", expected_sources - mapped_sources)
     append_set_differences(errors, "manifest maps source outside the governed inventory", mapped_sources - expected_sources)
     append_set_differences(errors, "same-path consumer source is not mapped", same_path_intersection - mapped_sources)
-    CONSUMER_PATH_OVERRIDES.each_key do |source|
+    CONSUMER_PATH_OVERRIDES.each_key.sort.each do |source|
       next unless consumer_files.include?(source)
 
       errors << "active consumer copy conflicts with fixture-only override: .agents/#{source}"
     end
-    mappings.each do |source, consumer|
+    mappings.sort.each do |source, consumer|
+      expected_consumer = CONSUMER_PATH_OVERRIDES.fetch(source, ".agents/#{source}")
+      next unless consumer == expected_consumer
+
       relative_consumer = consumer.delete_prefix(".agents/")
       errors << "mapped consumer file is missing: #{source} -> #{consumer}" unless consumer_files.include?(relative_consumer)
     end

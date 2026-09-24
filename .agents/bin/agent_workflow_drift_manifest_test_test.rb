@@ -102,6 +102,21 @@ class AgentWorkflowDriftManifestTest < Minitest::Test
                     "expected #{AgentWorkflowDriftManifest::CONSUMER_PATH_OVERRIDES.fetch(source)}"
   end
 
+  def test_invalid_consumer_path_does_not_also_report_the_consumer_as_missing
+    source = "bin/agent-workflow-seam-doctor"
+    invalid_consumer = ".agents/bin/agent-workflow-seam-doctor"
+    errors = []
+
+    AgentWorkflowDriftManifest.validate_inventory(
+      baseline_source_files,
+      baseline_consumer_files,
+      baseline_mappings.reject { |mapped_source, _consumer| mapped_source == source } + [[source, invalid_consumer]],
+      errors
+    )
+
+    refute_includes errors, "mapped consumer file is missing: #{source} -> #{invalid_consumer}"
+  end
+
   def test_inventory_rejects_stray_active_copy_of_fixture_only_source
     source = "bin/agent-workflow-seam-doctor"
     errors = []

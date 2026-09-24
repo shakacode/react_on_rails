@@ -8,12 +8,17 @@ if [ -d react_on_rails_pro ]; then
   ( cd react_on_rails_pro && BUNDLE_GEMFILE=../Gemfile bundle exec rubocop --ignore-parent-exclusion ) || rc=1
 fi
 legacy_doctor_dir=.agents/fixtures/agent-workflows/bin
-if [ -f "$legacy_doctor_dir/agent-workflow-seam-doctor" ]; then
+if [ ! -f "$legacy_doctor_dir/agent-workflow-seam-doctor" ] || \
+  [ ! -f "$legacy_doctor_dir/agent-workflow-seam-doctor-test.rb" ]; then
+  echo "legacy agent-workflows fixture is incomplete: $legacy_doctor_dir" >&2
+  rc=1
+else
   BUNDLE_GEMFILE=Gemfile bundle exec rubocop \
     "$legacy_doctor_dir/agent-workflow-seam-doctor" \
     "$legacy_doctor_dir/agent-workflow-seam-doctor-test.rb" || rc=1
   ruby "$legacy_doctor_dir/agent-workflow-seam-doctor-test.rb" || rc=1
 fi
+BUNDLE_GEMFILE=Gemfile bundle exec rubocop script/shaka_seam_check_test.rb || rc=1
 pnpm run lint || rc=1
 pnpm start format.listDifferent || rc=1
 exit "$rc"
