@@ -108,6 +108,7 @@ function runGemMatrix(script, { full, generators }) {
 
 const labelDispatchWorkflow = read('.github/workflows/hosted-ci-label-dispatch.yml');
 const requiredWorkflow = read('.github/workflows/ci-required.yml');
+const agentLint = read('.agents/bin/lint');
 const requiredPrGateJob = extractJob(requiredWorkflow, 'required-pr-gate');
 const agentWorkflowCheckoutStep = extractStep(requiredPrGateJob, 'Check out pinned agent workflows');
 const agentWorkflowDriftStep = extractStep(requiredPrGateJob, 'Validate pinned agent workflow copies');
@@ -197,6 +198,22 @@ assertMatches(
   'ci-required Shaka regression fixtures',
   shakaValidationStep,
   /SHAKA_COMMAND=\.shaka-source\/skills\/shaka\/scripts\/shaka ruby script\/shaka_seam_check_test\.rb/,
+);
+assertMatches('local lint validates the candidate seam when Shaka is installed', agentLint, /seam check --root \. --local/);
+assertMatches(
+  'local lint runs Shaka regression fixtures when Shaka is installed',
+  agentLint,
+  /SHAKA_COMMAND="\$shaka_command" ruby script\/shaka_seam_check_test\.rb/,
+);
+assertMatches(
+  'local lint runs consumer-owned drift manifest tests',
+  agentLint,
+  /ruby \.agents\/bin\/agent_workflow_drift_manifest_test_test\.rb/,
+);
+assertMatches(
+  'local lint fails when the legacy fixture is incomplete',
+  agentLint,
+  /legacy agent-workflows fixture is incomplete/,
 );
 assertMatches('ci-required mirrored-block lint', requiredWorkflow, /ruby bin\/lint-mirrored-blocks/);
 assertMatches(

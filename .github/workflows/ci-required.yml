@@ -97,6 +97,7 @@ jobs:
       - name: Validate CI scripts
         run: |
           for script in \
+            .agents/bin/lint \
             .agents/bin/setup \
             .agents/bin/validate \
             .agents/bin/test \

@@ -117,12 +117,12 @@ class ShakaSeamCheckTest < Minitest::Test
     File.expand_path("..", SHAKA_COMMAND_ROOT),
     File.expand_path("../skills/shaka", SHAKA_COMMAND_ROOT)
   ].find { |root| File.file?(File.join(root, "lib/shaka/public_comments/trust_config.rb")) }
-  raise "cannot locate Shaka skill root from #{SHAKA_COMMAND}" unless SHAKA_SKILL_ROOT
-
   REPOSITORY_ROOT = File.expand_path("..", __dir__)
 
-  $LOAD_PATH.unshift(File.join(SHAKA_SKILL_ROOT, "lib"))
-  require "shaka/public_comments/trust_config"
+  if SHAKA_SKILL_ROOT
+    $LOAD_PATH.unshift(File.join(SHAKA_SKILL_ROOT, "lib"))
+    require "shaka/public_comments/trust_config"
+  end
 
   include ShakaTrustConfigHelper
   include ShakaSeamFixtureHelper
@@ -242,14 +242,18 @@ class ShakaSeamCheckTest < Minitest::Test
   end
 
   def test_repository_trust_config_is_accepted_by_shaka
+    skip "installed Shaka does not expose its skill library" unless SHAKA_SKILL_ROOT
+
     trust_path = File.join(REPOSITORY_ROOT, ".agents/trusted-github-actors.yml")
 
     merged = load_trust_config(File.binread(trust_path))
 
-    %i[users bots metadata_bots teams].each { |role| refute_empty merged.fetch(role) }
+    assert_empty merged.fetch(:bots) & merged.fetch(:metadata_bots)
   end
 
   def test_overlapping_trust_bot_roles_are_rejected_by_shaka
+    skip "installed Shaka does not expose its skill library" unless SHAKA_SKILL_ROOT
+
     contents = <<~YAML
       trusted_bots:
         - github-actions

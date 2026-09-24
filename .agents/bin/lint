@@ -24,14 +24,7 @@ BUNDLE_GEMFILE=Gemfile bundle exec rubocop \
 ruby .agents/bin/agent_workflow_drift_manifest_test_test.rb || rc=1
 if shaka_command=$(command -v shaka 2>/dev/null); then
   "$shaka_command" seam check --root . --local || rc=1
-  shaka_realpath=$(ruby -e 'puts File.realpath(ARGV.fetch(0))' "$shaka_command")
-  shaka_command_root=$(dirname "$shaka_realpath")
-  if [ -f "$shaka_command_root/../lib/shaka/public_comments/trust_config.rb" ] || \
-    [ -f "$shaka_command_root/../skills/shaka/lib/shaka/public_comments/trust_config.rb" ]; then
-    SHAKA_COMMAND="$shaka_command" ruby script/shaka_seam_check_test.rb || rc=1
-  else
-    echo "Skipping Shaka library regression tests because the installed executable has no skill library." >&2
-  fi
+  SHAKA_COMMAND="$shaka_command" ruby script/shaka_seam_check_test.rb || rc=1
 else
   echo "Skipping local Shaka seam checks because shaka is not installed." >&2
 fi
