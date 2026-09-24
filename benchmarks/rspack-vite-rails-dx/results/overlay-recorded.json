@@ -1,0 +1,110 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-09-12T01:10:38.530Z",
+  "environment": {
+    "harness_git_head": "caaa27bc232393836bb71c2f8c94ec656bed49c2",
+    "harness_git_clean": true,
+    "operating_system": "Darwin 25.6.0 arm64",
+    "cpu": "Apple M5 Max",
+    "logical_cpu_count": 18,
+    "total_memory_bytes": 137438953472,
+    "node": "v22.12.0",
+    "pnpm": "10.33.4",
+    "ruby": "ruby 4.0.5 (2026-05-20 revision 64336ffd0e) +PRISM [arm64-darwin23]",
+    "rails": { "rspack": "Rails 8.1.3", "vite": "Rails 8.1.3" },
+    "dependencies": {
+      "rspack_ruby": "react_on_rails 17.0.1; shakapacker 10.3.0",
+      "rspack_javascript": "rspack/2.2.2 darwin-arm64 node-v22.12.0",
+      "vite_ruby": "inertia_rails 3.22.0; vite_rails 3.11.1",
+      "vite_javascript": "vite/8.2.2 darwin-arm64 node-v22.12.0"
+    },
+    "commands": {
+      "rspack": "REACT_ON_RAILS_BASE_PORT=<PORT> bin/dev --no-open-browser",
+      "vite": "PORT=<PORT> VITE_RUBY_PORT=<PORT+1> bin/dev"
+    }
+  },
+  "methodology": {
+    "compile_overlay": "append a deterministic syntax error and require the overlay marker plus original TSX file and line",
+    "runtime_overlay": "insert a deterministic render-time throw and require the overlay marker plus original TSX file and line",
+    "click_to_editor": "click the compile-error source link with LAUNCH_EDITOR set to a recorder; require exact copied source path, line, and column",
+    "cleanup": "restore each source mutation, wait for the overlay to clear, then remove the process group, workspace, and ports"
+  },
+  "results": {
+    "rspack": {
+      "compile_overlay": {
+        "status": "PASS",
+        "marker_visible": true,
+        "source_location_visible": true,
+        "expected_source": "app/javascript/src/HelloWorld/ror_components/HelloWorld.client.tsx:26",
+        "evidence": "Compiled with problems:×ERROR in ./app/javascript/src/HelloWorld/ror_components/HelloWorld.client.tsx × Module build failed (from builtin:swc-loader): ╰─▶ × Syntax Error: Expression expected ╭─[26:36] 24 │ 25 │ export default HelloWorld; 26 │ const ROR_DX_COMPILE_ERROR_MARKER = ; · ─ ╰────"
+      },
+      "runtime_overlay": {
+        "status": "FAIL",
+        "marker_visible": true,
+        "source_location_visible": false,
+        "expected_source": "app/javascript/src/HelloWorld/ror_components/HelloWorld.client.tsx:6",
+        "evidence": "Uncaught runtime errors:×ERRORROR_DX_RUNTIME_ERROR_MARKER at HelloWorld (http://127.0.0.1:47876/packs/js/generated/HelloWorld.1c2173974ac152c1.hot-update.js:15:11) at react-stack-bottom-frame (http://127.0.0.1:47876/packs/js/vendors-starters_rspack_node_modules_pnpm_react_19_0_4_node_modules_react_jsx-dev-runtime_js--39f23b.js:22430:20) at renderWithHooks (http://127.0.0.1:47876/packs/js/vendors-starters_rspack_node_modules_pnpm_react_19_0_4_node_modules_react_jsx-dev-runtime_js--39f23b.js:5759:22) at updateFunctionComponent (http://127.0.0.1:47876/packs/js/vendors-starters_rspack_node_modules_pnpm_react_19_0_4_node_modules_react_jsx-dev-runtime_js--39f23b.js:8020:19) at beginWork (http://127.0.0.1:47876/packs/js/vendors-starters_rspack_node_modules_pnpm_react_19_0_4_node_modules_react_jsx-dev-runtime_js--39f23b.js:9685:18) at runWithFiberInDEV (http://127.0.0.1:47876/packs/js/vendors-starters_rspack_node_modules_pnpm_react_19_0_4_node_modules_react_jsx-dev-runtime_js--39f23b.js:546:16"
+      },
+      "click_to_editor": {
+        "status": "FAIL",
+        "expected_source": "app/javascript/src/HelloWorld/ror_components/HelloWorld.client.tsx:26:<column>",
+        "evidence": "timed out waiting for the LAUNCH_EDITOR recorder",
+        "available_targets": [],
+        "responses": [
+          {
+            "status": 404,
+            "url": "http://127.0.0.1:46556/rspack-dev-server/open-editor?fileName=builtin:react-refresh-loader!builtin:react-refresh-loader!builtin:swc-loader??ruleSet[1].rules[3].use[0]!<LOCAL_PATH>/.work/rspack-oc-14145-1789175438692-ca39148008b1f/app/javascript/src/HelloWorld/ror_components/HelloWorld.client.tsx",
+            "body": "<!DOCTYPE html> <html lang=\"en\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"> <meta name=\"turbo-visit-control\" content=\"reload\"> <title>Action Controller: Exception caught</title> <style> body { background-color: #FAFAFA; color: #333; color-scheme: light dark; supported-color-schemes: light dark; margin: 0px; } body, p, ol, ul, td { font-family: helvetica, verdana, arial, sans-serif; font-size: 13px; line-height: 18px; } pre { font-size: 11px; white-space: pre-wrap; } pre.box { border: 1px solid #EEE; padding: 10px; margin: 0px; width: 958px; } header { color: #F0F0F0; background: #C00; padding: 0.5em 1.5em; } header button { appearance: none; background-color: hsl(0 0% 0% / 0.2); border: 0; border-radius: 14px; color: white; float: right; font-weight: 500; height: 28px; padding-inline: 14px; margin: 0.35em 0; } header button:active { background-color: hsl(0 0% 0% / 0.25); } h1 { overflow-wrap: break-word; margin: 0.2em 0; line-he"
+          }
+        ]
+      },
+      "source_restoration": {
+        "status": "FAIL",
+        "compile": {
+          "status": "FAIL",
+          "health_marker_observed": false,
+          "evidence": "ready=false; overlay=undefined"
+        },
+        "runtime": { "status": "PASS", "health_marker_observed": true }
+      },
+      "browser_error_excerpt": "Error: ROR_DX_RUNTIME_ERROR_MARKER at HelloWorld (http://127.0.0.1:47876/packs/js/generated/HelloWorld.1c2173974ac152c1.hot-update.js:15:11) at react-stack-bottom-frame (http://127.0.0.1:47876/packs/js/vendors-starters_rspack_node_modules_pnpm_react_19_0_4_node_modules_react_jsx-dev-runtime_js--39f23b.js:22430:20) at renderWithHooks (http://127.0.0.1:47876/packs/js/vendors-starters_rspack_node_modules_pnpm_react_19_0_4_node_modules_react_jsx-dev-runtime_js--39f23b.js:5759:22) at updateFunctionComponent (http://127.0.0.1:47876/packs/js/vendors-starters_rspack_node_modules_pnpm_react_19_0_4_node_modules_react_jsx-dev-runtime_js--39f23b.js:8020:19) at beginWork (http://127.0.0.1:47876/packs/js/vendors-starters_rspack_node_modules_pnpm_react_19_0_4_node_modules_react_jsx-dev-runtime_js--39f23b.js:9685:18) at runWithFiberInDEV (http://127.0.0.1:47876/packs/js/vendors-starters_rspack_node_modules_pnpm_react_19_0_4_node_modules_react_jsx-dev-runtime_js--39f23b.js:546:16) at performUnitOfWork ",
+      "cleanup": "PASS"
+    },
+    "vite": {
+      "compile_overlay": {
+        "status": "PASS",
+        "marker_visible": true,
+        "source_location_visible": true,
+        "expected_source": "app/frontend/pages/inertia_example/index.tsx:26",
+        "evidence": "[plugin:vite:oxc] Transform failed with 1 error: [PARSE_ERROR] Unexpected token ╭─[ app/frontend/pages/inertia_example/index.tsx:26:37 ] │ 26 │ const ROR_DX_COMPILE_ERROR_MARKER = ; │ ┬ │ ╰── ────╯<LOCAL_PATH>/.work/vite-oc-14145-1789175496734-eb4cb61914712/app/frontend/pages/inertia_example/index.tsx at transformWithOxc (file://<LOCAL_PATH>/starters/vite/node_modules/.pnpm/vite@8.2.2/node_modules/vite/dist/node/chunks/node.js:4103:19) at TransformPluginContext.transform (file://<LOCAL_PATH>/starters/vite/node_modules/.pnpm/vite@8.2.2/node_modules/vite/dist/node/chunks/node.js:4174:26) at EnvironmentPluginContainer.transform (file://<LOCAL_PATH>/starters/vite/node_modules/.pnpm/vite@8.2.2/node_modules/vite/dist/node/chunks/node.js:30932:51) at async loadAndTransform (file://<LOCAL_PATH>/starters/vite/node_modules/.pnpm/vite@8.2.2/node_modules/vite/dist/node/chunks/node.js:20671:26) at async viteTransformMiddleware (file://<LOCAL_PATH>/starters/vite/node_modules/.pnpm/vite@8.2.2/node_mo"
+      },
+      "runtime_overlay": {
+        "status": "FAIL",
+        "marker_visible": false,
+        "source_location_visible": false,
+        "expected_source": "app/frontend/pages/inertia_example/index.tsx:7",
+        "evidence": "No matching overlay appeared before the bounded timeout."
+      },
+      "click_to_editor": {
+        "status": "FAIL",
+        "expected_source": "app/frontend/pages/inertia_example/index.tsx:26:<column>",
+        "evidence": "locator.waitFor: Timeout 5000ms exceeded. Call log: \u001b[2m - waiting for locator('vite-error-overlay').locator('.file-link').filter({ hasText: 'index.tsx' }).first() to be visible\u001b[22m",
+        "available_targets": [
+          "file://<LOCAL_PATH>/starters/vite/node_modules/.pnpm/vite@8.2.2/node_modules/vite/dist/node/chunks/node.js:4103:19",
+          "file://<LOCAL_PATH>/starters/vite/node_modules/.pnpm/vite@8.2.2/node_modules/vite/dist/node/chunks/node.js:4174:26",
+          "file://<LOCAL_PATH>/starters/vite/node_modules/.pnpm/vite@8.2.2/node_modules/vite/dist/node/chunks/node.js:30932:51",
+          "file://<LOCAL_PATH>/starters/vite/node_modules/.pnpm/vite@8.2.2/node_modules/vite/dist/node/chunks/node.js:20671:26",
+          "file://<LOCAL_PATH>/starters/vite/node_modules/.pnpm/vite@8.2.2/node_modules/vite/dist/node/chunks/node.js:25205:20"
+        ],
+        "responses": []
+      },
+      "source_restoration": {
+        "status": "PASS",
+        "compile": { "status": "PASS", "health_marker_observed": true },
+        "runtime": { "status": "PASS", "health_marker_observed": true }
+      },
+      "browser_error_excerpt": "Error: ROR_DX_RUNTIME_ERROR_MARKER at InertiaExample (http://127.0.0.1:45297/vite-dev/pages/inertia_example/index.tsx?t=1789175514442:9:8) at react-stack-bottom-frame (http://127.0.0.1:45297/vite-dev/@fs<LOCAL_PATH>/.work/vite-or-14145-1789175507463-a6f4299da1a83/node_modules/.vite/deps/@inertiajs_react.js?v=1deaec1a:18325:12) at renderWithHooks (http://127.0.0.1:45297/vite-dev/@fs<LOCAL_PATH>/.work/vite-or-14145-1789175507463-a6f4299da1a83/node_modules/.vite/deps/@inertiajs_react.js?v=1deaec1a:9993:19) at updateFunctionComponent (http://127.0.0.1:45297/vite-dev/@fs<LOCAL_PATH>/.work/vite-or-14145-1789175507463-a6f4299da1a83/node_modules/.vite/deps/@inertiajs_react.js?v=1deaec1a:11226:16) at beginWork (http://127.0.0.1:45297/vite-dev/@fs<LOCAL_PATH>/.work/vite-or-14145-1789175507463-a6f4299da1a83/node_modules/.vite/deps/@inertiajs_react.js?v=1deaec1a:11847:20) at runWithFiberInDEV (http://127.0.0.1:45297/vite-dev/@fs<LOCAL_PATH>/.work/vite-or-14145-1789175507463-a6f4299da1a83/node_modu",
+      "cleanup": "PASS"
+    }
+  }
+}
