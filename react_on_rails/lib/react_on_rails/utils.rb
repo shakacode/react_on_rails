@@ -454,6 +454,15 @@ module ReactOnRails
     def self.sanitize_url_for_display(url)
       return url if url.nil? || url.empty?
 
+      # Prepend http:// if there's no scheme — bare "host:port" strings are
+      # valid targets but URI.parse misparses them (treats "host" as the scheme).
+      # The HTTP stack makes the same assumption.
+      added_scheme = false
+      unless url.include?("://") || url.start_with?("/")
+        url = "http://#{url}"
+        added_scheme = true
+      end
+
       begin
         uri = URI.parse(url)
       rescue URI::InvalidURIError
@@ -465,7 +474,10 @@ module ReactOnRails
         uri.user = nil
       end
 
-      redact_query_values(uri)
+      result = redact_query_values(uri)
+      # Strip the scheme we added — output should match the input format
+      result = result.delete_prefix("http://") if added_scheme
+      result
     end
 
     # Scrubs credentials from error-message text that may contain URLs.
