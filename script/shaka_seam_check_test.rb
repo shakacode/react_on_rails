@@ -67,17 +67,18 @@ module ShakaSeamFixtureHelper
   end
 
   def commit_fixture(root)
+    git_environment = { "GIT_CONFIG_GLOBAL" => File::NULL, "GIT_CONFIG_SYSTEM" => File::NULL }
     git = ["git", "-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false", "-C", root]
     commands = [
       %w[init -q],
-      %w[add .],
+      %w[add -f .],
       ["-c", "user.name=Shaka Test", "-c", "user.email=shaka-test@example.com", "commit", "-qm", "fixture"]
     ]
     commands.each do |arguments|
-      _output, error, status = Open3.capture3(*git, *arguments)
+      _output, error, status = Open3.capture3(git_environment, *git, *arguments)
       raise "fixture git command failed: #{error}" unless status.success?
     end
-    output, error, status = Open3.capture3(*git, "rev-parse", "HEAD")
+    output, error, status = Open3.capture3(git_environment, *git, "rev-parse", "HEAD")
     raise "fixture git rev-parse failed: #{error}" unless status.success?
 
     output.strip
@@ -248,7 +249,7 @@ class ShakaSeamCheckTest < Minitest::Test
 
     merged = load_trust_config(File.binread(trust_path))
 
-    assert_empty merged.fetch(:bots) & merged.fetch(:metadata_bots)
+    assert_equal %i[bots metadata_bots sources teams users], merged.keys.sort
   end
 
   def test_overlapping_trust_bot_roles_are_rejected_by_shaka

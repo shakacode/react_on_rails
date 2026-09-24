@@ -23,8 +23,12 @@ BUNDLE_GEMFILE=Gemfile bundle exec rubocop \
   script/shaka_seam_check_test.rb || rc=1
 ruby .agents/bin/agent_workflow_drift_manifest_test_test.rb || rc=1
 if shaka_command=$(command -v shaka 2>/dev/null); then
-  "$shaka_command" seam check --root . --local || rc=1
-  SHAKA_COMMAND="$shaka_command" ruby script/shaka_seam_check_test.rb || rc=1
+  if "$shaka_command" seam check --help 2>&1 | grep -q -- '--ci-review-job'; then
+    "$shaka_command" seam check --root . --local || rc=1
+    SHAKA_COMMAND="$shaka_command" ruby script/shaka_seam_check_test.rb || rc=1
+  else
+    echo "Skipping local Shaka seam checks because the installed version uses an older contract." >&2
+  fi
 else
   echo "Skipping local Shaka seam checks because shaka is not installed." >&2
 fi

@@ -109,6 +109,7 @@ function runGemMatrix(script, { full, generators }) {
 const labelDispatchWorkflow = read('.github/workflows/hosted-ci-label-dispatch.yml');
 const requiredWorkflow = read('.github/workflows/ci-required.yml');
 const agentLint = read('.agents/bin/lint');
+const agentInstructions = read('AGENTS.md');
 const requiredPrGateJob = extractJob(requiredWorkflow, 'required-pr-gate');
 const agentWorkflowCheckoutStep = extractStep(requiredPrGateJob, 'Check out pinned agent workflows');
 const agentWorkflowDriftStep = extractStep(requiredPrGateJob, 'Validate pinned agent workflow copies');
@@ -214,6 +215,12 @@ assertMatches(
   'local lint fails when the legacy fixture is incomplete',
   agentLint,
   /legacy agent-workflows fixture is incomplete/,
+);
+assertMatches('agent workflow pointer heading', agentInstructions, /^## Agent Workflow Configuration$/m);
+assertMatches(
+  'agent workflow trusted Shaka pointer',
+  agentInstructions,
+  /shaka seam check --root "\$\(pwd\)" --ref "\$\(git rev-parse origin\/main\)"/,
 );
 assertMatches('ci-required mirrored-block lint', requiredWorkflow, /ruby bin\/lint-mirrored-blocks/);
 assertMatches(
