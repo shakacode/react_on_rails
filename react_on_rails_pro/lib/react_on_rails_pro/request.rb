@@ -685,19 +685,23 @@ module ReactOnRailsPro
           force_http2: ReactOnRailsPro.configuration.renderer_http_force_http2
         )
       rescue StandardError => e
-        message = <<~MSG
+        raise ReactOnRailsPro::Error, create_connection_error_message(url, e)
+      end
+
+      def create_connection_error_message(url, error)
+        config = ReactOnRailsPro.configuration
+        <<~MSG
           [ReactOnRailsPro] Error creating async-http connection.
-          renderer_http_pool_size = #{ReactOnRailsPro.configuration.renderer_http_pool_size}
-          renderer_http_pool_timeout = #{ReactOnRailsPro.configuration.renderer_http_pool_timeout}
-          renderer_http_pool_warn_timeout = #{ReactOnRailsPro.configuration.renderer_http_pool_warn_timeout}
-          renderer_http_keep_alive_timeout = #{ReactOnRailsPro.configuration.renderer_http_keep_alive_timeout}
-          renderer_http_force_http2 = #{ReactOnRailsPro.configuration.renderer_http_force_http2}
+          renderer_http_pool_size = #{config.renderer_http_pool_size}
+          renderer_http_pool_timeout = #{config.renderer_http_pool_timeout}
+          renderer_http_pool_warn_timeout = #{config.renderer_http_pool_warn_timeout}
+          renderer_http_keep_alive_timeout = #{config.renderer_http_keep_alive_timeout}
+          renderer_http_force_http2 = #{config.renderer_http_force_http2}
           renderer_url = #{ReactOnRails::Utils.sanitize_url_for_display(url)}
           Be sure to use a url that contains the protocol of http or https.
           Original error is
-          #{ReactOnRails::Utils.sanitize_error_text(e.message)}
+          #{ReactOnRails::Utils.sanitize_error_text(error.message)}
         MSG
-        raise ReactOnRailsPro::Error, message
       end
 
       def get_form_body_for_file(path)
