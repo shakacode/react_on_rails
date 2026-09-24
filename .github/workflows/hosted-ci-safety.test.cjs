@@ -16,15 +16,19 @@ function assertDoesNotMatch(name, text, pattern) {
   assert.doesNotMatch(text, pattern, `${name} unexpectedly matches ${pattern}`);
 }
 
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function assertPinnedCheckout(name, step, { repository, ref, path }) {
   assertMatches(
     `${name} action`,
     step,
     /^\s+uses: actions\/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5\s+# v4$/m,
   );
-  assertMatches(`${name} repository`, step, new RegExp(`^\\s+repository: ${repository}$`, 'm'));
-  assertMatches(`${name} ref`, step, new RegExp(`^\\s+ref: ${ref}$`, 'm'));
-  assertMatches(`${name} path`, step, new RegExp(`^\\s+path: ${path}$`, 'm'));
+  assertMatches(`${name} repository`, step, new RegExp(`^\\s+repository: ${escapeRegExp(repository)}$`, 'm'));
+  assertMatches(`${name} ref`, step, new RegExp(`^\\s+ref: ${escapeRegExp(ref)}$`, 'm'));
+  assertMatches(`${name} path`, step, new RegExp(`^\\s+path: ${escapeRegExp(path)}$`, 'm'));
   assertMatches(`${name} fetch depth`, step, /^\s+fetch-depth: 1$/m);
   assertMatches(`${name} credentials`, step, /^\s+persist-credentials: false$/m);
 }
@@ -167,7 +171,7 @@ assert.ok(agentWorkflowRevision, 'agent workflow drift manifest must pin a full 
 assertPinnedCheckout('ci-required pinned agent workflow checkout', agentWorkflowCheckoutStep, {
   repository: 'shakacode/agent-workflows',
   ref: agentWorkflowRevision[1],
-  path: '\\.agent-workflows-source',
+  path: '.agent-workflows-source',
 });
 assertMatches(
   'ci-required agent workflow manifest completeness check',
@@ -182,7 +186,7 @@ assertMatches(
 assertPinnedCheckout('ci-required pinned Shaka checkout', shakaCheckoutStep, {
   repository: 'shakacode/shaka',
   ref: '67c1d8f70f5c4eaa05f58f796be53a6866148139',
-  path: '\\.shaka-source',
+  path: '.shaka-source',
 });
 assertMatches(
   'ci-required Shaka candidate seam validation',

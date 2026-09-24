@@ -16,7 +16,11 @@ module ShakaTrustConfigHelper
   }.freeze
 
   GitHubTrustFixture = Struct.new(:repository, :contents) do
-    def graphql(*)
+    def graphql(_query, owner:, name:, expression:)
+      expected_expression = "#{'a' * 40}:.agents/trusted-github-actors.yml"
+      raise "unexpected trust repository" unless [owner, name].join("/") == repository
+      raise "unexpected trust expression: #{expression}" unless expression == expected_expression
+
       object = {
         "__typename" => "Blob", "text" => contents, "isBinary" => false,
         "isTruncated" => false, "byteSize" => contents.bytesize

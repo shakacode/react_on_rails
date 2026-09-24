@@ -6,6 +6,18 @@ require "tempfile"
 require_relative "agent-workflow-drift-manifest-test"
 
 class AgentWorkflowDriftManifestTest < Minitest::Test
+  def test_real_consumer_inventory_includes_relocated_legacy_fixtures
+    repository_root = File.expand_path("../..", __dir__)
+    errors = []
+
+    files = AgentWorkflowDriftManifest.consumer_agent_files(repository_root, errors)
+
+    assert_empty errors
+    AgentWorkflowDriftManifest::CONSUMER_PATH_OVERRIDES.each_value do |consumer|
+      assert_includes files, consumer.delete_prefix(".agents/")
+    end
+  end
+
   def test_safe_yaml_loader_rejects_aliases
     Tempfile.create(["agent-workflow-drift", ".yml"]) do |file|
       file.write("version: &version 1\nsource_revision: *version\nfiles: []\n")
