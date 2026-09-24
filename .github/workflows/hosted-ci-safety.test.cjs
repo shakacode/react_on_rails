@@ -200,7 +200,11 @@ assertMatches(
   shakaValidationStep,
   /SHAKA_COMMAND=\.shaka-source\/skills\/shaka\/scripts\/shaka ruby script\/shaka_seam_check_test\.rb/,
 );
-assertMatches('local lint validates the candidate seam when Shaka is installed', agentLint, /seam check --root \. --local/);
+assertMatches(
+  'local lint validates the candidate seam when Shaka is installed',
+  agentLint,
+  /seam check --root \. --local/,
+);
 assertMatches(
   'local lint runs Shaka regression fixtures when Shaka is installed',
   agentLint,
