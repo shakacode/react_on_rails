@@ -671,7 +671,8 @@ module ReactOnRailsPro
       end
 
       def create_connection
-        url = ReactOnRailsPro.configuration.renderer_url
+        config = ReactOnRailsPro.configuration
+        url = config.renderer_url
         Rails.logger.debug do
           "[ReactOnRailsPro] Setting up Node Renderer connection to " \
             "#{ReactOnRails::Utils.sanitize_url_for_display(url)}"
@@ -679,19 +680,19 @@ module ReactOnRailsPro
 
         ReactOnRailsPro::RendererHttpClient.new(
           origin: url,
-          pool_size: ReactOnRailsPro.configuration.renderer_http_pool_size,
-          connect_timeout: ReactOnRailsPro.configuration.renderer_http_pool_timeout,
-          read_timeout: ReactOnRailsPro.configuration.ssr_timeout,
-          force_http2: ReactOnRailsPro.configuration.renderer_http_force_http2
+          pool_size: config.renderer_http_pool_size,
+          connect_timeout: config.renderer_http_pool_timeout,
+          read_timeout: config.ssr_timeout,
+          force_http2: config.renderer_http_force_http2
         )
       rescue StandardError => e
         message = <<~MSG
           [ReactOnRailsPro] Error creating async-http connection.
-          renderer_http_pool_size = #{ReactOnRailsPro.configuration.renderer_http_pool_size}
-          renderer_http_pool_timeout = #{ReactOnRailsPro.configuration.renderer_http_pool_timeout}
-          renderer_http_pool_warn_timeout = #{ReactOnRailsPro.configuration.renderer_http_pool_warn_timeout}
-          renderer_http_keep_alive_timeout = #{ReactOnRailsPro.configuration.renderer_http_keep_alive_timeout}
-          renderer_http_force_http2 = #{ReactOnRailsPro.configuration.renderer_http_force_http2}
+          renderer_http_pool_size = #{config.renderer_http_pool_size}
+          renderer_http_pool_timeout = #{config.renderer_http_pool_timeout}
+          renderer_http_pool_warn_timeout = #{config.renderer_http_pool_warn_timeout}
+          renderer_http_keep_alive_timeout = #{config.renderer_http_keep_alive_timeout}
+          renderer_http_force_http2 = #{config.renderer_http_force_http2}
           renderer_url = #{ReactOnRails::Utils.sanitize_url_for_display(url)}
           Be sure to use a url that contains the protocol of http or https.
           Original error is
