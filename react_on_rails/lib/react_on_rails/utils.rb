@@ -446,41 +446,29 @@ module ReactOnRails
     end
 
     # Removes credentials from a URL for safe display in logs and error messages.
+    # Uses URI.parse for all heavy lifting — no regex on the URL itself.
     #
-    # Handles the URL shapes React on Rails actually receives:
-    #   - http(s)://user:pass@host/path  → strips userinfo via URI.parse
-    #   - http(s)://host/b.js?key=val    → redacts query values (presigned S3, etc.)
-    #   - file://user:pass@host/path     → strips userinfo via regex (URI::File drops it)
-    #   - /local/path/bundle.js          → passed through unchanged
-    #
-    # URLs malformed enough to fail URI.parse (spaces, unencoded special chars) are
-    # not realistic renderer URLs — return a safe placeholder instead of trying to
-    # regex-extract credentials from arbitrary broken strings. See #5046.
+    # URI::File silently drops userinfo during parsing, so uri.to_s is already
+    # clean for file:// URLs. Malformed URLs that fail URI.parse get a safe
+    # placeholder. See #5046.
     def self.sanitize_url_for_display(url)
       return url if url.nil? || url.empty?
 
       begin
         uri = URI.parse(url)
-        if uri.userinfo.nil?
-          # URI::File silently drops userinfo — fall back to regex for non-HTTP schemes.
-          unless uri.is_a?(URI::HTTP)
-            return redact_query_values(strip_authority_userinfo(url))
-          end
+      rescue URI::InvalidURIError
+        return "[unparseable URL redacted]"
+      end
 
-          return redact_query_values(uri.to_s)
-        end
-
+      if uri.userinfo
         uri.password = nil
         uri.user = nil
-        redact_query_values(uri.to_s)
-      rescue URI::InvalidURIError
-        "[unparseable URL redacted]"
       end
+
+      redact_query_values(uri)
     end
 
-    # Scrubs credentials from arbitrary error-message text that may contain URLs.
-    # Strips //...@ patterns (authority userinfo) and redacts query values in any
-    # http(s) URL found in the text.
+    # Scrubs credentials from error-message text that may contain URLs.
     def self.sanitize_error_text(text)
       return text if text.nil? || text.empty?
 
@@ -492,43 +480,20 @@ module ReactOnRails
       end
     end
 
-    # Strips userinfo from file:// and other non-HTTP URLs where URI.parse
-    # succeeds but silently loses the credentials. Only looks at the authority
-    # (before the first /?#), so @ in paths and queries is left alone.
-    def self.strip_authority_userinfo(url)
-      match = url.match(%r{\A\s*(?<scheme>\w+://)}i)
-      return url unless match
-
-      rest = url[match[0].length..]
-      authority_end = rest.index(%r{[/?#]})
-      authority = authority_end ? rest[0...authority_end] : rest
-      suffix = authority_end ? rest[authority_end..] : ""
-
-      return url unless authority.include?("@")
-
-      last_at = authority.rindex("@")
-      match[:scheme] + authority[(last_at + 1)..] + suffix
-    end
-    private_class_method :strip_authority_userinfo
-
-    # Replaces query-string values with [REDACTED], keeping keys for diagnostics.
-    # Splits # before ? so a ?-inside-fragment (hash-router URLs) isn't misread.
-    def self.redact_query_values(url)
-      return url unless url.include?("?")
-
-      base_and_query, fragment = url.split("#", 2)
-      base, query_part = base_and_query.split("?", 2)
-      return url unless query_part
-
-      unless query_part.empty?
-        query_part = query_part.gsub(/=([^&]*)/, "=[REDACTED]")
-        # Bare components without = (e.g. ?eyJhbGciOi...) are opaque tokens — redact those too
-        query_part = query_part.split("&").map { |c| c.include?("=") ? c : "[REDACTED]" }.join("&")
+    # Replaces query values with [REDACTED], keeping keys for diagnostics.
+    # Bare components without = (like ?eyJhbGciOi...) are treated as opaque
+    # tokens and fully redacted. Operates on a parsed URI object.
+    def self.redact_query_values(uri)
+      if uri.query && !uri.query.empty?
+        begin
+          pairs = URI.decode_www_form(uri.query)
+          uri.query = pairs.map { |k, v| v.empty? ? "[REDACTED]" : "#{k}=[REDACTED]" }.join("&")
+        rescue ArgumentError
+          uri.query = "[REDACTED]"
+        end
       end
 
-      result = "#{base}?#{query_part}"
-      result += "##{fragment}" if fragment
-      result
+      uri.to_s
     end
     private_class_method :redact_query_values
 
