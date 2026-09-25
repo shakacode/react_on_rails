@@ -26,13 +26,15 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Added
 
-- **[Pro]** **Candidate `react-on-rails-rsc@19.3.1-rc.0` soak**: The Pro package optional peer now
-  also accepts `~19.3.1-rc.0` so apps can install the React 19.3 Flight RC (`next` dist-tag)
-  without satisfying the stable `>=19.2.1 <20.0.0` range. Pro dummy and package tests pin that RC
-  with React/React DOM/`react-server-dom-webpack` 19.3.0. The generator still installs stable
-  `19.2.1`. Do not mix this RC with published `react-on-rails-rsc@19.3.0` (React 19.2.8 Flight).
-  Doctor's mismatch Fix command now recommends the React line for the installed RSC package.
-  [PR 5094](https://github.com/shakacode/react_on_rails/pull/5094) by [justin808](https://github.com/justin808).
+- **[Pro]** **React 19.3 support with `react-on-rails-rsc@19.3.1-rc.0`**: The node renderer startup
+  check and `react_on_rails:doctor` now accept `react-on-rails-rsc` 19.3.1-rc.0 (npm `next`) and later
+  19.3.1+ releases with React/React DOM 19.3.x. The `react-on-rails-pro` optional peer range admits
+  `~19.3.1-rc.0`. Published `react-on-rails-rsc` 19.3.0 (npm `latest`, which bundles React 19.2.8 Flight)
+  stays supported with React 19.2.8+ only, and 19.2.x stays on React 19.2.7+. Each check rejects mixed pairs
+  such as 19.3.0 with React 19.3 or 19.2.x with React 19.3, and it rejects prerelease React builds. Doctor's
+  Fix command names the React version that matches the installed RSC package. The generator still installs
+  stable `react-on-rails-rsc` 19.2.1. [PR 5094](https://github.com/shakacode/react_on_rails/pull/5094) by
+  [justin808](https://github.com/justin808).
 
 #### Fixed
 

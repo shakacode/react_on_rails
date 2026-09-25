@@ -143,6 +143,36 @@ describe('runRscPeerCompatibilityCheck', () => {
     expect(warnSpy).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['19.3.0', '19.2.8'],
+    ['19.3.1', '19.3.0'],
+  ])('does not warn for react-on-rails-rsc %s with React %s', (rscVersion, reactVersion) => {
+    expect(() =>
+      runRscPeerCompatibilityCheck({
+        resolveVersion: resolveVersions(rscVersion, reactVersion),
+      }),
+    ).not.toThrow();
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['19.3.0', '19.3.0', 'react 19.2.x with patch >= 19.2.8 (stable releases only) (found 19.3.0)'],
+    ['19.2.1', '19.3.0', 'react 19.2.x with patch >= 19.2.7 (stable releases only) (found 19.3.0)'],
+    ['19.3.1-rc.0', '19.2.8', 'react 19.3.x with patch >= 19.3.0 (stable releases only) (found 19.2.8)'],
+    [
+      '19.3.1-rc.0',
+      '19.3.0-canary-d083ec1d-20260922',
+      'react 19.3.x with patch >= 19.3.0 (stable releases only) (found 19.3.0-canary-d083ec1d-20260922)',
+    ],
+  ])('throws for react-on-rails-rsc %s with React %s', (rscVersion, reactVersion, requirement) => {
+    expect(() =>
+      runRscPeerCompatibilityCheck({
+        resolveVersion: resolveVersions(rscVersion, reactVersion),
+      }),
+    ).toThrow(`requires ${requirement}`);
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
   it.each(['19.2.1-rc.0', '19.2.1-rc.1'])(
     'throws for the superseded prerelease package line %s',
     (prerelease) => {

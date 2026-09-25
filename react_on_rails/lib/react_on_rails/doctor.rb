@@ -5067,20 +5067,25 @@ module ReactOnRails
     RSC_MINIMUM_PACKAGE_VERSION = "19.2.1"
     RSC_SUPPORTED_PACKAGE_MAJOR = 19
     # Keep in sync with packages/react-on-rails-pro-node-renderer/src/shared/rscPeerSupport.ts.
-    # rsc_min_patch: 1 on the 19.3 line keeps published 19.3.0 (React 19.2.8 Flight) out of
-    # the React 19.3 soak window used by react-on-rails-rsc 19.3.1-rc.0.
+    # Each row covers react-on-rails-rsc patches rsc_min_patch..rsc_max_patch (nil = open-ended)
+    # on rsc_minor. React must match the Flight line the RSC package bundles:
+    # 19.2.x ships Flight 19.2, published 19.3.0 ships Flight 19.2.8 (React on Rails 17.1.0),
+    # and 19.3.1+ (starting with 19.3.1-rc.0) ships Flight 19.3.0.
     RSC_REACT_SUPPORT_RANGES = [
-      { rsc_minor: 2, rsc_min_patch: 1, minor: 2, min_patch: 7 },
-      { rsc_minor: 3, rsc_min_patch: 1, minor: 3, min_patch: 0 }
+      { rsc_minor: 2, rsc_min_patch: 1, rsc_max_patch: nil, minor: 2, min_patch: 7 },
+      { rsc_minor: 3, rsc_min_patch: 0, rsc_max_patch: 0, minor: 2, min_patch: 8 },
+      { rsc_minor: 3, rsc_min_patch: 1, rsc_max_patch: nil, minor: 3, min_patch: 0 }
     ].freeze
-    RSC_SUPPORTED_PACKAGE_MINORS = RSC_REACT_SUPPORT_RANGES.map { |range| range.fetch(:rsc_minor) }.freeze
-    RSC_SUPPORTED_PACKAGE_LINE = RSC_REACT_SUPPORT_RANGES.map do |range|
-      minor = range.fetch(:rsc_minor)
-      floor = "#{RSC_SUPPORTED_PACKAGE_MAJOR}.#{minor}.#{range.fetch(:rsc_min_patch)}"
-      "#{RSC_SUPPORTED_PACKAGE_MAJOR}.#{minor}.x starting at #{floor}"
+    RSC_SUPPORTED_PACKAGE_MINORS = RSC_REACT_SUPPORT_RANGES.map { |range| range.fetch(:rsc_minor) }.uniq.freeze
+    RSC_SUPPORTED_PACKAGE_LINE = RSC_SUPPORTED_PACKAGE_MINORS.map do |minor|
+      min_patch = RSC_REACT_SUPPORT_RANGES.select { |range| range.fetch(:rsc_minor) == minor }
+                                          .map { |range| range.fetch(:rsc_min_patch) }.min
+      line = "#{RSC_SUPPORTED_PACKAGE_MAJOR}.#{minor}.x"
+      min_patch.positive? ? "#{line} starting at #{RSC_SUPPORTED_PACKAGE_MAJOR}.#{minor}.#{min_patch}" : line
     end.join(" or ")
     RSC_PACKAGE_INSTALL_VERSION = ReactOnRails::Generators::JsDependencyManager::RSC_PACKAGE_VERSION_PIN
-    # Candidate soak only. The generator pin stays on stable 19.2.1 / latest.
+    # Admits the 19.3.1-rc.x soak. The generator pin stays on stable 19.2.1.
+    # Remove once react-on-rails-rsc 19.3.1 ships stable.
     RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION = "19.3.1-rc.0"
     RSC_MINIMUM_REACT_VERSION = "19.2.7"
     RSC_MINIMUM_REACT_VERSION_TUPLE = RSC_MINIMUM_REACT_VERSION.split(".").map(&:to_i).freeze
@@ -5397,7 +5402,7 @@ module ReactOnRails
       return true if rsc_package_version_at_or_above_minimum?(rsc_version)
 
       prerelease_requirement = if RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION.present?
-                                 "\n(or #{RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION} during the 17.0 RC soak)"
+                                 "\n(or #{RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION} during the RC soak)"
                                else
                                  ""
                                end
@@ -5426,16 +5431,20 @@ module ReactOnRails
     def rsc_stable_package_version_supported?(rsc_version)
       return false if npm_prerelease(rsc_version).present?
 
-      major, minor, patch = npm_version_tuple(rsc_version)
-      range = rsc_react_support_range_for_minor(minor)
+      major, = npm_version_tuple(rsc_version)
       major == RSC_SUPPORTED_PACKAGE_MAJOR &&
-        range &&
-        patch >= range.fetch(:rsc_min_patch) &&
+        rsc_react_support_range_for(rsc_version) &&
         npm_version_compare(rsc_version, RSC_MINIMUM_PACKAGE_VERSION) >= 0
     end
 
-    def rsc_react_support_range_for_minor(rsc_minor)
-      RSC_REACT_SUPPORT_RANGES.find { |range| range.fetch(:rsc_minor) == rsc_minor }
+    def rsc_react_support_range_for(rsc_version)
+      _rsc_major, rsc_minor, rsc_patch = npm_version_tuple(rsc_version)
+      RSC_REACT_SUPPORT_RANGES.find do |range|
+        max_patch = range.fetch(:rsc_max_patch)
+        range.fetch(:rsc_minor) == rsc_minor &&
+          rsc_patch >= range.fetch(:rsc_min_patch) &&
+          (max_patch.nil? || rsc_patch <= max_patch)
+      end
     end
 
     def unsupported_rsc_react_version?(react_version)
@@ -5487,9 +5496,10 @@ module ReactOnRails
     end
 
     def supported_rsc_react_version_for_package?(react_version, rsc_version)
-      _rsc_major, rsc_minor, = npm_version_tuple(rsc_version)
-      range = rsc_react_support_range_for_minor(rsc_minor)
+      range = rsc_react_support_range_for(rsc_version)
       return false unless range
+      # The prerelease exception is for the RSC package soak, not its React peers.
+      return false if npm_prerelease(react_version).present?
 
       major, minor, patch = npm_version_tuple(react_version)
       major == RSC_SUPPORTED_REACT_MAJOR &&
@@ -5498,17 +5508,15 @@ module ReactOnRails
     end
 
     def supported_react_range_label_for_rsc_package(rsc_version)
-      _rsc_major, rsc_minor, = npm_version_tuple(rsc_version)
-      range = rsc_react_support_range_for_minor(rsc_minor)
+      range = rsc_react_support_range_for(rsc_version)
       return RSC_SUPPORTED_REACT_LINE unless range
 
       "#{RSC_SUPPORTED_REACT_MAJOR}.#{range.fetch(:minor)}.x with patch >= " \
-        "#{RSC_SUPPORTED_REACT_MAJOR}.#{range.fetch(:minor)}.#{range.fetch(:min_patch)}"
+        "#{RSC_SUPPORTED_REACT_MAJOR}.#{range.fetch(:minor)}.#{range.fetch(:min_patch)} (stable releases only)"
     end
 
     def recommended_react_install_version_for_rsc_package(rsc_version)
-      _rsc_major, rsc_minor, = npm_version_tuple(rsc_version)
-      range = rsc_react_support_range_for_minor(rsc_minor)
+      range = rsc_react_support_range_for(rsc_version)
       return RSC_MINIMUM_REACT_VERSION unless range
 
       "#{RSC_SUPPORTED_REACT_MAJOR}.#{range.fetch(:minor)}.#{range.fetch(:min_patch)}"

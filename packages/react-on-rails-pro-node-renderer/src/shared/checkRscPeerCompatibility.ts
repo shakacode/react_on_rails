@@ -116,36 +116,39 @@ const rscFloorRange = ({
     ? `>= ${minimumVersion} (or ${minimumPrereleaseVersion} during the RC soak)`
     : `>= ${minimumVersion}`;
 
-const supportedReactRange = (
-  rscTuple: VersionTuple,
-  { supportedMajor, supportedRanges }: typeof RSC_PEER_SUPPORT.react,
-): string => {
-  const rscMinor = rscTuple[1];
-  const matchingRanges = supportedRanges.filter((range) => range.rscMinor === rscMinor);
+type ReactSupportRange = (typeof RSC_PEER_SUPPORT.react.supportedRanges)[number];
 
-  return matchingRanges
-    .map(
-      ({ minor, minPatch }) =>
-        `${supportedMajor}.${minor}.x with patch >= ${supportedMajor}.${minor}.${minPatch}`,
-    )
-    .join(' or ');
-};
-
-const isSupportedReactTuple = (
-  [major, minor, patch]: VersionTuple,
-  rscTuple: VersionTuple,
-  { supportedMajor, supportedRanges }: typeof RSC_PEER_SUPPORT.react,
-): boolean =>
-  major === supportedMajor &&
-  supportedRanges.some(
-    (range) => rscTuple[1] === range.rscMinor && minor === range.minor && patch >= range.minPatch,
+const reactRangesForRsc = (
+  [, rscMinor, rscPatch]: VersionTuple,
+  { supportedRanges }: typeof RSC_PEER_SUPPORT.react,
+): readonly ReactSupportRange[] =>
+  supportedRanges.filter(
+    (range) =>
+      range.rscMinor === rscMinor &&
+      rscPatch >= range.rscMinPatch &&
+      (range.rscMaxPatch === null || rscPatch <= range.rscMaxPatch),
   );
 
-const isSupportedRscMinor = (
+const supportedReactRange = (rscTuple: VersionTuple, react: typeof RSC_PEER_SUPPORT.react): string =>
+  reactRangesForRsc(rscTuple, react)
+    .map(
+      ({ minor, minPatch }) =>
+        `${react.supportedMajor}.${minor}.x with patch >= ${react.supportedMajor}.${minor}.${minPatch} (stable releases only)`,
+    )
+    .join(' or ');
+
+const isSupportedReactVersion = (
+  { tuple: [major, minor, patch], prerelease }: ParsedVersion,
   rscTuple: VersionTuple,
-  { supportedRanges }: typeof RSC_PEER_SUPPORT.react,
+  react: typeof RSC_PEER_SUPPORT.react,
 ): boolean =>
-  supportedRanges.some((range) => rscTuple[1] === range.rscMinor && rscTuple[2] >= range.rscMinPatch);
+  // The prerelease exception is for the RSC package soak, not its React peers.
+  !prerelease &&
+  major === react.supportedMajor &&
+  reactRangesForRsc(rscTuple, react).some((range) => minor === range.minor && patch >= range.minPatch);
+
+const isSupportedRscVersion = (rscTuple: VersionTuple, react: typeof RSC_PEER_SUPPORT.react): boolean =>
+  reactRangesForRsc(rscTuple, react).length > 0;
 
 const proLabel = (proVersion?: string) =>
   proVersion ? `React on Rails Pro (${proVersion})` : 'React on Rails Pro';
@@ -200,7 +203,7 @@ export function checkRscPeerCompatibility(input: RscPeerCheckInput): RscPeerChec
     };
   }
 
-  if (!isSupportedRscMinor(rscTuple, react)) {
+  if (!isSupportedRscVersion(rscTuple, react)) {
     return {
       level: 'error',
       message: errorMessage(
@@ -216,8 +219,9 @@ export function checkRscPeerCompatibility(input: RscPeerCheckInput): RscPeerChec
   // an app with React truly absent will fail during normal module loading.
   let reactTuple: VersionTuple | null = null;
   if (reactVersion) {
-    reactTuple = parseTuple(reactVersion);
-    if (!isSupportedReactTuple(reactTuple, rscTuple, react)) {
+    const parsedReact = parseVersion(reactVersion);
+    reactTuple = parsedReact.tuple;
+    if (!isSupportedReactVersion(parsedReact, rscTuple, react)) {
       return {
         level: 'error',
         message: errorMessage('react', reactVersion, supportedReactRange(rscTuple, react), proVersion),
@@ -226,8 +230,9 @@ export function checkRscPeerCompatibility(input: RscPeerCheckInput): RscPeerChec
   }
 
   if (reactDomVersion) {
-    const reactDomTuple = parseTuple(reactDomVersion);
-    if (!isSupportedReactTuple(reactDomTuple, rscTuple, react)) {
+    const parsedReactDom = parseVersion(reactDomVersion);
+    const reactDomTuple = parsedReactDom.tuple;
+    if (!isSupportedReactVersion(parsedReactDom, rscTuple, react)) {
       return {
         level: 'error',
         message: errorMessage('react-dom', reactDomVersion, supportedReactRange(rscTuple, react), proVersion),

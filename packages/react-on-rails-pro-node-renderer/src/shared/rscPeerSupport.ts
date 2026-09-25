@@ -20,9 +20,13 @@
 // Ruby Doctor/generator constants that install and diagnose the same Pro RSC
 // package line. The 19.2.1 line pairs with React/React DOM 19.2.7 and carries
 // the coordinated RSC fixes required by the Pro RSC renderer path.
-// The 19.3.1-rc.0 soak pairs with React/React DOM 19.3.0 and Flight 19.3.0.
-// Published react-on-rails-rsc 19.3.0 stays on the React 19.2.8 Flight line, so
-// rscMinPatch: 1 keeps that package out of the 19.3 React window.
+// Each React range applies to react-on-rails-rsc versions on `rscMinor` whose patch falls in
+// [rscMinPatch, rscMaxPatch] (`null` = open-ended). The RSC package bundles Flight from the
+// matching React line, so React must match the Flight line, not just the package minor:
+// - 19.2.x ships Flight 19.2 and pairs with React 19.2.7+.
+// - Published 19.3.0 ships Flight 19.2.8 and pairs with React 19.2.8+ (React on Rails 17.1.0).
+// - 19.3.1+ (starting with the 19.3.1-rc.0 soak) ships Flight 19.3.0 and pairs with React 19.3.
+// `minimumPrereleaseVersion` admits the 19.3.1-rc.x soak. Remove it once 19.3.1 ships stable.
 export const RSC_PEER_SUPPORT = {
   reactOnRailsRsc: {
     minimumVersion: '19.2.1',
@@ -32,10 +36,9 @@ export const RSC_PEER_SUPPORT = {
   react: {
     supportedMajor: 19,
     supportedRanges: [
-      // React 19.2.7 is the coordinated floor for react-on-rails-rsc 19.2.x.
-      { rscMinor: 2, rscMinPatch: 1, minor: 2, minPatch: 7 },
-      // Candidate pin only: react-on-rails-rsc 19.3.1-rc.0 + React 19.3.0.
-      { rscMinor: 3, rscMinPatch: 1, minor: 3, minPatch: 0 },
+      { rscMinor: 2, rscMinPatch: 1, rscMaxPatch: null, minor: 2, minPatch: 7 },
+      { rscMinor: 3, rscMinPatch: 0, rscMaxPatch: 0, minor: 2, minPatch: 8 },
+      { rscMinor: 3, rscMinPatch: 1, rscMaxPatch: null, minor: 3, minPatch: 0 },
     ],
   },
 } as const;

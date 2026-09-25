@@ -11509,6 +11509,7 @@ RSpec.describe ReactOnRails::Doctor do
         /
           rscMinor:\s*(?<rsc_minor>\d+),\s*
           rscMinPatch:\s*(?<rsc_min_patch>\d+),\s*
+          rscMaxPatch:\s*(?<rsc_max_patch>\d+|null),\s*
           minor:\s*(?<minor>\d+),\s*
           minPatch:\s*(?<min_patch>\d+)
         /x
@@ -11524,12 +11525,13 @@ RSpec.describe ReactOnRails::Doctor do
       expect(described_class::RSC_SUPPORTED_PACKAGE_MAJOR).to eq(
         rsc_support.match(/supportedMajor:\s*(?<major>\d+)/)[:major].to_i
       )
-      expect(described_class::RSC_SUPPORTED_PACKAGE_MINORS).to eq(react_ranges.map { |range| range[0].to_i })
+      expect(described_class::RSC_SUPPORTED_PACKAGE_MINORS).to eq(react_ranges.map { |range| range[0].to_i }.uniq)
       expect(described_class::RSC_REACT_SUPPORT_RANGES).to eq(
-        react_ranges.map do |rsc_minor, rsc_min_patch, minor, min_patch|
+        react_ranges.map do |rsc_minor, rsc_min_patch, rsc_max_patch, minor, min_patch|
           {
             rsc_minor: rsc_minor.to_i,
             rsc_min_patch: rsc_min_patch.to_i,
+            rsc_max_patch: rsc_max_patch == "null" ? nil : rsc_max_patch.to_i,
             minor: minor.to_i,
             min_patch: min_patch.to_i
           }
@@ -11900,7 +11902,7 @@ RSpec.describe ReactOnRails::Doctor do
             expect(error_msgs).to include(
               a_string_including(
                 "react-on-rails-rsc 19.4.0 is not supported by React on Rails Pro 17 RSC",
-                "supported 19.2.x starting at 19.2.1 or 19.3.x starting at 19.3.1 package line"
+                "supported 19.2.x starting at 19.2.1 or 19.3.x package line"
               )
             )
             expect(error_msgs.size).to eq(1)
@@ -11909,41 +11911,111 @@ RSpec.describe ReactOnRails::Doctor do
         end
       end
 
-      it "errors when published react-on-rails-rsc 19.3.0 is mixed with React 19.3" do
-        Dir.mktmpdir do |tmpdir|
-          Dir.chdir(tmpdir) do
-            File.write(
-              "package.json",
-              JSON.generate(
-                "dependencies" => {
-                  "react" => "19.3.0",
-                  "react-dom" => "19.3.0",
-                  "react-on-rails-rsc" => "19.3.0"
-                }
-              )
-            )
-            install_react("19.3.0")
-            install_package("react-dom", "version" => "19.3.0")
-            install_package(
-              "react-on-rails-rsc",
-              "version" => "19.3.0",
-              "peerDependencies" => { "react" => "^19.3.0", "react-dom" => "^19.3.0" }
-            )
-            stub_package_root(Dir.pwd)
-            allow(doctor).to receive(:capture_rsc_dist_tags)
+      describe "React 19.3 support table" do
+        # Peer ranges match the published packages: 19.3.0 bundles Flight 19.2.8 and
+        # 19.3.1-rc.0 bundles Flight 19.3.0.
+        published_rsc_react_peers = {
+          "19.2.1" => "^19.2.7",
+          "19.3.0" => "^19.2.8",
+          "19.3.1-rc.0" => "^19.3.0",
+          "19.3.1" => "^19.3.0"
+        }
 
-            doctor.send(:check_rsc_react_version)
-
-            error_msgs = checker.messages.select { |m| m[:type] == :error }.map { |m| m[:content] }
-            expect(error_msgs).to include(
-              a_string_including(
-                "react-on-rails-rsc 19.3.0 is not supported by React on Rails Pro 17 RSC",
-                "19.3.x starting at 19.3.1",
-                "19.3.1-rc.0"
+        def rsc_errors_for(rsc_version:, react_version:, react_peer:, react_dom_version: react_version)
+          Dir.mktmpdir do |tmpdir|
+            Dir.chdir(tmpdir) do
+              File.write(
+                "package.json",
+                JSON.generate(
+                  "dependencies" => {
+                    "react" => react_version,
+                    "react-dom" => react_dom_version,
+                    "react-on-rails-rsc" => rsc_version
+                  }
+                )
               )
-            )
-            expect(doctor).not_to have_received(:capture_rsc_dist_tags)
+              install_react(react_version)
+              install_package("react-dom", "version" => react_dom_version)
+              install_package(
+                "react-on-rails-rsc",
+                "version" => rsc_version,
+                "peerDependencies" => { "react" => react_peer, "react-dom" => react_peer }
+              )
+              stub_package_root(Dir.pwd)
+              allow(doctor).to receive(:rsc_dist_tags).and_return({})
+
+              doctor.send(:check_rsc_react_version)
+
+              checker.messages.select { |m| m[:type] == :error }.map { |m| m[:content] }
+            end
           end
+        end
+
+        [
+          %w[19.3.0 19.2.8],
+          %w[19.3.1-rc.0 19.3.0],
+          %w[19.3.1 19.3.0]
+        ].each do |rsc_version, react_version|
+          it "accepts react-on-rails-rsc #{rsc_version} with React #{react_version}" do
+            errors = rsc_errors_for(rsc_version:, react_version:,
+                                    react_peer: published_rsc_react_peers.fetch(rsc_version))
+
+            expect(errors).to be_empty
+          end
+        end
+
+        [
+          ["19.3.0", "19.3.0", "19.2.x with patch >= 19.2.8 (stable releases only)", "19.2.8"],
+          ["19.2.1", "19.3.0", "19.2.x with patch >= 19.2.7 (stable releases only)", "19.2.7"]
+        ].each do |rsc_version, react_version, supported_range, fix_version|
+          it "rejects react-on-rails-rsc #{rsc_version} with React #{react_version} " \
+             "and points the Fix at React #{fix_version}" do
+            errors = rsc_errors_for(rsc_version:, react_version:,
+                                    react_peer: published_rsc_react_peers.fetch(rsc_version))
+
+            expect(errors).to contain_exactly(
+              a_string_including(
+                "react-on-rails-rsc #{rsc_version} is installed with unsupported React #{react_version}",
+                "React on Rails Pro 17 RSC currently supports React/React DOM #{supported_range}.",
+                "Fix: npm install react@~#{fix_version} react-dom@~#{fix_version} --save-exact"
+              )
+            )
+          end
+        end
+
+        it "rejects the 19.3.1-rc.0 soak with React 19.2.8 when the package peers would allow it" do
+          errors = rsc_errors_for(rsc_version: "19.3.1-rc.0", react_version: "19.2.8", react_peer: "^19.2.8")
+
+          expect(errors).to contain_exactly(
+            a_string_including(
+              "react-on-rails-rsc 19.3.1-rc.0 is installed with unsupported React 19.2.8",
+              "React/React DOM 19.3.x with patch >= 19.3.0 (stable releases only).",
+              "Fix: npm install react@~19.3.0 react-dom@~19.3.0 --save-exact"
+            )
+          )
+        end
+
+        it "rejects a prerelease React build even when the package peers would allow it" do
+          canary = "19.3.0-canary-d083ec1d-20260922"
+          errors = rsc_errors_for(rsc_version: "19.3.1-rc.0", react_version: canary, react_peer: ">=19.3.0-0")
+
+          expect(errors).to contain_exactly(
+            a_string_including(
+              "react-on-rails-rsc 19.3.1-rc.0 is installed with unsupported React #{canary}",
+              "19.3.x with patch >= 19.3.0 (stable releases only)"
+            )
+          )
+        end
+
+        it "rejects the superseded 19.3.0-rc.4 prerelease that React on Rails 17.1.0 accepted" do
+          errors = rsc_errors_for(rsc_version: "19.3.0-rc.4", react_version: "19.2.8", react_peer: "^19.2.8")
+
+          expect(errors).to contain_exactly(
+            a_string_including(
+              "react-on-rails-rsc 19.3.0-rc.4 is not supported by React on Rails Pro 17 RSC",
+              ">= 19.2.1\n(or 19.3.1-rc.0 during the RC soak)"
+            )
+          )
         end
       end
 
