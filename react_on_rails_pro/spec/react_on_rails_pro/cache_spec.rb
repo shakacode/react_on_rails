@@ -381,54 +381,45 @@ describe ReactOnRailsPro::Cache, :caching do
       ReactOnRailsPro.configuration.enable_rsc_support = original_enable_rsc_support
     end
 
-    it "stamps the CSP nonce partition segment in a fixed position before the user key (issue #5021)" do
+    it "partitions the key so no caller-controlled content can forge across it (issue #5021)" do
       allow(ReactOnRailsPro::Utils).to receive(:bundle_hash).and_return("123456")
 
+      # Mechanism: the segment is always present — both states — in a fixed position
+      # that precedes ALL caller-controlled content (component name and cache_key value).
       nonce_free_key = described_class.react_component_cache_key("Foobar", cache_key: "abc", prerender: true)
       nonce_active_key = described_class.react_component_cache_key("Foobar", cache_key: "abc", prerender: true,
                                                                              csp_nonce_active: true)
-
-      # The segment is always present — both states — and precedes ALL caller-controlled
-      # content (component name and cache_key value), so neither can spell one partition
-      # into the other.
       expect(nonce_free_key[-3..]).to eq([described_class::CSP_NONCE_FREE_CACHE_KEY_SEGMENT, "Foobar", "abc"])
       expect(nonce_active_key[-3..]).to eq([described_class::CSP_NONCE_CACHE_KEY_SEGMENT, "Foobar", "abc"])
       expect(nonce_active_key.length).to eq(nonce_free_key.length)
-    end
 
-    it "never collides a nonce-free key whose user segments end in the nonce segment (issue #5021)" do
-      allow(ReactOnRailsPro::Utils).to receive(:bundle_hash).and_return("123456")
+      # Forgery via trailing user key segments: cache stores flatten nested key arrays
+      # into one slash-joined string, so a conditional TRAILING segment would make these
+      # two expand identically.
+      expect(ActiveSupport::Cache.expand_cache_key(
+               described_class.react_component_cache_key(
+                 "Foobar", cache_key: ["article", 1], prerender: true, csp_nonce_active: true
+               )
+             )).not_to eq(ActiveSupport::Cache.expand_cache_key(
+                            described_class.react_component_cache_key(
+                              "Foobar",
+                              cache_key: ["article", 1, ReactOnRailsPro::Cache::CSP_NONCE_CACHE_KEY_SEGMENT],
+                              prerender: true
+                            )
+                          ))
 
-      # Cache stores flatten nested key arrays into one slash-joined string, so a
-      # conditional TRAILING segment would make these two expand identically.
-      nonce_active_key = described_class.react_component_cache_key(
-        "Foobar", cache_key: ["article", 1], prerender: true, csp_nonce_active: true
-      )
-      forged_nonce_free_key = described_class.react_component_cache_key(
-        "Foobar",
-        cache_key: ["article", 1, ReactOnRailsPro::Cache::CSP_NONCE_CACHE_KEY_SEGMENT],
-        prerender: true
-      )
-
-      expect(ActiveSupport::Cache.expand_cache_key(nonce_active_key))
-        .not_to eq(ActiveSupport::Cache.expand_cache_key(forged_nonce_free_key))
-    end
-
-    it "never collides partitions through a component name containing the nonce segment (issue #5021)" do
-      allow(ReactOnRailsPro::Utils).to receive(:bundle_hash).and_return("123456")
-
-      # Component names are caller-controlled registered keys and may contain "/", so a
-      # partition segment placed after the component name could be forged from the
-      # nonce-free side. The segment must precede all caller-controlled content.
-      nonce_active_key = described_class.react_component_cache_key(
-        "Widget", cache_key: %w[csp-nonce-free 1], prerender: true, csp_nonce_active: true
-      )
-      forged_nonce_free_key = described_class.react_component_cache_key(
-        "Widget/csp-nonce", cache_key: "1", prerender: true
-      )
-
-      expect(ActiveSupport::Cache.expand_cache_key(nonce_active_key))
-        .not_to eq(ActiveSupport::Cache.expand_cache_key(forged_nonce_free_key))
+      # Forgery via the component name: names are caller-controlled registered keys and
+      # may contain "/", so a segment placed after the component name could be forged
+      # from the nonce-free side.
+      expect(ActiveSupport::Cache.expand_cache_key(
+               described_class.react_component_cache_key(
+                 "Widget", cache_key: %w[csp-nonce-free 1], prerender: true, csp_nonce_active: true
+               )
+             )).not_to eq(ActiveSupport::Cache.expand_cache_key(
+                            described_class.react_component_cache_key(
+                              "Widget/csp-nonce", cache_key: "1", prerender: true
+                            )
+                          ))
     end
   end
 

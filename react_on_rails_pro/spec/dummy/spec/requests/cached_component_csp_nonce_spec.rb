@@ -54,4 +54,36 @@ describe "CSP nonce on fragment-cached component cache hits", :caching, :server_
     expect(response.body).not_to include("&lt;script")
     expect(response.body).not_to include("rorp-cached-csp-nonce")
   end
+
+  context "when the app's nonce generator emits a malformed value" do
+    around do |example|
+      # The generator reaches requests through the memoized env_config hash, so swap the
+      # entry there ("bad nonce!" fails the base64/base64url shape check: space and !).
+      env_config = Rails.application.env_config
+      original = env_config["action_dispatch.content_security_policy_nonce_generator"]
+      env_config["action_dispatch.content_security_policy_nonce_generator"] = ->(_request) { "bad nonce!" }
+      example.run
+    ensure
+      env_config["action_dispatch.content_security_policy_nonce_generator"] = original
+    end
+
+    it "warns about the component-cache bypass once per request, again on the next request" do
+      # Once per REQUEST is the contract (the per-view-context dedup across many cached
+      # components on one page is pinned in the helper spec). A process-global latch —
+      # which would silence every request after the first — must fail here.
+      allow(Rails.logger).to receive(:warn).and_call_original
+      bypass_warning =
+        /Component caching bypassed for this request.*length 10.*content_security_policy_nonce_generator/m
+
+      get "/server_side_redux_app_cached"
+      expect(response).to have_http_status(:ok)
+      expect(Rails.logger).to have_received(:warn).with(bypass_warning).once
+
+      get "/server_side_redux_app_cached"
+      expect(response).to have_http_status(:ok)
+      expect(Rails.logger).to have_received(:warn).with(bypass_warning).twice
+      # The nonce value itself is secret-adjacent and never logged.
+      expect(Rails.logger).not_to have_received(:warn).with(/bad nonce!/)
+    end
+  end
 end
