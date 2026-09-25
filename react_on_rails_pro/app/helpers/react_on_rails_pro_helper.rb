@@ -40,6 +40,44 @@ module ReactOnRailsProHelper
   PRO_ATTRIBUTION_MARKER = "Powered by React on Rails Pro"
   PRO_ATTRIBUTION_COMMENT_PREFIX = "Powered by React on Rails Pro (c) ShakaCode"
   RAILS_CONTEXT_MARKER = "js-react-on-rails-context"
+  # CSP nonces are per-request values, so any nonce baked into cached markup is stale on a
+  # cache hit and the browser refuses to run the script (issue #5021). At cache-write time
+  # the framework appends a trailing marker comment recording the originating request's
+  # nonce; on a cache hit, only attributes carrying that exact originating value are
+  # re-stamped with the serving request's nonce. Scope of that match: markup carrying a
+  # guessed or unrelated nonce value is never promoted to the live nonce, and unrelated
+  # cached text is never mutated. It is NOT an XSS boundary: the originating nonce is
+  # visible in that response's CSP header and in every sibling framework script tag, so
+  # content injected into the same fragment through an app-level HTML injection sink can
+  # copy it at render time. Such content already executes on the originating response
+  # (its copied nonce matches that response's policy), and on cache hits its attribute is
+  # re-stamped like the framework's own — neutralizing that requires fixing the injection
+  # sink itself.
+  CACHED_CSP_NONCE_MARKER_PREFIX = "<!--rorp-cached-csp-nonce:"
+  CACHED_CSP_NONCE_MARKER_SUFFIX = "-->"
+  # Single source of truth for the accepted CSP nonce shape — base64/base64url characters
+  # with `=` only as trailing padding. The cache-write marker capture and the value
+  # validation pattern are both built from it, so the two cannot silently diverge.
+  CSP_NONCE_VALUE_SHAPE = "[a-zA-Z0-9+/_-]+={0,2}"
+  # Anchored to the very end of the cached value: the framework appends its marker after
+  # all rendered content, so the trailing marker is always framework-owned. Built from
+  # CACHED_CSP_NONCE_MARKER_PREFIX/SUFFIX and CSP_NONCE_VALUE_SHAPE — the same sources
+  # the writer and the validation pattern use — so none of the shapes can silently drift.
+  CACHED_CSP_NONCE_MARKER_REGEX = Regexp.new(
+    "#{Regexp.escape(CACHED_CSP_NONCE_MARKER_PREFIX)}(#{CSP_NONCE_VALUE_SHAPE})" \
+    "#{Regexp.escape(CACHED_CSP_NONCE_MARKER_SUFFIX)}\\z"
+  )
+  # Mirrors the accepted shape in packages/react-on-rails/src/sanitizeNonce.ts —
+  # base64/base64url characters with optional trailing `=` padding — but validates the
+  # original value as-is. Never strip-then-validate: a stripped derivative can pass the
+  # pattern while the CSP header still carries the original, mismatching every script.
+  CSP_NONCE_VALUE_PATTERN = /\A#{CSP_NONCE_VALUE_SHAPE}\z/
+  # Escaped HTML ASCII whitespace characters for regexp character classes, derived from
+  # HTML_SPACE_CHARACTERS so the two cannot drift. Deliberately narrower than Ruby's \s:
+  # \v is not HTML whitespace (it parses as part of an attribute name or value).
+  CSP_NONCE_HTML_WS_CHARS = Regexp.escape(HTML_SPACE_CHARACTERS.join).freeze
+  # HTML ASCII whitespace run allowed around an attribute's `=`.
+  CSP_NONCE_ATTR_WS_PATTERN = "[#{CSP_NONCE_HTML_WS_CHARS}]*".freeze
   @static_rsc_asset_diagnostic_cache = {}
 
   class << self
@@ -465,10 +503,23 @@ module ReactOnRailsProHelper
     end
   end
 
-  def fetch_react_component(component_name, options, cache_write_if: nil)
-    return yield unless ReactOnRailsPro::Cache.use_cache?(options)
+  # All view-level component cache keys must segregate nonce-rendered entries from
+  # nonce-free ones (issue #5021), so every cached_* helper builds its key through here.
+  # The flag uses the same validity check as the cache-write marker. Requests whose nonce
+  # is present but malformed never reach this key builder: they bypass the component
+  # cache entirely (see malformed_csp_nonce_bypasses_component_cache?), because their
+  # marker-free entries would poison whichever partition held them.
+  def pro_component_cache_key(component_name, options)
+    ReactOnRailsPro::Cache.react_component_cache_key(
+      component_name,
+      options.merge(csp_nonce_active: current_csp_nonce_for_cached_html.present?)
+    )
+  end
 
-    cache_key = ReactOnRailsPro::Cache.react_component_cache_key(component_name, options)
+  def fetch_react_component(component_name, options, cache_write_if: nil)
+    return yield unless pro_component_cache_usable?(options)
+
+    cache_key = pro_component_cache_key(component_name, options)
     Rails.logger.debug { "React on Rails Pro cache_key is #{cache_key.inspect}" }
     cache_write_options = ReactOnRailsPro::Cache.cache_write_options(options[:cache_options])
     if ReactOnRailsPro::Cache.cache_write_expired?(options[:cache_options])
@@ -487,8 +538,9 @@ module ReactOnRailsProHelper
     unless cache_hit || cache_write_skipped
       ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_write_options)
     end
+    result, cached_csp_nonce = extract_cached_csp_nonce_marker(result)
     load_pack_for_cached_react_component(component_name, options) if cache_hit
-    result = normalize_cached_pro_attribution(result) if cache_hit
+    result = normalize_cached_pro_attribution(result, cached_csp_nonce) if cache_hit
 
     add_component_cache_metadata(result, cache_key, cache_hit)
   end
@@ -500,7 +552,9 @@ module ReactOnRailsProHelper
     result = catch(skip_cache_write) do
       Rails.cache.fetch(cache_key, cache_write_options) do
         cache_hit = false
-        rendered_result = yield
+        # The marker travels with the cached value; both hit and miss consumers strip it
+        # with extract_cached_csp_nonce_marker before the value reaches the page.
+        rendered_result = append_cached_csp_nonce_marker(yield)
         next rendered_result unless cache_write_if && !cache_write_if.call
 
         cache_write_skipped = true
@@ -511,27 +565,336 @@ module ReactOnRailsProHelper
     [result, cache_hit, cache_write_skipped]
   end
 
-  def normalize_cached_pro_attribution(result)
-    return normalize_cached_pro_attribution_html(result) if result.is_a?(String)
+  def normalize_cached_pro_attribution(result, cached_csp_nonce = nil)
+    cached_csp_nonce = effective_cached_csp_nonce(cached_csp_nonce)
+    return normalize_cached_pro_attribution_html(result, cached_csp_nonce) if result.is_a?(String)
 
     return result unless result.is_a?(Hash) && result.key?(ReactOnRails::Helper::COMPONENT_HTML_KEY)
 
-    result.merge(
-      ReactOnRails::Helper::COMPONENT_HTML_KEY =>
-        normalize_cached_pro_attribution_html(result[ReactOnRails::Helper::COMPONENT_HTML_KEY])
-    )
+    if cached_csp_nonce.nil?
+      return result.merge(
+        ReactOnRails::Helper::COMPONENT_HTML_KEY =>
+          normalize_cached_pro_attribution_html(result[ReactOnRails::Helper::COMPONENT_HTML_KEY])
+      )
+    end
+
+    # One traversal builds the normalized hash: componentHtml gets attribution
+    # normalization plus the nonce re-stamp, and every other string field gets the
+    # re-stamp too (any hash field can carry nonce-stamped markup, e.g. a render
+    # function's apolloStateTag, possibly nested).
+    result.to_h do |key, value|
+      if key == ReactOnRails::Helper::COMPONENT_HTML_KEY
+        [key, normalize_cached_pro_attribution_html(value, cached_csp_nonce)]
+      else
+        [key, rewrite_cached_csp_nonces_in_value(value, cached_csp_nonce)]
+      end
+    end
   end
 
-  def normalize_cached_pro_attribution_html(html)
-    return html if @rendered_rails_context && !html.include?(PRO_ATTRIBUTION_MARKER) &&
-                   !html.include?(RAILS_CONTEXT_MARKER)
+  # Demotes the originating nonce to nil when re-stamping would be a no-op — the serving
+  # nonce is absent, malformed, or identical to the originating one (mirroring
+  # rewrite_cached_csp_nonces's per-string short-circuit) — so hash entries take the
+  # merge-only path instead of walking and rebuilding every field, while componentHtml
+  # still gets its attribution normalization.
+  def effective_cached_csp_nonce(cached_csp_nonce)
+    return nil unless cached_csp_nonce
 
+    current_nonce = current_csp_nonce_for_cached_html
+    return nil if current_nonce.nil? || current_nonce == cached_csp_nonce
+
+    cached_csp_nonce
+  end
+
+  # Recursive companion to rewrite_cached_csp_nonces for non-componentHtml hash fields,
+  # whose values may nest (arrays of tags, sub-hashes from custom render functions).
+  def rewrite_cached_csp_nonces_in_value(value, cached_csp_nonce)
+    case value
+    when String then rewrite_cached_csp_nonces(value, cached_csp_nonce)
+    when Hash then value.transform_values { |nested| rewrite_cached_csp_nonces_in_value(nested, cached_csp_nonce) }
+    when Array then value.map { |nested| rewrite_cached_csp_nonces_in_value(nested, cached_csp_nonce) }
+    else value
+    end
+  end
+
+  def normalize_cached_pro_attribution_html(html, cached_csp_nonce = nil)
     was_html_safe = html.html_safe?
-    normalized_html = strip_leading_pro_attribution_comments(html)
+    normalized_html = rewrite_cached_csp_nonces(html, cached_csp_nonce)
+
+    if @rendered_rails_context && !normalized_html.include?(PRO_ATTRIBUTION_MARKER) &&
+       !normalized_html.include?(RAILS_CONTEXT_MARKER)
+      # rewrite_cached_csp_nonces preserves object identity when nothing matched and the
+      # receiver's html_safe flag when it rewrote, so the fast path returns it as-is.
+      return normalized_html
+    end
+
+    normalized_html = strip_leading_pro_attribution_comments(normalized_html)
     normalized_html = strip_leading_rails_context_script(normalized_html)
     normalized_html = prepend_render_rails_context(normalized_html)
 
     was_html_safe ? normalized_html : String.new(normalized_html)
+  end
+
+  # Appends the trailing marker that records the originating request's CSP nonce on the
+  # value that is about to be cached, so cache hits can re-stamp exactly the attributes
+  # this request emitted (issue #5021). No-op when the current request has no usable
+  # nonce: nonce-free entries live under a separate cache key (see the cache-key segment
+  # in ReactOnRailsPro::Cache.react_component_cache_key) and carry nothing to re-stamp.
+  def append_cached_csp_nonce_marker(value)
+    nonce = current_csp_nonce_for_cached_html
+    return value if nonce.nil?
+
+    marker = "#{CACHED_CSP_NONCE_MARKER_PREFIX}#{nonce}#{CACHED_CSP_NONCE_MARKER_SUFFIX}"
+    case value
+    when Array
+      value + [marker]
+    when Hash
+      return value unless value.key?(ReactOnRails::Helper::COMPONENT_HTML_KEY)
+
+      value.merge(
+        ReactOnRails::Helper::COMPONENT_HTML_KEY =>
+          append_cached_csp_nonce_marker_to_html(value[ReactOnRails::Helper::COMPONENT_HTML_KEY], marker)
+      )
+    when String
+      append_cached_csp_nonce_marker_to_html(value, marker)
+    else
+      value
+    end
+  end
+
+  def append_cached_csp_nonce_marker_to_html(html, marker)
+    # SafeBuffer#+ escapes plain-string operands, so mark the framework-built marker safe
+    # before concatenating onto html_safe content.
+    html.html_safe? ? html + marker.html_safe : html + marker
+  end
+
+  # Splits a cached value into [value_without_marker, originating_nonce]. Extraction runs
+  # only for nonce-active readers: the reader's nonce state selects the cache partition
+  # (see pro_component_cache_key), and the nonce-active partition is written exclusively
+  # by valid-nonce requests, which always append the framework marker LAST — so the
+  # trailing match stays framework-owned even when app content also ends in marker-shaped
+  # text (the capture's alphabet cannot span across an earlier comment's `-->`). Nonce-free
+  # entries never carry a framework marker, so a trailing marker-shaped comment there is
+  # app content (e.g. CMS-supplied) and must never be stripped.
+  def extract_cached_csp_nonce_marker(value)
+    return [value, nil] if current_csp_nonce_for_cached_html.nil?
+
+    case value
+    when Array then extract_cached_csp_nonce_marker_from_chunks(value)
+    when Hash then extract_cached_csp_nonce_marker_from_hash(value)
+    when String then extract_cached_csp_nonce_marker_from_html(value)
+    else [value, nil]
+    end
+  end
+
+  def extract_cached_csp_nonce_marker_from_chunks(chunks)
+    last_chunk = chunks.last
+    return [chunks, nil] unless last_chunk.is_a?(String)
+
+    match = last_chunk.match(CACHED_CSP_NONCE_MARKER_REGEX)
+    # The marker must be the entire final chunk, not a suffix of rendered chunk content.
+    return [chunks, nil] unless match&.begin(0)&.zero?
+
+    [chunks[0...-1], match[1]]
+  end
+
+  def extract_cached_csp_nonce_marker_from_hash(hash)
+    return [hash, nil] unless hash.key?(ReactOnRails::Helper::COMPONENT_HTML_KEY)
+
+    html, nonce = extract_cached_csp_nonce_marker_from_html(hash[ReactOnRails::Helper::COMPONENT_HTML_KEY])
+    return [hash, nil] unless nonce
+
+    [hash.merge(ReactOnRails::Helper::COMPONENT_HTML_KEY => html), nonce]
+  end
+
+  def extract_cached_csp_nonce_marker_from_html(html)
+    match = html.match(CACHED_CSP_NONCE_MARKER_REGEX)
+    return [html, nil] unless match
+
+    [html[0...match.begin(0)], match[1]]
+  end
+
+  # Re-stamps cached `nonce` attributes with the current request's CSP nonce so cache hits
+  # execute under the response's own `script-src 'nonce-...'` policy (issue #5021). Only
+  # attributes carrying the entry's exact originating nonce (from the cache-write marker)
+  # are rewritten: content that arrived with any other nonce value is left for CSP to
+  # block, and no other cached text can match a value only the originating request knew.
+  def rewrite_cached_csp_nonces(html, cached_csp_nonce)
+    return html if cached_csp_nonce.nil?
+
+    current_nonce = current_csp_nonce_for_cached_html
+    return html if current_nonce.nil? || current_nonce == cached_csp_nonce
+
+    # Allocation-free pre-check: the recursive hash/array field walk calls this for every
+    # string field and most fields carry no nonce at all. A field that never mentions the
+    # originating value cannot match the attribute pattern, so return the receiver itself
+    # (the identity contract callers detect via equal?).
+    return html unless html.include?(cached_csp_nonce)
+
+    attribute_pattern = cached_csp_nonce_attribute_pattern(cached_csp_nonce)
+
+    # SafeBuffer#gsub semantics vary across Rails versions (the html_safe flag is dropped,
+    # and some versions HTML-escape a non-safe block return), so rewrite a plain copy and
+    # restore the receiver's html_safe flag explicitly. The matched flag keeps the rewrite
+    # single-pass (no separate match? pre-scan), and a substring-present-but-no-attribute
+    # case still returns the receiver itself: callers rely on object identity.
+    matched = false
+    rewritten = String.new(html).gsub(attribute_pattern) do
+      matched = true
+      %(nonce="#{current_nonce}")
+    end
+    return html unless matched
+
+    html.html_safe? ? rewritten.html_safe : rewritten
+  end
+
+  # Builds the attribute pattern for one originating nonce. Only the double-quoted
+  # spelling `nonce="<originating value>"` is matched — the form every framework emitter
+  # produces. The attribute name stays ASCII case-insensitive, HTML whitespace is allowed
+  # around `=` (the HTML set, never Ruby's \s — \v is not HTML whitespace), and the
+  # attribute may start after HTML whitespace, `/`, or a closing quote, all
+  # tokenizer-valid attribute starts (`<script/nonce="...">`, `<script id="x"nonce="...">`).
+  # Unquoted and single-quoted spellings are deliberately NOT matched: cached SSR output
+  # embeds JSON data blocks whose escaping (ERB::Util.json_escape / JSON string rules)
+  # leaves plain text and single quotes intact, so those spellings can occur as inert
+  # text inside a JSON string — rewriting one would inject raw double quotes that break
+  # JSON.parse on every cache hit. The double-quoted form cannot appear unescaped inside
+  # a JSON string (its quotes are `\"`), so this bound is JSON-safe; app-provided raw
+  # markup using another spelling fails closed and keeps its stale nonce for CSP to block.
+  # Compiled once per originating nonce and reused across the hash fields, nested values,
+  # and stream chunks of one entry (value-keyed like @csp_nonce_validation_memo, since
+  # entries with different originating nonces can be served within one request).
+  def cached_csp_nonce_attribute_pattern(cached_csp_nonce)
+    memo = @csp_nonce_attribute_pattern_memo if defined?(@csp_nonce_attribute_pattern_memo)
+    return memo[1] if memo && memo[0] == cached_csp_nonce
+
+    ws = CSP_NONCE_HTML_WS_CHARS
+    html_ws = CSP_NONCE_ATTR_WS_PATTERN
+    escaped_nonce = Regexp.escape(cached_csp_nonce)
+    pattern = %r{(?<=[#{ws}/"'])(?i:nonce)#{html_ws}=#{html_ws}"#{escaped_nonce}"}
+    (@csp_nonce_attribute_pattern_memo = [cached_csp_nonce, pattern])[1]
+  end
+
+  # Re-stamps nonces across a cached stream's chunk array as one document. React's
+  # streaming writer flushes at fixed-size buffer boundaries, so a `nonce="..."`
+  # attribute can straddle two cached chunks; rewriting each chunk independently would
+  # miss the split attribute and replay the stale nonce — the same boundary problem
+  # ReactOnRailsPro::StreamCache::DomNodeIdRewriter solves for cached dom ids. The
+  # String chunks are joined, rewritten once, and re-split at the original chunk
+  # boundaries. When the rewrite changes the total byte length (differing nonce
+  # lengths) — or, defensively, if a re-split would slice a multibyte character — the
+  # original boundaries no longer apply, so the whole rewritten document is delivered
+  # in the first String chunk and the rest are emptied; the streamed concatenation is
+  # identical either way.
+  def rewrite_cached_csp_nonces_across_chunks(chunks, cached_csp_nonce)
+    return chunks if cached_csp_nonce.nil?
+
+    document = chunks.map { |chunk| chunk.is_a?(String) ? chunk : "" }.join
+    rewritten = rewrite_cached_csp_nonces(document, cached_csp_nonce)
+    # rewrite_cached_csp_nonces returns the receiver untouched when nothing matched.
+    return chunks if rewritten.equal?(document)
+
+    if rewritten.bytesize == document.bytesize
+      pieces = resplit_stream_chunks_at_original_boundaries(chunks, rewritten)
+      return pieces if pieces
+    end
+
+    land_rewritten_stream_document(chunks, rewritten)
+  end
+
+  # Byte-slices the rewritten document back into the original chunk sizes, preserving
+  # each chunk's html_safe flag. Returns nil when a boundary would cut a multibyte
+  # character (possible when same-total-length rewrites shift bytes between chunks).
+  def resplit_stream_chunks_at_original_boundaries(chunks, rewritten)
+    offset = 0
+    chunks.map do |chunk|
+      next chunk unless chunk.is_a?(String)
+
+      piece = rewritten.byteslice(offset, chunk.bytesize) || ""
+      offset += chunk.bytesize
+      return nil unless piece.valid_encoding?
+
+      chunk.html_safe? ? piece.html_safe : piece
+    end
+  end
+
+  # Fallback framing when the original byte boundaries no longer apply: the whole
+  # rewritten document rides in the first String chunk (mirroring DomNodeIdRewriter's
+  # landing behavior) and every other String chunk is emptied.
+  def land_rewritten_stream_document(chunks, rewritten)
+    landing_index = chunks.index { |chunk| chunk.is_a?(String) }
+    chunks.each_with_index.map do |chunk, index|
+      next chunk unless chunk.is_a?(String)
+
+      piece = index == landing_index ? rewritten : ""
+      chunk.html_safe? ? piece.html_safe : piece
+    end
+  end
+
+  # Returns the current request's CSP nonce, or nil when absent or malformed. The original
+  # value is validated as-is (never stripped first): a stripped derivative could pass the
+  # pattern while the response header still carries the original, so every re-stamped
+  # script would mismatch the policy.
+  # The shape validation is memoized keyed by the raw value: Rails already memoizes the
+  # nonce itself per request, but this helper is consulted by the cache gate, key builder,
+  # marker writer, and every rewrite of a cached component, so the pattern match should
+  # not rerun each time. Keying by the raw value (rather than a bare defined? guard)
+  # keeps the memo correct if the nonce ever changes under one helper instance — as specs
+  # that simulate several requests on a single view context do.
+  def current_csp_nonce_for_cached_html
+    nonce = csp_nonce.presence
+    if defined?(@csp_nonce_validation_memo) && @csp_nonce_validation_memo.first == nonce
+      return @csp_nonce_validation_memo.last
+    end
+
+    validated = nonce && CSP_NONCE_VALUE_PATTERN.match?(nonce) ? nonce : nil
+    @csp_nonce_validation_memo = [nonce, validated]
+    validated
+  end
+
+  # True when the request carries a CSP nonce that current_csp_nonce_for_cached_html
+  # rejects. Such a request bypasses the component cache entirely — no read, no write; it
+  # renders fresh (documented in docs/pro/strict-csp.md -> Caching Caveats). It cannot use
+  # the nonce partition: no marker can record its value (markers only carry pattern-valid
+  # values), so its entries could never be re-stamped. It must not use the nonce-free
+  # partition either: railsContext.cspNonce carries the raw value and the JS pipeline
+  # sanitizes by stripping disallowed characters before validating
+  # (packages/react-on-rails/src/sanitizeNonce.ts), so markup rendered under a
+  # malformed-but-sanitizable nonce can still carry live nonce attributes — cached
+  # marker-free under the nonce-free key, that stale (possibly session-derived) value
+  # would replay verbatim to genuinely nonce-free requests.
+  def malformed_csp_nonce_bypasses_component_cache?
+    csp_nonce.present? && current_csp_nonce_for_cached_html.nil?
+  end
+
+  # The bypass is an app misconfiguration, not a routine path: every cached_* helper
+  # renders fresh for the request (a silent 0% hit rate), so surface it at warn level.
+  # Warned once per helper instance (one view context per request) so a page of many
+  # cached components does not spam the log. The nonce value is secret-adjacent and never
+  # logged — only its length.
+  def warn_component_cache_bypassed_for_malformed_nonce
+    return if defined?(@warned_component_cache_bypassed_for_malformed_nonce)
+
+    @warned_component_cache_bypassed_for_malformed_nonce = true
+    Rails.logger.warn(
+      "[React on Rails Pro] Component caching bypassed for this request: the CSP nonce " \
+      "(length #{csp_nonce.to_s.length}) falls outside the accepted base64/base64url shape, so every cached_* " \
+      "helper renders fresh. Fix content_security_policy_nonce_generator to emit only [A-Za-z0-9+/_-] characters " \
+      "with optional trailing '=' padding."
+    )
+  end
+
+  # Single gate for every cached_* entry point: component caching is usable only when the
+  # cache options enable it AND the request's CSP nonce does not force a bypass. The
+  # bypass warning lives here (not in the predicate) so the predicate stays pure.
+  def pro_component_cache_usable?(options)
+    return false unless ReactOnRailsPro::Cache.use_cache?(options)
+
+    if malformed_csp_nonce_bypasses_component_cache?
+      warn_component_cache_bypassed_for_malformed_nonce
+      return false
+    end
+
+    true
   end
 
   def strip_leading_pro_attribution_comments(html)
@@ -682,13 +1045,13 @@ module ReactOnRailsProHelper
     cache_write_if:,
     &
   )
-    cache_enabled = ReactOnRailsPro::Cache.use_cache?(cache_options)
+    cache_enabled = pro_component_cache_usable?(cache_options)
     cache_diagnostics[:enabled] = cache_enabled
     cache_diagnostics[:hit] = false
 
     return yield unless cache_enabled
 
-    cache_key = ReactOnRailsPro::Cache.react_component_cache_key(component_name, cache_options)
+    cache_key = pro_component_cache_key(component_name, cache_options)
     raw_cache_options = cache_options[:cache_options]
     write_expired = ReactOnRailsPro::Cache.cache_write_expired?(raw_cache_options)
     if diagnostics_enabled
@@ -732,10 +1095,11 @@ module ReactOnRailsProHelper
     unless cache_hit || cache_write_skipped
       ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_write_options)
     end
+    result, cached_csp_nonce = extract_cached_csp_nonce_marker(result)
     load_pack_for_cached_react_component(component_name, render_options) if cache_hit
 
     cache_diagnostics[:hit] = cache_hit
-    result = normalize_cached_pro_attribution(result) if cache_hit
+    result = normalize_cached_pro_attribution(result, cached_csp_nonce) if cache_hit
     result
   end
 
@@ -1140,7 +1504,7 @@ module ReactOnRailsProHelper
   def fetch_stream_react_component(component_name, raw_options, &)
     auto_load_bundle = auto_load_bundle_option(raw_options)
 
-    unless ReactOnRailsPro::Cache.use_cache?(raw_options)
+    unless pro_component_cache_usable?(raw_options)
       return render_stream_component_with_props(component_name, raw_options, auto_load_bundle, &)
     end
 
@@ -1151,7 +1515,7 @@ module ReactOnRailsProHelper
 
     # Compose a cache key consistent with non-stream helper semantics.
     key_options = raw_options.merge(prerender: true)
-    view_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(component_name, key_options)
+    view_cache_key = pro_component_cache_key(component_name, key_options)
 
     cache_write_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
     # Attempt HIT without evaluating props block
@@ -1166,6 +1530,11 @@ module ReactOnRailsProHelper
   def handle_stream_cache_hit(component_name, raw_options, auto_load_bundle, cached_chunks)
     load_pack_for_cached_react_component(component_name, raw_options.merge(auto_load_bundle:))
 
+    cached_chunks, cached_csp_nonce = extract_cached_csp_nonce_marker(cached_chunks)
+    # Nonce re-stamping must happen across the joined chunk array, not per chunk: a
+    # `nonce="..."` attribute can straddle two cached chunks and per-chunk rewriting
+    # would replay the stale value.
+    cached_chunks = rewrite_cached_csp_nonces_across_chunks(cached_chunks, cached_csp_nonce)
     initial_result = normalize_cached_pro_attribution(cached_chunks.first)
 
     # Enqueue remaining chunks asynchronously
@@ -1209,7 +1578,8 @@ module ReactOnRailsProHelper
 
         cache_write = ReactOnRailsPro::StreamCacheWrites.build(
           cache_key: view_cache_key,
-          chunks:,
+          # Only the cached copy carries the nonce marker; the live stream already went out.
+          chunks: append_cached_csp_nonce_marker(chunks),
           normalized_cache_tags:,
           raw_cache_options:
         )
@@ -1263,11 +1633,11 @@ module ReactOnRailsProHelper
     cache_options = options_with_auto_load_bundle(raw_options)
 
     # Check conditional caching (:if / :unless options)
-    unless ReactOnRailsPro::Cache.use_cache?(cache_options)
+    unless pro_component_cache_usable?(cache_options)
       return render_async_react_component_uncached(component_name, raw_options, &)
     end
 
-    cache_key = ReactOnRailsPro::Cache.react_component_cache_key(component_name, cache_options)
+    cache_key = pro_component_cache_key(component_name, cache_options)
     raw_cache_options = cache_options[:cache_options] || {}
     if ReactOnRailsPro::Cache.cache_write_expired?(raw_cache_options)
       return render_async_react_component_uncached(component_name, raw_options, &)
@@ -1281,7 +1651,8 @@ module ReactOnRailsProHelper
     if cached_result
       Rails.logger.debug { "React on Rails Pro async cache HIT for #{cache_key.inspect}" }
       load_pack_for_cached_react_component(component_name, cache_options)
-      normalized_result = normalize_cached_pro_attribution(cached_result)
+      cached_result, cached_csp_nonce = extract_cached_csp_nonce_marker(cached_result)
+      normalized_result = normalize_cached_pro_attribution(cached_result, cached_csp_nonce)
       return ReactOnRailsPro::ImmediateAsyncValue.new(normalized_result)
     end
 
@@ -1320,7 +1691,7 @@ module ReactOnRailsProHelper
         result = react_component(component_name, options)
         unless ReactOnRailsPro::Cache.cache_write_expired?(raw_cache_options)
           cache_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
-          Rails.cache.write(cache_key, result, cache_options)
+          Rails.cache.write(cache_key, append_cached_csp_nonce_marker(result), cache_options)
           ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_options)
         end
         result

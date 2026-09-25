@@ -21,6 +21,8 @@ module ReactOnRailsPro
     ACTIVE_SUPPORT_EXPIRES_AT_VERSION = Gem::Version.new("7.0.0")
     EXPIRED_CACHE_WRITE_TTL = 1 # seconds; minimum positive TTL for race-expired writes
     RSC_BUNDLE_MISSING_CACHE_KEY = "rsc-bundle-missing"
+    CSP_NONCE_CACHE_KEY_SEGMENT = "csp-nonce"
+    CSP_NONCE_FREE_CACHE_KEY_SEGMENT = "csp-nonce-free"
 
     class << self
       # Registers cache tags for an already-written cache entry so a later
@@ -168,6 +170,24 @@ module ReactOnRailsPro
           ).hexdigest
       end
 
+      # options[:csp_nonce_active] distinguishes entries rendered with a CSP nonce from
+      # entries rendered without one. Cached markup written under a nonce carries nonce
+      # attributes that get re-stamped per request on the way out (issue #5021), while
+      # markup written without a nonce has no attribute to re-stamp — so the two must never
+      # share an entry when an app toggles its nonce generator. Only the boolean goes into
+      # the key: keying on the nonce VALUE would give every request its own entry and
+      # defeat the cache. The partition segment is ALWAYS present and sits at a fixed
+      # index preceded ONLY by framework-controlled segments (key type, gem versions,
+      # bundle hashes, dependency digest) — never by caller-controlled content. Cache
+      # stores flatten nested key arrays into one slash-joined string, so a segment placed
+      # after any caller-controlled value can be forged: a conditional trailing segment
+      # collides ["article", 1, "csp-nonce"] (nonce-free) with ["article", 1]
+      # (nonce-active), and even a segment after component_name is forgeable because
+      # component names are caller-controlled registered keys that may contain "/"
+      # (nonce-active "Widget" + cache_key ["csp-nonce-free", "1"] would collide with
+      # nonce-free "Widget/csp-nonce" + cache_key "1"). With the segment left of all
+      # user-supplied content, no component name or cache_key can make the two partitions
+      # expand to the same key.
       def react_component_cache_key(component_name, options)
         cache_key_option = options[:cache_key]
         cache_key_value = if cache_key_option.respond_to?(:call)
@@ -180,6 +200,7 @@ module ReactOnRailsPro
         [
           *base_cache_key("ror_component", prerender: options[:prerender]),
           dependencies_cache_key,
+          options[:csp_nonce_active] ? CSP_NONCE_CACHE_KEY_SEGMENT : CSP_NONCE_FREE_CACHE_KEY_SEGMENT,
           component_name,
           cache_key_value
         ].compact

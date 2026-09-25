@@ -63,6 +63,35 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [Issue 5027](https://github.com/shakacode/react_on_rails/issues/5027).
   [PR 5029](https://github.com/shakacode/react_on_rails/pull/5029) by
   [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- **[Pro]** **Fragment-cached components no longer serve stale CSP nonces**: The `cached_*` helpers
+  (`cached_react_component`, `cached_react_component_hash`, `cached_stream_react_component`,
+  `cached_buffered_stream_react_component`, `cached_static_rsc_component`, `cached_async_react_component`) cached
+  the rendered HTML with the originating request's CSP nonce baked into every executable inline script — immediate
+  hydration, console replay, and React's streaming runtime scripts — so under a nonce-enforcing `script-src` every
+  cache hit served scripts the browser refused to run. The cache write now records the originating request's nonce
+  in a trailing framework marker, and cache hits re-stamp exactly the attributes carrying that originating value
+  with the serving request's nonce (streamed replays are rewritten across chunk boundaries, so an attribute that
+  straddles two cached chunks is still re-stamped) — matching the exact per-request secret means
+  markup that arrived with any other nonce value is never promoted to the live nonce. Every component cache key also
+  gains a CSP-nonce partition segment (`csp-nonce` or `csp-nonce-free`), placed at a fixed position preceded only
+  by framework-controlled segments — before the caller's component name and `cache_key` value — so neither can
+  spell one partition into the other; entries rendered with a nonce are never
+  shared with nonce-free requests (and vice versa) when an app toggles its nonce generator. (Component cache keys
+  already embed the gem version, so the new segment costs no extra cache fault beyond the upgrade's own.) For the executable double-quoted
+  `nonce="…"` attributes it covers, the re-stamp also stops serving one request's nonce value to other users from
+  shared cache entries, which mattered for session-derived nonce generators — but only there: a nonce rendered into
+  visible text, a data attribute, differently-quoted app markup, or JSON props inside a cached fragment still replays
+  verbatim, so apps must not render the nonce (e.g. `railsContext.cspNonce`) into cached content outside those
+  attributes. Requests whose nonce is present but falls outside
+  the base64/base64url shape bypass the component cache entirely (they render fresh), so a malformed nonce can
+  neither create entries that no later request could re-stamp nor leak a sanitized derivative of its value into entries
+  served to nonce-free requests. Note for apps overriding private normalization hooks: `normalize_cached_pro_attribution`
+  and `normalize_cached_pro_attribution_html` now take a `cached_csp_nonce` parameter and are invoked with it on cache
+  hits, so an override or prepended module written for the old one-argument form raises ArgumentError after upgrading —
+  accept (and forward) the new parameter. Fixes
+  [Issue 5021](https://github.com/shakacode/react_on_rails/issues/5021).
+  [PR 5025](https://github.com/shakacode/react_on_rails/pull/5025) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 - **Console replay can no longer swallow the rest of the page, and replayed messages are no longer altered**:
   A server-side `console.log` argument containing `<!--` could switch the browser's HTML parser into a state where
