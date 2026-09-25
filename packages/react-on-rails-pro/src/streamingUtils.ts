@@ -59,23 +59,15 @@ const FLIGHT_PATCHED_CONSOLE_METHODS = [
 ] as const;
 
 let nativeConsole: Console | undefined;
-// Created at module load, outside any render, so running a callback in this scope clears Flight's
-// request AsyncLocalStorage store for the callback and every async continuation it starts.
-const requestFreeDeliveryScope = new AsyncResource('ReactOnRailsRSCStreamDelivery');
 
 // React 19.3 development Flight patches console and encodes calls made while `currentRequest` / ALS
 // is set as `:W["log"...]` rows. Emitting a chunk to the returned Readable is still inside that
-// request, so consumer logs leaked into the RSC payload. Deliver each event from a request-free
-// async scope, so later continuations of consumer listeners don't inherit Flight's request, and
-// swap Flight's wrappers for Node's native console for the synchronous part, where Flight's
-// `currentRequest` is still set.
-// Production Flight does not patch console, so production delivery leaves the caller's console
-// (for example, the node renderer's console-replay capture) untouched.
-const runWithFlightConsoleCaptureDisabled = <T>(callback: () => T): T => {
-  if (process.env.NODE_ENV === 'production') {
-    return callback();
-  }
-
+// request, so consumer logs leaked into the RSC payload. Each event is delivered in
+// `deliveryScope`, the render's own async context captured before Flight starts, so consumer
+// listeners and their async continuations keep the render's stores (tracing, request ids) without
+// Flight's request store. Flight's wrappers are swapped for Node's native console for the
+// synchronous part, where Flight's `currentRequest` is still set.
+const runWithFlightConsoleCaptureDisabled = <T>(deliveryScope: AsyncResource, callback: () => T): T => {
   nativeConsole ??= new Console({ stdout: process.stdout, stderr: process.stderr });
   const flightFreeConsole = nativeConsole;
   const restored: Array<() => void> = [];
@@ -102,7 +94,7 @@ const runWithFlightConsoleCaptureDisabled = <T>(callback: () => T): T => {
   });
 
   try {
-    return requestFreeDeliveryScope.runInAsyncScope(callback);
+    return deliveryScope.runInAsyncScope(callback);
   } finally {
     restored.reverse().forEach((restore) => restore());
   }
@@ -124,6 +116,12 @@ const runWithFlightConsoleCaptureDisabled = <T>(callback: () => T): T => {
  *   - emitError: A function to manually emit errors into the stream
  */
 const bufferStream = (stream: Readable, { isolateFlightConsole }: StreamDeliveryOptions) => {
+  // Production Flight does not patch console, so production delivery leaves the caller's console
+  // (for example, the node renderer's console-replay capture) and async context untouched.
+  const deliveryScope =
+    isolateFlightConsole && process.env.NODE_ENV !== 'production'
+      ? new AsyncResource('ReactOnRailsRSCStreamDelivery')
+      : undefined;
   const bufferedEvents: BufferedEvent[] = [];
   let startedReading = false;
 
@@ -144,9 +142,8 @@ const bufferStream = (stream: Readable, { isolateFlightConsole }: StreamDelivery
 
       // Remove initial listeners
       listeners.forEach(({ event, listener }) => stream.off(event, listener));
-      const deliver = isolateFlightConsole
-        ? runWithFlightConsoleCaptureDisabled
-        : <T>(callback: () => T) => callback();
+      const deliver = <T>(callback: () => T): T =>
+        deliveryScope ? runWithFlightConsoleCaptureDisabled(deliveryScope, callback) : callback();
       const handleEvent = ({ event, data }: BufferedEvent) =>
         deliver(() => {
           if (event === 'data') {

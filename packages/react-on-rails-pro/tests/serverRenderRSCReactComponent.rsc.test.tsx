@@ -19,6 +19,7 @@
 
 /// <reference types="react/experimental" />
 
+import { AsyncLocalStorage } from 'async_hooks';
 import * as React from 'react';
 import { Suspense, useInsertionEffect, useState } from 'react';
 import * as mock from 'mock-fs';
@@ -274,6 +275,38 @@ test('does not capture logs from async continuations of consumer data listeners'
 
   expect(content).toContain('[Async Consumer] Before awaitng');
   expect(content).not.toContain('Async Consumer Log');
+});
+
+test('delivers RSC chunks in the async context of the render that produced them', async () => {
+  // Unrelated async-local stores (tracing, request ids) must follow the render, not whatever
+  // context was active when the bundle module was loaded.
+  const requestStore = new AsyncLocalStorage<string>();
+  const seenStores = new Set<string | undefined>();
+  const continuationStores = new Set<string | undefined>();
+
+  await requestStore.run('request-B', async () => {
+    const readable = ReactOnRails.serverRenderRSCReactComponent({
+      railsContext: {
+        reactClientManifestFileName: 'react-client-manifest.json',
+        reactServerClientManifestFileName: 'react-server-client-manifest.json',
+      } as unknown as RailsContextWithServerStreamingCapabilities,
+      name: 'PromiseContainer',
+      renderingReturnsPromises: true,
+      throwJsErrors: true,
+      domNodeId: 'dom-id',
+      props: { name: 'Context Consumer' },
+    });
+    readable.on('data', () => {
+      seenStores.add(requestStore.getStore());
+      void Promise.resolve().then(() => {
+        continuationStores.add(requestStore.getStore());
+      });
+    });
+    await finished(readable);
+  });
+
+  expect([...seenStores]).toEqual(['request-B']);
+  expect([...continuationStores]).toEqual(['request-B']);
 });
 
 test('does not capture consumer renderingError-listener logs raised after streaming starts', async () => {
