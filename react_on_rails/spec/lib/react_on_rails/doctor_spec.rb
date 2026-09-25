@@ -12007,6 +12007,23 @@ RSpec.describe ReactOnRails::Doctor do
           )
         end
 
+        it "keeps the support table when the installed RSC package declares no React peers" do
+          errors = rsc_errors_for(rsc_version: "19.2.1", react_version: "19.3.0", react_peer: nil)
+
+          expect(errors).to contain_exactly(
+            a_string_including(
+              "react-on-rails-rsc 19.2.1 is installed with unsupported React 19.3.0",
+              "19.2.x with patch >= 19.2.7 (stable releases only)"
+            )
+          )
+        end
+
+        it "accepts a supported pair when the installed RSC package declares no React peers" do
+          errors = rsc_errors_for(rsc_version: "19.3.0", react_version: "19.2.8", react_peer: nil)
+
+          expect(errors).to be_empty
+        end
+
         it "rejects the superseded 19.3.0-rc.4 prerelease that React on Rails 17.1.0 accepted" do
           errors = rsc_errors_for(rsc_version: "19.3.0-rc.4", react_version: "19.2.8", react_peer: "^19.2.8")
 
