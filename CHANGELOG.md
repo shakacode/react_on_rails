@@ -40,9 +40,9 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 - **[Pro]** **RSC streams no longer encode consumer logs into the Flight payload**: React 19.3 development
   Flight keeps a console hook active while it flushes chunks, so logs from code consuming the returned RSC
-  Readable were serialized as `:W["log"...]` rows. In non-production builds, RSC payload event delivery now
-  uses Node's native console while each event reaches the consumer. Production builds and HTML streams keep
-  the caller's console unchanged. [PR 5094](https://github.com/shakacode/react_on_rails/pull/5094) by
+  Readable were serialized as `:W["log"...]` rows. In non-production builds, RSC payload streams now use
+  Node's native console while chunks reach the consumer. Production builds and HTML streams keep the
+  caller's console unchanged. [PR 5094](https://github.com/shakacode/react_on_rails/pull/5094) by
   [justin808](https://github.com/justin808).
 
 - **`authenticityHeaders()` no longer mutates its input object**: The helper now returns a new merged object instead of writing CSRF headers into the caller's `otherHeaders` argument. Previously, passing a shared or module-level headers object would bake a stale CSRF token into it, causing intermittent `422 InvalidAuthenticityToken` errors after Turbo navigations. Fixes [Issue 5028](https://github.com/shakacode/react_on_rails/issues/5028).
