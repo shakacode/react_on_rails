@@ -64,7 +64,8 @@ describe "CSP nonce on fragment-cached component cache hits", :caching, :server_
       env_config["action_dispatch.content_security_policy_nonce_generator"] = ->(_request) { "bad nonce!" }
       example.run
     ensure
-      env_config["action_dispatch.content_security_policy_nonce_generator"] = original
+      # Guarded: if reading env_config itself raised, restoring on nil would mask the error.
+      env_config["action_dispatch.content_security_policy_nonce_generator"] = original if env_config
     end
 
     it "warns about the component-cache bypass once per request, again on the next request" do
