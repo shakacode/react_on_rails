@@ -62,10 +62,12 @@ let nativeConsole: Console | undefined;
 
 // React 19.3 development Flight patches console and encodes calls made while `currentRequest` / ALS
 // is set as `:W["log"...]` rows. Emitting a chunk to the returned Readable is still inside that
-// request, so consumer logs leaked into the RSC payload. Each event is delivered in
-// `deliveryScope`, the render's own async context captured before Flight starts, so consumer
-// listeners and their async continuations keep the render's stores (tracing, request ids) without
-// Flight's request store. Flight's wrappers are swapped for Node's native console for the
+// request, so consumer logs leaked into the RSC payload. The invariant is that consumer code never
+// runs in Flight's request context. Events that Flight's flush delivers synchronously run in
+// `deliveryScope`, the render's own async context captured before Flight starts, so listeners and
+// their async continuations keep the render's stores (tracing, request ids) without Flight's
+// request store. Events Node defers to the consumer's own read run in the consumer's context,
+// which is already outside Flight. Flight's wrappers are swapped for Node's native console for the
 // synchronous part, where Flight's `currentRequest` is still set.
 const runWithFlightConsoleCaptureDisabled = <T>(deliveryScope: AsyncResource, callback: () => T): T => {
   nativeConsole ??= new Console({ stdout: process.stdout, stderr: process.stderr });
