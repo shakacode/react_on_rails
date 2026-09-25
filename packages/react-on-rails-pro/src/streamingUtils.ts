@@ -61,8 +61,8 @@ const nativeConsole = new Console({ stdout: process.stdout, stderr: process.stde
 
 // React 19.3 Flight patches console while `currentRequest` / ALS is set. Emitting a chunk to the
 // returned Readable is still inside that request, so consumer `on('data')` logs were encoded as
-// `:W["log"...]` rows. Swap Flight's wrappers for Node's native console for the duration of the
-// consumer push so those logs stay out of the RSC payload.
+// `:W["log"...]` rows. Swap Flight's wrappers for Node's native console while each event is
+// delivered to the consumer so those logs stay out of the RSC payload.
 const runWithFlightConsoleCaptureDisabled = <T>(callback: () => T): T => {
   const restored: Array<() => void> = [];
 
@@ -130,21 +130,18 @@ const bufferStream = (stream: Readable) => {
 
       // Remove initial listeners
       listeners.forEach(({ event, listener }) => stream.off(event, listener));
-      const handleEvent = ({ event, data }: BufferedEvent) => {
-        if (event === 'data') {
-          runWithFlightConsoleCaptureDisabled(() => {
+      const handleEvent = ({ event, data }: BufferedEvent) =>
+        runWithFlightConsoleCaptureDisabled(() => {
+          if (event === 'data') {
             this.push(data);
-          });
-        } else if (event === 'error') {
-          this.emit('error', data);
-        } else if (event === 'renderingError') {
-          this.emit('renderingError', data);
-        } else {
-          runWithFlightConsoleCaptureDisabled(() => {
+          } else if (event === 'error') {
+            this.emit('error', data);
+          } else if (event === 'renderingError') {
+            this.emit('renderingError', data);
+          } else {
             this.push(null);
-          });
-        }
-      };
+          }
+        });
 
       // Replay buffered events
       bufferedEvents.forEach(handleEvent);
