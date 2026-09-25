@@ -1043,6 +1043,28 @@ describe('streamServerRenderedReactComponent', () => {
     expect(chunks[1].isShellReady).toBe(true);
   });
 
+  it('keeps HTML stream consumer logs on the caller console outside production', async () => {
+    // The Flight console isolation applies only to RSC payload streams; HTML streams have no Flight hook.
+    expect(process.env.NODE_ENV).not.toBe('production');
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      const { renderResult, chunks } = setupStreamTest();
+      renderResult.on('data', () => {
+        console.log('HTML Consumer Log');
+      });
+      await new Promise((resolve) => {
+        renderResult.once('end', resolve);
+      });
+
+      expect(chunks.length).toBeGreaterThan(0);
+      expect(logSpy.mock.calls.filter(([message]) => message === 'HTML Consumer Log')).toHaveLength(
+        chunks.length,
+      );
+    } finally {
+      logSpy.mockRestore();
+    }
+  });
+
   it('keeps useId values isolated across streamed roots without assuming React private ID encoding', async () => {
     ReactOnRails.register({ UseIdField });
 
