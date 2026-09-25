@@ -5383,9 +5383,14 @@ module ReactOnRails
         checker.add_warning(<<~MSG.strip)
           ⚠️  #{RSC_PACKAGE_NAME} #{rsc_package['version']} does not declare React peer dependencies.
 
-          Falling back to the legacy React version heuristic.
+          Checking React against the React on Rails Pro support window for this package instead.
         MSG
-        return false
+        if check_rsc_supported_react_packages_for_package(rsc_package, react_version)
+          checker.add_success(
+            "✅ React #{react_version} is compatible with #{RSC_PACKAGE_NAME} #{rsc_package['version']}"
+          )
+        end
+        return true
       end
 
       peer_compatible = check_rsc_package_peer_compatibility(rsc_package, react_version)

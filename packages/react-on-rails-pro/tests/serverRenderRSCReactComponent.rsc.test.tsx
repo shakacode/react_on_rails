@@ -250,6 +250,32 @@ test('does not capture consumer data-listener logs after returning the render st
   expect(content1).toContain('[First Unique Name] Before awaitng');
 });
 
+test('does not capture logs from async continuations of consumer data listeners', async () => {
+  const readable = ReactOnRails.serverRenderRSCReactComponent({
+    railsContext: {
+      reactClientManifestFileName: 'react-client-manifest.json',
+      reactServerClientManifestFileName: 'react-server-client-manifest.json',
+    } as unknown as RailsContextWithServerStreamingCapabilities,
+    name: 'PromiseContainer',
+    renderingReturnsPromises: true,
+    throwJsErrors: true,
+    domNodeId: 'dom-id',
+    props: { name: 'Async Consumer' },
+  });
+
+  let content = '';
+  readable.on('data', (chunk: Buffer) => {
+    content += chunk.toString();
+    void Promise.resolve().then(() => {
+      console.log('Async Consumer Log');
+    });
+  });
+  await finished(readable);
+
+  expect(content).toContain('[Async Consumer] Before awaitng');
+  expect(content).not.toContain('Async Consumer Log');
+});
+
 test('does not capture consumer renderingError-listener logs raised after streaming starts', async () => {
   const readable = ReactOnRails.serverRenderRSCReactComponent({
     railsContext: {
