@@ -233,6 +233,39 @@ test('does not capture consumer data-listener logs after returning the render st
   expect(content1).toContain('[First Unique Name] Before awaitng');
 });
 
+test('keeps consumer logs on the caller console in production builds', async () => {
+  // Production Flight does not patch console, so delivery must not reroute consumer logs
+  // (for example, away from the node renderer's console-replay capture).
+  const previousNodeEnv = process.env.NODE_ENV;
+  process.env.NODE_ENV = 'production';
+  const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+  try {
+    const readable = ReactOnRails.serverRenderRSCReactComponent({
+      railsContext: {
+        reactClientManifestFileName: 'react-client-manifest.json',
+        reactServerClientManifestFileName: 'react-server-client-manifest.json',
+      } as unknown as RailsContextWithServerStreamingCapabilities,
+      name: 'PromiseContainer',
+      renderingReturnsPromises: true,
+      throwJsErrors: true,
+      domNodeId: 'dom-id',
+      props: { name: 'Production Consumer' },
+    });
+    let dataEvents = 0;
+    readable.on('data', () => {
+      dataEvents += 1;
+      console.log('Consumer Log');
+    });
+    await finished(readable);
+
+    expect(dataEvents).toBeGreaterThan(0);
+    expect(logSpy.mock.calls.filter(([message]) => message === 'Consumer Log')).toHaveLength(dataEvents);
+  } finally {
+    logSpy.mockRestore();
+    process.env.NODE_ENV = previousNodeEnv;
+  }
+});
+
 test('explains likely missing use client directive when a server component calls a client hook', async () => {
   const error = await captureRenderedError('HooksWithoutClientDirective');
 

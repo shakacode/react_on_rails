@@ -57,18 +57,26 @@ const FLIGHT_PATCHED_CONSOLE_METHODS = [
   'warn',
 ] as const;
 
-const nativeConsole = new Console({ stdout: process.stdout, stderr: process.stderr });
+let nativeConsole: Console | undefined;
 
-// React 19.3 Flight patches console while `currentRequest` / ALS is set. Emitting a chunk to the
-// returned Readable is still inside that request, so consumer `on('data')` logs were encoded as
-// `:W["log"...]` rows. Swap Flight's wrappers for Node's native console while each event is
-// delivered to the consumer so those logs stay out of the RSC payload.
+// React 19.3 development Flight patches console and encodes calls made while `currentRequest` / ALS
+// is set as `:W["log"...]` rows. Emitting a chunk to the returned Readable is still inside that
+// request, so consumer logs leaked into the RSC payload. Swap Flight's wrappers for Node's native
+// console while each event is delivered to the consumer so those logs stay out of the payload.
+// Production Flight does not patch console, so production delivery leaves the caller's console
+// (for example, the node renderer's console-replay capture) untouched.
 const runWithFlightConsoleCaptureDisabled = <T>(callback: () => T): T => {
+  if (process.env.NODE_ENV === 'production') {
+    return callback();
+  }
+
+  nativeConsole ??= new Console({ stdout: process.stdout, stderr: process.stderr });
+  const flightFreeConsole = nativeConsole;
   const restored: Array<() => void> = [];
 
   FLIGHT_PATCHED_CONSOLE_METHODS.forEach((methodName) => {
     const current = console[methodName];
-    const nativeMethod = nativeConsole[methodName];
+    const nativeMethod = flightFreeConsole[methodName];
     if (typeof current !== 'function' || typeof nativeMethod !== 'function') {
       return;
     }
@@ -76,7 +84,7 @@ const runWithFlightConsoleCaptureDisabled = <T>(callback: () => T): T => {
     Object.defineProperty(console, methodName, {
       configurable: true,
       writable: true,
-      value: nativeMethod.bind(nativeConsole),
+      value: nativeMethod.bind(flightFreeConsole),
     });
     restored.push(() => {
       Object.defineProperty(console, methodName, {
