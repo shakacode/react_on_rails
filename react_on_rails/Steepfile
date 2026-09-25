@@ -43,6 +43,7 @@ target :lib do
   check "lib/react_on_rails/typescript_response_types/generated_file_writer.rb"
   check "lib/react_on_rails/utils.rb"
   check "lib/react_on_rails/version_checker.rb"
+  check "lib/react_on_rails/version_checker/lockfile_resolution.rb"
 
   # Specify RBS signature directories
   signature "sig"

@@ -46,3 +46,6 @@ benchmarks/rspack-vite-rails-dx/results/*.json
 REACT-ON-RAILS-PRO-LICENSE.md
 packages/react-on-rails-pro/LICENSE.md
 packages/react-on-rails-pro-node-renderer/LICENSE.md
+
+# Intentionally invalid JSON fixture (lockfile parser resilience test)
+react_on_rails/spec/react_on_rails/fixtures/lockfiles/npm_malformed/package-lock.json

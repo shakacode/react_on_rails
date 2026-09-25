@@ -4,6 +4,7 @@ require "json"
 require_relative "version_syntax_converter"
 require_relative "shakapacker_config_helpers"
 require_relative "rsc_rspack_support"
+require_relative "version_checker/lockfile_resolution"
 
 module ReactOnRails
   # Responsible for checking versions of rubygem versus yarn node package
@@ -15,7 +16,10 @@ module ReactOnRails
     attr_reader :node_package_version
 
     # Semver uses - to separate pre-release, but RubyGems use .
-    VERSION_PARTS_REGEX = /(\d+)\.(\d+)\.(\d+)(?:[-.]([0-9A-Za-z.-]+))?/
+    # Possessive quantifiers (++) keep matching linear on adversarial inputs (e.g. a version
+    # string of thousands of digits): a digit run never needs to backtrack for the following
+    # "." to match, so the semantics are unchanged.
+    VERSION_PARTS_REGEX = /(\d++)\.(\d++)\.(\d++)(?:[-.]([0-9A-Za-z.-]++))?/
     def self.build
       new(NodePackageVersion.build)
     end
@@ -205,8 +209,10 @@ module ReactOnRails
         Detected: #{node_package_version.raw}
              Gem: #{gem_version}
 
-        React on Rails requires exact version matching between the gem and npm package.
-        Do not use ^, ~, >, <, *, or other semver ranges.
+        React on Rails checks the INSTALLED package version against the gem version, so semver
+        ranges like ^ or ~ in package.json are fine when a lockfile can resolve them. No lockfile
+        could resolve the installed version here, so the package.json version itself must be an
+        exact version matching the gem.
 
         Fix:
           Run: #{install_cmd}
@@ -579,24 +585,33 @@ module ReactOnRails
 
       # Resolve version from lockfiles if available, otherwise use package.json version
       def resolve_version(package_json_version, package_name)
-        # If package.json specifies a local path or URL, don't try to resolve from lockfiles
-        # Lockfiles may contain placeholder versions like "0.0.0" for local links
-        return package_json_version if local_path_or_url_version?(package_json_version)
+        # If package.json specifies a local path, URL, or workspace link, don't try to resolve
+        # from lockfiles. Lockfiles record placeholders for links (e.g. "0.0.0", the Yarn Berry
+        # "0.0.0-use.local"), and keeping the raw spec lets the validators apply their
+        # local/workspace exemptions. A JSON null dependency value stays nil (validators treat a
+        # nil raw as "not installed").
+        return package_json_version if package_json_version.nil? ||
+                                       local_path_or_url_version?(package_json_version) ||
+                                       package_json_version.start_with?("workspace:")
 
-        # Try yarn.lock first
+        # Fall back to the package.json version when no lockfile resolves one.
+        lockfile_version(package_name) || package_json_version
+      end
+
+      # Try yarn.lock first, then package-lock.json, then the other package managers'
+      # lockfiles (pnpm-lock.yaml, bun.lock), which live in the same directory as package.json.
+      def lockfile_version(package_name)
         if yarn_lock && File.exist?(yarn_lock)
-          lockfile_version = version_from_yarn_lock(package_name)
-          return lockfile_version if lockfile_version
+          version = version_from_yarn_lock(package_name)
+          return version if version
         end
 
-        # Try package-lock.json
         if package_lock && File.exist?(package_lock)
-          lockfile_version = version_from_package_lock(package_name)
-          return lockfile_version if lockfile_version
+          version = version_from_package_lock(package_name)
+          return version if version
         end
 
-        # Fall back to package.json version
-        package_json_version
+        LockfileResolution.version(File.dirname(package_json.to_s), package_name)
       end
 
       # Check if a version string represents a local path or URL
@@ -616,6 +631,13 @@ module ReactOnRails
       def version_from_yarn_lock(package_name)
         return nil unless yarn_lock && File.exist?(yarn_lock)
 
+        # Yarn Berry (yarn 2+) writes the same yarn.lock filename in a YAML format marked by an
+        # __metadata section near the top; the format is decided by content, not by the yarn
+        # version in use. Sniff only the file head so the classic path below keeps streaming.
+        if File.open(yarn_lock) { |f| f.read(1024) }.to_s.include?("__metadata:")
+          return LockfileResolution.berry_yarn_version(File.read(yarn_lock), package_name)
+        end
+
         in_package_block = false
         File.foreach(yarn_lock) do |line|
           # Check if we're starting the block for our package
@@ -627,15 +649,14 @@ module ReactOnRails
           end
 
           # If we're in the package block, look for the version line
-          if in_package_block
-            # Version line looks like:  version "16.1.1"
-            if (match = line.match(/^\s+version\s+"([^"]+)"/))
-              return match[1]
-            end
-
-            # If we hit a blank line or new package, we've left the block
-            break if line.strip.empty? || (line[0] != " " && line[0] != "\t")
+          next unless in_package_block
+          # Version line looks like:  version "16.1.1"
+          if (match = line.match(/^\s+version\s+"([^"]+)"/))
+            return match[1]
           end
+
+          # If we hit a blank line or new package, we've left the block
+          break if line.strip.empty? || (line[0] != " " && line[0] != "\t")
         end
 
         nil
