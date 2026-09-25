@@ -58,6 +58,22 @@ const PromiseContainer = ({ name }: { name: string }) => {
   );
 };
 
+const DelayedFailure = async () => {
+  await new Promise((resolve) => {
+    setTimeout(resolve, 5);
+  });
+  throw new Error('Delayed RSC failure');
+};
+
+const DelayedFailureContainer = () => (
+  <div>
+    <h1>Shell Before Failure</h1>
+    <Suspense fallback={<p>Loading Failure</p>}>
+      <DelayedFailure />
+    </Suspense>
+  </div>
+);
+
 const HooksWithoutClientDirective = () => {
   useState('client state');
 
@@ -71,6 +87,7 @@ const InsertionEffectWithoutClientDirective = () => {
 };
 
 ReactOnRails.register({
+  DelayedFailureContainer,
   HooksWithoutClientDirective,
   InsertionEffectWithoutClientDirective,
   PromiseContainer,
@@ -231,6 +248,35 @@ test('does not capture consumer data-listener logs after returning the render st
   expect(content1).not.toContain('From Interval');
   expect(content1).not.toContain('Outside The Component');
   expect(content1).toContain('[First Unique Name] Before awaitng');
+});
+
+test('does not capture consumer renderingError-listener logs raised after streaming starts', async () => {
+  const readable = ReactOnRails.serverRenderRSCReactComponent({
+    railsContext: {
+      reactClientManifestFileName: 'react-client-manifest.json',
+      reactServerClientManifestFileName: 'react-server-client-manifest.json',
+    } as unknown as RailsContextWithServerStreamingCapabilities,
+    name: 'DelayedFailureContainer',
+    renderingReturnsPromises: true,
+    throwJsErrors: false,
+    domNodeId: 'dom-id',
+    props: {},
+  });
+
+  let content = '';
+  let renderingErrors = 0;
+  readable.on('renderingError', () => {
+    renderingErrors += 1;
+    console.log('Consumer Rendering Error Log');
+  });
+  readable.on('data', (chunk: Buffer) => {
+    content += chunk.toString();
+  });
+  await finished(readable);
+
+  expect(renderingErrors).toBeGreaterThan(0);
+  expect(content).toContain('Shell Before Failure');
+  expect(content).not.toContain('Consumer Rendering Error Log');
 });
 
 test('keeps consumer logs on the caller console in production builds', async () => {
