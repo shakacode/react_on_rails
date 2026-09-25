@@ -117,7 +117,7 @@ const runWithFlightConsoleCaptureDisabled = <T>(callback: () => T): T => {
  *   - stream: A new Readable stream that will buffer and replay all events
  *   - emitError: A function to manually emit errors into the stream
  */
-const bufferStream = (stream: Readable) => {
+const bufferStream = (stream: Readable, { isolateFlightConsole }: StreamDeliveryOptions) => {
   const bufferedEvents: BufferedEvent[] = [];
   let startedReading = false;
 
@@ -138,8 +138,11 @@ const bufferStream = (stream: Readable) => {
 
       // Remove initial listeners
       listeners.forEach(({ event, listener }) => stream.off(event, listener));
+      const deliver = isolateFlightConsole
+        ? runWithFlightConsoleCaptureDisabled
+        : <T>(callback: () => T) => callback();
       const handleEvent = ({ event, data }: BufferedEvent) =>
-        runWithFlightConsoleCaptureDisabled(() => {
+        deliver(() => {
           if (event === 'data') {
             this.push(data);
           } else if (event === 'error') {
@@ -180,7 +183,15 @@ const bufferStream = (stream: Readable) => {
   };
 };
 
-export const transformRenderStreamChunksToResultObject = (renderState: StreamRenderState) => {
+export type StreamDeliveryOptions = {
+  // Set for RSC payload streams, whose development Flight build captures consumer console calls.
+  isolateFlightConsole?: boolean;
+};
+
+export const transformRenderStreamChunksToResultObject = (
+  renderState: StreamRenderState,
+  deliveryOptions: StreamDeliveryOptions = {},
+) => {
   const consoleHistory = console.history;
   let previouslyReplayedConsoleMessages = 0;
 
@@ -222,7 +233,7 @@ export const transformRenderStreamChunksToResultObject = (renderState: StreamRen
     stream: readableStream,
     emitError: emitRenderError,
     notifyRenderingError: notifyRenderError,
-  } = bufferStream(transformStream);
+  } = bufferStream(transformStream, deliveryOptions);
 
   // Set once the consumer has abandoned the output stream before the render finished (issue #3885).
   const consumerAbortHandlers: Array<() => void> = [];

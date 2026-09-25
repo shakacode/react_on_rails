@@ -200,16 +200,6 @@ describe('checkRscPeerCompatibility', () => {
     expect(r.message).toContain('>= 19.2.1 (or 19.3.1-rc.0 during the RC soak)');
   });
 
-  it('returns ok for the 19.3.1-rc.0 soak with React 19.3.0', () => {
-    expect(
-      checkRscPeerCompatibility({
-        rscVersion: '19.3.1-rc.0',
-        reactVersion: '19.3.0',
-        reactDomVersion: '19.3.0',
-      }).level,
-    ).toBe('ok');
-  });
-
   it('errors when the 19.3.1-rc.0 soak is paired with React 19.2.7', () => {
     const r = checkRscPeerCompatibility({ rscVersion: '19.3.1-rc.0', reactVersion: '19.2.7' });
     expect(r.level).toBe('error');

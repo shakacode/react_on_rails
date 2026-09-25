@@ -120,7 +120,7 @@ const streamRenderRSCComponent = (
     notifyRenderingError,
     isConsumerAborted,
     onConsumerAbort,
-  } = transformRenderStreamChunksToResultObject(renderState);
+  } = transformRenderStreamChunksToResultObject(renderState, { isolateFlightConsole: true });
 
   // On client disconnect the RSC render stream is aborted by cancelUpstream; also release any RSC
   // payload streams this render fetched so their upstream Rails/API work stops, and run post-SSR
