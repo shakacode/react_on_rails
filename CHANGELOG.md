@@ -105,28 +105,6 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4998](https://github.com/shakacode/react_on_rails/pull/4998) by
   [justin808](https://github.com/justin808).
 
-- **[Pro]** **Prerender-cached streamed renders now hydrate on every request**: The automatic prerender cache key
-  deliberately ignores random dom ids so one cached render serves every mount point, but the cached
-  chunks still embedded the first request's dom id in their React Server Component payload keys.
-  Every cache hit therefore refetched the payload and failed hydration whenever the render was not
-  byte-identical. Cached streams are now rebound to the dom id of the render being served. Fixes
-  [Issue 4984](https://github.com/shakacode/react_on_rails/issues/4984). [PR 4987](https://github.com/shakacode/react_on_rails/pull/4987) by
-  [justin808](https://github.com/justin808).
-
-- **Release failures now provide supervised, reason-specific recovery**: `script/release --evaluate-head`
-  supports strict exact-HEAD CI evaluation for both preview and live retries, foreign claims identify the available
-  holder/task/session metadata and targeted status command, and npm readiness distinguishes stale dependencies,
-  pnpm-version mismatches, and package-build failures without requiring `bin/setup`. Fixes
-  [Issue 4955](https://github.com/shakacode/react_on_rails/issues/4955).
-
-- **Fresh generated apps now preserve their resolved Shakapacker version**: The installer now pins
-  `bundle add shakapacker --strict` to the version already selected through React on Rails instead
-  of allowing an older globally installed gem to downgrade the app's lockfile. The tested
-  Shakapacker baseline is now 10.3.2, which includes the rack-proxy v1 development-server proxy fix
-  and the macOS 27 liveness fix. Fixes
-  [Issue 4947](https://github.com/shakacode/react_on_rails/issues/4947). [PR 4948](https://github.com/shakacode/react_on_rails/pull/4948) by
-  [justin808](https://github.com/justin808).
-
 - **`bin/dev kill` now stops only the current app directory's processes, and verifies they are
   gone**: the kill path matched command lines machine-wide (`pgrep -f rails`, `pgrep -f overmind`,
   `pgrep -f ruby.*puma`, and friends) and scanned ports with an unfiltered `lsof -ti :PORT`, so
@@ -173,6 +151,79 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4918](https://github.com/shakacode/react_on_rails/pull/4918) by
   [justin808](https://github.com/justin808).
 
+- **[Pro]** **OpenTelemetry propagation and existing-provider attachment now recover cleanly**: Rails-to-renderer
+  requests replace stale mixed-case W3C propagation headers with each request attempt's current client-span context
+  without mutating caller-owned raw headers. Node Renderer attachment to an application-owned provider now rolls back
+  a newly installed tracing adapter when a conflicting sub-span integration rejects installation, so initialization can
+  be retried after the conflict is removed. Existing-provider mode also reports every ignored renderer-managed option
+  before provider and context checks, while both provider modes share one service-name precedence implementation.
+  [PR 4956](https://github.com/shakacode/react_on_rails/pull/4956) by
+  [justin808](https://github.com/justin808).
+
+- **[Pro]** **Raised the `jwt` floor to `>= 2.8` for reliable offline license validation on Ruby 3.4+**:
+  jwt 2.8 first declares `base64` as a runtime dependency, so the gemspec now requires `jwt >= 2.8, < 4`.
+  jwt 3.x remains supported and 4.x remains unsupported. Documentation now distinguishes the Pro Node renderer's
+  default Fastify 5 setup, which requires Node 20+ at startup, from its `engines.node` floor of Node 18.19.0+
+  when applications use the documented Fastify 4-compatible dependency overrides. Fixes
+  [Issue 4730](https://github.com/shakacode/react_on_rails/issues/4730).
+  [PR 4864](https://github.com/shakacode/react_on_rails/pull/4864) by
+  [justin808](https://github.com/justin808).
+
+#### Changed
+
+- **[Pro]** **License**: React on Rails Pro moves to The React on Rails Pro License 3.0, an application of ShakaCode
+  Trust-Based Commercial Licensing that matches ShakaPerf: free in production for small organizations, charities,
+  educational institutions, and hospitals; 45-day production evaluation; 30-day grace after a subscription lapses;
+  the license key stays optional and only sets the attribution status.
+  Published gem metadata now uses `LicenseRef-ReactOnRailsPro`, and generator messages reflect these terms.
+  [PR 5104](https://github.com/shakacode/react_on_rails/pull/5104) by
+  [sashakhar1](https://github.com/sashakhar1).
+
+### [17.1.0] - 2026-09-16
+
+No user-visible changes since 17.1.0.rc.4; this candidate completes publication after the partial RC4 release.
+
+#### Fixed
+
+- **[Pro]** **Side-effect-only RSC client modules work in generated apps again**: Generated RSC apps now pin
+  `react-on-rails-rsc@19.3.0-rc.4` with React/React DOM `~19.2.8`. RC4 accepts `"use client"` browser
+  registration modules that intentionally perform runtime side effects without exporting a client reference,
+  while continuing to reject inert, type-only, and CommonJS-style modules that may have lost their exports.
+  It also preserves CSS-wrapper side effects through production Webpack and Rspack tree shaking. RC3 remains
+  outside the qualified prerelease window because it rejected valid side-effect-only registration entrypoints.
+  See [Tutorial Issue 823](https://github.com/shakacode/react-webpack-rails-tutorial/issues/823) and the
+  [RSC RC4 release](https://github.com/shakacode/react_on_rails_rsc/releases/tag/19.3.0-rc.4).
+  [PR 5066](https://github.com/shakacode/react_on_rails/pull/5066) by
+  [justin808](https://github.com/justin808).
+- **[Pro] RSC 19.3 prerelease compatibility**: The 17.1 series adds JSX/TSX client-export parsing,
+  Rspack shared-chunk fixes, and stylesheet hints when Webpack or Rspack scope-hoists CSS-bearing
+  client-reference trees into concatenated modules. Generated apps use the RC4 tuple described above.
+  Doctor and the Node Renderer accept this qualified tuple while preserving stable RSC 19.2.x >=19.2.1
+  with stable React 19.2.x >=19.2.7. Nonqualified RSC-package prereleases and unsupported React minors
+  remain rejected. The Node Renderer explicitly rejects React/React DOM prereleases, including apps using
+  stable RSC 19.2.1, and standalone RSC generators warn about React prereleases instead of discarding their
+  version suffix. See [Issue 4958](https://github.com/shakacode/react_on_rails/issues/4958).
+  [PR 5026](https://github.com/shakacode/react_on_rails/pull/5026) by [justin808](https://github.com/justin808).
+- **[Pro]** **Prerender-cached streamed renders now hydrate on every request**: The automatic prerender cache key
+  deliberately ignores random dom ids so one cached render serves every mount point, but the cached
+  chunks still embedded the first request's dom id in their React Server Component payload keys.
+  Every cache hit therefore refetched the payload and failed hydration whenever the render was not
+  byte-identical. Cached streams are now rebound to the dom id of the render being served. Fixes
+  [Issue 4984](https://github.com/shakacode/react_on_rails/issues/4984). [PR 4987](https://github.com/shakacode/react_on_rails/pull/4987) by
+  [justin808](https://github.com/justin808).
+- **Release failures now provide supervised, reason-specific recovery**: `script/release --evaluate-head`
+  supports strict exact-HEAD CI evaluation for both preview and live retries, foreign claims identify the available
+  holder/task/session metadata and targeted status command, and npm readiness distinguishes stale dependencies,
+  pnpm-version mismatches, and package-build failures without requiring `bin/setup`. Fixes
+  [Issue 4955](https://github.com/shakacode/react_on_rails/issues/4955).
+
+- **Fresh generated apps now preserve their resolved Shakapacker version**: The installer now pins
+  `bundle add shakapacker --strict` to the version already selected through React on Rails instead
+  of allowing an older globally installed gem to downgrade the app's lockfile. The tested
+  Shakapacker baseline is now 10.3.2, which includes the rack-proxy v1 development-server proxy fix
+  and the macOS 27 liveness fix. Fixes
+  [Issue 4947](https://github.com/shakacode/react_on_rails/issues/4947). [PR 4948](https://github.com/shakacode/react_on_rails/pull/4948) by
+  [justin808](https://github.com/justin808).
 - **[Pro]** **Expected Node Renderer cold starts no longer emit OpenTelemetry error spans**: The
   `ror.bundle.build_execution_context` cache-first probe previously ended with status ERROR when a worker had not
   compiled a bundle's VM context yet, even though the normal cache-miss path then rendered successfully. The probe
@@ -216,15 +267,6 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4869](https://github.com/shakacode/react_on_rails/pull/4869) by
   [sashakhar1](https://github.com/sashakhar1).
 
-- **[Pro]** **OpenTelemetry propagation and existing-provider attachment now recover cleanly**: Rails-to-renderer
-  requests replace stale mixed-case W3C propagation headers with each request attempt's current client-span context
-  without mutating caller-owned raw headers. Node Renderer attachment to an application-owned provider now rolls back
-  a newly installed tracing adapter when a conflicting sub-span integration rejects installation, so initialization can
-  be retried after the conflict is removed. Existing-provider mode also reports every ignored renderer-managed option
-  before provider and context checks, while both provider modes share one service-name precedence implementation.
-  [PR 4956](https://github.com/shakacode/react_on_rails/pull/4956) by
-  [justin808](https://github.com/justin808).
-
 - **[Pro]** **Node Renderer transport follow-ups now expose protocol errors and accurate Fastify modes**:
   Rails retries continue for network disconnects and peer-reset HTTP/2 streams, while HTTP parser and framing errors
   surface directly. Public `configureFastify` callbacks and `fastifyServerOptions` now reflect both HTTP/1.1 and
@@ -247,15 +289,6 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   that previously fell back to the default now fail fast during renderer startup. Fixes
   [Issue 4810](https://github.com/shakacode/react_on_rails/issues/4810).
   [PR 4811](https://github.com/shakacode/react_on_rails/pull/4811) by
-  [justin808](https://github.com/justin808).
-
-- **[Pro]** **Raised the `jwt` floor to `>= 2.8` for reliable offline license validation on Ruby 3.4+**:
-  jwt 2.8 first declares `base64` as a runtime dependency, so the gemspec now requires `jwt >= 2.8, < 4`.
-  jwt 3.x remains supported and 4.x remains unsupported. Documentation now distinguishes the Pro Node renderer's
-  default Fastify 5 setup, which requires Node 20+ at startup, from its `engines.node` floor of Node 18.19.0+
-  when applications use the documented Fastify 4-compatible dependency overrides. Fixes
-  [Issue 4730](https://github.com/shakacode/react_on_rails/issues/4730).
-  [PR 4864](https://github.com/shakacode/react_on_rails/pull/4864) by
   [justin808](https://github.com/justin808).
 
 - **Routine startup diagnostics no longer appear in default `INFO` logs**: Successful package validation, valid
@@ -302,18 +335,19 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4833](https://github.com/shakacode/react_on_rails/pull/4833) by
   [justin808](https://github.com/justin808).
 
-- **[Pro]** **RSC render-error details are no longer sent to the browser on the fetched payload path**:
-  The RSC payload fetched during client-side navigation (via `rsc_payload_generation_url_path`) included
-  the server's rendering-error message and source-mapped stack — which contains server file paths — in its
-  metadata, in every environment. The inline (first-paint) payload path was already redacted, so error
-  detail that was hidden on first paint could still reach the browser on a client navigation. The fetched
-  path now applies the same fail-closed gate: full detail only in `development` and `test`, while
-  `production`, `staging`, and any unrecognized environment receive a generic `hasErrors: true` signal so
-  client error boundaries still fire. Server-side error handling is unaffected — `raise_prerender_error`
-  still receives the full message and stack, because redaction happens at the browser-facing boundary
-  after the server's own error transform runs. Fixes
-  [Issue 4736](https://github.com/shakacode/react_on_rails/issues/4736).
-  [PR 4821](https://github.com/shakacode/react_on_rails/pull/4821) by
+- **[Pro]** **RSC render-error details no longer reach browser-facing payloads in production-like
+  environments**: Fetched RSC payload metadata now uses a fail-closed allowlist that exposes only the
+  generic `hasErrors` signal needed by client error boundaries. Inline error-bearing payload chunks now
+  also suppress console replay in `production`, `staging`, and unrecognized environments, closing a path
+  that could repeat the server error message or source-mapped file paths after diagnostic metadata was
+  redacted. Full diagnostics and console replay remain available in `development` and `test`, clean
+  production chunks retain console replay, and server-side reporting still receives the original error
+  details before the browser-boundary redaction runs. Fixes
+  [Issue 4736](https://github.com/shakacode/react_on_rails/issues/4736),
+  [Issue 4822](https://github.com/shakacode/react_on_rails/issues/4822), and
+  [Issue 4827](https://github.com/shakacode/react_on_rails/issues/4827).
+  [PR 4821](https://github.com/shakacode/react_on_rails/pull/4821) and
+  [PR 4856](https://github.com/shakacode/react_on_rails/pull/4856) by
   [justin808](https://github.com/justin808).
 
 - **HTTP-served SSR bundle loading now honors the response charset, rejects non-2xx responses,
@@ -514,9 +548,9 @@ pair`, returns invalid UTF-8, or silently mis-decodes the value. The parser now 
   attributes below explicit resource configuration, or opt in to preserving renderer `ror.*` spans through an
   application-owned global provider. Empty service-name values from environment variables, options, and resource
   attributes are treated as unset. Renderer-managed shutdown disables registered instrumentations and shuts down
-  provider components after successful initialization. On failed initialization, a caller-supplied `spanProcessor`
-  remains caller-owned and is force-flushed when supported; a supplied `exporter` is wrapped by a renderer-owned
-  processor and is shut down with that processor.
+  provider components after successful initialization. Failed initialization preserves a caller-supplied `spanProcessor`
+  (force-flushed, not shut down); a caller-supplied `exporter` is wrapped in a renderer-owned processor and is shut
+  down with it if a later initialization step fails.
   Fixes [Issue 4867](https://github.com/shakacode/react_on_rails/issues/4867).
   [PR 4878](https://github.com/shakacode/react_on_rails/pull/4878) by
   [sashakhar1](https://github.com/sashakhar1).
@@ -582,14 +616,6 @@ pair`, returns invalid UTF-8, or silently mis-decodes the value. The parser now 
   [ihabadham](https://github.com/ihabadham).
 
 #### Changed
-
-- **[Pro]** **License**: React on Rails Pro moves to The React on Rails Pro License 3.0, an application of ShakaCode
-  Trust-Based Commercial Licensing that matches ShakaPerf: free in production for small organizations, charities,
-  educational institutions, and hospitals; 45-day production evaluation; 30-day grace after a subscription lapses;
-  the license key stays optional and only sets the attribution status.
-  Published gem metadata now uses `LicenseRef-ReactOnRailsPro`, and generator messages reflect these terms.
-  [PR 5104](https://github.com/shakacode/react_on_rails/pull/5104) by
-  [sashakhar1](https://github.com/sashakhar1).
 
 - **[Pro] Render requests now send raw JavaScript bodies to the Node renderer**: Non-bundle render
   requests use a raw `application/vnd.react-on-rails.render-request+javascript` body with metadata in
@@ -3359,7 +3385,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.0.1...main
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.1.0...main
+[17.1.0]: https://github.com/shakacode/react_on_rails/compare/v17.0.1...v17.1.0
 [17.0.1]: https://github.com/shakacode/react_on_rails/compare/v17.0.0...v17.0.1
 [17.0.0]: https://github.com/shakacode/react_on_rails/compare/v16.6.0...v17.0.0
 [16.6.0]: https://github.com/shakacode/react_on_rails/compare/v16.5.1...v16.6.0
