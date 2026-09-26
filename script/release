@@ -24,6 +24,7 @@ class ReleaseSupervisor
   PR_SET_CHILD_SUBREAPER = 36
 
   ReleaseScope = Data.define(:version, :base_version, :repo, :target, :branch)
+  TerminalHandoff = Data.define(:fd, :supervisor_pgid, :release_pgid)
   ReleasePipes = Data.define(
     :liveness_reader,
     :liveness_writer,
@@ -70,6 +71,7 @@ class ReleaseSupervisor
 
   def run_live(scope)
     doctor_tools!
+    verify_live_terminal_foreground!
     intervals = supervisor_intervals
 
     enable_descendant_reaping!
@@ -286,33 +288,68 @@ class ReleaseSupervisor
     death_watch_pid = nil
     liveness_writer = nil
     death_writer = nil
+    terminal_handoff = nil
     previous_signal_handlers = install_signal_handlers
-    child_pid, pgid, death_watch_pid, liveness_writer, death_writer = spawn_release_group(
+    child_pid, pgid, death_watch_pid, liveness_writer, death_writer, terminal_handoff = spawn_release_group(
       scope, handshake_timeout:, termination_grace:
     )
     @stdout.puts "Release process group #{pgid} started."
-    supervise_loop(child_pid:, pgid:, liveness_writer:, termination_grace:)
+    supervise_loop(child_pid:, pgid:, liveness_writer:, terminal_handoff:, termination_grace:)
   rescue StandardError
+    restore_terminal_after_release(terminal_handoff, $ERROR_INFO)
     cleanup_failed_release(pgid, child_pid, liveness_writer, termination_grace)
     raise
   ensure
-    close_io(liveness_writer)
-    close_io(death_writer)
-    reap_death_watch(death_watch_pid, grace: termination_grace)
-    restore_signal_handlers(previous_signal_handlers) if previous_signal_handlers
+    begin
+      restore_terminal_after_release(terminal_handoff, $ERROR_INFO)
+    ensure
+      close_io(liveness_writer)
+      close_io(death_writer)
+      reap_death_watch(death_watch_pid, grace: termination_grace)
+      restore_signal_handlers(previous_signal_handlers) if previous_signal_handlers
+    end
   end
 
-  def supervise_loop(child_pid:, pgid:, liveness_writer:, termination_grace:)
+  def restore_terminal_after_release(terminal_handoff, active_exception)
+    restore_terminal_foreground(terminal_handoff)
+  rescue StandardError
+    raise unless active_exception
+
+    with_sigttou_ignored do
+      @stderr.puts "ERROR: terminal foreground restoration also failed while handling a release failure"
+    end
+  end
+
+  def supervise_loop(child_pid:, pgid:, liveness_writer:, terminal_handoff:, termination_grace:)
     loop do
-      return interrupt_release(pgid, child_pid, liveness_writer, termination_grace) if @received_signal
+      if @received_signal
+        restore_terminal_foreground(terminal_handoff)
+        return interrupt_release(pgid, child_pid, liveness_writer, termination_grace)
+      end
 
       child_status = nonblocking_child_status(child_pid)
-      return complete_release(pgid, liveness_writer, child_status, termination_grace) if child_status
+      if child_status&.stopped?
+        restore_terminal_foreground(terminal_handoff)
+        return stop_release(pgid, child_pid, liveness_writer, termination_grace)
+      end
+      if child_status
+        restore_terminal_foreground(terminal_handoff)
+        return complete_release(pgid, liveness_writer, child_status, termination_grace)
+      end
 
       sleep(POLL_INTERVAL)
     end
   rescue Errno::ECHILD
+    restore_terminal_foreground(terminal_handoff)
     handle_lost_child_ownership(pgid, liveness_writer, termination_grace)
+  end
+
+  def stop_release(pgid, child_pid, liveness_writer, termination_grace)
+    close_liveness(liveness_writer)
+    @stderr.puts "Release process group #{pgid} stopped; terminating it so publication cannot remain suspended."
+    terminate_group(pgid, child_pid:, grace: termination_grace)
+    report_group_handoff(pgid)
+    1
   end
 
   def handle_lost_child_ownership(pgid, liveness_writer, termination_grace)
@@ -334,7 +371,7 @@ class ReleaseSupervisor
   end
 
   def nonblocking_child_status(child_pid)
-    _waited_pid, child_status = Process.waitpid2(child_pid, Process::WNOHANG)
+    _waited_pid, child_status = Process.waitpid2(child_pid, Process::WNOHANG | Process::WUNTRACED)
     child_status
   end
 
@@ -349,8 +386,10 @@ class ReleaseSupervisor
 
   def spawn_release_group(scope, handshake_timeout:, termination_grace:)
     pipes = release_pipes
+    terminal_owner = foreground_terminal_owner
     child_pid = nil
     death_watch_pid = nil
+    terminal_handoff = nil
     child_pid = fork_release_child(scope, pipes)
     prepare_supervisor_release_pipes(pipes)
     pgid = read_child_process_group!(
@@ -366,20 +405,26 @@ class ReleaseSupervisor
       termination_grace:
     )
     pipes.death_reader.close
+    terminal_handoff = hand_off_terminal_foreground(terminal_owner, pgid)
+    raise SupervisorError, "initial terminal foreground transfer failed" if terminal_owner && !terminal_handoff
+
     release_child(pipes.start_writer)
-    [child_pid, pgid, death_watch_pid, pipes.liveness_writer, pipes.death_writer]
+    [child_pid, pgid, death_watch_pid, pipes.liveness_writer, pipes.death_writer, terminal_handoff]
   rescue StandardError
-    begin
-      close_release_pipes(pipes)
-    ensure
-      stop_unverified_child(child_pid, grace: termination_grace) if child_pid
-      reap_death_watch(death_watch_pid, grace: termination_grace)
-    end
+    cleanup_failed_spawn(pipes, terminal_handoff, child_pid, death_watch_pid, termination_grace)
     raise
   ensure
     close_io(pipes&.ready_reader)
     close_io(pipes&.death_reader)
     close_io(pipes&.start_writer)
+  end
+
+  def cleanup_failed_spawn(pipes, terminal_handoff, child_pid, death_watch_pid, termination_grace)
+    restore_terminal_after_release(terminal_handoff, $ERROR_INFO)
+    close_release_pipes(pipes)
+  ensure
+    stop_unverified_child(child_pid, grace: termination_grace) if child_pid
+    reap_death_watch(death_watch_pid, grace: termination_grace)
   end
 
   def release_pipes
@@ -562,6 +607,104 @@ class ReleaseSupervisor
 
   def close_io(io)
     io&.close unless io&.closed?
+  end
+
+  def foreground_terminal_owner
+    return unless $stdin.tty?
+
+    fd = $stdin.fileno
+    foreground_pgid = terminal_foreground_pgid(fd)
+    return if foreground_pgid.nil?
+    unless foreground_pgid == Process.getpgrp
+      raise SupervisorError, "terminal foreground ownership changed before release child spawn; use fg and retry"
+    end
+
+    TerminalHandoff.new(fd:, supervisor_pgid: foreground_pgid, release_pgid: nil)
+  end
+
+  def verify_live_terminal_foreground!
+    controlling_terminal = open_controlling_terminal
+    return unless controlling_terminal
+
+    foreground_pgid = terminal_foreground_pgid(controlling_terminal.fileno)
+    return if foreground_pgid.nil?
+    unless foreground_pgid == Process.getpgrp
+      raise SupervisorError, "interactive live release must run in the terminal foreground; use fg and retry"
+    end
+
+    direct_terminal_io = $stdin.tty? && $stdout.tty? &&
+                         terminal_foreground_pgid($stdin.fileno) == foreground_pgid &&
+                         terminal_foreground_pgid($stdout.fileno) == foreground_pgid
+    return if direct_terminal_io
+
+    raise SupervisorError,
+          "live release requires direct terminal stdin and stdout when attached to a controlling terminal"
+  ensure
+    close_io(controlling_terminal)
+  end
+
+  def open_controlling_terminal
+    File.open("/dev/tty", File::RDONLY)
+  rescue Errno::ENXIO, Errno::ENODEV, Errno::ENOENT
+    nil
+  end
+
+  def hand_off_terminal_foreground(owner, release_pgid)
+    return unless owner
+    return unless terminal_foreground_pgid(owner.fd) == owner.supervisor_pgid
+    return unless group_alive?(release_pgid)
+    return unless set_terminal_foreground_pgid(owner.fd, release_pgid, tolerate_dead_pgid: release_pgid)
+
+    signal_group("CONT", release_pgid)
+    owner.with(release_pgid:)
+  end
+
+  def restore_terminal_foreground(handoff)
+    return unless handoff
+
+    foreground_pgid = terminal_foreground_pgid(handoff.fd)
+    return if foreground_pgid.nil? || foreground_pgid == handoff.supervisor_pgid
+    return unless foreground_pgid == handoff.release_pgid
+
+    set_terminal_foreground_pgid(handoff.fd, handoff.supervisor_pgid)
+  end
+
+  def terminal_foreground_pgid(terminal_fd)
+    pgid = terminal_function("tcgetpgrp", 1).call(terminal_fd)
+    return pgid unless pgid == -1
+
+    errno = Fiddle.last_error
+    return nil if errno == Errno::ENOTTY::Errno
+
+    raise SupervisorError, "could not read the controlling terminal foreground process group (errno #{errno})"
+  end
+
+  def set_terminal_foreground_pgid(terminal_fd, pgid, tolerate_dead_pgid: nil)
+    result = with_sigttou_ignored do
+      terminal_function("tcsetpgrp", 2).call(terminal_fd, pgid)
+    end
+    return true if result.zero?
+
+    errno = Fiddle.last_error
+    return false if errno == Errno::ENOTTY::Errno
+    return false if tolerate_dead_pgid && !group_alive?(tolerate_dead_pgid)
+
+    raise SupervisorError, "could not set the controlling terminal foreground process group (errno #{errno})"
+  end
+
+  def terminal_function(name, argument_count)
+    require "fiddle"
+    argument_types = Array.new(argument_count, Fiddle::TYPE_INT)
+    Fiddle::Function.new(Fiddle::Handle::DEFAULT[name], argument_types, Fiddle::TYPE_INT)
+  rescue LoadError, Fiddle::DLError
+    raise SupervisorError, "controlling terminal job-control support is unavailable"
+  end
+
+  def with_sigttou_ignored
+    previous_handler = Signal.trap("TTOU", "IGNORE")
+    yield
+  ensure
+    Signal.trap("TTOU", previous_handler) if previous_handler
   end
 
   def cleanup_failed_release(pgid, child_pid, liveness_writer, termination_grace)
