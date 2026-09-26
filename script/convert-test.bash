@@ -117,15 +117,16 @@ write_fixture() {
       "app>react-dom": "^18.3.1",
       "react_on_rails>react": "^19.2.0",
       "react_on_rails>react-dom": "^19.2.0",
-      "react-on-rails-pro>react": "~19.2.7",
-      "react-on-rails-pro>react-dom": "~19.2.7",
-      "react-on-rails-pro>react-on-rails-rsc": "19.2.1",
-      "react-on-rails-pro-node-renderer>react": "~19.2.7",
-      "react-on-rails-pro-node-renderer>react-dom": "~19.2.7",
-      "react-on-rails-pro-node-renderer>react-on-rails-rsc": "19.2.1",
-      "react_on_rails_pro_dummy>react": "~19.2.7",
-      "react_on_rails_pro_dummy>react-dom": "~19.2.7",
-      "react_on_rails_pro_dummy>react-on-rails-rsc": "19.2.1",
+      "react-on-rails-pro>react": "19.3.0",
+      "react-on-rails-pro>react-dom": "19.3.0",
+      "react-on-rails-pro>react-on-rails-rsc": "19.3.1-rc.0",
+      "react-on-rails-pro-node-renderer>react": "19.3.0",
+      "react-on-rails-pro-node-renderer>react-dom": "19.3.0",
+      "react-on-rails-pro-node-renderer>react-on-rails-rsc": "19.3.1-rc.0",
+      "react_on_rails_pro_dummy>react": "19.3.0",
+      "react_on_rails_pro_dummy>react-dom": "19.3.0",
+      "react_on_rails_pro_dummy>react-on-rails-rsc": "19.3.1-rc.0",
+      "react_on_rails_pro_dummy>react-server-dom-webpack": "19.3.0",
       "sentry-testkit>express": "npm:empty-npm-package@1.0.0"
     }
   }
@@ -194,7 +195,8 @@ test_strips_react_19_only_workspace_overrides() {
     "react-on-rails-pro-node-renderer>react-on-rails-rsc" \
     "react_on_rails_pro_dummy>react" \
     "react_on_rails_pro_dummy>react-dom" \
-    "react_on_rails_pro_dummy>react-on-rails-rsc"; do
+    "react_on_rails_pro_dummy>react-on-rails-rsc" \
+    "react_on_rails_pro_dummy>react-server-dom-webpack"; do
     assert_json_key_absent package.json "$removed_key"
   done
 

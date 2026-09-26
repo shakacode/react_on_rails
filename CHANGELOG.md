@@ -24,7 +24,26 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Added
+
+- **[Pro]** **React 19.3 support with `react-on-rails-rsc@19.3.1-rc.0`**: The node renderer startup
+  check and `react_on_rails:doctor` now accept `react-on-rails-rsc` 19.3.1-rc.0 (npm `next`) and later
+  19.3.1+ releases with React/React DOM 19.3.x. The `react-on-rails-pro` optional peer range admits
+  `~19.3.1-rc.0`. Published `react-on-rails-rsc` 19.3.0 (npm `latest`, which bundles React 19.2.8 Flight)
+  stays supported with React 19.2.8+ only, and 19.2.x stays on React 19.2.7+. Each check rejects mixed pairs
+  such as 19.3.0 with React 19.3 or 19.2.x with React 19.3, and it rejects prerelease React builds. Doctor's
+  Fix command names the React version that matches the installed RSC package. The generator still installs
+  stable `react-on-rails-rsc` 19.2.1. [PR 5094](https://github.com/shakacode/react_on_rails/pull/5094) by
+  [justin808](https://github.com/justin808).
+
 #### Fixed
+
+- **[Pro]** **RSC streams no longer encode consumer logs into the Flight payload**: React 19.3 development
+  Flight keeps a console hook active while it flushes chunks, so logs from code consuming the returned RSC
+  Readable were serialized as `:W["log"...]` rows. In non-production builds, RSC payload streams now use
+  Node's native console while chunks reach the consumer. Production builds and HTML streams keep the
+  caller's console unchanged. [PR 5094](https://github.com/shakacode/react_on_rails/pull/5094) by
+  [justin808](https://github.com/justin808).
 
 - **`authenticityHeaders()` no longer mutates its input object**: The helper now returns a new merged object instead of writing CSRF headers into the caller's `otherHeaders` argument. Previously, passing a shared or module-level headers object would bake a stale CSRF token into it, causing intermittent `422 InvalidAuthenticityToken` errors after Turbo navigations. Fixes [Issue 5028](https://github.com/shakacode/react_on_rails/issues/5028).
 

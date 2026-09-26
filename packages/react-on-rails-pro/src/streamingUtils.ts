@@ -13,8 +13,11 @@
  * https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
-import * as React from 'react';
+import { AsyncResource } from 'async_hooks';
+import { Console } from 'node:console';
 import { PassThrough, Readable } from 'stream';
+
+import * as React from 'react';
 
 import createReactOutput from 'react-on-rails/createReactOutput';
 import { isPromise, isServerRenderHash } from 'react-on-rails/isServerRenderResult';
@@ -39,6 +42,66 @@ type BufferedEvent = {
   data: unknown;
 };
 
+const FLIGHT_PATCHED_CONSOLE_METHODS = [
+  'assert',
+  'debug',
+  'dir',
+  'dirxml',
+  'error',
+  'group',
+  'groupCollapsed',
+  'groupEnd',
+  'info',
+  'log',
+  'table',
+  'trace',
+  'warn',
+] as const;
+
+let nativeConsole: Console | undefined;
+
+// React 19.3 development Flight patches console and encodes calls made while `currentRequest` / ALS
+// is set as `:W["log"...]` rows. Emitting a chunk to the returned Readable is still inside that
+// request, so consumer logs leaked into the RSC payload. The invariant is that consumer code never
+// runs in Flight's request context. Events that Flight's flush delivers synchronously run in
+// `deliveryScope`, the render's own async context captured before Flight starts, so listeners and
+// their async continuations keep the render's stores (tracing, request ids) without Flight's
+// request store. Events Node defers to the consumer's own read run in the consumer's context,
+// which is already outside Flight. Flight's wrappers are swapped for Node's native console for the
+// synchronous part, where Flight's `currentRequest` is still set.
+const runWithFlightConsoleCaptureDisabled = <T>(deliveryScope: AsyncResource, callback: () => T): T => {
+  nativeConsole ??= new Console({ stdout: process.stdout, stderr: process.stderr });
+  const flightFreeConsole = nativeConsole;
+  const restored: Array<() => void> = [];
+
+  FLIGHT_PATCHED_CONSOLE_METHODS.forEach((methodName) => {
+    const current = console[methodName];
+    const nativeMethod = flightFreeConsole[methodName];
+    if (typeof current !== 'function' || typeof nativeMethod !== 'function') {
+      return;
+    }
+
+    Object.defineProperty(console, methodName, {
+      configurable: true,
+      writable: true,
+      value: nativeMethod.bind(flightFreeConsole),
+    });
+    restored.push(() => {
+      Object.defineProperty(console, methodName, {
+        configurable: true,
+        writable: true,
+        value: current,
+      });
+    });
+  });
+
+  try {
+    return deliveryScope.runInAsyncScope(callback);
+  } finally {
+    restored.reverse().forEach((restore) => restore());
+  }
+};
+
 /**
  * Creates a new Readable stream that safely buffers all events from the input stream until reading begins.
  *
@@ -54,7 +117,13 @@ type BufferedEvent = {
  *   - stream: A new Readable stream that will buffer and replay all events
  *   - emitError: A function to manually emit errors into the stream
  */
-const bufferStream = (stream: Readable) => {
+const bufferStream = (stream: Readable, { isolateFlightConsole }: StreamDeliveryOptions) => {
+  // Production Flight does not patch console, so production delivery leaves the caller's console
+  // (for example, the node renderer's console-replay capture) and async context untouched.
+  const deliveryScope =
+    isolateFlightConsole && process.env.NODE_ENV !== 'production'
+      ? new AsyncResource('ReactOnRailsRSCStreamDelivery')
+      : undefined;
   const bufferedEvents: BufferedEvent[] = [];
   let startedReading = false;
 
@@ -75,17 +144,20 @@ const bufferStream = (stream: Readable) => {
 
       // Remove initial listeners
       listeners.forEach(({ event, listener }) => stream.off(event, listener));
-      const handleEvent = ({ event, data }: BufferedEvent) => {
-        if (event === 'data') {
-          this.push(data);
-        } else if (event === 'error') {
-          this.emit('error', data);
-        } else if (event === 'renderingError') {
-          this.emit('renderingError', data);
-        } else {
-          this.push(null);
-        }
-      };
+      const deliver = <T>(callback: () => T): T =>
+        deliveryScope ? runWithFlightConsoleCaptureDisabled(deliveryScope, callback) : callback();
+      const handleEvent = ({ event, data }: BufferedEvent) =>
+        deliver(() => {
+          if (event === 'data') {
+            this.push(data);
+          } else if (event === 'error') {
+            this.emit('error', data);
+          } else if (event === 'renderingError') {
+            this.emit('renderingError', data);
+          } else {
+            this.push(null);
+          }
+        });
 
       // Replay buffered events
       bufferedEvents.forEach(handleEvent);
@@ -116,7 +188,15 @@ const bufferStream = (stream: Readable) => {
   };
 };
 
-export const transformRenderStreamChunksToResultObject = (renderState: StreamRenderState) => {
+export type StreamDeliveryOptions = {
+  // Set for RSC payload streams, whose development Flight build captures consumer console calls.
+  isolateFlightConsole?: boolean;
+};
+
+export const transformRenderStreamChunksToResultObject = (
+  renderState: StreamRenderState,
+  deliveryOptions: StreamDeliveryOptions = {},
+) => {
   const consoleHistory = console.history;
   let previouslyReplayedConsoleMessages = 0;
 
@@ -158,7 +238,7 @@ export const transformRenderStreamChunksToResultObject = (renderState: StreamRen
     stream: readableStream,
     emitError: emitRenderError,
     notifyRenderingError: notifyRenderError,
-  } = bufferStream(transformStream);
+  } = bufferStream(transformStream, deliveryOptions);
 
   // Set once the consumer has abandoned the output stream before the render finished (issue #3885).
   const consumerAbortHandlers: Array<() => void> = [];

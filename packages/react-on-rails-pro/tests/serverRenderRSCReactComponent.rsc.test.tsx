@@ -19,6 +19,7 @@
 
 /// <reference types="react/experimental" />
 
+import { AsyncLocalStorage } from 'async_hooks';
 import * as React from 'react';
 import { Suspense, useInsertionEffect, useState } from 'react';
 import * as mock from 'mock-fs';
@@ -58,6 +59,22 @@ const PromiseContainer = ({ name }: { name: string }) => {
   );
 };
 
+const DelayedFailure = async () => {
+  await new Promise((resolve) => {
+    setTimeout(resolve, 5);
+  });
+  throw new Error('Delayed RSC failure');
+};
+
+const DelayedFailureContainer = () => (
+  <div>
+    <h1>Shell Before Failure</h1>
+    <Suspense fallback={<p>Loading Failure</p>}>
+      <DelayedFailure />
+    </Suspense>
+  </div>
+);
+
 const HooksWithoutClientDirective = () => {
   useState('client state');
 
@@ -71,6 +88,7 @@ const InsertionEffectWithoutClientDirective = () => {
 };
 
 ReactOnRails.register({
+  DelayedFailureContainer,
   HooksWithoutClientDirective,
   InsertionEffectWithoutClientDirective,
   PromiseContainer,
@@ -230,6 +248,127 @@ test('does not capture consumer data-listener logs after returning the render st
   expect(content1).toContain('First Unique Name');
   expect(content1).not.toContain('From Interval');
   expect(content1).not.toContain('Outside The Component');
+  expect(content1).toContain('[First Unique Name] Before awaitng');
+});
+
+test('does not capture logs from async continuations of consumer data listeners', async () => {
+  const readable = ReactOnRails.serverRenderRSCReactComponent({
+    railsContext: {
+      reactClientManifestFileName: 'react-client-manifest.json',
+      reactServerClientManifestFileName: 'react-server-client-manifest.json',
+    } as unknown as RailsContextWithServerStreamingCapabilities,
+    name: 'PromiseContainer',
+    renderingReturnsPromises: true,
+    throwJsErrors: true,
+    domNodeId: 'dom-id',
+    props: { name: 'Async Consumer' },
+  });
+
+  let content = '';
+  readable.on('data', (chunk: Buffer) => {
+    content += chunk.toString();
+    void Promise.resolve().then(() => {
+      console.log('Async Consumer Log');
+    });
+  });
+  await finished(readable);
+
+  expect(content).toContain('[Async Consumer] Before awaitng');
+  expect(content).not.toContain('Async Consumer Log');
+});
+
+test('delivers RSC chunks in the async context of the render that produced them', async () => {
+  // Unrelated async-local stores (tracing, request ids) must follow the render, not whatever
+  // context was active when the bundle module was loaded.
+  const requestStore = new AsyncLocalStorage<string>();
+  const seenStores = new Set<string | undefined>();
+  const continuationStores = new Set<string | undefined>();
+
+  await requestStore.run('request-B', async () => {
+    const readable = ReactOnRails.serverRenderRSCReactComponent({
+      railsContext: {
+        reactClientManifestFileName: 'react-client-manifest.json',
+        reactServerClientManifestFileName: 'react-server-client-manifest.json',
+      } as unknown as RailsContextWithServerStreamingCapabilities,
+      name: 'PromiseContainer',
+      renderingReturnsPromises: true,
+      throwJsErrors: true,
+      domNodeId: 'dom-id',
+      props: { name: 'Context Consumer' },
+    });
+    readable.on('data', () => {
+      seenStores.add(requestStore.getStore());
+      void Promise.resolve().then(() => {
+        continuationStores.add(requestStore.getStore());
+      });
+    });
+    await finished(readable);
+  });
+
+  expect([...seenStores]).toEqual(['request-B']);
+  expect([...continuationStores]).toEqual(['request-B']);
+});
+
+test('does not capture consumer renderingError-listener logs raised after streaming starts', async () => {
+  const readable = ReactOnRails.serverRenderRSCReactComponent({
+    railsContext: {
+      reactClientManifestFileName: 'react-client-manifest.json',
+      reactServerClientManifestFileName: 'react-server-client-manifest.json',
+    } as unknown as RailsContextWithServerStreamingCapabilities,
+    name: 'DelayedFailureContainer',
+    renderingReturnsPromises: true,
+    throwJsErrors: false,
+    domNodeId: 'dom-id',
+    props: {},
+  });
+
+  let content = '';
+  let renderingErrors = 0;
+  readable.on('renderingError', () => {
+    renderingErrors += 1;
+    console.log('Consumer Rendering Error Log');
+  });
+  readable.on('data', (chunk: Buffer) => {
+    content += chunk.toString();
+  });
+  await finished(readable);
+
+  expect(renderingErrors).toBeGreaterThan(0);
+  expect(content).toContain('Shell Before Failure');
+  expect(content).not.toContain('Consumer Rendering Error Log');
+});
+
+test('keeps consumer logs on the caller console in production builds', async () => {
+  // Production Flight does not patch console, so delivery must not reroute consumer logs
+  // (for example, away from the node renderer's console-replay capture).
+  const previousNodeEnv = process.env.NODE_ENV;
+  process.env.NODE_ENV = 'production';
+  const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+  try {
+    const readable = ReactOnRails.serverRenderRSCReactComponent({
+      railsContext: {
+        reactClientManifestFileName: 'react-client-manifest.json',
+        reactServerClientManifestFileName: 'react-server-client-manifest.json',
+      } as unknown as RailsContextWithServerStreamingCapabilities,
+      name: 'PromiseContainer',
+      renderingReturnsPromises: true,
+      throwJsErrors: true,
+      domNodeId: 'dom-id',
+      props: { name: 'Production Consumer' },
+    });
+    let dataEvents = 0;
+    readable.on('data', () => {
+      dataEvents += 1;
+      console.log('Consumer Log');
+    });
+    await finished(readable);
+
+    expect(dataEvents).toBeGreaterThan(0);
+    expect(logSpy.mock.calls.filter(([message]) => message === 'Consumer Log')).toHaveLength(dataEvents);
+  } finally {
+    logSpy.mockRestore();
+    process.env.NODE_ENV = previousNodeEnv;
+  }
 });
 
 test('explains likely missing use client directive when a server component calls a client hook', async () => {
