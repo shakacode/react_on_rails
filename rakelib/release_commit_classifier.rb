@@ -49,7 +49,7 @@ module ReleaseCommitClassifier
       return false if metadata_touched.nil?
       return release_finalization_metadata_commit?(monorepo_root:, sha:) if metadata_touched
 
-      commit_non_runtime_only?(monorepo_root:, sha:)
+      commit_non_runtime_only?(monorepo_root:, sha:) || release_tag_retry_operational_commit?(monorepo_root:, sha:)
     end
 
     def release_finalization_metadata_touched(monorepo_root:, sha:)
