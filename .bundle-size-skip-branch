@@ -1,11 +1,7 @@
-# Audited intentional growth for PR #4490 (React on Rails Pro 17 RSC floor):
-# The Pro RSC client helper bundles exceed the dynamic base+512 B budget because
-# this PR deliberately moves the Pro RSC runtime from the React 19.0.x RSC line
-# to react-on-rails-rsc 19.2.1-rc.0 with React/React DOM 19.2.7.
-# Hosted CI evidence before this skip:
-# - registerServerComponent/client: 138045 B gzip vs 78728 B limit,
-#   83078 B brotli vs 67927 B limit.
-# - wrapServerComponentRenderer/client: 130323 B gzip vs 70958 B limit,
-#   76207 B brotli vs 61025 B limit.
-# Clear this file in a follow-up after the PR merges.
-jg-codex/rsc-19-2-1-rc-0
+# Audited intentional growth for PR 5094 (react-on-rails-rsc 19.3.1-rc.0 soak):
+# Pro RSC client entries pull Flight 19.3 (`react-server-dom-webpack@19.3.0`) and exceed
+# the dynamic base+512 B budget vs the 19.2 baseline. Hosted CI on 86fff7bd6:
+# - registerServerComponent/client gzip/brotli ~6-12% over limit
+# - wrapServerComponentRenderer/client gzip/brotli ~7-13% over limit
+# OSS client bundles stayed at 0%. Clear this file after the soak merges.
+jg/rsc-19-3-1-rc0-candidate-pin
