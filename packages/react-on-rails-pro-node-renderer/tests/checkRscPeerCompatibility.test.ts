@@ -198,6 +198,15 @@ describe('checkRscPeerCompatibility', () => {
     expect(r.level).toBe('error');
     expect(r.message).toContain('Incompatible react-on-rails-rsc version');
     expect(r.message).toContain('>= 19.2.1 (or 19.3.1-rc.0 during the RC soak)');
+    expect(r.message).toContain(
+      'Upgrade react-on-rails-rsc to the stable 19.3.0 release, with react and react-dom 19.2.x with patch >= 19.2.8 (stable releases only).',
+    );
+  });
+
+  it('does not suggest a stable release for a prerelease whose stable version is unsupported', () => {
+    const r = checkRscPeerCompatibility({ rscVersion: '19.4.0-rc.0', reactVersion: '19.3.0' });
+    expect(r.level).toBe('error');
+    expect(r.message).not.toContain('Upgrade react-on-rails-rsc to the stable');
   });
 
   it('errors when the 19.3.1-rc.0 soak is paired with React 19.2.7', () => {

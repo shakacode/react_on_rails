@@ -153,13 +153,29 @@ const isSupportedRscVersion = (rscTuple: VersionTuple, react: typeof RSC_PEER_SU
 const proLabel = (proVersion?: string) =>
   proVersion ? `React on Rails Pro (${proVersion})` : 'React on Rails Pro';
 
-const errorMessage = (pkg: string, found: string, want: string, proVersion?: string) =>
+const errorMessage = (pkg: string, found: string, want: string, proVersion?: string, advice?: string) =>
   [
     `[ReactOnRails] Incompatible ${pkg} version.`,
     `  ${proLabel(proVersion)} requires ${pkg} ${want} (found ${found}).`,
+    ...(advice ? [`  ${advice}`] : []),
     `  Upgrade or downgrade ${pkg} to a compatible release. See https://www.shakacode.com/react-on-rails-pro/docs/.`,
     `  (Set REACT_ON_RAILS_PRO_DISABLE_VERSION_CHECK=1 to downgrade this error to a warning.)`,
   ].join('\n');
+
+// A rejected prerelease (for example the 19.3.0-rc.4 pin that React on Rails 17.1.0 generated) usually
+// has a supported stable release with the same version number. Name it and its React line.
+const stableReleaseAdvice = (
+  { tuple, prerelease }: ParsedVersion,
+  { minimumVersion }: typeof RSC_PEER_SUPPORT.reactOnRailsRsc,
+  react: typeof RSC_PEER_SUPPORT.react,
+): string | undefined => {
+  if (!prerelease) return undefined;
+  const stableVersion = tuple.join('.');
+  const reactRange = supportedReactRange(tuple, react);
+  if (!reactRange || !isAtLeastVersion(stableVersion, minimumVersion)) return undefined;
+
+  return `Upgrade react-on-rails-rsc to the stable ${stableVersion} release, with react and react-dom ${reactRange}.`;
+};
 
 export function checkRscPeerCompatibility(input: RscPeerCheckInput): RscPeerCheckResult {
   const { rscVersion, reactVersion, reactDomVersion, proVersion } = input;
@@ -199,7 +215,13 @@ export function checkRscPeerCompatibility(input: RscPeerCheckInput): RscPeerChec
   if (!meetsStableFloor && !meetsPrereleaseFloor) {
     return {
       level: 'error',
-      message: errorMessage('react-on-rails-rsc', rscVersion, rscFloorRange(reactOnRailsRsc), proVersion),
+      message: errorMessage(
+        'react-on-rails-rsc',
+        rscVersion,
+        rscFloorRange(reactOnRailsRsc),
+        proVersion,
+        stableReleaseAdvice(rscParsedVersion, reactOnRailsRsc, react),
+      ),
     };
   }
 

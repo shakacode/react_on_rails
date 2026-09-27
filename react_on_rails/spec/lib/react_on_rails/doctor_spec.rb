@@ -12030,7 +12030,8 @@ RSpec.describe ReactOnRails::Doctor do
           expect(errors).to contain_exactly(
             a_string_including(
               "react-on-rails-rsc 19.3.0-rc.4 is not supported by React on Rails Pro 17 RSC",
-              ">= 19.2.1\n(or 19.3.1-rc.0 during the RC soak)"
+              ">= 19.2.1\n(or 19.3.1-rc.0 during the RC soak)",
+              "Fix: npm install react@~19.2.8 react-dom@~19.2.8 react-on-rails-rsc@19.3.0 --save-exact"
             )
           )
         end

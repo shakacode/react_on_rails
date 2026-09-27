@@ -5419,9 +5419,25 @@ module ReactOnRails
         on the supported #{RSC_SUPPORTED_PACKAGE_LINE} package line
         with React/React DOM #{RSC_MINIMUM_REACT_VERSION}+.
 
-        Fix: npm install react@~#{RSC_MINIMUM_REACT_VERSION} react-dom@~#{RSC_MINIMUM_REACT_VERSION} #{RSC_PACKAGE_NAME}@#{RSC_PACKAGE_INSTALL_VERSION} --save-exact
+        Fix: #{rsc_package_floor_fix_command(rsc_version)}
       MSG
       false
+    end
+
+    # A rejected prerelease (for example the 19.3.0-rc.4 pin React on Rails 17.1.0 generated) usually has a
+    # supported stable release with the same version number; point the Fix there instead of the generator pin.
+    def rsc_package_floor_fix_command(rsc_version)
+      rsc_install = RSC_PACKAGE_INSTALL_VERSION
+      react_install = RSC_MINIMUM_REACT_VERSION
+      if npm_prerelease(rsc_version).present?
+        stable_version = npm_version_tuple(rsc_version).join(".")
+        if rsc_stable_package_version_supported?(stable_version)
+          rsc_install = stable_version
+          react_install = recommended_react_install_version_for_rsc_package(stable_version)
+        end
+      end
+
+      "npm install react@~#{react_install} react-dom@~#{react_install} #{RSC_PACKAGE_NAME}@#{rsc_install} --save-exact"
     end
 
     def rsc_package_version_at_or_above_minimum?(rsc_version)
