@@ -5090,6 +5090,7 @@ module ReactOnRails
     RSC_MINIMUM_REACT_VERSION = "19.2.7"
     RSC_MINIMUM_REACT_VERSION_TUPLE = RSC_MINIMUM_REACT_VERSION.split(".").map(&:to_i).freeze
     RSC_SUPPORTED_REACT_MAJOR = RSC_MINIMUM_REACT_VERSION_TUPLE.fetch(0)
+    RSC_SUPPORTED_REACT_MINORS = RSC_REACT_SUPPORT_RANGES.map { |range| range.fetch(:minor) }.uniq.freeze
     RSC_SUPPORTED_REACT_LINE = RSC_REACT_SUPPORT_RANGES.map do |range|
       "#{RSC_SUPPORTED_REACT_MAJOR}.#{range.fetch(:minor)}.x"
     end.uniq.join(" or ")
@@ -5412,32 +5413,32 @@ module ReactOnRails
                                  ""
                                end
 
+      rsc_install, react_install = rsc_package_floor_install_versions(rsc_version)
+
       checker.add_error(<<~MSG.strip)
         🚫 #{RSC_PACKAGE_NAME} #{rsc_version.presence || 'unknown'} is not supported by React on Rails Pro 17 RSC.
 
         React on Rails Pro 17 requires #{RSC_PACKAGE_NAME} >= #{RSC_MINIMUM_PACKAGE_VERSION}#{prerelease_requirement}
         on the supported #{RSC_SUPPORTED_PACKAGE_LINE} package line
-        with React/React DOM #{RSC_MINIMUM_REACT_VERSION}+.
+        with React/React DOM #{react_install}+.
 
-        Fix: #{rsc_package_floor_fix_command(rsc_version)}
+        Fix: npm install react@~#{react_install} react-dom@~#{react_install} #{RSC_PACKAGE_NAME}@#{rsc_install} --save-exact
       MSG
       false
     end
 
     # A rejected prerelease (for example the 19.3.0-rc.4 pin React on Rails 17.1.0 generated) usually has a
     # supported stable release with the same version number; point the Fix there instead of the generator pin.
-    def rsc_package_floor_fix_command(rsc_version)
-      rsc_install = RSC_PACKAGE_INSTALL_VERSION
-      react_install = RSC_MINIMUM_REACT_VERSION
+    # Returns [rsc_version_to_install, react_version_to_install].
+    def rsc_package_floor_install_versions(rsc_version)
       if npm_prerelease(rsc_version).present?
         stable_version = npm_version_tuple(rsc_version).join(".")
         if rsc_stable_package_version_supported?(stable_version)
-          rsc_install = stable_version
-          react_install = recommended_react_install_version_for_rsc_package(stable_version)
+          return [stable_version, recommended_react_install_version_for_rsc_package(stable_version)]
         end
       end
 
-      "npm install react@~#{react_install} react-dom@~#{react_install} #{RSC_PACKAGE_NAME}@#{rsc_install} --save-exact"
+      [RSC_PACKAGE_INSTALL_VERSION, RSC_MINIMUM_REACT_VERSION]
     end
 
     def rsc_package_version_at_or_above_minimum?(rsc_version)
@@ -5479,7 +5480,7 @@ module ReactOnRails
 
     def supported_rsc_react_line?(react_version)
       major, minor, = npm_version_tuple(react_version)
-      major == RSC_SUPPORTED_REACT_MAJOR && RSC_SUPPORTED_PACKAGE_MINORS.include?(minor)
+      major == RSC_SUPPORTED_REACT_MAJOR && RSC_SUPPORTED_REACT_MINORS.include?(minor)
     end
 
     def rsc_react_major_or_newer?(react_version)

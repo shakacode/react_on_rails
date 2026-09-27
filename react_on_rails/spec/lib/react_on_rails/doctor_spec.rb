@@ -11552,7 +11552,7 @@ RSpec.describe ReactOnRails::Doctor do
     it "derives the RSC React support predicate from the configured floor and line" do
       minimum_major, minimum_minor, minimum_patch = described_class::RSC_MINIMUM_REACT_VERSION_TUPLE
       below_floor = "#{minimum_major}.#{minimum_minor}.#{minimum_patch - 1}"
-      unsupported_minor = "#{minimum_major}.#{described_class::RSC_SUPPORTED_PACKAGE_MINORS.max + 1}.0"
+      unsupported_minor = "#{minimum_major}.#{described_class::RSC_SUPPORTED_REACT_MINORS.max + 1}.0"
 
       expect(doctor.send(:unsupported_rsc_react_version?, described_class::RSC_MINIMUM_REACT_VERSION)).to be false
       expect(doctor.send(:unsupported_rsc_react_version?, below_floor)).to be true
@@ -12044,6 +12044,7 @@ RSpec.describe ReactOnRails::Doctor do
             a_string_including(
               "react-on-rails-rsc 19.3.0-rc.4 is not supported by React on Rails Pro 17 RSC",
               ">= 19.2.1\n(or 19.3.1-rc.0 during the RC soak)",
+              "with React/React DOM 19.2.8+.",
               "Fix: npm install react@~19.2.8 react-dom@~19.2.8 react-on-rails-rsc@19.3.0 --save-exact"
             )
           )
