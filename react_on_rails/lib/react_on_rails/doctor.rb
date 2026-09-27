@@ -5625,9 +5625,17 @@ module ReactOnRails
         React Server Components depend on React internal server APIs that can change between React minors.
 
         Fix: install matching versions, for example:
-          npm install #{package_name}@#{peer_range} #{RSC_PACKAGE_NAME}@#{rsc_version} --save-exact
+          npm install #{package_name}@#{rsc_peer_install_spec(rsc_version, peer_range)} #{RSC_PACKAGE_NAME}@#{rsc_version} --save-exact
       MSG
       false
+    end
+
+    # A package peer range such as ^19.2.8 can admit React minors the support table rejects for that RSC
+    # release, so prefer the table's React line when the installed RSC version has one.
+    def rsc_peer_install_spec(rsc_version, peer_range)
+      return peer_range unless rsc_react_support_range_for(rsc_version)
+
+      "~#{recommended_react_install_version_for_rsc_package(rsc_version)}"
     end
 
     def check_rsc_package_dist_tags(rsc_package, package_root)

@@ -12007,6 +12007,19 @@ RSpec.describe ReactOnRails::Doctor do
           )
         end
 
+        it "names the support-table React version when the package's own peer range rejects React" do
+          errors = rsc_errors_for(rsc_version: "19.3.0", react_version: "19.2.7",
+                                  react_peer: published_rsc_react_peers.fetch("19.3.0"))
+
+          expect(errors).to include(
+            a_string_including(
+              "react-on-rails-rsc 19.3.0 requires react ^19.2.8, but installed react is 19.2.7",
+              "npm install react@~19.2.8 react-on-rails-rsc@19.3.0 --save-exact"
+            )
+          )
+          expect(errors.none? { |error| error.include?("react@^19.2.8") }).to be true
+        end
+
         it "keeps the support table when the installed RSC package declares no React peers" do
           errors = rsc_errors_for(rsc_version: "19.2.1", react_version: "19.3.0", react_peer: nil)
 
