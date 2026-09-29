@@ -125,7 +125,8 @@ How it works, and what to configure:
   margin for render duration and clock skew) with a prefix scan over `<keyPrefix>rorp:rsc-tag:*`. If
   any tagged entry uses `revalidate: 0`, do not delete stamps: those entries never expire, and entry
   keys are opaque hashes, so the blobs a stamp governs cannot be identified — sweep stamps only
-  together with all of the deployment's entry keys.
+  together with all of the deployment's entry keys, during a window with no tagged renders in flight
+  (an in-flight render stores its entry after the sweep, with no stamp left to govern it).
 - Invalidation times use the invalidating process's clock. Keep servers NTP-synced; a skewed clock
   shifts which in-flight renders an invalidation covers.
 - A refused entry is also deleted from Redis opportunistically **on read** (guarded so it can never
