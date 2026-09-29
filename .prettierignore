@@ -41,6 +41,10 @@ internal/analysis/experiments/
 benchmarks/rspack-vite-rails-dx/starters/
 benchmarks/rspack-vite-rails-dx/results/*.json
 
+# Byte-verbatim historical generator output (one file per resolver era); digest-matched by
+# rsc_generator_spec.rb, so formatters must never rewrite them.
+react_on_rails/spec/react_on_rails/fixtures/previous_generated_rsc_configs/*.js
+
 # Legal copies follow the byte faithful precedents above for the pinned shared copy and PPR evidence artifacts.
 # Their required digest is verified by package_license_metadata_spec.rb.
 REACT-ON-RAILS-PRO-LICENSE.md
