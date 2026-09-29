@@ -68,10 +68,14 @@ refuse any entry whose render started at or before that instant, so an invalidat
 render is in flight also covers the entry that render stores afterward. Like the entry's `tags`, the
 call takes no timestamp — the invalidation time is always "now".
 
-At this stage the call reaches only the process that makes it (the Node Renderer worker running your
-RSC bundle), and only cache handlers that implement the optional `revalidateTag` method — currently
-the default in-memory handler. Storing tagged entries on a handler without `revalidateTag` logs a
-warning once per handler; the entries keep their tags, so a handler upgrade honors them later.
+The call itself reaches only the process that makes it (the Node Renderer worker running your RSC
+bundle), and only cache handlers that implement the optional `revalidateTag` method — the default
+in-memory handler and `RedisCacheHandler`. With the in-memory handler the invalidation stays inside
+that one process. With `RedisCacheHandler` the invalidation record lives in the shared Redis, so it
+is visible to **every** worker and machine sharing that Redis on their next read — no broadcast is
+involved (see [Tag Invalidation Through Redis](#tag-invalidation-through-redis)). Storing tagged
+entries on a handler without `revalidateTag` logs a warning once per handler; the entries keep their
+tags, so a handler upgrade honors them later.
 
 ## Use Shared Storage
 
@@ -94,6 +98,42 @@ const ProductCard = unstable_cache(renderProductCard, {
   revalidate: 60,
 });
 ```
+
+### Tag Invalidation Through Redis
+
+`RedisCacheHandler` implements `revalidateTag`, and entries persist their `tags` through Redis, so
+tag invalidation works across processes: one `unstable_revalidateTag` call from any worker is visible
+to every worker and machine sharing that Redis on their next read. Nothing is broadcast — the
+invalidation is a record in the shared storage that each `get` checks.
+
+How it works, and what to configure:
+
+- Each invalidated tag gets one small **stamp key**, `rorp:rsc-tag:<tag>`, holding the invalidation
+  time. Stamp keys inherit the client's `keyPrefix` exactly like entry keys, are written
+  monotonically (a racing older invalidation can never move a stamp backwards), and deliberately have
+  **no TTL**: a stamp must outlive every entry it governs, and entry lifetimes are unbounded when
+  `revalidate` is `0`.
+- **Set a `volatile-*` eviction policy** (for example `volatile-lru`) on a Redis under memory
+  pressure. Those policies evict only keys with a TTL, so entry blobs remain evictable while stamp
+  keys are never evicted. An `allkeys-*` policy can evict a stamp and silently resurrect entries it
+  had invalidated.
+- Stamp keys grow by one small key per distinct invalidated tag (tag names are capped at 256
+  characters). If your tag cardinality is very high, clean them up periodically with a prefix scan
+  over `<keyPrefix>rorp:rsc-tag:*` during a window when no invalidation is in flight.
+- Invalidation times use the invalidating process's clock. Keep servers NTP-synced; a skewed clock
+  shifts which in-flight renders an invalidation covers.
+- A refused entry is also deleted from Redis opportunistically (guarded so it can never delete a
+  fresher entry written concurrently), so tagged entries with `revalidate: 0` do not accumulate as
+  unreadable blobs.
+- Untagged entries pay no extra Redis traffic; tagged entries pay one batched `MGET` of their tags'
+  stamps per cache hit.
+- Tags are stored inside the entry blob, so they count toward `maxEntryBytes`: an entry within a few
+  hundred bytes of the cap may newly skip caching once it carries tags.
+- Entries written by this version use a new storage format that older package versions cannot read.
+  In practice they never need to: the cache key includes the build ID, so entries written by
+  different package versions live under different keys. Old-format entries remain readable.
+- The handler builds a single-node client. Redis Cluster is not supported: the multi-key stamp
+  lookup assumes one node.
 
 You can also implement the exported `CacheHandler` interface and register it with
 `registerCacheHandler(kind, handler)`. A handler implements asynchronous `get(key)` and
@@ -121,13 +161,14 @@ support tag invalidation. The contract:
 
 ## Invalidation Limits
 
-Tag-based invalidation currently works only from JavaScript, and only within one process:
-`unstable_revalidateTag` reaches the cache handlers registered in the worker that calls it. There is
-no Node Renderer tag-invalidation endpoint and no Ruby `ReactOnRailsPro::RSCCache` bridge yet, so a
-Rails-side write cannot invalidate JavaScript `unstable_cache` entries, and in a multi-worker
-deployment each worker's in-memory cache is invalidated independently. `RedisCacheHandler` does not
-implement `revalidateTag` yet (entries round-tripped through Redis also come back without their
-tags), and the `CacheHandler` interface has no delete method.
+Tag-based invalidation currently works only from JavaScript: `unstable_revalidateTag` reaches the
+cache handlers registered in the worker that calls it. There is no Node Renderer tag-invalidation
+endpoint and no Ruby `ReactOnRailsPro::RSCCache` bridge yet, so a Rails-side write cannot invalidate
+JavaScript `unstable_cache` entries. In a multi-worker deployment each worker's **in-memory** cache
+is still invalidated independently; entries in a shared `RedisCacheHandler` are invalidated for every
+worker sharing the Redis (see
+[Tag Invalidation Through Redis](#tag-invalidation-through-redis)). The `CacheHandler` interface has
+no delete method.
 
 Use a finite `revalidate` interval when data can change. Include all data that distinguishes the
 rendered result in the cached function arguments. The build ID comes from the RSC artifact ID

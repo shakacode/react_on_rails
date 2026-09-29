@@ -44,6 +44,15 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   separately. Part of [Issue 5077](https://github.com/shakacode/react_on_rails/issues/5077).
   [PR 5122](https://github.com/shakacode/react_on_rails/pull/5122) by
   [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- **[Pro]** **Redis tag invalidation for the RSC cache**: `RedisCacheHandler` implements
+  `revalidateTag` with monotonic per-tag stamps (written atomically via Lua), persists entry tags in a
+  versioned binary format (old entries remain readable), and refuses and cleans up invalidated entries
+  on read — one `unstable_revalidateTag` call is now visible to every worker and machine sharing the
+  Redis. Requires a `volatile-*` eviction policy for full correctness (see the
+  [unstable_cache docs](https://reactonrails.com/docs/pro/react-server-components/unstable-cache)).
+  Part of [Issue 5077](https://github.com/shakacode/react_on_rails/issues/5077).
+  [PR XXXX](https://github.com/shakacode/react_on_rails/pull/XXXX) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 #### Added
 
