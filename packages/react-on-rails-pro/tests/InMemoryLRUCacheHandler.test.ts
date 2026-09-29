@@ -204,6 +204,28 @@ describe('InMemoryLRUCacheHandler', () => {
       }
     });
 
+    test('overflow clear preserves a discarded future stamp in the watermark', async () => {
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        // A stamp ahead of the local clock (the sandbox hook carries origin
+        // timestamps, so cross-machine clock skew makes this real)...
+        const futureStamp = Date.now() + 1_000_000;
+        await handler.revalidateTag!('future-tag', futureStamp);
+        // ...is forgotten by the overflow clear.
+        for (let i = 0; i <= 10_000; i += 1) {
+          await handler.revalidateTag!(`bulk-${i}`); // eslint-disable-line no-await-in-loop
+        }
+
+        // An entry the forgotten stamp governs (timestamp between local now
+        // and the stamp) must STAY refused: the watermark has to absorb the
+        // maximum discarded stamp, not just local Date.now().
+        await handler.set('governed', makeEntry({ timestamp: Date.now() + 1000, tags: ['future-tag'] }));
+        expect(await handler.get('governed')).toBeNull();
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
     test('an older invalidation does not refuse a newer entry', async () => {
       const t = Date.now();
       await handler.revalidateTag!('tag-old', t - 5000);

@@ -211,6 +211,15 @@ describe('the stub entry point', () => {
         expect(() => stub.unstable_revalidateTag('t')).toThrow('react-server');
         // The stub installs no hook — it exists only where handlers exist.
         expect(globalThis.__REACT_ON_RAILS_REVALIDATE_TAGS__).toBeUndefined();
+
+        // Type-level pin: function-form tags see typed arguments through the
+        // stub too. With a non-generic stub signature this fails to compile,
+        // because productId would be `unknown` and have no toFixed().
+        const typedStub = stub.unstable_cache(async (productId: number) => String(productId), {
+          id: 'stub-typed-tags',
+          tags: (productId) => [productId.toFixed()],
+        });
+        expect(typeof typedStub).toBe('function');
       });
     } finally {
       globalThis.__REACT_ON_RAILS_REVALIDATE_TAGS__ = saved;

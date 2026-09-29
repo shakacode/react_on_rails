@@ -47,7 +47,7 @@ const STUB_ERROR_REVALIDATE =
 // eslint-disable-next-line camelcase -- matches Next.js API naming convention
 export function unstable_cache<TArgs extends unknown[]>(
   originalFn: (...args: TArgs) => Promise<ReactNode> | ReactNode,
-  options: UnstableCacheOptions,
+  options: UnstableCacheOptions<TArgs>,
 ): (...args: TArgs) => Promise<ReactNode> {
   return () => {
     throw new Error(STUB_ERROR);
