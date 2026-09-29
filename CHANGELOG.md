@@ -51,7 +51,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   Redis. Requires a `volatile-*` eviction policy for full correctness (see the
   [unstable_cache docs](https://reactonrails.com/docs/pro/react-server-components/unstable-cache)).
   Part of [Issue 5077](https://github.com/shakacode/react_on_rails/issues/5077).
-  [PR XXXX](https://github.com/shakacode/react_on_rails/pull/XXXX) by
+  [PR 5123](https://github.com/shakacode/react_on_rails/pull/5123) by
   [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 #### Added
