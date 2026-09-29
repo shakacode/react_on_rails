@@ -118,13 +118,24 @@ How it works, and what to configure:
   keys are never evicted. An `allkeys-*` policy can evict a stamp and silently resurrect entries it
   had invalidated.
 - Stamp keys grow by one small key per distinct invalidated tag (tag names are capped at 256
-  characters). If your tag cardinality is very high, clean them up periodically with a prefix scan
-  over `<keyPrefix>rorp:rsc-tag:*` during a window when no invalidation is in flight.
+  characters). Deleting a stamp is safe **only when no entry it governs can still exist**: a deleted
+  stamp refuses nothing, so a surviving tagged blob it had invalidated is served again on its next
+  read — the same resurrection an `allkeys-*` eviction causes. If every tagged entry uses a finite
+  `revalidate`, you can sweep stamps older than your longest `revalidate` interval (plus a generous
+  margin for render duration and clock skew) with a prefix scan over `<keyPrefix>rorp:rsc-tag:*`. If
+  any tagged entry uses `revalidate: 0`, do not delete stamps: those entries never expire, and entry
+  keys are opaque hashes, so the blobs a stamp governs cannot be identified — sweep stamps only
+  together with all of the deployment's entry keys.
 - Invalidation times use the invalidating process's clock. Keep servers NTP-synced; a skewed clock
   shifts which in-flight renders an invalidation covers.
-- A refused entry is also deleted from Redis opportunistically (guarded so it can never delete a
-  fresher entry written concurrently), so tagged entries with `revalidate: 0` do not accumulate as
-  unreadable blobs.
+- A refused entry is also deleted from Redis opportunistically **on read** (guarded so it can never
+  delete a fresher entry written concurrently), so tagged `revalidate: 0` entries that keep receiving
+  reads do not linger as unreadable blobs. An invalidated entry that is never read again keeps its
+  blob until a re-render overwrites its key or it is removed manually.
+- Invalidation is best-effort and at-most-once: a stamp write that fails (for example during a
+  failover) is logged with a warning and not retried. Entries with a finite `revalidate` fall back to
+  their TTL; `revalidate: 0` entries keep serving until the tag is invalidated again, so re-run
+  `unstable_revalidateTag` if Redis was unavailable when you invalidated.
 - Untagged entries pay no extra Redis traffic; tagged entries pay one batched `MGET` of their tags'
   stamps per cache hit.
 - Tags are stored inside the entry blob, so they count toward `maxEntryBytes`: an entry within a few
