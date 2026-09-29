@@ -250,6 +250,15 @@ describe('InMemoryLRUCacheHandler', () => {
       expect(await handler.get('epoch')).not.toBeNull();
     });
 
+    test('a finite negative first stamp is stored as-is, not floored to 0', async () => {
+      // Pre-epoch times are unrealistic in production, but the contract is
+      // "keep the max stamp SEEN": flooring -100 to 0 would over-invalidate
+      // an entry whose timestamp (-50) is later than the invalidation.
+      await handler.revalidateTag!('tag-negative', -100);
+      await handler.set('key', makeEntry({ timestamp: -50, revalidate: 0, tags: ['tag-negative'] }));
+      expect(await handler.get('key')).not.toBeNull();
+    });
+
     test('a tag refusal does not disturb the LRU order of other keys', async () => {
       await handler.set('a', makeEntry({ timestamp: Date.now() - 1000, tags: ['tag-lru'] }));
       await handler.set('b', makeEntry());

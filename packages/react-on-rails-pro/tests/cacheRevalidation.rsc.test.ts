@@ -199,16 +199,20 @@ describe('the sandbox global hook', () => {
 });
 
 describe('the stub entry point', () => {
-  test('unstable_revalidateTag throws the stub error and no global hook is installed', () => {
+  test('unstable_revalidateTag rejects with the stub error and no global hook is installed', async () => {
     // jest.isolateModules resets the module registry but NOT globalThis, so
     // the hook installed by the real entry point must be managed explicitly.
     const saved = globalThis.__REACT_ON_RAILS_REVALIDATE_TAGS__;
     delete globalThis.__REACT_ON_RAILS_REVALIDATE_TAGS__;
     try {
+      let rejection: Promise<void> | undefined;
       jest.isolateModules(() => {
         // eslint-disable-next-line global-require, @typescript-eslint/no-require-imports
         const stub = require('../src/cache/index.stub') as typeof import('../src/cache/index.stub');
-        expect(() => stub.unstable_revalidateTag('t')).toThrow('react-server');
+        // Like the sibling stub methods, the call REJECTS rather than throwing
+        // synchronously — matching the real entry point, whose failures
+        // surface as rejections.
+        rejection = stub.unstable_revalidateTag('t');
         // The stub installs no hook — it exists only where handlers exist.
         expect(globalThis.__REACT_ON_RAILS_REVALIDATE_TAGS__).toBeUndefined();
 
@@ -221,6 +225,7 @@ describe('the stub entry point', () => {
         });
         expect(typeof typedStub).toBe('function');
       });
+      await expect(rejection).rejects.toThrow('react-server');
     } finally {
       globalThis.__REACT_ON_RAILS_REVALIDATE_TAGS__ = saved;
     }

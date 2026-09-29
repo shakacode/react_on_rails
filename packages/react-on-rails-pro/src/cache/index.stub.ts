@@ -60,8 +60,8 @@ export function registerCacheHandler(kind: string, handler: CacheHandler): void 
 
 // The stub installs NO global revalidation hook — the hook exists only where
 // handlers exist (the react-server entry point).
-// eslint-disable-next-line camelcase -- matches Next.js API naming convention
-export function unstable_revalidateTag(_tags: string | string[]): Promise<void> {
+// eslint-disable-next-line camelcase, @typescript-eslint/require-await -- Next.js naming; async so the stub REJECTS like its siblings
+export async function unstable_revalidateTag(_tags: string | string[]): Promise<void> {
   throw new Error(STUB_ERROR_REVALIDATE);
 }
 

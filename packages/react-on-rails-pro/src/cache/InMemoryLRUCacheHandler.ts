@@ -121,7 +121,7 @@ export class InMemoryLRUCacheHandler implements CacheHandler {
       this.tagStampsClearedAt = Math.max(this.tagStampsClearedAt, watermark);
     }
 
-    const prev = this.tagInvalidatedAt.get(tag) ?? 0;
-    this.tagInvalidatedAt.set(tag, Math.max(prev, at)); // never regress
+    const prev = this.tagInvalidatedAt.get(tag);
+    this.tagInvalidatedAt.set(tag, prev === undefined ? at : Math.max(prev, at)); // never regress
   }
 }
