@@ -113,4 +113,137 @@ describe('InMemoryLRUCacheHandler', () => {
     const result = await handler.get('key');
     expect(result!.value[0].toString()).toBe('new');
   });
+
+  describe('revalidateTag', () => {
+    test('refuses an entry whose tag was invalidated after its timestamp, deleting it', async () => {
+      const small = new InMemoryLRUCacheHandler(2);
+      // Insertion order matters for the deletion proof: untagged 'b' goes in
+      // FIRST so it is the oldest. If the tag refusal merely hid 'a' instead of
+      // deleting it, the cache would still be full ({b, a}) and inserting 'c'
+      // would evict the oldest entry — 'b'. Deletion leaves room, so 'b' survives.
+      await small.set('b', makeEntry({ timestamp: Date.now() - 1000 }));
+      await small.set('a', makeEntry({ timestamp: Date.now() - 1000, tags: ['product-1'] }));
+
+      await small.revalidateTag!('product-1');
+
+      expect(await small.get('a')).toBeNull();
+
+      await small.set('c', makeEntry());
+      expect(await small.get('b')).not.toBeNull();
+      expect(await small.get('c')).not.toBeNull();
+    });
+
+    test('tie refuses: invalidation in the same millisecond as the render start', async () => {
+      const t = Date.now() - 5000;
+      await handler.set('key', makeEntry({ timestamp: t, tags: ['tag-tie'] }));
+      await handler.revalidateTag!('tag-tie', t);
+      expect(await handler.get('key')).toBeNull();
+    });
+
+    test('monotonic: an older invalidation never moves the stamp backwards', async () => {
+      await handler.revalidateTag!('tag-mono', 100);
+      await handler.revalidateTag!('tag-mono', 50);
+      await handler.set('key', makeEntry({ timestamp: 75, tags: ['tag-mono'] }));
+      expect(await handler.get('key')).toBeNull();
+    });
+
+    test('non-finite invalidatedAt behaves as "now" and never poisons the stamp', async () => {
+      await handler.set('key', makeEntry({ timestamp: Date.now() - 1000, tags: ['tag-nan'] }));
+      await handler.revalidateTag!('tag-nan', NaN);
+      // Treated as now: the pre-existing entry is refused.
+      expect(await handler.get('key')).toBeNull();
+
+      // The recorded stamp is finite: an older call cannot regress it, and a
+      // NaN stamp would have disabled the tag (NaN >= x is always false).
+      await handler.revalidateTag!('tag-nan', 5);
+      await handler.set('old', makeEntry({ timestamp: 10, tags: ['tag-nan'] }));
+      expect(await handler.get('old')).toBeNull();
+    });
+
+    test('overflow valve: exceeding the tag-stamp cardinality bound clears the cache and warns', async () => {
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        await handler.set('x', makeEntry());
+
+        // MAX_TRACKED_TAGS is 10_000; one more distinct tag trips the valve.
+        for (let i = 0; i <= 10_000; i += 1) {
+          await handler.revalidateTag!(`bulk-${i}`); // eslint-disable-line no-await-in-loop
+        }
+
+        expect(await handler.get('x')).toBeNull();
+        expect(warnSpy).toHaveBeenCalledTimes(1);
+        expect(warnSpy.mock.calls[0][0]).toContain('tag-stamp map exceeded');
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
+    test('overflow watermark: a tagged write from a render in flight across the clear stays refused', async () => {
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        // A stamp exists for T, then the valve trips and forgets it.
+        await handler.revalidateTag!('T');
+        for (let i = 0; i <= 10_000; i += 1) {
+          await handler.revalidateTag!(`bulk-${i}`); // eslint-disable-line no-await-in-loop
+        }
+
+        // Models a render that STARTED before the clear and stored AFTER it:
+        // its stamp is gone, so only the watermark can refuse it.
+        await handler.set('inflight', makeEntry({ timestamp: Date.now() - 60_000, tags: ['T'] }));
+        expect(await handler.get('inflight')).toBeNull();
+
+        // A render that started after the clear is served (no stamp, above watermark).
+        await handler.set('fresh', makeEntry({ timestamp: Date.now() + 60_000, tags: ['T'] }));
+        expect(await handler.get('fresh')).not.toBeNull();
+
+        // An untagged entry is unaffected even by the watermark.
+        await handler.set('untagged', makeEntry({ timestamp: 5 }));
+        expect(await handler.get('untagged')).not.toBeNull();
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
+    test('an older invalidation does not refuse a newer entry', async () => {
+      const t = Date.now();
+      await handler.revalidateTag!('tag-old', t - 5000);
+      await handler.set('key', makeEntry({ timestamp: t, tags: ['tag-old'] }));
+      expect(await handler.get('key')).not.toBeNull();
+    });
+
+    test('any one stale tag among several refuses the entry', async () => {
+      await handler.set('key', makeEntry({ timestamp: Date.now() - 1000, tags: ['a', 'b', 'c'] }));
+      await handler.revalidateTag!('b');
+      expect(await handler.get('key')).toBeNull();
+    });
+
+    test('an entry without tags is unaffected by any stamps', async () => {
+      await handler.set('key', makeEntry({ timestamp: 10 }));
+      await handler.revalidateTag!('some-tag');
+      expect(await handler.get('key')).not.toBeNull();
+    });
+
+    test('a missing stamp refuses nothing, including an entry with timestamp 0', async () => {
+      await handler.set('epoch', makeEntry({ timestamp: 0, revalidate: 0, tags: ['never-invalidated'] }));
+      expect(await handler.get('epoch')).not.toBeNull();
+    });
+
+    test('a tag refusal does not disturb the LRU order of other keys', async () => {
+      await handler.set('a', makeEntry({ timestamp: Date.now() - 1000, tags: ['tag-lru'] }));
+      await handler.set('b', makeEntry());
+      await handler.set('c', makeEntry());
+      await handler.revalidateTag!('tag-lru');
+
+      expect(await handler.get('a')).toBeNull();
+
+      // Order is still b, c (get('a') promoted nothing): with capacity 3,
+      // adding d fills the free slot and adding e evicts b, the oldest.
+      await handler.set('d', makeEntry());
+      await handler.set('e', makeEntry());
+      expect(await handler.get('b')).toBeNull();
+      expect(await handler.get('c')).not.toBeNull();
+      expect(await handler.get('d')).not.toBeNull();
+      expect(await handler.get('e')).not.toBeNull();
+    });
+  });
 });
