@@ -17,7 +17,7 @@ import { getUniqueCacheHandlersSnapshot } from './cacheHandlerRegistry.ts';
 import { validateTags } from './tagValidation.ts';
 
 declare global {
-  // eslint-disable-next-line no-var, vars-on-top -- global augmentation needs var
+  // eslint-disable-next-line vars-on-top, no-underscore-dangle -- global augmentation needs var; dunder name matches the sandbox-global convention
   var __REACT_ON_RAILS_REVALIDATE_TAGS__:
     | ((tags: string[], invalidatedAt?: number) => Promise<void>)
     | undefined;
@@ -39,13 +39,14 @@ export async function revalidateTagsAt(tags: string | string[], invalidatedAt: n
 
   const attempts: Promise<void>[] = [];
   for (const handler of getUniqueCacheHandlersSnapshot()) {
-    if (typeof handler.revalidateTag !== 'function') continue; // eslint-disable-line no-continue
+    const { revalidateTag } = handler;
+    if (typeof revalidateTag !== 'function') continue; // eslint-disable-line no-continue
     for (const tag of list) {
       attempts.push(
         // Promise.resolve().then(...) converts a synchronous throw into a
         // rejection this catch handles, so one bad handler cannot abort the loop.
         Promise.resolve()
-          .then(() => handler.revalidateTag!(tag, at))
+          .then(() => revalidateTag.call(handler, tag, at))
           .catch((err: unknown) => {
             // Do not log tag values: application-provided, possibly large or
             // identifying. The handler's constructor name locates the culprit.
@@ -77,5 +78,6 @@ export function unstable_revalidateTag(tags: string | string[]): Promise<void> {
 // direction: __reactOnRailsProReportMissingLoadableStats (vm.ts /
 // injectRSCPayload.ts). The stub entry point installs nothing — the hook
 // exists only where handlers exist.
+// eslint-disable-next-line no-underscore-dangle -- dunder name matches the sandbox-global convention
 globalThis.__REACT_ON_RAILS_REVALIDATE_TAGS__ = (tags, invalidatedAt) =>
   revalidateTagsAt(tags, invalidatedAt ?? Date.now());

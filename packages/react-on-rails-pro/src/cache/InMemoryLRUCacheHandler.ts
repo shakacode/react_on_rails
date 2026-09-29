@@ -102,7 +102,10 @@ export class InMemoryLRUCacheHandler implements CacheHandler {
     // overflow clears the entry cache AND raises the watermark to now: tagged
     // entries from renders in flight across the clear (stored after it,
     // started before it) stay refused.
-    if (!this.tagInvalidatedAt.has(tag) && this.tagInvalidatedAt.size >= InMemoryLRUCacheHandler.MAX_TRACKED_TAGS) {
+    if (
+      !this.tagInvalidatedAt.has(tag) &&
+      this.tagInvalidatedAt.size >= InMemoryLRUCacheHandler.MAX_TRACKED_TAGS
+    ) {
       console.warn(
         `InMemoryLRUCacheHandler: tag-stamp map exceeded ${InMemoryLRUCacheHandler.MAX_TRACKED_TAGS} entries; ` +
           'clearing the cache. Reduce tag cardinality or use a shared handler.',
