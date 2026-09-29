@@ -22,8 +22,9 @@
 import type { ReactNode } from 'react';
 import { setBuildId } from '../src/cache/buildIdProvider';
 import type { CacheEntry, CacheHandler } from '../src/cache/CacheHandler';
-import { registerCacheHandler } from '../src/cache/cacheHandlerRegistry';
+import { registerCacheHandler, resetCacheHandlersForTesting } from '../src/cache/cacheHandlerRegistry';
 import { InMemoryLRUCacheHandler } from '../src/cache/InMemoryLRUCacheHandler';
+import { unstable_revalidateTag } from '../src/cache/revalidation';
 
 // jest.mock is hoisted, so we build renderers inside the factory using require()
 jest.mock('../src/cache/manifestLoader', () => {
@@ -69,7 +70,7 @@ beforeAll(() => {
 
 describe('unstable_cache', () => {
   beforeEach(() => {
-    registerCacheHandler('default', new InMemoryLRUCacheHandler());
+    resetCacheHandlersForTesting();
   });
 
   test('cold MISS: calls the original function and returns a result', async () => {
@@ -249,7 +250,7 @@ function makeSpyHandler() {
 
 describe('unstable_cache tags', () => {
   beforeEach(() => {
-    registerCacheHandler('default', new InMemoryLRUCacheHandler());
+    resetCacheHandlersForTesting();
   });
 
   test('static tags are stored on the entry, deduped', async () => {
@@ -435,5 +436,70 @@ describe('unstable_cache tags', () => {
     } finally {
       warnSpy.mockRestore();
     }
+  });
+});
+
+describe('tag invalidation end-to-end (the in-flight race)', () => {
+  beforeEach(() => {
+    resetCacheHandlersForTesting();
+  });
+
+  /** Cached function whose render blocks on a gate the test controls. */
+  function makeGatedCachedFn(id: string) {
+    let renderCount = 0;
+    let releaseRender!: () => void;
+    let signalStarted!: () => void;
+    const started = new Promise<void>((resolve) => {
+      signalStarted = resolve;
+    });
+    const gate = new Promise<void>((resolve) => {
+      releaseRender = resolve;
+    });
+
+    const cachedFn = unstable_cache(
+      async () => {
+        renderCount += 1;
+        signalStarted();
+        await gate;
+        return `render-${renderCount}`;
+      },
+      { id, tags: ['race-tag'] },
+    );
+
+    return {
+      cachedFn,
+      started,
+      releaseRender,
+      getRenderCount: () => renderCount,
+    };
+  }
+
+  test('a tag invalidated during an in-flight render refuses the entry that render stores', async () => {
+    const { cachedFn, started, releaseRender, getRenderCount } = makeGatedCachedFn('race');
+
+    const firstCall = cachedFn();
+    await started;
+    // The invalidation lands while the render is in flight: it carries a stamp
+    // >= the render start, so the entry stored after it must be refused.
+    await unstable_revalidateTag('race-tag');
+    releaseRender();
+    await firstCall;
+    await new Promise((resolve) => setTimeout(resolve, 50)); // let the store settle
+
+    await cachedFn();
+    expect(getRenderCount()).toBe(2);
+  });
+
+  test('control: without the invalidation the next call is a cache HIT', async () => {
+    const { cachedFn, started, releaseRender, getRenderCount } = makeGatedCachedFn('race-control');
+
+    const firstCall = cachedFn();
+    await started;
+    releaseRender();
+    await firstCall;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    await cachedFn();
+    expect(getRenderCount()).toBe(1);
   });
 });

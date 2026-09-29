@@ -29,14 +29,19 @@ import type { CacheHandler, CacheEntry } from './CacheHandler.ts';
 
 export type { CacheHandler, CacheEntry };
 
-export interface UnstableCacheOptions {
+export interface UnstableCacheOptions<TArgs extends unknown[] = unknown[]> {
   id: string;
   revalidate?: number;
   kind?: string;
+  tags?: string[] | ((...args: TArgs) => string[]);
 }
 
 const STUB_ERROR =
   'unstable_cache is only available in the react-server bundle. ' +
+  'It should not be called from the SSR server bundle or client bundle.';
+
+const STUB_ERROR_REVALIDATE =
+  'unstable_revalidateTag is only available in the react-server bundle. ' +
   'It should not be called from the SSR server bundle or client bundle.';
 
 // eslint-disable-next-line camelcase -- matches Next.js API naming convention
@@ -51,6 +56,13 @@ export function unstable_cache<TArgs extends unknown[]>(
 
 export function registerCacheHandler(kind: string, handler: CacheHandler): void {
   throw new Error(STUB_ERROR);
+}
+
+// The stub installs NO global revalidation hook — the hook exists only where
+// handlers exist (the react-server entry point).
+// eslint-disable-next-line camelcase -- matches Next.js API naming convention
+export function unstable_revalidateTag(_tags: string | string[]): Promise<void> {
+  throw new Error(STUB_ERROR_REVALIDATE);
 }
 
 export type { RedisCacheHandlerOptions } from './RedisCacheHandler.ts';
