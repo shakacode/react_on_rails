@@ -44,14 +44,17 @@ describe('buildCacheKey', () => {
     expect(key1).not.toBe(key2);
   });
 
-  test('key starts with rorp:rsc-cache: prefix', () => {
+  test('key starts with the format-generation prefix rorp:rsc-cache:2:', () => {
     const key = buildCacheKey('build-1', 'comp', []);
-    expect(key).toMatch(/^rorp:rsc-cache:/);
+    // The ':2:' generation segment keeps new-format entries in a key namespace
+    // that pre-tags package versions never read (and vice versa) — pinned here
+    // so a prefix change is a conscious storage-format decision, not a typo.
+    expect(key).toMatch(/^rorp:rsc-cache:2:/);
   });
 
   test('key contains a hex SHA256 hash', () => {
     const key = buildCacheKey('build-1', 'comp', []);
-    const hash = key.replace('rorp:rsc-cache:', '');
+    const hash = key.replace('rorp:rsc-cache:2:', '');
     expect(hash).toMatch(/^[0-9a-f]{64}$/);
   });
 

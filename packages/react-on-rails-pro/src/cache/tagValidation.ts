@@ -19,7 +19,14 @@
 
 export const MAX_TAG_LENGTH = 256; // chars; matches the renderer-endpoint cap planned for the IPC PR
 
-/** Validates and dedupes; throws TypeError on anything else. */
+// Per-call/per-entry ceiling, enforced here once so every handler inherits it
+// instead of each reinventing its own storage-format guard (the Redis v2
+// format's uint16 tagCount is far above this). Also bounds how fast a single
+// unstable_cache call can burn through InMemoryLRUCacheHandler's tag-stamp
+// cardinality valve. Generous for real use: tags name entities, not rows.
+export const MAX_TAGS_PER_CALL = 64;
+
+/** Validates, caps the count, and dedupes; throws TypeError on anything else. */
 export function validateTags(value: unknown): string[] {
   if (!Array.isArray(value)) {
     throw new TypeError('tags must be an array of non-empty strings');
@@ -29,5 +36,11 @@ export function validateTags(value: unknown): string[] {
       throw new TypeError(`tags must be non-empty strings of at most ${MAX_TAG_LENGTH} characters`);
     }
   }
-  return [...new Set(value as string[])];
+  const deduped = [...new Set(value as string[])];
+  if (deduped.length > MAX_TAGS_PER_CALL) {
+    throw new TypeError(
+      `tags must contain at most ${MAX_TAGS_PER_CALL} distinct tags (got ${deduped.length})`,
+    );
+  }
+  return deduped;
 }

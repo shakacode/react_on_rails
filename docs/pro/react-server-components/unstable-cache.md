@@ -116,7 +116,8 @@ How it works, and what to configure:
 - **Set a `volatile-*` eviction policy** (for example `volatile-lru`) on a Redis under memory
   pressure. Those policies evict only keys with a TTL, so finite-`revalidate` entry blobs remain
   evictable while stamp keys are never evicted. An `allkeys-*` policy can evict a stamp and silently
-  resurrect entries it had invalidated. Note that `revalidate: 0` entries also have no TTL, so under
+  resurrect entries it had invalidated; the handler probes `maxmemory-policy` on connect
+  (best-effort — silent where `CONFIG` is disabled) and logs a warning when it detects one. Note that `revalidate: 0` entries also have no TTL, so under
   a `volatile-*` policy they are never evicted either: size Redis for the full working set of
   indefinite entries, or Redis at `maxmemory` will start rejecting writes (cache writes and stamp
   writes degrade to skip-and-warn; reads still work).
@@ -152,10 +153,17 @@ How it works, and what to configure:
 
 You can also implement the exported `CacheHandler` interface and register it with
 `registerCacheHandler(kind, handler)`. A handler implements asynchronous `get(key)` and
-`set(key, entry)` methods. `TieredCacheHandler` can compose handlers as L1 and L2 caches — but it
-does not implement `revalidateTag` yet, so tag invalidation does not reach handlers composed inside
-it (storing tagged entries on it logs the once-per-handler warning). Register `RedisCacheHandler`
-directly when you need tag invalidation; `TieredCacheHandler` forwarding is planned.
+`set(key, entry)` methods. `TieredCacheHandler` composes handlers as L1 and L2 caches and forwards
+`revalidateTag` to each layer that implements it, so an L1 in-memory + L2 Redis composition gets tag
+invalidation in both layers. Two behaviors to know:
+
+- **Tagged entries are never promoted from L2 into L1.** Promotion re-stamps the entry's `timestamp`
+  to the promotion time, which would erase the render-start evidence tag invalidation is judged
+  against (contract rule 5 below). Fresh renders still write both layers with the original
+  timestamp; only the cross-worker L2-to-L1 warm-up is skipped for tagged entries.
+- **A composition where neither layer implements `revalidateTag` does not claim to support it**, so
+  storing tagged entries on it still logs the once-per-handler warning instead of silently
+  swallowing invalidations.
 
 Custom handlers must enforce the entry lifetime: return `null` from `get` for stale entries based on
 `entry.timestamp` and `entry.revalidate`, or enforce expiry with the storage backend's TTL.
@@ -195,6 +203,19 @@ build-scoped cache separation occurs only when that artifact ID changes; rebuild
 with unchanged RSC artifacts does not rotate it. Changes to Rails code, data, or configuration still
 need a finite lifetime or an explicit version in the function `id` or arguments to separate cached
 results. Changing the namespace does not delete old entries from shared storage.
+
+The default in-memory handler tracks at most 10,000 distinct invalidated tags per process
+(constructor option `maxTrackedTags`). Past that bound it clears its **entire** entry cache and
+starts over — a safety valve that trades a one-time cold cache for bounded memory, with a
+`console.warn` when it trips. Avoid deriving tags from unbounded or request-controlled collections;
+tags should name entities (`product-42-reviews`), not rows or visitors.
+
+Entries written by package versions before tag support live under a different Redis key namespace
+(the storage-format generation is part of the cache key). After upgrading, those old entries are
+simply never read again: they expire via their own TTLs. If you used `revalidate: 0` (no TTL) with
+shared storage, delete the leftovers manually — they match `rorp:rsc-cache:` WITHOUT the `2:`
+generation segment (scan with your `keyPrefix` applied, for example
+`SCAN 0 MATCH <keyPrefix>rorp:rsc-cache:[0-9a-f]*`).
 
 React on Rails Pro's Ruby fragment-caching helpers have a separate `cache_tags:` and
 `ReactOnRailsPro.revalidate_tag` API. That API invalidates Rails fragment-cache entries; it does not

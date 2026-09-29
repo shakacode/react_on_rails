@@ -34,6 +34,10 @@ const mockRedisInstance: Record<string, jest.Mock> = {
   set: jest.fn(),
   mget: jest.fn(),
   on: jest.fn(),
+  // The constructor's best-effort eviction-policy probe registers a 'ready'
+  // listener and calls CONFIG GET; the unit suite never fires 'ready'.
+  once: jest.fn(),
+  config: jest.fn().mockResolvedValue(['maxmemory-policy', 'noeviction']),
   defineCommand: jest.fn((name: string) => {
     mockRedisInstance[name] = jest.fn().mockResolvedValue(0);
   }),
@@ -73,10 +77,14 @@ describe('RedisCacheHandler', () => {
       expect(await handler.get('error-key')).toBeNull();
     });
 
-    test('deserializes a valid entry from Redis', async () => {
+    test('a pre-tags v1 blob (no version byte) is a miss, never a corrupt entry', async () => {
       const original = makeEntry();
 
-      // Manually serialize to verify deserialization
+      // Hand-build the legacy v1 format: [timestamp f64BE][revalidate i32BE][chunks].
+      // v1 blobs live under the old key namespace (buildCacheKey's ':2:'
+      // generation segment), so this code should never meet one — but if it
+      // does (manual keying, copied datasets), the version sniff must turn it
+      // into a miss rather than misparse it. mget must not be consulted.
       let totalLen = 12;
       for (const chunk of original.value) totalLen += 4 + chunk.length;
       const blob = Buffer.allocUnsafe(totalLen);
@@ -93,14 +101,7 @@ describe('RedisCacheHandler', () => {
       mockRedisInstance.getBuffer.mockResolvedValue(blob);
       const result = await handler.get('test-key');
 
-      expect(result).not.toBeNull();
-      expect(result!.timestamp).toBe(original.timestamp);
-      expect(result!.revalidate).toBe(original.revalidate);
-      expect(result!.value).toHaveLength(2);
-      expect(result!.value[0].toString()).toBe('chunk-one');
-      expect(result!.value[1].toString()).toBe('chunk-two');
-      // Backcompat contract: a v1 blob has no tags and is never tag-checked.
-      expect(result!.tags).toBeUndefined();
+      expect(result).toBeNull();
       expect(mockRedisInstance.mget).not.toHaveBeenCalled();
     });
 
@@ -192,9 +193,9 @@ describe('RedisCacheHandler', () => {
       expect(await handler.get('k')).toBeNull();
       expect(mockRedisInstance.mget).toHaveBeenCalledWith(['rorp:rsc-tag:t']);
       // Cleanup is the header-guarded conditional delete, keyed on the first
-      // 13 bytes (version + timestamp + revalidate) of the refused blob.
+      // 17 bytes (version + timestamp + revalidate + nonce) of the refused blob.
       expect(mockRedisInstance.rorpDelIfHeaderMatches).toHaveBeenCalledTimes(1);
-      expect(mockRedisInstance.rorpDelIfHeaderMatches).toHaveBeenCalledWith('k', blob.subarray(0, 13));
+      expect(mockRedisInstance.rorpDelIfHeaderMatches).toHaveBeenCalledWith('k', blob.subarray(0, 17));
     });
 
     test('a stamp equal to the timestamp refuses (ties refuse)', async () => {
@@ -251,6 +252,91 @@ describe('RedisCacheHandler', () => {
     });
   });
 
+  describe('per-write nonce (conditional-delete guard)', () => {
+    test('two writes of the same entry produce different 17-byte guard prefixes', async () => {
+      const blobs: Buffer[] = [];
+      mockRedisInstance.set.mockImplementation((_key: string, blob: Buffer) => {
+        blobs.push(Buffer.from(blob));
+        return Promise.resolve('OK');
+      });
+      const entry = makeEntry({ tags: ['t'] });
+      await handler.set('k', entry);
+      await handler.set('k', entry);
+
+      expect(blobs).toHaveLength(2);
+      // Same timestamp and revalidate — only the nonce (bytes 13-16) differs,
+      // so two same-millisecond renders can never collide on the delete guard.
+      expect(blobs[0].subarray(0, 13).equals(blobs[1].subarray(0, 13))).toBe(true);
+      expect(blobs[0].subarray(0, 17).equals(blobs[1].subarray(0, 17))).toBe(false);
+    });
+  });
+
+  describe('stamp value hygiene', () => {
+    test('empty and whitespace-only stamp values refuse nothing (not epoch-zero stamps)', async () => {
+      let blob: Buffer | null = null;
+      mockRedisInstance.set.mockImplementation((_key: string, b: Buffer) => {
+        blob = Buffer.from(b);
+        return Promise.resolve('OK');
+      });
+      // timestamp 0 is exactly the value a Number('') === 0 bug would refuse.
+      await handler.set('k', makeEntry({ timestamp: 0, revalidate: 0, tags: ['t'] }));
+      mockRedisInstance.getBuffer.mockResolvedValue(blob);
+
+      for (const junk of ['', '  ']) {
+        mockRedisInstance.mget.mockResolvedValue([junk]);
+        // eslint-disable-next-line no-await-in-loop -- sequential assertion per junk variant
+        expect(await handler.get('k')).not.toBeNull();
+      }
+      expect(mockRedisInstance.rorpDelIfHeaderMatches).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('eviction-policy probe', () => {
+    const fireReady = () => {
+      const readyCall = mockRedisInstance.once.mock.calls.find(([event]) => event === 'ready');
+      expect(readyCall).toBeDefined();
+      (readyCall![1] as () => void)();
+      // Let the probe's promise chain settle.
+      return new Promise((resolve) => {
+        setImmediate(resolve);
+      });
+    };
+
+    test('warns once when maxmemory-policy is allkeys-*', async () => {
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        mockRedisInstance.config.mockResolvedValue(['maxmemory-policy', 'allkeys-lru']);
+        // eslint-disable-next-line no-new -- constructor registers the probe
+        new RedisCacheHandler({ redisUrl: 'redis://localhost:6379' });
+        await fireReady();
+        expect(warnSpy).toHaveBeenCalledTimes(1);
+        expect(warnSpy.mock.calls[0][0]).toContain('allkeys-lru');
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
+    test('stays silent for volatile-* policies and when CONFIG is unavailable', async () => {
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        mockRedisInstance.config.mockResolvedValue(['maxmemory-policy', 'volatile-lru']);
+        // eslint-disable-next-line no-new -- constructor registers the probe
+        new RedisCacheHandler({ redisUrl: 'redis://localhost:6379' });
+        await fireReady();
+
+        mockRedisInstance.once.mockClear();
+        mockRedisInstance.config.mockRejectedValue(new Error('CONFIG disabled'));
+        // eslint-disable-next-line no-new -- constructor registers the probe
+        new RedisCacheHandler({ redisUrl: 'redis://localhost:6379' });
+        await fireReady();
+
+        expect(warnSpy).not.toHaveBeenCalled();
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+  });
+
   describe('revalidateTag()', () => {
     test('writes the stamp through the monotonic Lua command, unprefixed key, decimal string', async () => {
       await handler.revalidateTag!('t', 1700000001234);
@@ -301,11 +387,11 @@ describe('RedisCacheHandler', () => {
       expect(def.lua).not.toMatch(/EXPIRE|'EX'|"EX"/);
     });
 
-    test('rorpDelIfHeaderMatches guards on the 13-byte header before deleting', () => {
+    test('rorpDelIfHeaderMatches guards on the 17-byte header (incl. nonce) before deleting', () => {
       const def = definedLua('rorpDelIfHeaderMatches');
       expect(def.numberOfKeys).toBe(1);
-      // GETRANGE end offset is inclusive: 0..12 = 13 bytes.
-      expect(def.lua).toContain("GETRANGE', KEYS[1], 0, 12");
+      // GETRANGE end offset is inclusive: 0..16 = 17 bytes.
+      expect(def.lua).toContain("GETRANGE', KEYS[1], 0, 16");
       expect(def.lua).toContain('DEL');
     });
   });
@@ -407,13 +493,13 @@ describe('RedisCacheHandler', () => {
       await handler.set('victim', makeEntry({ tags: ['some-tag'] }));
 
       // Truncated mid-tag: cut inside the tag bytes.
-      const midTag = valid!.subarray(0, 15 + 2 + 3);
+      const midTag = valid!.subarray(0, 19 + 2 + 3);
       // tagCount claims more tags than the buffer holds.
       const overCount = Buffer.from(valid!);
-      overCount.writeUInt16BE(500, 13);
+      overCount.writeUInt16BE(500, 17);
       // Tag length overruns into/past the chunk area.
       const overLen = Buffer.from(valid!);
-      overLen.writeUInt16BE(0xffff, 15);
+      overLen.writeUInt16BE(0xffff, 19);
       // Too short to even hold a v2 header.
       const shortHeader = Buffer.from([0x02, 0x00, 0x01]);
 

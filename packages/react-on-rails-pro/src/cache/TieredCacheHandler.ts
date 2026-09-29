@@ -47,6 +47,38 @@ export class TieredCacheHandler implements CacheHandler {
     // indefinite entry's revalidate: 0 to Infinity, which a custom
     // TTL-on-write L1 handler could reject as an invalid backend TTL.
     this.l1MaxTtlSeconds = opts.l1MaxTtlSeconds === Infinity ? undefined : opts.l1MaxTtlSeconds;
+
+    // Tag invalidation forwards to whichever layers support it. When NEITHER
+    // layer does, this composite must not LOOK like it supports invalidation —
+    // unstable_cache's capability warning feature-detects revalidateTag, and a
+    // prototype method here would silence that warning while invalidations
+    // silently record nothing. An undefined instance property shadows the
+    // prototype method, so typeof stays 'undefined' for such compositions.
+    if (typeof l1.revalidateTag !== 'function' && typeof l2.revalidateTag !== 'function') {
+      (this as { revalidateTag?: TieredCacheHandler['revalidateTag'] }).revalidateTag = undefined;
+    }
+  }
+
+  // Forwards to each layer that implements it (skipping the other silently,
+  // matching the fanout's own behavior for handlers without the method).
+  // Best-effort per layer: one layer rejecting or throwing synchronously never
+  // stops the other, and this method itself never throws.
+  async revalidateTag(tag: string, invalidatedAt?: number): Promise<void> {
+    const forward = (layer: CacheHandler, name: string): Promise<void> => {
+      const { revalidateTag } = layer;
+      if (typeof revalidateTag !== 'function') return Promise.resolve();
+      return Promise.resolve()
+        .then(() => revalidateTag.call(layer, tag, invalidatedAt))
+        .catch((err: unknown) => {
+          // Message only: raw error objects can carry connection strings, and
+          // console output may be replayed to the browser during RSC renders.
+          console.error(
+            `TieredCacheHandler: ${name} revalidateTag failed:`,
+            err instanceof Error ? err.message : String(err),
+          );
+        });
+    };
+    await Promise.all([forward(this.l1, 'L1'), forward(this.l2, 'L2')]);
   }
 
   async get(key: string): Promise<CacheEntry | null> {
@@ -64,7 +96,16 @@ export class TieredCacheHandler implements CacheHandler {
     }
 
     if (l2Entry) {
-      const promoted = this.applyL1TtlForPromotion(l2Entry);
+      // TAGGED entries are never promoted into L1. Promotion re-stamps
+      // timestamp to `now` (see applyL1TtlForPromotion), which would erase the
+      // render-start evidence the tag mark-stale check compares against: an L1
+      // whose stamp map receives a delayed invalidation (stamped between the
+      // entry's real render start and its promotion) would then wrongly accept
+      // the stale copy. L2 vetted the entry against ITS stamps just now, but
+      // L1's stamps arrive independently. Skipping promotion costs tagged
+      // entries the L1 read-through warm-up only — fresh renders still write
+      // both layers via set(), which preserves the original timestamp.
+      const promoted = l2Entry.tags?.length ? null : this.applyL1TtlForPromotion(l2Entry);
       if (promoted) {
         void this.l1.set(key, promoted).catch((err: unknown) => {
           console.error('TieredCacheHandler: L1 promotion failed', err);
