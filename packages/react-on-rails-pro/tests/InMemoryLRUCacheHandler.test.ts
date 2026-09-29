@@ -133,18 +133,29 @@ describe('InMemoryLRUCacheHandler', () => {
       expect(await small.get('c')).not.toBeNull();
     });
 
-    test('tie refuses: invalidation in the same millisecond as the render start', async () => {
+    test('comparison boundary: an older stamp serves, a same-millisecond stamp refuses', async () => {
       const t = Date.now() - 5000;
-      await handler.set('key', makeEntry({ timestamp: t, tags: ['tag-tie'] }));
+      // stamp < timestamp: the entry's data postdates the invalidation.
+      await handler.revalidateTag!('tag-older', t - 1);
+      await handler.set('served', makeEntry({ timestamp: t, tags: ['tag-older'] }));
+      expect(await handler.get('served')).not.toBeNull();
+      // stamp == timestamp: ties refuse (wrong only in the cheap direction).
       await handler.revalidateTag!('tag-tie', t);
-      expect(await handler.get('key')).toBeNull();
+      await handler.set('refused', makeEntry({ timestamp: t, tags: ['tag-tie'] }));
+      expect(await handler.get('refused')).toBeNull();
     });
 
-    test('monotonic: an older invalidation never moves the stamp backwards', async () => {
-      await handler.revalidateTag!('tag-mono', 100);
-      await handler.revalidateTag!('tag-mono', 50);
-      await handler.set('key', makeEntry({ timestamp: 75, tags: ['tag-mono'] }));
-      expect(await handler.get('key')).toBeNull();
+    test('stamp bookkeeping: the first stamp is stored as-is and later stamps never regress', async () => {
+      // First stamp stored as-is, not floored to 0: an invalidation at -100
+      // must not refuse an entry whose timestamp (-50) postdates it.
+      await handler.revalidateTag!('tag-book', -100);
+      await handler.set('negative', makeEntry({ timestamp: -50, revalidate: 0, tags: ['tag-book'] }));
+      expect(await handler.get('negative')).not.toBeNull();
+      // An older later call never moves the recorded stamp backwards.
+      await handler.revalidateTag!('tag-book', 100);
+      await handler.revalidateTag!('tag-book', 50);
+      await handler.set('governed', makeEntry({ timestamp: 75, revalidate: 0, tags: ['tag-book'] }));
+      expect(await handler.get('governed')).toBeNull();
     });
 
     test('non-finite invalidatedAt behaves as "now" and never poisons the stamp', async () => {
@@ -160,77 +171,46 @@ describe('InMemoryLRUCacheHandler', () => {
       expect(await handler.get('old')).toBeNull();
     });
 
-    test('overflow valve: exceeding the tag-stamp cardinality bound clears the cache and warns', async () => {
+    test('overflow valve: warns once, clears, and the watermark refuses everything a discarded stamp governed', async () => {
       const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
       try {
-        await handler.set('x', makeEntry());
+        // A stamp ahead of the local clock (the sandbox hook carries origin
+        // timestamps, so cross-machine clock skew makes these real) is about
+        // to be discarded by the clear; the watermark must absorb it.
+        const futureStamp = Date.now() + 1_000_000;
+        await handler.revalidateTag!('T', futureStamp);
+        await handler.set('preexisting', makeEntry());
 
         // MAX_TRACKED_TAGS is 10_000; one more distinct tag trips the valve.
         for (let i = 0; i <= 10_000; i += 1) {
           await handler.revalidateTag!(`bulk-${i}`); // eslint-disable-line no-await-in-loop
         }
 
-        expect(await handler.get('x')).toBeNull();
+        // One warning; the whole entry cache is gone along with the stamps.
         expect(warnSpy).toHaveBeenCalledTimes(1);
         expect(warnSpy.mock.calls[0][0]).toContain('tag-stamp map exceeded');
-      } finally {
-        warnSpy.mockRestore();
-      }
-    });
+        expect(await handler.get('preexisting')).toBeNull();
 
-    test('overflow watermark: a tagged write from a render in flight across the clear stays refused', async () => {
-      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
-      try {
-        // A stamp exists for T, then the valve trips and forgets it.
-        await handler.revalidateTag!('T');
-        for (let i = 0; i <= 10_000; i += 1) {
-          await handler.revalidateTag!(`bulk-${i}`); // eslint-disable-line no-await-in-loop
-        }
-
-        // Models a render that STARTED before the clear and stored AFTER it:
-        // its stamp is gone, so only the watermark can refuse it.
+        // A tagged render in flight across the clear (started before it,
+        // stored after it): its stamp is gone, only the watermark refuses it.
         await handler.set('inflight', makeEntry({ timestamp: Date.now() - 60_000, tags: ['T'] }));
         expect(await handler.get('inflight')).toBeNull();
 
-        // A render that started after the clear is served (no stamp, above watermark).
-        await handler.set('fresh', makeEntry({ timestamp: Date.now() + 60_000, tags: ['T'] }));
+        // Still governed by the DISCARDED future stamp: a Date.now()-only
+        // watermark would serve this.
+        await handler.set('governed', makeEntry({ timestamp: Date.now() + 1000, tags: ['T'] }));
+        expect(await handler.get('governed')).toBeNull();
+
+        // Above the watermark: served — the valve refuses more, never forever.
+        await handler.set('fresh', makeEntry({ timestamp: futureStamp + 1, tags: ['T'] }));
         expect(await handler.get('fresh')).not.toBeNull();
 
-        // An untagged entry is unaffected even by the watermark.
+        // An untagged entry ignores the watermark entirely.
         await handler.set('untagged', makeEntry({ timestamp: 5 }));
         expect(await handler.get('untagged')).not.toBeNull();
       } finally {
         warnSpy.mockRestore();
       }
-    });
-
-    test('overflow clear preserves a discarded future stamp in the watermark', async () => {
-      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
-      try {
-        // A stamp ahead of the local clock (the sandbox hook carries origin
-        // timestamps, so cross-machine clock skew makes this real)...
-        const futureStamp = Date.now() + 1_000_000;
-        await handler.revalidateTag!('future-tag', futureStamp);
-        // ...is forgotten by the overflow clear.
-        for (let i = 0; i <= 10_000; i += 1) {
-          await handler.revalidateTag!(`bulk-${i}`); // eslint-disable-line no-await-in-loop
-        }
-
-        // An entry the forgotten stamp governs (timestamp between local now
-        // and the stamp) must STAY refused: the watermark has to absorb the
-        // maximum discarded stamp, not just local Date.now().
-        await handler.set('governed', makeEntry({ timestamp: Date.now() + 1000, tags: ['future-tag'] }));
-        expect(await handler.get('governed')).toBeNull();
-      } finally {
-        warnSpy.mockRestore();
-      }
-    });
-
-    test('an older invalidation does not refuse a newer entry', async () => {
-      const t = Date.now();
-      await handler.revalidateTag!('tag-old', t - 5000);
-      await handler.set('key', makeEntry({ timestamp: t, tags: ['tag-old'] }));
-      expect(await handler.get('key')).not.toBeNull();
     });
 
     test('any one stale tag among several refuses the entry', async () => {
@@ -248,15 +228,6 @@ describe('InMemoryLRUCacheHandler', () => {
     test('a missing stamp refuses nothing, including an entry with timestamp 0', async () => {
       await handler.set('epoch', makeEntry({ timestamp: 0, revalidate: 0, tags: ['never-invalidated'] }));
       expect(await handler.get('epoch')).not.toBeNull();
-    });
-
-    test('a finite negative first stamp is stored as-is, not floored to 0', async () => {
-      // Pre-epoch times are unrealistic in production, but the contract is
-      // "keep the max stamp SEEN": flooring -100 to 0 would over-invalidate
-      // an entry whose timestamp (-50) is later than the invalidation.
-      await handler.revalidateTag!('tag-negative', -100);
-      await handler.set('key', makeEntry({ timestamp: -50, revalidate: 0, tags: ['tag-negative'] }));
-      expect(await handler.get('key')).not.toBeNull();
     });
 
     test('a tag refusal does not disturb the LRU order of other keys', async () => {
