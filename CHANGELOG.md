@@ -26,6 +26,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Added
 
+- **[Pro]** **Tag-based invalidation groundwork for the RSC cache**: `unstable_cache` accepts a
+  `tags` option (a static array, or a function of the call's arguments), the `CacheHandler` interface
+  gains an optional `revalidateTag(tag, invalidatedAt?)` method, the in-memory handler implements it
+  with mark-stale semantics, and `unstable_revalidateTag` is exported from `react-on-rails-pro/cache`.
+  Invalidation is per-process at this stage; the Node Renderer endpoint and Rails bridge land
+  separately. Part of [Issue 5077](https://github.com/shakacode/react_on_rails/issues/5077).
+  [PR 5122](https://github.com/shakacode/react_on_rails/pull/5122) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
 - **[Pro]** **React 19.3 support with `react-on-rails-rsc@19.3.1-rc.0`**: The node renderer startup
   check and `react_on_rails:doctor` now accept `react-on-rails-rsc` 19.3.1-rc.0 (npm `next`) and later
   19.3.1+ releases with React/React DOM 19.3.x. The `react-on-rails-pro` optional peer range admits
@@ -38,6 +46,15 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   with React/React DOM 19.2.8+, or 19.3.1-rc.0 with React/React DOM 19.3.0. The node renderer error and Doctor's Fix name the stable
   release to install. [PR 5094](https://github.com/shakacode/react_on_rails/pull/5094) by
   [justin808](https://github.com/justin808).
+
+#### Changed
+
+- **[Pro]** **RSC cache entries are now timestamped at render start** (was: at store time), so a tag
+  invalidation during an in-flight render correctly refuses the entry that render stores. For handlers
+  that enforce expiry from the entry timestamp (the in-memory handler), effective TTL shrinks by the
+  render duration; `RedisCacheHandler`'s Redis-side `EX` TTL is unchanged.
+  [PR 5122](https://github.com/shakacode/react_on_rails/pull/5122) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 #### Fixed
 
