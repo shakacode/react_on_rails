@@ -119,6 +119,22 @@ describeWithRedis('RedisCacheHandler (real Redis)', () => {
     expect(await handler.get(key)).not.toBeNull();
   });
 
+  test('one invalidation refuses every key sharing the tag', async () => {
+    // The point of tags is fan-out across keys: a stamp is keyed by tag alone,
+    // never by cache key. Regression this pins: scoping stamps per cache key
+    // would pass every single-key test while breaking cross-key invalidation.
+    const t0 = Date.now();
+    await handler.set('fanout-k1', makeEntry({ tags: ['fanout-tag'], timestamp: t0 }));
+    await handler.set('fanout-k2', makeEntry({ tags: ['fanout-tag', 'other-tag'], timestamp: t0 }));
+    expect(await handler.get('fanout-k1')).not.toBeNull();
+    expect(await handler.get('fanout-k2')).not.toBeNull();
+
+    await handler.revalidateTag!('fanout-tag', t0 + 1);
+
+    expect(await handler.get('fanout-k1')).toBeNull();
+    expect(await handler.get('fanout-k2')).toBeNull();
+  });
+
   test('stamps are monotonic on real Lua: an older invalidation cannot regress the stamp', async () => {
     const key = 'monotonic';
     const t1 = Date.now();

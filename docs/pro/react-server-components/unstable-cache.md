@@ -114,9 +114,12 @@ How it works, and what to configure:
   **no TTL**: a stamp must outlive every entry it governs, and entry lifetimes are unbounded when
   `revalidate` is `0`.
 - **Set a `volatile-*` eviction policy** (for example `volatile-lru`) on a Redis under memory
-  pressure. Those policies evict only keys with a TTL, so entry blobs remain evictable while stamp
-  keys are never evicted. An `allkeys-*` policy can evict a stamp and silently resurrect entries it
-  had invalidated.
+  pressure. Those policies evict only keys with a TTL, so finite-`revalidate` entry blobs remain
+  evictable while stamp keys are never evicted. An `allkeys-*` policy can evict a stamp and silently
+  resurrect entries it had invalidated. Note that `revalidate: 0` entries also have no TTL, so under
+  a `volatile-*` policy they are never evicted either: size Redis for the full working set of
+  indefinite entries, or Redis at `maxmemory` will start rejecting writes (cache writes and stamp
+  writes degrade to skip-and-warn; reads still work).
 - Stamp keys grow by one small key per distinct invalidated tag (tag names are capped at 256
   characters). Deleting a stamp is safe **only when no entry it governs can still exist**: a deleted
   stamp refuses nothing, so a surviving tagged blob it had invalidated is served again on its next
@@ -149,7 +152,10 @@ How it works, and what to configure:
 
 You can also implement the exported `CacheHandler` interface and register it with
 `registerCacheHandler(kind, handler)`. A handler implements asynchronous `get(key)` and
-`set(key, entry)` methods. `TieredCacheHandler` can compose handlers as L1 and L2 caches.
+`set(key, entry)` methods. `TieredCacheHandler` can compose handlers as L1 and L2 caches — but it
+does not implement `revalidateTag` yet, so tag invalidation does not reach handlers composed inside
+it (storing tagged entries on it logs the once-per-handler warning). Register `RedisCacheHandler`
+directly when you need tag invalidation; `TieredCacheHandler` forwarding is planned.
 
 Custom handlers must enforce the entry lifetime: return `null` from `get` for stale entries based on
 `entry.timestamp` and `entry.revalidate`, or enforce expiry with the storage backend's TTL.
