@@ -246,8 +246,11 @@ export class RedisCacheHandler implements CacheHandler {
       const at = Number.isFinite(invalidatedAt) ? invalidatedAt : Date.now();
       await this.redis.rorpTagStampMax(tagKey(tag), String(at));
     } catch (err) {
-      // Same failure style as get/set: this handler never throws. TTL remains
-      // the correctness floor when Redis is unreachable.
+      // Same failure style as get/set: this handler never throws, and the
+      // write is not retried. For entries with a finite revalidate the Redis
+      // TTL remains the correctness floor; revalidate: 0 entries have no TTL
+      // and rely on Redis being writable at invalidation time (documented as
+      // best-effort in the unstable-cache docs).
       console.warn('[RedisCacheHandler] revalidateTag failed, skipping:', (err as Error).message);
     }
   }

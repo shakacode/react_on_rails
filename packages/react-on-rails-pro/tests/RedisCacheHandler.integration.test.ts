@@ -29,6 +29,7 @@
  */
 
 import IORedis from 'ioredis';
+import type { RedisOptions } from 'ioredis';
 import type { CacheEntry } from '../src/cache/CacheHandler';
 import { RedisCacheHandler } from '../src/cache/RedisCacheHandler';
 
@@ -70,9 +71,18 @@ describeWithRedis('RedisCacheHandler (real Redis)', () => {
     await (handler as any).redis.quit();
   });
 
-  function parseUrl(url: string): { host: string; port: number } {
+  // The handler needs an options object (the URL-string form cannot carry
+  // keyPrefix), so translate the whole URL: dropping db/auth/TLS here would
+  // silently point the handler and the raw client at different databases.
+  function parseUrl(url: string): RedisOptions {
     const parsed = new URL(url);
-    return { host: parsed.hostname, port: Number(parsed.port || 6379) };
+    const opts: RedisOptions = { host: parsed.hostname, port: Number(parsed.port || 6379) };
+    if (parsed.username) opts.username = decodeURIComponent(parsed.username);
+    if (parsed.password) opts.password = decodeURIComponent(parsed.password);
+    const db = parsed.pathname.replace(/^\//, '');
+    if (db) opts.db = Number(db);
+    if (parsed.protocol === 'rediss:') opts.tls = {};
+    return opts;
   }
 
   /** Polls until the raw (prefixed) key disappears or the deadline passes. */
