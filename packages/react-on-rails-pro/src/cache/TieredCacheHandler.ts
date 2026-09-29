@@ -70,12 +70,13 @@ export class TieredCacheHandler implements CacheHandler {
       return Promise.resolve()
         .then(() => revalidateTag.call(layer, tag, invalidatedAt))
         .catch((err: unknown) => {
-          // Message only: raw error objects can carry connection strings, and
-          // console output may be replayed to the browser during RSC renders.
-          console.error(
-            `TieredCacheHandler: ${name} revalidateTag failed:`,
-            err instanceof Error ? err.message : String(err),
-          );
+          // Error class/code only — never the message: connection-error
+          // messages can carry host:port or credentials, and console output
+          // may be replayed to the browser during RSC renders (same policy as
+          // revalidation.ts and RedisCacheHandler.revalidateTag).
+          const label =
+            (err as NodeJS.ErrnoException)?.code ?? (err instanceof Error ? err.name : String(err));
+          console.error(`TieredCacheHandler: ${name} revalidateTag failed:`, label);
         });
     };
     await Promise.all([forward(this.l1, 'L1'), forward(this.l2, 'L2')]);

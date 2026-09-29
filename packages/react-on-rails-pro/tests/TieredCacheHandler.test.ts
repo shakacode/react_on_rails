@@ -165,11 +165,10 @@ describe('TieredCacheHandler', () => {
         expect(l2Spy).toHaveBeenCalledWith('t', 5);
         // Message only — never the raw error object (console output can be
         // replayed to the browser during RSC renders).
-        expect(errorSpy).toHaveBeenCalledWith(
-          expect.stringContaining('L1 revalidateTag failed'),
-          expect.any(String),
-        );
+        expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('L1 revalidateTag failed'), 'Error');
         expect(errorSpy.mock.calls.every((call) => !(call[1] instanceof Error))).toBe(true);
+        // The message ('redis://user:secret@host down') must never reach the log.
+        expect(JSON.stringify(errorSpy.mock.calls)).not.toContain('secret');
 
         errorSpy.mockClear();
         const throwing = {
