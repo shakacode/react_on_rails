@@ -176,8 +176,8 @@ describeWithRedis('RedisCacheHandler (real Redis)', () => {
     };
 
     await handler.set(key, makeEntry({ tags: ['guard-tag'], timestamp: t0 }));
-    const staleHeader = (await raw.getrangeBuffer(`${RUN_PREFIX}${key}`, 0, 12)) as Buffer;
-    expect(staleHeader.length).toBe(13);
+    const staleHeader = (await raw.getrangeBuffer(`${RUN_PREFIX}${key}`, 0, 16)) as Buffer;
+    expect(staleHeader.length).toBe(17); // version + timestamp + revalidate + nonce
 
     const fresh = makeEntry({ tags: ['guard-tag'], timestamp: t0 + 5000 });
     await handler.set(key, fresh);
@@ -189,7 +189,7 @@ describeWithRedis('RedisCacheHandler (real Redis)', () => {
     expect(survivor!.timestamp).toBe(fresh.timestamp);
 
     // Matching header deletes: same call with the CURRENT header removes it.
-    const freshHeader = (await raw.getrangeBuffer(`${RUN_PREFIX}${key}`, 0, 12)) as Buffer;
+    const freshHeader = (await raw.getrangeBuffer(`${RUN_PREFIX}${key}`, 0, 16)) as Buffer;
     expect(await client.rorpDelIfHeaderMatches(key, freshHeader)).toBe(1);
     expect(await raw.exists(`${RUN_PREFIX}${key}`)).toBe(0);
   });

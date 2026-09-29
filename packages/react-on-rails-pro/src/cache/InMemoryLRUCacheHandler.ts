@@ -15,13 +15,24 @@
 
 import type { CacheEntry, CacheHandler } from './CacheHandler.ts';
 
-// eslint-disable-next-line import/prefer-default-export -- designed for named import alongside the interface
+export interface InMemoryLRUCacheHandlerOptions {
+  /**
+   * Cardinality bound for the tag-stamp map (distinct tags ever invalidated in
+   * this process). When exceeded, the valve clears the entire entry cache (see
+   * revalidateTag). Size it above the number of distinct tags your app can
+   * invalidate over a worker's lifetime. Default: 10,000.
+   */
+  maxTrackedTags?: number;
+}
+
 export class InMemoryLRUCacheHandler implements CacheHandler {
-  private static readonly MAX_TRACKED_TAGS = 10_000;
+  private static readonly DEFAULT_MAX_TRACKED_TAGS = 10_000;
 
   private cache = new Map<string, CacheEntry>();
 
   private maxEntries: number;
+
+  private maxTrackedTags: number;
 
   // tag -> epoch-ms of the latest invalidation. Cardinality-bounded by
   // MAX_TRACKED_TAGS (with MAX_TAG_LENGTH from tagValidation.ts, worst case
@@ -34,8 +45,11 @@ export class InMemoryLRUCacheHandler implements CacheHandler {
   // overflow valve safe for renders that were in flight across the clear.
   private tagStampsClearedAt = 0;
 
-  constructor(maxEntries = 1000) {
+  constructor(maxEntries = 1000, options: InMemoryLRUCacheHandlerOptions = {}) {
     this.maxEntries = maxEntries;
+    const { maxTrackedTags = InMemoryLRUCacheHandler.DEFAULT_MAX_TRACKED_TAGS } = options;
+    this.maxTrackedTags =
+      maxTrackedTags > 0 ? maxTrackedTags : InMemoryLRUCacheHandler.DEFAULT_MAX_TRACKED_TAGS;
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await -- CacheHandler interface is async for remote implementations
@@ -99,26 +113,36 @@ export class InMemoryLRUCacheHandler implements CacheHandler {
 
     // Cardinality bound: a safety valve, not a working mode. Dropping a stamp
     // is only safe if every entry it might govern is also unreadable, so
-    // overflow clears the entry cache AND raises the watermark to now OR the
-    // maximum discarded stamp, whichever is later: tagged entries from renders
-    // in flight across the clear stay refused, and a forgotten stamp ahead of
-    // the local clock (the sandbox hook carries origin timestamps, so clock
-    // skew makes those real) keeps governing the entries it covered.
-    if (
-      !this.tagInvalidatedAt.has(tag) &&
-      this.tagInvalidatedAt.size >= InMemoryLRUCacheHandler.MAX_TRACKED_TAGS
-    ) {
+    // overflow clears the entry cache AND raises the watermark to now: tagged
+    // entries from renders in flight across the clear stay refused. Stamps
+    // AHEAD of the local clock (the sandbox hook carries origin timestamps, so
+    // clock skew makes those real) are RETAINED instead of folded into the
+    // watermark — a future watermark would refuse every fresh tagged entry
+    // until the local clock caught up, disabling tagged caching for the whole
+    // skew. Retained future stamps keep governing exactly their own tags.
+    if (!this.tagInvalidatedAt.has(tag) && this.tagInvalidatedAt.size >= this.maxTrackedTags) {
       console.warn(
-        `InMemoryLRUCacheHandler: tag-stamp map exceeded ${InMemoryLRUCacheHandler.MAX_TRACKED_TAGS} entries; ` +
-          'clearing the cache. Reduce tag cardinality or use a shared handler.',
+        `InMemoryLRUCacheHandler: tag-stamp map exceeded ${this.maxTrackedTags} entries; ` +
+          'clearing the cache. Reduce tag cardinality, raise maxTrackedTags, or use a shared handler.',
       );
-      let watermark = Date.now();
-      for (const stamp of this.tagInvalidatedAt.values()) {
-        watermark = Math.max(watermark, stamp);
+      const nowMs = Date.now();
+      const futureStamps = new Map<string, number>();
+      for (const [futureTag, stamp] of this.tagInvalidatedAt) {
+        if (stamp > nowMs) futureStamps.set(futureTag, stamp);
       }
       this.cache.clear();
-      this.tagInvalidatedAt.clear();
-      this.tagStampsClearedAt = Math.max(this.tagStampsClearedAt, watermark);
+      // If retaining future stamps would leave the map at or over the bound
+      // (pathological clock chaos), fall back to a full fold so the valve
+      // still shrinks: watermark absorbs the maximum discarded stamp.
+      if (futureStamps.size >= this.maxTrackedTags) {
+        let watermark = nowMs;
+        for (const stamp of futureStamps.values()) watermark = Math.max(watermark, stamp);
+        this.tagInvalidatedAt.clear();
+        this.tagStampsClearedAt = Math.max(this.tagStampsClearedAt, watermark);
+      } else {
+        this.tagInvalidatedAt = futureStamps;
+        this.tagStampsClearedAt = Math.max(this.tagStampsClearedAt, nowMs);
+      }
     }
 
     const prev = this.tagInvalidatedAt.get(tag);

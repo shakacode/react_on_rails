@@ -16,25 +16,31 @@
 import type { Redis, RedisOptions } from 'ioredis';
 import type { CacheEntry, CacheHandler } from './CacheHandler.ts';
 
-// Serialized-blob format versions. v1 (no version byte) is what every
-// pre-tags package version wrote: [timestamp f64BE (8)] [revalidate i32BE (4)]
-// [chunks]. v2 prepends a version byte and inserts a tag section between the
-// header and the chunks. Sniffing on the first byte is unambiguous: a v1
-// blob's first byte is the top byte of an IEEE-754 float64 epoch-ms timestamp
-// (0x41-0x43 for any plausible date, 0x00 for the fixture value 0, 0x80+ for
-// negatives) and can never be 0x02.
+// Serialized-blob format. v2 is the only format this handler reads or writes:
+// [version 0x02 (1)] [timestamp f64BE (8)] [revalidate i32BE (4)]
+// [nonce u32BE (4)] [tagCount u16BE (2)] [tags: u16BE len + UTF-8]* [chunks]*.
+// The pre-tags v1 format (no version byte) is unreachable by construction —
+// buildCacheKey.ts namespaces keys per format generation ('rorp:rsc-cache:2:'),
+// so v1 blobs live under keys this code never looks up. The version sniff is
+// retained purely as a corruption guard: any first byte other than 0x02 (a v1
+// timestamp's top byte is 0x41-0x43 for real dates, 0x00 for the fixture
+// value 0, 0x80+ for negatives — never 0x02) deserializes to null, a miss.
 const FORMAT_V2 = 0x02;
-const HEADER_V1_SIZE = 12; // 8 (timestamp float64) + 4 (revalidate int32)
-const HEADER_V2_SIZE = 15; // 1 (version) + 8 (timestamp) + 4 (revalidate) + 2 (tagCount)
-// version + timestamp + revalidate: unique per rendered entry (render-start
-// ms), so it guards the conditional delete against racing fresh writes.
-const V2_GUARD_PREFIX_LEN = 13;
-// The v2 tagCount field is a uint16; per-tag byte lengths stay under their own
-// uint16 automatically (tagValidation.ts caps tags at 256 UTF-16 units ≤ 1024
-// UTF-8 bytes), but the tag COUNT is uncapped upstream.
+const HEADER_V2_SIZE = 19; // 1 (version) + 8 (timestamp) + 4 (revalidate) + 4 (nonce) + 2 (tagCount)
+// version + timestamp + revalidate + per-write random nonce: unique per STORED
+// blob (not merely per render-start millisecond), so the conditional delete's
+// guard cannot collide even when two workers re-render the same key in the
+// same millisecond with different tag sets.
+const V2_GUARD_PREFIX_LEN = 17;
+// The v2 tagCount field is a uint16. tagValidation.ts's shared MAX_TAGS_PER_CALL
+// (64) already caps counts far below this at the call site for every handler;
+// this belt-and-braces guard keeps the serializer safe against entries that
+// reach set() without passing validateTags (custom callers of the handler).
 const MAX_V2_TAG_COUNT = 0xffff;
 
-// Parallel to entry keys' 'rorp:rsc-cache:' prefix (buildCacheKey.ts). Tag
+// Parallel to entry keys' 'rorp:rsc-cache:2:' prefix (buildCacheKey.ts). Tag
+// stamps are format-agnostic decimal strings, so they carry no generation
+// segment — stamps written today stay valid across entry-format bumps. Tag
 // keys are passed UNPREFIXED to ioredis; the client's keyPrefix option (which
 // the docs require on shared Redis) prefixes them exactly like entry keys —
 // for MGET and for defineCommand-declared KEYS alike.
@@ -62,7 +68,11 @@ function serialize(entry: CacheEntry): Buffer {
   buf.writeDoubleBE(entry.timestamp, 1);
   const revalidateInt = Number.isFinite(entry.revalidate) ? Math.ceil(entry.revalidate) : 0;
   buf.writeInt32BE(revalidateInt, 9);
-  buf.writeUInt16BE(tags.length, 13);
+  // Anti-collision nonce for the conditional-delete guard, not a secret:
+  // Math.random's ~2^-32 same-value odds only matter when two writes of the
+  // same key also share a millisecond timestamp AND race a delete.
+  buf.writeUInt32BE(Math.floor(Math.random() * 0x1_0000_0000), 13);
+  buf.writeUInt16BE(tags.length, 17);
 
   let offset = HEADER_V2_SIZE;
   for (let i = 0; i < tags.length; i += 1) {
@@ -96,25 +106,13 @@ function deserializeChunks(buf: Buffer, startOffset: number): Buffer[] | null {
   return chunks;
 }
 
-// Today's format, byte for byte: entries written by older package versions.
-// They carry no tags and are never refused by tag checks.
-function deserializeV1(buf: Buffer): CacheEntry | null {
-  if (buf.length < HEADER_V1_SIZE) return null;
-
-  const timestamp = buf.readDoubleBE(0);
-  const revalidate = buf.readInt32BE(8);
-  const chunks = deserializeChunks(buf, HEADER_V1_SIZE);
-  if (!chunks) return null;
-
-  return { value: chunks, revalidate, timestamp };
-}
-
 function deserializeV2(buf: Buffer): CacheEntry | null {
   if (buf.length < HEADER_V2_SIZE) return null;
 
   const timestamp = buf.readDoubleBE(1);
   const revalidate = buf.readInt32BE(9);
-  const tagCount = buf.readUInt16BE(13);
+  // Bytes 13-16 are the per-write nonce: guard-only, never exposed on the entry.
+  const tagCount = buf.readUInt16BE(17);
 
   const tags: string[] = [];
   let offset = HEADER_V2_SIZE;
@@ -138,8 +136,8 @@ function deserializeV2(buf: Buffer): CacheEntry | null {
 }
 
 function deserialize(buf: Buffer): CacheEntry | null {
-  if (buf.length === 0) return null;
-  return buf[0] === FORMAT_V2 ? deserializeV2(buf) : deserializeV1(buf);
+  if (buf.length === 0 || buf[0] !== FORMAT_V2) return null; // corruption guard; see format comment
+  return deserializeV2(buf);
 }
 
 export interface RedisCacheHandlerOptions {
@@ -208,6 +206,27 @@ export class RedisCacheHandler implements CacheHandler {
     this.redis.on('error', (err: Error) => {
       console.error('[RedisCacheHandler] Redis error:', err.message);
     });
+
+    // Best-effort misconfiguration probe: an allkeys-* eviction policy can
+    // evict a no-TTL tag stamp while the entries it invalidated survive,
+    // silently resurrecting stale data — the exact failure this feature
+    // exists to prevent. Warn loudly once; stay silent when CONFIG is
+    // unavailable (managed Redis providers commonly disable it).
+    this.redis.once('ready', () => {
+      void this.redis
+        .config('GET', 'maxmemory-policy')
+        .then((result) => {
+          const policy = Array.isArray(result) ? result[1] : undefined;
+          if (typeof policy === 'string' && policy.startsWith('allkeys-')) {
+            console.warn(
+              `[RedisCacheHandler] maxmemory-policy is "${policy}": under memory pressure Redis may evict ` +
+                'tag-invalidation stamps while cached entries survive, resurrecting stale data. ' +
+                'Use a volatile-* policy or noeviction (see the unstable_cache docs).',
+            );
+          }
+        })
+        .catch(() => {});
+    });
   }
 
   async get(key: string): Promise<CacheEntry | null> {
@@ -225,7 +244,10 @@ export class RedisCacheHandler implements CacheHandler {
         // stamp. '>=': ties refuse (wrong only in the cheap direction).
         const stamps = await this.redis.mget(entry.tags.map(tagKey));
         const refused = stamps.some((s) => {
-          if (s === null) return false;
+          // Number('') and Number('  ') are 0, not NaN — an empty/whitespace
+          // value (external write to this keyspace) must count as "no recorded
+          // stamp", not as an epoch-zero invalidation.
+          if (s === null || s.trim() === '') return false;
           const stamp = Number(s);
           return Number.isFinite(stamp) && stamp >= entry.timestamp;
         });

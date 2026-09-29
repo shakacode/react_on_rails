@@ -352,6 +352,49 @@ describe('unstable_cache tags', () => {
     await expect(nonString()).rejects.toThrow(TypeError);
   });
 
+  test('falsy junk supplied as tags rejects instead of silently caching untagged', async () => {
+    const { handler } = makeSpyHandler();
+    registerCacheHandler('spy-falsy-tags', handler);
+
+    // Only an ABSENT option (undefined/null) means "no tags". An untyped
+    // JavaScript caller or JSON config passing false/0/'' must get the
+    // documented TypeError — silently caching untagged would make later
+    // unstable_revalidateTag calls ineffective for that entry.
+    let renders = 0;
+    for (const junk of [false, 0, '']) {
+      const cached = unstable_cache(
+        async () => {
+          renders += 1;
+          return 'x';
+        },
+        { id: `falsy-tags-${String(junk)}`, kind: 'spy-falsy-tags', tags: junk as unknown as string[] },
+      );
+      // eslint-disable-next-line no-await-in-loop -- sequential assertion per junk variant
+      await expect(cached()).rejects.toThrow(TypeError);
+    }
+    expect(renders).toBe(0); // validation fails before the render runs
+  });
+
+  test('more than MAX_TAGS_PER_CALL distinct tags rejects before the render', async () => {
+    const { handler } = makeSpyHandler();
+    registerCacheHandler('spy-many-tags', handler);
+
+    let renders = 0;
+    const cached = unstable_cache(
+      async () => {
+        renders += 1;
+        return 'x';
+      },
+      {
+        id: 'many-tags',
+        kind: 'spy-many-tags',
+        tags: Array.from({ length: 65 }, (_v, i) => `t${i}`),
+      },
+    );
+    await expect(cached()).rejects.toThrow(/at most 64 distinct tags/);
+    expect(renders).toBe(0);
+  });
+
   test('without tags (or with empty tags) the stored entry has no tags field', async () => {
     const { handler, setCalls, waitForStores } = makeSpyHandler();
     registerCacheHandler('spy-tagless', handler);

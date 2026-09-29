@@ -48,11 +48,15 @@ export async function revalidateTagsAt(tags: string | string[], invalidatedAt: n
         Promise.resolve()
           .then(() => revalidateTag.call(handler, tag, at))
           .catch((err: unknown) => {
-            // Do not log tag values: application-provided, possibly large or
-            // identifying. The handler's constructor name locates the culprit.
+            // Do not log tag values (application-provided, possibly large or
+            // identifying) and do not log the raw error object: server-side
+            // console output during an RSC render can be replayed into the
+            // browser console, and a storage error's stack/message can carry
+            // connection details. The handler's constructor name plus the
+            // error MESSAGE locate the culprit.
             console.error(
-              `unstable_revalidateTag: ${handler.constructor?.name ?? 'handler'} failed for 1 of ${list.length} tag(s)`,
-              err,
+              `unstable_revalidateTag: ${handler.constructor?.name ?? 'handler'} failed for 1 of ${list.length} tag(s):`,
+              err instanceof Error ? err.message : String(err),
             );
           }),
       );

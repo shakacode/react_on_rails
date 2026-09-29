@@ -171,43 +171,74 @@ describe('InMemoryLRUCacheHandler', () => {
       expect(await handler.get('old')).toBeNull();
     });
 
-    test('overflow valve: warns once, clears, and the watermark refuses everything a discarded stamp governed', async () => {
+    test('overflow valve: clears + watermark, retains future stamps, serves fresh unrelated entries', async () => {
       const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
       try {
+        // Small configurable bound (also pins the maxTrackedTags option).
+        const small = new InMemoryLRUCacheHandler(1000, { maxTrackedTags: 3 });
+
         // A stamp ahead of the local clock (the sandbox hook carries origin
-        // timestamps, so cross-machine clock skew makes these real) is about
-        // to be discarded by the clear; the watermark must absorb it.
+        // timestamps, so cross-machine clock skew makes these real). The valve
+        // must RETAIN it rather than fold it into the watermark — a future
+        // watermark would refuse every fresh tagged entry until the local
+        // clock caught up.
         const futureStamp = Date.now() + 1_000_000;
-        await handler.revalidateTag!('T', futureStamp);
-        await handler.set('preexisting', makeEntry());
+        await small.revalidateTag!('T', futureStamp);
+        await small.set('preexisting', makeEntry());
 
-        // MAX_TRACKED_TAGS is 10_000; one more distinct tag trips the valve.
-        for (let i = 0; i <= 10_000; i += 1) {
-          await handler.revalidateTag!(`bulk-${i}`); // eslint-disable-line no-await-in-loop
-        }
+        await small.revalidateTag!('a');
+        await small.revalidateTag!('b'); // map at the bound (3 tags)
+        await small.revalidateTag!('c'); // a NEW tag past the bound trips the valve
 
-        // One warning; the whole entry cache is gone along with the stamps.
         expect(warnSpy).toHaveBeenCalledTimes(1);
-        expect(warnSpy.mock.calls[0][0]).toContain('tag-stamp map exceeded');
-        expect(await handler.get('preexisting')).toBeNull();
+        expect(warnSpy.mock.calls[0][0]).toContain('tag-stamp map exceeded 3');
+        expect(await small.get('preexisting')).toBeNull();
 
-        // A tagged render in flight across the clear (started before it,
-        // stored after it): its stamp is gone, only the watermark refuses it.
-        await handler.set('inflight', makeEntry({ timestamp: Date.now() - 60_000, tags: ['T'] }));
-        expect(await handler.get('inflight')).toBeNull();
+        // A tagged render in flight across the clear, governed by a DISCARDED
+        // stamp ('a'): only the watermark refuses it now.
+        await small.set('inflight', makeEntry({ timestamp: Date.now() - 60_000, tags: ['a'] }));
+        expect(await small.get('inflight')).toBeNull();
 
-        // Still governed by the DISCARDED future stamp: a Date.now()-only
-        // watermark would serve this.
-        await handler.set('governed', makeEntry({ timestamp: Date.now() + 1000, tags: ['T'] }));
-        expect(await handler.get('governed')).toBeNull();
+        // The RETAINED future stamp still governs its own tag.
+        await small.set('governed', makeEntry({ timestamp: Date.now() + 1000, tags: ['T'] }));
+        expect(await small.get('governed')).toBeNull();
 
-        // Above the watermark: served — the valve refuses more, never forever.
-        await handler.set('fresh', makeEntry({ timestamp: futureStamp + 1, tags: ['T'] }));
-        expect(await handler.get('fresh')).not.toBeNull();
+        // Fresh entry with an UNRELATED tag rendered after the clear: served.
+        // (Folding the future stamp into the watermark would refuse this and
+        // disable tagged caching for the whole skew window.)
+        await small.set('freshUnrelated', makeEntry({ timestamp: Date.now() + 50, tags: ['unrelated'] }));
+        expect(await small.get('freshUnrelated')).not.toBeNull();
 
-        // An untagged entry ignores the watermark entirely.
-        await handler.set('untagged', makeEntry({ timestamp: 5 }));
-        expect(await handler.get('untagged')).not.toBeNull();
+        // Beyond the retained stamp: served — the valve refuses more, never forever.
+        await small.set('fresh', makeEntry({ timestamp: futureStamp + 1, tags: ['T'] }));
+        expect(await small.get('fresh')).not.toBeNull();
+
+        // An untagged entry ignores stamps and watermark entirely.
+        await small.set('untagged', makeEntry({ timestamp: 5 }));
+        expect(await small.get('untagged')).not.toBeNull();
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
+    test('overflow valve fallback: all-future stamps fold into the watermark so the map still shrinks', async () => {
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        const small = new InMemoryLRUCacheHandler(1000, { maxTrackedTags: 2 });
+        const f1 = Date.now() + 500_000;
+        const f2 = Date.now() + 1_000_000;
+        await small.revalidateTag!('f1', f1);
+        await small.revalidateTag!('f2', f2); // at the bound, both future
+        await small.revalidateTag!('t3'); // trips; retaining both would not shrink
+
+        // Degraded-but-safe: the watermark absorbed the maximum discarded
+        // stamp, so anything either stamp governed stays refused...
+        await small.set('covered', makeEntry({ timestamp: f2 - 1, tags: ['f1'] }));
+        expect(await small.get('covered')).toBeNull();
+        // ...at the cost of refusing fresh tagged entries until f2 passes
+        // (pathological clock chaos only). Untagged entries are unaffected.
+        await small.set('untagged', makeEntry({ timestamp: 5 }));
+        expect(await small.get('untagged')).not.toBeNull();
       } finally {
         warnSpy.mockRestore();
       }
