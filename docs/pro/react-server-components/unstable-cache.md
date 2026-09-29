@@ -36,10 +36,42 @@ The options are:
   expire the entry by time.
 - `kind`: the registered cache-handler name. The default is `default`, which uses an in-memory LRU
   cache in each Node Renderer worker.
+- `tags`: invalidation labels stored on each entry, for use with
+  [`unstable_revalidateTag`](#invalidate-by-tag-javascript). Pass a static array, or a function of the
+  cached function's arguments — `tags: ({ productId }) => ['products', 'product-' + productId]` — when
+  the tags depend on which entity is being rendered. Tags must be non-empty strings of at most 256
+  characters, and an invalidation matches a stored tag byte-for-byte: the string you invalidate must be
+  exactly the string you stored.
 
 The cache key includes the build ID, function ID, and function arguments. Arguments must use the
 supported deterministic value types. Supported built-in instances include `Date`, `Map`, and `Set`.
 Circular references, functions, symbols, and arbitrary custom class instances are not supported.
+
+Entries are timestamped when their render **starts**, not when the finished payload is stored. For
+handlers that enforce expiry from `entry.timestamp` (the default in-memory handler, and any custom
+handler that does the same), the effective lifetime therefore shrinks by however long the render took.
+`RedisCacheHandler` is unaffected: its Redis-side `EX` TTL starts when the entry is stored.
+
+## Invalidate by Tag (JavaScript)
+
+`unstable_revalidateTag(tags)` invalidates every cached entry that carries any of the given tags, on
+every registered cache handler that supports invalidation:
+
+```tsx
+import { unstable_revalidateTag } from 'react-on-rails-pro/cache';
+
+await unstable_revalidateTag('products'); // one tag, or an array of tags
+```
+
+Invalidation is **mark-stale**, not delete: handlers remember when each tag was last invalidated and
+refuse any entry whose render started at or before that instant, so an invalidation that lands while a
+render is in flight also covers the entry that render stores afterward. Like the entry's `tags`, the
+call takes no timestamp — the invalidation time is always "now".
+
+At this stage the call reaches only the process that makes it (the Node Renderer worker running your
+RSC bundle), and only cache handlers that implement the optional `revalidateTag` method — currently
+the default in-memory handler. Storing tagged entries on a handler without `revalidateTag` logs a
+warning once per handler; the entries keep their tags, so a handler upgrade honors them later.
 
 ## Use Shared Storage
 
@@ -71,11 +103,27 @@ Custom handlers must enforce the entry lifetime: return `null` from `get` for st
 `entry.timestamp` and `entry.revalidate`, or enforce expiry with the storage backend's TTL.
 `unstable_cache` replays any non-null entry returned by `get`; it does not check expiry itself.
 
+A custom handler may also implement the optional `revalidateTag(tag, invalidatedAt?)` method to
+support tag invalidation. The contract:
+
+1. An entry with no `tags` is never refused by a tag check.
+2. An entry is refused if and only if any of its tags has a **recorded** invalidation with
+   `invalidatedAt >= entry.timestamp` — a tag that was never invalidated refuses nothing, and ties
+   refuse (an invalidation in the same millisecond as the render start refuses the entry).
+3. `revalidateTag` keeps the **maximum** invalidation time seen per tag; it never moves a recorded
+   time backwards, and it treats a non-finite `invalidatedAt` as now.
+4. `revalidateTag` on a tag with no matching entries still records the invalidation time: a render
+   for that tag may already be in flight, and the recorded time is what refuses the entry it stores.
+
 ## Invalidation Limits
 
-The RSC cache API does not currently provide tag-based invalidation. In particular, it does not
-export `unstable_revalidateTag`, expose a Node Renderer tag-invalidation endpoint, or provide a Ruby
-`ReactOnRailsPro::RSCCache` bridge. The `CacheHandler` interface also has no delete method.
+Tag-based invalidation currently works only from JavaScript, and only within one process:
+`unstable_revalidateTag` reaches the cache handlers registered in the worker that calls it. There is
+no Node Renderer tag-invalidation endpoint and no Ruby `ReactOnRailsPro::RSCCache` bridge yet, so a
+Rails-side write cannot invalidate JavaScript `unstable_cache` entries, and in a multi-worker
+deployment each worker's in-memory cache is invalidated independently. `RedisCacheHandler` does not
+implement `revalidateTag` yet (entries round-tripped through Redis also come back without their
+tags), and the `CacheHandler` interface has no delete method.
 
 Use a finite `revalidate` interval when data can change. Include all data that distinguishes the
 rendered result in the cached function arguments. The build ID comes from the RSC artifact ID
