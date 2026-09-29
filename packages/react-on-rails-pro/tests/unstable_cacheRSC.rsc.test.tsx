@@ -232,6 +232,22 @@ describe('unstable_cache', () => {
   });
 });
 
+/**
+ * Deterministic wait: the cache store runs asynchronously after the cached
+ * call returns, so poll for its observable effect instead of a fixed sleep
+ * (which is scheduler-dependent and flaky on slow runners).
+ */
+async function waitFor(condition: () => boolean, timeoutMs = 5000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!condition()) {
+    if (Date.now() > deadline) throw new Error('waitFor: condition not met in time');
+    // eslint-disable-next-line no-await-in-loop
+    await new Promise((resolve) => {
+      setTimeout(resolve, 5);
+    });
+  }
+}
+
 /** Handler that records set() calls and supports revalidateTag. */
 function makeSpyHandler() {
   const setCalls: [string, CacheEntry][] = [];
@@ -245,7 +261,7 @@ function makeSpyHandler() {
     // eslint-disable-next-line @typescript-eslint/require-await
     revalidateTag: async () => {},
   };
-  return { handler, setCalls };
+  return { handler, setCalls, waitForStores: (n: number) => waitFor(() => setCalls.length >= n) };
 }
 
 describe('unstable_cache tags', () => {
@@ -254,7 +270,7 @@ describe('unstable_cache tags', () => {
   });
 
   test('static tags are stored on the entry, deduped', async () => {
-    const { handler, setCalls } = makeSpyHandler();
+    const { handler, setCalls, waitForStores } = makeSpyHandler();
     registerCacheHandler('spy-static-tags', handler);
 
     const cachedFn = unstable_cache(async () => 'tagged', {
@@ -263,14 +279,14 @@ describe('unstable_cache tags', () => {
       tags: ['x', 'y', 'x'],
     });
     await cachedFn();
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await waitForStores(1);
 
     expect(setCalls).toHaveLength(1);
     expect(setCalls[0][1].tags).toEqual(['x', 'y']);
   });
 
   test('function-form tags see the call arguments', async () => {
-    const { handler, setCalls } = makeSpyHandler();
+    const { handler, setCalls, waitForStores } = makeSpyHandler();
     registerCacheHandler('spy-fn-tags', handler);
 
     const cachedFn = unstable_cache(async (productId: number) => `Product ${productId}`, {
@@ -280,7 +296,7 @@ describe('unstable_cache tags', () => {
     });
     await cachedFn(1);
     await cachedFn(2);
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await waitForStores(2);
 
     expect(setCalls).toHaveLength(2);
     expect(setCalls[0][1].tags).toEqual(['product-1', 'products']);
@@ -340,7 +356,7 @@ describe('unstable_cache tags', () => {
   });
 
   test('without tags (or with empty tags) the stored entry has no tags field', async () => {
-    const { handler, setCalls } = makeSpyHandler();
+    const { handler, setCalls, waitForStores } = makeSpyHandler();
     registerCacheHandler('spy-tagless', handler);
 
     const tagless = unstable_cache(async () => 'a', { id: 'tagless', kind: 'spy-tagless' });
@@ -353,7 +369,7 @@ describe('unstable_cache tags', () => {
     await tagless();
     await emptyTags();
     await emptyFn();
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await waitForStores(3);
 
     expect(setCalls).toHaveLength(3);
     for (const [, entry] of setCalls) {
@@ -362,7 +378,7 @@ describe('unstable_cache tags', () => {
   });
 
   test('entries are stamped at render start, not store time', async () => {
-    const { handler, setCalls } = makeSpyHandler();
+    const { handler, setCalls, waitForStores } = makeSpyHandler();
     registerCacheHandler('spy-stamping', handler);
 
     let releaseRender!: () => void;
@@ -388,12 +404,12 @@ describe('unstable_cache tags', () => {
         setTimeout(resolve, 0);
       });
       // ...then everything after the render start happens at t=5_000.
+      // (waitFor's deadline uses the mocked clock and so never fires here;
+      // Jest's own test timeout covers a pathological hang.)
       nowSpy.mockReturnValue(5_000);
       releaseRender();
       await resultPromise;
-      await new Promise((resolve) => {
-        setTimeout(resolve, 50);
-      });
+      await waitForStores(1);
 
       expect(setCalls).toHaveLength(1);
       expect(setCalls[0][1].timestamp).toBe(1_000);
@@ -444,9 +460,14 @@ describe('tag invalidation end-to-end (the in-flight race)', () => {
     resetCacheHandlersForTesting();
   });
 
-  /** Cached function whose render blocks on a gate the test controls. */
+  /**
+   * Cached function whose render blocks on a gate the test controls, backed
+   * by a real in-memory handler wrapped so completed stores are observable
+   * (a fixed sleep before asserting would be scheduler-dependent).
+   */
   function makeGatedCachedFn(id: string) {
     let renderCount = 0;
+    let storeCount = 0;
     let releaseRender!: () => void;
     let signalStarted!: () => void;
     const started = new Promise<void>((resolve) => {
@@ -456,6 +477,17 @@ describe('tag invalidation end-to-end (the in-flight race)', () => {
       releaseRender = resolve;
     });
 
+    const inner = new InMemoryLRUCacheHandler();
+    const recording: CacheHandler = {
+      get: (key) => inner.get(key),
+      set: async (key, entry) => {
+        await inner.set(key, entry);
+        storeCount += 1;
+      },
+      revalidateTag: (tag, invalidatedAt) => inner.revalidateTag(tag, invalidatedAt),
+    };
+    registerCacheHandler(`gated-${id}`, recording);
+
     const cachedFn = unstable_cache(
       async () => {
         renderCount += 1;
@@ -463,7 +495,7 @@ describe('tag invalidation end-to-end (the in-flight race)', () => {
         await gate;
         return `render-${renderCount}`;
       },
-      { id, tags: ['race-tag'] },
+      { id, kind: `gated-${id}`, tags: ['race-tag'] },
     );
 
     return {
@@ -471,11 +503,12 @@ describe('tag invalidation end-to-end (the in-flight race)', () => {
       started,
       releaseRender,
       getRenderCount: () => renderCount,
+      waitForStores: (n: number) => waitFor(() => storeCount >= n),
     };
   }
 
   test('a tag invalidated during an in-flight render refuses the entry that render stores', async () => {
-    const { cachedFn, started, releaseRender, getRenderCount } = makeGatedCachedFn('race');
+    const { cachedFn, started, releaseRender, getRenderCount, waitForStores } = makeGatedCachedFn('race');
 
     const firstCall = cachedFn();
     await started;
@@ -484,20 +517,20 @@ describe('tag invalidation end-to-end (the in-flight race)', () => {
     await unstable_revalidateTag('race-tag');
     releaseRender();
     await firstCall;
-    await new Promise((resolve) => setTimeout(resolve, 50)); // let the store settle
+    await waitForStores(1);
 
     await cachedFn();
     expect(getRenderCount()).toBe(2);
   });
 
   test('control: without the invalidation the next call is a cache HIT', async () => {
-    const { cachedFn, started, releaseRender, getRenderCount } = makeGatedCachedFn('race-control');
+    const { cachedFn, started, releaseRender, getRenderCount, waitForStores } = makeGatedCachedFn('race-control');
 
     const firstCall = cachedFn();
     await started;
     releaseRender();
     await firstCall;
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await waitForStores(1);
 
     await cachedFn();
     expect(getRenderCount()).toBe(1);
