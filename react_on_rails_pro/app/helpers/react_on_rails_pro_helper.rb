@@ -937,6 +937,11 @@ module ReactOnRailsProHelper
       "helper renders fresh. Fix content_security_policy_nonce_generator to emit only [A-Za-z0-9+/_-] characters " \
       "with optional trailing '=' padding."
     )
+  rescue StandardError
+    # This warn sits on the malformed/poison-nonce degradation path, so it must not
+    # itself defeat fail-open (nil or raising custom logger, a non-String generator
+    # return raising in #to_s). The once-flag latches before logging — no retry loop.
+    nil
   end
 
   # Nothing in the issue-#5021 nonce machinery is allowed to fail a request: detection
