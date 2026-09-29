@@ -230,3 +230,210 @@ describe('unstable_cache', () => {
     consoleSpy.mockRestore();
   });
 });
+
+/** Handler that records set() calls and supports revalidateTag. */
+function makeSpyHandler() {
+  const setCalls: [string, CacheEntry][] = [];
+  const handler: CacheHandler = {
+    // eslint-disable-next-line @typescript-eslint/require-await
+    get: async () => null,
+    // eslint-disable-next-line @typescript-eslint/require-await
+    set: async (key: string, entry: CacheEntry) => {
+      setCalls.push([key, entry]);
+    },
+    // eslint-disable-next-line @typescript-eslint/require-await
+    revalidateTag: async () => {},
+  };
+  return { handler, setCalls };
+}
+
+describe('unstable_cache tags', () => {
+  beforeEach(() => {
+    registerCacheHandler('default', new InMemoryLRUCacheHandler());
+  });
+
+  test('static tags are stored on the entry, deduped', async () => {
+    const { handler, setCalls } = makeSpyHandler();
+    registerCacheHandler('spy-static-tags', handler);
+
+    const cachedFn = unstable_cache(async () => 'tagged', {
+      id: 'static-tags',
+      kind: 'spy-static-tags',
+      tags: ['x', 'y', 'x'],
+    });
+    await cachedFn();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(setCalls).toHaveLength(1);
+    expect(setCalls[0][1].tags).toEqual(['x', 'y']);
+  });
+
+  test('function-form tags see the call arguments', async () => {
+    const { handler, setCalls } = makeSpyHandler();
+    registerCacheHandler('spy-fn-tags', handler);
+
+    const cachedFn = unstable_cache(async (productId: number) => `Product ${productId}`, {
+      id: 'fn-tags',
+      kind: 'spy-fn-tags',
+      tags: (productId) => [`product-${productId}`, 'products'],
+    });
+    await cachedFn(1);
+    await cachedFn(2);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(setCalls).toHaveLength(2);
+    expect(setCalls[0][1].tags).toEqual(['product-1', 'products']);
+    expect(setCalls[1][1].tags).toEqual(['product-2', 'products']);
+  });
+
+  test('a throwing tags function rejects before the render and never strands concurrent callers', async () => {
+    const { handler } = makeSpyHandler();
+    registerCacheHandler('spy-throwing-tags', handler);
+
+    let renderCount = 0;
+    let tagCalls = 0;
+    const cachedFn = unstable_cache(
+      async () => {
+        renderCount += 1;
+        return 'rendered';
+      },
+      {
+        id: 'throwing-tags',
+        kind: 'spy-throwing-tags',
+        tags: () => {
+          tagCalls += 1;
+          if (tagCalls === 1) throw new Error('bad tags');
+          return ['t'];
+        },
+      },
+    );
+
+    // The throw propagates before originalFn runs and BEFORE the in-flight
+    // marker is installed. With marker-first ordering this test hangs: the
+    // second call would wait forever on a promise nobody resolves.
+    await expect(cachedFn()).rejects.toThrow('bad tags');
+    expect(renderCount).toBe(0);
+
+    const result = await cachedFn();
+    expect(String(result)).toBe('rendered');
+    expect(renderCount).toBe(1);
+  });
+
+  test('invalid tag values throw TypeError', async () => {
+    const { handler } = makeSpyHandler();
+    registerCacheHandler('spy-invalid-tags', handler);
+
+    const tooLong = unstable_cache(async () => 'x', {
+      id: 'too-long-tag',
+      kind: 'spy-invalid-tags',
+      tags: ['a'.repeat(257)],
+    });
+    await expect(tooLong()).rejects.toThrow(TypeError);
+
+    const nonString = unstable_cache(async () => 'x', {
+      id: 'non-string-tag',
+      kind: 'spy-invalid-tags',
+      tags: [42 as unknown as string],
+    });
+    await expect(nonString()).rejects.toThrow(TypeError);
+  });
+
+  test('without tags (or with empty tags) the stored entry has no tags field', async () => {
+    const { handler, setCalls } = makeSpyHandler();
+    registerCacheHandler('spy-tagless', handler);
+
+    const tagless = unstable_cache(async () => 'a', { id: 'tagless', kind: 'spy-tagless' });
+    const emptyTags = unstable_cache(async () => 'b', { id: 'empty-tags', kind: 'spy-tagless', tags: [] });
+    const emptyFn = unstable_cache(async () => 'c', {
+      id: 'empty-fn-tags',
+      kind: 'spy-tagless',
+      tags: () => [],
+    });
+    await tagless();
+    await emptyTags();
+    await emptyFn();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(setCalls).toHaveLength(3);
+    for (const [, entry] of setCalls) {
+      expect(entry).not.toHaveProperty('tags');
+    }
+  });
+
+  test('entries are stamped at render start, not store time', async () => {
+    const { handler, setCalls } = makeSpyHandler();
+    registerCacheHandler('spy-stamping', handler);
+
+    let releaseRender!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      releaseRender = resolve;
+    });
+
+    // Scripted clock — a real-sleep + epsilon variant is scheduler-dependent
+    // and could let store-time stamping pass; the mock cannot.
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(1_000);
+    try {
+      const cachedFn = unstable_cache(
+        async () => {
+          await gate;
+          return 'slow';
+        },
+        { id: 'stamping', kind: 'spy-stamping' },
+      );
+
+      const resultPromise = cachedFn();
+      // Let cachedFn reach the render (it blocks on the gate) at t=1_000...
+      await new Promise((resolve) => {
+        setTimeout(resolve, 0);
+      });
+      // ...then everything after the render start happens at t=5_000.
+      nowSpy.mockReturnValue(5_000);
+      releaseRender();
+      await resultPromise;
+      await new Promise((resolve) => {
+        setTimeout(resolve, 50);
+      });
+
+      expect(setCalls).toHaveLength(1);
+      expect(setCalls[0][1].timestamp).toBe(1_000);
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
+  test('storing tagged entries on a handler without revalidateTag warns once per handler instance', async () => {
+    const makeLackingHandler = (): CacheHandler => ({
+      // eslint-disable-next-line @typescript-eslint/require-await
+      get: async () => null,
+      // eslint-disable-next-line @typescript-eslint/require-await
+      set: async () => {},
+    });
+
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      registerCacheHandler('no-reval', makeLackingHandler());
+
+      // Empty resolved tags never warn.
+      await unstable_cache(async () => 'a', { id: 'w-empty', kind: 'no-reval', tags: [] })();
+      expect(warnSpy).not.toHaveBeenCalled();
+
+      // Non-empty tags warn, once...
+      await unstable_cache(async () => 'b', { id: 'w-1', kind: 'no-reval', tags: ['t'] })();
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(warnSpy.mock.calls[0][0]).toContain('"no-reval"');
+      expect(warnSpy.mock.calls[0][0]).toContain('revalidateTag');
+
+      // ...and a second cached function on the SAME handler instance stays quiet.
+      await unstable_cache(async () => 'c', { id: 'w-2', kind: 'no-reval', tags: ['u'] })();
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+
+      // A DIFFERENT handler instance under the same kind warns again
+      // (suppression is per instance, not per kind).
+      registerCacheHandler('no-reval', makeLackingHandler());
+      await unstable_cache(async () => 'd', { id: 'w-3', kind: 'no-reval', tags: ['v'] })();
+      expect(warnSpy).toHaveBeenCalledTimes(2);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+});
