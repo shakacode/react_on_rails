@@ -47,15 +47,6 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   release to install. [PR 5094](https://github.com/shakacode/react_on_rails/pull/5094) by
   [justin808](https://github.com/justin808).
 
-#### Changed
-
-- **[Pro]** **RSC cache entries are now timestamped at render start** (was: at store time), so a tag
-  invalidation during an in-flight render correctly refuses the entry that render stores. For handlers
-  that enforce expiry from the entry timestamp (the in-memory handler), effective TTL shrinks by the
-  render duration; `RedisCacheHandler`'s Redis-side `EX` TTL is unchanged.
-  [PR 5122](https://github.com/shakacode/react_on_rails/pull/5122) by
-  [AbanoubGhadban](https://github.com/AbanoubGhadban).
-
 #### Fixed
 
 - **[Pro]** **RSC streams no longer encode consumer logs into the Flight payload**: React 19.3 development
@@ -210,6 +201,12 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Changed
 
+- **[Pro]** **RSC cache entries are now timestamped at render start** (was: at store time), so a tag
+  invalidation during an in-flight render correctly refuses the entry that render stores. For handlers
+  that enforce expiry from the entry timestamp (the in-memory handler), effective TTL shrinks by the
+  render duration; `RedisCacheHandler`'s Redis-side `EX` TTL is unchanged.
+  [PR 5122](https://github.com/shakacode/react_on_rails/pull/5122) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
 - **[Pro]** **License**: React on Rails Pro moves to The React on Rails Pro License 3.0, an application of ShakaCode
   Trust-Based Commercial Licensing that matches ShakaPerf: free in production for small organizations, charities,
   educational institutions, and hospitals; 45-day production evaluation; 30-day grace after a subscription lapses;

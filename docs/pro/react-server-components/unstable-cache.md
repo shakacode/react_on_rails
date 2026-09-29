@@ -114,6 +114,10 @@ support tag invalidation. The contract:
    time backwards, and it treats a non-finite `invalidatedAt` as now.
 4. `revalidateTag` on a tag with no matching entries still records the invalidation time: a render
    for that tag may already be in flight, and the recorded time is what refuses the entry it stores.
+5. A handler that copies or forwards entries (for example between cache tiers) must not move a
+   tagged entry's `timestamp` forward in transit — the timestamp is what invalidation is judged
+   against, so re-stamping lets the entry evade a recorded invalidation. Either preserve the
+   original `timestamp`, or drop the `tags` field when re-stamping.
 
 ## Invalidation Limits
 
