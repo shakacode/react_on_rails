@@ -36,6 +36,15 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [justin808](https://github.com/justin808). Fixes
   [Issue 4880](https://github.com/shakacode/react_on_rails/issues/4880).
 
+- **[Pro]** **Tag-based invalidation groundwork for the RSC cache**: `unstable_cache` accepts a
+  `tags` option (a static array, or a function of the call's arguments), the `CacheHandler` interface
+  gains an optional `revalidateTag(tag, invalidatedAt?)` method, the in-memory handler implements it
+  with mark-stale semantics, and `unstable_revalidateTag` is exported from `react-on-rails-pro/cache`.
+  Invalidation is per-process at this stage; the Node Renderer endpoint and Rails bridge land
+  separately. Part of [Issue 5077](https://github.com/shakacode/react_on_rails/issues/5077).
+  [PR 5122](https://github.com/shakacode/react_on_rails/pull/5122) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 #### Added
 
 - **[Pro]** **React 19.3 support with `react-on-rails-rsc@19.3.1-rc.0`**: The node renderer startup
@@ -125,6 +134,13 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   the newer `router._serverResult` API (>=1.170.19) are supported.
   Fixes [#5125](https://github.com/shakacode/react_on_rails/issues/5125).
   [PR 5224](https://github.com/shakacode/react_on_rails/pull/5224).
+
+- **[Pro]** **RSC cache entries are now timestamped at render start** (was: at store time), so a tag
+  invalidation during an in-flight render correctly refuses the entry that render stores. For handlers
+  that enforce expiry from the entry timestamp (the in-memory handler), effective TTL shrinks by the
+  render duration; `RedisCacheHandler`'s Redis-side `EX` TTL is unchanged.
+  [PR 5122](https://github.com/shakacode/react_on_rails/pull/5122) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 #### Fixed
 
