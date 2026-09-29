@@ -30,6 +30,18 @@ function makeEntry(overrides: Partial<CacheEntry> = {}): CacheEntry {
   };
 }
 
+async function waitFor(cond: () => Promise<boolean>, timeoutMs = 1000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  /* eslint-disable no-await-in-loop -- polling helper */
+  while (Date.now() < deadline) {
+    if (await cond()) return;
+    await new Promise((resolve) => {
+      setTimeout(resolve, 5);
+    });
+  }
+  /* eslint-enable no-await-in-loop */
+}
+
 describe('TieredCacheHandler', () => {
   let l1: InMemoryLRUCacheHandler;
   let l2: InMemoryLRUCacheHandler;
@@ -206,7 +218,71 @@ describe('TieredCacheHandler', () => {
       const entry = makeEntry({ timestamp: Date.now() - 5_000, revalidate: 60 });
       await l2.set('key', entry);
       await tiered.get('key');
+      // Promotion is fire-and-forget (void this.l1.set(...)), so poll instead
+      // of asserting immediately — a future await inside a handler's set()
+      // must not turn this into a flake.
+      await waitFor(async () => (await l1.get('key')) !== null);
       expect(await l1.get('key')).not.toBeNull();
+    });
+
+    test('mixed composition, blind L1: tagged entries skip L1, invalidation works through the composite', async () => {
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        const blindL1 = new Map<string, CacheEntry>();
+        const bare = {
+          get: jest.fn((k: string) => Promise.resolve(blindL1.get(k) ?? null)),
+          set: jest.fn((k: string, e: CacheEntry) => {
+            blindL1.set(k, e);
+            return Promise.resolve();
+          }),
+        };
+        const composed = new TieredCacheHandler(bare, l2);
+        expect(typeof composed.revalidateTag).toBe('function'); // claims support (L2 sees)
+
+        const t0 = Date.now() - 1000;
+        await composed.set('key', makeEntry({ timestamp: t0, revalidate: 0, tags: ['t'] }));
+        // The blind layer must never hold a tagged entry...
+        expect(bare.set).not.toHaveBeenCalled();
+        expect(warnSpy).toHaveBeenCalledTimes(1); // once per instance
+        await composed.set('key2', makeEntry({ timestamp: t0, revalidate: 0, tags: ['t'] }));
+        expect(warnSpy).toHaveBeenCalledTimes(1);
+        // ...while untagged entries still reach it.
+        await composed.set('plain', makeEntry({ timestamp: t0, revalidate: 0 }));
+        expect(bare.set).toHaveBeenCalledTimes(1);
+
+        // The headline regression: get-after-invalidation through the composite.
+        expect(await composed.get('key')).not.toBeNull();
+        await composed.revalidateTag!('t', Date.now());
+        expect(await composed.get('key')).toBeNull();
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
+    test('mixed composition, blind L2: tagged entries skip L2 and stay refusable via L1', async () => {
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        const blindStore = new Map<string, CacheEntry>();
+        const bareL2 = {
+          get: jest.fn((k: string) => Promise.resolve(blindStore.get(k) ?? null)),
+          set: jest.fn((k: string, e: CacheEntry) => {
+            blindStore.set(k, e);
+            return Promise.resolve();
+          }),
+        };
+        const composed = new TieredCacheHandler(l1, bareL2);
+
+        const t0 = Date.now() - 1000;
+        await composed.set('key', makeEntry({ timestamp: t0, revalidate: 0, tags: ['t'] }));
+        expect(bareL2.set).not.toHaveBeenCalled();
+
+        expect(await composed.get('key')).not.toBeNull();
+        await composed.revalidateTag!('t', Date.now());
+        // L1 refuses; the blind L2 holds nothing to fall back to.
+        expect(await composed.get('key')).toBeNull();
+      } finally {
+        warnSpy.mockRestore();
+      }
     });
 
     test('set() writes tagged entries to BOTH layers with the original timestamp', async () => {

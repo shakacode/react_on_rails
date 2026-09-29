@@ -40,11 +40,13 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   `unstable_revalidateTag` call is now visible to every worker and machine sharing the Redis.
   `TieredCacheHandler` forwards `revalidateTag` to both layers (tagged entries are not promoted from
   L2 into L1; see the docs). Entries written by pre-tags package versions live under a different key
-  namespace and are never read after the upgrade; they expire via their own TTLs (`revalidate: 0`
-  leftovers can be deleted manually — see the migration note in the
-  [unstable_cache docs](https://reactonrails.com/docs/pro/react-server-components/unstable-cache)).
-  Requires a `volatile-*` eviction policy for full correctness; the handler warns on connect when it
-  detects an `allkeys-*` policy. Part of
+  namespace and are never read after the upgrade; they expire via their own TTLs.
+  **Action required for upgraders:** on a shared Redis, (1) set a `volatile-*` eviction policy —
+  under `allkeys-*`, eviction can drop invalidation stamps while cached entries survive,
+  resurrecting stale data (the handler warns on connect when it detects one); (2) if you used
+  `revalidate: 0` with tags' predecessor entries, delete the orphaned old-namespace blobs manually —
+  see the migration note in the
+  [unstable_cache docs](https://reactonrails.com/docs/pro/react-server-components/unstable-cache). Part of
   [Issue 5077](https://github.com/shakacode/react_on_rails/issues/5077).
   [PR 5122](https://github.com/shakacode/react_on_rails/pull/5122) by
   [AbanoubGhadban](https://github.com/AbanoubGhadban).

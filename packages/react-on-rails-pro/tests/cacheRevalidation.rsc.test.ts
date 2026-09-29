@@ -155,7 +155,7 @@ describe('the sandbox global hook', () => {
     const spy = makeRevalidatingSpy();
     registerCacheHandler('kind-hook', spy.handler);
 
-    // An explicit timestamp is forwarded EXACTLY (no re-stamping in transit).
+    // An explicit (past) timestamp is forwarded EXACTLY (no re-stamping in transit).
     await hook!(['exact'], 12_345);
     expect(spy.revalidateCalls).toEqual([['exact', 12_345]]);
 
@@ -172,6 +172,19 @@ describe('the sandbox global hook', () => {
       expect(invalidatedAt!).toBeGreaterThanOrEqual(before);
       expect(invalidatedAt!).toBeLessThanOrEqual(after);
     }
+
+    // A far-future timestamp is clamped to now + a bounded skew allowance:
+    // stamps are monotonic and (in Redis) TTL-less, so an uncapped future value
+    // would pin its tags stale FOREVER, fleet-wide — the durable outage the
+    // public API avoids by not exposing a timestamp at all. Legitimate NTP-level
+    // clock skew stays under the allowance and is forwarded unclamped.
+    const beforeClamp = Date.now();
+    await hook!(['pinned'], 8.64e15); // year ~275760
+    const afterClamp = Date.now();
+    const clamped = spy.revalidateCalls[3][1]!;
+    const fiveMinutes = 5 * 60 * 1000;
+    expect(clamped).toBeGreaterThanOrEqual(beforeClamp + fiveMinutes);
+    expect(clamped).toBeLessThanOrEqual(afterClamp + fiveMinutes);
   });
 });
 

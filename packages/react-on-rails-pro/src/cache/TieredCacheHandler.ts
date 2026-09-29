@@ -118,11 +118,29 @@ export class TieredCacheHandler implements CacheHandler {
   }
 
   async set(key: string, entry: CacheEntry): Promise<void> {
-    const l2Write = this.l2.set(key, entry).catch((err: unknown) => {
-      console.error('TieredCacheHandler: L2 set failed', err);
-    });
+    // Mixed-capability composition: when exactly one layer implements
+    // revalidateTag, a TAGGED entry must never be stored in the layer that
+    // cannot refuse it — that layer would keep serving the stale copy after an
+    // invalidation, forever for revalidate: 0, while this composite claims
+    // invalidation support (so the write-side capability warning never fires).
+    // Same philosophy as the no-promotion rule in get(). When NEITHER layer
+    // supports invalidation the composite doesn't claim to (see constructor),
+    // the write-side warning fires, and both layers store the entry as before.
+    const tagged = !!entry.tags?.length;
+    const l1Sees = typeof this.l1.revalidateTag === 'function';
+    const l2Sees = typeof this.l2.revalidateTag === 'function';
+    const skipBlindLayers = tagged && l1Sees !== l2Sees;
+    if (skipBlindLayers) this.warnTaggedBlindLayerOnce(l1Sees ? 'L2' : 'L1');
 
-    if (this.l1Disabled()) {
+    const skipL2 = skipBlindLayers && !l2Sees;
+    const l2Write = skipL2
+      ? Promise.resolve()
+      : this.l2.set(key, entry).catch((err: unknown) => {
+          console.error('TieredCacheHandler: L2 set failed', err);
+        });
+
+    const skipL1 = this.l1Disabled() || (skipBlindLayers && !l1Sees);
+    if (skipL1) {
       await l2Write;
       return;
     }
@@ -132,6 +150,19 @@ export class TieredCacheHandler implements CacheHandler {
       console.error('TieredCacheHandler: L1 set failed', err);
     });
     await Promise.all([l2Write, l1Write]);
+  }
+
+  private warnedTaggedBlindLayer = false;
+
+  private warnTaggedBlindLayerOnce(blindLayer: 'L1' | 'L2'): void {
+    if (this.warnedTaggedBlindLayer) return;
+    this.warnedTaggedBlindLayer = true;
+    console.warn(
+      `TieredCacheHandler: ${blindLayer} has no revalidateTag, so tagged entries are not stored in it ` +
+        '(a layer that cannot refuse an invalidated entry must never hold one). Tagged entries are ' +
+        'cached only in the layer that supports invalidation; implement revalidateTag on both layers ' +
+        'to cache them in both.',
+    );
   }
 
   // A cap of 0, negative, or NaN cannot be expressed as a revalidate value —

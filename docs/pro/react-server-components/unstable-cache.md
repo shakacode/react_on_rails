@@ -40,8 +40,9 @@ The options are:
   [`unstable_revalidateTag`](#invalidate-by-tag-javascript). Pass a static array, or a function of the
   cached function's arguments — `tags: ({ productId }) => ['products', 'product-' + productId]` — when
   the tags depend on which entity is being rendered. Tags must be non-empty strings of at most 256
-  characters, and an invalidation matches a stored tag byte-for-byte: the string you invalidate must be
-  exactly the string you stored.
+  characters, with at most 64 distinct tags per call (invalid or over-limit tags throw a `TypeError`
+  before the render runs), and an invalidation matches a stored tag byte-for-byte: the string you
+  invalidate must be exactly the string you stored.
 
 The cache key includes the build ID, function ID, and function arguments. Arguments must use the
 supported deterministic value types. Supported built-in instances include `Date`, `Map`, and `Set`.
@@ -145,9 +146,12 @@ How it works, and what to configure:
   stamps per cache hit.
 - Tags are stored inside the entry blob, so they count toward `maxEntryBytes`: an entry within a few
   hundred bytes of the cap may newly skip caching once it carries tags.
-- Entries written by this version use a new storage format that older package versions cannot read.
-  In practice they never need to: the cache key includes the build ID, so entries written by
-  different package versions live under different keys. Old-format entries remain readable.
+- Entries written by this version use a new storage format under a new key namespace: the cache key
+  carries a storage-format generation segment (`rorp:rsc-cache:2:`), so old-format entries live under
+  keys this version never reads — deliberately independent of the build ID, which a package upgrade
+  does not always rotate (see above). Old-format entries are ignored by this version (readable only
+  by a rolled-back older package) and expire via their own TTLs; see the migration note below for
+  `revalidate: 0` leftovers.
 - The handler builds a single-node client. Redis Cluster is not supported: the multi-key stamp
   lookup assumes one node.
 
@@ -164,6 +168,22 @@ invalidation in both layers. Two behaviors to know:
 - **A composition where neither layer implements `revalidateTag` does not claim to support it**, so
   storing tagged entries on it still logs the once-per-handler warning instead of silently
   swallowing invalidations.
+- **In a mixed composition (exactly one layer implements `revalidateTag`), tagged entries are stored
+  only in the layer that supports invalidation** — a layer that cannot refuse an invalidated entry
+  must never hold one, or it would keep serving the stale copy forever. A once-per-instance warning
+  logs when this skip first happens. Two corners: if the supporting layer is an L1 that
+  `l1MaxTtlSeconds` has disabled, tagged entries are cached nowhere (correct, but uncacheable —
+  implement `revalidateTag` on both layers instead); and tagged entries written into the
+  non-supporting layer by versions before this rule remain servable there until they expire — after
+  an upgrade they are normally unreachable anyway because the build ID in the cache key rotates with
+  the bundle.
+- **Invalidation reaches only the process that calls it, per layer.** With an in-memory L1 in several
+  workers over a shared Redis L2, a worker that calls `unstable_revalidateTag` stamps its own L1 and
+  the shared L2 — other workers' L1 copies are untouched and, with the default (uncapped)
+  `l1MaxTtlSeconds`, a `revalidate: 0` tagged entry another worker cached before the invalidation
+  stays servable there indefinitely. When you use tags with a multi-worker tiered setup, set
+  `l1MaxTtlSeconds` to the cross-worker staleness you can tolerate; it is the bound until renderer
+  cross-process invalidation ships.
 
 Custom handlers must enforce the entry lifetime: return `null` from `get` for stale entries based on
 `entry.timestamp` and `entry.revalidate`, or enforce expiry with the storage backend's TTL.
@@ -215,7 +235,8 @@ Entries written by package versions before tag support live under a different Re
 simply never read again: they expire via their own TTLs. If you used `revalidate: 0` (no TTL) with
 shared storage, delete the leftovers manually — they match `rorp:rsc-cache:` WITHOUT the `2:`
 generation segment (scan with your `keyPrefix` applied, for example
-`SCAN 0 MATCH <keyPrefix>rorp:rsc-cache:[0-9a-f]*`).
+`SCAN 0 MATCH <keyPrefix>rorp:rsc-cache:[0-9a-f][0-9a-f]*` — the doubled hex class is what
+excludes live keys: a current-generation key has `2:` there, and `:` fails the second class).
 
 React on Rails Pro's Ruby fragment-caching helpers have a separate `cache_tags:` and
 `ReactOnRailsPro.revalidate_tag` API. That API invalidates Rails fragment-cache entries; it does not
