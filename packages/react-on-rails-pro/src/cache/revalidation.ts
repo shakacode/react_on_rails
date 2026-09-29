@@ -30,12 +30,20 @@ declare global {
  * Best-effort: a handler that rejects OR throws synchronously never stops the
  * others. Not exported from the package index.
  */
+// How far ahead of this process's clock a carried invalidation timestamp may
+// point. Covers real cross-machine clock skew under broken NTP; anything
+// further is a bug or abuse, and an uncapped future stamp would pin its tags
+// stale FOREVER (stamps are monotonic and, in Redis, TTL-less) — the exact
+// durable outage the public API avoids by not exposing a timestamp at all.
+const MAX_STAMP_FUTURE_SKEW_MS = 5 * 60 * 1000;
+
 export async function revalidateTagsAt(tags: string | string[], invalidatedAt: number): Promise<void> {
   const list = validateTags(Array.isArray(tags) ? tags : [tags]); // validates, dedupes
-  // Defensive runtime check: the sandbox hook is called from untyped
-  // JavaScript, and a NaN would poison every handler's Math.max, silently
-  // disabling these tags.
-  const at = Number.isFinite(invalidatedAt) ? invalidatedAt : Date.now();
+  // Defensive runtime checks: the sandbox hook is called from untyped
+  // JavaScript. A NaN would poison every handler's Math.max and silently
+  // disable these tags; a far-future value would durably pin them stale.
+  const now = Date.now();
+  const at = Number.isFinite(invalidatedAt) ? Math.min(invalidatedAt, now + MAX_STAMP_FUTURE_SKEW_MS) : now;
 
   const attempts: Promise<void>[] = [];
   for (const handler of getUniqueCacheHandlersSnapshot()) {
@@ -49,14 +57,17 @@ export async function revalidateTagsAt(tags: string | string[], invalidatedAt: n
           .then(() => revalidateTag.call(handler, tag, at))
           .catch((err: unknown) => {
             // Do not log tag values (application-provided, possibly large or
-            // identifying) and do not log the raw error object: server-side
-            // console output during an RSC render can be replayed into the
-            // browser console, and a storage error's stack/message can carry
-            // connection details. The handler's constructor name plus the
-            // error MESSAGE locate the culprit.
+            // identifying) and do not log the error object OR its message:
+            // server-side console output during an RSC render can be replayed
+            // into the browser console, and a storage error's message can
+            // carry connection details (ioredis puts host:port in
+            // ECONNREFUSED messages). Handler name + error class/code locate
+            // the culprit without disclosing topology.
+            const label =
+              (err as NodeJS.ErrnoException)?.code ?? (err instanceof Error ? err.name : String(err));
             console.error(
               `unstable_revalidateTag: ${handler.constructor?.name ?? 'handler'} failed for 1 of ${list.length} tag(s):`,
-              err instanceof Error ? err.message : String(err),
+              label,
             );
           }),
       );

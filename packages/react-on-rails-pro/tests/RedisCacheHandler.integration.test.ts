@@ -36,6 +36,25 @@ import { RedisCacheHandler } from '../src/cache/RedisCacheHandler';
 const REDIS_TEST_URL = process.env.REDIS_TEST_URL;
 const describeWithRedis = REDIS_TEST_URL ? describe : describe.skip;
 
+// Fail-closed tripwire: this file is the ONLY coverage that executes the real
+// Lua scripts (monotonic stamps, binary GETRANGE guard) and real keyPrefix
+// propagation. In CI it must never silently degrade to describe.skip — every
+// workflow job that runs this package's tests provisions a Redis service and
+// sets REDIS_TEST_URL (package-js-tests.yml and pro-test-package-and-gem.yml).
+// If a workflow refactor drops that wiring, fail the suite instead of shipping
+// green with the coverage gone. Local runs without the env still skip quietly.
+if (process.env.CI && !REDIS_TEST_URL) {
+  describe('RedisCacheHandler integration CI wiring', () => {
+    test('REDIS_TEST_URL is set wherever CI runs this suite', () => {
+      throw new Error(
+        'REDIS_TEST_URL is not set in CI: the RedisCacheHandler integration suite would be ' +
+          'silently skipped. Restore the redis service + REDIS_TEST_URL env on the CI job ' +
+          '(see .github/workflows/package-js-tests.yml and pro-test-package-and-gem.yml).',
+      );
+    });
+  });
+}
+
 // Unique per run so parallel runs and leftovers cannot collide; entries are
 // cleaned by prefix scan afterward, flushdb is never used.
 const RUN_PREFIX = `rorp-test:${process.pid}:${Date.now()}:`;

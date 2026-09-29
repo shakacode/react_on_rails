@@ -271,6 +271,77 @@ describe('RedisCacheHandler', () => {
     });
   });
 
+  describe('format limits and shape', () => {
+    test('multibyte UTF-8 tags round-trip, and stamp lookups use the same bytes', async () => {
+      let blob: Buffer | null = null;
+      mockRedisInstance.set.mockImplementation((_key: string, b: Buffer) => {
+        blob = Buffer.from(b);
+        return Promise.resolve('OK');
+      });
+      // Chars where .length !== Buffer.byteLength: the classic length-vs-bytes
+      // serializer regression passes every ASCII-only test but corrupts these.
+      const tag = 'café-日本-продукт';
+      await handler.set('k', makeEntry({ tags: [tag] }));
+      mockRedisInstance.getBuffer.mockResolvedValue(blob);
+      mockRedisInstance.mget.mockResolvedValue([null]);
+
+      const result = await handler.get('k');
+      expect(result!.tags).toEqual([tag]);
+      // The stamp key must be built from the identical string, or invalidation
+      // silently misses.
+      expect(mockRedisInstance.mget).toHaveBeenCalledWith([`rorp:rsc-tag:${tag}`]);
+    });
+
+    test('exact entry shape: guard nonce and other internals never leak onto the entry', async () => {
+      let blob: Buffer | null = null;
+      mockRedisInstance.set.mockImplementation((_key: string, b: Buffer) => {
+        blob = Buffer.from(b);
+        return Promise.resolve('OK');
+      });
+      await handler.set('k', makeEntry({ tags: ['t'] }));
+      mockRedisInstance.getBuffer.mockResolvedValue(blob);
+      mockRedisInstance.mget.mockResolvedValue([null]);
+
+      const result = await handler.get('k');
+      expect(Object.keys(result!).sort()).toEqual(['revalidate', 'tags', 'timestamp', 'value']);
+    });
+
+    test('non-finite and huge revalidate values serialize safely', async () => {
+      const blobs: Buffer[] = [];
+      const setArgs: unknown[][] = [];
+      mockRedisInstance.set.mockImplementation((...args: unknown[]) => {
+        blobs.push(Buffer.from(args[1] as Buffer));
+        setArgs.push(args);
+        return Promise.resolve('OK');
+      });
+
+      // Infinity -> field 0, no EX (the claim TieredCacheHandler's promotion
+      // comment relies on).
+      await handler.set('inf', makeEntry({ revalidate: Infinity }));
+      expect(blobs[0].readInt32BE(9)).toBe(0);
+      expect(setArgs[0]).toHaveLength(2); // no 'EX'
+
+      // Fractional -> ceil for both the field and EX.
+      await handler.set('frac', makeEntry({ revalidate: 1.2 }));
+      expect(blobs[1].readInt32BE(9)).toBe(2);
+      expect(setArgs[1].slice(2)).toEqual(['EX', 2]);
+
+      // Huge finite -> field clamps to int32 max instead of writeInt32BE
+      // throwing (which would silently disable caching); EX keeps the real value.
+      await handler.set('huge', makeEntry({ revalidate: 9_999_999_999 }));
+      expect(blobs[2].readInt32BE(9)).toBe(0x7fffffff);
+      expect(setArgs[2].slice(2)).toEqual(['EX', 9_999_999_999]);
+    });
+
+    test('a TAGGED entry with a non-finite timestamp is refused storage (invalidation-immune otherwise)', async () => {
+      await handler.set('bad', makeEntry({ timestamp: NaN, tags: ['t'] }));
+      expect(mockRedisInstance.set).not.toHaveBeenCalled();
+      // Untagged entries with odd timestamps are not this guard's business.
+      await handler.set('plain', makeEntry({ timestamp: NaN }));
+      expect(mockRedisInstance.set).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('stamp value hygiene', () => {
     test('empty and whitespace-only stamp values refuse nothing (not epoch-zero stamps)', async () => {
       let blob: Buffer | null = null;
@@ -359,12 +430,21 @@ describe('RedisCacheHandler', () => {
       }
     });
 
-    test('never throws: a failing stamp write warns and resolves', async () => {
+    test('never throws: a failing stamp write warns with the error CODE/NAME, never the message', async () => {
       const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
-      mockRedisInstance.rorpTagStampMax.mockRejectedValue(new Error('READONLY'));
+      // ioredis puts the internal host:port in connection-error messages, and
+      // console output on render paths can be replayed to browsers — so the
+      // log must carry err.code (or err.name), never err.message.
+      const err = new Error('connect ECONNREFUSED 10.0.3.7:6379') as NodeJS.ErrnoException;
+      err.code = 'ECONNREFUSED';
+      mockRedisInstance.rorpTagStampMax.mockRejectedValue(err);
 
       await expect(handler.revalidateTag!('t')).resolves.toBeUndefined();
-      expect(warnSpy).toHaveBeenCalledWith('[RedisCacheHandler] revalidateTag failed, skipping:', 'READONLY');
+      expect(warnSpy).toHaveBeenCalledWith(
+        '[RedisCacheHandler] revalidateTag failed, skipping:',
+        'ECONNREFUSED',
+      );
+      expect(JSON.stringify(warnSpy.mock.calls)).not.toContain('10.0.3.7');
       warnSpy.mockRestore();
     });
   });

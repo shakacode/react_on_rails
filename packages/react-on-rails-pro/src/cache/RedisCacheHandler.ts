@@ -66,7 +66,14 @@ function serialize(entry: CacheEntry): Buffer {
   const buf = Buffer.allocUnsafe(totalLen);
   buf.writeUInt8(FORMAT_V2, 0);
   buf.writeDoubleBE(entry.timestamp, 1);
-  const revalidateInt = Number.isFinite(entry.revalidate) ? Math.ceil(entry.revalidate) : 0;
+  // Clamp to the field's int32 ceiling (~68 years): a caller using a huge
+  // finite revalidate as "practically forever" must not make writeInt32BE
+  // throw and silently disable caching for that entry. Redis-side expiry (EX
+  // in set()) still uses the caller's value; this field is informational for
+  // timestamp-checking consumers.
+  const revalidateInt = Number.isFinite(entry.revalidate)
+    ? Math.min(Math.ceil(entry.revalidate), 0x7fffffff)
+    : 0;
   buf.writeInt32BE(revalidateInt, 9);
   // Anti-collision nonce for the conditional-delete guard, not a secret:
   // Math.random's ~2^-32 same-value odds only matter when two writes of the
@@ -187,14 +194,15 @@ export class RedisCacheHandler implements CacheHandler {
     });
 
     // Header-guarded conditional delete: removes a refused entry only if the
-    // stored blob still starts with the same 13-byte v2 header we read
-    // (version + timestamp + revalidate). A concurrent re-render's fresh SET
-    // survives because its render-start ms differs; the only collision is two
-    // renders of the same key starting in the same millisecond (even with
-    // different tag sets), and deleting that twin costs at most a lost cache
-    // entry (one extra render) — a delete can only remove a blob, never admit
-    // one, so stale data is never served. Lua string comparison is
-    // binary-safe. GETRANGE end offset is inclusive: 0..12 = 13 bytes.
+    // stored blob still starts with the same 17-byte v2 guard prefix we read
+    // (version + timestamp + revalidate + per-write nonce). A concurrent
+    // re-render's fresh SET survives because its render-start ms differs — and
+    // even a same-millisecond twin differs in the random nonce (~2^-32 odds),
+    // which is the nonce's entire purpose. In the astronomically unlikely full
+    // collision, deleting the twin costs at most a lost cache entry (one extra
+    // render) — a delete can only remove a blob, never admit one, so stale
+    // data is never served. Lua string comparison is binary-safe. GETRANGE end
+    // offset is inclusive: 0..16 = 17 bytes.
     this.redis.defineCommand('rorpDelIfHeaderMatches', {
       numberOfKeys: 1,
       lua: `if redis.call('GETRANGE', KEYS[1], 0, ${V2_GUARD_PREFIX_LEN - 1}) == ARGV[1] then
@@ -280,7 +288,13 @@ export class RedisCacheHandler implements CacheHandler {
       // TTL remains the correctness floor; revalidate: 0 entries have no TTL
       // and rely on Redis being writable at invalidation time (documented as
       // best-effort in the unstable-cache docs).
-      console.warn('[RedisCacheHandler] revalidateTag failed, skipping:', (err as Error).message);
+      // Error class/code only, never the message: revalidateTag can run inside
+      // an RSC render whose console output is replayed to browsers, and ioredis
+      // connection errors put the internal host:port in the message.
+      console.warn(
+        '[RedisCacheHandler] revalidateTag failed, skipping:',
+        (err as NodeJS.ErrnoException).code ?? (err as Error).name ?? String(err),
+      );
     }
   }
 
@@ -295,6 +309,19 @@ export class RedisCacheHandler implements CacheHandler {
       if (tagCount > MAX_V2_TAG_COUNT) {
         console.debug(
           `[RedisCacheHandler] Skipping entry for key "${key}": ${tagCount} tags > the storage format's maximum (${MAX_V2_TAG_COUNT}).`,
+        );
+        return;
+      }
+
+      // A tagged entry whose timestamp is not a finite epoch-ms (a contract
+      // violation by a custom caller — the shipped pipeline always stamps
+      // Date.now()) could never be refused by any stamp: `stamp >= NaN` and
+      // `stamp >= Infinity` are always false. Refuse to store it rather than
+      // create an invalidation-immune blob — same belt-and-braces standard as
+      // the tag-count guard above.
+      if (tagCount > 0 && !Number.isFinite(entry.timestamp)) {
+        console.debug(
+          `[RedisCacheHandler] Skipping tagged entry for key "${key}": non-finite timestamp would be immune to tag invalidation.`,
         );
         return;
       }

@@ -42,11 +42,12 @@ function resolveTags<TArgs extends unknown[]>(
   tags: UnstableCacheOptions<TArgs>['tags'],
   args: TArgs,
 ): string[] {
-  // Only an ABSENT option means "no tags". Any other supplied value — including
-  // falsy junk like false, 0, or '' from an untyped caller or JSON config —
+  // Only an OMITTED option (undefined) means "no tags". Any other supplied
+  // value — including falsy junk like null, false, 0, or '' from an untyped
+  // caller or JSON config (where null is expressible and undefined is not) —
   // must reach validateTags and throw, not silently cache the render untagged
   // (which would make later unstable_revalidateTag calls ineffective for it).
-  if (tags === undefined || tags === null) return [];
+  if (tags === undefined) return [];
   return validateTags(typeof tags === 'function' ? tags(...args) : tags);
 }
 

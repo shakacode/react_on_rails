@@ -361,7 +361,7 @@ describe('unstable_cache tags', () => {
     // documented TypeError — silently caching untagged would make later
     // unstable_revalidateTag calls ineffective for that entry.
     let renders = 0;
-    for (const junk of [false, 0, '']) {
+    for (const junk of [null, false, 0, '']) {
       const cached = unstable_cache(
         async () => {
           renders += 1;
