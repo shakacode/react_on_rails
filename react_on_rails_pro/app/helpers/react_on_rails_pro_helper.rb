@@ -659,6 +659,11 @@ module ReactOnRailsProHelper
     else
       value
     end
+  rescue StandardError => e
+    # Fail open: cache the value marker-free (hits then serve the originating nonce for
+    # CSP to block — the pre-#5021 behavior) instead of failing the rendering request.
+    warn_cached_csp_nonce_degraded("recording the originating CSP nonce at cache-write time", e)
+    value
   end
 
   def append_cached_csp_nonce_marker_to_html(html, marker)
@@ -684,6 +689,12 @@ module ReactOnRailsProHelper
     when String then extract_cached_csp_nonce_marker_from_html(value)
     else [value, nil]
     end
+  rescue StandardError => e
+    # Fail open (e.g. an invalid-encoding cached string makes String#match raise): serve
+    # the entry as cached — the unextracted marker rides along as an inert HTML comment
+    # and no re-stamp runs — instead of failing the request.
+    warn_cached_csp_nonce_degraded("extracting the cache entry's originating-nonce marker", e)
+    [value, nil]
   end
 
   def extract_cached_csp_nonce_marker_from_chunks(chunks)
@@ -745,6 +756,12 @@ module ReactOnRailsProHelper
     return html unless matched
 
     html.html_safe? ? rewritten.html_safe : rewritten
+  rescue StandardError => e
+    # Fail open: an error while matching or replacing (e.g. invalid-encoding cached
+    # bytes) serves the string as cached — stale nonce left for CSP to block, the
+    # pre-#5021 behavior — instead of failing the request.
+    warn_cached_csp_nonce_degraded("re-stamping cached CSP nonce attributes", e)
+    html
   end
 
   # Builds the attribute pattern for one originating nonce. Only the double-quoted
@@ -799,6 +816,12 @@ module ReactOnRailsProHelper
     end
 
     land_rewritten_stream_document(chunks, rewritten)
+  rescue StandardError => e
+    # Fail open: an error while joining or re-splitting the chunk document (e.g.
+    # incompatible chunk encodings) streams the chunks as cached — stale nonces left for
+    # CSP to block — instead of failing the request.
+    warn_cached_csp_nonce_degraded("re-stamping CSP nonces across cached stream chunks", e)
+    chunks
   end
 
   # Byte-slices the rewritten document back into the original chunk sizes, preserving
@@ -830,6 +853,20 @@ module ReactOnRailsProHelper
     end
   end
 
+  # Detection seam for every nonce consultation the cache machinery makes. csp_nonce
+  # delegates to the app's content_security_policy_nonce_generator, which can raise; a
+  # raising generator inside the cache paths degrades to "no usable nonce" — the request
+  # is handled as nonce-free (no partition flag, no marker, no re-stamp) instead of
+  # failing (see warn_cached_csp_nonce_degraded). The render path proper calls csp_nonce
+  # directly and keeps its own semantics: this guard covers only the cache machinery
+  # issue #5021 added, which must never introduce a failure the render itself would not.
+  def raw_csp_nonce_for_cached_html
+    csp_nonce
+  rescue StandardError => e
+    warn_cached_csp_nonce_degraded("detecting the request's CSP nonce", e)
+    nil
+  end
+
   # Returns the current request's CSP nonce, or nil when absent or malformed. The original
   # value is validated as-is (never stripped first): a stripped derivative could pass the
   # pattern while the response header still carries the original, so every re-stamped
@@ -841,7 +878,7 @@ module ReactOnRailsProHelper
   # keeps the memo correct if the nonce ever changes under one helper instance — as specs
   # that simulate several requests on a single view context do.
   def current_csp_nonce_for_cached_html
-    nonce = csp_nonce.presence
+    nonce = raw_csp_nonce_for_cached_html.presence
     if defined?(@csp_nonce_validation_memo) && @csp_nonce_validation_memo.first == nonce
       return @csp_nonce_validation_memo.last
     end
@@ -863,7 +900,7 @@ module ReactOnRailsProHelper
   # marker-free under the nonce-free key, that stale (possibly session-derived) value
   # would replay verbatim to genuinely nonce-free requests.
   def malformed_csp_nonce_bypasses_component_cache?
-    csp_nonce.present? && current_csp_nonce_for_cached_html.nil?
+    raw_csp_nonce_for_cached_html.present? && current_csp_nonce_for_cached_html.nil?
   end
 
   # The bypass is an app misconfiguration, not a routine path: every cached_* helper
@@ -877,9 +914,30 @@ module ReactOnRailsProHelper
     @warned_component_cache_bypassed_for_malformed_nonce = true
     Rails.logger.warn(
       "[React on Rails Pro] Component caching bypassed for this request: the CSP nonce " \
-      "(length #{csp_nonce.to_s.length}) falls outside the accepted base64/base64url shape, so every cached_* " \
+      "(length #{raw_csp_nonce_for_cached_html.to_s.length}) falls outside the accepted base64/base64url shape, " \
+      "so every cached_* " \
       "helper renders fresh. Fix content_security_policy_nonce_generator to emit only [A-Za-z0-9+/_-] characters " \
       "with optional trailing '=' padding."
+    )
+  end
+
+  # Nothing in the issue-#5021 nonce machinery is allowed to fail a request: detection
+  # failures handle the request as nonce-free, write-time marker failures cache the value
+  # marker-free, and hit-time extraction/re-stamp failures serve the cached value
+  # unmodified. Degraded output can carry the originating request's nonce, which a
+  # nonce-enforcing CSP blocks — the pre-#5021 symptom (rendered but unhydrated HTML),
+  # strictly better than failing the whole request. Warned once per helper instance (one
+  # view context per request) with the error class only: exception messages can embed
+  # cached markup or nonce values, which never belong in logs.
+  def warn_cached_csp_nonce_degraded(operation, error)
+    return if defined?(@warned_cached_csp_nonce_degraded)
+
+    @warned_cached_csp_nonce_degraded = true
+    Rails.logger.warn(
+      "[React on Rails Pro] CSP nonce handling for cached components failed while #{operation} " \
+      "(#{error.class}); the step was skipped rather than failing the request. Served cached markup " \
+      "may still carry its originating request's nonce, which a nonce-enforcing CSP blocks " \
+      "(the issue #5021 symptom)."
     )
   end
 

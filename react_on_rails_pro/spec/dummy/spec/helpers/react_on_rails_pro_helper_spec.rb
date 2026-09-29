@@ -1048,6 +1048,124 @@ describe ReactOnRailsProHelper do
       expect(second_result).not_to include("good-nonce-AAA=")
     end
 
+    # Fail-open guarantee: no failure inside the nonce machinery — detection, write-time
+    # marker append, hit-time marker extraction, or the re-stamp itself — may fail the
+    # request. Each seam degrades to what pre-#5021 code served (cached markup as-is,
+    # possibly carrying a stale nonce for CSP to block) and warns once per view context
+    # with the error class, never the raised message (it can embed secret-adjacent
+    # values).
+    describe "fail-open degradation" do
+      it "serves a cache hit and warns once when the nonce generator raises" do
+        cached_react_component("App", cache_key: "csp-detect-raise", auto_load_bundle: false) do
+          { name: "nonce-free-writer" }
+        end
+
+        allow(self).to receive(:csp_nonce).and_raise(RuntimeError, "generator exploded")
+        allow(Rails.logger).to receive(:warn)
+
+        result = cached_react_component("App", cache_key: "csp-detect-raise", auto_load_bundle: false) do
+          raise "props block must not run on a cache hit"
+        end
+
+        # Detection failure handles the request as nonce-free, so it still HITS the
+        # nonce-free entry (the props block raising proves the hit) and serves it.
+        expect(result).to include("nonce-free-writer")
+        expect(Rails.logger).to have_received(:warn)
+          .with(/CSP nonce handling for cached components failed while detecting.*RuntimeError/m)
+          .once
+        expect(Rails.logger).not_to have_received(:warn).with(/generator exploded/)
+      end
+
+      it "still caches and serves the entry when recording the write-time marker raises" do
+        allow(self).to receive(:append_cached_csp_nonce_marker_to_html)
+          .and_raise(RuntimeError, "marker append exploded")
+        allow(Rails.logger).to receive(:warn)
+        allow(self).to receive(:csp_nonce).and_return("miss-nonce-AAA=")
+
+        first_result = cached_react_component("App", cache_key: "csp-append-raise", auto_load_bundle: false) do
+          { name: "first" }
+        end
+        expect(first_result).to include('nonce="miss-nonce-AAA="')
+        expect(Rails.logger).to have_received(:warn)
+          .with(/failed while recording the originating CSP nonce at cache-write time/)
+          .once
+
+        allow(self).to receive(:csp_nonce).and_return("hit-nonce-BBB=")
+        second_result = cached_react_component("App", cache_key: "csp-append-raise", auto_load_bundle: false) do
+          raise "props block must not run on a cache hit"
+        end
+
+        # The marker-free entry cannot be re-stamped: the hit serves the originating
+        # nonce (the pre-#5021 symptom) instead of failing.
+        expect(second_result).to include('nonce="miss-nonce-AAA="')
+        expect(second_result).not_to include("hit-nonce-BBB=")
+      end
+
+      it "serves the cached entry unmodified, marker included, when marker extraction raises" do
+        allow(self).to receive(:extract_cached_csp_nonce_marker_from_html)
+          .and_raise(ArgumentError, "invalid byte sequence in UTF-8")
+        allow(Rails.logger).to receive(:warn)
+
+        cached_html = "<div>cached</div>" \
+                      '<script nonce="origin-AAA=">framework()</script>' \
+                      "<!--rorp-cached-csp-nonce:origin-AAA=-->"
+        result = serve_from_cache(cached_html, key: "csp-extract-raise")
+
+        # Without the extracted marker no re-stamp can run; the entry is served exactly
+        # as cached — the marker rides along as an inert HTML comment, and the stale
+        # nonce stays for CSP to block. (The freshly rendered request preamble ahead of
+        # it may legitimately mention the live nonce; only the cached fragment matters.)
+        expect(result).to end_with(cached_html)
+        expect(Rails.logger).to have_received(:warn)
+          .with(/failed while extracting the cache entry's originating-nonce marker/)
+          .once
+      end
+
+      it "serves the cached markup with its original nonce and warns when the re-stamp raises" do
+        allow(self).to receive(:cached_csp_nonce_attribute_pattern)
+          .and_raise(Encoding::CompatibilityError, "re-stamp exploded")
+        allow(Rails.logger).to receive(:warn)
+
+        result = serve_from_cache(
+          "<div>cached</div>" \
+          '<script nonce="origin-AAA=">framework()</script>' \
+          "<!--rorp-cached-csp-nonce:origin-AAA=-->",
+          key: "csp-restamp-raise"
+        )
+
+        # The cached script keeps its stale nonce (the pre-#5021 symptom); it was never
+        # re-stamped with the live nonce. The freshly rendered request preamble ahead of
+        # the fragment may legitimately mention the live nonce.
+        expect(result).to include('<script nonce="origin-AAA=">framework()</script>')
+        expect(result).not_to include('nonce="live-BBB=">framework()')
+        # The marker was consumed before the failed re-stamp; only the rewrite degraded.
+        expect(result).not_to include("rorp-cached-csp-nonce")
+        expect(result).to be_html_safe
+        expect(Rails.logger).to have_received(:warn)
+          .with(/failed while re-stamping cached CSP nonce attributes/)
+          .once
+      end
+
+      it "returns stream chunks unchanged and warns when the cross-chunk rewrite raises" do
+        allow(self).to receive(:csp_nonce).and_return("live-BBB=")
+        allow(Rails.logger).to receive(:warn)
+
+        # Mixed-encoding chunks (a multibyte UTF-8 chunk plus a high-byte BINARY chunk)
+        # make the chunk-document join raise Encoding::CompatibilityError.
+        chunks = [
+          %(<script nonce="origin-AAA=">café()</script>),
+          (+"\xC3").force_encoding(Encoding::ASCII_8BIT)
+        ]
+
+        result = rewrite_cached_csp_nonces_across_chunks(chunks, "origin-AAA=")
+
+        expect(result).to equal(chunks)
+        expect(Rails.logger).to have_received(:warn)
+          .with(/failed while re-stamping CSP nonces across cached stream chunks/)
+          .once
+      end
+    end
+
     context "with async context" do
       around do |example|
         Sync do
