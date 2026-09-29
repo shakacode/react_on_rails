@@ -336,17 +336,14 @@ describe('unstable_cache tags', () => {
     expect(renderCount).toBe(1);
   });
 
-  test('invalid tag values throw TypeError', async () => {
+  test('invalid tag values reject with TypeError', async () => {
     const { handler } = makeSpyHandler();
     registerCacheHandler('spy-invalid-tags', handler);
 
-    const tooLong = unstable_cache(async () => 'x', {
-      id: 'too-long-tag',
-      kind: 'spy-invalid-tags',
-      tags: ['a'.repeat(257)],
-    });
-    await expect(tooLong()).rejects.toThrow(TypeError);
-
+    // A non-string member pins both the validation WIRING on this surface and
+    // the validator's typeof clause — a number has no .length, so the length
+    // checks alone would silently store it. The empty and over-length clauses
+    // are pinned through unstable_revalidateTag in cacheRevalidation.rsc.test.ts.
     const nonString = unstable_cache(async () => 'x', {
       id: 'non-string-tag',
       kind: 'spy-invalid-tags',
@@ -524,7 +521,8 @@ describe('tag invalidation end-to-end (the in-flight race)', () => {
   });
 
   test('control: without the invalidation the next call is a cache HIT', async () => {
-    const { cachedFn, started, releaseRender, getRenderCount, waitForStores } = makeGatedCachedFn('race-control');
+    const { cachedFn, started, releaseRender, getRenderCount, waitForStores } =
+      makeGatedCachedFn('race-control');
 
     const firstCall = cachedFn();
     await started;
