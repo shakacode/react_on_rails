@@ -275,6 +275,7 @@ const config: KnipConfig = {
   // These test-only reset helpers are used across files (imported by test setup), but
   // `knip --production` strips test files and would report them as unused exports.
   ignoreIssues: {
+    'packages/react-on-rails-pro/src/cache/cacheHandlerRegistry.ts': ['exports'],
     'packages/react-on-rails-pro-node-renderer/src/shared/tracing.ts': ['exports'],
     'packages/react-on-rails-pro-node-renderer/src/worker/fastifyConfig.ts': ['exports'],
     'packages/react-on-rails-pro-node-renderer/src/worker/shutdownHooks.ts': ['exports'],
