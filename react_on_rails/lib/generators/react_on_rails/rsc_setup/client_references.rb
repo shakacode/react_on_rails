@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require "digest"
-
 module ReactOnRails
   module Generators
     module RscSetup
@@ -26,22 +24,6 @@ module ReactOnRails
         # (`RSCWebpackPlugin`) or rspack (`RSCRspackPlugin`). Shared by the partition scanner and
         # the routing checks so both detect the same set of invocations.
         RSC_PLUGIN_INVOCATION_REGEX = /new\s+RSC(?:Webpack|Rspack)Plugin\s*\(/
-
-        # SHA-256 digests of `normalize_js_for_comparison` applied to the exact resolver blocks
-        # (the `fallbackRscClientReferences` object literal through the end of the
-        # `rscClientReferences` IIFE) that previous generator versions emitted, one digest per
-        # historical executable-code variant of the snippet:
-        #   - 5c71c6a9c (#3556): the initial graph-derived resolver
-        #   - 912d2a2b4 (#3712) / d7a6025be (#3721): registration-entry override added
-        #   - c2de1e1c2 (#4234) through b58d1fe8b (#4625): the shape replaced by issue #5079
-        # `upgrade_previous_generated_rsc_client_references` rewrites only blocks matching one of
-        # these digests, so a hand-customized resolver is never clobbered, while comment or
-        # whitespace changes (formatters) do not affect the digest and still upgrade.
-        PREVIOUS_GENERATED_RSC_CLIENT_REFERENCES_DIGESTS = %w[
-          1d86f063126cc6ba96d2954bd950d07d8ed61dbdef3f7b24dcf626cb00a31a57
-          aa031e33fd555d2648fb7ef9ce85508a2946737ee167df2447f6886c1aadd3bc
-          038c973303979d86755a6e435a498900f98553aa22966cc77f88bfad52ce556d
-        ].freeze
 
         private
 
@@ -330,9 +312,10 @@ module ReactOnRails
 
             content = read_current_rsc_config(config_path, fallback: content)
           end
-          # A previous generated IIFE (no react-on-rails-pro registrations — issue #5079) also
-          # counts as generated below; upgrade it first so re-runs emit the current resolver.
-          content = upgrade_previous_generated_rsc_client_references(config_path, content)
+          # A previously generated IIFE (no react-on-rails-pro registrations — issue #5079) also
+          # counts as generated below; warn so the user registers the components manually.
+          warn_outdated_rsc_client_references_helper(config_path) if
+            outdated_generated_rsc_client_references_defined?(content)
           return :scoped if generated_rsc_client_references_defined?(content)
 
           warn_unscoped_rsc_client_references_helper(config_path)
@@ -368,10 +351,11 @@ module ReactOnRails
             content = normalized_content
           end
 
-          # Upgrade the resolver emitted by a previous generator version (no react-on-rails-pro
-          # client-component registrations — issue #5079) before the scoped-references
-          # short-circuit below treats it as already current.
-          content = upgrade_previous_generated_rsc_client_references(config_path, content)
+          # A resolver emitted by a previous generator version (no react-on-rails-pro
+          # client-component registrations — issue #5079) is deliberately not rewritten; warn
+          # before the scoped-references short-circuit below treats it as already current.
+          warn_outdated_rsc_client_references_helper(config_path) if
+            outdated_generated_rsc_client_references_defined?(content)
 
           return unless rsc_plugin_sections_safe_to_rewrite?(config_path, content, is_server:)
 
@@ -1468,9 +1452,8 @@ module ReactOnRails
 
         # True when the file carries a manifest-backed generated resolver IIFE that does not
         # register the react-on-rails-pro client components (issue #5079) — either the resolver a
-        # previous generator version emitted, or a user customization of one. Which of the two it
-        # is (and so whether the in-place upgrade may rewrite it) is decided by
-        # `previous_generated_rsc_client_references_block?`.
+        # previous generator version emitted, or a user customization of one. The generator never
+        # rewrites such a resolver; it warns with manual registration instructions instead.
         def outdated_generated_rsc_client_references_defined?(content)
           return false unless generated_rsc_client_references_defined?(content)
 
@@ -1480,92 +1463,15 @@ module ReactOnRails
           !js_code_matches?(iife_body, /\breactOnRailsProClientReferences\b/)
         end
 
-        # Byte-exact match, modulo comments and whitespace, against the resolver text previous
-        # generator versions emitted, so a hand-customized resolver is never clobbered while a
-        # formatter's whitespace or comment changes still upgrade. The digest set covers every
-        # historical executable-code variant of the emitted snippet (see the constant).
-        def previous_generated_rsc_client_references_block?(block)
-          PREVIOUS_GENERATED_RSC_CLIENT_REFERENCES_DIGESTS.include?(
-            Digest::SHA256.hexdigest(normalize_js_for_comparison(block))
-          )
-        end
-
-        def normalize_js_for_comparison(code)
-          rsc_plugin_options_without_comments(code).gsub(/\s+/, "")
-        end
-
-        # Locates the whole generated resolver block — the `fallbackRscClientReferences` object
-        # literal through the end of the `rscClientReferences` IIFE — so the previous generated
-        # shape can be replaced as one unit. Returns nil (no rewrite) when the two declarations
-        # are not adjacent up to comments/whitespace, which indicates user code was inserted
-        # inside the generated block.
-        def generated_rsc_client_references_setup_range(content)
-          fallback_range = scoped_object_literal_range(content, "fallbackRscClientReferences")
-          return nil unless fallback_range
-
-          iife_range = generated_rsc_client_references_iife_range(content)
-          return nil unless iife_range
-          return nil unless fallback_range[1] <= iife_range[0]
-
-          gap = content[fallback_range[1]...iife_range[0]]
-          return nil unless rsc_plugin_options_without_comments(gap).strip.empty?
-
-          [fallback_range[0], iife_range[1]]
-        end
-
-        # Range twin of `generated_rsc_client_references_iife_body`: the declaration start
-        # through the end of the `})();` invocation (semicolon included when present).
-        def generated_rsc_client_references_iife_range(content)
-          declaration = /^[ \t]*(?:const|let|var)\s+rscClientReferences\s*=\s*\(\s*\(\s*\)\s*=>\s*\{/
-          content.to_enum(:scan, declaration).each do
-            match = Regexp.last_match
-            next unless js_top_level_position?(content, match.begin(0))
-
-            open_brace = match.end(0) - 1
-            close_brace = matching_js_closing_brace(content, open_brace)
-            next unless close_brace
-
-            invocation = /\A\s*\)\s*\(\s*\)\s*;?/.match(content[(close_brace + 1)..])
-            next unless invocation
-
-            return [match.begin(0), close_brace + 1 + invocation.end(0)]
-          end
-
-          nil
-        end
-
-        # Upgrades the resolver emitted by a previous generator version in place with the
-        # current `rsc_client_references_js` (which appends the react-on-rails-pro
-        # client-component registrations — issue #5079), mirroring how
-        # `replace_legacy_rsc_client_references_setup` upgrades the legacy object-literal
-        # helper. Returns the (possibly updated) file content. When the previous shape is
-        # present but its exact span cannot be located safely, the file is left untouched and
-        # a warning tells the user how to register the components manually.
-        def upgrade_previous_generated_rsc_client_references(config_path, content)
-          return content unless outdated_generated_rsc_client_references_defined?(content)
-
-          range_start, range_end = generated_rsc_client_references_setup_range(content)
-          if range_start && previous_generated_rsc_client_references_block?(content[range_start...range_end])
-            updated_content = content.dup
-            updated_content[range_start...range_end] =
-              rsc_client_references_js.gsub(/\r?\n/, js_line_ending(content))
-            write_existing_rsc_config(config_path, updated_content, action: :rewrite)
-            return options[:pretend] || options[:skip] ? content : updated_content
-          end
-
-          warn_outdated_rsc_client_references_helper(config_path)
-          content
-        end
-
         def warn_outdated_rsc_client_references_helper(config_path)
           GeneratorMessages.add_warning(
-            "#{config_path} contains a generated-style rscClientReferences resolver that does not " \
-            "register the react-on-rails-pro package's own client components (RSCRoute, RSCProvider, " \
-            "registerDefaultRSCProvider/client — issue #5079), but it does not match any resolver a " \
-            "previous generator version emitted (it was customized, or code was inserted inside the " \
-            "generated block), so it was left unchanged. Re-apply your customizations on top of the " \
-            "current generated resolver, or add the require.resolve entries for those components to " \
-            "your clientReferences manually."
+            "#{config_path} contains a rscClientReferences resolver from a previous generator " \
+            "version: it does not register the react-on-rails-pro package's own client components " \
+            "(RSCRoute, RSCProvider, registerDefaultRSCProvider/client — issue #5079). The file was " \
+            "left unchanged. Add require.resolve entries for those components to your " \
+            "clientReferences (see the RSC setup docs at " \
+            "https://reactonrails.com/docs/pro/react-server-components/create-without-ssr), or " \
+            "remove the generated resolver block and re-run this generator to emit the current one."
           )
         end
 

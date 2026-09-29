@@ -68,9 +68,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   for section-level refetching) then failed the render-time manifest lookup even when the RSC bundle compiled. The
   client-reference resolver emitted by the `react_on_rails:rsc` generator now appends these components as explicit
   `clientReferences` entries (via `require.resolve`) to every resolution branch, on both the client and server
-  manifest plugins. Re-run `rails g react_on_rails:rsc` to pick this up in an existing app: a resolver emitted by a
-  previous generator version is upgraded in place, while a customized resolver is left untouched with a warning that
-  explains the manual registration (or register the entries in a hand-maintained config — see the
+  manifest plugins. **Action required for existing RSC apps:** a resolver emitted by a previous generator version is
+  never rewritten — re-running `rails g react_on_rails:rsc` warns and leaves it unchanged. Add the `require.resolve`
+  entries for the three components to your `clientReferences` manually, or remove the generated resolver block and
+  re-run the generator (see the
   [RSC setup docs](https://reactonrails.com/docs/pro/react-server-components/create-without-ssr)). Part of
   [Issue 5079](https://github.com/shakacode/react_on_rails/issues/5079).
   [PR 5100](https://github.com/shakacode/react_on_rails/pull/5100) by

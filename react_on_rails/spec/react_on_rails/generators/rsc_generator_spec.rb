@@ -1332,21 +1332,10 @@ describe RscGenerator, type: :generator do
       previous_generated_rsc_config("manifest_era_b58d1fe8b.js")
     end
 
-    # Verbatim clientWebpackConfig.js files as previous generator versions produced them, one
-    # per resolver era; see the fixture directory's README.md for per-era provenance. Kept
-    # byte-verbatim in fixture files (no added headers) so digest matching and migration-range
-    # detection see exactly what a real app contains. Each era corresponds to one entry of
-    # ClientReferences::PREVIOUS_GENERATED_RSC_CLIENT_REFERENCES_DIGESTS; the inventory example
-    # below pins that correspondence exactly.
-    previous_generated_rsc_config_eras = {
-      "manifest-backed resolver era (pre-#5079, golden output at b58d1fe8b)" =>
-        "manifest_era_b58d1fe8b.js",
-      "initial graph-derived resolver era (#3556 at 5c71c6a9c)" =>
-        "initial_graph_era_5c71c6a9c.js",
-      "registration-entry override era (#3712 at 912d2a2b4, unchanged through #3721)" =>
-        "registration_entry_era_912d2a2b4.js"
-    }
-
+    # A verbatim clientWebpackConfig.js as the last pre-#5079 generator version produced it
+    # (the golden webpack_rsc fixture at b58d1fe8b); see the fixture directory's README.md.
+    # Kept byte-verbatim (no added headers) so outdated-resolver detection sees exactly what
+    # a real app contains.
     def previous_generated_rsc_config(fixture_name)
       File.read(
         File.expand_path("../fixtures/previous_generated_rsc_configs/#{fixture_name}", __dir__)
@@ -1479,57 +1468,23 @@ describe RscGenerator, type: :generator do
       expect(migrated_content).to include("clientReferences: rscClientReferences")
     end
 
-    # One example per historical resolver era: the generator re-run must upgrade that era's
-    # verbatim generated output in place (digest-gated), leaving a single resolver block and
-    # emitting no mismatch warning.
-    previous_generated_rsc_config_eras.each do |era, fixture_name|
-      it "upgrades the #{era} to register the pro package client components" do
-        config_path = "config/webpack/clientWebpackConfig.js"
-        simulate_existing_file(config_path, previous_generated_rsc_config(fixture_name))
-
-        generator.send(:update_client_webpack_config_for_rsc)
-
-        migrated_content = File.read(File.join(destination_root, config_path))
-        expect(migrated_content.scan("const rscClientReferences").length).to eq(1)
-        expect(migrated_content.scan("const fallbackRscClientReferences").length).to eq(1)
-        expect(migrated_content).to include("'react-on-rails-pro/RSCRoute',")
-        expect(migrated_content).to include("'react-on-rails-pro/RSCProvider',")
-        expect(migrated_content).to include("'react-on-rails-pro/registerDefaultRSCProvider/client',")
-        expect(migrated_content.scan("clientReferences: rscClientReferences").length).to eq(1)
-        expect(GeneratorMessages.messages.join("\n")).not_to include(
-          "does not match any resolver a previous generator version emitted"
-        )
-      end
-    end
-
-    it "keeps the previous-resolver digest table in one-to-one correspondence with the era fixtures" do
-      fixture_digests = previous_generated_rsc_config_eras.map do |era, fixture_name|
-        content = previous_generated_rsc_config(fixture_name)
-        range = generator.send(:generated_rsc_client_references_setup_range, content)
-        expect(range).not_to be_nil, "no generated resolver block found in the #{era} fixture"
-        Digest::SHA256.hexdigest(
-          generator.send(:normalize_js_for_comparison, content[range[0]...range[1]])
-        )
-      end
-
-      expect(fixture_digests).to match_array(
-        ReactOnRails::Generators::RscSetup::ClientReferences::PREVIOUS_GENERATED_RSC_CLIENT_REFERENCES_DIGESTS
-      )
-    end
-
-    it "re-runs idempotently once the resolver carries the pro package client components" do
+    # The generator deliberately never rewrites a resolver a previous version emitted
+    # (issue #5079 follow-up decision): it warns with manual registration instructions and
+    # leaves the file byte-identical.
+    it "warns and leaves a previously generated resolver without the pro client components unchanged" do
       config_path = "config/webpack/clientWebpackConfig.js"
       simulate_existing_file(config_path, previously_generated_rsc_client_config)
-      generator.send(:update_client_webpack_config_for_rsc)
-      upgraded_content = File.read(File.join(destination_root, config_path))
 
       generator.send(:update_client_webpack_config_for_rsc)
 
-      expect(File.read(File.join(destination_root, config_path))).to eq(upgraded_content)
-      expect(GeneratorMessages.messages.join("\n")).not_to include("left unchanged")
+      expect(File.read(File.join(destination_root, config_path))).to eq(previously_generated_rsc_client_config)
+      messages = GeneratorMessages.messages.join("\n")
+      expect(messages).to include("does not register the react-on-rails-pro package's own client components")
+      expect(messages).to include("The file was left unchanged")
+      expect(messages).to include("react-server-components/create-without-ssr")
     end
 
-    it "leaves a customized manifest-backed resolver alone and warns with manual instructions" do
+    it "warns and leaves a customized previously generated resolver unchanged" do
       config_path = "config/webpack/clientWebpackConfig.js"
       customized_config = previously_generated_rsc_client_config.sub(
         "  return [fallbackRscClientReferences];\n})();",
@@ -1540,30 +1495,9 @@ describe RscGenerator, type: :generator do
 
       generator.send(:update_client_webpack_config_for_rsc)
 
-      migrated_content = File.read(File.join(destination_root, config_path))
-      expect(migrated_content).to include("{ directory: resolve('vendor-client') }")
-      expect(migrated_content).not_to include("reactOnRailsProClientReferences")
+      expect(File.read(File.join(destination_root, config_path))).to eq(customized_config)
       expect(GeneratorMessages.messages.join("\n")).to include(
-        "does not match any resolver a previous generator version emitted"
-      )
-    end
-
-    it "leaves the generated block alone and warns when user code sits inside it" do
-      config_path = "config/webpack/clientWebpackConfig.js"
-      interleaved_config = previously_generated_rsc_client_config.sub(
-        "// The resolution cascade below",
-        "const myCustomHelper = () => 'between the generated declarations';\n// The resolution cascade below"
-      )
-      expect(interleaved_config).to include("myCustomHelper") # guard that the sub matched
-      simulate_existing_file(config_path, interleaved_config)
-
-      generator.send(:update_client_webpack_config_for_rsc)
-
-      migrated_content = File.read(File.join(destination_root, config_path))
-      expect(migrated_content).to include("myCustomHelper")
-      expect(migrated_content).not_to include("reactOnRailsProClientReferences")
-      expect(GeneratorMessages.messages.join("\n")).to include(
-        "does not match any resolver a previous generator version emitted"
+        "does not register the react-on-rails-pro package's own client components"
       )
     end
 
