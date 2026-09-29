@@ -99,9 +99,11 @@ export class InMemoryLRUCacheHandler implements CacheHandler {
 
     // Cardinality bound: a safety valve, not a working mode. Dropping a stamp
     // is only safe if every entry it might govern is also unreadable, so
-    // overflow clears the entry cache AND raises the watermark to now: tagged
-    // entries from renders in flight across the clear (stored after it,
-    // started before it) stay refused.
+    // overflow clears the entry cache AND raises the watermark to now OR the
+    // maximum discarded stamp, whichever is later: tagged entries from renders
+    // in flight across the clear stay refused, and a forgotten stamp ahead of
+    // the local clock (the sandbox hook carries origin timestamps, so clock
+    // skew makes those real) keeps governing the entries it covered.
     if (
       !this.tagInvalidatedAt.has(tag) &&
       this.tagInvalidatedAt.size >= InMemoryLRUCacheHandler.MAX_TRACKED_TAGS
@@ -110,9 +112,13 @@ export class InMemoryLRUCacheHandler implements CacheHandler {
         `InMemoryLRUCacheHandler: tag-stamp map exceeded ${InMemoryLRUCacheHandler.MAX_TRACKED_TAGS} entries; ` +
           'clearing the cache. Reduce tag cardinality or use a shared handler.',
       );
+      let watermark = Date.now();
+      for (const stamp of this.tagInvalidatedAt.values()) {
+        watermark = Math.max(watermark, stamp);
+      }
       this.cache.clear();
       this.tagInvalidatedAt.clear();
-      this.tagStampsClearedAt = Math.max(this.tagStampsClearedAt, Date.now());
+      this.tagStampsClearedAt = Math.max(this.tagStampsClearedAt, watermark);
     }
 
     const prev = this.tagInvalidatedAt.get(tag) ?? 0;
