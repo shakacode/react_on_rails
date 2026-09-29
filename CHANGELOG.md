@@ -85,10 +85,11 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   attributes. Requests whose nonce is present but falls outside
   the base64/base64url shape bypass the component cache entirely (they render fresh), so a malformed nonce can
   neither create entries that no later request could re-stamp nor leak a sanitized derivative of its value into entries
-  served to nonce-free requests. The whole mechanism fails open: an error inside nonce detection (e.g. a raising
-  custom `content_security_policy_nonce_generator` consulted on a cache hit), the write-time marker, hit-time marker
-  extraction, or the re-stamp itself never fails the request — the step is skipped with one warning per request (error
-  class only, never nonce values), and the cached markup is served as-is, at worst with its stale originating nonce for
+  served to nonce-free requests. The whole mechanism fails open: an error inside nonce detection or validation (e.g. a
+  raising custom `content_security_policy_nonce_generator` consulted on a cache hit, or one returning a value whose
+  encoding makes the presence/shape checks raise), the write-time marker, hit-time marker extraction, or the re-stamp
+  itself never fails the request — the step is skipped with one warning per failed step per request (error class only,
+  never nonce values), and the affected cached markup is served as-is, at worst with its stale originating nonce for
   CSP to block. Note for apps overriding private normalization hooks: `normalize_cached_pro_attribution`
   and `normalize_cached_pro_attribution_html` now take a `cached_csp_nonce` parameter and are invoked with it on cache
   hits, so an override or prepended module written for the old one-argument form raises ArgumentError after upgrading —

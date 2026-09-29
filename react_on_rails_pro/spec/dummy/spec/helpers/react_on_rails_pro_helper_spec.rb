@@ -1048,13 +1048,41 @@ describe ReactOnRailsProHelper do
       expect(second_result).not_to include("good-nonce-AAA=")
     end
 
-    # Fail-open guarantee: no failure inside the nonce machinery — detection, write-time
-    # marker append, hit-time marker extraction, or the re-stamp itself — may fail the
-    # request. Each seam degrades to what pre-#5021 code served (cached markup as-is,
-    # possibly carrying a stale nonce for CSP to block) and warns once per view context
-    # with the error class, never the raised message (it can embed secret-adjacent
-    # values).
+    # Fail-open guarantee: no failure inside the nonce machinery — detection, validation
+    # of a generator-returned value, write-time marker append, hit-time marker
+    # extraction, or the re-stamp itself — may fail the request. Each seam degrades to
+    # what pre-#5021 code served (cached markup as-is, possibly carrying a stale nonce
+    # for CSP to block) and warns once per failed step per view context with the error
+    # class, never the raised message (it can embed secret-adjacent values).
     describe "fail-open degradation" do
+      it "degrades to the malformed-nonce bypass when the generator returns poison values" do
+        # A generator can RETURN a value that makes the presence/shape checks themselves
+        # raise even though csp_nonce returned normally. Both poison classes must degrade
+        # to the malformed-nonce bypass (cache unusable, request renders fresh), never
+        # raise out of the gate. Without the validation-seam rescues, each predicate call
+        # below raises (ArgumentError / Encoding::CompatibilityError) and fails the spec.
+        allow(Rails.logger).to receive(:warn)
+
+        # Invalid UTF-8 bytes: String#present? raises ArgumentError (ActiveSupport's
+        # String#blank? rescues only Encoding::CompatibilityError).
+        allow(self).to receive(:csp_nonce).and_return((+"\xC3").force_encoding(Encoding::UTF_8))
+        expect(current_csp_nonce_for_cached_html).to be_nil
+        expect(malformed_csp_nonce_bypasses_component_cache?).to be(true)
+        expect(pro_component_cache_usable?({})).to be(false)
+
+        # ASCII-incompatible encoding: the shape regexp match raises
+        # Encoding::CompatibilityError.
+        allow(self).to receive(:csp_nonce).and_return("abc123".encode(Encoding::UTF_16LE))
+        expect(current_csp_nonce_for_cached_html).to be_nil
+        expect(malformed_csp_nonce_bypasses_component_cache?).to be(true)
+        expect(pro_component_cache_usable?({})).to be(false)
+
+        expect(Rails.logger).to have_received(:warn)
+          .with(/CSP nonce handling for cached components failed while/)
+          .at_least(:once)
+        expect(Rails.logger).not_to have_received(:warn).with(/abc123/)
+      end
+
       it "serves a cache hit and warns once when the nonce generator raises" do
         cached_react_component("App", cache_key: "csp-detect-raise", auto_load_bundle: false) do
           { name: "nonce-free-writer" }

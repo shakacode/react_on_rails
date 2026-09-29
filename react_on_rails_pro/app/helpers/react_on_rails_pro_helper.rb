@@ -886,6 +886,16 @@ module ReactOnRailsProHelper
     validated = nonce && CSP_NONCE_VALUE_PATTERN.match?(nonce) ? nonce : nil
     @csp_nonce_validation_memo = [nonce, validated]
     validated
+  rescue StandardError => e
+    # Fail open: a generator-RETURNED poison value can make the presence or shape checks
+    # themselves raise even though csp_nonce returned normally — invalid-encoding bytes
+    # raise ArgumentError inside String#blank? (ActiveSupport rescues only
+    # Encoding::CompatibilityError there), and an ASCII-incompatible encoding raises
+    # Encoding::CompatibilityError in the shape regexp match. Degrade to "no usable
+    # nonce"; the gate predicate below then routes the request to the malformed-nonce
+    # bypass, never to a cache partition.
+    warn_cached_csp_nonce_degraded("validating the request's CSP nonce", e)
+    nil
   end
 
   # True when the request carries a CSP nonce that current_csp_nonce_for_cached_html
@@ -901,6 +911,14 @@ module ReactOnRailsProHelper
   # would replay verbatim to genuinely nonce-free requests.
   def malformed_csp_nonce_bypasses_component_cache?
     raw_csp_nonce_for_cached_html.present? && current_csp_nonce_for_cached_html.nil?
+  rescue StandardError => e
+    # Fail open: if even the presence check raises on a generator-returned poison value
+    # (e.g. invalid-encoding bytes make String#present? raise ArgumentError), treat the
+    # request as the malformed-nonce bypass — render fresh, touch no cache partition —
+    # instead of failing it. Bypassing is the safe degradation here for the same
+    # partition-poisoning reasons documented above.
+    warn_cached_csp_nonce_degraded("checking the request's CSP nonce at the component-cache gate", e)
+    true
   end
 
   # The bypass is an app misconfiguration, not a routine path: every cached_* helper
@@ -922,23 +940,30 @@ module ReactOnRailsProHelper
   end
 
   # Nothing in the issue-#5021 nonce machinery is allowed to fail a request: detection
-  # failures handle the request as nonce-free, write-time marker failures cache the value
-  # marker-free, and hit-time extraction/re-stamp failures serve the cached value
-  # unmodified. Degraded output can carry the originating request's nonce, which a
-  # nonce-enforcing CSP blocks — the pre-#5021 symptom (rendered but unhydrated HTML),
-  # strictly better than failing the whole request. Warned once per helper instance (one
-  # view context per request) with the error class only: exception messages can embed
-  # cached markup or nonce values, which never belong in logs.
+  # and validation failures handle the request as nonce-free or malformed-bypassed,
+  # write-time marker failures cache the value marker-free, and hit-time
+  # extraction/re-stamp failures serve the cached value unmodified. Degraded output can
+  # carry the originating request's nonce, which a nonce-enforcing CSP blocks — the
+  # pre-#5021 symptom (rendered but unhydrated HTML), strictly better than failing the
+  # whole request. Warned once per FAILED STEP per helper instance (one view context per
+  # request), so two different degradations in one request are both named, with the error
+  # class only: exception messages can embed cached markup or nonce values, which never
+  # belong in logs. The warn itself is also guarded — a nil or raising custom logger must
+  # not defeat the fail-open contract it reports on (the once-guard latches before
+  # logging, so there is no retry loop).
   def warn_cached_csp_nonce_degraded(operation, error)
-    return if defined?(@warned_cached_csp_nonce_degraded)
+    warned = (@warned_cached_csp_nonce_degraded ||= {})
+    return if warned[operation]
 
-    @warned_cached_csp_nonce_degraded = true
+    warned[operation] = true
     Rails.logger.warn(
       "[React on Rails Pro] CSP nonce handling for cached components failed while #{operation} " \
       "(#{error.class}); the step was skipped rather than failing the request. Served cached markup " \
       "may still carry its originating request's nonce, which a nonce-enforcing CSP blocks " \
       "(the issue #5021 symptom)."
     )
+  rescue StandardError
+    nil
   end
 
   # Single gate for every cached_* entry point: component caching is usable only when the
