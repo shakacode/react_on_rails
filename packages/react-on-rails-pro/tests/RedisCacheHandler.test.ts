@@ -147,6 +147,23 @@ describe('RedisCacheHandler', () => {
       expect(mockRedisInstance.set).not.toHaveBeenCalled();
     });
 
+    test('skips entries with more tags than the v2 format can hold, with an explicit reason', async () => {
+      const debugSpy = jest.spyOn(console, 'debug').mockImplementation(() => {});
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const tooManyTags = Array.from({ length: 65_536 }, (_, i) => `t${i}`);
+      await handler.set('tag-count-overflow', makeEntry({ tags: tooManyTags }));
+
+      expect(mockRedisInstance.set).not.toHaveBeenCalled();
+      // The explicit guard, not serialize()'s RangeError landing in the
+      // generic catch: the log names the actual cause.
+      expect(debugSpy).toHaveBeenCalledWith(expect.stringContaining('65536 tags'));
+      expect(warnSpy).not.toHaveBeenCalled();
+
+      debugSpy.mockRestore();
+      warnSpy.mockRestore();
+    });
+
     test('silently ignores Redis errors on set', async () => {
       mockRedisInstance.set.mockRejectedValue(new Error('write failed'));
       await expect(handler.set('key3', makeEntry())).resolves.toBeUndefined();

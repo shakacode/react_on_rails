@@ -29,6 +29,10 @@ const HEADER_V2_SIZE = 15; // 1 (version) + 8 (timestamp) + 4 (revalidate) + 2 (
 // version + timestamp + revalidate: unique per rendered entry (render-start
 // ms), so it guards the conditional delete against racing fresh writes.
 const V2_GUARD_PREFIX_LEN = 13;
+// The v2 tagCount field is a uint16; per-tag byte lengths stay under their own
+// uint16 automatically (tagValidation.ts caps tags at 256 UTF-16 units ≤ 1024
+// UTF-8 bytes), but the tag COUNT is uncapped upstream.
+const MAX_V2_TAG_COUNT = 0xffff;
 
 // Parallel to entry keys' 'rorp:rsc-cache:' prefix (buildCacheKey.ts). Tag
 // keys are passed UNPREFIXED to ioredis; the client's keyPrefix option (which
@@ -186,10 +190,13 @@ export class RedisCacheHandler implements CacheHandler {
 
     // Header-guarded conditional delete: removes a refused entry only if the
     // stored blob still starts with the same 13-byte v2 header we read
-    // (version + timestamp + revalidate — render-start ms makes it unique per
-    // rendered entry), so it can never race-delete a concurrent re-render's
-    // fresh SET. Lua string comparison is binary-safe. GETRANGE end offset is
-    // inclusive: 0..12 = 13 bytes.
+    // (version + timestamp + revalidate). A concurrent re-render's fresh SET
+    // survives because its render-start ms differs; the only collision is two
+    // renders of the same key starting in the same millisecond (even with
+    // different tag sets), and deleting that twin costs at most a lost cache
+    // entry (one extra render) — a delete can only remove a blob, never admit
+    // one, so stale data is never served. Lua string comparison is
+    // binary-safe. GETRANGE end offset is inclusive: 0..12 = 13 bytes.
     this.redis.defineCommand('rorpDelIfHeaderMatches', {
       numberOfKeys: 1,
       lua: `if redis.call('GETRANGE', KEYS[1], 0, ${V2_GUARD_PREFIX_LEN - 1}) == ARGV[1] then
@@ -257,6 +264,19 @@ export class RedisCacheHandler implements CacheHandler {
 
   async set(key: string, entry: CacheEntry): Promise<void> {
     try {
+      // The v2 format's tagCount field is a uint16. Nothing upstream caps the
+      // tag ARRAY length (tagValidation.ts caps each tag's string length), so
+      // guard here — the format ceiling is this serializer's own — with the
+      // same skip-and-log behavior as the maxEntryBytes gate, instead of
+      // letting serialize()'s RangeError surface as a generic write failure.
+      const tagCount = entry.tags?.length ?? 0;
+      if (tagCount > MAX_V2_TAG_COUNT) {
+        console.debug(
+          `[RedisCacheHandler] Skipping entry for key "${key}": ${tagCount} tags > the storage format's maximum (${MAX_V2_TAG_COUNT}).`,
+        );
+        return;
+      }
+
       const blob = serialize(entry);
       if (blob.length > this.maxEntryBytes) {
         console.debug(
