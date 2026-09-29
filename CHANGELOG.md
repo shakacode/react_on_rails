@@ -31,6 +31,17 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   generated IDs consistent with accessible references. Fixes [Issue 5146](https://github.com/shakacode/react_on_rails/issues/5146).
   [PR 5148](https://github.com/shakacode/react_on_rails/pull/5148) by [justin808](https://github.com/justin808).
 
+- **npm packages no longer ship dangling `sourceMappingURL` pointers**: Every published `lib/**/*.js` file in
+  `react-on-rails` and `react-on-rails-pro` ended with a `//# sourceMappingURL=<name>.js.map` comment, but the
+  packages never published the `.map` files, so each pointer referenced a missing file. Besides devtools warnings,
+  the dangling pointers crashed RSC bundle builds (`SyntaxError: ... is not valid JSON` from
+  `react-on-rails-rsc/WebpackLoader`) whenever server-component code imported one of the Pro package's own
+  `'use client'` components such as `react-on-rails-pro/RSCRoute`. The packages' `tsc` builds no longer emit
+  sourcemaps, removing the pointer comments without changing the emitted JavaScript. Part of
+  [Issue 5079](https://github.com/shakacode/react_on_rails/issues/5079).
+  [PR 5099](https://github.com/shakacode/react_on_rails/pull/5099) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 ### [17.2.0.rc.0] - 2026-09-29
 
 #### Added
