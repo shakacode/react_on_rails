@@ -386,6 +386,77 @@ export default function AppRouter() {
 }
 ```
 
+### Refetchable sections inside a server component
+
+The nesting also works in the other direction: a **server component** page can mount one of its own
+sections through a nested `<RSCRoute>`, so that section can refetch alone. Refetching the section
+streams only that section's RSC payload — the rest of the page keeps its DOM, form state, and scroll
+position. Trigger the refetch from inside the section with
+[`useCurrentRSCRoute()`](#usecurrentrscroute-from-inside-the-rsc-subtree) or from outside it with a
+[`ref` handle](#ref-handle-on-rscroute).
+
+`RSCRoute` is itself a `'use client'` component shipped inside the `react-on-rails-pro` npm package,
+and that placement matters for how you mount it from a server component:
+
+**On current releases (react-on-rails-pro ≤ 17.0.x with react-on-rails-rsc ≤ 19.2.1), a server
+component cannot import `react-on-rails-pro/RSCRoute` directly.** Two independent problems block it
+([issue 5079](https://github.com/shakacode/react_on_rails/issues/5079)):
+
+1. The RSC bundle build crashes: the published `lib/*.js` files carry `sourceMappingURL` pointers to
+   `.map` files that are not in the package, and the released `react-on-rails-rsc/WebpackLoader`
+   fails on them (`SyntaxError: ... is not valid JSON` pointing at the file's license header).
+2. Even with a compiling bundle, client-reference discovery only scans app directories —
+   `node_modules` is excluded — so the shipped component never reaches `react-client-manifest.json`,
+   and rendering it from a server component fails the render-time manifest lookup.
+
+The supported pattern on these versions is a four-line app-level `'use client'` wrapper. It works
+because the wrapper is an app-source file: the RSC loader replaces it with a client reference before
+the import of the package's file is ever followed, and app directories are scanned for the manifest.
+
+```tsx
+// app/javascript/components/ReviewsSectionRoute.tsx
+'use client';
+import RSCRoute from 'react-on-rails-pro/RSCRoute';
+
+export const ReviewsSectionRoute = ({ productId }: { productId: number }) => (
+  <RSCRoute componentName="ProductReviewsSection" componentProps={{ product_id: productId }} />
+);
+```
+
+```tsx
+// inside ProductPage (a server component)
+import { ReviewsSectionRoute } from './ReviewsSectionRoute';
+
+export default function ProductPage({ productId }) {
+  return (
+    <>
+      {/* ...rest of the page, rendered on the server... */}
+      <ReviewsSectionRoute productId={productId} />
+    </>
+  );
+}
+```
+
+**With the issue 5079 fixes in place** — packages published without dangling `sourceMappingURL`
+pointers, the `react-on-rails-rsc` loader serving sourcemap requests correctly, and the generated
+webpack configs registering the package's own client components as explicit `clientReferences`
+entries (see [Create a React Server Component](./create-without-ssr.md)) — the wrapper is no longer
+needed and a server component can import and render `RSCRoute` directly:
+
+```tsx
+// inside ProductPage (a server component)
+import RSCRoute from 'react-on-rails-pro/RSCRoute';
+
+export default function ProductPage({ productId }) {
+  return (
+    <>
+      {/* ...rest of the page, rendered on the server... */}
+      <RSCRoute componentName="ProductReviewsSection" componentProps={{ product_id: productId }} />
+    </>
+  );
+}
+```
+
 ### Client router loaders
 
 Client router loaders can choose which server component a route renders and warm the RSC payload

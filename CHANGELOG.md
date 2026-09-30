@@ -40,15 +40,33 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [Issue 5144](https://github.com/shakacode/react_on_rails/issues/5144).
   [PR 5147](https://github.com/shakacode/react_on_rails/pull/5147) by [justin808](https://github.com/justin808).
 
-- **npm packages no longer ship dangling `sourceMappingURL` pointers**: Every published `lib/**/*.js` file in
-  `react-on-rails` and `react-on-rails-pro` ended with a `//# sourceMappingURL=<name>.js.map` comment, but the
+- **Published JavaScript no longer ships dangling `sourceMappingURL` pointers**: Every published `lib/**/*.js` file
+  in `react-on-rails` and `react-on-rails-pro` ended with a `//# sourceMappingURL=<name>.js.map` comment, but the
   packages never published the `.map` files, so each pointer referenced a missing file. Besides devtools warnings,
   the dangling pointers crashed RSC bundle builds (`SyntaxError: ... is not valid JSON` from
   `react-on-rails-rsc/WebpackLoader`) whenever server-component code imported one of the Pro package's own
   `'use client'` components such as `react-on-rails-pro/RSCRoute`. The packages' `tsc` builds no longer emit
-  sourcemaps, removing the pointer comments without changing the emitted JavaScript. Part of
+  JavaScript sourcemaps, removing the pointer comments without changing the emitted JavaScript. (TypeScript
+  `declarationMap` pointers in published `.d.ts` files are unaffected — cosmetic, tracked as a follow-up.) Part of
   [Issue 5079](https://github.com/shakacode/react_on_rails/issues/5079).
   [PR 5099](https://github.com/shakacode/react_on_rails/pull/5099) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
+- **[Pro]** **RSC client-reference resolution now registers the Pro package's own `'use client'` components**:
+  Client-reference discovery only scans app source directories (`node_modules` is excluded), so the `'use client'`
+  components the `react-on-rails-pro` npm package itself ships — `react-on-rails-pro/RSCRoute`,
+  `react-on-rails-pro/RSCProvider`, and `react-on-rails-pro/registerDefaultRSCProvider/client` — could never appear
+  in `react-client-manifest.json`. A server component rendering one of them (for example a nested `<RSCRoute>` used
+  for section-level refetching) then failed the render-time manifest lookup even when the RSC bundle compiled. The
+  client-reference resolver emitted by the `react_on_rails:rsc` generator now appends these components as explicit
+  `clientReferences` entries (via `require.resolve`) to every resolution branch, on both the client and server
+  manifest plugins. **Action required for existing RSC apps:** a resolver emitted by a previous generator version is
+  never rewritten — re-running `rails g react_on_rails:rsc` warns and leaves it unchanged. Add the `require.resolve`
+  entries for the three components to your `clientReferences` manually, or remove the generated resolver block and
+  re-run the generator (see the
+  [RSC setup docs](https://reactonrails.com/docs/pro/react-server-components/create-without-ssr)). Part of
+  [Issue 5079](https://github.com/shakacode/react_on_rails/issues/5079).
+  [PR 5100](https://github.com/shakacode/react_on_rails/pull/5100) by
   [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 ### [17.2.0.rc.0] - 2026-09-29
