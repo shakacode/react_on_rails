@@ -5427,11 +5427,11 @@ module ReactOnRails
       false
     end
 
-    # A rejected prerelease (for example the 19.3.0-rc.4 pin React on Rails 17.1.0 generated) usually has a
-    # supported stable release with the same version number; point the Fix there instead of the generator pin.
+    # Only the 19.3.0 transition has a known published stable successor. Compatibility does not establish
+    # publication for other rejected prereleases; use the generator pin for those versions.
     # Returns [rsc_version_to_install, react_version_to_install].
     def rsc_package_floor_install_versions(rsc_version)
-      if npm_prerelease(rsc_version).present?
+      if npm_prerelease(rsc_version).present? && npm_version_tuple(rsc_version) == [19, 3, 0]
         stable_version = npm_version_tuple(rsc_version).join(".")
         if rsc_stable_package_version_supported?(stable_version)
           return [stable_version, recommended_react_install_version_for_rsc_package(stable_version)]
