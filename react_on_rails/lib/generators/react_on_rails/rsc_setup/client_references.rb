@@ -43,8 +43,10 @@ module ReactOnRails
             // (which re-runs the hook). Running bin/shakapacker directly after changing server
             // components is covered by the best-effort staleness warning below.
             //
-            // The resolution cascade below is mirrored, branch for branch, by the Pro dummy's
-            // hand-written rscManifestClientReferences.js and pinned on both sides by contract tests.
+            // The resolution cascade below — including the react-on-rails-pro client-component
+            // registrations appended to every branch's result (issue #5079) — is mirrored, branch
+            // for branch, by the Pro dummy's hand-written rscManifestClientReferences.js and pinned
+            // on both sides by contract tests.
             const rscClientReferences = (() => {
               // Required inside the IIFE rather than at the top of the file because the module-scope
               // bindings 'resolve' (from 'path') and 'config' (from 'shakapacker') are already
@@ -168,40 +170,73 @@ module ReactOnRails
                 );
               };
 
-              if (configuredRefsJson) {
-                const resolvedRefsJson = resolve(configuredRefsJson);
-                if (!existsSync(resolvedRefsJson)) {
-                  throw new Error(
-                    `RSC_MANIFEST_CLIENT_REFERENCES_JSON is set but the file does not exist: ${resolvedRefsJson}`,
-                  );
+              const resolveDiscoveredClientReferences = () => {
+                if (configuredRefsJson) {
+                  const resolvedRefsJson = resolve(configuredRefsJson);
+                  if (!existsSync(resolvedRefsJson)) {
+                    throw new Error(
+                      `RSC_MANIFEST_CLIENT_REFERENCES_JSON is set but the file does not exist: ${resolvedRefsJson}`,
+                    );
+                  }
+                  warnIfManifestStale(resolvedRefsJson);
+                  return readManifestReferences(resolvedRefsJson);
                 }
-                warnIfManifestStale(resolvedRefsJson);
-                return readManifestReferences(resolvedRefsJson);
-              }
 
-              if (process.env.RSC_REFERENCE_DISCOVERY_BUILD === 'true' || process.env.RSC_BUNDLE_ONLY === 'true') {
-                return [fallbackRscClientReferences];
-              }
-
-              if (existsSync(defaultRefsJson)) {
-                warnIfManifestStale(defaultRefsJson);
-                return readManifestReferences(defaultRefsJson);
-              }
-
-              if (existsSync(serverComponentRegistrationEntry)) {
-                if (!rscConfigSupportsDiscovery()) {
-                  console.warn(
-                    `[react_on_rails] Missing ${defaultRefsJson}, but this app's RSC webpack config ` +
-                      'or precompile hook does not support manifest discovery yet; falling back to broad client ' +
-                      'reference scan. Re-run rails g react_on_rails:rsc to update generated configs.',
-                  );
+                if (process.env.RSC_REFERENCE_DISCOVERY_BUILD === 'true' || process.env.RSC_BUNDLE_ONLY === 'true') {
                   return [fallbackRscClientReferences];
                 }
 
-                throw new Error(`Missing ${defaultRefsJson}. Run bin/shakapacker-precompile-hook before bin/shakapacker.`);
-              }
+                if (existsSync(defaultRefsJson)) {
+                  warnIfManifestStale(defaultRefsJson);
+                  return readManifestReferences(defaultRefsJson);
+                }
 
-              return [fallbackRscClientReferences];
+                if (existsSync(serverComponentRegistrationEntry)) {
+                  if (!rscConfigSupportsDiscovery()) {
+                    console.warn(
+                      `[react_on_rails] Missing ${defaultRefsJson}, but this app's RSC webpack config ` +
+                        'or precompile hook does not support manifest discovery yet; falling back to broad client ' +
+                        'reference scan. Re-run rails g react_on_rails:rsc to update generated configs.',
+                    );
+                    return [fallbackRscClientReferences];
+                  }
+
+                  throw new Error(`Missing ${defaultRefsJson}. Run bin/shakapacker-precompile-hook before bin/shakapacker.`);
+                }
+
+                return [fallbackRscClientReferences];
+              };
+
+              // react-on-rails-pro ships its own 'use client' components (RSCRoute, RSCProvider, and
+              // the default RSC provider registration). Both the discovery build and the fallback
+              // directory scan only cover app source — node_modules is never scanned — so these can
+              // never be discovered and, without explicit registration, never reach
+              // react-client-manifest.json. Server components rendering them (e.g. a nested
+              // <RSCRoute> for section-level refetching) then fail the render-time manifest lookup
+              // even when the RSC bundle compiles (issue #5079). require.resolve returns the
+              // absolute realpath, which matches the module resource webpack records
+              // (resolve.symlinks defaults to true), so the manifest keys line up with the file URLs
+              // the RSC bundle's client references carry even when react-on-rails-pro is installed
+              // through a symlink (pnpm, workspaces). A function (invoked in the return below, after
+              // the discovered references resolve) so both this resolver and its Pro dummy mirror
+              // surface the same first error when both steps fail.
+              const reactOnRailsProClientReferences = () =>
+                [
+                  'react-on-rails-pro/RSCRoute',
+                  'react-on-rails-pro/RSCProvider',
+                  'react-on-rails-pro/registerDefaultRSCProvider/client',
+                ].map((subpath) => {
+                  try {
+                    return require.resolve(subpath);
+                  } catch (err) {
+                    throw new Error(
+                      `Failed to resolve the react-on-rails-pro client component "${subpath}" for RSC ` +
+                        `client-reference registration: ${err.message}`,
+                    );
+                  }
+                });
+
+              return [...new Set([...resolveDiscoveredClientReferences(), ...reactOnRailsProClientReferences()])];
             })();
           JS
         end
@@ -277,6 +312,10 @@ module ReactOnRails
 
             content = read_current_rsc_config(config_path, fallback: content)
           end
+          # A previously generated IIFE (no react-on-rails-pro registrations — issue #5079) also
+          # counts as generated below; warn so the user registers the components manually.
+          warn_outdated_rsc_client_references_helper(config_path) if
+            outdated_generated_rsc_client_references_defined?(content)
           return :scoped if generated_rsc_client_references_defined?(content)
 
           warn_unscoped_rsc_client_references_helper(config_path)
@@ -311,6 +350,12 @@ module ReactOnRails
             write_existing_rsc_config(config_path, normalized_content, action: :rewrite)
             content = normalized_content
           end
+
+          # A resolver emitted by a previous generator version (no react-on-rails-pro
+          # client-component registrations — issue #5079) is deliberately not rewritten; warn
+          # before the scoped-references short-circuit below treats it as already current.
+          warn_outdated_rsc_client_references_helper(config_path) if
+            outdated_generated_rsc_client_references_defined?(content)
 
           return unless rsc_plugin_sections_safe_to_rewrite?(config_path, content, is_server:)
 
@@ -1403,6 +1448,31 @@ module ReactOnRails
           updated_content = content.dup
           updated_content[range_start...range_end] = rsc_client_references_js
           write_existing_rsc_config(config_path, updated_content, action: :rewrite)
+        end
+
+        # True when the file carries a manifest-backed generated resolver IIFE that does not
+        # register the react-on-rails-pro client components (issue #5079) — either the resolver a
+        # previous generator version emitted, or a user customization of one. The generator never
+        # rewrites such a resolver; it warns with manual registration instructions instead.
+        def outdated_generated_rsc_client_references_defined?(content)
+          return false unless generated_rsc_client_references_defined?(content)
+
+          iife_body = generated_rsc_client_references_iife_body(content)
+          return false unless iife_body
+
+          !js_code_matches?(iife_body, /\breactOnRailsProClientReferences\b/)
+        end
+
+        def warn_outdated_rsc_client_references_helper(config_path)
+          GeneratorMessages.add_warning(
+            "#{config_path} contains a rscClientReferences resolver from a previous generator " \
+            "version: it does not register the react-on-rails-pro package's own client components " \
+            "(RSCRoute, RSCProvider, registerDefaultRSCProvider/client — issue #5079). The file was " \
+            "left unchanged. Add require.resolve entries for those components to your " \
+            "clientReferences (see the RSC setup docs at " \
+            "https://reactonrails.com/docs/pro/react-server-components/create-without-ssr), or " \
+            "remove the generated resolver block and re-run this generator to emit the current one."
+          )
         end
 
         def read_current_rsc_config(config_path, fallback:)

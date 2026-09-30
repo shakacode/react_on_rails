@@ -1,8 +1,10 @@
 # frozen_string_literal: true
 
 require_relative "../support/generator_spec_helper"
+require "json"
 require "open3"
 require "tempfile"
+require "tmpdir"
 
 describe RscGenerator, type: :generator do
   include GeneratorSpec::TestCase
@@ -317,6 +319,21 @@ describe RscGenerator, type: :generator do
           expect(content).to include("directory: resolve(config.source_path)")
           expect(content).to include('include: /\.(js|mjs|cjs|ts|mts|cts|jsx|tsx)$/')
           expect(content).to include("isServer: false")
+        end
+      end
+
+      it "registers the pro package client components in both emitted resolvers" do
+        # Kept in lockstep with the Pro dummy's PRO_CLIENT_REFERENCES list in
+        # react_on_rails_pro/spec/dummy/tests/rsc-manifest-client-references.test.js (issue #5079).
+        # Deliberately independent of the golden-output spec: REGENERATE_GENERATOR_GOLDEN=1
+        # re-approves golden files wholesale, while this pin still fails if the registrations
+        # disappear from the emitted resolver.
+        %w[config/webpack/serverWebpackConfig.js config/webpack/clientWebpackConfig.js].each do |config_path|
+          assert_file config_path do |content|
+            expect(content).to include("'react-on-rails-pro/RSCRoute',")
+            expect(content).to include("'react-on-rails-pro/RSCProvider',")
+            expect(content).to include("'react-on-rails-pro/registerDefaultRSCProvider/client',")
+          end
         end
       end
 
@@ -1311,6 +1328,19 @@ describe RscGenerator, type: :generator do
 
   describe "existing RSC webpack config migration helpers" do
     let(:generator) { described_class.new([], {}, { destination_root: }) }
+    let(:previously_generated_rsc_client_config) do
+      previous_generated_rsc_config("manifest_era_b58d1fe8b.js")
+    end
+
+    # A verbatim clientWebpackConfig.js as the last pre-#5079 generator version produced it
+    # (the golden webpack_rsc fixture at b58d1fe8b); see the fixture directory's README.md.
+    # Kept byte-verbatim (no added headers) so outdated-resolver detection sees exactly what
+    # a real app contains.
+    def previous_generated_rsc_config(fixture_name)
+      File.read(
+        File.expand_path("../fixtures/previous_generated_rsc_configs/#{fixture_name}", __dir__)
+      )
+    end
 
     before do
       prepare_destination
@@ -1436,6 +1466,39 @@ describe RscGenerator, type: :generator do
       expect(migrated_content).to include("const fallbackRscClientReferences = {")
       expect(migrated_content).to include("const rscClientReferences = (() => {")
       expect(migrated_content).to include("clientReferences: rscClientReferences")
+    end
+
+    # The generator deliberately never rewrites a resolver a previous version emitted
+    # (issue #5079 follow-up decision): it warns with manual registration instructions and
+    # leaves the file byte-identical.
+    it "warns and leaves a previously generated resolver without the pro client components unchanged" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(config_path, previously_generated_rsc_client_config)
+
+      generator.send(:update_client_webpack_config_for_rsc)
+
+      expect(File.read(File.join(destination_root, config_path))).to eq(previously_generated_rsc_client_config)
+      messages = GeneratorMessages.messages.join("\n")
+      expect(messages).to include("does not register the react-on-rails-pro package's own client components")
+      expect(messages).to include("The file was left unchanged")
+      expect(messages).to include("react-server-components/create-without-ssr")
+    end
+
+    it "warns and leaves a customized previously generated resolver unchanged" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      customized_config = previously_generated_rsc_client_config.sub(
+        "  return [fallbackRscClientReferences];\n})();",
+        "  return [fallbackRscClientReferences, { directory: resolve('vendor-client') }];\n})();"
+      )
+      expect(customized_config).to include("vendor-client") # guard that the sub matched
+      simulate_existing_file(config_path, customized_config)
+
+      generator.send(:update_client_webpack_config_for_rsc)
+
+      expect(File.read(File.join(destination_root, config_path))).to eq(customized_config)
+      expect(GeneratorMessages.messages.join("\n")).to include(
+        "does not register the react-on-rails-pro package's own client components"
+      )
     end
 
     it "warns and skips wiring an existing unscoped rscClientReferences helper on the fresh-install path" do
@@ -1918,26 +1981,90 @@ describe RscGenerator, type: :generator do
       expect(generator.send(:generated_rsc_client_references_defined?, resolver)).to be(true)
     end
 
-    it "runs the exact generated resolver in ESM with the documented compatibility shim" do
-      resolver = generator.send(:rsc_client_references_js)
+    # Wraps the generated resolver in the documented ESM compatibility shim, appends
+    # `assertions` (plain JS that may throw), and runs the whole file under node. The gem test
+    # environment installs no npm packages, so require.resolve of the react-on-rails-pro package
+    # (registered explicitly by the resolver — issue #5079) is stubbed to a fixed path; real apps
+    # resolve the installed package through the documented createRequire prelude unchanged. The
+    # stubbed pro paths are exposed to `assertions` as `proReferences`. Returns
+    # `[stderr, status]` from the node run for the example's own expectation.
+    def run_generated_resolver_in_esm(resolver, assertions, env: {})
       esm_config = <<~JS
         import { createRequire } from 'node:module';
         import { dirname, resolve } from 'node:path';
         import { fileURLToPath } from 'node:url';
 
-        const require = createRequire(import.meta.url);
+        const nodeRequire = createRequire(import.meta.url);
+        const require = Object.assign((request) => nodeRequire(request), nodeRequire, {
+          resolve: (request) =>
+            request.startsWith('react-on-rails-pro/')
+              ? `/stubbed-node-modules/${request}.js`
+              : nodeRequire.resolve(request),
+        });
         const __dirname = dirname(fileURLToPath(import.meta.url));
         const config = { source_path: '.', source_entry_path: '.' };
 
         #{resolver}
 
         if (!Array.isArray(rscClientReferences)) throw new Error('Expected an array of client references');
+        const proReferences = [
+          '/stubbed-node-modules/react-on-rails-pro/RSCRoute.js',
+          '/stubbed-node-modules/react-on-rails-pro/RSCProvider.js',
+          '/stubbed-node-modules/react-on-rails-pro/registerDefaultRSCProvider/client.js',
+        ];
+        const countOf = (reference) =>
+          rscClientReferences.filter((entry) => entry === reference).length;
+        #{assertions}
       JS
 
       Tempfile.create(["rsc-client-references", ".mjs"]) do |file|
         file.write(esm_config)
         file.flush
-        _stdout, stderr, status = Open3.capture3("node", file.path)
+        _stdout, stderr, status = Open3.capture3(env, "node", file.path)
+
+        [stderr, status]
+      end
+    end
+
+    it "runs the exact generated resolver in ESM with the documented compatibility shim" do
+      stderr, status = run_generated_resolver_in_esm(generator.send(:rsc_client_references_js), <<~JS)
+        for (const reference of proReferences) {
+          if (countOf(reference) !== 1) {
+            throw new Error(
+              `Expected exactly one ${reference}, got: ${JSON.stringify(rscClientReferences)}`,
+            );
+          }
+        }
+      JS
+
+      expect(status.success?).to be(true), stderr
+    end
+
+    it "dedupes a pro client component already present in the discovery manifest" do
+      Dir.mktmpdir do |dir|
+        manifest_path = File.join(dir, "rsc-client-references.json")
+        File.write(manifest_path, JSON.generate(refs: [
+                                                  "/app/components/Widget.jsx",
+                                                  "/stubbed-node-modules/react-on-rails-pro/RSCRoute.js"
+                                                ]))
+
+        stderr, status = run_generated_resolver_in_esm(
+          generator.send(:rsc_client_references_js),
+          <<~JS,
+            const expected = ['/app/components/Widget.jsx', ...proReferences];
+            for (const reference of expected) {
+              if (countOf(reference) !== 1) {
+                throw new Error(
+                  `Expected exactly one ${reference}, got: ${JSON.stringify(rscClientReferences)}`,
+                );
+              }
+            }
+            if (rscClientReferences.length !== expected.length) {
+              throw new Error(`Expected ${expected.length} references, got: ${JSON.stringify(rscClientReferences)}`);
+            }
+          JS
+          env: { "RSC_MANIFEST_CLIENT_REFERENCES_JSON" => manifest_path }
+        )
 
         expect(status.success?).to be(true), stderr
       end
@@ -4826,6 +4953,21 @@ describe RscGenerator, type: :generator do
           expect(content).to include("isServer: false")
           expect(content).not_to include("RSCWebpackPlugin")
           expect(content).not_to include("react-on-rails-rsc/WebpackPlugin")
+        end
+      end
+
+      it "registers the pro package client components in both emitted resolvers" do
+        # Kept in lockstep with the Pro dummy's PRO_CLIENT_REFERENCES list in
+        # react_on_rails_pro/spec/dummy/tests/rsc-manifest-client-references.test.js (issue #5079).
+        # Deliberately independent of the golden-output spec: REGENERATE_GENERATOR_GOLDEN=1
+        # re-approves golden files wholesale, while this pin still fails if the registrations
+        # disappear from the emitted resolver.
+        %w[config/rspack/serverWebpackConfig.js config/rspack/clientWebpackConfig.js].each do |config_path|
+          assert_file config_path do |content|
+            expect(content).to include("'react-on-rails-pro/RSCRoute',")
+            expect(content).to include("'react-on-rails-pro/RSCProvider',")
+            expect(content).to include("'react-on-rails-pro/registerDefaultRSCProvider/client',")
+          end
         end
       end
 
