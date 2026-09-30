@@ -93,6 +93,14 @@ module ReactOnRailsPro
       # @param render_options [Object] Options that control the rendering behavior
       # @return [String] JavaScript code that sets up AsyncPropsManager or empty string
       def async_props_setup_js(render_options)
+        # When no async_props_block is present, return empty string — the component
+        # either doesn't use async props at all, or is on the refetch path where the
+        # template-level fix (rsc_payload.text.erb) already handles it.
+        #
+        # We must NOT inject a stub getReactOnRailsAsyncProp function here because
+        # React cannot serialize functions to Client Components — doing so causes
+        # "Functions cannot be passed directly to Client Components" errors for every
+        # RSC component that doesn't use async props.
         return "" unless render_options.internal_option(:async_props_block)
 
         <<-JS
