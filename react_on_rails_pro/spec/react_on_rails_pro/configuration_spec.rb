@@ -1219,7 +1219,8 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
           ReactOnRailsPro.configure do |config|
             config.register_async_props("MyComponent", String)
           end
-        end.to raise_error(ReactOnRailsPro::Error, /provider_class_name must be a non-empty String.*class name, not the class/)
+        end.to raise_error(ReactOnRailsPro::Error,
+                           /provider_class_name must be a non-empty String.*class name, not the class/)
       end
     end
 
