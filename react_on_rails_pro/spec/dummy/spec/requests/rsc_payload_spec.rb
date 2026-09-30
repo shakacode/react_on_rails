@@ -90,6 +90,13 @@ RSpec.describe "RSC payload endpoint" do
     expect(response.body).to eq("Invalid props JSON")
   end
 
+  it "returns bad request for non-object JSON props" do
+    get "/rsc_payload/RscEchoProps", params: { props: "42" }
+
+    expect(response).to have_http_status(:bad_request)
+    expect(response.body).to include("Invalid props JSON")
+  end
+
   it "returns bad request for bracket-notation props instead of 500" do
     get "/rsc_payload/RscEchoProps", params: { "props[foo]" => "bar" }
 

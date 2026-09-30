@@ -391,7 +391,7 @@ without a full page reload:
 
 ```tsx
 'use client';
-import { useCurrentRSCRoute } from 'react-on-rails-pro';
+import { useCurrentRSCRoute } from 'react-on-rails-pro/RSCRoute';
 
 function SaveButton({ onSave }) {
   const { refetch } = useCurrentRSCRoute();

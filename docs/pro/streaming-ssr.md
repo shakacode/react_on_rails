@@ -273,8 +273,8 @@ For the full data-fetching guidance — synchronous props, parallelizing indepen
 > end
 > ```
 >
-> Or override `rsc_payload_async_props_block_override` in your controller. See the
-> [RSC payload endpoint docs](react-server-components/rsc-payload-route-data.md)
+> Or override `rsc_payload_async_props_block_override` in your controller. See
+> [Upgrading: async props on the RSC payload endpoint](updating.md#async-props-on-the-rsc-payload-endpoint)
 > for details.
 
 ### The discouraged alternative: direct `fetch` from the renderer
