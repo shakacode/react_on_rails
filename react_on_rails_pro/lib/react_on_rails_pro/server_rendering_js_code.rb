@@ -93,28 +93,15 @@ module ReactOnRailsPro
       # @param render_options [Object] Options that control the rendering behavior
       # @return [String] JavaScript code that sets up AsyncPropsManager or empty string
       def async_props_setup_js(render_options)
-        unless render_options.internal_option(:async_props_block)
-          # Install a stub that rejects with a clear error message instead of letting
-          # the component hit "getReactOnRailsAsyncProp is not a function".
-          # This only runs on the RSC bundle path (the regular SSR bundle doesn't
-          # use this prop at all).
-          return <<-JS
-            if (ReactOnRails.isRSCBundle) {
-              usedProps = Object.assign({}, usedProps, {
-                getReactOnRailsAsyncProp: function(propName) {
-                  return Promise.reject(new Error(
-                    "getReactOnRailsAsyncProp('" + propName + "') was called, but no async props " +
-                    "block is configured for this render. This usually means RSCRoute.refetch() " +
-                    "hit the rsc_payload endpoint, which does not run your page view's emit block. " +
-                    "Fix: override rsc_payload_async_props_block_override in your controller, or register " +
-                    "the component with config.register_async_props in your initializer. " +
-                    "See: https://github.com/shakacode/react_on_rails/issues/5075"
-                  ));
-                }
-              });
-            }
-          JS
-        end
+        # When no async_props_block is present, return empty string — the component
+        # either doesn't use async props at all, or is on the refetch path where the
+        # template-level fix (rsc_payload.text.erb) already handles it.
+        #
+        # We must NOT inject a stub getReactOnRailsAsyncProp function here because
+        # React cannot serialize functions to Client Components — doing so causes
+        # "Functions cannot be passed directly to Client Components" errors for every
+        # RSC component that doesn't use async props.
+        return "" unless render_options.internal_option(:async_props_block)
 
         <<-JS
           if (ReactOnRails.isRSCBundle) {

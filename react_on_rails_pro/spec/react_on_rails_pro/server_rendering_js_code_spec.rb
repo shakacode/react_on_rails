@@ -26,22 +26,10 @@ RSpec.describe ReactOnRailsPro::ServerRenderingJsCode do
         )
       end
 
-      it "generates a stub getReactOnRailsAsyncProp that rejects with a helpful error" do
+      it "returns empty string" do
         result = described_class.async_props_setup_js(render_options)
 
-        expect(result).to include("getReactOnRailsAsyncProp")
-        expect(result).to include("Promise.reject")
-        expect(result).to include("no async props")
-        expect(result).to include("block is configured")
-        expect(result).to include("rsc_payload_async_props_block_override")
-        expect(result).to include("register_async_props")
-        expect(result).to include("5075")
-      end
-
-      it "wraps the stub in an isRSCBundle guard" do
-        result = described_class.async_props_setup_js(render_options)
-
-        expect(result).to include("ReactOnRails.isRSCBundle")
+        expect(result).to eq("")
       end
     end
 
@@ -129,7 +117,7 @@ RSpec.describe ReactOnRailsPro::ServerRenderingJsCode do
         )
       end
 
-      it "includes a fail-loud stub instead of the full async props setup" do
+      it "does NOT include async props setup JavaScript in the generated code" do
         result = described_class.render(
           props_string,
           rails_context,
@@ -140,8 +128,7 @@ RSpec.describe ReactOnRailsPro::ServerRenderingJsCode do
 
         expect(result).to include("var usedProps = typeof props === 'undefined' ?")
         expect(result).not_to include("ReactOnRails.addAsyncPropsCapabilityToComponentProps")
-        expect(result).to include("getReactOnRailsAsyncProp")
-        expect(result).to include("Promise.reject")
+        expect(result).not_to include("asyncPropManager")
       end
     end
 
