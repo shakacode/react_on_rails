@@ -96,6 +96,26 @@ RSpec.describe "react_on_rails_pro:update_public_key" do
     expect(File).not_to have_received(:write)
   end
 
+  it "rejects encrypted keys without requesting a password or writing either source file" do
+    encrypted_key = key_pair.private_to_pem(OpenSSL::Cipher.new("aes-128-cbc"), "test-password")
+    allow(Net::HTTP).to receive(:get_response).and_return(
+      instance_double(Net::HTTPOK, code: "200", body: JSON.generate(publicKey: encrypted_key))
+    )
+    password_requested = false
+    allow(OpenSSL::PKey::RSA).to receive(:new).and_wrap_original do |parse, *args|
+      parse.call(*args) do
+        password_requested = true
+        ""
+      end
+    end
+
+    expect { Rake::Task["react_on_rails_pro:update_public_key"].invoke }.to raise_error(SystemExit) do |error|
+      expect(error.status).to eq(1)
+    end
+    expect(password_requested).to be(false)
+    expect(File).not_to have_received(:write)
+  end
+
   it "does not copy trailing source text from an otherwise valid public key" do
     allow(Net::HTTP).to receive(:get_response).and_return(
       instance_double(Net::HTTPOK, code: "200", body: JSON.generate(publicKey: "#{public_key}PEM\n`${injected}`"))

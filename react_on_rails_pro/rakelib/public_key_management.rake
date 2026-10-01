@@ -69,7 +69,7 @@ namespace :react_on_rails_pro do # rubocop:disable Metrics/BlockLength
         exit 1
       end
 
-      parsed_key = OpenSSL::PKey::RSA.new(public_key)
+      parsed_key = OpenSSL::PKey::RSA.new(public_key, "")
       raise ArgumentError, "Expected a public RSA key, not a private key" if parsed_key.private?
 
       public_key = parsed_key.public_to_pem
