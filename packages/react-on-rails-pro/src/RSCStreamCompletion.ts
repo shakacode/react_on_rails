@@ -18,12 +18,21 @@ import type { ReactNode } from 'react';
 // Flight resolves its root before the stream completes. Track completion on
 // the decoded object, not a wrapper promise whose identity callers can change.
 // Weak keys keep this bookkeeping bounded by live payload trees.
-const completions = new WeakMap<object, Promise<boolean>>();
+const completions = new WeakMap<object, { completion: Promise<boolean>; hasErrors?: () => boolean }>();
 
-export const trackRSCStreamCompletion = (payload: ReactNode, completion: Promise<boolean>): ReactNode => {
-  if (typeof payload === 'object' && payload !== null) completions.set(payload, completion);
+export const trackRSCStreamCompletion = (
+  payload: ReactNode,
+  completion: Promise<boolean>,
+  hasErrors?: () => boolean,
+): ReactNode => {
+  if (typeof payload === 'object' && payload !== null) completions.set(payload, { completion, hasErrors });
   return payload;
 };
 
 export const getRSCStreamCompletion = (payload: ReactNode): Promise<boolean> | undefined =>
-  typeof payload === 'object' && payload !== null ? completions.get(payload) : undefined;
+  typeof payload === 'object' && payload !== null ? completions.get(payload)?.completion : undefined;
+
+export const hasRSCStreamErrors = (payload: ReactNode): boolean | undefined => {
+  const stream = typeof payload === 'object' && payload !== null ? completions.get(payload) : undefined;
+  return stream ? (stream.hasErrors?.() ?? false) : undefined;
+};

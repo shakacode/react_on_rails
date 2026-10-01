@@ -31,6 +31,7 @@ const artifacts = await mkdtemp(join(tmpdir(), 'ror-flight-recovery-'));
 const bundle = join(artifacts, 'bundle.js');
 const baseline = process.argv.includes('--baseline');
 const httpFailure = process.argv.includes('--http-failure');
+const clientFailure = process.argv.includes('--client-failure');
 await build({
   entryPoints: [fileURLToPath(new URL('./browser.tsx', import.meta.url))],
   bundle: true,
@@ -94,6 +95,8 @@ const server = spawn(
     fileURLToPath(new URL('./server.mjs', import.meta.url)),
     bundle,
     ...(httpFailure ? ['--http-failure'] : []),
+    ...(clientFailure ? ['--client-failure'] : []),
+    ...(process.argv.includes('--diagnostic-only') ? ['--diagnostic-only'] : []),
   ],
   {
     env: { ...process.env, NODE_ENV: 'production' },
@@ -133,42 +136,56 @@ try {
   if (!httpFailure) {
     await expect(page.getByTestId('pending')).toBeVisible();
     // The decoded root has rendered its Suspense shell before the server emits E.
-    await page.request.get(`http://127.0.0.1:${ready}/release-error`);
+    if (clientFailure) {
+      await page.getByRole('button', { name: 'Break client card', exact: true }).click();
+    } else {
+      await page.request.get(`http://127.0.0.1:${ready}/release-error`);
+    }
   }
   const response = await failedResponse;
   expect(response.status()).toBe(httpFailure ? 503 : 200);
-  const bytes = await response.body();
-  if (!httpFailure) {
-    expect(bytes.toString()).toMatch(/:E\{/);
-    expect(bytes.toString()).toContain('DETERMINISTIC_BOUNDARY_DIGEST');
+  if (clientFailure) {
+    // A healthy stream is still pending: a client error must reach the normal
+    // outer boundary, not restore old content or report a server refetch error.
+    await expect(page.getByRole('alert')).toHaveText('Outer route failure');
+    await expect(page.getByTestId('card')).toHaveCount(0);
+    await expect(page.getByTestId('notifications')).toHaveText('0');
+    await page.screenshot({ path: join(artifacts, 'unrelated-client-error.png') });
+  } else {
+    const bytes = await response.body();
+    if (!httpFailure) {
+      expect(bytes.toString()).toMatch(/:E\{/);
+      expect(bytes.toString()).toContain('DETERMINISTIC_BOUNDARY_DIGEST');
+    }
+    await expect(page.getByTestId('card')).toContainText('Card v1');
+    await expect(page.getByRole('alert')).toContainText('Refetch failed');
+    await expect(page.getByTestId('notifications')).toHaveText('1');
+    expect(await page.evaluate(() => Reflect.get(globalThis, '__flightRecoveryError'))).toMatchObject({
+      name: 'ServerComponentFetchError',
+      componentName: 'UserCard',
+      componentProps: { id: 1 },
+      ...(!httpFailure ? { digest: 'DETERMINISTIC_BOUNDARY_DIGEST' } : {}),
+    });
+    await page.waitForTimeout(700);
+    await page.screenshot({ path: join(artifacts, 'retained-error-desktop.png') });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.waitForTimeout(700);
+    await page.screenshot({ path: join(artifacts, 'retained-error-mobile.png') });
+    await page.getByRole('button', { name: 'Retry', exact: true }).click();
+    await expect(page.getByTestId('card')).toContainText('Card v2');
+    await expect(page.getByRole('alert')).toHaveCount(0);
+    await expect(page.getByTestId('notifications')).toHaveText('1');
+    await page.waitForTimeout(700);
+    await page.screenshot({ path: join(artifacts, 'retry-recovered.png') });
   }
-  await expect(page.getByTestId('card')).toContainText('Card v1');
-  await expect(page.getByRole('alert')).toContainText('Refetch failed');
-  await expect(page.getByTestId('notifications')).toHaveText('1');
-  expect(await page.evaluate(() => Reflect.get(globalThis, '__flightRecoveryError'))).toMatchObject({
-    name: 'ServerComponentFetchError',
-    componentName: 'UserCard',
-    componentProps: { id: 1 },
-    ...(!httpFailure ? { digest: 'DETERMINISTIC_BOUNDARY_DIGEST' } : {}),
-  });
-  await page.waitForTimeout(700);
-  await page.screenshot({ path: join(artifacts, 'retained-error-desktop.png') });
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.waitForTimeout(700);
-  await page.screenshot({ path: join(artifacts, 'retained-error-mobile.png') });
-  await page.getByRole('button', { name: 'Retry', exact: true }).click();
-  await expect(page.getByTestId('card')).toContainText('Card v2');
-  await expect(page.getByRole('alert')).toHaveCount(0);
-  await expect(page.getByTestId('notifications')).toHaveText('1');
-  await page.waitForTimeout(700);
-  await page.screenshot({ path: join(artifacts, 'retry-recovered.png') });
   await context.close();
   process.stdout.write(
     JSON.stringify({
       result: 'PASS',
       production: true,
       failedHTTPStatus: response.status(),
-      boundaryErrorRow: !httpFailure,
+      boundaryErrorRow: !httpFailure && !clientFailure,
+      unrelatedClientError: clientFailure,
       bundleBytes,
       artifacts,
     }) + '\n',

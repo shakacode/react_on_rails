@@ -59,7 +59,9 @@ const server = createServer(async (request, response) => {
       'article',
       { 'data-testid': 'card' },
       React.createElement('h2', null, failed ? 'Candidate' : requestCount === 1 ? 'Card v1' : 'Card v2'),
-      React.createElement(Controls),
+      React.createElement(Controls, {
+        enableClientFailure: failed && process.argv.includes('--client-failure'),
+      }),
       failed
         ? React.createElement(
             React.Suspense,
@@ -71,7 +73,11 @@ const server = createServer(async (request, response) => {
     response.writeHead(200, { 'content-type': 'text/plain' });
     const writable = new Writable({
       write(chunk, _encoding, done) {
-        const metadata = JSON.stringify({ hasErrors });
+        const metadata = JSON.stringify(
+          process.argv.includes('--diagnostic-only')
+            ? { renderingError: hasErrors ? { message: 'DETERMINISTIC_BOUNDARY_ERROR' } : undefined }
+            : { hasErrors },
+        );
         response.write(Buffer.concat([Buffer.from(`${metadata}\t${chunk.length.toString(16)}\n`), chunk]));
         done();
       },

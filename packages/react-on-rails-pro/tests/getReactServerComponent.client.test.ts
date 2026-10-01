@@ -91,9 +91,16 @@ describe('fetchRSC HTTP responses', () => {
     jest.resetModules();
   });
 
-  it.each([true, false])(
-    'tracks completion independently of an early Flight root (hasErrors=%s)',
-    async (hasErrors) => {
+  it.each([
+    [{ hasErrors: true }, false, false],
+    [{ hasErrors: false }, true, false],
+    [{ renderingError: { message: 'Boundary failed' } }, false, false],
+    [{ hasErrors: false, renderingError: { stack: 'Error: boundary failure' } }, false, false],
+    [{ renderingError: { message: '  ', stack: '\n' } }, true, false],
+    [{ hasErrors: false }, false, true],
+  ])(
+    'does not certify a diagnostic-only failed Flight stream (metadata=%j)',
+    async (metadata, successful, transportFailure) => {
       let controller!: ReadableStreamDefaultController<Uint8Array>;
       const body = new ReadableStream<Uint8Array>({
         start(streamController) {
@@ -103,11 +110,11 @@ describe('fetchRSC HTTP responses', () => {
       const root = React.createElement('div', null, 'decoded root');
       const { fetchRSC } = await loadClientModule(
         jest.fn((stream: ReadableStream<Uint8Array>) => {
-          void readStreamText(stream);
+          void readStreamText(stream).catch(() => undefined);
           return Promise.resolve(root);
         }),
       );
-      const { getRSCStreamCompletion } = await import('../src/RSCStreamCompletion.ts');
+      const { getRSCStreamCompletion, hasRSCStreamErrors } = await import('../src/RSCStreamCompletion.ts');
       fetchMock.mockResolvedValue({ ok: true, status: 200, body } as Response);
       controller.enqueue(encoder.encode(toLengthPrefixedRecord('root', { hasErrors: false })));
       const payload = await fetchRSC({
@@ -123,9 +130,14 @@ describe('fetchRSC HTTP responses', () => {
       });
       await Promise.resolve();
       expect(completed).toBe(false);
-      controller.enqueue(encoder.encode(toLengthPrefixedRecord('boundary', { hasErrors })));
-      controller.close();
-      await expect(completion).resolves.toBe(!hasErrors);
+      if (transportFailure) {
+        controller.error(new Error('late transport failure'));
+      } else {
+        controller.enqueue(encoder.encode(toLengthPrefixedRecord('boundary', metadata)));
+        controller.close();
+      }
+      await expect(completion).resolves.toBe(successful);
+      expect(hasRSCStreamErrors(payload)).toBe(!successful);
     },
   );
 

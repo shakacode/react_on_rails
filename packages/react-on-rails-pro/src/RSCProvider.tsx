@@ -34,7 +34,7 @@ import {
   RSC_PAYLOAD_FAILURE_RETENTION_MS,
 } from './RSCProviderCache.ts';
 import { consumePrefetchedServerComponent } from './RSCPrefetchStore.ts';
-import { getRSCStreamCompletion } from './RSCStreamCompletion.ts';
+import { getRSCStreamCompletion, hasRSCStreamErrors } from './RSCStreamCompletion.ts';
 import { createRSCPayloadKey, hasEmbeddedRSCPayload } from './utils.ts';
 
 export type RSCRefetchRecovery = {
@@ -42,6 +42,7 @@ export type RSCRefetchRecovery = {
   fallback: Promise<ReactNode>;
   refetchVersion: number;
   recover: () => void;
+  canRecover: () => boolean;
   commit: () => void;
 };
 
@@ -513,6 +514,7 @@ export const createRSCProvider = ({
           renderRecoveriesRef.current.delete(previousSuccessfulPromise);
         }
         let promise!: Promise<ReactNode>;
+        let refetchedPayload: ReactNode;
         const restoreLastSuccessfulPromise = () => {
           if (fetchRSCPromises.get(key, false) !== promise) {
             return;
@@ -564,6 +566,7 @@ export const createRSCProvider = ({
           )
           .then(
             (payload) => {
+              refetchedPayload = payload;
               if (payload instanceof Error) {
                 if (recoverOnError) {
                   restoreLastSuccessfulPromise();
@@ -612,6 +615,9 @@ export const createRSCProvider = ({
             fallback: previousSuccessfulPromise,
             refetchVersion,
             recover: restoreLastSuccessfulPromise,
+            // An interactive client can fail while a healthy Flight stream is
+            // still pending. Only its server/transport failure arms recovery.
+            canRecover: () => hasRSCStreamErrors(refetchedPayload) !== false,
             // Root fulfillment alone cannot certify a rendered Flight payload.
             // Wait for a successful commit and, for HTTP Flight, its error-free
             // stream completion before treating later client errors as unrelated.

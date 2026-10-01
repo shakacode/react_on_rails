@@ -126,8 +126,9 @@ const createFromFetch = async (
       componentName,
       source: sourceDescription,
     });
-    if (diagnosticError && !rscDiagnosticError) {
-      rscDiagnosticError = diagnosticError;
+    if (diagnosticError) {
+      streamHasErrors = true;
+      rscDiagnosticError ??= diagnosticError;
     }
   };
 
@@ -135,7 +136,6 @@ const createFromFetch = async (
     async start(controller) {
       const reader = body.getReader();
       const handleContent = (content: Uint8Array, metadata: Record<string, unknown>) => {
-        streamHasErrors ||= metadata.hasErrors === true;
         reportDiagnosticError(metadata);
         controller.enqueue(content);
         const consoleScript = (metadata.consoleReplayScript as string) ?? '';
@@ -158,6 +158,7 @@ const createFromFetch = async (
         finishStream(!streamHasErrors);
       } catch (error) {
         console.error('[ReactOnRails] Error parsing RSC stream:', error);
+        streamHasErrors = true;
         controller.error(error);
         finishStream(false);
       }
@@ -171,7 +172,7 @@ const createFromFetch = async (
   // rejects the diagnostic — if the stream carried one — is already set; it is never undefined
   // purely because of timing.
   return wrapInNewPromise(renderPromise)
-    .then((payload) => trackRSCStreamCompletion(payload, completion))
+    .then((payload) => trackRSCStreamCompletion(payload, completion, () => streamHasErrors))
     .catch((error: unknown) => {
       throw mergeRSCStreamDiagnosticError(error, rscDiagnosticError);
     });

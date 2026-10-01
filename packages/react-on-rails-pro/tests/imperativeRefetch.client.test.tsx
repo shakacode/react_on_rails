@@ -649,9 +649,9 @@ class CapturingErrorBoundary extends React.Component<
     expect(ref.current!.refetchError).toBeNull();
   });
 
-  it.each([false, true])(
-    'does not recover unrelated client errors after a successful refetch (stream=%s)',
-    async (streamed) => {
+  it.each(['none', 'completed', 'pending'])(
+    'does not recover unrelated client errors during or after a refetch stream (stream=%s)',
+    async (stream) => {
       process.env.NODE_ENV = 'production';
       const ClientCard = () => {
         const [broken, setBroken] = React.useState(false);
@@ -665,7 +665,7 @@ class CapturingErrorBoundary extends React.Component<
       const candidate = <ClientCard />;
       setupSequencedFetcher([
         <span>Old card</span>,
-        streamed ? trackRSCStreamCompletion(candidate, completion) : candidate,
+        stream !== 'none' ? trackRSCStreamCompletion(candidate, completion) : candidate,
       ]);
       const ref = React.createRef<RSCRouteHandle>();
       const onError = jest.fn();
@@ -679,7 +679,7 @@ class CapturingErrorBoundary extends React.Component<
       await act(async () => {
         await ref.current!.refetch();
       });
-      if (streamed) await act(async () => finish(true));
+      if (stream === 'completed') await act(async () => finish(true));
       await act(async () => {
         fireEvent.click(screen.getByText('Break client card'));
       });

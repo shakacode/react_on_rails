@@ -19,10 +19,13 @@ import RSCRoute, { useCurrentRSCRoute } from '../../../src/RSCRoute.tsx';
 import { createRSCProvider } from '../../../src/RSCProvider.tsx';
 import { fetchRSC } from '../../../src/getReactServerComponent.client.ts';
 
-const Controls = () => {
+const Controls = ({ enableClientFailure = false }: { enableClientFailure?: boolean }) => {
   const route = useCurrentRSCRoute();
+  const [broken, setBroken] = React.useState(false);
+  if (broken) throw new Error('DETERMINISTIC_CLIENT_ERROR');
   return (
     <section>
+      {enableClientFailure && <button onClick={() => setBroken(true)}>Break client card</button>}
       <button
         onClick={() => {
           void route.refetch().catch(() => {});
