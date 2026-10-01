@@ -38,9 +38,11 @@ import { getRSCStreamCompletion } from './RSCStreamCompletion.ts';
 import { createRSCPayloadKey, hasEmbeddedRSCPayload } from './utils.ts';
 
 export type RSCRefetchRecovery = {
+  active: boolean;
   fallback: Promise<ReactNode>;
   refetchVersion: number;
   recover: () => void;
+  commit: () => void;
 };
 
 type RSCContextType = {
@@ -604,11 +606,28 @@ export const createRSCProvider = ({
         // the eviction victim when the cache is already full of pinned keys.
         fetchRSCPromises.setPinned(key, promise);
         if (recoverOnError && previousSuccessfulPromise !== undefined) {
-          renderRecoveriesRef.current.set(promise, {
+          let renderCommitted = false;
+          const recovery: RSCRefetchRecovery = {
+            active: true,
             fallback: previousSuccessfulPromise,
             refetchVersion,
             recover: restoreLastSuccessfulPromise,
-          });
+            // Root fulfillment alone cannot certify a rendered Flight payload.
+            // Wait for a successful commit and, for HTTP Flight, its error-free
+            // stream completion before treating later client errors as unrelated.
+            commit: () => {
+              if (renderCommitted) return;
+              renderCommitted = true;
+              void promise.then(async (payload) => {
+                const completion = getRSCStreamCompletion(payload);
+                if (completion !== undefined && !(await completion)) return;
+                if (fetchRSCPromises.get(key, false) !== promise) return;
+                recovery.active = false;
+                renderRecoveriesRef.current.delete(promise);
+              });
+            },
+          };
+          renderRecoveriesRef.current.set(promise, recovery);
         }
         startTransition(() => {
           setVersions((v) => ({ ...v, [key]: (v[key] ?? 0) + 1 }));

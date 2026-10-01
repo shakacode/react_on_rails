@@ -52,9 +52,17 @@ export default class RefetchRenderBoundary extends Component<
     return { error };
   }
 
+  componentDidMount() {
+    this.completeSuccessfulRender();
+  }
+
+  componentDidUpdate() {
+    this.completeSuccessfulRender();
+  }
+
   componentDidCatch(error: Error) {
     const { recovery, onRecover } = this.props;
-    if (recovery) {
+    if (recovery?.active) {
       recovery.recover();
       // A sibling may have restored this shared entry first. Still notify the
       // initiating handle; its version guards exclude unrelated/stale routes.
@@ -62,11 +70,15 @@ export default class RefetchRenderBoundary extends Component<
     }
   }
 
+  completeSuccessfulRender() {
+    if (!this.state.error) this.props.recovery?.commit();
+  }
+
   render() {
     const { promise, recovery } = this.props;
     const { error } = this.state;
     if (error) {
-      if (!recovery) throw error;
+      if (!recovery?.active) throw error;
       return <PromiseWrapper promise={recovery.fallback} />;
     }
     return <PromiseWrapper promise={promise} />;

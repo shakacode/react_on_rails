@@ -649,6 +649,46 @@ class CapturingErrorBoundary extends React.Component<
     expect(ref.current!.refetchError).toBeNull();
   });
 
+  it.each([false, true])(
+    'does not recover unrelated client errors after a successful refetch (stream=%s)',
+    async (streamed) => {
+      process.env.NODE_ENV = 'production';
+      const ClientCard = () => {
+        const [broken, setBroken] = React.useState(false);
+        if (broken) throw new Error('unrelated client error');
+        return <button onClick={() => setBroken(true)}>Break client card</button>;
+      };
+      let finish!: (value: boolean) => void;
+      const completion = new Promise<boolean>((resolve) => {
+        finish = resolve;
+      });
+      const candidate = <ClientCard />;
+      setupSequencedFetcher([
+        <span>Old card</span>,
+        streamed ? trackRSCStreamCompletion(candidate, completion) : candidate,
+      ]);
+      const ref = React.createRef<RSCRouteHandle>();
+      const onError = jest.fn();
+      await renderInAct(
+        <TestHarness>
+          <CapturingErrorBoundary fallback={(error) => <div>{error.message}</div>}>
+            <RSCRoute ref={ref} componentName="Card" componentProps={{}} onRefetchError={onError} />
+          </CapturingErrorBoundary>
+        </TestHarness>,
+      );
+      await act(async () => {
+        await ref.current!.refetch();
+      });
+      if (streamed) await act(async () => finish(true));
+      await act(async () => {
+        fireEvent.click(screen.getByText('Break client card'));
+      });
+      expect(screen.getByText('unrelated client error')).toBeInTheDocument();
+      expect(screen.queryByText('Old card')).not.toBeInTheDocument();
+      expect(onError).not.toHaveBeenCalled();
+    },
+  );
+
   it('notifies the initiating sibling when another route restores a failed render first', async () => {
     process.env.NODE_ENV = 'production';
     const boundaryError = new Error('shared Flight boundary failed');
