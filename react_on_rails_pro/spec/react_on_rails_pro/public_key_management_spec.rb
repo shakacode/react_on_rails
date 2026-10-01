@@ -16,6 +16,9 @@
 require "rake"
 
 RSpec.describe "react_on_rails_pro:update_public_key" do
+  let(:key_pair) { OpenSSL::PKey::RSA.new(512) }
+  let(:public_key) { key_pair.public_to_pem }
+
   around do |example|
     Rake.with_application do
       load File.expand_path("../../rakelib/public_key_management.rake", __dir__)
@@ -27,7 +30,7 @@ RSpec.describe "react_on_rails_pro:update_public_key" do
     allow(File).to receive(:write)
     allow($stdout).to receive(:puts)
     allow(Net::HTTP).to receive(:get_response).and_return(
-      instance_double(Net::HTTPOK, code: "200", body: JSON.generate(publicKey: "test-public-key"))
+      instance_double(Net::HTTPOK, code: "200", body: JSON.generate(publicKey: public_key))
     )
   end
 
@@ -71,12 +74,47 @@ RSpec.describe "react_on_rails_pro:update_public_key" do
     end
   end
 
+  it "rejects malformed key material before writing either source file" do
+    allow(Net::HTTP).to receive(:get_response).and_return(
+      instance_double(Net::HTTPOK, code: "200", body: JSON.generate(publicKey: "PEM\n`${injected}`"))
+    )
+
+    expect { Rake::Task["react_on_rails_pro:update_public_key"].invoke }.to raise_error(SystemExit) do |error|
+      expect(error.status).to eq(1)
+    end
+    expect(File).not_to have_received(:write)
+  end
+
+  it "rejects private keys before writing either source file" do
+    allow(Net::HTTP).to receive(:get_response).and_return(
+      instance_double(Net::HTTPOK, code: "200", body: JSON.generate(publicKey: key_pair.to_pem))
+    )
+
+    expect { Rake::Task["react_on_rails_pro:update_public_key"].invoke }.to raise_error(SystemExit) do |error|
+      expect(error.status).to eq(1)
+    end
+    expect(File).not_to have_received(:write)
+  end
+
+  it "does not copy trailing source text from an otherwise valid public key" do
+    allow(Net::HTTP).to receive(:get_response).and_return(
+      instance_double(Net::HTTPOK, code: "200", body: JSON.generate(publicKey: "#{public_key}PEM\n`${injected}`"))
+    )
+
+    Rake::Task["react_on_rails_pro:update_public_key"].invoke
+
+    expect(File).to have_received(:write).twice do |_path, content|
+      expect(content).to include(public_key.strip)
+      expect(content).not_to include("injected")
+    end
+  end
+
   it "writes the renderer key into the current workspace package with its commercial license header" do
     Rake::Task["react_on_rails_pro:update_public_key"].invoke
 
     expect(File).to have_received(:write).with(
       File.expand_path("../../../packages/react-on-rails-pro-node-renderer/src/shared/licensePublicKey.ts", __dir__),
-      a_string_including("React on Rails Pro (commercial license)", "test-public-key")
+      a_string_including("React on Rails Pro (commercial license)", public_key.strip)
     )
   end
 
@@ -85,7 +123,11 @@ RSpec.describe "react_on_rails_pro:update_public_key" do
 
     expect(File).to have_received(:write).with(
       File.expand_path("../../lib/react_on_rails_pro/license_public_key.rb", __dir__),
-      a_string_including("# frozen_string_literal: true", "React on Rails Pro (commercial license)", "test-public-key")
-    )
+      a_string_including("# frozen_string_literal: true", "React on Rails Pro (commercial license)", public_key.strip)
+    ) do |_path, content|
+      generated = Module.new
+      generated.module_eval(content)
+      expect(generated.const_get("ReactOnRailsPro::LicensePublicKey::KEY").public_to_pem).to eq(public_key)
+    end
   end
 end

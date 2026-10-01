@@ -16,6 +16,7 @@
 require "net/http"
 require "json"
 require "uri"
+require "openssl"
 
 # React on Rails Pro License Public Key Management Tasks
 #
@@ -67,6 +68,11 @@ namespace :react_on_rails_pro do # rubocop:disable Metrics/BlockLength
         puts "❌ No public key found in response"
         exit 1
       end
+
+      parsed_key = OpenSSL::PKey::RSA.new(public_key)
+      raise ArgumentError, "Expected a public RSA key, not a private key" if parsed_key.private?
+
+      public_key = parsed_key.public_to_pem
 
       # Update Ruby public key file
       ruby_file_path = File.expand_path("../lib/react_on_rails_pro/license_public_key.rb", __dir__)
