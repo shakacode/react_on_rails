@@ -84,7 +84,8 @@ export default class CallbackRegistry<T> {
   }
 
   private initializeTimeoutEvents() {
-    if (this.timeoutEventsInitialized) return;
+    // Server registries must not be retained by browser page-lifecycle callbacks.
+    if (typeof window === 'undefined' || this.timeoutEventsInitialized) return;
     this.timeoutEventsInitialized = true;
 
     onPageLoaded(() => {

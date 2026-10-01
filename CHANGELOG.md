@@ -49,6 +49,11 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 5134](https://github.com/shakacode/react_on_rails/pull/5134) by
   [Justin Gordon](https://github.com/justin808).
 
+- **[Pro]** **Concurrent SSR keeps hydrated Redux stores separate**: Async rendering, streaming,
+  and RSC Client Component providers now read only their request's stores in a shared Node Renderer
+  worker. Upgrade the Node Renderer and React on Rails JavaScript packages together. Browser store
+  APIs and page lifecycle behavior are unchanged. Fixes [issue 5124](https://github.com/shakacode/react_on_rails/issues/5124).
+
 - **[Pro]** **RSC streams no longer encode consumer logs into the Flight payload**: React 19.3 development
   Flight keeps a console hook active while it flushes chunks, so logs from code consuming the returned RSC
   Readable were serialized as `:W["log"...]` rows. In non-production builds, RSC payload streams now use

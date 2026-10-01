@@ -689,7 +689,7 @@ async function buildVM(filePath: string): Promise<VMContext> {
       Object.defineProperty(contextObject, HYDRATED_STORE_SCOPE_CONTEXT_KEY, {
         configurable: false,
         enumerable: false,
-        value: hydratedStoreScope,
+        value: Object.freeze({ getStore: () => hydratedStoreScope.getStore() }),
         writable: false,
       });
       // Install this after every context extension so application configuration
