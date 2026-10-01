@@ -49,7 +49,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 - **[Pro]** **Concurrent SSR keeps hydrated Redux stores separate**: Async rendering, streaming,
   and RSC Client Component providers now read only their request's stores in a shared Node Renderer
   worker. **Action required for upgraders:** Upgrade the Node Renderer and React on Rails JavaScript packages together. Move module-scope `setStore` calls into per-render hydration. Browser store
-  APIs and page lifecycle behavior are unchanged. Fixes [issue 5124](https://github.com/shakacode/react_on_rails/issues/5124).
+  APIs and page lifecycle behavior are unchanged. [PR 5133](https://github.com/shakacode/react_on_rails/pull/5133) by
+  [justin808](https://github.com/justin808).
 
 - **[Pro]** **RSC streams no longer encode consumer logs into the Flight payload**: React 19.3 development
   Flight keeps a console hook active while it flushes chunks, so logs from code consuming the returned RSC
