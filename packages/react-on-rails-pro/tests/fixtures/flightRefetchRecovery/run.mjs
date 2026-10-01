@@ -47,10 +47,13 @@ await build({
           {
             name: 'unfixed-negative-control',
             setup(builder) {
-              builder.onResolve({ filter: /(?:^|\/)(?:RSCRoute|RSCProvider)\.tsx$/ }, ({ path }) => ({
-                path: path.split('/').at(-1),
-                namespace: 'unfixed',
-              }));
+              builder.onResolve(
+                { filter: /(?:^|\/)(?:RSCRoute|RSCProvider|getReactServerComponent\.client)\.tsx?$/ },
+                ({ path }) => ({
+                  path: path.split('/').at(-1),
+                  namespace: 'unfixed',
+                }),
+              );
               builder.onLoad({ filter: /.*/, namespace: 'unfixed' }, ({ path }) => ({
                 contents: execFileSync(
                   'git',
