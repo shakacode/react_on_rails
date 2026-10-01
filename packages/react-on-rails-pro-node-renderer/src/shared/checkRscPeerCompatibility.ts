@@ -162,14 +162,14 @@ const errorMessage = (pkg: string, found: string, want: string, proVersion?: str
     `  (Set REACT_ON_RAILS_PRO_DISABLE_VERSION_CHECK=1 to downgrade this error to a warning.)`,
   ].join('\n');
 
-// A rejected prerelease (for example the 19.3.0-rc.4 pin that React on Rails 17.1.0 generated) usually
-// has a supported stable release with the same version number. Name it and its React line.
+// The 19.3.0-rc.4 pin that React on Rails 17.1.0 generated has a known published stable successor.
+// Compatibility alone does not establish publication for other rejected prereleases.
 const stableReleaseAdvice = (
   { tuple, prerelease }: ParsedVersion,
   { minimumVersion }: typeof RSC_PEER_SUPPORT.reactOnRailsRsc,
   react: typeof RSC_PEER_SUPPORT.react,
 ): string | undefined => {
-  if (!prerelease) return undefined;
+  if (!prerelease || !sameTuple(tuple, [19, 3, 0])) return undefined;
   const stableVersion = tuple.join('.');
   const reactRange = supportedReactRange(tuple, react);
   if (!reactRange || !isAtLeastVersion(stableVersion, minimumVersion)) return undefined;
