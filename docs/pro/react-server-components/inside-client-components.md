@@ -633,6 +633,8 @@ function Dashboard() {
 
 In production, failed client-control refetches are recoverable: the last successful route content remains visible, `ref.current.refetchError` is set, and `ref.current.retry()` fetches the route's current `componentName` and `componentProps`. If props changed after the failure, `retry()` attempts the new request; call `clearRefetchError()` to dismiss the old error without fetching. Pass `onRefetchError` to `<RSCRoute>` when a parent or sibling needs to report the failure or update its own error UI. The callback receives the error after the handle's `refetchError` state has committed. In development, the failed refetch still throws through the route so the real `ServerComponentFetchError` and component context are visible.
 
+An HTTP 200 Flight response can contain errors in individual streamed boundaries. Its root promise may resolve before a descendant throws, so a `.catch(...)` alone cannot observe every failure. Use `refetchError` or `onRefetchError` for late render errors as well. Production recovery restores the previous content and leaves Retry available, but can remount descendant client components and reset their local state.
+
 Recoverable refetches keep the last successful rendered `ReactNode` promise in the provider cache for each unique `componentName` and `componentProps` pair until the provider unmounts. Use this pattern for stable, low-cardinality route props; high-churn props such as per-user IDs in a long-lived single-page session can retain more rendered subtrees. Bounded eviction is tracked in [issue 3564](https://github.com/shakacode/react_on_rails/issues/3564).
 
 ### `useCurrentRSCRoute()` from inside the RSC subtree
@@ -660,7 +662,7 @@ export function InlineRefreshButton() {
 }
 ```
 
-The hook returns the same `RSCRouteHandle` as the ref. In production, descendants can render `refetchError` and call `retry()` while the previous server-rendered content remains mounted. Calling it outside an `<RSCRoute>` ancestor throws an error.
+The hook returns the same `RSCRouteHandle` as the ref. In production, descendants can render `refetchError` and call `retry()` while the previous server-rendered content remains available. Calling it outside an `<RSCRoute>` ancestor throws an error.
 
 ### `useRSC().refetchComponent(name, props)` for error retry
 
