@@ -34,7 +34,7 @@ import {
   RSC_PAYLOAD_FAILURE_RETENTION_MS,
 } from './RSCProviderCache.ts';
 import { consumePrefetchedServerComponent } from './RSCPrefetchStore.ts';
-import { getRSCStreamCompletion, hasRSCStreamErrors } from './RSCStreamCompletion.ts';
+import { getRSCStreamState } from './RSCStreamCompletion.ts';
 import { createRSCPayloadKey, hasEmbeddedRSCPayload } from './utils.ts';
 
 export type RSCRefetchRecovery = {
@@ -43,7 +43,7 @@ export type RSCRefetchRecovery = {
   refetchVersion: number;
   recover: () => void;
   canRecover: () => boolean;
-  commit: () => void;
+  commit: () => Promise<void>;
 };
 
 type RSCContextType = {
@@ -579,7 +579,7 @@ export const createRSCProvider = ({
                     inFlightEvictedSuccessfulPayloadCounts.delete(key);
                   }
                 };
-                const completion = getRSCStreamCompletion(payload);
+                const completion = getRSCStreamState(payload)?.completion;
                 if (completion !== undefined) {
                   // A decoded Flight root is not yet a successful payload.
                   // Preserve the snapshot across overlapping streamed refetches.
@@ -617,20 +617,18 @@ export const createRSCProvider = ({
             recover: restoreLastSuccessfulPromise,
             // An interactive client can fail while a healthy Flight stream is
             // still pending. Only its server/transport failure arms recovery.
-            canRecover: () => hasRSCStreamErrors(refetchedPayload) !== false,
+            canRecover: () => getRSCStreamState(refetchedPayload)?.hasErrors() !== false,
             // Root fulfillment alone cannot certify a rendered Flight payload.
             // Wait for a successful commit and, for HTTP Flight, its error-free
             // stream completion before treating later client errors as unrelated.
-            commit: () => {
+            commit: async () => {
               if (renderCommitted) return;
               renderCommitted = true;
-              void promise.then(async (payload) => {
-                const completion = getRSCStreamCompletion(payload);
-                if (completion !== undefined && !(await completion)) return;
-                if (fetchRSCPromises.get(key, false) !== promise) return;
-                recovery.active = false;
-                renderRecoveriesRef.current.delete(promise);
-              });
+              // A successful render has already read this fulfilled payload.
+              if ((await getRSCStreamState(refetchedPayload)?.completion) === false) return;
+              if (fetchRSCPromises.get(key, false) !== promise) return;
+              recovery.active = false;
+              renderRecoveriesRef.current.delete(promise);
             },
           };
           renderRecoveriesRef.current.set(promise, recovery);

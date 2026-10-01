@@ -44,7 +44,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 - **[Pro]** **Production refetch recovery handles streamed boundary errors.** HTTP 200 Flight
   responses whose root resolves before a descendant fails now restore the previous route content,
   report `refetchError` and `onRefetchError`, and keep Retry available. Restoring content can remount
-  descendant client components. Fixes [Issue 5078](https://github.com/shakacode/react_on_rails/issues/5078).
+  descendant client components. Completion tracking also covers scalar roots and rejects truncated
+  response records. Fixes [Issue 5078](https://github.com/shakacode/react_on_rails/issues/5078).
   [PR 5135](https://github.com/shakacode/react_on_rails/pull/5135) by
   [Justin Gordon](https://github.com/justin808).
 

@@ -32,6 +32,7 @@ const bundle = join(artifacts, 'bundle.js');
 const baseline = process.argv.includes('--baseline');
 const httpFailure = process.argv.includes('--http-failure');
 const clientFailure = process.argv.includes('--client-failure');
+const truncatedRecord = process.argv.includes('--truncate-boundary');
 await build({
   entryPoints: [fileURLToPath(new URL('./browser.tsx', import.meta.url))],
   bundle: true,
@@ -97,6 +98,7 @@ const server = spawn(
     ...(httpFailure ? ['--http-failure'] : []),
     ...(clientFailure ? ['--client-failure'] : []),
     ...(process.argv.includes('--diagnostic-only') ? ['--diagnostic-only'] : []),
+    ...(truncatedRecord ? ['--truncate-boundary'] : []),
   ],
   {
     env: { ...process.env, NODE_ENV: 'production' },
@@ -164,7 +166,7 @@ try {
       name: 'ServerComponentFetchError',
       componentName: 'UserCard',
       componentProps: { id: 1 },
-      ...(!httpFailure ? { digest: 'DETERMINISTIC_BOUNDARY_DIGEST' } : {}),
+      ...(!httpFailure && !truncatedRecord ? { digest: 'DETERMINISTIC_BOUNDARY_DIGEST' } : {}),
     });
     await page.waitForTimeout(700);
     await page.screenshot({ path: join(artifacts, 'retained-error-desktop.png') });
@@ -186,6 +188,7 @@ try {
       failedHTTPStatus: response.status(),
       boundaryErrorRow: !httpFailure && !clientFailure,
       unrelatedClientError: clientFailure,
+      truncatedRecord,
       bundleBytes,
       artifacts,
     }) + '\n',

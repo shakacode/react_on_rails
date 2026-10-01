@@ -78,7 +78,11 @@ const server = createServer(async (request, response) => {
             ? { renderingError: hasErrors ? { message: 'DETERMINISTIC_BOUNDARY_ERROR' } : undefined }
             : { hasErrors },
         );
-        response.write(Buffer.concat([Buffer.from(`${metadata}\t${chunk.length.toString(16)}\n`), chunk]));
+        const content =
+          hasErrors && process.argv.includes('--truncate-boundary')
+            ? chunk.subarray(0, chunk.length - 1)
+            : chunk;
+        response.write(Buffer.concat([Buffer.from(`${metadata}\t${chunk.length.toString(16)}\n`), content]));
         done();
       },
       final(done) {

@@ -689,6 +689,43 @@ class CapturingErrorBoundary extends React.Component<
     },
   );
 
+  it('does not notify a refetch error for a client update while the replacement root is pending', async () => {
+    process.env.NODE_ENV = 'production';
+    const ClientCard = () => {
+      const [broken, setBroken] = React.useState(false);
+      if (broken) throw new Error('retained client error');
+      return <button onClick={() => setBroken(true)}>Break retained card</button>;
+    };
+    let finish!: (payload: React.ReactNode) => void;
+    const pending = new Promise<React.ReactNode>((resolve) => {
+      finish = resolve;
+    });
+    getServerComponent.mockResolvedValueOnce(<ClientCard />).mockReturnValueOnce(pending);
+    const ref = React.createRef<RSCRouteHandle>();
+    const onError = jest.fn();
+    await renderInAct(
+      <TestHarness>
+        <CapturingErrorBoundary fallback={(error) => <div>{error.message}</div>}>
+          <RSCRoute ref={ref} componentName="Card" componentProps={{}} onRefetchError={onError} />
+        </CapturingErrorBoundary>
+      </TestHarness>,
+    );
+    let refetch!: Promise<React.ReactNode>;
+    await act(async () => {
+      refetch = ref.current!.refetch();
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByText('Break retained card'));
+    });
+    expect(onError).not.toHaveBeenCalled();
+    await act(async () => {
+      finish(<span>New content</span>);
+      await refetch;
+    });
+    expect(screen.getByText('New content')).toBeInTheDocument();
+    expect(onError).not.toHaveBeenCalled();
+  });
+
   it('notifies the initiating sibling when another route restores a failed render first', async () => {
     process.env.NODE_ENV = 'production';
     const boundaryError = new Error('shared Flight boundary failed');
@@ -755,15 +792,23 @@ class CapturingErrorBoundary extends React.Component<
     expect(ref.current!.refetchError).toBeNull();
   });
 
-  it.each([true, false])(
-    'only promotes a completed healthy Flight root (completion=%s)',
-    async (successful) => {
+  it.each([
+    [true, false],
+    [false, false],
+    [true, true],
+    [false, true],
+  ])(
+    'only promotes a completed healthy Flight root (completion=%s, primitive=%s)',
+    async (successful, primitive) => {
       process.env.NODE_ENV = 'production';
       let finish!: (value: boolean) => void;
       const completion = new Promise<boolean>((resolve) => {
         finish = resolve;
       });
-      const candidate = trackRSCStreamCompletion(<span>Streamed candidate</span>, completion);
+      const candidate = trackRSCStreamCompletion(
+        primitive ? 'Streamed candidate' : <span>Streamed candidate</span>,
+        completion,
+      );
       const BrokenBoundary = (): React.ReactNode => {
         throw new Error('later render failure');
       };

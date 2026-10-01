@@ -91,6 +91,50 @@ describe('fetchRSC HTTP responses', () => {
     jest.resetModules();
   });
 
+  it.each(['text', 7, null, false])('tracks completion for a scalar HTTP root (%j)', async (root) => {
+    const { fetchRSC } = await loadClientModule(jest.fn(() => Promise.resolve(root)));
+    const { getRSCStreamState } = await import('../src/RSCStreamCompletion.ts');
+    fetchMock.mockResolvedValue(createWebResponseFromText(toLengthPrefixedRecord('root')));
+    const payload = await fetchRSC({
+      componentName: 'Card',
+      componentProps: {},
+      rscPayloadGenerationUrlPath: '/rsc',
+    });
+    expect(payload).toEqual([root]);
+    await expect(getRSCStreamState(payload)?.completion).resolves.toBe(true);
+  });
+
+  it.each(['{"hasErrors":false}\t4\nx', '{"hasErrors":false}\t4'])(
+    'does not certify clean EOF with an incomplete record (%j)',
+    async (tail) => {
+      let controller!: ReadableStreamDefaultController<Uint8Array>;
+      const body = new ReadableStream<Uint8Array>({
+        start: (value) => {
+          controller = value;
+        },
+      });
+      const root = React.createElement('div', null, 'early root');
+      const { fetchRSC } = await loadClientModule(
+        jest.fn((stream: ReadableStream<Uint8Array>) => {
+          void readStreamText(stream).catch(() => undefined);
+          return Promise.resolve(root);
+        }),
+      );
+      const { getRSCStreamState } = await import('../src/RSCStreamCompletion.ts');
+      fetchMock.mockResolvedValue({ ok: true, status: 200, body } as Response);
+      controller.enqueue(encoder.encode(toLengthPrefixedRecord('root')));
+      const payload = await fetchRSC({
+        componentName: 'Card',
+        componentProps: {},
+        rscPayloadGenerationUrlPath: '/rsc',
+      });
+      controller.enqueue(encoder.encode(tail));
+      controller.close();
+      await expect(getRSCStreamState(payload)?.completion).resolves.toBe(false);
+      expect(getRSCStreamState(payload)?.hasErrors()).toBe(true);
+    },
+  );
+
   it.each([
     [{ hasErrors: true }, false, false],
     [{ hasErrors: false }, true, false],
@@ -114,7 +158,7 @@ describe('fetchRSC HTTP responses', () => {
           return Promise.resolve(root);
         }),
       );
-      const { getRSCStreamCompletion, hasRSCStreamErrors } = await import('../src/RSCStreamCompletion.ts');
+      const { getRSCStreamState } = await import('../src/RSCStreamCompletion.ts');
       fetchMock.mockResolvedValue({ ok: true, status: 200, body } as Response);
       controller.enqueue(encoder.encode(toLengthPrefixedRecord('root', { hasErrors: false })));
       const payload = await fetchRSC({
@@ -122,7 +166,7 @@ describe('fetchRSC HTTP responses', () => {
         componentProps: {},
         rscPayloadGenerationUrlPath: '/rsc',
       });
-      const completion = getRSCStreamCompletion(payload);
+      const completion = getRSCStreamState(payload)?.completion;
       expect(completion).toBeDefined();
       let completed = false;
       void completion!.then(() => {
@@ -137,7 +181,7 @@ describe('fetchRSC HTTP responses', () => {
         controller.close();
       }
       await expect(completion).resolves.toBe(successful);
-      expect(hasRSCStreamErrors(payload)).toBe(!successful);
+      expect(getRSCStreamState(payload)?.hasErrors()).toBe(!successful);
     },
   );
 
@@ -452,7 +496,7 @@ describe('fetchRSC HTTP responses', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('warns when a fetched length-prefixed response ends mid-record', async () => {
+  it('rejects and warns when a fetched length-prefixed response ends mid-record', async () => {
     const createFromReadableStream = jest.fn((stream: ReadableStream<Uint8Array>) => readStreamText(stream));
     const { fetchRSC } = await loadClientModule(createFromReadableStream);
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
@@ -466,7 +510,7 @@ describe('fetchRSC HTTP responses', () => {
           componentProps: {},
           rscPayloadGenerationUrlPath: '/rsc_payload',
         }),
-      ).resolves.toBe('');
+      ).rejects.toThrow('Incomplete RSC response');
       expect(warnSpy).toHaveBeenCalledWith(
         expect.stringContaining('[react_on_rails] Incomplete length-prefixed stream:'),
       );
@@ -492,7 +536,7 @@ describe('fetchRSC HTTP responses', () => {
         componentProps: {},
         rscPayloadGenerationUrlPath: '/rsc_payload',
       }),
-    ).resolves.toBe('payload');
+    ).resolves.toEqual(['payload']);
 
     expect([...document.body.querySelectorAll('script')].map((script) => script.textContent)).not.toContain(
       'console.log("replay")',
@@ -520,7 +564,7 @@ describe('fetchRSC HTTP responses', () => {
         componentName: 'ConsolePanel',
         componentProps: {},
       }),
-    ).resolves.toBe('payload');
+    ).resolves.toEqual(['payload']);
 
     const replayScript = [...document.body.querySelectorAll('script')].find(
       (script) => script.textContent === 'console.log("navigation replay")',
@@ -548,7 +592,7 @@ describe('fetchRSC HTTP responses', () => {
         cspNonce: 'legacyNonce123',
         replayConsoleScripts: true,
       }),
-    ).resolves.toBe('payload');
+    ).resolves.toEqual(['payload']);
 
     const replayScript = [...document.body.querySelectorAll('script')].find(
       (script) => script.textContent === 'console.log("replay")',
@@ -600,7 +644,7 @@ describe('prefetchServerComponent client API', () => {
     );
     await expect(
       getReusablePrefetchedServerComponent(createRSCPayloadKey('PrefetchedPanel', componentProps)),
-    ).resolves.toBe('decoded payload');
+    ).resolves.toEqual(['decoded payload']);
   });
 
   it('reuses an in-flight prefetch for repeated loader calls', async () => {
@@ -633,7 +677,7 @@ describe('prefetchServerComponent client API', () => {
     fetchMock.mockResolvedValue(createWebResponseFromText(toLengthPrefixedRecord('fresh payload')));
     await expect(prefetchServerComponent('PrefetchedPanel', componentProps)).resolves.toBeUndefined();
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    await expect(getReusablePrefetchedServerComponent(key)).resolves.toBe('decoded payload');
+    await expect(getReusablePrefetchedServerComponent(key)).resolves.toEqual(['decoded payload']);
   });
 
   it('honors the current caller abort signal when reusing an in-flight prefetch', async () => {
@@ -732,7 +776,7 @@ describe('prefetchServerComponent client API', () => {
     expect(fetchMock).toHaveBeenCalledWith(fetchUrl);
     await expect(
       getReusablePrefetchedServerComponent(createRSCPayloadKey('PrefetchedPanel', componentProps)),
-    ).resolves.toBe('decoded payload');
+    ).resolves.toEqual(['decoded payload']);
   });
 
   it('resolves and self-evicts when the shared prefetch fetch rejects', async () => {
@@ -817,7 +861,7 @@ describe('prefetchServerComponent client API', () => {
     await expect(prefetchServerComponent('PrefetchedPanel', componentProps)).resolves.toBeUndefined();
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    await expect(getReusablePrefetchedServerComponent(key)).resolves.toBe('decoded payload');
+    await expect(getReusablePrefetchedServerComponent(key)).resolves.toEqual(['decoded payload']);
   });
 });
 
@@ -866,7 +910,7 @@ describe('getReactServerComponent preloaded payload replay', () => {
     });
     if (!api) throw new Error('RSC provider API was not captured');
 
-    await expect(api.getComponent(componentName, componentProps)).resolves.toBe('fresh HTTP payload');
+    await expect(api.getComponent(componentName, componentProps)).resolves.toEqual(['fresh HTTP payload']);
     expect(createFromReadableStream).toHaveBeenCalledTimes(2);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith(fetchUrl);

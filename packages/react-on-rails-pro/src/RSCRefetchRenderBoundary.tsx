@@ -53,11 +53,11 @@ export default class RefetchRenderBoundary extends Component<
   }
 
   componentDidMount() {
-    this.completeSuccessfulRender();
+    if (!this.state.error) void this.props.recovery?.commit();
   }
 
   componentDidUpdate() {
-    this.completeSuccessfulRender();
+    this.componentDidMount();
   }
 
   componentDidCatch(error: Error) {
@@ -68,10 +68,6 @@ export default class RefetchRenderBoundary extends Component<
       // initiating handle; its version guards exclude unrelated/stale routes.
       onRecover(error, recovery.refetchVersion);
     }
-  }
-
-  completeSuccessfulRender() {
-    if (!this.state.error) this.props.recovery?.commit();
   }
 
   render() {

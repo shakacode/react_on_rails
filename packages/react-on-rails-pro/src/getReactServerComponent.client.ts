@@ -153,7 +153,7 @@ const createFromFetch = async (
             parser.feed(readResult.value, handleContent);
           }
         }
-        parser.flush();
+        if (!parser.flush()) throw new Error('Incomplete RSC response');
         controller.close();
         finishStream(!streamHasErrors);
       } catch (error) {
