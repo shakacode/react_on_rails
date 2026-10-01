@@ -22845,11 +22845,11 @@ RSpec.describe "release.rake helper methods" do
       gemfile = File.read(File.join(dummy_root, "Gemfile"))
       lockfile = File.read(File.join(dummy_root, "Gemfile.lock"))
 
-      expect(gemfile).to include('gem "sqlite3", "~> 1.7", force_ruby_platform:')
-      expect(lockfile).to match(/^    sqlite3 \(1\.7\.\d+\)$/)
-      expect(lockfile).to match(/^    sqlite3 \(1\.7\.\d+-arm64-darwin\)$/)
+      expect(gemfile).to include('gem "sqlite3", "~> 2.9", force_ruby_platform:')
+      expect(lockfile).to match(/^    sqlite3 \(2\.9\.\d+\)$/)
+      expect(lockfile).to match(/^    sqlite3 \(2\.9\.\d+-arm64-darwin\)$/)
       expect(lockfile).to match(/^  ruby$/)
-      expect(lockfile).to match(/^  sqlite3 \(~> 1\.7\)$/)
+      expect(lockfile).to match(/^  sqlite3 \(~> 2\.9\)$/)
       expect(lockfile).to match(/BUNDLED WITH\n   2\.5\.9\n\z/)
     end
   end
