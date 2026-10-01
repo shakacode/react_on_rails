@@ -36,6 +36,9 @@ module ReactOnRailsPro
           # When already on RSC bundle, we prevent further RSC payload generation
           # by throwing an error if generateRSCPayload is called
           return <<-JS
+            railsContext.serverSideRSCPayloadParameters = {
+              rscBundleHash: #{rsc_artifact_id(render_options, artifacts).to_json},
+            };
             if (typeof generateRSCPayload !== 'function') {
               globalThis.generateRSCPayload = function generateRSCPayload() {
                 throw new Error('The rendering request is already running on the RSC bundle. Please ensure that generateRSCPayload is only called from any React Server Component.')

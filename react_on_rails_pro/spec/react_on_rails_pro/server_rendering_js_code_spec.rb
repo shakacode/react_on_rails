@@ -237,6 +237,20 @@ RSpec.describe ReactOnRailsPro::ServerRenderingJsCode do
         expect(result).to include('rscBundleHash: "rsc-artifact-id-before-drift"')
       end
 
+      it "embeds the captured RSC artifact ID on the payload endpoint path" do
+        allow(render_options).to receive(:rsc_payload_streaming?).and_return(true)
+        request = described_class.render(
+          props_string,
+          rails_context,
+          redux_stores,
+          "CachedPayload",
+          render_options
+        )
+        expect(request).to include('rscBundleHash: "rsc-artifact-id-before-drift"')
+        expect(request).to include("The rendering request is already running on the RSC bundle")
+        expect(request).not_to include("runOnOtherBundle")
+      end
+
       it "retains only lightweight artifact identities across production renders" do
         server_id = "rorp-v2-s-#{'a' * 64}"
         rsc_id = "rorp-v2-r-#{'b' * 64}"
