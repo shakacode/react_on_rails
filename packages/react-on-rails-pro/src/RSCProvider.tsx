@@ -37,6 +37,12 @@ import { consumePrefetchedServerComponent } from './RSCPrefetchStore.ts';
 import { getRSCStreamCompletion } from './RSCStreamCompletion.ts';
 import { createRSCPayloadKey, hasEmbeddedRSCPayload } from './utils.ts';
 
+export type RSCRefetchRecovery = {
+  fallback: Promise<ReactNode>;
+  refetchVersion: number;
+  recover: () => void;
+};
+
 type RSCContextType = {
   getComponent: (componentName: string, componentProps: unknown) => Promise<ReactNode>;
 
@@ -48,9 +54,7 @@ type RSCContextType = {
 
   getRefetchVersion: (componentName: string, componentProps: unknown) => number;
 
-  getRenderRecovery: (
-    promise: Promise<ReactNode>,
-  ) => { fallback: Promise<ReactNode>; refetchVersion: number; recover: () => boolean } | undefined;
+  getRenderRecovery: (promise: Promise<ReactNode>) => RSCRefetchRecovery | undefined;
 
   retainComponent: (componentName: string, componentProps: unknown) => () => void;
 
@@ -147,16 +151,7 @@ export const createRSCProvider = ({
     // version. (`versions`/`successfulVersions` state is cleaned via the same
     // `onEvict` path below.)
     const lastSuccessfulRSCPromisesRef = useRef<Record<string, Promise<ReactNode>>>({});
-    const renderRecoveriesRef = useRef(
-      new WeakMap<
-        Promise<ReactNode>,
-        {
-          fallback: Promise<ReactNode>;
-          refetchVersion: number;
-          recover: () => boolean;
-        }
-      >(),
-    );
+    const renderRecoveriesRef = useRef(new WeakMap<Promise<ReactNode>, RSCRefetchRecovery>());
     const getRenderRecovery = useCallback(
       (promise: Promise<ReactNode>) => renderRecoveriesRef.current.get(promise),
       [],
@@ -401,21 +396,15 @@ export const createRSCProvider = ({
           (inFlightEvictedSuccessfulPayloadCounts.get(key) ?? 0) > 0;
         const markPayloadIfSuccessful = (payload: ReactNode) => {
           if (!(payload instanceof Error)) {
-            const markSuccessful = () => {
-              payloadSucceeded = markSuccessfulPromise(key, promise, notifyRoutesOnSuccess);
-              if (payloadSucceeded) {
-                // A winning replacement retires the key's success latches.
-                evictedSuccessfulPayloadKeys.deleteWithoutEvict(key);
-                inFlightEvictedSuccessfulPayloadCounts.delete(key);
-              }
-            };
-            const completion = getRSCStreamCompletion(payload);
-            if (completion !== undefined) {
-              void completion.then((successful) => {
-                if (successful) markSuccessful();
-              });
-            } else {
-              markSuccessful();
+            payloadSucceeded = markSuccessfulPromise(key, promise, notifyRoutesOnSuccess);
+            if (payloadSucceeded) {
+              // Delete the entire count: once this replacement wins the cache
+              // identity check and notifies routes, same-key `getComponent`
+              // replacements cannot have piled up because later callers reuse
+              // the cached promise, while stale refetch races are guarded
+              // separately.
+              evictedSuccessfulPayloadKeys.deleteWithoutEvict(key);
+              inFlightEvictedSuccessfulPayloadCounts.delete(key);
             }
           }
           return payload;
@@ -524,7 +513,7 @@ export const createRSCProvider = ({
         let promise!: Promise<ReactNode>;
         const restoreLastSuccessfulPromise = () => {
           if (fetchRSCPromises.get(key, false) !== promise) {
-            return false;
+            return;
           }
 
           if (previousSuccessfulPromise !== undefined) {
@@ -561,7 +550,6 @@ export const createRSCProvider = ({
           startTransition(() => {
             setVersions((v) => ({ ...v, [key]: (v[key] ?? 0) + 1 }));
           });
-          return true;
         };
 
         promise = Promise.resolve()

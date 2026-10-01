@@ -19,7 +19,7 @@
 
 import * as React from 'react';
 import { Component, use, type ReactNode } from 'react';
-import type { useRSC } from './RSCProvider.tsx';
+import type { RSCRefetchRecovery } from './RSCProvider.tsx';
 
 const PromiseWrapper = ({ promise }: { promise: Promise<ReactNode> }) => {
   const payload = use(promise);
@@ -29,7 +29,7 @@ const PromiseWrapper = ({ promise }: { promise: Promise<ReactNode> }) => {
 
 type RefetchRenderBoundaryProps = {
   promise: Promise<ReactNode>;
-  recovery: ReturnType<ReturnType<typeof useRSC>['getRenderRecovery']>;
+  recovery: RSCRefetchRecovery | undefined;
   onRecover: (error: Error, refetchVersion: number) => void;
 };
 

@@ -753,6 +753,36 @@ class CapturingErrorBoundary extends React.Component<
     },
   );
 
+  it.each(['pending', 'errored'])('preserves initial-root recovery with a %s stream', async (state) => {
+    process.env.NODE_ENV = 'production';
+    const completion = state === 'pending' ? new Promise<boolean>(() => {}) : Promise.resolve(false);
+    const initial = trackRSCStreamCompletion(<span>Initial content</span>, completion);
+    const error = new Error('HTTP failure');
+    setupSequencedFetcher([initial, rejectWith(error), rejectWith(error), <span>Recovered content</span>]);
+    const ref = React.createRef<RSCRouteHandle>();
+    const onError = jest.fn();
+    await renderInAct(
+      <TestHarness>
+        <RSCRoute ref={ref} componentName="Card" componentProps={{}} onRefetchError={onError} />
+      </TestHarness>,
+    );
+    await act(async () => {
+      await expect(ref.current!.refetch()).rejects.toThrow('HTTP failure');
+    });
+    expect(screen.getByText('Initial content')).toBeInTheDocument();
+    await waitFor(() => expect(onError).toHaveBeenCalledTimes(1));
+    await act(async () => {
+      await expect(ref.current!.retry()).rejects.toThrow('HTTP failure');
+    });
+    expect(screen.getByText('Initial content')).toBeInTheDocument();
+    await waitFor(() => expect(onError).toHaveBeenCalledTimes(2));
+    await act(async () => {
+      await ref.current!.retry();
+    });
+    expect(screen.getByText('Recovered content')).toBeInTheDocument();
+    expect(ref.current!.refetchError).toBeNull();
+  });
+
   it('1d4. production fire-and-forget retry failures are handled after refetchError records them', async () => {
     process.env.NODE_ENV = 'production';
     setupSequencedFetcher([

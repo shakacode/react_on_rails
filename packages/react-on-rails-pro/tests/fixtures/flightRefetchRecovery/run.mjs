@@ -30,6 +30,7 @@ const { chromium, expect } = dummyRequire('@playwright/test');
 const artifacts = await mkdtemp(join(tmpdir(), 'ror-flight-recovery-'));
 const bundle = join(artifacts, 'bundle.js');
 const baseline = process.argv.includes('--baseline');
+const httpFailure = process.argv.includes('--http-failure');
 await build({
   entryPoints: [fileURLToPath(new URL('./browser.tsx', import.meta.url))],
   bundle: true,
@@ -84,7 +85,13 @@ if (process.argv.includes('--build-only')) {
 }
 const server = spawn(
   process.execPath,
-  ['--conditions', 'react-server', fileURLToPath(new URL('./server.mjs', import.meta.url)), bundle],
+  [
+    '--conditions',
+    'react-server',
+    fileURLToPath(new URL('./server.mjs', import.meta.url)),
+    bundle,
+    ...(httpFailure ? ['--http-failure'] : []),
+  ],
   {
     env: { ...process.env, NODE_ENV: 'production' },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -120,14 +127,18 @@ try {
   await page.screenshot({ path: join(artifacts, 'initial.png') });
   const failedResponse = page.waitForResponse((response) => response.url().includes('/rsc/UserCard'));
   await page.getByRole('button', { name: 'Refresh', exact: true }).click();
-  await expect(page.getByTestId('pending')).toBeVisible();
-  // The decoded root has rendered its Suspense shell before the server emits E.
-  await page.request.get(`http://127.0.0.1:${ready}/release-error`);
+  if (!httpFailure) {
+    await expect(page.getByTestId('pending')).toBeVisible();
+    // The decoded root has rendered its Suspense shell before the server emits E.
+    await page.request.get(`http://127.0.0.1:${ready}/release-error`);
+  }
   const response = await failedResponse;
-  expect(response.status()).toBe(200);
+  expect(response.status()).toBe(httpFailure ? 503 : 200);
   const bytes = await response.body();
-  expect(bytes.toString()).toMatch(/:E\{/);
-  expect(bytes.toString()).toContain('DETERMINISTIC_BOUNDARY_DIGEST');
+  if (!httpFailure) {
+    expect(bytes.toString()).toMatch(/:E\{/);
+    expect(bytes.toString()).toContain('DETERMINISTIC_BOUNDARY_DIGEST');
+  }
   await expect(page.getByTestId('card')).toContainText('Card v1');
   await expect(page.getByRole('alert')).toContainText('Refetch failed');
   await expect(page.getByTestId('notifications')).toHaveText('1');
@@ -135,7 +146,7 @@ try {
     name: 'ServerComponentFetchError',
     componentName: 'UserCard',
     componentProps: { id: 1 },
-    digest: 'DETERMINISTIC_BOUNDARY_DIGEST',
+    ...(!httpFailure ? { digest: 'DETERMINISTIC_BOUNDARY_DIGEST' } : {}),
   });
   await page.waitForTimeout(700);
   await page.screenshot({ path: join(artifacts, 'retained-error-desktop.png') });
@@ -153,8 +164,8 @@ try {
     JSON.stringify({
       result: 'PASS',
       production: true,
-      failedHTTPStatus: 200,
-      boundaryErrorRow: true,
+      failedHTTPStatus: response.status(),
+      boundaryErrorRow: !httpFailure,
       bundleBytes,
       artifacts,
     }) + '\n',

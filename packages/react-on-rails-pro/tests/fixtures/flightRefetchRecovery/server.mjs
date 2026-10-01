@@ -43,6 +43,11 @@ const server = createServer(async (request, response) => {
   if (request.url?.startsWith('/rsc/UserCard')) {
     requestCount += 1;
     const failed = requestCount === 2;
+    if (failed && process.argv.includes('--http-failure')) {
+      response.writeHead(503, { 'content-type': 'text/plain' });
+      response.end('DETERMINISTIC_HTTP_FAILURE');
+      return;
+    }
     let hasErrors = false;
     const Broken = async () => {
       await new Promise((resolve) => {

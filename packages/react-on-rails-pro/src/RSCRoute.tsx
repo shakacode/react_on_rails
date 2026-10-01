@@ -196,6 +196,7 @@ const RSCRouteContent = forwardRef<RSCRouteHandle, RSCRouteContentProps>(
     const onRefetchErrorRef = useRef(onRefetchError);
     const latestRefetchRequestRef = useRef(0);
     const latestRefetchVersionRef = useRef<{ key: string; version: number } | null>(null);
+    const reportedRefetchRequestRef = useRef(0);
     // Version 0 means "evicted or not yet seen"; it lets a later monotonic
     // success token clear a stale refetch error after the key reloads.
     const previousSuccessfulVersionRef = useRef({ key: currentRouteKey, version: successfulVersion });
@@ -226,6 +227,15 @@ const RSCRouteContent = forwardRef<RSCRouteHandle, RSCRouteContentProps>(
       }
     }, [currentRouteKey, successfulVersion]);
 
+    const recordRefetchError = useCallback(
+      (key: string, requestId: number, error: ServerComponentFetchError) => {
+        if (reportedRefetchRequestRef.current === requestId) return;
+        reportedRefetchRequestRef.current = requestId;
+        setRefetchErrorState([key, error]);
+      },
+      [],
+    );
+
     const refetch = useCallback((): Promise<ReactNode> => {
       const [n, p] = latestPropsRef.current;
       const requestKey = createRSCPayloadKey(n, p);
@@ -248,7 +258,7 @@ const RSCRouteContent = forwardRef<RSCRouteHandle, RSCRouteContentProps>(
           getRefetchVersion(n, p) === sharedRefetchVersion &&
           createRSCPayloadKey(...latestPropsRef.current) === requestKey
         ) {
-          setRefetchErrorState([requestKey, serverComponentFetchError]);
+          recordRefetchError(requestKey, requestId, serverComponentFetchError);
         }
         throw serverComponentFetchError;
       });
@@ -256,7 +266,7 @@ const RSCRouteContent = forwardRef<RSCRouteHandle, RSCRouteContentProps>(
         void handledRefetchPromise.catch(() => undefined);
       }
       return handledRefetchPromise;
-    }, [getRefetchVersion, refetchComponent]);
+    }, [getRefetchVersion, recordRefetchError, refetchComponent]);
 
     const clearRefetchError = useCallback(() => {
       if (isMountedRef.current) {
@@ -288,14 +298,15 @@ const RSCRouteContent = forwardRef<RSCRouteHandle, RSCRouteContentProps>(
             getRefetchVersion(componentName, componentProps) === refetchVersion &&
             createRSCPayloadKey(...latestPropsRef.current) === currentRouteKey
           ) {
-            setRefetchErrorState([
+            recordRefetchError(
               currentRouteKey,
+              latestRefetchRequestRef.current,
               toServerComponentFetchError(error, componentName, componentProps),
-            ]);
+            );
           }
         });
       },
-      [componentName, componentProps, currentRouteKey, getRefetchVersion],
+      [componentName, componentProps, currentRouteKey, getRefetchVersion, recordRefetchError],
     );
     return (
       <CurrentRSCRouteContext.Provider value={handle}>
