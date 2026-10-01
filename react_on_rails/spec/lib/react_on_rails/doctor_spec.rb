@@ -12037,6 +12037,19 @@ RSpec.describe ReactOnRails::Doctor do
           expect(errors).to be_empty
         end
 
+        %w[19.3.1-beta.0 19.3.2-rc.0 19.2.2-beta.0 19.4.0-rc.0].each do |rsc_version|
+          it "recommends the generator pin instead of inferring a published stable release for #{rsc_version}" do
+            errors = rsc_errors_for(rsc_version:, react_version: "19.3.0", react_peer: "^19.3.0")
+
+            expect(errors).to contain_exactly(
+              a_string_including(
+                "Fix: npm install react@~19.2.7 react-dom@~19.2.7 " \
+                "react-on-rails-rsc@19.2.1 --save-exact"
+              )
+            )
+          end
+        end
+
         it "rejects the superseded 19.3.0-rc.4 prerelease that React on Rails 17.1.0 accepted" do
           errors = rsc_errors_for(rsc_version: "19.3.0-rc.4", react_version: "19.2.8", react_peer: "^19.2.8")
 
