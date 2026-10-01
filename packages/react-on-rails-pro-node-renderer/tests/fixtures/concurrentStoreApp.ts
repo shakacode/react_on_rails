@@ -82,7 +82,6 @@ Object.assign(globalThis, {
 });
 
 ReactOnRails.register({
-  StoreView,
   AsyncStoreView,
   StreamedStoreView,
   RSCStoreView: wrapServerComponentRenderer(
