@@ -27,7 +27,8 @@ jest.mock('react-on-rails/pageLifecycle', () => ({
 
 test('request store waiters stay isolated and do not bind browser lifecycle callbacks', async () => {
   const storage = new AsyncLocalStorage<Map<object, unknown>>();
-  Object.assign(globalThis, { reactOnRailsHydratedStoreScope: storage });
+  // A server bundle may provide a window shim; request registries still have no page lifecycle.
+  Object.assign(globalThis, { reactOnRailsHydratedStoreScope: storage, window: {} });
   const aliceScope = new Map<object, unknown>();
   const bobScope = new Map<object, unknown>();
   const alice = { getState: () => ({ user: 'Alice' }) } as Store;
@@ -45,5 +46,6 @@ test('request store waiters stay isolated and do not bind browser lifecycle call
     expect(onPageUnloaded).not.toHaveBeenCalled();
   } finally {
     Reflect.deleteProperty(globalThis, 'reactOnRailsHydratedStoreScope');
+    Reflect.deleteProperty(globalThis, 'window');
   }
 });

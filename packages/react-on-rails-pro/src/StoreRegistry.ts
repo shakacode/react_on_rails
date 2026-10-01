@@ -30,7 +30,7 @@ function currentHydratedStoreRegistry(): CallbackRegistry<Store> {
   if (!scope) return hydratedStoreRegistry;
   let registry = scope.get(scopeKey) as CallbackRegistry<Store> | undefined;
   if (!registry) {
-    registry = new CallbackRegistry<Store>('hydrated store');
+    registry = new CallbackRegistry<Store>('hydrated store', false);
     scope.set(scopeKey, registry);
   }
   return registry;
