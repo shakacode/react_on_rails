@@ -13,8 +13,8 @@
  * https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
-// Executes Rails' actual payload prelude in independent Node workers.
-// The caller supplies the prelude; this fixture must not initialize BUILD_ID.
+// Executes Rails' actual payload request in independent Node workers.
+// The caller supplies the request; this fixture must not initialize BUILD_ID.
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -24,22 +24,10 @@ import { isMainThread, Worker, workerData, parentPort, threadId } from 'node:wor
 if (isMainThread) {
   let input = '';
   for await (const chunk of process.stdin) input += chunk;
-  const { prelude } = JSON.parse(input);
+  const { request } = JSON.parse(input);
   const manifestDir = await mkdtemp(join(tmpdir(), 'ror-payload-build-id-'));
   const manifest = join(manifestDir, 'manifest.json');
   await writeFile(manifest, JSON.stringify({ filePathToModuleMetadata: {}, moduleLoading: {} }));
-  const request = `(() => {
-    const railsContext = {
-      serverSide: true,
-      reactClientManifestFileName: 'react-client-manifest.json',
-      reactServerClientManifestFileName: 'react-server-client-manifest.json',
-      componentSpecificMetadata: { renderRequestId: 'payload-worker' },
-    };
-    ${prelude}
-    return ReactOnRails.serverRenderRSCReactComponent({
-      name: 'CachedPayload', props: {}, railsContext, throwJsErrors: false,
-    });
-  })()`;
   const workers = [];
   try {
     const results = await Promise.all(
@@ -112,17 +100,18 @@ if (isMainThread) {
   );
   ReactOnRails.register({ CachedPayload: async () => cached() });
   const requests = [];
+  const decoder = new TextDecoder();
+  const request = workerData.request.replaceAll(
+    /react-(?:server-)?client-manifest\.json/g,
+    workerData.manifest,
+  );
   for (let index = 0; index < 2; index += 1) {
-    const request = workerData.request.replaceAll(
-      /react-(?:server-)?client-manifest\.json/g,
-      workerData.manifest,
-    );
     const parser = new Parser();
     const response = { flight: '', errors: [] };
     const stream = runInThisContext(request);
     for await (const chunk of stream) {
       parser.feed(chunk, (content, metadata) => {
-        response.flight += new TextDecoder().decode(content);
+        response.flight += decoder.decode(content);
         if (metadata.hasErrors) response.errors.push(metadata.error ?? 'render error');
       });
     }

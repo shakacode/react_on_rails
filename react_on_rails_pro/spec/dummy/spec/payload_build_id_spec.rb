@@ -18,16 +18,29 @@ require "open3"
 
 RSpec.describe "Payload-only RSC cache initialization" do
   it "initializes BUILD_ID independently on two fresh production workers" do
-    allow(ReactOnRailsPro.configuration).to receive(:enable_rsc_support).and_return(true)
+    allow(ReactOnRailsPro.configuration).to receive_messages(
+      enable_rsc_support: true,
+      react_client_manifest_file: "react-client-manifest.json",
+      react_server_client_manifest_file: "react-server-client-manifest.json",
+      throw_js_errors: false,
+      rendering_returns_promises: false,
+      ssr_pre_hook_js: nil
+    )
     options = instance_double(
-      ReactOnRails::ReactComponent::RenderOptions, streaming?: true, rsc_payload_streaming?: true
+      ReactOnRails::ReactComponent::RenderOptions,
+      streaming?: true, rsc_payload_streaming?: true, dom_id: "CachedPayload", trace: false, internal_option: nil
     )
     artifact = Struct.new(:role, :id).new(:rsc, "payload-worker-build-id")
-    prelude = ReactOnRailsPro::ServerRenderingJsCode.generate_rsc_payload_js_function(options, artifacts: [artifact])
+    generator = ReactOnRailsPro::ServerRenderingJsCode
+    allow(generator).to receive(:capture_renderer_artifact_snapshot).with(options).and_return([artifact])
+    rails_context = JSON.generate(serverSide: true, componentSpecificMetadata: { renderRequestId: "payload-worker" })
+    request = generator.render("{}", rails_context, "", "CachedPayload", options)
     fixture = Rails.root.join("../../..", "packages/react-on-rails-pro/tests/fixtures/payloadBuildId.mjs")
+    built_package = Rails.root.join("../../..", "packages/react-on-rails-pro/lib/ReactOnRailsRSC.js")
+    expect(built_package).to exist, "Run pnpm run build before the cross-runtime integration suite"
     output, error, status = Open3.capture3(
-      "node", "--conditions", "react-server", fixture.to_s,
-      stdin_data: JSON.generate(prelude:)
+      "node", fixture.to_s,
+      stdin_data: JSON.generate(request:)
     )
     expect(status.success?).to be(true), error
     workers = JSON.parse(output)
