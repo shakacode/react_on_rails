@@ -381,6 +381,9 @@ importers:
       babel-jest:
         specifier: ^29.7.0
         version: 29.7.0(@babel/core@7.29.6)
+      esbuild:
+        specifier: 0.28.0
+        version: 0.28.0
       form-data:
         specifier: ^4.0.6
         version: 4.0.6
@@ -404,10 +407,16 @@ importers:
         version: link:../react-on-rails
       react-on-rails-rsc:
         specifier: 19.3.1-rc.0
-        version: 19.3.1-rc.0(@rspack/core@2.2.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(webpack@5.105.2(@swc/core@1.15.3))
+        version: 19.3.1-rc.0(@rspack/core@2.2.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(webpack@5.105.2(@swc/core@1.15.3)(esbuild@0.28.0))
+      react-redux:
+        specifier: ^9.2.0
+        version: 9.2.0(@types/react@19.2.7)(react@19.3.0)(redux@5.0.1)
       redis:
         specifier: ^5.0.1
         version: 5.10.0
+      redux:
+        specifier: ^5.0.1
+        version: 5.0.1
       sentry-testkit:
         specifier: ^5.0.6
         version: 5.0.10
@@ -19363,6 +19372,19 @@ snapshots:
     optionalDependencies:
       '@rspack/core': 2.2.1
 
+  react-on-rails-rsc@19.3.1-rc.0(@rspack/core@2.2.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(webpack@5.105.2(@swc/core@1.15.3)(esbuild@0.28.0)):
+    dependencies:
+      '@babel/parser': 7.29.7
+      acorn-loose: 8.5.2
+      neo-async: 2.6.2
+      react: 19.3.0
+      react-dom: 19.3.0(react@19.3.0)
+      react-server-dom-webpack: 19.3.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(webpack@5.105.2(@swc/core@1.15.3)(esbuild@0.28.0))
+      webpack: 5.105.2(@swc/core@1.15.3)(esbuild@0.28.0)
+      webpack-sources: 3.3.3
+    optionalDependencies:
+      '@rspack/core': 2.2.1
+
   react-on-rails-rsc@19.3.1-rc.0(@rspack/core@2.2.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(webpack@5.105.2(@swc/core@1.15.3)):
     dependencies:
       '@babel/parser': 7.29.7
@@ -19438,6 +19460,15 @@ snapshots:
       react: 19.3.0
       react-dom: 19.3.0(react@19.3.0)
       webpack: 5.104.1(@swc/core@1.15.3)(esbuild@0.28.0)(webpack-cli@7.0.3)
+      webpack-sources: 3.3.3
+
+  react-server-dom-webpack@19.3.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(webpack@5.105.2(@swc/core@1.15.3)(esbuild@0.28.0)):
+    dependencies:
+      acorn-loose: 8.5.2
+      neo-async: 2.6.2
+      react: 19.3.0
+      react-dom: 19.3.0(react@19.3.0)
+      webpack: 5.105.2(@swc/core@1.15.3)(esbuild@0.28.0)
       webpack-sources: 3.3.3
 
   react-server-dom-webpack@19.3.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(webpack@5.105.2(@swc/core@1.15.3)):
@@ -20958,6 +20989,18 @@ snapshots:
       '@swc/core': 1.15.3
       esbuild: 0.28.0
 
+  terser-webpack-plugin@5.3.16(@swc/core@1.15.3)(esbuild@0.28.0)(webpack@5.105.2(@swc/core@1.15.3)(esbuild@0.28.0)):
+    dependencies:
+      '@jridgewell/trace-mapping': 0.3.31
+      jest-worker: 27.5.1
+      schema-utils: 4.3.3
+      serialize-javascript: 7.0.5
+      terser: 5.46.0
+      webpack: 5.105.2(@swc/core@1.15.3)(esbuild@0.28.0)
+    optionalDependencies:
+      '@swc/core': 1.15.3
+      esbuild: 0.28.0
+
   terser-webpack-plugin@5.3.16(@swc/core@1.15.3)(esbuild@0.28.0)(webpack@5.105.2):
     dependencies:
       '@jridgewell/trace-mapping': 0.3.31
@@ -21669,6 +21712,38 @@ snapshots:
       schema-utils: 4.3.3
       tapable: 2.3.0
       terser-webpack-plugin: 5.3.16(@swc/core@1.15.3)(webpack@5.105.2(@swc/core@1.15.3))
+      watchpack: 2.5.1
+      webpack-sources: 3.3.3
+    transitivePeerDependencies:
+      - '@swc/core'
+      - esbuild
+      - uglify-js
+
+  webpack@5.105.2(@swc/core@1.15.3)(esbuild@0.28.0):
+    dependencies:
+      '@types/eslint-scope': 3.7.7
+      '@types/estree': 1.0.8
+      '@types/json-schema': 7.0.15
+      '@webassemblyjs/ast': 1.14.1
+      '@webassemblyjs/wasm-edit': 1.14.1
+      '@webassemblyjs/wasm-parser': 1.14.1
+      acorn: 8.15.0
+      acorn-import-phases: 1.0.4(acorn@8.15.0)
+      browserslist: 4.28.1
+      chrome-trace-event: 1.0.4
+      enhanced-resolve: 5.19.0
+      es-module-lexer: 2.0.0
+      eslint-scope: 5.1.1
+      events: 3.3.0
+      glob-to-regexp: 0.4.1
+      graceful-fs: 4.2.11
+      json-parse-even-better-errors: 2.3.1
+      loader-runner: 4.3.1
+      mime-types: 2.1.35
+      neo-async: 2.6.2
+      schema-utils: 4.3.3
+      tapable: 2.3.0
+      terser-webpack-plugin: 5.3.16(@swc/core@1.15.3)(esbuild@0.28.0)(webpack@5.105.2(@swc/core@1.15.3)(esbuild@0.28.0))
       watchpack: 2.5.1
       webpack-sources: 3.3.3
     transitivePeerDependencies:
