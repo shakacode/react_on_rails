@@ -16,6 +16,10 @@
 import fs from 'fs';
 import path from 'path';
 import { execFileSync } from 'child_process';
+import { once } from 'events';
+import type { Readable } from 'stream';
+import { buildExecutionContext } from '../src/worker/vm';
+import { buildConfig } from '../src/shared/configBuilder';
 import { buildSync } from 'esbuild';
 import packageJson from '../package.json';
 import worker, { disableHttp2 } from '../src/worker';
@@ -130,3 +134,74 @@ test.each(['async SSR', 'streaming', 'RSC client provider'])(
     }
   },
 );
+
+test("consumer disconnect cleanup still reads each render's store", async () => {
+  const bundlePath = path.join(serverBundleCachePath(testName), 'cleanup-store-app.js');
+  buildSync({
+    entryPoints: [path.resolve(__dirname, 'fixtures/concurrentStoreApp.ts')],
+    outfile: bundlePath,
+    bundle: true,
+    platform: 'node',
+    format: 'cjs',
+    conditions: ['node'],
+    external: ['react', 'react-dom', 'react-dom/*'],
+  });
+  buildConfig({
+    serverBundleCachePath: serverBundleCachePath(testName),
+    supportModules: true,
+    stubTimers: false,
+  });
+  const aliceContext = await buildExecutionContext([bundlePath], true);
+  const bobContext = await buildExecutionContext([bundlePath], true);
+  expect(aliceContext.getVMContext(bundlePath)).toBe(bobContext.getVMContext(bundlePath));
+  const request = (user: string) => `(() => {
+    const railsContext = { serverSide: true, railsEnv: 'test',
+      reactClientManifestFileName: '', reactServerClientManifestFileName: '' };
+    ReactOnRails.clearHydratedStores();
+    ReactOnRails.setStore('UserStore', ReactOnRails.getStoreGenerator('UserStore')({ user: ${JSON.stringify(user)} }, railsContext));
+    return ReactOnRails.streamServerRenderedReactComponent({ name: 'CleanupStoreView',
+      domNodeId: 'cleanup-store', props: {}, railsContext });
+  })()`;
+  const streams = (await Promise.all([
+    aliceContext.runInVM(request('Alice'), bundlePath),
+    bobContext.runInVM(request('Bob'), bundlePath),
+  ])) as Readable[];
+  try {
+    await Promise.all(
+      streams.map(async (stream) => {
+        const shell = once(stream, 'data');
+        stream.resume();
+        await shell;
+        stream.pause();
+      }),
+    );
+    // This is the consumer-side teardown used by the worker on client disconnect.
+    await Promise.all(
+      streams.map(async (stream) => {
+        const closed = once(stream, 'close');
+        stream.destroy();
+        await closed;
+      }),
+    );
+    const cleanup = await aliceContext.runInVM(
+      'cleanupDone.then(() => JSON.stringify(cleanupUsers))',
+      bundlePath,
+    );
+    expect(JSON.parse(cleanup as string).sort()).toEqual(['Alice', 'Bob']);
+    // Subsequent VM executions retain the same request's stores, including consumer-driven pulls.
+    const pullStreams = (await Promise.all([
+      aliceContext.runInVM('createPullStoreStream()', bundlePath),
+      bobContext.runInVM('createPullStoreStream()', bundlePath),
+    ])) as Readable[];
+    const collect = async (stream: Readable) => {
+      let value = '';
+      for await (const chunk of stream) value += chunk.toString();
+      return value;
+    };
+    expect(await Promise.all(pullStreams.map(collect))).toEqual(['Alice', 'Bob']);
+  } finally {
+    streams.forEach((stream) => stream.destroy());
+    aliceContext.release();
+    bobContext.release();
+  }
+});

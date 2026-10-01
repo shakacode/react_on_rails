@@ -180,7 +180,7 @@ React on Rails provides two Redux patterns. Both continue to work with RSC as lo
 
 **Pattern 1: Shared store (`registerStore` + `redux_store` helper)**
 
-If you use `ReactOnRails.registerStore()` with the `redux_store` view helper, Client Components can continue using `ReactOnRails.getStore()` and `<Provider>`. The store generator receives `(props, railsContext)` and creates a store for each render. In the Pro Node Renderer, hydrated stores are scoped to that render, including work resumed after an `await` or a streaming boundary. In the browser, the hydrated store belongs to the current page and is replaced during page hydration or navigation. Declare the store with `redux_store` before rendering components that read it. Register store generators at module scope, but hydrate user-specific stores from render props rather than at module scope.
+If you use `ReactOnRails.registerStore()` with the `redux_store` view helper, Client Components can continue using `ReactOnRails.getStore()` and `<Provider>`. The store generator receives `(props, railsContext)` and creates a store for each render. In the Pro Node Renderer, hydrated stores are scoped to that render, including work resumed after an `await` or a streaming boundary. In the browser, the hydrated store belongs to the current page and is replaced during page hydration or navigation. Declare the store with `redux_store` before rendering components that call `getStore()`. Register store generators at module scope, but hydrate user-specific stores from render props rather than at module scope.
 
 ```jsx
 // ReduxApp.client.jsx -- Client Component (unchanged)

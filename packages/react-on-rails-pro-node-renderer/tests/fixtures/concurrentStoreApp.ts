@@ -14,7 +14,7 @@
  */
 
 import React from 'react';
-import { PassThrough } from 'stream';
+import { PassThrough, Readable } from 'stream';
 import { createStore } from 'redux';
 import ReduxProvider from './StoreProvider.client.ts';
 import RSCRoute from '../../../react-on-rails-pro/src/RSCRoute.tsx';
@@ -60,7 +60,49 @@ function StreamedStoreView({ user }: { user: string }) {
   );
 }
 
+const cleanupUsers: string[] = [];
+let cleanupArrivals = 0;
+let resolveCleanup: () => void;
+const cleanupDone = new Promise<void>((resolve) => {
+  resolveCleanup = resolve;
+});
+const neverReady = new Promise<void>(() => {});
+function PendingChild() {
+  React.use(neverReady);
+  return null;
+}
+function CleanupStoreView(_props: unknown, railsContext: { addPostSSRHook: (hook: () => void) => void }) {
+  railsContext.addPostSSRHook(() => {
+    try {
+      cleanupUsers.push(ReactOnRails.getStore('UserStore')?.getState().user);
+    } finally {
+      cleanupArrivals += 1;
+      if (cleanupArrivals === 2) resolveCleanup();
+    }
+  });
+  return () =>
+    React.createElement(
+      'div',
+      null,
+      React.createElement('h1', null, 'shell'),
+      React.createElement(
+        React.Suspense,
+        { fallback: React.createElement('span', null, 'pending') },
+        React.createElement(PendingChild),
+      ),
+    );
+}
+
 Object.assign(globalThis, {
+  cleanupUsers,
+  cleanupDone,
+  createPullStoreStream: () =>
+    new Readable({
+      read() {
+        this.push(ReactOnRails.getStore('UserStore')?.getState().user);
+        this.push(null);
+      },
+    }),
   __webpack_require__: () => ({ default: ReduxProvider }),
   __webpack_chunk_load__: () => Promise.resolve(),
   createStoreFlightStream: async (payload: string) => {
@@ -83,6 +125,7 @@ Object.assign(globalThis, {
 
 ReactOnRails.register({
   AsyncStoreView,
+  CleanupStoreView,
   StreamedStoreView,
   RSCStoreView: wrapServerComponentRenderer(
     () => React.createElement(RSCRoute, { componentName: 'StorePage', componentProps: {} }),

@@ -1032,6 +1032,13 @@ export async function buildExecutionContext(
       );
 
       if (isReadableStream(result)) {
+        // Consumer-driven reads and teardown can begin outside the render's async context.
+        const stream = result;
+        const read = stream.read.bind(stream);
+        const destroy = stream.destroy.bind(stream);
+        stream.read = (size?: number) => hydratedStoreScope.run(requestHydratedStores, () => read(size));
+        stream.destroy = (error?: Error) =>
+          hydratedStoreScope.run(requestHydratedStores, () => destroy(error));
         const reportedErrors = new WeakSet<object>();
         // A stream error thrown inside the sandboxed VM realm is a genuine Error, but it
         // fails the worker-realm `instanceof Error` check because it comes from a different
