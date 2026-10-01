@@ -45,6 +45,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   responses whose root resolves before a descendant fails now restore the previous route content,
   report `refetchError` and `onRefetchError`, and keep Retry available. Restoring content can remount
   descendant client components. Fixes [Issue 5078](https://github.com/shakacode/react_on_rails/issues/5078).
+  [PR 5135](https://github.com/shakacode/react_on_rails/pull/5135) by
+  [Justin Gordon](https://github.com/justin808).
 
 - **[Pro]** **RSC streams no longer encode consumer logs into the Flight payload**: React 19.3 development
   Flight keeps a console hook active while it flushes chunks, so logs from code consuming the returned RSC
