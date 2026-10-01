@@ -23,7 +23,6 @@ require "uri"
 #   rake react_on_rails_pro:update_public_key              # From production (pro.reactonrails.com)
 #   rake react_on_rails_pro:update_public_key[local]       # From localhost:3000
 #   rake react_on_rails_pro:update_public_key[custom.com]  # From custom hostname
-#   rake react_on_rails_pro:verify_public_key              # Verify current configuration
 #   rake react_on_rails_pro:public_key_help                # Show help
 
 namespace :react_on_rails_pro do # rubocop:disable Metrics/BlockLength
@@ -184,9 +183,6 @@ namespace :react_on_rails_pro do # rubocop:disable Metrics/BlockLength
 
       4. From a custom full URL:
          rake react_on_rails_pro:update_public_key[https://api.example.com/api/public-key]
-
-      Verify current public key:
-         rake react_on_rails_pro:verify_public_key
 
       Note: The public key is used to verify JWT licenses for React on Rails Pro.
             The corresponding private key is held securely by ShakaCode.

@@ -61,6 +61,16 @@ RSpec.describe "react_on_rails_pro:update_public_key" do
     expect(Net::HTTP).to have_received(:get_response).with(URI("https://staging.example.com/api/public-key"))
   end
 
+  it "advertises only registered tasks in its help output" do
+    Rake::Task["react_on_rails_pro:public_key_help"].invoke
+
+    expect($stdout).to have_received(:puts) do |help|
+      commands = help.scan(/rake (react_on_rails_pro:\w+)/).flatten
+      expect(commands).not_to be_empty
+      expect(commands).to all(satisfy { |command| Rake::Task.task_defined?(command) })
+    end
+  end
+
   it "writes the renderer key into the current workspace package with its commercial license header" do
     Rake::Task["react_on_rails_pro:update_public_key"].invoke
 
@@ -70,11 +80,11 @@ RSpec.describe "react_on_rails_pro:update_public_key" do
     )
   end
 
-  it "retains the commercial license header in the generated Ruby key" do
+  it "writes the Ruby key into the gem with its commercial license header" do
     Rake::Task["react_on_rails_pro:update_public_key"].invoke
 
     expect(File).to have_received(:write).with(
-      anything,
+      File.expand_path("../../lib/react_on_rails_pro/license_public_key.rb", __dir__),
       a_string_including("# frozen_string_literal: true", "React on Rails Pro (commercial license)", "test-public-key")
     )
   end
