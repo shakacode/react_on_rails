@@ -26,8 +26,8 @@ require "nokogiri"
 
 # rubocop:disable Metrics/ModuleLength
 module ReactOnRailsProHelper
-  CachedComponentResponse = Struct.new(:content, :http_response)
-  private_constant :CachedComponentResponse
+  CACHED_HTTP_RESPONSE_MARKER = "rorp-http-response-v1"
+  private_constant :CACHED_HTTP_RESPONSE_MARKER
 
   STATIC_RSC_RENDER_DIAGNOSTIC_EVENT = "render_static_rsc_component.react_on_rails_pro"
   HTML_SPACE_CHARACTERS = [" ", "\t", "\n", "\f", "\r"].freeze
@@ -533,24 +533,24 @@ module ReactOnRailsProHelper
     result, cache_hit, cache_write_skipped = fetch_cache_entry(
       cache_key,
       cache_write_options,
-      cache_write_if:,
-      cache_http_response: true
+      cache_write_if:
     ) do
       normalized_cache_tags = ReactOnRailsPro::Cache.normalize_tags(options[:cache_tags])
-      yield
+      content = yield
+      with_cached_http_response(content, server_rendered_http_response)
     end
     unless cache_hit || cache_write_skipped
       ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_write_options)
     end
     result, cached_csp_nonce = extract_cached_csp_nonce_marker(result)
+    result = unwrap_cached_http_response(result)
     load_pack_for_cached_react_component(component_name, options) if cache_hit
     result = normalize_cached_pro_attribution(result, cached_csp_nonce) if cache_hit
 
     add_component_cache_metadata(result, cache_key, cache_hit)
   end
 
-  def fetch_cache_entry(cache_key, cache_write_options, cache_write_if:, cache_http_response: false)
-    @server_rendered_http_response = nil if cache_http_response
+  def fetch_cache_entry(cache_key, cache_write_options, cache_write_if:)
     cache_hit = true
     cache_write_skipped = false
     skip_cache_write = Object.new
@@ -559,10 +559,7 @@ module ReactOnRailsProHelper
         cache_hit = false
         # The marker travels with the cached value; both hit and miss consumers strip it
         # with extract_cached_csp_nonce_marker before the value reaches the page.
-        rendered_result = yield
-        http_response = server_rendered_http_response if cache_http_response
-        rendered_result = append_cached_csp_nonce_marker(rendered_result)
-        rendered_result = with_cached_http_response(rendered_result, http_response)
+        rendered_result = append_cached_csp_nonce_marker(yield)
         next rendered_result unless cache_write_if && !cache_write_if.call
 
         cache_write_skipped = true
@@ -570,18 +567,21 @@ module ReactOnRailsProHelper
       end
     end
 
-    if result.is_a?(CachedComponentResponse)
-      apply_server_rendered_http_response!("httpResponse" => result.http_response)
-      result = result.content
-    end
-
     [result, cache_hit, cache_write_skipped]
   end
 
   def with_cached_http_response(content, http_response)
-    return content unless http_response && http_response["status"] != 200
+    return content unless http_response
+    return content if http_response["status"] == 200 && http_response["location"].nil?
 
-    CachedComponentResponse.new(content, http_response)
+    [CACHED_HTTP_RESPONSE_MARKER, content, http_response]
+  end
+
+  def unwrap_cached_http_response(value)
+    return value unless value.is_a?(Array) && value.length == 3 && value.first == CACHED_HTTP_RESPONSE_MARKER
+
+    apply_server_rendered_http_response!("httpResponse" => value[2])
+    value[1]
   end
 
   def normalize_cached_pro_attribution(result, cached_csp_nonce = nil)

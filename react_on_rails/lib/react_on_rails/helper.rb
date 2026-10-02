@@ -855,10 +855,9 @@ module ReactOnRails
       end
 
       location = http_response["location"]
-      if !location.nil? && (!location.is_a?(String) || location.match?(/[\r\n]/) ||
-                      !(300..399).cover?(http_response["status"]))
-        raise ReactOnRails::Error, "Expected redirect Location to be a string without newlines and a 3xx status."
-      end
+      return unless !location.nil? && (!location.is_a?(String) || location.match?(/[\r\n]/))
+
+      raise ReactOnRails::Error, "Expected HTTP Location to be a string without newlines."
     end
 
     def merge_server_rendered_client_props!(render_options, result)

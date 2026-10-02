@@ -1777,6 +1777,7 @@ describe('tanstack-router integration (Pro)', () => {
         ActualRouterProvider as React.ComponentType<{ router: TanStackRouter }>,
         ({ initialEntries }) => createActualMemoryHistory({ initialEntries }),
       );
+      expect(serverResult.httpResponse).toEqual({ status: 404 });
       expect(serverResult.dehydratedState.ssrRouter?.matches).toEqual(
         expect.arrayContaining([expect.objectContaining({ globalNotFound: true })]),
       );

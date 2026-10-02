@@ -571,6 +571,14 @@ describe ReactOnRailsHelper do
         expect(ssr_response.headers["Location"]).to eq("/products?ids=1%2C2#details")
       end
 
+      it "supports a Location header on a created response" do
+        send(:apply_server_rendered_http_response!, "httpResponse" => {
+               "status" => 201, "location" => "/products/new-resource"
+             })
+        expect(ssr_response.status).to eq(201)
+        expect(ssr_response.headers["Location"]).to eq("/products/new-resource")
+      end
+
       it "applies not-found and loader-error statuses" do
         [404, 500].each do |status|
           send(:apply_server_rendered_http_response!, "httpResponse" => { "status" => status })
