@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { cleanupRun, residualProcessGroups } from './app-session.mjs';
+import { cleanupResources, residualProcessGroups } from './app-session.mjs';
 
 test('finds only process groups owned by the unique benchmark session', () => {
   const processList = `
@@ -12,21 +12,35 @@ test('finds only process groups owned by the unique benchmark session', () => {
   assert.deepEqual(residualProcessGroups(processList, 'rspack-session-abc', 300), [100]);
 });
 
-test('cleanup attempts browser and workspace removal after a session stop failure', async () => {
+test('cleanup attempts all session resources when page closure fails', async () => {
+  const calls = [];
+  const failure = new Error('page close failed');
+  await assert.rejects(
+    cleanupResources(
+      async () => {
+        calls.push('page');
+        throw failure;
+      },
+      ...['process', 'residuals', 'ports', 'workspace'].map((name) => async () => {
+        calls.push(name);
+      }),
+    ),
+    (error) => error === failure,
+  );
+  assert.deepEqual(calls, ['page', 'process', 'residuals', 'ports', 'workspace']);
+});
+
+test('run cleanup attempts browser and workspace removal after a session stop failure', async () => {
   const calls = [];
   const failure = new Error('stop failed');
   await assert.rejects(
-    cleanupRun(
-      {
-        stop: async () => {
-          calls.push('stop');
-          throw failure;
-        },
+    cleanupResources(
+      async () => {
+        calls.push('stop');
+        throw failure;
       },
-      {
-        close: async () => {
-          calls.push('browser');
-        },
+      async () => {
+        calls.push('browser');
       },
       async () => {
         calls.push('workspaces');
@@ -42,16 +56,12 @@ test('cleanup preserves multiple failures after attempting every resource', asyn
   const browserFailure = new Error('browser failed');
   let removed = false;
   await assert.rejects(
-    cleanupRun(
-      {
-        stop: async () => {
-          throw failure;
-        },
+    cleanupResources(
+      async () => {
+        throw failure;
       },
-      {
-        close: async () => {
-          throw browserFailure;
-        },
+      async () => {
+        throw browserFailure;
       },
       async () => {
         removed = true;

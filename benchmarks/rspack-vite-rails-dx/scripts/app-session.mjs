@@ -51,16 +51,13 @@ export async function startApp({ browser, label, root, tool, extraEnv = {} }) {
   let page;
   let stopPromise;
   const stop = async () => {
-    stopPromise ??= (async () => {
-      try {
-        await page?.close();
-        await stopProcess(child);
-        await stopResidualProcesses(nonce);
-        await waitForClosedPorts([webPort, assetPort]);
-      } finally {
-        await workspace.remove();
-      }
-    })();
+    stopPromise ??= cleanupResources(
+      () => page?.close(),
+      () => stopProcess(child),
+      () => stopResidualProcesses(nonce),
+      () => waitForClosedPorts([webPort, assetPort]),
+      () => workspace.remove(),
+    );
     await stopPromise;
   };
 
@@ -282,9 +279,9 @@ function round(value) {
   return Math.round(value * 10) / 10;
 }
 
-export async function cleanupRun(session, browser, removeWorkspaces) {
+export async function cleanupResources(...actions) {
   const errors = [];
-  for (const cleanup of [() => session?.stop(), () => browser?.close(), removeWorkspaces]) {
+  for (const cleanup of actions) {
     try {
       await cleanup();
     } catch (error) {

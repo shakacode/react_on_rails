@@ -10,6 +10,7 @@ import {
   runtimeErrorMarker,
   sourceLocationVisible,
   sourceLinkPattern,
+  waitForSourceOverlay,
 } from './overlay-helpers.mjs';
 
 test('compile probe reports the appended source line', () => {
@@ -75,6 +76,8 @@ test('editor invocation must contain the exact workspace source, line, and colum
     column: 7,
   });
   assert.equal(parseEditorInvocation(['/other/index.tsx:12:7'], workspace, source), undefined);
+  assert.equal(parseEditorInvocation([`builtin:swc-loader!${source}:12:7`], workspace, source), undefined);
+  assert.equal(parseEditorInvocation([`${source}:12:7.backup`], workspace, source), undefined);
 });
 
 test('restoration health marker must replace an existing benchmark marker', () => {
@@ -127,4 +130,32 @@ test('editor target uses the full source path rather than a shared basename', ()
   assert.equal(pattern.test('file:///workspace/node_modules/example/index.tsx:17:9'), false);
   assert.equal(pattern.test('app/frontend/pages/inertia_example/index.tsx.backup:17:9'), false);
   assert.equal(pattern.test('file:///workspace/app/frontend/pages/inertia_example/index.tsx:17:9'), true);
+});
+
+test('overlay polling waits for a source frame after the marker appears', async () => {
+  const source = 'app/frontend/pages/inertia_example/index.tsx';
+  let reads = 0;
+  const frame = `${compileErrorMarker} ${source}:17:9`;
+  const text = await waitForSourceOverlay(
+    async () => (++reads === 1 ? compileErrorMarker : frame),
+    compileErrorMarker,
+    source,
+    17,
+    1000,
+    0,
+  );
+  assert.equal(text, frame);
+  assert.equal(reads, 2);
+});
+
+test('overlay polling retains matching evidence when its source frame never arrives', async () => {
+  const text = await waitForSourceOverlay(
+    async () => compileErrorMarker,
+    compileErrorMarker,
+    'app/source.tsx',
+    17,
+    20,
+    0,
+  );
+  assert.equal(text, compileErrorMarker);
 });

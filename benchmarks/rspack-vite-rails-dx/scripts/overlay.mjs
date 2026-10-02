@@ -4,7 +4,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { format as formatOutput } from 'prettier';
-import { captureEnvironment, cleanupRun, startApp } from './app-session.mjs';
+import { captureEnvironment, cleanupResources, startApp } from './app-session.mjs';
 import { assertNoLocalPaths, redactLocalPaths } from './local-paths.mjs';
 import {
   addCompileError,
@@ -16,6 +16,7 @@ import {
   runtimeErrorMarker,
   sourceLocationVisible,
   sourceLinkPattern,
+  waitForSourceOverlay,
 } from './overlay-helpers.mjs';
 import { prepareWorkspaces, removeWorkspaces } from './starter-workspace.mjs';
 
@@ -60,7 +61,11 @@ try {
   browser = await chromium.launch({ headless: true });
   for (const tool of tools) raw.results[tool] = await verifyTool(tool);
 } finally {
-  await cleanupRun(activeSession, browser, () => removeWorkspaces(root));
+  await cleanupResources(
+    () => activeSession?.stop(),
+    () => browser?.close(),
+    () => removeWorkspaces(root),
+  );
 }
 
 const safeRaw = JSON.parse(redactLocalPaths(JSON.stringify(raw), rootAliases));
@@ -140,7 +145,13 @@ async function withProbeSession(tool, label, browserErrors, probe) {
 }
 
 async function observeOverlay(session, tool, marker, line, timeout = 30_000) {
-  const text = await waitForOverlayText(session.page, tool, marker, timeout);
+  const text = await waitForSourceOverlay(
+    () => currentOverlayText(session.page, tool),
+    marker,
+    session.workspace.relativeMessagePath,
+    line,
+    timeout,
+  );
   if (text === undefined) {
     return {
       status: 'FAIL',
@@ -248,16 +259,6 @@ async function restoreHealthy(session, tool, healthySource, marker) {
     health_marker_observed: false,
     evidence: `ready=${lastReady}; overlay=${excerpt(redactEvidence(lastOverlay, session))}`,
   };
-}
-
-async function waitForOverlayText(page, tool, marker, timeout) {
-  const deadline = Date.now() + timeout;
-  while (Date.now() < deadline) {
-    const text = await currentOverlayText(page, tool);
-    if (text.includes(marker)) return text;
-    await delay(100);
-  }
-  return undefined;
 }
 
 async function currentOverlayText(page, tool) {

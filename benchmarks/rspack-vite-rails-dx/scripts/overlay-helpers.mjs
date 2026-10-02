@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 
 export const compileErrorMarker = 'ROR_DX_COMPILE_ERROR_MARKER';
 export const runtimeErrorMarker = 'ROR_DX_RUNTIME_ERROR_MARKER';
@@ -44,9 +45,9 @@ export function sourceLocationVisible(text, relativePath, line) {
 }
 
 export function parseEditorInvocation(invocation, workspaceDirectory, expectedSourcePath) {
-  const combined = invocation.join(' ');
   const escaped = expectedSourcePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const match = combined.match(new RegExp(`${escaped}:(\\d+):(\\d+)`));
+  const position = new RegExp(`^${escaped}:(\\d+):(\\d+)$`);
+  const match = invocation.map((argument) => argument.match(position)).find(Boolean);
   const splitArguments =
     invocation[0] === expectedSourcePath && /^\d+$/.test(invocation[1]) && /^\d+$/.test(invocation[2]);
   if (!match && !splitArguments) return undefined;
@@ -100,4 +101,18 @@ Each overlay result requires the deterministic marker and the original TSX file 
 
 This is a same-machine browser verification of the two pinned generated Rails starters. A FAIL records observed behavior; it is not by itself a product defect. Product fixes require separate issue evaluation. See [issue #4696](https://github.com/shakacode/react_on_rails/issues/4696).
 `;
+}
+
+export async function waitForSourceOverlay(readText, marker, sourcePath, line, timeout, interval = 100) {
+  const deadline = Date.now() + timeout;
+  let lastMatchingText;
+  while (Date.now() < deadline) {
+    const text = await readText();
+    if (text.includes(marker)) {
+      lastMatchingText = text;
+      if (sourceLocationVisible(text, sourcePath, line)) return text;
+    }
+    await delay(interval);
+  }
+  return lastMatchingText;
 }
