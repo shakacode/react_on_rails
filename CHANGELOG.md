@@ -41,6 +41,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **Payload-only RSC requests initialize the cache build ID on every renderer worker**:
+  The payload endpoint now supplies its captured RSC artifact ID without requiring an earlier full-page
+  render on that worker. Cached server components can therefore render on fresh workers after a restart
+  or when requests are distributed across workers. Fixes
+  [Issue 5076](https://github.com/shakacode/react_on_rails/issues/5076).
+  [PR 5134](https://github.com/shakacode/react_on_rails/pull/5134) by
+  [Justin Gordon](https://github.com/justin808).
+
 - **[Pro]** **RSC streams no longer encode consumer logs into the Flight payload**: React 19.3 development
   Flight keeps a console hook active while it flushes chunks, so logs from code consuming the returned RSC
   Readable were serialized as `:W["log"...]` rows. In non-production builds, RSC payload streams now use
