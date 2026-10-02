@@ -6173,6 +6173,22 @@ with unchanged RSC artifacts does not rotate it. Changes to Rails code, data, or
 need a finite lifetime or an explicit version in the function `id` or arguments to separate cached
 results. Changing the namespace does not delete old entries from shared storage.
 
+### Deploy-time stale entries with Redis
+
+Each cache entry's key includes the build ID (derived from `rscBundleHash`). When the RSC bundle
+changes across deploys, the build ID rotates, and new requests produce new cache keys. Old entries
+under the previous build ID are never read again but are **not automatically deleted**.
+
+- **In-memory handler** (`InMemoryLRUCacheHandler`): bounded by the LRU size cap (default 1000
+  entries). Stale entries are evicted naturally as new entries arrive. No action needed.
+- **Redis handler** (`RedisCacheHandler`): entries with `revalidate: 0` (indefinite lifetime)
+  persist in Redis forever because `set` is called without a TTL. Over many deploys, stale entries
+  accumulate. Use a finite `revalidate` interval, or flush the RSC cache namespace after each
+  deploy (e.g. `redis-cli --scan --pattern 'rorp:rsc-cache:*' | xargs redis-cli del`). If you use
+  a `keyPrefix`, scope the flush to that prefix.
+- **Tiered handler** (`TieredCacheHandler`): the L1 handler follows its own eviction rules (see
+  above); the L2 handler (typically Redis) follows the Redis rules.
+
 React on Rails Pro's Ruby fragment-caching helpers have a separate `cache_tags:` and
 `ReactOnRailsPro.revalidate_tag` API. That API invalidates Rails fragment-cache entries; it does not
 invalidate entries created by JavaScript `unstable_cache`.
