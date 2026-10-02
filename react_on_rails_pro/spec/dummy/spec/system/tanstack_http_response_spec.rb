@@ -80,13 +80,15 @@ describe "TanStack Router HTTP responses" do
     end
 
     { "not_found" => 404, "unknown" => 404, "error" => 500 }.each do |path, status|
-      it "preserves #{path} HTTP #{status} and content on both the cache miss and hit" do
+      it "preserves #{path} HTTP #{status} and content across repeated requests" do
         2.times do
           page.driver.get("/tanstack_router_async/#{path}?cached=1")
           expect(page.status_code).to eq(status)
           expect(page).to have_css(status == 404 ? "#tanstack-async-not-found" : "#tanstack-async-error")
         end
-        expect(ReactOnRails::ServerRenderingPool).to have_received(:server_render_js_with_console_logging).once
+        render_count = status >= 500 ? 2 : 1
+        expect(ReactOnRails::ServerRenderingPool).to have_received(:server_render_js_with_console_logging)
+          .exactly(render_count).times
       end
     end
   end

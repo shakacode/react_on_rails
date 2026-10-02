@@ -20,7 +20,8 @@ RSpec.describe ReactOnRailsProHelper, :caching do
     helper.extend(ReactOnRails::Helper)
   end
 
-  statuses = [307, 308, 404, 500]
+  statuses = [307, 308, 404]
+  server_error_statuses = [500, 503]
 
   cache_helpers = %i[cached_react_component cached_react_component_hash]
   serializers = { "default" => nil, "JSON" => JSON }
@@ -60,6 +61,38 @@ RSpec.describe ReactOnRailsProHelper, :caching do
               end
               expect(helper).to have_received(:server_rendered_react_component).once
             end
+          end
+
+          server_error_statuses.each do |status|
+            it "retries HTTP #{status} instead of caching a transient failure" do
+              allow(helper).to receive(:server_rendered_react_component).and_return(
+                { "html" => rendered_html, "consoleReplayScript" => "", "httpResponse" => { "status" => status } },
+                { "html" => rendered_html, "consoleReplayScript" => "", "httpResponse" => { "status" => 200 } }
+              )
+              options = { cache_key: "retry-#{cache_helper}-#{status}", auto_load_bundle: false, prerender: true }
+              [status, 200, 200].each do |expected_status|
+                helper.controller.response = ActionDispatch::Response.new
+                result = helper.public_send(cache_helper, "App", options) { {} }
+                expect(result.to_s).to include("SSR body")
+                expect(helper.controller.response.status).to eq(expected_status)
+              end
+              expect(helper).to have_received(:server_rendered_react_component).twice
+            end
+          end
+
+          it "preserves the controller's status with a successful Location on a cache miss and hit" do
+            allow(helper).to receive(:server_rendered_react_component).and_return(
+              "html" => rendered_html, "consoleReplayScript" => "",
+              "httpResponse" => { "status" => 200, "location" => "/poll/123" }
+            )
+            2.times do
+              helper.controller.response = ActionDispatch::Response.new(202)
+              helper.public_send(cache_helper, "App", cache_key: "location-#{cache_helper}",
+                                                      auto_load_bundle: false, prerender: true) { {} }
+              expect(helper.controller.response.status).to eq(202)
+              expect(helper.controller.response.headers["Location"]).to eq("/poll/123")
+            end
+            expect(helper).to have_received(:server_rendered_react_component).once
           end
 
           it "re-stamps CSP nonces while replaying a cached not-found response" do

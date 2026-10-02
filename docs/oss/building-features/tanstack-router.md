@@ -142,5 +142,6 @@ If you call `serverRenderTanStackAppAsync` directly, include its `httpResponse`
 property alongside `renderedHtml` and `clientProps` in your render function result.
 This response handling applies to non-streaming renders, including
 `cached_react_component` and `cached_react_component_hash`. Cached markup replays
-its HTTP outcome on cache hits. Include the route and search in the component
+its HTTP outcome on cache hits. Server errors (5xx) bypass cache writes so a later
+request can recover. Include the route and search in the component
 cache key (for example, `request.fullpath`) so different URLs do not share responses.

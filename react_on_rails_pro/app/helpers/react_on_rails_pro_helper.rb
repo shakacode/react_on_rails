@@ -533,11 +533,10 @@ module ReactOnRailsProHelper
     result, cache_hit, cache_write_skipped = fetch_cache_entry(
       cache_key,
       cache_write_options,
-      cache_write_if:
+      cache_write_if: -> { server_rendered_component_cache_write_allowed?(cache_write_if) }
     ) do
       normalized_cache_tags = ReactOnRailsPro::Cache.normalize_tags(options[:cache_tags])
-      content = yield
-      with_cached_http_response(content, server_rendered_http_response)
+      with_cached_http_response(yield)
     end
     unless cache_hit || cache_write_skipped
       ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_write_options)
@@ -570,7 +569,15 @@ module ReactOnRailsProHelper
     [result, cache_hit, cache_write_skipped]
   end
 
-  def with_cached_http_response(content, http_response)
+  def server_rendered_component_cache_write_allowed?(condition)
+    http_response = server_rendered_http_response
+    return false if http_response && http_response["status"] >= 500
+
+    !condition || condition.call
+  end
+
+  def with_cached_http_response(content)
+    http_response = server_rendered_http_response
     return content unless http_response
     return content if http_response["status"] == 200 && http_response["location"].nil?
 

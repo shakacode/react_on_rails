@@ -592,6 +592,13 @@ describe ReactOnRailsHelper do
         expect(ssr_response.status).to eq(202)
       end
 
+      it "preserves the controller's status while applying a successful Location" do
+        ssr_response.status = 202
+        send(:apply_server_rendered_http_response!, "httpResponse" => { "status" => 200, "location" => "/poll/123" })
+        expect(ssr_response.status).to eq(202)
+        expect(ssr_response.headers["Location"]).to eq("/poll/123")
+      end
+
       it "rejects invalid HTTP metadata and response splitting" do
         invalid_metadata = [
           { "status" => 999 },

@@ -841,11 +841,14 @@ module ReactOnRails
       return if http_response["status"] == 200 && location.nil?
       return unless respond_to?(:controller) && controller.respond_to?(:response)
 
-      response = controller.response
+      update_controller_http_response!(controller.response, http_response)
+    end
+
+    def update_controller_http_response!(response, http_response)
       raise ReactOnRails::Error, "Cannot apply SSR HTTP response after headers are committed." if response.committed?
 
-      response.status = http_response["status"]
-      response.headers["Location"] = location if location
+      response.status = http_response["status"] unless http_response["status"] == 200
+      response.headers["Location"] = http_response["location"] if http_response["location"]
     end
 
     def validate_server_rendered_http_response!(http_response)
