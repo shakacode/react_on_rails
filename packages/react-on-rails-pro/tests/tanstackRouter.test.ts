@@ -179,61 +179,71 @@ function buildStoresHydrationHarness({
 }
 
 describe('tanstack-router integration (Pro)', () => {
-  it('returns a Promise with serverRenderHash on server-side render', async () => {
-    const router = buildRouter();
-    const options = {
-      createRouter: () => router,
-    };
-    const deps = {
-      RouterProvider: (_props: { router: TanStackRouter }) => React.createElement('div'),
-      createMemoryHistory: jest.fn().mockReturnValue({
-        location: {
-          pathname: '/products',
-          search: '?category=tools',
-          hash: '',
-          href: '/products?category=tools',
-          state: null,
+  it.each([200, 307, 308, 404, 500])(
+    'forwards HTTP %i through the public server render function',
+    async (status) => {
+      const router = buildRouter();
+      const location = '/products?ids=1%2C2#details';
+      const httpResponse = { status, ...(status >= 300 && status < 400 ? { location } : {}) };
+      Object.assign(router.state, {
+        statusCode: status,
+        ...(status >= 300 && status < 400 ? { redirect: { status, headers: { get: () => location } } } : {}),
+      });
+      const options = {
+        createRouter: () => router,
+      };
+      const deps = {
+        RouterProvider: (_props: { router: TanStackRouter }) => React.createElement('div'),
+        createMemoryHistory: jest.fn().mockReturnValue({
+          location: {
+            pathname: '/products',
+            search: '?category=tools',
+            hash: '',
+            href: '/products?category=tools',
+            state: null,
+          },
+        }),
+        createBrowserHistory: jest.fn(),
+      };
+
+      const renderFn = createTanStackRouterRenderFunction(options, deps);
+
+      const result = renderFn({ initial: 'prop' }, {
+        serverSide: true,
+        pathname: '/products',
+        search: '?category=tools',
+      } as unknown as RailsContext);
+
+      // Server-side should return a Promise (async path)
+      expect(result).toBeInstanceOf(Promise);
+
+      const resolved = (await result) as ServerRenderResult;
+      expect(resolved.httpResponse).toEqual(httpResponse);
+      expect(renderFn.renderFunction).toBe(true);
+      expect(React.isValidElement(resolved.renderedHtml)).toBe(true);
+      expect(resolved.clientProps).toEqual({
+        __tanstackRouterDehydratedState: {
+          url: '/products?category=tools',
+          dehydratedRouter: { matches: [{ id: 'products' }] },
+          ssrRouter: {
+            manifest: undefined,
+            lastMatchId: '\u0000products',
+            matches: [
+              {
+                i: '\u0000products',
+                l: { products: ['hammer'] },
+                s: 'success',
+                ssr: true,
+                u: 123,
+              },
+            ],
+          },
         },
-      }),
-      createBrowserHistory: jest.fn(),
-    };
-
-    const renderFn = createTanStackRouterRenderFunction(options, deps);
-
-    const result = renderFn({ initial: 'prop' }, {
-      serverSide: true,
-      pathname: '/products',
-      search: '?category=tools',
-    } as unknown as RailsContext);
-
-    // Server-side should return a Promise (async path)
-    expect(result).toBeInstanceOf(Promise);
-
-    const resolved = (await result) as ServerRenderResult;
-    expect(renderFn.renderFunction).toBe(true);
-    expect(React.isValidElement(resolved.renderedHtml)).toBe(true);
-    expect(resolved.clientProps).toEqual({
-      __tanstackRouterDehydratedState: {
-        url: '/products?category=tools',
-        dehydratedRouter: { matches: [{ id: 'products' }] },
-        ssrRouter: {
-          manifest: undefined,
-          lastMatchId: '\u0000products',
-          matches: [
-            {
-              i: '\u0000products',
-              l: { products: ['hammer'] },
-              s: 'success',
-              ssr: true,
-              u: 123,
-            },
-          ],
-        },
-      },
-    });
-    expect(deps.createMemoryHistory).toHaveBeenCalledWith({ initialEntries: ['/products?category=tools'] });
-    expect(router.load).toHaveBeenCalled();
-  });
+      });
+      expect(deps.createMemoryHistory).toHaveBeenCalledWith({ initialEntries: ['/products?category=tools'] });
+      expect(router.load).toHaveBeenCalled();
+    },
+  );
 
   it('normalizes railsContext.search when it does not include a leading "?"', async () => {
     const router = buildRouter();
@@ -1753,9 +1763,10 @@ describe('tanstack-router integration (Pro)', () => {
     },
   );
 
-  it('preserves the redirect response status when router statusCode is absent', async () => {
+  it.each([undefined, 307])('prioritizes redirect status over router statusCode %s', async (statusCode) => {
     const router = buildRouter();
     Object.assign(router.state, {
+      statusCode,
       redirect: { status: 308, headers: { get: () => '/products?ids=1%2C2#details' } },
     });
     const result = await serverRenderTanStackAppAsync(
