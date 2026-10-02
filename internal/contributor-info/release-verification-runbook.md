@@ -67,8 +67,13 @@ Accept only a published stable release whose validation and promotion have close
 For an RC/beta or an open release validation/promotion run, switch
 to $run-fleet-validation and preserve its APP_WORK_ALLOWED barrier, report-only soft
 tracks, independent audit, and closeout merge ownership before any app mutation.
-First verify the release tag and published gem/npm artifacts. Inventory every manifest
-repository, including hard_gate and soft_track entries, and verify its live owner,
+First verify the release tag and published gem/npm artifacts.
+Before creating upgrade chats or changing apps, obtain the fresh independent final-tag
+audit required by rc-testing-plan.md: this runbook's Lane 4a must be COMPLETE and Lane 4b
+must be CLEAN for the exact stable tag and published artifacts. Retain both reports;
+GAPS, DEFECTS, missing, or unknown evidence blocks launch. Closed promotion alone is not
+a substitute for this audit.
+Inventory every manifest repository, including hard_gate and soft_track entries, and verify its live owner,
 visibility, archival state, declared package manager, and packages actually consumed.
 Prioritize hard gates. Report archived, inaccessible, already-current, or inapplicable
 repositories with a reason; do not silently drop them or invent upgrade PRs.
