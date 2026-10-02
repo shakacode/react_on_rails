@@ -115,6 +115,25 @@ RSpec.describe ReactOnRailsProHelper, :caching do
             expect(helper).to have_received(:server_rendered_react_component).once
           end
 
+          it "replays HTTP metadata when CSP marker extraction fails open" do
+            metadata = { "status" => 308, "location" => "/target?ids=1%2C2#details" }
+            allow(helper).to receive_messages(csp_nonce: "http-cache-AAA=",
+                                              server_rendered_react_component: {
+                                                "html" => rendered_html,
+                                                "consoleReplayScript" => "", "httpResponse" => metadata
+                                              })
+            options = { cache_key: "csp-failure-#{cache_helper}", auto_load_bundle: false, prerender: true }
+            helper.public_send(cache_helper, "App", options) { {} }
+            allow(helper).to receive(:extract_cached_csp_nonce_marker_from_chunks).and_raise(ArgumentError, "probe")
+            helper.controller.response = ActionDispatch::Response.new
+            result = helper.public_send(cache_helper, "App", options) { {} }
+            expect(helper.controller.response.status).to eq(308)
+            expect(helper.controller.response.headers["Location"]).to eq(metadata["location"])
+            expect(result.to_s).to include("SSR body")
+            expect(result.to_s).not_to include("rorp-http-response-v1", "rorp-cached-csp-nonce:")
+            expect(helper).to have_received(:server_rendered_react_component).once
+          end
+
           it "rejects replaying an HTTP outcome after headers are committed" do
             html = "<div>SSR body</div>"
             html = { "componentHtml" => html } if cache_helper == :cached_react_component_hash

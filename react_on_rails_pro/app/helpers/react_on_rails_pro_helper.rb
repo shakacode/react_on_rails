@@ -585,7 +585,7 @@ module ReactOnRailsProHelper
   end
 
   def unwrap_cached_http_response(value)
-    return value unless value.is_a?(Array) && value.length == 3 && value.first == CACHED_HTTP_RESPONSE_MARKER
+    return value unless value.is_a?(Array) && value.length.between?(3, 4) && value.first == CACHED_HTTP_RESPONSE_MARKER
 
     apply_server_rendered_http_response!("httpResponse" => value[2])
     value[1]
