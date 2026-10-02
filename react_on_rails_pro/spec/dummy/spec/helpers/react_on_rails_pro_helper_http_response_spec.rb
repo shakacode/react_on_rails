@@ -182,4 +182,48 @@ RSpec.describe ReactOnRailsProHelper, :caching do
       end
     end
   end
+
+  describe "#cached_async_react_component" do
+    around do |example|
+      Sync { example.run }
+    end
+
+    before do
+      helper.instance_variable_set(:@react_on_rails_async_barrier, Async::Barrier.new)
+    end
+
+    serializers.each do |name, serializer|
+      context "with the #{name} cache serializer" do
+        before do
+          store = if serializer
+                    ActiveSupport::Cache::MemoryStore.new(serializer:)
+                  else
+                    ActiveSupport::Cache::MemoryStore.new
+                  end
+          allow(Rails).to receive(:cache).and_return(store)
+        end
+
+        (statuses + server_error_statuses).each do |status|
+          it "preserves HTTP #{status} and only caches non-server-error outcomes" do
+            metadata = { "status" => status }
+            metadata["location"] = "/target?ids=1%2C2#details" if status < 400
+            failure = { "html" => "<div>SSR body</div>", "consoleReplayScript" => "", "httpResponse" => metadata }
+            success = failure.merge("httpResponse" => { "status" => 200 })
+            results = status >= 500 ? [failure, success] : [failure]
+            allow(helper).to receive(:server_rendered_react_component).and_return(*results)
+            expected_statuses = status >= 500 ? [status, 200, 200] : [status, status]
+            expected_statuses.each do |expected_status|
+              helper.controller.response = ActionDispatch::Response.new
+              result = helper.cached_async_react_component("App", cache_key: "async-http-#{status}",
+                                                                  auto_load_bundle: false, prerender: true) { {} }.value
+              expect(result).to include("SSR body")
+              expect(helper.controller.response.status).to eq(expected_status)
+              expect(helper.controller.response.headers["Location"]).to eq(metadata["location"])
+            end
+            expect(helper).to have_received(:server_rendered_react_component).exactly(status >= 500 ? 2 : 1).times
+          end
+        end
+      end
+    end
+  end
 end

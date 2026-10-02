@@ -60,39 +60,61 @@ describe "TanStack Router HTTP responses" do
     end
   end
 
+  describe "prerender-cached Rails controller responses", :caching, :rack_test do
+    it "renders every loader failure instead of retaining it in the prerender cache" do
+      # Keep render inputs stable so repeated requests reach the same prerender cache key.
+      nonce_free_env = Rails.application.env_config
+                            .merge("action_dispatch.content_security_policy_nonce_generator" => nil)
+      allow(Rails.application).to receive(:env_config).and_return(nonce_free_env)
+      pool = ReactOnRailsPro::ServerRenderingPool::ProRendering.pool
+      allow(pool).to receive(:exec_server_render_js).and_call_original
+      2.times do
+        page.driver.get("/tanstack_router_async/error")
+        expect(page.status_code).to eq(500)
+        expect(page).to have_css("#tanstack-async-error", text: "Loader failed")
+      end
+      expect(pool).to have_received(:exec_server_render_js).twice
+    end
+  end
+
   describe "cached Rails controller responses", :caching, :rack_test do
     before do
       allow(ReactOnRails::ServerRenderingPool).to receive(:server_render_js_with_console_logging).and_call_original
     end
 
-    it "preserves loader redirects on both the cache miss and hit" do
-      2.times do
-        page.driver.get("/tanstack_router_async/redirect?cached=1")
-        expect(page.status_code).to eq(308)
-        expect(page.response_headers["Location"]).to eq("/tanstack_router_async/second_page?ids=1%2C2#details")
-      end
-      expect(ReactOnRails::ServerRenderingPool).to have_received(:server_render_js_with_console_logging).once
-    end
-
-    it "preserves canonical redirects on both the cache miss and hit" do
-      2.times do
-        page.driver.get("/tanstack_router_async/?cached=1")
-        expect(page.status_code).to eq(307)
-        expect(page.response_headers["Location"]).to eq("/tanstack_router_async?cached=1")
-      end
-      expect(ReactOnRails::ServerRenderingPool).to have_received(:server_render_js_with_console_logging).once
-    end
-
-    { "not_found" => 404, "unknown" => 404, "error" => 500 }.each do |path, status|
-      it "preserves #{path} HTTP #{status} and content across repeated requests" do
-        2.times do
-          page.driver.get("/tanstack_router_async/#{path}?cached=1")
-          expect(page.status_code).to eq(status)
-          expect(page).to have_css(status == 404 ? "#tanstack-async-not-found" : "#tanstack-async-error")
+    error_routes = { "not_found" => 404, "unknown" => 404, "error" => 500 }
+    %w[1 async].each do |cache_mode|
+      context "with cache mode #{cache_mode}" do
+        it "preserves loader redirects on both the cache miss and hit" do
+          2.times do
+            page.driver.get("/tanstack_router_async/redirect?cached=#{cache_mode}")
+            expect(page.status_code).to eq(308)
+            expect(page.response_headers["Location"]).to eq("/tanstack_router_async/second_page?ids=1%2C2#details")
+          end
+          expect(ReactOnRails::ServerRenderingPool).to have_received(:server_render_js_with_console_logging).once
         end
-        render_count = status >= 500 ? 2 : 1
-        expect(ReactOnRails::ServerRenderingPool).to have_received(:server_render_js_with_console_logging)
-          .exactly(render_count).times
+
+        it "preserves canonical redirects on both the cache miss and hit" do
+          2.times do
+            page.driver.get("/tanstack_router_async/?cached=#{cache_mode}")
+            expect(page.status_code).to eq(307)
+            expect(page.response_headers["Location"]).to eq("/tanstack_router_async?cached=#{cache_mode}")
+          end
+          expect(ReactOnRails::ServerRenderingPool).to have_received(:server_render_js_with_console_logging).once
+        end
+
+        error_routes.each do |path, status|
+          it "preserves #{path} HTTP #{status} and content across repeated requests" do
+            2.times do
+              page.driver.get("/tanstack_router_async/#{path}?cached=#{cache_mode}")
+              expect(page.status_code).to eq(status)
+              expect(page).to have_css(status == 404 ? "#tanstack-async-not-found" : "#tanstack-async-error")
+            end
+            render_count = status >= 500 ? 2 : 1
+            expect(ReactOnRails::ServerRenderingPool).to have_received(:server_render_js_with_console_logging)
+              .exactly(render_count).times
+          end
+        end
       end
     end
   end

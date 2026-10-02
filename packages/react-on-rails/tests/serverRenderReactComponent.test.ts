@@ -313,6 +313,23 @@ describe('serverRenderReactComponent', () => {
     expect(result.html).toBe('<h1>Result</h1>');
   });
 
+  it('preserves a synchronous HTTP redirect through the wire protocol', () => {
+    const httpResponse = { status: 308, location: '/products?ids=1%2C2#details' };
+    const HttpApp = (() => ({ renderedHtml: '<h1>Result</h1>', httpResponse })) as RenderFunction;
+    HttpApp.renderFunction = true;
+    ComponentRegistry.register({ HttpApp });
+    const wire = serverRenderReactComponent({
+      name: 'HttpApp',
+      trace: false,
+      throwJsErrors: true,
+      renderingReturnsPromises: false,
+    });
+    expect(typeof wire).toBe('string');
+    const result = parseLengthPrefixed(wire as string);
+    expect(result.httpResponse).toEqual(httpResponse);
+    expect(result.html).toBe('<h1>Result</h1>');
+  });
+
   it('serverRenderReactComponent processes async serverRenderHash with clientProps', async () => {
     const X6WithClientProps = (() =>
       Promise.resolve({
