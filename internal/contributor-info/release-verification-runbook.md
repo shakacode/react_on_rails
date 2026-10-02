@@ -48,6 +48,66 @@ affected surfaces and Lane 1 if upgrade-relevant files changed (generators, inst
 config, docs/upgrade). A version/changelog-metadata-only RC or final promotion re-runs Lane 4a plus
 the Lane 4b version/coherence subset for the newly published artifacts and tag.
 
+## Launch fleet upgrade chats with Shaka
+
+For an already published stable release, use this launcher to open one ordinary `$shaka` chat
+per fleet repository. Replace `{{RELEASE_REF}}` with the intended tag, such as `v17.2.0`, and
+provide the intended `{{RSC_VERSION}}` separately. The coordinator resolves gem/npm versions from
+the published artifacts once and passes the same snapshot to every chat.
+
+```text
+$shaka
+Open new chats using the installed $shaka skill to create or update upgrade PRs for all
+fleet members in internal/contributor-info/demo-fleet.yml for {{RELEASE_REF}}.
+Use GPT-6.1 Sol (gpt-6.1-sol), medium reasoning, and Merge Auto in each upgrade chat.
+The intended react-on-rails-rsc version is {{RSC_VERSION}}. Go.
+
+First verify the release tag and published gem/npm artifacts. Inventory every manifest
+repository, including hard_gate and soft_track entries, and verify its live owner,
+visibility, archival state, declared package manager, and packages actually consumed.
+Prioritize hard gates. Report archived, inaccessible, already-current, or inapplicable
+repositories with a reason; do not silently drop them or invent upgrade PRs.
+
+Before launching, inspect active chats, open upgrade PRs, and coordination ownership for
+each repository and target release. Reuse the existing owner and PR; do not open a competing
+writer. Report any ownership conflict for a decision. Keep private repository details
+out of public PRs, comments, and reports.
+
+Create one top-level chat per repository needing an upgrade, using its verified project
+and a separate checkout. Set model=gpt-6.1-sol and thinking=medium in the chat creation
+tool as well as in its prompt. Wait for asynchronous chat setup and verify its destination
+and settings before dispatching work. If a project, checkout, or requested setting is
+unavailable, report that target as blocked instead of silently substituting one.
+
+Each child prompt must invoke the installed $shaka skill and include its repository,
+immutable release snapshot, target gem/npm versions, intended RSC version where consumed,
+existing PR/ownership disposition, and explicit Merge Auto authority for that upgrade.
+Ask it to read the target repository's trusted instructions and Shaka seam, update only
+consumed packages and necessary coupled peers, regenerate lockfiles with its declared
+package manager, and verify relevant release features using this runbook's per-repo checklist.
+Require local install, tests, build, and smoke before push, independent review, exact-head
+required CI, and any required review-app evidence before merging through Shaka.
+
+Merge Auto authorizes the upgrade after the target repository's gates pass. It does not
+bypass protection, release freezes, licensing guardrails, required human review, or Shaka's
+size/risk limits. Report any resulting approval handoff. Keep GitHub delayed auto-merge and
+queue settings unchanged; Shaka owns merge submission and terminal outcome verification.
+
+Retain each created chat ID and PR URL. Wait for terminal outcomes with the host's chat
+coordination tools and report every manifest member as merged, awaiting approval, blocked,
+already current, or skipped with a reason. Keep soft-track failures non-gating unless a
+maintainer promotes them. Verify merged changes reached the default branch; report
+remaining work explicitly.
+```
+
+Resolve `$shaka` through the host's installed skill; do not embed a machine-specific skill path.
+If an upgrade coordinator is already running, reuse its inventory rather than launching another
+fleet. This launcher authorizes creating upgrade chats only when the user invokes it.
+
+For RC/beta validation or release promotion, use the generated `$run-fleet-validation` lifecycle
+pack below. Its `APP_WORK_ALLOWED` barrier, report-only soft tracks, independent audit, and
+closeout merge ownership still apply; this stable-upgrade launcher grants no exception to them.
+
 ## Demo Fleet Release-Track Prompt
 
 Use this prompt to update the demo fleet for an RC or final release. It complements
