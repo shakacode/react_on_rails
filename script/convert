@@ -71,6 +71,7 @@ MINIMUM_REACT_OVERRIDE_KEYS = %w[
   react_on_rails_pro_dummy>react
   react_on_rails_pro_dummy>react-dom
   react_on_rails_pro_dummy>react-on-rails-rsc
+  react_on_rails_pro_dummy>react-server-dom-webpack
 ].freeze
 
 # The below packages don't work on the oldest supported Node version and aren't needed there anyway

@@ -1,7 +1,7 @@
 # Bundle Caching
 
 > **Pro Feature** — Available with [React on Rails Pro](../../pro/react-on-rails-pro.md).
-> Free or very low cost for startups and small companies. [Upgrade or licensing details →](../../pro/upgrading-to-pro.md#try-pro-risk-free)
+> Free in development, test, CI, and staging, and in production for small organizations, charities, schools, and hospitals; larger organizations subscribe at https://pro.reactonrails.com/ ($1,800 per year per organization). No license key is needed to run Pro.
 
 Bundle caching avoids redundant webpack builds by caching bundles based on a digest of source files.
 

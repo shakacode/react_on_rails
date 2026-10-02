@@ -23,8 +23,8 @@ export default function logLicenseStatus(licenseToken?: string) {
     if (isProduction) {
       log.warn(
         `[React on Rails Pro] ${summary}. ` +
-          'Production Use of React on Rails Pro requires an appropriate license. ' +
-          `If this deployment is Production Use, ${productionAction}`,
+          'React on Rails Pro is free in production for small organizations, charities, schools, and hospitals; ' +
+          `other organizations need a subscription. If that is you, ${productionAction}`,
       );
     } else {
       log.info(`[React on Rails Pro] ${summary}. No license required for development/test environments.`);

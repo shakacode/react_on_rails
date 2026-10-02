@@ -1,194 +1,345 @@
-# ShakaCode React on Rails Pro – End User License Agreement (EULA)
+# The React on Rails Pro License
 
-_Version 2.3 — 2026-07-14_\
-© 2015–2026 ShakaCode, LLC. All rights reserved.
+The React on Rails Pro License, version 3.0, an application of ShakaCode
+Trust-Based Commercial Licensing.
 
----
+Copyright (c) 2015-2026 ShakaCode LLC, a Hawaii limited liability company
+("ShakaCode").
 
-## 1. Definitions
+SPDX-License-Identifier: LicenseRef-ReactOnRailsPro
 
-- **Organization** – the single legal entity identified in the order (e.g., GitHub Sponsors, invoice).
-- **Licensee** – the Organization or any other person or entity exercising royalty-free rights under Section 4.
-- **Production Use** – any use of the Software in connection with a live application, website, or service accessed by end users **other than**:
-  - evaluation or testing
-  - classroom instruction, tutorials, workshops, coursework
-  - recorded demos, livestreams, or videos
-  - personal/hobby experiments not offered as a service
-- **Complimentary OSS License** – a license issued under Section 4.1 at no charge to a qualifying open-source Organization.
-- **Covered HTML Document** – an HTML document containing output rendered by the integrated React on Rails Pro product.
-- **Attribution Provider** – the part of the integrated React on Rails Pro product that generates and inserts the Generated Attribution on behalf of the product as a whole.
-- **Generated Attribution** – the complete, non-visual HTML comment emitted by the Attribution Provider, including its license-status suffix.
+## Plain-language summary (informative, not part of the terms)
 
----
+React on Rails Pro is trust-based: no license key is needed to run it,
+nothing phones home, and a missing key never blocks, slows, or changes
+how your app runs. Reading the source, development, test, CI, staging,
+review apps, education, personal projects, and open-source work are free
+for everyone, at any organization size. Production use is also free if
+you can answer yes to all three questions: *Do fewer than 10 people work
+for your organization (counting all affiliates)? Was its revenue in the
+last twelve months under US $1M? Has it raised under US $1M in outside
+capital, ever?* Charities, educational institutions, and hospitals are
+free at any size. If any answer is no and you are none of those,
+production use requires a paid subscription, and one subscription covers
+your whole organization: every application, environment, and developer.
+See https://pro.reactonrails.com/. Every page rendered with Pro carries
+one HTML comment naming the product and its license status; the license
+key that comes with a subscription makes it read `Licensed`. Once a
+version ships under these terms, those terms govern that version
+permanently.
 
-## 2. Grant of License (Per-Organization)
+## 1. Acceptance
 
-Subject to this Agreement, ShakaCode grants the subscribing Organization a **non-exclusive, non-transferable** license, during the applicable license term, to install, internally modify, and use React on Rails Pro (“Software”) in the Organization’s own applications, websites, and services, whether accessed internally or by public end users.
+By using the software, you agree to these terms. If you use the software
+on behalf of an organization, you represent that you have authority to
+bind that organization, and "you" includes it.
 
-This grant does not permit redistribution or sublicensing of the Software, offering the Software itself to third parties, or using one Organization’s license for another Organization or consulting client.
+## 2. Definitions
 
----
+**"Software"** means React on Rails Pro: the `react_on_rails_pro` Ruby
+gem, the `react-on-rails-pro` and `react-on-rails-pro-node-renderer` npm
+packages, and any other component ShakaCode distributes under these
+terms. The open-source React on Rails core that the software builds on is
+licensed separately under the MIT License.
 
-## 3. Consulting Firms and Individual Consultants
+**"Control"** means ownership of more than 50% of the voting interests of
+an entity, or the power to direct its management or policies, by contract
+or otherwise.
 
-- **Consulting Firms** – this license covers only the firm’s own applications, websites, and services, whether accessed internally or by public end users. Each client Organization requires its own license for any Production Use.
-- **Individual Consultants** – this license covers only the consultant’s own applications, websites, and services personally operated by them, not client Organizations. Each client Organization must obtain its own license.
+**"Your organization"** means you together with every entity that Controls
+you, that you Control, or that is under common Control with you. Teams,
+departments, and other sub-units are not separate organizations.
 
----
+**"Small Organization"** means an organization for which all of the
+following are true, counted across the entire organization as defined
+above:
 
-## 4. Non-Commercial / Educational / Demo Use (Free)
+a. fewer than 10 individuals perform paid work for it or on its products
+   and services, whether directly or through staffing, outsourcing, or
+   services arrangements, counted as full-time equivalents;
+b. its total gross revenue, measured over the twelve months ending with
+   the most recently completed calendar quarter, was less than
+   US $1,000,000; and
+c. it has received less than US $1,000,000 in aggregate outside capital
+   over its lifetime (equity, tokens, convertible instruments, venture or
+   investor debt, accelerator funding, and grants or donations, other than
+   academic research or charitable grants to accredited academic or
+   nonprofit institutions) from sources other than its own operating
+   revenue and its founders' personal funds. Ordinary-course bank and
+   trade credit do not count.
 
-Free, royalty-free use is permitted for:
+Government entities, other than public educational institutions, are not
+Small Organizations.
 
-- classroom instruction, training, workshops, coursework;
-- tutorials, blog posts, livestreams, or videos;
-- personal/hobby projects not used in production;
-- demo apps showcasing coding techniques.
+**"Charity"** means an organization recognized as charitable or
+public-benefit under the law of the jurisdiction where it is organized (for
+example, a US 501(c)(3) organization or its equivalent elsewhere), no part
+of whose net earnings benefits any private person.
 
-**Note:** This clause does **not** permit any Production Use by any entity (commercial, non-profit, or individual). All Production Use requires a paid subscription under this Agreement, except as provided in Section 4.1.
+**"Educational Institution"** means a school, college, university, or
+other institution whose principal purpose is teaching or academic
+research, whether public or private, including its libraries, research
+institutes, and teaching hospitals.
 
-**4.1 Open-Source Project License (Complimentary)**
+**"Hospital"** means an institution licensed to provide inpatient
+medical care to the public, whether public, non-profit, or private,
+including its clinics and medical research units.
 
-ShakaCode may, at its sole discretion, issue a complimentary "oss" license to an Organization that meets **all** of the following criteria:
+Charity, Educational Institution, and Hospital status belongs to the
+qualifying entity and to affiliates that qualify on their own; it does
+not extend to for-profit affiliates, spin-offs, or commercial ventures
+that are not themselves one of these.
 
-1. The Organization deploys the Software as part of a project whose source code is publicly available under an [OSI-approved license](https://opensource.org/licenses).
-2. The Organization's annual revenue (or total funding received, if pre-revenue) does not exceed USD $1,000,000.
-3. The Organization applies by emailing [justin@shakacode.com](mailto:justin@shakacode.com) and provides truthful information about the project and Organization.
+**"Production use"** means running the software to serve an application,
+website, or service to its end users, whether those users are the public,
+your customers, or your own staff. Development, test, continuous
+integration, staging, preview, review-app, and other non-production
+environments are not production use.
 
-**Terms of Complimentary OSS Licenses:**
+**"Generated Attribution"** means the HTML comment the software emits
+once in each document it renders, in the form
+`<!-- Powered by React on Rails Pro (c) ShakaCode | STATUS -->`, where
+STATUS is generated by the software from the license status.
 
-- The attribution requirement in Section 6 applies and may not be waived.
-- Complimentary OSS Licenses are granted for a fixed term of one (1) year from the date of issuance and may be renewed upon request.
-- ShakaCode may revoke a Complimentary OSS License (i) immediately upon written notice if the Organization violates this Agreement, or (ii) on thirty (30) days' written notice if the Organization no longer meets the eligibility criteria.
-- All other terms of this Agreement apply (including Sections 5, 7, 9, and 12), subject to the modifications for Complimentary OSS Licenses in Section 7.
+**"Subscription"** means an active paid React on Rails Pro subscription
+purchased at https://pro.reactonrails.com/, through another order channel
+ShakaCode designates (for example a designated GitHub Sponsors tier or an
+invoice), or under a separate written agreement with ShakaCode.
+Sponsorships and donations that ShakaCode has not designated as
+subscriptions are appreciated but are not Subscriptions and grant no
+production-use rights.
 
----
+**"License key"** means the optional credential ShakaCode issues that
+identifies your organization in the software's license-status logs and in
+the Generated Attribution. A license key is identity, not enforcement.
 
-## 5. Restrictions
+## 3. Copyright grant
 
-The Organization shall not:
+ShakaCode grants you a non-exclusive, worldwide, royalty-free license to
+use, copy, modify, and create derivative works of the software, and to
+include it in the builds and deployments of your organization's own
+applications, in each case only as allowed by these terms. You may share
+copies with contractors and service providers working on those
+applications, who must observe these terms. You may not distribute the
+software or your modifications as a standalone product or library, or as
+part of a product whose purpose is to provide the software's
+functionality to others (see Section 7).
 
-1. redistribute or resell the Software or derivatives;
-2. remove, obfuscate, or disable required attribution;
-3. use the Software to build a directly competing product exposing substantially similar functionality;
-4. **circumvent, bypass, modify, disable, or tamper with any license validation mechanisms, license checks, or authentication systems;**
-5. **reverse engineer, decompile, or disassemble the Software for the purpose of circumventing license restrictions;**
-6. **create, use, or distribute any tools, scripts, patches, or modifications designed to enable unauthorized use of Pro features;**
-7. **access or use the Software outside the rights granted by this Agreement, including any Production Use without a valid, active paid or Complimentary OSS License.**
+## 4. Free uses
 
----
+The following uses are free of charge for anyone, at any organization
+size:
 
-## 6. Product-Level Attribution (HTML Source)
+a. reading and studying the source code;
+b. development, test, continuous integration, staging, preview,
+   review-app, and every other non-production environment, without time
+   limit;
+c. evaluating the software in production for up to 45 days per
+   organization (not per version, person, or application), solely to
+   decide whether to adopt it;
+d. education and training of people, tutorials, demonstrations, and
+   academic research, in each case not directed at developing or
+   operating your organization's own products or services;
+e. personal and hobby projects;
+f. developing and operating a public open-source project distributed
+   under a license approved by the Open Source Initiative, where the
+   software runs as part of that project's own publicly available code
+   and primarily for that project's benefit, and not for the development
+   or operation of a proprietary product or service.
 
-Every Covered HTML Document must retain exactly one complete, unmodified Generated Attribution in its HTML source. The Attribution Provider emits this comment once on behalf of the integrated React on Rails Pro product. A related component, including `react-on-rails-rsc`, has no independent obligation to insert another attribution comment when it does not control the HTML document or generate or insert the Generated Attribution.
+In addition, **all production use is free of charge for a Small
+Organization, a Charity, an Educational Institution, or a Hospital, at
+any size for the last three.** If your organization is one of these,
+nothing in Section 5 applies to you.
 
-This requirement applies to paid Production Use, Production Use under a Complimentary OSS License, and every royalty-free use permitted by Section 4.
+## 5. Paid uses
 
-The Generated Attribution uses the following form, where the status suffix is generated by the Software:
+Production use by an organization that is not a Small Organization, a
+Charity, an Educational Institution, or a Hospital requires a
+Subscription. This includes, without limitation, production use beyond
+the Section 4(c) evaluation window, internal applications used only by
+your staff, and applications you operate for your customers.
 
-```html
-<!-- Powered by React on Rails Pro (c) ShakaCode | STATUS -->
+In any conflict between Section 4 and this Section 5, use described in
+this Section 5 is production use and is not a free use under Section
+4(b), (c), or (d).
+
+**Client work.** If you use the software to build or run an application
+for a client, the use is attributed to the organization whose business
+the application ultimately serves, traced through any intermediaries.
+That organization's status determines whether the use is free or paid,
+and any required Subscription must be held by, or purchased for the
+benefit of and identifying, that organization. You may rely on a client's
+written self-certification of its status. A consulting firm's or agency's
+own applications are attributed to the firm or agency.
+
+## 6. Subscriptions
+
+One Subscription covers your whole organization: every application,
+environment, server, and developer of your organization, with no per-seat
+or per-application charge. A Subscription is governed by the subscription
+terms, order form, or other agreement under which it is purchased; if
+that agreement conflicts with these terms, that agreement controls. While
+a Subscription is active, ShakaCode provides software updates and
+reasonable support through its published channels; no response or
+resolution times are guaranteed unless an order or separate agreement
+says so. If a required Subscription expires or is terminated, your
+production use remains licensed for 30 days while you renew or wind down,
+and the software keeps running either way. ShakaCode and you may enter a
+separate written agreement that supplements or supersedes these terms.
+
+## 7. No hosted or embedded offering
+
+You may not provide the software or its rendering functionality to third
+parties as a hosted, managed, embedded, or bundled offering, for example
+a platform that builds or runs other organizations' React on Rails
+applications, without a separate written agreement with ShakaCode. Each
+organization whose applications use the software must independently
+qualify for free use or hold its own Subscription. Running your own
+applications for your own users, customers, or staff is not an offering
+to third parties.
+
+## 8. Attribution and license status
+
+Every HTML document rendered with the software must retain exactly one
+complete, unmodified Generated Attribution in its source. You may not
+remove, alter, obscure, or suppress it, in free and paid use alike. With
+a valid license key the status reads `Licensed`; without a key it reads
+`UNLICENSED`; an expired or malformed key reads `LICENSE EXPIRED` or
+`INVALID LICENSE`. An `UNLICENSED` status is not by itself a violation,
+because free uses need no key. The software never blocks, degrades, or
+reports your use based on license status; it only labels and logs it.
+Keep your license key private: it identifies your organization. A related
+component that does not itself generate or insert the Generated
+Attribution, such as `react-on-rails-rsc`, has no obligation to insert a
+second one.
+
+## 9. Trust, self-certification, and true-up
+
+These terms are enforced by trust, not technology: the software contains
+no activation, no usage telemetry, and no runtime lockout, and a license
+key only changes what the status says. You are responsible for
+determining in good faith whether your use is free or paid. ShakaCode
+encourages every organization, free and paid alike, to register at
+https://pro.reactonrails.com/ (free of charge). Registration is optional
+and is never a condition of any free use.
+
+If your organization stops qualifying as a Small Organization, your
+production use remains licensed for 60 days after the change; after that,
+continued production use requires a Subscription. No payment is owed for
+use during that window, and the obligation is not avoided by
+re-qualification within 12 months of the change.
+
+If you discover in good faith that past use required a Subscription,
+purchasing the applicable Subscription within 60 days of discovery is
+full compliance, and no back payment is owed for the good-faith period.
+If your organization made production use requiring a Subscription
+without a good-faith basis for treating it as free, ShakaCode may require
+payment of the applicable subscription fees for the period of that use,
+up to 24 months.
+
+You must not misrepresent your organization, its size or status, or your
+license status, whether in a registration, in the software's
+configuration, or in the Generated Attribution.
+
+## 10. Redistribution and notices
+
+Copies of the software and derivative works that these terms allow you to
+make must remain under these same terms and must retain these terms, all
+copyright and attribution notices, and the SPDX identifier.
+
+## 11. Patents
+
+ShakaCode grants you a license under any patent claims it can license that
+are necessarily infringed by the software, only for uses allowed by these
+terms. This patent license ends immediately if you or your organization
+initiate a patent claim (excluding counterclaims and cross-claims filed in
+response to a patent claim first brought against you) alleging that the
+software infringes a patent.
+
+## 12. Trademarks
+
+These terms grant no rights in the names, logos, or trademarks of
+ShakaCode, React on Rails, or React on Rails Pro, except for the
+attribution required by these terms and truthful factual references.
+
+## 13. Per-version terms, breach, and cure
+
+These terms apply per version: the terms delivered with a version of the
+software govern that version permanently, and patch and security releases
+of a version line remain under that line's terms. Later versions may be
+offered under different terms.
+
+If you breach these terms, your license ends automatically 30 days after
+ShakaCode provides written notice of the breach, unless you cure it within
+that period; upon cure, your license is reinstated retroactively. Curing
+continued production use during a lapsed Subscription includes payment of
+the applicable fees for the lapsed period.
+
+## 14. Feedback
+
+If you submit feedback, suggestions, or improvements to ShakaCode, you
+grant ShakaCode a worldwide, royalty-free, irrevocable license to use and
+incorporate them.
+
+## 15. Disclaimer and limitation of liability
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+PURPOSE, TITLE, AND NON-INFRINGEMENT. TO THE MAXIMUM EXTENT PERMITTED BY
+LAW, SHAKACODE WILL NOT BE LIABLE FOR ANY INDIRECT, SPECIAL, INCIDENTAL,
+OR CONSEQUENTIAL DAMAGES ARISING FROM OR RELATED TO THE SOFTWARE OR THESE
+TERMS, AND SHAKACODE'S TOTAL LIABILITY WILL NOT EXCEED THE AMOUNTS YOU
+PAID SHAKACODE FOR THE SOFTWARE IN THE TWELVE MONTHS BEFORE THE CLAIM
+AROSE.
+
+## 16. Assignment, governing law, and miscellaneous
+
+You may assign these terms, together with any active Subscription, to a
+successor in connection with a merger, acquisition, or sale of
+substantially all assets, upon notice to ShakaCode; these terms are
+otherwise non-transferable. These terms are governed by the laws of the
+State of Hawaii, USA, excluding its conflict-of-law rules, with exclusive
+jurisdiction and venue in the state and federal courts located in
+Honolulu, Hawaii. If a provision of these terms is unenforceable, the
+remainder stays in effect. These terms, together with any subscription
+agreement or order, are the entire agreement about the software; if they
+conflict, the order controls.
+
+## 17. Questions and commercial licensing
+
+contact@shakacode.com · https://pro.reactonrails.com/ ·
+https://github.com/shakacode/commercial-licensing
+
+## Machine-readable summary (informative)
+
+```yaml
+license_name: The React on Rails Pro License 3.0
+spdx_identifier: LicenseRef-ReactOnRailsPro
+type: trust-based commercial
+free_production_use_if_all:
+  max_org_headcount_fte: 10        # exclusive; whole control group
+  max_ttm_revenue_usd: 1000000     # exclusive; trailing 12 months
+  max_lifetime_outside_capital_usd: 1000000  # exclusive
+free_production_use_if_any:
+  - charity                        # recognized charitable / public-benefit org, any size
+  - educational_institution        # school, college, university, any size
+  - hospital                       # licensed inpatient care provider, any size
+always_free: [read, study, development, test, ci, staging, preview, review_apps, evaluate_in_production_45_days, education, personal, oss_projects]
+paid: production use by any other organization; one subscription per organization, unlimited applications and developers
+license_key: optional  # identity only; sets the attribution status; never required for free use
+runtime_enforcement: none  # no activation, no telemetry, no lockout; status is logged and labeled
+attribution_required: true  # one HTML comment per rendered document
+subscription_lapse_grace_days: 30
+outgrow_free_line_grace_days: 60
+per_version_terms: true
+pricing_url: https://pro.reactonrails.com/
+register_url: https://pro.reactonrails.com/
+contact: contact@shakacode.com
 ```
 
-For a valid license credential, the status suffix is `Licensed` and does not identify the Organization. Expired, invalid, and missing license credentials use `LICENSE EXPIRED`, `INVALID LICENSE`, and `UNLICENSED`, respectively. `UNLICENSED` indicates that no license credential was present; that status alone does not establish a violation because the use may be permitted by Section 4.
+## Version history (informative)
 
-The Licensee may not remove, modify, obfuscate, or disable the Generated Attribution.
-
----
-
-## 7. Fees; Term; Termination
-
-Paid subscriptions may be purchased or renewed at [pro.reactonrails.com](https://pro.reactonrails.com/) or through another ShakaCode-approved order channel.
-
-Fees and billing terms are as agreed in the applicable order (e.g., GitHub Sponsors subscription or annual invoice).\
-For paid subscriptions, the license remains active only while fees are paid. ShakaCode may suspend or terminate for non-payment or material breach. Complimentary OSS Licenses remain active for the term specified in the grant, subject to the revocation terms in Section 4.1.\
-Upon termination, lapse, or revocation, the Organization must immediately cease use and remove the Software (including derivatives) from all Production systems and repositories, except for (a) non-commercial uses explicitly permitted in Section 4, or (b) Complimentary OSS Licenses revoked under Section 4.1(ii) for eligibility changes, in which case the Organization has thirty (30) days from written notice to comply.
-
----
-
-## 8. Updates & Support
-
-While subscribed, the Organization receives software updates and reasonable support (email or issue tracker, business hours). No specific response or resolution times are guaranteed unless set out in an order or separate SLA.
-
----
-
-## 9. Verification / Audit
-
-If ShakaCode reasonably suspects non-compliance, the Organization will cooperate in good faith to verify compliance, including enabling inspection for attribution presence and providing a usage statement. ShakaCode will use commercially reasonable efforts to minimize disruption.
-
-**9.1 Detailed Audits**\
-ShakaCode or a certified auditor acting on its behalf may, upon reasonable request and at ShakaCode’s expense, audit the Organization’s use of the Software to verify compliance with this Agreement. Audits may be conducted by mail, electronically, or by in-person visits during regular business hours and shall minimize disruption to the Organization’s business. If the audit reveals a material unauthorized use, the Organization shall reimburse ShakaCode for reasonable audit costs.
-
----
-
-## 10. Feedback & Contributions
-
-By submitting feedback or improvements, the Organization grants ShakaCode a worldwide, royalty-free, irrevocable license to use and incorporate them.
-
----
-
-## 11. Intellectual Property
-
-The Software is **licensed, not sold**. ShakaCode retains all rights, title, and interest, including all intellectual property rights.
-
----
-
-## 12. Confidentiality
-
-License keys and any non-public materials are ShakaCode confidential information. The Organization will protect them with at least reasonable care.
-
----
-
-## 13. Warranty Disclaimer
-
-> EXCEPT AS EXPRESSLY PROVIDED IN §8, THE SOFTWARE IS PROVIDED “AS IS,” WITHOUT WARRANTIES OF ANY KIND, EXPRESS OR IMPLIED.
-
----
-
-## 14. Limitation of Liability
-
-To the maximum extent permitted by law, ShakaCode is not liable for indirect, incidental, special, consequential, or punitive damages.\
-Direct damages are limited to amounts paid in the 12 months preceding the claim.
-
----
-
-## 15. Indemnification
-
-The Organization agrees to defend, indemnify, and hold harmless ShakaCode and its affiliates from any claims, losses, damages, liabilities, costs, or expenses (including legal fees) arising out of the Organization’s use of the Software or breach of this Agreement.
-
----
-
-## 16. Export Compliance
-
-The Organization agrees to comply with all applicable export laws and regulations, including restrictions on export, re-export, or redistribution of the Software.
-
----
-
-## 17. Attorneys’ Fees and Costs
-
-In any enforcement or legal action arising under this Agreement, the prevailing party shall be entitled to recover reasonable attorneys’ fees and costs.
-
----
-
-## 18. Governing Law; Venue
-
-This Agreement is governed by the laws of the **State of Hawaii**, USA. Exclusive jurisdiction and venue lie in the courts located therein.
-
----
-
-## 19. Miscellaneous
-
-- **19.1 Severability**\
-  If any provision is held invalid or unenforceable, the remainder shall continue in full force.
-
-- **19.2 Waiver**\
-  Failure to enforce any provision is not a waiver of rights.
-
-- **19.3 Assignment**\
-  The Organization may not assign this Agreement without prior written consent.
-
----
-
-## 20. Entire Agreement; Order of Precedence
-
-This EULA and any order (pricing/term) are the entire agreement. If there is a conflict, the order controls.
+Version 3.0 replaces the React on Rails Pro End User License Agreement,
+version 2.3 (2026-07-14), for releases shipped under these terms. Releases
+shipped under earlier terms remain under those terms.

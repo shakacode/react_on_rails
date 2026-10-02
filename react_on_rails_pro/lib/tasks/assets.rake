@@ -56,7 +56,8 @@ namespace :react_on_rails_pro do # rubocop:disable Metrics/BlockLength
 
   desc "Copy assets to remote node-renderer"
   task copy_assets_to_remote_vm_renderer: :environment do
-    puts "[ReactOnRailsPro] Copying assets to remote node-renderer #{ReactOnRailsPro.configuration.renderer_url}"
+    puts "[ReactOnRailsPro] Copying assets to remote node-renderer " \
+         "#{ReactOnRails::Utils.sanitize_url_for_display(ReactOnRailsPro.configuration.renderer_url)}"
     ReactOnRailsPro::Request.upload_assets
   end
 end

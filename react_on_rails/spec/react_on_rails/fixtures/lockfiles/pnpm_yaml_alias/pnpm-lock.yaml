@@ -1,0 +1,9 @@
+lockfileVersion: &v '9.0'
+sameVersion: *v
+
+importers:
+  .:
+    dependencies:
+      react-on-rails:
+        specifier: 16.6.0
+        version: 16.6.0

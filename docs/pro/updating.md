@@ -352,19 +352,17 @@ yarn install
 + require('react-on-rails-pro-node-renderer/integrations/honeybadger').init();
 ```
 
-#### Step 5: Configure License Token (Production Only)
+#### Step 5: Configure the License Key (Optional)
 
-React on Rails Pro uses **ShakaCode Trust-Based Commercial Licensing** to simplify evaluation and development.
+The license key is optional in every environment. It identifies your
+organization, marks rendered pages `Licensed`, and changes the license status
+in logs. Without a key, Pro keeps running and rendered pages read `UNLICENSED`.
 
-A license token is **optional** for non-production environments:
-
-- Evaluation and local development
-- Test environments and CI/CD pipelines
-- Staging/non-production deployments
-
-**A paid license is required only for production deployments.**
-
-If no license is configured, Pro keeps running in unlicensed mode and logs license status instead of blocking your app. In production, that log message is a warning because a paid license is required.
+Production without a key is fine for the free uses and for organizations below
+the free line. Larger organizations subscribe at
+[pro.reactonrails.com](https://pro.reactonrails.com/) and receive a key with
+their subscription. In production, a missing or invalid key produces a warning
+that reminds larger organizations to subscribe.
 
 Configure the token through Rails credentials or another application-owned secret provider:
 
@@ -389,7 +387,7 @@ Explicit nonblank configuration takes precedence over the environment variable; 
 Never commit your license token to version control. Configure a standalone Node renderer separately through its
 `licenseToken` option or environment because it cannot read Rails credentials.
 
-**Where to get your license token:** Visit [Pro pricing and sign up](https://pro.reactonrails.com/) or contact [justin@shakacode.com](mailto:justin@shakacode.com) if you don't have your license token.
+**Where to get your license key:** Subscribe at [pro.reactonrails.com](https://pro.reactonrails.com/).
 
 For complete licensing details, see [LICENSE_SETUP.md](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/LICENSE_SETUP.md).
 
@@ -493,6 +491,30 @@ If you are upgrading from Pro 3.x and relied on default values without explicitl
 
 If your app depends on the previous defaults, set them explicitly in `config/initializers/react_on_rails_pro.rb`.
 
+##### Async props on the RSC payload endpoint
+
+The RSC payload endpoint now supports async props through two mechanisms:
+
+1. **Config registry** (recommended): Register providers in your initializer:
+
+   ```ruby
+   ReactOnRailsPro.configure do |config|
+     config.register_async_props("ComponentName", "ProviderClassName")
+   end
+   ```
+
+   The provider class must implement `.call(emit, props, controller)`. Pass the
+   class name as a string (not the class itself) so the reference survives Rails
+   class reloading in development.
+
+2. **Controller hook**: Override `rsc_payload_async_props_block_override` in your controller
+   for components that need controller context (e.g. `current_user`).
+
+If you were using the template-shadowing workaround described in
+[#5075](https://github.com/shakacode/react_on_rails/issues/5075), you can now
+replace it with either approach. The template-shadow approach continues to work but
+is no longer necessary.
+
 ##### RSC payload template overrides
 
 React on Rails Pro now renders the built-in RSC payload template with `formats: [:text]` so Rails view annotations cannot inject HTML comments into NDJSON responses.
@@ -537,9 +559,9 @@ Start your Rails server and verify behavior:
 React on Rails Pro license validated successfully
 ```
 
-If no license is set in non-production environments, the app still runs and logs informational status.
-
-For production, ensure a valid license is configured.
+If no license key is set, the app still runs. Non-production environments log informational status. Production logs a
+warning that reminds larger organizations to subscribe. Subscribing organizations can confirm that their configured
+key reports a valid status.
 
 #### 4. Test Your Application
 
@@ -572,12 +594,12 @@ This error occurs when you import from both `react-on-rails` and `react-on-rails
 
 The Pro package re-exports everything from core, so you don't need both.
 
-#### "License validation failed" (production)
+#### "License validation failed" for a configured key
 
-- Ensure `config.license_token` or `REACT_ON_RAILS_PRO_LICENSE` provides the token in production.
-- If using the standalone Node renderer, ensure its `licenseToken` option or environment provides the same token.
+- If your organization subscribes, ensure `config.license_token` or `REACT_ON_RAILS_PRO_LICENSE` provides its key.
+- If using the standalone Node renderer, ensure its `licenseToken` option or environment provides the same key.
 - Verify the token string is correct (no extra spaces or quotes).
-- Contact [justin@shakacode.com](mailto:justin@shakacode.com) if you need a new token.
+- Visit [pro.reactonrails.com](https://pro.reactonrails.com/) if you need a new key.
 
 ### Need Help?
 

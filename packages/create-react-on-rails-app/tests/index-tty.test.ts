@@ -77,8 +77,14 @@ describe('setup mode resolution in run()', () => {
       expect.objectContaining({ pro: true, rsc: false, tailwind: false }),
     );
     expect(mockedLogInfo).toHaveBeenCalledWith(expect.stringContaining('Default setup: React on Rails Pro'));
-    expect(mockedLogInfo).toHaveBeenCalledWith('Pro pricing and sign up: https://pro.reactonrails.com/');
-    expect(mockedLogInfo).toHaveBeenCalledWith(expect.stringContaining('free or low-cost options'));
+    expect(mockedLogInfo).toHaveBeenCalledWith('Pro pricing: https://reactonrails.com/pricing/');
+    expect(mockedLogInfo).toHaveBeenCalledWith('Pro sign up: https://pro.reactonrails.com/');
+    expect(mockedLogInfo).toHaveBeenCalledWith(
+      expect.stringContaining('no license key is needed to run Pro'),
+    );
+    expect(mockedLogInfo).toHaveBeenCalledWith(
+      expect.stringContaining('in production for small organizations, charities, schools, and hospitals'),
+    );
   });
 
   it('defaults to the Pro setup without RSC when stdin/stdout are not TTYs', async () => {

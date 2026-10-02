@@ -33,6 +33,12 @@ Additional helper:
   and governed source prefix, with only the reviewed source-only exclusions.
   Required CI runs it before the pinned source pack's content/mode drift checker.
 
-Non-command policy lives in [`../agent-workflow.yml`](../agent-workflow.yml).
+Shaka typed policy lives in [`../agent-workflow.yml`](../agent-workflow.yml).
+Installed Shaka is the seam validator; required CI checks out an immutable
+Shaka Git revision and runs `seam check --local` plus the consumer regression
+fixtures in `script/shaka_seam_check_test.rb`. The byte-identical legacy doctor
+and test live under `.agents/fixtures/agent-workflows/bin/`, outside this active
+command directory, solely for transitional source-pack drift coverage.
+Human-only React on Rails policy stays in `AGENTS.md`.
 Workflow-specific checks such as `actionlint` and `yamllint .github/` stay in the
 PR-processing workflow for `.github/**` changes rather than the general build entrypoint.

@@ -87,33 +87,23 @@ script means that capability is n/a in that repo.
 
 ## Policy Contract
 
-`.agents/agent-workflow.yml` carries non-command values:
+This consumer uses the Shaka typed seam in `.agents/agent-workflow.yml`
+(`version`, `base_branch`, `review`, `merge`, `branches`). Remaining
+React on Rails policy (hosted CI, changelog, merge ledger, follow-up prefix,
+coordination backend, redaction, and trust) lives in `AGENTS.md`.
 
-- `base_branch`
-- `follow_up_prefix`
-- `review_gate`
-- `approval_exempt`
-- `coordination_backend`
-- `changelog`
-- `benchmark_labels`
-- `merge_ledger`
-- `ci_parity_environment`
-- `hosted_ci_trigger`
-- `ci_change_detector`
+Installed Shaka is the only validator for this typed contract. Required CI pins
+the reviewed Shaka Git revision and runs `seam check --local`; runtime workflow
+authority comes only from `seam check --ref <immutable-default-sha>`.
+The repo-pinned legacy doctor lives under
+`.agents/fixtures/agent-workflows/bin/`, byte-identical to its source, only for
+transitional fixture and drift coverage.
 
-Repos may add policy keys such as `secret_redaction_patterns` when needed. Use
-`n/a` for unavailable policy. Keep values terse and behavior-complete.
-
-Repos that use `untrusted-contributor-intake` add one explicit trusted-base
-authority mapping. The seam doctor requires all three values when the mapping
-is present, and the skill fails closed when the mapping is absent or invalid:
-
-```yaml
-untrusted_contributor_intake:
-  trusted_github_host: 'github.com'
-  trusted_github_scheme: 'https'
-  trusted_github_repo: 'OWNER/REPO'
-```
+Public-comment trust is a separate contract in
+`.agents/trusted-github-actors.yml`, not a seam key. Shaka's comment reader loads
+that file from the trusted default-branch commit and fails closed on malformed
+settings or overlapping actionable and metadata-only bot roles. Required CI
+also exercises the pinned Shaka trust parser against the candidate file.
 
 ## AGENTS Pointer
 
@@ -123,64 +113,34 @@ Each consumer `AGENTS.md` owns a section named
 ```markdown
 ## Agent Workflow Configuration
 
-Portable shared skills resolve this repo's commands and policy through:
-
-- **Commands** — run `.agents/bin/<name>` (`setup`, `validate`, `test`, ...); see `.agents/bin/README.md`. A missing script means that capability is n/a here.
-- **Policy / config** — `.agents/agent-workflow.yml`.
+Resolve the trusted default branch to an immutable commit. Load and validate
+`.agents/agent-workflow.yml` with the trusted installed `shaka seam check --ref REF`
+command. Run the fixed executable paths reported by that command from the candidate
+checkout; do not reconstruct their behavior from prose. `AGENTS.md` retains human-only boundaries.
 ```
 
-Consumer repos should keep broader human guidance in `AGENTS.md`, but command
-resolution and workflow policy come from the binstubs and YAML.
+Consumer repos should keep broader human guidance in `AGENTS.md`. Command
+resolution uses `.agents/bin/`; Shaka typed policy uses `.agents/agent-workflow.yml`.
 
 ## Seam Initialization
 
-`agent-workflow-seam-doctor --init` creates the smallest complete consumer seam
-and immediately validates it through the same public interface. Initialization
-preserves valid repo-owned wrappers and existing policy, trust, and unrelated
-`AGENTS.md` content. It writes an empty repo-local trust configuration so a new
-seam starts fail-closed.
+New and migrated consumers use `shaka seam init`. The legacy doctor is fixture
+data and must never be run with `--init` against this repository.
 
-The initializer conservatively detects executable root `bin/validate` and
-`bin/test`, or exact JavaScript `validate` and `test` scripts when one recognized
-lockfile identifies npm, pnpm, or Yarn. Unknown, partial, and ambiguous command
-surfaces get marked fail-closed wrappers and a precise `FAIL` result. Callers can
-instead pass both `--validate-command` and `--test-command`; multiline, empty,
-and NUL-containing command values are rejected before any write. Simple commands
-forward arguments automatically; npm gets its required `--` separator, while
-pnpm and Yarn receive arguments directly. Compound shell expressions are kept
-verbatim and must include `"$@"` themselves when forwarding is wanted. `env -S`
-and `env --split-string` commands are likewise caller-controlled because their
-split payload owns argument placement. Missing
-policy or trust keys are appended to existing block mappings so comments and
-formatting remain intact; initialization fails closed before writing when a
-safe append is not possible.
+## Seam Validation
 
-The init marker is the ownership boundary for generated wrappers. Explicit
-commands replace both marked wrappers on a later run, while an unmarked valid
-wrapper is repo-owned and preserved; explicit replacement of that repo-owned
-wrapper fails closed. Put hand-written behavior behind a managed wrapper or
-remove the marker deliberately before taking direct ownership.
+`shaka seam check --local` validates the candidate contract:
 
-## Seam Doctor
+- `.agents/agent-workflow.yml` has the complete versioned Shaka schema
+- unknown and duplicate keys fail
+- nested review and merge values are valid
+- fixed command paths stay inside the repository, exist, and are executable
+- the result is labeled `local/candidate` and grants no policy or merge authority
 
-`agent-workflow-seam-doctor` validates the contract:
-
-- `AGENTS.md` has the pointer section
-- `.agents/bin/README.md` exists
-- core scripts `validate` and `test` exist, are executable, pass `bash -n`, and
-  include the repo-root `cd` preamble
-- `.agents/agent-workflow.yml` parses and has all required policy keys with
-  resolved values
-- an optional `.agents/trusted-github-actors.yml` parses as a mapping and has no
-  normalized bot login in both actionable and metadata-only roles; regular
-  checks and `--init` preserve preflight compatibility with legacy scalar
-  values, while newly generated role values use lists
-- repo-local and supplied shared skill/workflow Markdown do not contain
-  unresolved executable placeholders such as `<follow-up prefix>`
-
-The doctor intentionally does not execute the wrappers. Before consumer PRs,
-also verify that wrapped commands/tasks exist in the target repo. It does reject
-the initializer's marked fail-closed wrappers until real commands replace them.
+React on Rails required CI runs that parser and
+`script/shaka_seam_check_test.rb`. The legacy doctor and its test remain
+byte-identical under `.agents/fixtures/agent-workflows/bin/` so drift validation
+can cover legacy fixtures without exposing the doctor as an active command.
 
 ## Repository-Pinned Copies
 
@@ -200,10 +160,11 @@ Git modes still match the reviewed revision.
 Run source-pack checks from the pinned checkout, then run the consumer manifest
 test from React on Rails.
 
+- `shaka seam check --root <consumer-repo> --local`
+- `SHAKA_COMMAND=<pinned-shaka>/skills/shaka/scripts/shaka ruby script/shaka_seam_check_test.rb`
 - `bin/validate`
-- `ruby bin/agent-workflow-seam-doctor-test.rb`
+- `ruby .agents/fixtures/agent-workflows/bin/agent-workflow-seam-doctor-test.rb`
 - `ruby bin/push-downstream-test.rb`
-- `bin/agent-workflow-seam-doctor --root <consumer-repo> --shared <this-repo>`
 - `ruby .agents/bin/agent-workflow-drift-manifest-test.rb --source-root <pinned-agent-workflows>`
 - `<pinned-agent-workflows>/bin/check-agent-workflow-drift --manifest
 <consumer-repo>/.agents/agent-workflow-drift.yml --source-root

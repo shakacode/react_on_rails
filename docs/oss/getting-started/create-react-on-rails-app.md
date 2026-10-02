@@ -25,8 +25,10 @@ want Pro with the generated React Server Components example. Pro modes require `
 to be installable in your environment ([Pro setup docs](../../pro/installation.md)). All mode flags
 support JavaScript (`.jsx`) and TypeScript (`.tsx`) templates.
 
-Pro license note: no token is required for development, test, CI/CD, or staging. Production Pro
-deployments require a paid license.
+Free in development, test, CI, and staging, and in production for small
+organizations, charities, schools, and hospitals; larger organizations
+subscribe at https://pro.reactonrails.com/ ($1,800 per year per organization).
+No license key is needed to run Pro.
 
 To try the latest release candidate instead of the latest stable release, use the npm `rc` tag:
 

@@ -13,18 +13,15 @@ and [Release Verification Runbook](release-verification-runbook.md).
 > **Execution boundary:** Live publication and accelerated-RC reconciliation use
 > only `script/release` (or
 > `script/release --reconcile-accelerated-rc`). The supervisor selects the first
-> prepared version after `### [Unreleased]`, creates a fresh process UUID,
-> atomically acquires the matching `release-line:X.Y.Z` claim without takeover,
-> maintains its heartbeat, renews its exact active claim at least hourly, and
-> proves that each outward write still has the same live claim. It never takes
-> over another holder and releases only its acquired claim after proving the
-> supervised process group absent. Direct live
+> prepared version after `### [Unreleased]`, starts a dedicated process group,
+> and holds a private liveness channel. It terminates and proves the supervised
+> process group absent after success, failure, or a handled signal. Shaka owns
+> release-task orchestration and PR serialization. Direct live
 > `bundle exec rake release[...]` is refused; use Rake directly only with `dry_run=true`.
-> For one-time machine setup, advanced automation compatibility, handoff, and partial-publication
+> For one-time machine setup, handoff, and partial-publication
 > recovery, follow the [Release-Train
 > Runbook](release-train-runbook.md#serialize-every-release-line-write).
 
-The derived lease branch must equal the checkout used for publication.
 Prereleases and accelerated-RC reconciliation remain restricted to the matching
 `release/X.Y.Z` branch; a stable release may use that matching branch or `main`.
 
@@ -822,10 +819,9 @@ Before running the release command, verify:
    required" section when this release has or needs one. See `AGENTS.md` → "Changelog" → "Helper signature
    changes" and "Action-required placement".
 
-2. **One-time coordination setup**: Load `AGENT_COORD_API_URL`, the secret
-   `AGENT_COORD_API_TOKEN`, and a stable `AGENT_COORD_MACHINE_ID` from private
-   shell/dotfile configuration; ensure `~/.local/bin` is on `PATH`; then run
-   `script/release --doctor`. Never commit or print the token.
+2. **Local release setup**: Run `script/release --doctor`. It validates the
+   publishing tools used by the locally supervised release; no coordination
+   backend credentials are required.
 
 3. **GitHub CLI**: Run `gh auth login` and ensure your account/token has write access to the repository (required for automatic GitHub release creation)
 
@@ -945,27 +941,20 @@ a fresh code; all printed OTP values remain redacted.
 
 ### If Release Fails
 
+`script/release` is locally supervised and has no `agent-coord` lease to retain
+or reacquire. Coordinate the recovery through the Shaka release task and keep
+the existing branch, tag, and registry identity checks below.
+
 If the release fails partway through (e.g., during NPM publish):
 
-1. Stop the compound helper and keep the release-line lease. Do not delete or move tags, rewrite the
+1. Stop the compound helper. Do not delete or move tags, rewrite the
    release branch, rerun publication, or manually publish missing packages.
 2. Check what was published with read-only registry queries:
    - NPM: `npm view react-on-rails@X.Y.Z`
    - RubyGems: `gem list react_on_rails -r -a`
 3. Record the exact branch tip, local and remote tag identity, published artifact set, and helper output.
 4. Follow [Partial-publication recovery](release-train-runbook.md#partial-publication-recovery). Resume only through
-   `script/release` after the supervisor has acquired the required claim and the artifact evidence is exact; if lease state
-   or any remote/artifact identity is `UNKNOWN`, remain stopped.
-
-If the wrapper cannot clean up its managed release-line lease, it prints the
-exact `script/release-claim --release ...` command followed by the restart
-command. First prove that every process group reported by the failed release is
-dead. Then run the printed release command from the repository root with the
-release-machine coordination environment loaded. Do not edit or reconstruct its
-agent ID, instance ID, repository, or target arguments. The command is fenced to
-that exact lease and safely refuses a replacement lease. See
-[Recover a retained publication lease](release-train-runbook.md#recover-a-retained-publication-lease)
-for the complete procedure.
+   `script/release` after the artifact evidence is exact; if any remote/artifact identity is `UNKNOWN`, remain stopped.
 
 ## Version History
 

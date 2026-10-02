@@ -136,7 +136,10 @@ describe('TieredCacheHandler', () => {
 
       const l1Entry = await l1.get('key');
       expect(l1Entry).not.toBeNull();
-      expect(l1Entry!.revalidate).toBe(5);
+      // Promotion computes the remaining lifetime floored to whole seconds, so
+      // allow up to 1s of slack — but never more than the original.
+      expect(l1Entry!.revalidate).toBeLessThanOrEqual(5);
+      expect(l1Entry!.revalidate).toBeGreaterThanOrEqual(4);
     });
 
     test('assigns l1MaxTtlSeconds when original revalidate is 0 (indefinite)', async () => {
@@ -164,6 +167,306 @@ describe('TieredCacheHandler', () => {
       const l2Entry = await l2.get('key');
       expect(l2Entry).not.toBeNull();
       expect(l2Entry!.revalidate).toBe(600);
+    });
+  });
+
+  // Regression tests for https://github.com/shakacode/react_on_rails/issues/5027:
+  // promotion must account for the entry's age, not just rewrite `revalidate`.
+  describe('L2-to-L1 promotion of aged entries', () => {
+    test('promotes an indefinite entry aged past l1MaxTtlSeconds into a readable L1 entry', async () => {
+      const capped = new TieredCacheHandler(l1, l2, { l1MaxTtlSeconds: 30 });
+      // Written 60s ago with revalidate: 0 (indefinite) — L2 rightfully still holds it.
+      const entry = makeEntry({ revalidate: 0, timestamp: Date.now() - 60_000 });
+      await l2.set('key', entry);
+
+      await capped.get('key');
+
+      const l1Entry = await l1.get('key');
+      expect(l1Entry).not.toBeNull();
+      expect(l1Entry!.revalidate).toBe(30);
+      // Re-stamped at promotion time so the L1 copy gets a full cap window.
+      expect(Date.now() - l1Entry!.timestamp).toBeLessThan(5_000);
+    });
+
+    test('does not extend an aged finite entry past its original expiry', async () => {
+      const capped = new TieredCacheHandler(l1, l2, { l1MaxTtlSeconds: 60 });
+      // Written ~3595s ago with revalidate: 3600 — only ~5s of life left.
+      const originalTimestamp = Date.now() - 3_595_000;
+      const entry = makeEntry({ revalidate: 3600, timestamp: originalTimestamp });
+      await l2.set('key', entry);
+
+      await capped.get('key');
+
+      const l1Entry = await l1.get('key');
+      expect(l1Entry).not.toBeNull();
+      // The promoted copy must expire when the original would (~5s from now),
+      // not a full cap window (60s) later.
+      const promotedExpiry = l1Entry!.timestamp + l1Entry!.revalidate * 1000;
+      const originalExpiry = originalTimestamp + 3600 * 1000;
+      expect(promotedExpiry).toBeLessThanOrEqual(originalExpiry);
+      expect(promotedExpiry).toBeGreaterThan(Date.now());
+    });
+
+    test('skips the L1 write entirely for an entry already past its own revalidate', async () => {
+      // A real L2 would not return an expired entry, but Redis TTL rounding
+      // (Math.ceil) or cross-worker clock skew can hand back an entry with no
+      // remaining lifetime. Deliver it via a stub L2.
+      const expired = makeEntry({ revalidate: 5, timestamp: Date.now() - 10_000 });
+      const stubL2: InMemoryLRUCacheHandler = {
+        get: jest.fn().mockResolvedValue(expired),
+        set: jest.fn().mockResolvedValue(undefined),
+      } as unknown as InMemoryLRUCacheHandler;
+      const capped = new TieredCacheHandler(l1, stubL2, { l1MaxTtlSeconds: 60 });
+      const l1SetSpy = jest.spyOn(l1, 'set');
+
+      await capped.get('key');
+
+      expect(l1SetSpy).not.toHaveBeenCalled();
+      expect(await l1.get('key')).toBeNull();
+    });
+
+    test('skips the L1 write for an expired entry even without l1MaxTtlSeconds', async () => {
+      const expired = makeEntry({ revalidate: 5, timestamp: Date.now() - 10_000 });
+      const stubL2: InMemoryLRUCacheHandler = {
+        get: jest.fn().mockResolvedValue(expired),
+        set: jest.fn().mockResolvedValue(undefined),
+      } as unknown as InMemoryLRUCacheHandler;
+      const uncapped = new TieredCacheHandler(l1, stubL2);
+      const l1SetSpy = jest.spyOn(l1, 'set');
+
+      await uncapped.get('key');
+
+      expect(l1SetSpy).not.toHaveBeenCalled();
+    });
+
+    test('aged entries hit L2 only once, then are served from L1', async () => {
+      const capped = new TieredCacheHandler(l1, l2, { l1MaxTtlSeconds: 30 });
+      await l2.set('key', makeEntry({ revalidate: 0, timestamp: Date.now() - 60_000 }));
+      const l2GetSpy = jest.spyOn(l2, 'get');
+
+      for (let i = 0; i < 5; i += 1) {
+        expect(await capped.get('key')).not.toBeNull(); // eslint-disable-line no-await-in-loop
+      }
+
+      // Before the fix, every get above fell through to L2 and re-promoted an
+      // already-expired entry, so this was 5.
+      expect(l2GetSpy).toHaveBeenCalledTimes(1);
+    });
+
+    test('without l1MaxTtlSeconds, promotes an aged entry with its absolute expiry preserved', async () => {
+      // No cap configured: the promoted copy must still expire exactly when the
+      // original would, re-stamped so TTL-on-write L1 handlers apply only the
+      // remaining lifetime.
+      const originalTimestamp = Date.now() - 60_000;
+      const entry = makeEntry({ revalidate: 3600, timestamp: originalTimestamp });
+      await l2.set('key', entry);
+
+      await tiered.get('key');
+
+      const l1Entry = await l1.get('key');
+      expect(l1Entry).not.toBeNull();
+      const promotedExpiry = l1Entry!.timestamp + l1Entry!.revalidate * 1000;
+      expect(promotedExpiry).toBeLessThanOrEqual(originalTimestamp + 3600 * 1000 + 1);
+      expect(promotedExpiry).toBeGreaterThan(Date.now());
+    });
+
+    test('l1MaxTtlSeconds of 0 disables L1 writes on set instead of writing immortal entries', async () => {
+      // revalidate <= 0 means "never expires" in both L1 backends, so capping
+      // to 0 must not fall through to Math.min — it would make entries
+      // permanent, the opposite of a stricter cap.
+      const capped = new TieredCacheHandler(l1, l2, { l1MaxTtlSeconds: 0 });
+      const l1SetSpy = jest.spyOn(l1, 'set');
+
+      await capped.set('key', makeEntry({ revalidate: 600 }));
+
+      expect(l1SetSpy).not.toHaveBeenCalled();
+      expect(await l2.get('key')).not.toBeNull(); // L2 still written normally
+    });
+
+    test('a non-positive l1MaxTtlSeconds disables L1 promotion writes', async () => {
+      const capped = new TieredCacheHandler(l1, l2, { l1MaxTtlSeconds: -5 });
+      await l2.set('key', makeEntry({ revalidate: 600 }));
+      const l1SetSpy = jest.spyOn(l1, 'set');
+
+      const result = await capped.get('key');
+
+      expect(result).not.toBeNull(); // L2 value still served
+      expect(l1SetSpy).not.toHaveBeenCalled();
+    });
+
+    test('a disabled L1 is also bypassed on reads, so pre-existing L1 data cannot be served', async () => {
+      // A persistent L1 (e.g. shared Redis) may still hold entries from before
+      // the cap disabled it; "all reads go to L2" must include those.
+      await l1.set('key', makeEntry({ value: [Buffer.from('stale-l1')], revalidate: 0 }));
+      await l2.set('key', makeEntry({ value: [Buffer.from('fresh-l2')], revalidate: 0 }));
+      const disabled = new TieredCacheHandler(l1, l2, { l1MaxTtlSeconds: 0 });
+      const l1GetSpy = jest.spyOn(l1, 'get');
+
+      const result = await disabled.get('key');
+
+      expect(result!.value[0].toString()).toBe('fresh-l2');
+      expect(l1GetSpy).not.toHaveBeenCalled();
+    });
+
+    test('a NaN l1MaxTtlSeconds disables L1 instead of writing immortal entries', async () => {
+      // e.g. Number(process.env.UNSET_VAR): NaN passes a `<= 0` check and turns
+      // Math.min into NaN, which both backends treat as "never expires".
+      const capped = new TieredCacheHandler(l1, l2, { l1MaxTtlSeconds: Number.NaN });
+      const l1SetSpy = jest.spyOn(l1, 'set');
+
+      await capped.set('key', makeEntry({ revalidate: 600 }));
+      await l2.set('key2', makeEntry({ revalidate: 600 }));
+      await capped.get('key2'); // promotion path
+
+      expect(l1SetSpy).not.toHaveBeenCalled();
+      expect(await l2.get('key')).not.toBeNull();
+    });
+
+    test('a future-stamped entry (producer clock ahead) is served from L2 but not promoted', async () => {
+      // Cross-worker skew: any lifetime computed from a future timestamp
+      // overshoots a Redis L2's EX (which started at the producer's write), so
+      // promotion is skipped entirely instead of clamped.
+      const skewed = makeEntry({ revalidate: 10, timestamp: Date.now() + 5_000 });
+      const stubL2: InMemoryLRUCacheHandler = {
+        get: jest.fn().mockResolvedValue(skewed),
+        set: jest.fn().mockResolvedValue(undefined),
+      } as unknown as InMemoryLRUCacheHandler;
+      const capped = new TieredCacheHandler(l1, stubL2, { l1MaxTtlSeconds: 60 });
+      const l1SetSpy = jest.spyOn(l1, 'set');
+
+      const result = await capped.get('key');
+
+      expect(result).not.toBeNull(); // L2 value still served
+      expect(l1SetSpy).not.toHaveBeenCalled();
+    });
+
+    test('a future-stamped indefinite entry is still promoted (its expiry cannot depend on the timestamp)', async () => {
+      // The future-timestamp skip only makes sense for finite lifetimes; an
+      // indefinite entry (revalidate: 0 — the unstable_cache default) must keep
+      // populating L1 even during a clock-skew window.
+      const skewed = makeEntry({ revalidate: 0, timestamp: Date.now() + 5_000 });
+      const stubL2: InMemoryLRUCacheHandler = {
+        get: jest.fn().mockResolvedValue(skewed),
+        set: jest.fn().mockResolvedValue(undefined),
+      } as unknown as InMemoryLRUCacheHandler;
+      const capped = new TieredCacheHandler(l1, stubL2, { l1MaxTtlSeconds: 30 });
+      const l1SetSpy = jest.spyOn(l1, 'set');
+
+      await capped.get('key');
+
+      expect(l1SetSpy).toHaveBeenCalledTimes(1);
+      const promoted = l1SetSpy.mock.calls[0][1];
+      expect(promoted.revalidate).toBe(30);
+      expect(promoted.timestamp).toBeLessThanOrEqual(Date.now());
+    });
+
+    test('a NaN-stamped finite entry is served from L2 but never promoted (would be immortal in L1)', async () => {
+      // A malformed timestamp from a custom L2 yields NaN remaining lifetime,
+      // which passes every <=/> comparison unchecked and would previously fall
+      // through to promoting the entry unmodified — never expiring in L1.
+      const malformed = makeEntry({ revalidate: 600, timestamp: Number.NaN });
+      const stubL2: InMemoryLRUCacheHandler = {
+        get: jest.fn().mockResolvedValue(malformed),
+        set: jest.fn().mockResolvedValue(undefined),
+      } as unknown as InMemoryLRUCacheHandler;
+      const capped = new TieredCacheHandler(l1, stubL2, { l1MaxTtlSeconds: 60 });
+      const l1SetSpy = jest.spyOn(l1, 'set');
+
+      const result = await capped.get('key');
+
+      expect(result).not.toBeNull(); // L2 value still served
+      expect(l1SetSpy).not.toHaveBeenCalled();
+    });
+
+    test('a future-stamped Infinity entry is also promoted (Infinity is the other indefinite spelling)', async () => {
+      // RedisCacheHandler maps every non-finite revalidate to the non-expiring
+      // representation (serialized as 0, stored without EX), and the in-memory
+      // handler's age check can never exceed Infinity — so like revalidate: 0,
+      // an Infinity entry's expiry cannot depend on its timestamp and clock
+      // skew must not block promotion.
+      const skewed = makeEntry({ revalidate: Infinity, timestamp: Date.now() + 5_000 });
+      const stubL2: InMemoryLRUCacheHandler = {
+        get: jest.fn().mockResolvedValue(skewed),
+        set: jest.fn().mockResolvedValue(undefined),
+      } as unknown as InMemoryLRUCacheHandler;
+      const capped = new TieredCacheHandler(l1, stubL2, { l1MaxTtlSeconds: 30 });
+      const l1SetSpy = jest.spyOn(l1, 'set');
+
+      await capped.get('key');
+
+      expect(l1SetSpy).toHaveBeenCalledTimes(1);
+      const promoted = l1SetSpy.mock.calls[0][1];
+      expect(promoted.revalidate).toBe(30);
+      expect(promoted.timestamp).toBeLessThanOrEqual(Date.now());
+    });
+
+    test('a sub-second cap still promotes (flooring must not zero out the cap)', async () => {
+      // Flooring exists to stop Redis EX ceil from passing the ORIGINAL expiry,
+      // so only the remaining-lifetime term is floored; the cap itself is
+      // applied unfloored. A 0.5s cap must keep repopulating L1, not silently
+      // disable promotion forever.
+      const capped = new TieredCacheHandler(l1, l2, { l1MaxTtlSeconds: 0.5 });
+      await l2.set('key', makeEntry({ revalidate: 0, timestamp: Date.now() - 60_000 }));
+      const l1SetSpy = jest.spyOn(l1, 'set');
+
+      await capped.get('key');
+
+      expect(l1SetSpy).toHaveBeenCalledTimes(1);
+      expect(l1SetSpy.mock.calls[0][1].revalidate).toBe(0.5);
+    });
+
+    test('an Infinity cap preserves indefinite revalidate on fresh writes, exactly like undefined', async () => {
+      // Without normalization, min/ternary logic would rewrite revalidate: 0 to
+      // Infinity — a value a custom TTL-on-write L1 handler could reject.
+      const uncapped = new TieredCacheHandler(l1, l2, { l1MaxTtlSeconds: Infinity });
+
+      await uncapped.set('key', makeEntry({ revalidate: 0 }));
+
+      const l1Entry = await l1.get('key');
+      expect(l1Entry).not.toBeNull();
+      expect(l1Entry!.revalidate).toBe(0);
+    });
+
+    test('an Infinity cap behaves as "no cap", not as disabled L1', async () => {
+      // Infinity means "unbounded", the same as leaving the option undefined:
+      // L1 stays in use and promoted entries keep their own expiry.
+      const uncapped = new TieredCacheHandler(l1, l2, { l1MaxTtlSeconds: Infinity });
+      const originalTimestamp = Date.now() - 60_000;
+      await l2.set('key', makeEntry({ revalidate: 3600, timestamp: originalTimestamp }));
+
+      await uncapped.get('key');
+
+      const l1Entry = await l1.get('key');
+      expect(l1Entry).not.toBeNull();
+      const promotedExpiry = l1Entry!.timestamp + l1Entry!.revalidate * 1000;
+      expect(promotedExpiry).toBeLessThanOrEqual(originalTimestamp + 3600 * 1000 + 1);
+      expect(promotedExpiry).toBeGreaterThan(Date.now());
+    });
+
+    test('promoted entries are re-stamped so TTL-on-write L1 handlers apply only the remaining lifetime', async () => {
+      // RedisCacheHandler.set starts EX ceil(revalidate) at write time and its
+      // get never checks entry.timestamp, so a promoted entry carrying an old
+      // timestamp with its full original revalidate would let a Redis L1 serve
+      // it long past the L2 expiry. The promoted copy must always encode the
+      // remaining lifetime relative to a fresh timestamp.
+      const capped = new TieredCacheHandler(l1, l2, { l1MaxTtlSeconds: 60 });
+      // ~4.5s of life left out of 3600s (deliberately not a whole second, so a
+      // rounded-up TTL would provably pass the original expiry).
+      const entry = makeEntry({ revalidate: 3600, timestamp: Date.now() - 3_595_500 });
+      await l2.set('key', entry);
+      const l1SetSpy = jest.spyOn(l1, 'set');
+
+      await capped.get('key');
+
+      expect(l1SetSpy).toHaveBeenCalledTimes(1);
+      const promoted = l1SetSpy.mock.calls[0][1];
+      expect(Date.now() - promoted.timestamp).toBeLessThan(2_000); // fresh timestamp
+      expect(promoted.revalidate).toBeGreaterThan(0);
+      // A TTL-on-write handler applies EX ceil(revalidate) from the promoted
+      // timestamp, so even the rounded-up TTL must not pass the original expiry.
+      const originalExpiry = entry.timestamp + 3600 * 1000;
+      const trueRemainingSeconds = (originalExpiry - promoted.timestamp) / 1000;
+      expect(Math.ceil(promoted.revalidate)).toBeLessThanOrEqual(trueRemainingSeconds);
     });
   });
 });

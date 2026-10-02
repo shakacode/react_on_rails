@@ -127,24 +127,34 @@ flowchart TD
 
 ### Serialize every release-line write
 
-Before running **any** step below that creates, updates, tags, promotes, or
-deletes `release/X.Y.Z`, acquire the canonical release-line coordination lease
-and hold it through that write. This includes release-branch creation, every RC
-cut or re-spin, release-first fixes, backports from `main`, changelog and metadata
-PRs, final promotion, and branch deletion. The lease is an `agent-coord` claim
-in `shakacode/react_on_rails` whose target is exactly `release-line:X.Y.Z` (for
-example, `release-line:17.0.0`). One dedicated release coordinator owns this
-synthetic target and is the only actor that dispatches a release-targeted lane
-or performs a release-line write. A claim on an individual issue or PR does not
-serialize writers that target the same release line. If an actor cannot
-participate in this lease, stop. The repository's merge-group CI does not rerun
-release-specific source-liveness, provenance, attribution, manual QA, or review
-gates and is not an alternative.
+Use one Shaka task as the release coordinator. Before creating or updating a
+release PR, search for existing release-targeted tasks, pull requests, and remote
+branches. Reuse the active lane or wait until it reaches a terminal state. Chain
+dependent work in Shaka so only one release-line mutation is ready at a time.
+
+GitHub branch protection, expected-head checks, and the merge queue serialize
+remote branch updates. `script/release` provides process-local supervision for
+publication. It does not use an external coordination lease.
+
+Set the release version once in the coordinator shell for the command examples
+below. The branch name is derived from that value; no per-run identity or lease
+variables are required:
+
+```bash
+RELEASE_VERSION="${RELEASE_VERSION_INPUT:?set the exact X.Y.Z release version}"
+[[ "${RELEASE_VERSION}" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || {
+  echo "release version must be X.Y.Z; stop" >&2
+  return 1 2>/dev/null || exit 1
+}
+RELEASE_BRANCH="release/${RELEASE_VERSION}"
+readonly RELEASE_VERSION RELEASE_BRANCH
+export RELEASE_VERSION RELEASE_BRANCH
+```
 
 #### Normal publication path
 
-The publication wrapper owns this coordination for a normal maintainer. Prepare
-and commit the next non-empty version section immediately after
+The Shaka task owns orchestration for a normal maintainer; the publication
+wrapper owns only its local process group. Prepare and commit the next non-empty version section immediately after
 `### [Unreleased]`, then run:
 
 ```bash
@@ -166,69 +176,28 @@ script/release --dry-run --evaluate-head
 script/release --evaluate-head
 ```
 
-`script/release` derives `release-line:X.Y.Z` and `release/X.Y.Z` from that
-changelog version, creates a fresh UUID-backed identity, claims the exact line,
-heartbeats and authoritatively verifies it, supervises the Rake process group,
-and releases its own claim after success, failure, or a handled signal. A
-refused, stale, local, unhealthy, or `UNKNOWN` backend state stops before release
-work. Do not pass a version; the wrapper rejects positional arguments so the
-committed changelog remains the source of truth.
+`script/release` derives `release/X.Y.Z` from the changelog version, starts the
+Rake task in a dedicated process group, and holds a private liveness channel.
+It terminates and proves that process group absent after success, failure, or a
+handled signal. Do not pass a version; the committed changelog remains the
+source of truth.
 
-Managed acquisition is an atomic conditional write: an absent record is created
-with `If-None-Match: *`, while a released record is replaced only with the exact
-observed version in `If-Match`. Every active record is refused, including one
-whose holder appears dead, stale, or expired. A concurrent `409` is likewise a
-claim refusal. The preliminary status read is diagnostic only and never grants
-takeover authority.
+#### Recover an interrupted publication
 
-On a foreign-claim refusal, the wrapper prints available holder metadata,
-including task/thread and session fields when the claim recorded them, plus the
-targeted inspection command:
+Before retrying, prove that the prior supervisor's printed process group and
+children are dead. Keep the interrupted version first after `### [Unreleased]`,
+preserve any required `RELEASE_TRACKER`, and rerun `script/release`. Registry,
+tag, and GitHub-release checks resume without republishing artifacts that
+already exist.
 
-```bash
-agent-coord status --repo shakacode/react_on_rails --target release-line:X.Y.Z --json
-```
+#### Retired agent-coord automation reference
 
-Inspect and coordinate with the recorded holder. Never infer takeover safety
-from lease expiry or heartbeat age alone; the wrapper does not provide or
-attempt an automatic takeover.
+> **Historical reference only:** The following lease procedure documents the
+> retired publication design. Do not run it. Shaka now owns orchestration, and
+> `script/release` uses only its local supervisor contract.
 
-#### Recover a retained publication lease
-
-If managed lease cleanup fails, `script/release` prints the exact recovery
-command for the lease that it acquired. A foreign-claim refusal prints the same
-command when the backend supplies a usable exact identity. Before running the
-command, prove that every process group reported by the failed release is dead.
-Do not use lease expiry or heartbeat age as that proof.
-
-Run the printed command from the repository root with the release-machine
-coordination environment loaded. Its shape is:
-
-```bash
-script/release-claim --release \
-  --agent-id <printed-agent-id> \
-  --instance-id <printed-instance-id> \
-  --repo shakacode/react_on_rails \
-  --target release-line:X.Y.Z
-```
-
-The helper releases only the exact active `agent_id` and `instance_id` at the
-observed backend version. It refuses a replacement lease, even if the new lease
-reuses the agent ID. Repeating the command is safe when the first release write
-succeeded but its response was lost. If the backend reports a missing,
-malformed, or `UNKNOWN` identity, the wrapper omits the release command. Inspect
-the authoritative status and coordinate with the holder instead of constructing
-a command manually.
-
-After the exact lease release succeeds, keep the interrupted version first
-after `### [Unreleased]` and run the printed restart command. It preserves
-applicable command modifiers such as `--evaluate-head` or
-`--reconcile-accelerated-rc`; reapply any required `RELEASE_TRACKER` value in
-the environment.
-The release task's registry, tag, and GitHub-release checks resume an interrupted
-publication without republishing artifacts that already exist.
-
-#### Advanced automation compatibility
+<details>
+<summary>Former agent-coord publication protocol</summary>
 
 Automation that already coordinates a broader sequence of release-line writes
 may keep the externally supplied identity path below. This is not the normal
@@ -458,16 +427,18 @@ takeover becomes available. A fresh identity helps reject later preflights from
 a resumed old process; it cannot revoke a write already between preflight and
 mutation.
 
+</details>
+
 #### Partial-publication recovery
 
-If a compound release stops after any outward write, stop the helper and preserve
-the release-line lease state. Preserve the exact local and remote branch tips,
+If a compound release stops after any outward write, stop the helper. Preserve
+the exact local and remote branch tips,
 local and remote tag identity, the complete six-package registry artifact set,
 and the helper command and output. Do not delete or move tags, reset or
-force-push the release branch, rerun direct or unfenced publication, overwrite
-published artifacts, or ad-lib manual publication. If the prior supervisor has
-stopped, prove its process group and children are dead before an operator
-intentionally releases/acquires the claim under a fresh identity.
+force-push the release branch, rerun direct or unsupervised publication,
+overwrite published artifacts, or ad-lib manual publication. If the prior
+supervisor has stopped, prove its process group and children are dead before an
+operator starts a new supervised retry.
 
 For a known tracker, retry with that exact issue:
 
@@ -505,9 +476,8 @@ unfenced command safe.
 ### 1. Cut the RC onto `release/X.Y.Z`
 
 Do this when maintainers decide `main` is feature-complete for the target and want to start stabilizing.
-Acquire the release-line writer lease above before Step 1a, keep its heartbeat
-live while waiting for CI, and rerun `require_live_release_line_lease`
-immediately before the branch push and again before every RC cut or re-spin.
+Keep Step 1 in the single Shaka release-coordinator task. Refetch and recheck the
+exact remote refs immediately before every branch push and RC cut or re-spin.
 
 Starting a release line is two steps with a CI run between them — cutting the branch and tagging rc.0
 **cannot** be one command. The release CI gate evaluates the branch tip, and a freshly pushed
@@ -537,7 +507,6 @@ After the dry-run succeeds, create the branch from an explicitly refreshed
 git fetch --prune origin "+refs/heads/main:refs/remotes/origin/main"
 # Cut from the exact main commit you intend to stabilize.
 git switch -c "release/${RELEASE_VERSION}" origin/main
-require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
 git push \
   --force-with-lease="refs/heads/release/${RELEASE_VERSION}:" \
   -u origin "release/${RELEASE_VERSION}:refs/heads/release/${RELEASE_VERSION}"
@@ -758,7 +727,7 @@ above; when there are multiple selections, serialize the sequence:
      return 1 2>/dev/null || exit 1
    fi
    test "${BACKPORT_RELEASE_VERSION}" = "${RELEASE_VERSION}" || {
-     echo "backport release version must equal held release-line lease version ${RELEASE_VERSION}; stop backport" >&2
+     echo "backport release version must equal coordinator release version ${RELEASE_VERSION}; stop backport" >&2
      return 1 2>/dev/null || exit 1
    }
    jq -en --arg branch "${BACKPORT_RELEASE_BRANCH}" \
@@ -766,8 +735,8 @@ above; when there are multiple selections, serialize the sequence:
      echo "backport target is not an exact release/X.Y.Z branch; stop backport" >&2
      return 1 2>/dev/null || exit 1
    }
-   test "${BACKPORT_RELEASE_BRANCH}" = "release/${RELEASE_VERSION}" || {
-     echo "backport target must equal release/${RELEASE_VERSION}; stop backport" >&2
+   test "${BACKPORT_RELEASE_BRANCH}" = "release/${BACKPORT_RELEASE_VERSION}" || {
+     echo "backport target must equal release/${BACKPORT_RELEASE_VERSION}; stop backport" >&2
      return 1 2>/dev/null || exit 1
    }
    ruby -e '
@@ -852,7 +821,6 @@ above; when there are multiple selections, serialize the sequence:
      echo "source audit is missing, UNKNOWN, stale, or not clean; stop backport" >&2
      return 1 2>/dev/null || exit 1
    }
-   require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
    backport_merge_result="$(
      gh api graphql \
        -f query='mutation(
@@ -995,14 +963,14 @@ Merge every source-change PR and the dedicated changelog PR synchronously from
 the release coordinator's shell after its exact-head gates pass. Set
 `CLOSEOUT_MERGE_METHOD=REBASE` for a source-change PR and `SQUASH` for the
 dedicated changelog PR. Do not use auto-merge or a merge queue here: neither
-rechecks the release-line lease immediately before the write, and a queued
-merge can land a different head. Record both the head OID and base OID covered
+preserves this exact-head, exact-base synchronous workflow, and a queued merge
+can land a different head. Record both the head OID and base OID covered
 by validation and review. The mutation binds the head with `expectedHeadOid`;
 the base comparisons below are fail-closed preflight checks because GitHub's
 merge mutation has no expected-base argument:
 
-Both merge methods require `CLOSEOUT_RELEASE_VERSION` to match the canonical
-lease version. A `REBASE` additionally binds one full source release SHA to the
+Both merge methods require an explicit `CLOSEOUT_RELEASE_VERSION`. A `REBASE`
+additionally binds one full source release SHA to the
 fetched canonical release ref, the current `origin/main` forward-port plan, and
 the PR's single commit plus direct provenance footer. A `SQUASH` binds its
 source changelog OID to the latest `CHANGELOG.md` commit on that same fetched
@@ -1023,7 +991,7 @@ if [[ ! "${CLOSEOUT_RELEASE_VERSION}" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[
   return 1 2>/dev/null || exit 1
 fi
 test "${CLOSEOUT_RELEASE_VERSION}" = "${RELEASE_VERSION}" || {
-  echo "closeout release version must equal held release-line lease version ${RELEASE_VERSION}; stop closeout" >&2
+  echo "closeout release version must equal coordinator release version ${RELEASE_VERSION}; stop closeout" >&2
   return 1 2>/dev/null || exit 1
 }
 if [[ ! "${CLOSEOUT_VALIDATED_HEAD_OID}" =~ ^[0-9a-f]{40}$ ]] ||
@@ -1154,7 +1122,6 @@ test "$(git rev-parse "${closeout_main_ref}^{commit}")" = "${CLOSEOUT_VALIDATED_
   echo "origin/main differs from the validated base; stop closeout" >&2
   return 1 2>/dev/null || exit 1
 }
-require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
 if [ "${CLOSEOUT_MERGE_METHOD}" = "SQUASH" ]; then
   closeout_merge_result="$(
     gh api graphql \
@@ -1314,9 +1281,10 @@ planning the next source-change PR or the final changelog PR.
 
 When the hard gates pass for a specific RC, promote **that** RC. Do not re-cut from `main`.
 
-Acquire or renew the release-line writer lease before promotion, keep its
-heartbeat live through publication, and rerun `require_live_release_line_lease`
-immediately before the release task writes the final version commit and tag.
+Keep promotion in the single Shaka release-coordinator task. Immediately before
+publication, refetch the release branch and confirm the exact accepted head;
+`script/release` then supervises the local publisher through the final version
+commit and tag.
 
 Before promotion, fetch `origin/main` and repeat the retained-source audit from
 the backport workflow. Enumerate every main-origin backport retained in the
@@ -1406,11 +1374,9 @@ evidence and maintainer sign-off; it must not become a global skip of CI, ShakaP
 
 ### 5. Close out the release line
 
-Acquire or renew the release-line writer lease before closeout and hold it
-through guarded branch deletion. Refresh its heartbeat during the read-only
-checks, and rerun `require_live_release_line_lease` immediately before every
-remote ref transaction. Release the lease only after closeout and phase clear
-are durable.
+Keep closeout in the single Shaka release-coordinator task through guarded
+branch deletion. Refetch and recheck the expected refs immediately before every
+remote transaction, and finish only after closeout and phase clear are durable.
 
 Before running the closeout helper, fetch `origin/main` and repeat the
 retained-source audit. If a retained backport's main origin was reverted,
@@ -1434,8 +1400,9 @@ source recreation rejects that cleanup transaction and leaves recovery available
 stable version-bump, merge, or rollback item that was inspected and intentionally required no source
 PR. For a legacy authoritative changelog PR without embedded source-SHA provenance, also pass
 `--ack-final-changelog-source <current-source-changelog-sha>`. Because the helper cannot refresh the
-canonical coordination lease immediately before each remote transaction, normal mode remains blocked
-until `release-finish` itself receives the lifetime/per-write contract. Preview with `--dry-run`:
+expected remote refs immediately before each transaction, normal mode remains
+blocked until `release-finish` itself receives that per-write contract. Preview
+with `--dry-run`:
 
 ```bash
 git fetch origin
@@ -1489,7 +1456,6 @@ test "$(git rev-parse origin/main)" = "${checked_main_sha}"
 test "$(git rev-parse "origin/release/${RELEASE_VERSION}")" = "${checked_source_sha}"
 release_ref="refs/heads/release/${RELEASE_VERSION}"
 recovery_ref="refs/heads/release-finish-recovery/${RELEASE_VERSION}-${checked_source_sha:0:12}"
-require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
 git push --atomic \
   --force-with-lease="${release_ref}:${checked_source_sha}" \
   --force-with-lease="${recovery_ref}:" \
@@ -1509,7 +1475,6 @@ if git ls-remote --exit-code --heads -- origin "release/${RELEASE_VERSION}" >/de
   exit 1
 fi
 if test "$(git rev-parse origin/main)" != "${checked_main_sha}"; then
-  require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
   git push --atomic \
     --force-with-lease="${release_ref}:" \
     --force-with-lease="${recovery_ref}:${checked_source_sha}" \
@@ -1519,7 +1484,6 @@ if test "$(git rev-parse origin/main)" != "${checked_main_sha}"; then
   echo "main changed; release branch restored — rerun close-out" >&2
   exit 1
 fi
-require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
 git push --atomic \
   --force-with-lease="${release_ref}:" \
   --force-with-lease="${recovery_ref}:${checked_source_sha}" \
@@ -1551,7 +1515,7 @@ audited manual path instead:
      return 1 2>/dev/null || exit 1
    fi
    test "${SELECTIVE_CLOSEOUT_RELEASE_VERSION}" = "${RELEASE_VERSION}" || {
-     echo "selective closeout version must equal held release-line lease version ${RELEASE_VERSION}; stop selective closeout" >&2
+     echo "selective closeout version must equal coordinator release version ${RELEASE_VERSION}; stop selective closeout" >&2
      return 1 2>/dev/null || exit 1
    }
    PLAN_FILE="${PLAN_FILE:?set a durable path for release-tracker plan evidence}"
@@ -1935,10 +1899,6 @@ audited manual path instead:
      -m "Final-plan-sha256: ${FINAL_PLAN_SHA256}" \
      -m "Omitted-picks-sha256: ${OMITTED_PICKS_SHA256}" || {
      echo "could not create the closeout evidence tag" >&2
-     return 1 2>/dev/null || exit 1
-   }
-   require_live_release_line_lease || {
-     echo "release-line lease unavailable or UNKNOWN; stop selective closeout" >&2
      return 1 2>/dev/null || exit 1
    }
    git push --atomic \

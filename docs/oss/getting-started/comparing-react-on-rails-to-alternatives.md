@@ -79,6 +79,13 @@ With React on Rails and a client-side router (for example TanStack Router in Pro
 
 ### When to choose which
 
+Comparing with Inertia Rails? React on Rails and Inertia Rails are both MIT. The
+only paid part of this stack is React on Rails Pro, and only in production at
+organizations above the small-organization line. That subscription buys what
+Inertia Rails does not have today: React Server Components, streaming SSR with
+selective hydration, fragment caching, and per-component adoption inside
+existing Rails views.
+
 Choose Inertia Rails if you are building a new app from scratch, want SPA-style page transitions, and are comfortable replacing the Rails view layer entirely.
 
 Choose React on Rails if you want to integrate React into existing Rails views incrementally, need server rendering with code splitting or streaming, or want the upgrade path to React on Rails Pro features like React Server Components.

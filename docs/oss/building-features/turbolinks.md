@@ -162,7 +162,7 @@ Unlike Turbo Frames, Turbo Streams don't dispatch the normal `turbo:render` even
 
 - See [Streaming Server Rendering](./streaming-server-rendering.md) for another Pro use case
 - Working example in codebase: `react_on_rails/spec/dummy/app/views/pages/turbo_stream_send_hello_world.turbo_stream.erb`
-- Contact [justin@shakacode.com](mailto:justin@shakacode.com) for React on Rails Pro licensing
+- See [pro.reactonrails.com](https://pro.reactonrails.com/) for React on Rails Pro licensing
 
 ## Legacy Turbolinks Support
 

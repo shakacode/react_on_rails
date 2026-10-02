@@ -178,6 +178,31 @@ RSpec.describe ReactOnRails::Dev::ProcessManager do
     end
   end
 
+  describe ".exec_process_if_available" do
+    it "exposes a public API that execs a process available in the current context" do
+      allow(described_class).to receive(:installed?).with("overmind").and_return(true)
+      expect(described_class).to receive(:exec).with("overmind", "quit", "-s", "/tmp/overmind.sock").and_return(true)
+
+      result = described_class.exec_process_if_available("overmind", ["quit", "-s", "/tmp/overmind.sock"])
+
+      expect(result).to be true
+    end
+
+    it "preserves runtime environment when execing outside Bundler" do
+      env_overrides = { "PORT" => "4321" }
+      allow(described_class).to receive(:installed?).with("overmind").and_return(false)
+      allow(described_class).to receive(:process_available_in_system?).with("overmind").and_return(true)
+      allow(described_class).to receive(:preserve_runtime_env_vars).and_return(env_overrides)
+      allow(described_class).to receive(:with_unbundled_context).and_yield
+      expect(described_class).to receive(:exec)
+        .with(env_overrides, "overmind", "kill", "-s", "/tmp/overmind.sock").and_return(true)
+
+      result = described_class.exec_process_if_available("overmind", ["kill", "-s", "/tmp/overmind.sock"])
+
+      expect(result).to be true
+    end
+  end
+
   describe ".run_process_outside_bundle" do
     it "uses with_unbundled_context when Bundler is available" do
       expect(described_class).to receive(:with_unbundled_context).and_yield

@@ -1,7 +1,7 @@
 # Node Renderer JavaScript Configuration
 
 > **Pro Feature** — Available with [React on Rails Pro](../../../pro/react-on-rails-pro.md).
-> Free or very low cost for startups and small companies. [Upgrade or licensing details →](../../../pro/upgrading-to-pro.md#try-pro-risk-free)
+> Free in development, test, CI, and staging, and in production for small organizations, charities, schools, and hospitals; larger organizations subscribe at https://pro.reactonrails.com/ ($1,800 per year per organization). No license key is needed to run Pro.
 
 You can configure the node-renderer entirely with ENV values from your own launch file or
 `package.json` script. The package does not ship a standalone `node-renderer` CLI.
@@ -35,7 +35,7 @@ available default ENV values if you wire them into your own launch script.
 1. **password** (default: `env.RENDERER_PASSWORD`) - The password expected to receive from the **Rails client** to authenticate rendering requests.
    In `development` and `test` environments (checked via both `NODE_ENV` and `RAILS_ENV`), the password is optional — if unset, no authentication is required.
    In all other environments (`staging`, `production`, etc.), the renderer will refuse to start without an explicit password. Set `RENDERER_PASSWORD` in your environment or pass `password` in the config object.
-1. **licenseToken** (default: `env.REACT_ON_RAILS_PRO_LICENSE`) - The paid React on Rails Pro license JWT.
+1. **licenseToken** (default: `env.REACT_ON_RAILS_PRO_LICENSE`) - Optional license key from your subscription (a JWT).
    Explicit nonblank configuration takes precedence over the environment variable; blank or omitted configuration falls
    back to the environment. Configure this process separately from Rails when it runs as a standalone service. Token
    values are masked from sanitized renderer configuration logs.

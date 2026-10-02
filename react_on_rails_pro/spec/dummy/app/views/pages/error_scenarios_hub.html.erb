@@ -265,6 +265,18 @@ end</pre>
     (which would crash the render), <code>emitError(error)</code> emits an <code>'error'</code> event on
     the readable stream, which the Node renderer&rsquo;s <code>handleStreamError</code> picks up and
     reports to error tracking.
+    <br/><br/>
+    <strong>Since Jul 2026 (PR #4631, fixes #4629):</strong> for streaming and RSC rendering with an
+    active response consumer, this config no longer decides <em>whether</em> error tracking sees component
+    errors. With <code>false</code>,
+    <code>reportError</code> emits a custom <code>'renderingError'</code> stream event (ignored by
+    standard stream consumers) that the Node renderer&rsquo;s <code>vm.ts</code> listener also reports to
+    <code>errorReporter</code>; a <code>WeakSet</code> deduplicates when both events fire for the same
+    error. The config now only selects <em>how</em> a streaming error surfaces on the stream (a standard
+    <code>'error'</code> event vs. metadata-only completion). Non-streaming rendering is unchanged: with
+    <code>false</code>, those errors still never reach <code>errorReporter</code>. If the response consumer
+    disconnects before a streaming/RSC error occurs, both stream-event helpers suppress the later error
+    as part of render teardown, so <code>errorReporter</code> is not called.
   </div>
 
   <p><strong>What it controls (JS side):</strong> This is the <em>only</em> config that is passed from Ruby to
@@ -281,14 +293,14 @@ end</pre>
     <tr<%= ' style="background: #e8f5e9;"'.html_safe unless throw_js_errors %>>
       <td><code>false</code></td>
       <td>Error caught in JS. Returns error HTML with <code>hasErrors: true</code>. Ruby decides via <code>raise_on_prerender_error</code>.</td>
-      <td>Error recorded in <code>renderState.hasErrors</code> and serialized into JSON chunk. No <code>'error'</code> event emitted on the stream.</td>
-      <td>NOT called for component errors. Errors are invisible to Sentry/Honeybadger.</td>
+      <td>Error recorded in <code>renderState.hasErrors</code> and serialized into JSON chunk. No standard <code>'error'</code> event &mdash; a custom <code>'renderingError'</code> event notifies the Node renderer (PR #4631).</td>
+      <td>Non-streaming: NOT called &mdash; those errors are invisible to Sentry/Honeybadger. Streaming/RSC with an active consumer: called via the <code>'renderingError'</code> listener in <code>vm.ts</code> (PR #4631); suppressed after consumer disconnect.</td>
     </tr>
     <tr<%= ' style="background: #e8f5e9;"'.html_safe if throw_js_errors %>>
       <td><code>true</code></td>
       <td>Error <strong>re-thrown</strong> in JS. The Node renderer catches it and returns an error HTTP response to Rails. Ruby wraps it as <code>PrerenderError</code> (always raised, regardless of <code>raise_on_prerender_error</code>).</td>
       <td><code>emitError(error)</code> emits an <code>'error'</code> event on the readable stream, in addition to setting <code>renderState.hasErrors</code>.</td>
-      <td>Called via <code>handleStreamError</code> in <code>vm.ts</code>. Errors are reported to Sentry/Honeybadger.</td>
+      <td>With an active consumer, called via <code>handleStreamError</code> in <code>vm.ts</code>. Errors are reported to Sentry/Honeybadger; post-disconnect errors are suppressed.</td>
     </tr>
   </table>
 
@@ -505,10 +517,13 @@ onError(e) {
 },
 
 const reportError = (error: Error) => {
+  sawUnexpectedRenderError = true;
   renderState.hasErrors = true;
   renderState.error = error;
   if (throwJsErrors) {            // Currently: <%= throw_js_errors %>
-    emitError(error);             // <%= throw_js_errors ? "CALLED — error emitted on stream" : "NOT called — throwJsErrors is false" %>
+    emitError(error);             // <%= throw_js_errors ? "CALLED while connected — 'error' event on the stream" : "NOT taken" %>
+  } else {
+    notifyRenderingError(error);  // <%= throw_js_errors ? "NOT taken" : "CALLED while connected — 'renderingError' event (PR #4631)" %>
   }
 };
 
@@ -529,7 +544,7 @@ onShellError(e) {
     <% end %>
     <span class="label">JSON chunk:</span> <code>hasErrors: true</code>, <code>isShellReady: false</code>.<br/>
     <span class="label">errorReporter:</span>
-    <%= throw_js_errors ? "Called — emitError() emits on the stream → errorReporter.message()." : "Not called — throwJsErrors is false." %>
+    <%= throw_js_errors ? "Called while connected — emitError() emits 'error' → handleStreamError → errorReporter.message()." : "Called while connected — notifyRenderingError() emits 'renderingError' → vm.ts listener → errorReporter.message() (PR #4631)." %>
   </div>
 </div>
 
@@ -582,7 +597,7 @@ const StreamErrorDemo = () => (
     <% end %><br/>
     <span class="label">JSON chunk:</span> <code>hasErrors: true</code>, <code>isShellReady: true</code>.<br/>
     <span class="label">errorReporter:</span>
-    <%= throw_js_errors ? "Called — emitError() emits on the stream → errorReporter.message()." : "Not called — throwJsErrors is false." %>
+    <%= throw_js_errors ? "Called while connected — emitError() emits 'error' → handleStreamError → errorReporter.message()." : "Called while connected — notifyRenderingError() emits 'renderingError' → vm.ts listener → errorReporter.message() (PR #4631)." %>
   </div>
 </div>
 
@@ -623,7 +638,7 @@ const StreamErrorDemo = () => (
     <% end %>
     <span class="label">JSON chunk:</span> <code>hasErrors: true</code>, <code>isShellReady: false</code>.<br/>
     <span class="label">errorReporter:</span>
-    <%= throw_js_errors ? "Called." : "Not called." %>
+    <%= throw_js_errors ? "Called while connected — via emitError()." : "Called while connected — via notifyRenderingError() (PR #4631)." %>
   </div>
 </div>
 
@@ -668,7 +683,7 @@ const StreamErrorDemo = () => (
     <% end %><br/>
     <span class="label">JSON chunk:</span> <code>hasErrors: true</code>, <code>isShellReady: true</code>.<br/>
     <span class="label">errorReporter:</span>
-    <%= throw_js_errors ? "Called." : "Not called." %>
+    <%= throw_js_errors ? "Called while connected — via emitError()." : "Called while connected — via notifyRenderingError() (PR #4631)." %>
   </div>
 </div>
 
@@ -710,7 +725,7 @@ const StreamErrorDemo = () => (
 
   <p><span class="label">Component:</span> <code>DeterministicRSCErrorComponent</code> (rendered standalone via <code>stream_react_component</code> with <code>prerender: true</code>)</p>
   <p><span class="label">Timing:</span> <strong>Immediate</strong> &mdash; throws synchronously during RSC render. Unlike <code>ErrorThrowingServerComponent</code> (50% random), this always fails.</p>
-  <p><span class="label">Error path:</span> RSC <code>onError</code> &rarr; <code>reportError</code> (always <code>console.error</code>). This is a <strong>post-shell</strong> error because of the Suspense wrapping described above.</p>
+  <p><span class="label">Error path:</span> RSC <code>onError</code> &rarr; <code>reportError</code>. This is a <strong>post-shell</strong> error because of the Suspense wrapping described above.</p>
 
   <p><strong>View template</strong> (<code>rsc_component_error.html.erb</code>):</p>
   <pre>&lt;%= stream_react_component(
@@ -726,14 +741,19 @@ const StreamErrorDemo = () => (
   throw new Error('Deterministic RSC error: always fails for error path testing');
 };</pre>
 
-  <p><strong>Error handler</strong> (<code>ReactOnRailsRSC.ts</code>) &mdash; RSC <code>reportError</code> always calls <code>console.error</code>:</p>
-  <pre>const reportError = (error: Error) => {
-  console.error('Error in RSC stream', error);  // always logged
+  <p><strong>Error handler</strong> (<code>capabilities/proRSC.ts</code>) &mdash; RSC <code>reportError</code>
+     reports through one of the two stream events (PR #4631 removed the old unconditional
+     <code>console.error</code>, which error reporters never captured):</p>
+  <pre>const reportError = (error: Error): Error => {
+  const diagnosticError = addRSCClientHookDiagnostic(error, componentName);
   if (throwJsErrors) {            // Currently: <%= throw_js_errors %>
-    emitError(error);             // <%= throw_js_errors ? "CALLED" : "NOT called" %>
+    emitError(diagnosticError);   // <%= throw_js_errors ? "CALLED while connected — 'error' event" : "NOT taken" %>
+  } else {
+    notifyRenderingError(diagnosticError);  // <%= throw_js_errors ? "NOT taken" : "CALLED while connected — 'renderingError' event" %>
   }
   renderState.hasErrors = true;
-  renderState.error = error;
+  renderState.error = diagnosticError;
+  return diagnosticError;
 };</pre>
 
   <div class="expected-behavior">
@@ -746,9 +766,8 @@ const StreamErrorDemo = () => (
       Rails does <strong>not</strong> raise because <code>raise_non_shell_server_rendering_errors = false</code>
       and this is a post-shell error (<code>isShellReady = true</code>).
     <% end %><br/>
-    <span class="label">Logs:</span> <code>Error in RSC stream ...</code> always appears in node-renderer logs.<br/>
     <span class="label">errorReporter:</span>
-    <%= throw_js_errors ? "Called." : "Not called — throwJsErrors is false." %>
+    <%= throw_js_errors ? "Called while connected — via emitError()." : "Called while connected — via notifyRenderingError() (PR #4631)." %>
   </div>
 </div>
 
@@ -789,9 +808,8 @@ const StreamErrorDemo = () => (
       Rails does <strong>not</strong> raise because <code>raise_non_shell_server_rendering_errors = false</code>
       and this is a post-shell error (<code>isShellReady = true</code>).
     <% end %><br/>
-    <span class="label">Logs:</span> <code>Error in RSC stream ...</code> always appears in node-renderer logs.<br/>
     <span class="label">errorReporter:</span>
-    <%= throw_js_errors ? "Called." : "Not called — throwJsErrors is false." %>
+    <%= throw_js_errors ? "Called while connected — via emitError()." : "Called while connected — via notifyRenderingError() (PR #4631)." %>
   </div>
 </div>
 
@@ -938,7 +956,7 @@ const StreamErrorDemo = () => (
       <td><code>StreamShellErrorDemo</code></td>
       <td><code>false</code></td>
       <td><%= raise_on_prerender_error ? "PrerenderError (rescue_from handler)" : "Error HTML box" %></td>
-      <td><%= throw_js_errors ? "Yes" : "No" %></td>
+      <td>Yes (while connected)</td>
       <td><%= raise_on_prerender_error ? "Yes (raise_on_prerender_error)" : "No" %></td>
     </tr>
     <tr>
@@ -947,7 +965,7 @@ const StreamErrorDemo = () => (
       <td><code>StreamErrorDemo</code></td>
       <td><code>true</code></td>
       <td><%= raise_non_shell ? "Stream aborted" : "Shell renders, async fails silently" %></td>
-      <td><%= throw_js_errors ? "Yes" : "No" %></td>
+      <td>Yes (while connected)</td>
       <td><%= raise_non_shell ? "Yes (raise_non_shell)" : "No" %></td>
     </tr>
     <tr>
@@ -956,7 +974,7 @@ const StreamErrorDemo = () => (
       <td><code>AsyncComponentsTreeForTesting</code></td>
       <td><code>false</code></td>
       <td><%= raise_on_prerender_error ? "PrerenderError (rescue_from handler)" : "Error HTML box" %></td>
-      <td><%= throw_js_errors ? "Yes" : "No" %></td>
+      <td>Yes (while connected)</td>
       <td><%= raise_on_prerender_error ? "Yes (raise_on_prerender_error)" : "No" %></td>
     </tr>
     <tr>
@@ -965,7 +983,7 @@ const StreamErrorDemo = () => (
       <td><code>AsyncComponentsTreeForTesting</code></td>
       <td><code>true</code></td>
       <td><%= raise_non_shell ? "Stream aborted" : "Shell renders, one Suspense fails" %></td>
-      <td><%= throw_js_errors ? "Yes" : "No" %></td>
+      <td>Yes (while connected)</td>
       <td><%= raise_non_shell ? "Yes (raise_non_shell)" : "No" %></td>
     </tr>
     <tr>
@@ -974,7 +992,7 @@ const StreamErrorDemo = () => (
       <td><code>DeterministicRSCErrorComponent</code></td>
       <td><code>true</code> (always post-shell)</td>
       <td><%= raise_non_shell ? "Stream aborted" : "RSC error HTML" %></td>
-      <td><%= throw_js_errors ? "Yes" : "No" %></td>
+      <td>Yes (while connected)</td>
       <td><%= raise_non_shell ? "Yes (raise_non_shell)" : "No" %></td>
     </tr>
     <tr>
@@ -983,7 +1001,7 @@ const StreamErrorDemo = () => (
       <td><code>DeterministicRSCErrorComponent</code></td>
       <td><code>true</code> (always post-shell)</td>
       <td>ErrorBoundary fallback</td>
-      <td><%= throw_js_errors ? "Yes" : "No" %></td>
+      <td>Yes (while connected)</td>
       <td><%= raise_non_shell ? "Yes (raise_non_shell)" : "No" %></td>
     </tr>
     <tr style="background: #fce4ec;">
@@ -1001,7 +1019,7 @@ const StreamErrorDemo = () => (
       <td><code>NonExistentComponent</code></td>
       <td><code>false</code></td>
       <td>Registry error</td>
-      <td><%= throw_js_errors ? "Yes" : "No" %></td>
+      <td>Yes (while connected)</td>
       <td>Yes (component not found)</td>
     </tr>
     <tr style="background: #fce4ec;">
@@ -1010,7 +1028,7 @@ const StreamErrorDemo = () => (
       <td><code>NonExistentComponent</code></td>
       <td>&mdash;</td>
       <td>Registry error</td>
-      <td><%= throw_js_errors ? "Yes" : "No" %></td>
+      <td>Yes (while connected)</td>
       <td>Yes (component not found)</td>
     </tr>
     <tr style="background: #fff8e1;">
@@ -1023,6 +1041,13 @@ const StreamErrorDemo = () => (
     </tr>
   </tbody>
 </table>
+
+<p><em>While the response stream has an active consumer, streaming and RSC rows (A&ndash;F, H, I)
+   reach <code>errorReporter</code> regardless of <code>throw_js_errors</code> since PR #4631 &mdash;
+   the config only selects the stream event (<code>'error'</code> vs <code>'renderingError'</code>).
+   After consumer disconnect, <code>emitError</code> and <code>notifyRenderingError</code> suppress later
+   errors as part of render teardown, so <code>errorReporter</code> is not called. Non-streaming rows
+   (N, G) still require <code>throw_js_errors = true</code>.</em></p>
 
 <hr/>
 
@@ -1059,10 +1084,17 @@ onError / onShellError callback
          v
 reportError(error) → renderState.hasErrors = true
          |
+         +--- response consumer already disconnected?
+         |     YES: stream-event helpers return without emitting
+         |          → errorReporter is NOT called
+         |     NO:
+         |
          +--- throwJsErrors == true? (currently: <%= throw_js_errors %>)
          |     YES: emitError(error) → stream 'error' event
          |          → vm.ts handleStreamError → errorReporter.message()
-         |     NO:  (no error event, errorReporter never sees it)
+         |     NO:  notifyRenderingError(error) → 'renderingError' event (PR #4631)
+         |          → vm.ts 'renderingError' listener → errorReporter.message()
+         |     (a WeakSet in vm.ts dedupes if both fire for the same error)
          |
          v
 JSON chunk: { hasErrors: true, isShellReady: true|false }

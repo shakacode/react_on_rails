@@ -84,6 +84,20 @@ module ReactOnRails
           exit 1
         end
 
+        # Replace this process with an available executable using the same
+        # Bundler-aware lookup strategy as development-process startup.
+        def exec_process_if_available(process, args)
+          return exec(process, *args) if installed?(process)
+          return false unless process_available_in_system?(process)
+
+          env_overrides = preserve_runtime_env_vars
+          with_unbundled_context do
+            exec(env_overrides, process, *args)
+          end
+        rescue Errno::ENOENT
+          false
+        end
+
         private
 
         # Check if a process is actually usable in the current execution context

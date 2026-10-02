@@ -68,8 +68,8 @@ describe('logLicenseStatus', () => {
 
       expect(warn).toHaveBeenCalledWith(
         `[React on Rails Pro] ${statusMessage}. ` +
-          'Production Use of React on Rails Pro requires an appropriate license. ' +
-          `If this deployment is Production Use, ${action} at https://pro.reactonrails.com/`,
+          'React on Rails Pro is free in production for small organizations, charities, schools, and hospitals; ' +
+          `other organizations need a subscription. If that is you, ${action} at https://pro.reactonrails.com/`,
       );
     },
   );
@@ -98,7 +98,7 @@ describe('logLicenseStatus', () => {
 
     logLicenseStatus();
 
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('Production Use'));
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('small organizations'));
   });
 
   it('logs valid licenses as information', () => {

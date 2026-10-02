@@ -148,8 +148,8 @@ module ReactOnRails
 
           Then run: bundle install
 
-          No license needed for evaluation or non-production use.
-          Free or low-cost production licenses available for startups and small companies.
+          No license key is needed to run Pro. Production is free for small organizations, charities, schools, and hospitals;
+          larger organizations subscribe: https://reactonrails.com/pricing/
           See the upgrade guide: https://reactonrails.com/docs/pro/upgrading-to-pro/
         MSG
         true

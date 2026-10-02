@@ -247,7 +247,8 @@ module ReactOnRails
         validate_product_stack_choice!
         return if options.new_app? || explicit_product_stack_choice? || !interactive_install_session?
 
-        say "React on Rails Pro is free for evaluation; production use requires a subscription."
+        say "No license key is needed to run Pro. Production is free for small organizations, charities, schools, " \
+            "and hospitals; larger organizations subscribe: https://reactonrails.com/pricing/"
         say "Learn more: https://reactonrails.com/docs/pro/upgrading-to-pro/"
         answer = ask(
           "Enable React on Rails Pro features (Node Renderer and streaming SSR; RSC available separately)? [Y/n]",

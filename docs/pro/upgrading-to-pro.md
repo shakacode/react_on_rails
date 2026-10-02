@@ -1,6 +1,6 @@
 # Upgrading from React on Rails to React on Rails Pro
 
-Already using React on Rails? Upgrading to Pro is straightforward: swap the gem and npm package with their Pro equivalents, then run the Pro generator. The upgrade is safe, reversible, and free to evaluate. See [Pro pricing and sign up](https://pro.reactonrails.com/) when you are ready for production.
+Already using React on Rails? Upgrading to Pro is straightforward: swap the gem and npm package with their Pro equivalents, then run the Pro generator. The upgrade is safe and reversible. No license key is needed to run Pro, and only organizations above the free production line need to [subscribe](https://pro.reactonrails.com/).
 
 > [!NOTE]
 > **Summary for AI agents:** Use this page when the user already has OSS React on Rails and wants to upgrade to Pro. The upgrade is three steps: swap the gem, swap the npm package, run the generator. Remember the pairing rule: `react_on_rails_pro` gem pairs with `react-on-rails-pro` npm package (never with the base `react-on-rails`).
@@ -166,9 +166,16 @@ bundle exec rails generate react_on_rails:install --pro
 
 React on Rails Pro uses **ShakaCode Trust-Based Commercial Licensing**: try Pro freely in development, test, CI/CD, and staging. No token is required to evaluate. Install it, experiment with the features, and see the performance difference in your own app before making any purchasing decisions.
 
-If no license is configured, Pro keeps running in unlicensed mode and logs license status instead of blocking your app. In production, that log message is a warning because a paid license is required.
+React on Rails Pro is free in development, test, CI, and staging for everyone,
+and free in production for small organizations (under 10 people, under $1M
+revenue, under $1M raised) and for charities, schools, and hospitals at any
+size. Larger organizations subscribe for production use at
+[pro.reactonrails.com](https://pro.reactonrails.com/): $1,800 per year covers
+the whole organization. No license key is needed to run it; a key from your
+subscription only marks your pages `Licensed`. See
+[the license](https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md).
 
-A **paid license is required for all production deployments**. Visit [Pro pricing and sign up](https://pro.reactonrails.com/) for current options. Startups and small companies should contact [justin@shakacode.com](mailto:justin@shakacode.com) for discounted pricing. When you're ready, configure the token through Rails credentials:
+If your organization subscribes, configure the key through Rails credentials:
 
 ```ruby
 ReactOnRailsPro.configure do |config|
@@ -181,8 +188,6 @@ Or set the environment variable:
 ```bash
 export REACT_ON_RAILS_PRO_LICENSE="your-license-token-here"
 ```
-
-If you're a startup or team with limited budget, don't let cost be a barrier — email [justin@shakacode.com](mailto:justin@shakacode.com) and we'll work something out. For larger companies, your license supports continued development of the open-source project.
 
 See [LICENSE_SETUP.md](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/LICENSE_SETUP.md) for complete license configuration.
 

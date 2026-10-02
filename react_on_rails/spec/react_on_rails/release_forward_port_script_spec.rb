@@ -626,19 +626,25 @@ RSpec.describe "script/release-forward-port" do
       expect(calls).to be_empty
     end
 
-    it "assigns the canonical release version, target, and branch only in the lease bootstrap" do
+    it "documents the active coordinator variables alongside the retired lease bootstrap" do
       runbook = File.read(File.join(repo_root, "internal/contributor-info/release-train-runbook.md"))
       snippets = runbook.to_enum(:scan, /```bash\n(.*?)\n[ \t]*```/m).map { Regexp.last_match(1) }
       executable_lines = snippets.flat_map(&:lines).map(&:strip)
 
       expect(executable_lines.grep(/\ARELEASE_VERSION=/)).to eq(
-        ['RELEASE_VERSION="${RELEASE_VERSION_INPUT:?set the exact stable X.Y.Z release version}"']
+        [
+          'RELEASE_VERSION="${RELEASE_VERSION_INPUT:?set the exact X.Y.Z release version}"',
+          'RELEASE_VERSION="${RELEASE_VERSION_INPUT:?set the exact stable X.Y.Z release version}"'
+        ]
       )
       expect(executable_lines.grep(/\ARELEASE_LINE_TARGET=/)).to eq(
         ['RELEASE_LINE_TARGET="release-line:${RELEASE_VERSION}"']
       )
       expect(executable_lines.grep(/\ARELEASE_BRANCH=/)).to eq(
-        ['RELEASE_BRANCH="${RELEASE_BRANCH_INPUT:-release/${RELEASE_VERSION}}"']
+        [
+          'RELEASE_BRANCH="release/${RELEASE_VERSION}"',
+          'RELEASE_BRANCH="${RELEASE_BRANCH_INPUT:-release/${RELEASE_VERSION}}"'
+        ]
       )
     end
 
@@ -757,7 +763,7 @@ RSpec.describe "script/release-forward-port" do
       expect(arguments).to be_empty
     end
 
-    it "refuses a squash version that differs from the held lease before attempting the merge" do
+    it "refuses a squash version that differs from the coordinator version before attempting the merge" do
       source_changelog_oid = "c" * 40
       _stdout, stderr, status, arguments = run_documented_closeout_merge(
         method: "SQUASH",
@@ -767,7 +773,7 @@ RSpec.describe "script/release-forward-port" do
       )
 
       expect(status).not_to be_success
-      expect(stderr).to include("closeout release version must equal held release-line lease version 17.0.0")
+      expect(stderr).to include("closeout release version must equal coordinator release version 17.0.0")
       expect(arguments).to be_empty
     end
 
@@ -941,7 +947,7 @@ RSpec.describe "script/release-forward-port" do
       expect(arguments).to be_empty
     end
 
-    it "refuses a backport version that retargets the held release-line lease before mutation" do
+    it "refuses a backport version that retargets the coordinator version before mutation" do
       _stdout, stderr, status, arguments = run_documented_backport_merge(
         lease_version: "17.0.0",
         release_version: "17.0.1",
@@ -949,7 +955,7 @@ RSpec.describe "script/release-forward-port" do
       )
 
       expect(status).not_to be_success
-      expect(stderr).to include("backport release version must equal held release-line lease version 17.0.0")
+      expect(stderr).to include("backport release version must equal coordinator release version 17.0.0")
       expect(arguments).to be_empty
     end
 
@@ -977,14 +983,14 @@ RSpec.describe "script/release-forward-port" do
       expect(arguments).to include("fetch", "--prune", "switch", "main")
     end
 
-    it "refuses a later selective-closeout version that differs from the held lease before mutation" do
+    it "refuses a later selective-closeout version that differs from the coordinator version before mutation" do
       _stdout, stderr, status, arguments = run_documented_selective_closeout_setup(
         lease_version: "17.0.0",
         closeout_version: "17.0.1"
       )
 
       expect(status).not_to be_success
-      expect(stderr).to include("selective closeout version must equal held release-line lease version 17.0.0")
+      expect(stderr).to include("selective closeout version must equal coordinator release version 17.0.0")
       expect(arguments).to be_empty
     end
 

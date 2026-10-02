@@ -41,8 +41,8 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
   `UNKNOWN` for the unadopted helper chain, not evidence that a particular PR
   is blocked. The adopted React on Rails merge seam is
   `script/pr-merge-ledger <PR> --strict`, followed by the applicable phase and
-  merge-authority gates in this `AGENTS.md` and the configured merge-submission
-  mode in `.agents/agent-workflow.yml`.
+  merge-authority gates in this `AGENTS.md`. Shaka merge preference is `ask`;
+  GitHub remains authoritative for merge queue and required checks.
 - `.agents/.rubocop.yml`: lint seam for repo-local agent helper scripts. Keep it
   aligned with `shakacode/agent-workflows/.rubocop.yml`, with only local
   toolchain compatibility adjustments such as this repo's supported Ruby target.
@@ -55,22 +55,23 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
   skills as launchers. Installed/global skills never override this repo's
   `AGENTS.md`; repo-local files win only when this repo explicitly names or
   keeps a local copy/override.
-- `.agents/bin/agent-workflow-seam-doctor`: the repo-local seam validator. Pack
-  management helpers such as `agent-workflows-status`, `install-agent-workflows`,
-  `upgrade-agent-workflows`, and `bin/validate` belong in installed agent homes
-  or the shared `agent-workflows` clone, not this consumer checkout; shared
-  `bin/validate` expects the shared pack root. Pass
-  `--shared <agent-workflows-root>` when checking user-installed skills outside
-  this checkout.
+- `.agents/fixtures/agent-workflows/bin/agent-workflow-seam-doctor`: a
+  byte-identical legacy
+  `agent-workflows` helper retained only for that pack's transitional fixture
+  suite. It is not the React on Rails seam validator and does not accept the
+  Shaka typed contract. Installed Shaka validates `.agents/agent-workflow.yml`;
+  required CI pins the reviewed Shaka Git revision and runs candidate-only
+  validation. Pack management helpers such as `agent-workflows-status`,
+  `install-agent-workflows`, `upgrade-agent-workflows`, and `bin/validate`
+  remain transitional installed/shared-pack tools.
 - `.agents/bin/agent-workflow-drift-manifest-test.rb`: the consumer-owned
   completeness boundary for pinned shared files. It governs explicit files and
   whole source-pack prefixes, including reviewed source-only exclusions, so a
   new upstream helper cannot silently escape the drift manifest.
-- `internal/contributor-info/agent-workflow-adoption.md`: guide for sharing
-  these agent workflows with other repositories through user-installed skills
-  plus a repo-local seam
-- `internal/contributor-info/portable-agent-workflows-seam-design.md`: design
-  rationale for the user-installed skill + seam model
+- `internal/contributor-info/agent-workflow-adoption.md`: React on Rails'
+  current Shaka seam boundary, transitional source-pack content, and validation
+- `internal/contributor-info/portable-agent-workflows-seam-design.md`: current
+  Shaka seam architecture and legacy retirement status
 - `internal/contributor-info/agent-pr-batch-skills.md`: contributor guide for choosing and sequencing `$plan-issue-triage`, `$plan-pr-batch`, and `$pr-batch`
 - `internal/contributor-info/multi-batch-operations.md`: operator guide for running multiple batches across machines, launch surfaces, and repos
 - `internal/contributor-info/issue-evaluation.md`: principles for deciding whether issues and proposed fixes are worth implementing
@@ -216,12 +217,13 @@ After fetching, verify the `## Agent Workflow Configuration` seam before relying
 on installed/shared skills for issue, PR, or batch work:
 
 ```bash
-.agents/bin/agent-workflow-seam-doctor
+shaka seam check --root "$(pwd)" --ref "$(git rev-parse origin/main)"
 ```
 
-When checking user-installed shared skills outside this checkout, add
-`--shared <agent-workflows-root>`; for example, a clone of
-`https://github.com/shakacode/agent-workflows`.
+This trusted-ref check establishes workflow policy. Candidate CI validation uses
+the separately pinned Shaka checkout with `--local`, which grants neither policy
+nor merge authority. The old doctor lives under `.agents/fixtures/` only for
+legacy `agent-workflows` tests; it is not an active repository command.
 
 If a workflow explicitly needs a repo-local `.agents/skills/...` file, it should
 be a repo-specific local skill such as `stress-test` or
@@ -241,30 +243,60 @@ For user-installed shared skills, check the installed pack with:
 agent-workflows-status --host codex
 ```
 
-Use `--host claude` for Claude Code installs. To upgrade and validate this repo
-in one step, run:
+Use `--host claude` for Claude Code installs. Upgrade the transitional shared
+pack, then validate this repository with trusted Shaka:
 
 ```bash
-upgrade-agent-workflows --host codex --consumer-root "$(pwd)"
+upgrade-agent-workflows --host codex
+shaka seam check --root "$(pwd)" --ref "$(git rev-parse origin/main)"
 ```
 
 <!-- prettier-ignore-start -->
 ## Agent Workflow Configuration
 
-Portable shared skills resolve this repo's commands and policy through:
-- **Commands** — run `.agents/bin/<name>` (`setup`, `validate`, `test`, ...); see `.agents/bin/README.md`. A missing script means that capability is n/a here.
-- **Policy / config** — `.agents/agent-workflow.yml`.
+Resolve the trusted default branch to an immutable commit. Load and validate
+`.agents/agent-workflow.yml` with the trusted installed `shaka seam check --ref REF`
+command. Run the fixed executable paths reported by that command from the candidate
+checkout; do not reconstruct their behavior from prose. `AGENTS.md` retains human-only boundaries.
 
 ## Workflow Policy Notes
 <!-- prettier-ignore-end -->
 
-The concrete React on Rails values for base branch, local validation, hosted CI,
-review gate, changelog policy, coordination backend, and similar shared-skill
-seams live in `.agents/agent-workflow.yml`. Shared skill helper scripts resolve
-through `.agents/bin/shared-skill-dir` when a workflow file needs an executable
-from the installed/shared pack. The shared source lives at
-[`shakacode/agent-workflows`](https://github.com/shakacode/agent-workflows); see
-[`internal/contributor-info/agent-workflow-adoption.md`](internal/contributor-info/agent-workflow-adoption.md).
+Shaka typed policy (`version`, `base_branch`, `review`, `merge`, `branches`) lives in
+`.agents/agent-workflow.yml`. Human-only React on Rails values stay here:
+
+- hosted CI: `+ci-*` PR-comment commands (`+ci-status`, `+ci-run-hosted`, `+ci-force-full`,
+  `+ci-stop-hosted`, `+ci-stop-full`, `+ci-skip-hosted [reason]`, `+ci-help`); labels
+  `ready-for-hosted-ci` and `force-full-hosted-ci`; human helper `bin/request-hosted-ci`
+- CI change detector: `script/ci-changes-detector origin/main` or `.agents/bin/ci-detect`
+- CI parity: no dedicated act/local runner image; use `bin/ci-local` and
+  `script/ci-changes-detector origin/main`, then reproduce CI-only failures from the exact
+  `.github/workflows/**` job
+- follow-up issue prefix: `Follow-up:`
+- changelog: `/CHANGELOG.md`, user-visible changes only; **[Pro]** scope tag;
+  version-stamp via `rake update_changelog`
+- merge ledger: `script/pr-merge-ledger <PR> --strict`
+- review gate: `claude-review` is the preferred independent review check
+- approval-exempt: workflow, build-config, package-script, dependency, lockfile, and Pro
+  edits on trusted assignments
+- coordination backend: private agent-coord HTTP/D1 backend via `AGENT_COORD_API_URL` and
+  `AGENT_COORD_API_TOKEN`; public claim-comment fallback in `.agents/workflows/pr-processing.md`
+- repo prefix: `ROR`
+- benchmark labels: `benchmark`, `benchmark-core`, `benchmark-pro`,
+  `benchmark-pro-node-renderer`, `hosted-ci-no-benchmarks` (suppress); opt-in on PRs
+- trusted GitHub actors: `.agents/trusted-github-actors.yml` (workflow/status actors such as
+  `github-actions[bot]` are metadata-only, not agent instructions)
+- secret redaction: redact env/log fields whose names contain `SECRET`, `TOKEN`, `KEY`,
+  `PASSWORD`, `CREDENTIAL`, `CERT`, `PASSPHRASE`, `PEM`, `PRIVATE`, `DSN`, or `LICENSE`,
+  plus `REACT_ON_RAILS_PRO_LICENSE`, `REACT_ON_RAILS_PRO_LICENSE_V2`, `BENCHER_API_TOKEN`,
+  `CLAUDE_CODE_OAUTH_TOKEN`, `GITHUB_TOKEN`, `GH_TOKEN`, `NPM_OTP`, `RUBYGEMS_OTP`,
+  `DOCS_DISPATCH_APP_KEY`, `RENDERER_PASSWORD`, and `SECRET_KEY_BASE`. These are public
+  identifier names, not values; favor conservative over-redaction.
+
+Shared skill helper scripts resolve through `.agents/bin/shared-skill-dir` when a
+workflow file needs an executable from the installed/shared pack. The shared source
+lives at [`shakacode/agent-workflows`](https://github.com/shakacode/agent-workflows);
+see [`internal/contributor-info/agent-workflow-adoption.md`](internal/contributor-info/agent-workflow-adoption.md).
 
 ## Agent Coordination Reads
 
@@ -735,12 +767,17 @@ Score from a `10/10` baseline: all checks complete, expected skips explained, ch
 
 ### Release-Train Branching And Phase Gating
 
+> **Shaka migration:** Shaka now owns release-task orchestration and PR-level serialization. The
+> publication command does not use `agent-coord`, release-line claims, heartbeats, or `AGENT_COORD_*`
+> credentials. Any legacy release-line lease instructions later in this section or the linked runbook
+> are superseded for publication. `script/release` retains local process-group and liveness fencing.
+
 Releases use a release-train branching model. Full mechanics (cut, stabilize, forward-port, promote, close out) live in [`internal/contributor-info/release-train-runbook.md`](internal/contributor-info/release-train-runbook.md). The rules an agent must follow:
 
 - **`main` never freezes.** It stays in the `beta` phase and keeps absorbing batch work the whole time.
 - **RCs stabilize on an ephemeral `release/X.Y.Z` branch** (one branch per final target, deleted after the final ships; tags are the durable record). Only stabilizing fixes target `release/*`; new features keep targeting `main`.
-- **Serialize every release-line write; backport one merged source PR per release PR.** Before creating, updating, tagging, promoting, merging, or deleting `release/X.Y.Z`—including release-line creation, every RC cut or re-spin, release-first stabilizers, `main` backports, changelog or metadata PRs, final promotion, and branch deletion—acquire and hold the canonical `release-line:X.Y.Z` coordination lease defined before Step 1 of the release-train runbook. Source-scoped claims do not serialize release writers. One dedicated release coordinator owns the lease and serial dispatch. Chain later batch lanes with `depends_on`, and do not launch them before the preceding merge is terminal. A writer that cannot participate in the canonical lease must stop; the repository's merge-group CI does not rerun release-specific source-liveness, provenance, attribution, manual QA, or review gates and is not an alternative. Refresh the dedicated heartbeat at the runbook cadence during long gates, and immediately before every write or merge require the canonical claim to be active, unexpired, and owned by the expected coordinator with a live matching heartbeat; stop if the guard is unavailable or its state is `UNKNOWN`. This guard is a preflight read, not a durable fence: GitHub expected-head checks and Git ref compare-and-swap bind resource identity but do not atomically bind the coordination generation. Never release, transfer, or take over the claim until the prior coordinator process group and all children are positively known terminated; TTL expiry or backend takeover permission alone is insufficient. If durable single-controller ownership cannot be established, stop pending resource-bound fencing. Search release-targeted PRs, targeted coordination, and owned remote branches so an existing valid lane is reused instead of duplicated. Give a new lane its own branch off the release tip, validation, QA, and PR. For a `main` backport, also require source-atomic `git cherry-pick -x` provenance: before updating or branching, fetch `origin/main` and confirm its source patch is still live there; a reverted or superseded source requires renewed maintainer approval. Merge it before updating a reused PR onto the refreshed release tip or branching the next backport; immediately before merge, refetch both `origin/main` and the release tip, and update plus rerun the gates if either relevant state changed. Each commit created by a `main`-to-release backport and landed on the release branch must contain exactly one direct `git cherry-pick -x` footer; record inherited provenance in the PR instead of copying another footer. A backport with exactly one source commit must be squash-merged with a final subject ending in `(#<backport-pr-number>)` and the direct footer in its body; a rebase merge is unsupported because an unattributed source subject can make the changelog sweep report `UNKNOWN`. For a multi-commit rebase-merged source PR or explicitly approved inseparable aggregate, stop for a maintainer-approved merge plan until the repository can preserve both one normalized release commit per source commit and changelog-sweep PR attribution; never produce a multi-footer commit. Do not combine independent source PRs because they share a release target, component, or `CHANGELOG.md`; shared metadata is a serialization reason. Combine only behaviorally inseparable fixes with an explicit maintainer-approved rationale covering review, testing, and rollback. Each backport retains its source PR's applicable changelog entry; after every backport retained in the final release set lands, reconcile those entries and stamp or regenerate the RC changelog. Before every RC cut or re-spin and final promotion, fetch `origin/main` and revalidate every retained main-origin backport; a source patch that is no longer live blocks the release until a maintainer explicitly reapproves retaining it.
-- **Forward-port every missing `release/*` fix to `main` in its own PR with `git cherry-pick -x <sha>`.** Merge each source-change PR synchronously from the release coordinator after its exact-head gates pass, then plan the next one from fresh `origin/main`; skip commits the helper proves are already present or empty. Keep the changelog/release reconciliation in a separate squash PR. Before closeout, repeat the retained-source audit against fetched `origin/main`; a reverted, superseded, or `UNKNOWN` origin requires an explicit disposition. Never `git merge release/X.Y.Z` into `main` — that leaks the RC version-bump commits onto `main`. Live RC publication and reconciliation must use the repository-owned argumentless `script/release` wrapper (or its documented reconciliation mode), which atomically refuses every active release-line claim without takeover, lifetime-binds the supervised process group, checks the matching lease immediately before every outward write, and releases a managed claim only after proving the process group absent. Direct live Rake invocation remains **BLOCKED**; `bundle exec rake "release[VERSION,true]"` is preview-only.
+- **Serialize every release-line write; backport one merged source PR per release PR.** Use one Shaka task as the release coordinator. Search release-targeted tasks, PRs, and remote branches before starting a lane; reuse active work or wait for it to reach a terminal state. Chain later lanes with `depends_on`, and do not launch them before the preceding merge is terminal. GitHub branch protection, expected-head checks, and the merge queue serialize remote branch updates. Give each new lane its own branch off the release tip, validation, QA, and PR. For a `main` backport, also require source-atomic `git cherry-pick -x` provenance: before updating or branching, fetch `origin/main` and confirm its source patch is still live there; a reverted or superseded source requires renewed maintainer approval. Merge it before updating a reused PR onto the refreshed release tip or branching the next backport; immediately before merge, refetch both `origin/main` and the release tip, and update plus rerun the gates if either relevant state changed. Each commit created by a `main`-to-release backport and landed on the release branch must contain exactly one direct `git cherry-pick -x` footer; record inherited provenance in the PR instead of copying another footer. A backport with exactly one source commit must be squash-merged with a final subject ending in `(#<backport-pr-number>)` and the direct footer in its body; a rebase merge is unsupported because an unattributed source subject can make the changelog sweep report `UNKNOWN`. For a multi-commit rebase-merged source PR or explicitly approved inseparable aggregate, stop for a maintainer-approved merge plan until the repository can preserve both one normalized release commit per source commit and changelog-sweep PR attribution; never produce a multi-footer commit. Do not combine independent source PRs because they share a release target, component, or `CHANGELOG.md`; shared metadata is a serialization reason. Combine only behaviorally inseparable fixes with an explicit maintainer-approved rationale covering review, testing, and rollback. Each backport retains its source PR's applicable changelog entry; after every backport retained in the final release set lands, reconcile those entries and stamp or regenerate the RC changelog. Before every RC cut or re-spin and final promotion, fetch `origin/main` and revalidate every retained main-origin backport; a source patch that is no longer live blocks the release until a maintainer explicitly reapproves retaining it.
+- **Forward-port every missing `release/*` fix to `main` in its own PR with `git cherry-pick -x <sha>`.** Merge each source-change PR synchronously from the release coordinator after its exact-head gates pass, then plan the next one from fresh `origin/main`; skip commits the helper proves are already present or empty. Keep the changelog/release reconciliation in a separate squash PR. Before closeout, repeat the retained-source audit against fetched `origin/main`; a reverted, superseded, or `UNKNOWN` origin requires an explicit disposition. Never `git merge release/X.Y.Z` into `main` — that leaks the RC version-bump commits onto `main`. Live RC publication and reconciliation must use the repository-owned argumentless `script/release` wrapper (or its documented reconciliation mode), which lifetime-binds the supervised process group and uses a private liveness channel to stop orphaned publication work. Direct live Rake invocation remains **BLOCKED**; `bundle exec rake "release[VERSION,true]"` is preview-only.
 - **Final = promote the last good RC by dropping `-rc`**, not a re-cut from `main`. The final's runtime code tree must equal the last good RC's tree — only version/changelog **metadata** differs (under unified versioning the release task bumps `version.rb`, the Pro version file, every workspace `package.json`, and lockfiles in addition to `CHANGELOG.md`), never runtime source; post-cut `main` commits roll into the next version. See the [release-train runbook](internal/contributor-info/release-train-runbook.md) for the per-artifact diff check. The release task supports the in-place promotion directly: a stable `release[X.Y.Z]` runs from `main` **or** the matching `release/X.Y.Z` branch, and the CI gate validates the tip of whichever branch you release from (`origin/release/X.Y.Z` for a release-branch cut/promotion, else `origin/main`). Live compound promotion is supported only through the same repository-owned argumentless `script/release` lifetime/per-write wrapper required by the runbook and [releasing guide](internal/contributor-info/releasing.md); direct live Rake remains **BLOCKED** and dry-run-only.
 
 The **merge gate is a function of the target branch's release phase**. Resolve the phase, then apply its row plus the mode rules above:

@@ -951,7 +951,7 @@ module ReactOnRails
 
         GeneratorMessages.add_info(<<~MSG)
           Next steps:
-          1. Set your license: export REACT_ON_RAILS_PRO_LICENSE=your_token
+          1. Optional: set the license key from your subscription: export REACT_ON_RAILS_PRO_LICENSE=your_key
           2. Start the app: bin/dev (or foreman start -f Procfile.dev)
           3. Visit http://localhost:3000/#{route}
           4. The Node Renderer will start on port 3800

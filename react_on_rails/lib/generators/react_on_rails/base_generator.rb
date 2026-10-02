@@ -904,7 +904,8 @@ module ReactOnRails
       end
 
       def home_page_pro_note_for_oss_app
-        "Review the Pro docs and upgrade guide first, then enable it with the appropriate license when you're ready."
+        "Review the Pro docs and upgrade guide first, then enable it when you're ready; " \
+          "a license key is optional and only marks your pages Licensed."
       end
 
       def preferred_rspec_helper_file

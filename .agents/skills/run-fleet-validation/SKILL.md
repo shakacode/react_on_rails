@@ -44,9 +44,10 @@ must never replace another pack's durable result ledger.
 ## Generate public standing-health evidence
 
 Standing health is a sibling contract, not a shortened candidate closeout. It reads only manifest
-entries explicitly marked `standing_health.public: true` plus the manifest's archived public
-targets. It never queries or emits a non-public lane, never mutates a demo repository, and never
-turns archived or `soft_track` entries into blocking targets.
+entries explicitly marked `standing_health.public: true`. Optional
+`standing_health.archived_targets` stay report-only when present. It never queries or emits a
+non-public lane, never mutates a demo repository, and never turns `soft_track` entries into
+blocking targets.
 
 The manifest's `standing_health.stable_release` and `standing_health.rsc_version` fields are the
 authoritative scheduled defaults:
@@ -74,7 +75,7 @@ head branch, and head SHA agree with its public PR metadata. Staging, cleanup, d
 promotion workflows never substitute for that path. GitHub archival of an active target is
 surfaced as blocking manifest drift. Active public targets block on missing, stale, failed, or
 unknown required evidence.
-Report-only and archived targets retain findings without blocking the aggregate. The scheduled
+Report-only targets retain findings without blocking the aggregate. The scheduled
 `.github/workflows/demo-fleet-health.yml` run uploads the same three evidence files.
 
 The Dependabot v1 evaluation is deliberately narrow: the same enabled weekly root entry must

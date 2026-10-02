@@ -11,11 +11,12 @@
   - `react-on-rails` NPM package
   - Core functionality is completely free
 
-- **ShakaCode Trust-Based Commercial Licensing (Paid License Required for Production):**
+- **ShakaCode Trust-Based Commercial Licensing (free for most uses; subscription for production use by larger organizations):**
   - `react_on_rails_pro` Ruby gem
   - `react-on-rails-pro` NPM package
   - `react-on-rails-pro-node-renderer` NPM package
-  - Advanced features can be evaluated without a token; production deployments require a paid license
+  - Development, test, CI, staging, preview and review apps, education, personal projects, and open-source projects are free for everyone
+  - Production is free for small organizations, charities, educational institutions, and hospitals
 
 ### Q: How do I install and use the packages?
 
@@ -52,34 +53,87 @@ See [LICENSE.md](../LICENSE.md) for the authoritative list of which directories 
 
 ### Q: What requires a paid Pro license?
 
-**A:** React on Rails Pro is offered under ShakaCode Trust-Based Commercial Licensing. A paid license is required for production deployments that use Pro features, including:
+**A:** Production use by an organization above the small-organization line requires a subscription.
 
-- Server-side rendering optimizations
-- Advanced caching strategies
-- React Server Components support
-- Node.js rendering process management
-- Premium support and consultation
+React on Rails (the `react_on_rails` gem and the `react-on-rails` package) is
+open source under the MIT License, the same license as Inertia Rails.
 
-See [REACT-ON-RAILS-PRO-LICENSE.md](https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md) for complete Pro license terms.
+React on Rails Pro adds React Server Components, streaming SSR, fragment
+caching, and the dedicated Node renderer, under The React on Rails Pro License,
+a trust-based commercial license:
+
+- **Free for everyone, at any organization size:** development, test, CI,
+  staging, preview and review apps (no license key needed), education, personal
+  projects, open-source projects, and a 45-day production evaluation.
+- **Free in production for small organizations:** under 10 people, under US $1M
+  revenue in the last twelve months, and under US $1M raised, counted with
+  affiliates. Charities, educational institutions, and hospitals are free at
+  any size.
+- **Everyone else subscribes for production use:** $1,800 per year per
+  organization, covering every application, environment, and developer, with
+  updates and maintainer support. Subscribe at
+  [pro.reactonrails.com](https://pro.reactonrails.com/).
+- **No license key is required to run anything,** nothing phones home, and
+  nothing breaks: a missing key only changes one HTML comment from `Licensed`
+  to `UNLICENSED`. If a subscription lapses, production stays licensed for 30
+  days.
+- **Terms are per version:** once a release ships under these terms, they never
+  tighten on that release.
+
+Full text:
+[REACT-ON-RAILS-PRO-LICENSE.md](https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md).
+Questions: [contact@shakacode.com](mailto:contact@shakacode.com).
 
 ### Q: Can I try Pro features for free?
 
-**A:** Yes! Under ShakaCode Trust-Based Commercial Licensing, no license token is required for:
+**A:** Yes. Reading and studying the source, development, test, CI, staging,
+preview and review apps, education, training, tutorials, demonstrations,
+academic research, personal projects, and qualifying open-source projects are
+free for everyone. Every organization also gets one 45-day production
+evaluation.
 
-- Evaluation and local development
-- Test environments and CI/CD pipelines
-- Staging and other non-production deployments
-- Educational, tutorial, and demonstration use
+### Q: Is Pro free for my company?
 
-Production use requires a paid production license.
+**A:** Production use is free if you can answer yes to all three questions,
+counted with affiliates: do fewer than 10 people work for your organization,
+was revenue in the last twelve months under US $1M, and has it raised under US
+$1M in outside capital? Charities, educational institutions, and hospitals are
+free at any size. If any answer is no and none of those categories applies,
+subscribe at [pro.reactonrails.com](https://pro.reactonrails.com/).
+
+### Q: What happens if we do not configure a license key?
+
+**A:** Nothing breaks. The app runs normally, logs report the license status,
+and the HTML attribution comment reads `UNLICENSED` instead of `Licensed`.
+
+### Q: What happens when a subscription lapses?
+
+**A:** Production use stays licensed for 30 days while you renew or wind down.
+The software keeps running either way.
+
+### Q: We are an agency building for clients. Who needs the license?
+
+**A:** The client organization is the licensee, and its size determines whether
+production use is free or paid. You may rely on the client's written
+self-certification of its status.
+
+### Q: How does this compare with Inertia?
+
+**A:** Comparing with Inertia Rails? React on Rails and Inertia Rails are both
+MIT. The only paid part of this stack is React on Rails Pro, and only in
+production at organizations above the small-organization line. That subscription
+buys what Inertia Rails does not have today: React Server Components, streaming
+SSR with selective hydration, fragment caching, and per-component adoption
+inside existing Rails views. Already on Inertia? Both gems coexist in one app,
+so you can migrate route by route: see the
+[Inertia Rails migration guide](./oss/migrating/migrating-from-inertia-rails.md).
 
 ### Q: Can I modify the MIT-licensed interface files?
 
 **A:** Yes! Under the MIT license, you can freely modify any MIT-licensed files (those outside the Pro-licensed directories). However:
 
 - **Permitted:** Modifying MIT-licensed code for your own purposes
-- **Not Permitted:** Using those modifications to access Pro features without a valid license
-- **Distinction:** The MIT license grants you modification rights, but the Pro License restricts unauthorized use of Pro features
+- **Pro boundary:** The MIT license governs the core files, while the Pro packages remain governed by The React on Rails Pro License
 
 ### Q: What about contributing to the project?
 

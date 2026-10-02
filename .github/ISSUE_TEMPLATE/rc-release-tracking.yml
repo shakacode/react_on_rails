@@ -173,17 +173,9 @@ body:
           - Reason: migration reference, not a current blocker
           - Current action:
 
-        - `shakacode/react-on-rails-demo-v16-bundle-splitting`
-          - Reason: inherited from an older spec, not part of the current public-example gate
-          - Current action:
-
         - `shakacode/react_on_rails-demo-octochangelog-on-rails-pro`
           - Reason: Pro/RSC signal, but not part of the current approved hard gate
           - Current action:
-
-        - `shakacode/react-on-rails-rsc-demo`
-          - Reason: retired and archived; generator validation moved to `react_on_rails`
-          - Current action: no RC bump
     validations:
       required: false
 

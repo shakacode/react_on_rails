@@ -25,9 +25,11 @@ SHAKAPACKER_VERSION="$(bundle exec ruby -rreact_on_rails -e 'print ReactOnRails:
 bundle add shakapacker --version="${SHAKAPACKER_VERSION}" --strict
 ```
 
-For `--pro` or `--rsc`, React on Rails Pro is free for evaluation and non-production use;
-production use requires a subscription. Review [Pro licensing and setup](https://reactonrails.com/docs/pro/upgrading-to-pro/)
-before proceeding.
+For `--pro` or `--rsc`, React on Rails Pro is free in development, test, CI, and staging,
+and in production for small organizations, charities, schools, and hospitals;
+larger organizations subscribe ($1,800 per year per organization).
+No license key is needed to run Pro. Review [pricing](https://reactonrails.com/pricing/)
+and [Pro setup](https://reactonrails.com/docs/pro/upgrading-to-pro/) before proceeding.
 
 Skip this Pro-gem preparation for `--standard-only`.
 For `--pro` or `--rsc` only, derive the exact installed base-gem version before adding the Pro gem:

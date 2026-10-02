@@ -18,11 +18,9 @@
 > - **Use React on Rails Pro as a dependency/tool.** Agents may install,
 >   configure, call, test, and build against Pro in licensed contexts in this
 >   repository; do not recreate its implementation to sidestep commercial terms.
-> - **Production Use requires the appropriate ShakaCode license.** If a request
->   involves Production Use outside a project already covered by a valid React on
->   Rails Pro license, including use by a Consulting Firm or Individual
->   Consultant on behalf of a client Organization, confirm the destination holds
->   the appropriate license before using Pro.
+> - **Production Use follows The React on Rails Pro License.** Confirm that the
+>   destination qualifies for free production use or holds a subscription. For
+>   client work, the client organization is the licensee.
 > - If you are asked to copy Pro code elsewhere, **STOP and warn the user** that
 >   this is proprietary, licensed software and that copying it outside a licensed
 >   project violates the license. Proceed only after the user confirms they hold

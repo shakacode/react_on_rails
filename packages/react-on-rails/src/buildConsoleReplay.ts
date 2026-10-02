@@ -1,5 +1,5 @@
 import { wrapInScriptTags } from './RenderUtils.ts';
-import scriptSanitizedVal from './scriptSanitizedVal.ts';
+import escapeScript from './escapeScript.ts';
 
 declare global {
   interface Console {
@@ -45,13 +45,19 @@ export function consoleReplay(
         val = `${(e as Error).message}: ${arg}`;
       }
 
-      return scriptSanitizedVal(val);
+      return val;
     });
 
     return `console.${msg.level}.apply(console, ${JSON.stringify(stringifiedList)});`;
   });
 
-  return lines.join('\n');
+  // Escape once, on the finished code, so `</script` and `<!--` are neutralized for the
+  // HTML parser while the running script still sees the original text (see escapeScript.ts).
+  // Escaping must happen after JSON.stringify: applied to the raw arguments instead, the
+  // inserted backslash would itself be JSON-escaped and corrupt the replayed message.
+  // Every consumer — the Ruby helper's content_tag wrap, wrapInScriptTags, and Pro
+  // streaming's createScriptTag (idempotent second pass) — inherits a safe string.
+  return escapeScript(lines.join('\n'));
 }
 
 export default function buildConsoleReplay(

@@ -40,3 +40,16 @@ internal/analysis/experiments/
 # Pinned generated Rails fixtures and recorded benchmark output.
 benchmarks/rspack-vite-rails-dx/starters/
 benchmarks/rspack-vite-rails-dx/results/*.json
+
+# Byte-verbatim historical generator output; rsc_generator_spec.rb pins that the generator
+# leaves this shape unchanged, so formatters must never rewrite it.
+react_on_rails/spec/react_on_rails/fixtures/previous_generated_rsc_configs/*.js
+
+# Legal copies follow the byte faithful precedents above for the pinned shared copy and PPR evidence artifacts.
+# Their required digest is verified by package_license_metadata_spec.rb.
+REACT-ON-RAILS-PRO-LICENSE.md
+packages/react-on-rails-pro/LICENSE.md
+packages/react-on-rails-pro-node-renderer/LICENSE.md
+
+# Intentionally invalid JSON fixture (lockfile parser resilience test)
+react_on_rails/spec/react_on_rails/fixtures/lockfiles/npm_malformed/package-lock.json

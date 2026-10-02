@@ -243,7 +243,10 @@ This is a helper method that takes any JavaScript expression and returns the out
 
 ## Pro-Only View Helpers
 
-The following view helpers are available exclusively with [React on Rails Pro](../../pro/react-on-rails-pro.md). Install the Pro gem to use them. ShakaCode Trust-Based Commercial Licensing lets you evaluate Pro without a token in development, test, CI/CD, and staging; production deployments require a paid license from [Pro pricing and sign up](https://pro.reactonrails.com/).
+The following view helpers are available exclusively with [React on Rails Pro](../../pro/react-on-rails-pro.md). Install
+the Pro gem to use them. Free in development, test, CI, and staging, and in production for small organizations,
+charities, schools, and hospitals; larger organizations subscribe at https://pro.reactonrails.com/ ($1,800 per year
+per organization). No license key is needed to run Pro.
 
 ### cached_react_component and cached_react_component_hash
 

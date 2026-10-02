@@ -14,7 +14,10 @@ pnpm add react-on-rails-pro
 
 **Important:** When using the `react_on_rails_pro` Ruby gem, you **must** use this package (`react-on-rails-pro`) instead of `react-on-rails`. If the Pro gem detects the base `react-on-rails` npm package at runtime, it will raise an error.
 
-React on Rails Pro uses ShakaCode Trust-Based Commercial Licensing: it is free to evaluate in development, CI/CD, and staging, and a paid license is required only for production deployments.
+Free in development, test, CI, and staging, and in production for small
+organizations, charities, schools, and hospitals; larger organizations
+subscribe at https://pro.reactonrails.com/ ($1,800 per year per organization).
+No license key is needed to run Pro.
 
 ## Usage
 
@@ -98,4 +101,13 @@ See the [full installation guide](https://reactonrails.com/docs/pro/installation
 
 ## License
 
-Commercial software under ShakaCode Trust-Based Commercial Licensing. No license token is required for evaluation, development, testing, or CI/CD. A paid license is required for production deployments. Contact [ShakaCode](https://pro.reactonrails.com/contact) for licensing.
+React on Rails Pro is free in development, test, CI, and staging for everyone,
+and free in production for small organizations (under 10 people, under $1M
+revenue, under $1M raised) and for charities, schools, and hospitals at any
+size. Larger organizations subscribe for production use at
+[pro.reactonrails.com](https://pro.reactonrails.com/): $1,800 per year covers
+the whole organization. No license key is needed to run it; a key from your
+subscription only marks your pages `Licensed`. See
+[the license](https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md).
+
+Questions: [contact@shakacode.com](mailto:contact@shakacode.com).

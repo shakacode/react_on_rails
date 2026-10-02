@@ -803,11 +803,12 @@ RSpec.describe "release.rake helper methods" do
 
     it "states the wrapper boundary and direct-Rake refusal" do
       expect(release_compound_live_boundary_guidance).to eq(<<~GUIDANCE.chomp)
-        Live release uses only `script/release`, which selects the prepared CHANGELOG.md version, acquires the
-        matching release-line lease, and performs fresh authoritative fences before every outward write. Direct
+        Live release uses only `script/release`, which selects the prepared CHANGELOG.md version, supervises one
+        dedicated process group, and verifies its local liveness contract before every outward write. Direct
         live Rake is refused without its private supervisor contract; use `bundle exec rake
-        "release[VERSION,true]"` only for an explicit internal preview. See
-        internal/contributor-info/release-train-runbook.md for automation compatibility and recovery procedures.
+        "release[VERSION,true]"` only for an explicit internal preview. Cross-agent coordination belongs to the
+        Shaka workflow that prepares the release PR, not to the publication command. See
+        internal/contributor-info/release-train-runbook.md for the release sequence and recovery procedures.
       GUIDANCE
 
       expect(github_release_sync_preview_guidance(version: "17.0.0")).to eq(<<~GUIDANCE.chomp)
@@ -18438,7 +18439,8 @@ RSpec.describe "release.rake helper methods" do
       )
       allow(self).to receive(:sh_in_dir_for_release)
       allow(self).to receive(:validate_remote_release_tag_candidate_sha!).with(
-        monorepo_root: "/tmp/repo", tag: "v17.0.0", candidate_sha:, phase: "package publication"
+        monorepo_root: "/tmp/repo", tag: "v17.0.0", candidate_sha:, phase: "package publication",
+        allow_metadata_only_ancestor: true, expected_tag_sha: candidate_sha
       ).and_return(candidate_sha)
 
       push_release_tag_for_candidate!(
@@ -18451,7 +18453,8 @@ RSpec.describe "release.rake helper methods" do
 
       expect(self).to have_received(:fetch_remote_rc_tag!).exactly(3).times
       expect(self).to have_received(:validate_remote_release_tag_candidate_sha!).with(
-        monorepo_root: "/tmp/repo", tag: "v17.0.0", candidate_sha:, phase: "package publication"
+        monorepo_root: "/tmp/repo", tag: "v17.0.0", candidate_sha:, phase: "package publication",
+        allow_metadata_only_ancestor: true, expected_tag_sha: candidate_sha
       )
     end
 
@@ -18917,6 +18920,9 @@ RSpec.describe "release.rake helper methods" do
         "git", "-C", "/tmp/repo", "ls-remote", "--tags", "origin",
         "refs/tags/v17.0.0", "refs/tags/v17.0.0^{}"
       ).and_return(["#{moved_sha}\trefs/tags/v17.0.0\n", success])
+      allow(Open3).to receive(:capture2e).with(
+        "git", "-C", "/tmp/repo", "merge-base", "--is-ancestor", moved_sha, candidate_sha
+      ).and_return(["", instance_double(Process::Status, success?: false, exitstatus: 1)])
       pushed = false
       package_publication_started = false
       allow(self).to receive(:sh_in_dir_for_release) { pushed = true }
@@ -18972,6 +18978,47 @@ RSpec.describe "release.rake helper methods" do
         "git", "-C", "/tmp/repo", "ls-remote", "--tags", "origin",
         "refs/tags/v17.0.0.rc.10", "refs/tags/v17.0.0.rc.10^{}"
       )
+    end
+
+    it "blocks package publication when the remote stable tag moved to another metadata-only ancestor" do
+      allow(self).to receive_messages(
+        remote_release_tag_candidate_sha!: "b" * 40,
+        release_tag_retry_metadata_only_ancestor?: true
+      )
+
+      expect do
+        validate_remote_release_tag_candidate_sha!(
+          monorepo_root: "/tmp/repo", tag: "v17.0.0", candidate_sha: "e" * 40, phase: "package publication",
+          allow_metadata_only_ancestor: true, expected_tag_sha: "a" * 40
+        )
+      end.to raise_error(SystemExit, /Remote release tag v17\.0\.0 moved away from the tag SHA accepted/)
+    end
+
+    it "accepts the pinned remote stable tag for a metadata-only retry" do
+      allow(self).to receive_messages(
+        remote_release_tag_candidate_sha!: "a" * 40,
+        release_tag_retry_metadata_only_ancestor?: true
+      )
+
+      expect do
+        expect(
+          validate_remote_release_tag_candidate_sha!(
+            monorepo_root: "/tmp/repo", tag: "v17.0.0", candidate_sha: "e" * 40, phase: "package publication",
+            allow_metadata_only_ancestor: true, expected_tag_sha: "a" * 40
+          )
+        ).to eq("a" * 40)
+      end.to output(/precedes metadata-only release commits/).to_stdout
+    end
+
+    it "blocks package publication when the local stable tag moved away from the pinned SHA" do
+      allow(self).to receive_messages(current_git_sha!: "e" * 40, validate_release_tag_candidate_sha!: "b" * 40)
+
+      expect do
+        validate_release_candidate_publication_boundary!(
+          monorepo_root: "/tmp/repo", tag: "v17.0.0", candidate_sha: "e" * 40, phase: "package publication",
+          allow_metadata_only_ancestor: true, expected_tag_sha: "a" * 40
+        )
+      end.to raise_error(SystemExit, /Local release tag v17\.0\.0 moved away from the tag SHA accepted/)
     end
 
     it "blocks an existing stable tag before push when HEAD moved after final gates" do
@@ -22741,6 +22788,55 @@ RSpec.describe "release.rake helper methods" do
     end
   end
 
+  describe "#update_execjs_dummy_release_lock_versions!" do
+    let(:lockfile) do
+      <<~LOCK
+        PATH
+          remote: ../../..
+          specs:
+            react_on_rails (17.1.0.rc.0)
+
+        PATH
+          remote: ../..
+          specs:
+            react_on_rails_pro (17.1.0.rc.0)
+              react_on_rails (= 17.1.0.rc.0)
+
+        GEM
+          specs:
+            sqlite3 (1.7.3)
+            sqlite3 (1.7.3-arm64-darwin)
+      LOCK
+    end
+
+    it "updates only the release path-gem versions" do
+      Dir.mktmpdir do |dir|
+        lockfile_path = File.join(dir, "Gemfile.lock")
+        File.write(lockfile_path, lockfile)
+
+        update_execjs_dummy_release_lock_versions!(lockfile_path, "17.1.0.rc.1")
+
+        expect(File.read(lockfile_path)).to eq(lockfile.gsub("17.1.0.rc.0", "17.1.0.rc.1"))
+      end
+    end
+
+    it "fails closed without rewriting when the expected lock entries are ambiguous" do
+      Dir.mktmpdir do |dir|
+        lockfile_path = File.join(dir, "Gemfile.lock")
+        ambiguous_lockfile = lockfile.sub(
+          "    react_on_rails (17.1.0.rc.0)",
+          "    react_on_rails (17.1.0.rc.0)\n    react_on_rails (17.1.0.rc.0)"
+        )
+        File.write(lockfile_path, ambiguous_lockfile)
+
+        expect do
+          update_execjs_dummy_release_lock_versions!(lockfile_path, "17.1.0.rc.1")
+        end.to raise_error(SystemExit, /Expected exactly one react_on_rails path entry/)
+        expect(File.read(lockfile_path)).to eq(ambiguous_lockfile)
+      end
+    end
+  end
+
   describe "execjs-compatible dummy release lock compatibility" do
     let(:repo_root) { File.expand_path("../../..", __dir__) }
     let(:dummy_root) { File.join(repo_root, "react_on_rails_pro", "spec", "execjs-compatible-dummy") }
@@ -23313,6 +23409,110 @@ RSpec.describe "release.rake helper methods" do
       end.to output(/Stable tag v17\.0\.0 already points at local HEAD/).to_stdout
     end
 
+    it "allows a stable release retry when the immutable tag precedes only metadata commits" do
+      allow(self).to receive(:current_git_sha!)
+        .with(monorepo_root, context: "stable release retry")
+        .and_return("headsha")
+      allow(self).to receive(:remote_git_tag_exists?)
+        .with(monorepo_root:, tag: "v17.0.0")
+        .and_return(true)
+      allow(self).to receive(:peeled_git_tag_sha)
+        .with(monorepo_root:, tag: "v17.0.0")
+        .and_return(nil, "tagsha")
+      allow(self).to receive(:fetch_remote_release_tag!)
+        .with(monorepo_root:, tag: "v17.0.0", tag_type: "stable")
+      allow(self).to receive(:release_tag_retry_metadata_only_ancestor?)
+        .with(monorepo_root:, tag_sha: "tagsha", candidate_sha: "headsha")
+        .and_return(true)
+
+      retry_state = nil
+      expect do
+        retry_state = stable_release_retry_state_for_current_head(
+          monorepo_root:,
+          current_branch: "release/17.0.0",
+          current_checkout_version: "17.0.0",
+          target_gem_version: "17.0.0"
+        )
+      end.to output(/v17\.0\.0 precedes metadata-only release commits/).to_stdout
+      expect(retry_state).to eq(:remote_metadata)
+      expect(remote_release_tag_retry?(retry_state)).to be(true)
+      expect(release_tag_at_current_head?(retry_state)).to be(true)
+    end
+
+    it "rejects a stable retry across commits that could change published artifacts" do
+      Dir.mktmpdir("ror-release-retry") do |repo|
+        expect(system("git", "init", "-q", repo)).to be(true)
+        expect(system("git", "-C", repo, "config", "user.email", "release@example.test")).to be(true)
+        expect(system("git", "-C", repo, "config", "user.name", "Release Test")).to be(true)
+        runtime_path = File.join(repo, "react_on_rails/lib/react_on_rails/helper.rb")
+        FileUtils.mkdir_p(File.dirname(runtime_path))
+        File.write(runtime_path, "# helper\nmodule Helper; end\n")
+        expect(system("git", "-C", repo, "add", ".")).to be(true)
+        expect(system("git", "-C", repo, "commit", "-qm", "Release candidate")).to be(true)
+        tag_sha = `git -C #{repo} rev-parse HEAD`.strip
+
+        # A comment-only edit to a shipped Ruby file is CI non-runtime but still changes the gem.
+        File.write(runtime_path, "# helper, revised\nmodule Helper; end\n")
+        expect(system("git", "-C", repo, "commit", "-qam", "Comment-only runtime edit")).to be(true)
+        head_sha = `git -C #{repo} rev-parse HEAD`.strip
+
+        expect(release_tag_retry_metadata_only_ancestor?(monorepo_root: repo, tag_sha:, candidate_sha: head_sha))
+          .to be(false)
+      end
+    end
+
+    def commit_release_test_paths(repo, paths, message)
+      paths.each do |path|
+        full_path = File.join(repo, path)
+        FileUtils.mkdir_p(File.dirname(full_path))
+        File.write(full_path, "#{message}\n")
+      end
+      expect(system("git", "-C", repo, "add", ".")).to be(true)
+      expect(system("git", "-C", repo, "commit", "-qm", message)).to be(true)
+      sha, status = Open3.capture2("git", "-C", repo, "rev-parse", "HEAD")
+      expect(status).to be_success
+      sha.strip
+    end
+
+    def init_release_test_repo(repo)
+      expect(system("git", "init", "-q", repo)).to be(true)
+      expect(system("git", "-C", repo, "config", "user.email", "release@example.test")).to be(true)
+      expect(system("git", "-C", repo, "config", "user.name", "Release Test")).to be(true)
+    end
+
+    release_operational_test_paths = [
+      "AGENTS.md", "internal/contributor-info/releasing.md", "rakelib/release.rake",
+      "react_on_rails/spec/react_on_rails/release_rake_helpers_spec.rb", "script/release"
+    ]
+
+    it "recognizes release-operational commits in a real git ancestry" do
+      Dir.mktmpdir("ror release retry") do |repo|
+        init_release_test_repo(repo)
+        tag_sha = commit_release_test_paths(repo, ["runtime.rb"], "Release candidate")
+        head_sha = commit_release_test_paths(repo, release_operational_test_paths, "Release operation cleanup")
+
+        expect(release_tag_retry_metadata_only_ancestor?(monorepo_root: repo, tag_sha:, candidate_sha: head_sha))
+          .to be(true)
+      end
+    end
+
+    it "classifies operational-only commits as non-runtime for release-branch promotion" do
+      Dir.mktmpdir("ror release promotion") do |repo|
+        init_release_test_repo(repo)
+        commit_release_test_paths(repo, ["runtime.rb"], "Release candidate")
+        operational_sha =
+          commit_release_test_paths(repo, release_operational_test_paths, "Release operation cleanup")
+        runtime_sha = commit_release_test_paths(
+          repo, ["react_on_rails/lib/react_on_rails/helper.rb"], "Runtime change"
+        )
+
+        expect(ReleaseCommitClassifier.promotion_non_runtime_only?(monorepo_root: repo, sha: operational_sha))
+          .to be(true)
+        expect(ReleaseCommitClassifier.promotion_non_runtime_only?(monorepo_root: repo, sha: runtime_sha))
+          .to be(false)
+      end
+    end
+
     it "does not trust a local-only stable tag at HEAD for idempotent retry" do
       allow(self).to receive(:current_git_sha!)
         .with(monorepo_root, context: "stable release retry")
@@ -23515,7 +23715,10 @@ RSpec.describe "release.rake helper methods" do
 
     before do
       allow(self).to receive(:remote_git_tag_exists?).and_call_original
-      allow(self).to receive(:remote_release_tags).and_return(["v17.0.0.rc.3"])
+      allow(self).to receive_messages(
+        release_tag_retry_operational_commit?: false,
+        remote_release_tags: ["v17.0.0.rc.3"]
+      )
       allow(self)
         .to receive(:remote_git_tag_exists?)
         .with(monorepo_root:, tag: "v17.0.0.rc.3")
@@ -24245,10 +24448,9 @@ RSpec.describe "release.rake helper methods" do
       allow(self).to receive(:start_release_line!)
       expected_output = <<~OUTPUT.chomp
         ⚠️ LEGACY LIVE RELEASE-LINE PATH
-        Answering yes will create and push release/17.0.0 without the release-line lease.
+        Answering yes will create and push release/17.0.0 outside the Shaka PR workflow.
         This remains technically possible only for backward compatibility and violates current repository release policy.
-        Operators and agents must answer no and follow the individually guarded procedure in
-        internal/contributor-info/release-train-runbook.md.
+        Operators and agents must answer no and prepare the release branch through a reviewed PR.
         Start the 17.0.0 release line now? [y/N]:
       OUTPUT
 

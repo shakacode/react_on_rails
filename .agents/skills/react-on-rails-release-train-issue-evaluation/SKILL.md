@@ -91,8 +91,9 @@ source PR per release backport PR:
 ## Workflow
 
 1. Refresh repo context: fetch and prune `origin/main` and the target release
-   branch, then run `.agents/bin/agent-workflow-seam-doctor`. Use the refreshed
-   release ref for ancestry, prior-backport, and supersession checks.
+   branch, then run
+   `shaka seam check --root "$(pwd)" --ref "$(git rev-parse origin/main)"`.
+   Use the refreshed release ref for ancestry, prior-backport, and supersession checks.
 2. Resolve candidates from live GitHub. For strict 48-hour windows, search by date then timestamp-filter locally because GitHub search is date-granular.
 3. Exclude started lanes. For an ordinary issue candidate, an assignee,
    linked/open implementation PR, private claim/heartbeat/branch, or

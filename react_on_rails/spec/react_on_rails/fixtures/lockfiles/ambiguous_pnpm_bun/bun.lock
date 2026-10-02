@@ -1,0 +1,16 @@
+// Synthesized after the structure bun >= 1.2 writes (lockfileVersion 1).
+// bun.lock is JSONC: comments and trailing commas are permitted.
+{
+  "lockfileVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "t",
+      "dependencies": {
+        "react-on-rails": "^16.1.1",
+      },
+    },
+  },
+  "packages": {
+    "react-on-rails": ["react-on-rails@16.5.0", "", { "peerDependencies": { "react": ">= 16", "react-dom": ">= 16" } }, "sha512-aaaaaaaaaaaaaaaaaa"],
+  }
+}

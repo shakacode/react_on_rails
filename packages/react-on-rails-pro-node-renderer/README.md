@@ -103,7 +103,7 @@ All options can be set via the config object or environment variables. Config ob
 | `supportModules`                       | `RENDERER_SUPPORT_MODULES`                          | `false`                     | Enable Node.js globals in VM context (`Buffer`, `process`, `setTimeout`, etc.)                            |
 | `workersCount`                         | `RENDERER_WORKERS_COUNT`                            | CPU count - 1               | Number of worker processes. Legacy `NODE_RENDERER_CONCURRENCY` is still supported in generated templates. |
 | `password`                             | `RENDERER_PASSWORD`                                 | (none)                      | Shared secret for Rails authentication                                                                    |
-| `licenseToken`                         | `REACT_ON_RAILS_PRO_LICENSE`                        | (none)                      | Paid React on Rails Pro license JWT                                                                       |
+| `licenseToken`                         | `REACT_ON_RAILS_PRO_LICENSE`                        | (none)                      | Optional license key from your subscription                                                               |
 | `stubTimers`                           | `RENDERER_STUB_TIMERS`                              | `true`                      | Stub timer functions during SSR                                                                           |
 | `allWorkersRestartInterval`            | `RENDERER_ALL_WORKERS_RESTART_INTERVAL`             | (disabled)                  | Minutes between restarting all workers                                                                    |
 | `delayBetweenIndividualWorkerRestarts` | `RENDERER_DELAY_BETWEEN_INDIVIDUAL_WORKER_RESTARTS` | (disabled)                  | Minutes between each worker restart                                                                       |
@@ -176,4 +176,13 @@ Rails App
 
 ## License
 
-Commercial software. No license required for evaluation, development, testing, or CI/CD. A paid license is required for production deployments. Contact [justin@shakacode.com](mailto:justin@shakacode.com) for licensing.
+React on Rails Pro is free in development, test, CI, and staging for everyone,
+and free in production for small organizations (under 10 people, under $1M
+revenue, under $1M raised) and for charities, schools, and hospitals at any
+size. Larger organizations subscribe for production use at
+[pro.reactonrails.com](https://pro.reactonrails.com/): $1,800 per year covers
+the whole organization. No license key is needed to run it; a key from your
+subscription only marks your pages `Licensed`. See
+[the license](https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md).
+
+Questions: [contact@shakacode.com](mailto:contact@shakacode.com).

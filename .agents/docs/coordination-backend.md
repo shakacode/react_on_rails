@@ -1,8 +1,9 @@
 # Coordination Backend
 
 Shared workflow skills do not require one specific coordination backend. Each
-consumer repo declares its backend in `.agents/agent-workflow.yml` under
-`coordination_backend`.
+consumer repo declares its backend in `AGENTS.md` (this repository: private
+`agent-coord` via `AGENT_COORD_API_URL` and `AGENT_COORD_API_TOKEN`, with the
+public claim-comment fallback in `.agents/workflows/pr-processing.md`).
 
 Use this page as the canonical vocabulary for private coordination, public
 claim-comment fallback, no-backend mode, and `UNKNOWN` coordination state.

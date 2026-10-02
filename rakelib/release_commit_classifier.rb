@@ -28,6 +28,13 @@ module ReleaseCommitClassifier
     "react_on_rails_pro/spec/dummy/Gemfile.lock",
     "react_on_rails_pro/spec/execjs-compatible-dummy/Gemfile.lock"
   ].freeze
+  RELEASE_RETRY_OPERATIONAL_PATH_PREFIXES = [
+    "internal/contributor-info/",
+    "rakelib/release",
+    "react_on_rails/spec/react_on_rails/release_",
+    "script/release"
+  ].freeze
+  RELEASE_RETRY_OPERATIONAL_PATHS = ["AGENTS.md"].freeze
 
   # Shared with the live Rake helpers so preview and publishing guards cannot drift.
   module Promotion
@@ -42,7 +49,7 @@ module ReleaseCommitClassifier
       return false if metadata_touched.nil?
       return release_finalization_metadata_commit?(monorepo_root:, sha:) if metadata_touched
 
-      commit_non_runtime_only?(monorepo_root:, sha:)
+      commit_non_runtime_only?(monorepo_root:, sha:) || release_tag_retry_operational_commit?(monorepo_root:, sha:)
     end
 
     def release_finalization_metadata_touched(monorepo_root:, sha:)
@@ -57,6 +64,23 @@ module ReleaseCommitClassifier
       paths.any? { |path| release_finalization_metadata_paths.include?(path) }
     rescue StandardError
       nil
+    end
+
+    def release_tag_retry_operational_commit?(monorepo_root:, sha:)
+      output, status = Open3.capture2e(
+        "git", "-C", monorepo_root, "diff-tree", "--no-commit-id", "--name-only", "-r", "#{sha}^", sha
+      )
+      return false unless status.success?
+
+      paths = output.lines.map(&:strip).reject(&:empty?)
+      paths.any? && paths.all? { |path| release_tag_retry_operational_path?(path) }
+    rescue StandardError
+      false
+    end
+
+    def release_tag_retry_operational_path?(path)
+      RELEASE_RETRY_OPERATIONAL_PATHS.include?(path) ||
+        RELEASE_RETRY_OPERATIONAL_PATH_PREFIXES.any? { |prefix| path.start_with?(prefix) }
     end
 
     def release_finalization_metadata_commit?(monorepo_root:, sha:)

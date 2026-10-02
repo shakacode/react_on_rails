@@ -39,9 +39,7 @@ do not require an RC bump unless someone explicitly chooses to work on them.
 | `shakacode/react-on-rails-demo-ssr-hmr`                    | Shelved because it is very outdated. Follow-up: `shakacode/react-on-rails-demo-ssr-hmr#77`.                   | Modernize setup, dependencies, CI, and SSR/HMR smoke commands; then decide whether to promote it back to hard gate. |
 | `shakacode/react-on-rails-example-migration`               | Shelved; value for the current final gate is uncertain.                                                       | Promote only if migration examples become a stated final-release gate.                                              |
 | `shakacode/react-on-rails-example-open-flights`            | Shelved; useful reference, but not a current blocker.                                                         | Promote only after it has durable smoke coverage and maintainers want migration references to block final.          |
-| `shakacode/react-on-rails-demo-v16-bundle-splitting`       | Shelved; inherited from an older RC spec, not part of the current public-example gate.                        | Promote only if it becomes a current major example again.                                                           |
 | `shakacode/react_on_rails-demo-octochangelog-on-rails-pro` | Non-gating for the current plan; useful Pro/RSC signal but not part of the approved public-example hard gate. | Promote only if maintainers want this Pro demo to block final releases again.                                       |
-| `shakacode/react-on-rails-rsc-demo`                        | Retired and archived; it mainly represented a manual generator run.                                           | Do not promote. Validate this surface through `react_on_rails` generator/install smoke instead.                     |
 
 ## Tracking Issue Lifecycle
 
@@ -155,7 +153,7 @@ The scheduled/default stable versions come from `standing_health.stable_release`
 `standing_health.rsc_version` in the manifest. Pass explicit version flags only for a manual
 historical or forward-looking probe.
 Only explicitly public standing-health entries are queried. Active public targets gate the
-standing-health result; soft-track and archived targets are report-only. The evidence records
+standing-health result; soft-track targets are report-only. The evidence records
 exact-default-head currency, CI, reusable-smoke adoption, review-app capability, staleness, and
 Dependabot v1 conformance. It does not grant candidate promotion or mutate any demo.
 
@@ -538,18 +536,15 @@ Lane 4a COMPLETE; and Lane 4b CLEAN artifact coherence. Verify reused evidence's
 and freshness. On missing, prerelease, incoherent, stale, or UNKNOWN evidence, stop without changing
 repos. Tracker: shakacode/react_on_rails#3823.
 
-Own only the five soft-track repos in internal/contributor-info/demo-fleet.yml:
+Own only the four soft-track repos in internal/contributor-info/demo-fleet.yml:
 - shakacode/react_on_rails-demo-octochangelog-on-rails-pro
 - shakacode/react-on-rails-demo-ssr-hmr
-- shakacode/react-on-rails-demo-v16-bundle-splitting (report-only while archived)
 - shakacode/react-on-rails-example-open-flights
 - shakacode/react-on-rails-example-migration
 
 Use one claimed worktree and worker per mutable repo. Workers read target AGENTS.md, verify manifest
 data, update only consumed packages/lockfiles, install/build/test/smoke, open or update PRs, request
-required hosted CI, and address actionable review. Treat the archived v16 bundle-splitting repo as
-read-only: inspect and report whether a refresh is useful, but create no claim/worktree/branch/PR or
-CI/review request unless a maintainer first unarchives it. Use Terra/high for mechanical work,
+required hosted CI, and address actionable review. Use Terra/high for mechanical work,
 Sol/high for uncertain work/QA, and Sol/xhigh only after an evidenced MODEL_ESCALATION_REQUEST. A
 fresh Sol/xhigh checker audits the results.
 

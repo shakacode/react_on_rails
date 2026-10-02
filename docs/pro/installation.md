@@ -1,10 +1,13 @@
 # Installation
 
-React on Rails Pro packages are published publicly on npmjs.org and RubyGems.org. A **paid license is required for production deployments only**.
-
-**ShakaCode Trust-Based Commercial Licensing:** Try Pro freely in development, test, CI/CD, and staging. No token is required to evaluate. If no license is configured, Pro keeps running in unlicensed mode and logs license status instead of blocking your app.
-
-When you are ready for production, visit [Pro pricing and sign up](https://pro.reactonrails.com/) or contact [justin@shakacode.com](mailto:justin@shakacode.com) for a license.
+React on Rails Pro is free in development, test, CI, and staging for everyone,
+and free in production for small organizations (under 10 people, under $1M
+revenue, under $1M raised) and for charities, schools, and hospitals at any
+size. Larger organizations subscribe for production use at
+[pro.reactonrails.com](https://pro.reactonrails.com/): $1,800 per year covers
+the whole organization. No license key is needed to run it; a key from your
+subscription only marks your pages `Licensed`. See
+[the license](https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md).
 
 **Upgrading from GitHub Packages?** See the [Upgrading Guide](./updating.md) for migration instructions.
 
@@ -58,7 +61,7 @@ Customized, unknown, unsupported historical, incomplete, or ambiguous pairs are 
 
 ## After Running the Generator
 
-Run a quick validation. For evaluation and non-production deployments, you can skip license setup.
+Run a quick validation. A license key is optional in every environment.
 
 ```bash
 bundle exec rails react_on_rails:doctor
@@ -72,14 +75,14 @@ If port 3000 is already in use:
 PORT=3001 bin/dev
 ```
 
-For production deployments, configure the license token. This environment-variable form remains supported:
+If your organization subscribes, you can configure its optional license key. This environment-variable form remains supported:
 
 ```bash
 export REACT_ON_RAILS_PRO_LICENSE="your-license-token-here"
 ```
 
-See [License Configuration](#license-configuration-production-only) below for other options and
-[Pro pricing and sign up](https://pro.reactonrails.com/) when you need a production license.
+See [License Key](#license-key-optional) below for other options and
+[pro.reactonrails.com](https://pro.reactonrails.com/) to subscribe.
 
 ## Adding React Server Components
 
@@ -134,14 +137,20 @@ Or install directly:
 gem install react_on_rails_pro --version "<version>"
 ```
 
-## License Configuration (Production Only)
+## License Key (Optional)
 
-React on Rails Pro uses **ShakaCode Trust-Based Commercial Licensing** to simplify evaluation and development. A license token is optional for evaluation, local development, test environments, CI/CD pipelines, and staging/non-production deployments.
+The license key is optional in every environment. It identifies your
+organization, marks rendered pages `Licensed`, and changes the license status
+in logs. Without a key, Pro keeps running and rendered pages read `UNLICENSED`.
 
-If no license is configured, the app continues running in unlicensed mode and logs license status instead of blocking startup. In production, that log message is a warning because a paid license is required; in non-production environments, it is informational.
+Production without a key is fine for the free uses and for organizations below
+the free line. Larger organizations subscribe at
+[pro.reactonrails.com](https://pro.reactonrails.com/) and receive a key with
+their subscription.
 
-**For production deployments**, provide your license token to Rails through application configuration or the
-environment. Explicit nonblank configuration takes precedence over the environment variable:
+To configure a key, provide it to Rails through application configuration or
+the environment. Explicit nonblank configuration takes precedence over the
+environment variable:
 
 ```ruby
 # config/initializers/react_on_rails_pro.rb
@@ -184,18 +193,21 @@ License validation happens in these places:
   single-process mode (`workersCount: 0`).
 - The browser receives `railsContext.rorPro` as a Pro-installed signal only; it does not validate the license.
 
-A missing, expired, or invalid license does not prevent Rails or the node renderer from starting. In production, license
-issues are logged as warnings, and Rails includes an HTML attribution comment indicating the license state.
+A missing, expired, or invalid license does not prevent Rails or the node renderer from starting. In production, that
+log message is a warning that reminds larger organizations to subscribe. Rails includes an HTML attribution comment
+indicating the license state.
 
-### Verify License Compliance
+### Check Subscription Key Status
 
-Pro validates licenses **offline** at boot, and a missing, invalid, or expired license never crashes the app — Rails and the node renderer simply log the issue. The recommended way to catch license problems before they reach production is the built-in rake task, which exits non-zero when the license is missing, invalid, or expired:
+Pro checks configured keys **offline** at boot, and a missing, invalid, or expired key never crashes the app. Rails and
+the node renderer simply log the status. Subscribing organizations can use the built-in rake task to catch key problems
+before deployment. It exits non-zero when the key is missing, invalid, or expired:
 
 ```bash
 RAILS_ENV=production bundle exec rake react_on_rails_pro:verify_license
 ```
 
-Add it to your deploy pipeline as a one-line gate:
+If your organization subscribes, you can add it to your deploy pipeline as a one-line gate:
 
 ```yaml
 - name: Verify React on Rails Pro license

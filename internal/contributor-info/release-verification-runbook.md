@@ -123,7 +123,7 @@ review-app capability uses the exact `standing_health.review_app_workflow` publi
 cleanup, delete, help, and promotion workflows never substitute for that path. GitHub archival of
 an active target blocks as manifest drift. Dependabot requires one enabled weekly root entry per
 required ecosystem; separate disabled, non-root, or differently scheduled entries cannot combine
-into a pass. Keep soft-track and archived findings report-only. This pack is evidence for fleet
+into a pass. Keep soft-track findings report-only. This pack is evidence for fleet
 currency and capability drift; it is not a replacement for the candidate ledger or a
 release-promotion signal.
 
@@ -145,7 +145,8 @@ First read `AGENTS.md`, `internal/contributor-info/demo-fleet.yml`,
 `internal/contributor-info/release-verification-runbook.md`, and `CHANGELOG.md`. If
 `internal/contributor-info/demo-fleet-design.md` exists, read it as historical design context only;
 do not block the fleet update if that draft design file has already been removed. Run
-`.agents/bin/agent-workflow-seam-doctor` before relying on repo workflow policy. If API tokens
+`shaka seam check --root "$(pwd)" --ref "$(git rev-parse origin/main)"` before relying on repo
+workflow policy. If API tokens
 appear missing, follow `AGENTS.md` for any trusted, session-provided token-loading helper; do not run
 arbitrary `PATH` matches or unreviewed scripts.
 

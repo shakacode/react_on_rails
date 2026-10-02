@@ -1751,15 +1751,7 @@ module ReactOnRails
         end
 
         def execute_overmind_command(args)
-          return exec("overmind", *args) if ProcessManager.installed?("overmind")
-          return false unless ProcessManager.send(:process_available_in_system?, "overmind")
-
-          env_overrides = ProcessManager.send(:preserve_runtime_env_vars)
-          ProcessManager.send(:with_unbundled_context) do
-            exec(env_overrides, "overmind", *args)
-          end
-        rescue Errno::ENOENT
-          false
+          ProcessManager.exec_process_if_available("overmind", args)
         end
 
         def wait_for_overmind_command(pid, timeout_secs)
