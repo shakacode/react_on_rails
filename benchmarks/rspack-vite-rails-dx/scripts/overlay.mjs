@@ -15,6 +15,7 @@ import {
   replaceBenchmarkMarker,
   runtimeErrorMarker,
   sourceLocationVisible,
+  sourceLinkPattern,
 } from './overlay-helpers.mjs';
 import { prepareWorkspaces, removeWorkspaces } from './starter-workspace.mjs';
 
@@ -181,7 +182,7 @@ async function verifyClickToEditor(session, tool, expectedLine, expectedColumn) 
       : session.page
           .locator('vite-error-overlay')
           .locator('.file-link')
-          .filter({ hasText: path.basename(session.workspace.messagePath) })
+          .filter({ hasText: sourceLinkPattern(session.workspace.relativeMessagePath) })
           .first();
   try {
     await target.waitFor({ state: 'visible', timeout: 5_000 });

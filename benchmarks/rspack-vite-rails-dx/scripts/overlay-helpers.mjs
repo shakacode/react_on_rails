@@ -27,21 +27,19 @@ export function addRuntimeError(source, tool) {
   };
 }
 
+export function sourceLinkPattern(relativePath) {
+  const escaped = relativePath.replaceAll('\\', '/').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(?:^|[\\s/"'(])${escaped}(?=[:\\s)"']|$)`);
+}
+
 export function sourceLocationVisible(text, relativePath, line) {
   const normalized = text.replaceAll('\\', '/');
-  const normalizedPath = relativePath.replaceAll('\\', '/');
-  const escapedPath = normalizedPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const escapedLine = String(line).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  if (new RegExp(`${escapedPath}:${escapedLine}:\\d+`).test(normalized)) return true;
+  const pathPattern = sourceLinkPattern(relativePath).source;
+  if (new RegExp(`${pathPattern}:${line}:\\d+(?!\\d)`).test(normalized)) return true;
 
-  // Rspack renders the source path in the error heading and its line/column in
-  // the immediately following SWC code frame instead of one contiguous token.
-  const pathPattern = new RegExp(escapedPath, 'g');
-  const framePattern = new RegExp(`(?:╭─)?\\[${escapedLine}:\\d+\\]`);
-  return [...normalized.matchAll(pathPattern)].some(({ index }) => {
-    const errorTail = normalized.slice(index + normalizedPath.length, index + normalizedPath.length + 400);
-    return framePattern.test(errorTail);
-  });
+  // Tie the SWC frame to its source heading, rather than a nearby arbitrary frame.
+  const heading = '(?:\\s*|\\s+× Module build failed \\(from builtin:swc-loader\\):[^\\r\\n]{0,300}?)';
+  return new RegExp(`${pathPattern}${heading}╭─\\[${line}:\\d+\\]`).test(normalized);
 }
 
 export function parseEditorInvocation(invocation, workspaceDirectory, expectedSourcePath) {

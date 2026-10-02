@@ -9,6 +9,7 @@ import {
   replaceBenchmarkMarker,
   runtimeErrorMarker,
   sourceLocationVisible,
+  sourceLinkPattern,
 } from './overlay-helpers.mjs';
 
 test('compile probe reports the appended source line', () => {
@@ -38,6 +39,22 @@ test('source location accepts an original path and line but rejects a generated 
     sourceLocationVisible(
       `${relativePath} mentioned without a frame; ${'x'.repeat(450)} ${relativePath} ╭─[17:9]`,
       relativePath,
+      17,
+    ),
+    true,
+  );
+});
+
+test('source location rejects path substrings and unrelated code frames', () => {
+  const source = 'app/frontend/pages/inertia_example/index.tsx';
+  assert.equal(sourceLocationVisible(`other-${source}:17:9`, source, 17), false);
+  assert.equal(sourceLocationVisible(`${source}.backup:17:9`, source, 17), false);
+  assert.equal(sourceLocationVisible(`${source} mentioned; unrelated.js ╭─[17:9]`, source, 17), false);
+  assert.equal(sourceLocationVisible(`/workspace/${source}:17:9`, source, 17), true);
+  assert.equal(
+    sourceLocationVisible(
+      `./${source} × Module build failed (from builtin:swc-loader): ╰─▶ × Syntax Error: Expression expected ╭─[17:9]`,
+      source,
       17,
     ),
     true,
@@ -103,4 +120,11 @@ test('report renders all measured matrix cells', () => {
     },
   };
   assert.match(buildOverlayReport(raw), /Inertia Rails \+ Vite \| PASS \| FAIL \| PASS \| PASS/);
+});
+
+test('editor target uses the full source path rather than a shared basename', () => {
+  const pattern = sourceLinkPattern('app/frontend/pages/inertia_example/index.tsx');
+  assert.equal(pattern.test('file:///workspace/node_modules/example/index.tsx:17:9'), false);
+  assert.equal(pattern.test('app/frontend/pages/inertia_example/index.tsx.backup:17:9'), false);
+  assert.equal(pattern.test('file:///workspace/app/frontend/pages/inertia_example/index.tsx:17:9'), true);
 });
