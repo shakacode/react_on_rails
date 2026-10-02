@@ -16,6 +16,10 @@
 require "rails_helper"
 
 describe "TanStack Router HTTP responses" do
+  before(:each, :js) do
+    page.driver.browser.logs.get(:browser)
+  end
+
   describe "real Rails controller responses", :rack_test do
     it "preserves the loader redirect status and Location" do
       page.driver.get("/tanstack_router_async/redirect")
@@ -94,6 +98,19 @@ describe "TanStack Router HTTP responses" do
   end
 
   describe "cached browser hydration", :caching, :js do
+    around do |example|
+      app_host = Capybara.app_host
+      run_server = Capybara.run_server
+      begin
+        Capybara.app_host = nil
+        Capybara.run_server = true
+        Capybara.using_session(:tanstack_http_cache) { example.run }
+      ensure
+        Capybara.app_host = app_host
+        Capybara.run_server = run_server
+      end
+    end
+
     it "hydrates cached not-found markup before client navigation" do
       ssr_updates = Array.new(3) do
         visit "/tanstack_router_async/unknown?cached=1"
