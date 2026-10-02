@@ -53,7 +53,7 @@ test('source location rejects path substrings and unrelated code frames', () => 
   assert.equal(sourceLocationVisible(`/workspace/${source}:17:9`, source, 17), true);
   assert.equal(
     sourceLocationVisible(
-      `./${source} × Module build failed (from builtin:swc-loader): ╰─▶ × Syntax Error: Expression expected ╭─[17:9]`,
+      `./${source} × Module build failed (from builtin:swc-loader):\n ╰─▶ × Syntax Error: Expression expected\n ╭─[17:9]`,
       source,
       17,
     ),

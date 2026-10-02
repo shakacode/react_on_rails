@@ -38,7 +38,8 @@ export function sourceLocationVisible(text, relativePath, line) {
   if (new RegExp(`${pathPattern}:${line}:\\d+(?!\\d)`).test(normalized)) return true;
 
   // Tie the SWC frame to its source heading, rather than a nearby arbitrary frame.
-  const heading = '(?:\\s*|\\s+× Module build failed \\(from builtin:swc-loader\\):[^\\r\\n]{0,300}?)';
+  const heading =
+    '(?:\\s*|\\s+× Module build failed \\(from builtin:swc-loader\\):\\s*╰─▶\\s*× Syntax Error: Expression expected\\s*)';
   return new RegExp(`${pathPattern}${heading}╭─\\[${line}:\\d+\\]`).test(normalized);
 }
 

@@ -218,19 +218,16 @@ async function stopProcess(child) {
 async function stopResidualProcesses(nonce) {
   if (process.platform === 'win32') return;
   let groups = currentResidualProcessGroups(nonce);
-  for (const group of groups) signalProcess(-group, 'SIGTERM');
-  const deadline = Date.now() + 5_000;
-  while (groups.length > 0 && Date.now() < deadline) {
-    await delay(50);
-    groups = currentResidualProcessGroups(nonce);
+  for (const signal of ['SIGTERM', 'SIGKILL']) {
+    for (const group of groups) signalProcess(-group, signal);
+    const deadline = Date.now() + 5_000;
+    while (groups.length > 0 && Date.now() < deadline) {
+      await delay(50);
+      groups = currentResidualProcessGroups(nonce);
+    }
+    if (groups.length === 0) return;
   }
-  for (const group of groups) signalProcess(-group, 'SIGKILL');
-  if (groups.length > 0) {
-    await delay(50);
-    const survivors = currentResidualProcessGroups(nonce);
-    if (survivors.length > 0)
-      throw new Error(`benchmark session processes did not exit: ${survivors.join(', ')}`);
-  }
+  throw new Error(`benchmark session processes did not exit: ${groups.join(', ')}`);
 }
 
 function currentResidualProcessGroups(nonce) {
@@ -283,4 +280,17 @@ function commandOutput(command, args, cwd) {
 
 function round(value) {
   return Math.round(value * 10) / 10;
+}
+
+export async function cleanupRun(session, browser, removeWorkspaces) {
+  const errors = [];
+  for (const cleanup of [() => session?.stop(), () => browser?.close(), removeWorkspaces]) {
+    try {
+      await cleanup();
+    } catch (error) {
+      errors.push(error);
+    }
+  }
+  if (errors.length === 1) throw errors[0];
+  if (errors.length > 1) throw new AggregateError(errors, 'benchmark cleanup failed');
 }

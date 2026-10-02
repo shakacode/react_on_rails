@@ -4,7 +4,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { format as formatOutput } from 'prettier';
-import { captureEnvironment, startApp } from './app-session.mjs';
+import { captureEnvironment, cleanupRun, startApp } from './app-session.mjs';
 import { assertNoLocalPaths, redactLocalPaths } from './local-paths.mjs';
 import {
   addCompileError,
@@ -60,9 +60,7 @@ try {
   browser = await chromium.launch({ headless: true });
   for (const tool of tools) raw.results[tool] = await verifyTool(tool);
 } finally {
-  await activeSession?.stop();
-  await browser?.close();
-  await removeWorkspaces(root);
+  await cleanupRun(activeSession, browser, () => removeWorkspaces(root));
 }
 
 const safeRaw = JSON.parse(redactLocalPaths(JSON.stringify(raw), rootAliases));

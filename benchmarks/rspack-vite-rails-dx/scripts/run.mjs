@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { format as formatOutput } from 'prettier';
-import { captureEnvironment, startApp } from './app-session.mjs';
+import { captureEnvironment, cleanupRun, startApp } from './app-session.mjs';
 import { prepareWorkspaces, removeWorkspaces } from './starter-workspace.mjs';
 import { buildSummary } from './stats.mjs';
 
@@ -85,9 +85,7 @@ try {
     raw.generated_config_audit[tool] = await inspectConfig(tool);
   }
 } finally {
-  await activeSession?.stop();
-  await browser?.close();
-  await removeWorkspaces(root);
+  await cleanupRun(activeSession, browser, () => removeWorkspaces(root));
 }
 
 raw.summary = buildSummary(raw.raw_samples_ms);
