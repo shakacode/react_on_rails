@@ -116,3 +116,7 @@ export async function waitForSourceOverlay(readText, marker, sourcePath, line, t
   }
   return lastMatchingText;
 }
+
+export function restorationVisible(healthyMarkerVisible, overlayText) {
+  return healthyMarkerVisible && overlayText.trim() === '';
+}

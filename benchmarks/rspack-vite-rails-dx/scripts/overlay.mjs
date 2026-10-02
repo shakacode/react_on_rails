@@ -13,6 +13,7 @@ import {
   compileErrorMarker,
   parseEditorInvocation,
   replaceBenchmarkMarker,
+  restorationVisible,
   runtimeErrorMarker,
   sourceLocationVisible,
   sourceLinkPattern,
@@ -92,7 +93,7 @@ async function verifyTool(tool) {
             expected_source: `${session.workspace.relativeMessagePath}:${compile.line}:${compile.column}`,
             evidence: 'Compile overlay did not expose verified source evidence.',
           };
-    const restoration = await restoreHealthy(session, tool, healthySource, compileErrorMarker);
+    const restoration = await restoreHealthy(session, tool, healthySource);
     return { compileEvidence, clickEvidence, restoration };
   });
 
@@ -101,7 +102,7 @@ async function verifyTool(tool) {
     const runtime = addRuntimeError(healthySource, tool);
     await session.workspace.writeSource(runtime.source);
     const runtimeEvidence = await observeOverlay(session, tool, runtimeErrorMarker, runtime.line);
-    const restoration = await restoreHealthy(session, tool, healthySource, runtimeErrorMarker);
+    const restoration = await restoreHealthy(session, tool, healthySource);
     return { runtimeEvidence, restoration };
   });
 
@@ -238,7 +239,7 @@ async function verifyClickToEditor(session, tool, expectedLine, expectedColumn) 
   }
 }
 
-async function restoreHealthy(session, tool, healthySource, marker) {
+async function restoreHealthy(session, tool, healthySource) {
   const recoveryMarker = `recovered-${tool}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   await session.workspace.writeSource(replaceBenchmarkMarker(healthySource, recoveryMarker));
   const deadline = Date.now() + 30_000;
@@ -251,7 +252,7 @@ async function restoreHealthy(session, tool, healthySource, marker) {
       .filter({ hasText: recoveryMarker })
       .isVisible()
       .catch(() => false);
-    if (!lastOverlay.includes(marker) && lastReady) return { status: 'PASS', health_marker_observed: true };
+    if (restorationVisible(lastReady, lastOverlay)) return { status: 'PASS', health_marker_observed: true };
     await delay(100);
   }
   return {

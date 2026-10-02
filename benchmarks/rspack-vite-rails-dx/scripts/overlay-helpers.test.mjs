@@ -7,6 +7,7 @@ import {
   compileErrorMarker,
   parseEditorInvocation,
   replaceBenchmarkMarker,
+  restorationVisible,
   runtimeErrorMarker,
   sourceLocationVisible,
   sourceLinkPattern,
@@ -158,4 +159,12 @@ test('overlay polling retains matching evidence when its source frame never arri
     0,
   );
   assert.equal(text, compileErrorMarker);
+});
+
+test('restoration requires a healthy source marker and a cleared overlay', () => {
+  assert.equal(restorationVisible(true, ''), true);
+  assert.equal(restorationVisible(true, '  '), true);
+  assert.equal(restorationVisible(false, ''), false);
+  assert.equal(restorationVisible(true, compileErrorMarker), false);
+  assert.equal(restorationVisible(true, 'a different build error'), false);
 });
