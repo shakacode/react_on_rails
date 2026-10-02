@@ -62,7 +62,7 @@ export default class RefetchRenderBoundary extends Component<
 
   componentDidCatch(error: Error) {
     const { recovery, onRecover } = this.props;
-    if (recovery?.active && recovery.canRecover()) {
+    if (recovery?.canRecover()) {
       recovery.recover();
       // A sibling may have restored this shared entry first. Still notify the
       // initiating handle; its version guards exclude unrelated/stale routes.
@@ -73,10 +73,7 @@ export default class RefetchRenderBoundary extends Component<
   render() {
     const { promise, recovery } = this.props;
     const { error } = this.state;
-    if (error) {
-      if (!recovery?.active || !recovery.canRecover()) throw error;
-      return <PromiseWrapper promise={recovery.fallback} />;
-    }
-    return <PromiseWrapper promise={promise} />;
+    if (error && !recovery?.canRecover()) throw error;
+    return <PromiseWrapper promise={error && recovery ? recovery.fallback : promise} />;
   }
 }

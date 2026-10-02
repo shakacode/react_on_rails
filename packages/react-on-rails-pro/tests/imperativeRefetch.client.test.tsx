@@ -665,7 +665,7 @@ class CapturingErrorBoundary extends React.Component<
       const candidate = <ClientCard />;
       setupSequencedFetcher([
         <span>Old card</span>,
-        stream !== 'none' ? trackRSCStreamCompletion(candidate, completion) : candidate,
+        stream !== 'none' ? trackRSCStreamCompletion(candidate, { completion, hasErrors: false }) : candidate,
       ]);
       const ref = React.createRef<RSCRouteHandle>();
       const onError = jest.fn();
@@ -807,7 +807,7 @@ class CapturingErrorBoundary extends React.Component<
       });
       const candidate = trackRSCStreamCompletion(
         primitive ? 'Streamed candidate' : <span>Streamed candidate</span>,
-        completion,
+        { completion, hasErrors: false },
       );
       const BrokenBoundary = (): React.ReactNode => {
         throw new Error('later render failure');
@@ -841,7 +841,7 @@ class CapturingErrorBoundary extends React.Component<
   it.each(['pending', 'errored'])('preserves initial-root recovery with a %s stream', async (state) => {
     process.env.NODE_ENV = 'production';
     const completion = state === 'pending' ? new Promise<boolean>(() => {}) : Promise.resolve(false);
-    const initial = trackRSCStreamCompletion(<span>Initial content</span>, completion);
+    const initial = trackRSCStreamCompletion(<span>Initial content</span>, { completion, hasErrors: false });
     const error = new Error('HTTP failure');
     setupSequencedFetcher([initial, rejectWith(error), rejectWith(error), <span>Recovered content</span>]);
     const ref = React.createRef<RSCRouteHandle>();

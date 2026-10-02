@@ -91,6 +91,14 @@ describe('fetchRSC HTTP responses', () => {
     jest.resetModules();
   });
 
+  it.each(['text', 7, null, false, undefined])(
+    'leaves untracked scalar roots (%j) untracked',
+    async (root) => {
+      const { getRSCStreamState } = await import('../src/RSCStreamCompletion.ts');
+      expect(getRSCStreamState(root)).toBeUndefined();
+    },
+  );
+
   it.each(['text', 7, null, false])('tracks completion for a scalar HTTP root (%j)', async (root) => {
     const { fetchRSC } = await loadClientModule(jest.fn(() => Promise.resolve(root)));
     const { getRSCStreamState } = await import('../src/RSCStreamCompletion.ts');
@@ -131,7 +139,7 @@ describe('fetchRSC HTTP responses', () => {
       controller.enqueue(encoder.encode(tail));
       controller.close();
       await expect(getRSCStreamState(payload)?.completion).resolves.toBe(false);
-      expect(getRSCStreamState(payload)?.hasErrors()).toBe(true);
+      expect(getRSCStreamState(payload)?.hasErrors).toBe(true);
     },
   );
 
@@ -181,9 +189,46 @@ describe('fetchRSC HTTP responses', () => {
         controller.close();
       }
       await expect(completion).resolves.toBe(successful);
-      expect(getRSCStreamState(payload)?.hasErrors()).toBe(!successful);
+      expect(getRSCStreamState(payload)?.hasErrors).toBe(!successful);
     },
   );
+
+  it('does not certify a failed stream when error logging throws', async () => {
+    let controller!: ReadableStreamDefaultController<Uint8Array>;
+    let decodedStream!: Promise<string>;
+    const body = new ReadableStream<Uint8Array>({
+      start(value) {
+        controller = value;
+      },
+    });
+    const { fetchRSC } = await loadClientModule(
+      jest.fn((stream: ReadableStream<Uint8Array>) => {
+        decodedStream = readStreamText(stream);
+        void decodedStream.catch(() => undefined);
+        return Promise.resolve(React.createElement('div', null, 'early root'));
+      }),
+    );
+    const { getRSCStreamState } = await import('../src/RSCStreamCompletion.ts');
+    fetchMock.mockResolvedValue({ ok: true, status: 200, body } as Response);
+    const payload = await fetchRSC({
+      componentName: 'Card',
+      componentProps: {},
+      rscPayloadGenerationUrlPath: '/rsc',
+    });
+    const state = getRSCStreamState(payload)!;
+    expect(state.hasErrors).toBe(false);
+    const logging = jest.spyOn(console, 'error').mockImplementation(() => {
+      throw new Error('logging failed');
+    });
+    try {
+      controller.error(new Error('late transport failure'));
+      await expect(state.completion).resolves.toBe(false);
+      expect(state.hasErrors).toBe(true);
+      await expect(decodedStream).rejects.toThrow('late transport failure');
+    } finally {
+      logging.mockRestore();
+    }
+  });
 
   it('rejects non-ok HTTP responses before parsing the RSC stream', async () => {
     const { createFromReadableStream, fetchRSC } = await loadClientModule();
@@ -510,7 +555,7 @@ describe('fetchRSC HTTP responses', () => {
           componentProps: {},
           rscPayloadGenerationUrlPath: '/rsc_payload',
         }),
-      ).rejects.toThrow('Incomplete RSC response');
+      ).rejects.toThrow('Incomplete RSC stream');
       expect(warnSpy).toHaveBeenCalledWith(
         expect.stringContaining('[react_on_rails] Incomplete length-prefixed stream:'),
       );

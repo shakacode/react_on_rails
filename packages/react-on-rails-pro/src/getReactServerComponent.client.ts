@@ -116,27 +116,20 @@ const createFromFetch = async (
   const nonce = sanitizeNonce(cspNonce);
   const parser = new LengthPrefixedStreamParser();
   let finishStream!: (successful: boolean) => void;
-  const completion = new Promise<boolean>((resolve) => {
-    finishStream = resolve;
-  });
-  let streamHasErrors = false;
-  let rscDiagnosticError: Error | undefined;
-  const reportDiagnosticError = (metadata: Record<string, unknown>) => {
-    const diagnosticError = buildRSCStreamDiagnosticError(metadata, {
-      componentName,
-      source: sourceDescription,
-    });
-    if (diagnosticError) {
-      streamHasErrors = true;
-      rscDiagnosticError ??= diagnosticError;
-    }
+  const streamState = {
+    completion: new Promise<boolean>((resolve) => {
+      finishStream = resolve;
+    }),
+    hasErrors: false,
   };
-
+  let rscDiagnosticError: Error | undefined;
+  const diagnosticContext = { componentName, source: sourceDescription };
   const transformedStream = new ReadableStream<Uint8Array>({
     async start(controller) {
       const reader = body.getReader();
       const handleContent = (content: Uint8Array, metadata: Record<string, unknown>) => {
-        reportDiagnosticError(metadata);
+        rscDiagnosticError ??= buildRSCStreamDiagnosticError(metadata, diagnosticContext);
+        streamState.hasErrors = !!rscDiagnosticError;
         controller.enqueue(content);
         const consoleScript = (metadata.consoleReplayScript as string) ?? '';
         if (replayConsoleScripts && consoleScript) {
@@ -144,23 +137,21 @@ const createFromFetch = async (
         }
       };
       try {
-        let done = false;
-        while (!done) {
+        for (;;) {
           // eslint-disable-next-line no-await-in-loop
-          const readResult = await reader.read();
-          done = readResult.done;
-          if (readResult.value) {
-            parser.feed(readResult.value, handleContent);
-          }
+          const { done, value } = await reader.read();
+          if (value) parser.feed(value, handleContent);
+          if (done) break;
         }
-        if (!parser.flush()) throw new Error('Incomplete RSC response');
+        if (!parser.flush()) throw new Error('Incomplete RSC stream');
         controller.close();
-        finishStream(!streamHasErrors);
+        finishStream(!streamState.hasErrors);
       } catch (error) {
-        console.error('[ReactOnRails] Error parsing RSC stream:', error);
-        streamHasErrors = true;
-        controller.error(error);
+        // Application logging can throw; it must not turn this failure into success.
+        streamState.hasErrors = true;
         finishStream(false);
+        controller.error(error);
+        console.error('[ReactOnRails] Error parsing RSC stream:', error);
       }
     },
   });
@@ -171,11 +162,12 @@ const createFromFetch = async (
   // React can only read a chunk after it has been enqueued, so by the time `renderPromise`
   // rejects the diagnostic — if the stream carried one — is already set; it is never undefined
   // purely because of timing.
-  return wrapInNewPromise(renderPromise)
-    .then((payload) => trackRSCStreamCompletion(payload, completion, () => streamHasErrors))
-    .catch((error: unknown) => {
+  return wrapInNewPromise(renderPromise).then(
+    (payload) => trackRSCStreamCompletion(payload, streamState),
+    (error: unknown) => {
       throw mergeRSCStreamDiagnosticError(error, rscDiagnosticError);
-    });
+    },
+  );
 };
 
 // Duck type instead of `instanceof DOMException`: cross-realm AbortErrors

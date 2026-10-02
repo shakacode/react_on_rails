@@ -195,24 +195,20 @@ const RSCRouteContent = forwardRef<RSCRouteHandle, RSCRouteContentProps>(
     const latestPropsRef = useRef<[string, unknown]>([componentName, componentProps]);
     const onRefetchErrorRef = useRef(onRefetchError);
     const latestRefetchRequestRef = useRef(0);
-    const latestRefetchVersionRef = useRef<{ key: string; version: number } | null>(null);
+    const latestRefetchVersionRef = useRef<[key: string, version: number] | null>(null);
     const reportedRefetchRequestRef = useRef(0);
     // Version 0 means "evicted or not yet seen"; it lets a later monotonic
     // success token clear a stale refetch error after the key reloads.
     const previousSuccessfulVersionRef = useRef({ key: currentRouteKey, version: successfulVersion });
     const isMountedRef = useRef(false);
     useLayoutEffect(() => {
+      latestPropsRef.current = [componentName, componentProps];
+      onRefetchErrorRef.current = onRefetchError;
       isMountedRef.current = true;
       return () => {
         isMountedRef.current = false;
       };
-    }, []);
-    useLayoutEffect(() => {
-      latestPropsRef.current = [componentName, componentProps];
-    }, [componentName, componentProps]);
-    useLayoutEffect(() => {
-      onRefetchErrorRef.current = onRefetchError;
-    }, [onRefetchError]);
+    }, [componentName, componentProps, onRefetchError]);
     useLayoutEffect(
       () => retainComponent(componentName, componentProps),
       [componentName, componentProps, retainComponent],
@@ -248,7 +244,7 @@ const RSCRouteContent = forwardRef<RSCRouteHandle, RSCRouteContentProps>(
       // visible while the new promise streams in.
       const refetchPromise = refetchComponent(n, p, recoverOnError);
       const sharedRefetchVersion = getRefetchVersion(n, p);
-      latestRefetchVersionRef.current = { key: requestKey, version: sharedRefetchVersion };
+      latestRefetchVersionRef.current = [requestKey, sharedRefetchVersion];
       const handledRefetchPromise = rejectErrorPayload(refetchPromise).catch((error: unknown) => {
         const serverComponentFetchError = toServerComponentFetchError(error, n, p);
         if (
@@ -293,8 +289,8 @@ const RSCRouteContent = forwardRef<RSCRouteHandle, RSCRouteContentProps>(
         queueMicrotask(() => {
           if (
             isMountedRef.current &&
-            latestRefetchVersionRef.current?.key === currentRouteKey &&
-            latestRefetchVersionRef.current.version === refetchVersion &&
+            latestRefetchVersionRef.current?.[0] === currentRouteKey &&
+            latestRefetchVersionRef.current[1] === refetchVersion &&
             getRefetchVersion(componentName, componentProps) === refetchVersion &&
             createRSCPayloadKey(...latestPropsRef.current) === currentRouteKey
           ) {
