@@ -1753,6 +1753,56 @@ describe('tanstack-router integration (Pro)', () => {
     },
   );
 
+  it('preserves the redirect response status when router statusCode is absent', async () => {
+    const router = buildRouter();
+    Object.assign(router.state, {
+      redirect: { status: 308, headers: { get: () => '/products?ids=1%2C2#details' } },
+    });
+    const result = await serverRenderTanStackAppAsync(
+      { createRouter: () => router },
+      {},
+      { serverSide: true, pathname: '/products', search: '' } as RailsContext & { serverSide: true },
+      () => React.createElement('div'),
+      jest.fn(),
+    );
+    expect(result.httpResponse).toEqual({ status: 308, location: '/products?ids=1%2C2#details' });
+  });
+
+  it('round-trips an actual router global not-found match through JSON and hydration', () =>
+    withResponsePolyfill(async () => {
+      const serverResult = await serverRenderTanStackAppAsync(
+        { createRouter: buildActualTanStackRouter },
+        {},
+        { serverSide: true, pathname: '/missing', search: '' } as RailsContext & { serverSide: true },
+        ActualRouterProvider as React.ComponentType<{ router: TanStackRouter }>,
+        ({ initialEntries }) => createActualMemoryHistory({ initialEntries }),
+      );
+      expect(serverResult.dehydratedState.ssrRouter?.matches).toEqual(
+        expect.arrayContaining([expect.objectContaining({ globalNotFound: true })]),
+      );
+      const clientRouter = buildActualTanStackRouter();
+      const props = {
+        __tanstackRouterDehydratedState: JSON.parse(JSON.stringify(serverResult.dehydratedState)),
+      };
+      const renderFn = createTanStackRouterRenderFunction(
+        { createRouter: () => clientRouter },
+        {
+          RouterProvider: ActualRouterProvider as React.ComponentType<{ router: TanStackRouter }>,
+          createMemoryHistory: ({ initialEntries }) => createActualMemoryHistory({ initialEntries }),
+          createBrowserHistory: () => createActualMemoryHistory({ initialEntries: ['/missing'] }),
+        },
+      );
+      const result = renderFn(props, {
+        serverSide: false,
+        pathname: '/missing',
+        search: '',
+      } as RailsContext);
+      renderToString(React.createElement(result as React.ComponentType<Record<string, unknown>>, props));
+      expect(clientRouter.state.matches).toEqual(
+        expect.arrayContaining([expect.objectContaining({ globalNotFound: true })]),
+      );
+    }));
+
   it('builds SSR match payloads even when router.dehydrate is unavailable', async () => {
     const router = buildRouter();
     delete router.dehydrate;

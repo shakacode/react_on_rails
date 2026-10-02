@@ -548,7 +548,19 @@ describe ReactOnRailsHelper do
       let(:ssr_response) { ActionDispatch::Response.new }
 
       before do
-        allow(self).to receive(:controller).and_return(instance_double(ActionController::Base, response: ssr_response))
+        allow(self).to receive(:controller).and_return(
+          instance_double(ActionController::Base, response: ssr_response, session: {})
+        )
+      end
+
+      it "applies render-result metadata through the public helper" do
+        allow(self).to receive(:server_rendered_react_component).and_return(
+          "html" => "<div>SSR body</div>", "consoleReplayScript" => "",
+          "httpResponse" => { "status" => 308, "location" => "/products?ids=1%2C2#details" }
+        )
+        expect(react_component("HelloWorld", prerender: true, auto_load_bundle: false)).to include("SSR body")
+        expect(ssr_response.status).to eq(308)
+        expect(ssr_response.headers["Location"]).to eq("/products?ids=1%2C2#details")
       end
 
       it "preserves a redirect status and its exact Location" do

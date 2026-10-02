@@ -153,7 +153,7 @@ export async function serverRenderTanStackAppAsync(
     appElement: buildAppElement(router, RouterProvider, options.AppWrapper, props),
     dehydratedState,
     httpResponse: {
-      status: router.state.statusCode ?? 200,
+      status: router.state.redirect?.status ?? router.state.statusCode ?? 200,
       ...(router.state.redirect
         ? { location: router.state.redirect.headers.get('Location') ?? undefined }
         : {}),

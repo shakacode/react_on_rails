@@ -56,6 +56,62 @@ describe "TanStack Router HTTP responses" do
     end
   end
 
+  describe "cached Rails controller responses", :caching, :rack_test do
+    before do
+      allow(ReactOnRails::ServerRenderingPool).to receive(:server_render_js_with_console_logging).and_call_original
+    end
+
+    it "preserves loader redirects on both the cache miss and hit" do
+      2.times do
+        page.driver.get("/tanstack_router_async/redirect?cached=1")
+        expect(page.status_code).to eq(308)
+        expect(page.response_headers["Location"]).to eq("/tanstack_router_async/second_page?ids=1%2C2#details")
+      end
+      expect(ReactOnRails::ServerRenderingPool).to have_received(:server_render_js_with_console_logging).once
+    end
+
+    it "preserves canonical redirects on both the cache miss and hit" do
+      2.times do
+        page.driver.get("/tanstack_router_async/?cached=1")
+        expect(page.status_code).to eq(307)
+        expect(page.response_headers["Location"]).to eq("/tanstack_router_async?cached=1")
+      end
+      expect(ReactOnRails::ServerRenderingPool).to have_received(:server_render_js_with_console_logging).once
+    end
+
+    { "not_found" => 404, "unknown" => 404, "error" => 500 }.each do |path, status|
+      it "preserves #{path} HTTP #{status} and content on both the cache miss and hit" do
+        2.times do
+          page.driver.get("/tanstack_router_async/#{path}?cached=1")
+          expect(page.status_code).to eq(status)
+          expect(page).to have_css(status == 404 ? "#tanstack-async-not-found" : "#tanstack-async-error")
+        end
+        expect(ReactOnRails::ServerRenderingPool).to have_received(:server_render_js_with_console_logging).once
+      end
+    end
+  end
+
+  describe "cached browser hydration", :caching, :js do
+    it "hydrates cached not-found markup before client navigation" do
+      ssr_updates = Array.new(3) do
+        visit "/tanstack_router_async/unknown?cached=1"
+        expect(page).to have_css("#tanstack-async-not-found", text: "Page not found")
+        page.evaluate_script(<<~JS)
+          JSON.parse(document.querySelector('script[data-component-name="TanStackRouterAppAsync"]').textContent)
+            .__tanstackRouterDehydratedState.ssrRouter.matches.map(match => match.u)
+        JS
+      end
+      expect(ssr_updates.uniq.size).to be < ssr_updates.size
+      page.execute_script("window.__tanstackHttpNavigationMarker = true")
+      click_on "TanStack Router Async Second Page"
+      expect(page).to have_css("#tanstack-async-second-page")
+      expect(page.evaluate_script("window.__tanstackHttpNavigationMarker")).to be(true)
+      messages = page.driver.browser.logs.get(:browser).select { |entry| entry.level == "SEVERE" }.map(&:message)
+      mismatch_pattern = /Hydration failed|hydration mismatch|didn't match|Switched to client rendering/i
+      expect(messages.grep(mismatch_pattern)).to be_empty
+    end
+  end
+
   describe "browser hydration", :js do
     it "follows canonical redirects and hydrates before client navigation" do
       visit "/tanstack_router_async/?ids=1,2"

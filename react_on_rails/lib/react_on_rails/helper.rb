@@ -807,6 +807,7 @@ module ReactOnRails
       load_pack_for_generated_component(react_component_name, render_options)
       # Create the HTML rendering part
       result = server_rendered_react_component(render_options)
+      @server_rendered_http_response = nil
       apply_server_rendered_http_response!(result) if result.is_a?(Hash)
 
       # clientProps are only expected on successful SSR hashes. Current error hashes do not
@@ -824,11 +825,17 @@ module ReactOnRails
       }
     end
 
+    def server_rendered_http_response
+      @server_rendered_http_response
+    end
+
     def apply_server_rendered_http_response!(result)
+      @server_rendered_http_response = nil
       http_response = result["httpResponse"]
       return if http_response.nil?
 
       validate_server_rendered_http_response!(http_response)
+      @server_rendered_http_response = http_response
       location = http_response["location"]
 
       return if http_response["status"] == 200 && location.nil?

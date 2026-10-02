@@ -26,6 +26,9 @@ require "nokogiri"
 
 # rubocop:disable Metrics/ModuleLength
 module ReactOnRailsProHelper
+  CachedComponentResponse = Struct.new(:content, :http_response)
+  private_constant :CachedComponentResponse
+
   STATIC_RSC_RENDER_DIAGNOSTIC_EVENT = "render_static_rsc_component.react_on_rails_pro"
   HTML_SPACE_CHARACTERS = [" ", "\t", "\n", "\f", "\r"].freeze
   HTML_QUOTE_CHARACTERS = ['"', "'"].freeze
@@ -530,7 +533,8 @@ module ReactOnRailsProHelper
     result, cache_hit, cache_write_skipped = fetch_cache_entry(
       cache_key,
       cache_write_options,
-      cache_write_if:
+      cache_write_if:,
+      cache_http_response: true
     ) do
       normalized_cache_tags = ReactOnRailsPro::Cache.normalize_tags(options[:cache_tags])
       yield
@@ -545,7 +549,8 @@ module ReactOnRailsProHelper
     add_component_cache_metadata(result, cache_key, cache_hit)
   end
 
-  def fetch_cache_entry(cache_key, cache_write_options, cache_write_if:)
+  def fetch_cache_entry(cache_key, cache_write_options, cache_write_if:, cache_http_response: false)
+    @server_rendered_http_response = nil if cache_http_response
     cache_hit = true
     cache_write_skipped = false
     skip_cache_write = Object.new
@@ -554,7 +559,10 @@ module ReactOnRailsProHelper
         cache_hit = false
         # The marker travels with the cached value; both hit and miss consumers strip it
         # with extract_cached_csp_nonce_marker before the value reaches the page.
-        rendered_result = append_cached_csp_nonce_marker(yield)
+        rendered_result = yield
+        http_response = server_rendered_http_response if cache_http_response
+        rendered_result = append_cached_csp_nonce_marker(rendered_result)
+        rendered_result = with_cached_http_response(rendered_result, http_response)
         next rendered_result unless cache_write_if && !cache_write_if.call
 
         cache_write_skipped = true
@@ -562,7 +570,18 @@ module ReactOnRailsProHelper
       end
     end
 
+    if result.is_a?(CachedComponentResponse)
+      apply_server_rendered_http_response!("httpResponse" => result.http_response)
+      result = result.content
+    end
+
     [result, cache_hit, cache_write_skipped]
+  end
+
+  def with_cached_http_response(content, http_response)
+    return content unless http_response && http_response["status"] != 200
+
+    CachedComponentResponse.new(content, http_response)
   end
 
   def normalize_cached_pro_attribution(result, cached_csp_nonce = nil)

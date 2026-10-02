@@ -140,4 +140,7 @@ Successful SSR preserves an HTTP status already chosen by the Rails controller.
 
 If you call `serverRenderTanStackAppAsync` directly, include its `httpResponse`
 property alongside `renderedHtml` and `clientProps` in your render function result.
-This response handling applies to non-streaming `react_component` renders only.
+This response handling applies to non-streaming renders, including
+`cached_react_component` and `cached_react_component_hash`. Cached markup replays
+its HTTP outcome on cache hits. Include the route and search in the component
+cache key (for example, `request.fullpath`) so different URLs do not share responses.

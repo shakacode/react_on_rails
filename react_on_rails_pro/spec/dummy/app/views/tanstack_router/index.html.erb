@@ -14,5 +14,12 @@ https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE
 -%>
 <h1>TanStack Router Async Home</h1>
 
-<%= react_component("TanStackRouterAppAsync", props: @app_props_server_render, prerender: true,
-                    raise_on_prerender_error: true, trace: true) %>
+<% if params[:cached] == "1" %>
+  <%= cached_react_component("TanStackRouterAppAsync", cache_key: request.fullpath,
+                            prerender: true, raise_on_prerender_error: true, trace: true) do
+    @app_props_server_render
+  end %>
+<% else %>
+  <%= react_component("TanStackRouterAppAsync", props: @app_props_server_render, prerender: true,
+                      raise_on_prerender_error: true, trace: true) %>
+<% end %>
