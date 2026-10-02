@@ -49,6 +49,11 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 5134](https://github.com/shakacode/react_on_rails/pull/5134) by
   [Justin Gordon](https://github.com/justin808).
 
+- Render functions can return `httpResponse` to set Rails status and `Location` during non-streaming SSR. **[Pro]** TanStack Router async SSR now preserves redirect status and `Location`, including canonical URL redirects, and returns real 404 and 500 responses. Unknown-route markup also retains its not-found state during browser hydration. Server errors bypass component and prerender cache writes.
+  **Action required for upgraders:** The top-level render-result key `httpResponse` is reserved for this status and Location contract; move unrelated metadata into `clientProps`. Include the route and search in cached router component keys. Custom render functions calling `serverRenderTanStackAppAsync` must forward `httpResponse`. Render these HTTP outcomes before response headers are committed.
+  [PR 5139](https://github.com/shakacode/react_on_rails/pull/5139) by
+  [Justin Gordon](https://github.com/justin808).
+
 - **[Pro]** **RSC streams no longer encode consumer logs into the Flight payload**: React 19.3 development
   Flight keeps a console hook active while it flushes chunks, so logs from code consuming the returned RSC
   Readable were serialized as `:W["log"...]` rows. In non-production builds, RSC payload streams now use

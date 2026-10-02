@@ -65,6 +65,8 @@ export interface TanStackRouter {
   loadRouteChunk?: (route: unknown) => Promise<unknown>;
   state: {
     status: string;
+    statusCode?: number;
+    redirect?: { status: number; headers: { get: (name: string) => string | null } };
     location: {
       pathname: string;
       search?: unknown;
@@ -115,6 +117,8 @@ export interface TanStackSsrMatch {
   /** error */
   e?: unknown;
   ssr?: unknown;
+  /** Whether the root match renders the global not-found component. */
+  globalNotFound?: boolean;
 }
 
 export interface TanStackSsrRouterState {

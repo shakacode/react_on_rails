@@ -544,6 +544,82 @@ describe ReactOnRailsHelper do
       it { is_expected.to include json_props_sanitized }
     end
 
+    context "when server rendering selects an HTTP response" do
+      let(:ssr_response) { ActionDispatch::Response.new }
+
+      before do
+        allow(self).to receive(:controller).and_return(
+          instance_double(ActionController::Base, response: ssr_response, session: {})
+        )
+      end
+
+      it "applies render-result metadata through the public helper" do
+        allow(self).to receive(:server_rendered_react_component).and_return(
+          "html" => "<div>SSR body</div>", "consoleReplayScript" => "",
+          "httpResponse" => { "status" => 308, "location" => "/products?ids=1%2C2#details" }
+        )
+        expect(react_component("HelloWorld", prerender: true, auto_load_bundle: false)).to include("SSR body")
+        expect(ssr_response.status).to eq(308)
+        expect(ssr_response.headers["Location"]).to eq("/products?ids=1%2C2#details")
+      end
+
+      it "preserves a redirect status and its exact Location" do
+        send(:apply_server_rendered_http_response!, "httpResponse" => {
+               "status" => 308, "location" => "/products?ids=1%2C2#details"
+             })
+        expect(ssr_response.status).to eq(308)
+        expect(ssr_response.headers["Location"]).to eq("/products?ids=1%2C2#details")
+      end
+
+      it "supports a Location header on a created response" do
+        send(:apply_server_rendered_http_response!, "httpResponse" => {
+               "status" => 201, "location" => "/products/new-resource"
+             })
+        expect(ssr_response.status).to eq(201)
+        expect(ssr_response.headers["Location"]).to eq("/products/new-resource")
+      end
+
+      it "applies not-found and loader-error statuses" do
+        [404, 500].each do |status|
+          send(:apply_server_rendered_http_response!, "httpResponse" => { "status" => status })
+          expect(ssr_response.status).to eq(status)
+        end
+      end
+
+      it "preserves a status chosen by the controller when SSR succeeds" do
+        ssr_response.status = 202
+        send(:apply_server_rendered_http_response!, "httpResponse" => { "status" => 200 })
+        expect(ssr_response.status).to eq(202)
+      end
+
+      it "preserves the controller's status while applying a successful Location" do
+        ssr_response.status = 202
+        send(:apply_server_rendered_http_response!, "httpResponse" => { "status" => 200, "location" => "/poll/123" })
+        expect(ssr_response.status).to eq(202)
+        expect(ssr_response.headers["Location"]).to eq("/poll/123")
+      end
+
+      it "rejects invalid HTTP metadata and response splitting" do
+        invalid_metadata = [
+          { "status" => 999 },
+          { "status" => 307, "location" => false },
+          { "status" => 307, "location" => "/ok\r\nX-Test: injected" }
+        ]
+        invalid_metadata.each do |metadata|
+          expect do
+            send(:apply_server_rendered_http_response!, "httpResponse" => metadata)
+          end.to raise_error(ReactOnRails::Error)
+        end
+      end
+
+      it "rejects applying a response after headers are committed" do
+        ssr_response.commit!
+        expect do
+          send(:apply_server_rendered_http_response!, "httpResponse" => { "status" => 404 })
+        end.to raise_error(ReactOnRails::Error, /headers are committed/)
+      end
+    end
+
     context "when server rendering returns clientProps" do
       before do
         allow(ReactOnRails::ServerRenderingPool).to receive(:server_render_js_with_console_logging).and_return(

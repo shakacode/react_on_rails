@@ -807,6 +807,8 @@ module ReactOnRails
       load_pack_for_generated_component(react_component_name, render_options)
       # Create the HTML rendering part
       result = server_rendered_react_component(render_options)
+      @server_rendered_http_response = nil
+      apply_server_rendered_http_response!(result) if result.is_a?(Hash)
 
       # clientProps are only expected on successful SSR hashes. Current error hashes do not
       # include that key, so non-SSR/error paths skip this merge entirely.
@@ -821,6 +823,44 @@ module ReactOnRails
         tag: component_specification_tag,
         result:
       }
+    end
+
+    def server_rendered_http_response
+      @server_rendered_http_response
+    end
+
+    def apply_server_rendered_http_response!(result)
+      @server_rendered_http_response = nil
+      http_response = result["httpResponse"]
+      return if http_response.nil?
+
+      validate_server_rendered_http_response!(http_response)
+      @server_rendered_http_response = http_response
+      location = http_response["location"]
+
+      return if http_response["status"] == 200 && location.nil?
+      return unless respond_to?(:controller) && controller.respond_to?(:response)
+
+      update_controller_http_response!(controller.response, http_response)
+    end
+
+    def update_controller_http_response!(response, http_response)
+      raise ReactOnRails::Error, "Cannot apply SSR HTTP response after headers are committed." if response.committed?
+
+      response.status = http_response["status"] unless http_response["status"] == 200
+      response.headers["Location"] = http_response["location"] if http_response["location"]
+    end
+
+    def validate_server_rendered_http_response!(http_response)
+      unless http_response.is_a?(Hash) && http_response["status"].is_a?(Integer) &&
+             (200..599).cover?(http_response["status"])
+        raise ReactOnRails::Error, "Expected httpResponse to contain an integer HTTP status between 200 and 599."
+      end
+
+      location = http_response["location"]
+      return unless !location.nil? && (!location.is_a?(String) || location.match?(/[\r\n]/))
+
+      raise ReactOnRails::Error, "Expected HTTP Location to be a string without newlines."
     end
 
     def merge_server_rendered_client_props!(render_options, result)
