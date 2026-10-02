@@ -62,6 +62,9 @@ fleet members in internal/contributor-info/demo-fleet.yml for {{RELEASE_REF}}.
 Use GPT-6.1 Sol (gpt-6.1-sol), medium reasoning, and Merge Auto in each upgrade chat.
 The intended react-on-rails-rsc version is {{RSC_VERSION}}. Go.
 
+Accept only a published stable release here. For an RC/beta or release promotion, switch
+to $run-fleet-validation and preserve its APP_WORK_ALLOWED barrier, report-only soft
+tracks, independent audit, and closeout merge ownership before any app mutation.
 First verify the release tag and published gem/npm artifacts. Inventory every manifest
 repository, including hard_gate and soft_track entries, and verify its live owner,
 visibility, archival state, declared package manager, and packages actually consumed.
@@ -84,11 +87,14 @@ immutable release snapshot, target gem/npm versions, intended RSC version where 
 existing PR/ownership disposition, and explicit Merge Auto authority for that upgrade.
 Ask it to read the target repository's trusted instructions and Shaka seam, update only
 consumed packages and necessary coupled peers, regenerate lockfiles with its declared
-package manager, and verify relevant release features using this runbook's per-repo checklist.
+package manager, and verify relevant release features. Include the applicable per-repo
+checklist from this runbook in the child prompt; do not assume its checkout contains it.
 Require local install, tests, build, and smoke before push, independent review, exact-head
 required CI, and any required review-app evidence before merging through Shaka.
 
-Merge Auto authorizes the upgrade after the target repository's gates pass. It does not
+For this stable-upgrade task, the user's Merge Auto choice grants
+auto_merge_when_gates_pass for both hard_gate and soft_track upgrade PRs, overriding a
+default Ask preference where task-scoped authority is allowed. It does not
 bypass protection, release freezes, licensing guardrails, required human review, or Shaka's
 size/risk limits. Report any resulting approval handoff. Keep GitHub delayed auto-merge and
 queue settings unchanged; Shaka owns merge submission and terminal outcome verification.
