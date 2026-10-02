@@ -1,4 +1,6 @@
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const { test } = require('node:test');
 const { getLastResult, assertReviewCompleted } = require('./verify.cjs');
 
@@ -41,6 +43,28 @@ for (const [turns, denials] of [
 
 test('accepts a published zero-findings review despite unrelated permission denials', () => {
   assert.equal(assertReviewCompleted(result, [report], context).commentId, 123);
+  assert.equal(assertReviewCompleted(result, [report], context).permissionDenials, 13);
+});
+
+test('counts raw SDK permission denials without publishing their arguments', () => {
+  const rawResult = { ...result, permission_denials: [{ tool_name: 'Bash', tool_input: {} }] };
+  assert.equal(assertReviewCompleted(rawResult, [report], context).permissionDenials, 1);
+});
+
+test('accepts the completion markers requested by the actual workflow prompt', () => {
+  const workflow = fs.readFileSync(path.join(__dirname, '../../workflows/claude-code-review.yml'), 'utf8');
+  const markers = workflow
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith('REVIEWED ') || line.startsWith('CI run: '))
+    .join('\n')
+    .replace(/\$\{\{ github\.event\.pull_request\.head\.sha \}\}/g, headSha)
+    .replace(/\$\{\{ github\.run_id \}\}/g, context.runId)
+    .replace(/\$\{\{ github\.run_attempt \}\}/g, context.runAttempt);
+  assert.equal(
+    assertReviewCompleted(result, [{ ...report, body: `No findings.\n${markers}` }], context).commentId,
+    123,
+  );
 });
 
 test('rejects a report for another commit', () => {
@@ -96,6 +120,15 @@ test('fails closed on absent or failed native execution', () => {
   assert.throws(
     () => assertReviewCompleted({ ...result, num_turns: 0 }, [report], context),
     /No successful native/,
+  );
+  assert.throws(
+    () =>
+      assertReviewCompleted(
+        { ...result, is_error: true, num_turns: 1, total_cost_usd: 0 },
+        [report],
+        context,
+      ),
+    /Check CLAUDE_CODE_OAUTH_TOKEN/,
   );
 });
 

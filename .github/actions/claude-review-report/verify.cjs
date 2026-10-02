@@ -23,7 +23,11 @@ function getLastResult(text) {
 
 function assertNativeResult(result) {
   if (result?.is_error !== false || !Number.isInteger(result.num_turns) || result.num_turns < 1) {
-    throw new Error('No successful native Claude execution result; inspect the action result.');
+    const tokenHint =
+      result?.is_error === true && result.num_turns === 1 && result.total_cost_usd === 0
+        ? " Check CLAUDE_CODE_OAUTH_TOKEN; rotate it with 'claude setup-token' if invalid or expired."
+        : '';
+    throw new Error(`No successful native Claude execution result; inspect the action result.${tokenHint}`);
   }
 }
 
@@ -58,7 +62,12 @@ function assertReviewCompleted(result, comments, { headSha, startedAt, runId, ru
   });
   if (!report)
     throw new Error(`No completed Claude review report for ${headSha} was published during this run.`);
-  return { commentId: report.id, permissionDenials: result.permission_denials_count ?? 'UNKNOWN' };
+  return {
+    commentId: report.id,
+    permissionDenials: Array.isArray(result.permission_denials)
+      ? result.permission_denials.length
+      : (result.permission_denials_count ?? 'UNKNOWN'),
+  };
 }
 
 if (require.main === module) {
@@ -74,6 +83,9 @@ if (require.main === module) {
     } = process.env;
     if (!EXECUTION_FILE) throw new Error('Missing Claude execution file.');
     const result = getLastResult(fs.readFileSync(EXECUTION_FILE, 'utf8'));
+    console.log(
+      `Claude native result: is_error=${result?.is_error ?? 'UNKNOWN'} turns=${result?.num_turns ?? 'UNKNOWN'} cost_usd=${result?.total_cost_usd ?? 'UNKNOWN'}`,
+    );
     assertNativeResult(result);
     if (!/^[\w.-]+\/[\w.-]+$/.test(GH_REPO) || !/^[1-9]\d*$/.test(PR_NUMBER)) {
       throw new Error('Invalid GitHub repository or PR number.');
