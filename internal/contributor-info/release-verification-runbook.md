@@ -50,7 +50,8 @@ the Lane 4b version/coherence subset for the newly published artifacts and tag.
 
 ## Launch fleet upgrade chats with Shaka
 
-For an already published stable release, use this launcher to open one ordinary `$shaka` chat
+For routine adoption after a stable release's validation and promotion have closed, use this
+launcher to open one ordinary `$shaka` chat
 per fleet repository. Replace `{{RELEASE_REF}}` with the intended tag, such as `v17.2.0`, and
 provide the intended `{{RSC_VERSION}}` separately. The coordinator resolves gem/npm versions from
 the published artifacts once and passes the same snapshot to every chat.
@@ -62,7 +63,8 @@ fleet members in internal/contributor-info/demo-fleet.yml for {{RELEASE_REF}}.
 Use GPT-6.1 Sol (gpt-6.1-sol), medium reasoning, and Merge Auto in each upgrade chat.
 The intended react-on-rails-rsc version is {{RSC_VERSION}}. Go.
 
-Accept only a published stable release here. For an RC/beta or release promotion, switch
+Accept only a published stable release whose validation and promotion have closed.
+For an RC/beta or an open release validation/promotion run, switch
 to $run-fleet-validation and preserve its APP_WORK_ALLOWED barrier, report-only soft
 tracks, independent audit, and closeout merge ownership before any app mutation.
 First verify the release tag and published gem/npm artifacts. Inventory every manifest
@@ -85,6 +87,7 @@ unavailable, report that target as blocked instead of silently substituting one.
 Each child prompt must invoke the installed $shaka skill and include its repository,
 immutable release snapshot, target gem/npm versions, intended RSC version where consumed,
 existing PR/ownership disposition, and explicit Merge Auto authority for that upgrade.
+Include the full Merge Auto limits paragraph below in every child prompt.
 Ask it to read the target repository's trusted instructions and Shaka seam, update only
 consumed packages and necessary coupled peers, regenerate lockfiles with its declared
 package manager, and verify relevant release features. Include the applicable per-repo
