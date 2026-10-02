@@ -127,3 +127,17 @@ end
 - [View Helpers API](../api-reference/view-helpers-api.md)
 - [React Router Guide](./react-router.md)
 - [TanStack Query Guide](./tanstack-query.md) (the client-side server-state layer this pairs with)
+
+### HTTP status and redirects
+
+For non-streaming SSR, the helper passes the router's HTTP result to Rails before
+headers are committed. Loader redirects preserve their status (307 by default, or
+`redirect({ statusCode: 308 })`) and exact `Location` header. Trailing slashes and
+noncanonical query strings redirect to the canonical URL, whose response contains
+the rendered route for hydration. Loader `notFound()` and unmatched paths return
+404 with the not-found component; loader errors return 500 with the error component.
+Successful SSR preserves an HTTP status already chosen by the Rails controller.
+
+If you call `serverRenderTanStackAppAsync` directly, include its `httpResponse`
+property alongside `renderedHtml` and `clientProps` in your render function result.
+This response handling applies to non-streaming `react_component` renders only.

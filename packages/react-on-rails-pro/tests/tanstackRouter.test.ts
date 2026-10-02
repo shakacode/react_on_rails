@@ -1733,6 +1733,26 @@ describe('tanstack-router integration (Pro)', () => {
     expect(router.ssr).toBeFalsy();
   });
 
+  it.each([307, 308, 404, 500])(
+    'returns router HTTP status %i and the resolved redirect Location',
+    async (status) => {
+      const router = buildRouter();
+      const location = '/products?category=tools%2Cparts#details';
+      Object.assign(router.state, {
+        statusCode: status,
+        ...(status < 400 ? { redirect: { status, headers: { get: () => location } } } : {}),
+      });
+      const result = await serverRenderTanStackAppAsync(
+        { createRouter: () => router },
+        {},
+        { serverSide: true, pathname: '/products', search: '' } as RailsContext & { serverSide: true },
+        () => React.createElement('div'),
+        jest.fn(),
+      );
+      expect(result.httpResponse).toEqual({ status, ...(status < 400 ? { location } : {}) });
+    },
+  );
+
   it('builds SSR match payloads even when router.dehydrate is unavailable', async () => {
     const router = buildRouter();
     delete router.dehydrate;

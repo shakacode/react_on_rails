@@ -22,7 +22,7 @@ import type {
   TanStackSsrRouterState,
   TanStackRouterOptions,
 } from './types.ts';
-import type { RailsContext } from 'react-on-rails/types';
+import type { RailsContext, ServerRenderResult } from 'react-on-rails/types';
 import { normalizeSearch } from './utils.ts';
 
 /**
@@ -91,6 +91,10 @@ function buildSsrMatch(match: unknown): TanStackSsrMatch | null {
     dehydratedMatch.ssr = candidate.ssr;
   }
 
+  if (typeof candidate.globalNotFound === 'boolean') {
+    dehydratedMatch.globalNotFound = candidate.globalNotFound;
+  }
+
   return dehydratedMatch;
 }
 
@@ -109,6 +113,7 @@ function buildSsrRouterState(router: TanStackRouter): TanStackSsrRouterState {
 export interface TanStackServerRenderResult {
   appElement: ReactElement;
   dehydratedState: DehydratedRouterState;
+  httpResponse: NonNullable<ServerRenderResult['httpResponse']>;
 }
 
 /**
@@ -147,5 +152,11 @@ export async function serverRenderTanStackAppAsync(
   return {
     appElement: buildAppElement(router, RouterProvider, options.AppWrapper, props),
     dehydratedState,
+    httpResponse: {
+      status: router.state.statusCode ?? 200,
+      ...(router.state.redirect
+        ? { location: router.state.redirect.headers.get('Location') ?? undefined }
+        : {}),
+    },
   };
 }

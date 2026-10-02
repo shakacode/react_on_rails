@@ -291,6 +291,28 @@ describe('serverRenderReactComponent', () => {
     expect(result.hasErrors).toBeFalsy();
   });
 
+  it.each([
+    { status: 307, location: '/products?ids=1%2C2' },
+    { status: 308, location: 'https://example.com/target#section' },
+    { status: 404 },
+    { status: 500 },
+  ])('preserves the async HTTP response through the wire protocol: %j', async (httpResponse) => {
+    const HttpApp = (() =>
+      Promise.resolve({ renderedHtml: '<h1>Result</h1>', httpResponse })) as RenderFunction;
+    HttpApp.renderFunction = true;
+    ComponentRegistry.register({ HttpApp });
+    const wire = serverRenderReactComponent({
+      name: 'HttpApp',
+      trace: false,
+      throwJsErrors: true,
+      renderingReturnsPromises: true,
+    });
+    assertIsPromise(wire);
+    const result = parseLengthPrefixed(await wire);
+    expect(result.httpResponse).toEqual(httpResponse);
+    expect(result.html).toBe('<h1>Result</h1>');
+  });
+
   it('serverRenderReactComponent processes async serverRenderHash with clientProps', async () => {
     const X6WithClientProps = (() =>
       Promise.resolve({
