@@ -90,8 +90,9 @@ existing PR/ownership disposition, and explicit Merge Auto authority for that up
 Include the full Merge Auto limits paragraph below in every child prompt.
 Ask it to read the target repository's trusted instructions and Shaka seam, update only
 consumed packages and necessary coupled peers, regenerate lockfiles with its declared
-package manager, and verify relevant release features. Include the applicable per-repo
-checklist from this runbook in the child prompt; do not assume its checkout contains it.
+package manager, and verify relevant release features. Include the applicable "For each repo"
+steps from this runbook's "Demo Fleet Release-Track Prompt" and that repo's manifest commands
+in the child prompt; do not assume its checkout contains them.
 Require local install, tests, build, and smoke before push, independent review, exact-head
 required CI, and the deployment/smoke evidence below before calling the PR ready or merging.
 Copy the full deployment/smoke paragraph below into every child prompt.
@@ -123,6 +124,14 @@ already current, or skipped with a reason. Soft-track failures do not gate the f
 unless a maintainer promotes them; they still block readiness and merge of that repo's PR.
 Verify merged changes reached the default branch; report
 remaining work explicitly.
+
+Before declaring fleet adoption complete, verify demo-fleet.yml's
+standing_health.stable_release and standing_health.rsc_version match the resolved snapshot.
+If stale, coordinate a separate react_on_rails PR to update them through its trusted workflow
+and wait for it to merge. Do not roll back newer defaults for an older adoption run; report
+the mismatch for a maintainer decision. Run this runbook's public standing-health evidence
+procedure from the clean committed manifest, retain the result, and report remaining health
+blockers without declaring the fleet healthy.
 ```
 
 Resolve `$shaka` through the host's installed skill; do not embed a machine-specific skill path.
