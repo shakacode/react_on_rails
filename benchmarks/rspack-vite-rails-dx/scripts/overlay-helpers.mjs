@@ -79,12 +79,12 @@ export function buildOverlayReport(raw) {
 
 Generated from \`results/overlay-recorded.json\`. Do not edit the matrix by hand.
 
-| Stack | Compile overlay | Runtime overlay with original source frame | Compile-error click-to-editor | Source restoration |
+| Stack | Compile overlay | Runtime overlay with original source frame | Compile-error click-to-editor | Recovery after compile/editor sequence and runtime probe |
 | --- | --- | --- | --- | --- |
 ${row('React on Rails + Rspack', 'rspack')}
 ${row('Inertia Rails + Vite', 'vite')}
 
-Each overlay result requires the deterministic marker and the original TSX file and line. Click-to-editor uses a temporary \`LAUNCH_EDITOR\` recorder and requires the copied workspace's exact source path, line, and column. The harness restores each mutation, waits for the overlay to clear, and removes its process group, workspace, and ports.
+Each overlay result requires the deterministic marker and the original TSX file and line. Click-to-editor uses a temporary \`LAUNCH_EDITOR\` recorder and requires the copied workspace's exact source path, line, and column. The harness writes a healthy source with a fresh marker, waits for the overlay to clear, and removes its process group, workspace, and ports. Compile recovery follows the editor-click probe in the same session; a failed click may affect that recovery result. Runtime recovery uses a separate session. The combined recovery cell does not establish isolated compile recovery or identify a product defect.
 
 ## Environment
 

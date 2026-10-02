@@ -50,3 +50,5 @@ pnpm run verify:overlays
 ```
 
 The local JSON and Markdown outputs are ignored. A recorded result must come from a clean committed harness, redact local paths, and be replayed twice on a quiet machine before replacing `results/overlay-recorded.json` and `OVERLAY_RESULTS.md`. A failed matrix cell records observed behavior; evaluate product changes separately.
+
+Compile recovery follows the editor-click probe in the same session, so a failed click may contribute to a recovery failure. Runtime recovery uses a separate session. The combined recovery cell reports healthy-marker recovery across both sequences; it does not establish isolated compile recovery.
