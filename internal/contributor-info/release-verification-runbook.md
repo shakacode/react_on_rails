@@ -48,6 +48,105 @@ affected surfaces and Lane 1 if upgrade-relevant files changed (generators, inst
 config, docs/upgrade). A version/changelog-metadata-only RC or final promotion re-runs Lane 4a plus
 the Lane 4b version/coherence subset for the newly published artifacts and tag.
 
+## Launch fleet upgrade chats with Shaka
+
+For routine adoption after a stable release's validation and promotion have closed, use this
+launcher to open one ordinary `$shaka` chat
+per fleet repository. Replace `{{RELEASE_REF}}` with the intended tag, such as `v17.2.0`, and
+provide the intended `{{RSC_VERSION}}` separately. The coordinator resolves gem/npm versions from
+the published artifacts once and passes the same snapshot to every chat.
+
+```text
+$shaka
+Open new chats using the installed $shaka skill to create or update upgrade PRs for all
+fleet members in internal/contributor-info/demo-fleet.yml for {{RELEASE_REF}}.
+Use GPT-6.1 Sol (gpt-6.1-sol), medium reasoning, and Merge Auto in each upgrade chat.
+The intended react-on-rails-rsc version is {{RSC_VERSION}}. Go.
+
+Accept only a published stable release whose validation and promotion have closed.
+For an RC/beta or an open release validation/promotion run, switch
+to $run-fleet-validation and preserve its APP_WORK_ALLOWED barrier, report-only soft
+tracks, independent audit, and closeout merge ownership before any app mutation.
+First verify the release tag and published gem/npm artifacts.
+Before creating upgrade chats or changing apps, obtain the fresh independent final-tag
+audit required by rc-testing-plan.md: this runbook's Lane 4a must be COMPLETE and Lane 4b
+must be CLEAN for the exact stable tag and published artifacts. Retain both reports;
+GAPS, DEFECTS, missing, or unknown evidence blocks launch. Closed promotion alone is not
+a substitute for this audit.
+Inventory every manifest repository, including hard_gate and soft_track entries, and verify its live owner,
+visibility, archival state, declared package manager, and packages actually consumed.
+Prioritize hard gates. Report archived, inaccessible, already-current, or inapplicable
+repositories with a reason; do not silently drop them or invent upgrade PRs.
+
+Before launching, inspect active chats, open upgrade PRs, and coordination ownership for
+each repository and target release. Reuse the existing owner and PR; do not open a competing
+writer. Report any ownership conflict for a decision. Keep private repository details
+out of public PRs, comments, and reports.
+
+Create one top-level chat per repository needing an upgrade, using its verified project
+and a separate checkout. Set model=gpt-6.1-sol and thinking=medium in the chat creation
+tool as well as in its prompt. Wait for asynchronous chat setup and verify its destination
+and settings before dispatching work. If a project, checkout, or requested setting is
+unavailable, report that target as blocked instead of silently substituting one.
+
+Each child prompt must invoke the installed $shaka skill and include its repository,
+immutable release snapshot, target gem/npm versions, intended RSC version where consumed,
+existing PR/ownership disposition, and explicit Merge Auto authority for that upgrade.
+Include the full Merge Auto limits paragraph below in every child prompt.
+Ask it to read the target repository's trusted instructions and Shaka seam, update only
+consumed packages and necessary coupled peers, regenerate lockfiles with its declared
+package manager, and verify relevant release features. Include the applicable "For each repo"
+steps from this runbook's "Demo Fleet Release-Track Prompt" and that repo's manifest commands
+in the child prompt; do not assume its checkout contains them.
+Require local install, tests, build, and smoke before push, independent review, exact-head
+required CI, and the deployment/smoke evidence below before calling the PR ready or merging.
+Copy the full deployment/smoke paragraph below into every child prompt.
+
+For each repo with a review-app pipeline, explicitly request deployment through its
+documented workflow. CPFlow's first deployment requires +review-app-deploy or
+workflow_dispatch; a skipped pull_request deployment is not deployment evidence.
+Wait for successful deployment of the current PR head, verify the deployed SHA and URL,
+then smoke every manifest smoke path on that review app and require HTTP 2xx responses.
+Use a browser to exercise the primary page and relevant upgraded behavior, checking for
+console errors, hydration failures, and broken navigation where applicable. Record the
+tested SHA, deployment run, review-app URL, paths/interactions, and results in the PR;
+keep private URLs and captures in their authorized private destination. Refresh deployment
+and smoke evidence for every new PR head. Failed, pending, or unknown deployment
+or smoke evidence blocks readiness. For a repo without a review-app pipeline, record
+that limitation and local smoke evidence; obtain a maintainer disposition for a required
+review-app gate rather than silently treating it as passed.
+
+For this stable-upgrade task, the user's Merge Auto choice grants
+auto_merge_when_gates_pass for both hard_gate and soft_track upgrade PRs, overriding a
+default Ask preference where task-scoped authority is allowed. It does not
+bypass protection, release freezes, licensing guardrails, required human review, or Shaka's
+size/risk limits. Report any resulting approval handoff. Keep GitHub delayed auto-merge and
+queue settings unchanged; Shaka owns merge submission and terminal outcome verification.
+
+Retain each created chat ID and PR URL. Wait for terminal outcomes with the host's chat
+coordination tools and report every manifest member as merged, awaiting approval, blocked,
+already current, or skipped with a reason. Soft-track failures do not gate the fleet release
+unless a maintainer promotes them; they still block readiness and merge of that repo's PR.
+Verify merged changes reached the default branch; report
+remaining work explicitly.
+
+Before declaring fleet adoption complete, verify demo-fleet.yml's
+standing_health.stable_release and standing_health.rsc_version match the resolved snapshot.
+If stale, coordinate a separate react_on_rails PR to update them through its trusted workflow
+and wait for it to merge. Do not roll back newer defaults for an older adoption run; report
+the mismatch for a maintainer decision. Run this runbook's public standing-health evidence
+procedure from the clean committed manifest, retain the result, and report remaining health
+blockers without declaring the fleet healthy.
+```
+
+Resolve `$shaka` through the host's installed skill; do not embed a machine-specific skill path.
+If an upgrade coordinator is already running, reuse its inventory rather than launching another
+fleet. This launcher authorizes creating upgrade chats only when the user invokes it.
+
+For RC/beta validation or release promotion, use the generated `$run-fleet-validation` lifecycle
+pack below. Its `APP_WORK_ALLOWED` barrier, report-only soft tracks, independent audit, and
+closeout merge ownership still apply; this stable-upgrade launcher grants no exception to them.
+
 ## Demo Fleet Release-Track Prompt
 
 Use this prompt to update the demo fleet for an RC or final release. It complements
@@ -213,6 +312,14 @@ For each repo:
    - feature coverage added/verified
    - exact commands run and results
    - known unrelated failures, with issue links
+   Before calling the PR ready, explicitly dispatch its documented review-app deployment
+   and wait for success on the current head. Verify deployed SHA and URL, then smoke the
+   manifest paths (HTTP 2xx) and relevant browser interactions, checking console errors,
+   hydration, and navigation. Record exact-head deployment and smoke evidence on the PR,
+   keeping private evidence private. Refresh evidence after each new head. A successful
+   build or skipped deployment does not prove the review app works; missing or failed
+   required evidence blocks that PR. If no pipeline exists, document local smoke and the
+   limitation, and obtain a maintainer disposition for any required review-app gate.
 9. If `demo-fleet.yml` metadata is wrong after inspection, open a separate `react_on_rails` PR
    updating package manager, commands, smoke paths, review-app data, or `verify` state.
 
