@@ -94,6 +94,7 @@ package manager, and verify relevant release features. Include the applicable pe
 checklist from this runbook in the child prompt; do not assume its checkout contains it.
 Require local install, tests, build, and smoke before push, independent review, exact-head
 required CI, and the deployment/smoke evidence below before calling the PR ready or merging.
+Copy the full deployment/smoke paragraph below into every child prompt.
 
 For each repo with a review-app pipeline, explicitly request deployment through its
 documented workflow. CPFlow's first deployment requires +review-app-deploy or
@@ -103,8 +104,8 @@ then smoke every manifest smoke path on that review app and require HTTP 2xx res
 Use a browser to exercise the primary page and relevant upgraded behavior, checking for
 console errors, hydration failures, and broken navigation where applicable. Record the
 tested SHA, deployment run, review-app URL, paths/interactions, and results in the PR;
-keep private URLs and captures in their authorized private destination. Repeat deployment
-and affected smoke checks after runtime changes. Failed, pending, or unknown deployment
+keep private URLs and captures in their authorized private destination. Refresh deployment
+and smoke evidence for every new PR head. Failed, pending, or unknown deployment
 or smoke evidence blocks readiness. For a repo without a review-app pipeline, record
 that limitation and local smoke evidence; obtain a maintainer disposition for a required
 review-app gate rather than silently treating it as passed.
@@ -118,8 +119,9 @@ queue settings unchanged; Shaka owns merge submission and terminal outcome verif
 
 Retain each created chat ID and PR URL. Wait for terminal outcomes with the host's chat
 coordination tools and report every manifest member as merged, awaiting approval, blocked,
-already current, or skipped with a reason. Keep soft-track failures non-gating unless a
-maintainer promotes them. Verify merged changes reached the default branch; report
+already current, or skipped with a reason. Soft-track failures do not gate the fleet release
+unless a maintainer promotes them; they still block readiness and merge of that repo's PR.
+Verify merged changes reached the default branch; report
 remaining work explicitly.
 ```
 
@@ -296,10 +298,14 @@ For each repo:
    - feature coverage added/verified
    - exact commands run and results
    - known unrelated failures, with issue links
-   Before calling the PR ready, deploy its current head to the review app and smoke the
-   manifest paths plus relevant browser interactions, following the deployment/smoke
-   instructions in the Shaka launcher above. Record exact-head evidence on the PR;
-   a successful build or skipped deployment does not prove the review app works.
+   Before calling the PR ready, explicitly dispatch its documented review-app deployment
+   and wait for success on the current head. Verify deployed SHA and URL, then smoke the
+   manifest paths (HTTP 2xx) and relevant browser interactions, checking console errors,
+   hydration, and navigation. Record exact-head deployment and smoke evidence on the PR,
+   keeping private evidence private. Refresh evidence after each new head. A successful
+   build or skipped deployment does not prove the review app works; missing or failed
+   required evidence blocks that PR. If no pipeline exists, document local smoke and the
+   limitation, and obtain a maintainer disposition for any required review-app gate.
 9. If `demo-fleet.yml` metadata is wrong after inspection, open a separate `react_on_rails` PR
    updating package manager, commands, smoke paths, review-app data, or `verify` state.
 
