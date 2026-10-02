@@ -8,6 +8,7 @@ import {
   parseEditorInvocation,
   replaceBenchmarkMarker,
   restorationVisible,
+  readOverlayText,
   runtimeErrorMarker,
   sourceLocationVisible,
   sourceLinkPattern,
@@ -138,7 +139,7 @@ test('overlay polling waits for a source frame after the marker appears', async 
   let reads = 0;
   const frame = `${compileErrorMarker} ${source}:17:9`;
   const text = await waitForSourceOverlay(
-    async () => (++reads === 1 ? compileErrorMarker : frame),
+    async () => (++reads === 1 ? undefined : reads === 2 ? compileErrorMarker : frame),
     compileErrorMarker,
     source,
     17,
@@ -146,7 +147,7 @@ test('overlay polling waits for a source frame after the marker appears', async 
     0,
   );
   assert.equal(text, frame);
-  assert.equal(reads, 2);
+  assert.equal(reads, 3);
 });
 
 test('overlay polling retains matching evidence when its source frame never arrives', async () => {
@@ -167,4 +168,47 @@ test('restoration requires a healthy source marker and a cleared overlay', () =>
   assert.equal(restorationVisible(false, ''), false);
   assert.equal(restorationVisible(true, compileErrorMarker), false);
   assert.equal(restorationVisible(true, 'a different build error'), false);
+  assert.equal(restorationVisible(true, undefined), false);
+  assert.equal(restorationVisible(true, null), false);
+});
+
+test('overlay read failures remain unknown rather than cleared', async () => {
+  const fail = async () => {
+    throw new Error('browser disconnected');
+  };
+  assert.equal(await readOverlayText(fail, async () => ''), undefined);
+  assert.equal(await readOverlayText(async () => true, fail), undefined);
+  assert.equal(
+    await readOverlayText(
+      async () => true,
+      async () => null,
+    ),
+    undefined,
+  );
+});
+
+test('only a successful overlay visibility or text read can establish clearance', async () => {
+  assert.equal(
+    await readOverlayText(
+      async () => false,
+      async () => {
+        throw new Error('must not read');
+      },
+    ),
+    '',
+  );
+  assert.equal(
+    await readOverlayText(
+      async () => true,
+      async () => '',
+    ),
+    '',
+  );
+  assert.equal(
+    await readOverlayText(
+      async () => true,
+      async () => 'different error',
+    ),
+    'different error',
+  );
 });

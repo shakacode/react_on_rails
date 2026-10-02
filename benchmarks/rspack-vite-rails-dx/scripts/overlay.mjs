@@ -14,6 +14,7 @@ import {
   parseEditorInvocation,
   replaceBenchmarkMarker,
   restorationVisible,
+  readOverlayText,
   runtimeErrorMarker,
   sourceLocationVisible,
   sourceLinkPattern,
@@ -257,8 +258,8 @@ async function restoreHealthy(session, tool, healthySource) {
   }
   return {
     status: 'FAIL',
-    health_marker_observed: false,
-    evidence: `ready=${lastReady}; overlay=${excerpt(redactEvidence(lastOverlay, session))}`,
+    health_marker_observed: lastReady,
+    evidence: `ready=${lastReady}; overlay=${excerpt(redactEvidence(lastOverlay ?? 'Overlay state unavailable.', session))}`,
   };
 }
 
@@ -267,12 +268,14 @@ async function currentOverlayText(page, tool) {
     tool === 'rspack'
       ? page.locator('#rspack-dev-server-client-overlay')
       : page.locator('vite-error-overlay');
-  if (!(await host.isVisible().catch(() => false))) return '';
   const locator =
     tool === 'rspack'
       ? page.frameLocator('#rspack-dev-server-client-overlay').locator('body')
       : host.locator('.window');
-  return (await locator.textContent({ timeout: 500 }).catch(() => '')) ?? '';
+  return await readOverlayText(
+    () => host.isVisible(),
+    () => locator.textContent({ timeout: 500 }),
+  );
 }
 
 async function waitForEditorInvocation() {

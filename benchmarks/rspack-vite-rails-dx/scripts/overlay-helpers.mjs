@@ -108,7 +108,7 @@ export async function waitForSourceOverlay(readText, marker, sourcePath, line, t
   let lastMatchingText;
   while (Date.now() < deadline) {
     const text = await readText();
-    if (text.includes(marker)) {
+    if (typeof text === 'string' && text.includes(marker)) {
       lastMatchingText = text;
       if (sourceLocationVisible(text, sourcePath, line)) return text;
     }
@@ -118,5 +118,12 @@ export async function waitForSourceOverlay(readText, marker, sourcePath, line, t
 }
 
 export function restorationVisible(healthyMarkerVisible, overlayText) {
-  return healthyMarkerVisible && overlayText.trim() === '';
+  return healthyMarkerVisible && typeof overlayText === 'string' && overlayText.trim() === '';
+}
+
+export async function readOverlayText(isVisible, readText) {
+  const visible = await isVisible().catch(() => undefined);
+  if (visible === false) return '';
+  if (visible !== true) return undefined;
+  return (await readText().catch(() => undefined)) ?? undefined;
 }
