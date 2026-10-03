@@ -21,6 +21,7 @@ import '@testing-library/jest-dom';
 
 import { createRSCProvider, useRSC } from '../src/RSCProvider.tsx';
 import RSCRoute, { type RSCRouteHandle, useCurrentRSCRoute } from '../src/RSCRoute.tsx';
+import { trackRSCStreamCompletion } from '../src/RSCStreamCompletion.ts';
 import { flushMacrotasks, getNodeVersion } from './testUtils';
 
 type GetServerComponentArgs = {
@@ -594,6 +595,276 @@ class CapturingErrorBoundary extends React.Component<
 
     await waitFor(() => expect(screen.getByTestId('card')).toHaveTextContent('Card v2'));
     expect(screen.queryByTestId('recoverable-error')).not.toBeInTheDocument();
+    expect(ref.current!.refetchError).toBeNull();
+  });
+
+  it('production recovers a boundary render error after the refetch root has resolved', async () => {
+    process.env.NODE_ENV = 'production';
+    const boundaryError = new Error('Flight boundary failed');
+    const BrokenBoundary = (): React.ReactNode => {
+      throw boundaryError;
+    };
+    setupSequencedFetcher([
+      <div data-testid="card">
+        Card v1
+        <RecoverableInlineControls />
+      </div>,
+      <div>
+        <Suspense fallback="pending boundary">
+          <BrokenBoundary />
+        </Suspense>
+      </div>,
+      <div data-testid="card">
+        Card v2
+        <RecoverableInlineControls />
+      </div>,
+    ]);
+    const onRefetchError = jest.fn();
+    const ref = React.createRef<RSCRouteHandle>();
+    await renderInAct(
+      <TestHarness>
+        <CapturingErrorBoundary fallback={(error) => <div data-testid="route-error">{error.message}</div>}>
+          <RSCRoute
+            ref={ref}
+            componentName="UserCard"
+            componentProps={{ id: 1 }}
+            onRefetchError={onRefetchError}
+          />
+        </CapturingErrorBoundary>
+      </TestHarness>,
+    );
+    await act(async () => {
+      // Flight decoding resolves the root element; the nested boundary throws
+      // only when React renders that element, not in the fetch promise chain.
+      await expect(ref.current!.refetch()).resolves.toEqual(expect.anything());
+    });
+    expect(screen.queryByTestId('route-error')).not.toBeInTheDocument();
+    expect(screen.getByTestId('card')).toHaveTextContent('Card v1');
+    await waitFor(() => expect(onRefetchError).toHaveBeenCalledTimes(1));
+    expect(ref.current!.refetchError?.originalError).toBe(boundaryError);
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('inline-retry'));
+    });
+    await waitFor(() => expect(screen.getByTestId('card')).toHaveTextContent('Card v2'));
+    expect(ref.current!.refetchError).toBeNull();
+  });
+
+  it.each(['none', 'completed', 'pending'])(
+    'does not recover unrelated client errors during or after a refetch stream (stream=%s)',
+    async (stream) => {
+      process.env.NODE_ENV = 'production';
+      const ClientCard = () => {
+        const [broken, setBroken] = React.useState(false);
+        if (broken) throw new Error('unrelated client error');
+        return <button onClick={() => setBroken(true)}>Break client card</button>;
+      };
+      let finish!: (value: boolean) => void;
+      const completion = new Promise<boolean>((resolve) => {
+        finish = resolve;
+      });
+      const candidate = <ClientCard />;
+      setupSequencedFetcher([
+        <span>Old card</span>,
+        stream !== 'none' ? trackRSCStreamCompletion(candidate, { completion, hasErrors: false }) : candidate,
+      ]);
+      const ref = React.createRef<RSCRouteHandle>();
+      const onError = jest.fn();
+      await renderInAct(
+        <TestHarness>
+          <CapturingErrorBoundary fallback={(error) => <div>{error.message}</div>}>
+            <RSCRoute ref={ref} componentName="Card" componentProps={{}} onRefetchError={onError} />
+          </CapturingErrorBoundary>
+        </TestHarness>,
+      );
+      await act(async () => {
+        await ref.current!.refetch();
+      });
+      if (stream === 'completed') await act(async () => finish(true));
+      await act(async () => {
+        fireEvent.click(screen.getByText('Break client card'));
+      });
+      expect(screen.getByText('unrelated client error')).toBeInTheDocument();
+      expect(screen.queryByText('Old card')).not.toBeInTheDocument();
+      expect(onError).not.toHaveBeenCalled();
+    },
+  );
+
+  it('does not notify a refetch error for a client update while the replacement root is pending', async () => {
+    process.env.NODE_ENV = 'production';
+    const ClientCard = () => {
+      const [broken, setBroken] = React.useState(false);
+      if (broken) throw new Error('retained client error');
+      return <button onClick={() => setBroken(true)}>Break retained card</button>;
+    };
+    let finish!: (payload: React.ReactNode) => void;
+    const pending = new Promise<React.ReactNode>((resolve) => {
+      finish = resolve;
+    });
+    getServerComponent.mockResolvedValueOnce(<ClientCard />).mockReturnValueOnce(pending);
+    const ref = React.createRef<RSCRouteHandle>();
+    const onError = jest.fn();
+    await renderInAct(
+      <TestHarness>
+        <CapturingErrorBoundary fallback={(error) => <div>{error.message}</div>}>
+          <RSCRoute ref={ref} componentName="Card" componentProps={{}} onRefetchError={onError} />
+        </CapturingErrorBoundary>
+      </TestHarness>,
+    );
+    let refetch!: Promise<React.ReactNode>;
+    await act(async () => {
+      refetch = ref.current!.refetch();
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByText('Break retained card'));
+    });
+    expect(onError).not.toHaveBeenCalled();
+    await act(async () => {
+      finish(<span>New content</span>);
+      await refetch;
+    });
+    expect(screen.getByText('New content')).toBeInTheDocument();
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  it('notifies the initiating sibling when another route restores a failed render first', async () => {
+    process.env.NODE_ENV = 'production';
+    const boundaryError = new Error('shared Flight boundary failed');
+    const BrokenBoundary = (): React.ReactNode => {
+      throw boundaryError;
+    };
+    setupSequencedFetcher([<span>Shared v1</span>, <BrokenBoundary />, <span>Shared v2</span>]);
+    const leftRef = React.createRef<RSCRouteHandle>();
+    const rightRef = React.createRef<RSCRouteHandle>();
+    const onLeftError = jest.fn();
+    const onRightError = jest.fn();
+    await renderInAct(
+      <TestHarness>
+        <RSCRoute ref={leftRef} componentName="Shared" componentProps={{}} onRefetchError={onLeftError} />
+        <RSCRoute ref={rightRef} componentName="Shared" componentProps={{}} onRefetchError={onRightError} />
+      </TestHarness>,
+    );
+    await act(async () => {
+      await rightRef.current!.refetch();
+    });
+    expect(screen.getAllByText('Shared v1')).toHaveLength(2);
+    await waitFor(() => expect(onRightError).toHaveBeenCalledTimes(1));
+    expect(onLeftError).not.toHaveBeenCalled();
+    expect(leftRef.current!.refetchError).toBeNull();
+    expect(rightRef.current!.refetchError?.originalError).toBe(boundaryError);
+    await act(async () => {
+      await rightRef.current!.retry();
+    });
+    expect(screen.getAllByText('Shared v2')).toHaveLength(2);
+    expect(rightRef.current!.refetchError).toBeNull();
+  });
+
+  it('repeated render failures do not replace the retained successful snapshot', async () => {
+    process.env.NODE_ENV = 'production';
+    const BrokenBoundary = (): React.ReactNode => {
+      throw new Error('boundary failed again');
+    };
+    setupSequencedFetcher([
+      <span>Good content</span>,
+      <BrokenBoundary />,
+      <BrokenBoundary />,
+      <span>Recovered content</span>,
+    ]);
+    const ref = React.createRef<RSCRouteHandle>();
+    const onError = jest.fn();
+    await renderInAct(
+      <TestHarness>
+        <RSCRoute ref={ref} componentName="Card" componentProps={{}} onRefetchError={onError} />
+      </TestHarness>,
+    );
+    await act(async () => {
+      await ref.current!.refetch();
+    });
+    await waitFor(() => expect(onError).toHaveBeenCalledTimes(1));
+    await act(async () => {
+      await ref.current!.retry();
+    });
+    expect(screen.getByText('Good content')).toBeInTheDocument();
+    await waitFor(() => expect(onError).toHaveBeenCalledTimes(2));
+    await act(async () => {
+      await ref.current!.retry();
+    });
+    expect(screen.getByText('Recovered content')).toBeInTheDocument();
+    expect(ref.current!.refetchError).toBeNull();
+  });
+
+  it.each([
+    [true, false],
+    [false, false],
+    [true, true],
+    [false, true],
+  ])(
+    'only promotes a completed healthy Flight root (completion=%s, primitive=%s)',
+    async (successful, primitive) => {
+      process.env.NODE_ENV = 'production';
+      let finish!: (value: boolean) => void;
+      const completion = new Promise<boolean>((resolve) => {
+        finish = resolve;
+      });
+      const candidate = trackRSCStreamCompletion(
+        primitive ? 'Streamed candidate' : <span>Streamed candidate</span>,
+        { completion, hasErrors: false },
+      );
+      const BrokenBoundary = (): React.ReactNode => {
+        throw new Error('later render failure');
+      };
+      setupSequencedFetcher([<span>Initial content</span>, candidate, <BrokenBoundary />]);
+      const ref = React.createRef<RSCRouteHandle>();
+      await renderInAct(
+        <TestHarness>
+          <RSCRoute ref={ref} componentName="Card" componentProps={{}} />
+        </TestHarness>,
+      );
+      await act(async () => {
+        await ref.current!.refetch();
+      });
+      expect(screen.getByText('Streamed candidate')).toBeInTheDocument();
+      if (successful) {
+        await act(async () => finish(true));
+      }
+      await act(async () => {
+        await ref.current!.refetch();
+      });
+      expect(screen.getByText(successful ? 'Streamed candidate' : 'Initial content')).toBeInTheDocument();
+      if (!successful) {
+        await act(async () => finish(false));
+        expect(screen.getByText('Initial content')).toBeInTheDocument();
+      }
+      expect(ref.current!.refetchError).not.toBeNull();
+    },
+  );
+
+  it.each(['pending', 'errored'])('preserves initial-root recovery with a %s stream', async (state) => {
+    process.env.NODE_ENV = 'production';
+    const completion = state === 'pending' ? new Promise<boolean>(() => {}) : Promise.resolve(false);
+    const initial = trackRSCStreamCompletion(<span>Initial content</span>, { completion, hasErrors: false });
+    const error = new Error('HTTP failure');
+    setupSequencedFetcher([initial, rejectWith(error), rejectWith(error), <span>Recovered content</span>]);
+    const ref = React.createRef<RSCRouteHandle>();
+    const onError = jest.fn();
+    await renderInAct(
+      <TestHarness>
+        <RSCRoute ref={ref} componentName="Card" componentProps={{}} onRefetchError={onError} />
+      </TestHarness>,
+    );
+    await act(async () => {
+      await expect(ref.current!.refetch()).rejects.toThrow('HTTP failure');
+    });
+    expect(screen.getByText('Initial content')).toBeInTheDocument();
+    await waitFor(() => expect(onError).toHaveBeenCalledTimes(1));
+    await act(async () => {
+      await expect(ref.current!.retry()).rejects.toThrow('HTTP failure');
+    });
+    expect(screen.getByText('Initial content')).toBeInTheDocument();
+    await waitFor(() => expect(onError).toHaveBeenCalledTimes(2));
+    await act(async () => {
+      await ref.current!.retry();
+    });
+    expect(screen.getByText('Recovered content')).toBeInTheDocument();
     expect(ref.current!.refetchError).toBeNull();
   });
 

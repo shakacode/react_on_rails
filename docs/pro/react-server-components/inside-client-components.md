@@ -629,9 +629,15 @@ function Dashboard() {
 }
 ```
 
-`ref.current.refetch()` returns a `Promise<ReactNode>` that resolves with the new tree and rejects with `ServerComponentFetchError` when the refetch fails. If you don't await the promise, attach a `.catch(...)` as shown so failed refetches don't become unhandled rejections. The `<RSCRoute>` still updates on its own, and the current content stays visible while the new payload streams in (no Suspense fallback flash) thanks to an internal React transition.
+`ref.current.refetch()` returns a `Promise<ReactNode>` that resolves with the new tree and rejects with `ServerComponentFetchError` when the refetch fails. If you don't await the promise, attach a `.catch(...)` as shown so failed refetches don't become unhandled rejections. The `<RSCRoute>` updates on its own. An internal React transition retains the current content while the new root is pending; after that root resolves, its nested Suspense boundaries can still stream and show their own fallbacks.
 
 In production, failed client-control refetches are recoverable: the last successful route content remains visible, `ref.current.refetchError` is set, and `ref.current.retry()` fetches the route's current `componentName` and `componentProps`. If props changed after the failure, `retry()` attempts the new request; call `clearRefetchError()` to dismiss the old error without fetching. Pass `onRefetchError` to `<RSCRoute>` when a parent or sibling needs to report the failure or update its own error UI. The callback receives the error after the handle's `refetchError` state has committed. In development, the failed refetch still throws through the route so the real `ServerComponentFetchError` and component context are visible.
+
+An HTTP 200 Flight response can contain errors in individual streamed boundaries. Its root promise may resolve before a descendant throws, so a `.catch(...)` alone cannot observe every failure. Use `refetchError` or `onRefetchError` for late render errors as well. Production recovery restores the previous content and leaves Retry available, but can remount descendant client components and reset their local state.
+
+Scalar HTTP roots (strings, numbers, booleans, `null` or `undefined`) are normalized into one-item `ReactNode` arrays. Their rendered output is unchanged; the array keeps stream-completion metadata isolated per request. A clean EOF inside a length-prefixed record is a failed response, not a successful completion.
+
+A streamed refetch becomes the recovery snapshot only after its stream completes without errors. Until then, a failed overlapping refetch restores the earlier completed snapshot. A successful Retry clears `refetchError` at that completion point, not merely when its root resolves. Unrelated client errors reach the normal boundary while an otherwise healthy stream is still pending. After a successful render and error-free completion, later client errors also reach that boundary rather than restoring stale route content.
 
 Recoverable refetches keep the last successful rendered `ReactNode` promise in the provider cache for each unique `componentName` and `componentProps` pair until the provider unmounts. Use this pattern for stable, low-cardinality route props; high-churn props such as per-user IDs in a long-lived single-page session can retain more rendered subtrees. Bounded eviction is tracked in [issue 3564](https://github.com/shakacode/react_on_rails/issues/3564).
 
@@ -660,7 +666,7 @@ export function InlineRefreshButton() {
 }
 ```
 
-The hook returns the same `RSCRouteHandle` as the ref. In production, descendants can render `refetchError` and call `retry()` while the previous server-rendered content remains mounted. Calling it outside an `<RSCRoute>` ancestor throws an error.
+The hook returns the same `RSCRouteHandle` as the ref. In production, descendants can render `refetchError` and call `retry()` while the previous server-rendered content remains available. Calling it outside an `<RSCRoute>` ancestor throws an error.
 
 ### `useRSC().refetchComponent(name, props)` for error retry
 

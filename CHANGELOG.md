@@ -24,6 +24,16 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Breaking Changes
+
+- **[Pro]** **HTTP-fetched scalar RSC results resolve as one-item arrays.** String, number,
+  boolean, null, and undefined roots returned by `getComponent()`, `refetch()`, or `retry()`
+  are wrapped in arrays for per-request stream tracking. Embedded hydration still returns raw
+  scalars. React renders both shapes identically, but code inspecting the resolved value must
+  unwrap the HTTP result before scalar comparisons or processing. This affects initial HTTP
+  loads as well as refetches. [PR 5135](https://github.com/shakacode/react_on_rails/pull/5135) by
+  [Justin Gordon](https://github.com/justin808).
+
 #### Added
 
 - **[Pro]** **React 19.3 support with `react-on-rails-rsc@19.3.1-rc.0`**: The node renderer startup
@@ -40,6 +50,16 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [justin808](https://github.com/justin808).
 
 #### Fixed
+
+- **[Pro]** **Production refetch recovery handles streamed boundary errors.** HTTP 200 Flight
+  responses whose root resolves before a descendant fails now restore the previous route content,
+  report `refetchError` and `onRefetchError`, and keep Retry available. Restoring content can remount
+  descendant client components and reset their local state. Incomplete records are classified as failed
+  streams, but failed completion alone does not notify when the decoded root never throws. Initial-load
+  render failures still propagate to the outer error boundary. Fixes
+  [Issue 5078](https://github.com/shakacode/react_on_rails/issues/5078).
+  [PR 5135](https://github.com/shakacode/react_on_rails/pull/5135) by
+  [Justin Gordon](https://github.com/justin808).
 
 - **[Pro]** **RSC streams no longer encode consumer logs into the Flight payload**: React 19.3 development
   Flight keeps a console hook active while it flushes chunks, so logs from code consuming the returned RSC
