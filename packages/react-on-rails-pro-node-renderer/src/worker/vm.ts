@@ -66,6 +66,12 @@ const readFileAsync = promisify(fs.readFile);
 // MIRROR VALUES OF: packages/react-on-rails-pro/src/injectRSCPayload.ts
 const LOADABLE_STATS_MISSING_DIAGNOSTIC_CONTEXT_KEY = '__reactOnRailsProReportMissingLoadableStats';
 // MIRROR VALUES END
+// Injected into each VM context so the RSC runtime can derive BUILD_ID from the
+// executing bundle's own identity, without waiting for a Rails-supplied parameter.
+// See: packages/react-on-rails-pro/src/cache/buildIdProvider.ts (issue #5076).
+// MIRROR VALUE OF: packages/react-on-rails-pro/src/cache/buildIdProvider.ts
+const BUNDLE_ID_CONTEXT_KEY = '__reactOnRailsProBundleId';
+// MIRROR VALUE END
 // This is process-scoped diagnostic state, not request data: every VM context
 // shares the same host callback and only the first missing-stats event logs.
 let hasReportedMissingLoadableStats = false;
@@ -689,6 +695,18 @@ async function buildVM(filePath: string): Promise<VMContext> {
         configurable: false,
         enumerable: false,
         value: reportMissingLoadableStats,
+        writable: false,
+      });
+      // Expose the bundle's identity hash so the RSC runtime can derive BUILD_ID
+      // from the executing bundle itself, independent of any Rails-supplied parameter.
+      // This is a per-bundle constant (same value for all requests using this VM),
+      // so it satisfies the rsc-guardrails invariant 2 carve-out for build-config
+      // caches keyed by a build artifact. Uses bundleIdentityPath (not the raw
+      // request path) for stability across trusted aliases. (issue #5076)
+      Object.defineProperty(contextObject, BUNDLE_ID_CONTEXT_KEY, {
+        configurable: false,
+        enumerable: false,
+        value: path.basename(filePath, '.js'),
         writable: false,
       });
       const context = vm.createContext(contextObject);

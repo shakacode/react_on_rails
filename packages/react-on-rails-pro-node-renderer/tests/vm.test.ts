@@ -241,6 +241,80 @@ describe('buildVM and runInVM', () => {
 
       expect(infoSpy).toHaveBeenCalledTimes(2);
     });
+
+    // --- BUILD_ID injection (issue #5076) ---
+    // Test probes for the cross-package contract defined in src/worker/vm.ts and
+    // packages/react-on-rails-pro/src/cache/buildIdProvider.ts.
+    const BUNDLE_ID_CONTEXT_KEY = '__reactOnRailsProBundleId';
+
+    test('injects the bundle identity as a tamper-proof, non-enumerable property', async () => {
+      getConfig().supportModules = false;
+      await createUploadedBundleForTest();
+      const executionContext = await buildExecutionContext(
+        [uploadedBundlePathForTest()],
+        /* buildVmsIfNeeded */ true,
+      );
+      const bundlePath = uploadedBundlePathForTest();
+      const expectedBundleId = path.basename(bundlePath, '.js');
+
+      // Verify the property value matches path.basename of the bundle path
+      expect(
+        await executionContext.runInVM(`globalThis[${JSON.stringify(BUNDLE_ID_CONTEXT_KEY)}]`, bundlePath),
+      ).toBe(expectedBundleId);
+
+      // Verify the property descriptor is locked down
+      expect(
+        await executionContext.runInVM(
+          `(() => {
+            const descriptor = Object.getOwnPropertyDescriptor(
+              globalThis,
+              ${JSON.stringify(BUNDLE_ID_CONTEXT_KEY)},
+            );
+            const replaced = Reflect.set(
+              globalThis,
+              ${JSON.stringify(BUNDLE_ID_CONTEXT_KEY)},
+              'tampered',
+            );
+            return {
+              configurable: descriptor.configurable,
+              enumerable: descriptor.enumerable,
+              replaced,
+              writable: descriptor.writable,
+              stillOriginal: globalThis[${JSON.stringify(BUNDLE_ID_CONTEXT_KEY)}] === ${JSON.stringify(expectedBundleId)},
+            };
+          })()`,
+          bundlePath,
+        ),
+      ).toBe(
+        JSON.stringify({
+          configurable: false,
+          enumerable: false,
+          replaced: false,
+          writable: false,
+          stillOriginal: true,
+        }),
+      );
+    });
+
+    test('protects the bundle identity from additionalContext overrides', async () => {
+      getConfig().supportModules = false;
+      getConfig().additionalContext = {
+        [BUNDLE_ID_CONTEXT_KEY]: 'attacker-controlled-value',
+      };
+      await createUploadedBundleForTest();
+      const executionContext = await buildExecutionContext(
+        [uploadedBundlePathForTest()],
+        /* buildVmsIfNeeded */ true,
+      );
+      const bundlePath = uploadedBundlePathForTest();
+      const expectedBundleId = path.basename(bundlePath, '.js');
+
+      // Object.defineProperty runs after additionalContext is applied,
+      // so the host-injected value must win over any additionalContext override.
+      expect(
+        await executionContext.runInVM(`globalThis[${JSON.stringify(BUNDLE_ID_CONTEXT_KEY)}]`, bundlePath),
+      ).toBe(expectedBundleId);
+    });
   });
 
   describe('additionalContext', () => {
