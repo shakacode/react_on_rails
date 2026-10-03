@@ -17,9 +17,25 @@ export interface CacheEntry {
   value: Buffer[];
   revalidate: number;
   timestamp: number;
+  /**
+   * Labels for tag-based invalidation. Optional: entries written by older
+   * package versions (or by callers not using tags) have none and are never
+   * refused by tag checks.
+   */
+  tags?: string[];
 }
 
 export interface CacheHandler {
   get(key: string): Promise<CacheEntry | null>;
   set(key: string, entry: CacheEntry): Promise<void>;
+  /**
+   * Optional. Makes every entry whose tags include `tag` AND whose
+   * `timestamp` <= `invalidatedAt` invisible to `get()` from now on.
+   * Implementations MUST keep the maximum invalidation time seen per tag
+   * (never regress it), MUST compare with `>=` (ties refuse), and MUST
+   * refuse only on a RECORDED stamp (a tag never invalidated refuses
+   * nothing). `invalidatedAt` is epoch milliseconds; when omitted or not
+   * finite, now.
+   */
+  revalidateTag?(tag: string, invalidatedAt?: number): Promise<void>;
 }

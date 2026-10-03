@@ -26,6 +26,30 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Added
 
+- **[Pro]** **Tag-based invalidation groundwork for the RSC cache**: `unstable_cache` accepts a
+  `tags` option (a static array, or a function of the call's arguments), the `CacheHandler` interface
+  gains an optional `revalidateTag(tag, invalidatedAt?)` method, the in-memory handler implements it
+  with mark-stale semantics, and `unstable_revalidateTag` is exported from `react-on-rails-pro/cache`.
+  Invalidation is per-process at this stage; the Node Renderer endpoint and Rails bridge land
+  separately. Part of [Issue 5077](https://github.com/shakacode/react_on_rails/issues/5077).
+  [PR 5122](https://github.com/shakacode/react_on_rails/pull/5122) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- **[Pro]** **Redis and tiered tag invalidation for the RSC cache**: `RedisCacheHandler` implements
+  `revalidateTag` with monotonic per-tag stamps (written atomically via Lua), persists entry tags in a
+  versioned binary format, and refuses and cleans up invalidated entries on read — one
+  `unstable_revalidateTag` call is now visible to every worker and machine sharing the Redis.
+  `TieredCacheHandler` forwards `revalidateTag` to both layers (tagged entries are not promoted from
+  L2 into L1; see the docs). Entries written by pre-tags package versions live under a different key
+  namespace and are never read after the upgrade; they expire via their own TTLs.
+  **Action required for upgraders:** on a shared Redis, (1) set a `volatile-*` eviction policy —
+  under `allkeys-*`, eviction can drop invalidation stamps while cached entries survive,
+  resurrecting stale data (the handler warns on connect when it detects one); (2) if you used
+  `revalidate: 0` with tags' predecessor entries, delete the orphaned old-namespace blobs manually —
+  see the migration note in the
+  [unstable_cache docs](https://reactonrails.com/docs/pro/react-server-components/unstable-cache). Part of
+  [Issue 5077](https://github.com/shakacode/react_on_rails/issues/5077).
+  [PR 5122](https://github.com/shakacode/react_on_rails/pull/5122) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
 - **[Pro]** **React 19.3 support with `react-on-rails-rsc@19.3.1-rc.0`**: The node renderer startup
   check and `react_on_rails:doctor` now accept `react-on-rails-rsc` 19.3.1-rc.0 (npm `next`) and later
   19.3.1+ releases with React/React DOM 19.3.x. The `react-on-rails-pro` optional peer range admits
@@ -256,6 +280,12 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Changed
 
+- **[Pro]** **RSC cache entries are now timestamped at render start** (was: at store time), so a tag
+  invalidation during an in-flight render correctly refuses the entry that render stores. For handlers
+  that enforce expiry from the entry timestamp (the in-memory handler), effective TTL shrinks by the
+  render duration; `RedisCacheHandler`'s Redis-side `EX` TTL is unchanged.
+  [PR 5122](https://github.com/shakacode/react_on_rails/pull/5122) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
 - **[Pro]** **License**: React on Rails Pro moves to The React on Rails Pro License 3.0, an application of ShakaCode
   Trust-Based Commercial Licensing that matches ShakaPerf: free in production for small organizations, charities,
   educational institutions, and hospitals; 45-day production evaluation; 30-day grace after a subscription lapses;
