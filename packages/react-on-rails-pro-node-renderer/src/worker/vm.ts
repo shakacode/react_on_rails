@@ -23,6 +23,7 @@ import path from 'path';
 import vm from 'vm';
 import m from 'module';
 import cluster from 'cluster';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import type { Readable } from 'stream';
 import { ReadableStream } from 'stream/web';
 import { performance as monotonicPerformance } from 'node:perf_hooks';
@@ -66,6 +67,8 @@ const readFileAsync = promisify(fs.readFile);
 // MIRROR VALUES OF: packages/react-on-rails-pro/src/injectRSCPayload.ts
 const LOADABLE_STATS_MISSING_DIAGNOSTIC_CONTEXT_KEY = '__reactOnRailsProReportMissingLoadableStats';
 // MIRROR VALUES END
+const HYDRATED_STORE_SCOPE_CONTEXT_KEY = 'reactOnRailsHydratedStoreScope';
+const hydratedStoreScope = new AsyncLocalStorage<Map<object, unknown>>();
 // This is process-scoped diagnostic state, not request data: every VM context
 // shares the same host callback and only the first missing-stats event logs.
 let hasReportedMissingLoadableStats = false;
@@ -683,6 +686,12 @@ async function buildVM(filePath: string): Promise<VMContext> {
       if (additionalContextIsObject) {
         extendContext(contextObject, additionalContext);
       }
+      Object.defineProperty(contextObject, HYDRATED_STORE_SCOPE_CONTEXT_KEY, {
+        configurable: false,
+        enumerable: false,
+        value: Object.freeze({ getStore: () => hydratedStoreScope.getStore() }),
+        writable: false,
+      });
       // Install this after every context extension so application configuration
       // and bundle code cannot redirect the server path into replayed VM console history.
       Object.defineProperty(contextObject, LOADABLE_STATS_MISSING_DIAGNOSTIC_CONTEXT_KEY, {
@@ -964,6 +973,7 @@ export async function buildExecutionContext(
   // It allows data to be shared between the initial render and subsequent update chunks.
   // Example: asyncPropsManager is stored here during initial render and accessed by update chunks.
   const sharedExecutionContext = new Map();
+  const requestHydratedStores = new Map<object, unknown>();
   let released = false;
 
   const runInVM = async (renderingRequest: string, bundleFilePath: string, vmCluster?: typeof cluster) => {
@@ -998,28 +1008,37 @@ export async function buildExecutionContext(
       // so that code can store/retrieve data (e.g., asyncPropsManager).
       // IMPORTANT: We clean up immediately after execution to prevent the VM context
       // (which may be reused by other requests) from retaining references to this request's data.
-      let result = sharedConsoleHistory.trackConsoleHistoryInRenderRequest(() => {
-        context.renderingRequest = renderingRequest;
-        context.sharedExecutionContext = sharedExecutionContext;
-        context.runOnOtherBundle = (bundleTimestamp: string | number, newRenderingRequest: string) => {
-          const otherBundleFilePath = getRequestBundleFilePath(bundleTimestamp);
-          return runInVM(newRenderingRequest, otherBundleFilePath, vmCluster);
-        };
+      let result = hydratedStoreScope.run(requestHydratedStores, () =>
+        sharedConsoleHistory.trackConsoleHistoryInRenderRequest(() => {
+          context.renderingRequest = renderingRequest;
+          context.sharedExecutionContext = sharedExecutionContext;
+          context.runOnOtherBundle = (bundleTimestamp: string | number, newRenderingRequest: string) => {
+            const otherBundleFilePath = getRequestBundleFilePath(bundleTimestamp);
+            return runInVM(newRenderingRequest, otherBundleFilePath, vmCluster);
+          };
 
-        try {
-          return vm.runInContext(renderingRequest, context) as RenderCodeResult;
-        } finally {
-          // Clean up references immediately after execution.
-          // Note: sharedExecutionContext itself is NOT cleared here - it persists
-          // for the lifetime of this ExecutionContext so that update chunks can access it.
-          // We only remove the VM context's reference to prevent cross-request data access.
-          context.renderingRequest = undefined;
-          context.sharedExecutionContext = undefined;
-          context.runOnOtherBundle = undefined;
-        }
-      });
+          try {
+            return vm.runInContext(renderingRequest, context) as RenderCodeResult;
+          } finally {
+            // Clean up references immediately after execution.
+            // Note: sharedExecutionContext itself is NOT cleared here - it persists
+            // for the lifetime of this ExecutionContext so that update chunks can access it.
+            // We only remove the VM context's reference to prevent cross-request data access.
+            context.renderingRequest = undefined;
+            context.sharedExecutionContext = undefined;
+            context.runOnOtherBundle = undefined;
+          }
+        }),
+      );
 
       if (isReadableStream(result)) {
+        // Consumer-driven reads and teardown can begin outside the render's async context.
+        const stream = result;
+        const read = stream.read.bind(stream);
+        const destroy = stream.destroy.bind(stream);
+        stream.read = (size?: number) => hydratedStoreScope.run(requestHydratedStores, () => read(size));
+        stream.destroy = (error?: Error) =>
+          hydratedStoreScope.run(requestHydratedStores, () => destroy(error));
         const reportedErrors = new WeakSet<object>();
         // A stream error thrown inside the sandboxed VM realm is a genuine Error, but it
         // fails the worker-realm `instanceof Error` check because it comes from a different

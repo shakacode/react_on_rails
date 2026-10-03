@@ -2,6 +2,23 @@ import type { Store, StoreGenerator } from './types/index.ts';
 
 const registeredStoreGenerators = new Map<string, StoreGenerator>();
 const hydratedStores = new Map<string, Store>();
+const scopeKey = {};
+
+function currentHydratedStores(): Map<string, Store> {
+  const scopeStorage = (
+    globalThis as typeof globalThis & {
+      reactOnRailsHydratedStoreScope?: { getStore: () => Map<object, unknown> | undefined };
+    }
+  ).reactOnRailsHydratedStoreScope;
+  const scope = scopeStorage?.getStore();
+  if (!scope) return hydratedStores;
+  let stores = scope.get(scopeKey) as Map<string, Store> | undefined;
+  if (!stores) {
+    stores = new Map<string, Store>();
+    scope.set(scopeKey, stores);
+  }
+  return stores;
+}
 
 export default {
   /**
@@ -40,15 +57,16 @@ export default {
    * @returns Redux Store, possibly hydrated
    */
   getStore(name: string, throwIfMissing = true): Store | undefined {
-    if (hydratedStores.has(name)) {
-      return hydratedStores.get(name);
+    const stores = currentHydratedStores();
+    if (stores.has(name)) {
+      return stores.get(name);
     }
 
     if (!throwIfMissing) {
       return undefined;
     }
 
-    const storeKeys = Array.from(hydratedStores.keys()).join(', ');
+    const storeKeys = Array.from(stores.keys()).join(', ');
 
     if (storeKeys.length === 0) {
       const msg = `There are no stores hydrated and you are requesting the store ${name}.
@@ -89,14 +107,14 @@ This can happen if you are server rendering and either:
    * @param store (not the storeGenerator, but the hydrated store)
    */
   setStore(name: string, store: Store): void {
-    hydratedStores.set(name, store);
+    currentHydratedStores().set(name, store);
   },
 
   /**
    * Internally used function to completely clear hydratedStores Map.
    */
   clearHydratedStores(): void {
-    hydratedStores.clear();
+    currentHydratedStores().clear();
   },
 
   /**
@@ -119,7 +137,7 @@ This can happen if you are server rendering and either:
    * @returns Map where key is the component name and values are the hydrated stores.
    */
   stores(): Map<string, Store> {
-    return hydratedStores;
+    return currentHydratedStores();
   },
 
   /**

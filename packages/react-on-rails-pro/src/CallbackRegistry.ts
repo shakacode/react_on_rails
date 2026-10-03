@@ -50,7 +50,10 @@ export default class CallbackRegistry<T> {
 
   private timeoutId: NodeJS.Timeout | undefined;
 
-  constructor(registryType: string) {
+  constructor(
+    registryType: string,
+    private readonly bindPageLifecycle = true,
+  ) {
     this.registryType = registryType;
   }
 
@@ -84,7 +87,8 @@ export default class CallbackRegistry<T> {
   }
 
   private initializeTimeoutEvents() {
-    if (this.timeoutEventsInitialized) return;
+    // Server registries must not be retained by browser page-lifecycle callbacks.
+    if (!this.bindPageLifecycle || this.timeoutEventsInitialized) return;
     this.timeoutEventsInitialized = true;
 
     onPageLoaded(() => {

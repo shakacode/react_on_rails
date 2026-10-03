@@ -118,6 +118,8 @@ const config: KnipConfig = {
         'src/worker.ts!',
         // License validator: reset() is used in tests, getLicenseStatus/LicenseStatus imported by master.ts
         'src/shared/licenseValidator.ts!',
+        // esbuild loads this regression fixture by path rather than a TypeScript import.
+        'tests/fixtures/concurrentStoreApp.ts',
       ],
       project: ['src/**/*.[jt]s{x,}!', 'tests/**/*.[jt]s{x,}', '!lib/**'],
       ignore: [
