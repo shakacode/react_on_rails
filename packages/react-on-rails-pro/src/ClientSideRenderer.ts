@@ -376,7 +376,12 @@ You should return a React.Component always for the client side entry point.`);
             { componentName: name || undefined, domNodeId: domNodeId || undefined },
             shouldHydrate,
           );
-          let renderOptions: Parameters<typeof reactHydrateOrRender>[3] = userErrorCallbackOptions;
+          let renderOptions: Parameters<typeof reactHydrateOrRender>[3] = {
+            ...userErrorCallbackOptions,
+            ...(shouldHydrate && this.ssrIdentifierPrefix
+              ? { identifierPrefix: this.ssrIdentifierPrefix }
+              : {}),
+          };
           if (wrappedByDefaultRSCProvider) {
             const { onRecoverableError: userOnRecoverableError, ...rootErrorCallbackOptions } =
               userErrorCallbackOptions;
