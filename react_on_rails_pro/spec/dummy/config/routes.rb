@@ -50,6 +50,7 @@ Rails.application.routes.draw do
   get "redis_receiver_for_testing" => "pages#redis_receiver_for_testing", as: :redis_receiver_for_testing
   get "stream_error_demo" => "pages#stream_error_demo", as: :stream_error_demo
   get "stream_shell_error_demo" => "pages#stream_shell_error_demo", as: :stream_shell_error_demo
+  get "streamed_use_id" => "pages#streamed_use_id", as: :streamed_use_id
   get "stream_async_components" => "pages#stream_async_components", as: :stream_async_components
   get "stream_async_components_for_testing" => "pages#stream_async_components_for_testing",
       as: :stream_async_components_for_testing
