@@ -13,6 +13,7 @@
  * https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
+import http from 'http';
 import FormData from 'form-data';
 import { Readable } from 'stream';
 // eslint-disable-next-line import/no-relative-packages
@@ -138,4 +139,60 @@ describe('multipart aggregate body limit', () => {
 
     expect(response.statusCode).toBe(200);
   });
+
+  test.each([
+    ['exactly at', BODY_SIZE_LIMIT, 200],
+    ['one byte over', BODY_SIZE_LIMIT + 1, 413],
+  ])(
+    'enforces the streamed total limit over HTTP/1.1 %s the limit',
+    async (_description, totalSize, status) => {
+      const app = worker({
+        fastifyServerOptions: { http2: false },
+        password: 'my_password',
+        serverBundleCachePath: serverBundleCachePath(testName),
+        stubTimers: false,
+        supportModules: true,
+      });
+
+      try {
+        await app.listen({ host: '127.0.0.1', port: 0 });
+        const address = app.server.address();
+        if (!address || typeof address === 'string') {
+          throw new Error('Expected the renderer to listen on a TCP port');
+        }
+        const form = createFormWithTotalSize(totalSize);
+        const payload = form.getBuffer();
+        const response = await new Promise<{ statusCode: number | undefined; body: string }>(
+          (resolve, reject) => {
+            const request = http.request({
+              host: '127.0.0.1',
+              port: address.port,
+              method: 'POST',
+              path: '/upload-assets',
+              headers: { ...form.getHeaders(), 'transfer-encoding': 'chunked' },
+            });
+            request.on('error', reject);
+            request.on('response', (reply) => {
+              const chunks: Buffer[] = [];
+              reply.on('error', reject);
+              reply.on('data', (chunk: Buffer) => chunks.push(chunk));
+              reply.on('end', () =>
+                resolve({ statusCode: reply.statusCode, body: Buffer.concat(chunks).toString() }),
+              );
+            });
+            request.end(payload);
+          },
+        );
+        expect(response.statusCode).toBe(status);
+        if (status === 413) {
+          expect(JSON.parse(response.body)).toMatchObject({
+            code: 'FST_ERR_CTP_BODY_TOO_LARGE',
+            statusCode: 413,
+          });
+        }
+      } finally {
+        await app.close();
+      }
+    },
+  );
 });

@@ -134,6 +134,7 @@ function limitMultipartRawPipe(payload: Readable, onLimitExceeded: () => void) {
     const countBytes = (chunk: Buffer | string) => {
       receivedBytes += Buffer.byteLength(chunk);
       if (receivedBytes > BODY_SIZE_LIMIT) {
+        payload.removeListener('data', countBytes);
         onLimitExceeded();
         payload.unpipe(destination);
         (destination as typeof destination & { destroy(streamError?: Error): void }).destroy(
