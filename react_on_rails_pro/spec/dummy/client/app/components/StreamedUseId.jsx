@@ -13,6 +13,8 @@
  * https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
+'use client';
+
 import React, { useEffect, useId, useState } from 'react';
 
 // Registered directly in the client/server packs to exercise a plain root without an RSC wrapper.
