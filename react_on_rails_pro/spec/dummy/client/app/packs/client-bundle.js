@@ -18,6 +18,7 @@ import '../assets/styles/application.css';
 import Rails from '@rails/ujs';
 import ReactOnRails from 'react-on-rails-pro';
 import Turbolinks from 'turbolinks';
+import StreamedUseId from '../components/StreamedUseId';
 import SharedReduxStore from '../stores/SharedReduxStore';
 
 // Start rails-ujs so `remote: true` forms submit via XHR instead of a native
@@ -46,6 +47,8 @@ ReactOnRails.setOptions({
   // `turbo:*` events that Turbolinks never fires, silently disabling the page load/unload
   // lifecycle (component unmounting and per-page state cleanup on navigation).
 });
+
+ReactOnRails.register({ StreamedUseId });
 
 ReactOnRails.registerStoreGenerators({
   SharedReduxStore,

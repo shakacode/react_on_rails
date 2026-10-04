@@ -41,6 +41,11 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **Streamed `useId` hydration**: Client components now hydrate with the server's `useId` prefix even when
+  they are not wrapped by the default RSC provider. This prevents hydration mismatches and keeps
+  generated IDs consistent with accessible references. Fixes [Issue 5146](https://github.com/shakacode/react_on_rails/issues/5146).
+  [PR 5148](https://github.com/shakacode/react_on_rails/pull/5148) by [justin808](https://github.com/justin808).
+
 - **[Pro]** **RSC streams no longer encode consumer logs into the Flight payload**: React 19.3 development
   Flight keeps a console hook active while it flushes chunks, so logs from code consuming the returned RSC
   Readable were serialized as `:W["log"...]` rows. In non-production builds, RSC payload streams now use

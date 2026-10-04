@@ -18,6 +18,7 @@
  */
 
 import * as React from 'react';
+import { renderToString } from 'react-dom/server';
 import { getRailsContext, resetRailsContext } from 'react-on-rails/context';
 import { supportsReact19RootErrorCallbacks } from 'react-on-rails/reactApis';
 import type { RailsContext, RendererFunction } from 'react-on-rails/types';
@@ -526,6 +527,77 @@ describe('ClientSideRenderer', () => {
     } finally {
       getOrWaitForComponentSpy.mockRestore();
     }
+  });
+
+  it.each([
+    [false, false],
+    [true, false],
+    [false, true],
+  ])(
+    'hydrates plain useId roots with their server prefix (provider: %s, RSC URL: %s)',
+    async (registerProvider, enableRSC) => {
+      let updateLabel: React.Dispatch<React.SetStateAction<string>> | undefined;
+      const TestComponent = () => {
+        const id = React.useId();
+        const [label, setLabel] = React.useState('Server label');
+        updateLabel = setLabel;
+        return React.createElement('label', { id, htmlFor: id }, label);
+      };
+      ComponentRegistry.register({ TestComponent });
+      const serverHtml = renderToString(React.createElement(TestComponent), {
+        identifierPrefix: 'server-prefix-123',
+      });
+      const componentSpec = setupTestComponentDom('dom-id-123', serverHtml, {
+        ssrIdentifierPrefix: 'server-prefix-123',
+      });
+      addRailsContext(enableRSC ? { rscPayloadGenerationUrlPath: '/rsc_payload' } : {});
+      const providerFactory = jest.fn(({ reactElement }: DefaultRSCProviderFactoryArgs) => reactElement);
+      if (registerProvider) setDefaultRSCProviderFactory(providerFactory);
+      mockReactHydrateOrRender.mockImplementationOnce(
+        jest.requireActual('react-on-rails/reactHydrateOrRender').default,
+      );
+
+      try {
+        await React.act(async () => {
+          await renderOrHydrateComponent(componentSpec);
+        });
+        expect(providerFactory).not.toHaveBeenCalled();
+        expect(console.error).not.toHaveBeenCalled();
+        expect(document.getElementById('dom-id-123')?.innerHTML).toBe(serverHtml);
+
+        await React.act(() => {
+          updateLabel?.('Client label');
+        });
+        const label = document.querySelector('#dom-id-123 label');
+        expect(label?.textContent).toBe('Client label');
+        expect(label?.getAttribute('for')).toBe(label?.id);
+        expect(label?.id).toContain('server-prefix-123');
+      } finally {
+        await React.act(() => unmountAll());
+      }
+    },
+  );
+
+  it.each(['<div>Server label</div>', ''])(
+    'does not add a prefix to plain roots without server prefix metadata (%s)',
+    async (mountHtml) => {
+      ComponentRegistry.register({ TestComponent: () => React.createElement('div', null, 'Client label') });
+      addRailsContext();
+      await renderOrHydrateComponent(setupTestComponentDom('dom-id-123', mountHtml));
+      expect(mockReactHydrateOrRender.mock.calls[0][3]).not.toHaveProperty('identifierPrefix');
+    },
+  );
+
+  it('ignores server prefix metadata when a plain root renders without hydration', async () => {
+    ComponentRegistry.register({ TestComponent: () => React.createElement('div', null, 'Client label') });
+    addRailsContext();
+    await renderOrHydrateComponent(
+      setupTestComponentDom('dom-id-123', '', {
+        ssrIdentifierPrefix: 'server-prefix-123',
+      }),
+    );
+    expect(mockReactHydrateOrRender.mock.calls[0][2]).toBe(false);
+    expect(mockReactHydrateOrRender.mock.calls[0][3]).not.toHaveProperty('identifierPrefix');
   });
 
   it('passes the bailout-aware recoverable handler for hydrated default-provider roots', async () => {
