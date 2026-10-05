@@ -120,6 +120,7 @@ const config: KnipConfig = {
         'src/shared/licenseValidator.ts!',
         // esbuild loads this regression fixture by path rather than a TypeScript import.
         'tests/fixtures/concurrentStoreApp.ts',
+        'tests/fixtures/concurrentStoreRSCApp.ts',
       ],
       project: ['src/**/*.[jt]s{x,}!', 'tests/**/*.[jt]s{x,}', '!lib/**'],
       ignore: [
