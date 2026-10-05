@@ -68,7 +68,27 @@ const readFileAsync = promisify(fs.readFile);
 const LOADABLE_STATS_MISSING_DIAGNOSTIC_CONTEXT_KEY = '__reactOnRailsProReportMissingLoadableStats';
 // MIRROR VALUES END
 const HYDRATED_STORE_SCOPE_CONTEXT_KEY = 'reactOnRailsHydratedStoreScope';
-const hydratedStoreScope = new AsyncLocalStorage<Map<object, unknown>>();
+// Host-required packages execute outside the VM realm. Share one storage even
+// when the renderer module is loaded more than once in this process.
+const hostScopeKey = Symbol.for('reactOnRailsHydratedStoreScope.host');
+type HostStoreScope = {
+  storage: AsyncLocalStorage<Map<object, unknown>>;
+  bridge: { getStore: () => Map<object, unknown> | undefined };
+};
+const hostStoreScope =
+  (globalThis as typeof globalThis & Partial<Record<symbol, HostStoreScope>>)[hostScopeKey] ??
+  (() => {
+    const storage = new AsyncLocalStorage<Map<object, unknown>>();
+    return Object.freeze({ storage, bridge: Object.freeze({ getStore: () => storage.getStore() }) });
+  })();
+Object.defineProperty(globalThis, hostScopeKey, { value: hostStoreScope });
+Object.defineProperty(globalThis, HYDRATED_STORE_SCOPE_CONTEXT_KEY, {
+  configurable: false,
+  enumerable: false,
+  value: hostStoreScope.bridge,
+  writable: false,
+});
+const hydratedStoreScope = hostStoreScope.storage;
 // This is process-scoped diagnostic state, not request data: every VM context
 // shares the same host callback and only the first missing-stats event logs.
 let hasReportedMissingLoadableStats = false;
@@ -689,7 +709,7 @@ async function buildVM(filePath: string): Promise<VMContext> {
       Object.defineProperty(contextObject, HYDRATED_STORE_SCOPE_CONTEXT_KEY, {
         configurable: false,
         enumerable: false,
-        value: Object.freeze({ getStore: () => hydratedStoreScope.getStore() }),
+        value: hostStoreScope.bridge,
         writable: false,
       });
       // Install this after every context extension so application configuration

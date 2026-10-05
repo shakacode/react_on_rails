@@ -32,11 +32,28 @@ const testName = 'concurrent-store-isolation';
 beforeEach(() => resetForTest(testName));
 afterAll(() => resetForTest(testName));
 
-test.each(['async SSR', 'streaming', 'RSC client provider', 'separate RSC bundle'])(
-  'two HTTP renders in one worker isolate hydrated stores: %s',
-  async (mode) => {
+test.each([
+  ['async SSR', false],
+  ['streaming', false],
+  ['RSC client provider', false],
+  ['separate RSC bundle', false],
+  ['async SSR', true],
+] as const)(
+  'two HTTP renders in one worker isolate hydrated stores: %s, host packages: %s',
+  async (mode, hostPackages) => {
     const bundlePath = path.join(serverBundleCachePath(testName), 'concurrent-store-app.js');
-    buildSync({
+    const hostPackagePath = path.join(serverBundleCachePath(testName), 'host-store-package.js');
+    if (hostPackages) {
+      buildSync({
+        entryPoints: [path.resolve(__dirname, '../../react-on-rails-pro/src/ReactOnRails.node.ts')],
+        outfile: hostPackagePath,
+        bundle: true,
+        platform: 'node',
+        format: 'cjs',
+        external: ['react', 'react-dom', 'react-dom/*'],
+      });
+    }
+    await build({
       entryPoints: [path.resolve(__dirname, 'fixtures/concurrentStoreApp.ts')],
       outfile: bundlePath,
       bundle: true,
@@ -44,6 +61,22 @@ test.each(['async SSR', 'streaming', 'RSC client provider', 'separate RSC bundle
       format: 'cjs',
       conditions: ['node'],
       external: ['react', 'react-dom', 'react-dom/*'],
+      ...(hostPackages && {
+        plugins: [
+          {
+            name: 'host-store-packages',
+            setup(build) {
+              build.onResolve({ filter: /ReactOnRails\.(node|client)\.ts$/ }, () => ({
+                path: hostPackagePath,
+                external: true,
+              }));
+            },
+          },
+        ],
+        footer: {
+          js: `globalThis.ReactOnRails = require(${JSON.stringify(hostPackagePath)}).default;`,
+        },
+      }),
     });
     const clientManifest = path.join(serverBundleCachePath(testName), 'client-manifest.json');
     const serverManifest = path.join(serverBundleCachePath(testName), 'server-manifest.json');
