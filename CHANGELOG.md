@@ -31,6 +31,15 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   generated IDs consistent with accessible references. Fixes [Issue 5146](https://github.com/shakacode/react_on_rails/issues/5146).
   [PR 5148](https://github.com/shakacode/react_on_rails/pull/5148) by [justin808](https://github.com/justin808).
 
+- **[Pro]** **Node Renderer no longer drops multipart files that follow a large file over HTTP/1.1**: With
+  `fastifyServerOptions: { http2: false }`, file parts uploaded after a large file part were silently discarded
+  while the request still returned `200`. With RSC enabled, a large `assets_to_copy` file such as
+  `loadable-stats.json` caused the RSC manifests behind it to go missing, so the first RSC render failed with
+  `ENOENT ... react-client-manifest.json`. The renderer now keeps every file part, and requests over the
+  aggregate upload limit still return `413`. HTTP/2 (the default transport) was not affected. Fixes
+  [Issue 5144](https://github.com/shakacode/react_on_rails/issues/5144).
+  [PR 5147](https://github.com/shakacode/react_on_rails/pull/5147) by [justin808](https://github.com/justin808).
+
 ### [17.2.0.rc.0] - 2026-09-29
 
 #### Added
