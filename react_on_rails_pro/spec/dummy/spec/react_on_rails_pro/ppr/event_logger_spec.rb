@@ -73,7 +73,7 @@ describe ReactOnRailsPro::Ppr::EventLogger do
         { component_name: "ProductPage", error: "ArgumentError" }
       )
       expect(line).to eq(
-        "[ReactOnRailsPro][PPR] ProductPage: render aborted (ArgumentError) - error re-raised; nothing cached"
+        "[ReactOnRailsPro][PPR] ProductPage: render aborted (ArgumentError) - error re-raised"
       )
     end
 

@@ -15,9 +15,8 @@
 
 module ReactOnRailsPro
   module Ppr
-    # Opt-in development logger for the PPR instrumentation events (the simplest form of the
-    # "request timeline inspector" from suggested-tools.md; builds on the event catalog in
-    # docs/pro/ppr-events.md / issue #5102).
+    # Opt-in development logger for the PPR instrumentation events — the simplest form of a
+    # request-timeline view. Builds on the event catalog in docs/pro/ppr-events.md (issue #5102).
     #
     # Enable with `config.ppr_event_logging = true`. Every `ppr.*.react_on_rails_pro`
     # ActiveSupport::Notifications event is then logged on one line, in arrival order, with a plain
@@ -64,7 +63,7 @@ module ReactOnRailsPro
           end
         },
         "cache.write_refused" => ->(payload) { "cache write refused (#{payload[:reason]}) - nothing cached" },
-        "render.abort" => ->(payload) { "render aborted (#{payload[:error]}) - error re-raised; nothing cached" },
+        "render.abort" => ->(payload) { "render aborted (#{payload[:error]}) - error re-raised" },
         "cache.read_error" => ->(payload) { "cache read error (#{payload[:error]}) - treated as a miss" },
         "cache.evict_invalid" => ->(payload) { "invalid cached entry evicted (#{payload[:reason]})" },
         "resume.degraded_pre_flush" => lambda { |payload|

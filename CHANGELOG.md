@@ -47,8 +47,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   "serving the cached shell failed (RuntimeError) - fell back to a fresh render"). Off by default and
   logged at `debug` level, so a production log level silences it; the subscription is process-global,
   so read it in development with one request in flight. Builds on the
-  [PPR event catalog](docs/pro/ppr-events.md). [PR 5106](https://github.com/shakacode/react_on_rails/pull/5106)
-  follow-up for [Issue 5102](https://github.com/shakacode/react_on_rails/issues/5102).
+  [PPR event catalog](docs/pro/ppr-events.md) ([PR 5106](https://github.com/shakacode/react_on_rails/pull/5106),
+  [Issue 5102](https://github.com/shakacode/react_on_rails/issues/5102)).
+  [PR 5160](https://github.com/shakacode/react_on_rails/pull/5160) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 - **[Pro]** **PPR cache hit/miss instrumentation and event catalog (experimental)**: Every
   `ppr_react_component` invocation now emits exactly one `ppr.cache.lookup.react_on_rails_pro`
