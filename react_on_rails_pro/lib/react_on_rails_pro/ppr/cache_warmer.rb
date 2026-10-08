@@ -45,10 +45,10 @@ module ReactOnRailsPro
       # Outcome of warming one path.
       #
       # status is one of:
-      # - :warmed  — the request wrote at least one PPR cache entry (`ppr.cache.write`). On a
-      #   page with several PPR components, `detail` carries a partial-failure note when some
-      #   other component's write was refused, its invocation aborted, or a persisted write
-      #   could not register its revalidation tags.
+      # - :warmed  — the request wrote at least one PPR cache entry (`ppr.cache.write`) and no
+      #   invocation raised. On a page with several PPR components, `detail` carries a
+      #   partial-failure note when some other component's write was refused, stayed cold, or a
+      #   persisted write could not register its revalidation tags.
       # - :already_warm — 2xx response, no cache write, at least one `ppr.cache.lookup` hit,
       #   and no abort or bare miss: every PPR component on the page was a cache hit. Proven
       #   by the lookup counter (issue #5102), not inferred from silence.
@@ -59,9 +59,10 @@ module ReactOnRailsPro
       #   rescued PPR failure can never masquerade as this status (#5106 review).
       # - :failed — non-2xx response, a raised error, a refused cache write, a degraded
       #   resume that evicted the entry, an aborted `ppr_react_component` invocation
-      #   (`ppr.render.abort` on a 2xx — an app-level rescue swallowed the raise, the cache is
-      #   still cold), or a lookup miss with no write/refusal (same rescued-failure shape,
-      #   inferred when no abort event was delivered). `detail` carries the reason.
+      #   (`ppr.render.abort` on a 2xx — an app-level rescue swallowed the raise; fails even
+      #   beside a sibling write, because the raiser cannot be attributed and a broken page is
+      #   not a warmed one), or a lookup miss with no write/refusal (same rescued-failure
+      #   shape, inferred when no abort event was delivered). `detail` carries the reason.
       PathResult = Struct.new(:path, :status, :http_status, :writes, :detail, keyword_init: true)
 
       # Aggregated outcome of one warm-up run.
@@ -240,36 +241,47 @@ module ReactOnRailsPro
         return failed(path, http_status, counts, http_failure) if http_failure
 
         # Ordering matters: a post-flush degradation evicts the entry a moment after it was
-        # written, so it must win over the write count; a pre-flush degradation that recovered
-        # through the cache-miss fallback still ends with a write, so the write wins there.
+        # written, so it must win over the write count; an abort on a 2xx means a
+        # ppr_react_component invocation raised and the app rescued it — events are per-page
+        # with no per-invocation correlation, so the raiser cannot be told apart from a healthy
+        # sibling that wrote, and the only safe reading is failure even beside a write (a
+        # refusal already fails a write-less page, and an abort is strictly worse news — the
+        # page itself broke, #5106 review); a pre-flush degradation that recovered through the
+        # cache-miss fallback still ends with a write, so the write wins there.
         if counts[:degraded_post_flush].positive?
           failed(path, http_status, counts, "resume degraded post-flush; entry evicted")
+        elsif counts[:aborts].positive?
+          failed(path, http_status, counts, aborted_path_detail(counts, details))
         elsif counts[:writes].positive?
           PathResult.new(path:, status: :warmed, http_status:, writes: counts[:writes],
                          detail: partial_warm_detail(counts, details))
         elsif counts[:refusals].positive? || counts[:degraded_pre_flush].positive?
           failed(path, http_status, counts, details.first || "cache write refused")
         else
-          classify_without_writes(path, http_status, counts, details)
+          classify_without_writes(path, http_status, counts)
         end
       end
 
-      # 2xx with no write, refusal, or degradation: decide between already_warm / no_ppr /
-      # a rescued failure, from the abort counter and the lookup outcomes.
-      def classify_without_writes(path, http_status, counts, details)
-        if counts[:aborts].positive?
-          # A ppr_react_component invocation raised (ppr.render.abort) and an app-level rescue
-          # turned the failure into this 2xx. The cache is still cold — this must not pass as
-          # already_warm beside a sibling hit, nor as no_ppr when it was the only invocation
-          # (#5106 review).
-          failed(path, http_status, counts,
-                 "ppr_react_component raised and the app rescued it — the cache is still cold" \
-                 "#{detail_reason_suffix(details, 'aborts: ')}")
-        elsif counts[:misses].positive?
-          # A completed miss always writes or refuses (handled by the caller), and a raised
-          # invocation also emits ppr.render.abort (handled above). A bare miss without either
-          # is the same rescued-failure shape with the abort event undelivered — keep the
-          # inference as a backstop (issue #5102).
+      # An app-level rescue turned a raised ppr_react_component invocation into this 2xx. With
+      # no writes the cache is plainly cold; with sibling writes the persisted entries are
+      # real (PathResult#writes carries the count), but the raising component cannot be
+      # attributed, so the path still fails rather than reporting a broken page as warmed.
+      def aborted_path_detail(counts, details)
+        writes = counts[:writes]
+        cache_state =
+          writes.positive? ? "#{writes} #{'entry'.pluralize(writes)} still written" : "the cache is still cold"
+        "ppr_react_component raised and the app rescued it — #{cache_state}" \
+          "#{detail_reason_suffix(details, 'aborts: ')}"
+      end
+
+      # 2xx with no write, refusal, abort, or degradation: decide between already_warm /
+      # no_ppr / a rescued failure, from the lookup outcomes.
+      def classify_without_writes(path, http_status, counts)
+        if counts[:misses].positive?
+          # A completed miss always writes or refuses, and a raised invocation also emits
+          # ppr.render.abort (all three classified by the caller before this method runs). A
+          # bare miss without any of them is the same rescued-failure shape with the abort
+          # event undelivered — keep the inference as a backstop (issue #5102).
           failed(path, http_status, counts, "cache miss with no write — prerender raised and the app rescued it")
         elsif counts[:hits].positive?
           # Every ppr_react_component invocation emits exactly one ppr.cache.lookup, or
@@ -284,28 +296,25 @@ module ReactOnRailsPro
       end
 
       # A page can render several ppr_react_component instances, so one can write while another
-      # is refused, aborts (its invocation raised and the app rescued the error into this 2xx),
-      # or ends cold without any terminal event. Either way that component stays uncached and
-      # its first visitor still pays a prerender. Keep the warmed classification — something
-      # usable was cached — but surface each partial failure instead of silently masking it.
+      # is refused or ends cold without any terminal event. Either way that component stays
+      # uncached and its first visitor still pays a prerender. Keep the warmed classification —
+      # something usable was cached — but surface each partial failure instead of silently
+      # masking it. An aborted invocation never reaches this detail: any ppr.render.abort fails
+      # the whole path in classify, writes or not (#5106 review).
       #
       # Three independent signals compose the detail:
       # - refusals — writes that were skipped or failed (nothing persisted for that component).
-      # - aborts — invocations that raised (ppr.render.abort), before or after their lookup;
-      #   each left no cache entry.
-      # - residual cold — `misses + degraded_pre_flush - writes - refusals - aborts`: on a
-      #   healthy page every miss ends in a write or a refusal (0), a recovered degradation
-      #   adds one degraded_pre_flush and one fallback write/refusal (0), and a raised
-      #   invocation's miss is already counted by its abort (0). Only a component whose
+      # - residual cold — `misses + degraded_pre_flush - writes - refusals`: on a healthy page
+      #   every miss ends in a write or a refusal (0), and a recovered degradation adds one
+      #   degraded_pre_flush and one fallback write/refusal (0). Only a component whose
       #   terminal event went undelivered drives this positive — a backstop, not the primary
-      #   signal.
+      #   signal (a raised invocation's bare miss is caught earlier by its abort).
       # - tag_failures — persisted writes whose revalidation-tag registration failed: NOT cold
       #   (the entry serves and expires via TTL) but revalidate_tag cannot evict it, so the
       #   operator should know (#5106 review).
       def partial_warm_detail(counts, details)
         parts = [
           refused_writes_part(counts, details),
-          aborted_invocations_part(counts, details),
           residual_cold_part(counts),
           tag_failures_part(counts)
         ].compact
@@ -321,16 +330,9 @@ module ReactOnRailsPro
           "refused#{detail_reason_suffix(details, 'refusals: ')}"
       end
 
-      def aborted_invocations_part(counts, details)
-        return nil unless counts[:aborts].positive?
-
-        "#{counts[:aborts]} #{'invocation'.pluralize(counts[:aborts])} raised " \
-          "and left no cache entry#{detail_reason_suffix(details, 'aborts: ')}"
-      end
-
       def residual_cold_part(counts)
         cold = counts[:misses] + counts[:degraded_pre_flush] -
-               counts[:writes] - counts[:refusals] - counts[:aborts]
+               counts[:writes] - counts[:refusals]
         return nil unless cold.positive?
 
         "#{cold} PPR #{'component'.pluralize(cold)} left no cache entry " \

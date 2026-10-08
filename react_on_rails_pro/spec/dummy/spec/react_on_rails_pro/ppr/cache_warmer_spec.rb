@@ -239,20 +239,20 @@ describe ReactOnRailsPro::Ppr::CacheWarmer do
 
     it "does not let a tag-registration failure cancel out a cold sibling component" do
       # Component A persisted its write but tag registration failed (write with
-      # tags_registered: false — NOT a write_refused). Component B's prerender raised and the
-      # app rescued it. Before #5106 the tag failure emitted write + write_refused, and
+      # tags_registered: false — NOT a write_refused). Component B's prerender raised, the app
+      # rescued it, and B's abort event never arrived (delivery interference), leaving only a
+      # bare miss. Before #5106 the tag failure emitted write + write_refused, and
       # `misses - writes - refusals` summed to zero — hiding B entirely.
       stub_get(200) do
         instrument_miss
         instrument_write(tags_registered: false)
         instrument_miss
-        instrument_abort
       end
 
       result = described_class.call(paths: ["/a"]).results.first
 
       expect(result.status).to eq(:warmed)
-      expect(result.detail).to include("1 invocation raised and left no cache entry")
+      expect(result.detail).to include("1 PPR component left no cache entry")
       expect(result.detail)
         .to include("1 persisted write failed tag registration (entry cached, revalidate_tag cannot evict it)")
     end
@@ -271,10 +271,12 @@ describe ReactOnRailsPro::Ppr::CacheWarmer do
       expect(summary.warmed.first.detail).not_to include("refused")
     end
 
-    it "surfaces a raised sibling invocation beside a write as a partial-warm abort detail" do
-      # Component A missed and wrote; component B's prerender raised (lookup{miss} +
-      # render.abort) and the app rescued the error into this 2xx. The page stays warmed (A's
-      # entry is usable) but B's cold cache must not be silently masked by A's write.
+    it "classifies a write beside a raised invocation as failed, not warmed" do
+      # Component A missed and wrote; a prerender then raised (lookup{miss} + render.abort)
+      # and the app rescued the error into this 2xx. Events are per-page: these counts are
+      # also exactly what a SINGLE invocation produces when it persists its entry and then
+      # raises while serving the shell. Either way a ppr_react_component raised, so strict
+      # warm-up must not exit 0 — the write never mutes the abort (#5106 review).
       stub_get(200) do
         instrument_miss
         instrument_write
@@ -284,11 +286,13 @@ describe ReactOnRailsPro::Ppr::CacheWarmer do
 
       summary = described_class.call(paths: ["/a"])
 
-      expect(summary.warmed.map(&:path)).to eq(["/a"])
-      expect(summary.warmed.first.detail)
-        .to include("1 invocation raised and left no cache entry (RuntimeError)")
-      # B is attributed to the abort counter, not double-reported as residual cold too.
-      expect(summary.warmed.first.detail).not_to include("left no cache entry (prerender raised")
+      expect(summary.warmed).to be_empty
+      expect(summary.failed.map(&:path)).to eq(["/a"])
+      expect(summary.failed.first.detail)
+        .to eq("ppr_react_component raised and the app rescued it — 1 entry still written (RuntimeError)")
+      # The persisted sibling entry is real and stays reported on the result.
+      expect(summary.failed.first.writes).to eq(1)
+      expect(summary.success?).to be(false)
     end
 
     it "surfaces a bare miss beside a sibling write even when no abort event was delivered (backstop)" do
@@ -322,11 +326,11 @@ describe ReactOnRailsPro::Ppr::CacheWarmer do
       expect(summary.warmed.first.detail).to be_nil
     end
 
-    it "surfaces a degraded hit whose fallback failed beside a sibling write" do
+    it "fails a page whose degraded hit's fallback raised, even beside a sibling write" do
       # Component A: healthy miss + write. Component B: cached hit degraded pre-flush, then the
       # fallback prerender itself raised (escaping the helper, so render.abort fires) and the
-      # app rescued it — B's entry was evicted and nothing replaced it, which must not hide
-      # behind A's write.
+      # app rescued it — B's entry was evicted and nothing replaced it. The abort fails the
+      # whole path; A's write must not report this broken page as warmed.
       stub_get(200) do
         instrument_miss
         instrument_write
@@ -338,9 +342,11 @@ describe ReactOnRailsPro::Ppr::CacheWarmer do
 
       summary = described_class.call(paths: ["/a"])
 
-      expect(summary.warmed.map(&:path)).to eq(["/a"])
-      expect(summary.warmed.first.detail)
-        .to include("1 invocation raised and left no cache entry")
+      expect(summary.warmed).to be_empty
+      expect(summary.failed.map(&:path)).to eq(["/a"])
+      expect(summary.failed.first.detail)
+        .to eq("ppr_react_component raised and the app rescued it — 1 entry still written (RuntimeError)")
+      expect(summary.success?).to be(false)
     end
 
     it "keeps warmed above already_warm on a mixed page (one miss written, one hit)" do

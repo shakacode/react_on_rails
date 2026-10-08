@@ -54,8 +54,9 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   `tags_registered: false` on `ppr.cache.write` instead of emitting a contradictory
   `ppr.cache.write_refused`. The warm-up tool consumes the new counters: a 2xx path that renders
   no `ppr_react_component` is now reported as `no_ppr` instead of masquerading as
-  `already_warm`, a rescued PPR failure is reported as `failed` (never `no_ppr` or
-  `already_warm`), `Summary#success?` returns false for both, and `PPR_WARM_STRICT=true` exits
+  `already_warm`, a rescued PPR failure is reported as `failed` (never `no_ppr`,
+  `already_warm`, or `warmed` — an abort outranks even a sibling component's persisted write),
+  `Summary#success?` returns false for both, and `PPR_WARM_STRICT=true` exits
   non-zero. The full nine-event PPR catalog (payloads, ordering, non-fatal and redaction
   guarantees) is now documented in [docs/pro/ppr-events.md](docs/pro/ppr-events.md). Resolves
   [Issue 5102](https://github.com/shakacode/react_on_rails/issues/5102).
