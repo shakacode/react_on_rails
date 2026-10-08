@@ -382,12 +382,16 @@ class RSCRequestTracker {
       shareRSCStreamTruncationWarningState(stream1, stream2);
       const sourceStream = stream as Readable;
       stream.on('data', (chunk: Buffer) => {
-        stream1.push(chunk);
-        stream2.push(chunk);
+        // Guard: after cancelInFlightStreams() or clear() ends a tee destination, a buffered
+        // data event from the source can still fire (Node.js streams may emit queued data
+        // events after destroy()). Skip the push if the destination is already ended/destroyed
+        // to avoid ERR_STREAM_PUSH_AFTER_EOF (#5019-A).
+        if (!stream1.writableEnded && !stream1.destroyed) stream1.push(chunk);
+        if (!stream2.writableEnded && !stream2.destroyed) stream2.push(chunk);
       });
       stream.on('end', () => {
-        stream1.push(null);
-        stream2.push(null);
+        if (!stream1.writableEnded && !stream1.destroyed) stream1.push(null);
+        if (!stream2.writableEnded && !stream2.destroyed) stream2.push(null);
       });
       stream.on('error', (err: Error) => {
         stream1.destroy(err);
