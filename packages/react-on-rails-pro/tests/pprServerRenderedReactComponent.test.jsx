@@ -125,6 +125,49 @@ const createSlowGenerateRSCPayload = (streamDelayMs = HOLE_DELAY_MS * 2) =>
     return source;
   });
 
+// Component with TWO RSC payload fetches: one that completes before settle (fast/static),
+// and one that is still in-flight at settle time (slow/per-user). Tests the mixed-state
+// scenario where completed payloads belong in the shell but in-flight ones do not (#5019-A).
+const FAST_PAYLOAD_MARKER = 'FAST_RSC_COMPLETED_BEFORE_SETTLE';
+const SLOW_PAYLOAD_MARKER = 'SLOW_RSC_STILL_INFLIGHT_AT_SETTLE';
+const PprShellWithMixedRSC = (props, railsContext) => {
+  if (railsContext.getRSCPayloadStream) {
+    railsContext.getRSCPayloadStream('FastRSCComponent', { type: 'fast' });
+    railsContext.getRSCPayloadStream('SlowRSCComponent', { type: 'slow' });
+  }
+  return (
+    <div>
+      <h1>{SHELL_HEADER_TEXT}</h1>
+      <React.Suspense fallback={<div>{HOLE_FALLBACK_TEXT}</div>}>
+        <DelayedHole {...props} />
+      </React.Suspense>
+    </div>
+  );
+};
+
+/**
+ * Creates a generateRSCPayload mock that returns a fast stream for FastRSCComponent
+ * (completes immediately) and a slow stream for SlowRSCComponent (exceeds settle budget).
+ */
+const createMixedGenerateRSCPayload = () =>
+  jest.fn().mockImplementation(async (componentName) => {
+    const source = new PassThrough();
+    if (componentName === 'FastRSCComponent') {
+      // Completes immediately — before the settle budget fires
+      process.nextTick(() => {
+        source.push(new TextEncoder().encode(toLengthPrefixed(FAST_PAYLOAD_MARKER)));
+        source.push(null);
+      });
+    } else {
+      // SlowRSCComponent: completes well after the settle budget
+      setTimeout(() => {
+        source.push(new TextEncoder().encode(toLengthPrefixed(SLOW_PAYLOAD_MARKER)));
+        source.push(null);
+      }, HOLE_DELAY_MS * 3);
+    }
+    return source;
+  });
+
 // Regression component for the in-band flaw (#4890): user content deliberately contains the
 // EXACT bytes of the old #4659 prototype delimiter. The metadata-based protocol must transport
 // the PostponedState correctly regardless of what the rendered HTML contains.
@@ -800,6 +843,31 @@ describe('pprServerRenderedReactComponent', () => {
       // so the payload is static and belongs in the cached shell.
       expect(html).toContain(fastPayloadData);
       expect(html).toContain('REACT_ON_RAILS_RSC_PAYLOADS');
+    });
+
+    it('preserves completed RSC payload but excludes in-flight RSC payload in the mixed-state scenario', async () => {
+      // Two RSC payloads: FastRSCComponent completes before settle, SlowRSCComponent is still
+      // in-flight at settle time. The shell must contain the fast payload (it belongs to a
+      // non-postponed RSC route) and must NOT contain the slow payload (it belongs to a
+      // postponed boundary and would leak per-user data into a shared cache entry).
+      const { chunks, errors } = await collectStreamResult(
+        runPrerender({
+          component: PprShellWithMixedRSC,
+          componentName: 'PprShellWithMixedRSC',
+          generateRSCPayload: createMixedGenerateRSCPayload(),
+        }),
+      );
+      const html = chunks.map((chunk) => chunk.html).join('');
+      const trailingChunk = chunks[chunks.length - 1];
+
+      expect(errors).toHaveLength(0);
+      expect(trailingChunk[PPR_PRERENDER_COMPLETE_CHUNK_KEY]).toBe(true);
+      expect(trailingChunk[PPR_POSTPONED_STATE_CHUNK_KEY]).toBeDefined();
+
+      // Fast (completed before settle) → INCLUDED in the shell
+      expect(html).toContain(FAST_PAYLOAD_MARKER);
+      // Slow (still in-flight at settle) → EXCLUDED from the shell
+      expect(html).not.toContain(SLOW_PAYLOAD_MARKER);
     });
   });
 });
