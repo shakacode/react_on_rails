@@ -752,5 +752,66 @@ describe('RSCRequestTracker', () => {
       // through the integration test that checks no push() scripts appear in the shell.
       expect(source.destroyed).toBe(true);
     });
+
+    it('does not crash when source had pre-buffered data before on("data") was attached', async () => {
+      // Edge case: source pushes data synchronously before getRSCPayloadStream sets up
+      // the on('data') handler. The delayed flow callback could push to an already-ended
+      // tee after cancelInFlightStreams — the guard in the data handler prevents this.
+      const source = new PassThrough();
+      const payload = toLengthPrefixedPayload('PRE_BUFFERED');
+      source.push(payload);
+      // NOT ended — still "in-flight"
+
+      (globalThis as any).generateRSCPayload = jest.fn().mockResolvedValue(source);
+      const tracker = createTracker();
+
+      const stream1 = await tracker.getRSCPayloadStream('PreBuffered', {});
+
+      // Cancel while the source still has buffered data (or a pending flow callback)
+      tracker.cancelInFlightStreams();
+
+      // Must not throw ERR_STREAM_PUSH_AFTER_EOF; stream1 ends cleanly
+      expect(source.destroyed).toBe(true);
+      const data = await collectStreamData(stream1);
+      expect(data).toBeDefined();
+    });
+
+    it('handles cancel when one source is completed and another is still pending', async () => {
+      // Two components: one resolves and completes immediately, one is still pending.
+      const fastSource = new PassThrough();
+      fastSource.push(toLengthPrefixedPayload('FAST'));
+      fastSource.push(null);
+
+      let resolveSlowPayload!: (s: PassThrough) => void;
+      const slowPayloadPromise = new Promise<PassThrough>((resolve) => {
+        resolveSlowPayload = resolve;
+      });
+
+      (globalThis as any).generateRSCPayload = jest
+        .fn()
+        .mockResolvedValueOnce(fastSource)
+        .mockReturnValueOnce(slowPayloadPromise);
+
+      const tracker = createTracker();
+
+      const stream1Fast = await tracker.getRSCPayloadStream('Fast', {});
+      const stream1SlowPromise = tracker.getRSCPayloadStream('Slow', {});
+
+      // Wait for fast source to fully end
+      await new Promise<void>((resolve) => fastSource.once('end', resolve));
+
+      // Cancel while slow is still pending
+      tracker.cancelInFlightStreams();
+
+      // Fast data preserved (completed before cancel)
+      const fastData = await collectStreamData(stream1Fast);
+      expect(fastData.toString()).toContain('FAST');
+
+      // Resolve the slow payload — caught by the settled flag
+      resolveSlowPayload(new PassThrough());
+      const stream1Slow = await stream1SlowPromise;
+      const slowData = await collectStreamData(stream1Slow);
+      expect(slowData.length).toBe(0);
+    });
   });
 });
