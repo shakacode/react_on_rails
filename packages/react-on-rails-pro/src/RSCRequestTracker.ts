@@ -188,7 +188,7 @@ class RSCRequestTracker {
    * diagnostics, and does NOT prevent future `getRSCPayloadStream` calls. It only stops the
    * upstream work and ends the tee output for the subset of streams still in-flight.
    */
-  cancelInFlightStreams(): void {
+  cancelInFlightStreams(committedComponentNames?: Set<string>): void {
     // Mark the tracker as settled so that any generateRSCPayload promise that resolves
     // AFTER this point (slow Rails endpoint whose HTTP response hasn't arrived yet) does
     // not wire up a new stream or fire onRSCPayloadGenerated callbacks. Without this flag,
@@ -202,7 +202,28 @@ class RSCRequestTracker {
 
     this.sourceStreams.forEach((source, index) => {
       try {
-        if (!source.destroyed && !source.readableEnded) {
+        // Determine whether this stream's content was committed to the prelude (shell).
+        //
+        // When committedComponentNames is provided (from scanning PPR prelude for
+        // data-rsc-committed markers), a stream is committed only if its component name
+        // appears in the set. This correctly handles the edge case where an RSC stream
+        // completes (readableEnded=true) but the owning Suspense boundary was postponed
+        // for another reason (e.g., a sibling lazy import) — the marker is absent from
+        // the prelude, so the stream is cancelled despite being "completed."
+        //
+        // When committedComponentNames is not provided, fall back to the readableEnded
+        // heuristic for backward compatibility.
+        const componentName = this.streams[index]?.componentName;
+        // When committedComponentNames is provided, use marker-based cancellation:
+        // a stream is kept only if its component name appears in the committed set.
+        // An empty set means "no boundaries were committed" (all postponed) → cancel
+        // everything. When committedComponentNames is not provided (unit tests,
+        // backward compat for non-PPR callers), fall back to readableEnded.
+        const isCommittedToShell = committedComponentNames
+          ? committedComponentNames.has(componentName ?? '')
+          : source.readableEnded;
+
+        if (!source.destroyed && !isCommittedToShell) {
           markExpectedRSCStreamCleanup(source);
           source.destroy();
 

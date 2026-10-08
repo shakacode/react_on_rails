@@ -729,28 +729,81 @@ describe('RSCRequestTracker', () => {
       expect(() => tracker.clear()).not.toThrow();
     });
 
-    it('drains buffered tee data so it does not leak into consumers', async () => {
+    it('cancels a completed stream when committedComponentNames excludes it', async () => {
+      // A stream whose source completed (readableEnded=true) but whose component name
+      // is NOT in the committed set — the boundary was postponed despite the RSC fetch
+      // completing. The stream must be cancelled to prevent per-user data leaking into
+      // the shared cache (#5019-A readableEnded heuristic gap).
       const source = setupSourceStream();
       const tracker = createTracker();
 
-      const stream1 = await tracker.getRSCPayloadStream('BufferedDrain', {});
+      const stream1 = await tracker.getRSCPayloadStream('PostponedButCompleted', {});
 
-      // Push some data into the source BEFORE cancellation — this data is in the tee buffer
-      const payload = toLengthPrefixedPayload('buffered-data-should-be-drained');
+      // Push data and end the source BEFORE cancellation — source.readableEnded will be true
+      const payload = toLengthPrefixedPayload('USER_A_SECRET');
       source.push(payload);
-      // Do NOT end the source — it's still "in-flight"
+      source.push(null);
+      await new Promise<void>((resolve) => source.once('end', resolve));
 
-      // Cancel: should drain the tee buffer and end it
-      tracker.cancelInFlightStreams();
+      // Cancel with a committed set that does NOT include this component
+      tracker.cancelInFlightStreams(new Set(['OtherComponent']));
 
-      // stream1's tee should end cleanly after the source's close cascades
-      const data = await collectStreamData(stream1);
-      // The buffered data should NOT appear — it was drained by cancelInFlightStreams
-      // (stream1 is the first tee, stream2 is the tracked one that gets drained)
-      // Note: stream1 data depends on whether data events already fired before destroy.
-      // The key invariant is that stream2 (tracked stream) is drained, which we verify
-      // through the integration test that checks no push() scripts appear in the shell.
+      // The source should be destroyed despite readableEnded=true
       expect(source.destroyed).toBe(true);
+
+      // The tracked injection stream (stream2) must not deliver the excluded payload
+      const trackedStream = tracker.getRSCPayloadStreams()[0]?.stream;
+      if (trackedStream) {
+        const trackedData = await collectStreamData(trackedStream);
+        expect(trackedData.toString()).not.toContain('USER_A_SECRET');
+      }
+    });
+
+    it('keeps a completed stream when committedComponentNames includes it', async () => {
+      const source = setupSourceStream();
+      const tracker = createTracker();
+
+      const stream1 = await tracker.getRSCPayloadStream('CommittedRoute', {});
+
+      const payload = toLengthPrefixedPayload('STATIC_DATA');
+      source.push(payload);
+      source.push(null);
+      await new Promise<void>((resolve) => source.once('end', resolve));
+
+      // Cancel with a committed set that INCLUDES this component
+      tracker.cancelInFlightStreams(new Set(['CommittedRoute']));
+
+      // Source should NOT be destroyed — its data belongs in the shell
+      expect(source.destroyed).toBe(false);
+      const data = await collectStreamData(stream1);
+      expect(data.toString()).toContain('STATIC_DATA');
+    });
+
+    it('cancels ALL streams when committedComponentNames is empty (all boundaries postponed)', async () => {
+      // When all RSCRoute boundaries are postponed, all markers land inside hidden divs,
+      // the committed set is empty, and ALL streams must be cancelled — even completed ones.
+      const source = setupSourceStream();
+      const tracker = createTracker();
+
+      await tracker.getRSCPayloadStream('AllPostponed', {});
+
+      // Source completes before cancel
+      const payload = toLengthPrefixedPayload('SHOULD_BE_CANCELLED');
+      source.push(payload);
+      source.push(null);
+      await new Promise<void>((resolve) => source.once('end', resolve));
+
+      // Empty committed set — all boundaries postponed
+      tracker.cancelInFlightStreams(new Set());
+
+      expect(source.destroyed).toBe(true);
+
+      // The tracked injection stream (stream2, which feeds injectRSCPayload → cached shell)
+      // must be drained and ended — no data should reach the cache.
+      const trackedStream = tracker.getRSCPayloadStreams()[0]?.stream;
+      expect(trackedStream).toBeDefined();
+      const trackedData = await collectStreamData(trackedStream!);
+      expect(trackedData.toString()).not.toContain('SHOULD_BE_CANCELLED');
     });
 
     it('does not crash when source had pre-buffered data before on("data") was attached', async () => {
