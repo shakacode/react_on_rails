@@ -38,13 +38,38 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   with React/React DOM 19.2.8+, or 19.3.1-rc.0 with React/React DOM 19.3.0. The node renderer error and Doctor's Fix name the stable
   release to install. [PR 5094](https://github.com/shakacode/react_on_rails/pull/5094) by
   [justin808](https://github.com/justin808).
+
+- **[Pro]** **PPR cache hit/miss instrumentation and event catalog (experimental)**: Every
+  `ppr_react_component` invocation now emits exactly one `ppr.cache.lookup.react_on_rails_pro`
+  notification with `outcome: :hit` or `:miss` at the validated cache read (the
+  `cache_read.active_support` convention), so the PPR cache hit rate — the number the feature
+  exists to move — is measurable as `hits / lookups` from one subscription. A hit that degrades
+  pre-flush stays a hit, identified by pairing with `ppr.resume.degraded_pre_flush`; invalid
+  entries and cache read errors count as misses alongside their diagnostic events.
+  `ppr.static_shell` no longer carries `cache_hit:` — the cache axis lives exclusively in the
+  lookup event. A `ppr_react_component` invocation that raises past the helper now emits
+  `ppr.render.abort.react_on_rails_pro` (redacted error class name, error re-raised unchanged),
+  so an app-level `rescue_from` can no longer make a failed PPR page look like an all-hits or
+  no-PPR page; and a persisted write whose cache-tag registration fails reports
+  `tags_registered: false` on `ppr.cache.write` instead of emitting a contradictory
+  `ppr.cache.write_refused`. The warm-up tool consumes the new counters: a 2xx path that renders
+  no `ppr_react_component` is now reported as `no_ppr` instead of masquerading as
+  `already_warm`, a rescued PPR failure is reported as `failed` (never `no_ppr`,
+  `already_warm`, or `warmed` — an abort outranks even a sibling component's persisted write),
+  `Summary#success?` returns false for both, and `PPR_WARM_STRICT=true` exits
+  non-zero. The full nine-event PPR catalog (payloads, ordering, non-fatal and redaction
+  guarantees) is now documented in [docs/pro/ppr-events.md](docs/pro/ppr-events.md). Resolves
+  [Issue 5102](https://github.com/shakacode/react_on_rails/issues/5102).
+  [PR 5106](https://github.com/shakacode/react_on_rails/pull/5106) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 - **[Pro]** **PPR cache warm-up mechanism (experimental)**: New `rake react_on_rails_pro:ppr:warm`
   task and `ReactOnRailsPro::Ppr::CacheWarmer.call` API populate PPR shell cache entries by issuing
   real in-process requests against routes listed in the new `config.ppr_warm_up_paths` (an Array or a
   callable resolved at warm time). Run it after each deploy — the PPR cache key includes the bundle
   digests, so deploys invalidate every PPR entry and the first visitor per route otherwise pays the
   full prerender. One failing route never aborts the rest; the run finishes with a
-  warmed / already-warm / failed summary. Resolves
+  warmed / already-warm / no-ppr / failed summary. Resolves
   [Issue 4965](https://github.com/shakacode/react_on_rails/issues/4965).
   [PR 4967](https://github.com/shakacode/react_on_rails/pull/4967) by
   [AbanoubGhadban](https://github.com/AbanoubGhadban).
