@@ -103,6 +103,8 @@ const PprShellWithRSCHole = (props, railsContext) => {
     <div>
       <h1>{SHELL_HEADER_TEXT}</h1>
       <React.Suspense fallback={<div>{HOLE_FALLBACK_TEXT}</div>}>
+        {/* Boundary-committed marker inside the Suspense — discarded when postponed (#5019-A) */}
+        <span data-rsc-committed="PostponedRSCComponent" style={{ display: 'none' }} />
         <DelayedHole {...props} />
       </React.Suspense>
     </div>
@@ -138,7 +140,11 @@ const PprShellWithMixedRSC = (props, railsContext) => {
   return (
     <div>
       <h1>{SHELL_HEADER_TEXT}</h1>
+      {/* FastRSCComponent marker OUTSIDE the Suspense — always committed to shell */}
+      <span data-rsc-committed="FastRSCComponent" style={{ display: 'none' }} />
       <React.Suspense fallback={<div>{HOLE_FALLBACK_TEXT}</div>}>
+        {/* SlowRSCComponent marker INSIDE the Suspense — discarded when postponed */}
+        <span data-rsc-committed="SlowRSCComponent" style={{ display: 'none' }} />
         <DelayedHole {...props} />
       </React.Suspense>
     </div>
@@ -544,6 +550,8 @@ describe('pprServerRenderedReactComponent', () => {
   });
 
   it('captures the asset manifest in the prerender trailing protocol chunk', async () => {
+    // The test components are plain React (no RSC), so the manifest arrays are empty —
+    // but the structure is still captured for the resume pass to pre-seed its dedup sets.
     const { chunks, errors } = await collectStreamResult(runPrerender());
     expect(errors).toHaveLength(0);
 
@@ -559,18 +567,7 @@ describe('pprServerRenderedReactComponent', () => {
     expect(manifest).toHaveProperty('initScriptKeys');
     expect(Array.isArray(manifest.stylesheetHrefs)).toBe(true);
     expect(Array.isArray(manifest.initScriptKeys)).toBe(true);
-  });
-
-  it('captures the asset manifest even when the prerender has no RSC payloads (empty arrays)', async () => {
-    // The test components are plain React (no RSC), so the manifest should have empty arrays —
-    // the manifest structure is still captured and stored for the resume pass.
-    const { chunks, errors } = await collectStreamResult(runPrerender());
-    expect(errors).toHaveLength(0);
-
-    const trailingChunk = chunks[chunks.length - 1];
-    const manifest = JSON.parse(trailingChunk[PPR_ASSET_MANIFEST_CHUNK_KEY]);
-
-    // Empty arrays are valid — the resume pass pre-seeds its dedup sets from them.
+    // Empty arrays are valid when no RSC payloads were registered.
     expect(manifest.stylesheetHrefs).toEqual([]);
     expect(manifest.initScriptKeys).toEqual([]);
   });
@@ -677,9 +674,29 @@ describe('pprServerRenderedReactComponent', () => {
       }
     });
 
-    it('does not throw when both AbortController and real setTimeout are available', () => {
-      // The default Jest/Node environment has both — this is the happy path.
-      expect(() => validatePPRRuntimeEnvironment()).not.toThrow();
+    it('throws when setTimeout is completely undefined (not just stubbed), naming stubTimers', () => {
+      const originalSetTimeout = globalThis.setTimeout;
+      const originalClearTimeout = globalThis.clearTimeout;
+      // @ts-expect-error — deliberately removing setTimeout to simulate supportModules:false VM
+      delete globalThis.setTimeout;
+      try {
+        expect(() => validatePPRRuntimeEnvironment()).toThrow(/stubTimers/);
+        expect(() => validatePPRRuntimeEnvironment()).toThrow(/RENDERER_STUB_TIMERS/);
+      } finally {
+        globalThis.setTimeout = originalSetTimeout;
+        globalThis.clearTimeout = originalClearTimeout;
+      }
+    });
+
+    it('throws when clearTimeout is completely undefined, naming stubTimers', () => {
+      const originalClearTimeout = globalThis.clearTimeout;
+      // @ts-expect-error — deliberately removing clearTimeout
+      delete globalThis.clearTimeout;
+      try {
+        expect(() => validatePPRRuntimeEnvironment()).toThrow(/stubTimers/);
+      } finally {
+        globalThis.clearTimeout = originalClearTimeout;
+      }
     });
 
     it('surfaces the preflight error through the prerender stream when no caller signal is provided', async () => {
@@ -707,11 +724,14 @@ describe('pprServerRenderedReactComponent', () => {
         const controller = new AbortController();
         // Abort immediately so the render completes quickly.
         controller.abort();
-        const { errors } = await collectStreamResult(
+        const { chunks, errors } = await collectStreamResult(
           runPrerender({ signal: controller.signal, throwJsErrors: false }),
         );
-        // The render completes (the abort is handled gracefully), no preflight error.
+        // The render completes successfully — no preflight error, no chunk-level errors,
+        // and the prerender is marked complete.
         expect(errors.filter((e) => e.message.includes('stubTimers'))).toHaveLength(0);
+        expect(chunks.every((c) => !c.hasErrors)).toBe(true);
+        expect(chunks.some((c) => c[PPR_PRERENDER_COMPLETE_CHUNK_KEY] === true)).toBe(true);
       } finally {
         globalThis.setTimeout = originalSetTimeout;
       }
@@ -757,6 +777,13 @@ describe('pprServerRenderedReactComponent', () => {
       const manifest = JSON.parse(trailingChunk[PPR_ASSET_MANIFEST_CHUNK_KEY]);
       expect(manifest).toHaveProperty('initScriptKeys');
       expect(Array.isArray(manifest.initScriptKeys)).toBe(true);
+      // The init script keys must be non-empty — the RSC payload was registered even though
+      // its data chunks were suppressed. The resume pass uses these keys to avoid re-declaring
+      // arrays the shell already initialized.
+      expect(manifest.initScriptKeys.length).toBeGreaterThan(0);
+      // The initialization script itself must appear in the shell HTML (the ||=[] declaration),
+      // even though the payload data (.push() calls) was suppressed.
+      expect(html).toContain('REACT_ON_RAILS_RSC_PAYLOADS');
       expect(html).not.toContain(RSC_PAYLOAD_MARKER);
     });
 

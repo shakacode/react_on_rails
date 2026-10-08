@@ -168,7 +168,20 @@ export const validatePPRRuntimeEnvironment = (): void => {
     );
   }
 
-  // 2. setTimeout must be a real timer, not the no-op stub.
+  // 2. setTimeout must exist and be a real timer, not the no-op stub.
+  // When supportModules is false and no additionalContext injects timers, setTimeout is
+  // completely undefined (not even the no-op stub). Check existence first so the preflight
+  // surfaces a clear config error instead of an opaque ReferenceError (#5019-B).
+  if (typeof setTimeout === 'undefined' || typeof clearTimeout === 'undefined') {
+    throw new Error(
+      'React on Rails Pro PPR requires setTimeout and clearTimeout to be available in the node ' +
+        'renderer VM context, but they are not defined. Ensure your renderer config enables ' +
+        'supportModules (the default) or injects timer globals via additionalContext, then ' +
+        'disable the no-op stub:\n\n' +
+        '  stubTimers: false\n\n' +
+        'Or set the environment variable RENDERER_STUB_TIMERS=false.',
+    );
+  }
   // The stub (`function setTimeout() {}`) returns undefined; a real setTimeout returns a
   // truthy handle (Timeout object in Node.js, number in browsers).
   const handle = setTimeout(() => {}, 0);
@@ -361,16 +374,72 @@ const pprPrerenderRenderReactComponent = (
         if (settleTimeoutId !== undefined) clearTimeout(settleTimeoutId);
         renderState.isShellReady = true;
 
-        // PPR #5019-A: when the prerender has postponed boundaries, cancel any RSC streams
-        // that are still in-flight before injectRSCPayload drains them into the cached shell.
-        // In-flight streams correspond to RSC fetches for boundaries React postponed (or that
-        // outlasted the settle budget). Their Flight payload must NOT land in the shell because:
-        //   (a) it may contain per-user data that would be cached under a shared key, and
-        //   (b) the resume pass will regenerate those payloads fresh with the current user.
-        // Streams whose source already completed (non-postponed boundaries that resolved before
-        // the settle abort) are kept — their static payload belongs in the shell for hydration.
+        // PPR #5019-A: when the prerender has postponed boundaries, cancel RSC streams that
+        // should NOT be in the cached shell. To determine which streams belong to committed
+        // (non-postponed) boundaries, we buffer the prelude HTML and scan for boundary-committed
+        // markers emitted by RSCRoute (<span data-rsc-committed="ComponentName">). Fizz includes
+        // these markers only when the RSCRoute's Suspense boundary resolves — when postponed,
+        // the marker is discarded with the boundary's content.
+        //
+        // This replaces the readableEnded-only heuristic, which missed the edge case where an
+        // RSC stream completes but the boundary is postponed for another reason (e.g., a sibling
+        // lazy import or another pending dependency in the same Suspense boundary).
+        let preludeForInjection: NodeJS.ReadableStream = prelude;
         if (postponed != null) {
-          streamingTrackers.rscRequestTracker.cancelInFlightStreams();
+          // Buffer the prelude to scan for committed boundary markers.
+          // Acceptable for PPR: the prelude is the static shell, which gets cached anyway.
+          const preludeChunks: Buffer[] = [];
+          await new Promise<void>((resolve, reject) => {
+            const readable = prelude as unknown as import('stream').Readable;
+            readable.on('data', (chunk: Buffer | string) => preludeChunks.push(Buffer.from(chunk)));
+            readable.on('end', () => resolve());
+            readable.on('error', reject);
+          });
+          const preludeHtml = Buffer.concat(preludeChunks).toString('utf-8');
+
+          // Extract component names from RSCRoute boundary-committed markers, excluding
+          // markers inside React PPR's hidden divs (<div hidden id="...S:N">) which hold
+          // the rendered-but-discarded content of postponed boundaries.
+          const committedNames = new Set<string>();
+
+          // First, find the byte ranges of hidden postponed-content divs.
+          const hiddenRanges: Array<[number, number]> = [];
+          const hiddenDivPattern = /<div hidden [^>]*>/g;
+          let hiddenMatch;
+          while ((hiddenMatch = hiddenDivPattern.exec(preludeHtml)) !== null) {
+            const start = hiddenMatch.index;
+            let depth = 1;
+            let pos = start + hiddenMatch[0].length;
+            while (depth > 0 && pos < preludeHtml.length) {
+              const nextOpen = preludeHtml.indexOf('<div', pos);
+              const nextClose = preludeHtml.indexOf('</div>', pos);
+              if (nextClose === -1) break;
+              if (nextOpen !== -1 && nextOpen < nextClose) {
+                depth++;
+                pos = nextOpen + 4;
+              } else {
+                depth--;
+                pos = nextClose + 6;
+              }
+            }
+            hiddenRanges.push([start, pos]);
+          }
+
+          // Scan for markers, keeping only those in the visible (committed) part of the prelude.
+          const markerPattern = /data-rsc-committed="([^"]+)"/g;
+          let markerMatch;
+          while ((markerMatch = markerPattern.exec(preludeHtml)) !== null) {
+            const markerPos = markerMatch.index;
+            const isInsideHiddenDiv = hiddenRanges.some(([s, e]) => markerPos >= s && markerPos < e);
+            if (!isInsideHiddenDiv) {
+              committedNames.add(markerMatch[1]);
+            }
+          }
+
+          streamingTrackers.rscRequestTracker.cancelInFlightStreams(committedNames);
+
+          // Re-create a Readable from the buffered HTML for injectRSCPayload.
+          preludeForInjection = Readable.from(Buffer.from(preludeHtml, 'utf-8'));
         }
 
         // Pipe the HTML prelude through injectRSCPayload so the RSC payload scripts and promoted
@@ -381,7 +450,7 @@ const pprPrerenderRenderReactComponent = (
         // cache envelope and passed to the resume pass for duplicate suppression (#4897).
         let capturedAssetManifest: PPRShellAssetManifest | null = null;
         const injectedStream = injectRSCPayload(
-          prelude as unknown as import('react-on-rails/types').PipeableOrReadableStream,
+          preludeForInjection as unknown as import('react-on-rails/types').PipeableOrReadableStream,
           streamingTrackers.rscRequestTracker,
           domNodeId,
           railsContext.cspNonce,
