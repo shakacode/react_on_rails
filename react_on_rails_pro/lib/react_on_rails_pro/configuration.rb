@@ -34,7 +34,7 @@ module ReactOnRailsPro
       renderer_http_force_http2: Configuration::DEFAULT_RENDERER_HTTP_FORCE_HTTP2,
       renderer_password: nil,
       license_token: nil,
-      tracing: Configuration::DEFAULT_TRACING,
+      tracing: Configuration::DEFAULT_TRACING, ppr_event_logging: Configuration::DEFAULT_PPR_EVENT_LOGGING,
       dependency_globs: Configuration::DEFAULT_DEPENDENCY_GLOBS,
       excluded_dependency_globs: Configuration::DEFAULT_EXCLUDED_DEPENDENCY_GLOBS,
       remote_bundle_cache_adapter: Configuration::DEFAULT_REMOTE_BUNDLE_CACHE_ADAPTER,
@@ -82,6 +82,10 @@ module ReactOnRailsPro
     DEFAULT_SSR_TIMEOUT = 5
     DEFAULT_PRERENDER_CACHING = false
     DEFAULT_TRACING = false
+    # When true, ReactOnRailsPro::Ppr::EventLogger logs every PPR notification (lookup, write,
+    # refusal, degradation, abort, ...) in arrival order at debug level. Off by default; a
+    # development debugging aid. See docs/pro/ppr-events.md.
+    DEFAULT_PPR_EVENT_LOGGING = false
     DEFAULT_DEPENDENCY_GLOBS = [].freeze
     DEFAULT_EXCLUDED_DEPENDENCY_GLOBS = [].freeze
     DEFAULT_REMOTE_BUNDLE_CACHE_ADAPTER = nil
@@ -125,7 +129,7 @@ module ReactOnRailsPro
     ROLLING_DEPLOY_UPLOAD_ALL_KEYWORD_PARAMS = %i[keyrest].freeze
     ROLLING_DEPLOY_UPLOAD_REQUIRED_KEYWORDS = %i[bundle assets].freeze
 
-    attr_accessor :renderer_url, :renderer_password, :license_token, :tracing,
+    attr_accessor :renderer_url, :renderer_password, :license_token, :tracing, :ppr_event_logging,
                   :server_renderer, :renderer_use_fallback_exec_js, :prerender_caching,
                   :renderer_http_pool_timeout, :renderer_http_pool_warn_timeout,
                   :dependency_globs, :excluded_dependency_globs, :rendering_returns_promises,
@@ -320,7 +324,7 @@ module ReactOnRailsPro
                    renderer_http_pool_size: nil, renderer_http_pool_timeout: nil,
                    renderer_http_pool_warn_timeout: nil, renderer_http_keep_alive_timeout: nil,
                    renderer_http_force_http2: DEFAULT_RENDERER_HTTP_FORCE_HTTP2,
-                   tracing: nil,
+                   tracing: nil, ppr_event_logging: nil,
                    dependency_globs: nil, excluded_dependency_globs: nil, rendering_returns_promises: nil,
                    remote_bundle_cache_adapter: nil, rolling_deploy_adapter: nil,
                    rolling_deploy_token: nil, rolling_deploy_previous_urls: nil,
@@ -350,6 +354,7 @@ module ReactOnRailsPro
       assign_initial_renderer_http_keep_alive_timeout(renderer_http_keep_alive_timeout)
       self.renderer_http_force_http2 = renderer_http_force_http2
       self.tracing = tracing
+      self.ppr_event_logging = ppr_event_logging
       self.rendering_returns_promises = server_renderer == "NodeRenderer" ? rendering_returns_promises : false
       self.dependency_globs = dependency_globs
       self.excluded_dependency_globs = excluded_dependency_globs
