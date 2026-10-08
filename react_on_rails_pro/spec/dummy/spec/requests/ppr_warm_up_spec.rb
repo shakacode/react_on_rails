@@ -111,6 +111,27 @@ describe "PPR cache warm-up", :caching, :server_rendering do
     expect(summary.to_log).to include("no_ppr: /server_side_hello_world")
   end
 
+  it "classifies a rescued PPR failure as failed, not no_ppr (ppr.render.abort attribution)" do
+    # The page DOES render ppr_react_component, but its cache_key proc raises before the cache
+    # read and the template rescues the error into this 2xx (simulating an app-level
+    # rescue_from). No lookup ever fires, so without the abort event this page was
+    # indistinguishable from one that renders no PPR at all — and reported the misleading
+    # no_ppr guidance instead of the real failure (#5106 review).
+    rescued_path = "/ppr_page_for_testing?raiseInCacheKey=true&rescuePprErrors=true"
+
+    summary = ReactOnRailsPro::Ppr::CacheWarmer.call(paths: [rescued_path])
+
+    expect(summary.no_ppr).to be_empty
+    expect(summary.already_warm).to be_empty
+    expect(summary.failed.map(&:path)).to eq([rescued_path])
+    expect(summary.failed.first.http_status).to eq(200)
+    expect(summary.failed.first.detail).to include("ppr_react_component raised")
+    expect(summary.failed.first.detail).to include("RuntimeError")
+    expect(summary.success?).to be(false)
+    # The failure never reached the renderer — it died in the cache_key proc.
+    expect(prerender_calls).to eq(0)
+  end
+
   it "does not let a failing path prevent the remaining paths from warming" do
     missing_route = "/ppr-warm-up-spec-route-that-does-not-exist"
 

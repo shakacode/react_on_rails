@@ -88,16 +88,33 @@ module ReactOnRailsPro
     #
     # ppr.cache.write — a shell + PostponedState envelope was successfully persisted to the
     # cache store. This is the `ppr.cache.write` counter: subscribe and count events.
-    # Payload: :component_name, :cache_key
+    # :tags_registered is false when the entry persisted but its cache-tag registration raised
+    # (the entry serves and expires via TTL, but `revalidate_tag` cannot evict it). That state
+    # rides on the write event rather than firing `ppr.cache.write_refused`: a refusal event for
+    # a persisted write would make `writes - refusals` arithmetic (the warmer's, or any
+    # subscriber's) miscount by one per tag failure (#5106 review).
+    # Payload: :component_name, :cache_key, :tags_registered (true | false)
     CACHE_WRITE_NOTIFICATION = "ppr.cache.write.react_on_rails_pro"
 
-    # ppr.cache.write_refused — the cache write was intentionally skipped because the prerender
-    # reported a rendering error, the cache options expired between render start and write, or
-    # the cache store itself raised during the write attempt. A refused write is non-fatal: the
-    # current request still serves its own streamed render; only caching for future requests is
-    # lost.
+    # ppr.cache.write_refused — NO entry was persisted: the cache write was intentionally
+    # skipped because the prerender reported a rendering error, the cache options expired
+    # between render start and write, or the cache store itself raised (or returned falsy)
+    # during the write attempt. A refused write is non-fatal: the current request still serves
+    # its own streamed render; only caching for future requests is lost.
     # Payload: :component_name, :reason ("render_error" | "expired" | "store_error")
     CACHE_WRITE_REFUSED_NOTIFICATION = "ppr.cache.write_refused.react_on_rails_pro"
+
+    # ppr.render.abort — a ppr_react_component invocation raised past the helper (option
+    # validation, a user cache_key proc, a prerender/transport failure on the miss path, a tag
+    # configuration error, or a hit path whose degraded fallback also failed). The event fires
+    # from the helper's rescue and the error is re-raised unchanged, so it reports the abort —
+    # it does not change what the application sees. Its purpose is attribution: an app-level
+    # rescue_from can turn such a raise into a 2xx page, and without this event that page is
+    # indistinguishable from one that renders no ppr_react_component at all (or, next to a
+    # sibling hit, from an all-hits page) — the cache warmer uses it to keep a rescued failure
+    # from classifying as success (#5106 review).
+    # Payload: :component_name, :error
+    RENDER_ABORT_NOTIFICATION = "ppr.render.abort.react_on_rails_pro"
 
     # ppr.cache.read_error — the cache store raised during a cache read. The error is swallowed
     # and the request falls through to a cache-miss prerender. Non-fatal.
@@ -185,11 +202,12 @@ module ReactOnRailsPro
         )
       end
 
-      def instrument_cache_write(component_name:, cache_key:)
+      def instrument_cache_write(component_name:, cache_key:, tags_registered: true)
         ActiveSupport::Notifications.instrument(
           CACHE_WRITE_NOTIFICATION,
           component_name:,
-          cache_key:
+          cache_key:,
+          tags_registered:
         )
       end
 
@@ -204,6 +222,14 @@ module ReactOnRailsPro
       def instrument_cache_read_error(component_name:, error:)
         ActiveSupport::Notifications.instrument(
           CACHE_READ_ERROR_NOTIFICATION,
+          component_name:,
+          error: redacted_error_class_name(error)
+        )
+      end
+
+      def instrument_render_abort(component_name:, error:)
+        ActiveSupport::Notifications.instrument(
+          RENDER_ABORT_NOTIFICATION,
           component_name:,
           error: redacted_error_class_name(error)
         )
