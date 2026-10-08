@@ -13,6 +13,7 @@
  * https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
+import type { ReactNode } from 'react';
 import { BundleManifest } from 'react-on-rails-rsc';
 import { buildClientRenderer } from 'react-on-rails-rsc/client.node';
 import type { RailsContextWithServerStreamingCapabilities } from 'react-on-rails/types';
@@ -68,7 +69,7 @@ const createFromReactOnRailsNodeStream = async (
   // deferred-render path is enriched separately in `streamServerRenderedReactComponent`'s `onError`
   // by reading the diagnostic recorded above via `onDiagnosticCaptured` (#3475).
   try {
-    return await createFromNodeStream<React.ReactNode>(transformedStream);
+    return await createFromNodeStream<ReactNode>(transformedStream);
   } catch (error: unknown) {
     throw mergeRSCStreamDiagnosticError(error, rscDiagnosticError);
   }
@@ -107,7 +108,7 @@ const createFromReactOnRailsNodeStream = async (
  */
 const getReactServerComponent =
   (railsContext: RailsContextWithServerStreamingCapabilities) =>
-  async ({ componentName, componentProps }: GetReactServerComponentOnServerProps) => {
+  async ({ componentName, componentProps }: GetReactServerComponentOnServerProps): Promise<ReactNode> => {
     const rscPayloadStream = await railsContext.getRSCPayloadStream(componentName, componentProps);
 
     return createFromReactOnRailsNodeStream(
