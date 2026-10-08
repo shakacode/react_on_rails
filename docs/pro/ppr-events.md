@@ -2,7 +2,7 @@
 
 > **Experimental**: `ppr_react_component` (Partial Prerendering) is an experimental Pro feature. Event names and payloads may change between minor versions.
 
-Every PPR render path emits [`ActiveSupport::Notifications`](https://guides.rubyonrails.org/active_support_instrumentation.html) events so operators can monitor cache effectiveness, cache health, and degradations without touching the render pipeline. This page is the complete catalog: eight events, their triggers, payloads, and the guarantees they ship with.
+Every PPR render path emits [`ActiveSupport::Notifications`](https://guides.rubyonrails.org/active_support_instrumentation.html) events so operators can monitor cache effectiveness, cache health, and degradations without touching the render pipeline. This page is the complete catalog: nine events, their triggers, payloads, and the guarantees they ship with.
 
 Names put the library last, per the Rails convention, so subscribers can match every PPR event with one pattern; all but the oldest event also follow the `ppr.<area>.<what>.react_on_rails_pro` shape (`ppr.static_shell` predates it):
 
@@ -49,10 +49,16 @@ end
 
 Semantics worth knowing before you alert on it:
 
-- **The event records the lookup, not the delivery.** If a hit's serve path fails before the shell reaches the response, the lookup is not retracted — the request additionally emits `ppr.resume.degraded_pre_flush` and falls back to a full render. A _degraded hit_ is therefore the pair `lookup{outcome: :hit}` + `degraded_pre_flush` in the same request; the fallback render emits **no second lookup**, so `hits + misses` equals the number of invocations that reach the cache read (an invocation that fails option validation raises before the read and emits nothing).
+- **The event records the lookup, not the delivery.** If a hit's serve path fails before the shell reaches the response, the lookup is not retracted — the request additionally emits `ppr.resume.degraded_pre_flush` and falls back to a full render. A _degraded hit_ is therefore the pair `lookup{outcome: :hit}` + `degraded_pre_flush` in the same request; the fallback render emits **no second lookup**, so `hits + misses` equals the number of invocations that reach the cache read. An invocation that raises before the read — option validation, a raising user `cache_key` proc — emits no lookup at all; it emits `ppr.render.abort` instead, keeping the hit-rate denominator untouched by aborted invocations.
 - **Diagnostic misses stay diagnosable.** An invalid entry or a read error counts as `outcome: :miss` _and_ fires its own `evict_invalid` / `read_error` event — the lookup keeps denominators honest while the sibling event carries the reason.
 - **Per invocation, not per page.** A page rendering three `ppr_react_component` calls emits three lookups. `hits / lookups` is a component-render hit rate; interpret page-level questions accordingly.
 - **`ppr.static_shell` is a different axis.** It reports "this render had no holes" and says nothing about cache state; the two compose (a fully-static warm serve emits `lookup{hit}` + `static_shell`).
+
+## `ppr.render.abort` — attribution for invocations that raise
+
+Fires when a `ppr_react_component` invocation raises past the helper (option validation, a raising user `cache_key` proc, a prerender/transport failure on the miss path, a tag configuration error, or a hit whose degraded fallback also failed), and then the error is **re-raised unchanged** — the event never alters what the application sees. Its purpose is attribution: an app-level `rescue_from` can turn such a raise into a 2xx page, and without this event that page is indistinguishable from one that renders no `ppr_react_component` at all — or, next to a sibling component's hit, from an all-hits page. The [cache warmer](./ppr-cache-warm-up.md) uses it to classify a rescued PPR failure as `failed` instead of `no_ppr` or `already_warm`.
+
+An abort **after** the cache read pairs with that invocation's `lookup{miss}` (the lookup is not retracted and no second lookup fires); an abort **before** the read is the invocation's only event.
 
 ## Guarantees
 
@@ -64,21 +70,22 @@ Semantics worth knowing before you alert on it:
 
 **Ordering within one invocation** (events on the same request thread, in emission order — `evict_invalid` / `read_error` fire _inside_ the cache read, so they precede the `lookup` event that reports the read's outcome):
 
-| Scenario                                                   | Sequence                                                                                                                        |
-| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| Cold miss (normal page)                                    | `lookup{miss}` → `cache.write`                                                                                                  |
-| Warm hit (normal page)                                     | `lookup{hit}`                                                                                                                   |
-| Fully static, cold → warm                                  | `lookup{miss}` → `cache.write` → `static_shell`, then `lookup{hit}` → `static_shell`                                            |
-| Invalid entry                                              | `cache.evict_invalid` → `lookup{miss}` → `cache.write`                                                                          |
-| Read error                                                 | `cache.read_error` → `lookup{miss}` → `cache.write`                                                                             |
-| Render error                                               | `lookup{miss}` → `cache.write_refused{render_error}`                                                                            |
-| Prerender raise on a miss (protocol/transport/props error) | `lookup{miss}` only — the request errors before any write event                                                                 |
-| Write persisted, tag registration failed                   | `lookup{miss}` → `cache.write` → `cache.write_refused{store_error}` — the entry IS cached, but `revalidate_tag` cannot evict it |
-| Degraded hit (pre-flush)                                   | `lookup{hit}` → `resume.degraded_pre_flush` → `cache.write`                                                                     |
-| Resume failure (post-flush)                                | `lookup{hit or miss}` → … → `resume.degraded_post_flush`                                                                        |
+| Scenario                                                   | Sequence                                                                                                           |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Cold miss (normal page)                                    | `lookup{miss}` → `cache.write`                                                                                     |
+| Warm hit (normal page)                                     | `lookup{hit}`                                                                                                      |
+| Fully static, cold → warm                                  | `lookup{miss}` → `cache.write` → `static_shell`, then `lookup{hit}` → `static_shell`                               |
+| Invalid entry                                              | `cache.evict_invalid` → `lookup{miss}` → `cache.write`                                                             |
+| Read error                                                 | `cache.read_error` → `lookup{miss}` → `cache.write`                                                                |
+| Render error                                               | `lookup{miss}` → `cache.write_refused{render_error}`                                                               |
+| Prerender raise on a miss (protocol/transport/props error) | `lookup{miss}` → `render.abort` — no write event; the error is re-raised to the app                                |
+| Raise before the cache read (e.g. a `cache_key` proc)      | `render.abort` only — the invocation never reached the lookup                                                      |
+| Write persisted, tag registration failed                   | `lookup{miss}` → `cache.write{tags_registered: false}` — the entry IS cached, but `revalidate_tag` cannot evict it |
+| Degraded hit (pre-flush)                                   | `lookup{hit}` → `resume.degraded_pre_flush` → `cache.write`                                                        |
+| Resume failure (post-flush)                                | `lookup{hit or miss}` → … → `resume.degraded_post_flush`                                                           |
 
 **Attribution is process-global.** Subscriptions see every thread in the process; there is no per-request scoping. When counting per request (as the [cache warm-up](./ppr-cache-warm-up.md) tool does), run in a process that is not concurrently serving PPR traffic.
 
 ## Reference consumer
 
-`ReactOnRailsPro::Ppr::CacheWarmer` subscribes to five of these events to classify each warm-up request as `warmed` / `already_warm` / `no_ppr` / `failed` — see [PPR Cache Warm-Up](./ppr-cache-warm-up.md). In particular, "2xx response with zero PPR events" is how it detects a warm path that renders no `ppr_react_component` at all.
+`ReactOnRailsPro::Ppr::CacheWarmer` subscribes to six of these events to classify each warm-up request as `warmed` / `already_warm` / `no_ppr` / `failed` — see [PPR Cache Warm-Up](./ppr-cache-warm-up.md). In particular, "2xx response with zero PPR events" is how it detects a warm path that renders no `ppr_react_component` at all.

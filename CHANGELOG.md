@@ -47,11 +47,17 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   pre-flush stays a hit, identified by pairing with `ppr.resume.degraded_pre_flush`; invalid
   entries and cache read errors count as misses alongside their diagnostic events.
   `ppr.static_shell` no longer carries `cache_hit:` — the cache axis lives exclusively in the
-  lookup event. The warm-up tool consumes the new counter: a 2xx path that renders no
-  `ppr_react_component` is now reported as `no_ppr` instead of masquerading as `already_warm`,
-  `Summary#success?` returns false for it, and `PPR_WARM_STRICT=true` exits non-zero. The full
-  eight-event PPR catalog (payloads, ordering, non-fatal and redaction guarantees) is now
-  documented in [docs/pro/ppr-events.md](docs/pro/ppr-events.md). Resolves
+  lookup event. A `ppr_react_component` invocation that raises past the helper now emits
+  `ppr.render.abort.react_on_rails_pro` (redacted error class name, error re-raised unchanged),
+  so an app-level `rescue_from` can no longer make a failed PPR page look like an all-hits or
+  no-PPR page; and a persisted write whose cache-tag registration fails reports
+  `tags_registered: false` on `ppr.cache.write` instead of emitting a contradictory
+  `ppr.cache.write_refused`. The warm-up tool consumes the new counters: a 2xx path that renders
+  no `ppr_react_component` is now reported as `no_ppr` instead of masquerading as
+  `already_warm`, a rescued PPR failure is reported as `failed` (never `no_ppr` or
+  `already_warm`), `Summary#success?` returns false for both, and `PPR_WARM_STRICT=true` exits
+  non-zero. The full nine-event PPR catalog (payloads, ordering, non-fatal and redaction
+  guarantees) is now documented in [docs/pro/ppr-events.md](docs/pro/ppr-events.md). Resolves
   [Issue 5102](https://github.com/shakacode/react_on_rails/issues/5102).
   [PR 5106](https://github.com/shakacode/react_on_rails/pull/5106) by
   [AbanoubGhadban](https://github.com/AbanoubGhadban).

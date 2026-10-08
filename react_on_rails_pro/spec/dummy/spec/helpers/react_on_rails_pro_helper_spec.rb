@@ -3539,6 +3539,8 @@ describe ReactOnRailsProHelper do
           expect(write_events.length).to eq(1)
           expect(write_events.first.payload[:component_name]).to eq(component_name)
           expect(write_events.first.payload[:cache_key]).to be_present
+          # A healthy write reports its tags registered (vacuously true with no cache_tags).
+          expect(write_events.first.payload[:tags_registered]).to be(true)
         ensure
           ActiveSupport::Notifications.unsubscribe(subscription)
         end
@@ -3656,6 +3658,91 @@ describe ReactOnRailsProHelper do
           expect(warm_chunks.join).to include("Fully static PPR shell")
           expect(chunks_read.count).to eq(0)
           expect(Rails.cache.read(computed_ppr_cache_key)).to be_present
+        ensure
+          ActiveSupport::Notifications.unsubscribe(subscription)
+        end
+      end
+
+      # --- #5106 review: ppr.render.abort — attribution for invocations that raise ---
+
+      it "a raising cache_key proc emits ppr.render.abort (redacted class name) and no lookup, then re-raises" do
+        # No renderer responses queued: the invocation must die before any renderer request.
+        mock_ppr_responses
+        stub_render_with_ppr(cache_key: -> { raise ArgumentError, "key proc read user@email.com" })
+
+        abort_events = []
+        abort_subscription = ActiveSupport::Notifications.subscribe(
+          ReactOnRailsPro::Ppr::RENDER_ABORT_NOTIFICATION
+        ) { |event| abort_events << event }
+        lookup_events = []
+        lookup_subscription = ActiveSupport::Notifications.subscribe(
+          ReactOnRailsPro::Ppr::CACHE_LOOKUP_NOTIFICATION
+        ) { |event| lookup_events << event }
+
+        begin
+          # The abort event is attribution only: the raise reaches the app unchanged.
+          expect { run_stream }.to raise_error(ArgumentError, /key proc/)
+
+          expect(abort_events.length).to eq(1)
+          expect(abort_events.first.payload[:component_name]).to eq(component_name)
+          # Redaction contract (#4966): class name only, never the message.
+          expect(abort_events.first.payload[:error]).to eq("ArgumentError")
+          # The invocation died before the cache read, so there is no lookup to pair with —
+          # the abort event is the only trace this invocation ever ran (#5106 review: without
+          # it, an app-level rescue_from makes this page look like it has no PPR at all).
+          expect(lookup_events).to be_empty
+        ensure
+          ActiveSupport::Notifications.unsubscribe(abort_subscription)
+          ActiveSupport::Notifications.unsubscribe(lookup_subscription)
+        end
+      end
+
+      it "a prerender raise after the lookup emits lookup{miss} + ppr.render.abort (no write)" do
+        # A renderer response without the PPR protocol metadata makes the miss path raise
+        # after the lookup already fired — the post-lookup abort shape.
+        legacy_chunks = [
+          { html: "<div>Shell from a bundle without PPR support</div>", consoleReplayScript: "",
+            hasErrors: false, isShellReady: true }
+        ]
+        mock_ppr_responses(legacy_chunks)
+        stub_render_with_ppr
+
+        abort_events = []
+        abort_subscription = ActiveSupport::Notifications.subscribe(
+          ReactOnRailsPro::Ppr::RENDER_ABORT_NOTIFICATION
+        ) { |event| abort_events << event }
+        lookup_events = []
+        lookup_subscription = ActiveSupport::Notifications.subscribe(
+          ReactOnRailsPro::Ppr::CACHE_LOOKUP_NOTIFICATION
+        ) { |event| lookup_events << event }
+
+        begin
+          expect { run_stream }.to raise_error(ReactOnRailsPro::Error)
+
+          # The lookup already fired (exactly once) — the abort does NOT retract it or emit a
+          # second one, so hits + misses still equals invocations that reached the cache read.
+          expect(lookup_events.map { |event| event.payload[:outcome] }).to eq([:miss])
+          expect(abort_events.length).to eq(1)
+          expect(abort_events.first.payload[:error]).to eq("ReactOnRailsPro::Error")
+          expect(Rails.cache.read(computed_ppr_cache_key)).to be_nil
+        ensure
+          ActiveSupport::Notifications.unsubscribe(abort_subscription)
+          ActiveSupport::Notifications.unsubscribe(lookup_subscription)
+        end
+      end
+
+      it "a raising ppr.render.abort subscriber does not swallow or replace the original error" do
+        mock_ppr_responses
+        stub_render_with_ppr(cache_key: -> { raise ArgumentError, "original failure" })
+
+        subscription = ActiveSupport::Notifications.subscribe(
+          ReactOnRailsPro::Ppr::RENDER_ABORT_NOTIFICATION
+        ) { raise "deliberate abort subscriber failure" }
+
+        begin
+          # The non-fatal contract holds on the abort path too: the app sees the ORIGINAL
+          # error, not the subscriber's.
+          expect { run_stream }.to raise_error(ArgumentError, /original failure/)
         ensure
           ActiveSupport::Notifications.unsubscribe(subscription)
         end
@@ -3815,9 +3902,11 @@ describe ReactOnRailsProHelper do
       # eviction. We intentionally do NOT delete the orphaned entry because a non-atomic
       # delete would risk removing a concurrent writer's valid envelope.
       #
-      # Tag registration runs before the write-success event. If tag registration raises, the
-      # write event still fires (accurate — the envelope IS persisted), and the outer rescue
-      # reports the tag failure as write_refused with reason "store_error".
+      # Event contract (#5106 review): the persisted entry emits exactly one ppr.cache.write,
+      # carrying tags_registered: false — and NO ppr.cache.write_refused. A refusal event for a
+      # persisted write would make `writes - refusals` arithmetic (the cache warmer's
+      # cold-component count, an operator's dashboard) miscount by one, which can exactly
+      # cancel a genuinely cold component on the same page.
       it "tag-registration failure is non-fatal (envelope stays cached, request completes)" do
         mock_ppr_responses(ppr_shell_chunks, ppr_resume_chunks)
         stub_render_with_ppr(cache_tags: ["ppr-tag"])
@@ -3845,11 +3934,11 @@ describe ReactOnRailsProHelper do
           cache_key = computed_ppr_cache_key
           expect(Rails.cache.read(cache_key)).to be_a(Hash)
 
-          # The write-success event fired (the envelope IS persisted).
+          # Exactly one write event, flagged as untagged — and no write_refused: the entry IS
+          # persisted, so reporting a refusal would corrupt writes/refusals arithmetic.
           expect(write_events.length).to eq(1)
-          # The write-refused counter also fired for the tag-registration I/O failure.
-          expect(refused_events.length).to eq(1)
-          expect(refused_events.first.payload[:reason]).to eq("store_error")
+          expect(write_events.first.payload[:tags_registered]).to be(false)
+          expect(refused_events).to be_empty
         ensure
           ActiveSupport::Notifications.unsubscribe(write_sub)
           ActiveSupport::Notifications.unsubscribe(refused_sub)
@@ -4900,7 +4989,9 @@ describe ReactOnRailsProHelper do
           a_hash_including(
             pack: invalid_component_name,
             type: :generated_component_pack,
-            reason: /ArgumentError: react_on_rails_preload_links/
+            # Class name only: diagnostics route errors through redacted_error_class_name,
+            # which never includes the message (#4966 fail-closed redaction contract).
+            reason: "ArgumentError"
           )
         )
         expect(diagnostics.first[:cache]).to include(enabled: true, hit: false)
