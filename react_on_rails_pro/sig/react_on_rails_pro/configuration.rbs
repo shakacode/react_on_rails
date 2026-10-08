@@ -61,6 +61,8 @@ module ReactOnRailsPro
     attr_accessor renderer_password: String?
     attr_accessor license_token: String?
     attr_accessor tracing: bool?
+
+    attr_accessor ppr_event_logging: bool?
     attr_accessor server_renderer: String?
     attr_accessor renderer_use_fallback_exec_js: bool?
     attr_accessor prerender_caching: bool?
@@ -110,6 +112,7 @@ module ReactOnRailsPro
       ?renderer_http_keep_alive_timeout: Numeric?,
       ?renderer_http_force_http2: bool,
       ?tracing: bool?,
+      ?ppr_event_logging: bool?,
       ?dependency_globs: Array[String]?,
       ?excluded_dependency_globs: Array[String]?,
       ?rendering_returns_promises: bool?,
