@@ -609,4 +609,262 @@ describe('RSCRequestTracker', () => {
       expect(result).toContain('REACT_ON_RAILS_RSC_PAYLOADS');
     }, 5000);
   });
+
+  // ---------------------------------------------------------------------------
+  // cancelInFlightStreams (#5019-A) — unit tests for selective stream cancellation
+  // ---------------------------------------------------------------------------
+
+  describe('cancelInFlightStreams (#5019-A)', () => {
+    it('destroys in-flight source streams and ends their tee outputs', async () => {
+      const source = setupSourceStream();
+      const tracker = createTracker();
+
+      const stream1 = await tracker.getRSCPayloadStream('InFlight', {});
+
+      // Source is still open (not ended)
+      expect(source.destroyed).toBe(false);
+      expect(source.readableEnded).toBe(false);
+
+      tracker.cancelInFlightStreams();
+
+      // Source should be destroyed, and the consumer stream (stream1) should end cleanly
+      expect(source.destroyed).toBe(true);
+      const data = await collectStreamData(stream1);
+      // No data should have flowed — the source was destroyed before pushing any
+      expect(data.length).toBe(0);
+    });
+
+    it('leaves completed source streams intact', async () => {
+      const source = setupSourceStream();
+      const tracker = createTracker();
+
+      const stream1 = await tracker.getRSCPayloadStream('Completed', {});
+
+      // Push data and end the source BEFORE cancellation
+      const payload = toLengthPrefixedPayload('completed-data');
+      source.push(payload);
+      source.push(null);
+
+      // Wait for the source to fully end
+      await new Promise<void>((resolve) => source.once('end', resolve));
+
+      tracker.cancelInFlightStreams();
+
+      // Source was already ended — cancelInFlightStreams should NOT have destroyed it
+      // (readableEnded is true, so the `!source.readableEnded` guard skips it)
+      const data = await collectStreamData(stream1);
+      expect(data.length).toBeGreaterThan(0);
+      expect(data.toString()).toContain('completed-data');
+    });
+
+    it('blocks late-arriving generateRSCPayload responses via the settled flag', async () => {
+      // Simulate a slow generateRSCPayload that resolves AFTER cancelInFlightStreams
+      const lateSource = new PassThrough();
+      let resolvePayload: (value: PassThrough) => void;
+      const payloadPromise = new Promise<PassThrough>((resolve) => {
+        resolvePayload = resolve;
+      });
+      (globalThis as any).generateRSCPayload = jest.fn().mockReturnValue(payloadPromise);
+
+      const tracker = createTracker();
+
+      // Start the RSC payload generation (fire-and-forget)
+      const streamPromise = tracker.getRSCPayloadStream('LateArrival', {});
+
+      // Cancel before the payload resolves
+      tracker.cancelInFlightStreams();
+
+      // Now resolve the payload — it arrives AFTER settlement
+      resolvePayload!(lateSource);
+      const stream1 = await streamPromise;
+
+      // The late-arriving source should be destroyed
+      expect(lateSource.destroyed).toBe(true);
+
+      // stream1 should be an already-ended PassThrough (not the source)
+      const data = await collectStreamData(stream1);
+      expect(data.length).toBe(0);
+    });
+
+    it('does not fire onRSCPayloadGenerated callbacks for late-arriving settled streams', async () => {
+      let resolvePayload: (value: PassThrough) => void;
+      const payloadPromise = new Promise<PassThrough>((resolve) => {
+        resolvePayload = resolve;
+      });
+      (globalThis as any).generateRSCPayload = jest.fn().mockReturnValue(payloadPromise);
+
+      const tracker = createTracker();
+      const callback = jest.fn();
+      tracker.onRSCPayloadGenerated(callback);
+
+      // Start RSC generation, cancel, then resolve
+      const streamPromise = tracker.getRSCPayloadStream('LateCallback', {});
+      tracker.cancelInFlightStreams();
+      resolvePayload!(new PassThrough());
+      await streamPromise;
+
+      // The callback should NOT have been called for the late-arriving stream
+      expect(callback).not.toHaveBeenCalled();
+    });
+
+    it('is safe to call multiple times (idempotent)', async () => {
+      const source = setupSourceStream();
+      const tracker = createTracker();
+
+      await tracker.getRSCPayloadStream('Idempotent', {});
+
+      // Call twice — should not throw or double-destroy
+      tracker.cancelInFlightStreams();
+      expect(() => tracker.cancelInFlightStreams()).not.toThrow();
+    });
+
+    it('works correctly when clear() is called after cancelInFlightStreams()', async () => {
+      const source = setupSourceStream();
+      const tracker = createTracker();
+
+      await tracker.getRSCPayloadStream('ClearAfterCancel', {});
+
+      tracker.cancelInFlightStreams();
+      // clear() after cancel should not throw — sources are already destroyed
+      expect(() => tracker.clear()).not.toThrow();
+    });
+
+    it('cancels a completed stream when committedComponentNames excludes it', async () => {
+      // A stream whose source completed (readableEnded=true) but whose component name
+      // is NOT in the committed set — the boundary was postponed despite the RSC fetch
+      // completing. The stream must be cancelled to prevent per-user data leaking into
+      // the shared cache (#5019-A readableEnded heuristic gap).
+      const source = setupSourceStream();
+      const tracker = createTracker();
+
+      const stream1 = await tracker.getRSCPayloadStream('PostponedButCompleted', {});
+
+      // Push data and end the source BEFORE cancellation — source.readableEnded will be true
+      const payload = toLengthPrefixedPayload('USER_A_SECRET');
+      source.push(payload);
+      source.push(null);
+      await new Promise<void>((resolve) => source.once('end', resolve));
+
+      // Cancel with a committed set that does NOT include this component
+      tracker.cancelInFlightStreams(new Set(['OtherComponent']));
+
+      // The source should be destroyed despite readableEnded=true
+      expect(source.destroyed).toBe(true);
+
+      // The tracked injection stream (stream2) must not deliver the excluded payload
+      const trackedStream = tracker.getRSCPayloadStreams()[0]?.stream;
+      if (trackedStream) {
+        const trackedData = await collectStreamData(trackedStream);
+        expect(trackedData.toString()).not.toContain('USER_A_SECRET');
+      }
+    });
+
+    it('keeps a completed stream when committedComponentNames includes it', async () => {
+      const source = setupSourceStream();
+      const tracker = createTracker();
+
+      const stream1 = await tracker.getRSCPayloadStream('CommittedRoute', {});
+
+      const payload = toLengthPrefixedPayload('STATIC_DATA');
+      source.push(payload);
+      source.push(null);
+      await new Promise<void>((resolve) => source.once('end', resolve));
+
+      // Cancel with a committed set that INCLUDES this component
+      tracker.cancelInFlightStreams(new Set(['CommittedRoute']));
+
+      // Source should NOT be destroyed — its data belongs in the shell
+      expect(source.destroyed).toBe(false);
+      const data = await collectStreamData(stream1);
+      expect(data.toString()).toContain('STATIC_DATA');
+    });
+
+    it('cancels ALL streams when committedComponentNames is empty (all boundaries postponed)', async () => {
+      // When all RSCRoute boundaries are postponed, all markers land inside hidden divs,
+      // the committed set is empty, and ALL streams must be cancelled — even completed ones.
+      const source = setupSourceStream();
+      const tracker = createTracker();
+
+      await tracker.getRSCPayloadStream('AllPostponed', {});
+
+      // Source completes before cancel
+      const payload = toLengthPrefixedPayload('SHOULD_BE_CANCELLED');
+      source.push(payload);
+      source.push(null);
+      await new Promise<void>((resolve) => source.once('end', resolve));
+
+      // Empty committed set — all boundaries postponed
+      tracker.cancelInFlightStreams(new Set());
+
+      expect(source.destroyed).toBe(true);
+
+      // The tracked injection stream (stream2, which feeds injectRSCPayload → cached shell)
+      // must be drained and ended — no data should reach the cache.
+      const trackedStream = tracker.getRSCPayloadStreams()[0]?.stream;
+      expect(trackedStream).toBeDefined();
+      const trackedData = await collectStreamData(trackedStream!);
+      expect(trackedData.toString()).not.toContain('SHOULD_BE_CANCELLED');
+    });
+
+    it('does not crash when source had pre-buffered data before on("data") was attached', async () => {
+      // Edge case: source pushes data synchronously before getRSCPayloadStream sets up
+      // the on('data') handler. The delayed flow callback could push to an already-ended
+      // tee after cancelInFlightStreams — the guard in the data handler prevents this.
+      const source = new PassThrough();
+      const payload = toLengthPrefixedPayload('PRE_BUFFERED');
+      source.push(payload);
+      // NOT ended — still "in-flight"
+
+      (globalThis as any).generateRSCPayload = jest.fn().mockResolvedValue(source);
+      const tracker = createTracker();
+
+      const stream1 = await tracker.getRSCPayloadStream('PreBuffered', {});
+
+      // Cancel while the source still has buffered data (or a pending flow callback)
+      tracker.cancelInFlightStreams();
+
+      // Must not throw ERR_STREAM_PUSH_AFTER_EOF; stream1 ends cleanly
+      expect(source.destroyed).toBe(true);
+      const data = await collectStreamData(stream1);
+      expect(data).toBeDefined();
+    });
+
+    it('handles cancel when one source is completed and another is still pending', async () => {
+      // Two components: one resolves and completes immediately, one is still pending.
+      const fastSource = new PassThrough();
+      fastSource.push(toLengthPrefixedPayload('FAST'));
+      fastSource.push(null);
+
+      let resolveSlowPayload!: (s: PassThrough) => void;
+      const slowPayloadPromise = new Promise<PassThrough>((resolve) => {
+        resolveSlowPayload = resolve;
+      });
+
+      (globalThis as any).generateRSCPayload = jest
+        .fn()
+        .mockResolvedValueOnce(fastSource)
+        .mockReturnValueOnce(slowPayloadPromise);
+
+      const tracker = createTracker();
+
+      const stream1Fast = await tracker.getRSCPayloadStream('Fast', {});
+      const stream1SlowPromise = tracker.getRSCPayloadStream('Slow', {});
+
+      // Wait for fast source to fully end
+      await new Promise<void>((resolve) => fastSource.once('end', resolve));
+
+      // Cancel while slow is still pending
+      tracker.cancelInFlightStreams();
+
+      // Fast data preserved (completed before cancel)
+      const fastData = await collectStreamData(stream1Fast);
+      expect(fastData.toString()).toContain('FAST');
+
+      // Resolve the slow payload — caught by the settled flag
+      resolveSlowPayload(new PassThrough());
+      const stream1Slow = await stream1SlowPromise;
+      const slowData = await collectStreamData(stream1Slow);
+      expect(slowData.length).toBe(0);
+    });
+  });
 });

@@ -347,12 +347,22 @@ const RSCRoute = forwardRef<RSCRouteHandle, RSCRouteProps>(
     }
 
     return (
-      <RSCRouteContentWithErrorBoundary
-        ref={ref}
-        componentName={componentName}
-        componentProps={componentProps}
-        onRefetchError={onRefetchError}
-      />
+      <>
+        <RSCRouteContentWithErrorBoundary
+          ref={ref}
+          componentName={componentName}
+          componentProps={componentProps}
+          onRefetchError={onRefetchError}
+        />
+        {/* PPR boundary-committed marker (#5019-A). Fizz includes this in the prelude only when
+            the owning Suspense boundary resolves (content committed to the shell). When the
+            boundary is postponed, Fizz discards the content — including this marker — and
+            emits only the fallback. The PPR prerender path scans the prelude for these markers
+            to determine which RSC streams belong to committed boundaries and must be kept in
+            the cached shell. Streams whose marker is absent are cancelled.
+            Rendered on both server and client for hydration parity (inert on the client). */}
+        <span data-rsc-committed={componentName} style={{ display: 'none' }} />
+      </>
     );
   },
 );

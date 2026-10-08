@@ -99,6 +99,12 @@ class RSCRequestTracker {
   // destroyed immediately instead of being wired up and tracked.
   private cleared = false;
 
+  // Set by cancelInFlightStreams() when the PPR prerender settles with postponed boundaries.
+  // A `generateRSCPayload` promise that resolves *after* this point must not wire up or fire
+  // callbacks — its source is destroyed immediately and an ended stream is returned (#5019-A).
+  // Unlike `cleared`, this does NOT tear down callbacks, diagnostics, or existing streams.
+  private settled = false;
+
   private callbacks: RSCPayloadCallback[] = [];
 
   private capturedRSCDiagnostics: CapturedRSCDiagnostic[] = [];
@@ -164,6 +170,79 @@ class RSCRequestTracker {
     this.streams = [];
     this.callbacks = [];
     this.capturedRSCDiagnostics = [];
+  }
+
+  /**
+   * Cancels RSC streams whose source has not yet finished delivering data (#5019-A).
+   *
+   * Used by the PPR prerender phase after `prerenderToNodeStream` resolves: streams still
+   * in-flight at that point correspond to Suspense boundaries that React postponed (or to
+   * RSC fetches that outlasted the settle budget). Their Flight payload must NOT be drained
+   * into the cached shell — the resume pass will regenerate them fresh with the current
+   * user's data.
+   *
+   * Streams whose source already ended naturally (non-postponed, resolved before the settle
+   * abort) are left intact — their payload belongs in the shell for client hydration.
+   *
+   * Unlike `clear()`, this method does NOT set `this.cleared`, does NOT drop callbacks or
+   * diagnostics, and does NOT prevent future `getRSCPayloadStream` calls. It only stops the
+   * upstream work and ends the tee output for the subset of streams still in-flight.
+   */
+  cancelInFlightStreams(committedComponentNames?: Set<string>): void {
+    // Mark the tracker as settled so that any generateRSCPayload promise that resolves
+    // AFTER this point (slow Rails endpoint whose HTTP response hasn't arrived yet) does
+    // not wire up a new stream or fire onRSCPayloadGenerated callbacks. Without this flag,
+    // a late-arriving RSC response bypasses cancellation entirely and leaks into the shell.
+    //
+    // TODO (#5019 follow-up): thread the settle AbortSignal through generateRSCPayload so
+    // the Rails HTTP request itself is cancelled at settle time, saving wasted server work.
+    // Currently the Rails endpoint keeps running; only the response is discarded when it
+    // finally arrives.
+    this.settled = true;
+
+    this.sourceStreams.forEach((source, index) => {
+      try {
+        // Determine whether this stream's content was committed to the prelude (shell).
+        //
+        // When committedComponentNames is provided (from scanning PPR prelude for
+        // data-rsc-committed markers), a stream is committed only if its component name
+        // appears in the set. This correctly handles the edge case where an RSC stream
+        // completes (readableEnded=true) but the owning Suspense boundary was postponed
+        // for another reason (e.g., a sibling lazy import) — the marker is absent from
+        // the prelude, so the stream is cancelled despite being "completed."
+        //
+        // When committedComponentNames is not provided, fall back to the readableEnded
+        // heuristic for backward compatibility.
+        const componentName = this.streams[index]?.componentName;
+        // When committedComponentNames is provided, use marker-based cancellation:
+        // a stream is kept only if its component name appears in the committed set.
+        // An empty set means "no boundaries were committed" (all postponed) → cancel
+        // everything. When committedComponentNames is not provided (unit tests,
+        // backward compat for non-PPR callers), fall back to readableEnded.
+        const isCommittedToShell = committedComponentNames
+          ? committedComponentNames.has(componentName ?? '')
+          : source.readableEnded;
+
+        if (!source.destroyed && !isCommittedToShell) {
+          markExpectedRSCStreamCleanup(source);
+          source.destroy();
+
+          const teeStream = this.streams[index]?.stream as PassThrough | undefined;
+          if (teeStream && !teeStream.writableEnded && !teeStream.destroyed) {
+            markExpectedRSCStreamCleanup(teeStream);
+            // Drain buffered chunks so end() doesn't flush them into the shell (#5019-A).
+            while (teeStream.read() !== null) {} // eslint-disable-line no-empty
+            teeStream.end();
+          }
+        }
+      } catch (error) {
+        const componentName = this.streams[index]?.componentName ?? 'unknown';
+        console.warn(
+          `Warning: Error while cancelling in-flight RSC stream for ${componentName} at index ${index}:`,
+          error,
+        );
+      }
+    });
   }
 
   /**
@@ -297,7 +376,7 @@ class RSCRequestTracker {
       // at disconnect cannot be cancelled here because `GenerateRSCPayloadFunction` takes no
       // `AbortSignal`; cancelling that requires threading a signal through the JS → node-renderer →
       // Rails boundary.
-      if (this.cleared) {
+      if (this.cleared || this.settled) {
         const source = stream as Readable;
         if (!source.destroyed) {
           source.destroy();
@@ -324,12 +403,16 @@ class RSCRequestTracker {
       shareRSCStreamTruncationWarningState(stream1, stream2);
       const sourceStream = stream as Readable;
       stream.on('data', (chunk: Buffer) => {
-        stream1.push(chunk);
-        stream2.push(chunk);
+        // Guard: after cancelInFlightStreams() or clear() ends a tee destination, a buffered
+        // data event from the source can still fire (Node.js streams may emit queued data
+        // events after destroy()). Skip the push if the destination is already ended/destroyed
+        // to avoid ERR_STREAM_PUSH_AFTER_EOF (#5019-A).
+        if (!stream1.writableEnded && !stream1.destroyed) stream1.push(chunk);
+        if (!stream2.writableEnded && !stream2.destroyed) stream2.push(chunk);
       });
       stream.on('end', () => {
-        stream1.push(null);
-        stream2.push(null);
+        if (!stream1.writableEnded && !stream1.destroyed) stream1.push(null);
+        if (!stream2.writableEnded && !stream2.destroyed) stream2.push(null);
       });
       stream.on('error', (err: Error) => {
         stream1.destroy(err);
