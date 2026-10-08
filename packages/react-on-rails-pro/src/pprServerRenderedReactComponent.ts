@@ -150,7 +150,7 @@ const getValidatedPPRApis = (): PPRApis => {
 let pprRuntimeValidated = false;
 
 /** @internal Reset the once-per-process preflight guard. Test-only. */
-export const _resetPPRRuntimeValidation = (): void => {
+export const resetPPRRuntimeValidationForTesting = (): void => {
   pprRuntimeValidated = false;
 };
 

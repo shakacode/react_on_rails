@@ -27,7 +27,7 @@ import {
   PPR_RENDER_ERRORED_CHUNK_KEY,
   PPR_ASSET_MANIFEST_CHUNK_KEY,
   validatePPRRuntimeEnvironment,
-  _resetPPRRuntimeValidation,
+  resetPPRRuntimeValidationForTesting,
 } from '../src/pprServerRenderedReactComponent.ts';
 import * as ComponentRegistry from '../src/ComponentRegistry.ts';
 import ReactOnRails from '../src/ReactOnRails.node.ts';
@@ -198,7 +198,7 @@ describe('pprServerRenderedReactComponent', () => {
 
   beforeEach(() => {
     ComponentRegistry.clear();
-    _resetPPRRuntimeValidation();
+    resetPPRRuntimeValidationForTesting();
   });
 
   const parseStreamChunk = (rawBytes) => {
