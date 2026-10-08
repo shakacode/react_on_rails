@@ -406,6 +406,7 @@ const pprPrerenderRenderReactComponent = (
           const hiddenRanges: Array<[number, number]> = [];
           const hiddenDivPattern = /<div hidden [^>]*>/g;
           let hiddenMatch;
+          // eslint-disable-next-line no-cond-assign
           while ((hiddenMatch = hiddenDivPattern.exec(preludeHtml)) !== null) {
             const start = hiddenMatch.index;
             let depth = 1;
@@ -415,10 +416,10 @@ const pprPrerenderRenderReactComponent = (
               const nextClose = preludeHtml.indexOf('</div>', pos);
               if (nextClose === -1) break;
               if (nextOpen !== -1 && nextOpen < nextClose) {
-                depth++;
+                depth += 1;
                 pos = nextOpen + 4;
               } else {
-                depth--;
+                depth -= 1;
                 pos = nextClose + 6;
               }
             }
@@ -428,6 +429,7 @@ const pprPrerenderRenderReactComponent = (
           // Scan for markers, keeping only those in the visible (committed) part of the prelude.
           const markerPattern = /data-rsc-committed="([^"]+)"/g;
           let markerMatch;
+          // eslint-disable-next-line no-cond-assign
           while ((markerMatch = markerPattern.exec(preludeHtml)) !== null) {
             const markerPos = markerMatch.index;
             const isInsideHiddenDiv = hiddenRanges.some(([s, e]) => markerPos >= s && markerPos < e);
