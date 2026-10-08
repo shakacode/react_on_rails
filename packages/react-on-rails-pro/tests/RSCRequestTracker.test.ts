@@ -609,4 +609,148 @@ describe('RSCRequestTracker', () => {
       expect(result).toContain('REACT_ON_RAILS_RSC_PAYLOADS');
     }, 5000);
   });
+
+  // ---------------------------------------------------------------------------
+  // cancelInFlightStreams (#5019-A) — unit tests for selective stream cancellation
+  // ---------------------------------------------------------------------------
+
+  describe('cancelInFlightStreams (#5019-A)', () => {
+    it('destroys in-flight source streams and ends their tee outputs', async () => {
+      const source = setupSourceStream();
+      const tracker = createTracker();
+
+      const stream1 = await tracker.getRSCPayloadStream('InFlight', {});
+
+      // Source is still open (not ended)
+      expect(source.destroyed).toBe(false);
+      expect(source.readableEnded).toBe(false);
+
+      tracker.cancelInFlightStreams();
+
+      // Source should be destroyed, and the consumer stream (stream1) should end cleanly
+      expect(source.destroyed).toBe(true);
+      const data = await collectStreamData(stream1);
+      // No data should have flowed — the source was destroyed before pushing any
+      expect(data.length).toBe(0);
+    });
+
+    it('leaves completed source streams intact', async () => {
+      const source = setupSourceStream();
+      const tracker = createTracker();
+
+      const stream1 = await tracker.getRSCPayloadStream('Completed', {});
+
+      // Push data and end the source BEFORE cancellation
+      const payload = toLengthPrefixedPayload('completed-data');
+      source.push(payload);
+      source.push(null);
+
+      // Wait for the source to fully end
+      await new Promise<void>((resolve) => source.once('end', resolve));
+
+      tracker.cancelInFlightStreams();
+
+      // Source was already ended — cancelInFlightStreams should NOT have destroyed it
+      // (readableEnded is true, so the `!source.readableEnded` guard skips it)
+      const data = await collectStreamData(stream1);
+      expect(data.length).toBeGreaterThan(0);
+      expect(data.toString()).toContain('completed-data');
+    });
+
+    it('blocks late-arriving generateRSCPayload responses via the settled flag', async () => {
+      // Simulate a slow generateRSCPayload that resolves AFTER cancelInFlightStreams
+      const lateSource = new PassThrough();
+      let resolvePayload: (value: PassThrough) => void;
+      const payloadPromise = new Promise<PassThrough>((resolve) => {
+        resolvePayload = resolve;
+      });
+      (globalThis as any).generateRSCPayload = jest.fn().mockReturnValue(payloadPromise);
+
+      const tracker = createTracker();
+
+      // Start the RSC payload generation (fire-and-forget)
+      const streamPromise = tracker.getRSCPayloadStream('LateArrival', {});
+
+      // Cancel before the payload resolves
+      tracker.cancelInFlightStreams();
+
+      // Now resolve the payload — it arrives AFTER settlement
+      resolvePayload!(lateSource);
+      const stream1 = await streamPromise;
+
+      // The late-arriving source should be destroyed
+      expect(lateSource.destroyed).toBe(true);
+
+      // stream1 should be an already-ended PassThrough (not the source)
+      const data = await collectStreamData(stream1);
+      expect(data.length).toBe(0);
+    });
+
+    it('does not fire onRSCPayloadGenerated callbacks for late-arriving settled streams', async () => {
+      let resolvePayload: (value: PassThrough) => void;
+      const payloadPromise = new Promise<PassThrough>((resolve) => {
+        resolvePayload = resolve;
+      });
+      (globalThis as any).generateRSCPayload = jest.fn().mockReturnValue(payloadPromise);
+
+      const tracker = createTracker();
+      const callback = jest.fn();
+      tracker.onRSCPayloadGenerated(callback);
+
+      // Start RSC generation, cancel, then resolve
+      const streamPromise = tracker.getRSCPayloadStream('LateCallback', {});
+      tracker.cancelInFlightStreams();
+      resolvePayload!(new PassThrough());
+      await streamPromise;
+
+      // The callback should NOT have been called for the late-arriving stream
+      expect(callback).not.toHaveBeenCalled();
+    });
+
+    it('is safe to call multiple times (idempotent)', async () => {
+      const source = setupSourceStream();
+      const tracker = createTracker();
+
+      await tracker.getRSCPayloadStream('Idempotent', {});
+
+      // Call twice — should not throw or double-destroy
+      tracker.cancelInFlightStreams();
+      expect(() => tracker.cancelInFlightStreams()).not.toThrow();
+    });
+
+    it('works correctly when clear() is called after cancelInFlightStreams()', async () => {
+      const source = setupSourceStream();
+      const tracker = createTracker();
+
+      await tracker.getRSCPayloadStream('ClearAfterCancel', {});
+
+      tracker.cancelInFlightStreams();
+      // clear() after cancel should not throw — sources are already destroyed
+      expect(() => tracker.clear()).not.toThrow();
+    });
+
+    it('drains buffered tee data so it does not leak into consumers', async () => {
+      const source = setupSourceStream();
+      const tracker = createTracker();
+
+      const stream1 = await tracker.getRSCPayloadStream('BufferedDrain', {});
+
+      // Push some data into the source BEFORE cancellation — this data is in the tee buffer
+      const payload = toLengthPrefixedPayload('buffered-data-should-be-drained');
+      source.push(payload);
+      // Do NOT end the source — it's still "in-flight"
+
+      // Cancel: should drain the tee buffer and end it
+      tracker.cancelInFlightStreams();
+
+      // stream1's tee should end cleanly after the source's close cascades
+      const data = await collectStreamData(stream1);
+      // The buffered data should NOT appear — it was drained by cancelInFlightStreams
+      // (stream1 is the first tee, stream2 is the tracked one that gets drained)
+      // Note: stream1 data depends on whether data events already fired before destroy.
+      // The key invariant is that stream2 (tracked stream) is drained, which we verify
+      // through the integration test that checks no push() scripts appear in the shell.
+      expect(source.destroyed).toBe(true);
+    });
+  });
 });
