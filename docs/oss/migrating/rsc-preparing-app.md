@@ -631,7 +631,7 @@ These are the most frequent mistakes encountered during RSC infrastructure setup
 
 ### Mistake 1: Wrong `react-on-rails-rsc` version
 
-React on Rails Pro 17 RSC requires React and `react-on-rails-rsc` on the same coordinated line (19.3.x with `react-on-rails-rsc` 19.3.x starting at 19.3.1 for new apps). Older 19.0.x RSC packages can pass older setup guides but now fail the Pro 17 runtime and Doctor checks.
+React on Rails Pro 17 RSC requires React and `react-on-rails-rsc` from one coordinated set: `react-on-rails-rsc` 19.3.x starting at 19.3.1 with React 19.3.x (new apps), 19.3.0 with React 19.2.8 or later, or 19.2.x with React 19.2.7 or later. Older 19.0.x RSC packages can pass older setup guides but now fail the Pro 17 runtime and Doctor checks.
 
 **Fix:** Upgrade React, React DOM, and `react-on-rails-rsc` together:
 
